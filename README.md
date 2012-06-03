@@ -14,7 +14,7 @@ to use this port.
 
 ## Loading ISOs
 
-Mednafen differs from other PS1 games in that it reads a .cue sheet that points to an .iso.
+Mednafen differs from other PS1 emulators in that it reads a .cue sheet that points to an .iso.
 If you have e.g. <tt>foo.iso</tt>, you should create a foo.cue, and fill this in:
 
     FILE "foo.iso" BINARY
