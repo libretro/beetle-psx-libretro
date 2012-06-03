@@ -96,7 +96,7 @@ all: $(TARGET)
 
 
 LDFLAGS += -Wl,--no-undefined -fPIC -shared -lz -Wl,--version-script=link.T -pthread
-FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall -fPIC -fno-strict-overflow -fno-strict-aliasing
+FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall -fPIC -fno-strict-overflow
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -pthread
 
 WARNINGS := -Wall \
@@ -107,6 +107,7 @@ WARNINGS := -Wall \
 	-Wno-unused-function \
 	-Wno-uninitialized \
 	-Wno-unused-result \
+	-Wno-strict-aliasing \
 	-Wno-overflow
 
 FLAGS += -DLSB_FIRST -DHAVE_MKDIR -DSIZEOF_DOUBLE=8 $(WARNINGS) \
