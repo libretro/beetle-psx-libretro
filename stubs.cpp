@@ -37,8 +37,6 @@ void MDFND_PrintError(const char* err)
 
 MDFN_Thread *MDFND_CreateThread(int (*fn)(void *), void *data)
 {
-   std::cerr << "Attempting to create thread." << std::endl;
-
    pthread_t *thread = new pthread_t;
 
    pthread_create(thread, NULL, (void* (*)(void *))fn, data);
@@ -51,8 +49,6 @@ void MDFND_SetStateStatus(StateStatusStruct *) {}
 
 void MDFND_WaitThread(MDFN_Thread *thr, int *val)
 {
-   std::cerr << "Waiting for thread." << std::endl;
-
    pthread_t *thread = (pthread_t*)thr;
    void *data;
    pthread_join(*thread, &data);
@@ -65,8 +61,6 @@ void MDFND_WaitThread(MDFN_Thread *thr, int *val)
 
 void MDFND_KillThread(MDFN_Thread *thr)
 {
-   std::cerr << "Killing thread." << std::endl;
-
    pthread_t *thread = (pthread_t*)thr;
    pthread_cancel(*thread);
    pthread_join(*thread, NULL);
@@ -75,8 +69,6 @@ void MDFND_KillThread(MDFN_Thread *thr)
 
 MDFN_Mutex *MDFND_CreateMutex()
 {
-   std::cerr << "Attempting to create mutex." << std::endl;
-
    pthread_mutex_t *mutex = new pthread_mutex_t;
    pthread_mutex_init(mutex, NULL);
    return (MDFN_Mutex*)mutex;
@@ -110,7 +102,6 @@ void MDFND_NetworkClose() {}
 
 uint32 MDFND_GetTime()
 {
-   std::cerr << "Get time!" << std::endl;
    struct timeval val;
    gettimeofday(&val, NULL);
    uint32_t ms = val.tv_sec * 1000 + val.tv_usec / 1000;

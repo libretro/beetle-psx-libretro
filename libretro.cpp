@@ -34,7 +34,6 @@ void retro_init()
 
 void retro_deinit()
 {
-   //MDFNI_Kill();
    delete surf;
    surf = NULL;
 }
@@ -60,17 +59,84 @@ void retro_unload_game()
    MDFNI_CloseGame();
 }
 
-static inline uint16_t conv_pixel(uint32_t pix)
+#ifndef __SSE2__
+#error "SSE2 required."
+#endif
+
+#include <emmintrin.h>
+
+static inline void convert_surface()
 {
-   uint16_t r = (pix >> 19) & 0x1f;
-   uint16_t g = (pix >> 11) & 0x1f;
-   uint16_t b = (pix >>  3) & 0x1f;
-   return (r << 10) | (g << 5) | (b << 0);
+   const uint32_t *pix = surf->pixels;
+   for (unsigned i = 0; i < 680 * 480; i += 8)
+   {
+      __m128i pix0 = _mm_load_si128((const __m128i*)(pix + i + 0));
+      __m128i pix1 = _mm_load_si128((const __m128i*)(pix + i + 4));
+
+      __m128i red0   = _mm_and_si128(pix0, _mm_set1_epi32(0xf80000));
+      __m128i green0 = _mm_and_si128(pix0, _mm_set1_epi32(0x00f800));
+      __m128i blue0  = _mm_and_si128(pix0, _mm_set1_epi32(0x0000f8));
+      __m128i red1   = _mm_and_si128(pix1, _mm_set1_epi32(0xf80000));
+      __m128i green1 = _mm_and_si128(pix1, _mm_set1_epi32(0x00f800));
+      __m128i blue1  = _mm_and_si128(pix1, _mm_set1_epi32(0x0000f8));
+
+      red0   = _mm_srli_epi32(red0,   19 - 10); 
+      green0 = _mm_srli_epi32(green0, 11 -  5); 
+      blue0  = _mm_srli_epi32(blue0,   3 -  0); 
+
+      red1   = _mm_srli_epi32(red1,   19 - 10); 
+      green1 = _mm_srli_epi32(green1, 11 -  5); 
+      blue1  = _mm_srli_epi32(blue1,   3 -  0); 
+
+      __m128i res0 = _mm_or_si128(_mm_or_si128(red0, green0), blue0);
+      __m128i res1 = _mm_or_si128(_mm_or_si128(red1, green1), blue1);
+
+      _mm_store_si128((__m128i*)(conv_buf + i), _mm_packs_epi32(res0, res1));
+   }
+}
+
+// Hardcoded for PSX. No reason to parse lots of structures ...
+// See mednafen/psx/input/gamepad.cpp
+static void update_input()
+{
+   static uint16_t input_buf[2];
+   input_buf[0] = input_buf[1] = 0;
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_SELECT,
+      -1u,
+      -1u,
+      RETRO_DEVICE_ID_JOYPAD_START,
+      RETRO_DEVICE_ID_JOYPAD_UP,
+      RETRO_DEVICE_ID_JOYPAD_RIGHT,
+      RETRO_DEVICE_ID_JOYPAD_DOWN,
+      RETRO_DEVICE_ID_JOYPAD_LEFT,
+      RETRO_DEVICE_ID_JOYPAD_L2,
+      RETRO_DEVICE_ID_JOYPAD_R2,
+      RETRO_DEVICE_ID_JOYPAD_L,
+      RETRO_DEVICE_ID_JOYPAD_R,
+      RETRO_DEVICE_ID_JOYPAD_X,
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_Y,
+   };
+
+   for (unsigned j = 0; j < 2; j++)
+   {
+      for (unsigned i = 0; i < 16; i++)
+         input_buf[j] |= map[i] != -1u &&
+            input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+   }
+
+   // Possible endian bug ...
+   game->SetInput(0, "gamepad", &input_buf[0]);
+   game->SetInput(1, "gamepad", &input_buf[1]);
 }
 
 void retro_run()
 {
    input_poll_cb();
+
+   update_input();
 
    static int16_t sound_buf[0x10000];
    static MDFN_Rect rects[512];
@@ -89,9 +155,7 @@ void retro_run()
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
 
-   for (unsigned i = 0; i < 680 * 512; i++)
-      conv_buf[i] = conv_pixel(surf->pixels[i]);
-
+   convert_surface();
    video_cb(conv_buf, width, height, 680 << 1);
 
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
