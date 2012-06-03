@@ -15,8 +15,8 @@ static retro_input_state_t input_state_cb;
 
 static MDFN_Surface *surf;
 
-static uint16_t conv_buf[680 * 512] __attribute__((aligned(16)));
-static uint32_t mednafen_buf[680 * 512] __attribute__((aligned(16)));
+static uint16_t conv_buf[680 * 480] __attribute__((aligned(16)));
+static uint32_t mednafen_buf[680 * 480] __attribute__((aligned(16)));
 
 void retro_init()
 {
@@ -30,6 +30,10 @@ void retro_init()
    std::string home = getenv("HOME");
    home += "/.mednafen";
    MDFNI_Initialize(home.c_str(), settings);
+
+   // Hints that we need a fairly powerful system to run this.
+   unsigned level = 3;
+   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
 void retro_deinit()
@@ -65,6 +69,10 @@ void retro_unload_game()
 
 #include <emmintrin.h>
 
+// PSX core should be able to output ARGB1555 directly,
+// so we can avoid this conversion step.
+// Done in SSE2 here because any system that can run this
+// core to begin with will be at least that powerful (as of writing).
 static inline void convert_surface()
 {
    const uint32_t *pix = surf->pixels;
@@ -139,7 +147,7 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[512];
+   static MDFN_Rect rects[480];
 
    EmulateSpecStruct spec = {0}; 
    spec.surface = surf;
@@ -167,12 +175,13 @@ void retro_get_system_info(struct retro_system_info *info)
    info->library_name     = "Mednafen PSX";
    info->library_version  = "0.9.22";
    info->need_fullpath    = true;
-   info->valid_extensions = "iso|ISO";
+   info->valid_extensions = "cue|CUE";
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
+   // Just assume NTSC for now. TODO: Verify FPS.
    info->timing.fps            = 59.97;
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = game->nominal_width;
@@ -192,11 +201,9 @@ unsigned retro_api_version(void)
    return RETRO_API_VERSION;
 }
 
-void retro_set_controller_port_device(unsigned port, unsigned device)
-{
-   (void)port;
-   (void)device;
-}
+// TODO: Allow for different kinds of joypads?
+void retro_set_controller_port_device(unsigned, unsigned)
+{}
 
 void retro_set_environment(retro_environment_t cb)
 {
