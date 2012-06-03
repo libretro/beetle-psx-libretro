@@ -21,5 +21,5 @@ If you have e.g. <tt>foo.iso</tt>, you should create a foo.cue, and fill this in
        TRACK 01 MODE1/2352
           INDEX 01 00:00:00
 
-After that, you can load the foo.cue file as a ROM.
+After that, you can load the <tt>foo.cue</tt> file as a ROM.
 
