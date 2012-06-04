@@ -499,12 +499,16 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
  {
   if(IsWrite)
   {
+#ifdef DEBUG
    PSX_WARNING("[MEM] Unknown write%d to %08x at time %d, =%08x(%d)", (int)(sizeof(T) * 8), A, timestamp, V, V);
+#endif
   }
   else
   {
    V = 0;
+#ifdef DEBUG
    PSX_WARNING("[MEM] Unknown read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
+#endif
   }
  }
  else

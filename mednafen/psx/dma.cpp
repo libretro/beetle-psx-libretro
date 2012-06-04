@@ -461,8 +461,11 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
      	     RecalcIRQOut();
 	     break;
 
-   default: PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
+   default:
+#ifdef DEBUG
+PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
 		assert(0);
+#endif
 	    break;
   }
   return;
@@ -496,8 +499,10 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	      GPU->Write(timestamp, 0x04, 0x01 << 24);
 	     }
 
+#ifdef DEBUG
 	     PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
 	     MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
+#endif
 	    }
 
 	    if(ch == 6)
@@ -544,8 +549,11 @@ uint32 DMA_Read(const pscpu_timestamp_t timestamp, uint32 A)
  {
   switch(A & 0xC)
   {
-   default: PSX_WARNING("[DMA] Unknown read: %08x", A);
-		assert(0);
+   default:
+#ifdef DEBUG
+PSX_WARNING("[DMA] Unknown read: %08x", A);
+assert(0);
+#endif
 	    break;
 
    case 0x0: ret = DMAControl;

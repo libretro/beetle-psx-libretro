@@ -116,7 +116,9 @@ static int32 CalcNextEvent(int32 next_event)
   count_delta = target - Timers[i].Counter;
   if(count_delta <= 0)
   {
+#ifdef DEBUG
    fprintf(stderr, "timer %d count_delta <= 0!!! %d %d\n", i, target, Timers[i].Counter);
+#endif
    continue;
   }
 
@@ -128,13 +130,17 @@ static int32 CalcNextEvent(int32 next_event)
 
    if((i == 0x2) && (Timers[i].Mode & 0x200))
    {
+#ifdef DEBUG
     assert(Timers[i].Div8Counter >= 0 && Timers[i].Div8Counter < 8);
+#endif
     tmp_clocks = ((count_delta - 1) * 8) + (8 - Timers[i].Div8Counter);
    }
    else
     tmp_clocks = count_delta;
 
+#ifdef DEBUG
    assert(tmp_clocks > 0);
+#endif
 
    if(next_event > tmp_clocks)
     next_event = tmp_clocks;
@@ -178,7 +184,7 @@ static void ClockTimer(int i, uint32 clocks)
 
  if((before < target && Timers[i].Counter >= target) || zero_tm || Timers[i].Counter > 0xFFFF)
  {
-#if 1
+#ifdef DEBUG
   if(Timers[i].Mode & 0x10)
   {
    if((Timers[i].Counter - target) > 3)
@@ -255,9 +261,11 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32 A, uint16 V)
 
  int which = (A >> 4) & 0x3;
 
+#ifdef DEBUG
  assert(!(A & 3));
 
  PSX_DBGINFO("[TIMER] Write: %08x %04x", A, V);
+#endif
 
  if(which >= 3)
   return;
@@ -314,10 +322,12 @@ uint16 TIMER_Read(const pscpu_timestamp_t timestamp, uint32 A)
  uint16 ret = 0;
  int which = (A >> 4) & 0x3;
 
+#ifdef DEBUG
  assert(!(A & 3));
 
  if(which >= 3)
   assert(0);
+#endif
 
  TIMER_Update(timestamp);
 

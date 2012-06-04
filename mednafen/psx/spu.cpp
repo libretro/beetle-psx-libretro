@@ -488,7 +488,10 @@ void PS_SPU::RunEnvelope(SPU_Voice *voice)
  //static INLINE void CalcVCDelta(const uint8 zs, uint8 speed, bool log_mode, bool decrement, int16 Current, int &increment, int &divinco)
  switch(ADSR->Phase)
  {
-  default: assert(0);
+  default: 
+#ifdef DEBUG
+assert(0);
+#endif
 	   break;
 
   case ADSR_ATTACK:
@@ -762,7 +765,9 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
      phase_inc = voice->Pitch + (((int16)voice->Pitch * ((voice - 1)->PreLRSample)) >> 15);
      if(phase_inc < 0)
      {
+#ifdef DEBUG
       printf("phase_inc < 0 (THIS SHOULD NOT HAPPEN)\n");
+#endif
       phase_inc = 0;
      }
     }
@@ -883,7 +888,9 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
   clamp(&output_l, -32768, 32767);
   clamp(&output_r, -32768, 32767);
 
+#ifdef DEBUG
   assert(IntermediateBufferPos < 4096);
+#endif
   IntermediateBuffer[IntermediateBufferPos][0] = output_l;
   IntermediateBuffer[IntermediateBufferPos][1] = output_r;
   IntermediateBufferPos++;
@@ -1231,7 +1238,9 @@ int32 PS_SPU::EndFrame(int16 *SoundBuf)
 
   speex_resampler_process_interleaved_int(resampler, (const spx_int16_t *)IntermediateBuffer, &in_len, (spx_int16_t *)SoundBuf, &out_len);
 
+#ifdef DEBUG
   assert(in_len <= IntermediateBufferPos);
+#endif
 
   if((IntermediateBufferPos - in_len) > 0)
    memmove(IntermediateBuffer, IntermediateBuffer + in_len, (IntermediateBufferPos - in_len) * sizeof(int16) * 2);

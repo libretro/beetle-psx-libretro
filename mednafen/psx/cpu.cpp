@@ -209,6 +209,7 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
  const bool InBDSlot = !(NPM & 0x3);
  uint32 handler = 0x80000080;
 
+#ifdef DEBUG
  assert(code < 16);
 
  if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
@@ -217,6 +218,7 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
 	IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
   //assert(0);
  }
+#endif
 
  if(CP0.SR & (1 << 22))	// BEV
   handler = 0xBFC00180;
@@ -411,7 +413,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    {
     BEGIN_OPF(ILL, 0, 0);
+#ifdef DEBUG
 	     PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
+#endif
 	     DO_LDS();
 	     new_PC = Exception(EXCEPTION_RI, PC, new_PC_mask);
 	     new_PC_mask = 0;
@@ -598,7 +602,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
     // BREAK - Breakpoint
     //
     BEGIN_OPF(BREAK, 0, 0x0D);
+#ifdef DEBUG
 	PSX_WARNING("[CPU] BREAK BREAK BREAK BREAK DAAANCE -- PC=0x%08x", PC);
+#endif
 
 	DO_LDS();
 	new_PC = Exception(EXCEPTION_BP, PC, new_PC_mask);
@@ -640,10 +646,12 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 		 uint32 rd = (instr >> 11) & 0x1F;
 		 uint32 val = GPR[rt];
 
+#ifdef DEBUG
 		 if(rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
 		 {
 	 	  PSX_WARNING("[CPU] Unimplemented MTC0: rt=%d(%08x) -> rd=%d", rt, GPR[rt], rd);
 		 }
+#endif
 
 		 switch(rd)
 		 {
@@ -681,8 +689,10 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 			CP0.SR = val & ~( (0x3 << 26) | (0x3 << 23) | (0x3 << 6));
 			RecalcIPCache();
 
+#ifdef DEBUG
 			if(CP0.SR & 0x10000)
 			 PSX_WARNING("[CPU] IsC set");
+#endif
 			break;
 		 }
 		}
