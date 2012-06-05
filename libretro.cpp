@@ -26,6 +26,8 @@ void retro_init()
    std::vector<MDFNGI*> ext;
    MDFNI_InitializeModules(ext);
 
+   // TODO: Figure out how to avoid using plain configs.
+   // Will probably have to use a folder for memcards anyways, though.
    std::vector<MDFNSetting> settings;
    std::string home = getenv("HOME");
    home += "/.mednafen";
@@ -52,9 +54,50 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
    return false;
 }
 
+static bool create_cuesheet(const std::string &path)
+{
+   std::string cue_path = path;
+   cue_path += ".cue";
+
+   FILE *file = fopen(cue_path.c_str(), "w");
+   if (!file)
+      return false;
+
+   std::string ref_path = path;
+   size_t pos = path.find_last_of("\\/");
+   if (pos != std::string::npos)
+      ref_path = ref_path.substr(pos + 1, std::string::npos);
+
+   // Mednafen doesn't really seem to care
+   // about the details here.
+   fprintf(file,
+         "FILE \"%s\" BINARY\n"
+         "   TRACK 01 MODE1/2352\n" // TODO: Should this be MODE2?
+         "      INDEX 01 00:00:00\n",
+         ref_path.c_str());
+
+   fclose(file);
+   return true;
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
-   game = MDFNI_LoadGame("psx", info->path);
+   const char *ext = strrchr(info->path, '.');
+   std::string path = info->path;
+
+   if (ext && strcmp(ext, ".cue") != 0)
+   {
+      if (!create_cuesheet(path))
+      {
+         fprintf(stderr,
+               "Failed to create cue-sheet.\n");
+         return false;
+      }
+
+      path += ".cue";
+   }
+
+   game = MDFNI_LoadGame("psx", path.c_str());
    return game;
 }
 
