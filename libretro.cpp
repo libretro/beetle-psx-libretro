@@ -27,6 +27,8 @@ void retro_init()
    MDFNI_InitializeModules(ext);
 
    std::vector<MDFNSetting> settings;
+
+   // FIXME: This will not work on Windows ...
    std::string home = getenv("HOME");
    home += "/.mednafen";
    MDFNI_Initialize(home.c_str(), settings);

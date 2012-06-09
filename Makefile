@@ -1,4 +1,39 @@
-TARGET := libretro.so
+
+ifeq ($(platform),)
+platform = unix
+ifeq ($(shell uname -a),)
+   platform = win
+else ifneq ($(findstring Darwin,$(shell uname -a)),)
+   platform = osx
+else ifneq ($(findstring MINGW,$(shell uname -a)),)
+   platform = win
+endif
+endif
+
+ifeq ($(platform), unix)
+   TARGET := libretro.so
+   fpic := -fPIC
+   SHARED := -shared -Wl,-no-undefined -Wl,--version-script=link.T
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   LDFLAGS += -pthread
+   FLAGS += -pthread -DHAVE_MKDIR
+else ifeq ($(platform), osx)
+   TARGET := libretro.dylib
+   fpic := -fPIC
+   SHARED := -dynamiclib
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   LDFLAGS += -pthread
+   FLAGS += -pthread -DHAVE_MKDIR
+else
+   TARGET := retro.dll
+   CC = gcc
+   CXX = g++
+   SHARED := -shared -Wl,-no-undefined -Wl,--version-script=link.T
+   LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   FLAGS += -DHAVE__MKDIR
+endif
+
 
 MEDNAFEN_DIR := mednafen
 PSX_DIR := $(MEDNAFEN_DIR)/psx
@@ -74,9 +109,12 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
 TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 
+LIBRETRO_SOURCES := libretro.cpp stubs.cpp thread.cpp
+
 SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MPC_SRC) \
 	$(TREMOR_SRC) \
+	$(LIBRETRO_SOURCES_C) \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c \
 	$(MEDNAFEN_DIR)/string/world_strtod.c \
@@ -87,17 +125,14 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/compress/ioapi.c \
 	$(MEDNAFEN_DIR)/resampler/resample.c
 
-LIBRETRO_SOURCES := libretro.cpp stubs.cpp
-
 SOURCES := $(LIBRETRO_SOURCES) $(PSX_SOURCES) $(MEDNAFEN_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
-
-LDFLAGS += -Wl,--no-undefined -fPIC -shared -lz -Wl,--version-script=link.T -pthread
-FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall -fPIC -fno-strict-overflow
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -pthread
+LDFLAGS += $(fpic) -lz
+FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall $(fpic) -fno-strict-overflow
+FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl
 
 WARNINGS := -Wall \
 	-Wno-narrowing \
@@ -110,7 +145,7 @@ WARNINGS := -Wall \
 	-Wno-strict-aliasing \
 	-Wno-overflow
 
-FLAGS += -DLSB_FIRST -DHAVE_MKDIR -DSIZEOF_DOUBLE=8 $(WARNINGS) \
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
 			-DMEDNAFEN_VERSION=\"0.9.22\" -DMEDNAFEN_VERSION_NUMERIC=922 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 \
 			-DWANT_PSX_EMU -DSTDC_HEADERS
 
