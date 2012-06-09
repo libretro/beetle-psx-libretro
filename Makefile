@@ -13,7 +13,7 @@ endif
 ifeq ($(platform), unix)
    TARGET := libretro.so
    fpic := -fPIC
-   SHARED := -shared -Wl,-no-undefined -Wl,--version-script=link.T
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ENDIANNESS_DEFINES := -DLSB_FIRST
    LDFLAGS += -pthread
    FLAGS += -pthread -DHAVE_MKDIR
@@ -28,7 +28,7 @@ else
    TARGET := retro.dll
    CC = gcc
    CXX = g++
-   SHARED := -shared -Wl,-no-undefined -Wl,--version-script=link.T
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
    FLAGS += -DHAVE__MKDIR
@@ -130,7 +130,7 @@ OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
-LDFLAGS += $(fpic) -lz
+LDFLAGS += $(fpic) -lz $(SHARED)
 FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall $(fpic) -fno-strict-overflow
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl
 
