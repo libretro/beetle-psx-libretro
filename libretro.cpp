@@ -49,7 +49,7 @@ void retro_init()
 #ifndef _WIN32
    mkdir(home.c_str(), 0755);
 #else
-   _mkdir(home.c_str(), 0755);
+   _mkdir(home.c_str());
 #endif
 
    std::vector<MDFNSetting> settings;
