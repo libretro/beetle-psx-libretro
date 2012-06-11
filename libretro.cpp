@@ -5,6 +5,12 @@
 #include <iostream>
 #include "libretro.h"
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#else
+#include <windows.h>
+#endif
+
 static MDFNGI *game;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
@@ -21,16 +27,32 @@ static uint32_t mednafen_buf[680 * 480] __attribute__((aligned(16)));
 void retro_init()
 {
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-   surf = new MDFN_Surface(mednafen_buf, 680, 512, 680, pix_fmt);
+   surf = new MDFN_Surface(mednafen_buf, 680, 480, 680, pix_fmt);
 
    std::vector<MDFNGI*> ext;
    MDFNI_InitializeModules(ext);
 
-   std::vector<MDFNSetting> settings;
+   const char *dir = NULL;
+   std::string home;
 
-   // FIXME: This will not work on Windows ...
-   std::string home = getenv("HOME");
-   home += "/.mednafen";
+   if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
+   {
+      home = dir;
+      home += "/mednafen";
+   }
+   else // Use "default" mednafen behavior.
+   {
+      home = getenv("HOME");
+      home += "/.mednafen";
+   }
+
+#ifndef _WIN32
+   mkdir(home.c_str(), 0755);
+#else
+   _mkdir(home.c_str(), 0755);
+#endif
+
+   std::vector<MDFNSetting> settings;
    MDFNI_Initialize(home.c_str(), settings);
 
    // Hints that we need a fairly powerful system to run this.
