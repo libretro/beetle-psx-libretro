@@ -1,16 +1,13 @@
 # Mednafen PSX libretro
 
 This is port of Mednafen PSX core to the libretro API.
-It currently runs on Linux and possibly OSX.
+It currently runs on Linux, OSX and possibly Windows.
 
 ## Running
 
-To run this core, a proper configuration for Mednafen must be set up in
-<tt>$HOME/.mednafen</tt> as Mednafen itself expects.
-Here, at least the BIOS must be set up as it is not distributed.
-You should attempt to at least get an ISO image running in the real Mednafen before attempting
-to use this port.
-
+To run this core, the "system directory" must be defined if running in RetroArch.
+Here, the PSX BIOSes must be placed, $sysdir/SCPH550{0,1,2} for Japanese, NA and EU regions respectively.
+Memory cards will also be saved to this system directory.
 
 ## Loading ISOs
 
