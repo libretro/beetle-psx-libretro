@@ -1,4 +1,6 @@
 
+DEBUG = 0
+
 ifeq ($(platform),)
 platform = unix
 ifeq ($(shell uname -a),)
@@ -130,8 +132,14 @@ OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
+ifeq ($(DEBUG),0)
+   FLAGS += -O3 -ffast-math -funroll-loops 
+else
+   FLAGS += -O0 -g
+endif
+
 LDFLAGS += $(fpic) -lz $(SHARED)
-FLAGS += -ffast-math -msse -msse2 -funroll-loops -O3 -g -Wall $(fpic) -fno-strict-overflow
+FLAGS += -msse -msse2 -Wall $(fpic) -fno-strict-overflow
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl
 
 WARNINGS := -Wall \

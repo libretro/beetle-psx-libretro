@@ -5,12 +5,6 @@
 #include <iostream>
 #include "libretro.h"
 
-#ifndef _WIN32
-#include <sys/stat.h>
-#else
-#include <windows.h>
-#endif
-
 static MDFNGI *game;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
@@ -23,6 +17,7 @@ static MDFN_Surface *surf;
 
 static uint16_t conv_buf[680 * 480] __attribute__((aligned(16)));
 static uint32_t mednafen_buf[680 * 480] __attribute__((aligned(16)));
+static bool failed_init;
 
 void retro_init()
 {
@@ -33,27 +28,35 @@ void retro_init()
    MDFNI_InitializeModules(ext);
 
    const char *dir = NULL;
-   std::string home;
+
+   std::vector<MDFNSetting> settings;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
-      home = dir;
-      home += "/mednafen";
+      std::string eu_path = dir;
+      eu_path += "/scph5502.bin";
+
+      std::string jp_path = dir;
+      jp_path += "/scph5500.bin";
+
+      std::string na_path = dir;
+      na_path += "/scph5501.bin";
+
+      MDFNSetting jp_setting = { "psx.bios_jp", MDFNSF_EMU_STATE, "SCPH-5500 BIOS", NULL, MDFNST_STRING, jp_path.c_str() };
+      MDFNSetting eu_setting = { "psx.bios_eu", MDFNSF_EMU_STATE, "SCPH-5502 BIOS", NULL, MDFNST_STRING, eu_path.c_str() };
+      MDFNSetting na_setting = { "psx.bios_na", MDFNSF_EMU_STATE, "SCPH-5501 BIOS", NULL, MDFNST_STRING, na_path.c_str() };
+      MDFNSetting filesys = { "filesys.path_sav", MDFNSF_NOFLAGS, "Memcards", NULL, MDFNST_STRING, "." };
+      settings.push_back(jp_setting);
+      settings.push_back(eu_setting);
+      settings.push_back(na_setting);
+      settings.push_back(filesys);
+      MDFNI_Initialize(dir, settings);
    }
-   else // Use "default" mednafen behavior.
+   else
    {
-      home = getenv("HOME");
-      home += "/.mednafen";
+      fprintf(stderr, "System directory is not defined. Cannot continue ...\n");
+      failed_init = true;
    }
-
-#ifndef _WIN32
-   mkdir(home.c_str(), 0755);
-#else
-   _mkdir(home.c_str());
-#endif
-
-   std::vector<MDFNSetting> settings;
-   MDFNI_Initialize(home.c_str(), settings);
 
    // Hints that we need a fairly powerful system to run this.
    unsigned level = 3;
@@ -78,6 +81,9 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 
 bool retro_load_game(const struct retro_game_info *info)
 {
+   if (failed_init)
+      return false;
+
    game = MDFNI_LoadGame("psx", info->path);
    return game;
 }
