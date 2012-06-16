@@ -14,6 +14,7 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 static MDFN_Surface *surf;
+static bool rgb32;
 
 static uint16_t conv_buf[680 * 480] __attribute__((aligned(16)));
 static uint32_t mednafen_buf[680 * 480] __attribute__((aligned(16)));
@@ -83,6 +84,10 @@ bool retro_load_game(const struct retro_game_info *info)
 {
    if (failed_init)
       return false;
+
+   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+      rgb32 = true;
 
    game = MDFNI_LoadGame("psx", info->path);
    return game;
@@ -178,6 +183,7 @@ void retro_run()
 
    static int16_t sound_buf[0x10000];
    static MDFN_Rect rects[480];
+   rects[0].w = ~0;
 
    EmulateSpecStruct spec = {0}; 
    spec.surface = surf;
@@ -193,8 +199,41 @@ void retro_run()
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
 
-   convert_surface();
-   video_cb(conv_buf, width, height, 680 << 1);
+   if (rgb32)
+   {
+      // FIXME: Avoid black borders. Cannot see how DisplayRect exposes this.
+      const uint32_t *ptr = mednafen_buf;
+      if (width == 340)
+      {
+         ptr += 10;
+         width = 320;
+      }
+      else if (width == 680)
+      {
+         ptr += 20;
+         width = 640;
+      }
+
+      video_cb(ptr, width, height, 680 << 2);
+   }
+   else
+   {
+      convert_surface();
+
+      const uint16_t *ptr = conv_buf;
+      if (width == 340)
+      {
+         ptr += 10;
+         width = 320;
+      }
+      else if (width == 680)
+      {
+         ptr += 20;
+         width = 640;
+      }
+
+      video_cb(ptr, width, height, 680 << 1);
+   }
 
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
 }
@@ -212,11 +251,11 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
    // Just assume NTSC for now. TODO: Verify FPS.
-   info->timing.fps            = 59.97;
+   info->timing.fps            = 59.94;
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = game->nominal_width;
-   info->geometry.base_height  = game->nominal_height;
-   info->geometry.max_width    = 680;
+   info->geometry.base_width   = 320;
+   info->geometry.base_height  = 240;
+   info->geometry.max_width    = 640;
    info->geometry.max_height   = 480;
    info->geometry.aspect_ratio = 4.0 / 3.0;
 }
