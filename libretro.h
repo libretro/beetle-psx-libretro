@@ -30,6 +30,7 @@ extern "C" {
 #define RETRO_DEVICE_LIGHTGUN_SUPER_SCOPE   ((1 << 8) | RETRO_DEVICE_LIGHTGUN)
 #define RETRO_DEVICE_LIGHTGUN_JUSTIFIER     ((2 << 8) | RETRO_DEVICE_LIGHTGUN)
 #define RETRO_DEVICE_LIGHTGUN_JUSTIFIERS    ((3 << 8) | RETRO_DEVICE_LIGHTGUN)
+#define RETRO_DEVICE_DUAL_ANALOG            RETRO_DEVICE_MOUSE
 
 #define RETRO_DEVICE_ID_JOYPAD_B        0
 #define RETRO_DEVICE_ID_JOYPAD_Y        1
@@ -131,7 +132,7 @@ extern "C" {
                                            //
                                            // It can be used by the frontend to potentially warn
                                            // about too demanding implementations.
-                                           // 
+                                           //
                                            // The levels are "floating", but roughly defined as:
                                            // 1: Low-powered devices such as Raspberry Pi, smart phones, tablets, etc.
                                            // 2: Medium-spec consoles, such as PS3/360, with sub-par CPUs.

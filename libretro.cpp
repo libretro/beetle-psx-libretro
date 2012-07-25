@@ -123,13 +123,13 @@ static inline void convert_surface()
       __m128i green1 = _mm_and_si128(pix1, _mm_set1_epi32(0x00f800));
       __m128i blue1  = _mm_and_si128(pix1, _mm_set1_epi32(0x0000f8));
 
-      red0   = _mm_srli_epi32(red0,   19 - 10); 
-      green0 = _mm_srli_epi32(green0, 11 -  5); 
-      blue0  = _mm_srli_epi32(blue0,   3 -  0); 
+      red0   = _mm_srli_epi32(red0,   19 - 10);
+      green0 = _mm_srli_epi32(green0, 11 -  5);
+      blue0  = _mm_srli_epi32(blue0,   3 -  0);
 
-      red1   = _mm_srli_epi32(red1,   19 - 10); 
-      green1 = _mm_srli_epi32(green1, 11 -  5); 
-      blue1  = _mm_srli_epi32(blue1,   3 -  0); 
+      red1   = _mm_srli_epi32(red1,   19 - 10);
+      green1 = _mm_srli_epi32(green1, 11 -  5);
+      blue1  = _mm_srli_epi32(blue1,   3 -  0);
 
       __m128i res0 = _mm_or_si128(_mm_or_si128(red0, green0), blue0);
       __m128i res1 = _mm_or_si128(_mm_or_si128(red1, green1), blue1);
@@ -137,6 +137,8 @@ static inline void convert_surface()
       _mm_store_si128((__m128i*)(conv_buf + i), _mm_packs_epi32(res0, res1));
    }
 }
+
+static unsigned retro_devices[2];
 
 // Hardcoded for PSX. No reason to parse lots of structures ...
 // See mednafen/psx/input/gamepad.cpp
@@ -175,24 +177,24 @@ static void update_input()
    }
 
    // Buttons.
-   buf.u8[0][0] = (input_buf[0] >> 0) & 0xff; 
-   buf.u8[0][1] = (input_buf[0] >> 8) & 0xff; 
-   buf.u8[1][0] = (input_buf[1] >> 0) & 0xff; 
-   buf.u8[1][1] = (input_buf[1] >> 8) & 0xff; 
+   buf.u8[0][0] = (input_buf[0] >> 0) & 0xff;
+   buf.u8[0][1] = (input_buf[0] >> 8) & 0xff;
+   buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
+   buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
 
    // Analogs
    for (unsigned j = 0; j < 2; j++)
    {
-      int analog_left_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, 
+      int analog_left_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
             RETRO_DEVICE_ID_ANALOG_X);
 
-      int analog_left_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, 
+      int analog_left_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
             RETRO_DEVICE_ID_ANALOG_Y);
 
-      int analog_right_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, 
+      int analog_right_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
             RETRO_DEVICE_ID_ANALOG_X);
 
-      int analog_right_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, 
+      int analog_right_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
             RETRO_DEVICE_ID_ANALOG_Y);
 
       uint32_t r_right = analog_right_x > 0 ?  analog_right_x : 0;
@@ -216,8 +218,16 @@ static void update_input()
       buf.u32[j][8] = l_up;
    }
 
-   game->SetInput(0, "dualanalog", &buf.u8[0]);
-   game->SetInput(1, "dualanalog", &buf.u8[1]);
+   for (int j = 0; j < 2; j++) {
+        switch(retro_devices[j]) {
+            case RETRO_DEVICE_DUAL_ANALOG:
+               game->SetInput(j, "dualanalog", &buf.u8[j]);
+               break;
+            default:
+               game->SetInput(j, "gamepad", &buf.u8[j]);
+               break;
+        }
+   }
 }
 
 void retro_run()
@@ -230,7 +240,7 @@ void retro_run()
    static MDFN_Rect rects[480];
    rects[0].w = ~0;
 
-   EmulateSpecStruct spec = {0}; 
+   EmulateSpecStruct spec = {0};
    spec.surface = surf;
    spec.SoundRate = 44100;
    spec.SoundBuf = sound_buf;
@@ -315,9 +325,27 @@ unsigned retro_api_version(void)
    return RETRO_API_VERSION;
 }
 
-// TODO: Allow for different kinds of joypads?
-void retro_set_controller_port_device(unsigned, unsigned)
-{}
+void retro_set_controller_port_device(unsigned in_port, unsigned device)
+{
+    if (in_port > 1) {
+            fprintf(stderr,
+                "Only the 2 main ports are supported at the moment");
+            return;
+    }
+
+    switch (device) {
+        // TODO: Add support for other input types
+        case RETRO_DEVICE_JOYPAD:
+        case RETRO_DEVICE_DUAL_ANALOG:
+            fprintf(stderr, "Selected controller type %u", device);
+            retro_devices[in_port] = device;
+            break;
+        default:
+            retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
+            fprintf(stderr,
+                "Unsupported controller device, falling back to gamepad");
+    }
+}
 
 void retro_set_environment(retro_environment_t cb)
 {
