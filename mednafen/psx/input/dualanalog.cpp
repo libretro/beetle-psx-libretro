@@ -84,7 +84,7 @@ void InputDevice_DualAnalog::UpdateInput(const void *data)
   {
    int32 tmp;
 
-   tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+   tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32768);
    tmp >>= 8;
 
    axes[stick][axis] = tmp;
