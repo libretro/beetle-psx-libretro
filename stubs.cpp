@@ -89,8 +89,8 @@ int MDFND_UnlockMutex(MDFN_Mutex *lock)
    return 0;
 }
 
-int MDFND_SendData(const void*, uint32) { return 0; }
-int MDFND_RecvData(void *, uint32) { return 0; }
+void MDFND_SendData(const void*, uint32) {}
+void MDFND_RecvData(void *, uint32) {}
 void MDFND_NetplayText(const uint8*, bool) {}
 void MDFND_NetworkClose() {}
 
