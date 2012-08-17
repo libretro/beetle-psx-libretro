@@ -218,15 +218,17 @@ static void update_input()
       buf.u32[j][8] = l_up;
    }
 
-   for (int j = 0; j < 2; j++) {
-        switch(retro_devices[j]) {
-            case RETRO_DEVICE_DUAL_ANALOG:
-               game->SetInput(j, "dualanalog", &buf.u8[j]);
-               break;
-            default:
-               game->SetInput(j, "gamepad", &buf.u8[j]);
-               break;
-        }
+   for (int j = 0; j < 2; j++)
+   {
+      switch (retro_devices[j])
+      {
+         case RETRO_DEVICE_ANALOG:
+            game->SetInput(j, "dualanalog", &buf.u8[j]);
+            break;
+         default:
+            game->SetInput(j, "gamepad", &buf.u8[j]);
+            break;
+      }
    }
 }
 
@@ -327,24 +329,26 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
-    if (in_port > 1) {
-            fprintf(stderr,
-                "Only the 2 main ports are supported at the moment");
-            return;
-    }
+   if (in_port > 1)
+   {
+      fprintf(stderr,
+            "[Mednafen PSX]: Only the 2 main ports are supported at the moment");
+      return;
+   }
 
-    switch (device) {
-        // TODO: Add support for other input types
-        case RETRO_DEVICE_JOYPAD:
-        case RETRO_DEVICE_DUAL_ANALOG:
-            fprintf(stderr, "Selected controller type %u", device);
-            retro_devices[in_port] = device;
-            break;
-        default:
-            retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
-            fprintf(stderr,
-                "Unsupported controller device, falling back to gamepad");
-    }
+   switch (device)
+   {
+      // TODO: Add support for other input types
+      case RETRO_DEVICE_JOYPAD:
+      case RETRO_DEVICE_ANALOG:
+         fprintf(stderr, "[Mednafen PSX]: Selected controller type %u", device);
+         retro_devices[in_port] = device;
+         break;
+      default:
+         retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
+         fprintf(stderr,
+               "[Mednafen PSX]: Unsupported controller device, falling back to gamepad");
+   }
 }
 
 void retro_set_environment(retro_environment_t cb)
