@@ -360,8 +360,10 @@ void PS_CDC::WriteResult(uint8 V)
  ResultsWP = (ResultsWP + 1) & 0xF;
  ResultsIn = (ResultsIn + 1) & 0x1F;
 
+#if 0
  if(!ResultsIn)
   PSX_WARNING("[CDC] Results buffer overflow!");
+#endif
 }
 
 uint8 PS_CDC::ReadResult(void)
@@ -622,10 +624,12 @@ void PS_CDC::CheckAIP(void)
 
 void PS_CDC::SetAIP(unsigned irq, unsigned result_count, uint8 *r)
 {
+#if 0
  if(AsyncIRQPending)
  {
   PSX_WARNING("***WARNING*** Previous notification skipped: CurSector=%d, old_notification=0x%02x", CurSector, AsyncIRQPending);
  }
+#endif
  ClearAIP();
 
  AsyncResultsPendingCount = result_count;
@@ -797,8 +801,10 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
 	}
        }
 
+#if 0
        if(!(Mode & 0x30) && (buf[12 + 6] & 0x20))
 	PSX_WARNING("BORK: %d", CurSector);
+#endif
 
        {
 	int32 offs = (Mode & 0x20) ? 0 : 12;
@@ -924,8 +930,10 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
        else
         CurSector++;
       }
+#if 0
       else
        PSX_WARNING("[CDC] BUG CDDA buffer full");
+#endif
 
      }
     } // end if playing
@@ -981,7 +989,7 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      const CDC_CTEntry *command = &Commands[PendingCommand];
      //PSX_WARNING("[CDC] Command: %s --- %d", command->name, Results.CanRead());
 
-#if 1
+#if 0
      printf("[CDC] Command: %s --- ", command->name);
      for(unsigned int i = 0; i < ArgsIn; i++)
       printf(" 0x%02x", ArgsBuf[i]);
@@ -1033,6 +1041,7 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		break;
 
 	 case 0x00:
+#if 0
 		if(PendingCommandCounter > 0)
 		{
 		 PSX_WARNING("[CDC] WARNING: Interrupting command 0x%02x, phase=%d, timeleft=%d with command=0x%02x", PendingCommand, PendingCommandPhase,
@@ -1048,6 +1057,7 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		{
 		 PSX_WARNING("[CDC] Attempting to start command(0x%02x) while command results(count=%d) still in buffer.", V, ResultsIn);
 		}
+#endif
 
          	PendingCommandCounter = 8192; //1024; //128; //256; //16; //1024;
 	 	PendingCommand = V;
@@ -1058,10 +1068,12 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		ArgsBuf[ArgsIn & 0xF] = V;
 		ArgsIn = (ArgsIn + 1) & 0x1F;
 
+#if 0
 		if(!(ArgsIn & 0x0F))
 		{
 		 PSX_WARNING("[CDC] Argument buffer overflow");
 		}
+#endif
 		break;
 
 	 case 0x02:
@@ -1084,10 +1096,12 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		   SB_In = 0;
 		  }
 	  	 }
+#if 0
 		 else
 		 {
 		  //PSX_WARNING("[CDC] Attempt to start data transfer via 0x80->1803 when %d bytes still in buffer", DMABuffer.CanRead());
 		 }
+#endif
 	 	}
 	 	else if(V & 0x40)	// Something CD-DA related(along with & 0x20 ???)?
 	 	{
@@ -1148,6 +1162,7 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		{
 		 memcpy(DecodeVolume, Pending_DecodeVolume, sizeof(DecodeVolume));
 
+#if 0
 		 for(int i = 0; i < 2; i++)
 		 {
 		  for(int o = 0; o < 2; o++)
@@ -1155,6 +1170,7 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		   //fprintf(stderr, "Input Channel %d, Output Channel %d -- Volume=%d\n", i, o, DecodeVolume[i][o]);
 		  }
 		 }
+#endif
 		}
 		break;
   }
@@ -1196,10 +1212,12 @@ uint8 PS_CDC::Read(const pscpu_timestamp_t timestamp, uint32 A)
    case 0x02:
 	if(DMABuffer.CanRead())
 	 ret = DMABuffer.ReadByte();
+#if 0
 	else
 	{
 	 PSX_WARNING("[CDC] CD data transfer port read, but no data present!");
 	}
+#endif
 	break;
 
    case 0x03:
@@ -1304,7 +1322,7 @@ static int32 CalcSeekTime(int32 initial, int32 target, bool motor_on, bool pause
  else if(paused)
   ret += (int64)33868800 * 150 / 1000;
 
- printf("%d\n", ret);
+ //printf("%d\n", ret);
 
  return(ret);
 }
@@ -1368,7 +1386,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 
   PlayTrackMatch = track;
 
-  printf("[CDC] Play track: %d\n", track);
+  //printf("[CDC] Play track: %d\n", track);
   SeekTarget = toc.tracks[track].lba;
   PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   PreSeekHack(SeekTarget);

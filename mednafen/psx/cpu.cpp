@@ -640,10 +640,12 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 		 uint32 rd = (instr >> 11) & 0x1F;
 		 uint32 val = GPR[rt];
 
+#if 0
 		 if(rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
 		 {
 	 	  PSX_WARNING("[CPU] Unimplemented MTC0: rt=%d(%08x) -> rd=%d", rt, GPR[rt], rd);
 		 }
+#endif
 
 		 switch(rd)
 		 {
