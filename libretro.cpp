@@ -64,12 +64,6 @@ void retro_init()
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
-void retro_deinit()
-{
-   delete surf;
-   surf = NULL;
-}
-
 void retro_reset()
 {
    MDFNI_Reset();
@@ -232,6 +226,8 @@ static void update_input()
    }
 }
 
+static uint64_t video_frames, audio_frames;
+
 void retro_run()
 {
    input_poll_cb();
@@ -292,6 +288,9 @@ void retro_run()
       video_cb(ptr, width, height, 680 << 1);
    }
 
+   video_frames++;
+   audio_frames += spec.SoundBufSize;
+
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
 }
 
@@ -307,14 +306,25 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   // Just assume NTSC for now. TODO: Verify FPS.
-   info->timing.fps            = 59.94;
+   info->timing.fps            = 59.85398; // Determined from empirical testing.
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = 320;
    info->geometry.base_height  = 240;
    info->geometry.max_width    = 640;
    info->geometry.max_height   = 480;
    info->geometry.aspect_ratio = 4.0 / 3.0;
+}
+
+void retro_deinit()
+{
+   delete surf;
+   surf = NULL;
+
+   fprintf(stderr, "[Mednafen PSX]: Samples / Frame: %.5f\n",
+         (double)audio_frames / video_frames);
+
+   fprintf(stderr, "[Mednafen PSX]: Estimated FPS: %.5f\n",
+         (double)video_frames * 44100 / audio_frames);
 }
 
 unsigned retro_get_region(void)
