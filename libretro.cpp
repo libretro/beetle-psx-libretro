@@ -16,15 +16,12 @@ static retro_input_state_t input_state_cb;
 static MDFN_Surface *surf;
 static bool rgb32;
 
-static uint16_t conv_buf[680 * 480] __attribute__((aligned(16)));
-static uint32_t mednafen_buf[680 * 480] __attribute__((aligned(16)));
+static uint16_t *conv_buf;
+static uint32_t *mednafen_buf;
 static bool failed_init;
 
 void retro_init()
 {
-   MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-   surf = new MDFN_Surface(mednafen_buf, 680, 480, 680, pix_fmt);
-
    std::vector<MDFNGI*> ext;
    MDFNI_InitializeModules(ext);
 
@@ -84,12 +81,23 @@ bool retro_load_game(const struct retro_game_info *info)
       rgb32 = true;
 
    game = MDFNI_LoadGame("psx", info->path);
+   int fbWidth = MDFNGameInfo->fb_width;
+   int fbHeight = MDFNGameInfo->fb_height;
+   int fbSize = fbWidth* fbHeight;
+
+   conv_buf = new uint16_t[fbSize];
+   mednafen_buf = new uint32_t[fbSize];
+   MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
+   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, 680, pix_fmt);
+
    return game;
 }
 
 void retro_unload_game()
 {
    MDFNI_CloseGame();
+   delete [] conv_buf;
+   delete [] mednafen_buf;
 }
 
 #ifndef __SSE2__
@@ -105,7 +113,7 @@ void retro_unload_game()
 static inline void convert_surface()
 {
    const uint32_t *pix = surf->pixels;
-   for (unsigned i = 0; i < 680 * 480; i += 8)
+   for (unsigned i = 0; i < (MDFNGameInfo->fb_width * MDFNGameInfo->fb_height); i += 8)
    {
       __m128i pix0 = _mm_load_si128((const __m128i*)(pix + i + 0));
       __m128i pix1 = _mm_load_si128((const __m128i*)(pix + i + 4));
@@ -235,7 +243,7 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[480];
+   static MDFN_Rect rects[576];
    rects[0].w = ~0;
 
    EmulateSpecStruct spec = {0};
@@ -251,21 +259,37 @@ void retro_run()
 
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
+   unsigned int ptrDiff = 0;
+   // This is for PAL, the core implements PAL over NTSC TV so you get the
+   // infamous PAL borders. This removes them. The PS1 supports only two horizontal
+   // resolutions so it's OK to use constants and not precentage.
+   bool isPal = false;
+   if (height == 576) {
+       ptrDiff += width * 47;
+       height = 480;
+       isPal = true;
+   } else if (height == 288) {
+       // TODO: This seems to be OK as is, but I might be wrong.
+       isPal = true;
+   }
+
+   if (isPal && width == 680) {
+       ptrDiff += 7;
+   }
+
+   // The core handles vertical overscan for NTSC pretty well, but it ignores
+   // horizontal overscan. This is a tough estimation of what the horizontal
+   // overscan should be, tested with all major NTSC resolutions. Mayeb make it
+   // configurable?
+   float hoverscan = 0.941176471;
+
+   width = width * hoverscan;
+   ptrDiff += ((rects[0].w - width) / 2);
 
    if (rgb32)
    {
-      // FIXME: Avoid black borders. Cannot see how DisplayRect exposes this.
       const uint32_t *ptr = mednafen_buf;
-      if (width == 340)
-      {
-         ptr += 10;
-         width = 320;
-      }
-      else if (width == 680)
-      {
-         ptr += 20;
-         width = 640;
-      }
+      ptr += ptrDiff;
 
       video_cb(ptr, width, height, 680 << 2);
    }
@@ -274,17 +298,7 @@ void retro_run()
       convert_surface();
 
       const uint16_t *ptr = conv_buf;
-      if (width == 340)
-      {
-         ptr += 10;
-         width = 320;
-      }
-      else if (width == 680)
-      {
-         ptr += 20;
-         width = 640;
-      }
-
+      ptr += ptrDiff;
       video_cb(ptr, width, height, 680 << 1);
    }
 
@@ -308,10 +322,10 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->timing.fps            = 59.85398; // Determined from empirical testing.
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = 320;
-   info->geometry.base_height  = 240;
-   info->geometry.max_width    = 640;
-   info->geometry.max_height   = 480;
+   info->geometry.base_width   = MDFNGameInfo->nominal_width;
+   info->geometry.base_height  = MDFNGameInfo->nominal_height;
+   info->geometry.max_width    = MDFNGameInfo->fb_width;
+   info->geometry.max_height   = MDFNGameInfo->fb_height;
    info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
