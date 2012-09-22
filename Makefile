@@ -38,6 +38,7 @@ endif
 
 
 MEDNAFEN_DIR := mednafen
+MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
 PSX_DIR := $(MEDNAFEN_DIR)/psx
 
 PSX_SOURCES := $(PSX_DIR)/psx.cpp \
@@ -60,7 +61,7 @@ PSX_SOURCES := $(PSX_DIR)/psx.cpp \
 	$(PSX_DIR)/input/mouse.cpp
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
-	$(MEDNAFEN_DIR)/mednafen.cpp \
+	$(MEDNAFEN_LIBRETRO_DIR)/mednafen-libretro.cpp \
 	$(MEDNAFEN_DIR)/PSFLoader.cpp \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
