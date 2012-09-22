@@ -51,7 +51,7 @@ PSX_SOURCES := $(PSX_DIR)/psx.cpp \
 	$(PSX_DIR)/gte.cpp \
 	$(PSX_DIR)/dis.cpp \
 	$(PSX_DIR)/cdc.cpp \
-	$(PSX_DIR)/spu.cpp \
+	$(MEDNAFEN_LIBRETRO_DIR)/psx/spu.cpp \
 	$(PSX_DIR)/gpu.cpp \
 	$(PSX_DIR)/mdec.cpp \
 	$(PSX_DIR)/input/gamepad.cpp \
@@ -69,7 +69,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/netplay.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
 	$(MEDNAFEN_DIR)/player.cpp \
-	$(MEDNAFEN_DIR)/cdplay.cpp \
+	$(MEDNAFEN_LIBRETRO_DIR)/cdplay.cpp \
 	$(MEDNAFEN_DIR)/FileWrapper.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/tests.cpp \
@@ -141,7 +141,7 @@ endif
 
 LDFLAGS += $(fpic) -lz $(SHARED)
 FLAGS += -msse -msse2 -Wall $(fpic) -fno-strict-overflow
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl
+FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/psx
 
 WARNINGS := -Wall \
 	-Wno-narrowing \
