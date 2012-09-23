@@ -270,7 +270,6 @@ void MDFNI_CloseGame(void)
    delete CDInterfaces[i];
   CDInterfaces.clear();
  }
- TBlur_Kill();
 
  #ifdef WANT_DEBUGGER
  MDFNDBG_Kill();
@@ -589,8 +588,6 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  MDFN_ResetMessages();   // Save state, status messages, etc.
 
- TBlur_Init();
-
  MDFN_StateEvilBegin();
 
 
@@ -814,8 +811,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 	PrevInterlaced = false;
 	deint.ClearState();
-
-	TBlur_Init();
 
         MDFN_StateEvilBegin();
 
@@ -1254,8 +1249,7 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
   ff_resampler.buffer_size((espec->SoundRate / 2) * 2);
  }
 
- if(TBlur_IsOn())
-  espec->skip = 0;
+ espec->skip = 0;
 
  if(espec->NeedRewind)
  {
@@ -1299,8 +1293,6 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
   PrevInterlaced = false;
 
  ProcessAudio(espec);
-
- TBlur_Run(espec);
 }
 
 // This function should only be called for state rewinding.
