@@ -317,7 +317,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
                       }
                       else if(type == MDFNMKF_SAV)
                       {
-		       dir = MDFN_GetSettingS("filesys.path_sav");
+		       dir = "";
                        fstring = MDFN_GetSettingS("filesys.fname_sav");
 		       fmap['x'] = std::string(cd1);
                       }
