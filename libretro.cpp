@@ -81,15 +81,18 @@ bool retro_load_game(const struct retro_game_info *info)
       rgb32 = true;
 
    game = MDFNI_LoadGame("psx", info->path);
-   int fbWidth = MDFNGameInfo->fb_width;
-   int fbHeight = MDFNGameInfo->fb_height;
-   int fbSize = fbWidth* fbHeight;
+   if (!game)
+      return false;
 
-   conv_buf = new uint16_t[fbSize];
+   int fbWidth  = game->fb_width;
+   int fbHeight = game->fb_height;
+   int fbSize   = fbWidth * fbHeight;
+
+   conv_buf     = new uint16_t[fbSize];
    mednafen_buf = new uint32_t[fbSize];
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, 680, pix_fmt);
 
+   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, 680, pix_fmt);
    return game;
 }
 
