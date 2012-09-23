@@ -322,10 +322,10 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->timing.fps            = 59.85398; // Determined from empirical testing.
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = MDFNGameInfo->nominal_width;
-   info->geometry.base_height  = MDFNGameInfo->nominal_height;
-   info->geometry.max_width    = MDFNGameInfo->fb_width;
-   info->geometry.max_height   = MDFNGameInfo->fb_height;
+   info->geometry.base_width   = 320;
+   info->geometry.base_height  = 240;
+   info->geometry.max_width    = 640;
+   info->geometry.max_height   = 480;
    info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
