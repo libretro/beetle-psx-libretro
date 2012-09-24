@@ -29,56 +29,6 @@
 
 void MDFNI_SaveSnapshot(const MDFN_Surface *src, const MDFN_Rect *rect, const MDFN_Rect *LineWidths)
 {
- FileWrapper *pp = NULL;
-
- try
- {
-  std::string fn;
-  int u = 0;
-
-  try
-  {
-   pp = new FileWrapper(MDFN_MakeFName(MDFNMKF_SNAP_DAT, 0, NULL).c_str(), FileWrapper::MODE_READ);
-  }
-  catch(std::exception &e)
-  {
-
-  }
-
-  if(pp)
-  {
-   if(pp->scanf("%d", &u) != 1)
-    u = 0;
-
-   delete pp;
-   pp = NULL;
-  }
-
-  pp = new FileWrapper(MDFN_MakeFName(MDFNMKF_SNAP_DAT, 0, NULL).c_str(), FileWrapper::MODE_WRITE);
-
-  pp->seek(0, SEEK_SET);
-  pp->printf("%d\n", u + 1);
-
-  delete pp;
-  pp = NULL;
-
-  fn = MDFN_MakeFName(MDFNMKF_SNAP, u, "png");
-
-  PNGWrite(fn.c_str(), src, *rect, LineWidths);
-
-  MDFN_DispMessage(_("Screen snapshot %d saved."), u);
- }
- catch(std::exception &e)
- {
-  if(pp)
-  {
-   delete pp;
-   pp = NULL;
-  }
-
-  MDFN_PrintError(_("Error saving screen snapshot: %s"), e.what());
-  MDFN_DispMessage(_("Error saving screen snapshot: %s"), e.what());
- }
 }
 
 void MDFN_DispMessage(const char *format, ...) throw()

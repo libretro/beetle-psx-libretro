@@ -1,17 +1,12 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include <zlib.h>
+#include "zlib.h"
 
 #include "video.h"
 #include "state-common.h"
 
 void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status);
-
-int MDFNSS_Save(const char *, const char *suffix, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_Load(const char *, const char *suffix);
-int MDFNSS_SaveFP(gzFile fp, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_LoadFP(gzFile fp);
 
 typedef struct
 {
@@ -23,19 +18,6 @@ typedef struct
 
 	uint32 initial_malloc; // A setting!
 } StateMem;
-
-// Eh, we abuse the smem_* in-memory stream code
-// in a few other places. :)
-int32 smem_read(StateMem *st, void *buffer, uint32 len);
-int32 smem_write(StateMem *st, void *buffer, uint32 len);
-int32 smem_putc(StateMem *st, int value);
-int32 smem_tell(StateMem *st);
-int32 smem_seek(StateMem *st, uint32 offset, int whence);
-int smem_write32le(StateMem *st, uint32 b);
-int smem_read32le(StateMem *st, uint32 *b);
-
-int MDFNSS_SaveSM(StateMem *st, int wantpreview_and_ts, int data_only, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_LoadSM(StateMem *st, int haspreview, int data_only);
 
 void MDFNSS_CheckStates(void);
 
@@ -138,10 +120,7 @@ class SSDescriptor
 int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDescriptor> &sections);
 int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
 
-void MDFN_StateEvilFlushMovieLove(void);
-bool MDFN_StateEvilIsRunning(void);
-void MDFN_StateEvilBegin(void);
-void MDFN_StateEvilEnd(void);
-int MDFN_StateEvil(int);
+int MDFNSS_SaveSM(StateMem *st);
+int MDFNSS_LoadSM(StateMem *st);
 
 #endif

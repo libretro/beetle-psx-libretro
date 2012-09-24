@@ -20,23 +20,24 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+
 #include <time.h>
 
-#include <trio/trio.h>
+#include "include/trio/trio.h"
 #include "driver.h"
 #include "general.h"
 #include "state.h"
-#include "movie.h"
-#include "netplay.h"
 #include "video.h"
-#include "video/resize.h"
 
 static int SaveStateStatus[10];
 
 #define RLSB 		MDFNSTATE_RLSB	//0x80000000
 
-int32 smem_read(StateMem *st, void *buffer, uint32 len)
+static int32 smem_read(StateMem *st, void *buffer, uint32 len)
 {
  if((len + st->loc) > st->len)
   return(0);
@@ -47,7 +48,7 @@ int32 smem_read(StateMem *st, void *buffer, uint32 len)
  return(len);
 }
 
-int32 smem_write(StateMem *st, void *buffer, uint32 len)
+static int32 smem_write(StateMem *st, void *buffer, uint32 len)
 {
  if((len + st->loc) > st->malloced)
  {
@@ -66,7 +67,7 @@ int32 smem_write(StateMem *st, void *buffer, uint32 len)
  return(len);
 }
 
-int32 smem_putc(StateMem *st, int value)
+static int32 smem_putc(StateMem *st, int value)
 {
  uint8 tmpval = value;
  if(smem_write(st, &tmpval, 1) != 1)
@@ -74,12 +75,12 @@ int32 smem_putc(StateMem *st, int value)
  return(1);
 }
 
-int32 smem_tell(StateMem *st)
+static int32 smem_tell(StateMem *st)
 {
  return(st->loc);
 }
 
-int32 smem_seek(StateMem *st, uint32 offset, int whence)
+static int32 smem_seek(StateMem *st, uint32 offset, int whence)
 {
  switch(whence)
  {
@@ -103,7 +104,7 @@ int32 smem_seek(StateMem *st, uint32 offset, int whence)
  return(0);
 }
 
-int smem_write32le(StateMem *st, uint32 b)
+static int smem_write32le(StateMem *st, uint32 b)
 {
  uint8 s[4];
  s[0]=b;
@@ -113,7 +114,7 @@ int smem_write32le(StateMem *st, uint32 b)
  return((smem_write(st, s, 4)<4)?0:4);
 }
 
-int smem_read32le(StateMem *st, uint32 *b)
+static int smem_read32le(StateMem *st, uint32 *b)
 {
  uint8 s[4];
 
@@ -124,7 +125,6 @@ int smem_read32le(StateMem *st, uint32 *b)
 
  return(4);
 }
-
 
 static bool ValidateSFStructure(SFORMAT *sf)
 {
@@ -153,8 +153,6 @@ static bool ValidateSFStructure(SFORMAT *sf)
 
 static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_prefix = NULL)
 {
- // FIXME?  It's kind of slow, and we definitely don't want it on with state rewinding...
- if(!data_only) 
   ValidateSFStructure(sf);
 
  while(sf->size || sf->name)	// Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct.
@@ -167,7 +165,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
 
   if(sf->size == (uint32)~0)		/* Link to another struct.	*/
   {
-   if(!SubWrite(st, (SFORMAT *)sf->v, data_only, name_prefix))
+   if(!SubWrite(st, (SFORMAT *)sf->v, 0, name_prefix))
     return(0);
 
    sf++;
@@ -176,15 +174,6 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
 
   int32 bytesize = sf->size;
 
-  // If we're only saving the raw data, and we come across a bool type, we save it as it is in memory, rather than converting it to
-  // 1-byte.  In the SFORMAT structure, the size member for bool entries is the number of bool elements, not the total in-memory size,
-  // so we adjust it here.
-  if(data_only && (sf->flags & MDFNSTATE_BOOL))
-  {
-   bytesize *= sizeof(bool);
-  }
-  
-  if(!data_only)
   {
    char nameo[1 + 256];
    int slen;
@@ -218,7 +207,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
     
   // Special case for the evil bool type, to convert bool to 1-byte elements.
   // Don't do it if we're only saving the raw data.
-  if((sf->flags & MDFNSTATE_BOOL) && !data_only)
+  if((sf->flags & MDFNSTATE_BOOL))
   {
    for(int32 bool_monster = 0; bool_monster < bytesize; bool_monster++)
    {
@@ -230,7 +219,6 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
   else
    smem_write(st, (uint8 *)sf->v, bytesize);
 
-  if(!data_only)
   {
    /* Now restore the original byte order. */
    if(sf->flags & MDFNSTATE_BOOL)
@@ -257,7 +245,6 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf, int dat
  int32 data_start_pos;
  int32 end_pos;
 
- if(!data_only)
  {
   uint8 sname_tmp[32];
 
@@ -274,12 +261,11 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf, int dat
 
  data_start_pos = smem_tell(st);
 
- if(!SubWrite(st, sf, data_only))
+ if(!SubWrite(st, sf, 0))
   return(0);
 
  end_pos = smem_tell(st);
 
- if(!data_only)
  {
   smem_seek(st, data_start_pos - 4, SEEK_SET);
   smem_write32le(st, end_pos - data_start_pos);
@@ -325,47 +311,10 @@ static void MakeSFMap(SFORMAT *sf, SFMap_t &sfmap)
  }
 }
 
-// Fast raw chunk reader
-static void DOReadChunk(StateMem *st, SFORMAT *sf)
-{
- while(sf->size || sf->name)       // Size can sometimes be zero, so also check for the text name.  
-				// These two should both be zero only at the end of a struct.
- {
-  if(!sf->size || !sf->v)
-  {
-   sf++;
-   continue;
-  }
-
-  if(sf->size == (uint32) ~0) // Link to another SFORMAT struct
-  {
-   DOReadChunk(st, (SFORMAT *)sf->v);
-   sf++;
-   continue;
-  }
-
-  int32 bytesize = sf->size;
-
-  // Loading raw data, bool types are stored as they appear in memory, not as single bytes in the full state format.
-  // In the SFORMAT structure, the size member for bool entries is the number of bool elements, not the total in-memory size,
-  // so we adjust it here.
-  if(sf->flags & MDFNSTATE_BOOL)
-   bytesize *= sizeof(bool);
-
-  smem_read(st, (uint8 *)sf->v, bytesize);
-  sf++;
- }
-}
-
 static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size, int data_only)
 {
  int temp;
 
- if(data_only)
- {
-  DOReadChunk(st, sf);
- }
- else
  {
   SFMap_t sfmap;
   SFMap_t sfmap_found;	// Used for identifying variables that are missing in the save state.
@@ -470,14 +419,6 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
 
  if(load)
  {
-  if(data_only)
-  {
-   for(section = sections.begin(); section != sections.end(); section++)
-   {
-     ReadStateChunk(st, section->sf, ~0, 1);
-   }
-  }
-  else
   {
    char sname[32];
 
@@ -507,7 +448,6 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
      } 
      else
      {
-      // puts("SEEK");
       if(smem_seek(st, tmp_size, SEEK_CUR) < 0)
       {
        puts("Chunk seek failure");
@@ -532,7 +472,7 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
  {
   for(section = sections.begin(); section != sections.end(); section++)
   {
-   if(!WriteStateChunk(st, section->name, section->sf, data_only))
+   if(!WriteStateChunk(st, section->name, section->sf, 0))
     return(0);
   }
  }
@@ -545,116 +485,34 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const
  std::vector <SSDescriptor> love;
 
  love.push_back(SSDescriptor(sf, name, optional));
- return(MDFNSS_StateAction(st, load, data_only, love));
+ return(MDFNSS_StateAction(st, load, 0, love));
 }
 
-int MDFNSS_SaveSM(StateMem *st, int wantpreview_and_ts, int data_only, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
+int MDFNSS_SaveSM(StateMem *st)
 {
 	static const char *header_magic = "MDFNSVST";
         uint8 header[32];
 	int neowidth = 0, neoheight = 0;
 
 	memset(header, 0, sizeof(header));
+	memcpy(header, header_magic, 8);
 
-	if(wantpreview_and_ts)
-	{
-	 bool is_multires = FALSE;
+	MDFN_en32lsb(header + 16, MEDNAFEN_VERSION_NUMERIC);
+	MDFN_en32lsb(header + 24, neowidth);
+	MDFN_en32lsb(header + 28, neoheight);
+	smem_write(st, header, 32);
 
-	 // We'll want to use the nominal width if the source rectangle is > 25% off on either axis, or the source image has
-	 // multiple horizontal resolutions.
-	 neowidth = MDFNGameInfo->nominal_width;
-	 neoheight = MDFNGameInfo->nominal_height;
-
-	 if(LineWidths[0].w != ~0)
- 	 {
-	  uint32 first_w = LineWidths[DisplayRect->y].w;
-
-	  for(int y = 0; y < DisplayRect->h; y++)
-	   if(LineWidths[DisplayRect->y + y].w != first_w)
-	   {
-	    puts("Multires!");
-	    is_multires = TRUE;
-	   }
-	 }
-
-	 if(!is_multires)
-	 {
-	  if(((double)DisplayRect->w / MDFNGameInfo->nominal_width) > 0.75  && ((double)DisplayRect->w / MDFNGameInfo->nominal_width) < 1.25)
-	   neowidth = DisplayRect->w;
-
-          if(((double)DisplayRect->h / MDFNGameInfo->nominal_height) > 0.75  && ((double)DisplayRect->h / MDFNGameInfo->nominal_height) < 1.25)
-	   neoheight = DisplayRect->h;
-	 }
-	}
-
-	if(!data_only)
-	{
-	 memcpy(header, header_magic, 8);
-
-	 if(wantpreview_and_ts)
-	  MDFN_en64lsb(header + 8, time(NULL));
-
-	 MDFN_en32lsb(header + 16, MEDNAFEN_VERSION_NUMERIC);
-	 MDFN_en32lsb(header + 24, neowidth);
-	 MDFN_en32lsb(header + 28, neoheight);
-	 smem_write(st, header, 32);
-	}
-
-	if(wantpreview_and_ts)
-	{
-         uint8 *previewbuffer = (uint8 *)malloc(4 * neowidth * neoheight);
-	 MDFN_Surface *dest_surface = new MDFN_Surface((uint32 *)previewbuffer, neowidth, neoheight, neowidth, surface->format);
-	 MDFN_Rect dest_rect;
-
-	 dest_rect.x = 0;
-	 dest_rect.y = 0;
-	 dest_rect.w = neowidth;
-	 dest_rect.h = neoheight;
-
-	 MDFN_ResizeSurface(surface, DisplayRect, (LineWidths[0].w != ~0) ? LineWidths : NULL, dest_surface, &dest_rect);
-
-	 {
-	  uint32 a, b = 0;
-	  for(a = 0; a < neowidth * neoheight * 4; a+=4)
-	  {
-	   uint32 c = *(uint32 *)&previewbuffer[a];
-	   int nr, ng, nb;
-
-	   surface->DecodeColor(c, nr, ng, nb);
-
-	   previewbuffer[b + 0] = nr;
-	   previewbuffer[b + 1] = ng;
-           previewbuffer[b + 2] = nb;
-	   b += 3;
-	  }
-	 }
-
-         smem_write(st, previewbuffer, 3 * neowidth * neoheight);
-
-	 free(previewbuffer);
-	 delete dest_surface;
-	}
-
-        // State rewinding code path hack, FIXME
-        if(data_only)
-        {
-         if(!MDFN_RawInputStateAction(st, 0, data_only))
-          return(0);
-        }
-
-	if(!MDFNGameInfo->StateAction(st, 0, data_only))
+	if(!MDFNGameInfo->StateAction(st, 0, 0))
 	 return(0);
 
-	if(!data_only)
-	{
-	 uint32 sizy = smem_tell(st);
-	 smem_seek(st, 16 + 4, SEEK_SET);
-	 smem_write32le(st, sizy);
-	}
+	uint32 sizy = smem_tell(st);
+	smem_seek(st, 16 + 4, SEEK_SET);
+	smem_write32le(st, sizy);
+
 	return(1);
 }
 
-int MDFNSS_Save(const char *fname, const char *suffix, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
+static int MDFNSS_Save(const char *fname, const char *suffix)
 {
 	StateMem st;
 
@@ -667,7 +525,7 @@ int MDFNSS_Save(const char *fname, const char *suffix, const MDFN_Surface *surfa
 	 return(0);
 	}
 
-	if(!MDFNSS_SaveSM(&st, (DisplayRect && LineWidths), 0, surface, DisplayRect, LineWidths))
+	if(!MDFNSS_SaveSM(&st))
 	{
 	 if(st.data)
 	  free(st.data);
@@ -698,74 +556,22 @@ int MDFNSS_Save(const char *fname, const char *suffix, const MDFN_Surface *surfa
 	return(1);
 }
 
-// Convenience function for movie.cpp
-int MDFNSS_SaveFP(gzFile fp, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
+int MDFNSS_LoadSM(StateMem *st)
 {
- StateMem st;
+ uint8 header[32];
+ uint32 stateversion;
 
- memset(&st, 0, sizeof(StateMem));
+ smem_read(st, header, 32);
 
- if(!MDFNSS_SaveSM(&st, (DisplayRect && LineWidths), 0, surface, DisplayRect, LineWidths))
- {
-  if(st.data)
-   free(st.data);
+ if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
   return(0);
- }
 
- if(gzwrite(fp, st.data, st.len) != (int32)st.len)
- {
-  if(st.data)
-   free(st.data);
-  return(0);
- }
+ stateversion = MDFN_de32lsb(header + 16);
 
- if(st.data)
-  free(st.data);
-
- return(1);
+ return(MDFNGameInfo->StateAction(st, stateversion, 0));
 }
 
-
-int MDFNSS_LoadSM(StateMem *st, int haspreview, int data_only)
-{
-        uint8 header[32];
-	uint32 stateversion;
-
-	if(data_only)
-	{
-	 stateversion = MEDNAFEN_VERSION_NUMERIC;
-	}
-	else
-	{
-         smem_read(st, header, 32);
-
-         if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
-          return(0);
-
-	 stateversion = MDFN_de32lsb(header + 16);
-	}
-
-	if(haspreview)
-        {
-         uint32 width = MDFN_de32lsb(header + 24);
-         uint32 height = MDFN_de32lsb(header + 28);
-	 uint32 psize;
-
-	 psize = width * height * 3;
-	 smem_seek(st, psize, SEEK_CUR);	// Skip preview
- 	}
-
-	// State rewinding code path hack, FIXME
-	if(data_only)
-	{
-	 if(!MDFN_RawInputStateAction(st, stateversion, data_only))
-	  return(0);
-	}
-
-	return(MDFNGameInfo->StateAction(st, stateversion, data_only));
-}
-
-int MDFNSS_LoadFP(gzFile fp)
+static int MDFNSS_LoadFP(gzFile fp)
 {
  uint8 header[32];
  StateMem st;
@@ -790,7 +596,7 @@ int MDFNSS_LoadFP(gzFile fp)
   free(st.data);
   return(0);
  }
- if(!MDFNSS_LoadSM(&st, 1, 0))
+ if(!MDFNSS_LoadSM(&st))
  {
   free(st.data);
   return(0);
@@ -799,7 +605,7 @@ int MDFNSS_LoadFP(gzFile fp)
  return(1);
 }
 
-int MDFNSS_Load(const char *fname, const char *suffix)
+static int MDFNSS_Load(const char *fname, const char *suffix)
 {
 	gzFile st;
 
@@ -859,7 +665,7 @@ void MDFNSS_CheckStates(void)
 	 struct stat stat_buf;
 
 	 SaveStateStatus[ssel] = 0;
-	 //printf("%s\n", MDFN_MakeFName(MDFNMKF_STATE, ssel, 0).c_str());
+
 	 if(stat(MDFN_MakeFName(MDFNMKF_STATE, ssel, 0).c_str(), &stat_buf) == 0)
 	 {
 	  SaveStateStatus[ssel] = 1;
@@ -878,9 +684,6 @@ void MDFNSS_CheckStates(void)
 void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status)
 {
  gzFile fp;
- uint32 StateShowPBWidth;
- uint32 StateShowPBHeight;
- uint8 *previewbuffer = NULL;
 
  fp = gzopen(filename, "rb");
  if(fp)
@@ -888,35 +691,12 @@ void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status)
   uint8 header[32];
 
   gzread(fp, header, 32);
-  uint32 width = MDFN_de32lsb(header + 24);
-  uint32 height = MDFN_de32lsb(header + 28);
 
-  if(width > 1024) width = 1024;
-  if(height > 1024) height = 1024;
-
-  if(!(previewbuffer = (uint8 *)MDFN_malloc(3 * width * height, _("Save state preview buffer"))))
-  {
-   StateShowPBWidth = 0;
-   StateShowPBHeight = 0;
-  }
-  else
-  {
-   gzread(fp, previewbuffer, 3 * width * height);
-
-   StateShowPBWidth = width;
-   StateShowPBHeight = height;
-  }
   gzclose(fp);
  }
  else
  {
-  StateShowPBWidth = MDFNGameInfo->nominal_width;
-  StateShowPBHeight = MDFNGameInfo->nominal_height;
  }
-
- status->gfx = previewbuffer;
- status->w = StateShowPBWidth;
- status->h = StateShowPBHeight;
 }
 
 void MDFNI_SelectState(int w)
@@ -930,7 +710,6 @@ void MDFNI_SelectState(int w)
   MDFND_SetStateStatus(NULL);
   return; 
  }
- MDFNI_SelectMovie(-1);
 
  if(w == 666 + 1)
   CurrentState = (CurrentState + 1) % 10;
@@ -957,21 +736,13 @@ void MDFNI_SelectState(int w)
  MDFND_SetStateStatus(status);
 }  
 
-void MDFNI_SaveState(const char *fname, const char *suffix, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
+void MDFNI_SaveState(const char *fname, const char *suffix)
 {
  if(!MDFNGameInfo->StateAction) 
   return;
 
- if(MDFNnetplay && (MDFNGameInfo->SaveStateAltersState == true))
- {
-  char sb[256];
-  trio_snprintf(sb, sizeof(sb), _("Module %s is not compatible with manual state saving during netplay."), MDFNGameInfo->shortname);
-  MDFND_NetplayText((const uint8*)sb, false);
-  return;
- }
-
  MDFND_SetStateStatus(NULL);
- MDFNSS_Save(fname, suffix, surface, DisplayRect, LineWidths);
+ MDFNSS_Save(fname, suffix);
 }
 
 void MDFNI_LoadState(const char *fname, const char *suffix)
@@ -981,296 +752,5 @@ void MDFNI_LoadState(const char *fname, const char *suffix)
 
  MDFND_SetStateStatus(NULL);
 
- /* For network play and movies, be load the state locally, and then save the state to a temporary buffer,
-    and send or record that.  This ensures that if an older state is loaded that is missing some
-    information expected in newer save states, desynchronization won't occur(at least not
-    from this ;)).
- */
- if(MDFNSS_Load(fname, suffix))
- {
-  if(MDFNnetplay)
-  {
-   NetplaySendState();
-  }
-
-  if(MDFNMOV_IsRecording())
-   MDFNMOV_RecordState();
- }
-}
-
-#include "compress/minilzo.h"
-#include "compress/quicklz.h"
-#include "compress/blz.h"
-
-static union
-{
- char qlz_scratch_compress[/*QLZ_*/SCRATCH_COMPRESS];
- char qlz_scratch_decompress[/*QLZ_*/SCRATCH_DECOMPRESS];
-};
-
-enum
-{
- SRW_COMPRESSOR_MINILZO = 0,
- SRW_COMPRESSOR_QUICKLZ,
- SRW_COMPRESSOR_BLZ
-};
-
-struct StateMemPacket
-{
-	uint8 *data;
-	uint32 compressed_len;
-	uint32 uncompressed_len;
-
-	StateMem MovieLove;
-};
-
-static int SRW_NUM = 600;
-static int SRWCompressor;
-static int EvilEnabled = 0;
-static StateMemPacket *bcs;
-static int32 bcspos;
-
-void MDFN_StateEvilBegin(void)
-{
- int x;
- std::string srwcompstring;
-
-
- if(!EvilEnabled)
-  return;
-
- SRW_NUM = MDFN_GetSettingUI("srwframes");
-
- SRWCompressor = SRW_COMPRESSOR_MINILZO;
- srwcompstring = MDFN_GetSettingS("srwcompressor");
-
- if(srwcompstring == "minilzo")
-  SRWCompressor = SRW_COMPRESSOR_MINILZO;
- else if(srwcompstring == "quicklz")
-  SRWCompressor  = SRW_COMPRESSOR_QUICKLZ;
- else if(srwcompstring == "blz")
-  SRWCompressor = SRW_COMPRESSOR_BLZ;
-
- bcs = (StateMemPacket *)calloc(SRW_NUM, sizeof(StateMemPacket));
- bcspos = 0;
-
- for(x=0;x<SRW_NUM;x++)
- {
-  bcs[x].data = NULL;
-  bcs[x].compressed_len = 0;
-  bcs[x].uncompressed_len = 0;
-  memset(&bcs[x].MovieLove, 0, sizeof(StateMem));
- }
-}
-
-bool MDFN_StateEvilIsRunning(void)
-{
- return(EvilEnabled);
-}
-
-void MDFN_StateEvilEnd(void)
-{
- int x;
-
- if(!EvilEnabled)
-  return;
-
- if(bcs)
- {
-  if(MDFNMOV_IsRecording())
-   MDFN_StateEvilFlushMovieLove();
-
-  for(x = 0;x < SRW_NUM; x++)
-  {
-
-   if(bcs[x].data)
-    free(bcs[x].data);
-   bcs[x].data = NULL;
-   bcs[x].compressed_len = 0;
-  }
-  free(bcs);
- }
-}
-
-void MDFN_StateEvilFlushMovieLove(void)
-{
- int bahpos = (bcspos + 1) % SRW_NUM;
- for(int x = 0; x < SRW_NUM; x++)
- {
-  if(bcs[bahpos].MovieLove.data)
-  {
-   if(bcs[x].data)
-    MDFNMOV_ForceRecord(&bcs[bahpos].MovieLove);
-   free(bcs[bahpos].MovieLove.data);
-   bcs[bahpos].MovieLove.data = NULL;
-  }
-  bahpos = (bahpos + 1) % SRW_NUM;
- }
-}
-
-int MDFN_StateEvil(int rewind)
-{
- if(!EvilEnabled)
-  return(0);
-
- if(rewind)
- {
-  int32 next_bcspos = bcspos;
-  bool NeedDataFlush = FALSE;
-
-  bcspos--;
-  if(bcspos < 0) bcspos += SRW_NUM;
-
-  if(!bcs[bcspos].data)
-   bcspos = (bcspos + 1) % SRW_NUM;
-  else
-   NeedDataFlush = TRUE;
-
-  if(bcs[bcspos].compressed_len)
-  {
-   uint8 *tmp_buf;
-   lzo_uint dst_len = bcs[bcspos].uncompressed_len;
-
-   tmp_buf = (uint8 *)malloc(bcs[bcspos].uncompressed_len);
-
-   if(SRWCompressor == SRW_COMPRESSOR_QUICKLZ)
-    dst_len = qlz_decompress((char*)bcs[bcspos].data, tmp_buf, qlz_scratch_decompress);
-   else if(SRWCompressor == SRW_COMPRESSOR_MINILZO)
-    lzo1x_decompress(bcs[bcspos].data, bcs[bcspos].compressed_len, tmp_buf, &dst_len, NULL);
-   else if(SRWCompressor == SRW_COMPRESSOR_BLZ)
-   {
-    dst_len = blz_unpack(bcs[bcspos].data, tmp_buf);
-   }
-   for(uint32 x = 0; x < bcs[bcspos].uncompressed_len && x < bcs[next_bcspos].uncompressed_len; x++)
-    tmp_buf[x] ^= bcs[next_bcspos].data[x];
-
-   free(bcs[bcspos].data);
-   bcs[bcspos].data = tmp_buf;
-   bcs[bcspos].compressed_len = 0;
-  }
-
-  if(NeedDataFlush)
-  {
-   if(bcs[next_bcspos].MovieLove.data)
-   {
-    free(bcs[next_bcspos].MovieLove.data);
-    bcs[next_bcspos].MovieLove.data = NULL;
-   }
-   free(bcs[next_bcspos].data);
-   bcs[next_bcspos].data = NULL;
-   bcs[next_bcspos].compressed_len = 0;
-   bcs[next_bcspos].uncompressed_len = 0;
-  }
-
-  if(bcs[bcspos].uncompressed_len)
-  {
-   StateMem sm;
-
-   sm.data = bcs[bcspos].data;
-   sm.loc = 0;
-   sm.initial_malloc = 0;
-   sm.malloced = sm.len = bcs[bcspos].uncompressed_len;
-
-   MDFNSS_LoadSM(&sm, 0, 1);
-
-   free(MDFNMOV_GrabRewindJoy().data);
-   return(1);
-  }
- }
- else
- {
-  StateMem sm;
-  int32 prev_bcspos = bcspos;
-
-  bcspos = (bcspos + 1) % SRW_NUM;
-
-  if(MDFNMOV_IsRecording())
-  {
-   if(bcs[bcspos].data && bcs[bcspos].MovieLove.data)
-   {
-    //printf("Force: %d\n", bcspos);
-    MDFNMOV_ForceRecord(&bcs[bcspos].MovieLove);
-    free(bcs[bcspos].MovieLove.data);
-    bcs[bcspos].MovieLove.data = NULL;
-   }
-  }
-  if(bcs[bcspos].data)
-  {
-   free(bcs[bcspos].data);
-   bcs[bcspos].data = NULL;
-  }
-  if(bcs[bcspos].MovieLove.data)
-  {
-   free(bcs[bcspos].MovieLove.data);
-   bcs[bcspos].MovieLove.data = NULL;
-  }
-
-  memset(&sm, 0, sizeof(sm));
-
-  MDFNSS_SaveSM(&sm, 0, 1);
-
-  bcs[bcspos].data = sm.data;
-  bcs[bcspos].compressed_len = 0;
-  bcs[bcspos].uncompressed_len = sm.len;
-
-  // Compress the previous save state.
-  if(bcs[prev_bcspos].data)
-  {
-   for(uint32 x = 0; x < bcs[prev_bcspos].uncompressed_len && x < sm.len; x++)
-    bcs[prev_bcspos].data[x] ^= sm.data[x];
-
-   if(SRWCompressor == SRW_COMPRESSOR_QUICKLZ)
-   {
-    uint32 dst_len;
-    uint8 *tmp_buf = (uint8 *)malloc(bcs[prev_bcspos].uncompressed_len + 400);
-
-    dst_len = qlz_compress(bcs[prev_bcspos].data, (char*)tmp_buf, bcs[prev_bcspos].uncompressed_len, qlz_scratch_compress);
-
-    free(bcs[prev_bcspos].data);
-    bcs[prev_bcspos].data = (uint8 *)realloc(tmp_buf, dst_len);
-    bcs[prev_bcspos].compressed_len = dst_len;
-   }
-   else if(SRWCompressor == SRW_COMPRESSOR_MINILZO)
-   {
-    uint8 workmem[LZO1X_1_MEM_COMPRESS];
-    uint8 * tmp_buf = (uint8 *)malloc((size_t)(1.10 * bcs[prev_bcspos].uncompressed_len));
-    lzo_uint dst_len = (lzo_uint)(1.10 * bcs[prev_bcspos].uncompressed_len);
-
-    lzo1x_1_compress(bcs[prev_bcspos].data, bcs[prev_bcspos].uncompressed_len, tmp_buf, &dst_len, workmem);
-
-    free(bcs[prev_bcspos].data);
-    bcs[prev_bcspos].data = (uint8 *)realloc(tmp_buf, dst_len);
-    bcs[prev_bcspos].compressed_len = dst_len;
-   }
-   else if(SRWCompressor == SRW_COMPRESSOR_BLZ)
-   {
-    blz_pack_t workmem;
-
-    uint8 * tmp_buf = (uint8 *)malloc((size_t)(bcs[prev_bcspos].uncompressed_len + blz_pack_extra));
-    uint32 dst_len = bcs[prev_bcspos].uncompressed_len + blz_pack_extra;
-
-    dst_len = blz_pack(bcs[prev_bcspos].data, bcs[prev_bcspos].uncompressed_len, tmp_buf, &workmem);
-
-    free(bcs[prev_bcspos].data);
-    bcs[prev_bcspos].data = (uint8 *)realloc(tmp_buf, dst_len);
-    bcs[prev_bcspos].compressed_len = dst_len;
-   }
-  }
-
-  if(MDFNMOV_IsRecording())
-   bcs[bcspos].MovieLove = MDFNMOV_GrabRewindJoy();
- }
- return(0);
-}
-
-void MDFNI_EnableStateRewind(int enable)
-{
- if(!MDFNGameInfo->StateAction) 
-  return;
-
- MDFN_StateEvilEnd();
-
- EvilEnabled = enable;
-
- MDFN_StateEvilBegin();
+ MDFNSS_Load(fname, suffix);
 }

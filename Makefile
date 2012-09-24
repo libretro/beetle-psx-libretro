@@ -28,8 +28,8 @@ else ifeq ($(platform), osx)
    FLAGS += -pthread -DHAVE_MKDIR
 else
    TARGET := retro.dll
-   CC = gcc
-   CXX = g++
+   CC = i686-pc-mingw32-gcc
+   CXX = i686-pc-mingw32-g++
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
@@ -66,16 +66,13 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
-	$(MEDNAFEN_DIR)/netplay.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
 	$(MEDNAFEN_DIR)/player.cpp \
 	$(MEDNAFEN_LIBRETRO_DIR)/cdplay.cpp \
 	$(MEDNAFEN_DIR)/FileWrapper.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/tests.cpp \
-	$(MEDNAFEN_DIR)/movie.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
-	$(MEDNAFEN_DIR)/qtrecord.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
@@ -94,7 +91,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/text.cpp \
 	$(MEDNAFEN_DIR)/video/font-data.cpp \
 	$(MEDNAFEN_DIR)/video/tblur.cpp \
-	$(MEDNAFEN_DIR)/video/png.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(MEDNAFEN_DIR)/video/resize.cpp \
@@ -125,8 +121,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/compress/unzip.c \
 	$(MEDNAFEN_DIR)/compress/minilzo.c \
 	$(MEDNAFEN_DIR)/compress/quicklz.c \
-	$(MEDNAFEN_DIR)/compress/ioapi.c \
-	$(MEDNAFEN_DIR)/resampler/resample.c
+	$(MEDNAFEN_DIR)/compress/ioapi.c
 
 SOURCES := $(LIBRETRO_SOURCES) $(PSX_SOURCES) $(MEDNAFEN_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
