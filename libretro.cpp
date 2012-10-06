@@ -85,7 +85,7 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
 
    int fbWidth  = 680;
-   int fbHeight = 480;
+   int fbHeight = 576;
    int fbSize   = fbWidth * fbHeight;
 
    conv_buf     = new uint16_t[fbSize];
