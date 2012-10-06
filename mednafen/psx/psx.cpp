@@ -1217,8 +1217,8 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
  int ret = InitCommon(CDInterfaces);
 
  // TODO: fastboot setting
- //if(MDFN_GetSettingB("psx.fastboot"))
- BIOSROM->WriteU32(0x6990, 0);
+ if(MDFN_GetSettingB("psx.fastboot"))
+     BIOSROM->WriteU32(0x6990, 0);
 
  MDFNGameInfo->GameType = GMT_CDROM;
 
@@ -1457,7 +1457,7 @@ static MDFNSetting PSXSettings[] =
  { "psx.input.port8.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on port 2D."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
 
 
- //{ "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "0" },
+ { "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "1" },
  { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Attempt to auto-detect region of game."), NULL, MDFNST_BOOL, "1" },
  { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Default region to use."), gettext_noop("Used if region autodetection fails or is disabled."), MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
 
