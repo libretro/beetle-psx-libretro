@@ -55,13 +55,13 @@ void FlipByteOrder(uint8 *src, uint32 count);
 
 // The following functions can encode/decode to unaligned addresses.
 
-static INLINE void MDFN_en16lsb(uint8 *buf, uint16 morp)
+static inline void MDFN_en16lsb(uint8 *buf, uint16 morp)
 {
  buf[0]=morp;
  buf[1]=morp>>8;
 }
 
-static INLINE void MDFN_en24lsb(uint8 *buf, uint32 morp)
+static inline void MDFN_en24lsb(uint8 *buf, uint32 morp)
 {
  buf[0]=morp;
  buf[1]=morp>>8;
@@ -69,7 +69,7 @@ static INLINE void MDFN_en24lsb(uint8 *buf, uint32 morp)
 }
 
 
-static INLINE void MDFN_en32lsb(uint8 *buf, uint32 morp)
+static inline void MDFN_en32lsb(uint8 *buf, uint32 morp)
 {
  buf[0]=morp;
  buf[1]=morp>>8;
@@ -77,7 +77,7 @@ static INLINE void MDFN_en32lsb(uint8 *buf, uint32 morp)
  buf[3]=morp>>24;
 }
 
-static INLINE void MDFN_en64lsb(uint8 *buf, uint64 morp)
+static inline void MDFN_en64lsb(uint8 *buf, uint64 morp)
 {
  buf[0]=morp >> 0;
  buf[1]=morp >> 8;
@@ -90,20 +90,20 @@ static INLINE void MDFN_en64lsb(uint8 *buf, uint64 morp)
 }
 
 
-static INLINE void MDFN_en16msb(uint8 *buf, uint16 morp)
+static inline void MDFN_en16msb(uint8 *buf, uint16 morp)
 {
  buf[0] = morp >> 8;
  buf[1] = morp;
 }
 
-static INLINE void MDFN_en24msb(uint8 *buf, uint32 morp)
+static inline void MDFN_en24msb(uint8 *buf, uint32 morp)
 {
  buf[0] = morp >> 16;
  buf[1] = morp >> 8;
  buf[2] = morp;
 }
 
-static INLINE void MDFN_en32msb(uint8 *buf, uint32 morp)
+static inline void MDFN_en32msb(uint8 *buf, uint32 morp)
 {
  buf[0] = morp >> 24;
  buf[1] = morp >> 16;
@@ -111,7 +111,7 @@ static INLINE void MDFN_en32msb(uint8 *buf, uint32 morp)
  buf[3] = morp;
 }
 
-static INLINE void MDFN_en64msb(uint8 *buf, uint64 morp)
+static inline void MDFN_en64msb(uint8 *buf, uint64 morp)
 {
  buf[0] = morp >> 56;
  buf[1] = morp >> 48;
@@ -125,39 +125,39 @@ static INLINE void MDFN_en64msb(uint8 *buf, uint64 morp)
 
 
 // Overloaded functions, yay.
-static INLINE void MDFN_enlsb(uint16 * buf, uint16 value)
+static inline void MDFN_enlsb(uint16 * buf, uint16 value)
 {
  MDFN_en16lsb((uint8 *)buf, value);
 }
 
-static INLINE void MDFN_enlsb(uint32 * buf, uint32 value)
+static inline void MDFN_enlsb(uint32 * buf, uint32 value)
 {
  MDFN_en32lsb((uint8 *)buf, value);
 }
 
-static INLINE void MDFN_enlsb(uint64 * buf, uint64 value)
+static inline void MDFN_enlsb(uint64 * buf, uint64 value)
 {
  MDFN_en64lsb((uint8 *)buf, value);
 }
 
 
-static INLINE uint16 MDFN_de16lsb(const uint8 *morp)
+static inline uint16 MDFN_de16lsb(const uint8 *morp)
 {
  return(morp[0] | (morp[1] << 8));
 }
 
 
-static INLINE uint32 MDFN_de24lsb(const uint8 *morp)
+static inline uint32 MDFN_de24lsb(const uint8 *morp)
 {
  return(morp[0]|(morp[1]<<8)|(morp[2]<<16));
 }
 
-static INLINE uint32 MDFN_de32lsb(const uint8 *morp)
+static inline uint32 MDFN_de32lsb(const uint8 *morp)
 {
  return(morp[0]|(morp[1]<<8)|(morp[2]<<16)|(morp[3]<<24));
 }
 
-static INLINE uint64 MDFN_de64lsb(const uint8 *morp)
+static inline uint64 MDFN_de64lsb(const uint8 *morp)
 {
  uint64 ret = 0;
 
@@ -173,33 +173,33 @@ static INLINE uint64 MDFN_de64lsb(const uint8 *morp)
  return(ret);
 }
 
-static INLINE uint16 MDFN_delsb(const uint16 *buf)
+static inline uint16 MDFN_delsb(const uint16 *buf)
 {
  return(MDFN_de16lsb((uint8 *)buf));
 }
 
-static INLINE uint32 MDFN_delsb(const uint32 *buf)
+static inline uint32 MDFN_delsb(const uint32 *buf)
 {
  return(MDFN_de32lsb((uint8 *)buf));
 }
 
-static INLINE uint64 MDFN_delsb(const uint64 *buf)
+static inline uint64 MDFN_delsb(const uint64 *buf)
 {
  return(MDFN_de64lsb((uint8 *)buf));
 }
 
-static INLINE uint16 MDFN_de16msb(const uint8 *morp)
+static inline uint16 MDFN_de16msb(const uint8 *morp)
 {
  return(morp[1] | (morp[0] << 8));
 }
 
-static INLINE uint32 MDFN_de24msb(const uint8 *morp)
+static inline uint32 MDFN_de24msb(const uint8 *morp)
 {
  return((morp[2]<<0)|(morp[1]<<8)|(morp[0]<<16));
 }
 
 
-static INLINE uint32 MDFN_de32msb(const uint8 *morp)
+static inline uint32 MDFN_de32msb(const uint8 *morp)
 {
  return(morp[3]|(morp[2]<<8)|(morp[1]<<16)|(morp[0]<<24));
 }

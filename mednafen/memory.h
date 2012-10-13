@@ -1,8 +1,9 @@
 #ifndef _MDFN_MEMORY_H
 
-#include <stdint.h>
-
 // These functions can be used from driver code or from internal Mednafen code.
+//
+
+#include <stdint.h>
 
 #define MDFN_malloc(size, purpose) MDFN_malloc_real(size, purpose, __FILE__, __LINE__)
 #define MDFN_calloc(nmemb, size, purpose) MDFN_calloc_real(nmemb, size, purpose, __FILE__, __LINE__)
@@ -37,7 +38,7 @@ static inline void MDFN_FastU32MemsetM8(uint32_t *array, uint32_t value_32, unsi
 
  #else
 
- for(uint32 *ai = array; ai < array + u32len; ai += 2)
+ for(uint32_t *ai = array; ai < array + u32len; ai += 2)
  {
   ai[0] = value_32;
   ai[1] = value_32;

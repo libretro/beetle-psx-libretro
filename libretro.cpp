@@ -20,6 +20,9 @@ static uint16_t *conv_buf;
 static uint32_t *mednafen_buf;
 static bool failed_init;
 
+std::string retro_base_directory;
+std::string retro_base_name;
+
 void retro_init()
 {
    std::vector<MDFNGI*> ext;
@@ -49,6 +52,8 @@ void retro_init()
       settings.push_back(na_setting);
       settings.push_back(filesys);
       MDFNI_Initialize(dir, settings);
+
+      retro_base_directory = dir;
    }
    else
    {
@@ -80,6 +85,17 @@ bool retro_load_game(const struct retro_game_info *info)
    if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
       rgb32 = true;
 
+   const char *base = strrchr(info->path, '/');
+   if (!base)
+      base = strrchr(info->path, '\\');
+
+   if (base)
+      retro_base_name = base + 1;
+   else
+      retro_base_name = info->path;
+
+   retro_base_name = retro_base_name.substr(0, retro_base_name.find_last_of('.'));
+ 
    game = MDFNI_LoadGame("psx", info->path);
    if (!game)
       return false;
@@ -93,6 +109,7 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
 
    surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, 680, pix_fmt);
+
    return game;
 }
 
@@ -315,7 +332,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "Mednafen PSX";
-   info->library_version  = "0.9.24";
+   info->library_version  = "0.9.25";
    info->need_fullpath    = true;
    info->valid_extensions = "cue|CUE";
 }

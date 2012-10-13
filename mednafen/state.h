@@ -1,12 +1,17 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include "zlib.h"
+#include <zlib.h>
 
 #include "video.h"
 #include "state-common.h"
 
 void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status);
+
+int MDFNSS_Save(const char *, const char *suffix, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
+int MDFNSS_Load(const char *, const char *suffix);
+int MDFNSS_SaveFP(gzFile fp, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
+int MDFNSS_LoadFP(gzFile fp);
 
 typedef struct
 {
@@ -18,6 +23,19 @@ typedef struct
 
 	uint32 initial_malloc; // A setting!
 } StateMem;
+
+// Eh, we abuse the smem_* in-memory stream code
+// in a few other places. :)
+int32 smem_read(StateMem *st, void *buffer, uint32 len);
+int32 smem_write(StateMem *st, void *buffer, uint32 len);
+int32 smem_putc(StateMem *st, int value);
+int32 smem_tell(StateMem *st);
+int32 smem_seek(StateMem *st, uint32 offset, int whence);
+int smem_write32le(StateMem *st, uint32 b);
+int smem_read32le(StateMem *st, uint32 *b);
+
+int MDFNSS_SaveSM(StateMem *st, int wantpreview_and_ts, int data_only, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
+int MDFNSS_LoadSM(StateMem *st, int haspreview, int data_only);
 
 void MDFNSS_CheckStates(void);
 
@@ -49,49 +67,49 @@ typedef struct {
 	   //uint32 struct_size;	// Only used for MDFNSTATE_ARRAYOFS, sizeof(struct) that members of the linked SFORMAT struct are in.
 } SFORMAT;
 
-INLINE int SF_IS_BOOL(bool *) { return(1); }
-INLINE int SF_IS_BOOL(void *) { return(0); }
+INLINE bool SF_IS_BOOL(bool *) { return(1); }
+INLINE bool SF_IS_BOOL(void *) { return(0); }
 
-INLINE int SF_FORCE_AB(bool *) { return(0); }
+INLINE uint32 SF_FORCE_AB(bool *) { return(0); }
 
-INLINE int SF_FORCE_A8(int8 *) { return(0); }
-INLINE int SF_FORCE_A8(uint8 *) { return(0); }
+INLINE uint32 SF_FORCE_A8(int8 *) { return(0); }
+INLINE uint32 SF_FORCE_A8(uint8 *) { return(0); }
 
-INLINE int SF_FORCE_A16(int16 *) { return(0); }
-INLINE int SF_FORCE_A16(uint16 *) { return(0); }
+INLINE uint32 SF_FORCE_A16(int16 *) { return(0); }
+INLINE uint32 SF_FORCE_A16(uint16 *) { return(0); }
 
-INLINE int SF_FORCE_A32(int32 *) { return(0); }
-INLINE int SF_FORCE_A32(uint32 *) { return(0); }
+INLINE uint32 SF_FORCE_A32(int32 *) { return(0); }
+INLINE uint32 SF_FORCE_A32(uint32 *) { return(0); }
 
-INLINE int SF_FORCE_A64(int64 *) { return(0); }
-INLINE int SF_FORCE_A64(uint64 *) { return(0); }
+INLINE uint32 SF_FORCE_A64(int64 *) { return(0); }
+INLINE uint32 SF_FORCE_A64(uint64 *) { return(0); }
 
-INLINE int SF_FORCE_D(double *) { return(0); }
+INLINE uint32 SF_FORCE_D(double *) { return(0); }
 
-#define SFVARN(x, n) { &x, SF_IS_BOOL(&x) ? 1 : sizeof(x), MDFNSTATE_RLSB | (SF_IS_BOOL(&x) ? MDFNSTATE_BOOL : 0), n }
-#define SFVAR(x) SFVARN(x, #x)
+#define SFVARN(x, n) { &(x), SF_IS_BOOL(&(x)) ? 1 : sizeof(x), MDFNSTATE_RLSB | (SF_IS_BOOL(&(x)) ? MDFNSTATE_BOOL : 0), n }
+#define SFVAR(x) SFVARN((x), #x)
 
-#define SFARRAYN(x, l, n) { x, l, 0 | SF_FORCE_A8(x), n }
-#define SFARRAY(x, l) SFARRAYN(x, l, #x)
+#define SFARRAYN(x, l, n) { (x), (uint32)(l), 0 | SF_FORCE_A8(x), n }
+#define SFARRAY(x, l) SFARRAYN((x), (l), #x)
 
-#define SFARRAYBN(x, l, n) { x, l, MDFNSTATE_BOOL | SF_FORCE_AB(x), n }
-#define SFARRAYB(x, l) SFARRAYBN(x, l, #x)
+#define SFARRAYBN(x, l, n) { (x), (uint32)(l), MDFNSTATE_BOOL | SF_FORCE_AB(x), n }
+#define SFARRAYB(x, l) SFARRAYBN((x), (l), #x)
 
-#define SFARRAY16N(x, l, n) {x, (l * sizeof(uint16)), MDFNSTATE_RLSB16 | SF_FORCE_A16(x), n }
-#define SFARRAY16(x, l) SFARRAY16N(x, l, #x)
+#define SFARRAY16N(x, l, n) { (x), (uint32)((l) * sizeof(uint16)), MDFNSTATE_RLSB16 | SF_FORCE_A16(x), n }
+#define SFARRAY16(x, l) SFARRAY16N((x), (l), #x)
 
-#define SFARRAY32N(x, l, n) {x, (l * sizeof(uint32)), MDFNSTATE_RLSB32 | SF_FORCE_A32(x), n }
-#define SFARRAY32(x, l) SFARRAY32N(x, l, #x)
+#define SFARRAY32N(x, l, n) { (x), (uint32)((l) * sizeof(uint32)), MDFNSTATE_RLSB32 | SF_FORCE_A32(x), n }
+#define SFARRAY32(x, l) SFARRAY32N((x), (l), #x)
 
-#define SFARRAY64N(x, l, n) {x, (l * sizeof(uint64)), MDFNSTATE_RLSB64 | SF_FORCE_A64(x), n }
-#define SFARRAY64(x, l) SFARRAY64N(x, l, #x)
+#define SFARRAY64N(x, l, n) { (x), (uint32)((l) * sizeof(uint64)), MDFNSTATE_RLSB64 | SF_FORCE_A64(x), n }
+#define SFARRAY64(x, l) SFARRAY64N((x), (l), #x)
 
 #if SIZEOF_DOUBLE != 8
 #error "sizeof(double) != 8"
 #endif
 
-#define SFARRAYDN(x, l, n) {x, (l * 8), MDFNSTATE_RLSB64 | SF_FORCE_D(x), n }
-#define SFARRAYD(x, l) SFARRAYDN(x, l, #x)
+#define SFARRAYDN(x, l, n) { (x), (uint32)((l) * 8), MDFNSTATE_RLSB64 | SF_FORCE_D(x), n }
+#define SFARRAYD(x, l) SFARRAYDN((x), (l), #x)
 
 #define SFEND { 0, 0, 0, 0 }
 
@@ -120,7 +138,10 @@ class SSDescriptor
 int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDescriptor> &sections);
 int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
 
-int MDFNSS_SaveSM(StateMem *st);
-int MDFNSS_LoadSM(StateMem *st);
+void MDFN_StateEvilFlushMovieLove(void);
+bool MDFN_StateEvilIsRunning(void);
+void MDFN_StateEvilBegin(void);
+void MDFN_StateEvilEnd(void);
+int MDFN_StateEvil(int);
 
 #endif

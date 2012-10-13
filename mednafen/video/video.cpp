@@ -27,10 +27,6 @@
 
 #include "png.h"
 
-void MDFNI_SaveSnapshot(const MDFN_Surface *src, const MDFN_Rect *rect, const MDFN_Rect *LineWidths)
-{
-}
-
 void MDFN_DispMessage(const char *format, ...) throw()
 {
  va_list ap;

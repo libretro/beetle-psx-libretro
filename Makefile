@@ -51,25 +51,32 @@ PSX_SOURCES := $(PSX_DIR)/psx.cpp \
 	$(PSX_DIR)/gte.cpp \
 	$(PSX_DIR)/dis.cpp \
 	$(PSX_DIR)/cdc.cpp \
-	$(MEDNAFEN_LIBRETRO_DIR)/psx/spu.cpp \
+	$(PSX_DIR)/spu.cpp \
 	$(PSX_DIR)/gpu.cpp \
 	$(PSX_DIR)/mdec.cpp \
 	$(PSX_DIR)/input/gamepad.cpp \
 	$(PSX_DIR)/input/dualanalog.cpp \
+	$(PSX_DIR)/input/dualshock.cpp \
+	$(PSX_DIR)/input/justifier.cpp \
+	$(PSX_DIR)/input/guncon.cpp \
+	$(PSX_DIR)/input/negcon.cpp \
 	$(PSX_DIR)/input/memcard.cpp \
 	$(PSX_DIR)/input/multitap.cpp \
 	$(PSX_DIR)/input/mouse.cpp
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
-	$(MEDNAFEN_LIBRETRO_DIR)/mednafen-libretro.cpp \
+	$(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/PSFLoader.cpp \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
 	$(MEDNAFEN_DIR)/player.cpp \
-	$(MEDNAFEN_LIBRETRO_DIR)/cdplay.cpp \
+	$(MEDNAFEN_DIR)/cdplay.cpp \
 	$(MEDNAFEN_DIR)/FileWrapper.cpp \
+	$(MEDNAFEN_DIR)/FileStream.cpp \
+	$(MEDNAFEN_DIR)/MemoryStream.cpp \
+	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/tests.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
@@ -117,6 +124,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c \
 	$(MEDNAFEN_DIR)/string/world_strtod.c \
+	$(MEDNAFEN_DIR)/resampler/resample.c \
 	$(MEDNAFEN_DIR)/compress/blz.c \
 	$(MEDNAFEN_DIR)/compress/unzip.c \
 	$(MEDNAFEN_DIR)/compress/minilzo.c \
@@ -150,8 +158,8 @@ WARNINGS := -Wall \
 	-Wno-overflow
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
-			-DMEDNAFEN_VERSION=\"0.9.24\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=924 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 \
-			-DWANT_PSX_EMU -DSTDC_HEADERS
+			-DMEDNAFEN_VERSION=\"0.9.25\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=925 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 \
+			-DWANT_PSX_EMU -DSTDC_HEADERS -D__STDC_LIMIT_MACROS
 
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS) -std=gnu99

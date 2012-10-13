@@ -23,13 +23,12 @@
 
 // #include "mpcenc.h"
 #include <stdio.h>
+#include <string.h>
 #include "mpc_types.h"
 
 #ifdef _WIN32
 # include <windows.h>
 #endif
-
-#include <string.h>
 
 #ifdef _MSC_VER
 # define strncasecmp	strnicmp

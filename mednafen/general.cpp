@@ -64,13 +64,14 @@ static bool IsAbsolutePath(const char *path)
   return(TRUE);
  }
 
- // FIXME if we add DOS support(HAHAHAHA).
- #if defined(WIN32)
+ #if defined(WIN32) || defined(DOS)
  if((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z'))
+ {
   if(path[1] == ':')
   {
    return(TRUE);
   }
+ }
  #endif
 
  return(FALSE);
@@ -248,6 +249,7 @@ static void CreateMissingDirs(const char *path)
 }
 #endif
 
+#if 0
 std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
  char tmp_path[4096];
@@ -317,7 +319,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
                       }
                       else if(type == MDFNMKF_SAV)
                       {
-		       dir = "";
+		       dir = MDFN_GetSettingS("filesys.path_sav");
                        fstring = MDFN_GetSettingS("filesys.fname_sav");
 		       fmap['x'] = std::string(cd1);
                       }
@@ -391,19 +393,19 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 		     std::string overpath = MDFN_GetSettingS("filesys.path_cheat");
 
 		     if(IsAbsolutePath(overpath))
-                      trio_snprintf(tmp_path, 4096, "%s"PSS"%s.%scht",overpath.c_str(), MDFNGameInfo->shortname, (type == MDFNMKF_CHEAT_TMP) ? "tmp" : "");
+                      trio_snprintf(tmp_path, 4096, "%s" PSS "%s.%scht",overpath.c_str(), MDFNGameInfo->shortname, (type == MDFNMKF_CHEAT_TMP) ? "tmp" : "");
                      else
-                      trio_snprintf(tmp_path, 4096, "%s"PSS"%s"PSS"%s.%scht", BaseDirectory.c_str(), overpath.c_str(), MDFNGameInfo->shortname, (type == MDFNMKF_CHEAT_TMP) ? "tmp" : "");
+                      trio_snprintf(tmp_path, 4096, "%s" PSS "%s" PSS "%s.%scht", BaseDirectory.c_str(), overpath.c_str(), MDFNGameInfo->shortname, (type == MDFNMKF_CHEAT_TMP) ? "tmp" : "");
 		    }
                     break;
 
   case MDFNMKF_AUX: if(IsAbsolutePath(cd1))
 		     trio_snprintf(tmp_path, 4096, "%s", (char *)cd1);
 		    else
-		     trio_snprintf(tmp_path, 4096, "%s"PSS"%s", FileBaseDirectory.c_str(), (char *)cd1);
+		     trio_snprintf(tmp_path, 4096, "%s" PSS "%s", FileBaseDirectory.c_str(), (char *)cd1);
 		    break;
 
-  case MDFNMKF_IPS:  trio_snprintf(tmp_path, 4096, "%s"PSS"%s%s.ips", FileBaseDirectory.c_str(), FileBase.c_str(), FileExt.c_str());
+  case MDFNMKF_IPS:  trio_snprintf(tmp_path, 4096, "%s" PSS "%s%s.ips", FileBaseDirectory.c_str(), FileBase.c_str(), FileExt.c_str());
                      break;
 
   case MDFNMKF_FIRMWARE:
@@ -417,14 +419,14 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 		     else
 		     {
 		      if(IsAbsolutePath(overpath))
-                       trio_snprintf(tmp_path, 4096, "%s"PSS"%s",overpath.c_str(), cd1);
+                       trio_snprintf(tmp_path, 4096, "%s" PSS "%s",overpath.c_str(), cd1);
                       else
 		      {
-                       trio_snprintf(tmp_path, 4096, "%s"PSS"%s"PSS"%s", BaseDirectory.c_str(), overpath.c_str(), cd1);
+                       trio_snprintf(tmp_path, 4096, "%s" PSS "%s" PSS "%s", BaseDirectory.c_str(), overpath.c_str(), cd1);
 
 		       // For backwards-compatibility with < 0.9.0
 		       if(stat(tmp_path,&tmpstat) == -1)
-                        trio_snprintf(tmp_path, 4096, "%s"PSS"%s", BaseDirectory.c_str(), cd1);
+                        trio_snprintf(tmp_path, 4096, "%s" PSS "%s", BaseDirectory.c_str(), cd1);
 		      }
 		     }
 		    }
@@ -439,20 +441,21 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 		       else
 			eff_dir = std::string(BaseDirectory) + std::string(PSS) + overpath;
 
-                       trio_snprintf(tmp_path, 4096, "%s"PSS"%s.pal", eff_dir.c_str(), FileBase.c_str());
+                       trio_snprintf(tmp_path, 4096, "%s" PSS "%s.pal", eff_dir.c_str(), FileBase.c_str());
 
                        if(stat(tmp_path,&tmpstat) == -1 && errno == ENOENT)
 		       {
-                        trio_snprintf(tmp_path, 4096, "%s"PSS"%s.%s.pal", eff_dir.c_str(), FileBase.c_str(), md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str());
+                        trio_snprintf(tmp_path, 4096, "%s" PSS "%s.%s.pal", eff_dir.c_str(), FileBase.c_str(), md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str());
 
 		        if(stat(tmp_path, &tmpstat) == -1 && errno == ENOENT)
-			 trio_snprintf(tmp_path, 4096, "%s"PSS"%s.pal", eff_dir.c_str(), cd1 ? cd1 : MDFNGameInfo->shortname);
+			 trio_snprintf(tmp_path, 4096, "%s" PSS "%s.pal", eff_dir.c_str(), cd1 ? cd1 : MDFNGameInfo->shortname);
 		       }
 		      }
                       break;
  }
  return(tmp_path);
 }
+#endif
 
 const char * GetFNComponent(const char *str)
 {
