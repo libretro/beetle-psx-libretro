@@ -94,7 +94,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(MEDNAFEN_DIR)/string/escape.cpp \
-	$(MEDNAFEN_DIR)/string/ConvertUTF.cpp \
 	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
