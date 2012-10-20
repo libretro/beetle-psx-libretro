@@ -1,5 +1,7 @@
-
 DEBUG = 0
+
+MEDNAFEN_DIR := mednafen
+MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
 
 ifeq ($(platform),)
 platform = unix
@@ -16,20 +18,113 @@ endif
 # CD in order to prevent file access delays/hiccups
 CACHE_CD = 0
 
+#if no core specified, just pick psx for now
+ifeq ($(core),)
+   core = psx
+endif
+
+ifeq ($(core), psx)
+   core = psx
+   PTHREAD_FLAGS = -pthread
+   NEED_CD = 1
+   NEED_THREADING = 1
+   CORE_DEFINE := -DWANT_PSX_EMU
+   CORE_INCDIR := -I$(MEDNAFEN_DIR)/psx
+   CORE_DIR := $(MEDNAFEN_DIR)/psx
+   CORE_SOURCES := $(CORE_DIR)/psx.cpp \
+	$(CORE_DIR)/irq.cpp \
+	$(CORE_DIR)/timer.cpp \
+	$(CORE_DIR)/dma.cpp \
+	$(CORE_DIR)/frontio.cpp \
+	$(CORE_DIR)/sio.cpp \
+	$(CORE_DIR)/cpu.cpp \
+	$(CORE_DIR)/gte.cpp \
+	$(CORE_DIR)/dis.cpp \
+	$(CORE_DIR)/cdc.cpp \
+	$(CORE_DIR)/spu.cpp \
+	$(CORE_DIR)/gpu.cpp \
+	$(CORE_DIR)/mdec.cpp \
+	$(CORE_DIR)/input/gamepad.cpp \
+	$(CORE_DIR)/input/dualanalog.cpp \
+	$(CORE_DIR)/input/dualshock.cpp \
+	$(CORE_DIR)/input/justifier.cpp \
+	$(CORE_DIR)/input/guncon.cpp \
+	$(CORE_DIR)/input/negcon.cpp \
+	$(CORE_DIR)/input/memcard.cpp \
+	$(CORE_DIR)/input/multitap.cpp \
+	$(CORE_DIR)/input/mouse.cpp
+TARGET_NAME := mednafen_psx_libretro
+SSE_DEFINES := 	-msse -msse2
+else ifeq ($(core), pce_fast)
+   core = pce_fast
+   PTHREAD_FLAGS = -pthread
+   NEED_CD = 1
+   NEED_THREADING = 1
+   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
+TARGET_NAME := mednafen_pce_fast_libretro
+endif
+
 ifeq ($(platform), unix)
-   TARGET := libretro.so
+   TARGET := $(TARGET_NAME).so
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ENDIANNESS_DEFINES := -DLSB_FIRST
-   LDFLAGS += -pthread
-   FLAGS += -pthread -DHAVE_MKDIR
+   ifneq ($(shell uname -p | grep -E '((i.|x)86|amd64)'),)
+      IS_X86 = 1
+   endif
+   LDFLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS)
 else ifeq ($(platform), osx)
-   TARGET := libretro.dylib
+   TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    ENDIANNESS_DEFINES := -DLSB_FIRST
-   LDFLAGS += -pthread
-   FLAGS += -pthread -DHAVE_MKDIR
+   LDFLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS)
+else ifeq ($(platform), ps3)
+   TARGET := $(TARGET_NAME)_ps3.a
+   CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
+   CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
+   AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
+   ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+else ifeq ($(platform), sncps3)
+   TARGET := $(TARGET_NAME)_ps3.a
+   CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
+   CXX = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
+   AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
+   ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+
+   CXXFLAGS += -Xc+=exceptions
+else ifeq ($(platform), psl1ght)
+   TARGET := $(TARGET_NAME)_psl1ght.a
+   CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
+   CC = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
+   AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+else ifeq ($(platform), xenon)
+   TARGET := $(TARGET_NAME)_xenon360.a
+   CC = xenon-gcc$(EXE_EXT)
+   CXX = xenon-g++$(EXE_EXT)
+   AR = xenon-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+   LIBS := $(PTHREAD_FLAGS)
+else ifeq ($(platform), ngc)
+   TARGET := $(TARGET_NAME)_ngc.a
+   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
+   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+
+   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
+
+else ifeq ($(platform), wii)
+   TARGET := $(TARGET_NAME)_wii.a
+   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
+   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+
+   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
 else
    TARGET := retro.dll
    CC = i686-pc-mingw32-gcc
@@ -37,36 +132,29 @@ else
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
-   FLAGS += -DHAVE__MKDIR
 endif
 
+ifeq ($(NEED_THREADING), 1)
+THREAD_STUBS := thread.cpp
+endif
 
-MEDNAFEN_DIR := mednafen
-MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
-PSX_DIR := $(MEDNAFEN_DIR)/psx
+ifeq ($(NEED_CD), 1)
+CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
+	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
+	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
+	$(MEDNAFEN_DIR)/cdrom/lec.cpp \
+	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
+	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
+	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
+	$(MEDNAFEN_DIR)/cdrom/pcecd.cpp \
+	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
+	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
+	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
+	$(MEDNAFEN_DIR)/cdrom/crc32.cpp
 
-PSX_SOURCES := $(PSX_DIR)/psx.cpp \
-	$(PSX_DIR)/irq.cpp \
-	$(PSX_DIR)/timer.cpp \
-	$(PSX_DIR)/dma.cpp \
-	$(PSX_DIR)/frontio.cpp \
-	$(PSX_DIR)/sio.cpp \
-	$(PSX_DIR)/cpu.cpp \
-	$(PSX_DIR)/gte.cpp \
-	$(PSX_DIR)/dis.cpp \
-	$(PSX_DIR)/cdc.cpp \
-	$(PSX_DIR)/spu.cpp \
-	$(PSX_DIR)/gpu.cpp \
-	$(PSX_DIR)/mdec.cpp \
-	$(PSX_DIR)/input/gamepad.cpp \
-	$(PSX_DIR)/input/dualanalog.cpp \
-	$(PSX_DIR)/input/dualshock.cpp \
-	$(PSX_DIR)/input/justifier.cpp \
-	$(PSX_DIR)/input/guncon.cpp \
-	$(PSX_DIR)/input/negcon.cpp \
-	$(PSX_DIR)/input/memcard.cpp \
-	$(PSX_DIR)/input/multitap.cpp \
-	$(PSX_DIR)/input/mouse.cpp
+MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
+TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+endif
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/mednafen.cpp \
@@ -80,18 +168,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
-	$(MEDNAFEN_DIR)/cdrom/lec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
-	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
-	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
-	$(MEDNAFEN_DIR)/cdrom/pcecd.cpp \
-	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
-	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
-	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/crc32.cpp \
+	$(CDROM_SOURCES) \
 	$(MEDNAFEN_DIR)/memory.cpp \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
@@ -103,10 +180,8 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/okiadpcm.cpp \
 	$(MEDNAFEN_DIR)/md5.cpp
 
-MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
-TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 
-LIBRETRO_SOURCES := libretro.cpp stubs.cpp thread.cpp
+LIBRETRO_SOURCES := libretro.cpp stubs.cpp $(THREAD_STUBS)
 
 SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MPC_SRC) \
@@ -115,7 +190,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
 
-SOURCES := $(LIBRETRO_SOURCES) $(PSX_SOURCES) $(MEDNAFEN_SOURCES)
+SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
@@ -126,9 +201,9 @@ else
    FLAGS += -O0 -g
 endif
 
-LDFLAGS += $(fpic) -lz $(SHARED)
-FLAGS += -msse -msse2 -Wall $(fpic) -fno-strict-overflow
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/psx
+LDFLAGS += $(fpic) $(SHARED)
+FLAGS += $(SSE_DEFINES) -Wall $(fpic) -fno-strict-overflow
+FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl $(CORE_INCDIR)
 
 WARNINGS := -Wall \
 	-Wno-narrowing \
@@ -142,7 +217,7 @@ WARNINGS := -Wall \
 	-Wno-overflow
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
-			-DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 -DWANT_PSX_EMU -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG
+			-DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG $(EXTRA_INCLUDES)
 
 ifeq ($(CACHE_CD), 1)
 FLAGS += -D__LIBRETRO_CACHE_CD__

@@ -23,6 +23,25 @@ static bool failed_init;
 std::string retro_base_directory;
 std::string retro_base_name;
 
+#if defined(WANT_PSX_EMU)
+const char *mednafen_core_str = "Mednafen PSX";
+#define MEDNAFEN_CORE_NAME "Mednafen PSX"
+#define FB_WIDTH 680
+#define FB_HEIGHT 576
+#elif defined(WANT_PCE_FAST_EMU)
+#define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
+const char *mednafen_core_str = "Mednafen PCE Fast";
+#endif
+
+static void check_system_specs(void)
+{
+#if defined(WANT_PSX_EMU)
+   // Hints that we need a fairly powerful system to run this.
+   unsigned level = 3;
+   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
+#endif
+}
+
 void retro_init()
 {
    std::vector<MDFNGI*> ext;
@@ -40,13 +59,12 @@ void retro_init()
    }
    else
    {
+	/* TODO: Add proper fallback */
       fprintf(stderr, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
 
-   // Hints that we need a fairly powerful system to run this.
-   unsigned level = 3;
-   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
+   check_system_specs();
 }
 
 void retro_reset()
@@ -83,15 +101,15 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!game)
       return false;
 
-   int fbWidth  = 680;
-   int fbHeight = 576;
+   int fbWidth  = FB_WIDTH;
+   int fbHeight = FB_HEIGHT;
    int fbSize   = fbWidth * fbHeight;
 
    conv_buf     = new uint16_t[fbSize];
    mednafen_buf = new uint32_t[fbSize];
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
 
-   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, 680, pix_fmt);
+   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, FB_WIDTH, pix_fmt);
 
    return game;
 }
@@ -147,8 +165,9 @@ static unsigned retro_devices[2];
 
 // Hardcoded for PSX. No reason to parse lots of structures ...
 // See mednafen/psx/input/gamepad.cpp
-static void update_input()
+static void update_input(void)
 {
+#if defined(WANT_PSX_EMU)
    union
    {
       uint32_t u32[2][1 + 8];
@@ -235,6 +254,7 @@ static void update_input()
             break;
       }
    }
+#endif
 }
 
 static uint64_t video_frames, audio_frames;
@@ -246,7 +266,7 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[576];
+   static MDFN_Rect rects[FB_HEIGHT];
    rects[0].w = ~0;
 
    EmulateSpecStruct spec = {0};
@@ -267,7 +287,7 @@ void retro_run()
    // infamous PAL borders. This removes them. The PS1 supports only two horizontal
    // resolutions so it's OK to use constants and not precentage.
    bool isPal = false;
-   if (height == 576) {
+   if (height == FB_HEIGHT) {
        ptrDiff += width * 47;
        height = 480;
        isPal = true;
@@ -276,7 +296,7 @@ void retro_run()
        isPal = true;
    }
 
-   if (isPal && width == 680) {
+   if (isPal && width == FB_WIDTH) {
        ptrDiff += 7;
    }
 
@@ -294,7 +314,7 @@ void retro_run()
       const uint32_t *ptr = mednafen_buf;
       ptr += ptrDiff;
 
-      video_cb(ptr, width, height, 680 << 2);
+      video_cb(ptr, width, height, FB_WIDTH << 2);
    }
    else
    {
@@ -302,7 +322,7 @@ void retro_run()
 
       const uint16_t *ptr = conv_buf;
       ptr += ptrDiff;
-      video_cb(ptr, width, height, 680 << 1);
+      video_cb(ptr, width, height, FB_WIDTH << 1);
    }
 
    video_frames++;
@@ -314,7 +334,7 @@ void retro_run()
 void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->library_name     = "Mednafen PSX";
+   info->library_name     = MEDNAFEN_CORE_NAME;
    info->library_version  = "0.9.26";
    info->need_fullpath    = true;
    info->valid_extensions = "cue|CUE";
@@ -337,11 +357,11 @@ void retro_deinit()
    delete surf;
    surf = NULL;
 
-   fprintf(stderr, "[Mednafen PSX]: Samples / Frame: %.5f\n",
-         (double)audio_frames / video_frames);
+   fprintf(stderr, "[%s]: Samples / Frame: %.5f\n",
+         mednafen_core_str, (double)audio_frames / video_frames);
 
-   fprintf(stderr, "[Mednafen PSX]: Estimated FPS: %.5f\n",
-         (double)video_frames * 44100 / audio_frames);
+   fprintf(stderr, "[%s]: Estimated FPS: %.5f\n",
+         mednafen_core_str, (double)video_frames * 44100 / audio_frames);
 }
 
 unsigned retro_get_region(void)
@@ -356,25 +376,27 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
+#ifdef WANT_PSX_EMU
    if (in_port > 1)
    {
       fprintf(stderr,
-            "[Mednafen PSX]: Only the 2 main ports are supported at the moment");
+            "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
       return;
    }
+#endif
 
    switch (device)
    {
       // TODO: Add support for other input types
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_ANALOG:
-         fprintf(stderr, "[Mednafen PSX]: Selected controller type %u", device);
+         fprintf(stderr, "[%s]: Selected controller type %u", mednafen_core_str, device);
          retro_devices[in_port] = device;
          break;
       default:
          retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
          fprintf(stderr,
-               "[Mednafen PSX]: Unsupported controller device, falling back to gamepad");
+               "[%s]: Unsupported controller device, falling back to gamepad", mednafen_core_str);
    }
 }
 

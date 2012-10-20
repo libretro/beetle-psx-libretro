@@ -15,21 +15,6 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#if HAVE_MKDIR
- #if MKDIR_TAKES_ONE_ARG
-  #define MDFN_mkdir(a, b) mkdir(a)
- #else
-  #define MDFN_mkdir(a, b) mkdir(a, b)
- #endif
-#else
- #if HAVE__MKDIR
-  /* Plain Win32 */
-  #define MDFN_mkdir(a, b) _mkdir(a)
- #else
-  #error "Don't know how to create a directory on this system."
- #endif
-#endif
-
 typedef int8_t int8;
 typedef int16_t int16;
 typedef int32_t int32; 
@@ -43,28 +28,6 @@ typedef uint64_t uint64;
 
 #if !defined(HAVE_NATIVE64BIT) && SIZEOF_VOID_P >= 8
 #define HAVE_NATIVE64BIT 1
-#endif
-
-#if 0
-// Multi-type union array!
-template<size_t array_byte_size>
-struct mtuarray
-{
- union
- {
-  uint64 u64[array_byte_size / sizeof(uint64)];
-  int64 s64[array_byte_size / sizeof(uint64)];
-
-  uint8 u8[array_byte_size];
-  int8 s8[array_byte_size];
-
-  uint16 u16[array_byte_size / sizeof(uint16)];
-  int16 s16[array_byte_size / sizeof(int16)];
-
-  uint32 u32[array_byte_size / sizeof(uint32)];
-  int32 s32[array_byte_size / sizeof(int32)];
- };
-};
 #endif
 
 #ifdef __GNUC__
