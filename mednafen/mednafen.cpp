@@ -27,12 +27,9 @@
 #include	<list>
 #include	<algorithm>
 
-#include	"netplay.h"
-#include	"netplay-driver.h"
 #include	"general.h"
 
 #include	"state.h"
-#include	"movie.h"
 #include        "video.h"
 #include	"video/Deinterlacer.h"
 #include	"file.h"
@@ -40,9 +37,6 @@
 #include	"cdrom/cdromif.h"
 #include	"mempatcher.h"
 #include	"compress/minilzo.h"
-#include	"tests.h"
-#include	"video/tblur.h"
-#include	"qtrecord.h"
 #include	"md5.h"
 #include	"clamp.h"
 #include	"Fir_Resampler.h"
@@ -53,26 +47,11 @@
 
 static const char *CSD_forcemono = gettext_noop("Force monophonic sound output.");
 static const char *CSD_enable = gettext_noop("Enable (automatic) usage of this module.");
-static const char *CSD_tblur = gettext_noop("Enable video temporal blur(50/50 previous/current frame by default).");
-static const char *CSD_tblur_accum = gettext_noop("Accumulate color data rather than discarding it.");
-static const char *CSD_tblur_accum_amount = gettext_noop("Blur amount in accumulation mode, specified in percentage of accumulation buffer to mix with the current frame.");
-
-static MDFNSetting_EnumList CompressorList[] =
-{
- // TODO: Actual associated numerical values are not currently used.
- { "minilzo", -1, "MiniLZO" },
- { "quicklz", -1, "QuickLZ" },
- { "blz", -1, "BLZ" },
-
- { NULL, 0 },
-};
 
 static const char *fname_extra = gettext_noop("See fname_format.txt for more information.  Edit at your own risk.");
 
 static MDFNSetting MednafenSettings[] =
 {
-  { "srwcompressor", MDFNSF_NOFLAGS, gettext_noop("Compressor to use with state rewinding"), NULL, MDFNST_ENUM, "quicklz", NULL, NULL, NULL, NULL, CompressorList },
-
   { "srwframes", MDFNSF_NOFLAGS, gettext_noop("Number of frames to keep states for when state rewinding is enabled."), 
 	gettext_noop("WARNING: Setting this to a large value may cause excessive RAM usage in some circumstances, such as with games that stream large volumes of data off of CDs."), MDFNST_UINT, "600", "10", "99999" },
 
@@ -113,14 +92,6 @@ static MDFNSetting RenamedSettings[] =
  { "soundvol", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS     , "sound.volume"      },
  { "soundbufsize", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS , "sound.buffer_time" },
 
- { "nethost", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "netplay.host"   },
- { "netport", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "netplay.port"   },
- { "netpassword", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS     , "netplay.password"},
- { "netlocalplayers", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS , "netplay.localplayers" },
- { "netnick", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "netplay.nick"   },
- { "netgamekey", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS      , "netplay.gamekey"        },
- { "netsmallfont", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS    , "netplay.smallfont" },
-
  { "frameskip", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS       , "video.frameskip" },
  { "vdriver", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "video.driver" },
  { "glvsync", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "video.glvsync" },
@@ -133,13 +104,8 @@ static MDFNSetting RenamedSettings[] =
  { NULL }
 };
 
-static char *PortDeviceCache[16];
-static void *PortDataCache[16];
-static uint32 PortDataLenCache[16];
-
 MDFNGI *MDFNGameInfo = NULL;
 
-static WAVRecord *wavrecorder = NULL;
 static Fir_Resampler<16> ff_resampler;
 static double LastSoundMultiplier;
 
@@ -169,37 +135,20 @@ void MDFNI_CloseGame(void)
   MDFNMP_Kill();
 
   MDFNGameInfo = NULL;
-  MDFN_StateEvilEnd();
 
   for(unsigned i = 0; i < CDInterfaces.size(); i++)
    delete CDInterfaces[i];
   CDInterfaces.clear();
  }
- TBlur_Kill();
 
  #ifdef WANT_DEBUGGER
  MDFNDBG_Kill();
  #endif
-
- for(unsigned int x = 0; x < sizeof(PortDeviceCache) / sizeof(char *); x++)
- {
-  if(PortDeviceCache[x])
-  {
-   free(PortDeviceCache[x]);
-   PortDeviceCache[x] = NULL;
-  }
- }
-
- memset(PortDataCache, 0, sizeof(PortDataCache));
- memset(PortDataLenCache, 0, sizeof(PortDataLenCache));
- memset(PortDeviceCache, 0, sizeof(PortDeviceCache));
 }
 
 #ifdef WANT_PSX_EMU
 extern MDFNGI EmulatedPSX;
 #endif
-
-extern MDFNGI EmulatedCDPlay;
 
 std::vector<MDFNGI *> MDFNSystems;
 static std::list<MDFNGI *> MDFNSystemsPrio;
@@ -452,14 +401,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  MDFNDBG_PostGameLoad(); 
  #endif
 
- MDFNSS_CheckStates();
-
  MDFN_ResetMessages();   // Save state, status messages, etc.
-
- TBlur_Init();
-
- MDFN_StateEvilBegin();
-
 
  if(MDFNGameInfo->GameType != GMT_PLAYER)
  {
@@ -673,8 +615,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	MDFNDBG_PostGameLoad();
 	#endif
 
-	MDFNSS_CheckStates();
-
 	MDFN_ResetMessages();	// Save state, status messages, etc.
 
 	MDFN_indent(-2);
@@ -697,11 +637,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 	PrevInterlaced = false;
 	deint.ClearState();
-
-	TBlur_Init();
-
-        MDFN_StateEvilBegin();
-
 
         last_sound_rate = -1;
         memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
@@ -865,8 +800,6 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
   &EmulatedSMS,
   &EmulatedGG,
   #endif
-
-  &EmulatedCDPlay
  };
  std::string i_modules_string, e_modules_string;
 
@@ -906,16 +839,6 @@ int MDFNI_Initialize(const char *basedir, const std::vector<MDFNSetting> &Driver
 	// FIXME static
 	static std::vector<MDFNSetting> dynamic_settings;
 
-	// DO NOT REMOVE/DISABLE THESE MATH AND COMPILER SANITY TESTS.  THEY EXIST FOR A REASON.
-	if(!MDFN_RunMathTests())
-	{
-	 return(0);
-	}
-
-	memset(PortDataCache, 0, sizeof(PortDataCache));
-	memset(PortDataLenCache, 0, sizeof(PortDataLenCache));
-	memset(PortDeviceCache, 0, sizeof(PortDeviceCache));
-
 	lzo_init();
 
 	MDFNI_SetBaseDirectory(basedir);
@@ -940,15 +863,6 @@ int MDFNI_Initialize(const char *basedir, const std::vector<MDFNSetting> &Driver
 	 }
 
 	 BuildDynamicSetting(&setting, sysname, "enable", MDFNSF_COMMON_TEMPLATE, CSD_enable, MDFNST_BOOL, "1");
-	 dynamic_settings.push_back(setting);
-
-	 BuildDynamicSetting(&setting, sysname, "tblur", MDFNSF_COMMON_TEMPLATE | MDFNSF_CAT_VIDEO, CSD_tblur, MDFNST_BOOL, "0");
-         dynamic_settings.push_back(setting);
-
-         BuildDynamicSetting(&setting, sysname, "tblur.accum", MDFNSF_COMMON_TEMPLATE | MDFNSF_CAT_VIDEO, CSD_tblur_accum, MDFNST_BOOL, "0");
-         dynamic_settings.push_back(setting);
-
-         BuildDynamicSetting(&setting, sysname, "tblur.accum.amount", MDFNSF_COMMON_TEMPLATE | MDFNSF_CAT_VIDEO, CSD_tblur_accum_amount, MDFNST_FLOAT, "50", "0", "100");
 	 dynamic_settings.push_back(setting);
 	}
 
@@ -1002,31 +916,6 @@ static void ProcessAudio(EmulateSpecStruct *espec)
   int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
   const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
 
-
-  if(espec->NeedSoundReverse)
-  {
-   int16 *yaybuf = SoundBuf;
-   int32 slen = SoundBufSize;
-
-   if(MDFNGameInfo->soundchan == 1)
-   {
-    for(int x = 0; x < (slen / 2); x++)    
-    {
-     int16 cha = yaybuf[slen - x - 1];
-     yaybuf[slen - x - 1] = yaybuf[x];
-     yaybuf[x] = cha;
-    }
-   }
-   else if(MDFNGameInfo->soundchan == 2)
-   {
-    for(int x = 0; x < (slen * 2) / 2; x++)
-    {
-     int16 cha = yaybuf[slen * 2 - (x&~1) - ((x&1) ^ 1) - 1];
-     yaybuf[slen * 2 - (x&~1) - ((x&1) ^ 1) - 1] = yaybuf[x];
-     yaybuf[x] = cha;
-    }
-   }
-  }
 
   if(multiplier_save != LastSoundMultiplier)
   {
@@ -1164,9 +1053,6 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
   ff_resampler.buffer_size((espec->SoundRate / 2) * 2);
  }
 
- if(TBlur_IsOn())
-  espec->skip = 0;
-
  if(espec->NeedRewind)
  {
   if(MDFNGameInfo->GameType == GMT_PLAYER)
@@ -1179,7 +1065,7 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
  // Don't even save states with state rewinding if netplay is enabled, it will degrade netplay performance, and can cause
  // desynchs with some emulation(IE SNES based on bsnes).
 
-  espec->NeedSoundReverse = MDFN_StateEvil(espec->NeedRewind);
+  espec->NeedSoundReverse = false;
 
  MDFNGameInfo->Emulate(espec);
 
@@ -1213,8 +1099,6 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
   PrevInterlaced = false;
 
  ProcessAudio(espec);
-
- TBlur_Run(espec);
 }
 
 // This function should only be called for state rewinding.
@@ -1230,16 +1114,8 @@ int MDFN_RawInputStateAction(StateMem *sm, int load, int data_only)
   StateRegs[x].name = stringies[x];
   StateRegs[x].flags = 0;
 
-  if(PortDataCache[x])
-  {
-   StateRegs[x].v = PortDataCache[x];
-   StateRegs[x].size = PortDataLenCache[x];
-  }
-  else
-  {
-   StateRegs[x].v = NULL;
-   StateRegs[x].size = 0;
-  }
+  StateRegs[x].v = NULL;
+  StateRegs[x].size = 0;
  }
 
  StateRegs[x].v = NULL;
@@ -1426,17 +1302,6 @@ void MDFNI_SetInput(int port, const char *type, void *ptr, uint32 ptr_len_thingy
  if(MDFNGameInfo)
  {
   assert(port < 16);
-
-  PortDataCache[port] = ptr;
-  PortDataLenCache[port] = ptr_len_thingy;
-
-  if(PortDeviceCache[port])
-  {
-   free(PortDeviceCache[port]);
-   PortDeviceCache[port] = NULL;
-  }
-
-  PortDeviceCache[port] = strdup(type);
 
   MDFNGameInfo->SetInput(port, type, ptr);
  }

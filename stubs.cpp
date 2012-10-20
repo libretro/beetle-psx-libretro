@@ -4,7 +4,6 @@
 #include "mednafen/git.h"
 #include "mednafen/general.h"
 #include "mednafen/mednafen-driver.h"
-#include "mednafen/netplay-driver.h"
 #include "thread.h"
 
 #include <iostream>
@@ -121,8 +120,6 @@ int MDFND_UnlockMutex(MDFN_Mutex *lock)
 
 void MDFND_SendData(const void*, uint32) {}
 void MDFND_RecvData(void *, uint32) {}
-void MDFND_NetplayText(const uint8*, bool) {}
-void MDFND_NetworkClose() {}
 
 uint32 MDFND_GetTime()
 {

@@ -66,19 +66,15 @@ PSX_SOURCES := $(PSX_DIR)/psx.cpp \
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/mednafen.cpp \
-	$(MEDNAFEN_DIR)/PSFLoader.cpp \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
-	$(MEDNAFEN_DIR)/player.cpp \
-	$(MEDNAFEN_DIR)/cdplay.cpp \
 	$(MEDNAFEN_DIR)/FileWrapper.cpp \
 	$(MEDNAFEN_DIR)/FileStream.cpp \
 	$(MEDNAFEN_DIR)/MemoryStream.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
-	$(MEDNAFEN_DIR)/tests.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
@@ -97,7 +93,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
 	$(MEDNAFEN_DIR)/video/text.cpp \
 	$(MEDNAFEN_DIR)/video/font-data.cpp \
-	$(MEDNAFEN_DIR)/video/tblur.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(MEDNAFEN_DIR)/video/resize.cpp \
@@ -159,7 +154,7 @@ WARNINGS := -Wall \
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
 			-DMEDNAFEN_VERSION=\"0.9.25\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=925 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 \
-			-DWANT_PSX_EMU -DSTDC_HEADERS -D__STDC_LIMIT_MACROS
+			-DWANT_PSX_EMU -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__
 
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS) -std=gnu99

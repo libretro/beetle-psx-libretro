@@ -15,6 +15,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef __LIBRETRO__
+#define HAVE_PSF 1
+#endif
+
 #include "psx.h"
 #include "mdec.h"
 #include "frontio.h"
@@ -24,8 +28,11 @@
 #include "spu.h"
 #include "../mednafen-endian.h"
 #include "../mempatcher.h"
+#ifdef HAVE_PSF
 #include "../PSFLoader.h"
 #include "../player.h"
+#endif
+
 #include "../cputest/cputest.h"
 
 extern MDFNGI EmulatedPSX;
@@ -33,6 +40,7 @@ extern MDFNGI EmulatedPSX;
 namespace MDFN_IEN_PSX
 {
 
+#ifdef HAVE_PSF
 class PSF1Loader : public PSFLoader
 {
  public:
@@ -44,6 +52,7 @@ class PSF1Loader : public PSFLoader
 
  PSFTags tags;
 };
+#endif
 
 enum
 {
@@ -58,7 +67,10 @@ static uint32 ReadCounter = 0;
 static uint32 WriteCounter = 0;
 #endif
 
+#ifdef HAVE_PSF
 static PSF1Loader *psf_loader = NULL;
+#endif
+
 static std::vector<CDIF*> *cdifs = NULL;
 static std::vector<const char *> cdifs_scex_ids;
 static bool CD_TrayOpen;
@@ -780,11 +792,19 @@ static void Emulate(EmulateSpecStruct *espec)
  espec->SoundBufSize = 0;
 
  FIO->UpdateInput();
+#ifdef HAVE_PSF
  GPU->StartFrame(psf_loader ? NULL : espec);
+#else
+ GPU->StartFrame(espec);
+#endif
  SPU->StartFrame(espec->SoundRate, MDFN_GetSettingUI("psx.spu.resamp_quality"));
 
  Running = -1;
+#ifdef HAVE_PSF
  timestamp = CPU->Run(timestamp, psf_loader != NULL);
+#else
+ timestamp = CPU->Run(timestamp, false);
+#endif
 
  assert(timestamp);
 
@@ -806,6 +826,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
  espec->MasterCycles = timestamp;
 
+#ifdef HAVE_PSF
  if(psf_loader)
  {
   if(!espec->skip)
@@ -814,6 +835,7 @@ static void Emulate(EmulateSpecStruct *espec)
    Player_Draw(espec->surface, &espec->DisplayRect, 0, espec->SoundBuf, espec->SoundBufSize);
   }
  }
+#endif
 
  // Save memcards if dirty.
  for(int i = 0; i < 8; i++)
@@ -867,8 +889,10 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
+#ifdef HAVE_PSF
  if(PSFLoader::TestMagic(0x01, fp))
   return(true);
+#endif
 
  if(fp->size < 0x800)
   return(false);
@@ -1433,6 +1457,7 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
 
 }
 
+#ifdef HAVE_PSF
 PSF1Loader::PSF1Loader(MDFNFILE *fp)
 {
  tags = Load(0x01, 2033664, fp);
@@ -1447,11 +1472,16 @@ void PSF1Loader::HandleEXE(const uint8 *data, uint32 size, bool ignore_pcsp)
 {
  LoadEXE(data, size, ignore_pcsp);
 }
+#endif
 
 static void Cleanup(void);
 static int Load(const char *name, MDFNFILE *fp)
 {
+#ifdef HAVE_PSF
  const bool IsPSF = PSFLoader::TestMagic(0x01, fp);
+#else
+ const bool IsPSF = false; 
+#endif
 
  if(!TestMagic(name, fp))
  {
@@ -1480,6 +1510,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
  try
  {
+#ifdef HAVE_PSF
   if(IsPSF)
   {
    psf_loader = new PSF1Loader(fp);
@@ -1491,6 +1522,7 @@ static int Load(const char *name, MDFNFILE *fp)
    Player_Init(1, psf_loader->tags.GetTag("game"), psf_loader->tags.GetTag("artist"), psf_loader->tags.GetTag("copyright"), SongNames);
   }
   else
+#endif
    LoadEXE(fp->data, fp->size);
  }
  catch(std::exception &e)
@@ -1520,11 +1552,13 @@ static void Cleanup(void)
 {
  TextMem.resize(0);
 
+#ifdef HAVE_PSF
  if(psf_loader)
  {
   delete psf_loader;
   psf_loader = NULL;
  }
+#endif
 
  if(CDC)
  {
@@ -1575,7 +1609,9 @@ static void Cleanup(void)
 
 static void CloseGame(void)
 {
+#ifdef HAVE_PSF
  if(!psf_loader)
+#endif
  {
   for(int i = 0; i < 8; i++)
   {
@@ -1601,9 +1637,11 @@ static void CloseGame(void)
 
 static void SetInput(int port, const char *type, void *ptr)
 {
+#ifdef HAVE_PSF
  if(psf_loader)
   FIO->SetInput(port, "none", NULL);
  else
+#endif
   FIO->SetInput(port, type, ptr);
 }
 
@@ -1719,8 +1757,10 @@ static void DoSimpleCommand(int cmd)
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
+#ifdef HAVE_PSF
  { ".psf", gettext_noop("PSF1 Rip") },
  { ".minipsf", gettext_noop("MiniPSF1 Rip") },
+#endif
  { ".psx", gettext_noop("PS-X Executable") },
  { ".exe", gettext_noop("PS-X Executable") },
  { NULL, NULL }
