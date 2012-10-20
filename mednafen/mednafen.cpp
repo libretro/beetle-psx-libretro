@@ -909,41 +909,6 @@ static void ProcessAudio(EmulateSpecStruct *espec)
   int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
   const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
 
-
-  if(multiplier_save != LastSoundMultiplier)
-  {
-   ff_resampler.time_ratio(multiplier_save, 0.9965);
-   LastSoundMultiplier = multiplier_save;
-  }
-
-  if(multiplier_save != 1)
-  {
-   {
-     assert(ff_resampler.max_write() >= SoundBufSize * 2);
-
-     for(int i = 0; i < SoundBufSize; i++)
-     {
-      ff_resampler.buffer()[i * 2] = SoundBuf[i];
-      ff_resampler.buffer()[i * 2 + 1] = 0;
-     }
-
-    ff_resampler.write(SoundBufSize * 2);
-
-    int avail = ff_resampler.avail();
-    int real_read = std::min((int)(SoundBufMaxSize * MDFNGameInfo->soundchan), avail);
-
-    SoundBufSize = ff_resampler.read_mono_hack(SoundBuf, real_read );
-
-    avail -= real_read;
-
-    if(avail > 0)
-    {
-     printf("ff_resampler.avail() > espec->SoundBufMaxSize * MDFNGameInfo->soundchan - %d\n", avail);
-     ff_resampler.clear();
-    }
-   }
-  }
-
   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
  } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
 }
@@ -958,37 +923,6 @@ static void ProcessAudio(EmulateSpecStruct *espec)
   int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
   int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
   const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
-
-
-  if(multiplier_save != LastSoundMultiplier)
-  {
-   ff_resampler.time_ratio(multiplier_save, 0.9965);
-   LastSoundMultiplier = multiplier_save;
-  }
-
-  if(multiplier_save != 1)
-  {
-   {
-     assert(ff_resampler.max_write() >= SoundBufSize * 2);
-
-     for(int i = 0; i < SoundBufSize * 2; i++)
-      ff_resampler.buffer()[i] = SoundBuf[i];
-    ff_resampler.write(SoundBufSize * 2);
-
-    int avail = ff_resampler.avail();
-    int real_read = std::min((int)(SoundBufMaxSize * MDFNGameInfo->soundchan), avail);
-
-    SoundBufSize = ff_resampler.read(SoundBuf, real_read ) >> 1;
-
-    avail -= real_read;
-
-    if(avail > 0)
-    {
-     printf("ff_resampler.avail() > espec->SoundBufMaxSize * MDFNGameInfo->soundchan - %d\n", avail);
-     ff_resampler.clear();
-    }
-   }
-  }
 
   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
  } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
