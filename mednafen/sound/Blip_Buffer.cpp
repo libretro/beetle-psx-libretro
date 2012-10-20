@@ -23,6 +23,10 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA */
 	#include BLARGG_ENABLE_OPTIMIZER
 #endif
 
+#if defined(WANT_PSX_EMU)
+#define SOUND_STEREO 1
+#endif
+
 int const silent_buf_size = 1; // size used for Silent_Blip_Buffer
 
 Blip_Buffer::Blip_Buffer()
@@ -401,6 +405,7 @@ long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, long max_sampl
 		int const bass = BLIP_READER_BASS( *this );
 		BLIP_READER_BEGIN( reader, *this );
 		
+#ifndef SOUND_STEREO
 		if ( !stereo )
 		{
 			for ( blip_long n = count; n; --n )
@@ -413,6 +418,7 @@ long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, long max_sampl
 			}
 		}
 		else
+#endif
 		{
 			for ( blip_long n = count; n; --n )
 			{

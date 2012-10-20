@@ -14,6 +14,10 @@ for more details. You should have received a copy of the GNU General
 Public License along with Stereo_Buffer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA */
 
+#if defined(WANT_PSX_EMU)
+#define SOUND_STEREO 1
+#endif
+
 Stereo_Buffer::Stereo_Buffer() {
 }
 
@@ -78,6 +82,7 @@ long Stereo_Buffer::read_samples( blip_sample_t* out, long max_samples )
 			bufs [1].remove_samples( count );
 			bufs [2].remove_samples( count );
 		}
+#ifndef SOUND_STEREO
 		else
 		{
 			mix_mono( out, count );
@@ -87,6 +92,7 @@ long Stereo_Buffer::read_samples( blip_sample_t* out, long max_samples )
 			bufs [1].remove_silence( count );
 			bufs [2].remove_silence( count );
 		}
+#endif
 		
 		// to do: this might miss opportunities for optimization
 		if ( !bufs [0].samples_avail() ) {
@@ -152,6 +158,7 @@ void Stereo_Buffer::mix_stereo( float* out, long count )
         left.end( bufs [1] );
 }
 
+#ifndef SOUND_STEREO
 void Stereo_Buffer::mix_mono( blip_sample_t* out, long count )
 {
 	Blip_Reader in;
@@ -185,4 +192,5 @@ void Stereo_Buffer::mix_mono( float* out, long count )
 
         in.end( bufs [0] );
 }
+#endif
 
