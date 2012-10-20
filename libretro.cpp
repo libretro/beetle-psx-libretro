@@ -24,6 +24,7 @@ std::string retro_base_directory;
 std::string retro_base_name;
 
 #if defined(WANT_PSX_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|CUE|toc|TOC"
 #define MEDNAFEN_CORE_TIMING_FPS 59.85398
@@ -34,8 +35,19 @@ std::string retro_base_name;
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 680
 #define FB_HEIGHT 576
+
 #elif defined(WANT_PCE_FAST_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
+#define MEDNAFEN_CORE_EXTENSIONS "pce|PCE|cue|CUE|zip|ZIP"
+#define MEDNAFEN_CORE_TIMING_FPS 59.82
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 512
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 242
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 512
+#define FB_HEIGHT 242
 #endif
 const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
@@ -88,9 +100,11 @@ bool retro_load_game(const struct retro_game_info *info)
    if (failed_init)
       return false;
 
+#ifdef WANT_32BPP
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
       rgb32 = true;
+#endif
 
    const char *base = strrchr(info->path, '/');
    if (!base)
@@ -103,7 +117,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    retro_base_name = retro_base_name.substr(0, retro_base_name.find_last_of('.'));
  
-   game = MDFNI_LoadGame("psx", info->path);
+   game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
    if (!game)
       return false;
 
@@ -127,18 +141,16 @@ void retro_unload_game()
    delete [] mednafen_buf;
 }
 
-#ifndef __SSE2__
-#error "SSE2 required."
-#endif
-
+#if defined(WANT_PSX_EMU)
 #include <emmintrin.h>
 
+static inline void convert_surface()
+{
+#ifdef __SSE2__
 // PSX core should be able to output ARGB1555 directly,
 // so we can avoid this conversion step.
 // Done in SSE2 here because any system that can run this
 // core to begin with will be at least that powerful (as of writing).
-static inline void convert_surface()
-{
    const uint32_t *pix = surf->pixels;
    for (unsigned i = 0; i < (MDFNGameInfo->fb_width * MDFNGameInfo->fb_height); i += 8)
    {
@@ -165,7 +177,9 @@ static inline void convert_surface()
 
       _mm_store_si128((__m128i*)(conv_buf + i), _mm_packs_epi32(res0, res1));
    }
+#endif
 }
+#endif
 
 static unsigned retro_devices[2];
 
@@ -260,6 +274,42 @@ static void update_input(void)
             break;
       }
    }
+#elif defined(WANT_PCE_FAST_EMU)
+   static uint8_t input_buf[5][2];
+
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_Y,
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_SELECT,
+      RETRO_DEVICE_ID_JOYPAD_START,
+      RETRO_DEVICE_ID_JOYPAD_UP,
+      RETRO_DEVICE_ID_JOYPAD_RIGHT,
+      RETRO_DEVICE_ID_JOYPAD_DOWN,
+      RETRO_DEVICE_ID_JOYPAD_LEFT,
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_X,
+      RETRO_DEVICE_ID_JOYPAD_L,
+      RETRO_DEVICE_ID_JOYPAD_R,
+      RETRO_DEVICE_ID_JOYPAD_L2
+   };
+
+   if (input_state_cb)
+   {
+      for (unsigned j = 0; j < 5; j++)
+      {
+         uint16_t input_state = 0;
+         for (unsigned i = 0; i < 13; i++)
+            input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+         // Input data must be little endian.
+         input_buf[j][0] = (input_state >> 0) & 0xff;
+         input_buf[j][1] = (input_state >> 8) & 0xff;
+      }
+   }
+
+   // Possible endian bug ...
+   for (unsigned i = 0; i < 5; i++)
+      MDFNI_SetInput(i, "gamepad", &input_buf[i][0], 0);
 #endif
 }
 
@@ -273,7 +323,9 @@ void retro_run()
 
    static int16_t sound_buf[0x10000];
    static MDFN_Rect rects[FB_HEIGHT];
+#ifdef WANT_PSX_EMU
    rects[0].w = ~0;
+#endif
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
@@ -286,9 +338,14 @@ void retro_run()
 
    MDFNI_Emulate(&spec);
 
+#ifdef WANT_PSX_EMU
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
    unsigned int ptrDiff = 0;
+#else
+   unsigned width = rects->w;
+   unsigned height = rects->h;
+#endif
 
 #ifdef WANT_PSX_EMU
    // This is for PAL, the core implements PAL over NTSC TV so you get the
@@ -334,6 +391,9 @@ void retro_run()
       ptr += ptrDiff;
       video_cb(ptr, width, height, FB_WIDTH << 1);
    }
+#elif defined(WANT_PCE_FAST_EMU)
+   const uint16_t *pix = surf->pixels16;
+   video_cb(pix, width, height, FB_WIDTH << 1);
 #endif
 
    video_frames++;
@@ -349,6 +409,7 @@ void retro_get_system_info(struct retro_system_info *info)
    info->library_version  = "0.9.26";
    info->need_fullpath    = true;
    info->valid_extensions = MEDNAFEN_CORE_EXTENSIONS;
+   info->block_extract    = false;
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
@@ -394,7 +455,6 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
             "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
       return;
    }
-#endif
 
    switch (device)
    {
@@ -409,6 +469,7 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
          fprintf(stderr,
                "[%s]: Unsupported controller device, falling back to gamepad", mednafen_core_str);
    }
+#endif
 }
 
 void retro_set_environment(retro_environment_t cb)
@@ -440,6 +501,8 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 {
    video_cb = cb;
 }
+
+static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {

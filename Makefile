@@ -28,8 +28,8 @@ ifeq ($(core), psx)
    PTHREAD_FLAGS = -pthread
    NEED_CD = 1
    NEED_THREADING = 1
+   NEED_BPP = 32
    CORE_DEFINE := -DWANT_PSX_EMU
-   CORE_INCDIR := -I$(MEDNAFEN_DIR)/psx
    CORE_DIR := $(MEDNAFEN_DIR)/psx
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
 	$(CORE_DIR)/irq.cpp \
@@ -58,11 +58,32 @@ SSE_DEFINES := 	-msse -msse2
 else ifeq ($(core), pce_fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
+   NEED_BPP = 16
    NEED_CD = 1
+   NEED_CRC32 = 1
    NEED_THREADING = 1
-   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
+   CORE_DEFINE := -DWANT_PCE_FAST_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-0924
+
+CORE_SOURCES := $(CORE_DIR)/huc.cpp \
+	$(CORE_DIR)/pce_huc6280.cpp \
+	$(CORE_DIR)/input.cpp \
+	$(CORE_DIR)/pce.cpp \
+	$(CORE_DIR)/tsushin.cpp \
+	$(CORE_DIR)/input/gamepad.cpp \
+	$(CORE_DIR)/input/mouse.cpp \
+	$(CORE_DIR)/input/tsushinkb.cpp \
+	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
+
+HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/huc6280/huc6280.cpp
+HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
+HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
+HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 endif
+
+CORE_INCDIR := -I$(CORE_DIR)
 
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME).so
@@ -135,7 +156,11 @@ else
 endif
 
 ifeq ($(NEED_THREADING), 1)
-THREAD_STUBS := thread.cpp stubs_thread.cpp
+THREAD_STUBS += thread.cpp stubs_thread.cpp
+endif
+
+ifeq ($(NEED_CRC32), 1)
+FLAGS += -DHAVE_CRC32
 endif
 
 ifeq ($(NEED_CD), 1)
@@ -150,7 +175,7 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
 	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/crc32.cpp
+	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
 
 MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
 TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
@@ -190,7 +215,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
 
-SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES)
+SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
@@ -221,6 +246,14 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
 
 ifeq ($(CACHE_CD), 1)
 FLAGS += -D__LIBRETRO_CACHE_CD__
+endif
+
+ifeq ($(NEED_BPP), 16)
+FLAGS += -DWANT_16BPP
+endif
+
+ifeq ($(NEED_BPP), 32)
+FLAGS += -DWANT_32BPP
 endif
 
 CXXFLAGS += $(FLAGS)

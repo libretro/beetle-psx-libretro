@@ -33,6 +33,21 @@ bool MDFN_SaveSettings(const char *path)
 
 uint64 MDFN_GetSettingUI(const char *name)
 {
+	/* PCE FAST */
+	if(!strcmp("pce_fast.cddavolume", name)) /* make configurable */
+		return 100;
+	if(!strcmp("pce_fast.adpcmvolume", name)) /* make configurable */
+		return 100;
+	if(!strcmp("pce_fast.cdpsgvolume", name)) /* make configurable */
+		return 100;
+	if(!strcmp("pce_fast.cdspeed", name)) /* make configurable */
+		return 1;
+	if(!strcmp("pce_fast.ocmultiplier", name)) /* make configurable */
+		return 1;
+	if(!strcmp("pce_fast.slstart", name))
+		return 4;
+	if(!strcmp("pce_fast.slend", name))
+		return 235;
 	/* PSX */
 	if(!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
 		return 4;
@@ -135,7 +150,7 @@ std::string MDFN_GetSettingS(const char *name)
 	if(!strcmp("pce_fast.cdbios", name))
         {
                 fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
-		return std::string("syscard3.pce");
+		return std::string(retro_base_directory) + std::string("syscard3.pce");
         }
 	/* PSX */
 	if(!strcmp("psx.bios_eu", name))

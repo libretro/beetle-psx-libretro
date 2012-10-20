@@ -5,6 +5,8 @@
 #include "mednafen/general.h"
 #include "mednafen/mednafen-driver.h"
 
+#include <unistd.h>
+
 #include <iostream>
 
 #ifdef _WIN32

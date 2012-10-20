@@ -52,10 +52,15 @@ class MDFN_PixelFormat
  uint8 Aprec;
 
  // Creates a color value for the surface corresponding to the 8-bit R/G/B/A color passed.
-#if (defined(WANT_PSX_EMU)) && defined(__LIBRETRO__)
+#if defined(WANT_32BPP)
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
     return((r << Rshift) | (g << Gshift) | (b << Bshift) | (a << Ashift));
+ }
+#elif defined(WANT_16BPP)
+ INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
+ {
+    return (((r >> 3) << 10) | ((g >> 3) << 5) | ((b >> 3) << 0));
  }
 #else
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
@@ -94,13 +99,20 @@ class MDFN_PixelFormat
 #endif
 
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
-#if (defined(WANT_PSX_EMU)) && defined(__LIBRETRO__)
+#if defined(WANT_32BPP)
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
     r = (value >> Rshift) & 0xFF;
     g = (value >> Gshift) & 0xFF;
     b = (value >> Bshift) & 0xFF;
     a = (value >> Ashift) & 0xFF;
+ }
+#elif defined(WANT_16BPP)
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
+ {
+    r = ((value & 0x1f) << 10) & 0x7fff;
+    g = (((value & 0x3e0) << 5) <<5) & 0x7fff;
+    b = (((value & 0x7c00) >> 10)) & 0x7fff;
  }
 #else
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
@@ -192,23 +204,48 @@ class MDFN_Surface //typedef struct
  void SetFormat(const MDFN_PixelFormat &new_format, bool convert);
 
  // Creates a 32-bit value for the surface corresponding to the R/G/B/A color passed.
+#if defined(WANT_16BPP)
+ INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
+ {
+    return (((r >> 3) << 10) | ((g >> 3) << 5) | ((b >> 3) << 0));
+ }
+#else
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
   return(format.MakeColor(r, g, b, a));
  }
+#endif
 
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
+#if defined(WANT_16BPP)
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
+ {
+    r = ((value & 0x1f) << 10) & 0x7fff;
+    g = (((value & 0x3e0) << 5) <<5) & 0x7fff;
+    b = (((value & 0x7c00) >> 10)) & 0x7fff;
+ }
+#else
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
   format.DecodeColor(value, r, g, b, a);
  }
+#endif
 
+#if defined(WANT_16BPP)
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
+ {
+  r = ((value & 0x1f) << 10) & 0x7fff;
+  g = (((value & 0x3e0) << 5) <<5) & 0x7fff;
+  b = (((value & 0x7c00) >> 10)) & 0x7fff;
+ }
+#else
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
  {
   int dummy_a;
 
   DecodeColor(value, r, g, b, dummy_a);
  }
+#endif
  private:
  void Init(void *const p_pixels, const uint32 p_width, const uint32 p_height, const uint32 p_pitchinpix, const MDFN_PixelFormat &nf);
 };

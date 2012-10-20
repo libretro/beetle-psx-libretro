@@ -78,12 +78,12 @@ class MDFNFILE
 	}
 
 	char *fgets(char *s, int size);
-
-	private:
-
         uint8 *f_data;
         int64 f_size;
         char *f_ext;
+
+	private:
+
 
 	int error_code;
 	int local_errno;

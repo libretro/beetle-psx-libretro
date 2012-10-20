@@ -1,8 +1,6 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include <zlib.h>
-
 #include "video.h"
 #include "state-common.h"
 
@@ -10,8 +8,6 @@ void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status);
 
 int MDFNSS_Save(const char *, const char *suffix, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
 int MDFNSS_Load(const char *, const char *suffix);
-int MDFNSS_SaveFP(gzFile fp, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_LoadFP(gzFile fp);
 
 typedef struct
 {

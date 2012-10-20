@@ -139,9 +139,6 @@ void MDFNI_CloseGame(void)
  #endif
 }
 
-#ifdef WANT_PSX_EMU
-extern MDFNGI EmulatedPSX;
-#endif
 
 std::vector<MDFNGI *> MDFNSystems;
 static std::list<MDFNGI *> MDFNSystemsPrio;
@@ -611,6 +608,14 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
         return(MDFNGameInfo);
 }
+
+#if defined(WANT_PSX_EMU)
+extern MDFNGI EmulatedPSX;
+#elif defined(WANT_PCE_EMU)
+extern MDFNGI EmulatedPCE;
+#elif defined(WANT_PCE_FAST_EMU)
+extern MDFNGI EmulatedPCE_Fast;
+#endif
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
 {
