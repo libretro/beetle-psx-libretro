@@ -101,7 +101,7 @@ static struct
 // Event stuff
 //
 // Comment out this define for extra speeeeed.
-#define PSX_EVENT_SYSTEM_CHECKS	1
+//#define PSX_EVENT_SYSTEM_CHECKS	1
 
 static pscpu_timestamp_t Running;	// Set to -1 when not desiring exit, and 0 when we are.
 
@@ -604,14 +604,10 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
  if(!Peek)
  {
-  if(IsWrite)
-  {
-   PSX_WARNING("[MEM] Unknown write%d to %08x at time %d, =%08x(%d)", (int)(sizeof(T) * 8), A, timestamp, V, V);
-  }
-  else
+  if(!IsWrite)
   {
    V = 0;
-   PSX_WARNING("[MEM] Unknown read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
+   //PSX_WARNING("[MEM] Unknown read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
   }
  }
  else
@@ -773,8 +769,10 @@ static void Emulate(EmulateSpecStruct *espec)
  assert(timestamp);
 
  ForceEventUpdates(timestamp);
+#if 0
  if(GPU->GetScanlineNum() < 100)
   printf("[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
+#endif
 
  //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
@@ -806,14 +804,17 @@ static void Emulate(EmulateSpecStruct *espec)
    Memcard_SaveDelay[i] += timestamp;
    if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
    {
-    fprintf(stderr, "Saving memcard %d...\n", i);
+    //fprintf(stderr, "Saving memcard %d...\n", i);
+    /*
     try
     {
+*/
      char ext[64];
      trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
      FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
      Memcard_SaveDelay[i] = -1;
      Memcard_PrevDC[i] = 0;
+/*
     }
     catch(std::exception &e)
     {
@@ -821,6 +822,7 @@ static void Emulate(EmulateSpecStruct *espec)
      MDFN_DispMessage("Memcard %d save error: %s", i, e.what());
     }
     //MDFN_DispMessage("Memcard %d saved.", i);
+*/
    }
   }
  }

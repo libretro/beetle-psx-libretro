@@ -1155,9 +1155,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
          dest[x] = black;
         }
        }
+#if 0
        char buffer[256];
 
-       /* trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH")); */
+       trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
+#endif
       }
       else
       {
