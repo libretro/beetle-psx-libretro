@@ -674,7 +674,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
  if(port < 2)
   irq10_pulse_ts[port] = PSX_EVENT_MAXTS;
 
- if(!strcmp(type, "gamepad"))
+ if(!strcmp(type, "gamepad") || !strcmp(type, "dancepad"))
   Devices[port] = Device_Gamepad_Create();
  else if(!strcmp(type, "dualanalog"))
   Devices[port] = Device_DualAnalog_Create(false);
@@ -880,6 +880,15 @@ static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =
   NULL,
   sizeof(Device_Justifier_IDII) / sizeof(InputDeviceInputInfoStruct),
   Device_Justifier_IDII,
+ },
+
+ {
+  "dancepad",
+  "Dance Pad",
+  "Dingo Dingo Rodeo!",
+  NULL,
+  sizeof(Device_Dancepad_IDII) / sizeof(InputDeviceInputInfoStruct),
+  Device_Dancepad_IDII,
  },
 
 };

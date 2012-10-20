@@ -15,10 +15,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __LIBRETRO__
-#define HAVE_PSF 1
-#endif
-
 #include "psx.h"
 #include "mdec.h"
 #include "frontio.h"
@@ -26,33 +22,13 @@
 #include "sio.h"
 #include "cdc.h"
 #include "spu.h"
-#include "../mednafen-endian.h"
 #include "../mempatcher.h"
-#ifdef HAVE_PSF
-#include "../PSFLoader.h"
-#include "../player.h"
-#endif
-
 #include "../cputest/cputest.h"
 
 extern MDFNGI EmulatedPSX;
 
 namespace MDFN_IEN_PSX
 {
-
-#ifdef HAVE_PSF
-class PSF1Loader : public PSFLoader
-{
- public:
-
- PSF1Loader(MDFNFILE *fp);
- virtual ~PSF1Loader();
-
- virtual void HandleEXE(const uint8 *data, uint32 len, bool ignore_pcsp = false);
-
- PSFTags tags;
-};
-#endif
 
 enum
 {
@@ -65,10 +41,6 @@ enum
 static uint32 PortReadCounter[0x4000] = { 0 };	// Debugging(performance)
 static uint32 ReadCounter = 0;
 static uint32 WriteCounter = 0;
-#endif
-
-#ifdef HAVE_PSF
-static PSF1Loader *psf_loader = NULL;
 #endif
 
 static std::vector<CDIF*> *cdifs = NULL;
@@ -587,7 +559,7 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
    return;
   }
 
-  if(A >= 0x1F801100 && A <= 0x1F80112F)	// Root counters
+  if(A >= 0x1F801100 && A <= 0x1F80113F)	// Root counters
   {
    if(IsWrite)
     TIMER_Write(timestamp, A, V);
@@ -777,15 +749,11 @@ static void Emulate(EmulateSpecStruct *espec)
 {
  pscpu_timestamp_t timestamp = 0;
 
-#ifdef __LIBRETRO__
-  espec->skip = false;
-#else
  if(FIO->RequireNoFrameskip())
  {
   //puts("MEOW");
   espec->skip = false;	//TODO: Save here, and restore at end of Emulate() ?
  }
-#endif
 
  MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 
@@ -796,19 +764,11 @@ static void Emulate(EmulateSpecStruct *espec)
  espec->SoundBufSize = 0;
 
  FIO->UpdateInput();
-#ifdef HAVE_PSF
- GPU->StartFrame(psf_loader ? NULL : espec);
-#else
  GPU->StartFrame(espec);
-#endif
  SPU->StartFrame(espec->SoundRate, MDFN_GetSettingUI("psx.spu.resamp_quality"));
 
  Running = -1;
-#ifdef HAVE_PSF
- timestamp = CPU->Run(timestamp, psf_loader != NULL);
-#else
  timestamp = CPU->Run(timestamp, false);
-#endif
 
  assert(timestamp);
 
@@ -830,17 +790,6 @@ static void Emulate(EmulateSpecStruct *espec)
 
  espec->MasterCycles = timestamp;
 
-#ifdef HAVE_PSF
- if(psf_loader)
- {
-  if(!espec->skip)
-  {
-   espec->LineWidths[0].w = ~0;
-   Player_Draw(espec->surface, &espec->DisplayRect, 0, espec->SoundBuf, espec->SoundBufSize);
-  }
- }
-#endif
-
  // Save memcards if dirty.
  for(int i = 0; i < 8; i++)
  {
@@ -857,7 +806,7 @@ static void Emulate(EmulateSpecStruct *espec)
    Memcard_SaveDelay[i] += timestamp;
    if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
    {
-    //fprintf(stderr, "Saving memcard %d...\n", i);
+    fprintf(stderr, "Saving memcard %d...\n", i);
     try
     {
      char ext[64];
@@ -893,11 +842,6 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
-#ifdef HAVE_PSF
- if(PSFLoader::TestMagic(0x01, fp))
-  return(true);
-#endif
-
  if(fp->size < 0x800)
   return(false);
 
@@ -1461,31 +1405,10 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
 
 }
 
-#ifdef HAVE_PSF
-PSF1Loader::PSF1Loader(MDFNFILE *fp)
-{
- tags = Load(0x01, 2033664, fp);
-}
-
-PSF1Loader::~PSF1Loader()
-{
-
-}
-
-void PSF1Loader::HandleEXE(const uint8 *data, uint32 size, bool ignore_pcsp)
-{
- LoadEXE(data, size, ignore_pcsp);
-}
-#endif
-
 static void Cleanup(void);
 static int Load(const char *name, MDFNFILE *fp)
 {
-#ifdef HAVE_PSF
- const bool IsPSF = PSFLoader::TestMagic(0x01, fp);
-#else
- const bool IsPSF = false; 
-#endif
+ const bool IsPSF = false;
 
  if(!TestMagic(name, fp))
  {
@@ -1514,19 +1437,6 @@ static int Load(const char *name, MDFNFILE *fp)
 
  try
  {
-#ifdef HAVE_PSF
-  if(IsPSF)
-  {
-   psf_loader = new PSF1Loader(fp);
-
-   std::vector<std::string> SongNames;
-
-   SongNames.push_back(psf_loader->tags.GetTag("title"));
-
-   Player_Init(1, psf_loader->tags.GetTag("game"), psf_loader->tags.GetTag("artist"), psf_loader->tags.GetTag("copyright"), SongNames);
-  }
-  else
-#endif
    LoadEXE(fp->data, fp->size);
  }
  catch(std::exception &e)
@@ -1544,8 +1454,8 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
  int ret = InitCommon(CDInterfaces);
 
  // TODO: fastboot setting
- if(MDFN_GetSettingB("psx.fastboot"))
-  BIOSROM->WriteU32(0x6990, 0);
+ //if(MDFN_GetSettingB("psx.fastboot"))
+ // BIOSROM->WriteU32(0x6990, 0);
 
  MDFNGameInfo->GameType = GMT_CDROM;
 
@@ -1555,14 +1465,6 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 static void Cleanup(void)
 {
  TextMem.resize(0);
-
-#ifdef HAVE_PSF
- if(psf_loader)
- {
-  delete psf_loader;
-  psf_loader = NULL;
- }
-#endif
 
  if(CDC)
  {
@@ -1613,9 +1515,6 @@ static void Cleanup(void)
 
 static void CloseGame(void)
 {
-#ifdef HAVE_PSF
- if(!psf_loader)
-#endif
  {
   for(int i = 0; i < 8; i++)
   {
@@ -1641,11 +1540,6 @@ static void CloseGame(void)
 
 static void SetInput(int port, const char *type, void *ptr)
 {
-#ifdef HAVE_PSF
- if(psf_loader)
-  FIO->SetInput(port, "none", NULL);
- else
-#endif
   FIO->SetInput(port, type, ptr);
 }
 
@@ -1761,10 +1655,8 @@ static void DoSimpleCommand(int cmd)
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
-#ifdef HAVE_PSF
  { ".psf", gettext_noop("PSF1 Rip") },
  { ".minipsf", gettext_noop("MiniPSF1 Rip") },
-#endif
  { ".psx", gettext_noop("PS-X Executable") },
  { ".exe", gettext_noop("PS-X Executable") },
  { NULL, NULL }
@@ -1806,7 +1698,7 @@ static MDFNSetting PSXSettings[] =
  { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on port 2C."),   gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
  { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on port 2D."),   gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
 
- { "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "0" },
+ //{ "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "0" },
  { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Attempt to auto-detect region of game."), NULL, MDFNST_BOOL, "1" },
  { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Default region to use."), gettext_noop("Used if region autodetection fails or is disabled."), MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
 

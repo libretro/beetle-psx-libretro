@@ -54,7 +54,7 @@ void PS_CPU::SetFastMap(void *region_mem, uint32 region_address, uint32 region_s
  // FAST_MAP_SHIFT
  // FAST_MAP_PSIZE
 
- for(uint64 A = region_address; A < region_address + region_size; A += FAST_MAP_PSIZE)
+ for(uint64 A = region_address; A < (uint64)region_address + region_size; A += FAST_MAP_PSIZE)
  {
   FastMap[A >> FAST_MAP_SHIFT] = ((uint8 *)region_mem - region_address);
  }

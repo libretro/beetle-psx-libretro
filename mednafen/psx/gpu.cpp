@@ -787,6 +787,8 @@ INLINE void PS_GPU::WriteCB(uint32 InData)
 
 void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
+ V <<= (A & 3) * 8;
+
  if(A & 4)	// GP1 ("Control")
  {
   uint32 command = V >> 24;
@@ -965,7 +967,7 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
   //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
  }
 
- return(ret);
+ return(ret >> ((A & 3) * 8));
 }
 
 INLINE void PS_GPU::ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift, bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
@@ -1155,11 +1157,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
        }
        char buffer[256];
 
-       trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
-#ifndef __LIBRETRO__
-       DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
-		surface->MakeColor(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13);
-#endif
+       /* trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH")); */
       }
       else
       {

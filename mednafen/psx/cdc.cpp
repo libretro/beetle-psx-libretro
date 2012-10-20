@@ -554,8 +554,8 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
    uint8 ibuffer[28];
    int16 obuffer[2 + 28];
 
-   //if(param != param_copy)
-   // printf("%d %02x %02x\n", unit, param, param_copy);
+   if(param != param_copy)
+    printf("%d %02x %02x\n", unit, param, param_copy);
 
    for(unsigned i = 0; i < 28; i++)
    {
@@ -775,8 +775,8 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
       {
        if(XA_Test(buf))
        {
-	//if(AudioBuffer_ReadPos & 0xFFF)
-	 //printf("readpos=%04x(rabl=%04x) writepos=%04x\n", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
+	if(AudioBuffer_ReadPos & 0xFFF)
+	 printf("readpos=%04x(rabl=%04x) writepos=%04x\n", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
 
 	//if(AudioBuffer_UsedCount == 0)
 	// AudioBuffer_InPrebuffer = true;
@@ -986,7 +986,7 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      const CDC_CTEntry *command = &Commands[PendingCommand];
      //PSX_WARNING("[CDC] Command: %s --- %d", command->name, Results.CanRead());
 
-#if 0
+#if 1
      printf("[CDC] Command: %s --- ", command->name);
      for(unsigned int i = 0; i < ArgsIn; i++)
       printf(" 0x%02x", ArgsBuf[i]);
@@ -1327,7 +1327,7 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
   }
  }
 
- //printf("%d\n", ret);
+ printf("%d\n", ret);
 
  return(ret);
 }

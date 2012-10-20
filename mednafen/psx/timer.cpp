@@ -71,12 +71,12 @@
 
 /*
  FIXME: Clock appropriately(and update events) when using SetRegister() via the debugger.
+
+ TODO: If we ever return randomish values to "simulate" open bus, remember to change the return type and such of the TIMER_Read() function to full 32-bit too.
 */
 
 namespace MDFN_IEN_PSX
 {
-
-extern PS_GPU *GPU;
 
 struct Timer
 {
@@ -337,7 +337,7 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32 A, uint16 V)
 
  int which = (A >> 4) & 0x3;
 
- assert(!(A & 3));
+ V <<= (A & 3) * 8;
 
  PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V);
 
@@ -384,7 +384,8 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32 A, uint16 V)
   case 0x8: Timers[which].Target = V & 0xFFFF;
 	    break;
 
-  default: assert(0);
+  case 0xC: // Open bus
+	    break;
  }
 
  // TIMER_Update(timestamp);
@@ -397,10 +398,12 @@ uint16 TIMER_Read(const pscpu_timestamp_t timestamp, uint32 A)
  uint16 ret = 0;
  int which = (A >> 4) & 0x3;
 
- assert(!(A & 3));
-
  if(which >= 3)
-  assert(0);
+ {
+  PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+
+  return(ret >> ((A & 3) * 8));
+ }
 
  TIMER_Update(timestamp);
 
@@ -416,10 +419,11 @@ uint16 TIMER_Read(const pscpu_timestamp_t timestamp, uint32 A)
   case 0x8: ret = Timers[which].Target;
 	    break;
 
-  default: assert(0);
+  case 0xC: PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+	    break;
  }
 
- return(ret);
+ return(ret >> ((A & 3) * 8));
 }
 
 

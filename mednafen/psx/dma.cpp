@@ -434,6 +434,7 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
  int ch = (A & 0x7F) >> 4;
 
+ //if(ch == 2 || ch == 7)
  //PSX_WARNING("[DMA] Write: %08x %08x, DMAIntStatus=%08x", A, V, DMAIntStatus);
 
  // FIXME if we ever have "accurate" bus emulation
@@ -548,11 +549,6 @@ uint32 DMA_Read(const pscpu_timestamp_t timestamp, uint32 A)
 {
  int ch = (A & 0x7F) >> 4;
  uint32 ret = 0;
- 
- //assert(!(A & 3));
-
- //if(ch == 2)
- // printf("DMA Read: %08x --- %d\n", A, GPU->GetScanlineNum());
 
  if(ch == 7)
  {

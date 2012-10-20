@@ -332,7 +332,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "Mednafen PSX";
-   info->library_version  = "0.9.25";
+   info->library_version  = "0.9.26";
    info->need_fullpath    = true;
    info->valid_extensions = "cue|CUE";
 }

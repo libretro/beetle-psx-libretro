@@ -770,7 +770,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
     voice->CurPhase_SD += phase_inc;
    }
 
-   if(!(SPUControl & 0x8000) || (VoiceOff & (1 << voice_num)))
+   if(VoiceOff & (1 << voice_num))
    {
     if(voice->ADSR.Phase != ADSR_RELEASE)
     {
@@ -778,7 +778,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
     }
    }
 
-   if((SPUControl & 0x8000) && (VoiceOn & (1 << voice_num)))
+   if(VoiceOn & (1 << voice_num))
    {
     ResetEnvelope(voice);
 
@@ -795,6 +795,12 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
     voice->CurPhase_SD = 28 << 12;	 // Trigger initial sample decode
 
     voice->CurAddr = voice->StartAddr & ~0x7;
+   }
+
+   if(!(SPUControl & 0x8000))
+   {
+    voice->ADSR.Phase = ADSR_RELEASE;
+    voice->ADSR.EnvLevel = 0;
    }
   }
 
@@ -1173,6 +1179,7 @@ void PS_SPU::StartFrame(double rate, uint32 quality)
 {
  if((int)rate != last_rate || quality != last_quality)
  {
+  //double ratio = (double)44100 / (rate ? rate : 44100);
   int err = 0;
 
   last_rate = (int)rate;

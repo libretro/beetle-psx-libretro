@@ -160,14 +160,6 @@ class MDFN_PixelFormat
 
 }; // MDFN_PixelFormat;
 
-struct MDFN_PaletteEntry
-{
- uint8 r, g, b;
-};
-
-#include <vector>
-typedef std::vector<MDFN_PaletteEntry> MDFN_Palette;
-
 // Supports 32-bit RGBA
 //  16-bit is WIP
 class MDFN_Surface //typedef struct
