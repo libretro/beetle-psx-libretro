@@ -135,7 +135,7 @@ else
 endif
 
 ifeq ($(NEED_THREADING), 1)
-THREAD_STUBS := thread.cpp
+THREAD_STUBS := thread.cpp stubs_thread.cpp
 endif
 
 ifeq ($(NEED_CD), 1)

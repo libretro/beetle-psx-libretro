@@ -24,14 +24,20 @@ std::string retro_base_directory;
 std::string retro_base_name;
 
 #if defined(WANT_PSX_EMU)
-const char *mednafen_core_str = "Mednafen PSX";
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
+#define MEDNAFEN_CORE_EXTENSIONS "cue|CUE|toc|TOC"
+#define MEDNAFEN_CORE_TIMING_FPS 59.85398
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 640
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 680
 #define FB_HEIGHT 576
 #elif defined(WANT_PCE_FAST_EMU)
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
-const char *mednafen_core_str = "Mednafen PCE Fast";
 #endif
+const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
 static void check_system_specs(void)
 {
@@ -283,22 +289,26 @@ void retro_run()
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
    unsigned int ptrDiff = 0;
+
+#ifdef WANT_PSX_EMU
    // This is for PAL, the core implements PAL over NTSC TV so you get the
    // infamous PAL borders. This removes them. The PS1 supports only two horizontal
-   // resolutions so it's OK to use constants and not precentage.
+   // resolutions so it's OK to use constants and not percentage.
    bool isPal = false;
-   if (height == FB_HEIGHT) {
+   if (height == FB_HEIGHT)
+   {
        ptrDiff += width * 47;
        height = 480;
        isPal = true;
-   } else if (height == 288) {
+   }
+   else if (height == 288)
+   {
        // TODO: This seems to be OK as is, but I might be wrong.
        isPal = true;
    }
 
-   if (isPal && width == FB_WIDTH) {
+   if (isPal && width == FB_WIDTH)
        ptrDiff += 7;
-   }
 
    // The core handles vertical overscan for NTSC pretty well, but it ignores
    // horizontal overscan. This is a tough estimation of what the horizontal
@@ -324,6 +334,7 @@ void retro_run()
       ptr += ptrDiff;
       video_cb(ptr, width, height, FB_WIDTH << 1);
    }
+#endif
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
@@ -337,19 +348,19 @@ void retro_get_system_info(struct retro_system_info *info)
    info->library_name     = MEDNAFEN_CORE_NAME;
    info->library_version  = "0.9.26";
    info->need_fullpath    = true;
-   info->valid_extensions = "cue|CUE";
+   info->valid_extensions = MEDNAFEN_CORE_EXTENSIONS;
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->timing.fps            = 59.85398; // Determined from empirical testing.
+   info->timing.fps            = MEDNAFEN_CORE_TIMING_FPS; // Determined from empirical testing.
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = 320;
-   info->geometry.base_height  = 240;
-   info->geometry.max_width    = 640;
-   info->geometry.max_height   = 480;
-   info->geometry.aspect_ratio = 4.0 / 3.0;
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H;
+   info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 }
 
 void retro_deinit()
