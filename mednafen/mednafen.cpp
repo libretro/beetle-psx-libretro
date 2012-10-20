@@ -39,8 +39,6 @@
 #include	"md5.h"
 #include	"clamp.h"
 
-#include	"string/escape.h"
-
 #include	"cdrom/CDUtility.h"
 
 static const char *CSD_forcemono = gettext_noop("Force monophonic sound output.");

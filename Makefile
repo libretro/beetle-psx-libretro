@@ -93,7 +93,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/string/escape.cpp \
 	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
@@ -110,8 +109,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(TREMOR_SRC) \
 	$(LIBRETRO_SOURCES_C) \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
-	$(MEDNAFEN_DIR)/trio/triostr.c \
-	$(MEDNAFEN_DIR)/string/world_strtod.c
+	$(MEDNAFEN_DIR)/trio/triostr.c
 
 SOURCES := $(LIBRETRO_SOURCES) $(PSX_SOURCES) $(MEDNAFEN_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
