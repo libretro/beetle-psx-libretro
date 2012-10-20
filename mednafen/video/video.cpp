@@ -25,8 +25,6 @@
 
 #include <trio/trio.h>
 
-#include "png.h"
-
 void MDFN_DispMessage(const char *format, ...) throw()
 {
  va_list ap;

@@ -91,11 +91,8 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/memory.cpp \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
-	$(MEDNAFEN_DIR)/video/text.cpp \
-	$(MEDNAFEN_DIR)/video/font-data.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/video/resize.cpp \
 	$(MEDNAFEN_DIR)/string/escape.cpp \
 	$(MEDNAFEN_DIR)/string/ConvertUTF.cpp \
 	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \

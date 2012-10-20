@@ -28,7 +28,6 @@
 #include "general.h"
 #include "state.h"
 #include "video.h"
-#include "video/resize.h"
 
 #define RLSB 		MDFNSTATE_RLSB	//0x80000000
 

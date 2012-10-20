@@ -843,8 +843,6 @@ int MDFNI_Initialize(const char *basedir, const std::vector<MDFNSetting> &Driver
 
 	MDFNI_SetBaseDirectory(basedir);
 
-	MDFN_InitFontData();
-
 	// Generate dynamic settings
 	for(unsigned int i = 0; i < MDFNSystems.size(); i++)
 	{
