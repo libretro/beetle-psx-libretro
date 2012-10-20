@@ -68,6 +68,9 @@ bool MDFN_GetSettingB(const char *name)
 {
 	if(!strcmp("cheats", name))
 		return 0;
+	/* LIBRETRO */
+        if(!strcmp("libretro.cd.load_into_ram", name))
+                return 0;
 	/* PCE_FAST */
         if(!strcmp("pce_fast.input.multitap", name))
                 return 1;

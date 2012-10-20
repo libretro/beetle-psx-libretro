@@ -12,6 +12,10 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
 endif
 endif
 
+# If you have a system with 1GB RAM or more - cache the whole 
+# CD in order to prevent file access delays/hiccups
+CACHE_CD = 0
+
 ifeq ($(platform), unix)
    TARGET := libretro.so
    fpic := -fPIC
@@ -139,6 +143,10 @@ WARNINGS := -Wall \
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
 			-DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 -DWANT_PSX_EMU -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG
+
+ifeq ($(CACHE_CD), 1)
+FLAGS += -D__LIBRETRO_CACHE_CD__
+endif
 
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS) -std=gnu99

@@ -192,7 +192,7 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
  efn = MDFN_EvalFIP(base_dir, filename);
  track->fp = new FileStream(efn.c_str(), FileStream::MODE_READ);
- if(image_memcache)
+ if(MDFN_GetSettingB("libretro.cd_load_into_ram"))
   track->fp = new MemoryStream(track->fp);
 
  if(strlen(filename) >= 4 && !strcasecmp(filename + strlen(filename) - 4, ".wav"))
@@ -415,7 +415,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       length = args[2];
      }
      //printf("%s, %s, %s, %s\n", args[0], binoffset, msfoffset, length);
-     ParseTOCFileLineInfo(&TmpTrack, active_track, args[0], binoffset, msfoffset, length, image_memcache);
+     ParseTOCFileLineInfo(&TmpTrack, active_track, args[0], binoffset, msfoffset, length, MDFN_GetSettingB("libretro.cd_load_into_ram"));
     }
     else if(!strcasecmp(cmdbuf, "DATAFILE"))
     {
@@ -430,7 +430,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      else
       length = args[1];
 
-     ParseTOCFileLineInfo(&TmpTrack, active_track, args[0], binoffset, NULL, length, image_memcache);
+     ParseTOCFileLineInfo(&TmpTrack, active_track, args[0], binoffset, NULL, length, MDFN_GetSettingB("libretro.cd_load_into_ram"));
     }
     else if(!strcasecmp(cmdbuf, "INDEX"))
     {
@@ -477,7 +477,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      TmpTrack.fp = new FileStream(efn.c_str(), FileStream::MODE_READ);
      TmpTrack.FirstFileInstance = 1;
 
-     if(image_memcache)
+     if(MDFN_GetSettingB("libretro.cd_load_into_ram"))
       TmpTrack.fp = new MemoryStream(TmpTrack.fp);
 
      if(!strcasecmp(args[1], "BINARY"))
@@ -696,7 +696,7 @@ CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : NumTrack
 
  try
  {
-  ImageOpen(path, image_memcache);
+  ImageOpen(path, MDFN_GetSettingB("libretro.cd_load_into_ram"));
  }
  catch(...)
  {
