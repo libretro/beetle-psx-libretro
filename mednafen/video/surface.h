@@ -52,6 +52,12 @@ class MDFN_PixelFormat
  uint8 Aprec;
 
  // Creates a color value for the surface corresponding to the 8-bit R/G/B/A color passed.
+#if (defined(WANT_PSX_EMU)) && defined(__LIBRETRO__)
+ INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
+ {
+    return((r << Rshift) | (g << Gshift) | (b << Bshift) | (a << Ashift));
+ }
+#else
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
   if(colorspace == MDFN_COLORSPACE_YCbCr)
@@ -85,8 +91,18 @@ class MDFN_PixelFormat
     return((r << Rshift) | (g << Gshift) | (b << Bshift) | (a << Ashift));
   }
  }
+#endif
 
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
+#if (defined(WANT_PSX_EMU)) && defined(__LIBRETRO__)
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
+ {
+    r = (value >> Rshift) & 0xFF;
+    g = (value >> Gshift) & 0xFF;
+    b = (value >> Bshift) & 0xFF;
+    a = (value >> Ashift) & 0xFF;
+ }
+#else
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
   if(colorspace == MDFN_COLORSPACE_YCbCr)
@@ -140,6 +156,7 @@ class MDFN_PixelFormat
    }
   }
  }
+#endif
 
 }; // MDFN_PixelFormat;
 

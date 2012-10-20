@@ -777,11 +777,15 @@ static void Emulate(EmulateSpecStruct *espec)
 {
  pscpu_timestamp_t timestamp = 0;
 
+#ifdef __LIBRETRO__
+  espec->skip = false;
+#else
  if(FIO->RequireNoFrameskip())
  {
   //puts("MEOW");
   espec->skip = false;	//TODO: Save here, and restore at end of Emulate() ?
  }
+#endif
 
  MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 

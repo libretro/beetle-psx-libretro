@@ -121,6 +121,15 @@ void MDFN_Surface::Init(void *const p_pixels, const uint32 p_width, const uint32
 // to boot.
 void MDFN_Surface::SetFormat(const MDFN_PixelFormat &nf, bool convert)
 {
+#if (defined(WANT_PSX_EMU)) && defined(__LIBRETRO__)
+ assert(format.bpp == 32);
+ assert(nf.bpp == 32);
+
+ assert((nf.Rshift + nf.Gshift + nf.Bshift + nf.Ashift) == 48);
+ assert(!((nf.Rshift | nf.Gshift | nf.Bshift | nf.Ashift) & 0x7));
+ 
+ format = nf;
+#else
  assert(format.bpp == 16 || format.bpp == 32);
  assert(nf.bpp == 16 || nf.bpp == 32);
 
@@ -250,12 +259,21 @@ void MDFN_Surface::SetFormat(const MDFN_PixelFormat &nf, bool convert)
   }
  }
  format = nf;
+#endif
 }
 
 void MDFN_Surface::Fill(uint8 r, uint8 g, uint8 b, uint8 a)
 {
  uint32 color = MakeColor(r, g, b, a);
 
+#if (defined(WANT_PSX_EMU) && defined(__LIBRETRO__))
+/* 32bpp color */
+  assert(pixels);
+
+  for(int32 i = 0; i < pitchinpix * h; i++)
+   pixels[i] = color;
+#else
+/* 16bpp color */
  if(format.bpp == 16)
  {
   assert(pixels16);
@@ -270,6 +288,7 @@ void MDFN_Surface::Fill(uint8 r, uint8 g, uint8 b, uint8 a)
   for(int32 i = 0; i < pitchinpix * h; i++)
    pixels[i] = color;
  }
+#endif
 }
 
 MDFN_Surface::~MDFN_Surface()
