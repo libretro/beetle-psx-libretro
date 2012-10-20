@@ -34,24 +34,7 @@ void retro_init()
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
-      std::string eu_path = dir;
-      eu_path += "/scph5502.bin";
-
-      std::string jp_path = dir;
-      jp_path += "/scph5500.bin";
-
-      std::string na_path = dir;
-      na_path += "/scph5501.bin";
-
-      MDFNSetting jp_setting = { "psx.bios_jp", MDFNSF_EMU_STATE, "SCPH-5500 BIOS", NULL, MDFNST_STRING, jp_path.c_str() };
-      MDFNSetting eu_setting = { "psx.bios_eu", MDFNSF_EMU_STATE, "SCPH-5502 BIOS", NULL, MDFNST_STRING, eu_path.c_str() };
-      MDFNSetting na_setting = { "psx.bios_na", MDFNSF_EMU_STATE, "SCPH-5501 BIOS", NULL, MDFNST_STRING, na_path.c_str() };
-      MDFNSetting filesys = { "filesys.path_sav", MDFNSF_NOFLAGS, "Memcards", NULL, MDFNST_STRING, "." };
-      settings.push_back(jp_setting);
-      settings.push_back(eu_setting);
-      settings.push_back(na_setting);
-      settings.push_back(filesys);
-      MDFNI_Initialize(dir, settings);
+      MDFNI_Initialize(dir);
 
       retro_base_directory = dir;
    }

@@ -238,18 +238,10 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
    {
     CDInterfaces.push_back(new CDIF_MT(file_list[i].c_str()));
    }
-
-   GetFileBase(devicename);
   }
   else
   {
    CDInterfaces.push_back(new CDIF_MT(devicename));
-   if(CDInterfaces[0]->IsPhysical())
-   {
-    GetFileBase("cdrom");
-   }
-   else
-    GetFileBase(devicename);
   }
  }
  catch(std::exception &e)
@@ -464,8 +456,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 	MDFN_indent(1);
 
-        GetFileBase(name);
-
 	// Construct a NULL-delimited list of known file extensions for MDFN_fopen()
 	for(unsigned int i = 0; i < MDFNSystems.size(); i++)
 	{
@@ -572,13 +562,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	// Load per-game settings
 	//
 	// Maybe we should make a "pgcfg" subdir, and automatically load all files in it?
-#if 0
-	{
-	 char hash_string[n + 1];
-	 const char *section_names[3] = { MDFNGameInfo->shortname, hash_string, NULL };
-	//asdfasdfMDFN_LoadSettings(std::string(basedir) + std::string(PSS) + std::string("pergame.cfg");
-	}
-#endif
 	// End load per-game settings
 	//
 
@@ -630,102 +613,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
         return(MDFNGameInfo);
 }
-
-static void BuildDynamicSetting(MDFNSetting *setting, const char *system_name, const char *name, uint32 flags, const char *description, MDFNSettingType type,
-        const char *default_value, const char *minimum = NULL, const char *maximum = NULL,
-        bool (*validate_func)(const char *name, const char *value) = NULL, void (*ChangeNotification)(const char *name) = NULL)
-{
- char setting_name[256];
-
- memset(setting, 0, sizeof(MDFNSetting));
-
- trio_snprintf(setting_name, 256, "%s.%s", system_name, name);
-
- setting->name = strdup(setting_name);
- setting->description = description;
- setting->type = type;
- setting->flags = flags;
- setting->default_value = default_value;
- setting->minimum = minimum;
- setting->maximum = maximum;
- setting->validate_func = validate_func;
- setting->ChangeNotification = ChangeNotification;
-}
-
-std::vector<std::string> string_to_vecstrlist(const std::string &str_str)
-{
- std::vector<std::string> ret;
- const char *str = str_str.c_str();
-
- bool in_quote = FALSE;
- const char *quote_begin = NULL;
- char last_char = 0;
-
- while(*str || in_quote)
- {
-  char c;
-
-  if(*str)
-   c = *str;
-  else		// If the string has ended and we're still in a quote, get out of it!
-  {
-   c = '"';
-   last_char = 0;
-  }
-
-  if(last_char != '\\')
-  {
-   if(c == '"')
-   {
-    if(in_quote)
-    {
-     int64 str_length = str - quote_begin;
-     char tmp_str[str_length];
-
-     memcpy(tmp_str, quote_begin, str_length);
-  
-     ret.push_back(std::string(tmp_str));
-
-     quote_begin = NULL;
-     in_quote = FALSE;
-    }
-    else
-    {
-     in_quote = TRUE;
-     quote_begin = str + 1;
-    }
-   }
-  }
-
-  last_char = c;
-
-  if(*str)
-   str++;
- }
-
-
- return(ret);
-}
-
-std::string vecstrlist_to_string(const std::vector<std::string> &vslist)
-{
- std::string ret;
-
- for(uint32 i = 0; i < vslist.size(); i++)
- {
-  char *tmp_str = escape_string(vslist[i].c_str());
-
-  ret += "\"";
- 
-  ret += std::string(tmp_str);
- 
-  ret += "\" ";
-
-  free(tmp_str);
- }
- return(ret);
-}
-
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
 {
@@ -821,65 +708,18 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
 }
 
 static std::string settings_file_path;
-int MDFNI_Initialize(const char *basedir, const std::vector<MDFNSetting> &DriverSettings)
+int MDFNI_Initialize(const char *basedir)
 {
-	// FIXME static
-	static std::vector<MDFNSetting> dynamic_settings;
-
-	MDFNI_SetBaseDirectory(basedir);
-
-	// Generate dynamic settings
-	for(unsigned int i = 0; i < MDFNSystems.size(); i++)
-	{
-	 MDFNSetting setting;
-	 const char *sysname;
-
-	 sysname = (const char *)MDFNSystems[i]->shortname;
-
-	 if(!MDFNSystems[i]->soundchan)
-	  printf("0 sound channels for %s????\n", sysname);
-
-	 if(MDFNSystems[i]->soundchan == 2)
-	 {
-	  BuildDynamicSetting(&setting, sysname, "forcemono", MDFNSF_COMMON_TEMPLATE | MDFNSF_CAT_SOUND, CSD_forcemono, MDFNST_BOOL, "0");
-	  dynamic_settings.push_back(setting);
-	 }
-
-	 BuildDynamicSetting(&setting, sysname, "enable", MDFNSF_COMMON_TEMPLATE, CSD_enable, MDFNST_BOOL, "1");
-	 dynamic_settings.push_back(setting);
-	}
-
-	if(DriverSettings.size())
- 	 MDFN_MergeSettings(DriverSettings);
-
-	// First merge all settable settings, then load the settings from the SETTINGS FILE OF DOOOOM
-	MDFN_MergeSettings(MednafenSettings);
-        MDFN_MergeSettings(dynamic_settings);
-	MDFN_MergeSettings(MDFNMP_Settings);
-
-	for(unsigned int x = 0; x < MDFNSystems.size(); x++)
-	{
-	 if(MDFNSystems[x]->Settings)
-	  MDFN_MergeSettings(MDFNSystems[x]->Settings);
-	}
-
-	MDFN_MergeSettings(RenamedSettings);
-
-	settings_file_path = std::string(basedir) + std::string(PSS) + std::string("mednafen-09x.cfg");
-	if(!MDFN_LoadSettings(settings_file_path.c_str()))
-	 return(0);
-
-	#ifdef WANT_DEBUGGER
+#ifdef WANT_DEBUGGER
 	MDFNDBG_Init();
-	#endif
+#endif
 
-        return(1);
+	return(1);
 }
 
 void MDFNI_Kill(void)
 {
- MDFN_SaveSettings(settings_file_path.c_str());
- MDFN_KillSettings();
+ /* save settings */
 }
 
 #if defined(WANT_LYNX_EMU) || defined(WANT_NES_EMU)

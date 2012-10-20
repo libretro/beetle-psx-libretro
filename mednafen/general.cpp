@@ -35,16 +35,6 @@
 
 using namespace std;
 
-static string BaseDirectory;
-static string FileBase;
-static string FileExt;	/* Includes the . character, as in ".nes" */
-static string FileBaseDirectory;
-
-void MDFNI_SetBaseDirectory(const char *dir)
-{
- BaseDirectory = string(dir);
-}
-
 // Really dumb, maybe we should use boost?
 static bool IsAbsolutePath(const char *path)
 {
@@ -237,53 +227,6 @@ const char * GetFNComponent(const char *str)
   return(tp1+1);
  else
   return(str);
-}
-
-void GetFileBase(const char *f)
-{
-        const char *tp1,*tp3;
-
- #if PSS_STYLE==4
-     tp1=((char *)strrchr(f,':'));
- #elif PSS_STYLE==1
-     tp1=((char *)strrchr(f,'/'));
- #else
-     tp1=((char *)strrchr(f,'\\'));
-  #if PSS_STYLE!=3
-     tp3=((char *)strrchr(f,'/'));
-     if(tp1<tp3) tp1=tp3;
-  #endif
- #endif
-     if(!tp1)
-     {
-      tp1=f;
-      FileBaseDirectory = ".";
-     }
-     else
-     {
-      char tmpfn[tp1 - f + 1];
-
-      memcpy(tmpfn,f,tp1-f);
-      tmpfn[tp1-f]=0;
-      FileBaseDirectory = string(tmpfn);
-
-      tp1++;
-     }
-
-     if(((tp3=strrchr(f,'.'))!=NULL) && (tp3>tp1))
-     {
-      char tmpbase[tp3 - tp1 + 1];
-
-      memcpy(tmpbase,tp1,tp3-tp1);
-      tmpbase[tp3-tp1]=0;
-      FileBase = string(tmpbase);
-      FileExt = string(tp3);
-     }
-     else
-     {
-      FileBase = string(tp1);
-      FileExt = "";
-     }
 }
 
 char *MDFN_RemoveControlChars(char *str)
