@@ -112,12 +112,7 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(LIBRETRO_SOURCES_C) \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c \
-	$(MEDNAFEN_DIR)/string/world_strtod.c \
-	$(MEDNAFEN_DIR)/compress/blz.c \
-	$(MEDNAFEN_DIR)/compress/unzip.c \
-	$(MEDNAFEN_DIR)/compress/minilzo.c \
-	$(MEDNAFEN_DIR)/compress/quicklz.c \
-	$(MEDNAFEN_DIR)/compress/ioapi.c
+	$(MEDNAFEN_DIR)/string/world_strtod.c
 
 SOURCES := $(LIBRETRO_SOURCES) $(PSX_SOURCES) $(MEDNAFEN_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)

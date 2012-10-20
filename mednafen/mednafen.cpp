@@ -36,7 +36,6 @@
 #include	"FileWrapper.h"
 #include	"cdrom/cdromif.h"
 #include	"mempatcher.h"
-#include	"compress/minilzo.h"
 #include	"md5.h"
 #include	"clamp.h"
 
@@ -834,8 +833,6 @@ int MDFNI_Initialize(const char *basedir, const std::vector<MDFNSetting> &Driver
 {
 	// FIXME static
 	static std::vector<MDFNSetting> dynamic_settings;
-
-	lzo_init();
 
 	MDFNI_SetBaseDirectory(basedir);
 
