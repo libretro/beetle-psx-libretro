@@ -109,8 +109,6 @@ MDFNGI *MDFNGameInfo = NULL;
 static Fir_Resampler<16> ff_resampler;
 static double LastSoundMultiplier;
 
-static bool FFDiscard = FALSE; // TODO:  Setting to discard sound samples instead of increasing pitch
-
 static MDFN_PixelFormat last_pixel_format;
 static double last_sound_rate;
 
@@ -897,14 +895,11 @@ void MDFNI_Kill(void)
  MDFN_KillSettings();
 }
 
-static double multiplier_save, volume_save;
-static std::vector<int16> SoundBufPristine;
+static double multiplier_save;
 
+#if defined(WANT_LYNX_EMU) || defined(WANT_NES_EMU)
 static void ProcessAudio(EmulateSpecStruct *espec)
 {
- if(espec->SoundVolume != 1)
-  volume_save = espec->SoundVolume;
-
  if(espec->soundmultiplier != 1)
   multiplier_save = espec->soundmultiplier;
 
@@ -923,22 +918,7 @@ static void ProcessAudio(EmulateSpecStruct *espec)
 
   if(multiplier_save != 1)
   {
-   if(FFDiscard)
    {
-    if(SoundBufSize >= multiplier_save)
-     SoundBufSize /= multiplier_save;
-   }
-   else
-   {
-    if(MDFNGameInfo->soundchan == 2)
-    {
-     assert(ff_resampler.max_write() >= SoundBufSize * 2);
-
-     for(int i = 0; i < SoundBufSize * 2; i++)
-      ff_resampler.buffer()[i] = SoundBuf[i];
-    }
-    else
-    {
      assert(ff_resampler.max_write() >= SoundBufSize * 2);
 
      for(int i = 0; i < SoundBufSize; i++)
@@ -946,16 +926,13 @@ static void ProcessAudio(EmulateSpecStruct *espec)
       ff_resampler.buffer()[i * 2] = SoundBuf[i];
       ff_resampler.buffer()[i * 2 + 1] = 0;
      }
-    }   
+
     ff_resampler.write(SoundBufSize * 2);
 
     int avail = ff_resampler.avail();
     int real_read = std::min((int)(SoundBufMaxSize * MDFNGameInfo->soundchan), avail);
 
-    if(MDFNGameInfo->soundchan == 2)
-     SoundBufSize = ff_resampler.read(SoundBuf, real_read ) >> 1;
-    else
-     SoundBufSize = ff_resampler.read_mono_hack(SoundBuf, real_read );
+    SoundBufSize = ff_resampler.read_mono_hack(SoundBuf, real_read );
 
     avail -= real_read;
 
@@ -967,46 +944,56 @@ static void ProcessAudio(EmulateSpecStruct *espec)
    }
   }
 
-  if(volume_save != 1)
+  espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
+ } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
+}
+#else
+static void ProcessAudio(EmulateSpecStruct *espec)
+{
+ if(espec->soundmultiplier != 1)
+  multiplier_save = espec->soundmultiplier;
+
+ if(espec->SoundBuf && espec->SoundBufSize)
+ {
+  int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
+  int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
+  const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
+
+
+  if(multiplier_save != LastSoundMultiplier)
   {
-   if(volume_save < 1)
-   {
-    int volume = (int)(16384 * volume_save);
-
-    for(int i = 0; i < SoundBufSize * MDFNGameInfo->soundchan; i++)
-     SoundBuf[i] = (SoundBuf[i] * volume) >> 14;
-   }
-   else
-   {
-    int volume = (int)(256 * volume_save);
-
-    for(int i = 0; i < SoundBufSize * MDFNGameInfo->soundchan; i++)
-    {
-     int temp = ((SoundBuf[i] * volume) >> 8) + 32768;
-
-     temp = clamp_to_u16(temp);
-
-     SoundBuf[i] = temp - 32768;
-    }
-   }
+   ff_resampler.time_ratio(multiplier_save, 0.9965);
+   LastSoundMultiplier = multiplier_save;
   }
 
-  // TODO: Optimize this.
-  if(MDFNGameInfo->soundchan == 2 && MDFN_GetSettingB(std::string(std::string(MDFNGameInfo->shortname) + ".forcemono").c_str()))
+  if(multiplier_save != 1)
   {
-   for(int i = 0; i < SoundBufSize * MDFNGameInfo->soundchan; i += 2)
    {
-    // We should use division instead of arithmetic right shift for correctness(rounding towards 0 instead of negative infinitininintinity), but I like speed.
-    int32 mixed = (SoundBuf[i + 0] + SoundBuf[i + 1]) >> 1;
+     assert(ff_resampler.max_write() >= SoundBufSize * 2);
 
-    SoundBuf[i + 0] =
-    SoundBuf[i + 1] = mixed;
+     for(int i = 0; i < SoundBufSize * 2; i++)
+      ff_resampler.buffer()[i] = SoundBuf[i];
+    ff_resampler.write(SoundBufSize * 2);
+
+    int avail = ff_resampler.avail();
+    int real_read = std::min((int)(SoundBufMaxSize * MDFNGameInfo->soundchan), avail);
+
+    SoundBufSize = ff_resampler.read(SoundBuf, real_read ) >> 1;
+
+    avail -= real_read;
+
+    if(avail > 0)
+    {
+     printf("ff_resampler.avail() > espec->SoundBufMaxSize * MDFNGameInfo->soundchan - %d\n", avail);
+     ff_resampler.clear();
+    }
    }
   }
 
   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
  } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
 }
+#endif
 
 void MDFN_MidSync(EmulateSpecStruct *espec)
 {
@@ -1021,7 +1008,6 @@ void MDFN_MidSync(EmulateSpecStruct *espec)
 void MDFNI_Emulate(EmulateSpecStruct *espec)
 {
  multiplier_save = 1;
- volume_save = 1;
 
  // Initialize some espec member data to zero, to catch some types of bugs.
  espec->DisplayRect.x = 0;

@@ -25,10 +25,6 @@
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
 
-#ifdef HAVE_LIBCDIO
-#include "CDAccess_Physical.h"
-#endif
-
 using namespace CDUtility;
 
 CDAccess::CDAccess()
@@ -46,11 +42,6 @@ CDAccess *cdaccess_open(const char *path, bool image_memcache)
  CDAccess *ret;
  struct stat stat_buf;
 
- #ifdef HAVE_LIBCDIO
- if(path == NULL || (!stat(path, &stat_buf) && !S_ISREG(stat_buf.st_mode)))
-  ret = new CDAccess_Physical(path);
- else
- #endif
   ret = new CDAccess_Image(path, image_memcache);
 
  return ret;
