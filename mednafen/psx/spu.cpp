@@ -96,8 +96,6 @@ PS_SPU::PS_SPU()
 
  IntermediateBufferPos = 0;
  memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
-
- resampler = NULL;
 }
 
 PS_SPU::~PS_SPU()
@@ -880,10 +878,6 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
   IntermediateBuffer[IntermediateBufferPos][1] = output_r;
   IntermediateBufferPos++;
 
-  //resampler.buffer()[0] = (int16)(rand() & 0xFFFF) >> 1;
-  //resampler.buffer()[1] = (int16)(rand() & 0xFFFF) >> 1;
-  //resampler.write(2);
-
   sample_clocks--;
 
   // Clock global sweep
@@ -1179,20 +1173,7 @@ void PS_SPU::StartFrame(double rate, uint32 quality)
 {
  if((int)rate != last_rate || quality != last_quality)
  {
-  //double ratio = (double)44100 / (rate ? rate : 44100);
-  //resampler.time_ratio(ratio, 0.9965);
   int err = 0;
-
-  if(resampler)
-  {
-   speex_resampler_destroy(resampler);
-   resampler = NULL;
-  }
-
-  if((int)rate && (int)rate != 44100)
-  {
-   resampler = speex_resampler_init(2, 44100, (int)rate, quality, &err);
-  }
 
   last_rate = (int)rate;
   last_quality = quality;
@@ -1212,25 +1193,6 @@ int32 PS_SPU::EndFrame(int16 *SoundBuf)
   IntermediateBufferPos = 0;
 
   return(ret);
- }
- else if(resampler)
- {
-  spx_uint32_t in_len;
-  spx_uint32_t out_len;
-
-  in_len = IntermediateBufferPos;
-  out_len = 524288; //8192;	// FIXME, real size.
-
-  speex_resampler_process_interleaved_int(resampler, (const spx_int16_t *)IntermediateBuffer, &in_len, (spx_int16_t *)SoundBuf, &out_len);
-
-  assert(in_len <= IntermediateBufferPos);
-
-  if((IntermediateBufferPos - in_len) > 0)
-   memmove(IntermediateBuffer, IntermediateBuffer + in_len, (IntermediateBufferPos - in_len) * sizeof(int16) * 2);
-
-  IntermediateBufferPos -= in_len;
-
-  return(out_len);
  }
  else
  {

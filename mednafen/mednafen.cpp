@@ -33,13 +33,12 @@
 #include        "video.h"
 #include	"video/Deinterlacer.h"
 #include	"file.h"
-#include	"sound/WAVRecord.h"
+#include	"FileWrapper.h"
 #include	"cdrom/cdromif.h"
 #include	"mempatcher.h"
 #include	"compress/minilzo.h"
 #include	"md5.h"
 #include	"clamp.h"
-#include	"Fir_Resampler.h"
 
 #include	"string/escape.h"
 
@@ -106,7 +105,6 @@ static MDFNSetting RenamedSettings[] =
 
 MDFNGI *MDFNGameInfo = NULL;
 
-static Fir_Resampler<16> ff_resampler;
 static double LastSoundMultiplier;
 
 static MDFN_PixelFormat last_pixel_format;
@@ -967,23 +965,9 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
  {
   espec->SoundFormatChanged = true;
   last_sound_rate = espec->SoundRate;
-
-  ff_resampler.buffer_size((espec->SoundRate / 2) * 2);
  }
 
- if(espec->NeedRewind)
- {
-  if(MDFNGameInfo->GameType == GMT_PLAYER)
-  {
-   espec->NeedRewind = 0;
-   MDFN_DispMessage(_("Music player rewinding is unsupported."));
-  }
- }
-
- // Don't even save states with state rewinding if netplay is enabled, it will degrade netplay performance, and can cause
- // desynchs with some emulation(IE SNES based on bsnes).
-
-  espec->NeedSoundReverse = false;
+ espec->NeedSoundReverse = false;
 
  MDFNGameInfo->Emulate(espec);
 

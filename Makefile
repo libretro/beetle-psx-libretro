@@ -96,10 +96,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/string/escape.cpp \
 	$(MEDNAFEN_DIR)/string/ConvertUTF.cpp \
 	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
-	$(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
-	$(MEDNAFEN_DIR)/sound/WAVRecord.cpp \
-	$(MEDNAFEN_DIR)/sound/sound.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
 	$(MEDNAFEN_DIR)/okiadpcm.cpp \
 	$(MEDNAFEN_DIR)/md5.cpp
@@ -116,7 +113,6 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c \
 	$(MEDNAFEN_DIR)/string/world_strtod.c \
-	$(MEDNAFEN_DIR)/resampler/resample.c \
 	$(MEDNAFEN_DIR)/compress/blz.c \
 	$(MEDNAFEN_DIR)/compress/unzip.c \
 	$(MEDNAFEN_DIR)/compress/minilzo.c \
