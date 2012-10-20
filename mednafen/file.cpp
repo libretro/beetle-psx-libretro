@@ -392,49 +392,6 @@ char *MDFNFILE::fgets(char *s, int buffer_size)
 
 static INLINE bool MDFN_DumpToFileReal(const char *filename, int compress, const std::vector<PtrLengthPair> &pearpairs)
 {
- if(MDFN_GetSettingB("filesys.disablesavegz"))
-  compress = 0;
-
- if(compress)
- {
-  char mode[64];
-  gzFile gp;
-
-  trio_snprintf(mode, 64, "wb%d", compress);
-
-  gp = gzopen(filename, mode);
-
-  if(!gp)
-  {
-   ErrnoHolder ene(errno);
-
-   MDFN_PrintError(_("Error opening \"%s\": %s"), filename, ene.StrError());
-   return(0);
-  }
-
-  for(unsigned int i = 0; i < pearpairs.size(); i++)
-  {
-   const void *data = pearpairs[i].GetData();
-   const int64 length = pearpairs[i].GetLength();
-
-   if(gzwrite(gp, data, length) != length)
-   {
-    int errnum;
-
-    MDFN_PrintError(_("Error writing to \"%s\": %s"), filename, gzerror(gp, &errnum));
-    gzclose(gp);
-    return(0);
-   }
-  }
-
-  if(gzclose(gp) != Z_OK) // FIXME: Huhm, how should we handle this?
-  {
-   MDFN_PrintError(_("Error closing \"%s\""), filename);
-   return(0);
-  }
- }
- else
- {
   FILE *fp = fopen(filename, "wb");
   if(!fp)
   {
@@ -466,7 +423,7 @@ static INLINE bool MDFN_DumpToFileReal(const char *filename, int compress, const
    MDFN_PrintError(_("Error closing \"%s\": %s"), filename, ene.StrError());
    return(0);
   }
- }
+
  return(1);
 }
 

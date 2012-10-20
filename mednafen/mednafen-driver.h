@@ -116,35 +116,6 @@ void MDFNI_DiskSelect();
 void MDFNI_DiskInsert();
 void MDFNI_DiskEject();
 
-// New removable media interface(TODO!)
-//
-#if 0
-
-struct MediumInfoStruct
-{
- const char *name;		// More descriptive name, "Al Gore's Grand Adventure, Disk 1 of 7" ???
-				// (remember, Do utf8->utf32->utf8 for truncation for display)
- const char *set_member_name;	// "Disk 1 of 4, Side A", "Disk 3 of 4, Side B", "Disc 2 of 5" ???? (Disk M of N, where N is related to the number of entries 
-				// in the structure???)
-};
-
-struct DriveInfoStruct
-{
- const char *name;
- const char *description;
- const MediumInfoStruct *possible_media;
- //bool 
- //const char *eject_state_name;	// Like "Lid Open", or "Tray Ejected"
- //const char *insert_state_name;	// Like "
-};
-
- // Entry point
- DriveInfoStruct *Drives;
-
-void MDFNI_SetDriveMedium(unsigned drive_index, unsigned int medium_index, unsigned state_id);
-#endif
-
-
 bool MDFNI_StartAVRecord(const char *path, double SoundRate);
 void MDFNI_StopAVRecord(void);
 

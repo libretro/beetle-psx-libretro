@@ -70,31 +70,6 @@ MemoryStream::MemoryStream(const MemoryStream &zs)
  position = zs.position;
 }
 
-#if 0
-MemoryStream & MemoryStream::operator=(const MemoryStream &zs)
-{
- if(this != &zs)
- {
-  if(data_buffer)
-  {
-   free(data_buffer);
-   data_buffer = NULL;
-  }
-
-  data_buffer_size = zs.data_buffer_size;
-  data_buffer_alloced = zs.data_buffer_alloced;
-
-  if(!(data_buffer = (uint8*)malloc(data_buffer_alloced)))
-   throw MDFN_Error(ErrnoHolder(errno));
-
-  memcpy(data_buffer, zs.data_buffer, data_buffer_size);
-
-  position = zs.position;
- }
- return(*this);
-}
-#endif
-
 MemoryStream::~MemoryStream()
 {
  if(data_buffer)

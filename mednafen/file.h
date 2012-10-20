@@ -90,28 +90,8 @@ class MDFNFILE
 
         int64 location;
 
-	#ifdef HAVE_MMAP
-	bool is_mmap;
-	#endif
-
 	bool MakeMemWrapAndClose(void *tz, int type);
 };
-
-#if 0
-MDFNFILE *MDFN_fopen(const char *path, const char *ipsfn, const char *mode, const FileExtensionSpecStruct *known_ext);
-int MDFN_fclose(MDFNFILE*);
-uint64 MDFN_fread(void *ptr, size_t size, size_t nmemb, MDFNFILE*);
-uint64 MDFN_fwrite(void *ptr, size_t size, size_t nmemb, MDFNFILE*);
-int MDFN_fseek(MDFNFILE*, int64 offset, int whence);
-uint64 MDFN_ftell(MDFNFILE*);
-void MDFN_rewind(MDFNFILE*);
-int MDFN_read32le(uint32 *Bufo, MDFNFILE*);
-int MDFN_read16le(uint16 *Bufo, MDFNFILE*);
-int MDFN_fgetc(MDFNFILE*);
-uint64 MDFN_fgetsize(MDFNFILE*);
-int MDFN_fisarchive(MDFNFILE*);
-char *MDFN_fgets(char *s, int size, MDFNFILE *);
-#endif
 
 class PtrLengthPair
 {

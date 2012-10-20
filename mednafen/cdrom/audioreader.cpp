@@ -30,14 +30,6 @@
 #include "../tremor/ivorbisfile.h"
 #include "../mpcdec/mpcdec.h"
 
-#ifdef HAVE_LIBSNDFILE
-#include <sndfile.h>
-#endif
-
-#ifdef HAVE_OPUSFILE
-#include "audioreader_opus.h"
-#endif
-
 #include <string.h>
 #include <errno.h>
 #include <time.h>
@@ -433,130 +425,6 @@ int64 MPCReader::FrameCount(void)
 **
 */
 
-#ifdef HAVE_LIBSNDFILE
-class SFReader : public AudioReader
-{
- public:
-
- SFReader(Stream *fp);
- ~SFReader();
-
- int64 Read_(int16 *buffer, int64 frames);
- bool Seek_(int64 frame_offset);
- int64 FrameCount(void);
-
- private:
- SNDFILE *sf;
- SF_INFO sfinfo;
- SF_VIRTUAL_IO sfvf;
-
- Stream *fw;
-};
-
-static sf_count_t isf_get_filelen(void *user_data)
-{
- Stream *fw = (Stream*)user_data;
-
- try
- {
-  return fw->size();
- }
- catch(...)
- {
-  return(-1);
- }
-}
-
-static sf_count_t isf_seek(sf_count_t offset, int whence, void *user_data)
-{
- Stream *fw = (Stream*)user_data;
-
- try
- {
-  fw->seek(offset, whence);
-  return fw->tell();
- }
- catch(...)
- {
-  return(-1);
- }
-}
-
-static sf_count_t isf_read(void *ptr, sf_count_t count, void *user_data)
-{
- Stream *fw = (Stream*)user_data;
-
- try
- {
-  return fw->read(ptr, count);
- }
- catch(...)
- {
-  return(0);
- }
-}
-
-static sf_count_t isf_write(const void *ptr, sf_count_t count, void *user_data)
-{
- return(0);
-}
-
-static sf_count_t isf_tell(void *user_data)
-{
- Stream *fw = (Stream*)user_data;
-
- try
- {
-  return fw->tell();
- }
- catch(...)
- {
-  return(-1);
- }
-}
-
-SFReader::SFReader(Stream *fp) : fw(fp)
-{
- fp->seek(0, SEEK_SET);
-
- memset(&sfvf, 0, sizeof(sfvf));
- sfvf.get_filelen = isf_get_filelen;
- sfvf.seek = isf_seek;
- sfvf.read = isf_read;
- sfvf.write = isf_write;
- sfvf.tell = isf_tell;
-
- memset(&sfinfo, 0, sizeof(sfinfo));
- if(!(sf = sf_open_virtual(&sfvf, SFM_READ, &sfinfo, (void*)fp)))
-  throw(0);
-}
-
-SFReader::~SFReader() 
-{
- sf_close(sf);
-}
-
-int64 SFReader::Read_(int16 *buffer, int64 frames)
-{
- return(sf_read_short(sf, (short*)buffer, frames * 2) / 2);
-}
-
-bool SFReader::Seek_(int64 frame_offset)
-{
- // FIXME error condition
- if(sf_seek(sf, frame_offset, SEEK_SET) != frame_offset)
-  return(false);
- return(true);
-}
-
-int64 SFReader::FrameCount(void)
-{
- return(sfinfo.frames);
-}
-
-#endif
-
-
 AudioReader *AR_Open(Stream *fp)
 {
  try
@@ -567,16 +435,6 @@ AudioReader *AR_Open(Stream *fp)
  {
  }
 
-#ifdef HAVE_OPUSFILE
- try
- {
-  return new OpusReader(fp);
- }
- catch(int i)
- {
- }
-#endif
-
  try
  {
   return new OggVorbisReader(fp);
@@ -584,16 +442,6 @@ AudioReader *AR_Open(Stream *fp)
  catch(int i)
  {
  }
-
-#ifdef HAVE_LIBSNDFILE
- try
- {
-  return new SFReader(fp);
- }
- catch(int i)
- {
- }
-#endif
 
  return(NULL);
 }

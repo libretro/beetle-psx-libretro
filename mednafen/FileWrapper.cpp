@@ -62,39 +62,6 @@
 
 // For special uses, IE in classes that take a path or a FileWrapper & in the constructor, and the FileWrapper non-pointer member
 // is in the initialization list for the path constructor but not the constructor with FileWrapper&
-#if 0
-FileWrapper::FileWrapper()
-{
- fp = NULL;
-}
-#endif
-
-#if 0
-FileWrapper::FileWrapper(FileWrapper &original) : OpenedMode(original.OpenedMode)
-{
- int fd;
- int duped_fd;
-
- path_save = original.path_save;
-
- original.flush();
-
- fd = fileno(original.fp);
- if(-1 == (duped_fd = dup(fd)))
- {
-  ErrnoHolder ene(errno);
-
-  throw(MDFN_Error(ene.Errno(), _("Error duping file descriptor: %s"), ene.StrError()));
- }
-
- if(!(fp = fdopen(duped_fd, (OpenedMode == MODE_READ) ? "rb" : "wb")))
- {
-  ErrnoHolder ene(errno);
-
-  throw(MDFN_Error(ene.Errno(), _("Error during fdopen(): %s"), ene.StrError()));
- }
-}
-#endif
 
 FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) : OpenedMode(mode)
 {

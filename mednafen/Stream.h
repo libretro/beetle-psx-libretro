@@ -25,14 +25,6 @@ class Stream
  };
  virtual uint64 attributes(void) = 0;
 
- virtual uint8 *map(void) = 0;	// Map the entirety of the stream data into the address space of the process, if possible, and return a pointer.
-				// (the returned pointer must be cached, and returned on any subsequent calls to map() without an unmap()
-				// in-between, to facilitate a sort of "feature-testing", to determine if an alternative like "MemoryStream"
-				// should be used).
-
- virtual void unmap(void) = 0;	// Unmap the stream data from the address space.  (Possibly invalidating the pointer returned from map()).
-				// (must automatically be called, if necessary, from the destructor).
-
  virtual uint64 read(void *data, uint64 count, bool error_on_eos = true) = 0;
  virtual void write(const void *data, uint64 count) = 0;
 

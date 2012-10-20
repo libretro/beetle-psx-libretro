@@ -53,18 +53,6 @@ uint64 FileStream::attributes(void)
  return ret;
 }
 
-uint8 *FileStream::map(void)
-{
- //return fw.map();
- return(NULL);
-}
-
-void FileStream::unmap(void)
-{
- //fw.unmap();
-}
-
-
 uint64 FileStream::read(void *data, uint64 count, bool error_on_eos)
 {
  return fw.read(data, count, error_on_eos);
