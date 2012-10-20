@@ -91,9 +91,6 @@ static const uint32 NoiseFreqTable[64] =
 
 PS_SPU::PS_SPU()
 {
- last_rate = -1;
- last_quality = ~0U;
-
  IntermediateBufferPos = 0;
  memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
 }
@@ -1177,35 +1174,18 @@ uint16 PS_SPU::Read(pscpu_timestamp_t timestamp, uint32 A)
 
 void PS_SPU::StartFrame(double rate, uint32 quality)
 {
- if((int)rate != last_rate || quality != last_quality)
- {
-  //double ratio = (double)44100 / (rate ? rate : 44100);
-  int err = 0;
-
-  last_rate = (int)rate;
-  last_quality = quality;
- }
-
 }
 
 int32 PS_SPU::EndFrame(int16 *SoundBuf)
 {
  //lastts = 0;
 
- if(last_rate == 44100)
- {
   int32 ret = IntermediateBufferPos;
 
   memcpy(SoundBuf, IntermediateBuffer, IntermediateBufferPos * 2 * sizeof(int16));
   IntermediateBufferPos = 0;
 
   return(ret);
- }
- else
- {
-  IntermediateBufferPos = 0;
-  return 0;
- }
 }
 
 int PS_SPU::StateAction(StateMem *sm, int load, int data_only)

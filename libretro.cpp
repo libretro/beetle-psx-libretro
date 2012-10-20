@@ -57,7 +57,7 @@ void retro_init()
    }
    else
    {
-      fprintf(stderr, "System directory is not defined. Cannot continue ...\n");
+      fprintf(stderr, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
 

@@ -580,21 +580,132 @@ double MDFN_GetSettingF(const char *name)
 
 bool MDFN_GetSettingB(const char *name)
 {
- return((bool)MDFN_GetSettingUI(name));
+	if(!strcmp("cheats", name))
+		return 0;
+	/* PCE_FAST */
+        if(!strcmp("pce_fast.input.multitap", name))
+                return 1;
+	if(!strcmp("pce_fast.arcadecard", name))
+		return 1;
+	if(!strcmp("pce_fast.forcesgx", name))
+		return 0;
+	if(!strcmp("pce_fast.nospritelimit", name))
+		return 0;
+	if(!strcmp("pce_fast.forcemono", name))
+		return 0;
+	if(!strcmp("pce_fast.disable_softreset", name))
+		return 0;
+	if(!strcmp("pce_fast.adpcmlp", name))
+		return 0;
+	if(!strcmp("pce_fast.correct_aspect", name))
+		return 1;
+	/* PSX */
+	if(!strcmp("psx.input.port1.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port2.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port3.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port4.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port5.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port6.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port7.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port8.memcard", name))
+		return 1;
+	if(!strcmp("psx.input.port1.multitap", name)) /* make configurable */
+		return 1;
+	if(!strcmp("psx.input.port2.multitap", name)) /* make configurable */
+		return 1;
+	if(!strcmp("psx.region_autodetect", name)) /* make configurable */
+		return 1;
+	if(!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
+		return 1;
+	/* CDROM */
+	if(!strcmp("cdrom.lec_eval", name))
+		return 1;
+	/* FILESYS */
+	if(!strcmp("filesys.untrusted_fip_check", name))
+		return 0;
+	if(!strcmp("filesys.disablesavegz", name))
+		return 1;
+	fprintf(stderr, "unhandled setting B: %s\n", name);
+	assert(0);
+	return 0;
 }
+
+extern std::string retro_base_directory;
+extern std::string retro_base_name;
 
 std::string MDFN_GetSettingS(const char *name)
 {
- const MDFNCS *setting = FindSetting(name);
- const char *value = GetSetting(setting);
-
- // Even if we're getting the string value of an enum instead of the associated numeric value, we still need
- // to make sure it's a valid enum
- // (actually, not really, since it's handled in other places where the setting is actually set)
- //if(setting->desc->type == MDFNST_ENUM)
- // GetEnum(setting, value);
-
- return(std::string(value));
+	/* PCE_FAST */
+	if(!strcmp("pce_fast.cdbios", name))
+        {
+                fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
+		return std::string("syscard3.pce");
+        }
+	/* PSX */
+	if(!strcmp("psx.bios_eu", name))
+        {
+                fprintf(stderr, "psx.bios_eu: %s%s\n", retro_base_directory.c_str(), name);
+		assert(0);
+		return std::string(retro_base_directory) + std::string("scph5502.bin");
+        }
+	if(!strcmp("psx.bios_jp", name))
+        {
+                fprintf(stderr, "psx.bios_jp: %s%s\n", retro_base_directory.c_str(), name);
+		assert(0);
+		return std::string(retro_base_directory) + std::string("scph5500.bin");
+        }
+	if(!strcmp("psx.bios_na", name))
+        {
+                fprintf(stderr, "psx.bios_na: %s%s\n", retro_base_directory.c_str(), name);
+		assert(0);
+		return std::string(retro_base_directory) + std::string("scph5501.bin");
+        }
+	/* FILESYS */
+	if(!strcmp("filesys.path_firmware", name))
+        {
+                fprintf(stderr, "filesys.path_firmware: %s\n", retro_base_directory.c_str());
+		return retro_base_directory;
+        }
+	if(!strcmp("filesys.path_palette", name))
+        {
+                fprintf(stderr, "filesys.path_palette: %s\n", retro_base_directory.c_str());
+		return retro_base_directory;
+        }
+	if(!strcmp("filesys.path_sav", name))
+        {
+                fprintf(stderr, "filesys.path_sav: %s\n", retro_base_directory.c_str());
+		return retro_base_directory;
+        }
+	if(!strcmp("filesys.path_state", name))
+        {
+                fprintf(stderr, "filesys.path_state: %s\n", retro_base_directory.c_str());
+		return retro_base_directory;
+        }
+	if(!strcmp("filesys.path_cheat", name))
+        {
+                fprintf(stderr, "filesys.path_cheat: %s\n", retro_base_directory.c_str());
+		return retro_base_directory;
+        }
+	if(!strcmp("filesys.fname_state", name))
+        {
+                fprintf(stderr, "filesys.fname_state: %s%s\n", retro_base_name.c_str(), std::string(".sav").c_str());
+		return retro_base_name + std::string(".sav");
+        }
+	if(!strcmp("filesys.fname_sav", name))
+        {
+                fprintf(stderr, "filesys.fname_sav: %s%s\n", retro_base_name.c_str(), std::string(".bsv").c_str());
+		return retro_base_name + std::string(".bsv");
+        }
+	fprintf(stderr, "unhandled setting S: %s\n", name);
+	assert(0);
+	return 0;
 }
 
 const std::multimap <uint32, MDFNCS> *MDFNI_GetSettings(void)
@@ -654,22 +765,6 @@ bool MDFNI_SetSetting(const char *name, const char *value, bool NetplayOverride)
   return(false);
  }
 }
-
-#if 0
-// TODO after a game is loaded, but should we?
-void MDFN_CallSettingsNotification(void)
-{
- for(unsigned int x = 0; x < CurrentSettings.size(); x++)
- {
-  if(CurrentSettings[x].ChangeNotification)
-  {
-   // TODO, always call driver notification function, regardless of whether a game is loaded.
-   if(MDFNGameInfo)
-    CurrentSettings[x].ChangeNotification(CurrentSettings[x].name);
-  }
- }
-}
-#endif
 
 bool MDFNI_SetSettingB(const char *name, bool value)
 {
