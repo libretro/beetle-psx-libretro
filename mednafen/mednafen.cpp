@@ -236,22 +236,14 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
    for(unsigned i = 0; i < file_list.size(); i++)
    {
-#if 1
     CDInterfaces.push_back(new CDIF_MT(file_list[i].c_str()));
-#else
-    CDInterfaces.push_back(new CDIF_ST(file_list[i].c_str()));
-#endif
    }
 
    GetFileBase(devicename);
   }
   else
   {
-#if 1
    CDInterfaces.push_back(new CDIF_MT(devicename));
-#else
-   CDInterfaces.push_back(new CDIF_ST(devicename));
-#endif
    if(CDInterfaces[0]->IsPhysical())
    {
     GetFileBase("cdrom");
@@ -324,7 +316,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
 	MDFNGameInfo = NULL;
 
-        for(std::list<MDFNGI *>::iterator it = MDFNSystemsPrio.begin(); it != MDFNSystemsPrio.end(); it++)  //_unsigned int x = 0; x < MDFNSystems.size(); x++)
+        for(std::list<MDFNGI *>::iterator it = MDFNSystemsPrio.begin(); it != MDFNSystemsPrio.end(); it++)
         {
          char tmpstr[256];
          trio_snprintf(tmpstr, 256, "%s.enable", (*it)->shortname);
@@ -890,14 +882,9 @@ void MDFNI_Kill(void)
  MDFN_KillSettings();
 }
 
-static double multiplier_save;
-
 #if defined(WANT_LYNX_EMU) || defined(WANT_NES_EMU)
 static void ProcessAudio(EmulateSpecStruct *espec)
 {
- if(espec->soundmultiplier != 1)
-  multiplier_save = espec->soundmultiplier;
-
  if(espec->SoundBuf && espec->SoundBufSize)
  {
   int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
@@ -910,9 +897,6 @@ static void ProcessAudio(EmulateSpecStruct *espec)
 #else
 static void ProcessAudio(EmulateSpecStruct *espec)
 {
- if(espec->soundmultiplier != 1)
-  multiplier_save = espec->soundmultiplier;
-
  if(espec->SoundBuf && espec->SoundBufSize)
  {
   int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
@@ -936,8 +920,6 @@ void MDFN_MidSync(EmulateSpecStruct *espec)
 
 void MDFNI_Emulate(EmulateSpecStruct *espec)
 {
- multiplier_save = 1;
-
  // Initialize some espec member data to zero, to catch some types of bugs.
  espec->DisplayRect.x = 0;
  espec->DisplayRect.w = 0;
@@ -967,20 +949,6 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
  espec->NeedSoundReverse = false;
 
  MDFNGameInfo->Emulate(espec);
-
- //
- // Sanity checks
- //
- if(!espec->skip)
- {
-  if(espec->DisplayRect.h == 0)
-  {
-   fprintf(stderr, "espec->DisplayRect.h == 0\n");
-  }
- }
- //
- //
- //
 
  if(espec->InterlaceOn)
  {

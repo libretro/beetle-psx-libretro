@@ -174,17 +174,4 @@ class CDIF_MT : public CDIF
 };
 
 
-// TODO: prohibit copy constructor
-class CDIF_ST : public CDIF
-{
- public:
-
- CDIF_ST(const char *device_name, bool di_memcache);
- virtual ~CDIF_ST();
-
- virtual void HintReadSector(uint32 lba);
- virtual bool ReadRawSector(uint8 *buf, uint32 lba);
- virtual bool Eject(bool eject_status);
-};
-
 #endif
