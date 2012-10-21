@@ -6,9 +6,6 @@
 
 void MDFNSS_GetStateInfo(const char *filename, StateStatusStruct *status);
 
-int MDFNSS_Save(const char *, const char *suffix, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_Load(const char *, const char *suffix);
-
 typedef struct
 {
         uint8 *data;
@@ -30,8 +27,8 @@ int32 smem_seek(StateMem *st, uint32 offset, int whence);
 int smem_write32le(StateMem *st, uint32 b);
 int smem_read32le(StateMem *st, uint32 *b);
 
-int MDFNSS_SaveSM(StateMem *st, int wantpreview_and_ts, int data_only, const MDFN_Surface *surface = (MDFN_Surface *)NULL, const MDFN_Rect *DisplayRect = (MDFN_Rect*)NULL, const MDFN_Rect *LineWidths = (MDFN_Rect *)NULL);
-int MDFNSS_LoadSM(StateMem *st, int haspreview, int data_only);
+int MDFNSS_SaveSM(StateMem *st);
+int MDFNSS_LoadSM(StateMem *st);
 
 void MDFNSS_CheckStates(void);
 

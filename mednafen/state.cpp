@@ -146,11 +146,10 @@ static bool ValidateSFStructure(SFORMAT *sf)
 }
 
 
-static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_prefix = NULL)
+static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 {
  // FIXME?  It's kind of slow, and we definitely don't want it on with state rewinding...
- if(!data_only) 
-  ValidateSFStructure(sf);
+ ValidateSFStructure(sf);
 
  while(sf->size || sf->name)	// Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct.
  {
@@ -162,7 +161,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
 
   if(sf->size == (uint32)~0)		/* Link to another struct.	*/
   {
-   if(!SubWrite(st, (SFORMAT *)sf->v, data_only, name_prefix))
+   if(!SubWrite(st, (SFORMAT *)sf->v, name_prefix))
     return(0);
 
    sf++;
@@ -171,16 +170,6 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
 
   int32 bytesize = sf->size;
 
-  // If we're only saving the raw data, and we come across a bool type, we save it as it is in memory, rather than converting it to
-  // 1-byte.  In the SFORMAT structure, the size member for bool entries is the number of bool elements, not the total in-memory size,
-  // so we adjust it here.
-  if(data_only && (sf->flags & MDFNSTATE_BOOL))
-  {
-   bytesize *= sizeof(bool);
-  }
-  
-  if(!data_only)
-  {
    char nameo[1 + 256];
    int slen;
 
@@ -209,11 +198,10 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
     Endian_A16_NE_to_LE(sf->v, bytesize / sizeof(uint16));
    else if(sf->flags & RLSB)
     Endian_V_NE_to_LE(sf->v, bytesize);
-  }
     
   // Special case for the evil bool type, to convert bool to 1-byte elements.
   // Don't do it if we're only saving the raw data.
-  if((sf->flags & MDFNSTATE_BOOL) && !data_only)
+  if(sf->flags & MDFNSTATE_BOOL)
   {
    for(int32 bool_monster = 0; bool_monster < bytesize; bool_monster++)
    {
@@ -225,61 +213,52 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, int data_only, const char *name_
   else
    smem_write(st, (uint8 *)sf->v, bytesize);
 
-  if(!data_only)
+  /* Now restore the original byte order. */
+  if(sf->flags & MDFNSTATE_BOOL)
   {
-   /* Now restore the original byte order. */
-   if(sf->flags & MDFNSTATE_BOOL)
-   {
 
-   }
-   else if(sf->flags & MDFNSTATE_RLSB64)
-    Endian_A64_LE_to_NE(sf->v, bytesize / sizeof(uint64));
-   else if(sf->flags & MDFNSTATE_RLSB32)
-    Endian_A32_LE_to_NE(sf->v, bytesize / sizeof(uint32));
-   else if(sf->flags & MDFNSTATE_RLSB16)
-    Endian_A16_LE_to_NE(sf->v, bytesize / sizeof(uint16));
-   else if(sf->flags & RLSB)
-    Endian_V_LE_to_NE(sf->v, bytesize);
   }
+  else if(sf->flags & MDFNSTATE_RLSB64)
+	  Endian_A64_LE_to_NE(sf->v, bytesize / sizeof(uint64));
+  else if(sf->flags & MDFNSTATE_RLSB32)
+	  Endian_A32_LE_to_NE(sf->v, bytesize / sizeof(uint32));
+  else if(sf->flags & MDFNSTATE_RLSB16)
+	  Endian_A16_LE_to_NE(sf->v, bytesize / sizeof(uint16));
+  else if(sf->flags & RLSB)
+	  Endian_V_LE_to_NE(sf->v, bytesize);
   sf++; 
  }
 
  return(TRUE);
 }
 
-static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf, int data_only)
+static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
 {
  int32 data_start_pos;
  int32 end_pos;
 
- if(!data_only)
- {
-  uint8 sname_tmp[32];
+ uint8 sname_tmp[32];
 
-  memset(sname_tmp, 0, sizeof(sname_tmp));
-  strncpy((char *)sname_tmp, sname, 32);
+ memset(sname_tmp, 0, sizeof(sname_tmp));
+ strncpy((char *)sname_tmp, sname, 32);
 
-  if(strlen(sname) > 32)
-   printf("Warning: section name is too long: %s\n", sname);
+ if(strlen(sname) > 32)
+	 printf("Warning: section name is too long: %s\n", sname);
 
-  smem_write(st, sname_tmp, 32);
+ smem_write(st, sname_tmp, 32);
 
-  smem_write32le(st, 0);                // We'll come back and write this later.
- }
+ smem_write32le(st, 0);                // We'll come back and write this later.
 
  data_start_pos = smem_tell(st);
 
- if(!SubWrite(st, sf, data_only))
+ if(!SubWrite(st, sf))
   return(0);
 
  end_pos = smem_tell(st);
 
- if(!data_only)
- {
-  smem_seek(st, data_start_pos - 4, SEEK_SET);
-  smem_write32le(st, end_pos - data_start_pos);
-  smem_seek(st, end_pos, SEEK_SET);
- }
+ smem_seek(st, data_start_pos - 4, SEEK_SET);
+ smem_write32le(st, end_pos - data_start_pos);
+ smem_seek(st, end_pos, SEEK_SET);
 
  return(end_pos - data_start_pos);
 }
@@ -352,15 +331,10 @@ static void DOReadChunk(StateMem *st, SFORMAT *sf)
  }
 }
 
-static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size, int data_only)
+static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 {
  int temp;
 
- if(data_only)
- {
-  DOReadChunk(st, sf);
- }
- else
  {
   SFMap_t sfmap;
   SFMap_t sfmap_found;	// Used for identifying variables that are missing in the save state.
@@ -464,14 +438,6 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
 
  if(load)
  {
-  if(data_only)
-  {
-   for(section = sections.begin(); section != sections.end(); section++)
-   {
-     ReadStateChunk(st, section->sf, ~0, 1);
-   }
-  }
-  else
   {
    char sname[32];
 
@@ -491,7 +457,7 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
      // Yay, we found the section
      if(!strncmp(sname, section->name, 32))
      {
-      if(!ReadStateChunk(st, section->sf, tmp_size, 0))
+      if(!ReadStateChunk(st, section->sf, tmp_size))
       {
        printf("Error reading chunk: %s\n", section->name);
        return(0);
@@ -501,7 +467,6 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
      } 
      else
      {
-      // puts("SEEK");
       if(smem_seek(st, tmp_size, SEEK_CUR) < 0)
       {
        puts("Chunk seek failure");
@@ -526,7 +491,7 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDes
  {
   for(section = sections.begin(); section != sections.end(); section++)
   {
-   if(!WriteStateChunk(st, section->name, section->sf, data_only))
+   if(!WriteStateChunk(st, section->name, section->sf))
     return(0);
   }
  }
@@ -539,156 +504,44 @@ int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const
  std::vector <SSDescriptor> love;
 
  love.push_back(SSDescriptor(sf, name, optional));
- return(MDFNSS_StateAction(st, load, data_only, love));
+ return(MDFNSS_StateAction(st, load, 0, love));
 }
 
-int MDFNSS_SaveSM(StateMem *st, int wantpreview_and_ts, int data_only, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
+int MDFNSS_SaveSM(StateMem *st)
 {
 	static const char *header_magic = "MDFNSVST";
         uint8 header[32];
 	int neowidth = 0, neoheight = 0;
 
 	memset(header, 0, sizeof(header));
+	memcpy(header, header_magic, 8);
 
-	if(wantpreview_and_ts)
-	{
-	 bool is_multires = FALSE;
+	MDFN_en32lsb(header + 16, MEDNAFEN_VERSION_NUMERIC);
+	MDFN_en32lsb(header + 24, neowidth);
+	MDFN_en32lsb(header + 28, neoheight);
+	smem_write(st, header, 32);
 
-	 // We'll want to use the nominal width if the source rectangle is > 25% off on either axis, or the source image has
-	 // multiple horizontal resolutions.
-	 neowidth = MDFNGameInfo->nominal_width;
-	 neoheight = MDFNGameInfo->nominal_height;
-
-	 if(LineWidths[0].w != ~0)
- 	 {
-	  uint32 first_w = LineWidths[DisplayRect->y].w;
-
-	  for(int y = 0; y < DisplayRect->h; y++)
-	   if(LineWidths[DisplayRect->y + y].w != first_w)
-	   {
-	    puts("Multires!");
-	    is_multires = TRUE;
-	   }
-	 }
-
-	 if(!is_multires)
-	 {
-	  if(((double)DisplayRect->w / MDFNGameInfo->nominal_width) > 0.75  && ((double)DisplayRect->w / MDFNGameInfo->nominal_width) < 1.25)
-	   neowidth = DisplayRect->w;
-
-          if(((double)DisplayRect->h / MDFNGameInfo->nominal_height) > 0.75  && ((double)DisplayRect->h / MDFNGameInfo->nominal_height) < 1.25)
-	   neoheight = DisplayRect->h;
-	 }
-	}
-
-	if(!data_only)
-	{
-	 memcpy(header, header_magic, 8);
-
-	 if(wantpreview_and_ts)
-	  MDFN_en64lsb(header + 8, time(NULL));
-
-	 MDFN_en32lsb(header + 16, MEDNAFEN_VERSION_NUMERIC);
-	 MDFN_en32lsb(header + 24, neowidth);
-	 MDFN_en32lsb(header + 28, neoheight);
-	 smem_write(st, header, 32);
-	}
-
-        // State rewinding code path hack, FIXME
-        if(data_only)
-        {
-         if(!MDFN_RawInputStateAction(st, 0, data_only))
-          return(0);
-        }
-
-	if(!MDFNGameInfo->StateAction(st, 0, data_only))
+	if(!MDFNGameInfo->StateAction(st, 0, 0))
 	 return(0);
 
-	if(!data_only)
-	{
-	 uint32 sizy = smem_tell(st);
-	 smem_seek(st, 16 + 4, SEEK_SET);
-	 smem_write32le(st, sizy);
-	}
-	return(1);
-}
-
-int MDFNSS_Save(const char *fname, const char *suffix, const MDFN_Surface *surface, const MDFN_Rect *DisplayRect, const MDFN_Rect *LineWidths)
-{
-	StateMem st;
-
-	memset(&st, 0, sizeof(StateMem));
-
-
-	if(!MDFNGameInfo->StateAction)
-	{
-	 MDFN_DispMessage(_("Module \"%s\" doesn't support save states."), MDFNGameInfo->shortname);
-	 return(0);
-	}
-
-	if(!MDFNSS_SaveSM(&st, (DisplayRect && LineWidths), 0, surface, DisplayRect, LineWidths))
-	{
-	 if(st.data)
-	  free(st.data);
-	 if(!fname && !suffix)
- 	  MDFN_DispMessage(_("State %d save error."), CurrentState);
-	 return(0);
-	}
-
-	if(!MDFN_DumpToFile(fname ? fname : MDFN_MakeFName(MDFNMKF_STATE,CurrentState,suffix).c_str(), 6, st.data, st.len))
-	{
-	 free(st.data);
-
-         if(!fname && !suffix)
-          MDFN_DispMessage(_("State %d save error."),CurrentState);
-
-	 return(0);
-	}
-
-	free(st.data);
-
-	if(!fname && !suffix)
-	 MDFN_DispMessage(_("State %d saved."),CurrentState);
+	uint32 sizy = smem_tell(st);
+	smem_seek(st, 16 + 4, SEEK_SET);
+	smem_write32le(st, sizy);
 
 	return(1);
 }
 
-int MDFNSS_LoadSM(StateMem *st, int haspreview, int data_only)
+int MDFNSS_LoadSM(StateMem *st)
 {
-        uint8 header[32];
-	uint32 stateversion;
+ uint8 header[32];
+ uint32 stateversion;
 
-	if(data_only)
-	{
-	 stateversion = MEDNAFEN_VERSION_NUMERIC;
-	}
-	else
-	{
-         smem_read(st, header, 32);
+ smem_read(st, header, 32);
 
-         if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
-          return(0);
+ if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
+  return(0);
 
-	 stateversion = MDFN_de32lsb(header + 16);
-	}
+ stateversion = MDFN_de32lsb(header + 16);
 
-	if(haspreview)
-        {
-         uint32 width = MDFN_de32lsb(header + 24);
-         uint32 height = MDFN_de32lsb(header + 28);
-	 uint32 psize;
-
-	 psize = width * height * 3;
-	 smem_seek(st, psize, SEEK_CUR);	// Skip preview
- 	}
-
-	// State rewinding code path hack, FIXME
-	if(data_only)
-	{
-	 if(!MDFN_RawInputStateAction(st, stateversion, data_only))
-	  return(0);
-	}
-
-	return(MDFNGameInfo->StateAction(st, stateversion, data_only));
+ return(MDFNGameInfo->StateAction(st, stateversion, 0));
 }
-
