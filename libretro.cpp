@@ -14,9 +14,7 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 static MDFN_Surface *surf;
-static bool rgb32;
 
-static uint16_t *conv_buf;
 static uint32_t *mednafen_buf;
 static bool failed_init;
 
@@ -102,8 +100,11 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef WANT_32BPP
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
-      rgb32 = true;
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+   {
+      fprintf(stderr, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
+      return false;
+   }
 #endif
 
    const char *base = strrchr(info->path, '/');
@@ -125,7 +126,6 @@ bool retro_load_game(const struct retro_game_info *info)
    int fbHeight = FB_HEIGHT;
    int fbSize   = fbWidth * fbHeight;
 
-   conv_buf     = new uint16_t[fbSize];
    mednafen_buf = new uint32_t[fbSize];
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
 
@@ -137,49 +137,8 @@ bool retro_load_game(const struct retro_game_info *info)
 void retro_unload_game()
 {
    MDFNI_CloseGame();
-   delete [] conv_buf;
    delete [] mednafen_buf;
 }
-
-#if defined(WANT_PSX_EMU)
-#include <emmintrin.h>
-
-static inline void convert_surface()
-{
-#ifdef __SSE2__
-// PSX core should be able to output ARGB1555 directly,
-// so we can avoid this conversion step.
-// Done in SSE2 here because any system that can run this
-// core to begin with will be at least that powerful (as of writing).
-   const uint32_t *pix = surf->pixels;
-   for (unsigned i = 0; i < (MDFNGameInfo->fb_width * MDFNGameInfo->fb_height); i += 8)
-   {
-      __m128i pix0 = _mm_load_si128((const __m128i*)(pix + i + 0));
-      __m128i pix1 = _mm_load_si128((const __m128i*)(pix + i + 4));
-
-      __m128i red0   = _mm_and_si128(pix0, _mm_set1_epi32(0xf80000));
-      __m128i green0 = _mm_and_si128(pix0, _mm_set1_epi32(0x00f800));
-      __m128i blue0  = _mm_and_si128(pix0, _mm_set1_epi32(0x0000f8));
-      __m128i red1   = _mm_and_si128(pix1, _mm_set1_epi32(0xf80000));
-      __m128i green1 = _mm_and_si128(pix1, _mm_set1_epi32(0x00f800));
-      __m128i blue1  = _mm_and_si128(pix1, _mm_set1_epi32(0x0000f8));
-
-      red0   = _mm_srli_epi32(red0,   19 - 10);
-      green0 = _mm_srli_epi32(green0, 11 -  5);
-      blue0  = _mm_srli_epi32(blue0,   3 -  0);
-
-      red1   = _mm_srli_epi32(red1,   19 - 10);
-      green1 = _mm_srli_epi32(green1, 11 -  5);
-      blue1  = _mm_srli_epi32(blue1,   3 -  0);
-
-      __m128i res0 = _mm_or_si128(_mm_or_si128(red0, green0), blue0);
-      __m128i res1 = _mm_or_si128(_mm_or_si128(red1, green1), blue1);
-
-      _mm_store_si128((__m128i*)(conv_buf + i), _mm_packs_epi32(res0, res1));
-   }
-#endif
-}
-#endif
 
 static unsigned retro_devices[2];
 
@@ -376,21 +335,10 @@ void retro_run()
    width = width * hoverscan;
    ptrDiff += ((rects[0].w - width) / 2);
 
-   if (rgb32)
-   {
-      const uint32_t *ptr = mednafen_buf;
-      ptr += ptrDiff;
+   const uint32_t *ptr = surf->pixels;
+   ptr += ptrDiff;
 
-      video_cb(ptr, width, height, FB_WIDTH << 2);
-   }
-   else
-   {
-      convert_surface();
-
-      const uint16_t *ptr = conv_buf;
-      ptr += ptrDiff;
-      video_cb(ptr, width, height, FB_WIDTH << 1);
-   }
+   video_cb(ptr, width, height, FB_WIDTH << 2);
 #elif defined(WANT_PCE_FAST_EMU)
    const uint16_t *pix = surf->pixels16;
    video_cb(pix, width, height, FB_WIDTH << 1);
