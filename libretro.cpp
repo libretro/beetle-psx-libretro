@@ -24,6 +24,7 @@ std::string retro_base_name;
 #if defined(WANT_PSX_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
+#define MEDNAFEN_CORE_VERSION "v0.9.26"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|CUE|toc|TOC"
 #define MEDNAFEN_CORE_TIMING_FPS 59.85398
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
@@ -37,6 +38,7 @@ std::string retro_base_name;
 #elif defined(WANT_PCE_FAST_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
+#define MEDNAFEN_CORE_VERSION "v0.9.24"
 #define MEDNAFEN_CORE_EXTENSIONS "pce|PCE|cue|CUE|zip|ZIP"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
@@ -46,16 +48,32 @@ std::string retro_base_name;
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 512
 #define FB_HEIGHT 242
+
+#elif defined(WANT_WSWAN_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "wswan"
+#define MEDNAFEN_CORE_NAME "Mednafen WonderSwan"
+#define MEDNAFEN_CORE_VERSION "v0.9.22"
+#define MEDNAFEN_CORE_EXTENSIONS "ws|WS|wsc|WSC|zip|ZIP"
+#define MEDNAFEN_CORE_TIMING_FPS 75.47
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 224
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 144
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 224
+#define FB_HEIGHT 144
+
 #endif
 const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
 static void check_system_specs(void)
 {
+   unsigned level = 0;
 #if defined(WANT_PSX_EMU)
    // Hints that we need a fairly powerful system to run this.
-   unsigned level = 3;
-   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
+   level = 3;
 #endif
+   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
 void retro_init()
@@ -79,6 +97,12 @@ void retro_init()
       fprintf(stderr, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
+
+#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+   enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
+   if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
+      fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+#endif
 
    check_system_specs();
 }
@@ -269,6 +293,38 @@ static void update_input(void)
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
       MDFNI_SetInput(i, "gamepad", &input_buf[i][0], 0);
+#elif defined(WANT_WSWAN_EMU)
+   static uint16_t input_buf;
+   input_buf = 0;
+
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_UP, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_RIGHT, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_DOWN, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_LEFT, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_R2, //Y Cursor UP vertical-layout games
+      RETRO_DEVICE_ID_JOYPAD_R, //Y Cursor RIGHT vertical-layout games
+      RETRO_DEVICE_ID_JOYPAD_L2, //Y Cursor DOWN vertical-layout games
+      RETRO_DEVICE_ID_JOYPAD_L, //Y Cursor LEFT vertical-layout games
+      RETRO_DEVICE_ID_JOYPAD_START,
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_B,
+   };
+
+for (unsigned i = 0; i < 11; i++)
+ input_buf |= map[i] != -1u &&
+    input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+#ifdef MSB_FIRST
+   union {
+      uint8_t b[2];
+      uint16_t s;
+   } u;
+   u.s = input_buf;
+   input_buf = u.b[0] | u.b[1] << 8;
+#endif
+
+   game->SetInput(0, "gamepad", &input_buf);
 #endif
 }
 
@@ -297,10 +353,13 @@ void retro_run()
 
    MDFNI_Emulate(&spec);
 
-#ifdef WANT_PSX_EMU
+#if defined(WANT_PSX_EMU)
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
    unsigned int ptrDiff = 0;
+#elif defined(WANT_WSWAN_EMU)
+   unsigned width = FB_WIDTH;
+   unsigned height = FB_HEIGHT;
 #else
    unsigned width = rects->w;
    unsigned height = rects->h;
@@ -339,7 +398,7 @@ void retro_run()
    ptr += ptrDiff;
 
    video_cb(ptr, width, height, FB_WIDTH << 2);
-#elif defined(WANT_PCE_FAST_EMU)
+#elif defined(WANT_16BPP)
    const uint16_t *pix = surf->pixels16;
    video_cb(pix, width, height, FB_WIDTH << 1);
 #endif
@@ -354,7 +413,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = MEDNAFEN_CORE_NAME;
-   info->library_version  = "0.9.26";
+   info->library_version  = MEDNAFEN_CORE_VERSION;
    info->need_fullpath    = true;
    info->valid_extensions = MEDNAFEN_CORE_EXTENSIONS;
    info->block_extract    = false;

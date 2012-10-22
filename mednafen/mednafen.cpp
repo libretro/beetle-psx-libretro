@@ -34,12 +34,14 @@
 #include	"video/Deinterlacer.h"
 #include	"file.h"
 #include	"FileWrapper.h"
+
 #include	"cdrom/cdromif.h"
+#include	"cdrom/CDUtility.h"
+
 #include	"mempatcher.h"
 #include	"md5.h"
 #include	"clamp.h"
 
-#include	"cdrom/CDUtility.h"
 
 static const char *CSD_forcemono = gettext_noop("Force monophonic sound output.");
 static const char *CSD_enable = gettext_noop("Enable (automatic) usage of this module.");
@@ -107,8 +109,10 @@ static double LastSoundMultiplier;
 static MDFN_PixelFormat last_pixel_format;
 static double last_sound_rate;
 
+#ifdef NEED_DEINTERLACER
 static bool PrevInterlaced;
 static Deinterlacer deint;
+#endif
 
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 
@@ -116,7 +120,6 @@ void MDFNI_CloseGame(void)
 {
  if(MDFNGameInfo)
  {
-  if(MDFNGameInfo->GameType != GMT_PLAYER)
    MDFN_FlushGameCheats(0);
 
   MDFNGameInfo->CloseGame();
@@ -377,11 +380,8 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  MDFN_ResetMessages();   // Save state, status messages, etc.
 
- if(MDFNGameInfo->GameType != GMT_PLAYER)
- {
-  MDFN_LoadGameCheats(NULL);
-  MDFNMP_InstallReadPatches();
- }
+ MDFN_LoadGameCheats(NULL);
+ MDFNMP_InstallReadPatches();
 
   last_sound_rate = -1;
   memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
@@ -568,11 +568,8 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
          return(0);
         }
 
-        if(MDFNGameInfo->GameType != GMT_PLAYER)
-	{
-	 MDFN_LoadGameCheats(NULL);
-	 MDFNMP_InstallReadPatches();
-	}
+	MDFN_LoadGameCheats(NULL);
+	MDFNMP_InstallReadPatches();
 
 	MDFNI_SetLayerEnableMask(~0ULL);
 
@@ -600,8 +597,10 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
           *tmp = 0;
         }
 
+#ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
 	deint.ClearState();
+#endif
 
         last_sound_rate = -1;
         memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
@@ -615,6 +614,8 @@ extern MDFNGI EmulatedPSX;
 extern MDFNGI EmulatedPCE;
 #elif defined(WANT_PCE_FAST_EMU)
 extern MDFNGI EmulatedPCE_Fast;
+#elif defined(WANT_WSWAN_EMU)
+extern MDFNGI EmulatedWSwan;
 #endif
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
@@ -688,6 +689,7 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
   i_modules_string += std::string(InternalSystems[i]->shortname);
  }
 
+#if 0
  for(unsigned int i = 0; i < ExternalSystems.size(); i++)
  {
   AddSystem(ExternalSystems[i]);
@@ -695,9 +697,10 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
    i_modules_string += " ";
   e_modules_string += std::string(ExternalSystems[i]->shortname);
  }
+#endif
 
  MDFNI_printf(_("Internal emulation modules: %s\n"), i_modules_string.c_str());
- MDFNI_printf(_("External emulation modules: %s\n"), e_modules_string.c_str());
+ //MDFNI_printf(_("External emulation modules: %s\n"), e_modules_string.c_str());
 
 
  for(unsigned int i = 0; i < MDFNSystems.size(); i++)
@@ -793,6 +796,7 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
 
  MDFNGameInfo->Emulate(espec);
 
+#ifdef NEED_DEINTERLACER
  if(espec->InterlaceOn)
  {
   if(!PrevInterlaced)
@@ -807,6 +811,7 @@ void MDFNI_Emulate(EmulateSpecStruct *espec)
  }
  else
   PrevInterlaced = false;
+#endif
 
  ProcessAudio(espec);
 }

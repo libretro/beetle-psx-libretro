@@ -18,10 +18,7 @@
 #include "mednafen.h"
 #include <errno.h>
 #include <string.h>
-#include <vector>
 #include <string>
-#include <trio/trio.h>
-#include <map>
 #include <list>
 #include "settings.h"
 #include "md5.h"
@@ -48,6 +45,27 @@ uint64 MDFN_GetSettingUI(const char *name)
 		return 4;
 	if(!strcmp("pce_fast.slend", name))
 		return 235;
+	/* WSWAN */
+	if(!strcmp("wswan.ocmultiplier", name))
+		return 1;
+        if(!strcmp("wswan.bday", name))
+                return 23;
+        if(!strcmp("wswan.bmonth", name))
+                return 6;
+        if(!strcmp("wswan.byear", name))
+                return 1989;
+	if(!strcmp("wswan.cdspeed", name))
+		return 2;
+	if(!strcmp("wswan.cdpsgvolume", name))
+		return 100;
+	if(!strcmp("wswan.cddavolume", name))
+		return 100;
+	if(!strcmp("wswan.adpcmvolume", name))
+		return 100;
+	if(!strcmp("wswan.slstart", name))
+		return 4;
+	if(!strcmp("wswan.slend", name))
+		return 235;
 	/* PSX */
 	if(!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
 		return 4;
@@ -62,7 +80,11 @@ int64 MDFN_GetSettingI(const char *name)
 	/* PSX */
 	if(!strcmp("psx.region_default", name)) /* make configurable */
 		return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
-
+	/* WSWAN */
+	if(!strcmp("wswan.sex", name))
+		return 0;
+	if(!strcmp("wswan.blood", name))
+		return 0;
 	fprintf(stderr, "unhandled setting I: %s\n", name);
 	assert(0);
 	return 0;
@@ -73,6 +95,9 @@ double MDFN_GetSettingF(const char *name)
 	/* PSX */
 	if(!strcmp("psx.input.mouse_sensitivity", name)) /* make configurable */
 		return 1.00;
+	/* WSWAN */
+	if(!strcmp("wswan.mouse_sensitivity", name))
+		return 0.50;
 
 	fprintf(stderr, "unhandled setting F: %s\n", name);
 	assert(0);
@@ -128,6 +153,13 @@ bool MDFN_GetSettingB(const char *name)
 		return 1;
 	if(!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
 		return 1;
+	/* WSWAN */
+        if(!strcmp("wswan.forcemono", name))
+                return 0;
+        if(!strcmp("wswan.language", name))
+                return 1;
+	if(!strcmp("wswan.correct_aspect", name))
+		return 1;
 	/* CDROM */
 	if(!strcmp("cdrom.lec_eval", name))
 		return 1;
@@ -173,6 +205,11 @@ std::string MDFN_GetSettingS(const char *name)
         }
 	if(!strcmp("psx.region_default", name)) /* make configurable */
 		return "na";
+	/* WSWAN */
+	if(!strcmp("wswan.name", name))
+        {
+		return std::string("Mednafen");
+        }
 	/* FILESYS */
 	if(!strcmp("filesys.path_firmware", name))
         {

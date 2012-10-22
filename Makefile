@@ -1,4 +1,5 @@
 DEBUG = 0
+FRONTEND_SUPPORTS_RGB565 = 1
 
 MEDNAFEN_DIR := mednafen
 MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
@@ -29,6 +30,8 @@ ifeq ($(core), psx)
    NEED_CD = 1
    NEED_THREADING = 1
    NEED_BPP = 32
+   NEED_BLIP = 1
+   NEED_DEINTERLACER = 1
    CORE_DEFINE := -DWANT_PSX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/psx
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
@@ -54,11 +57,11 @@ ifeq ($(core), psx)
 	$(CORE_DIR)/input/multitap.cpp \
 	$(CORE_DIR)/input/mouse.cpp
 TARGET_NAME := mednafen_psx_libretro
-SSE_DEFINES := 	-msse -msse2
-else ifeq ($(core), pce_fast)
+else ifeq ($(core), pce-fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
    NEED_BPP = 16
+   NEED_BLIP = 1
    NEED_CD = 1
    NEED_CRC32 = 1
    NEED_THREADING = 1
@@ -81,6 +84,26 @@ HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
+else ifeq ($(core), wswan)
+   core = wswan
+   PTHREAD_FLAGS = -pthread
+   NEED_BPP = 16
+   NEED_BLIP = 1
+   NEED_CD = 1
+   NEED_THREADING = 1
+   CORE_DEFINE := -DWANT_WSWAN_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/wswan
+
+CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
+	$(CORE_DIR)/main.cpp \
+	$(CORE_DIR)/memory.cpp \
+	$(CORE_DIR)/v30mz.cpp \
+	$(CORE_DIR)/sound.cpp \
+	$(CORE_DIR)/tcache.cpp \
+	$(CORE_DIR)/interrupt.cpp \
+	$(CORE_DIR)/eeprom.cpp \
+	$(CORE_DIR)/rtc.cpp
+TARGET_NAME := mednafen_wswan_libretro
 endif
 
 CORE_INCDIR := -I$(CORE_DIR)
@@ -163,6 +186,10 @@ ifeq ($(NEED_CRC32), 1)
 FLAGS += -DHAVE_CRC32
 endif
 
+ifeq ($(NEED_DEINTERLACER), 1)
+FLAGS += -DNEED_DEINTERLACER
+endif
+
 ifeq ($(NEED_CD), 1)
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
@@ -179,6 +206,11 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 
 MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
 TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+FLAGS += -DNEED_CD
+endif
+
+ifeq ($(NEED_BLIP), 1)
+BLIP_BUFFER += $(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp
 endif
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
@@ -199,7 +231,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
+	$(BLIP_BUFFER) \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
 	$(MEDNAFEN_DIR)/okiadpcm.cpp \
@@ -227,7 +259,7 @@ else
 endif
 
 LDFLAGS += $(fpic) $(SHARED)
-FLAGS += $(SSE_DEFINES) -Wall $(fpic) -fno-strict-overflow
+FLAGS += -Wall $(fpic) -fno-strict-overflow
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl $(CORE_INCDIR)
 
 WARNINGS := -Wall \
@@ -250,6 +282,10 @@ endif
 
 ifeq ($(NEED_BPP), 16)
 FLAGS += -DWANT_16BPP
+endif
+
+ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
+FLAGS += -DFRONTEND_SUPPORTS_RGB565
 endif
 
 ifeq ($(NEED_BPP), 32)
