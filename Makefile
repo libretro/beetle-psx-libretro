@@ -91,6 +91,7 @@ else ifeq ($(core), wswan)
    NEED_BLIP = 1
    NEED_CD = 1
    NEED_THREADING = 1
+   NEED_RESAMPLER = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/wswan
 
@@ -104,6 +105,18 @@ CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/eeprom.cpp \
 	$(CORE_DIR)/rtc.cpp
 TARGET_NAME := mednafen_wswan_libretro
+endif
+
+ifeq ($(NEED_RESAMPLER), 1)
+FLAGS += -DNEED_RESAMPLER
+RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
+ifeq ($(NEED_BLIP), 1)
+RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Blip_Buffer_orig.cpp
+endif
+else
+ifeq ($(NEED_BLIP), 1)
+RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp
+endif
 endif
 
 CORE_INCDIR := -I$(CORE_DIR)
@@ -209,9 +222,6 @@ TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 FLAGS += -DNEED_CD
 endif
 
-ifeq ($(NEED_BLIP), 1)
-BLIP_BUFFER += $(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp
-endif
 
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/mednafen.cpp \
@@ -231,7 +241,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(BLIP_BUFFER) \
+	$(RESAMPLER_SOURCES) \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
 	$(MEDNAFEN_DIR)/okiadpcm.cpp \
@@ -248,6 +258,8 @@ SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
+
+
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
@@ -291,6 +303,7 @@ endif
 ifeq ($(NEED_BPP), 32)
 FLAGS += -DWANT_32BPP
 endif
+
 
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS) -std=gnu99

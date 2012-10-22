@@ -15,7 +15,6 @@ static retro_input_state_t input_state_cb;
 
 static MDFN_Surface *surf;
 
-static uint32_t *mednafen_buf;
 static bool failed_init;
 
 std::string retro_base_directory;
@@ -63,6 +62,12 @@ std::string retro_base_name;
 #define FB_WIDTH 224
 #define FB_HEIGHT 144
 
+#endif
+
+#ifdef WANT_16BPP
+static uint16_t mednafen_buf[FB_WIDTH * FB_HEIGHT];
+#else
+static uint32_t mednafen_buf[FB_WIDTH * FB_HEIGHT];
 #endif
 const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
@@ -146,14 +151,9 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!game)
       return false;
 
-   int fbWidth  = FB_WIDTH;
-   int fbHeight = FB_HEIGHT;
-   int fbSize   = fbWidth * fbHeight;
-
-   mednafen_buf = new uint32_t[fbSize];
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
 
-   surf = new MDFN_Surface(mednafen_buf, fbWidth, fbHeight, FB_WIDTH, pix_fmt);
+   surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, FB_HEIGHT, FB_WIDTH, pix_fmt);
 
    return game;
 }
@@ -337,8 +337,12 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
+#if defined(WANT_WSWAN_EMU)
+   static MDFN_Rect rects[FB_WIDTH];
+#else
    static MDFN_Rect rects[FB_HEIGHT];
-#ifdef WANT_PSX_EMU
+#endif
+#if defined(WANT_PSX_EMU) || defined(WANT_WSWAN_EMU)
    rects[0].w = ~0;
 #endif
 
