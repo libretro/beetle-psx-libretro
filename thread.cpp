@@ -21,9 +21,16 @@
 #include <windows.h>
 #elif defined(_XBOX)
 #include <xtl.h>
+#elif defined(GEKKO)
+#include "thread/gx_pthread.h"
 #else
 #include <pthread.h>
 #include <time.h>
+#endif
+
+#ifdef __MACH__
+#include <mach/clock.h>
+#include <mach/mach.h>
 #endif
 
 struct thread_data
@@ -141,6 +148,17 @@ void scond_wait(scond_t *cond, slock_t *lock)
    WaitForSingleObject(cond->event, INFINITE);
 
    slock_lock(lock);
+}
+
+int scond_wait_timeout(scond_t *cond, slock_t *lock, unsigned timeout_ms)
+{
+   WaitForSingleObject(cond->event, 0);
+   slock_unlock(lock);
+
+   DWORD res = WaitForSingleObject(cond->event, timeout_ms);
+
+   slock_lock(lock);
+   return res == WAIT_OBJECT_0;
 }
 
 void scond_signal(scond_t *cond)
