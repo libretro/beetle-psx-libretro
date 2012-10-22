@@ -86,11 +86,8 @@ HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 else ifeq ($(core), wswan)
    core = wswan
-   PTHREAD_FLAGS = -pthread
    NEED_BPP = 16
    NEED_BLIP = 1
-   NEED_CD = 1
-   NEED_THREADING = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/wswan-0922
 
@@ -214,6 +211,7 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
 	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
+	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
 
 MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
@@ -222,8 +220,7 @@ FLAGS += -DNEED_CD
 endif
 
 
-MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
-	$(MEDNAFEN_DIR)/mednafen.cpp \
+MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \

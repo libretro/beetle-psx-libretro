@@ -35,8 +35,10 @@
 #include	"file.h"
 #include	"FileWrapper.h"
 
+#ifdef NEED_CD
 #include	"cdrom/cdromif.h"
 #include	"cdrom/CDUtility.h"
+#endif
 
 #include	"mempatcher.h"
 #include	"md5.h"
@@ -116,7 +118,9 @@ static bool PrevInterlaced;
 static Deinterlacer deint;
 #endif
 
+#ifdef NEED_CD
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
+#endif
 
 void MDFNI_CloseGame(void)
 {
@@ -134,9 +138,11 @@ void MDFNI_CloseGame(void)
 
   MDFNGameInfo = NULL;
 
+#ifdef NEED_CD
   for(unsigned i = 0; i < CDInterfaces.size(); i++)
    delete CDInterfaces[i];
   CDInterfaces.clear();
+#endif
  }
 
  #ifdef WANT_DEBUGGER
@@ -162,6 +168,7 @@ static void AddSystem(MDFNGI *system)
 }
 
 
+#ifdef NEED_CD
 bool CDIF_DumpCD(const char *fn);
 
 void MDFNI_DumpModulesDef(const char *fn)
@@ -390,6 +397,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  return(MDFNGameInfo);
 }
+#endif
 
 // Return FALSE on fatal error(IPS file found but couldn't be applied),
 // or TRUE on success(IPS patching succeeded, or IPS file not found).
@@ -433,6 +441,7 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	struct stat stat_buf;
 	std::vector<FileExtensionSpecStruct> valid_iae;
 
+#ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
 	{
 	 return(MDFNI_LoadCD(force_module, name));
@@ -442,6 +451,7 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	{
 	 return(MDFNI_LoadCD(force_module, name));
 	}
+#endif
 
 	MDFNI_CloseGame();
 
@@ -501,10 +511,11 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	   if(!(*it)->Load)
 	   {
             GameFile.Close();
-
+#ifdef NEED_CD
 	    if((*it)->LoadCD)
              MDFN_PrintError(_("Specified system only supports CD(physical, or image files, such as *.cue and *.toc) loading."));
 	    else
+#endif
              MDFN_PrintError(_("Specified system does not support normal file loading."));
             MDFN_indent(-1);
             MDFNGameInfo = NULL;
@@ -710,7 +721,9 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
 
  MDFNSystemsPrio.sort(MDFNSystemsPrio_CompareFunc);
 
+#ifdef NEED_CD
  CDUtility::CDUtility_Init();
+#endif
 
  return(1);
 }
