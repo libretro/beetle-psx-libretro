@@ -91,9 +91,8 @@ else ifeq ($(core), wswan)
    NEED_BLIP = 1
    NEED_CD = 1
    NEED_THREADING = 1
-   NEED_RESAMPLER = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/wswan
+   CORE_DIR := $(MEDNAFEN_DIR)/wswan-0922
 
 CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/main.cpp \

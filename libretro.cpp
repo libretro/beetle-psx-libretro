@@ -161,7 +161,6 @@ bool retro_load_game(const struct retro_game_info *info)
 void retro_unload_game()
 {
    MDFNI_CloseGame();
-   delete [] mednafen_buf;
 }
 
 static unsigned retro_devices[2];
