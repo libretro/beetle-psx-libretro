@@ -8,7 +8,7 @@
 #endif
 
 #include <limits.h>
-#include <inttypes.h>
+#include <stdint.h>
 
 // Blip_Buffer 0.4.1
 #ifndef BLIP_BUFFER_H

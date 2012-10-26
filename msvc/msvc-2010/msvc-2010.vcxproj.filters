@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Source Files\mednafen-libretro">
-      <UniqueIdentifier>{b68ac4b4-7b1b-4552-934b-591f115f179c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\mednafen">
       <UniqueIdentifier>{6e1feaad-8f37-43dc-a5a4-e7a7b3f5afb4}</UniqueIdentifier>
     </Filter>
@@ -31,14 +28,14 @@
     <Filter Include="Source Files\mednafen\sound">
       <UniqueIdentifier>{17bf18c6-2a07-456d-b3c9-c1e58e556733}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\mednafen\string">
-      <UniqueIdentifier>{7eaf3432-ca88-4867-9d71-32f75d8334d5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\mednafen\video">
       <UniqueIdentifier>{6ebe59df-57e5-44cb-9a5d-cc954268c480}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\mednafen-libretro\psx">
-      <UniqueIdentifier>{a2821c60-f219-4622-ad44-c64bcd811066}</UniqueIdentifier>
+    <Filter Include="Source Files\mednafen\mpcdec">
+      <UniqueIdentifier>{b69c19a1-9cd3-4b28-9663-de79e5423d10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mednafen\tremor">
+      <UniqueIdentifier>{f1639efc-7e36-4c58-ab3c-d662ee41d062}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -50,9 +47,6 @@
     </ClCompile>
     <ClCompile Include="..\..\thread.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\cdplay.cpp">
-      <Filter>Source Files\mednafen</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\endian.cpp">
       <Filter>Source Files\mednafen</Filter>
@@ -84,22 +78,7 @@
     <ClCompile Include="..\..\mednafen\mempatcher.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\movie.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\netplay.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\okiadpcm.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\player.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\PSFLoader.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\qtrecord.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\settings.cpp">
@@ -108,19 +87,10 @@
     <ClCompile Include="..\..\mednafen\state.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\tests.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\psx\cdc.cpp">
       <Filter>Source Files\mednafen\psx</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\psx\cpu.cpp">
-      <Filter>Source Files\mednafen\psx</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\psx\debug.cpp">
-      <Filter>Source Files\mednafen\psx</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\psx\dis.cpp">
       <Filter>Source Files\mednafen\psx</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\psx\dma.cpp">
@@ -177,16 +147,10 @@
     <ClCompile Include="..\..\mednafen\cdrom\CDAccess_Image.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\cdrom\CDAccess_Physical.cpp">
-      <Filter>Source Files\mednafen\cdrom</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\cdrom\cdromif.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\cdrom\CDUtility.cpp">
-      <Filter>Source Files\mednafen\cdrom</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\cdrom\crc32.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\cdrom\galois.cpp">
@@ -213,59 +177,101 @@
     <ClCompile Include="..\..\mednafen\sound\Blip_Buffer.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\sound\Fir_Resampler.cpp">
-      <Filter>Source Files\mednafen\sound</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\sound\sound.cpp">
-      <Filter>Source Files\mednafen\sound</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\sound\Stereo_Buffer.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\sound\WAVRecord.cpp">
-      <Filter>Source Files\mednafen\sound</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\string\ConvertUTF.cpp">
-      <Filter>Source Files\mednafen\string</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\string\escape.cpp">
-      <Filter>Source Files\mednafen\string</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\video\Deinterlacer.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\png.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\resize.cpp">
       <Filter>Source Files\mednafen\video</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\video\surface.cpp">
       <Filter>Source Files\mednafen\video</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\tblur.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\text.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\video\video.cpp">
       <Filter>Source Files\mednafen\video</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\font-data.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
+    <ClCompile Include="..\..\stubs_thread.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen-libretro\psx\spu.cpp">
-      <Filter>Source Files\mednafen-libretro\psx</Filter>
+    <ClCompile Include="..\..\mednafen\mpcdec\tags.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen-libretro\cdplay.cpp">
-      <Filter>Source Files\mednafen-libretro</Filter>
+    <ClCompile Include="..\..\mednafen\mpcdec\fastmath.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen-libretro\mednafen-libretro.cpp">
-      <Filter>Source Files\mednafen-libretro</Filter>
+    <ClCompile Include="..\..\mednafen\mpcdec\huffman.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen-libretro\state.cpp">
-      <Filter>Source Files\mednafen-libretro</Filter>
+    <ClCompile Include="..\..\mednafen\mpcdec\huffman-bcl.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\mpc_bits_reader.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\mpc_crc32.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\mpc_decoder.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\mpc_demux.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\mpc_reader.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\requant.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\streaminfo.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\mpcdec\synth_filter.c">
+      <Filter>Source Files\mednafen\mpcdec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\window.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\bitwise.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\block.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\codebook.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\floor0.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\floor1.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\framing.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\info.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\mapping0.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\mdct.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\registry.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\res012.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\sharedbook.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\synthesis.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\tremor\vorbisfile.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
