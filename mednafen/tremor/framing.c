@@ -96,27 +96,6 @@ int ogg_page_packets(const ogg_page *og){
 }
 
 
-#if 0
-/* helper to initialize lookup for direct-table CRC (illustrative; we
-   use the static init below) */
-
-static ogg_uint32_t _ogg_crc_entry(unsigned long index){
-  int           i;
-  unsigned long r;
-
-  r = index << 24;
-  for (i=0; i<8; i++)
-    if (r & 0x80000000UL)
-      r = (r << 1) ^ 0x04c11db7; /* The same as the ethernet generator
-                                    polynomial, although we use an
-                                    unreflected alg and an init/final
-                                    of 0, not 0xffffffff */
-    else
-       r<<=1;
- return (r & 0xffffffffUL);
-}
-#endif
-
 static const ogg_uint32_t crc_lookup[256]={
   0x00000000,0x04c11db7,0x09823b6e,0x0d4326d9,
   0x130476dc,0x17c56b6b,0x1a864db2,0x1e475005,

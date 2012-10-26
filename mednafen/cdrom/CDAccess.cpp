@@ -39,11 +39,6 @@ CDAccess::~CDAccess()
 
 CDAccess *cdaccess_open(const char *path, bool image_memcache)
 {
- CDAccess *ret;
- struct stat stat_buf;
-
-  ret = new CDAccess_Image(path, image_memcache);
-
- return ret;
+ return new CDAccess_Image(path, image_memcache);
 }
 

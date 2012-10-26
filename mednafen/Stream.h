@@ -147,12 +147,6 @@ class Stream
  // Implemented as virtual so that a higher-performance version can be implemented if possible(IE with MemoryStream)
  virtual int get_line(std::string &str);
  virtual void printf(const char *format, ...) MDFN_FORMATSTR(printf, 2, 3);
-
-#if 0
- int scanf(const char *format, ...) MDFN_FORMATSTR(scanf, 2, 3);
- void put_string(const char *str);
- void put_string(const std::string &str);
-#endif
 };
 
 // StreamFilter takes ownership of the Stream pointer passed, and will delete it in its destructor.

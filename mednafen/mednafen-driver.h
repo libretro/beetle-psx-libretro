@@ -73,9 +73,6 @@ int MDFNI_Initialize(const char *basedir);
    below this directory. */
 void MDFNI_SetBaseDirectory(const char *dir);
 
-/* Call only when a game is loaded. */
-int MDFNI_NetplayStart(uint32 local_players, const std::string &nickname, const std::string &game_key, const std::string &connect_password);
-
 /* Emulates a frame. */
 void MDFNI_Emulate(EmulateSpecStruct *espec);
 
@@ -115,12 +112,6 @@ void MDFNI_DiskSelect(int which);
 void MDFNI_DiskSelect();
 void MDFNI_DiskInsert();
 void MDFNI_DiskEject();
-
-bool MDFNI_StartAVRecord(const char *path, double SoundRate);
-void MDFNI_StopAVRecord(void);
-
-bool MDFNI_StartWAVRecord(const char *path, double SoundRate);
-void MDFNI_StopWAVRecord(void);
 
 void MDFNI_DumpModulesDef(const char *fn);
 

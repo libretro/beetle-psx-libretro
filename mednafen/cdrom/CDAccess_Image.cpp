@@ -692,17 +692,8 @@ void CDAccess_Image::Cleanup(void)
 
 CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
- memset(Tracks, 0, sizeof(Tracks));
-
- try
- {
-  ImageOpen(path, MDFN_GetSettingB("libretro.cd_load_into_ram"));
- }
- catch(...)
- {
-  Cleanup();
-  throw;
- }
+	memset(Tracks, 0, sizeof(Tracks));
+	ImageOpen(path, MDFN_GetSettingB("libretro.cd_load_into_ram"));
 }
 
 CDAccess_Image::~CDAccess_Image()
@@ -819,35 +810,6 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
   {
    throw(MDFN_Error(0, _("Could not find track for sector %u!"), lba));
   }
-
-#if 0
- if(qbuf[0] & 0x40)
- {
-  uint8 dummy_buf[2352 + 96];
-  bool any_mismatch = FALSE;
-
-  memcpy(dummy_buf + 16, buf + 16, 2048); 
-  memset(dummy_buf + 2352, 0, 96);
-
-  MakeSubPQ(lba, dummy_buf + 2352);
-  encode_mode1_sector(lba + 150, dummy_buf);
-
-  for(int i = 0; i < 2352 + 96; i++)
-  {
-   if(dummy_buf[i] != buf[i])
-   {
-    printf("Mismatch at %d, %d: %02x:%02x; ", lba, i, dummy_buf[i], buf[i]);
-    any_mismatch = TRUE;
-   }
-  }
-  if(any_mismatch)
-   puts("\n");
- }
-#endif
-
- //subq_deinterleave(buf + 2352, qbuf);
- //printf("%02x\n", qbuf[0]);
- //printf("%02x\n", buf[12 + 3]);
 }
 
 void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)

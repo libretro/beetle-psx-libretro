@@ -178,16 +178,8 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
  ra_count = 0;
  last_read_lba = ~0U;
 
- try
- {
-  disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
-  RT_EjectDisc(false, true);
- }
- catch(std::exception &e)
- {
-  EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
-  return(0);
- }
+ disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
+ RT_EjectDisc(false, true);
 
  is_phys_cache = disc_cdaccess->Is_Physical();
 
@@ -208,15 +200,8 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
  		 	 break;
 
     case CDIF_MSG_EJECT:
-			try
-			{
 			 RT_EjectDisc(msg.args[0]);
 			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
-			}
-			catch(std::exception &e)
-			{
-			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
-			}
 			break;
 
     case CDIF_MSG_READ_SECTOR:
@@ -261,16 +246,7 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
    uint8 tmpbuf[2352 + 96];
    bool error_condition = false;
 
-   try
-   {
-    disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
-   }
-   catch(std::exception &e)
-   {
-    MDFN_PrintError(_("Sector %u read error: %s"), ra_lba, e.what());
-    memset(tmpbuf, 0, sizeof(tmpbuf));
-    error_condition = true;
-   }
+   disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
    
    MDFND_LockMutex(SBMutex);
 
@@ -298,8 +274,6 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
 
 CDIF_MT::CDIF_MT(const char *device_name) : CDReadThread(NULL), SBMutex(NULL)
 {
- try
- {
   CDIF_Message msg;
   RTS_Args s;
 
@@ -311,23 +285,6 @@ CDIF_MT::CDIF_MT(const char *device_name) : CDReadThread(NULL), SBMutex(NULL)
 
   CDReadThread = MDFND_CreateThread(ReadThreadStart_C, &s);
   EmuThreadQueue.Read(&msg);
- }
- catch(...)
- {
-  if(CDReadThread)
-  {
-   MDFND_WaitThread(CDReadThread, NULL);
-   CDReadThread = NULL;
-  }
-
-  if(SBMutex)
-  {
-   MDFND_DestroyMutex(SBMutex);
-   SBMutex = NULL;
-  }
-
-  throw;
- }
 }
 
 
@@ -335,16 +292,7 @@ CDIF_MT::~CDIF_MT()
 {
  bool thread_murdered_with_kitchen_knife = false;
 
- try
- {
-  ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_DIEDIEDIE));
- }
- catch(std::exception &e)
- {
-  MDFND_PrintError(e.what());
-  MDFND_KillThread(CDReadThread);
-  thread_murdered_with_kitchen_knife = true;
- }
+ ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_DIEDIEDIE));
 
  if(!thread_murdered_with_kitchen_knife)
   MDFND_WaitThread(CDReadThread, NULL);
@@ -476,18 +424,10 @@ bool CDIF_MT::Eject(bool eject_status)
  if(UnrecoverableError)
   return(false);
 
- try
- {
-  CDIF_Message msg;
+ CDIF_Message msg;
 
-  ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
-  EmuThreadQueue.Read(&msg);
- }
- catch(std::exception &e)
- {
-  MDFN_PrintError(_("Error on eject/insert attempt: %s"), e.what());
-  return(false);
- }
+ ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
+ EmuThreadQueue.Read(&msg);
 
  return(true);
 }

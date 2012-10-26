@@ -62,29 +62,6 @@ void Stream::printf(const char *format, ...)
  }
 }
 
-#if 0
-int Stream::scanf(const char *format, ...)
-{
-
-
-}
-
-void Stream::printf(const char *format, ...)
-{
-
-}
-
-void Stream::put_string(const char *str)
-{
- write(str, strlen(str));
-}
-
-void Stream::put_string(const std::string &str)
-{
- write(str.data(), str.size());
-}
-#endif
-
 int Stream::get_line(std::string &str)
 {
  uint8 c;

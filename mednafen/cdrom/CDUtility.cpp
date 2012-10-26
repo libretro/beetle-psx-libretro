@@ -22,9 +22,6 @@
 #include "dvdisaster.h"
 #include "lec.h"
 
-//  Kill_LEC_Correct();
-
-
 namespace CDUtility
 {
 
@@ -162,15 +159,4 @@ void subq_deinterleave(const uint8 *SubPWBuf, uint8 *qbuf)
   qbuf[i >> 3] |= ((SubPWBuf[i] >> 6) & 0x1) << (7 - (i & 0x7));
  }
 }
-
-#if 0
-bool subq_extrapolate(const uint8 *subq_input, int32 position_delta, uint8 *subq_output)
-{
- assert(subq_check_checksum(subq_input));
-
-
- subq_generate_checksum(subq_output);
-}
-#endif
-
 }

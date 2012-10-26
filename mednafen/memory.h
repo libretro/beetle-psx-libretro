@@ -1,4 +1,5 @@
 #ifndef _MDFN_MEMORY_H
+#define _MDFN_MEMORY_H
 
 // These functions can be used from driver code or from internal Mednafen code.
 //
@@ -45,8 +46,6 @@ static inline void MDFN_FastU32MemsetM8(uint32_t *array, uint32_t value_32, unsi
  }
 
  #endif
- //printf("%08x %d\n", (int)(long long)array, u32len);
 }
 
-#define _MDFN_MEMORY_H
 #endif

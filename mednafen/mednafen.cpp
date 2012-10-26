@@ -702,19 +702,7 @@ bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)
   i_modules_string += std::string(InternalSystems[i]->shortname);
  }
 
-#if 0
- for(unsigned int i = 0; i < ExternalSystems.size(); i++)
- {
-  AddSystem(ExternalSystems[i]);
-  if(i)
-   i_modules_string += " ";
-  e_modules_string += std::string(ExternalSystems[i]->shortname);
- }
-#endif
-
  MDFNI_printf(_("Internal emulation modules: %s\n"), i_modules_string.c_str());
- //MDFNI_printf(_("External emulation modules: %s\n"), e_modules_string.c_str());
-
 
  for(unsigned int i = 0; i < MDFNSystems.size(); i++)
   MDFNSystemsPrio.push_back(MDFNSystems[i]);

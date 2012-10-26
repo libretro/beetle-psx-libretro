@@ -1,4 +1,3 @@
-
 // Blip_Buffer 0.3.0. http://www.slack.net/~ant/nes-emu/
 
 #include <blip/Stereo_Buffer.h>

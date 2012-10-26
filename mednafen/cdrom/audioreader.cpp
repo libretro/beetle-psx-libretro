@@ -100,58 +100,30 @@ static size_t iov_read_func(void *ptr, size_t size, size_t nmemb, void *user_dat
  if(!size)
   return(0);
 
- try
- {
-  return fw->read(ptr, size * nmemb, false) / size;
- }
- catch(...)
- {
-  return(0);
- }
+ return fw->read(ptr, size * nmemb, false) / size;
 }
 
 static int iov_seek_func(void *user_data, ogg_int64_t offset, int whence)
 {
  Stream *fw = (Stream*)user_data;
 
- try
- {
-  fw->seek(offset, whence);
-  return(0);
- }
- catch(...)
- {
-  return(-1);
- }
+ fw->seek(offset, whence);
+ return(0);
 }
 
 static int iov_close_func(void *user_data)
 {
  Stream *fw = (Stream*)user_data;
 
- try
- {
-  fw->close();
-  return(0);
- }
- catch(...)
- {
-  return EOF;
- }
+ fw->close();
+ return(0);
 }
 
 static long iov_tell_func(void *user_data)
 {
  Stream *fw = (Stream*)user_data;
 
- try
- {
-  return fw->tell();
- }
- catch(...)
- {
-  return(-1);
- }
+ return fw->tell();
 }
 
 OggVorbisReader::OggVorbisReader(Stream *fp) : fw(fp)
@@ -233,14 +205,7 @@ static mpc_int32_t impc_read(mpc_reader *p_reader, void *ptr, mpc_int32_t size)
 {
  Stream *fw = (Stream*)(p_reader->data);
 
- try
- {
   return fw->read(ptr, size, false);
- }
- catch(...)
- {
-  return(MPC_STATUS_FAIL);
- }
 }
 
 /// Seeks to byte position offset.
@@ -248,15 +213,8 @@ static mpc_bool_t impc_seek(mpc_reader *p_reader, mpc_int32_t offset)
 {
  Stream *fw = (Stream*)(p_reader->data);
 
- try
- {
   fw->seek(offset, SEEK_SET);
   return(MPC_TRUE);
- }
- catch(...)
- {
-  return(MPC_FALSE);
- }
 }
 
 /// Returns the current byte offset in the stream.
@@ -264,14 +222,7 @@ static mpc_int32_t impc_tell(mpc_reader *p_reader)
 {
  Stream *fw = (Stream*)(p_reader->data);
 
- try
- {
   return fw->tell();
- }
- catch(...)
- {
-  return(MPC_STATUS_FAIL);
- }
 }
 
 /// Returns the total length of the source stream, in bytes.
@@ -279,14 +230,7 @@ static mpc_int32_t impc_get_size(mpc_reader *p_reader)
 {
  Stream *fw = (Stream*)(p_reader->data);
 
- try
- {
   return fw->size();
- }
- catch(...)
- {
-  return(MPC_STATUS_FAIL);
- }
 }
 
 /// True if the stream is a seekable stream.
