@@ -26,7 +26,7 @@
 #include "../include/trio/trio.h"
 
 #ifdef _WIN32
-#include "../libretro/msvc_compat.h"
+#include "../msvc_compat.h"
 #endif
 
 enum
