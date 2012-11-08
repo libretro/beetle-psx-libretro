@@ -33,7 +33,7 @@
 #endif
 
 #ifdef _WIN32
-#include "../libretro/msvc_compat.h"
+#include "../msvc_compat.h"
 #endif
 
 static PCE_PSG *psg = NULL;

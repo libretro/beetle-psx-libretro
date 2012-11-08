@@ -34,7 +34,7 @@ The spectrum peaked at 15734 Hz.  21477272.727272... / 3 / 15734 = 455.00(CPU cy
 #include <math.h>
 
 #ifdef _WIN32
-#include "../libretro/msvc_compat.h"
+#include "../msvc_compat.h"
 #endif
 
 static uint8 *CustomColorMap = NULL; // 1024 * 3
