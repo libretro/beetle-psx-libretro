@@ -27,6 +27,10 @@
 #include "md5.h"
 #include "mempatcher.h"
 
+#ifdef _WIN32
+#include "msvc_compat.h"
+#endif
+
 static uint8 **RAMPtrs = NULL;
 static uint32 PageSize;
 static uint32 NumPages;

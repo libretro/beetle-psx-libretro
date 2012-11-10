@@ -17,35 +17,11 @@ void MDFN_free(void *ptr);
 
 static inline void MDFN_FastU32MemsetM8(uint32_t *array, uint32_t value_32, unsigned int u32len)
 {
- #ifdef ARCH_X86 
- uint32_t dummy_output0, dummy_output1;
-
- #ifdef __x86_64__
- asm volatile(
-        "cld\n\t"
-        "rep stosq\n\t"
-        : "=D" (dummy_output0), "=c" (dummy_output1)
-        : "a" (value_32 | ((uint64_t)value_32 << 32)), "D" (array), "c" (u32len >> 1)
-        : "cc", "memory");
- #else
- asm volatile(
-        "cld\n\t"
-        "rep stosl\n\t"
-        : "=D" (dummy_output0), "=c" (dummy_output1)
-        : "a" (value_32), "D" (array), "c" (u32len)
-        : "cc", "memory");
-
- #endif
-
- #else
-
  for(uint32_t *ai = array; ai < array + u32len; ai += 2)
  {
   ai[0] = value_32;
   ai[1] = value_32;
  }
-
- #endif
 }
 
 #endif

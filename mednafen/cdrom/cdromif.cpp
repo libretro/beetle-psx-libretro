@@ -25,6 +25,10 @@
 
 #include <algorithm>
 
+#ifdef _WIN32
+#include "../msvc_compat.h"
+#endif
+
 using namespace CDUtility;
 
 CDIF::CDIF() : UnrecoverableError(false), is_phys_cache(false), disc_cdaccess(NULL), DiscEjected(false)

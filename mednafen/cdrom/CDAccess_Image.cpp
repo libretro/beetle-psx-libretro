@@ -53,6 +53,10 @@
 
 #include <map>
 
+#ifdef _WIN32
+#include "../msvc_compat.h"
+#endif
+
 using namespace CDUtility;
 
 enum

@@ -20,6 +20,7 @@
 
 #undef UNICODE // Do not bother with UNICODE at this time.
 #include <stddef.h>
+#include <io.h>
 #include <math.h>
 
 // Python headers defines ssize_t and sets HAVE_SSIZE_T. Cannot duplicate these efforts.
@@ -32,9 +33,17 @@ typedef int ssize_t;
 #endif
 
 #define snprintf _snprintf
+#define strtoll _strtoi64
 #define strtoull _strtoui64
 #undef strcasecmp
 #define strcasecmp _stricmp
+#define lseek _lseek
+
+#include <tchar.h>
+#define strlen _tcslen
+
+# define S_IRUSR  S_IREAD                      /* read, user */
+# define S_IWUSR  S_IWRITE                     /* write, user */
 
 // Disable some of the annoying warnings.
 #pragma warning(disable : 4800)
@@ -46,7 +55,7 @@ typedef int ssize_t;
 #define roundf(in) (in >= 0.0f ? floorf(in + 0.5f) : ceilf(in - 0.5f))
 
 #ifndef PATH_MAX
-#define PATH_MAX _MAX_PATH
+#define PATH_MAX MAX_PATH
 #endif
 
 #endif
