@@ -334,68 +334,29 @@ void PSX_RequestMLExit(void)
 
 void DMA_CheckReadDebug(uint32 A);
 
-template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void MemRW(const pscpu_timestamp_t timestamp, uint32 A, uint32 &V)
+template<typename T, bool IsWrite, bool Peek> static INLINE void MemRW_Access24(const pscpu_timestamp_t timestamp, uint32 A, uint32 &V)
 {
  static const uint32 mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
 				 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
 
- //if(IsWrite)
- // V = (T)V;
-
- if(!Peek)
- {
-  #if 0
-  if(IsWrite)
-   printf("Write%d: %08x(orig=%08x), %08x\n", (int)(sizeof(T) * 8), A & mask[A >> 29], A, V);
-  else
-   printf("Read%d: %08x(orig=%08x)\n", (int)(sizeof(T) * 8), A & mask[A >> 29], A);
-  #endif
- }
-
  A &= mask[A >> 29];
 
- //if(A == 0xa0 && IsWrite)
- // DBG_Break();
-
  if(A < 0x00800000)
- //if(A <= 0x1FFFFF)
  {
-  //DMA_CheckReadDebug(A);
-  //assert(A <= 0x1FFFFF);
-  if(Access24)
-  {
    if(IsWrite)
     MainRAM.WriteU24(A & 0x1FFFFF, V);
    else
     V = MainRAM.ReadU24(A & 0x1FFFFF);
-  }
-  else
-  {
-   if(IsWrite)
-    MainRAM.Write<T>(A & 0x1FFFFF, V);
-   else
-    V = MainRAM.Read<T>(A & 0x1FFFFF);
-  }
 
   return;
  }
 
  if(A >= 0x1F800000 && A <= 0x1F8003FF)
  {
-  if(Access24)
-  {
    if(IsWrite)
     ScratchRAM.WriteU24(A & 0x3FF, V);
    else
     V = ScratchRAM.ReadU24(A & 0x3FF);
-  }
-  else
-  {
-   if(IsWrite)
-    ScratchRAM.Write<T>(A & 0x3FF, V);
-   else
-    V = ScratchRAM.Read<T>(A & 0x3FF);
-  }
   return;
  }
 
@@ -403,10 +364,7 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
  {
   if(!IsWrite)
   {
-   if(Access24)
     V = BIOSROM->ReadU24(A & 0x7FFFF);
-   else
-    V = BIOSROM->Read<T>(A & 0x7FFFF);
   }
 
   return;
@@ -417,42 +375,13 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
  if(A >= 0x1F801000 && A <= 0x1F802FFF && !Peek)	// Hardware register region. (TODO: Implement proper peek suppor)
  {
-#if 0
-  if(!IsWrite)
-  {
-   ReadCounter++;
-   PortReadCounter[A & 0x3FFF]++;
-  }
-  else
-   WriteCounter++;
-#endif
-
-  //if(IsWrite)
-  // printf("HW Write%d: %08x %08x\n", (unsigned int)(sizeof(T)*8), (unsigned int)A, (unsigned int)V);
-  //else
-  // printf("HW Read%d: %08x\n", (unsigned int)(sizeof(T)*8), (unsigned int)A);
 
   if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
   {
-   if(sizeof(T) == 4 && !Access24)
-   {
-    if(IsWrite)
-    {
-     SPU->Write(timestamp, A | 0, V);
-     SPU->Write(timestamp, A | 2, V >> 16);
-    }
-    else
-    {
-     V = SPU->Read(timestamp, A) | (SPU->Read(timestamp, A | 2) << 16);
-    }
-   }
-   else
-   {
     if(IsWrite)
      SPU->Write(timestamp, A & ~1, V);
     else
      V = SPU->Read(timestamp, A & ~1);
-   }
    return;
   }		// End SPU
 
@@ -524,22 +453,6 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
    return;
   }
 
-#if 0
-  if(A >= 0x1F801060 && A <= 0x1F801063)
-  {
-   if(IsWrite)
-   {
-
-   }
-   else
-   {
-
-   }
-
-   return;
-  }
-#endif
-
   if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
   {
    if(IsWrite)
@@ -582,21 +495,11 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
    if((A & 0x7FFFFF) < 65536)
    {
-    if(Access24)
      V = PIOMem->ReadU24(A & 0x7FFFFF);
-    else
-     V = PIOMem->Read<T>(A & 0x7FFFFF);
    }
    else if((A & 0x7FFFFF) < (65536 + TextMem.size()))
    {
-    if(Access24)
      V = MDFN_de24lsb(&TextMem[(A & 0x7FFFFF) - 65536]);
-    else switch(sizeof(T))
-    {
-     case 1: V = TextMem[(A & 0x7FFFFF) - 65536]; break;
-     case 2: V = MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
-     case 4: V = MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
-    }
    }
   }
   return;
@@ -615,32 +518,346 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
 }
 
+template<typename T, bool Peek> static INLINE void MemRW_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 &V)
+{
+ static const uint32 mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+				 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+
+ A &= mask[A >> 29];
+
+ if(A < 0x00800000)
+ {
+    MainRAM.Write<T>(A & 0x1FFFFF, V);
+
+  return;
+ }
+
+ if(A >= 0x1F800000 && A <= 0x1F8003FF)
+ {
+    ScratchRAM.Write<T>(A & 0x3FF, V);
+  return;
+ }
+
+ if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+  return;
+
+ if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+  PSX_EventHandler(timestamp);
+
+ if(A >= 0x1F801000 && A <= 0x1F802FFF && !Peek)	// Hardware register region. (TODO: Implement proper peek suppor)
+ {
+
+  if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
+  {
+   if(sizeof(T) == 4)
+   {
+     SPU->Write(timestamp, A | 0, V);
+     SPU->Write(timestamp, A | 2, V >> 16);
+   }
+   else
+   {
+      SPU->Write(timestamp, A & ~1, V);
+   }
+   return;
+  }		// End SPU
+
+  if(A >= 0x1f801800 && A <= 0x1f80180F)
+  {
+    CDC->Write(timestamp, A & 0x3, V);
+
+   return;
+  }
+
+  if(A >= 0x1F801810 && A <= 0x1F801817)
+  {
+    GPU->Write(timestamp, A, V);
+
+   return;
+  }
+
+  if(A >= 0x1F801820 && A <= 0x1F801827)
+  {
+    MDEC_Write(timestamp, A, V);
+
+   return;
+  }
+
+  if(A >= 0x1F801000 && A <= 0x1F801023)
+  {
+   unsigned index = (A & 0x1F) >> 2;
+
+   //if(A == 0x1F801014 && IsWrite)
+   // fprintf(stderr, "%08x %08x\n",A,V);
+
+    V <<= (A & 3) * 8;
+    SysControl.Regs[index] = V & SysControl_Mask[index];
+   return;
+  }
+
+  if(A >= 0x1F801040 && A <= 0x1F80104F)
+  {
+    FIO->Write(timestamp, A, V);
+   return;
+  }
+
+  if(A >= 0x1F801050 && A <= 0x1F80105F)
+  {
+     SIO_Write(timestamp, A, V);
+   return;
+  }
+
+  if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
+  {
+     IRQ_Write(A, V);
+   return;
+  }
+
+  if(A >= 0x1F801080 && A <= 0x1F8010FF) 	// DMA
+  {
+    DMA_Write(timestamp, A, V);
+
+   return;
+  }
+
+  if(A >= 0x1F801100 && A <= 0x1F80113F)	// Root counters
+  {
+    TIMER_Write(timestamp, A, V);
+
+   return;
+  }
+ }
+
+
+ if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+ {
+  return;
+ }
+
+ if(Peek)
+  V = 0;
+}
+
+template<typename T> static INLINE void MemRW_Peek(const pscpu_timestamp_t timestamp, uint32 A, uint32 &V)
+{
+ static const uint32 mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+				 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+
+ A &= mask[A >> 29];
+
+ if(A < 0x00800000)
+ {
+    V = MainRAM.Read<T>(A & 0x1FFFFF);
+
+  return;
+ }
+
+ if(A >= 0x1F800000 && A <= 0x1F8003FF)
+ {
+    V = ScratchRAM.Read<T>(A & 0x3FF);
+  return;
+ }
+
+ if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+ {
+    V = BIOSROM->Read<T>(A & 0x7FFFF);
+
+  return;
+ }
+
+ if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+  PSX_EventHandler(timestamp);
+
+ if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+ {
+   //if((A & 0x7FFFFF) <= 0x84)
+   // PSX_WARNING("[PIO] Read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
+
+   V = 0;
+
+   if((A & 0x7FFFFF) < 65536)
+   {
+     V = PIOMem->Read<T>(A & 0x7FFFFF);
+   }
+   else if((A & 0x7FFFFF) < (65536 + TextMem.size()))
+   {
+    switch(sizeof(T))
+    {
+     case 1: V = TextMem[(A & 0x7FFFFF) - 65536]; break;
+     case 2: V = MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+     case 4: V = MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+    }
+   }
+  return;
+ }
+
+ V = 0;
+}
+
+template<typename T, bool Peek> static INLINE void MemRW(const pscpu_timestamp_t timestamp, uint32 A, uint32 &V)
+{
+ static const uint32 mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+				 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+
+ A &= mask[A >> 29];
+
+ if(A < 0x00800000)
+ {
+    V = MainRAM.Read<T>(A & 0x1FFFFF);
+
+  return;
+ }
+
+ if(A >= 0x1F800000 && A <= 0x1F8003FF)
+ {
+    V = ScratchRAM.Read<T>(A & 0x3FF);
+  return;
+ }
+
+ if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+ {
+    V = BIOSROM->Read<T>(A & 0x7FFFF);
+
+  return;
+ }
+
+ if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+  PSX_EventHandler(timestamp);
+
+ if(A >= 0x1F801000 && A <= 0x1F802FFF && !Peek)	// Hardware register region. (TODO: Implement proper peek suppor)
+ {
+
+  if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
+  {
+   if(sizeof(T) == 4)
+   {
+     V = SPU->Read(timestamp, A) | (SPU->Read(timestamp, A | 2) << 16);
+   }
+   else
+   {
+     V = SPU->Read(timestamp, A & ~1);
+   }
+   return;
+  }		// End SPU
+
+  if(A >= 0x1f801800 && A <= 0x1f80180F)
+  {
+    V = CDC->Read(timestamp, A & 0x3);
+
+   return;
+  }
+
+  if(A >= 0x1F801810 && A <= 0x1F801817)
+  {
+    V = GPU->Read(timestamp, A);
+
+   return;
+  }
+
+  if(A >= 0x1F801820 && A <= 0x1F801827)
+  {
+    V = MDEC_Read(timestamp, A);
+
+   return;
+  }
+
+  if(A >= 0x1F801000 && A <= 0x1F801023)
+  {
+   unsigned index = (A & 0x1F) >> 2;
+
+   //if(A == 0x1F801014 && IsWrite)
+   // fprintf(stderr, "%08x %08x\n",A,V);
+
+    V = SysControl.Regs[index] | SysControl_OR[index];
+    V >>= (A & 3) * 8;
+   return;
+  }
+
+  if(A >= 0x1F801040 && A <= 0x1F80104F)
+  {
+    V = FIO->Read(timestamp, A);
+   return;
+  }
+
+  if(A >= 0x1F801050 && A <= 0x1F80105F)
+  {
+    V = SIO_Read(timestamp, A);
+   return;
+  }
+
+  if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
+  {
+    V = IRQ_Read(A);
+   return;
+  }
+
+  if(A >= 0x1F801080 && A <= 0x1F8010FF) 	// DMA
+  {
+    V = DMA_Read(timestamp, A);
+
+   return;
+  }
+
+  if(A >= 0x1F801100 && A <= 0x1F80113F)	// Root counters
+  {
+    V = TIMER_Read(timestamp, A);
+
+   return;
+  }
+ }
+
+
+ if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+ {
+   //if((A & 0x7FFFFF) <= 0x84)
+   // PSX_WARNING("[PIO] Read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
+
+   V = 0;
+
+   if((A & 0x7FFFFF) < 65536)
+   {
+     V = PIOMem->Read<T>(A & 0x7FFFFF);
+   }
+   else if((A & 0x7FFFFF) < (65536 + TextMem.size()))
+   {
+    switch(sizeof(T))
+    {
+     case 1: V = TextMem[(A & 0x7FFFFF) - 65536]; break;
+     case 2: V = MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+     case 4: V = MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+    }
+   }
+  return;
+ }
+
+ V = 0;
+}
+
 void MDFN_FASTCALL PSX_MemWrite8(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- MemRW<uint8, true, false, false>(timestamp, A, V);
+ MemRW_Write<uint8, false>(timestamp, A, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite16(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- MemRW<uint16, true, false, false>(timestamp, A, V);
+ MemRW_Write<uint16, false>(timestamp, A, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite24(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
  //assert(0);
- MemRW<uint32, true, true, false>(timestamp, A, V);
+ MemRW_Access24<uint32, true, false>(timestamp, A, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite32(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- MemRW<uint32, true, false, false>(timestamp, A, V);
+ MemRW_Write<uint32, false>(timestamp, A, V);
 }
 
 uint8 MDFN_FASTCALL PSX_MemRead8(const pscpu_timestamp_t timestamp, uint32 A)
 {
  uint32 V;
 
- MemRW<uint8, false, false, false>(timestamp, A, V);
+ MemRW<uint8, false>(timestamp, A, V);
 
  return(V);
 }
@@ -649,7 +866,7 @@ uint16 MDFN_FASTCALL PSX_MemRead16(const pscpu_timestamp_t timestamp, uint32 A)
 {
  uint32 V;
 
- MemRW<uint16, false, false, false>(timestamp, A, V);
+ MemRW<uint16, false>(timestamp, A, V);
 
  return(V);
 }
@@ -659,7 +876,7 @@ uint32 MDFN_FASTCALL PSX_MemRead24(const pscpu_timestamp_t timestamp, uint32 A)
  uint32 V;
 
  //assert(0);
- MemRW<uint32, false, true, false>(timestamp, A, V);
+ MemRW_Access24<uint32, false, false>(timestamp, A, V);
 
  return(V);
 }
@@ -668,7 +885,7 @@ uint32 MDFN_FASTCALL PSX_MemRead32(const pscpu_timestamp_t timestamp, uint32 A)
 {
  uint32 V;
 
- MemRW<uint32, false, false, false>(timestamp, A, V);
+ MemRW<uint32, false>(timestamp, A, V);
 
  return(V);
 }
@@ -678,7 +895,7 @@ uint8 PSX_MemPeek8(uint32 A)
 {
  uint32 V;
 
- MemRW<uint8, false, false, true>(0, A, V);
+ MemRW_Peek<uint8>(0, A, V);
 
  return(V);
 }
@@ -687,7 +904,7 @@ uint16 PSX_MemPeek16(uint32 A)
 {
  uint32 V;
 
- MemRW<uint16, false, false, true>(0, A, V);
+ MemRW_Peek<uint16>(0, A, V);
 
  return(V);
 }
@@ -696,7 +913,7 @@ uint32 PSX_MemPeek32(uint32 A)
 {
  uint32 V;
 
- MemRW<uint32, false, false, true>(0, A, V);
+ MemRW_Peek<uint32>(0, A, V);
 
  return(V);
 }

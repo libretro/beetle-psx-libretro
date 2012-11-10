@@ -962,10 +962,12 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
   ret = DataReadBuffer;
  }
 
+#if 0
  if(DMAControl & 2)
  {
   //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
  }
+#endif
 
  return(ret >> ((A & 3) * 8));
 }
@@ -1138,8 +1140,6 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      {
       if(PALMode != HardwarePALType)
       {
-       const uint32 black = surface->MakeColor(0, 0, 0);
-
        DisplayRect->w = 384;
        DisplayRect->h = (HardwarePALType ? 288 : 240);
 
@@ -1150,10 +1150,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
         LineWidths[y].x = 0;
         LineWidths[y].w = 384;
 
-        for(int32 x = 0; x < 384; x++)
-        {
-         dest[x] = black;
-        }
+        memset(dest, 0, 384 * sizeof(int32));
        }
 #if 0
        char buffer[256];
@@ -1250,27 +1247,24 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      LineWidths[dest_line].x = 0;
      LineWidths[dest_line].w = dmw;
 
+     memset(dest, 0, dmw * sizeof(int32));
+
      {
       const uint16 *src = GPURAM[DisplayFB_CurLineYReadout];
-      const uint32 black = surface->MakeColor(0, 0, 0);
-
-      for(int32 x = 0; x < dx_start; x++)
-       dest[x] = black;
 
       //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
+      /*
       if(surface->format.Rshift == 0 && surface->format.Gshift == 8 && surface->format.Bshift == 16)
        ReorderRGB<0, 8, 16>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
       else if(surface->format.Rshift == 8 && surface->format.Gshift == 16 && surface->format.Bshift == 24)
        ReorderRGB<8, 16, 24>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 16 && surface->format.Gshift == 8 && surface->format.Bshift == 0)
+       */
+      if(surface->format.Rshift == 16 && surface->format.Gshift == 8 && surface->format.Bshift == 0)
        ReorderRGB<16, 8, 0>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
       else if(surface->format.Rshift == 24 && surface->format.Gshift == 16 && surface->format.Bshift == 8)
        ReorderRGB<24, 16, 8>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
       else
        ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-
-      for(uint32 x = dx_end; x < dmw; x++)
-       dest[x] = black;
      }
 
      //if(scanline == 64)

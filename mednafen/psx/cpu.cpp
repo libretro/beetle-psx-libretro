@@ -277,6 +277,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
+#if 0
    if(DebugMode && CPUHook)
    {
     ACTIVE_TO_BACKING;
@@ -285,6 +286,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
     BACKING_TO_ACTIVE;
    }
+#endif
 
    if(!ILHMode)
    {
@@ -354,10 +356,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	 new_PC_mask = (mask) & ~3;			\
 	 /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
 							\
-         if(DebugMode && ADDBT)                 	\
-	 {						\
-          ADDBT(PC, (PC & new_PC_mask) + new_PC, false);	\
-	 }						\
 	 goto SkipNPCStuff;				\
 	}
 
