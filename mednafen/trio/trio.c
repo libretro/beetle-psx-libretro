@@ -231,16 +231,11 @@ typedef unsigned long trio_flags_t;
  * Platform specific definitions
  */
 #if defined(TRIO_PLATFORM_UNIX)
-# include <unistd.h>
-# include <signal.h>
 # include <locale.h>
 # if !defined(TRIO_FEATURE_LOCALE)
 #  define USE_LOCALE
 # endif
 #endif /* TRIO_PLATFORM_UNIX */
-#if defined(TRIO_PLATFORM_VMS)
-# include <unistd.h>
-#endif
 #if defined(TRIO_PLATFORM_WIN32)
 # if defined(TRIO_PLATFORM_WINCE)
 int read(int handle, char *buffer, unsigned int length);

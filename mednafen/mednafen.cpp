@@ -15,14 +15,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include        "mednafen.h"
+#include "mednafen.h"
 
-#include        <string.h>
+#include <string.h>
 #include	<stdarg.h>
 #include	<errno.h>
-#include	<sys/types.h>
-#include	<sys/stat.h>
-#include	<unistd.h>
 #include	<trio/trio.h>
 #include	<list>
 #include	<algorithm>
@@ -30,7 +27,7 @@
 #include	"general.h"
 
 #include	"state.h"
-#include        "video.h"
+#include "video.h"
 #include	"video/Deinterlacer.h"
 #include	"file.h"
 #include	"FileWrapper.h"
@@ -437,20 +434,12 @@ static bool LoadIPS(MDFNFILE &GameFile, const char *path)
 
 MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 {
-        MDFNFILE GameFile;
-	struct stat stat_buf;
+   MDFNFILE GameFile;
 	std::vector<FileExtensionSpecStruct> valid_iae;
 
 #ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
-	{
 	 return(MDFNI_LoadCD(force_module, name));
-	}
-	
-	if(!stat(name, &stat_buf) && !S_ISREG(stat_buf.st_mode))
-	{
-	 return(MDFNI_LoadCD(force_module, name));
-	}
 #endif
 
 	MDFNI_CloseGame();

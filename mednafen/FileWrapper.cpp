@@ -23,7 +23,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <string.h>
 
 // Some really bad preprocessor abuse follows to handle platforms that don't have fseeko and ftello...and of course
