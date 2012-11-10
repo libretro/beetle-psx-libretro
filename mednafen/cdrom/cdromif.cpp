@@ -162,7 +162,7 @@ static int ReadThreadStart_C(void *v_arg)
 
  if(args->device_name)
  {
-  char device_name[strlen(args->device_name) + 1];
+  char device_name[256];
 
   strcpy(device_name, args->device_name);
  
