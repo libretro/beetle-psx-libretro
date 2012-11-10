@@ -187,7 +187,7 @@ static void ClockTimer(int i, uint32 clocks)
 
  if((before < target && Timers[i].Counter >= target) || zero_tm || Timers[i].Counter > 0xFFFF)
  {
-#if 1
+#if 0
   if(Timers[i].Mode & 0x10)
   {
    if((Timers[i].Counter - target) > 3)
@@ -400,7 +400,7 @@ uint16 TIMER_Read(const pscpu_timestamp_t timestamp, uint32 A)
 
  if(which >= 3)
  {
-  PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+  //PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
 
   return(ret >> ((A & 3) * 8));
  }

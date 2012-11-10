@@ -318,7 +318,7 @@ INLINE void FrontIO::DoDSRIRQ(void)
 {
  if(Control & 0x1000)
  {
-  PSX_FIODBGINFO("[DSR] IRQ");
+  //PSX_FIODBGINFO("[DSR] IRQ");
   istatus = true;
   IRQ_Assert(IRQ_SIO, true);
  }
@@ -329,7 +329,7 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
  assert(!(A & 0x1));
 
- PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
+ //PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
 
  Update(timestamp);
 
@@ -346,8 +346,10 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	break;
 
   case 0xa:
+#if 0
 	if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
 	 fprintf(stderr, "FIO device selection changed during comm %04x->%04x", Control, V);
+#endif
 
 	//printf("Control: %d, %04x\n", timestamp, V);
 	Control = V & 0x3F2F;
@@ -472,8 +474,10 @@ uint32 FrontIO::Read(pscpu_timestamp_t timestamp, uint32 A)
 	break;
  }
 
+#if 0
  if((A & 0xF) != 0x4)
   PSX_FIODBGINFO("[FIO] Read: %08x %08x", A, ret);
+#endif
 
  return(ret);
 }
@@ -523,7 +527,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
      if(!TransmitBitCounter)
      {
       need_start_stop_check = true;
-      PSX_FIODBGINFO("[FIO] Data transmitted: %08x", TransmitBuffer);
+      //PSX_FIODBGINFO("[FIO] Data transmitted: %08x", TransmitBuffer);
       TransmitInProgress = false;
 
       if(Control & 0x400)
@@ -547,7 +551,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
      if(!ReceiveBitCounter)
      {
       need_start_stop_check = true;
-      PSX_FIODBGINFO("[FIO] Data received: %08x", ReceiveBuffer);
+      //PSX_FIODBGINFO("[FIO] Data received: %08x", ReceiveBuffer);
 
       ReceiveInProgress = false;
       ReceiveBufferAvail = true;

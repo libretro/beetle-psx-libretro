@@ -175,10 +175,17 @@ static INLINE bool ChCan(void)
 	   return(GPU->DMACanWrite());
 	  else
 	   return(true);	// GPU
+     /*
   case 3: return(true);	// CDC
   case 4: return(true);	// SPU
   case 5: return(true);	// ??
   case 6: return(true);	// OT
+  */
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+     return true;
  }
  abort();
 }
@@ -303,8 +310,10 @@ static INLINE void RunChannelT(pscpu_timestamp_t timestamp, int32 clocks)
     DMACH[ch].WordCounter = header >> 24;
     DMACH[ch].NextAddr = header & 0xFFFFFF;
 
+    /*
     if(DMACH[ch].WordCounter > 0x10) 
      printf("What the lala?  0x%02x @ 0x%08x\n", DMACH[ch].WordCounter, DMACH[ch].CurAddr - 4);
+     */
 
     if(DMACH[ch].WordCounter)
      DMACH[ch].ClockCounter -= 15;
