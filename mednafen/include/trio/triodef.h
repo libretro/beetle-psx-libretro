@@ -173,10 +173,6 @@
 # define PREDEF_STANDARD_CXX89
 #endif
 
-#if defined(TRIO_PLATFORM_UNIX)
-# include <unistd.h>
-#endif
-
 #if defined(_POSIX_VERSION)
 # define PREDEF_STANDARD_POSIX _POSIX_VERSION
 # if (_POSIX_VERSION >= 199506L)

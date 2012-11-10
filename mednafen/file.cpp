@@ -18,17 +18,11 @@
 #include "mednafen.h"
 #include <stdarg.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <errno.h>
 #include <trio/trio.h>
 
 #include "file.h"
 #include "general.h"
-
-#ifndef __GNUC__
- #define strcasecmp strcmp
-#endif
 
 static const int64 MaxROMImageSize = (int64)1 << 26; // 2 ^ 26 = 64MiB
 

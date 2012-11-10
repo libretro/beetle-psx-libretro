@@ -37,7 +37,6 @@ class ErrnoHolder
 
  ErrnoHolder()
  {
-  //SetErrno(0);
   local_errno = 0;
   local_strerror[0] = 0;
  }

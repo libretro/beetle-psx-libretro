@@ -232,7 +232,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
 	$(CDROM_SOURCES) \
-	$(MEDNAFEN_DIR)/memory.cpp \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/video.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \

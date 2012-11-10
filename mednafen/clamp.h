@@ -21,15 +21,9 @@ static INLINE int32 clamp_to_u16(int32 i)
 template<typename T, typename U, typename V> static INLINE void clamp(T *val, U minimum, V maximum)
 {
  if(*val < minimum)
- {
-  //printf("Warning: clamping to minimum(%d)\n", (int)minimum);
   *val = minimum;
- }
  if(*val > maximum)
- {
-  //printf("Warning: clamping to maximum(%d)\n", (int)maximum);
   *val = maximum;
- }
 }
 
 #endif
