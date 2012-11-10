@@ -178,77 +178,78 @@ extern std::string retro_base_name;
 
 std::string MDFN_GetSettingS(const char *name)
 {
-	/* PCE_FAST */
-	if(!strcmp("pce_fast.cdbios", name))
-        {
-                fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
-		return std::string(retro_base_directory) + std::string("syscard3.pce");
-        }
-	/* PSX */
-	if(!strcmp("psx.bios_eu", name))
-        {
-                fprintf(stderr, "psx.bios_eu: %s%s\n", retro_base_directory.c_str(), name);
-		assert(0);
-		return std::string(retro_base_directory) + std::string("scph5502.bin");
-        }
-	if(!strcmp("psx.bios_jp", name))
-        {
-                fprintf(stderr, "psx.bios_jp: %s%s\n", retro_base_directory.c_str(), name);
-		assert(0);
-		return std::string(retro_base_directory) + std::string("scph5500.bin");
-        }
-	if(!strcmp("psx.bios_na", name))
-        {
-                fprintf(stderr, "psx.bios_na: %s%s\n", retro_base_directory.c_str(), name);
-		assert(0);
-		return std::string(retro_base_directory) + std::string("scph5501.bin");
-        }
-	if(!strcmp("psx.region_default", name)) /* make configurable */
-		return "na";
-	/* WSWAN */
-	if(!strcmp("wswan.name", name))
-        {
-		return std::string("Mednafen");
-        }
-	/* FILESYS */
-	if(!strcmp("filesys.path_firmware", name))
-        {
-                fprintf(stderr, "filesys.path_firmware: %s\n", retro_base_directory.c_str());
-		return retro_base_directory;
-        }
-	if(!strcmp("filesys.path_palette", name))
-        {
-                fprintf(stderr, "filesys.path_palette: %s\n", retro_base_directory.c_str());
-		return retro_base_directory;
-        }
-	if(!strcmp("filesys.path_sav", name))
-        {
-                fprintf(stderr, "filesys.path_sav: %s\n", retro_base_directory.c_str());
-		return retro_base_directory;
-        }
-	if(!strcmp("filesys.path_state", name))
-        {
-                fprintf(stderr, "filesys.path_state: %s\n", retro_base_directory.c_str());
-		return retro_base_directory;
-        }
-	if(!strcmp("filesys.path_cheat", name))
-        {
-                fprintf(stderr, "filesys.path_cheat: %s\n", retro_base_directory.c_str());
-		return retro_base_directory;
-        }
-	if(!strcmp("filesys.fname_state", name))
-        {
-                fprintf(stderr, "filesys.fname_state: %s%s\n", retro_base_name.c_str(), std::string(".sav").c_str());
-		return retro_base_name + std::string(".sav");
-        }
-	if(!strcmp("filesys.fname_sav", name))
-        {
-                fprintf(stderr, "filesys.fname_sav: %s%s\n", retro_base_name.c_str(), std::string(".bsv").c_str());
-		return retro_base_name + std::string(".bsv");
-        }
-	fprintf(stderr, "unhandled setting S: %s\n", name);
-	assert(0);
-	return 0;
+   const std::string s = "/";
+   /* PCE_FAST */
+   if(!strcmp("pce_fast.cdbios", name))
+   {
+      fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
+      return std::string(retro_base_directory) + s + std::string("syscard3.pce");
+   }
+   /* PSX */
+   if(!strcmp("psx.bios_eu", name))
+   {
+      fprintf(stderr, "psx.bios_eu: %s%s\n", retro_base_directory.c_str(), name);
+      assert(0);
+      return std::string(retro_base_directory) + s + std::string("scph5502.bin");
+   }
+   if(!strcmp("psx.bios_jp", name))
+   {
+      fprintf(stderr, "psx.bios_jp: %s%s\n", retro_base_directory.c_str(), name);
+      assert(0);
+      return std::string(retro_base_directory) + s + std::string("scph5500.bin");
+   }
+   if(!strcmp("psx.bios_na", name))
+   {
+      fprintf(stderr, "psx.bios_na: %s%s\n", retro_base_directory.c_str(), name);
+      assert(0);
+      return std::string(retro_base_directory) + s + std::string("scph5501.bin");
+   }
+   if(!strcmp("psx.region_default", name)) /* make configurable */
+      return "na";
+   /* WSWAN */
+   if(!strcmp("wswan.name", name))
+   {
+      return std::string("Mednafen");
+   }
+   /* FILESYS */
+   if(!strcmp("filesys.path_firmware", name))
+   {
+      fprintf(stderr, "filesys.path_firmware: %s\n", retro_base_directory.c_str());
+      return retro_base_directory;
+   }
+   if(!strcmp("filesys.path_palette", name))
+   {
+      fprintf(stderr, "filesys.path_palette: %s\n", retro_base_directory.c_str());
+      return retro_base_directory;
+   }
+   if(!strcmp("filesys.path_sav", name))
+   {
+      fprintf(stderr, "filesys.path_sav: %s\n", retro_base_directory.c_str());
+      return retro_base_directory;
+   }
+   if(!strcmp("filesys.path_state", name))
+   {
+      fprintf(stderr, "filesys.path_state: %s\n", retro_base_directory.c_str());
+      return retro_base_directory;
+   }
+   if(!strcmp("filesys.path_cheat", name))
+   {
+      fprintf(stderr, "filesys.path_cheat: %s\n", retro_base_directory.c_str());
+      return retro_base_directory;
+   }
+   if(!strcmp("filesys.fname_state", name))
+   {
+      fprintf(stderr, "filesys.fname_state: %s%s\n", retro_base_name.c_str(), std::string(".sav").c_str());
+      return retro_base_name + std::string(".sav");
+   }
+   if(!strcmp("filesys.fname_sav", name))
+   {
+      fprintf(stderr, "filesys.fname_sav: %s%s\n", retro_base_name.c_str(), std::string(".bsv").c_str());
+      return retro_base_name + std::string(".bsv");
+   }
+   fprintf(stderr, "unhandled setting S: %s\n", name);
+   assert(0);
+   return 0;
 }
 
 bool MDFNI_SetSetting(const char *name, const char *value, bool NetplayOverride)

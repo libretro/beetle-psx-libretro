@@ -31,6 +31,16 @@ void MDFND_Sleep(unsigned int time)
 extern std::string retro_base_directory;
 extern std::string retro_base_name;
 
+#ifdef _WIN32
+static void sanitize_path(std::string &path)
+{
+   size_t size = path.size();
+   for (size_t i = 0; i < size; i++)
+      if (path[i] == '/')
+         path[i] = '\\';
+}
+#endif
+
 // Use a simpler approach to make sure that things go right for libretro.
 std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
@@ -54,6 +64,9 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    }
 
    fprintf(stderr, "[Mednafen]: Path request: %s\n", ret.c_str());
+#ifdef _WIN32
+   sanitize_path(ret); // Because Windows path handling is mongoloid.
+#endif
    return ret;
 }
 

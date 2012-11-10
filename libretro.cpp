@@ -92,9 +92,11 @@ void retro_init()
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
-      MDFNI_Initialize(dir);
-
       retro_base_directory = dir;
+      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
+      retro_base_directory = retro_base_directory.substr(0, retro_base_directory.find_last_not_of("/\\"));
+
+      MDFNI_Initialize(retro_base_directory.c_str());
    }
    else
    {
