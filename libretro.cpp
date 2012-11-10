@@ -94,7 +94,11 @@ void retro_init()
    {
       retro_base_directory = dir;
       // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      retro_base_directory = retro_base_directory.substr(0, retro_base_directory.find_last_not_of("/\\"));
+      size_t last = retro_base_directory.find_last_not_of("/\\");
+      if (last != std::string::npos)
+         last++;
+
+      retro_base_directory = retro_base_directory.substr(0, last);
 
       MDFNI_Initialize(retro_base_directory.c_str());
    }
