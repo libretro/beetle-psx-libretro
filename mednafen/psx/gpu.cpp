@@ -333,13 +333,7 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16 fore_pix)
 
 INLINE uint16 PS_GPU::ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y)
 {
- uint16 ret = texel & 0x8000;
-
- ret |= DitherLUT[dither_y][dither_x][(((texel & 0x1F) * r) >> (5 - 1))] << 0;
- ret |= DitherLUT[dither_y][dither_x][(((texel & 0x3E0) * g) >> (10 - 1))] << 5;
- ret |= DitherLUT[dither_y][dither_x][(((texel & 0x7C00) * b) >> (15 - 1))] << 10;
-
- return(ret);
+ return ((texel & 0x8000) | (DitherLUT[dither_y][dither_x][(((texel & 0x1F) * r) >> (5 - 1))] << 0) | (DitherLUT[dither_y][dither_x][(((texel & 0x3E0) * g) >> (10 - 1))] << 5) | (DitherLUT[dither_y][dither_x][(((texel & 0x7C00) * b) >> (15 - 1))] << 10));
 }
 
 template<uint32 TexMode_TA>
@@ -385,11 +379,6 @@ INLINE bool PS_GPU::LineSkipTest(unsigned y)
 // Special RAM write mode(16 pixels at a time), does *not* appear to use mask drawing environment settings.
 void PS_GPU::Command_FBFill(const uint32 *cb)
 {
- int32 r = cb[0] & 0xFF;
- int32 g = (cb[0] >> 8) & 0xFF;
- int32 b = (cb[0] >> 16) & 0xFF;
- const uint16 fill_value = ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
-
  int32 destX = (cb[1] >>  0) & 0x3F0;
  int32 destY = (cb[1] >> 16) & 0x3FF;
 
@@ -411,7 +400,7 @@ void PS_GPU::Command_FBFill(const uint32 *cb)
   {
    const int32 d_x = (x + destX) & 1023;
 
-   GPURAM[d_y][d_x] = fill_value;
+   GPURAM[d_y][d_x] = (((cb[0] & 0xFF) >> 3) << 0) | ((((cb[0] >> 8) & 0xFF) >> 3) << 5) | ((((cb[0] >> 16) & 0xFF) >> 3) << 10);
   }
  }
 
@@ -441,13 +430,15 @@ void PS_GPU::Command_FBCopy(const uint32 *cb)
  {
   for(int32 x = 0; x < width; x++)
   {
-   int32 s_y = (y + sourceY) & 511;
-   int32 s_x = (x + sourceX) & 1023;
    int32 d_y = (y + destY) & 511;
    int32 d_x = (x + destX) & 1023;
 
    if(!(GPURAM[d_y][d_x] & MaskEvalAND))
-    GPURAM[d_y][d_x] = GPURAM[s_y][s_x] | MaskSetOR;
+   {
+      int32 s_y = (y + sourceY) & 511;
+      int32 s_x = (x + sourceX) & 1023;
+      GPURAM[d_y][d_x] = GPURAM[s_y][s_x] | MaskSetOR;
+   }
   }
  }
 
@@ -511,14 +502,10 @@ void PS_GPU::RecalcTexWindowLUT(void)
 // printf("TWX: 0x%02x, TWW: 0x%02x\n", twx, tww);
 // printf("TWY: 0x%02x, TWH: 0x%02x\n", twy, twh);
 
- for(unsigned x = 0; x < 256; x++)
+ for(unsigned i = 0; i < 256; i++)
  {
-  TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
- }
-
- for(unsigned y = 0; y < 256; y++)
- {
-  TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
+  TexWindowXLUT[i] = (i & TexWindowX_AND) | TexWindowX_OR;
+  TexWindowYLUT[i] = (i & TexWindowY_AND) | TexWindowY_OR;
  }
 
  memset(TexWindowXLUT_Pre, TexWindowXLUT[0], sizeof(TexWindowXLUT_Pre));
@@ -730,12 +717,7 @@ void PS_GPU::ProcessFIFO(void)
 
   PrimitiveCounter[cc]++;
 
-  if(!command->func[TexMode])
-  {
-   //if(CB[0])
-   // PSX_WARNING("[GPU] Unknown command: %08x, %d", CB[0], scanline);
-  }
-  else
+  if(command->func[TexMode])
   {
 #if 0
    PSX_WARNING("[GPU] Command: %08x %s %d %d %d", CB[0], command->name, command->len, scanline, DrawTimeAvail);
@@ -1112,17 +1094,10 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
      IRQ_Assert(IRQ_VSYNC, true);
      IRQ_Assert(IRQ_VSYNC, false);
-    }
 
     // Might not be right:
-    if(scanline == 0)
      TIMER_SetVBlank(true);
-    else if(scanline == VisibleStartLine)
-     TIMER_SetVBlank(false);
-
-
-    if(scanline == 0)
-    {
+     
      field_atvs = field;
      DisplayHeightCounter = 0;
 
@@ -1168,6 +1143,9 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
      DisplayFB_CurYOffset = 0;
     }
+    else if(scanline == VisibleStartLine)
+     TIMER_SetVBlank(false);
+
 
     const uint32 VS_Adjust = 7; //PALMode ? (34 - 6) : 7;
 
