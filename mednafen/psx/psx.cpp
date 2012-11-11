@@ -25,6 +25,10 @@
 #include "../mempatcher.h"
 #include "../cputest/cputest.h"
 
+#ifdef _MSC_VER
+#include "../msvc_compat.h"
+#endif
+
 extern MDFNGI EmulatedPSX;
 
 namespace MDFN_IEN_PSX

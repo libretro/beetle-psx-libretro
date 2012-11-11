@@ -37,6 +37,8 @@ typedef int ssize_t;
 #define strtoull _strtoui64
 #undef strcasecmp
 #define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define strdup _strdup
 #define lseek _lseek
 
 #include <tchar.h>
