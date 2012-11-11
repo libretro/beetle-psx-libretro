@@ -1683,7 +1683,7 @@ int32 PS_CDC::Command_Setfilter(const int arg_count, const uint8 *args)
 
 int32 PS_CDC::Command_Setmode(const int arg_count, const uint8 *args)
 {
- PSX_DBGINFO("[CDC] Set mode 0x%02x", args[0]);
+ //PSX_DBGINFO("[CDC] Set mode 0x%02x", args[0]);
  Mode = args[0];
 
  WriteResult(MakeStatus());

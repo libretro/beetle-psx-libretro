@@ -18,12 +18,10 @@ static INLINE int32 clamp_to_u16(int32 i)
  return(i);
 }
 
-template<typename T, typename U, typename V> static INLINE void clamp(T *val, U minimum, V maximum)
+static INLINE void clamp(int32_t *val, size_t, size_t)
 {
- if(*val < minimum)
-  *val = minimum;
- if(*val > maximum)
-  *val = maximum;
+   if ( (int16_t) *val != *val )
+      *val = (*val >> 31) ^ 0x7FFF;
 }
 
 #endif
