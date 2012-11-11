@@ -954,46 +954,6 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
  return(ret >> ((A & 3) * 8));
 }
 
-INLINE void PS_GPU::ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift, bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
-{
-     if(bpp24)	// 24bpp
-     {
-      for(int32 x = dx_start; x < dx_end; x++)
-      {
-       uint32 srcpix;
-
-       srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + 1) & 0x7FF] << 16);
-       srcpix >>= (fb_x & 1) * 8;
-
-       dest[x] = (((srcpix >> 0) << out_Rshift) & (0xFF << out_Rshift)) | (((srcpix >> 8) << out_Gshift) & (0xFF << out_Gshift)) |
-       		 (((srcpix >> 16) << out_Bshift) & (0xFF << out_Bshift));
-
-       fb_x = (fb_x + 3) & 0x7FF;
-      }
-     }				// 15bpp
-     else
-     {
-      for(int32 x = dx_start; x < dx_end; x++)
-      {
-       uint32 srcpix = src[fb_x >> 1];
-
-       //dest[x] = (((srcpix >> 0) << out_Rshift) & (0xFF << out_Rshift)) | (((srcpix >> 8) << out_Gshift) & (0xFF << out_Gshift)) |
-       //		 (((srcpix >> 16) << out_Bshift) & (0xFF << out_Bshift));
-       dest[x] = OutputLUT[srcpix & 0x7FFF];
-
-       fb_x = (fb_x + 2) & 0x7FF;
-      }
-     }
-
-}
-
-
-template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
-void PS_GPU::ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
-{
- ReorderRGB_Var(out_Rshift, out_Gshift, out_Bshift, bpp24, src, dest, dx_start, dx_end, fb_x);
-}
-
 pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 {
  static const uint32 DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -1231,18 +1191,38 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
       const uint16 *src = GPURAM[DisplayFB_CurLineYReadout];
 
       //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-      /*
-      if(surface->format.Rshift == 0 && surface->format.Gshift == 8 && surface->format.Bshift == 16)
-       ReorderRGB<0, 8, 16>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 8 && surface->format.Gshift == 16 && surface->format.Bshift == 24)
-       ReorderRGB<8, 16, 24>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-       */
-      if(surface->format.Rshift == 16 && surface->format.Gshift == 8 && surface->format.Bshift == 0)
-       ReorderRGB<16, 8, 0>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 24 && surface->format.Gshift == 16 && surface->format.Bshift == 8)
-       ReorderRGB<24, 16, 8>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
+      bool bpp24 = DisplayMode & 0x10;
+      uint32 out_Rshift = surface->format.Rshift;
+      uint32 out_Gshift = surface->format.Gshift;
+      uint32 out_Bshift = surface->format.Bshift;
+
+      if(bpp24)	// 24bpp
+      {
+         for(int32 x = dx_start; x < dx_end; x++)
+         {
+            uint32 srcpix;
+
+            srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + 1) & 0x7FF] << 16);
+            srcpix >>= (fb_x & 1) * 8;
+
+            dest[x] = (((srcpix >> 0) << out_Rshift) & (0xFF << out_Rshift)) | (((srcpix >> 8) << out_Gshift) & (0xFF << out_Gshift)) |
+               (((srcpix >> 16) << out_Bshift) & (0xFF << out_Bshift));
+
+            fb_x = (fb_x + 3) & 0x7FF;
+         }
+      }				// 15bpp
       else
-       ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
+      {
+         for(int32 x = dx_start; x < dx_end; x++)
+         {
+            uint32 srcpix = src[fb_x >> 1];
+
+            //dest[x] = (((srcpix >> 0) << out_Rshift) & (0xFF << out_Rshift)) | (((srcpix >> 8) << out_Gshift) & (0xFF << out_Gshift)) | (((srcpix >> 16) << out_Bshift) & (0xFF << out_Bshift));
+            dest[x] = OutputLUT[srcpix & 0x7FFF];
+
+            fb_x = (fb_x + 2) & 0x7FF;
+         }
+      }
      }
 
      //if(scanline == 64)
