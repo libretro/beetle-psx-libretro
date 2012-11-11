@@ -100,10 +100,7 @@
     <ClCompile Include="..\..\mednafen\general.cpp" />
     <ClCompile Include="..\..\mednafen\math_ops.cpp" />
     <ClCompile Include="..\..\mednafen\md5.cpp" />
-    <ClCompile Include="..\..\mednafen\mednafen.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\memory.cpp" />
+    <ClCompile Include="..\..\mednafen\mednafen.cpp" />
     <ClCompile Include="..\..\mednafen\mempatcher.cpp" />
     <ClCompile Include="..\..\mednafen\mpcdec\fastmath.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
@@ -169,16 +166,12 @@
     <ClCompile Include="..\..\mednafen\psx\mdec.cpp" />
     <ClCompile Include="..\..\mednafen\psx\psx.cpp" />
     <ClCompile Include="..\..\mednafen\psx\sio.cpp" />
-    <ClCompile Include="..\..\mednafen\psx\spu.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\..\mednafen\psx\spu.cpp" />
     <ClCompile Include="..\..\mednafen\psx\timer.cpp" />
     <ClCompile Include="..\..\mednafen\settings.cpp" />
     <ClCompile Include="..\..\mednafen\sound\Blip_Buffer.cpp" />
     <ClCompile Include="..\..\mednafen\sound\Stereo_Buffer.cpp" />
-    <ClCompile Include="..\..\mednafen\state.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\..\mednafen\state.cpp" />
     <ClCompile Include="..\..\mednafen\tremor\bitwise.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>

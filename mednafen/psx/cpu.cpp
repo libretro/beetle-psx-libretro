@@ -330,7 +330,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    timestamp++;
 
    #define DO_LDS() { GPR[LDWhich] = LDValue; LDWhich = 0x20; }
-   #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name: /*assert( ((arg_op) ? (0x40 | (arg_op)) : (arg_funct)) == opf); */
+   #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name:
    #define END_OPF goto OpDone; }
 
    #define DO_BRANCH(offset, mask)			\
@@ -359,10 +359,10 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	 goto SkipNPCStuff;				\
 	}
 
-   #define ITYPE uint32 rs __attribute__((unused)) = (instr >> 21) & 0x1F; uint32 rt __attribute__((unused)) = (instr >> 16) & 0x1F; int32 immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define ITYPE_ZE uint32 rs __attribute__((unused)) = (instr >> 21) & 0x1F; uint32 rt __attribute__((unused)) = (instr >> 16) & 0x1F; uint32 immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define JTYPE uint32 target = instr & ((1 << 26) - 1); /*printf(" target=(%08x) ", target);*/
-   #define RTYPE uint32 rs __attribute__((unused)) = (instr >> 21) & 0x1F; uint32 rt __attribute__((unused)) = (instr >> 16) & 0x1F; uint32 rd __attribute__((unused)) = (instr >> 11) & 0x1F; uint32 shamt __attribute__((unused)) = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
+   #define ITYPE uint32 rs = (instr >> 21) & 0x1F; uint32 rt  = (instr >> 16) & 0x1F; int32 immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define ITYPE_ZE uint32 rs = (instr >> 21) & 0x1F; uint32 rt = (instr >> 16) & 0x1F; uint32 immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define JTYPE uint32 target = instr & ((1 << 26) - 1);
+   #define RTYPE uint32 rs = (instr >> 21) & 0x1F; uint32 rt = (instr >> 16) & 0x1F; uint32 rd = (instr >> 11) & 0x1F; uint32 shamt = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
 
    static const void *const op_goto_table[256] =
    {

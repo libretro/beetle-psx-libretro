@@ -72,9 +72,6 @@
     <ClCompile Include="..\..\mednafen\mednafen.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\memory.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\mempatcher.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>

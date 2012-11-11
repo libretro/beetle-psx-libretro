@@ -435,6 +435,9 @@ bool PS_CDC::DecodeSubQ(uint8 *subpw)
 
 struct XA_Subheader
 {
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
  uint8 file;
  uint8 channel;
  uint8 submode;
@@ -444,13 +447,26 @@ struct XA_Subheader
  uint8 channel_dup;
  uint8 submode_dup;
  uint8 coding_dup;
+#ifdef _MSC_VER
+#pragma pop
+};
+#else
 } __attribute__((__packed__));
+#endif
 
 struct XA_SoundGroup
 {
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
  uint8 params[16];
  uint8 samples[112];
+#ifdef _MSC_VER
+#pragma pop
+};
+#else
 } __attribute__((__packed__));
+#endif
 
 #define XA_SUBMODE_EOF		0x80
 #define XA_SUBMODE_REALTIME	0x40
