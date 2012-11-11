@@ -45,12 +45,20 @@ static uint32 Command;
 static uint8 QMatrix[2][64];
 static uint32 QMIndex;
 
+#ifdef _MSC_VER
+static MDFN_ALIGN(16) int16 IDCTMatrix[64];
+#else
 static int16 IDCTMatrix[64] MDFN_ALIGN(16);
+#endif
 static uint32 IDCTMIndex;
 
 static uint8 QScale;
 
+#ifdef _MSC_VER
+static MDFN_ALIGN(16) int16 Coeff[6][64];
+#else
 static int16 Coeff[6][64] MDFN_ALIGN(16);
+#endif
 static uint32 CoeffIndex;
 static uint32 DecodeWB;
 

@@ -50,9 +50,17 @@ namespace MDFN_IEN_PSX
 
 typedef struct
 {
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
  int16 MX[3][3];
  int16 dummy;
+#ifdef _MSC_VER
+#pragma pop
+} gtematrix;
+#else
 }  __attribute__((__packed__)) gtematrix;
+#endif
 
 typedef struct
 {
@@ -1005,15 +1013,12 @@ INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16 *v, c
  Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
 }
 
-
-#define VAR_UNUSED __attribute__((unused))
-
 #define DECODE_FIELDS							\
- const uint32 sf VAR_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
- const uint32 mx VAR_UNUSED = (instr >> 17) & 0x3;			\
+ const uint32 sf = (instr & (1 << 19)) ? 12 : 0;		\
+ const uint32 mx = (instr >> 17) & 0x3;			\
  const uint32 v_i = (instr >> 15) & 0x3;				\
- const int32* cv VAR_UNUSED = CRVectors.All[(instr >> 13) & 0x3];	\
- const int lm VAR_UNUSED = (instr >> 10) & 1;			\
+ const int32* cv = CRVectors.All[(instr >> 13) & 0x3];	\
+ const int lm = (instr >> 10) & 1;			\
  int16 v[3];							\
  if(v_i == 3)							\
  {								\

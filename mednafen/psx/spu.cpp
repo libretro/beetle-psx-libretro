@@ -1449,7 +1449,38 @@ uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 speci
 	break;
 
 
-  case GSREG_FB_SRC_A ... GSREG_IN_COEF_R:
+  case GSREG_FB_SRC_A:
+  case GSREG_FB_SRC_B:
+  case GSREG_IIR_ALPHA:
+  case GSREG_ACC_COEF_A:
+  case GSREG_ACC_COEF_B:
+  case GSREG_ACC_COEF_C:
+  case GSREG_ACC_COEF_D:
+  case GSREG_IIR_COEF:
+  case GSREG_FB_ALPHA:
+  case GSREG_FB_X:
+  case GSREG_IIR_DEST_A0:
+  case GSREG_IIR_DEST_A1:
+  case GSREG_ACC_SRC_A0:
+  case GSREG_ACC_SRC_A1:
+  case GSREG_ACC_SRC_B0:
+  case GSREG_ACC_SRC_B1:
+  case GSREG_IIR_SRC_A0:
+  case GSREG_IIR_SRC_A1:
+  case GSREG_IIR_DEST_B0:
+  case GSREG_IIR_DEST_B1:
+  case GSREG_ACC_SRC_C0:
+  case GSREG_ACC_SRC_C1:
+  case GSREG_ACC_SRC_D0:
+  case GSREG_ACC_SRC_D1:
+  case GSREG_IIR_SRC_B1:
+  case GSREG_IIR_SRC_B0:
+  case GSREG_MIX_DEST_A0:
+  case GSREG_MIX_DEST_A1:
+  case GSREG_MIX_DEST_B0:
+  case GSREG_MIX_DEST_B1:
+  case GSREG_IN_COEF_L:
+  case GSREG_IN_COEF_R:
 	ret = ReverbRegs[which - GSREG_FB_SRC_A] & 0xFFFF;
 	break;
  }
