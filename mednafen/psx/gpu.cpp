@@ -1146,7 +1146,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
     // Needs to occur even in vblank.
     DisplayFB_CurLineYReadout = (DisplayFB_YStart + DisplayFB_CurYOffset) & 0x1FF;
 
-    if(scanline >= VisibleStartLine && scanline < (VisibleStartLine + (HardwarePALType ? 288 : 240)) && !skip && espec && PALMode == HardwarePALType)
+    if(scanline >= VisibleStartLine && scanline < (VisibleStartLine + (HardwarePALType ? 288 : 240)) && espec && PALMode == HardwarePALType)
     {
      uint32 *dest;	// = surface->pixels + (scanline - VisibleStartLine) * surface->pitch32;
      int32 dest_line;
@@ -1283,12 +1283,6 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
 
  // Clear ~0 state.
  LineWidths[0].x = LineWidths[0].w = 0;
-
- for(int i = 0; i < 240; i++)
- {
-  LineWidths[i].x = 0;
-  LineWidths[i].w = 0;
- }
 
  if(espec->VideoFormatChanged)
  {
