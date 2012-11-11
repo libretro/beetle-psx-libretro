@@ -518,7 +518,7 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	      GPU->AbortDMA();
 	     }
 
-	     PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
+	     //PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
 	     //MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
 	    }
 

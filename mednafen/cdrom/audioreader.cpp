@@ -323,11 +323,8 @@ int64 MPCReader::Read_(int16 *buffer, int64 frames)
     #warning Floating-point MPC decoding path not tested.
     int32 samp = (int32)(MPCBuffer[MPCBufferOffs + x] * 32767);
 #endif
-    if(samp < -32768)
-     samp = -32768;
-
-    if(samp > 32767)
-     samp = 32767;
+    if ( (int16_t) samp != samp )
+       samp = (samp >> 31) ^ 0x7FFF;
 
     *cowbuf = (int16)samp;
     cowbuf++;

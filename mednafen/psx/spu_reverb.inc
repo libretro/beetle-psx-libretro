@@ -111,11 +111,8 @@ static INLINE int32 Reverb4422(const int16 *src)
 
  out >>= 15;
 
- if(out < -32768)
-  out = -32768;
-
- if(out > 32767)
-  out = 32767;
+ if ( (int16_t) out != out )
+ out = (out >> 31) ^ 0x7FFF;
 
  return(out);
 }
