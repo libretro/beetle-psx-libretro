@@ -1078,6 +1078,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
        DisplayRect->w = 384;
        DisplayRect->h = (HardwarePALType ? 288 : 240);
 
+       /*
        for(int32 y = 0; y < DisplayRect->h; y++)
        {
         uint32 *dest = surface->pixels + y * surface->pitch32;
@@ -1087,6 +1088,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
         memset(dest, 0, 384 * sizeof(int32));
        }
+       */
 #if 0
        char buffer[256];
 
