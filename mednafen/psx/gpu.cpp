@@ -1269,16 +1269,6 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
 void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
 {
- if(!espec_arg)
- {
-  espec = NULL;
-  surface = NULL;
-  DisplayRect = NULL;
-  LineWidths = NULL;
-  skip = true;
-  return;
- }
-
  espec = espec_arg;
 
  surface = espec->surface;
@@ -1303,14 +1293,7 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
  if(espec->VideoFormatChanged)
  {
   for(int rc = 0; rc < 0x8000; rc++)
-  {
-   uint32 r, g, b;
-
-   r = ((rc >> 0) & 0x1F) * 255 / 31;
-   g = ((rc >> 5) & 0x1F) * 255 / 31;
-   b = ((rc >> 10) & 0x1F) * 255 / 31;
-   OutputLUT[rc] = espec->surface->format.MakeColor(r, g, b, 0);
-  }
+   OutputLUT[rc] = espec->surface->format.MakeColor((rc & 0x1F) * 255 / 31, ((rc >> 5) & 0x1F) * 255 / 31, ((rc >> 10) & 0x1F) * 255 / 31, 0);
  }
 }
 
