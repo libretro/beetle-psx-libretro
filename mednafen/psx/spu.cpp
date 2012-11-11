@@ -306,11 +306,8 @@ void PS_SPU::DecodeADPCM(const uint8 *input, int16 *output, const unsigned shift
 
   sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-  if(sample < -32768)
-   sample = -32768;
-
-  if(sample > 32767)
-   sample = 32767;
+  if ( (int16_t) sample != sample )
+     sample = (sample >> 31) ^ 0x7FFF;
 
   output[i] = sample;
  }
@@ -373,11 +370,9 @@ void PS_SPU::DecodeSamples(SPU_Voice *voice)
 
   sample += ((voice->DecodeBuffer[(voice->DecodeWritePos - 1) & 0x1F] * Weights[weight][0]) >> 6)
 			   	      + ((voice->DecodeBuffer[(voice->DecodeWritePos - 2) & 0x1F] * Weights[weight][1]) >> 6);
-  if(sample < -32768)
-   sample = -32768;
 
-  if(sample > 32767)
-   sample = 32767;
+  if ( (int16_t) sample != sample )
+     sample = (sample >> 31) ^ 0x7FFF;
 
   voice->DecodeBuffer[voice->DecodeWritePos] = sample;
   voice->DecodeWritePos = (voice->DecodeWritePos + 1) & 0x1F;
