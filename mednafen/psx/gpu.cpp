@@ -599,7 +599,7 @@ CTEntry PS_GPU::Commands[4][256] =
  #undef BLENDMODE_MAC
 };
 
-static uint64 PrimitiveCounter[256] = { 0 }; // Debug
+//static uint64 PrimitiveCounter[256] = { 0 }; // Debug
 
 void PS_GPU::ProcessFIFO(void)
 {
@@ -715,7 +715,7 @@ void PS_GPU::ProcessFIFO(void)
   if(!command->ss_cmd)
    DrawTimeAvail -= 2;
 
-  PrimitiveCounter[cc]++;
+  //PrimitiveCounter[cc]++;
 
   if(command->func[TexMode])
   {

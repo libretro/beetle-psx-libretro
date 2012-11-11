@@ -118,10 +118,11 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
 {
   int32 xs = x_start, xb = x_bound;
 
+  /*
   if(LineSkipTest(y))
    return;
+  */
 
-  if(xs < xb)	// (xs != xb)
   {
    if(xs < ClipX0)
     xs = ClipX0;
@@ -129,7 +130,9 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
    if(xb > (ClipX1 + 1))
     xb = ClipX1 + 1;
 
+    /*
    if(xs < xb)
+    */
    {
     DrawTimeAvail -= (xb - xs);
 
@@ -191,20 +194,12 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
     }
     else
     {
-     uint16 pix = 0x8000;
+     uint16 pix;
 
      if(goraud && dtd)
-     {
-      pix |= DitherLUT[y & 3][x & 3][r] << 0;
-      pix |= DitherLUT[y & 3][x & 3][g] << 5;
-      pix |= DitherLUT[y & 3][x & 3][b] << 10;
-     }
+      pix = (0x8000) | (DitherLUT[y & 3][x & 3][r] << 0) | (DitherLUT[y & 3][x & 3][g] << 5) | (DitherLUT[y & 3][x & 3][b] << 10);
      else
-     {
-      pix |= (r >> 3) << 0;
-      pix |= (g >> 3) << 5;
-      pix |= (b >> 3) << 10;
-     }
+      pix = (0x8000) | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
     
      PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
     }
@@ -355,7 +350,10 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
  {
   for(int32 y = y_start; y < y_middle; y++)
   {
-   DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), vertices[0].x, ig, idl);
+     int32 x_start = GetPolyXFP_Int(base_coord);
+     int32 x_bound = GetPolyXFP_Int(bound_coord_ul);
+     if(!LineSkipTest(y) && x_start < x_bound)
+     DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, x_start, x_bound, vertices[0].x, ig, idl);
    base_coord += base_step;
    bound_coord_ul += bound_coord_us;
    AddIDeltas_DY<goraud, textured>(ig, idl);
@@ -363,7 +361,10 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 
   for(int32 y = y_middle; y < y_bound; y++)
   {
-   DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), vertices[0].x, ig, idl);
+     int32 x_start = GetPolyXFP_Int(base_coord);
+     int32 x_bound = GetPolyXFP_Int(bound_coord_ll);
+     if(!LineSkipTest(y) && x_start < x_bound)
+     DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, x_start, x_bound, vertices[0].x, ig, idl);
    base_coord += base_step;
    bound_coord_ll += bound_coord_ls;
    AddIDeltas_DY<goraud, textured>(ig, idl);
@@ -373,7 +374,10 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
  {
   for(int32 y = y_start; y < y_middle; y++)
   {
-   DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), vertices[0].x, ig, idl);
+     int32 x_start = GetPolyXFP_Int(bound_coord_ul);
+     int32 x_bound = GetPolyXFP_Int(base_coord);
+     if(!LineSkipTest(y) && x_start < x_bound)
+     DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, x_start, x_bound, vertices[0].x, ig, idl);
    base_coord += base_step;
    bound_coord_ul += bound_coord_us;
    AddIDeltas_DY<goraud, textured>(ig, idl);
@@ -381,7 +385,10 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 
   for(int32 y = y_middle; y < y_bound; y++)
   {
-   DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), vertices[0].x, ig, idl);
+     int32 x_start = GetPolyXFP_Int(bound_coord_ll);
+     int32 x_bound = GetPolyXFP_Int(base_coord);
+     if(!LineSkipTest(y) && x_start < x_bound)
+     DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, x_start, x_bound, vertices[0].x, ig, idl);
    base_coord += base_step;
    bound_coord_ll += bound_coord_ls;
    AddIDeltas_DY<goraud, textured>(ig, idl);
