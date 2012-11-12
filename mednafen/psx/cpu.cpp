@@ -277,42 +277,15 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
-#if 0
-   if(DebugMode && CPUHook)
-   {
-    ACTIVE_TO_BACKING;
 
-    CPUHook(PC);
-
-    BACKING_TO_ACTIVE;
-   }
-#endif
-
-   if(!ILHMode)
-   {
     if(PC == 0xB0)
     {
      if(GPR[9] == 0x3D)
      {
-      //if(GPR[4] == 'L')
-      // DBG_Break();
       fputc(GPR[4], stderr);
-      //if(GPR[4] == '\n')
-      //{
-      // fputc('%', stderr);
-      // fputc(' ', stderr);
-      //}
      }
     }
-   }
 
-/*
-   if(PC == 0xB0)
-   {
-    if(GPR[9] != 0xB)
-    PSX_WARNING("[BIOS] 0xB0 t1=0x%02x", GPR[9]);
-   }
-*/
    instr = LoadU32_LE((uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC]);
 
    //printf("PC=%08x, SP=%08x - op=0x%02x - funct=0x%02x - instr=0x%08x\n", PC, GPR[29], instr >> 26, instr & 0x3F, instr);
@@ -335,22 +308,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    #define DO_BRANCH(offset, mask)			\
 	{						\
-	 if(ILHMode)					\
-	 {								\
-	  uint32 old_PC = PC;						\
-	  PC = (PC & new_PC_mask) + new_PC;				\
-	  if(old_PC == ((PC & (mask)) + (offset)))			\
-	  {								\
-	   if(*(uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC] == 0)	\
-	   {								\
-	    if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
-	    {								\
-	     timestamp = next_event_ts;					\
-	    }								\
-	   }								\
-	  }								\
-	 }						\
-	 else						\
 	  PC = (PC & new_PC_mask) + new_PC;		\
 	 new_PC = (offset);				\
 	 new_PC_mask = (mask) & ~3;			\
@@ -1662,12 +1619,7 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool ILHMode)
  if(CPUHook || ADDBT)
   return(RunReal<true, false>(timestamp_in));
  else
- {
-  if(ILHMode)
-   return(RunReal<false, true>(timestamp_in));
-  else
    return(RunReal<false, false>(timestamp_in));
- }
 }
 
 void PS_CPU::SetCPUHook(void (*cpuh)(uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
