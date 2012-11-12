@@ -180,8 +180,8 @@ else ifeq ($(platform), wii)
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
 else
    TARGET := retro.dll
-   CC = i686-pc-mingw32-gcc
-   CXX = i686-pc-mingw32-g++
+   CC = gcc
+   CXX = g++
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
