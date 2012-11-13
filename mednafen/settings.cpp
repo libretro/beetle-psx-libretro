@@ -19,9 +19,7 @@
 #include <errno.h>
 #include <string.h>
 #include <string>
-#include <list>
 #include "settings.h"
-#include "md5.h"
 
 bool MDFN_SaveSettings(const char *path)
 {

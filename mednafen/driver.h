@@ -2,7 +2,6 @@
 #define _MDFN_DRIVERH
 
 #include "mednafen-types.h"
-#include <stdio.h> // REMOVE ME eventually
 #include "git.h"
 #include "settings-driver.h"
 #include "mednafen-driver.h"

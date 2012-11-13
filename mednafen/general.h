@@ -11,7 +11,6 @@ void GetFileBase(const char *f);
 bool MDFN_IsFIROPSafe(const std::string &path);
 
 std::string MDFN_MakeFName(int type, int id1, const char *cd1);
-char *MDFN_RemoveControlChars(char *str);
 
 void MDFN_ltrim(char *string);
 void MDFN_rtrim(char *string);

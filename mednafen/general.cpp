@@ -166,43 +166,6 @@ std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_pat
  }
 }
 
-
-typedef std::map<char, std::string> FSMap;
-
-static std::string EvalPathFS(const std::string &fstring, /*const (won't work because entry created if char doesn't exist) */ FSMap &fmap)
-{
- std::string ret = "";
- const char *str = fstring.c_str();
- bool in_spec = false;
-
- while(*str)
- {
-  int c = *str;
-
-  if(!in_spec && c == '%')
-   in_spec = true;
-  else if(in_spec == true)
-  {
-   if(c == '%')
-    ret = ret + std::string("%");
-   else
-    ret = ret + fmap[(char)c];
-   in_spec = false;
-  }
-  else
-  {
-   char ct[2];
-   ct[0] = c;
-   ct[1] = 0;
-   ret += std::string(ct);
-  }
-
-  str++;
- }
-
- return(ret);
-}
-
 const char * GetFNComponent(const char *str)
 {
  const char *tp1;
@@ -226,18 +189,6 @@ const char * GetFNComponent(const char *str)
   return(tp1+1);
  else
   return(str);
-}
-
-char *MDFN_RemoveControlChars(char *str)
-{
- char *orig = str;
- if(str)
-  while(*str)
-  {
-   if(*str < 0x20) *str = 0x20;
-   str++;
-  }
- return(orig);
 }
 
 // Remove whitespace from beginning of string
