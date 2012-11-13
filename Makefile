@@ -28,7 +28,6 @@ ifeq ($(core), psx)
    core = psx
    PTHREAD_FLAGS = -pthread
    NEED_CD = 1
-   NEED_THREADING = 1
    NEED_BPP = 32
    NEED_BLIP = 1
    NEED_DEINTERLACER = 1
@@ -64,7 +63,6 @@ else ifeq ($(core), pce-fast)
    NEED_BLIP = 1
    NEED_CD = 1
    NEED_CRC32 = 1
-   NEED_THREADING = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-0924
 
