@@ -57,6 +57,9 @@ static Deinterlacer deint;
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 #endif
 
+/* forward declarations */
+extern void MDFND_DispMessage(unsigned char *str);
+
 void MDFNI_CloseGame(void)
 {
  if(MDFNGameInfo)
@@ -100,6 +103,24 @@ bool MDFNSystemsPrio_CompareFunc(MDFNGI *first, MDFNGI *second)
 static void AddSystem(MDFNGI *system)
 {
  MDFNSystems.push_back(system);
+}
+
+
+void MDFN_DispMessage(const char *format, ...)
+{
+ va_list ap;
+ va_start(ap,format);
+ char *msg = NULL;
+
+ trio_vasprintf(&msg, format,ap);
+ va_end(ap);
+
+ MDFND_DispMessage((UTF8*)msg);
+}
+
+void MDFN_ResetMessages(void)
+{
+ MDFND_DispMessage(NULL);
 }
 
 
@@ -726,58 +747,59 @@ void MDFN_indent(int indent)
 }
 
 static uint8 lastchar = 0;
-void MDFN_printf(const char *format, ...) throw()
+
+void MDFN_printf(const char *format, ...)
 {
- char *format_temp;
- char *temp;
- unsigned int x, newlen;
+   char *format_temp;
+   char *temp;
+   unsigned int x, newlen;
 
- va_list ap;
- va_start(ap,format);
+   va_list ap;
+   va_start(ap,format);
 
 
- // First, determine how large our format_temp buffer needs to be.
- uint8 lastchar_backup = lastchar; // Save lastchar!
- for(newlen=x=0;x<strlen(format);x++)
- {
-  if(lastchar == '\n' && format[x] != '\n')
-  {
-   int y;
-   for(y=0;y<curindent;y++)
-    newlen++;
-  }
-  newlen++;
-  lastchar = format[x];
- }
+   // First, determine how large our format_temp buffer needs to be.
+   uint8 lastchar_backup = lastchar; // Save lastchar!
+   for(newlen=x=0;x<strlen(format);x++)
+   {
+      if(lastchar == '\n' && format[x] != '\n')
+      {
+         int y;
+         for(y=0;y<curindent;y++)
+            newlen++;
+      }
+      newlen++;
+      lastchar = format[x];
+   }
 
- format_temp = (char *)malloc(newlen + 1); // Length + NULL character, duh
- 
- // Now, construct our format_temp string
- lastchar = lastchar_backup; // Restore lastchar
- for(newlen=x=0;x<strlen(format);x++)
- {
-  if(lastchar == '\n' && format[x] != '\n')
-  {
-   int y;
-   for(y=0;y<curindent;y++)
-    format_temp[newlen++] = ' ';
-  }
-  format_temp[newlen++] = format[x];
-  lastchar = format[x];
- }
+   format_temp = (char *)malloc(newlen + 1); // Length + NULL character, duh
 
- format_temp[newlen] = 0;
+   // Now, construct our format_temp string
+   lastchar = lastchar_backup; // Restore lastchar
+   for(newlen=x=0;x<strlen(format);x++)
+   {
+      if(lastchar == '\n' && format[x] != '\n')
+      {
+         int y;
+         for(y=0;y<curindent;y++)
+            format_temp[newlen++] = ' ';
+      }
+      format_temp[newlen++] = format[x];
+      lastchar = format[x];
+   }
 
- temp = trio_vaprintf(format_temp, ap);
- free(format_temp);
+   format_temp[newlen] = 0;
 
- MDFND_Message(temp);
- free(temp);
+   temp = trio_vaprintf(format_temp, ap);
+   free(format_temp);
 
- va_end(ap);
+   MDFND_Message(temp);
+   free(temp);
+
+   va_end(ap);
 }
 
-void MDFN_PrintError(const char *format, ...) throw()
+void MDFN_PrintError(const char *format, ...)
 {
  char *temp;
 
@@ -892,3 +914,4 @@ void MDFNI_SetInput(int port, const char *type, void *ptr, uint32 ptr_len_thingy
 {
   MDFNGameInfo->SetInput(port, type, ptr);
 }
+

@@ -34,7 +34,7 @@ enum
 {
  MDFN_COLORSPACE_RGB = 0,
  MDFN_COLORSPACE_YCbCr = 1,
- //MDFN_COLORSPACE_YUV = 2, // TODO, maybe.
+ MDFN_COLORSPACE_YUV = 2, // TODO, maybe.
 };
 
 class MDFN_PixelFormat

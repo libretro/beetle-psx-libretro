@@ -1,4 +1,9 @@
-#include "video-common.h"
+#include "../mednafen.h"
+#include "../video.h"
+#include "../general.h"
+#include "../state.h"
+#include "../driver.h"
+
 #include "Deinterlacer.h"
 
 Deinterlacer::Deinterlacer()

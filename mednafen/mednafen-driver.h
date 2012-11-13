@@ -11,7 +11,7 @@ extern std::vector<MDFNGI *>MDFNSystems;
 
 /* Indent stdout newlines +- "indent" amount */
 void MDFN_indent(int indent);
-void MDFN_printf(const char *format, ...) throw() MDFN_FORMATSTR(printf, 1, 2);
+void MDFN_printf(const char *format, ...);
 
 #define MDFNI_printf MDFN_printf
 
@@ -82,7 +82,7 @@ void MDFNI_CloseGame(void);
 /* Deallocates all allocated memory.  Call after MDFNI_Emulate() returns. */
 void MDFNI_Kill(void);
 
-void MDFN_DispMessage(const char *format, ...) throw() MDFN_FORMATSTR(printf, 1, 2);
+void MDFN_DispMessage(const char *format, ...);
 #define MDFNI_DispMessage MDFN_DispMessage
 
 uint32 MDFNI_CRC32(uint32 crc, uint8 *buf, uint32 len);

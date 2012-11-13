@@ -15,11 +15,11 @@ extern MDFNGI *MDFNGameInfo;
 
 #include "settings.h"
 
-void MDFN_PrintError(const char *format, ...) throw() MDFN_FORMATSTR(printf, 1, 2);
-void MDFN_printf(const char *format, ...) throw() MDFN_FORMATSTR(printf, 1, 2);
-void MDFN_DispMessage(const char *format, ...) throw() MDFN_FORMATSTR(printf, 1, 2);
+void MDFN_PrintError(const char *format, ...);
+void MDFN_printf(const char *format, ...);
+void MDFN_DispMessage(const char *format, ...);
 
-void MDFN_DebugPrintReal(const char *file, const int line, const char *format, ...) MDFN_FORMATSTR(printf, 3, 4);
+void MDFN_DebugPrintReal(const char *file, const int line, const char *format, ...);
 
 #define gettext_noop(format, ...) (format)
 #define MDFN_DebugPrint(format, ...) MDFN_DebugPrintReal(__FILE__, __LINE__, format, ## __VA_ARGS__)
