@@ -73,12 +73,6 @@ class MDFN_PixelFormat
  };
 
  uint8 Ashift;  // [...] alpha component.
-
- uint8 Rprec;
- uint8 Gprec;
- uint8 Bprec;
- uint8 Aprec;
-
  // Creates a color value for the surface corresponding to the 8-bit R/G/B/A color passed.
 #if defined(WANT_32BPP)
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const

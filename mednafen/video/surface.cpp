@@ -27,11 +27,6 @@ MDFN_PixelFormat::MDFN_PixelFormat()
    Gshift = 0;
    Bshift = 0;
    Ashift = 0;
-
-   Rprec = 0;
-   Gprec = 0;
-   Bprec = 0;
-   Aprec = 0;
 }
 
 MDFN_PixelFormat::MDFN_PixelFormat(const unsigned int p_colorspace, const uint8 p_rs, const uint8 p_gs, const uint8 p_bs, const uint8 p_as)
@@ -47,11 +42,6 @@ MDFN_PixelFormat::MDFN_PixelFormat(const unsigned int p_colorspace, const uint8 
    Gshift = p_gs;
    Bshift = p_bs;
    Ashift = p_as;
-
-   Rprec = 8;
-   Gprec = 8;
-   Bprec = 8;
-   Aprec = 8;
 }
 
 MDFN_Surface::MDFN_Surface()
