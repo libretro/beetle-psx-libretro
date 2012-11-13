@@ -84,6 +84,7 @@ HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
+OKIADPCM_SOURCES += $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 16
@@ -199,7 +200,6 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
 	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
 	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
-	$(MEDNAFEN_DIR)/cdrom/pcecd.cpp \
 	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
 	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
@@ -231,7 +231,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(RESAMPLER_SOURCES) \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
-	$(MEDNAFEN_DIR)/okiadpcm.cpp \
+	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 
 
