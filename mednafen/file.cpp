@@ -26,144 +26,11 @@
 
 static const int64 MaxROMImageSize = (int64)1 << 26; // 2 ^ 26 = 64MiB
 
-enum
-{
- MDFN_FILETYPE_PLAIN = 0,
-};
+#define MDFN_FILETYPE_PLAIN 0
 
 bool MDFNFILE::ApplyIPS(FILE *ips)
 {
- uint8 header[5];
- uint32 count = 0;
- 
- //MDFN_printf(_("Applying IPS file \"%s\"...\n"), path);
-
- MDFN_indent(1);
- if(::fread(header, 1, 5, ips) != 5)
- {
-  ErrnoHolder ene(errno);
-
-  MDFN_PrintError(_("Error reading IPS file header: %s"), ene.StrError());
-  MDFN_indent(-1);
-  return(0);
- }
-
- if(memcmp(header, "PATCH", 5))
- {
-  MDFN_PrintError(_("IPS file header is invalid."));
-  MDFN_indent(-1);
-  return(0);
- }
-
- while(::fread(header, 1, 3, ips) == 3)
- {
-  uint32 offset = (header[0] << 16) | (header[1] << 8) | header[2];
-  uint8 patch_size_raw[2];
-  uint32 patch_size;
-  bool rle = false;
-
-  if(!memcmp(header, "EOF", 3))
-  {
-   MDFN_printf(_("IPS EOF:  Did %d patches\n\n"), count);
-   MDFN_indent(-1);
-   return(1);
-  }
-
-  if(::fread(patch_size_raw, 1, 2, ips) != 2)
-  {
-   ErrnoHolder ene(errno);
-   MDFN_PrintError(_("Error reading IPS patch length: %s"), ene.StrError());
-   return(0);
-  }
-
-  patch_size = MDFN_de16msb(patch_size_raw);
-
-  if(!patch_size)	/* RLE */
-  {
-   if(::fread(patch_size_raw, 1, 2, ips) != 2)
-   {
-    ErrnoHolder ene(errno);
-    MDFN_PrintError(_("Error reading IPS RLE patch length: %s"), ene.StrError());
-    return(0);
-   }
-
-   patch_size = MDFN_de16msb(patch_size_raw);
-
-   // Is this right?
-   if(!patch_size)
-    patch_size = 65536;
-
-   rle = true;
-   //MDFN_printf("  Offset: %8d  Size: %5d RLE\n",offset, patch_size);
-  }
-
-  if((offset + patch_size) > f_size)
-  {
-   uint8 *tmp;
-
-   //printf("%d\n", offset + patch_size, f_size);
-
-   if((offset + patch_size) > MaxROMImageSize)
-   {
-    MDFN_PrintError(_("ROM image will be too large after IPS patch; maximum size allowed is %llu bytes."), (unsigned long long)MaxROMImageSize);
-    return(0);
-   }
-
-   if(!(tmp = (uint8 *)MDFN_realloc(f_data, offset + patch_size, _("file read buffer"))))
-    return(0);
-
-   // Zero newly-allocated memory
-   memset(tmp + f_size, 0, (offset + patch_size) - f_size);
-
-   f_size = offset + patch_size;
-   f_data = tmp;
-  }
-
-
-  if(rle)
-  {
-   const int b = ::fgetc(ips);
-   uint8 *start = f_data + offset;
-
-   if(EOF == b)
-   {
-    ErrnoHolder ene(errno);
-
-    MDFN_PrintError(_("Error reading IPS RLE patch byte: %s"), ene.StrError());
-
-    return(0);
-   }
-
-   while(patch_size--)
-   {
-    *start=b;
-    start++;
-   }
-
-  }
-  else		/* Normal patch */
-  {
-   //MDFN_printf("  Offset: %8d  Size: %5d\n", offset, patch_size);
-   if(::fread(f_data + offset, 1, patch_size, ips) != patch_size)
-   {
-    ErrnoHolder ene(errno);
-
-    MDFN_PrintError(_("Error reading IPS patch: %s"), ene.StrError());
-    return(0);
-   }
-  }
-  count++;
- }
- ErrnoHolder ene(errno);
-
- //MDFN_printf(_("Warning:  IPS ended without an EOF chunk.\n"));
- //MDFN_printf(_("IPS EOF:  Did %d patches\n\n"), count);
- MDFN_indent(-1);
-
- MDFN_PrintError(_("Error reading IPS patch header: %s"), ene.StrError());
- return(0);
-
- //return(1);
+   return 1;
 }
 
 // This function should ALWAYS close the system file "descriptor"(gzip library, zip library, or FILE *) it's given,
@@ -386,13 +253,9 @@ char *MDFNFILE::fgets(char *s, int buffer_size)
 static INLINE bool MDFN_DumpToFileReal(const char *filename, int compress, const std::vector<PtrLengthPair> &pearpairs)
 {
   FILE *fp = fopen(filename, "wb");
-  if(!fp)
-  {
-   ErrnoHolder ene(errno);
 
-   MDFN_PrintError(_("Error opening \"%s\": %s"), filename, ene.StrError());
+  if(!fp)
    return(0);
-  }
 
   for(unsigned int i = 0; i < pearpairs.size(); i++)
   {
@@ -401,21 +264,13 @@ static INLINE bool MDFN_DumpToFileReal(const char *filename, int compress, const
 
    if(fwrite(data, 1, length, fp) != length)
    {
-    ErrnoHolder ene(errno);
-
-    MDFN_PrintError(_("Error writing to \"%s\": %s"), filename, ene.StrError());
     fclose(fp);
     return(0);
    }
   }
 
   if(fclose(fp) == EOF)
-  {
-   ErrnoHolder ene(errno);
-
-   MDFN_PrintError(_("Error closing \"%s\": %s"), filename, ene.StrError());
    return(0);
-  }
 
  return(1);
 }
