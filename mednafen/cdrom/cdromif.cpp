@@ -25,10 +25,6 @@
 
 #include <algorithm>
 
-#ifdef _WIN32
-#include "../msvc_compat.h"
-#endif
-
 using namespace CDUtility;
 
 CDIF::CDIF() : UnrecoverableError(false), is_phys_cache(false), disc_cdaccess(NULL), DiscEjected(false)
@@ -69,6 +65,7 @@ CDIF_Message::~CDIF_Message()
 
 }
 
+#ifdef WANT_CDIF_MT
 CDIF_Queue::CDIF_Queue()
 {
  ze_mutex = MDFND_CreateMutex();
@@ -120,7 +117,6 @@ void CDIF_Queue::Write(const CDIF_Message &message)
  MDFND_UnlockMutex(ze_mutex);
 }
 
-
 void CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
 {
  int32 old_de = DiscEjected;
@@ -160,13 +156,16 @@ static int ReadThreadStart_C(void *v_arg)
 {
  RTS_Args *args = (RTS_Args *)v_arg;
 
+ //zero 07-feb-2012 - fix dynamic stack buffer
  if(args->device_name)
  {
-  char device_name[256];
+  char *device_name = new char[strlen(args->device_name) + 1];
 
   strcpy(device_name, args->device_name);
  
-  return args->cdif_ptr->ReadThreadStart(device_name);
+  int ret = args->cdif_ptr->ReadThreadStart(device_name);
+  delete[] device_name;
+  return ret;
  }
  else
   return args->cdif_ptr->ReadThreadStart(NULL);
@@ -182,8 +181,16 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
  ra_count = 0;
  last_read_lba = ~0U;
 
- disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
- RT_EjectDisc(false, true);
+ try
+ {
+  disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
+  RT_EjectDisc(false, true);
+ }
+ catch(std::exception &e)
+ {
+  EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
+  return(0);
+ }
 
  is_phys_cache = disc_cdaccess->Is_Physical();
 
@@ -204,8 +211,15 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
  		 	 break;
 
     case CDIF_MSG_EJECT:
+			try
+			{
 			 RT_EjectDisc(msg.args[0]);
 			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
+			}
+			catch(std::exception &e)
+			{
+			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
+			}
 			break;
 
     case CDIF_MSG_READ_SECTOR:
@@ -250,7 +264,16 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
    uint8 tmpbuf[2352 + 96];
    bool error_condition = false;
 
-   disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
+   try
+   {
+    disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
+   }
+   catch(std::exception &e)
+   {
+    MDFN_PrintError(_("Sector %u read error: %s"), ra_lba, e.what());
+    memset(tmpbuf, 0, sizeof(tmpbuf));
+    error_condition = true;
+   }
    
    MDFND_LockMutex(SBMutex);
 
@@ -278,6 +301,8 @@ int CDIF_MT::ReadThreadStart(const char *device_name)
 
 CDIF_MT::CDIF_MT(const char *device_name) : CDReadThread(NULL), SBMutex(NULL)
 {
+ try
+ {
   CDIF_Message msg;
   RTS_Args s;
 
@@ -289,6 +314,23 @@ CDIF_MT::CDIF_MT(const char *device_name) : CDReadThread(NULL), SBMutex(NULL)
 
   CDReadThread = MDFND_CreateThread(ReadThreadStart_C, &s);
   EmuThreadQueue.Read(&msg);
+ }
+ catch(...)
+ {
+  if(CDReadThread)
+  {
+   MDFND_WaitThread(CDReadThread, NULL);
+   CDReadThread = NULL;
+  }
+
+  if(SBMutex)
+  {
+   MDFND_DestroyMutex(SBMutex);
+   SBMutex = NULL;
+  }
+
+  throw;
+ }
 }
 
 
@@ -296,7 +338,16 @@ CDIF_MT::~CDIF_MT()
 {
  bool thread_murdered_with_kitchen_knife = false;
 
- ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_DIEDIEDIE));
+ try
+ {
+  ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_DIEDIEDIE));
+ }
+ catch(std::exception &e)
+ {
+  MDFND_PrintError(e.what());
+  MDFND_KillThread(CDReadThread);
+  thread_murdered_with_kitchen_knife = true;
+ }
 
  if(!thread_murdered_with_kitchen_knife)
   MDFND_WaitThread(CDReadThread, NULL);
@@ -306,19 +357,6 @@ CDIF_MT::~CDIF_MT()
   MDFND_DestroyMutex(SBMutex);
   SBMutex = NULL;
  }
-}
-
-bool CDIF::ValidateRawSector(uint8 *buf)
-{
- int mode = buf[12 + 3];
-
- if(mode != 0x1 && mode != 0x2)
-  return(false);
-
- if(!edc_lec_check_correct(buf, mode == 2))
-  return(false);
-
- return(true);
 }
 
 bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
@@ -373,6 +411,43 @@ void CDIF_MT::HintReadSector(uint32 lba)
  ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_READ_SECTOR, lba));
 }
 
+bool CDIF_MT::Eject(bool eject_status)
+{
+ if(UnrecoverableError)
+  return(false);
+
+ try
+ {
+  CDIF_Message msg;
+
+  ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
+  EmuThreadQueue.Read(&msg);
+ }
+ catch(std::exception &e)
+ {
+  MDFN_PrintError(_("Error on eject/insert attempt: %s"), e.what());
+  return(false);
+ }
+
+ return(true);
+}
+
+#endif //WANT_CDIF_MT
+
+bool CDIF::ValidateRawSector(uint8 *buf)
+{
+ int mode = buf[12 + 3];
+
+ if(mode != 0x1 && mode != 0x2)
+  return(false);
+
+ if(!edc_lec_check_correct(buf, mode == 2))
+  return(false);
+
+ return(true);
+}
+
+
 int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 {
  int ret = 0;
@@ -423,18 +498,100 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
  return(ret);
 }
 
-bool CDIF_MT::Eject(bool eject_status)
+//
+//
+// Single-threaded implementation follows.
+//
+//
+
+CDIF_ST::CDIF_ST(const char *device_name)
+{
+ puts("***WARNING USING SINGLE-THREADED CD READER***");
+
+ disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
+ is_phys_cache = disc_cdaccess->Is_Physical();
+ UnrecoverableError = false;
+ DiscEjected = false;
+
+ disc_cdaccess->Read_TOC(&disc_toc);
+
+ if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
+ {
+  throw(MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track));
+ }
+}
+
+CDIF_ST::~CDIF_ST()
+{
+ if(disc_cdaccess)
+ {
+  delete disc_cdaccess;
+  disc_cdaccess = NULL;
+ }
+}
+
+void CDIF_ST::HintReadSector(uint32 lba)
+{
+ // TODO: disc_cdaccess seek hint? (probably not, would require asynchronousitycamel)
+}
+
+bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
+{
+ if(UnrecoverableError)
+ {
+  memset(buf, 0, 2352 + 96);
+  return(false);
+ }
+
+ try
+ {
+  disc_cdaccess->Read_Raw_Sector(buf, lba);
+ }
+ catch(std::exception &e)
+ {
+  MDFN_PrintError(_("Sector %u read error: %s"), lba, e.what());
+  memset(buf, 0, 2352 + 96);
+  return(false);
+ }
+
+ return(true);
+}
+
+bool CDIF_ST::Eject(bool eject_status)
 {
  if(UnrecoverableError)
   return(false);
 
- CDIF_Message msg;
+ try
+ {
+  int32 old_de = DiscEjected;
 
- ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
- EmuThreadQueue.Read(&msg);
+  DiscEjected = eject_status;
+
+  if(old_de != DiscEjected)
+  {
+   disc_cdaccess->Eject(eject_status);
+
+   if(!eject_status)     // Re-read the TOC
+   {
+    disc_cdaccess->Read_TOC(&disc_toc);
+
+    if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
+    {
+     throw(MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track));
+    }
+   }
+  }
+ }
+ catch(std::exception &e)
+ {
+  MDFN_PrintError("%s", e.what());
+  return(false);
+ }
 
  return(true);
 }
+
 
 class CDIF_Stream_Thing : public Stream
 {
