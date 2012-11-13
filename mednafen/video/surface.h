@@ -1,7 +1,12 @@
 #ifndef __MDFN_SURFACE_H
 #define __MDFN_SURFACE_H
 
-#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+#if defined(WANT_32BPP)
+#define RED_SHIFT 16
+#define GREEN_SHIFT 8
+#define BLUE_SHIFT 0
+#define ALPHA_SHIFT 24
+#elif defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
 /* 16bit color - RGB565 */
 #define RED_MASK  0xf800
 #define GREEN_MASK 0x7e0
@@ -44,7 +49,7 @@ class MDFN_PixelFormat
  MDFN_PixelFormat();
  MDFN_PixelFormat(const unsigned int p_colorspace, const uint8 p_rs, const uint8 p_gs, const uint8 p_bs, const uint8 p_as);
 
- unsigned int bpp;	// 32 only for now(16 wip)
+ unsigned int bpp;
  unsigned int colorspace;
 
  union
@@ -69,7 +74,6 @@ class MDFN_PixelFormat
 
  uint8 Ashift;  // [...] alpha component.
 
- // For 16bpp, WIP
  uint8 Rprec;
  uint8 Gprec;
  uint8 Bprec;
@@ -79,51 +83,12 @@ class MDFN_PixelFormat
 #if defined(WANT_32BPP)
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
-    return((r << Rshift) | (g << Gshift) | (b << Bshift) | (a << Ashift));
+    return((r << RED_SHIFT) | (g << GREEN_SHIFT) | (b << BLUE_SHIFT) | (a << ALPHA_SHIFT));
  }
-#elif defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+#elif defined(WANT_16BPP)
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
     return (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT));
- }
-#elif defined(WANT_16BPP) && !defined(FRONTEND_SUPPORTS_RGB565)
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-    return (((r >> RED_EXPAND) << BLUE_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT));
- }
-#else
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-  if(colorspace == MDFN_COLORSPACE_YCbCr)
-  {
-   uint32 y, u, v;
-
-   y = 16 + ((r * 16842 + g * 33030 + b * 6422) >> 16);
-   u = 128 + ((r * -9699 + g * -19071 + b * 28770) >> 16);
-   v = 128 + ((r * 28770 + g * -24117 + b * -4653) >> 16);
-
-   return((y << Yshift) | (u << Ushift) | (v << Vshift) | (a << Ashift));
-  }
-  else
-  {
-   if(bpp == 16)
-   {
-    uint32 ret = 0;
-/*
-    ret |= std::min(((r * ((1 << Rprec) - 1) + 127) / 255), 255) << Rshift;
-    ret |= std::min(((g * ((1 << Gprec) - 1) + 127) / 255), 255) << Gshift;
-    ret |= std::min(((b * ((1 << Bprec) - 1) + 127) / 255), 255) << Bshift;
-    ret |= std::min(((a * ((1 << Aprec) - 1) + 127) / 255), 255) << Ashift;
-*/
-    ret |= ((r * ((1 << Rprec) - 1) + 127) / 255) << Rshift;
-    ret |= ((g * ((1 << Gprec) - 1) + 127) / 255) << Gshift;
-    ret |= ((b * ((1 << Bprec) - 1) + 127) / 255) << Bshift;
-    ret |= ((a * ((1 << Aprec) - 1) + 127) / 255) << Ashift;
-    return(ret);
-   }
-   else
-    return((r << Rshift) | (g << Gshift) | (b << Bshift) | (a << Ashift));
-  }
  }
 #endif
 
@@ -131,78 +96,17 @@ class MDFN_PixelFormat
 #if defined(WANT_32BPP)
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
-    r = (value >> Rshift) & 0xFF;
-    g = (value >> Gshift) & 0xFF;
-    b = (value >> Bshift) & 0xFF;
-    a = (value >> Ashift) & 0xFF;
+    r = (value >> RED_SHIFT) & 0xFF;
+    g = (value >> GREEN_SHIFT) & 0xFF;
+    b = (value >> BLUE_SHIFT) & 0xFF;
+    a = (value >> ALPHA_SHIFT) & 0xFF;
  }
-#elif defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+#elif defined(WANT_16BPP)
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
     r = (value & BLUE_MASK) << RED_SHIFT;
     g = (value & GREEN_MASK) << GREEN_SHIFT;
     b = (value & RED_MASK);
- }
-#elif defined(WANT_16BPP) && !defined(FRONTEND_SUPPORTS_RGB565)
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-    r = (value & BLUE_MASK) << RED_SHIFT;
-    g = (value & GREEN_MASK) << GREEN_SHIFT;
-    b = (value & RED_MASK);
- }
-#else
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-  if(colorspace == MDFN_COLORSPACE_YCbCr)
-  {
-   int32 y = (value >> Yshift) & 0xFF;
-   int32 cb = (value >> Cbshift) & 0xFF;
-   int32 cr = (value >> Crshift) & 0xFF;
-
-   int32 r_tmp, g_tmp, b_tmp;
-
-   r_tmp = g_tmp = b_tmp = 76284 * (y - 16);
-   
-   r_tmp = r_tmp + 104595 * (cr - 128);
-   g_tmp = g_tmp - 53281 * (cr - 128) - 25690 * (cb - 128);
-   b_tmp = b_tmp + 132186 * (cb - 128);
-
-   r_tmp >>= 16;
-   g_tmp >>= 16;
-   b_tmp >>= 16;
-
-   if(r_tmp < 0) r_tmp = 0;
-   if(r_tmp > 255) r_tmp = 255;
-
-   if(g_tmp < 0) g_tmp = 0;
-   if(g_tmp > 255) g_tmp = 255;
-
-   if(b_tmp < 0) b_tmp = 0;
-   if(b_tmp > 255) b_tmp = 255;
-
-   r = r_tmp;
-   g = g_tmp;
-   b = b_tmp;
-
-   a = (value >> Ashift) & 0xFF;
-  }
-  else
-  {
-   if(bpp == 16)
-   {
-    r = ((value >> Rshift) & ((1 << Rprec) - 1)) * 255 / ((1 << Rprec) - 1);
-    g = ((value >> Gshift) & ((1 << Gprec) - 1)) * 255 / ((1 << Gprec) - 1);
-    b = ((value >> Bshift) & ((1 << Bprec) - 1)) * 255 / ((1 << Bprec) - 1);
-    a = ((value >> Ashift) & ((1 << Aprec) - 1)) * 255 / ((1 << Aprec) - 1);
-   }
-   else
-   {
-    r = (value >> Rshift) & 0xFF;
-    g = (value >> Gshift) & 0xFF;
-    b = (value >> Bshift) & 0xFF;
-    a = (value >> Ashift) & 0xFF;
-   }
-  }
  }
 #endif
 
@@ -239,7 +143,29 @@ class MDFN_Surface //typedef struct
  void Fill(uint8 r, uint8 g, uint8 b, uint8 a);
  void SetFormat(const MDFN_PixelFormat &new_format, bool convert);
 
-#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+#if defined(WANT_32BPP)
+ // Creates a 32-bit value for the surface corresponding to the R/G/B/A color passed.
+ INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
+ {
+    return((r << RED_SHIFT) | (g << GREEN_SHIFT) | (b << BLUE_SHIFT) | (a << ALPHA_SHIFT));
+ }
+
+ // Gets the R/G/B/A values for the passed 32-bit surface pixel value
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
+ {
+    r = (value >> RED_SHIFT) & 0xFF;
+    g = (value >> GREEN_SHIFT) & 0xFF;
+    b = (value >> BLUE_SHIFT) & 0xFF;
+    a = (value >> ALPHA_SHIFT) & 0xFF;
+ }
+
+ INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
+ {
+    r = (value >> RED_SHIFT) & 0xFF;
+    g = (value >> GREEN_SHIFT) & 0xFF;
+    b = (value >> BLUE_SHIFT) & 0xFF;
+ }
+#elif defined(WANT_16BPP)
  // Creates a 32-bit value for the surface corresponding to the R/G/B/A color passed.
  INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
  {
@@ -259,46 +185,6 @@ class MDFN_Surface //typedef struct
   r = (value & BLUE_MASK) << RED_SHIFT;
   g = (value & GREEN_MASK) << GREEN_SHIFT;
   b = (value & RED_MASK);
- }
-#elif defined(WANT_16BPP) && !defined(FRONTEND_SUPPORTS_RGB565)
- // Creates a 32-bit value for the surface corresponding to the R/G/B/A color passed.
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-    return (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT));
- }
-
- // Gets the R/G/B/A values for the passed 32-bit surface pixel value
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-    r = (value & BLUE_MASK) << RED_SHIFT;
-    g = (value & GREEN_MASK) << GREEN_SHIFT;
-    b = (value & RED_MASK);
- }
-
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
- {
-  r = (value & BLUE_MASK) << RED_SHIFT;
-  g = (value & GREEN_MASK) << GREEN_SHIFT;
-  b = (value & RED_MASK);
- }
-#else
- // Creates a 32-bit value for the surface corresponding to the R/G/B/A color passed.
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-  return(format.MakeColor(r, g, b, a));
- }
-
- // Gets the R/G/B/A values for the passed 32-bit surface pixel value
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-  format.DecodeColor(value, r, g, b, a);
- }
-
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
- {
-  int dummy_a;
-
-  DecodeColor(value, r, g, b, dummy_a);
  }
 #endif
  private:
