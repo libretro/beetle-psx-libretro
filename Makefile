@@ -103,16 +103,8 @@ CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 TARGET_NAME := mednafen_wswan_libretro
 endif
 
-ifeq ($(NEED_RESAMPLER), 1)
-FLAGS += -DNEED_RESAMPLER
-RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
-ifeq ($(NEED_BLIP), 1)
-RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Blip_Buffer_orig.cpp
-endif
-else
 ifeq ($(NEED_BLIP), 1)
 RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp
-endif
 endif
 
 CORE_INCDIR := -I$(CORE_DIR)
