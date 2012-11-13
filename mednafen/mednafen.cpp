@@ -28,7 +28,9 @@
 
 #include	"state.h"
 #include "video.h"
+#ifdef NEED_DEINTERLACER
 #include	"video/Deinterlacer.h"
+#endif
 #include	"file.h"
 #include	"FileWrapper.h"
 
@@ -44,68 +46,11 @@
 #include	"Fir_Resampler.h"
 #endif
 
-static const char *CSD_forcemono = gettext_noop("Force monophonic sound output.");
-static const char *CSD_enable = gettext_noop("Enable (automatic) usage of this module.");
-
-static const char *fname_extra = gettext_noop("See fname_format.txt for more information.  Edit at your own risk.");
-
-static MDFNSetting MednafenSettings[] =
-{
-  { "srwframes", MDFNSF_NOFLAGS, gettext_noop("Number of frames to keep states for when state rewinding is enabled."), 
-	gettext_noop("WARNING: Setting this to a large value may cause excessive RAM usage in some circumstances, such as with games that stream large volumes of data off of CDs."), MDFNST_UINT, "600", "10", "99999" },
-
-  { "filesys.untrusted_fip_check", MDFNSF_NOFLAGS, gettext_noop("Enable untrusted file-inclusion path security check."),
-	gettext_noop("When this setting is set to \"1\", the default, paths to files referenced from files like CUE sheets and PSF rips are checked for certain characters that can be used in directory traversal, and if found, loading is aborted.  Set it to \"0\" if you want to allow constructs like absolute paths in CUE sheets, but only if you understand the security implications of doing so(see \"Security Issues\" section in the documentation)."), MDFNST_BOOL, "1" },
-
-  { "filesys.path_snap", MDFNSF_NOFLAGS, gettext_noop("Path to directory for screen snapshots."), NULL, MDFNST_STRING, "snaps" },
-  { "filesys.path_sav", MDFNSF_NOFLAGS, gettext_noop("Path to directory for save games and nonvolatile memory."), gettext_noop("WARNING: Do not set this path to a directory that contains Famicom Disk System disk images, or you will corrupt them when you load an FDS game and exit Mednafen."), MDFNST_STRING, "sav" },
-  { "filesys.path_state", MDFNSF_NOFLAGS, gettext_noop("Path to directory for save states."), NULL, MDFNST_STRING, "mcs" },
-  { "filesys.path_movie", MDFNSF_NOFLAGS, gettext_noop("Path to directory for movies."), NULL, MDFNST_STRING, "mcm" },
-  { "filesys.path_cheat", MDFNSF_NOFLAGS, gettext_noop("Path to directory for cheats."), NULL, MDFNST_STRING, "cheats" },
-  { "filesys.path_palette", MDFNSF_NOFLAGS, gettext_noop("Path to directory for custom palettes."), NULL, MDFNST_STRING, "palettes" },
-  { "filesys.path_firmware", MDFNSF_NOFLAGS, gettext_noop("Path to directory for firmware."), NULL, MDFNST_STRING, "firmware" },
-
-  { "filesys.fname_movie", MDFNSF_NOFLAGS, gettext_noop("Format string for movie filename."), fname_extra, MDFNST_STRING, "%f.%M%p.%x" },
-  { "filesys.fname_state", MDFNSF_NOFLAGS, gettext_noop("Format string for state filename."), fname_extra, MDFNST_STRING, "%f.%M%X" /*"%F.%M%p.%x"*/ },
-  { "filesys.fname_sav", MDFNSF_NOFLAGS, gettext_noop("Format string for save games filename."), gettext_noop("WARNING: %x should always be included, otherwise you run the risk of overwriting save data for games that create multiple save data files.\n\nSee fname_format.txt for more information.  Edit at your own risk."), MDFNST_STRING, "%F.%M%x" },
-  { "filesys.fname_snap", MDFNSF_NOFLAGS, gettext_noop("Format string for screen snapshot filenames."), gettext_noop("WARNING: %x or %p should always be included, otherwise there will be a conflict between the numeric counter text file and the image data file.\n\nSee fname_format.txt for more information.  Edit at your own risk."), MDFNST_STRING, "%f-%p.%x" },
-
-  { "filesys.disablesavegz", MDFNSF_NOFLAGS, gettext_noop("Disable gzip compression when saving save states and backup memory."), NULL, MDFNST_BOOL, "0" },
-
-  { NULL }
-};
-
-static MDFNSetting RenamedSettings[] =
-{
- { "path_snap", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , 	"filesys.path_snap"	},
- { "path_sav", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , 	"filesys.path_sav"	},
- { "path_state", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  ,	"filesys.path_state"	},
- { "path_movie", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , 	"filesys.path_movie"	},
- { "path_cheat", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , 	"filesys.path_cheat"	},
- { "path_palette", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , 	"filesys.path_palette"	},
- { "path_firmware", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , "filesys.path_firmware"	},
-
- { "sounddriver", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , "sound.driver"      },
- { "sounddevice", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS  , "sound.device"      },
- { "soundrate", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS    , "sound.rate"        },
- { "soundvol", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS     , "sound.volume"      },
- { "soundbufsize", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS , "sound.buffer_time" },
-
- { "frameskip", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS       , "video.frameskip" },
- { "vdriver", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "video.driver" },
- { "glvsync", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "video.glvsync" },
- { "fs", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS              , "video.fs" },
-
- { "autofirefreq", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS    , "input.autofirefreq" },
- { "analogthreshold", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS , "input.joystick.axis_threshold" },
- { "ckdelay", MDFNSF_NOFLAGS, NULL, NULL, MDFNST_ALIAS         , "input.ckdelay" },
-
- { NULL }
-};
-
 MDFNGI *MDFNGameInfo = NULL;
 
+#if defined(NEED_RESAMPLER)
 static double LastSoundMultiplier;
+#endif
 
 static MDFN_PixelFormat last_pixel_format;
 static double last_sound_rate;
@@ -226,7 +171,9 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  MDFNI_CloseGame();
 
+#if defined(NEED_RESAMPLER)
  LastSoundMultiplier = 1;
+#endif
 
  MDFN_printf(_("Loading %s...\n\n"), devicename ? devicename : _("PHYSICAL CD"));
 
@@ -278,10 +225,6 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
   MDFN_printf("\n");
  }
  MDFN_indent(-1);
- //
- //
-
-
 
  // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
  // its own, or to use it to look up a game in its database.
@@ -400,35 +343,6 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 // or TRUE on success(IPS patching succeeded, or IPS file not found).
 static bool LoadIPS(MDFNFILE &GameFile, const char *path)
 {
- FILE *IPSFile;
-
- MDFN_printf(_("Applying IPS file \"%s\"...\n"), path);
-
- IPSFile = fopen(path, "rb");
- if(!IPSFile)
- {
-  ErrnoHolder ene(errno);
-
-  MDFN_indent(1);
-  MDFN_printf(_("Failed: %s\n"), ene.StrError());
-  MDFN_indent(-1);
-
-  if(ene.Errno() == ENOENT)
-   return(1);
-  else
-  {
-   MDFN_PrintError(_("Error opening IPS file: %s\n"), ene.StrError());
-   return(0);
-  }  
- }
-
- if(!GameFile.ApplyIPS(IPSFile))
- {
-  fclose(IPSFile);
-  return(0);
- }
- fclose(IPSFile);
-
  return(1);
 }
 
@@ -444,7 +358,9 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 	MDFNI_CloseGame();
 
+#if defined(NEED_RESAMPLER)
 	LastSoundMultiplier = 1;
+#endif
 
 	MDFNGameInfo = NULL;
 
@@ -820,29 +736,14 @@ static void ProcessAudio(EmulateSpecStruct *espec)
   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
  } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
 }
-#elif defined(WANT_LYNX_EMU) || defined(WANT_NES_EMU)
-static void ProcessAudio(EmulateSpecStruct *espec)
-{
- if(espec->SoundBuf && espec->SoundBufSize)
- {
-  int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
-  int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
-  const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
-
-  espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
- } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
-}
 #else
-static void ProcessAudio(EmulateSpecStruct *espec)
+static inline void ProcessAudio(EmulateSpecStruct *espec)
 {
- if(espec->SoundBuf && espec->SoundBufSize)
- {
-  int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
-  int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
-  const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
+   int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
+   int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
+   const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
 
-  espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
- } // end to:  if(espec->SoundBuf && espec->SoundBufSize)
+   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
 }
 #endif
 
@@ -1110,11 +1011,5 @@ void MDFNI_SetLayerEnableMask(uint64 mask)
 
 void MDFNI_SetInput(int port, const char *type, void *ptr, uint32 ptr_len_thingy)
 {
- if(MDFNGameInfo)
- {
-  assert(port < 16);
-
   MDFNGameInfo->SetInput(port, type, ptr);
- }
 }
-
