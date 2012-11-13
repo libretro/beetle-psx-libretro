@@ -321,6 +321,67 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    #define JTYPE uint32 target = instr & ((1 << 26) - 1);
    #define RTYPE uint32 rs = (instr >> 21) & 0x1F; uint32 rt = (instr >> 16) & 0x1F; uint32 rd = (instr >> 11) & 0x1F; uint32 shamt = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
 
+#ifdef _MSC_VER
+static __int32 op_goto_table[256] = {0};
+static __int32* op_goto_table_ptr = &op_goto_table[0];
+#  define STORE_ADDRESS(index,label) { int _idx = index; \
+     __asm lea eax, label\
+     __asm mov edx,op_goto_table_ptr\
+     __asm mov ebx, _idx\
+     __asm mov [edx + ebx*4],eax\
+}
+#  define JUMP_TO_IP(opf) { int addr = op_goto_table[opf]; __asm jmp addr }
+
+   static bool table_generated = false;
+   if(!table_generated)
+     {
+       table_generated = true;
+      int __ctr=0;
+ STORE_ADDRESS(__ctr++,op_SLL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SRL); STORE_ADDRESS(__ctr++,op_SRA); STORE_ADDRESS(__ctr++,op_SLLV); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SRLV); STORE_ADDRESS(__ctr++,op_SRAV);
+    STORE_ADDRESS(__ctr++,op_JR); STORE_ADDRESS(__ctr++,op_JALR); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SYSCALL); STORE_ADDRESS(__ctr++,op_BREAK); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_MFHI); STORE_ADDRESS(__ctr++,op_MTHI); STORE_ADDRESS(__ctr++,op_MFLO); STORE_ADDRESS(__ctr++,op_MTLO); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_MULT); STORE_ADDRESS(__ctr++,op_MULTU); STORE_ADDRESS(__ctr++,op_DIV); STORE_ADDRESS(__ctr++,op_DIVU); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_ADD); STORE_ADDRESS(__ctr++,op_ADDU); STORE_ADDRESS(__ctr++,op_SUB); STORE_ADDRESS(__ctr++,op_SUBU); STORE_ADDRESS(__ctr++,op_AND); STORE_ADDRESS(__ctr++,op_OR); STORE_ADDRESS(__ctr++,op_XOR); STORE_ADDRESS(__ctr++,op_NOR);
+    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SLT); STORE_ADDRESS(__ctr++,op_SLTU); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+
+    __ctr++; STORE_ADDRESS(__ctr++,op_BCOND); STORE_ADDRESS(__ctr++,op_J); STORE_ADDRESS(__ctr++,op_JAL); STORE_ADDRESS(__ctr++,op_BEQ); STORE_ADDRESS(__ctr++,op_BNE); STORE_ADDRESS(__ctr++,op_BLEZ); STORE_ADDRESS(__ctr++,op_BGTZ);
+    STORE_ADDRESS(__ctr++,op_ADDI); STORE_ADDRESS(__ctr++,op_ADDIU); STORE_ADDRESS(__ctr++,op_SLTI); STORE_ADDRESS(__ctr++,op_SLTIU); STORE_ADDRESS(__ctr++,op_ANDI); STORE_ADDRESS(__ctr++,op_ORI); STORE_ADDRESS(__ctr++,op_XORI); STORE_ADDRESS(__ctr++,op_LUI);
+    STORE_ADDRESS(__ctr++,op_COP0); STORE_ADDRESS(__ctr++,op_COP1); STORE_ADDRESS(__ctr++,op_COP2); STORE_ADDRESS(__ctr++,op_COP3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_LB); STORE_ADDRESS(__ctr++,op_LH); STORE_ADDRESS(__ctr++,op_LWL); STORE_ADDRESS(__ctr++,op_LW); STORE_ADDRESS(__ctr++,op_LBU); STORE_ADDRESS(__ctr++,op_LHU); STORE_ADDRESS(__ctr++,op_LWR); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_SB); STORE_ADDRESS(__ctr++,op_SH); STORE_ADDRESS(__ctr++,op_SWL); STORE_ADDRESS(__ctr++,op_SW); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SWR); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_LWC0); STORE_ADDRESS(__ctr++,op_LWC1); STORE_ADDRESS(__ctr++,op_LWC2); STORE_ADDRESS(__ctr++,op_LWC3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+    STORE_ADDRESS(__ctr++,op_SWC0); STORE_ADDRESS(__ctr++,op_SWC1); STORE_ADDRESS(__ctr++,op_SWC2); STORE_ADDRESS(__ctr++,op_SWC3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
+
+    // Interrupt portion of this table is constructed so that an interrupt won't be taken when the PC is pointing to a GTE instruction,
+    // to avoid problems caused by pipeline vs coprocessor nuances that aren't emulated.
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+
+    __ctr++; STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_COP2); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
+   }
+
+            //counter++;
+   const uint32 opc = instr>>26;
+   const uint32 func = instr&0x3F;
+   //if(dotrace) DEBUG_TRACE("{%12lld} %08X: [%08X] (%d,%d) %s\n",counter,PC, instr,opc,func,MDFN_IEN_PSX::DisassembleMIPS(PC,instr).c_str());
+   JUMP_TO_IP(opf);
+#else
    static const void *const op_goto_table[256] =
    {
     &&op_SLL, &&op_ILL, &&op_SRL, &&op_SRA, &&op_SLLV, &&op_ILL, &&op_SRLV, &&op_SRAV,
@@ -361,8 +422,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
     &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT,
     &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT,
    };
-
+   
    goto *op_goto_table[opf];
+#endif
 
    {
     BEGIN_OPF(ILL, 0, 0);
@@ -740,7 +802,8 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 		}
 		break;
 
-	 case 0x10 ... 0x1F:
+   case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x1F:
+
 		//printf("%08x\n", PC);
 	        if(timestamp < gte_ts_done)
 	         timestamp = gte_ts_done;

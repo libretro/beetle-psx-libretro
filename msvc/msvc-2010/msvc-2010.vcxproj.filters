@@ -75,9 +75,6 @@
     <ClCompile Include="..\..\mednafen\mempatcher.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mednafen\okiadpcm.cpp">
-      <Filter>Source Files\mednafen</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\mednafen\settings.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
@@ -181,9 +178,6 @@
       <Filter>Source Files\mednafen\video</Filter>
     </ClCompile>
     <ClCompile Include="..\..\mednafen\video\surface.cpp">
-      <Filter>Source Files\mednafen\video</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mednafen\video\video.cpp">
       <Filter>Source Files\mednafen\video</Filter>
     </ClCompile>
     <ClCompile Include="..\..\stubs_thread.cpp">
