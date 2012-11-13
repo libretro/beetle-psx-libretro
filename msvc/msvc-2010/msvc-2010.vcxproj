@@ -50,12 +50,13 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;MEDNAFENPSXLIBRETRO_EXPORTS;%(PreprocessorDefinitions);LSB_FIRST;HAVE_MKDIR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.24";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=924;PSS_STYLE=1;MPC_FIXED_POINT;ARCH_X86;WANT_PSX_EMU;STDC_HEADERS;_CRT_SECURE_NO_WARNINGS;WANT_32BPP</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;MEDNAFENPSXLIBRETRO_EXPORTS;%(PreprocessorDefinitions);LSB_FIRST;HAVE_MKDIR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.24";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=924;PSS_STYLE=1;MPC_FIXED_POINT;ARCH_X86;WANT_PSX_EMU;STDC_HEADERS;_CRT_SECURE_NO_WARNINGS;WANT_32BPP;NEED_DEINTERLACER;NEED_CD</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)/../mednafen;$(SolutionDir)/../;$(SolutionDir)/../mednafen-libretro;$(SolutionDir)/../mednafen/intl;$(SolutionDir)/../mednafen/psx;$(SolutionDir)/../mednafen/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -66,7 +67,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;MEDNAFENPSXLIBRETRO_EXPORTS;%(PreprocessorDefinitions);LSB_FIRST;HAVE_MKDIR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.24";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=924;PSS_STYLE=1;MPC_FIXED_POINT;ARCH_X86;WANT_PSX_EMU;STDC_HEADERS;_CRT_SECURE_NO_WARNINGS;WANT_32BPP</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;MEDNAFENPSXLIBRETRO_EXPORTS;%(PreprocessorDefinitions);LSB_FIRST;HAVE_MKDIR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.24";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=924;PSS_STYLE=1;MPC_FIXED_POINT;ARCH_X86;WANT_PSX_EMU;STDC_HEADERS;_CRT_SECURE_NO_WARNINGS;WANT_32BPP;NEED_DEINTERLACER;NEED_CD</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)/../mednafen;$(SolutionDir)/../;$(SolutionDir)/../mednafen-libretro;$(SolutionDir)/../mednafen/intl;$(SolutionDir)/../mednafen/psx;$(SolutionDir)/../mednafen/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -74,6 +75,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -83,6 +85,7 @@
     <ClCompile Include="..\..\mednafen\cdrom\CDAccess_Image.cpp" />
     <ClCompile Include="..\..\mednafen\cdrom\cdromif.cpp" />
     <ClCompile Include="..\..\mednafen\cdrom\CDUtility.cpp" />
+    <ClCompile Include="..\..\mednafen\cdrom\cd_crc32.cpp" />
     <ClCompile Include="..\..\mednafen\cdrom\galois.cpp" />
     <ClCompile Include="..\..\mednafen\cdrom\l-ec.cpp" />
     <ClCompile Include="..\..\mednafen\cdrom\lec.cpp" />
@@ -96,11 +99,13 @@
     <ClCompile Include="..\..\mednafen\endian.cpp" />
     <ClCompile Include="..\..\mednafen\error.cpp" />
     <ClCompile Include="..\..\mednafen\file.cpp" />
+    <ClCompile Include="..\..\mednafen\FileStream.cpp" />
     <ClCompile Include="..\..\mednafen\FileWrapper.cpp" />
     <ClCompile Include="..\..\mednafen\general.cpp" />
     <ClCompile Include="..\..\mednafen\math_ops.cpp" />
     <ClCompile Include="..\..\mednafen\md5.cpp" />
     <ClCompile Include="..\..\mednafen\mednafen.cpp" />
+    <ClCompile Include="..\..\mednafen\MemoryStream.cpp" />
     <ClCompile Include="..\..\mednafen\mempatcher.cpp" />
     <ClCompile Include="..\..\mednafen\mpcdec\fastmath.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
@@ -157,10 +162,14 @@
     <ClCompile Include="..\..\mednafen\psx\gpu.cpp" />
     <ClCompile Include="..\..\mednafen\psx\gte.cpp" />
     <ClCompile Include="..\..\mednafen\psx\input\dualanalog.cpp" />
+    <ClCompile Include="..\..\mednafen\psx\input\dualshock.cpp" />
     <ClCompile Include="..\..\mednafen\psx\input\gamepad.cpp" />
+    <ClCompile Include="..\..\mednafen\psx\input\guncon.cpp" />
+    <ClCompile Include="..\..\mednafen\psx\input\justifier.cpp" />
     <ClCompile Include="..\..\mednafen\psx\input\memcard.cpp" />
     <ClCompile Include="..\..\mednafen\psx\input\mouse.cpp" />
     <ClCompile Include="..\..\mednafen\psx\input\multitap.cpp" />
+    <ClCompile Include="..\..\mednafen\psx\input\negcon.cpp" />
     <ClCompile Include="..\..\mednafen\psx\irq.cpp" />
     <ClCompile Include="..\..\mednafen\psx\mdec.cpp" />
     <ClCompile Include="..\..\mednafen\psx\psx.cpp" />
@@ -171,6 +180,7 @@
     <ClCompile Include="..\..\mednafen\sound\Blip_Buffer.cpp" />
     <ClCompile Include="..\..\mednafen\sound\Stereo_Buffer.cpp" />
     <ClCompile Include="..\..\mednafen\state.cpp" />
+    <ClCompile Include="..\..\mednafen\Stream.cpp" />
     <ClCompile Include="..\..\mednafen\tremor\bitwise.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
@@ -231,11 +241,30 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
     </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\trio.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\trionan.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\triostr.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\..\mednafen\video\Deinterlacer.cpp" />
     <ClCompile Include="..\..\mednafen\video\surface.cpp" />
+    <ClCompile Include="..\..\scrc32.cpp" />
     <ClCompile Include="..\..\stubs.cpp" />
-    <ClCompile Include="..\..\stubs_thread.cpp" />
-    <ClCompile Include="..\..\thread.cpp" />
+    <ClCompile Include="..\..\stubs_thread.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\thread.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -43,6 +43,10 @@
 #include	"md5.h"
 #include	"clamp.h"
 
+#ifdef _MSC_VER
+#include "msvc_compat.h"
+#endif
+
 MDFNGI *MDFNGameInfo = NULL;
 
 static MDFN_PixelFormat last_pixel_format;

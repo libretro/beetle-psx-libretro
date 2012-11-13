@@ -37,6 +37,9 @@
     <Filter Include="Source Files\mednafen\tremor">
       <UniqueIdentifier>{f1639efc-7e36-4c58-ab3c-d662ee41d062}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\trio">
+      <UniqueIdentifier>{89e4cbf5-fb18-4fa3-b994-52780890401b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\libretro.cpp">
@@ -263,6 +266,42 @@
     </ClCompile>
     <ClCompile Include="..\..\mednafen\tremor\vorbisfile.c">
       <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\MemoryStream.cpp">
+      <Filter>Source Files\mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\FileStream.cpp">
+      <Filter>Source Files\mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\triostr.c">
+      <Filter>Source Files\mednafen\trio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\trio.c">
+      <Filter>Source Files\mednafen\trio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\trio\trionan.c">
+      <Filter>Source Files\mednafen\trio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\Stream.cpp">
+      <Filter>Source Files\mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\psx\input\negcon.cpp">
+      <Filter>Source Files\mednafen\psx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\psx\input\dualshock.cpp">
+      <Filter>Source Files\mednafen\psx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\psx\input\guncon.cpp">
+      <Filter>Source Files\mednafen\psx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\psx\input\justifier.cpp">
+      <Filter>Source Files\mednafen\psx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scrc32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mednafen\cdrom\cd_crc32.cpp">
+      <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
