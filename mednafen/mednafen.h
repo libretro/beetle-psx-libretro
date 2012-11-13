@@ -52,6 +52,6 @@ int MDFN_RawInputStateAction(StateMem *sm, int load, int data_only);
 #include "mednafen-driver.h"
 
 #include "mednafen-endian.h"
-#include "memory.h"
+#include "mednafen-memory.h"
 
 #endif
