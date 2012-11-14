@@ -18,6 +18,7 @@ endif
 # If you have a system with 1GB RAM or more - cache the whole 
 # CD in order to prevent file access delays/hiccups
 CACHE_CD = 0
+NEED_TRIO = 1
 
 #if no core specified, just pick psx for now
 ifeq ($(core),)
@@ -234,12 +235,15 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 
 LIBRETRO_SOURCES := libretro.cpp stubs.cpp $(THREAD_STUBS)
 
-SOURCES_C := $(MEDNAFEN_DIR)/trio/trio.c \
-	$(MPC_SRC) \
-	$(TREMOR_SRC) \
-	$(LIBRETRO_SOURCES_C) \
+ifeq ($(NEED_TRIO), 1)
+TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/trionan.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
+else
+TRIO_SOURCES += libretro_trio.c
+endif
+
+SOURCES_C := 	$(MPC_SRC) $(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
 
