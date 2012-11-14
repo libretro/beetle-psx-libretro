@@ -534,7 +534,7 @@ size_t retro_serialize_size(void)
    StateMem st;
    memset(&st, 0, sizeof(st));
 
-   if (!MDFNSS_SaveSM(&st))
+   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
    {
       fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", game->shortname);
       return 0;
@@ -551,7 +551,7 @@ bool retro_serialize(void *data, size_t size)
    st.data     = (uint8_t*)data;
    st.malloced = size;
 
-   return MDFNSS_SaveSM(&st);
+   return MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
 }
 
 bool retro_unserialize(const void *data, size_t size)
@@ -561,7 +561,7 @@ bool retro_unserialize(const void *data, size_t size)
    st.data = (uint8_t*)data;
    st.len  = size;
 
-   return MDFNSS_LoadSM(&st);
+   return MDFNSS_LoadSM(&st, 0, 0);
 }
 
 void *retro_get_memory_data(unsigned)
