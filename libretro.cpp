@@ -120,7 +120,7 @@ void retro_init()
 
 void retro_reset()
 {
-   MDFNI_Reset();
+   MDFN_DoSimpleCommand(MDFN_MSC_RESET);
 }
 
 bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
