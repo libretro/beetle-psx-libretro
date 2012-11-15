@@ -5,6 +5,11 @@
 #include "mednafen/general.h"
 #include "mednafen/mednafen-driver.h"
 
+#if defined(__CELLOS_LV2__)
+#include <sys/timer.h>
+#include <ppu_intrinsics.h>
+#endif
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -22,7 +27,9 @@
 
 void MDFND_Sleep(unsigned int time)
 {
-#ifdef _WIN32
+#if defined(__CELLOS_LV2__)
+   sys_timer_usleep(time * 1000);
+#elif defined(_WIN32)
    Sleep(time);
 #else
    usleep(time * 1000);
@@ -94,7 +101,16 @@ uint32 MDFND_GetTime()
    static bool first = true;
    static uint32_t start_ms;
 
-#ifdef _WIN32
+#if defined(__CELLOS_LV2__)
+   uint64_t time = __mftb();
+   uint32_t ms = (time - start_ms) / 1000;
+
+   if (first)
+   {
+      start_ms = ms;
+      first = false;
+   }
+#elif defined(_WIN32)
    DWORD ms = timeGetTime();
    if (first)
    {

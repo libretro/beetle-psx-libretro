@@ -25,6 +25,10 @@
 #include <fcntl.h>
 #include <string.h>
 
+#ifdef __CELLOS_LV2__
+#include <unistd.h>
+#endif
+
 // Some really bad preprocessor abuse follows to handle platforms that don't have fseeko and ftello...and of course
 // for largefile support on Windows:
 

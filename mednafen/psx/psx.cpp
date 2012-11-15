@@ -25,6 +25,10 @@
 #include "../mempatcher.h"
 #include "../cputest/cputest.h"
 
+#ifdef __CELLOS_LV2__
+#include <unistd.h>
+#endif
+
 #ifdef _MSC_VER
 #include "../msvc_compat.h"
 #endif

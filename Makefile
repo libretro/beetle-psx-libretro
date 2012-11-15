@@ -132,14 +132,16 @@ else ifeq ($(platform), ps3)
    CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+OLD_GCC := 1
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    CXX = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
-
    CXXFLAGS += -Xc+=exceptions
+OLD_GCC := 1
+NO_GCC := 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
@@ -174,6 +176,7 @@ else
    TARGET := retro.dll
    CC = gcc
    CXX = g++
+IS_X86 = 1
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
@@ -247,34 +250,50 @@ SOURCES_C := 	$(MPC_SRC) $(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
 
+WARNINGS := -Wall \
+	-Wno-sign-compare \
+	-Wno-unused-variable \
+	-Wno-unused-function \
+	-Wno-uninitialized \
+	$(NEW_GCC_WARNING_FLAGS) \
+	-Wno-strict-aliasing
+
+EXTRA_GCC_FLAGS := -funroll-loops -ffast-math
+
+ifeq ($(NO_GCC),1)
+	EXTRA_GCC_FLAGS :=
+	WARNINGS :=
+	FLAGS += -std=gnu99
+endif
+
 
 OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
 ifeq ($(DEBUG),0)
-   FLAGS += -O3 -ffast-math -funroll-loops 
+   FLAGS += -O3 $(EXTRA_GCC_FLAGS)
 else
    FLAGS += -O0 -g
 endif
 
+ifneq ($(OLD_GCC),1)
+NEW_GCC_WARNING_FLAGS += -Wno-narrowing \
+	-Wno-unused-but-set-variable \
+	-Wno-unused-result \
+	-Wno-overflow
+NEW_GCC_FLAGS += -fno-strict-overflow
+endif
+
 LDFLAGS += $(fpic) $(SHARED)
-FLAGS += -Wall $(fpic) -fno-strict-overflow
+FLAGS += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl $(CORE_INCDIR)
 
-WARNINGS := -Wall \
-	-Wno-narrowing \
-	-Wno-unused-but-set-variable \
-	-Wno-sign-compare \
-	-Wno-unused-variable \
-	-Wno-unused-function \
-	-Wno-uninitialized \
-	-Wno-unused-result \
-	-Wno-strict-aliasing \
-	-Wno-overflow
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) \
-			-DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT -DARCH_X86 $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG $(EXTRA_INCLUDES)
+ifeq ($(IS_X86), 1)
+FLAGS += -DARCH_X86
+endif
 
 ifeq ($(CACHE_CD), 1)
 FLAGS += -D__LIBRETRO_CACHE_CD__
@@ -294,7 +313,7 @@ endif
 
 
 CXXFLAGS += $(FLAGS)
-CFLAGS += $(FLAGS) -std=gnu99
+CFLAGS += $(FLAGS)
 
 $(TARGET): $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS)
