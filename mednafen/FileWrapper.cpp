@@ -76,7 +76,11 @@ FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) 
   fp = fopen(path, "rb");
 
  if(!fp)
-    fprintf(stderr, "Error opening file \"%s\".\n", path_save.c_str());
+ {
+  ErrnoHolder ene(errno);
+
+  throw(MDFN_Error(ene.Errno(), _("Error opening file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+ }
 }
 
 FileWrapper::~FileWrapper()
@@ -88,18 +92,24 @@ void FileWrapper::close(void)
 {
  if(fp)
  {
-    FILE *tmp = fp;
+  FILE *tmp = fp;
 
-    fp = NULL;
+  fp = NULL;
 
-    if(fclose(tmp) == EOF)
-       fprintf(stderr, "Error closing opened file \"%s\".\n", path_save.c_str());
+  if(fclose(tmp) == EOF)
+  {
+   ErrnoHolder ene(errno);
+
+   throw(MDFN_Error(ene.Errno(), _("Error closing opened file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+  }
  }
 }
 
 uint64 FileWrapper::read(void *data, uint64 count, bool error_on_eof)
 {
- return fread(data, 1, count, fp);
+ uint64 read_count = fread(data, 1, count, fp);
+
+ return(read_count);
 }
 
 void FileWrapper::flush(void)

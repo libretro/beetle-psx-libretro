@@ -80,9 +80,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 
 void MDFND_DispMessage(unsigned char *str)
 {
-#ifndef __CELLOS_LV2__
    std::cerr << str;
-#endif
 }
 
 void MDFND_Message(const char *str)

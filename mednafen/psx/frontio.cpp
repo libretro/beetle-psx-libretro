@@ -717,9 +717,10 @@ uint64 FrontIO::GetMemcardDirtyCount(unsigned int which)
 
 void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
-#ifndef __CELLOS_LV2__
  assert(which < 8);
 
+ try
+ {
   if(DevicesMC[which]->GetNVSize())
   {
    FileWrapper mf(path, FileWrapper::MODE_READ);
@@ -728,19 +729,23 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
    tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
    if(mf.size() != (int64)tmpbuf.size())
-      fprintf(stderr, "Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes.\n", path, (int)mf.size(), (int)tmpbuf.size());
+    throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
 
    mf.read(&tmpbuf[0], tmpbuf.size());
 
    DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
    DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
   }
-#endif
+ }
+ catch(MDFN_Error &e)
+ {
+  if(e.GetErrno() != ENOENT)
+   throw(e);
+ }
 }
 
 void FrontIO::SaveMemcard(unsigned int which, const char *path)
 {
-#ifndef __CELLOS_LV2__
  assert(which < 8);
 
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
@@ -757,7 +762,6 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
 
   DevicesMC[which]->ResetNVDirtyCount();
  }
-#endif
 }
 
 bool FrontIO::RequireNoFrameskip(void)
