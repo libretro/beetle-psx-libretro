@@ -15,6 +15,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <ctype.h>
 #include "psx.h"
 #include "mdec.h"
 #include "frontio.h"
@@ -1127,22 +1128,22 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
   do
   {
    if((pvd_search_count++) == 32)
-    throw MDFN_Error(0, "PVD search count limit met.");
+      fprintf(stderr, "PVD search count limit met.\n");
 
    fp->read(pvd, 2048);
 
    if(memcmp(&pvd[1], "CD001", 5))
-    throw MDFN_Error(0, "Not ISO-9660");
+      fprintf(stderr, "Not ISO-9660.\n");
 
    if(pvd[0] == 0xFF)
-    throw MDFN_Error(0, "Missing Primary Volume Descriptor");
+      fprintf(stderr, "Missing Primary Volume Descriptor.\n");
   } while(pvd[0] != 0x01);
   //[156 ... 189], 34 bytes
   uint32 rdel = MDFN_de32lsb(&pvd[0x9E]);
   uint32 rdel_len = MDFN_de32lsb(&pvd[0xA6]);
 
   if(rdel_len >= (1024 * 1024 * 10))	// Arbitrary sanity check.
-   throw MDFN_Error(0, "Root directory table too large");
+     fprintf(stderr, "Root directory table too large.\n");
 
   fp->seek((int64)rdel * 2048, SEEK_SET);
   //printf("%08x, %08x\n", rdel * 2048, rdel_len);
@@ -1490,7 +1491,7 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
  uint32 TextSize;
 
  if(size < 0x800)
-  throw(MDFN_Error(0, "PS-EXE is too small."));
+    fprintf(stderr, "PS-EXE is too small.\n");
 
  PC = MDFN_de32lsb(&data[0x10]);
  SP = MDFN_de32lsb(&data[0x30]);
@@ -1502,15 +1503,13 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
  TextStart &= 0x1FFFFF;
 
  if(TextSize > 2048 * 1024)
- {
-  throw(MDFN_Error(0, "Text section too large"));
- }
+    fprintf(stderr, "Text section too large.\n");
 
  if(TextSize > (size - 0x800))
-  throw(MDFN_Error(0, "Text section recorded size is larger than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800));
+    fprintf(stderr, "Text section recorded size is larger than data available in file.  Header=0x%08x, Available=0x%08x.\n", TextSize, size - 0x800);
 
  if(TextSize < (size - 0x800))
-  throw(MDFN_Error(0, "Text section recorded size is smaller than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800));
+    fprintf(stderr, "Text section recorded size is smaller than data available in file.  Header=0x%08x, Available=0x%08x.\n", TextSize, size - 0x800);
 
  if(!TextMem.size())
  {
