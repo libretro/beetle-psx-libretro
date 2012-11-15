@@ -76,6 +76,8 @@ int64 AudioReader::FrameCount(void)
 **
 */
 
+#ifdef NEED_TREMOR
+
 class OggVorbisReader : public AudioReader
 {
  public:
@@ -175,6 +177,7 @@ int64 OggVorbisReader::FrameCount(void)
 {
  return(ov_pcm_total(&ovfile, -1));
 }
+#endif
 
 /*
 **
@@ -190,6 +193,7 @@ int64 OggVorbisReader::FrameCount(void)
 
 AudioReader *AR_Open(Stream *fp)
 {
+#ifdef NEED_TREMOR
  try
  {
   return new OggVorbisReader(fp);
@@ -197,6 +201,7 @@ AudioReader *AR_Open(Stream *fp)
  catch(int i)
  {
  }
+#endif
 
  return(NULL);
 }

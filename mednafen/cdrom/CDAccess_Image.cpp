@@ -491,6 +491,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       //fstat(fileno(TmpTrack.fp), &stat_buf);
       //TmpTrack.sectors = stat_buf.st_size; // / 2048;
      }
+#ifdef NEED_TREMOR
      else if(!strcasecmp(args[1], "OGG") || !strcasecmp(args[1], "VORBIS") || !strcasecmp(args[1], "WAVE") || !strcasecmp(args[1], "WAV") || !strcasecmp(args[1], "PCM")
 	|| !strcasecmp(args[1], "MPC") || !strcasecmp(args[1], "MP+"))
      {
@@ -500,6 +501,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
        throw(MDFN_Error(0, _("Unsupported audio track file format: %s\n"), args[0]));
       }
      }
+#endif
      else
      {
       throw(MDFN_Error(0, _("Unsupported track format: %s\n"), args[1]));

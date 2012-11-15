@@ -3,6 +3,7 @@ FRONTEND_SUPPORTS_RGB565 = 1
 
 MEDNAFEN_DIR := mednafen
 MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
+NEED_TREMOR = 0
 
 ifeq ($(platform),)
 platform = unix
@@ -207,9 +208,12 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
-
-TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 FLAGS += -DNEED_CD
+endif
+
+ifeq ($(NEED_TREMOR), 1)
+TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+FLAGS += -DNEED_TREMOR
 endif
 
 
