@@ -28,7 +28,6 @@
 #include <sys/stat.h>
 
 #include "../tremor/ivorbisfile.h"
-#include "../mpcdec/mpcdec.h"
 
 #include <string.h>
 #include <errno.h>
@@ -177,183 +176,6 @@ int64 OggVorbisReader::FrameCount(void)
  return(ov_pcm_total(&ovfile, -1));
 }
 
-class MPCReader : public AudioReader
-{
- public:
- MPCReader(Stream *fp);
- ~MPCReader();
-
- int64 Read_(int16 *buffer, int64 frames);
- bool Seek_(int64 frame_offset);
- int64 FrameCount(void);
-
- private:
- mpc_reader reader;
- mpc_demux *demux;
- mpc_streaminfo si;
-
- MPC_SAMPLE_FORMAT MPCBuffer[MPC_DECODER_BUFFER_LENGTH];
-
- uint32 MPCBufferIn;
- uint32 MPCBufferOffs;
- Stream *fw;
-};
-
-
-/// Reads size bytes of data into buffer at ptr.
-static mpc_int32_t impc_read(mpc_reader *p_reader, void *ptr, mpc_int32_t size)
-{
- Stream *fw = (Stream*)(p_reader->data);
-
-  return fw->read(ptr, size, false);
-}
-
-/// Seeks to byte position offset.
-static mpc_bool_t impc_seek(mpc_reader *p_reader, mpc_int32_t offset)
-{
- Stream *fw = (Stream*)(p_reader->data);
-
-  fw->seek(offset, SEEK_SET);
-  return(MPC_TRUE);
-}
-
-/// Returns the current byte offset in the stream.
-static mpc_int32_t impc_tell(mpc_reader *p_reader)
-{
- Stream *fw = (Stream*)(p_reader->data);
-
-  return fw->tell();
-}
-
-/// Returns the total length of the source stream, in bytes.
-static mpc_int32_t impc_get_size(mpc_reader *p_reader)
-{
- Stream *fw = (Stream*)(p_reader->data);
-
-  return fw->size();
-}
-
-/// True if the stream is a seekable stream.
-static mpc_bool_t impc_canseek(mpc_reader *p_reader)
-{
- return(MPC_TRUE);
-}
-
-MPCReader::MPCReader(Stream *fp) : fw(fp)
-{
-	fp->seek(0, SEEK_SET);
-
-	demux = NULL;
-	memset(&si, 0, sizeof(si));
-	memset(MPCBuffer, 0, sizeof(MPCBuffer));
-	MPCBufferOffs = 0;
-	MPCBufferIn = 0;
-
-	memset(&reader, 0, sizeof(reader));
-	reader.read = impc_read;
-	reader.seek = impc_seek;
-	reader.tell = impc_tell;
-	reader.get_size = impc_get_size;
-	reader.canseek = impc_canseek;
-	reader.data = (void*)fp;
-
-	if(!(demux = mpc_demux_init(&reader)))
-	{
-	 throw(0);
-	}
-	mpc_demux_get_info(demux, &si);
-
-	if(si.channels != 2)
-	{
-         mpc_demux_exit(demux);
-         demux = NULL;
-	 throw MDFN_Error(0, _("MusePack stream has wrong number of channels(%u); the correct number is 2."), si.channels);
-	}
-
-	if(si.sample_freq != 44100)
-	{
-         mpc_demux_exit(demux);
-         demux = NULL;
-	 throw MDFN_Error(0, _("MusePack stream has wrong samplerate(%u Hz); the current samplerate is 44100 Hz."), si.sample_freq);
-	}
-}
-
-MPCReader::~MPCReader()
-{
- if(demux)
- {
-  mpc_demux_exit(demux);
-  demux = NULL;
- }
-}
-
-int64 MPCReader::Read_(int16 *buffer, int64 frames)
-{
-  mpc_status err;
-  int16 *cowbuf = (int16 *)buffer;
-  int32 toread = frames * 2;
-
-  while(toread > 0)
-  {
-   int32 tmplen;
-
-   if(!MPCBufferIn)
-   {
-    mpc_frame_info fi;
-    memset(&fi, 0, sizeof(fi));
-
-    fi.buffer = MPCBuffer;
-    if((err = mpc_demux_decode(demux, &fi)) < 0 || fi.bits == -1)
-     return(frames - toread / 2);
-
-    MPCBufferIn = fi.samples * 2;
-    MPCBufferOffs = 0;
-   }
-
-   tmplen = MPCBufferIn;
-
-   if(tmplen >= toread)
-    tmplen = toread;
-
-   for(int x = 0; x < tmplen; x++)
-   {
-#ifdef MPC_FIXED_POINT
-    int32 samp = MPCBuffer[MPCBufferOffs + x] >> MPC_FIXED_POINT_FRACTPART;
-#else
-    #warning Floating-point MPC decoding path not tested.
-    int32 samp = (int32)(MPCBuffer[MPCBufferOffs + x] * 32767);
-#endif
-    if ( (int16_t) samp != samp )
-       samp = (samp >> 31) ^ 0x7FFF;
-
-    *cowbuf = (int16)samp;
-    cowbuf++;
-   }
-      
-   MPCBufferOffs += tmplen;
-   toread -= tmplen;
-   MPCBufferIn -= tmplen;
-  }
-
-  return(frames - toread / 2);
-}
-
-bool MPCReader::Seek_(int64 frame_offset)
-{
- MPCBufferOffs = 0;
- MPCBufferIn = 0;
-
- if(mpc_demux_seek_sample(demux, frame_offset) < 0)
-  return(false);
-
- return(true);
-}
-
-int64 MPCReader::FrameCount(void)
-{
- return(mpc_streaminfo_get_length_samples(&si));
-}
-
 /*
 **
 **
@@ -368,14 +190,6 @@ int64 MPCReader::FrameCount(void)
 
 AudioReader *AR_Open(Stream *fp)
 {
- try
- {
-  return new MPCReader(fp);
- }
- catch(int i)
- {
- }
-
  try
  {
   return new OggVorbisReader(fp);

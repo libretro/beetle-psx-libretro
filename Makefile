@@ -208,7 +208,6 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
 
-MPC_SRC := $(wildcard $(MEDNAFEN_DIR)/mpcdec/*.c)
 TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 FLAGS += -DNEED_CD
 endif
@@ -246,7 +245,7 @@ else
 TRIO_SOURCES += libretro_trio.c
 endif
 
-SOURCES_C := 	$(MPC_SRC) $(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
+SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
 
