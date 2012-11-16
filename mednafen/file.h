@@ -29,15 +29,6 @@ class MDFNFILE
 	const uint8 * const &data;
 	const char * const &ext;
 
-	// Currently, only valid with Open()
-	inline int GetErrorCode(int *get_errno = NULL)
-	{
-	 if(get_errno)
-	  *get_errno = local_errno;
-
-	 return(error_code);
-	}
-
 	inline int64 Size(void)
 	{
 	 return(f_size);
@@ -84,13 +75,9 @@ class MDFNFILE
 
 	private:
 
-
-	int error_code;
-	int local_errno;
-
         int64 location;
 
-	bool MakeMemWrapAndClose(void *tz, int type);
+	bool MakeMemWrapAndClose(void *tz);
 };
 
 class PtrLengthPair

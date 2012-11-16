@@ -31,7 +31,7 @@ class FileStream : public Stream
  {
   MODE_READ = FileWrapper::MODE_READ,
   MODE_WRITE = FileWrapper::MODE_WRITE,
-  MODE_WRITE_SAFE = FileWrapper::MODE_WRITE_SAFE
+  MODE_WRITE_SAFE = FileWrapper::MODE_WRITE_SAFE,
  };
 
  FileStream(const char *path, const int mode);
@@ -47,7 +47,8 @@ class FileStream : public Stream
  virtual void close(void);
 
  private:
- FileWrapper fw;
+ FILE *fp;
+ std::string path_save;
  const int OpenedMode;
 };
 

@@ -22,7 +22,6 @@
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <string.h>
 
 #ifdef __CELLOS_LV2__
@@ -32,13 +31,8 @@
 // Some really bad preprocessor abuse follows to handle platforms that don't have fseeko and ftello...and of course
 // for largefile support on Windows:
 
-#ifndef HAVE_FSEEKO
- #define fseeko fseek
-#endif
-
-#ifndef HAVE_FTELLO
- #define ftello ftell
-#endif
+#define fseeko fseek
+#define ftello ftell
 
 #if SIZEOF_OFF_T == 4
 
@@ -182,17 +176,6 @@ int64 FileWrapper::size(void)
  fstat(fileno(fp), &buf);
 
  return(buf.st_size);
-
-/* TODO for systems without fstat()?
-  int64 orig_pos = tell();
-  int64 ret;
-
-  seek(0, SEEK_END);
-
-  ret = tell();
-
-  seek(orig_pos, SEEK_SET);
- */
 }
 
 int64 FileWrapper::tell(void)

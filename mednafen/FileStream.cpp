@@ -22,16 +22,61 @@
 #include "FileStream.h"
 
 #include <trio/trio.h>
+#include <stdarg.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+
+#ifdef __CELLOS_LV2__
+#include <unistd.h>
+#endif
+
+#define fseeko fseek
+#define ftello ftell
+
+#if SIZEOF_OFF_T == 4
+
+ #ifdef HAVE_FOPEN64
+  #define fopen fopen64
+ #endif
+
+ #ifdef HAVE_FTELLO64
+  #undef ftello
+  #define ftello ftello64
+ #endif
+
+ #ifdef HAVE_FSEEKO64
+  #undef fseeko
+  #define fseeko fseeko64
+ #endif
+
+ #ifdef HAVE_FSTAT64
+  #define fstat fstat64
+  #define stat stat64
+ #endif
+
+#endif
 
 
-FileStream::FileStream(const char *path, const int mode) : fw(path, mode), OpenedMode(mode)
+FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
+ path_save = std::string(path);
 
+ if(mode == MODE_WRITE)
+  fp = fopen(path, "wb");
+ else
+  fp = fopen(path, "rb");
+
+ if(!fp)
+ {
+  ErrnoHolder ene(errno);
+
+  throw(MDFN_Error(ene.Errno(), _("Error opening file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+ }
 }
 
 FileStream::~FileStream()
 {
-
 }
 
 uint64 FileStream::attributes(void)
@@ -43,7 +88,6 @@ uint64 FileStream::attributes(void)
   case MODE_READ:
 	ret |= ATTRIBUTE_READABLE;
 	break;
-
   case MODE_WRITE_SAFE:
   case MODE_WRITE:
 	ret |= ATTRIBUTE_WRITEABLE;
@@ -55,30 +99,48 @@ uint64 FileStream::attributes(void)
 
 uint64 FileStream::read(void *data, uint64 count, bool error_on_eos)
 {
- return fw.read(data, count, error_on_eos);
+ uint64 read_count = fread(data, 1, count, fp);
+
+ return(read_count);
 }
 
 void FileStream::write(const void *data, uint64 count)
 {
- fw.write(data, count);
+ fwrite(data, 1, count, fp);
 }
 
 void FileStream::seek(int64 offset, int whence)
 {
- fw.seek(offset, whence);
+ fseeko(fp, offset, whence);
 }
 
 int64 FileStream::tell(void)
 {
- return fw.tell();
+ return ftello(fp);
 }
 
 int64 FileStream::size(void)
 {
- return fw.size();
+ struct stat buf;
+
+ fstat(fileno(fp), &buf);
+
+ return(buf.st_size);
 }
 
 void FileStream::close(void)
 {
- fw.close();
+ if(fp)
+ {
+  FILE *tmp = fp;
+
+  fp = NULL;
+
+  if(fclose(tmp) == EOF)
+  {
+   ErrnoHolder ene(errno);
+
+   throw(MDFN_Error(ene.Errno(), _("Error closing opened file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+  }
+ }
 }

@@ -24,8 +24,6 @@
 #include "file.h"
 #include "general.h"
 
-static const int64 MaxROMImageSize = (int64)1 << 26; // 2 ^ 26 = 64MiB
-
 #define MDFN_FILETYPE_PLAIN 0
 
 bool MDFNFILE::ApplyIPS(FILE *ips)
@@ -35,7 +33,7 @@ bool MDFNFILE::ApplyIPS(FILE *ips)
 
 // This function should ALWAYS close the system file "descriptor"(gzip library, zip library, or FILE *) it's given,
 // even if it errors out.
-bool MDFNFILE::MakeMemWrapAndClose(void *tz, int type)
+bool MDFNFILE::MakeMemWrapAndClose(void *tz)
 {
  bool ret = FALSE;
 
@@ -45,24 +43,18 @@ bool MDFNFILE::MakeMemWrapAndClose(void *tz, int type)
   f_size = ::ftell((FILE *)tz);
   ::fseek((FILE *)tz, 0, SEEK_SET);
 
-  if(size > MaxROMImageSize)
+  if(!(f_data = (uint8*)MDFN_malloc(size, _("file read buffer"))))
   {
-   MDFN_PrintError(_("ROM image is too large; maximum size allowed is %llu bytes."), (unsigned long long)MaxROMImageSize);
-   goto doret;
+     goto doret;
   }
+  if((int64)::fread(f_data, 1, size, (FILE *)tz) != size)
+  {
+     ErrnoHolder ene(errno);
+     MDFN_PrintError(_("Error reading file: %s"), ene.StrError());
 
-   if(!(f_data = (uint8*)MDFN_malloc(size, _("file read buffer"))))
-   {
-    goto doret;
-   }
-   if((int64)::fread(f_data, 1, size, (FILE *)tz) != size)
-   {
-    ErrnoHolder ene(errno);
-    MDFN_PrintError(_("Error reading file: %s"), ene.StrError());
-
-    free(f_data);
-    goto doret;
-   }
+     free(f_data);
+     goto doret;
+  }
 
  ret = TRUE;
 
@@ -98,45 +90,29 @@ MDFNFILE::~MDFNFILE()
 
 bool MDFNFILE::Open(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose, const bool suppress_notfound_pe)
 {
- local_errno = 0;
- error_code = MDFNFILE_EC_OTHER;	// Set to 0 at the end if the function succeeds.
+   FILE *fp;
 
- //f_data = (uint8 *)0xDEADBEEF;
-
- {
-  FILE *fp;
-
-  if(!(fp = fopen(path, "rb")))
-  {
-   ErrnoHolder ene(errno);
-   local_errno = ene.Errno();
-
-   if(ene.Errno() == ENOENT)
+   if(!(fp = fopen(path, "rb")))
    {
-    local_errno = ene.Errno();
-    error_code = MDFNFILE_EC_NOTFOUND;
+      ErrnoHolder ene(errno);
+
+      if(ene.Errno() != ENOENT || !suppress_notfound_pe)
+         MDFN_PrintError(_("Error opening \"%s\": %s"), path, ene.StrError());
+
+      return(0);
    }
-
-   if(ene.Errno() != ENOENT || !suppress_notfound_pe)
-    MDFN_PrintError(_("Error opening \"%s\": %s"), path, ene.StrError());
-
-   return(0);
-  }
 
    ::fseek(fp, 0, SEEK_SET);
 
-   if(!MakeMemWrapAndClose(fp, MDFN_FILETYPE_PLAIN))
-    return(0);
+   if(!MakeMemWrapAndClose(fp))
+      return(0);
 
    const char *ld = strrchr(path, '.');
    f_ext = strdup(ld ? ld + 1 : "");
- } // End normal and gzip file handling else to zip
 
- // FIXME:  Handle extension fixing for cases where loaded filename is like "moo.moo/lalala"
+   // FIXME:  Handle extension fixing for cases where loaded filename is like "moo.moo/lalala"
 
- error_code = 0;
-
- return(TRUE);
+   return(TRUE);
 }
 
 bool MDFNFILE::Close(void)
