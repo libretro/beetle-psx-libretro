@@ -64,6 +64,7 @@ else ifeq ($(core), pce-fast)
    NEED_BPP = 16
    NEED_BLIP = 1
    NEED_CD = 1
+NEED_SCSI_CD = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-0924
@@ -195,6 +196,10 @@ ifeq ($(NEED_DEINTERLACER), 1)
 FLAGS += -DNEED_DEINTERLACER
 endif
 
+ifeq ($(NEED_SCSI_CD), 1)
+CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
+endif
+
 ifeq ($(NEED_CD), 1)
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
@@ -203,7 +208,6 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
 	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
 	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
-	$(MEDNAFEN_DIR)/cdrom/scsicd.cpp \
 	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
