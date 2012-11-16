@@ -313,7 +313,7 @@ static void update_input(void)
 
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
-      game->SetInput(i, "gamepad", &input_buf[i][0], 0);
+      game->SetInput(i, "gamepad", &input_buf[i][0]);
 #elif defined(WANT_WSWAN_EMU)
    static uint16_t input_buf;
    input_buf = 0;
