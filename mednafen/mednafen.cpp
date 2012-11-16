@@ -28,9 +28,6 @@
 
 #include	"state.h"
 #include "video.h"
-#ifdef NEED_DEINTERLACER
-#include	"video/Deinterlacer.h"
-#endif
 #include	"file.h"
 #include	"FileWrapper.h"
 
@@ -48,14 +45,6 @@
 #endif
 
 MDFNGI *MDFNGameInfo = NULL;
-
-static MDFN_PixelFormat last_pixel_format;
-static double last_sound_rate;
-
-#ifdef NEED_DEINTERLACER
-static bool PrevInterlaced;
-static Deinterlacer deint;
-#endif
 
 #ifdef NEED_CD
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
@@ -335,7 +324,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
   return(0);
  }
 
- MDFNI_SetLayerEnableMask(~0ULL);
+ //MDFNI_SetLayerEnableMask(~0ULL);
 
  #ifdef WANT_DEBUGGER
  MDFNDBG_PostGameLoad(); 
@@ -345,9 +334,6 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  MDFN_LoadGameCheats(NULL);
  MDFNMP_InstallReadPatches();
-
-  last_sound_rate = -1;
-  memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
 
  return(MDFNGameInfo);
 }
@@ -499,7 +485,7 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
 
-	MDFNI_SetLayerEnableMask(~0ULL);
+	//MDFNI_SetLayerEnableMask(~0ULL);
 
 	#ifdef WANT_DEBUGGER
 	MDFNDBG_PostGameLoad();
@@ -525,15 +511,8 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
           *tmp = 0;
         }
 
-#ifdef NEED_DEINTERLACER
-	PrevInterlaced = false;
-	deint.ClearState();
-#endif
 
-        last_sound_rate = -1;
-        memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
-
-        return(MDFNGameInfo);
+   return(MDFNGameInfo);
 }
 
 #if defined(WANT_PSX_EMU)
@@ -639,82 +618,6 @@ int MDFNI_Initialize(const char *basedir)
 #endif
 
 	return(1);
-}
-
-void MDFNI_Kill(void)
-{
- /* save settings */
-}
-
-static inline void ProcessAudio(EmulateSpecStruct *espec)
-{
-   int16 *const SoundBuf = espec->SoundBuf + espec->SoundBufSizeALMS * MDFNGameInfo->soundchan;
-   int32 SoundBufSize = espec->SoundBufSize - espec->SoundBufSizeALMS;
-   const int32 SoundBufMaxSize = espec->SoundBufMaxSize - espec->SoundBufSizeALMS;
-
-   espec->SoundBufSize = espec->SoundBufSizeALMS + SoundBufSize;
-}
-
-void MDFN_MidSync(EmulateSpecStruct *espec)
-{
- ProcessAudio(espec);
-
- MDFND_MidSync(espec);
-
- espec->SoundBufSizeALMS = espec->SoundBufSize;
- espec->MasterCyclesALMS = espec->MasterCycles;
-}
-
-void MDFNI_Emulate(EmulateSpecStruct *espec)
-{
- // Initialize some espec member data to zero, to catch some types of bugs.
- espec->DisplayRect.x = 0;
- espec->DisplayRect.w = 0;
- espec->DisplayRect.y = 0;
- espec->DisplayRect.h = 0;
-
- assert((bool)(espec->SoundBuf != NULL) == (bool)espec->SoundRate && (bool)espec->SoundRate == (bool)espec->SoundBufMaxSize);
-
- espec->SoundBufSize = 0;
-
- espec->VideoFormatChanged = false;
- espec->SoundFormatChanged = false;
-
- if(memcmp(&last_pixel_format, &espec->surface->format, sizeof(MDFN_PixelFormat)))
- {
-  espec->VideoFormatChanged = TRUE;
-
-  last_pixel_format = espec->surface->format;
- }
-
- if(espec->SoundRate != last_sound_rate)
- {
-  espec->SoundFormatChanged = true;
-  last_sound_rate = espec->SoundRate;
- }
-
- espec->NeedSoundReverse = false;
-
- MDFNGameInfo->Emulate(espec);
-
-#ifdef NEED_DEINTERLACER
- if(espec->InterlaceOn)
- {
-  if(!PrevInterlaced)
-   deint.ClearState();
-
-  deint.Process(espec->surface, espec->DisplayRect, espec->LineWidths, espec->InterlaceField);
-
-  PrevInterlaced = true;
-
-  espec->InterlaceOn = false;
-  espec->InterlaceField = 0;
- }
- else
-  PrevInterlaced = false;
-#endif
-
- ProcessAudio(espec);
 }
 
 // This function should only be called for state rewinding.
@@ -832,90 +735,3 @@ void MDFN_DebugPrintReal(const char *file, const int line, const char *format, .
 
  va_end(ap);
 }
-
-void MDFN_DoSimpleCommand(int cmd)
-{
- MDFNGameInfo->DoSimpleCommand(cmd);
-}
-
-void MDFN_QSimpleCommand(int cmd)
-{
-}
-
-void MDFNI_Power(void)
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_POWER);
-}
-
-void MDFNI_Reset(void)
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_RESET);
-}
-
-// Arcade-support functions
-void MDFNI_ToggleDIPView(void)
-{
-
-}
-
-void MDFNI_ToggleDIP(int which)
-{
- assert(MDFNGameInfo);
- assert(which >= 0);
-
- MDFN_QSimpleCommand(MDFN_MSC_TOGGLE_DIP0 + which);
-}
-
-void MDFNI_InsertCoin(void)
-{
- assert(MDFNGameInfo);
- 
- MDFN_QSimpleCommand(MDFN_MSC_INSERT_COIN);
-}
-
-// Disk/Disc-based system support functions
-void MDFNI_DiskInsert(int which)
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_INSERT_DISK0 + which);
-}
-
-void MDFNI_DiskSelect()
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_SELECT_DISK);
-}
-
-void MDFNI_DiskInsert()
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_INSERT_DISK);
-}
-
-void MDFNI_DiskEject()
-{
- assert(MDFNGameInfo);
-
- MDFN_QSimpleCommand(MDFN_MSC_EJECT_DISK);
-}
-
-void MDFNI_SetLayerEnableMask(uint64 mask)
-{
- if(MDFNGameInfo && MDFNGameInfo->SetLayerEnableMask)
- {
-  MDFNGameInfo->SetLayerEnableMask(mask);
- }
-}
-
-void MDFNI_SetInput(int port, const char *type, void *ptr, uint32 ptr_len_thingy)
-{
-  MDFNGameInfo->SetInput(port, type, ptr);
-}
-

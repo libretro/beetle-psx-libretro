@@ -1,7 +1,9 @@
-#include "mednafen/mednafen-types.h"
 #include "mednafen/mednafen.h"
 #include "mednafen/git.h"
 #include "mednafen/general.h"
+#ifdef NEED_DEINTERLACER
+#include	"mednafen/video/Deinterlacer.h"
+#endif
 #include <iostream>
 #include "libretro.h"
 
@@ -13,12 +15,20 @@ static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
+static double last_sound_rate;
+static MDFN_PixelFormat last_pixel_format;
+
 static MDFN_Surface *surf;
 
 static bool failed_init;
 
 std::string retro_base_directory;
 std::string retro_base_name;
+
+#ifdef NEED_DEINTERLACER
+static bool PrevInterlaced;
+static Deinterlacer deint;
+#endif
 
 #if defined(WANT_PSX_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
@@ -120,7 +130,7 @@ void retro_init()
 
 void retro_reset()
 {
-   MDFN_DoSimpleCommand(MDFN_MSC_RESET);
+   game->DoSimpleCommand(MDFN_MSC_RESET);
 }
 
 bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
@@ -158,8 +168,14 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
+   memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
 
    surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, FB_HEIGHT, FB_WIDTH, pix_fmt);
+
+#ifdef NEED_DEINTERLACER
+	PrevInterlaced = false;
+	deint.ClearState();
+#endif
 
    return game;
 }
@@ -297,7 +313,7 @@ static void update_input(void)
 
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
-      MDFNI_SetInput(i, "gamepad", &input_buf[i][0], 0);
+      game->SetInput(i, "gamepad", &input_buf[i][0], 0);
 #elif defined(WANT_WSWAN_EMU)
    static uint16_t input_buf;
    input_buf = 0;
@@ -359,8 +375,47 @@ void retro_run()
    spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
    spec.SoundVolume = 1.0;
    spec.soundmultiplier = 1.0;
+   spec.SoundBufSize = 0;
+   spec.VideoFormatChanged = false;
+   spec.SoundFormatChanged = false;
 
-   MDFNI_Emulate(&spec);
+   if(memcmp(&last_pixel_format, &spec.surface->format, sizeof(MDFN_PixelFormat)))
+   {
+      spec.VideoFormatChanged = TRUE;
+
+      last_pixel_format = spec.surface->format;
+   }
+
+   if(spec.SoundRate != last_sound_rate)
+   {
+      spec.SoundFormatChanged = true;
+      last_sound_rate = spec.SoundRate;
+   }
+
+   MDFNGameInfo->Emulate(&spec);
+
+#ifdef NEED_DEINTERLACER
+   if(spec.InterlaceOn)
+   {
+      if(!PrevInterlaced)
+         deint.ClearState();
+
+      deint.Process(spec.surface, spec.DisplayRect, spec.LineWidths, spec.InterlaceField);
+
+      PrevInterlaced = true;
+
+      spec.InterlaceOn = false;
+      spec.InterlaceField = 0;
+   }
+   else
+      PrevInterlaced = false;
+#endif
+
+   int16 *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * MDFNGameInfo->soundchan;
+   int32 SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
+   const int32 SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
+
+   spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
 #if defined(WANT_PSX_EMU)
    unsigned width = rects[0].w;
