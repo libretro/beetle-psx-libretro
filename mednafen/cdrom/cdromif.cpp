@@ -27,7 +27,7 @@
 
 using namespace CDUtility;
 
-CDIF::CDIF() : UnrecoverableError(false), is_phys_cache(false), disc_cdaccess(NULL), DiscEjected(false)
+CDIF::CDIF() : disc_cdaccess(NULL), DiscEjected(false)
 {
 
 }
@@ -83,9 +83,6 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 {
  int ret = 0;
 
- if(UnrecoverableError)
-  return(false);
-
  while(nSectors--)
  {
   uint8 tmpbuf[2352 + 96];
@@ -140,8 +137,6 @@ CDIF_ST::CDIF_ST(const char *device_name)
  puts("***WARNING USING SINGLE-THREADED CD READER***");
 
  disc_cdaccess = cdaccess_open(device_name ? device_name : NULL, false);
- is_phys_cache = disc_cdaccess->Is_Physical();
- UnrecoverableError = false;
  DiscEjected = false;
 
  disc_cdaccess->Read_TOC(&disc_toc);
@@ -168,33 +163,13 @@ void CDIF_ST::HintReadSector(uint32 lba)
 
 bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
 {
- if(UnrecoverableError)
- {
-  memset(buf, 0, 2352 + 96);
-  return(false);
- }
-
- try
- {
-  disc_cdaccess->Read_Raw_Sector(buf, lba);
- }
- catch(std::exception &e)
- {
-  MDFN_PrintError(_("Sector %u read error: %s"), lba, e.what());
-  memset(buf, 0, 2352 + 96);
-  return(false);
- }
+ disc_cdaccess->Read_Raw_Sector(buf, lba);
 
  return(true);
 }
 
 bool CDIF_ST::Eject(bool eject_status)
 {
- if(UnrecoverableError)
-  return(false);
-
- try
- {
   int32 old_de = DiscEjected;
 
   DiscEjected = eject_status;
@@ -213,12 +188,6 @@ bool CDIF_ST::Eject(bool eject_status)
     }
    }
   }
- }
- catch(std::exception &e)
- {
-  MDFN_PrintError("%s", e.what());
-  return(false);
- }
 
  return(true);
 }
@@ -350,4 +319,3 @@ Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 {
  return new CDIF_Stream_Thing(this, lba, sector_count);
 }
-

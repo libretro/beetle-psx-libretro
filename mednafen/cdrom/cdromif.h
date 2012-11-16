@@ -53,8 +53,6 @@ class CDIF
  // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
  virtual bool Eject(bool eject_status) = 0;
 
- inline bool IsPhysical(void) { return(is_phys_cache); }
-
  // For Mode 1, or Mode 2 Form 1.
  // No reference counting or whatever is done, so if you destroy the CDIF object before you destroy the returned Stream, things will go BOOM.
  Stream *MakeStream(uint32 lba, uint32 sector_count);
