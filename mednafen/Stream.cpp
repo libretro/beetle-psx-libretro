@@ -45,21 +45,8 @@ void Stream::printf(const char *format, ...)
 
  va_end(ap);
 
- if(rc < 0)
-  throw MDFN_Error(0, "Error in trio_vasprintf()");
- else
- {
-  try	// Bleck
-  {
-   write(str, rc);
-  }
-  catch(...)
-  {
-   free(str);
-   throw;
-  }
-  free(str);
- }
+ write(str, rc);
+ free(str);
 }
 
 int Stream::get_line(std::string &str)

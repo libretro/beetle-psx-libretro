@@ -30,32 +30,18 @@ MemoryStream::MemoryStream(uint64 size_hint) : data_buffer(NULL), data_buffer_si
 
 MemoryStream::MemoryStream(Stream *stream) : data_buffer(NULL), data_buffer_size(0), data_buffer_alloced(0), position(0)
 {
- try
- {
-  if((position = stream->tell()) != 0)
-   stream->seek(0, SEEK_SET);
+   if((position = stream->tell()) != 0)
+      stream->seek(0, SEEK_SET);
 
-  data_buffer_size = stream->size();
-  data_buffer_alloced = data_buffer_size;
-  if(!(data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced)))
-   throw MDFN_Error(ErrnoHolder(errno));
+   data_buffer_size = stream->size();
+   data_buffer_alloced = data_buffer_size;
+   if(!(data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced)))
+      throw MDFN_Error(ErrnoHolder(errno));
 
-  stream->read(data_buffer, data_buffer_size);
+   stream->read(data_buffer, data_buffer_size);
 
-  stream->close();
- }
- catch(...)
- {
-  if(data_buffer)
-  {
-   free(data_buffer);
-   data_buffer = NULL;
-  }
-
-  delete stream;
-  throw;
- }
- delete stream;
+   stream->close();
+   delete stream;
 }
 
 MemoryStream::MemoryStream(const MemoryStream &zs)
@@ -133,17 +119,11 @@ uint64 MemoryStream::read(void *data, uint64 count, bool error_on_eos)
 {
  if(count > data_buffer_size)
  {
-  if(error_on_eos)
-   throw MDFN_Error(0, _("EOF"));
-
   count = data_buffer_size;
  }
 
  if((uint64)position > (data_buffer_size - count))
  {
-  if(error_on_eos)
-   throw MDFN_Error(0, _("EOF"));
-
   count = data_buffer_size - position;
  }
 
