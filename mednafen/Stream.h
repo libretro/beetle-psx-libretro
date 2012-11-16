@@ -148,27 +148,4 @@ class Stream
  virtual int get_line(std::string &str);
  virtual void printf(const char *format, ...) MDFN_FORMATSTR(printf, 2, 3);
 };
-
-// StreamFilter takes ownership of the Stream pointer passed, and will delete it in its destructor.
-class StreamFilter : public Stream
-{
- public:
-
- StreamFilter();
- StreamFilter(Stream *target_arg);
- virtual ~StreamFilter();
-
- virtual uint64 read(void *data, uint64 count, bool error_on_eos = true) = 0;
- virtual void write(const void *data, uint64 count) = 0;
- virtual void seek(int64 offset, int whence) = 0;
- virtual int64 tell(void) = 0;
- virtual int64 size(void) = 0;
- virtual void close(void) = 0;
-
- virtual Stream *steal(void);
-
- private:
- Stream *target_stream;
-};
-
 #endif

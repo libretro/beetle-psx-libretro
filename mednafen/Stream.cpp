@@ -78,26 +78,3 @@ int Stream::get_line(std::string &str)
 
  return(-1);
 }
-
-StreamFilter::StreamFilter()
-{
- target_stream = NULL;
-}
-
-StreamFilter::StreamFilter(Stream *target_arg)
-{
- target_stream = target_arg;
-}
-
-StreamFilter::~StreamFilter()
-{
- if(target_stream)
-  delete target_stream;
-}
-
-Stream* StreamFilter::steal(void)
-{
- Stream *ret = target_stream;
- target_stream = NULL;
- return ret;
-}
