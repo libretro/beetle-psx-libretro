@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #endif
 
+//#define LIBRETRO_DEBUG
 
 // Stubs
 
@@ -56,12 +57,8 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    switch (type)
    {
       case MDFNMKF_SAV:
-         ret = retro_base_directory +
-            std::string(PSS) +
-            retro_base_name +
-            std::string(".") +
-            md5_context::asciistr(MDFNGameInfo->MD5, 0) +
-            std::string(".") +
+         ret = retro_base_directory + std::string(PSS) + retro_base_name +
+            std::string(".") + md5_context::asciistr(MDFNGameInfo->MD5, 0) + std::string(".") +
             std::string(cd1);
          break;
       case MDFNMKF_FIRMWARE:
@@ -74,18 +71,23 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 #ifdef _WIN32
    sanitize_path(ret); // Because Windows path handling is mongoloid.
 #endif
-   fprintf(stderr, "[Mednafen]: Path request: %s\n", ret.c_str());
    return ret;
 }
 
 void MDFND_DispMessage(unsigned char *str)
 {
-   std::cerr << str;
+#ifdef LIBRETRO_DEBUG
+   if(str != NULL)
+      fprintf(stderr, "DISPMSG: %s\n", str);
+#endif
 }
 
 void MDFND_Message(const char *str)
 {
-   std::cerr << str;
+#ifdef LIBRETRO_DEBUG
+   if(str != NULL)
+      fprintf(stderr, "MSG: %s\n", str);
+#endif
 }
 
 void MDFND_MidSync(const EmulateSpecStruct *)
@@ -93,7 +95,10 @@ void MDFND_MidSync(const EmulateSpecStruct *)
 
 void MDFND_PrintError(const char* err)
 {
-   std::cerr << err;
+#ifdef LIBRETRO_DEBUG
+   if(err != NULL)
+      fprintf(stderr, "ERR: %s\n", err);
+#endif
 }
 
 uint32 MDFND_GetTime()
