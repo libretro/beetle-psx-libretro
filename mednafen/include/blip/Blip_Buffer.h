@@ -232,15 +232,7 @@ public:
 	}
 	
 private:
-#if BLIP_BUFFER_FAST
 	Blip_Synth_Fast_ impl;
-#else
-	Blip_Synth_ impl;
-	typedef short imp_t;
-	imp_t impulses [blip_res * (quality / 2) + 1];
-public:
-	Blip_Synth() : impl( impulses, quality ) { }
-#endif
 };
 
 // Low-pass equalization parameters
@@ -354,7 +346,6 @@ blip_inline void Blip_Synth<quality,range>::offset_resampled( blip_resampled_tim
 	blip_long* BLIP_RESTRICT buf = blip_buf->buffer_ + (time >> BLIP_BUFFER_ACCURACY);
 	int phase = (int) (time >> (BLIP_BUFFER_ACCURACY - BLIP_PHASE_BITS) & (blip_res - 1));
 
-#if BLIP_BUFFER_FAST
 	blip_long left = buf [0] + delta;
 	
 	// Kind of crappy, but doing shift after multiply results in overflow.
@@ -366,107 +357,19 @@ blip_inline void Blip_Synth<quality,range>::offset_resampled( blip_resampled_tim
 	
 	buf [0] = left;
 	buf [1] = right;
-#else
-
-	int const fwd = (blip_widest_impulse_ - quality) / 2;
-	int const rev = fwd + quality - 2;
-	int const mid = quality / 2 - 1;
-	
-	imp_t const* BLIP_RESTRICT imp = impulses + blip_res - phase;
-	
-	#if defined (_M_IX86) || defined (_M_IA64) || defined (__i486__) || \
-			defined (__x86_64__) || defined (__ia64__) || defined (__i386__)
-	
-	// straight forward implementation resulted in better code on GCC for x86
-	
-	#define ADD_IMP( out, in ) \
-		buf [out] += (blip_long) imp [blip_res * (in)] * delta
-	
-	#define BLIP_FWD( i ) {\
-		ADD_IMP( fwd     + i, i     );\
-		ADD_IMP( fwd + 1 + i, i + 1 );\
-	}
-	#define BLIP_REV( r ) {\
-		ADD_IMP( rev     - r, r + 1 );\
-		ADD_IMP( rev + 1 - r, r     );\
-	}
-
-		BLIP_FWD( 0 )
-		if ( quality > 8  ) BLIP_FWD( 2 )
-		if ( quality > 12 ) BLIP_FWD( 4 )
-		{
-			ADD_IMP( fwd + mid - 1, mid - 1 );
-			ADD_IMP( fwd + mid    , mid     );
-			imp = impulses + phase;
-		}
-		if ( quality > 12 ) BLIP_REV( 6 )
-		if ( quality > 8  ) BLIP_REV( 4 )
-		BLIP_REV( 2 )
-		
-		ADD_IMP( rev    , 1 );
-		ADD_IMP( rev + 1, 0 );
-		
-	#else
-	
-	// for RISC processors, help compiler by reading ahead of writes
-	
-	#define BLIP_FWD( i ) {\
-		blip_long t0 =                       i0 * delta + buf [fwd     + i];\
-		blip_long t1 = imp [blip_res * (i + 1)] * delta + buf [fwd + 1 + i];\
-		i0 =           imp [blip_res * (i + 2)];\
-		buf [fwd     + i] = t0;\
-		buf [fwd + 1 + i] = t1;\
-	}
-	#define BLIP_REV( r ) {\
-		blip_long t0 =                 i0 * delta + buf [rev     - r];\
-		blip_long t1 = imp [blip_res * r] * delta + buf [rev + 1 - r];\
-		i0 =           imp [blip_res * (r - 1)];\
-		buf [rev     - r] = t0;\
-		buf [rev + 1 - r] = t1;\
-	}
-		
-		blip_long i0 = *imp;
-		BLIP_FWD( 0 )
-		if ( quality > 8  ) BLIP_FWD( 2 )
-		if ( quality > 12 ) BLIP_FWD( 4 )
-		{
-			blip_long t0 =                   i0 * delta + buf [fwd + mid - 1];
-			blip_long t1 = imp [blip_res * mid] * delta + buf [fwd + mid    ];
-			imp = impulses + phase;
-			i0 = imp [blip_res * mid];
-			buf [fwd + mid - 1] = t0;
-			buf [fwd + mid    ] = t1;
-		}
-		if ( quality > 12 ) BLIP_REV( 6 )
-		if ( quality > 8  ) BLIP_REV( 4 )
-		BLIP_REV( 2 )
-		
-		blip_long t0 =   i0 * delta + buf [rev    ];
-		blip_long t1 = *imp * delta + buf [rev + 1];
-		buf [rev    ] = t0;
-		buf [rev + 1] = t1;
-	#endif
-	
-#endif
 }
 
 #undef BLIP_FWD
 #undef BLIP_REV
 
 template<int quality,int range>
-#if BLIP_BUFFER_FAST
-	blip_inline
-#endif
-void Blip_Synth<quality,range>::offset( blip_time_t t, int delta, Blip_Buffer* buf ) const
+blip_inline void Blip_Synth<quality,range>::offset( blip_time_t t, int delta, Blip_Buffer* buf ) const
 {
 	offset_resampled( t * buf->factor_ + buf->offset_, delta, buf );
 }
 
 template<int quality,int range>
-#if BLIP_BUFFER_FAST
-	blip_inline
-#endif
-void Blip_Synth<quality,range>::update( blip_time_t t, int amp )
+blip_inline void Blip_Synth<quality,range>::update( blip_time_t t, int amp )
 {
 	int delta = amp - impl.last_amp;
 	impl.last_amp = amp;
