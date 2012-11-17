@@ -120,8 +120,6 @@ class MDFN_Surface //typedef struct
  uint16 *pixels16;
  uint32 *pixels;
 
- bool pixels_is_external;
-
  // w, h, and pitch32 should always be > 0
  int32 w;
  int32 h;
@@ -134,7 +132,6 @@ class MDFN_Surface //typedef struct
 
  MDFN_PixelFormat format;
 
- void Fill(uint8 r, uint8 g, uint8 b, uint8 a);
  void SetFormat(const MDFN_PixelFormat &new_format, bool convert);
 
 #if defined(WANT_32BPP)

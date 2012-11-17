@@ -50,7 +50,6 @@ MDFN_Surface::MDFN_Surface()
 
    pixels = NULL;
    pixels16 = NULL;
-   pixels_is_external = false;
    pitchinpix = 0;
    w = 0;
    h = 0;
@@ -71,18 +70,8 @@ void MDFN_Surface::Init(void *const p_pixels, const uint32 p_width, const uint32
    pixels16 = NULL;
    pixels = NULL;
 
-   pixels_is_external = false;
-
-   if(p_pixels)
-   {
-      rpix = p_pixels;
-      pixels_is_external = true;
-   }
-   else
-   {
-      if(!(rpix = calloc(1, p_pitchinpix * p_height * (nf.bpp / 8))))
-         throw(1);
-   }
+   if(!(rpix = calloc(1, p_pitchinpix * p_height * (nf.bpp / 8))))
+      throw(1);
 
    if(nf.bpp == 16)
       pixels16 = (uint16 *)rpix;
@@ -103,30 +92,11 @@ void MDFN_Surface::SetFormat(const MDFN_PixelFormat &nf, bool convert)
    format = nf;
 }
 
-void MDFN_Surface::Fill(uint8 r, uint8 g, uint8 b, uint8 a)
-{
-   uint32 color = MakeColor(r, g, b, a);
-
-#if defined(WANT_32BP)
-   /* 32bpp color */
-
-   for(int32 i = 0; i < pitchinpix * h; i++)
-      pixels[i] = color;
-#elif defined(WANT_16BPP)
-
-   for(int32 i = 0; i < pitchinpix * h; i++)
-      pixels16[i] = color;
-#endif
-}
-
 MDFN_Surface::~MDFN_Surface()
 {
-   if(!pixels_is_external)
-   {
-      if(pixels)
-         free(pixels);
-      if(pixels16)
-         free(pixels16);
-   }
+   if(pixels)
+      free(pixels);
+   if(pixels16)
+      free(pixels16);
 }
 
