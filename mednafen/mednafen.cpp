@@ -620,32 +620,6 @@ int MDFNI_Initialize(const char *basedir)
 	return(1);
 }
 
-// This function should only be called for state rewinding.
-// FIXME:  Add a macro for SFORMAT structure access instead of direct access
-int MDFN_RawInputStateAction(StateMem *sm, int load, int data_only)
-{
- static const char *stringies[16] = { "RI00", "RI01", "RI02", "RI03", "RI04", "RI05", "RI06", "RI07", "RI08", "RI09", "RI0a", "RI0b", "RI0c", "RI0d", "RI0e", "RI0f" };
- SFORMAT StateRegs[17];
- int x;
-
- for(x = 0; x < 16; x++)
- {
-  StateRegs[x].name = stringies[x];
-  StateRegs[x].flags = 0;
-
-  StateRegs[x].v = NULL;
-  StateRegs[x].size = 0;
- }
-
- StateRegs[x].v = NULL;
- StateRegs[x].size = 0;
- StateRegs[x].name = NULL;
-
- int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "rinp");
-
- return(ret);
-}
-
 static int curindent = 0;
 
 void MDFN_indent(int indent)

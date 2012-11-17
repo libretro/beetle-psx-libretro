@@ -32,23 +32,6 @@ Stream::~Stream()
 
 }
 
-void Stream::printf(const char *format, ...)
-{
- char *str = NULL;
- int rc;
-
- va_list ap;
-
- va_start(ap, format);
-
- rc = trio_vasprintf(&str, format, ap);
-
- va_end(ap);
-
- write(str, rc);
- free(str);
-}
-
 int Stream::get_line(std::string &str)
 {
  uint8 c;

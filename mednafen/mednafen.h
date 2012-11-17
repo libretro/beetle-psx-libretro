@@ -27,9 +27,6 @@ void MDFN_DebugPrintReal(const char *file, const int line, const char *format, .
 void MDFN_LoadGameCheats(FILE *override);
 void MDFN_FlushGameCheats(int nosave);
 
-#include "state.h"
-int MDFN_RawInputStateAction(StateMem *sm, int load, int data_only);
-
 #include "mednafen-driver.h"
 
 #include "mednafen-endian.h"

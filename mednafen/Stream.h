@@ -146,6 +146,5 @@ class Stream
  //  of it would be up to the STL implementation).
  // Implemented as virtual so that a higher-performance version can be implemented if possible(IE with MemoryStream)
  virtual int get_line(std::string &str);
- virtual void printf(const char *format, ...) MDFN_FORMATSTR(printf, 2, 3);
 };
 #endif

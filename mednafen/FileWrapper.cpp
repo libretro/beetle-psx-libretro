@@ -130,17 +130,6 @@ int FileWrapper::scanf(const char *format, ...)
  return ret;
 }
 
-void FileWrapper::printf(const char *format, ...)
-{
- va_list ap;
-
- va_start(ap, format);
-
- trio_vfprintf(fp, format, ap);
-
- va_end(ap);
-}
-
 void FileWrapper::put_char(int c)
 {
  fputc(c, fp);
