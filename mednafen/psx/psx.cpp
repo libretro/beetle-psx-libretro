@@ -1541,7 +1541,7 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
  //
 
  // BIOS patch
- BIOSROM->WriteU32(0x6990, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
+ //BIOSROM->WriteU32(0x6990, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
 // BIOSROM->WriteU32(0x691C, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
 
 // printf("INSN: 0x%08x\n", BIOSROM->ReadU32(0x6990));
@@ -1681,8 +1681,8 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
  int ret = InitCommon(CDInterfaces);
 
  // TODO: fastboot setting
- //if(MDFN_GetSettingB("psx.fastboot"))
- // BIOSROM->WriteU32(0x6990, 0);
+ if(MDFN_GetSettingB("psx.fastboot"))
+    BIOSROM->WriteU32(0x6990, 0);
 
  MDFNGameInfo->GameType = GMT_CDROM;
 
@@ -1925,7 +1925,7 @@ static MDFNSetting PSXSettings[] =
  { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on port 2C."),   gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
  { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on port 2D."),   gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
 
- //{ "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "0" },
+ { "psx.fastboot", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Skip BIOS intro sequence."), gettext_noop("MAY BREAK GAMES."), MDFNST_BOOL, "0" },
  { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Attempt to auto-detect region of game."), NULL, MDFNST_BOOL, "1" },
  { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Default region to use."), gettext_noop("Used if region autodetection fails or is disabled."), MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
 

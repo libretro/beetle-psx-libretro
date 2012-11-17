@@ -23,152 +23,154 @@
 
 bool MDFN_SaveSettings(const char *path)
 {
- return(1);
+   return(1);
 }
 
 uint64 MDFN_GetSettingUI(const char *name)
 {
-	/* PCE FAST */
-	if(!strcmp("pce_fast.cddavolume", name)) /* make configurable */
-		return 100;
-	if(!strcmp("pce_fast.adpcmvolume", name)) /* make configurable */
-		return 100;
-	if(!strcmp("pce_fast.cdpsgvolume", name)) /* make configurable */
-		return 100;
-	if(!strcmp("pce_fast.cdspeed", name)) /* make configurable */
-		return 1;
-	if(!strcmp("pce_fast.ocmultiplier", name)) /* make configurable */
-		return 1;
-	if(!strcmp("pce_fast.slstart", name))
-		return 4;
-	if(!strcmp("pce_fast.slend", name))
-		return 235;
-	/* WSWAN */
-	if(!strcmp("wswan.ocmultiplier", name))
-		return 1;
-        if(!strcmp("wswan.bday", name))
-                return 23;
-        if(!strcmp("wswan.bmonth", name))
-                return 6;
-        if(!strcmp("wswan.byear", name))
-                return 1989;
-	if(!strcmp("wswan.cdspeed", name))
-		return 2;
-	if(!strcmp("wswan.cdpsgvolume", name))
-		return 100;
-	if(!strcmp("wswan.cddavolume", name))
-		return 100;
-	if(!strcmp("wswan.adpcmvolume", name))
-		return 100;
-	if(!strcmp("wswan.slstart", name))
-		return 4;
-	if(!strcmp("wswan.slend", name))
-		return 235;
-	/* PSX */
-	if(!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
-		return 4;
+   /* PCE FAST */
+   if(!strcmp("pce_fast.cddavolume", name)) /* make configurable */
+      return 100;
+   if(!strcmp("pce_fast.adpcmvolume", name)) /* make configurable */
+      return 100;
+   if(!strcmp("pce_fast.cdpsgvolume", name)) /* make configurable */
+      return 100;
+   if(!strcmp("pce_fast.cdspeed", name)) /* make configurable */
+      return 1;
+   if(!strcmp("pce_fast.ocmultiplier", name)) /* make configurable */
+      return 1;
+   if(!strcmp("pce_fast.slstart", name))
+      return 4;
+   if(!strcmp("pce_fast.slend", name))
+      return 235;
+   /* WSWAN */
+   if(!strcmp("wswan.ocmultiplier", name))
+      return 1;
+   if(!strcmp("wswan.bday", name))
+      return 23;
+   if(!strcmp("wswan.bmonth", name))
+      return 6;
+   if(!strcmp("wswan.byear", name))
+      return 1989;
+   if(!strcmp("wswan.cdspeed", name))
+      return 2;
+   if(!strcmp("wswan.cdpsgvolume", name))
+      return 100;
+   if(!strcmp("wswan.cddavolume", name))
+      return 100;
+   if(!strcmp("wswan.adpcmvolume", name))
+      return 100;
+   if(!strcmp("wswan.slstart", name))
+      return 4;
+   if(!strcmp("wswan.slend", name))
+      return 235;
+   /* PSX */
+   if(!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
+      return 4;
 
-	fprintf(stderr, "unhandled setting UI: %s\n", name);
-	assert(0);
-	return 0;
+   fprintf(stderr, "unhandled setting UI: %s\n", name);
+   assert(0);
+   return 0;
 }
 
 int64 MDFN_GetSettingI(const char *name)
 {
-	/* PSX */
-	if(!strcmp("psx.region_default", name)) /* make configurable */
-		return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
-	/* WSWAN */
-	if(!strcmp("wswan.sex", name))
-		return 0;
-	if(!strcmp("wswan.blood", name))
-		return 0;
-	fprintf(stderr, "unhandled setting I: %s\n", name);
-	assert(0);
-	return 0;
+   /* PSX */
+   if(!strcmp("psx.region_default", name)) /* make configurable */
+      return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
+   /* WSWAN */
+   if(!strcmp("wswan.sex", name))
+      return 0;
+   if(!strcmp("wswan.blood", name))
+      return 0;
+   fprintf(stderr, "unhandled setting I: %s\n", name);
+   assert(0);
+   return 0;
 }
 
 double MDFN_GetSettingF(const char *name)
 {
-	/* PSX */
-	if(!strcmp("psx.input.mouse_sensitivity", name)) /* make configurable */
-		return 1.00;
-	/* WSWAN */
-	if(!strcmp("wswan.mouse_sensitivity", name))
-		return 0.50;
+   /* PSX */
+   if(!strcmp("psx.input.mouse_sensitivity", name)) /* make configurable */
+      return 1.00;
+   /* WSWAN */
+   if(!strcmp("wswan.mouse_sensitivity", name))
+      return 0.50;
 
-	fprintf(stderr, "unhandled setting F: %s\n", name);
-	assert(0);
-	return 0;
+   fprintf(stderr, "unhandled setting F: %s\n", name);
+   assert(0);
+   return 0;
 }
 
 bool MDFN_GetSettingB(const char *name)
 {
-	if(!strcmp("cheats", name))
-		return 0;
-	/* LIBRETRO */
-        if(!strcmp("libretro.cd_load_into_ram", name))
-                return 0;
-	/* PCE_FAST */
-        if(!strcmp("pce_fast.input.multitap", name))
-                return 1;
-	if(!strcmp("pce_fast.arcadecard", name))
-		return 1;
-	if(!strcmp("pce_fast.forcesgx", name))
-		return 0;
-	if(!strcmp("pce_fast.nospritelimit", name))
-		return 0;
-	if(!strcmp("pce_fast.forcemono", name))
-		return 0;
-	if(!strcmp("pce_fast.disable_softreset", name))
-		return 0;
-	if(!strcmp("pce_fast.adpcmlp", name))
-		return 0;
-	if(!strcmp("pce_fast.correct_aspect", name))
-		return 1;
-	/* PSX */
-	if(!strcmp("psx.input.port1.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port2.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port3.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port4.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port5.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port6.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port7.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port8.memcard", name))
-		return 1;
-	if(!strcmp("psx.input.port1.multitap", name)) /* make configurable */
-		return 1;
-	if(!strcmp("psx.input.port2.multitap", name)) /* make configurable */
-		return 1;
-	if(!strcmp("psx.region_autodetect", name)) /* make configurable */
-		return 1;
-	if(!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
-		return 1;
-	/* WSWAN */
-        if(!strcmp("wswan.forcemono", name))
-                return 0;
-        if(!strcmp("wswan.language", name))
-                return 1;
-	if(!strcmp("wswan.correct_aspect", name))
-		return 1;
-	/* CDROM */
-	if(!strcmp("cdrom.lec_eval", name))
-		return 1;
-	/* FILESYS */
-	if(!strcmp("filesys.untrusted_fip_check", name))
-		return 0;
-	if(!strcmp("filesys.disablesavegz", name))
-		return 1;
-	fprintf(stderr, "unhandled setting B: %s\n", name);
-	assert(0);
-	return 0;
+   if(!strcmp("cheats", name))
+      return 0;
+   /* LIBRETRO */
+   if(!strcmp("libretro.cd_load_into_ram", name))
+      return 0;
+   /* PCE_FAST */
+   if(!strcmp("pce_fast.input.multitap", name))
+      return 1;
+   if(!strcmp("pce_fast.arcadecard", name))
+      return 1;
+   if(!strcmp("pce_fast.forcesgx", name))
+      return 0;
+   if(!strcmp("pce_fast.nospritelimit", name))
+      return 0;
+   if(!strcmp("pce_fast.forcemono", name))
+      return 0;
+   if(!strcmp("pce_fast.disable_softreset", name))
+      return 0;
+   if(!strcmp("pce_fast.adpcmlp", name))
+      return 0;
+   if(!strcmp("pce_fast.correct_aspect", name))
+      return 1;
+   /* PSX */
+   if(!strcmp("psx.input.port1.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port2.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port3.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port4.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port5.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port6.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port7.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port8.memcard", name))
+      return 1;
+   if(!strcmp("psx.input.port1.multitap", name)) /* make configurable */
+      return 1;
+   if(!strcmp("psx.input.port2.multitap", name)) /* make configurable */
+      return 1;
+   if(!strcmp("psx.region_autodetect", name)) /* make configurable */
+      return 1;
+   if(!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
+      return 1;
+   if(!strcmp("psx.fastboot", name))
+      return 1;
+   /* WSWAN */
+   if(!strcmp("wswan.forcemono", name))
+      return 0;
+   if(!strcmp("wswan.language", name))
+      return 1;
+   if(!strcmp("wswan.correct_aspect", name))
+      return 1;
+   /* CDROM */
+   if(!strcmp("cdrom.lec_eval", name))
+      return 1;
+   /* FILESYS */
+   if(!strcmp("filesys.untrusted_fip_check", name))
+      return 0;
+   if(!strcmp("filesys.disablesavegz", name))
+      return 1;
+   fprintf(stderr, "unhandled setting B: %s\n", name);
+   assert(0);
+   return 0;
 }
 
 extern std::string retro_base_directory;
@@ -252,17 +254,17 @@ std::string MDFN_GetSettingS(const char *name)
 
 bool MDFNI_SetSetting(const char *name, const char *value, bool NetplayOverride)
 {
-  return false;
+   return false;
 }
 
 bool MDFNI_SetSettingB(const char *name, bool value)
 {
- return false;
+   return false;
 }
 
 bool MDFNI_SetSettingUI(const char *name, uint64 value)
 {
- return false;
+   return false;
 }
 
 void MDFNI_DumpSettingsDef(const char *path)
