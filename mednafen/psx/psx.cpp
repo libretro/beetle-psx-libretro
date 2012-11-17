@@ -154,7 +154,6 @@ static void RebaseTS(const pscpu_timestamp_t timestamp)
   if(i == PSX_EVENT__SYNFIRST || i == PSX_EVENT__SYNLAST)
    continue;
 
-  assert(events[i].event_time > timestamp);
   events[i].event_time -= timestamp;
  }
 
@@ -163,7 +162,6 @@ static void RebaseTS(const pscpu_timestamp_t timestamp)
 
 void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp)
 {
- assert(type > PSX_EVENT__SYNFIRST && type < PSX_EVENT__SYNLAST);
  event_list_entry *e = &events[type];
 
  if(next_timestamp < e->event_time)
@@ -970,16 +968,11 @@ static void Emulate(EmulateSpecStruct *espec)
 {
  pscpu_timestamp_t timestamp = 0;
 
- if(FIO->RequireNoFrameskip())
- {
-  //puts("MEOW");
-  espec->skip = false;	//TODO: Save here, and restore at end of Emulate() ?
- }
-
  MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 
+#ifdef WANT_CHEATS
  MDFNMP_ApplyPeriodicCheats();
-
+#endif
 
  espec->MasterCycles = 0;
  espec->SoundBufSize = 0;
@@ -991,15 +984,7 @@ static void Emulate(EmulateSpecStruct *espec)
  Running = -1;
  timestamp = CPU->Run(timestamp, false);
 
- assert(timestamp);
-
  ForceEventUpdates(timestamp);
-#if 0
- if(GPU->GetScanlineNum() < 100)
-  printf("[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
-#endif
-
- //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
  espec->SoundBufSize = SPU->EndFrame(espec->SoundBuf);
 
@@ -1029,25 +1014,11 @@ static void Emulate(EmulateSpecStruct *espec)
    Memcard_SaveDelay[i] += timestamp;
    if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
    {
-    //fprintf(stderr, "Saving memcard %d...\n", i);
-    /*
-    try
-    {
-*/
      char ext[64];
-     trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+     snprintf(ext, sizeof(ext), "%d.mcr", i);
      FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
      Memcard_SaveDelay[i] = -1;
      Memcard_PrevDC[i] = 0;
-/*
-    }
-    catch(std::exception &e)
-    {
-     MDFN_PrintError("Memcard %d save error: %s", i, e.what());
-     MDFN_DispMessage("Memcard %d save error: %s", i, e.what());
-    }
-    //MDFN_DispMessage("Memcard %d saved.", i);
-*/
    }
   }
  }
@@ -1116,7 +1087,6 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
  //if(toc.first_track > 1 || toc.
 
- try
  {
   uint8 pvd[2048];
   unsigned pvd_search_count = 0;
@@ -1218,14 +1188,6 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
     //puts("ASOFKOASDFKO");
    }
   }
- }
- catch(std::exception &e)
- {
-  //puts(e.what());
- }
- catch(...)
- {
-
  }
 
  Breakout:
@@ -1379,18 +1341,18 @@ static bool InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
   EmulatedPSX.nominal_width = 367;	// Dunno. :(
   EmulatedPSX.nominal_height = 288;
 
-  EmulatedPSX.fb_width = 768;
+  EmulatedPSX.fb_width = 640;
   EmulatedPSX.fb_height = 576;
  }
  else
  {
-  EmulatedPSX.lcm_width = 2720;
+  EmulatedPSX.lcm_width = 640;
   EmulatedPSX.lcm_height = 480;
 
-  EmulatedPSX.nominal_width = 310;
+  EmulatedPSX.nominal_width = 320;
   EmulatedPSX.nominal_height = 240;
 
-  EmulatedPSX.fb_width = 768;
+  EmulatedPSX.fb_width = 640;
   EmulatedPSX.fb_height = 480;
  }
 
@@ -1662,16 +1624,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
  TextMem.resize(0);
 
- try
- {
-   LoadEXE(fp->data, fp->size);
- }
- catch(std::exception &e)
- {
-  MDFND_PrintError(e.what());
-  Cleanup();
-  return 0;
- }
+ LoadEXE(fp->data, fp->size);
 
  return(1);
 }
