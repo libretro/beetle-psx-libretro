@@ -185,7 +185,7 @@ uint32 CDAccess_Image::GetSectorCount(CDRFILE_TRACK_INFO *track)
  return(0);
 }
 
-void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache)
+bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache)
 {
  long offset = 0; // In bytes!
  long tmp_long;
@@ -195,6 +195,16 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
  std::string efn;
 
  efn = MDFN_EvalFIP(base_dir, filename);
+
+ FILE *dummy = fopen(efn.c_str(), "rb");
+
+ // test if file exists - if not exit prematurely
+
+ if(dummy)
+    fclose(dummy);
+ else
+    return false;
+
  track->fp = new FileStream(efn.c_str(), FileStream::MODE_READ);
  if(MDFN_GetSettingB("libretro.cd_load_into_ram"))
   track->fp = new MemoryStream(track->fp);
@@ -204,7 +214,10 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
   track->AReader = AR_Open(track->fp);
 
   if(!track->AReader)
-   throw MDFN_Error(0, "TODO ERROR");
+  {
+     fprintf(stderr, "TODO ERROR.\n");
+     return false;
+  }
  }
 
  sector_mult = DI_Size_Table[track->DIFormat];
@@ -250,13 +263,16 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
   if(tmp_long > sectors)
   {
-   throw MDFN_Error(0, _("Length specified in TOC file for track %d is too large by %ld sectors!\n"), tracknum, (long)(tmp_long - sectors));
+   fprintf(stderr, "Length specified in TOC file for track %d is too large by %ld sectors!\n", tracknum, (long)(tmp_long - sectors));
+   return false;
   }
   sectors = tmp_long;
  }
 
  track->FirstFileInstance = 1;
  track->sectors = sectors;
+
+ return true;
 }
 
 
@@ -814,7 +830,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
 
   if(!TrackFound)
   {
-   throw(MDFN_Error(0, _("Could not find track for sector %u!"), lba));
+     fprintf(stderr, "Could not find track for sector %u!\n", lba);
   }
 }
 

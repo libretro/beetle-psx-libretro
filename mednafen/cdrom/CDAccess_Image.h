@@ -60,7 +60,7 @@ class CDAccess_Image : public CDAccess
  // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.
  void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
 
- void ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache);
+ bool ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache);
  uint32 GetSectorCount(CDRFILE_TRACK_INFO *track);
 };
 
