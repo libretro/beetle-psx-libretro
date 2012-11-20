@@ -185,7 +185,6 @@ IS_X86 = 1
 endif
 
 ifeq ($(NEED_THREADING), 1)
-THREAD_STUBS += thread.cpp stubs_thread.cpp
 FLAGS += -DWANT_THREADING
 endif
 
