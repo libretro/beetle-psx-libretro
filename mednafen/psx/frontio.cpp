@@ -719,28 +719,26 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
  assert(which < 8);
 
- try
+ FILE * memcard = fopen(path, "rb");
+ if (memcard)
  {
-  if(DevicesMC[which]->GetNVSize())
-  {
-   FileWrapper mf(path, FileWrapper::MODE_READ);
-   std::vector<uint8> tmpbuf;
+    fclose(memcard);
+    if(DevicesMC[which]->GetNVSize())
+    {
+       FileWrapper mf(path, FileWrapper::MODE_READ);
+       std::vector<uint8> tmpbuf;
 
-   tmpbuf.resize(DevicesMC[which]->GetNVSize());
+       tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
-   if(mf.size() != (int64)tmpbuf.size())
-    throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
+       if(mf.size() != (int64)tmpbuf.size())
+          throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
 
-   mf.read(&tmpbuf[0], tmpbuf.size());
+       mf.read(&tmpbuf[0], tmpbuf.size());
 
-   DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
-   DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
-  }
- }
- catch(MDFN_Error &e)
- {
-  if(e.GetErrno() != ENOENT)
-   throw(e);
+       DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
+       DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
+    }
+
  }
 }
 
