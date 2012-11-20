@@ -323,7 +323,21 @@ CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS)
 
 $(TARGET): $(OBJECTS)
+ifeq ($(platform), ps3)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), sncps3)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), psl1ght)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), xenon)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), ngc)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), wii)
+	$(AR) rcs $@ $(OBJECTS)
+else
 	$(CXX) -o $@ $^ $(LDFLAGS)
+endif
 
 %.o: %.cpp
 	$(CXX) -c -o $@ $< $(CXXFLAGS)

@@ -25,6 +25,8 @@
 #include "../mempatcher.h"
 #include "../cputest/cputest.h"
 
+#include <ctype.h>
+
 #ifdef __CELLOS_LV2__
 #include <unistd.h>
 #endif
