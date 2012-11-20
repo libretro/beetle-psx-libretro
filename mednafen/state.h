@@ -6,13 +6,11 @@
 
 typedef struct
 {
-        uint8 *data;
-        uint32 loc;
-        uint32 len;
-
-        uint32 malloced;
-
-	uint32 initial_malloc; // A setting!
+   uint8 *data;
+   uint32 loc;
+   uint32 len;
+   uint32 malloced;
+   uint32 initial_malloc; // A setting!
 } StateMem;
 
 // Eh, we abuse the smem_* in-memory stream code
@@ -42,18 +40,14 @@ int MDFNSS_LoadSM(StateMem *st, int, int);
 
 #define MDFNSTATE_BOOL		  0x08000000
 
-
-//// Array of structures
-//#define MDFNSTATE_ARRAYOFS	  0x04000000
-
 typedef struct {
-           void *v;		// Pointer to the variable/array
-           uint32 size;		// Length, in bytes, of the data to be saved EXCEPT:
-				//  In the case of MDFNSTATE_BOOL, it is the number of bool elements to save(bool is not always 1-byte).
-				// If 0, the subchunk isn't saved.
-	   uint32 flags;	// Flags
-	   const char *name;	// Name
-	   //uint32 struct_size;	// Only used for MDFNSTATE_ARRAYOFS, sizeof(struct) that members of the linked SFORMAT struct are in.
+   void *v;		// Pointer to the variable/array
+   uint32 size;		// Length, in bytes, of the data to be saved EXCEPT:
+   //  In the case of MDFNSTATE_BOOL, it is the number of bool elements to save(bool is not always 1-byte).
+   // If 0, the subchunk isn't saved.
+   uint32 flags;	// Flags
+   const char *name;	// Name
+   //uint32 struct_size;	// Only used for MDFNSTATE_ARRAYOFS, sizeof(struct) that members of the linked SFORMAT struct are in.
 } SFORMAT;
 
 INLINE bool SF_IS_BOOL(bool *) { return(1); }

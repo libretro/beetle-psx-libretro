@@ -11,6 +11,4 @@ bool MDFNI_DumpSettingsDef(const char *path);
 
 #include <map>
 
-const std::multimap <uint32, MDFNCS> *MDFNI_GetSettings(void);
-
 #endif
