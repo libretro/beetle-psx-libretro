@@ -358,14 +358,8 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
-#if defined(WANT_WSWAN_EMU)
-   static MDFN_Rect rects[FB_WIDTH];
-#else
    static MDFN_Rect rects[FB_HEIGHT];
-#endif
-#if defined(WANT_PSX_EMU) || defined(WANT_WSWAN_EMU)
    rects[0].w = ~0;
-#endif
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
@@ -421,15 +415,12 @@ void retro_run()
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
    unsigned int ptrDiff = 0;
-#elif defined(WANT_WSWAN_EMU)
-   unsigned width = FB_WIDTH;
-   unsigned height = FB_HEIGHT;
 #else
-   unsigned width = rects->w;
-   unsigned height = rects->h;
+   unsigned width  = spec.DisplayRect.w;
+   unsigned height = spec.DisplayRect.h;
 #endif
 
-#ifdef WANT_PSX_EMU
+#if defined(WANT_PSX_EMU)
    // This is for PAL, the core implements PAL over NTSC TV so you get the
    // infamous PAL borders. This removes them. The PS1 supports only two horizontal
    // resolutions so it's OK to use constants and not percentage.
@@ -462,6 +453,9 @@ void retro_run()
    ptr += ptrDiff;
 
    video_cb(ptr, width, height, FB_WIDTH << 2);
+#elif defined(WANT_32BPP)
+   const uint16_t *pix = surf->pixels;
+   video_cb(pix, width, height, FB_WIDTH << 2);
 #elif defined(WANT_16BPP)
    const uint16_t *pix = surf->pixels16;
    video_cb(pix, width, height, FB_WIDTH << 1);
