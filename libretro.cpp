@@ -454,7 +454,7 @@ void retro_run()
 
    video_cb(ptr, width, height, FB_WIDTH << 2);
 #elif defined(WANT_32BPP)
-   const uint16_t *pix = surf->pixels;
+   const uint32_t *pix = surf->pixels;
    video_cb(pix, width, height, FB_WIDTH << 2);
 #elif defined(WANT_16BPP)
    const uint16_t *pix = surf->pixels16;
