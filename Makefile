@@ -147,9 +147,16 @@ NO_GCC := 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
-   CC = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
+   CXX = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+else ifeq ($(platform), psp1)
+	TARGET := $(TARGET_NAME)_psp1.a
+	CC = psp-gcc$(EXE_EXT)
+	CXX = psp-g++$(EXE_EXT)
+	AR = psp-ar$(EXE_EXT)
+	ENDIANNESS_DEFINES := -DLSB_FIRST
+	FLAGS += -DPSP
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
@@ -328,6 +335,8 @@ ifeq ($(platform), ps3)
 else ifeq ($(platform), sncps3)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), psl1ght)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), psp1)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), xenon)
 	$(AR) rcs $@ $(OBJECTS)
