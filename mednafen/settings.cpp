@@ -109,6 +109,13 @@ bool MDFN_GetSettingB(const char *name)
    /* LIBRETRO */
    if(!strcmp("libretro.cd_load_into_ram", name))
       return 0;
+   /* SNES */
+   if(!strcmp("snes.correct_aspect", name))
+      return 0;
+   if(!strcmp("snes.input.port1.multitap", name))
+      return 0;
+   if(!strcmp("snes.input.port2.multitap", name))
+      return 0;
    /* PCE_FAST */
    if(!strcmp("pce_fast.input.multitap", name))
       return 1;

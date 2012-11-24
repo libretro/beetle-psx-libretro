@@ -527,6 +527,8 @@ extern MDFNGI EmulatedWSwan;
 extern MDFNGI EmulatedNGP;
 #elif defined(WANT_GBA_EMU)
 extern MDFNGI EmulatedGBA;
+#elif defined(WANT_SNES_EMU)
+extern MDFNGI EmulatedSNES;
 #endif
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)

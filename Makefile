@@ -176,6 +176,63 @@ HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Oscs.cpp
 EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
 TARGET_NAME := mednafen_gba_libretro
+else ifeq ($(core), snes)
+   core = snes
+   NEED_BPP = 32
+   NEED_BLIP = 1
+	NEED_STEREO_SOUND = 1
+   CORE_DEFINE := -DWANT_SNES_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/snes
+
+CORE_SOURCES := $(CORE_DIR)/interface.cpp \
+	$(CORE_DIR)/src/cartridge/cartridge.cpp \
+	$(CORE_DIR)/src/cartridge/header.cpp \
+	$(CORE_DIR)/src/cartridge/gameboyheader.cpp \
+	$(CORE_DIR)/src/cartridge/serialization.cpp \
+	$(CORE_DIR)/src/cheat/cheat.cpp \
+	$(CORE_DIR)/src/chip/21fx/21fx.cpp \
+	$(CORE_DIR)/src/chip/bsx/bsx.cpp \
+	$(CORE_DIR)/src/chip/bsx/bsx_base.cpp \
+	$(CORE_DIR)/src/chip/bsx/bsx_cart.cpp \
+	$(CORE_DIR)/src/chip/bsx/bsx_flash.cpp \
+	$(CORE_DIR)/src/chip/cx4/cx4.cpp \
+	$(CORE_DIR)/src/chip/cx4/data.cpp \
+	$(CORE_DIR)/src/chip/cx4/functions.cpp \
+	$(CORE_DIR)/src/chip/cx4/oam.cpp \
+	$(CORE_DIR)/src/chip/cx4/opcodes.cpp \
+	$(CORE_DIR)/src/chip/cx4/serialization.cpp \
+	$(CORE_DIR)/src/chip/dsp1/dsp1.cpp \
+	$(CORE_DIR)/src/chip/dsp2/dsp2.cpp \
+	$(CORE_DIR)/src/chip/dsp3/dsp3.cpp \
+	$(CORE_DIR)/src/chip/dsp4/dsp4.cpp \
+	$(CORE_DIR)/src/chip/obc1/obc1.cpp \
+	$(CORE_DIR)/src/chip/sa1/sa1.cpp \
+	$(CORE_DIR)/src/chip/sdd1/sdd1.cpp \
+	$(CORE_DIR)/src/chip/spc7110/spc7110.cpp \
+	$(CORE_DIR)/src/chip/srtc/srtc.cpp \
+	$(CORE_DIR)/src/chip/st010/st010.cpp \
+	$(CORE_DIR)/src/chip/st011/st011.cpp \
+	$(CORE_DIR)/src/chip/st018/st018.cpp \
+	$(CORE_DIR)/src/chip/superfx/superfx.cpp \
+	$(CORE_DIR)/src/chip/supergameboy/supergameboy.cpp \
+	$(CORE_DIR)/src/cpu/cpu.cpp \
+	$(CORE_DIR)/src/cpu/core/core.cpp \
+	$(CORE_DIR)/src/cpu/scpu/scpu.cpp \
+	$(CORE_DIR)/src/dsp/sdsp/sdsp.cpp \
+	$(CORE_DIR)/src/lib/libco/libco.c \
+	$(CORE_DIR)/src/memory/memory.cpp \
+	$(CORE_DIR)/src/memory/smemory/smemory.cpp \
+	$(CORE_DIR)/src/ppu/ppu.cpp \
+	$(CORE_DIR)/src/ppu/bppu/bppu.cpp \
+	$(CORE_DIR)/src/smp/smp.cpp \
+	$(CORE_DIR)/src/smp/core/core.cpp \
+	$(CORE_DIR)/src/smp/ssmp/ssmp.cpp \
+	$(CORE_DIR)/src/system/system.cpp
+
+HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
+EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip -I$(MEDNAFEN_DIR)/snes/src/lib
+TARGET_NAME := mednafen_snes_libretro
+LDFLAGS += -ldl
 endif
 
 ifeq ($(NEED_BLIP), 1)

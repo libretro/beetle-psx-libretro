@@ -100,6 +100,20 @@ static Deinterlacer deint;
 #define FB_WIDTH 240
 #define FB_HEIGHT 160
 
+#elif defined(WANT_SNES_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "snes"
+#define MEDNAFEN_CORE_NAME "Mednafen bSNES"
+#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_EXTENSIONS "sfc|SFC|zip|ZIP"
+#define MEDNAFEN_CORE_TIMING_FPS 60.10
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 512
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 512
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 512
+#define FB_HEIGHT 512
+
 #endif
 
 #ifdef WANT_16BPP
@@ -396,6 +410,41 @@ static void update_input(void)
 
    // Possible endian bug ...
    game->SetInput(0, "gamepad", &input_buf);
+#elif defined(WANT_SNES_EMU)
+   static uint8_t input_buf[5][2];
+
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_Y,
+      RETRO_DEVICE_ID_JOYPAD_SELECT,
+      RETRO_DEVICE_ID_JOYPAD_START,
+      RETRO_DEVICE_ID_JOYPAD_UP,
+      RETRO_DEVICE_ID_JOYPAD_DOWN,
+      RETRO_DEVICE_ID_JOYPAD_LEFT,
+      RETRO_DEVICE_ID_JOYPAD_RIGHT,
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_X,
+      RETRO_DEVICE_ID_JOYPAD_L,
+      RETRO_DEVICE_ID_JOYPAD_R,
+   };
+
+   if (input_state_cb)
+   {
+      for (unsigned j = 0; j < 5; j++)
+      {
+         uint16_t input_state = 0;
+         for (unsigned i = 0; i < 13; i++)
+            input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+         // Input data must be little endian.
+         input_buf[j][0] = (input_state >> 0) & 0xff;
+         input_buf[j][1] = (input_state >> 8) & 0xff;
+      }
+   }
+
+   // Possible endian bug ...
+   for (unsigned i = 0; i < 5; i++)
+      game->SetInput(i, "gamepad", &input_buf[i][0]);
 #else
    static uint16_t input_buf[1];
    input_buf[0] = 0;
