@@ -351,25 +351,13 @@ static bool SaveMemorySub(bool load, const char *extension, SNES::MappedRAM *mem
   if(memoryA && memoryA->size() != 0 && memoryA->size() != -1U)
   {
    errno = 0;
-   if(fread(memoryA->data(), memoryA->size(), 1, gp) != memoryA->size())
-   {
-    ErrnoHolder ene(errno);
-
-    MDFN_PrintError(_("Error reading save file \"%s\": %s"), path.c_str(), ene.StrError());
-    return(false);
-   }
+   fread(memoryA->data(), memoryA->size(), 1, gp);
   }
 
   if(memoryB && memoryB->size() != 0 && memoryB->size() != -1U)
   {
    errno = 0;
-   if(fread(memoryB->data(), memoryB->size(), 1, gp) != memoryB->size())
-   {
-    ErrnoHolder ene(errno);
-
-    MDFN_PrintError(_("Error reading save file \"%s\": %s"), path.c_str(), ene.StrError());
-    return(false);
-   }
+   fread(memoryB->data(), memoryB->size(), 1, gp);
   }
 
   fclose(gp);
