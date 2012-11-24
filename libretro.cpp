@@ -72,6 +72,20 @@ static Deinterlacer deint;
 #define FB_WIDTH 224
 #define FB_HEIGHT 144
 
+#elif defined(WANT_NGP_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "ngp"
+#define MEDNAFEN_CORE_NAME "Neo Geo Pocket"
+#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_EXTENSIONS "ngp|NGP|ngc|NGC|zip|ZIP"
+#define MEDNAFEN_CORE_TIMING_FPS 60.25
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 160
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 152
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 160
+#define FB_HEIGHT 152
+
 #endif
 
 #ifdef WANT_16BPP
@@ -332,9 +346,9 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_B,
    };
 
-for (unsigned i = 0; i < 11; i++)
- input_buf |= map[i] != -1u &&
-    input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+   for (unsigned i = 0; i < 11; i++)
+      input_buf |= map[i] != -1u &&
+         input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
 #ifdef MSB_FIRST
    union {
@@ -346,6 +360,28 @@ for (unsigned i = 0; i < 11; i++)
 #endif
 
    game->SetInput(0, "gamepad", &input_buf);
+#else
+   static uint16_t input_buf[1];
+   input_buf[0] = 0;
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_UP,
+      RETRO_DEVICE_ID_JOYPAD_DOWN,
+      RETRO_DEVICE_ID_JOYPAD_LEFT,
+      RETRO_DEVICE_ID_JOYPAD_RIGHT,
+      RETRO_DEVICE_ID_JOYPAD_A, //A button
+      RETRO_DEVICE_ID_JOYPAD_B, //B button
+      RETRO_DEVICE_ID_JOYPAD_START, //Option button
+   };
+
+   for (unsigned j = 0; j < 1; j++)
+   {
+      for (unsigned i = 0; i < 7; i++)
+         input_buf[j] |= map[i] != -1u &&
+            input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+   }
+
+   // Possible endian bug ...
+   game->SetInput(0, "gamepad", &input_buf[0]);
 #endif
 }
 

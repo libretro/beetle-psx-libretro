@@ -523,6 +523,8 @@ extern MDFNGI EmulatedPCE;
 extern MDFNGI EmulatedPCE_Fast;
 #elif defined(WANT_WSWAN_EMU)
 extern MDFNGI EmulatedWSwan;
+#elif defined(WANT_NGP_EMU)
+extern MDFNGI EmulatedNGP;
 #endif
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)

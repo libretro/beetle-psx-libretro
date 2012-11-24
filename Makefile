@@ -106,6 +106,44 @@ CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/eeprom.cpp \
 	$(CORE_DIR)/rtc.cpp
 TARGET_NAME := mednafen_wswan_libretro
+else ifeq ($(core), ngp)
+   core = ngp
+   NEED_BPP = 32
+   NEED_BLIP = 1
+	NEED_STEREO_SOUND = 1
+   CORE_DEFINE := -DWANT_NGP_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/ngp
+
+CORE_SOURCES := $(CORE_DIR)/bios.cpp \
+	$(CORE_DIR)/biosHLE.cpp \
+	$(CORE_DIR)/dma.cpp \
+	$(CORE_DIR)/flash.cpp \
+	$(CORE_DIR)/gfx.cpp \
+	$(CORE_DIR)/gfx_scanline_colour.cpp \
+	$(CORE_DIR)/gfx_scanline_mono.cpp \
+	$(CORE_DIR)/interrupt.cpp \
+	$(CORE_DIR)/mem.cpp \
+	$(CORE_DIR)/neopop.cpp \
+	$(CORE_DIR)/rom.cpp \
+	$(CORE_DIR)/rtc.cpp \
+	$(CORE_DIR)/sound.cpp \
+	$(CORE_DIR)/T6W28_Apu.cpp \
+	$(CORE_DIR)/Z80_interface.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_disassemble.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_disassemble_extra.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_disassemble_reg.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_disassemble_dst.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_disassemble_src.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret_dst.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret_reg.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret_single.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret_src.cpp \
+	$(CORE_DIR)/TLCS-900h/TLCS900h_registers.cpp
+
+HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80.cpp \
+						$(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80_ops.cpp
+TARGET_NAME := mednafen_ngp_libretro
 endif
 
 ifeq ($(NEED_BLIP), 1)
@@ -308,7 +346,7 @@ endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl $(CORE_INCDIR)
+FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_cpu $(CORE_INCDIR)
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE)
 
