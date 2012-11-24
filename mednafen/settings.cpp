@@ -179,6 +179,12 @@ extern std::string retro_base_name;
 std::string MDFN_GetSettingS(const char *name)
 {
    const std::string s = "/";
+   /* GBA */
+   if(!strcmp("gba.bios", name))
+   {
+      fprintf(stderr, "gba.bios: %s\n", std::string("gba_bios.bin").c_str());
+      return std::string(retro_base_directory) + s + std::string("gba_bios.bin");
+   }
    /* PCE_FAST */
    if(!strcmp("pce_fast.cdbios", name))
    {

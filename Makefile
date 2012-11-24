@@ -144,6 +144,38 @@ CORE_SOURCES := $(CORE_DIR)/bios.cpp \
 HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80_ops.cpp
 TARGET_NAME := mednafen_ngp_libretro
+else ifeq ($(core), gba)
+   core = gba
+   NEED_BPP = 32
+   NEED_BLIP = 1
+	NEED_STEREO_SOUND = 1
+   CORE_DEFINE := -DWANT_GBA_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/gba
+
+CORE_SOURCES := $(CORE_DIR)/arm.cpp \
+	$(CORE_DIR)/bios.cpp \
+	$(CORE_DIR)/eeprom.cpp \
+	$(CORE_DIR)/flash.cpp \
+	$(CORE_DIR)/GBA.cpp \
+	$(CORE_DIR)/GBAinline.cpp \
+	$(CORE_DIR)/Gfx.cpp \
+	$(CORE_DIR)/Globals.cpp \
+	$(CORE_DIR)/Mode0.cpp \
+	$(CORE_DIR)/Mode1.cpp \
+	$(CORE_DIR)/Mode2.cpp \
+	$(CORE_DIR)/Mode3.cpp \
+	$(CORE_DIR)/Mode4.cpp \
+	$(CORE_DIR)/Mode5.cpp \
+	$(CORE_DIR)/RTC.cpp \
+	$(CORE_DIR)/Sound.cpp \
+	$(CORE_DIR)/sram.cpp \
+	$(CORE_DIR)/thumb.cpp
+
+HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
+						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu_State.cpp \
+						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Oscs.cpp
+EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
+TARGET_NAME := mednafen_gba_libretro
 endif
 
 ifeq ($(NEED_BLIP), 1)
@@ -346,7 +378,7 @@ endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_cpu $(CORE_INCDIR)
+FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE)
 

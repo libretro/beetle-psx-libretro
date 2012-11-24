@@ -58,7 +58,7 @@ static const unsigned long crc_table[256] = {
 #define DO4_CRC32(buf) DO2_CRC32(buf); DO2_CRC32(buf);
 #define DO8_CRC32(buf) DO4_CRC32(buf); DO4_CRC32(buf);
 
-static unsigned long crc32(unsigned long crc, const unsigned char *buf, unsigned int len)
+unsigned long crc32(unsigned long crc, const unsigned char *buf, unsigned int len)
 {
 	if (buf == 0) return 0L;
 	crc = crc ^ 0xffffffffL;
