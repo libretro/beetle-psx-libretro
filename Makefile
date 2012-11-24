@@ -156,7 +156,7 @@ else ifeq ($(platform), psp1)
 	CXX = psp-g++$(EXE_EXT)
 	AR = psp-ar$(EXE_EXT)
 	ENDIANNESS_DEFINES := -DLSB_FIRST
-	FLAGS += -DPSP
+	FLAGS += -DPSP -G0
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
