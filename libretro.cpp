@@ -104,7 +104,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "snes"
 #define MEDNAFEN_CORE_NAME "Mednafen bSNES"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "sfc|SFC|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "smc|SMC|fig|FIG|bs|BS|st|ST|sfc|SFC|zip|ZIP"
 #define MEDNAFEN_CORE_TIMING_FPS 60.10
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
