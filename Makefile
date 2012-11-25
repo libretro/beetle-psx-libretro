@@ -69,16 +69,13 @@ else ifeq ($(core), pce-fast)
 	NEED_SCSI_CD = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-0924
+   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
 
 CORE_SOURCES := $(CORE_DIR)/huc.cpp \
 	$(CORE_DIR)/pce_huc6280.cpp \
 	$(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/pce.cpp \
 	$(CORE_DIR)/tsushin.cpp \
-	$(CORE_DIR)/input/gamepad.cpp \
-	$(CORE_DIR)/input/mouse.cpp \
-	$(CORE_DIR)/input/tsushinkb.cpp \
 	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
 
