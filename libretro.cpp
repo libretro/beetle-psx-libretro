@@ -114,6 +114,20 @@ static Deinterlacer deint;
 #define FB_WIDTH 512
 #define FB_HEIGHT 512
 
+#elif defined(WANT_VB_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "vb"
+#define MEDNAFEN_CORE_NAME "Mednafen VB"
+#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_EXTENSIONS "vb|VB|vboy|VBOY|bin|BIN|zip|ZIP"
+#define MEDNAFEN_CORE_TIMING_FPS 50.27
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 384
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 224
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 384
+#define FB_HEIGHT 256
+
 #endif
 
 #ifdef WANT_16BPP
@@ -445,6 +459,35 @@ static void update_input(void)
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
       game->SetInput(i, "gamepad", &input_buf[i][0]);
+#elif defined(WANT_VB_EMU)
+   static uint16_t input_buf[1];
+   input_buf[0] = 0;
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_R,
+      RETRO_DEVICE_ID_JOYPAD_L,
+      RETRO_DEVICE_ID_JOYPAD_L2, //right d-pad UP
+      RETRO_DEVICE_ID_JOYPAD_R3, //right d-pad RIGHT
+      RETRO_DEVICE_ID_JOYPAD_RIGHT, //left d-pad
+      RETRO_DEVICE_ID_JOYPAD_LEFT, //left d-pad
+      RETRO_DEVICE_ID_JOYPAD_DOWN, //left d-pad
+      RETRO_DEVICE_ID_JOYPAD_UP, //left d-pad
+      RETRO_DEVICE_ID_JOYPAD_START,
+      RETRO_DEVICE_ID_JOYPAD_SELECT,
+      RETRO_DEVICE_ID_JOYPAD_R2, //right d-pad LEFT
+      RETRO_DEVICE_ID_JOYPAD_L3, //right d-pad DOWN
+   };
+
+   for (unsigned j = 0; j < 1; j++)
+   {
+      for (unsigned i = 0; i < 14; i++)
+         input_buf[j] |= map[i] != -1u &&
+            input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+   }
+
+   // Possible endian bug ...
+   game->SetInput(0, "gamepad", &input_buf[0]);
 #else
    static uint16_t input_buf[1];
    input_buf[0] = 0;

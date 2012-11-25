@@ -17,7 +17,7 @@ endif
 endif
 
 # If you have a system with 1GB RAM or more - cache the whole 
-# CD in order to prevent file access delays/hiccups
+# CD for CD-based systems in order to prevent file access delays/hiccups
 CACHE_CD = 0
 NEED_TRIO = 1
 
@@ -172,7 +172,26 @@ HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu_State.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Oscs.cpp
 EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
-TARGET_NAME := mednafen_gba_libretro
+TARGET_NAME := mednafen_$(core)_libretro
+else ifeq ($(core), vb)
+   core = vb
+   NEED_BPP = 32
+   NEED_BLIP = 1
+	NEED_STEREO_SOUND = 1
+   CORE_DEFINE := -DWANT_VB_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/vb
+
+CORE_SOURCES := $(CORE_DIR)/input.cpp \
+	$(CORE_DIR)/timer.cpp \
+	$(CORE_DIR)/vb.cpp \
+	$(CORE_DIR)/vip.cpp \
+	$(CORE_DIR)/vsu.cpp
+
+LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
+HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
+						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
+EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
+TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
    core = snes
    NEED_BPP = 32
@@ -216,7 +235,6 @@ CORE_SOURCES := $(CORE_DIR)/interface.cpp \
 	$(CORE_DIR)/src/cpu/core/core.cpp \
 	$(CORE_DIR)/src/cpu/scpu/scpu.cpp \
 	$(CORE_DIR)/src/dsp/sdsp/sdsp.cpp \
-	$(CORE_DIR)/src/lib/libco/libco.c \
 	$(CORE_DIR)/src/memory/memory.cpp \
 	$(CORE_DIR)/src/memory/smemory/smemory.cpp \
 	$(CORE_DIR)/src/ppu/ppu.cpp \
@@ -225,6 +243,8 @@ CORE_SOURCES := $(CORE_DIR)/interface.cpp \
 	$(CORE_DIR)/src/smp/core/core.cpp \
 	$(CORE_DIR)/src/smp/ssmp/ssmp.cpp \
 	$(CORE_DIR)/src/system/system.cpp
+
+LIBRETRO_SOURCES_C := $(CORE_DIR)/src/lib/libco/libco.c
 
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
 EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip -I$(MEDNAFEN_DIR)/snes/src/lib

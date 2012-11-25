@@ -28,6 +28,11 @@ bool MDFN_SaveSettings(const char *path)
 
 uint64 MDFN_GetSettingUI(const char *name)
 {
+   /* VB */
+   if(!strcmp("vb.anaglyph.lcolor", name))
+      return 0xFF0000;
+   if(!strcmp("vb.anaglyph.rcolor", name))
+      return 0x000000;
    /* PCE FAST */
    if(!strcmp("pce_fast.cddavolume", name)) /* make configurable */
       return 100;
@@ -75,6 +80,9 @@ uint64 MDFN_GetSettingUI(const char *name)
 
 int64 MDFN_GetSettingI(const char *name)
 {
+   /* VB */
+   if(!strcmp("vb.anaglyph.preset", name))
+      return 0;
    /* PSX */
    if(!strcmp("psx.region_default", name)) /* make configurable */
       return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
@@ -109,6 +117,11 @@ bool MDFN_GetSettingB(const char *name)
    /* LIBRETRO */
    if(!strcmp("libretro.cd_load_into_ram", name))
       return 0;
+   /* VB */
+   if(!strcmp("vb.instant_display_hack", name))
+      return 1;
+   if(!strcmp("vb.allow_draw_skip", name))
+      return 1;
    /* SNES */
    if(!strcmp("snes.correct_aspect", name))
       return 0;
