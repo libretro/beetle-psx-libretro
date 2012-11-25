@@ -434,20 +434,19 @@ bool CPUWriteBatteryFile(const char *filename)
 
 bool CPUReadBatteryFile(const char *filename)
 {
-#if 0
- gzFile gp = gzopen(filename, "rb");
+ FILE *gp = fopen(filename, "rb");
  long size;
 
  if(!gp)
   return(FALSE);
 
  size = 0;
- while(gzgetc(gp) != EOF)
+ while(fgetc(gp) != EOF)
   size++;
 
  if(size == 512 || size == 0x2000) // Load the file as EEPROM for Mednafen < 0.8.2
  {
-  gzclose(gp);
+  fclose(gp);
 
   if(cpuEEPROMEnabled)
   {
@@ -457,13 +456,13 @@ bool CPUReadBatteryFile(const char *filename)
   return(FALSE);
  }
 
- gzseek(gp, 0, SEEK_SET);
+ fseek(gp, 0, SEEK_SET);
 
  if(size == 0x20000) 
  {
-  if(gzread(gp, flashSaveMemory, 0x20000) != 0x20000) 
+  if(fread(flashSaveMemory, 0x20000, 1, gp) != 0x20000) 
   {
-   gzclose(gp);
+   fclose(gp);
    return(FALSE);
   }
   if(!FlashSizeSet)
@@ -474,9 +473,9 @@ bool CPUReadBatteryFile(const char *filename)
  } 
  else 
  {
-  if(gzread(gp, flashSaveMemory, 0x10000) != 0x10000) 
+  if(fread(flashSaveMemory, 0x10000, 1, gp) != 0x10000) 
   {
-   gzclose(gp);
+   fclose(gp);
    return(FALSE);
   }
   if(!FlashSizeSet)
@@ -485,10 +484,8 @@ bool CPUReadBatteryFile(const char *filename)
    FlashSizeSet = TRUE;
   }
  }
- gzclose(gp);
+ fclose(gp);
  return(TRUE);
-#endif
- return TRUE;
 }
 
 void CPUCleanUp()
@@ -747,11 +744,10 @@ static int Load(const char *name, MDFNFILE *fp)
 
   std::string colormap_fn = MDFN_MakeFName(MDFNMKF_PALETTE, 0, NULL).c_str();
 
-#if 0
   {
    MDFN_printf(_("Loading custom palette from \"%s\"...\n"),  colormap_fn.c_str());
    MDFN_indent(1);
-   gzFile gp = gzopen(colormap_fn.c_str(), "rb");
+   FILE *gp = fopen(colormap_fn.c_str(), "rb");
    if(!gp)
    {
     ErrnoHolder ene(errno);
@@ -767,7 +763,7 @@ static int Load(const char *name, MDFNFILE *fp)
    }
    else if((CustomColorMap = (uint8*)MDFN_malloc(32768 * 3, _("custom color map"))))
    {
-    if(gzread(gp, CustomColorMap, 32768 * 3) != 32768 * 3)
+    if(fread(CustomColorMap, 32768 * 3, 1, gp) != 32768 * 3)
     {
      MDFN_printf(_("Error reading file\n"));
      MDFN_indent(-1);
@@ -783,7 +779,6 @@ static int Load(const char *name, MDFNFILE *fp)
    }
    MDFN_indent(-1);
   }
-#endif
 
  return(1);
 }
