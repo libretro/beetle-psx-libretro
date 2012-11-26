@@ -1,4 +1,68 @@
- const void * const IOReadHandlers[0x20] =
+#ifdef __CELLOS_LV2__
+ A &= 0x1FFF;
+
+ unsigned val = ((A & 0x1C00) >> 8) | (A & 0x3);
+
+ switch(val)
+ {
+   case 0:
+     goto VDC_00;
+   case 1:
+     goto VDC_01;
+   case 2:
+     goto VDC_02;
+   case 3:
+     goto VDC_03;
+   case 4:
+     goto VCE_00;
+   case 5:
+     goto VCE_01;
+   case 6:
+     goto VCE_02;
+   case 7:
+     goto VCE_03;
+   case 8:
+   case 9:
+   case 10:
+   case 11:
+     goto PSG;
+   case 12:
+     goto TIMER_00;
+   case 13:
+     goto TIMER_01;
+   case 14:
+     goto TIMER_02;
+   case 15:
+     goto TIMER_03;
+   case 16:
+     goto INPUT_00;
+   case 17:
+     goto INPUT_01;
+   case 18:
+     goto INPUT_02;
+   case 19:
+     goto INPUT_03;
+   case 20:
+     goto IRQ_00;
+   case 21:
+     goto IRQ_01;
+   case 22:
+     goto IRQ_02;
+   case 23:
+     goto IRQ_03;
+   case 24:
+   case 25:
+   case 26:
+   case 27:
+     goto CDROM;
+   case 28:
+   case 29:
+   case 30:
+   case 31:
+     goto EXP;
+ }
+#else
+   const void * const IOReadHandlers[0x20] =
  {
   &&VDC_00, &&VDC_01, &&VDC_02, &&VDC_03,
   &&VCE_00, &&VCE_01, &&VCE_02, &&VCE_03,
@@ -13,6 +77,7 @@
  A &= 0x1FFF;
 
  goto *IOReadHandlers[((A & 0x1C00) >> 8) | (A & 0x3)];
+#endif
 
 #if IOREAD_SGX==1
   VDC_00:
