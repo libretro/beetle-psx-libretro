@@ -428,8 +428,6 @@ EXTRA_GCC_FLAGS := -funroll-loops -ffast-math
 ifeq ($(NO_GCC),1)
 	EXTRA_GCC_FLAGS :=
 	WARNINGS :=
-else
-	FLAGS += -std=gnu99
 endif
 
 
