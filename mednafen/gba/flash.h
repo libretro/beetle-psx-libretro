@@ -27,8 +27,8 @@ bool GBA_Flash_Init(void);
 void GBA_Flash_Kill(void);
 void GBA_Flash_Reset(void);
 
-extern void flashSaveGame(gzFile gzFile);
-extern void flashReadGame(gzFile gzFile, int version);
+extern void flashSaveGame(FILE *file);
+extern void flashReadGame(FILE *file, int version);
 extern uint8 flashRead(uint32 address);
 extern void flashWrite(uint32 address, uint8 byte);
 extern uint8 *flashSaveMemory;

@@ -146,6 +146,7 @@ else ifeq ($(core), gba)
    NEED_BPP = 32
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
+   NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_GBA_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/gba
 

@@ -35,13 +35,12 @@
 #include "arm.h"
 #include "thumb.h"
 
-#include <memory.h>
 #include <stdarg.h>
 #include <string.h>
 #include <trio/trio.h>
 #include <errno.h>
 
-#include "../../scrc32.cpp"
+#include "../../scrc32.h"
 
 namespace MDFN_IEN_GBA
 {
