@@ -402,6 +402,34 @@ static void update_input(void)
 #endif
 
    game->SetInput(0, "gamepad", &input_buf);
+#elif defined(WANT_NGP_EMU)
+   static uint16_t input_buf;
+   input_buf = 0;
+
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_UP, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_DOWN, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_LEFT, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_RIGHT, //X Cursor horizontal-layout games
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_START,
+   };
+
+   for (unsigned i = 0; i < 8; i++)
+      input_buf |= map[i] != -1u &&
+         input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+#ifdef MSB_FIRST
+   union {
+      uint8_t b[2];
+      uint16_t s;
+   } u;
+   u.s = input_buf;
+   input_buf = u.b[0] | u.b[1] << 8;
+#endif
+
+   game->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_GBA_EMU)
    static uint16_t input_buf;
    input_buf = 0;
