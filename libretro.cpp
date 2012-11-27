@@ -485,6 +485,9 @@ static void update_input(void)
       } u;
       u.s = input_buf[j];
       input_buf[j] = u.b[0] | u.b[1] << 8;
+#else
+      input_buf[j][0] = (input_state >> 0) & 0xff;
+      input_buf[j][1] = (input_state >> 8) & 0xff;
 #endif
       }
    }
