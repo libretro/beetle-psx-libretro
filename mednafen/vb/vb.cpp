@@ -26,7 +26,9 @@
 #include "../general.h"
 #include "../md5.h"
 #include "../mempatcher.h"
+#if 0
 #include <iconv.h>
+#endif
 
 //#define VB_SUPPORT_BIN_EXT		// Even with this enabled, any *.bin file loaded must be in the internal database to be recognized as a VB game.
 
@@ -472,6 +474,7 @@ struct VB_HeaderInfo
 
 static void ReadHeader(MDFNFILE *fp, VB_HeaderInfo *hi)
 {
+#if 0
  iconv_t sjis_ict = iconv_open("UTF-8", "shift_jis");
 
  if(sjis_ict != (iconv_t)-1)
@@ -493,6 +496,7 @@ static void ReadHeader(MDFNFILE *fp, VB_HeaderInfo *hi)
   MDFN_trim(hi->game_title);
  }
  else
+#endif
   hi->game_title[0] = 0;
 
  hi->game_code = MDFN_de32lsb(fp->data + (0xFFFFFDFB & (fp->size - 1)));

@@ -126,7 +126,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 224
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 384
-#define FB_HEIGHT 256
+#define FB_HEIGHT 224
 
 #endif
 
@@ -478,9 +478,14 @@ static void update_input(void)
          for (unsigned i = 0; i < 13; i++)
             input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
-         // Input data must be little endian.
-         input_buf[j][0] = (input_state >> 0) & 0xff;
-         input_buf[j][1] = (input_state >> 8) & 0xff;
+#ifdef MSB_FIRST
+      union {
+         uint8_t b[2];
+         uint16_t s;
+      } u;
+      u.s = input_buf[j];
+      input_buf[j] = u.b[0] | u.b[1] << 8;
+#endif
       }
    }
 
@@ -512,6 +517,15 @@ static void update_input(void)
       for (unsigned i = 0; i < 14; i++)
          input_buf[j] |= map[i] != -1u &&
             input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+#ifdef MSB_FIRST
+      union {
+         uint8_t b[2];
+         uint16_t s;
+      } u;
+      u.s = input_buf[j];
+      input_buf[j] = u.b[0] | u.b[1] << 8;
+#endif
    }
 
    // Possible endian bug ...
