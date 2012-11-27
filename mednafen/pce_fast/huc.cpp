@@ -275,7 +275,7 @@ int HuCLoadCD(const char *bios_path)
 
  memset(ROMSpace, 0xFF, 262144);
 
- memcpy(ROMSpace, fp.Data() + (fp.Size() & 512), ((fp.Size() & ~512) > 262144) ? 262144 : (fp.Size() &~ 512) );
+ memcpy(ROMSpace, fp.f_data + (fp.f_size & 512), ((fp.f_size & ~512) > 262144) ? 262144 : (fp.f_size &~ 512) );
 
  fp.Close();
 

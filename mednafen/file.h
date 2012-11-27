@@ -25,20 +25,6 @@ class MDFNFILE
         bool ApplyIPS(FILE *);
 	bool Close(void);
 
-	const int64 &size;
-	const uint8 * const &data;
-	const char * const &ext;
-
-	inline int64 Size(void)
-	{
-	 return(f_size);
-	}
-
-	inline const uint8 *Data(void)
-	{
-	 return(f_data);
-	}
-	
 	uint64 fread(void *ptr, size_t size, size_t nmemb);
 	int fseek(int64 offset, int whence);
 
@@ -69,9 +55,9 @@ class MDFNFILE
 	}
 
 	char *fgets(char *s, int size);
-        uint8 *f_data;
-        int64 f_size;
-        char *f_ext;
+   uint8 *f_data;
+   int64 f_size;
+   char *f_ext;
 
 	private:
 

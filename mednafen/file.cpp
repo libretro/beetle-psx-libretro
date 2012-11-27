@@ -43,11 +43,11 @@ bool MDFNFILE::MakeMemWrapAndClose(void *tz)
   f_size = ::ftell((FILE *)tz);
   ::fseek((FILE *)tz, 0, SEEK_SET);
 
-  if(!(f_data = (uint8*)MDFN_malloc(size, _("file read buffer"))))
+  if(!(f_data = (uint8*)MDFN_malloc(f_size, _("file read buffer"))))
   {
      goto doret;
   }
-  if((int64)::fread(f_data, 1, size, (FILE *)tz) != size)
+  if((int64)::fread(f_data, 1, f_size, (FILE *)tz) != f_size)
   {
      ErrnoHolder ene(errno);
      MDFN_PrintError(_("Error reading file: %s"), ene.StrError());
@@ -64,7 +64,7 @@ bool MDFNFILE::MakeMemWrapAndClose(void *tz)
  return(ret);
 }
 
-MDFNFILE::MDFNFILE() : size(f_size), data((const uint8* const &)f_data), ext((const char * const &)f_ext)
+MDFNFILE::MDFNFILE()
 {
  f_data = NULL;
  f_size = 0;
@@ -73,7 +73,7 @@ MDFNFILE::MDFNFILE() : size(f_size), data((const uint8* const &)f_data), ext((co
  location = 0;
 }
 
-MDFNFILE::MDFNFILE(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose) : size(f_size), data((const uint8* const &)f_data), ext((const char * const &)f_ext)
+MDFNFILE::MDFNFILE(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose)
 {
  if(!Open(path, known_ext, purpose, false))
  {
@@ -179,10 +179,10 @@ int MDFNFILE::fseek(int64 offset, int whence)
 
 int MDFNFILE::read16le(uint16 *val)
 {
- if((location + 2) > size)
+ if((location + 2) > f_size)
   return 0;
 
- *val = MDFN_de16lsb(data + location);
+ *val = MDFN_de16lsb(f_data + location);
 
  location += 2;
 
@@ -191,10 +191,10 @@ int MDFNFILE::read16le(uint16 *val)
 
 int MDFNFILE::read32le(uint32 *val)
 {
- if((location + 4) > size)
+ if((location + 4) > f_size)
   return 0;
 
- *val = MDFN_de32lsb(data + location);
+ *val = MDFN_de32lsb(f_data + location);
 
  location += 4;
 
@@ -213,7 +213,7 @@ char *MDFNFILE::fgets(char *s, int buffer_size)
 
  while(pos < (buffer_size - 1) && location < buffer_size)
  {
-  int v = data[location];
+  int v = f_data[location];
   s[pos] = v;
   location++;
   pos++;
