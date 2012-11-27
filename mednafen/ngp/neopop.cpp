@@ -152,7 +152,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(strcasecmp(fp->ext, "ngp") && strcasecmp(fp->ext, "ngpc") && strcasecmp(fp->ext, "ngc") && strcasecmp(fp->ext, "npc"))
+ if(strcasecmp(fp->f_ext, "ngp") && strcasecmp(fp->f_ext, "ngpc") && strcasecmp(fp->f_ext, "ngc") && strcasecmp(fp->f_ext, "npc"))
   return(FALSE);
 
  return(TRUE);
@@ -160,11 +160,11 @@ static bool TestMagic(const char *name, MDFNFILE *fp)
 
 static int Load(const char *name, MDFNFILE *fp)
 {
- if(!(ngpc_rom.data = (uint8 *)MDFN_malloc(fp->size, _("Cart ROM"))))
+ if(!(ngpc_rom.data = (uint8 *)MDFN_malloc(fp->f_size, _("Cart ROM"))))
   return(0);
 
- ngpc_rom.length = fp->size;
- memcpy(ngpc_rom.data, fp->data, fp->size);
+ ngpc_rom.length = fp->f_size;
+ memcpy(ngpc_rom.data, fp->f_data, fp->f_size);
 
  md5_context md5;
  md5.starts();

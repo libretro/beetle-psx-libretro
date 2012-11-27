@@ -1071,10 +1071,10 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(fp->size < 0x800)
+ if(fp->f_size < 0x800)
   return(false);
 
- if(memcmp(fp->data, "PS-X EXE", 8))
+ if(memcmp(fp->f_data, "PS-X EXE", 8))
   return(false);
 
  return(true);
@@ -1684,7 +1684,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
  try
  {
-   LoadEXE(fp->data, fp->size);
+   LoadEXE(fp->f_data, fp->f_size);
  }
  catch(std::exception &e)
  {

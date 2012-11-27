@@ -485,7 +485,7 @@ static void ReadHeader(MDFNFILE *fp, VB_HeaderInfo *hi)
   ibl = 20;
   obl = sizeof(hi->game_title) - 1;
 
-  in_ptr = (char*)fp->data + (0xFFFFFDE0 & (fp->size - 1));
+  in_ptr = (char*)fp->f_data + (0xFFFFFDE0 & (fp->f_size - 1));
   out_ptr = hi->game_title;
 
   iconv(sjis_ict, (char **)&in_ptr, &ibl, &out_ptr, &obl);
@@ -499,9 +499,9 @@ static void ReadHeader(MDFNFILE *fp, VB_HeaderInfo *hi)
 #endif
   hi->game_title[0] = 0;
 
- hi->game_code = MDFN_de32lsb(fp->data + (0xFFFFFDFB & (fp->size - 1)));
- hi->manf_code = MDFN_de16lsb(fp->data + (0xFFFFFDF9 & (fp->size - 1)));
- hi->version = fp->data[0xFFFFFDFF & (fp->size - 1)];
+ hi->game_code = MDFN_de32lsb(fp->f_data + (0xFFFFFDFB & (fp->f_size - 1)));
+ hi->manf_code = MDFN_de16lsb(fp->f_data + (0xFFFFFDF9 & (fp->f_size - 1)));
+ hi->version = fp->f_data[0xFFFFFDFF & (fp->f_size - 1)];
 }
 
 #ifdef VB_SUPPORT_BIN_EXT
@@ -554,11 +554,11 @@ static bool FindGame(MDFNFILE *fp)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(!strcasecmp(fp->ext, "vb") || !strcasecmp(fp->ext, "vboy"))
+ if(!strcasecmp(fp->f_ext, "vb") || !strcasecmp(fp->f_ext, "vboy"))
   return(true);
 
  #ifdef VB_SUPPORT_BIN_EXT
- if(!strcasecmp(fp->ext, "bin") && FindGame(fp))
+ if(!strcasecmp(fp->f_ext, "bin") && FindGame(fp))
   return(true);
  #endif
 
@@ -575,26 +575,26 @@ static int Load(const char *name, MDFNFILE *fp)
 
  cpu_mode = (V810_Emu_Mode)MDFN_GetSettingI("vb.cpu_emulation");
 
- if(fp->size != round_up_pow2(fp->size))
+ if(fp->f_size != round_up_pow2(fp->f_size))
  {
   puts("VB ROM image size is not a power of 2???");
   return(0);
  }
 
- if(fp->size < 256)
+ if(fp->f_size < 256)
  {
   puts("VB ROM image size is too small??");
   return(0);
  }
 
- if(fp->size > (1 << 24))
+ if(fp->f_size > (1 << 24))
  {
   puts("VB ROM image size is too large??");
   return(0);
  }
 
  md5.starts();
- md5.update(fp->data, fp->size);
+ md5.update(fp->f_data, fp->f_size);
  md5.finish(MDFNGameInfo->MD5);
 
  VB_HeaderInfo hinfo;
@@ -606,7 +606,7 @@ static int Load(const char *name, MDFNFILE *fp)
  MDFN_printf(_("Manufacturer Code: %d\n"), hinfo.manf_code);
  MDFN_printf(_("Version:   %u\n"), hinfo.version);
 
- MDFN_printf(_("ROM:       %dKiB\n"), (int)(fp->size / 1024));
+ MDFN_printf(_("ROM:       %dKiB\n"), (int)(fp->f_size / 1024));
  MDFN_printf(_("ROM MD5:   0x%s\n"), md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str());
  
  MDFN_printf("\n");
@@ -643,7 +643,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
 
  // Round up the ROM size to 65536(we mirror it a little later)
- GPROM_Mask = (fp->size < 65536) ? (65536 - 1) : (fp->size - 1);
+ GPROM_Mask = (fp->f_size < 65536) ? (65536 - 1) : (fp->f_size - 1);
 
  for(uint64 A = 0; A < 1ULL << 32; A += (1 << 27))
  {
@@ -659,9 +659,9 @@ static int Load(const char *name, MDFNFILE *fp)
  Map_Addresses.clear();
 
  // Mirror ROM images < 64KiB to 64KiB
- for(uint64 i = 0; i < 65536; i += fp->size)
+ for(uint64 i = 0; i < 65536; i += fp->f_size)
  {
-  memcpy(GPROM + i, fp->data, fp->size);
+  memcpy(GPROM + i, fp->f_data, fp->f_size);
  }
 
  GPRAM_Mask = 0xFFFF;

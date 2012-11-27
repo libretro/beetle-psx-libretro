@@ -597,15 +597,15 @@ static void RedoColorMap(const MDFN_PixelFormat &format) //int rshift, int gshif
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(!memcmp(fp->data, "PSF\x22", 4))
+ if(!memcmp(fp->f_data, "PSF\x22", 4))
   return(TRUE);
 
- if(!strcasecmp(fp->ext, "gba") || !strcasecmp(fp->ext, "agb"))
+ if(!strcasecmp(fp->f_ext, "gba") || !strcasecmp(fp->f_ext, "agb"))
   return(TRUE);
 
- if(fp->size >= 192 && !strcasecmp(fp->ext, "bin"))
+ if(fp->f_size >= 192 && !strcasecmp(fp->f_ext, "bin"))
  {
-  if((fp->data[0xb2] == 0x96 && fp->data[0xb3] == 0x00) || (fp->data[0] == 0x2E && fp->data[3] == 0xEA))
+  if((fp->f_data[0xb2] == 0x96 && fp->f_data[0xb3] == 0x00) || (fp->f_data[0] == 0x2E && fp->f_data[3] == 0xEA))
    return(TRUE);
  }
 
@@ -629,7 +629,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
 
   {
-   uint32 size = fp->size;
+   uint32 size = fp->f_size;
    uint8 *whereToLoad;
 
    if(cpuIsMultiBoot)
@@ -645,15 +645,15 @@ static int Load(const char *name, MDFNFILE *fp)
      size = 0x2000000;
    }
 
-   memcpy(whereToLoad, fp->data, size);
+   memcpy(whereToLoad, fp->f_data, size);
 
    md5_context md5;
    md5.starts();
-   md5.update(fp->data, size);
+   md5.update(fp->f_data, size);
    md5.finish(MDFNGameInfo->MD5);
 
    MDFN_printf(_("ROM:       %dKiB\n"), (size + 1023) / 1024);
-   MDFN_printf(_("ROM CRC32: 0x%08x\n"), (unsigned int)crc32(0, fp->data, size));
+   MDFN_printf(_("ROM CRC32: 0x%08x\n"), (unsigned int)crc32(0, fp->f_data, size));
    MDFN_printf(_("ROM MD5:   0x%s\n"), md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str());
 
    uint16 *temp = (uint16 *)(rom+((size+1)&~1));
@@ -2462,14 +2462,14 @@ static bool CPUInit(const std::string bios_fn)
    return(0);
   }
   
-  if(bios_fp.Size() != 0x4000)
+  if(bios_fp.f_size != 0x4000)
   {
    MDFN_PrintError(_("Invalid BIOS file size"));
    bios_fp.Close();
    return(0);
   }
 
-  memcpy(bios, bios_fp.Data(), 0x4000);
+  memcpy(bios, bios_fp.f_data, 0x4000);
 
   bios_fp.Close();
   useBios = true;

@@ -420,8 +420,8 @@ static bool SaveLoadMemory(bool load)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(strcasecmp(fp->ext, "smc") && strcasecmp(fp->ext, "swc") && strcasecmp(fp->ext, "sfc") && strcasecmp(fp->ext, "fig") &&
-        strcasecmp(fp->ext, "bs") && strcasecmp(fp->ext, "st"))
+ if(strcasecmp(fp->f_ext, "smc") && strcasecmp(fp->f_ext, "swc") && strcasecmp(fp->f_ext, "sfc") && strcasecmp(fp->f_ext, "fig") &&
+        strcasecmp(fp->f_ext, "bs") && strcasecmp(fp->f_ext, "st"))
  {
   return(false);
  }
@@ -474,10 +474,10 @@ static int Load(const char *name, MDFNFILE *fp)
   // Allocate 8MiB of space regardless of actual ROM image size, to prevent malformed or corrupted ROM images
   // from crashing the bsnes cart loading code.
 
-  const uint32 header_adjust = (((fp->size & 0x7FFF) == 512) ? 512 : 0);
+  const uint32 header_adjust = (((fp->f_size & 0x7FFF) == 512) ? 512 : 0);
   uint8 *export_ptr;
 
-  if((fp->size - header_adjust) > (8192 * 1024))
+  if((fp->f_size - header_adjust) > (8192 * 1024))
   {
    throw MDFN_Error(0, _("SNES ROM image is too large."));
   }
@@ -485,18 +485,18 @@ static int Load(const char *name, MDFNFILE *fp)
   md5_context md5;
 
   md5.starts();
-  md5.update(fp->data, fp->size);
+  md5.update(fp->f_data, fp->f_size);
   md5.finish(MDFNGameInfo->MD5);
 
   SNES::system.init(&meowface);
 
-  //const SNES::Cartridge::Type rom_type = SNES::cartridge.detect_image_type((uint8 *)fp->data, fp->size);
+  //const SNES::Cartridge::Type rom_type = SNES::cartridge.detect_image_type((uint8 *)fp->f_data, fp->size);
 
   export_ptr = new uint8[8192 * 1024];
   memset(export_ptr, 0x00, 8192 * 1024);
-  memcpy(export_ptr, fp->data + header_adjust, fp->size - header_adjust);
+  memcpy(export_ptr, fp->f_data + header_adjust, fp->f_size - header_adjust);
 
-  SNES::memory::cartrom.map(export_ptr, fp->size - header_adjust);
+  SNES::memory::cartrom.map(export_ptr, fp->f_size - header_adjust);
 
   SNES::cartridge.load(SNES::Cartridge::ModeNormal);
 
