@@ -531,6 +531,8 @@ extern MDFNGI EmulatedGBA;
 extern MDFNGI EmulatedSNES;
 #elif defined(WANT_VB_EMU)
 extern MDFNGI EmulatedVB;
+#elif defined(WANT_PCFX_EMU)
+extern MDFNGI EmulatedPCFX;
 #endif
 
 bool MDFNI_InitializeModules(const std::vector<MDFNGI *> &ExternalSystems)

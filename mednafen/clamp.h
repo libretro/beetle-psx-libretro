@@ -24,4 +24,12 @@ static INLINE void clamp(int32_t *val, size_t, size_t)
       *val = (*val >> 31) ^ 0x7FFF;
 }
 
+#ifdef WANT_PCFX_EMU
+static INLINE void clamp(int64_t *val, size_t, size_t)
+{
+   if ( (int16_t) *val != *val )
+      *val = (*val >> 31) ^ 0x7FFF;
+}
+#endif
+
 #endif
