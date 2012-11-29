@@ -1,4 +1,5 @@
 #include "mednafen/mednafen.h"
+#include "mednafen/mempatcher.h"
 #include "mednafen/git.h"
 #include "mednafen/general.h"
 #ifdef NEED_DEINTERLACER
@@ -162,12 +163,9 @@ static void check_system_specs(void)
 
 void retro_init()
 {
-   std::vector<MDFNGI*> ext;
-   MDFNI_InitializeModules(ext);
+   MDFNI_InitializeModule();
 
    const char *dir = NULL;
-
-   std::vector<MDFNSetting> settings;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
@@ -251,7 +249,20 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game()
 {
-   MDFNI_CloseGame();
+   if(game)
+   {
+      MDFN_FlushGameCheats(0);
+
+      game->CloseGame();
+      if(game->name)
+      {
+         free(game->name);
+         game->name=0;
+      }
+      MDFNMP_Kill();
+
+      game = NULL;
+   }
 }
 
 static unsigned retro_devices[2];
@@ -260,6 +271,7 @@ static unsigned retro_devices[2];
 // See mednafen/psx/input/gamepad.cpp
 static void update_input(void)
 {
+   MDFNGI *currgame = game;
 #if defined(WANT_PSX_EMU)
    union
    {
@@ -340,10 +352,10 @@ static void update_input(void)
       switch (retro_devices[j])
       {
          case RETRO_DEVICE_ANALOG:
-            game->SetInput(j, "dualanalog", &buf.u8[j]);
+            currgame->SetInput(j, "dualanalog", &buf.u8[j]);
             break;
          default:
-            game->SetInput(j, "gamepad", &buf.u8[j]);
+            currgame->SetInput(j, "gamepad", &buf.u8[j]);
             break;
       }
    }
@@ -382,7 +394,7 @@ static void update_input(void)
 
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
-      game->SetInput(i, "gamepad", &input_buf[i][0]);
+      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
 #elif defined(WANT_WSWAN_EMU)
    static uint16_t input_buf;
    input_buf = 0;
@@ -414,7 +426,7 @@ static void update_input(void)
    input_buf = u.b[0] | u.b[1] << 8;
 #endif
 
-   game->SetInput(0, "gamepad", &input_buf);
+   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_NGP_EMU)
    static uint16_t input_buf;
    input_buf = 0;
@@ -442,7 +454,7 @@ static void update_input(void)
    input_buf = u.b[0] | u.b[1] << 8;
 #endif
 
-   game->SetInput(0, "gamepad", &input_buf);
+   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_GBA_EMU)
    static uint16_t input_buf;
    input_buf = 0;
@@ -473,7 +485,7 @@ static void update_input(void)
 #endif
 
    // Possible endian bug ...
-   game->SetInput(0, "gamepad", &input_buf);
+   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_SNES_EMU)
    static uint8_t input_buf[5][2];
 
@@ -516,7 +528,7 @@ static void update_input(void)
 
    // Possible endian bug ...
    for (unsigned i = 0; i < 5; i++)
-      game->SetInput(i, "gamepad", &input_buf[i][0]);
+      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
 #elif defined(WANT_VB_EMU)
    static uint16_t input_buf[1];
    input_buf[0] = 0;
@@ -554,7 +566,7 @@ static void update_input(void)
    }
 
    // Possible endian bug ...
-   game->SetInput(0, "gamepad", &input_buf[0]);
+   currgame->SetInput(0, "gamepad", &input_buf[0]);
 #elif defined(WANT_PCFX_EMU)
    static uint16_t input_buf[2];
    input_buf[0] = input_buf[1] = 0;
@@ -588,7 +600,7 @@ static void update_input(void)
       input_buf[j] = u.b[0] | u.b[1] << 8;
 #endif
 
-      game->SetInput(j, "gamepad", &input_buf[j]);
+      currgame->SetInput(j, "gamepad", &input_buf[j]);
    }
 #else
    static uint16_t input_buf[1];
@@ -611,7 +623,7 @@ static void update_input(void)
    }
 
    // Possible endian bug ...
-   game->SetInput(0, "gamepad", &input_buf[0]);
+   currgame->SetInput(0, "gamepad", &input_buf[0]);
 #endif
 }
 
@@ -619,6 +631,8 @@ static uint64_t video_frames, audio_frames;
 
 void retro_run()
 {
+   MDFNGI *curgame = game;
+
    input_poll_cb();
 
    update_input();
@@ -652,7 +666,7 @@ void retro_run()
       last_sound_rate = spec.SoundRate;
    }
 
-   MDFNGameInfo->Emulate(&spec);
+   curgame->Emulate(&spec);
 
 #ifdef NEED_DEINTERLACER
    if(spec.InterlaceOn)
@@ -671,7 +685,7 @@ void retro_run()
       PrevInterlaced = false;
 #endif
 
-   int16 *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * MDFNGameInfo->soundchan;
+   int16 *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * curgame->soundchan;
    int32 SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
    const int32 SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 
@@ -837,12 +851,13 @@ static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {
+   MDFNGI *curgame = game;
    //if (serialize_size)
    //   return serialize_size;
 
-   if (!game->StateAction)
+   if (!curgame->StateAction)
    {
-      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", game->shortname);
+      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
       return 0;
    }
 
@@ -851,7 +866,7 @@ size_t retro_serialize_size(void)
 
    if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
    {
-      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", game->shortname);
+      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
       return 0;
    }
 
