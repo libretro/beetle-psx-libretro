@@ -214,21 +214,21 @@ std::string MDFN_GetSettingS(const char *name)
    /* PSX */
    if(!strcmp("psx.bios_eu", name))
    {
-      fprintf(stderr, "psx.bios_eu: %s%s\n", retro_base_directory.c_str(), name);
-      assert(0);
-      return std::string(retro_base_directory) + s + std::string("scph5502.bin");
+      std::string ret = std::string(retro_base_directory) + s + std::string("scph5502.bin");
+      fprintf(stderr, "psx.bios_eu: %s\n", ret.c_str());
+      return ret;
    }
    if(!strcmp("psx.bios_jp", name))
    {
-      fprintf(stderr, "psx.bios_jp: %s%s\n", retro_base_directory.c_str(), name);
-      assert(0);
-      return std::string(retro_base_directory) + s + std::string("scph5500.bin");
+      std::string ret = std::string(retro_base_directory) + s + std::string("scph5500.bin");
+      fprintf(stderr, "psx.bios_jp: %s\n", ret.c_str());
+      return ret;
    }
    if(!strcmp("psx.bios_na", name))
    {
-      fprintf(stderr, "psx.bios_na: %s%s\n", retro_base_directory.c_str(), name);
-      assert(0);
-      return std::string(retro_base_directory) + s + std::string("scph5501.bin");
+      std::string ret = std::string(retro_base_directory) + s + std::string("scph5501.bin");
+      fprintf(stderr, "psx.bios_na: %s\n", ret.c_str());
+      return ret;
    }
    if(!strcmp("psx.region_default", name)) /* make configurable */
       return "na";
