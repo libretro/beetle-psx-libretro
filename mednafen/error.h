@@ -3,7 +3,7 @@
 
 #include <errno.h>
 #include <string.h>
-#include <exception>
+#include <stdexcept>
 
 #ifdef __cplusplus
 
