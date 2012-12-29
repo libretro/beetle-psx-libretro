@@ -1,17 +1,6 @@
 #ifndef __MDFN_TYPES
 #define __MDFN_TYPES
 
-// Make sure this file is included BEFORE a few common standard C header files(stdio.h, errno.h, math.h, AND OTHERS, but this is not an exhaustive check, nor
-// should it be), so that any defines in config.h that change header file behavior will work properly.
-#if defined(EOF) || defined(EACCES) || defined(F_LOCK) || defined(NULL) || defined(O_APPEND) || defined(M_LOG2E)
- #error "Wrong include order for mednafen-types.h"
-#endif
-
-// Yes, yes, I know:  There's a better place for including config.h than here, but I'm tired, and this should work fine. :b
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include <assert.h>
 #include <stdint.h>
 
@@ -24,11 +13,6 @@ typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
-
-
-#if !defined(HAVE_NATIVE64BIT) && SIZEOF_VOID_P >= 8
-#define HAVE_NATIVE64BIT 1
-#endif
 
 #ifdef __GNUC__
 

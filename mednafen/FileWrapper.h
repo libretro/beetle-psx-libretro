@@ -1,9 +1,6 @@
 #ifndef __MDFN_FILEWRAPPER_H
 #define __MDFN_FILEWRAPPER_H
 
-#include <stdio.h>
-#include <string>
-
 // A stdio FILE wrapper(with some BSD and POSIXisms, and a little dash of Win32, thrown in for special behaviors)
 class FileWrapper
 {

@@ -31,10 +31,8 @@
 */
 
 #define _CDROMFILE_INTERNAL
-#include "../mednafen.h"
-
-#include <sys/types.h>
 #include <sys/stat.h>
+#include "../mednafen.h"
 
 #include <string.h>
 #include <errno.h>
@@ -622,6 +620,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
  int32 RunningLBA = 0;
  int32 LastIndex = 0;
+ (void)LastIndex;
  long FileOffset = 0;
 
  for(int x = FirstTrack; x < (FirstTrack + NumTracks); x++)

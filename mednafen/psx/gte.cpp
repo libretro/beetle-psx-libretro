@@ -1020,6 +1020,7 @@ INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16 *v, c
  const int32* cv = CRVectors.All[(instr >> 13) & 0x3];	\
  const int lm = (instr >> 10) & 1;			\
  int16 v[3];							\
+ (void)v; \
  if(v_i == 3)							\
  {								\
   v[0] = IR1;							\

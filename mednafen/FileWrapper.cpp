@@ -15,12 +15,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <sys/stat.h>
 #include "mednafen.h"
 #include "FileWrapper.h"
 
 #include <trio/trio.h>
 #include <stdarg.h>
-#include <sys/stat.h>
 #include <string.h>
 
 #ifdef __CELLOS_LV2__
