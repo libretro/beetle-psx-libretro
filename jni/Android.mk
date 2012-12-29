@@ -7,15 +7,18 @@ include $(CLEAR_VARS)
 
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_CXXFLAGS += -DANDROID_ARM
+LOCAL_CFLAGS +=-DANDROID_ARM
 LOCAL_ARM_MODE := arm
 endif
 
 ifeq ($(TARGET_ARCH),x86)
 LOCAL_CXXFLAGS +=  -DANDROID_X86
+LOCAL_CFLAGS += -DANDROID_X86
 endif
 
 ifeq ($(TARGET_ARCH),mips)
 LOCAL_CXXFLAGS += -DANDROID_MIPS -D__mips__ -D__MIPSEL__
+LOCAL_CFLAGS += -DANDROID_MIPS -D__mips__ -D__MIPSEL__
 endif
 
 MEDNAFEN_DIR := ../mednafen
@@ -85,12 +88,12 @@ CORE_SOURCES := $(CORE_DIR)/huc.cpp \
 	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
 
-HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/huc6280/huc6280.cpp
-HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
-HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
-HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
-OKIADPCM_SOURCES += $(MEDNAFEN_DIR)/okiadpcm.cpp
+HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/huc6280/huc6280.cpp
+HW_MISC_SOURCES := $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
+HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
+HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+CORE_CD_SOURCES := $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
+OKIADPCM_SOURCES := $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 16
@@ -144,7 +147,7 @@ CORE_SOURCES := $(CORE_DIR)/bios.cpp \
 	$(CORE_DIR)/TLCS-900h/TLCS900h_interpret_src.cpp \
 	$(CORE_DIR)/TLCS-900h/TLCS900h_registers.cpp
 
-HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80.cpp \
+HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/z80-fuse/z80_ops.cpp
 TARGET_NAME := mednafen_ngp_libretro
 else ifeq ($(core), gba)
@@ -175,7 +178,7 @@ CORE_SOURCES := $(CORE_DIR)/arm.cpp \
 	$(CORE_DIR)/sram.cpp \
 	$(CORE_DIR)/thumb.cpp
 
-HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
+HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu_State.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Oscs.cpp
 EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip
@@ -225,8 +228,8 @@ CORE_SOURCES := $(CORE_DIR)/king.cpp \
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
 HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
-HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
-HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
+HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
 EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip $(MEDNAFEN_DIR)/hw_video/huc6270
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
@@ -283,14 +286,10 @@ CORE_SOURCES := $(CORE_DIR)/interface.cpp \
 
 LIBRETRO_SOURCES_C := $(CORE_DIR)/src/lib/libco/libco.c
 
-HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
+HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
 EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip $(MEDNAFEN_DIR)/snes/src/lib
 TARGET_NAME := mednafen_snes_libretro
 LDFLAGS += -ldl
-endif
-
-ifeq ($(NEED_BLIP), 1)
-RESAMPLER_SOURCES += $(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp
 endif
 
 ifeq ($(NEED_STEREO_SOUND), 1)
@@ -312,21 +311,11 @@ FLAGS += -DNEED_DEINTERLACER
 endif
 
 ifeq ($(NEED_SCSI_CD), 1)
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
+SCSI_CD_SOURCES := $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
 endif
 
 ifeq ($(NEED_CD), 1)
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
-	$(MEDNAFEN_DIR)/cdrom/lec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
-	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
-	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
-	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
-	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
-	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
+CDROM_SOURCES := $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp $(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp $(MEDNAFEN_DIR)/cdrom/CDUtility.cpp $(MEDNAFEN_DIR)/cdrom/lec.cpp $(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp $(MEDNAFEN_DIR)/cdrom/audioreader.cpp $(MEDNAFEN_DIR)/cdrom/galois.cpp $(MEDNAFEN_DIR)/cdrom/recover-raw.cpp $(MEDNAFEN_DIR)/cdrom/l-ec.cpp $(MEDNAFEN_DIR)/cdrom/cdromif.cpp $(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
 FLAGS += -DNEED_CD
 endif
 
@@ -347,11 +336,10 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
-	$(CDROM_SOURCES) \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(RESAMPLER_SOURCES) \
+	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
 	$(OKIADPCM_SOURCES) \
@@ -360,12 +348,9 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 
 LIBRETRO_SOURCES := $(MEDNAFEN_LIBRETRO_DIR)/libretro.cpp $(MEDNAFEN_LIBRETRO_DIR)/stubs.cpp $(THREAD_STUBS)
 
-TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
-	$(MEDNAFEN_DIR)/trio/triostr.c
+SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(MEDNAFEN_DIR)/trio/trio.c $(MEDNAFEN_DIR)/trio/triostr.c
 
-SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
-
-LOCAL_SRC_FILES += $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES) $(SOURCES_C)
+LOCAL_SRC_FILES += $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(CDROM_SOURCES) $(SCSI_CD_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES) $(SOURCES_C) $(CORE_CD_SOURCES)
 
 WARNINGS := -Wall \
 	-Wno-sign-compare \
