@@ -179,7 +179,7 @@ CORE_SOURCES := $(CORE_DIR)/arm.cpp \
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Apu_State.cpp \
 						$(MEDNAFEN_DIR)/hw_sound/gb_apu/Gb_Oscs.cpp
-EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
+EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), vb)
    core = vb
@@ -198,7 +198,7 @@ CORE_SOURCES := $(CORE_DIR)/input.cpp \
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
 HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
-EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip
+EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), pcfx)
    core = pcfx
@@ -228,7 +228,7 @@ HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
-EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip -I$(MEDNAFEN_DIR)/hw_video/huc6270
+EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip $(MEDNAFEN_DIR)/hw_video/huc6270
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
    core = snes
@@ -285,7 +285,7 @@ CORE_SOURCES := $(CORE_DIR)/interface.cpp \
 LIBRETRO_SOURCES_C := $(CORE_DIR)/src/lib/libco/libco.c
 
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/sound/Fir_Resampler.cpp
-EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip -I$(MEDNAFEN_DIR)/snes/src/lib
+EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip $(MEDNAFEN_DIR)/snes/src/lib
 TARGET_NAME := mednafen_snes_libretro
 LDFLAGS += -ldl
 endif
@@ -298,7 +298,7 @@ ifeq ($(NEED_STEREO_SOUND), 1)
 SOUND_DEFINE := -DWANT_STEREO_SOUND
 endif
 
-CORE_INCDIR := -I$(CORE_DIR)
+CORE_INCDIR := $(CORE_DIR)
 
 ifeq ($(NEED_THREADING), 1)
 FLAGS += -DWANT_THREADING
@@ -404,7 +404,7 @@ endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
-LOCAL_CXX_INCLUDES += -I. -I.. -I../mednafen -I../mednafen/include -I../mednafen/intl -I../mednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
+LOCAL_C_INCLUDES += .. ../mednafen ../mednafen/include ../mednafen/intl ../mednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(SOUND_DEFINE) -DLSB_FIRST
 
