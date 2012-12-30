@@ -198,7 +198,7 @@ CORE_SOURCES := $(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/vsu.cpp
 
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
-HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
+HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
 EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip
 TARGET_NAME := mednafen_$(core)_libretro
@@ -226,7 +226,7 @@ CORE_SOURCES := $(CORE_DIR)/king.cpp \
 	$(CORE_DIR)/input/mouse.cpp
 
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
-HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
+HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
 HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
