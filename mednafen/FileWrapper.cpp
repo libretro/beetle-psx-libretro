@@ -61,8 +61,6 @@
 
 FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) : OpenedMode(mode)
 {
- path_save = std::string(path);
-
  if(mode == MODE_WRITE)
   fp = fopen(path, "wb");
  else
@@ -72,7 +70,7 @@ FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) 
  {
   ErrnoHolder ene(errno);
 
-  throw(MDFN_Error(ene.Errno(), _("Error opening file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+  throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
  }
 }
 
@@ -93,7 +91,7 @@ void FileWrapper::close(void)
   {
    ErrnoHolder ene(errno);
 
-   throw(MDFN_Error(ene.Errno(), _("Error closing opened file \"%s\": %s"), path_save.c_str(), ene.StrError()));
+   throw(MDFN_Error(ene.Errno(), _("Error closing opened file %s"), ene.StrError()));
   }
  }
 }

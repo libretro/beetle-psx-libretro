@@ -1,7 +1,6 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include "video.h"
 #include "state-common.h"
 
 typedef struct
@@ -23,8 +22,8 @@ int32 smem_seek(StateMem *st, uint32 offset, int whence);
 int smem_write32le(StateMem *st, uint32 b);
 int smem_read32le(StateMem *st, uint32 *b);
 
-int MDFNSS_SaveSM(StateMem *st, int, int, const MDFN_Surface*, const MDFN_Rect*, const MDFN_Rect*);
-int MDFNSS_LoadSM(StateMem *st, int, int);
+int MDFNSS_SaveSM(void *st, int, int, const void*, const void*, const void*);
+int MDFNSS_LoadSM(void *st, int, int);
 
 // Flag for a single, >= 1 byte native-endian variable
 #define MDFNSTATE_RLSB            0x80000000
@@ -118,7 +117,7 @@ class SSDescriptor
  bool optional;
 };
 
-int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDescriptor> &sections);
-int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
+int MDFNSS_StateAction(void *st, int load, int data_only, std::vector <SSDescriptor> &sections);
+int MDFNSS_StateAction(void *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
 
 #endif

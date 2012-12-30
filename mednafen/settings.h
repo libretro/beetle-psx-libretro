@@ -3,11 +3,9 @@
 
 #include <string>
 
-#include "settings-common.h"
-
 bool MDFN_LoadSettings(const char *path, const char *section = NULL, bool override = false);
-bool MDFN_MergeSettings(const MDFNSetting *);
-bool MDFN_MergeSettings(const std::vector<MDFNSetting> &);
+bool MDFN_MergeSettings(const void*);
+bool MDFN_MergeSettings(const std::vector<void> &);
 bool MDFN_SaveSettings(const char *path);
 
 void MDFN_KillSettings(void);	// Free any resources acquired.

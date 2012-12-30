@@ -20,7 +20,7 @@
 
 #include "wswan.h"
 #include "eeprom.h"
-#include "memory.h"
+#include "wswan-memory.h"
 #include <ctype.h>
 
 namespace MDFN_IEN_WSWAN

@@ -12,17 +12,17 @@ class MDFNFILE
 
 	MDFNFILE();
 	// WIP constructors:
-	MDFNFILE(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose = NULL);
+	MDFNFILE(const char *path, const void *known_ext, const char *purpose = NULL);
 
 	~MDFNFILE();
 
-	bool Open(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose = NULL, const bool suppress_notfound_pe = FALSE);
-	INLINE bool Open(const std::string &path, const FileExtensionSpecStruct *known_ext, const char *purpose = NULL, const bool suppress_notfound_pe = FALSE)
+	bool Open(const char *path, const void *known_ext, const char *purpose = NULL, const bool suppress_notfound_pe = FALSE);
+	INLINE bool Open(const std::string &path, const void *known_ext, const char *purpose = NULL, const bool suppress_notfound_pe = FALSE)
 	{
 	 return(Open(path.c_str(), known_ext, purpose, suppress_notfound_pe));
 	}
 
-        bool ApplyIPS(FILE *);
+   bool ApplyIPS(void*);
 	bool Close(void);
 
 	uint64 fread(void *ptr, size_t size, size_t nmemb);

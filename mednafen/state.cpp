@@ -428,83 +428,86 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 static int CurrentState = 0;
 
 /* This function is called by the game driver(NES, GB, GBA) to save a state. */
-int MDFNSS_StateAction(StateMem *st, int load, int data_only, std::vector <SSDescriptor> &sections)
+int MDFNSS_StateAction(void *st_p, int load, int data_only, std::vector <SSDescriptor> &sections)
 {
- std::vector<SSDescriptor>::iterator section;
+   StateMem *st = (StateMem*)st_p;
+   std::vector<SSDescriptor>::iterator section;
 
- if(load)
- {
-  {
-   char sname[32];
-
-   for(section = sections.begin(); section != sections.end(); section++)
+   if(load)
    {
-    int found = 0;
-    uint32 tmp_size;
-    uint32 total = 0;
-
-    while(smem_read(st, (uint8 *)sname, 32) == 32)
-    {
-     if(smem_read32le(st, &tmp_size) != 4)
-      return(0);
-
-     total += tmp_size + 32 + 4;
-
-     // Yay, we found the section
-     if(!strncmp(sname, section->name, 32))
-     {
-      if(!ReadStateChunk(st, section->sf, tmp_size))
       {
-       printf("Error reading chunk: %s\n", section->name);
-       return(0);
+         char sname[32];
+
+         for(section = sections.begin(); section != sections.end(); section++)
+         {
+            int found = 0;
+            uint32 tmp_size;
+            uint32 total = 0;
+
+            while(smem_read(st, (uint8 *)sname, 32) == 32)
+            {
+               if(smem_read32le(st, &tmp_size) != 4)
+                  return(0);
+
+               total += tmp_size + 32 + 4;
+
+               // Yay, we found the section
+               if(!strncmp(sname, section->name, 32))
+               {
+                  if(!ReadStateChunk(st, section->sf, tmp_size))
+                  {
+                     printf("Error reading chunk: %s\n", section->name);
+                     return(0);
+                  }
+                  found = 1;
+                  break;
+               } 
+               else
+               {
+                  if(smem_seek(st, tmp_size, SEEK_CUR) < 0)
+                  {
+                     puts("Chunk seek failure");
+                     return(0);
+                  }
+               }
+            }
+            if(smem_seek(st, -total, SEEK_CUR) < 0)
+            {
+               puts("Reverse seek error");
+               return(0);
+            }
+            if(!found && !section->optional) // Not found.  We are sad!
+            {
+               printf("Section missing:  %.32s\n", section->name);
+               return(0);
+            }
+         }
       }
-      found = 1;
-      break;
-     } 
-     else
-     {
-      if(smem_seek(st, tmp_size, SEEK_CUR) < 0)
-      {
-       puts("Chunk seek failure");
-       return(0);
-      }
-     }
-    }
-    if(smem_seek(st, -total, SEEK_CUR) < 0)
-    {
-     puts("Reverse seek error");
-     return(0);
-    }
-    if(!found && !section->optional) // Not found.  We are sad!
-    {
-     printf("Section missing:  %.32s\n", section->name);
-     return(0);
-    }
    }
-  }
- }
- else
- {
-  for(section = sections.begin(); section != sections.end(); section++)
-  {
-   if(!WriteStateChunk(st, section->name, section->sf))
-    return(0);
-  }
- }
+   else
+   {
+      for(section = sections.begin(); section != sections.end(); section++)
+      {
+         if(!WriteStateChunk(st, section->name, section->sf))
+            return(0);
+      }
+   }
 
- return(1);
+   return(1);
 }
 
-int MDFNSS_StateAction(StateMem *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional)
+int MDFNSS_StateAction(void *st_p, int load, int data_only, SFORMAT *sf, const char *name, bool optional)
 {
- std::vector <SSDescriptor> love;
+   StateMem *st = (StateMem*)st_p;
+   std::vector <SSDescriptor> love;
 
- love.push_back(SSDescriptor(sf, name, optional));
- return(MDFNSS_StateAction(st, load, 0, love));
+   love.push_back(SSDescriptor(sf, name, optional));
+   return(MDFNSS_StateAction(st, load, 0, love));
 }
 
-int MDFNSS_SaveSM(StateMem *st, int, int, const MDFN_Surface*, const MDFN_Rect*, const MDFN_Rect*)
+int MDFNSS_SaveSM(void *st_p, int, int, const void*, const void*, const void*)
 {
+   StateMem *st = (StateMem*)st_p;
 	static const char *header_magic = "MDFNSVST";
         uint8 header[32];
 	int neowidth = 0, neoheight = 0;
@@ -527,17 +530,18 @@ int MDFNSS_SaveSM(StateMem *st, int, int, const MDFN_Surface*, const MDFN_Rect*,
 	return(1);
 }
 
-int MDFNSS_LoadSM(StateMem *st, int, int)
+int MDFNSS_LoadSM(void *st_p, int, int)
 {
- uint8 header[32];
- uint32 stateversion;
+   StateMem *st = (StateMem*)st_p;
+   uint8 header[32];
+   uint32 stateversion;
 
- smem_read(st, header, 32);
+   smem_read(st, header, 32);
 
- if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
-  return(0);
+   if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
+      return(0);
 
- stateversion = MDFN_de32lsb(header + 16);
+   stateversion = MDFN_de32lsb(header + 16);
 
- return(MDFNGameInfo->StateAction(st, stateversion, 0));
+   return(MDFNGameInfo->StateAction(st, stateversion, 0));
 }

@@ -48,7 +48,6 @@ class FileStream : public Stream
 
  private:
  FILE *fp;
- std::string path_save;
  const int OpenedMode;
 };
 

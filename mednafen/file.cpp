@@ -26,8 +26,10 @@
 
 #define MDFN_FILETYPE_PLAIN 0
 
-bool MDFNFILE::ApplyIPS(FILE *ips)
+bool MDFNFILE::ApplyIPS(void *unused)
 {
+   (void)unused;
+
    return 1;
 }
 
@@ -73,12 +75,11 @@ MDFNFILE::MDFNFILE()
  location = 0;
 }
 
-MDFNFILE::MDFNFILE(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose)
+MDFNFILE::MDFNFILE(const char *path, const void *known_ext, const char *purpose)
 {
- if(!Open(path, known_ext, purpose, false))
- {
-  throw(MDFN_Error(0, "TODO ERROR"));
- }
+   (void)known_ext;
+   if(!Open(path, known_ext, purpose, false))
+      throw(MDFN_Error(0, "TODO ERROR"));
 }
 
 
@@ -88,9 +89,10 @@ MDFNFILE::~MDFNFILE()
 }
 
 
-bool MDFNFILE::Open(const char *path, const FileExtensionSpecStruct *known_ext, const char *purpose, const bool suppress_notfound_pe)
+bool MDFNFILE::Open(const char *path, const void *known_ext, const char *purpose, const bool suppress_notfound_pe)
 {
    FILE *fp;
+   (void)known_ext;
 
    if(!(fp = fopen(path, "rb")))
    {

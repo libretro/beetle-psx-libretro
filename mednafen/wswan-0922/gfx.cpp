@@ -20,7 +20,7 @@
 
 #include "wswan.h"
 #include "gfx.h"
-#include "memory.h"
+#include "wswan-memory.h"
 #include "v30mz.h"
 #include "rtc.h"
 #include "../video.h"

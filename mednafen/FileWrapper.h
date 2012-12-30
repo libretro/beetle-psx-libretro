@@ -51,7 +51,6 @@ class FileWrapper
  FileWrapper(const FileWrapper &);		// Copy constructor
 
  FILE *fp;
- std::string path_save;
  const int OpenedMode;
 };
 

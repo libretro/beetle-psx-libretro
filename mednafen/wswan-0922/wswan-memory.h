@@ -16,7 +16,7 @@ void WSwan_MemoryInit(bool lang, bool IsWSC, uint32 ssize, bool SkipSaveLoad);
 void WSwan_MemoryKill(void);
 
 void WSwan_CheckSoundDMA(void);
-int WSwan_MemoryStateAction(StateMem *sm, int load, int data_only);
+int WSwan_MemoryStateAction(void *sm_ptr, int load, int data_only);
 void WSwan_MemoryReset(void);
 void WSwan_writeport(uint32 IOPort, uint8 V);
 uint8 WSwan_readport(uint32 number);

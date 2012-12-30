@@ -24,7 +24,7 @@ void MDFN_DebugPrintReal(const char *file, const int line, const char *format, .
 #define gettext_noop(format, ...) (format)
 #define MDFN_DebugPrint(format, ...) MDFN_DebugPrintReal(__FILE__, __LINE__, format, ## __VA_ARGS__)
 
-void MDFN_LoadGameCheats(FILE *override);
+void MDFN_LoadGameCheats(void *override);
 void MDFN_FlushGameCheats(int nosave);
 
 #include "mednafen-driver.h"

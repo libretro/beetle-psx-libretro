@@ -31,7 +31,7 @@
 #endif
 
 #include "gfx.h"
-#include "memory.h"
+#include "wswan-memory.h"
 #include "start.inc"
 #include "sound.h"
 #include "v30mz.h"

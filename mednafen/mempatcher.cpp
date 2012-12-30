@@ -191,25 +191,27 @@ static int AddCheatEntry(char *name, char *conditions, uint32 addr, uint64 val, 
  return(1);
 }
 
-static bool SeekToOurSection(FILE *fp) // Tentacle monster section aisle five, stale eggs and donkeys in aisle 2E.
+static bool SeekToOurSection(void *fp_ptr)
 {
- char buf[2048];
+   FILE *fp = (FILE*)fp_ptr;
+   char buf[2048];
 
- while(fgets(buf,2048,fp) > 0)
- {
-  if(buf[0] == '[')
-  {
-   if(!strncmp((char *)buf + 1, md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str(), 16))
-    return(1);
-  }
- }
- return(0);
+   while(fgets(buf,2048,fp) > 0)
+   {
+      if(buf[0] == '[')
+      {
+         if(!strncmp((char *)buf + 1, md5_context::asciistr(MDFNGameInfo->MD5, 0).c_str(), 16))
+            return(1);
+      }
+   }
+   return(0);
 }
 
-void MDFN_LoadGameCheats(FILE *override)
+void MDFN_LoadGameCheats(void *override_ptr)
 {
  char linebuf[2048];
  FILE *fp;
+ FILE *override = (FILE*)override_ptr;
 
  unsigned int addr;
  unsigned long long val;
