@@ -11,6 +11,10 @@
 #include "math_ops.h"
 #include "git.h"
 
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
+
 extern MDFNGI *MDFNGameInfo;
 
 #include "settings.h"

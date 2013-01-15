@@ -10,32 +10,17 @@
 #include <ppu_intrinsics.h>
 #endif
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
 #endif
 
 #include <iostream>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <sys/time.h>
-#endif
-
 //#define LIBRETRO_DEBUG
 
 // Stubs
-
-void MDFND_Sleep(unsigned int time)
-{
-#if defined(__CELLOS_LV2__)
-   sys_timer_usleep(time * 1000);
-#elif defined(_WIN32)
-   Sleep(time);
-#else
-   usleep(time * 1000);
-#endif
-}
 
 extern std::string retro_base_directory;
 extern std::string retro_base_name;
@@ -101,41 +86,6 @@ void MDFND_PrintError(const char* err)
 #endif
 }
 
-uint32 MDFND_GetTime()
-{
-   static bool first = true;
-   static uint32_t start_ms;
-
-#if defined(__CELLOS_LV2__)
-   uint64_t time = __mftb();
-   uint32_t ms = (time - start_ms) / 1000;
-
-   if (first)
-   {
-      start_ms = ms;
-      first = false;
-   }
-#elif defined(_WIN32)
-   DWORD ms = timeGetTime();
-   if (first)
-   {
-      start_ms = ms;
-      first = false;
-   }
-#else
-   struct timeval val;
-   gettimeofday(&val, NULL);
-   uint32_t ms = val.tv_sec * 1000 + val.tv_usec / 1000;
-
-   if (first)
-   {
-      start_ms = ms;
-      first = false;
-   }
-#endif
-
-   return ms - start_ms;
-}
 
 #ifdef WANT_THREADING
 
