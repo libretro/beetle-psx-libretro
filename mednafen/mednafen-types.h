@@ -130,6 +130,8 @@ typedef unsigned char   Boolean; /* 0 or 1 */
 #define TRUE 1
 #endif
 
+#define MDFN_COLD
+
 #undef require
 #define require( expr ) assert( expr )
 

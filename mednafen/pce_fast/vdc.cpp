@@ -219,6 +219,8 @@ vpc_t vpc;
 #define VDCS_VD		0x20 // Vertical blank interrupt occurred
 #define VDCS_BSY	0x40 // VDC is waiting for a CPU access slot during the active display area??
 
+//static MDFN_PaletteEntry PalTest[256];
+
 void VDC_SetPixelFormat(const MDFN_PixelFormat &format)
 {
  amask = 1 << format.Ashift;
@@ -263,10 +265,9 @@ void VDC_SetPixelFormat(const MDFN_PixelFormat &format)
    sc_r = sc_g = sc_b = y;
   }
 
-  systemColorMap32[x] = format.MakeColor(r, g, b);
-  bw_systemColorMap32[x] = format.MakeColor(sc_r, sc_g, sc_b);
+   systemColorMap32[x] = format.MakeColor(r, g, b);
+   bw_systemColorMap32[x] = format.MakeColor(sc_r, sc_g, sc_b);
  }
-
  // I know the temptation is there, but don't combine these two loops just
  // because they loop 512 times ;)
  for(int x = 0; x < 512; x++)
@@ -854,49 +855,8 @@ static void DrawSprites(vdc_t *vdc, const int32 end, uint16 *spr_linebuf)
 
 void (*MixBGSPR)(const uint32 count, const uint8 *bg_linebuf, const uint16 *spr_linebuf, uint32 *target) = NULL;
 
-void MixBGSPR_Generic(const uint32 count_in, const uint8 *bg_linebuf_in, const uint16 *spr_linebuf_in, uint32 *target_in)
-{
-#if 0
- #if SIZEOF_VOID_P > 4
- int64 count = 0 - (int64)count_in;
- #else
- int32 count = 0 - (int32)count_in;
- #endif
- const uint8 *bg_linebuf = bg_linebuf_in + count_in;
- const uint16 *spr_linebuf = spr_linebuf_in + count_in;
- uint32 *target = target_in + count_in;
-
- if(!count)
-  return;
-
- do
- {
-  const uint32 bg_pixel = bg_linebuf[count];
-  const uint32 spr_pixel = spr_linebuf[count];
-  uint32 pixel = bg_pixel;
-
-  if(((int16)(spr_pixel | ((bg_pixel & 0x0F) - 1))) < 0)
-   pixel = spr_pixel;
-
-  target[count] = vce.color_table_cache[pixel & 0x1FF];
- } while(++count);
-#else
- for(unsigned int x = 0; x < count_in; x++)
- {
-  const uint32 bg_pixel = bg_linebuf_in[x];
-  const uint32 spr_pixel = spr_linebuf_in[x];
-  uint32 pixel = bg_pixel;
-
-  if(((int16)(spr_pixel | ((bg_pixel & 0x0F) - 1))) < 0)
-   pixel = spr_pixel;
-
-  target_in[x] = vce.color_table_cache[pixel & 0x1FF];
- }
-#endif
-}
-
-
-void MixBGSPR_16BPP(const uint32 count_in, const uint8 *bg_linebuf_in, const uint16 *spr_linebuf_in, uint16 *target_in)
+template<typename T>
+void MixBGSPR_Generic(const uint32 count_in, const uint8 *bg_linebuf_in, const uint16 *spr_linebuf_in, T *target_in)
 {
  for(unsigned int x = 0; x < count_in; x++)
  {
@@ -910,7 +870,6 @@ void MixBGSPR_16BPP(const uint32 count_in, const uint8 *bg_linebuf_in, const uin
   target_in[x] = vce.color_table_cache[pixel & 0x1FF];
  }
 }
-
 
 #ifdef ARCH_X86
 
@@ -1141,31 +1100,13 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
  vdc_t *vdc = vdc_chips[0];
  int max_dc = 0;
 
- #if 0
- {
-  MDFN_PixelFormat nf;
-
-  nf.bpp = 16;
-  nf.colorspace = MDFN_COLORSPACE_RGB;
-  nf.Rshift = 11;
-  nf.Gshift = 5;
-  nf.Bshift = 0;
-  nf.Ashift = 16;
-  
-  nf.Rprec = 5;
-  nf.Gprec = 6;
-  nf.Bprec = 5;
-  nf.Aprec = 8;
-
-  surface->SetFormat(nf, false);
-  VDC_SetPixelFormat(nf);
- }
- #endif
-
  // x and w should be overwritten in the big loop
 
  if(!skip)
  {
+  //if(surface->palette)
+   //memcpy(surface->palette, PalTest, sizeof(PalTest));
+
   DisplayRect->x = 0;
   DisplayRect->w = 256;
 
@@ -1310,6 +1251,8 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
    
    uint32 *target_ptr = NULL;
    uint16 *target_ptr16 = NULL;
+   uint8 *target_ptr8 = NULL;
+
    vdc = vdc_chips[chip];
 
    if(VDC_TotalChips == 2)
@@ -1331,7 +1274,9 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
     {
      if(SHOULD_DRAW)
      {
-      if(target_ptr16)
+      if(target_ptr8)
+       DrawOverscan(vdc, target_ptr8, DisplayRect);
+      else if(target_ptr16)
        DrawOverscan(vdc, target_ptr16, DisplayRect);
       else
        DrawOverscan(vdc, target_ptr, DisplayRect);
@@ -1395,20 +1340,39 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
 
       if(width > 0)
       {
-       if(target_ptr16)
-       switch(vdc->CR & 0xC0)
+       if(target_ptr8)
        {
-        case 0xC0: MixBGSPR_16BPP(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, spr_linebuf + 0x20 + source_offset, target_ptr16 + target_offset);
- 		   break;
+        switch(vdc->CR & 0xC0)
+        {
+         case 0xC0: MixBGSPR_Generic(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, spr_linebuf + 0x20 + source_offset, target_ptr8 + target_offset);
+ 		    break;
 
-        case 0x80: MixBGOnly(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, target_ptr16 + target_offset);
-		   break;
+         case 0x80: MixBGOnly(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, target_ptr8 + target_offset);
+		    break;
 
-        case 0x40: MixSPROnly(width, spr_linebuf + 0x20 + source_offset, target_ptr16 + target_offset);
-		   break;
+         case 0x40: MixSPROnly(width, spr_linebuf + 0x20 + source_offset, target_ptr8 + target_offset);
+		    break;
 
-        case 0x00: MixNone(width, target_ptr16 + target_offset);
-		   break;
+         case 0x00: MixNone(width, target_ptr8 + target_offset);
+		    break;
+        }
+       }
+       else if(target_ptr16)
+       {
+        switch(vdc->CR & 0xC0)
+        {
+         case 0xC0: MixBGSPR_Generic(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, spr_linebuf + 0x20 + source_offset, target_ptr16 + target_offset);
+ 		    break;
+
+         case 0x80: MixBGOnly(width, bg_linebuf + (vdc->BG_XOffset & 7) + source_offset, target_ptr16 + target_offset);
+		    break;
+
+         case 0x40: MixSPROnly(width, spr_linebuf + 0x20 + source_offset, target_ptr16 + target_offset);
+		    break;
+
+         case 0x00: MixNone(width, target_ptr16 + target_offset);
+		    break;
+        }
        }
        else
        switch(vdc->CR & 0xC0)
@@ -1427,7 +1391,9 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
        }
       }
 
-      if(target_ptr16)
+      if(target_ptr8)
+       DrawOverscan(vdc, target_ptr8, DisplayRect, false, target_offset, target_offset + width);
+      else if(target_ptr16)
        DrawOverscan(vdc, target_ptr16, DisplayRect, false, target_offset, target_offset + width);
       else
        DrawOverscan(vdc, target_ptr, DisplayRect, false, target_offset, target_offset + width);
@@ -1441,7 +1407,9 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
     {
      if(SHOULD_DRAW)
      {
-      if(target_ptr16)
+      if(target_ptr8)
+       DrawOverscan(vdc, target_ptr8, DisplayRect);
+      else if(target_ptr16)
        DrawOverscan(vdc, target_ptr16, DisplayRect);
       else
        DrawOverscan(vdc, target_ptr, DisplayRect);
@@ -1528,6 +1496,7 @@ void VDC_RunFrame(MDFN_Surface *surface, MDFN_Rect *DisplayRect, MDFN_Rect *Line
      target_ptr = surface->pixels + y * surface->pitchinpix;
 
     LineWidths[y] = *DisplayRect;
+
     if(target_ptr16)
      DrawOverscan(vdc_chips[0], target_ptr16, DisplayRect);
     else
@@ -1615,7 +1584,7 @@ void VDC_Init(int sgx)
 
  LoadCustomPalette(MDFN_MakeFName(MDFNMKF_PALETTE, 0, NULL).c_str());
 
- MixBGSPR = MixBGSPR_Generic;
+ MixBGSPR = MixBGSPR_Generic<uint32>;
 
  #ifdef ARCH_X86
  // FIXME: cmov

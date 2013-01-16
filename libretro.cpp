@@ -48,7 +48,7 @@ static Deinterlacer deint;
 #elif defined(WANT_PCE_FAST_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
-#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_VERSION "v0.9.28"
 #define MEDNAFEN_CORE_EXTENSIONS "pce|PCE|cue|CUE|zip|ZIP"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)

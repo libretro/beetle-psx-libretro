@@ -18,7 +18,7 @@
  Arcade Card emulation based on information provided by Ki and David Shadoff
 */
 
-#include "../../mednafen.h"
+#include "mednafen/mednafen.h"
 
 //#include "pce.h"
 //#include "huc.h"

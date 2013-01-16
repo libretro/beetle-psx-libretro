@@ -1,5 +1,5 @@
 AUTOMAKE_OPTIONS = subdir-objects
-DEFS = -DLOCALEDIR=\"$(datadir)/locale\" @DEFS@ @MATH_OPTIMIZER_FLAGS@
+DEFS = -DLOCALEDIR=\"$(datadir)/locale\" @DEFS@ 
 DEFAULT_INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/intl -I$(top_srcdir)/src/hw_misc -I$(top_srcdir)/src/hw_sound
 
 noinst_LIBRARIES	=	libpce_fast.a

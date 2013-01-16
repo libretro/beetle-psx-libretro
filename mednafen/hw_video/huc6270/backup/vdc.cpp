@@ -17,11 +17,11 @@
 
 /* VDC emulation */
 
-#include "../../../mednafen.h"
-#include "../../../video.h"
-#include "../../../lepacker.h"
+#include "mednafen/mednafen.h"
+#include "mednafen/video.h"
+#include "mednafen/lepacker.h"
 
-#include "../../../include/trio/trio.h"
+#include <trio/trio.h>
 #include <math.h>
 #include "vdc.h"
 

@@ -52,6 +52,19 @@ class VDC
 	VDC(bool nospritelimit, uint32 par_VRAM_Size);
 	~VDC();
 
+#if 0
+	void *operator new(size_t bcount)
+	{
+	 void *ret = calloc(1, bcount);
+ 	 return(ret);
+	}
+
+	void operator delete(void *ptr)
+	{
+	 free(ptr);
+	}
+#endif
+
 	int32 Reset(void) MDFN_WARN_UNUSED_RESULT;
 
 	// ResetSimulate(), SimulateWrite(), and SimulateRead() are intended to handle VRAM read/write breakpoints.

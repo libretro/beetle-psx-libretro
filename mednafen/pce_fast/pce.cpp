@@ -17,17 +17,18 @@
 
 #include "pce.h"
 #include "vdc.h"
-#include "../hw_sound/pce_psg/pce_psg.h"
+#include <pce_psg/pce_psg.h>
 #include "input.h"
 #include "huc.h"
 #include "../cdrom/pcecd.h"
 #include "../cdrom/scsicd.h"
+#include "hes.h"
 #include "tsushin.h"
-#include "../hw_misc/arcade_card/arcade_card.h"
+#include "arcade_card/arcade_card.h"
 #include "../mempatcher.h"
 #include "../cdrom/cdromif.h"
 
-#include "../../scrc32.h"
+#include <scrc32.h>
 
 namespace PCE_Fast
 {
@@ -40,6 +41,7 @@ static Blip_Buffer sbuf[2];
 bool PCE_ACEnabled;
 
 static bool IsSGX;
+static bool IsHES;
 int pce_overclocked;
 
 // Statically allocated for speed...or something.
@@ -187,7 +189,7 @@ static void LoadCommonPre(void);
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(strcasecmp(fp->f_ext, "pce") && strcasecmp(fp->f_ext, "sgx"))
+ if(memcmp(fp->f_data, "HESM", 4) && strcasecmp(fp->f_ext, "pce") && strcasecmp(fp->f_ext, "sgx"))
   return(FALSE);
 
  return(TRUE);
@@ -198,10 +200,15 @@ static int Load(const char *name, MDFNFILE *fp)
  uint32 headerlen = 0;
  uint32 r_size;
 
+ IsHES = 0;
  IsSGX = 0;
+
+ if(!memcmp(fp->f_data, "HESM", 4))
+  IsHES = 1;
 
  LoadCommonPre();
 
+ if(!IsHES)
  {
   if(fp->f_size & 0x200) // 512 byte header!
    headerlen = 512;
@@ -217,7 +224,6 @@ static int Load(const char *name, MDFNFILE *fp)
  }
 
  uint32 crc = crc32(0, fp->f_data + headerlen, fp->f_size - headerlen);
-
 
   HuCLoad(fp->f_data + headerlen, fp->f_size - headerlen, crc);
 
@@ -286,6 +292,8 @@ static int LoadCommon(void)
 { 
  IsSGX |= MDFN_GetSettingB("pce_fast.forcesgx") ? 1 : 0;
 
+ if(IsHES)
+  IsSGX = 1;
  // Don't modify IsSGX past this point.
  
  VDC_Init(IsSGX);
@@ -349,8 +357,9 @@ static int LoadCommon(void)
  if(!MDFN_GetSettingB("pce_fast.correct_aspect"))
   MDFNGameInfo->fb_width = 682;
 
+ if(!IsHES)
  {
-  MDFNGameInfo->nominal_width = MDFN_GetSettingB("pce_fast.correct_aspect") ? 320 : 341;
+  MDFNGameInfo->nominal_width = MDFN_GetSettingB("pce_fast.correct_aspect") ? 288 : 341;
   MDFNGameInfo->nominal_height = MDFN_GetSettingUI("pce_fast.slend") - MDFN_GetSettingUI("pce_fast.slstart") + 1;
 
   MDFNGameInfo->lcm_width = MDFN_GetSettingB("pce_fast.correct_aspect") ? 1024 : 341;
@@ -424,6 +433,7 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 {
  std::string bios_path = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS("pce_fast.cdbios").c_str() );
 
+ IsHES = 0;
  IsSGX = 0;
 
  LoadCommonPre();
@@ -440,9 +450,7 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 
 static void CloseGame(void)
 {
- {
   HuCClose();
- }
  VDC_Close();
  if(psg)
  {
@@ -457,6 +465,52 @@ static void Emulate(EmulateSpecStruct *espec)
 
  MDFNMP_ApplyPeriodicCheats();
 
+ #if 0
+ {
+  static bool firstcat = true;
+  MDFN_PixelFormat nf;
+
+  nf.bpp = 16;
+  nf.colorspace = MDFN_COLORSPACE_RGB;
+  nf.Rshift = 11;
+  nf.Gshift = 5;
+  nf.Bshift = 0;
+  nf.Ashift = 16;
+  
+  nf.Rprec = 5;
+  nf.Gprec = 6;
+  nf.Bprec = 5;
+  nf.Aprec = 8;
+
+  espec->surface->SetFormat(nf, false);
+  espec->VideoFormatChanged = firstcat;
+  firstcat = false;
+ }
+ #endif
+
+#if 0
+ static bool firstcat = true;
+
+ MDFN_PixelFormat tmp_pf;
+
+ tmp_pf.Rshift = 0;
+ tmp_pf.Gshift = 0;
+ tmp_pf.Bshift = 0;
+ tmp_pf.Ashift = 8;
+
+ tmp_pf.Rprec = 0;
+ tmp_pf.Gprec = 0;
+ tmp_pf.Bprec = 0;
+ tmp_pf.Aprec = 0;
+
+ tmp_pf.bpp = 8;
+ tmp_pf.colorspace = MDFN_COLORSPACE_RGB;
+
+ espec->surface->SetFormat(tmp_pf, false);
+ espec->VideoFormatChanged = firstcat;
+ firstcat = false;
+#endif
+
  if(espec->VideoFormatChanged)
   VDC_SetPixelFormat(espec->surface->format); //.Rshift, espec->surface->format.Gshift, espec->surface->format.Bshift);
 
@@ -469,8 +523,7 @@ static void Emulate(EmulateSpecStruct *espec)
    sbuf[y].bass_freq(20);
   }
  }
- VDC_RunFrame(espec->surface, &espec->DisplayRect, espec->LineWidths, espec->skip);
-
+ VDC_RunFrame(espec->surface, &espec->DisplayRect, espec->LineWidths, IsHES ? 1 : espec->skip);
 
  if(PCE_IsCD)
  {
@@ -598,6 +651,7 @@ static uint8 MemRead(uint32 addr)
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
  { ".pce", gettext_noop("PC Engine ROM Image") },
+ { ".hes", gettext_noop("PC Engine Music Rip") },
  { ".sgx", gettext_noop("SuperGrafx ROM Image") },
  { NULL, NULL }
 };
@@ -639,7 +693,7 @@ MDFNGI EmulatedPCE_Fast =
  0,   // lcm_height           
  NULL,  // Dummy
 
- 320,   // Nominal width
+ 288,   // Nominal width
  232,   // Nominal height
 
  512,	// Framebuffer width

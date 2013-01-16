@@ -17,11 +17,11 @@
 
 /* VDC emulation */
 
-#include "../../mednafen.h"
-#include "../../video.h"
-#include "../../lepacker.h"
+#include "mednafen/mednafen.h"
+#include "mednafen/video.h"
+#include "mednafen/lepacker.h"
 
-#include "../../include/trio/trio.h"
+#include <trio/trio.h>
 #include <math.h>
 #include "vdc.h"
 
@@ -986,7 +986,7 @@ void VDC::DrawBG(uint16 *target, int enabled)
 #define SPRF_SPRITE0	0x10000
 
 static const unsigned int sprite_height_tab[4] = { 16, 32, 64, 64 };
-static const unsigned int sprite_height_no_mask[4] = { ~0, ~2, ~6, ~6 };
+static const unsigned int sprite_height_no_mask[4] = { ~0U, ~2U, ~6U, ~6U };
 static const unsigned int sprite_width_tab[2] = { 16, 32 };
 
 void VDC::FetchSpriteData(void)

@@ -47,7 +47,7 @@
     <ClCompile Include="..\..\..\mednafen\FileStream.cpp" />
     <ClCompile Include="..\..\..\mednafen\FileWrapper.cpp" />
     <ClCompile Include="..\..\..\mednafen\general.cpp" />
-    <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\huc6280.cpp" />
+    <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc_video.cpp" />
@@ -57,18 +57,10 @@
     <ClCompile Include="..\..\..\mednafen\MemoryStream.cpp" />
     <ClCompile Include="..\..\..\mednafen\mempatcher.cpp" />
     <ClCompile Include="..\..\..\mednafen\okiadpcm.cpp" />
-    <ClCompile Include="..\..\..\mednafen\pce_fast\hes.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='CodeAnalysis|Xbox 360'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Xbox 360'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Profile|Xbox 360'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Profile_FastCap|Xbox 360'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Xbox 360'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_LTCG|Xbox 360'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\pce_fast\huc.cpp" />
+    <ClCompile Include="..\..\..\mednafen\pce_fast\huc6280.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast\input.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast\pce.cpp" />
-    <ClCompile Include="..\..\..\mednafen\pce_fast\pce_huc6280.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast\tsushin.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast\vdc.cpp" />
     <ClCompile Include="..\..\..\mednafen\settings.cpp" />
@@ -245,7 +237,7 @@
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;MSB_FIRST;WANT_PCE_FAST_EMU;WANT_16BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;$(SolutionDir)\..\..\mednafen\hw_misc;$(SolutionDir)\..\..\mednafen\hw_sound;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -267,7 +259,7 @@
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;MSB_FIRST;WANT_PCE_FAST_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;$(SolutionDir)\..\..\mednafen\hw_sound;$(SolutionDir)\..\..\mednafen\hw_video;$(SolutionDir)\..\..\mednafen\hw_misc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -289,7 +281,7 @@
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>NDEBUG;_XBOX;LTCG;_LIB;MSB_FIRST;WANT_PCE_FAST_EMU;WANT_16BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;$(SolutionDir)\..\..\mednafen\hw_video;$(SolutionDir)\..\..\mednafen\hw_sound;$(SolutionDir)\..\..\mednafen\hw_misc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

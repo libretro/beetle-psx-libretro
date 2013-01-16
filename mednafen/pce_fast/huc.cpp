@@ -20,7 +20,7 @@
 #include "pce.h"
 #include <errno.h>
 #include "../cdrom/pcecd.h"
-#include "../hw_misc/arcade_card/arcade_card.h"
+#include <arcade_card/arcade_card.h>
 #include "../md5.h"
 #include "../file.h"
 #include "../cdrom/cdromif.h"
@@ -130,7 +130,7 @@ int HuCLoad(const uint8 *data, uint32 len, uint32 crc32)
  }
 
  memset(HuCROM, 0xFF, m_len);
- memcpy(HuCROM, data, len);
+ memcpy(HuCROM, data, (m_len < len) ? m_len : len);
 
  memset(ROMSpace, 0xFF, 0x88 * 8192 + 8192);
 
@@ -354,7 +354,7 @@ int HuCLoadCD(const char *bios_path)
   }
  }
 
- FILE *srp;
+ FILE * srp;
 
  memset(SaveRAM, 0x00, 2048);
  memcpy(SaveRAM, BRAM_Init_String, 8);	// So users don't have to manually intialize the file cabinet

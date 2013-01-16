@@ -1,7 +1,7 @@
 #ifndef __MDFN_HUC6280_H
 #define __MDFN_HUC6280_H
 
-#include "../../include/trio/trio.h"
+#include        <trio/trio.h>
 
 class HuC6280_Support
 {
@@ -108,7 +108,7 @@ class HuC6280
 	void StealCycles(const int count);
         void StealMasterCycles(const int count);
 
-	NO_INLINE void SetEvent(const int32 cycles)
+	void SetEvent(const int32 cycles) NO_INLINE
 	{
 	 next_user_event = cycles;
 	 CalcNextEvent();

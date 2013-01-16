@@ -1,5 +1,4 @@
 #ifndef _PCE_H
-#define _PCE_H
 
 #include "../mednafen-types.h"
 #include "../mednafen.h"
@@ -42,4 +41,5 @@ extern uint8 BaseRAM[32768 + 8192];
 
 using namespace PCE_Fast;
 
+#define _PCE_H
 #endif

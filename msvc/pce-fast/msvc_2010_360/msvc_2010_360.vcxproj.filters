@@ -125,27 +125,6 @@
     <ClCompile Include="..\..\..\mednafen\sound\Stereo_Buffer.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\vdc.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\hes.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\huc.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\input.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\pce.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\pce_huc6280.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast\tsushin.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\cdrom\scsicd.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
@@ -182,9 +161,6 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\audioreader.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\huc6280.cpp">
-      <Filter>Source Files\mednafen\hw_cpu\huc6280</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp">
       <Filter>Source Files\mednafen\hw_misc\arcade_card</Filter>
     </ClCompile>
@@ -194,8 +170,29 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\pcecd.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\vdc.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\huc6280.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\huc.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\input.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\pce.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pce_fast\tsushin.cpp">
+      <Filter>Source Files\mednafen\pce_fast</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc_video.cpp">
       <Filter>Source Files\mednafen\hw_video\huc6270</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp">
+      <Filter>Source Files\mednafen\hw_cpu\huc6280</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
