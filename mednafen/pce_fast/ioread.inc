@@ -1,4 +1,4 @@
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CELLOS_LV2__)
 switch(((A & 0x1C00) >> 8) | (A & 0x3))
 {
 	case 0:
