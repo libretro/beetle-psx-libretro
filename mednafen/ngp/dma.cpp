@@ -55,7 +55,7 @@
 */
 
 #include "neopop.h"
-#include "TLCS-900h/TLCS900h_disassemble.h"
+#include "TLCS900h_disassemble.h"
 #include "dma.h"
 #include "mem.h"
 #include "interrupt.h"
