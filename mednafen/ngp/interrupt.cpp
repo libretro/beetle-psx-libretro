@@ -13,11 +13,11 @@
 //---------------------------------------------------------------------------
 
 #include "neopop.h"
-#include "TLCS900h_registers.h"
+#include "TLCS-900h/TLCS900h_registers.h"
 #include "mem.h"
 #include "gfx.h"
 #include "interrupt.h"
-#include "TLCS900h_interpret.h"
+#include "TLCS-900h/TLCS900h_interpret.h"
 #include "Z80_interface.h"
 #include "dma.h"
 

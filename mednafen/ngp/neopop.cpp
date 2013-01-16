@@ -15,10 +15,9 @@
 #include "neopop.h"
 #include "../general.h"
 #include "../md5.h"
-#include "../FileStream.h"
 
-#include "TLCS900h_interpret.h"
-#include "TLCS900h_registers.h"
+#include "TLCS-900h/TLCS900h_interpret.h"
+#include "TLCS-900h/TLCS900h_registers.h"
 #include "Z80_interface.h"
 #include "interrupt.h"
 #include "mem.h"
@@ -28,7 +27,7 @@
 #include "bios.h"
 #include "flash.h"
 
-#include <algorithm>
+//#include <algorithm>
 
 extern uint8 CPUExRAM[16384];
 
@@ -153,7 +152,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
- if(strcasecmp(fp->ext, "ngp") && strcasecmp(fp->ext, "ngpc") && strcasecmp(fp->ext, "ngc") && strcasecmp(fp->ext, "npc"))
+ if(strcasecmp(fp->f_ext, "ngp") && strcasecmp(fp->f_ext, "ngpc") && strcasecmp(fp->f_ext, "ngc") && strcasecmp(fp->f_ext, "npc"))
   return(FALSE);
 
  return(TRUE);
@@ -161,11 +160,11 @@ static bool TestMagic(const char *name, MDFNFILE *fp)
 
 static int Load(const char *name, MDFNFILE *fp)
 {
- if(!(ngpc_rom.data = (uint8 *)MDFN_malloc(fp->size, _("Cart ROM"))))
+ if(!(ngpc_rom.data = (uint8 *)MDFN_malloc(fp->f_size, _("Cart ROM"))))
   return(0);
 
- ngpc_rom.length = fp->size;
- memcpy(ngpc_rom.data, fp->data, fp->size);
+ ngpc_rom.length = fp->f_size;
+ memcpy(ngpc_rom.data, fp->f_data, fp->f_size);
 
  md5_context md5;
  md5.starts();
@@ -297,33 +296,32 @@ static MDFNSetting NGPSettings[] =
 
 bool system_io_flash_read(uint8* buffer, uint32 bufferLength)
 {
- try
- {
-  FileStream fp(MDFN_MakeFName(MDFNMKF_SAV, 0, "flash").c_str(), FileStream::MODE_READ);
+ FILE *fp = fopen(MDFN_MakeFName(MDFNMKF_SAV, 0, "flash").c_str(), "rb");
+ if(!fp) return(0);
 
-  fp.read(buffer, bufferLength);
- }
- catch(std::exception &e)
+ if(!fread(buffer, 1, bufferLength, fp))
  {
-  //if(ene.Errno() == ENOENT)  . asdf
+  fclose(fp);
   return(0);
  }
+
+ fclose(fp);
 
  return(1);
 }
 
 bool system_io_flash_write(uint8* buffer, uint32 bufferLength)
 {
- try
- {
-  FileStream fp(MDFN_MakeFName(MDFNMKF_SAV, 0, "flash").c_str(), FileStream::MODE_WRITE);
+ FILE *fp = fopen(MDFN_MakeFName(MDFNMKF_SAV, 0, "flash").c_str(), "wb");
+ if(!fp) return(0);
 
-  fp.write(buffer, bufferLength);
- }
- catch(std::exception &e)
+ if(!fwrite(buffer, 1, bufferLength, fp))
  {
+  fclose(fp);
   return(0);
  }
+
+ fclose(fp);
 
  return(1);
 }
