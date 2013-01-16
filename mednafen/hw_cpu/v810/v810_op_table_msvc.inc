@@ -1,4 +1,4 @@
-switch(opcode)
+switch(tmpop >> 9)
 {
 	case 0:
 	case 1:
