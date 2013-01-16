@@ -2,7 +2,7 @@
 #include <config.h>
 #endif
 
-#include <inttypes.h>
+#include <stdint.h>
 
 /*----------------------------------------------------------------------------
 | One of the macros `BIGENDIAN' or `LITTLEENDIAN' must be defined.
