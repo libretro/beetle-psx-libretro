@@ -31,9 +31,9 @@ typedef uint64_t uint64;
 
 #elif defined(_MSC_VER)
   #define INLINE inline __forceinline
-  #define NO_INLINE __declspec(noinline)
+  #define NO_INLINE
 
-  #define MDFN_FASTCALL __fastcall
+  #define MDFN_FASTCALL
 
   #define MDFN_ALIGN(n) __declspec(align(n))
 
