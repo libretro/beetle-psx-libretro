@@ -37,6 +37,7 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\galois.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\l-ec.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\lec.cpp" />
+    <ClCompile Include="..\..\..\mednafen\cdrom\pcecd.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\recover-raw.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\scsicd.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\SimpleFIFO.cpp" />
@@ -49,6 +50,7 @@
     <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\huc6280.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp" />
+    <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\backup\vdc.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc.cpp" />
     <ClCompile Include="..\..\..\mednafen\math_ops.cpp" />
     <ClCompile Include="..\..\..\mednafen\md5.cpp" />
@@ -265,7 +267,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;MSB_FIRST;WANT_PCE_FAST_EMU;WANT_16BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;MSB_FIRST;WANT_PCE_FAST_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>

@@ -51,6 +51,9 @@
     <Filter Include="Source Files\mednafen\hw_video\huc6270">
       <UniqueIdentifier>{384ba939-89be-4acd-b3ff-5f6460b0fcf1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\hw_video\huc6270\backup">
+      <UniqueIdentifier>{1cc5eff6-d78d-42d0-b3b9-83afda75abf1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\mednafen\Stream.cpp">
@@ -193,6 +196,12 @@
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc.cpp">
       <Filter>Source Files\mednafen\hw_video\huc6270</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\cdrom\pcecd.cpp">
+      <Filter>Source Files\mednafen\cdrom</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\backup\vdc.cpp">
+      <Filter>Source Files\mednafen\hw_video\huc6270\backup</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
