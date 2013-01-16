@@ -42,6 +42,8 @@
 
 #include "../../scrc32.h"
 
+unsigned int soundTS = 0;
+
 namespace MDFN_IEN_GBA
 {
 
@@ -2778,7 +2780,6 @@ void CPUInterrupt()
   biosProtected[3] = 0xe5;
 }
 
-int32 soundTS = 0;
 static uint8 *padq;
 
 void MDFNGBA_SetInput(int port, const char *type, void *ptr)

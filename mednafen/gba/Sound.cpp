@@ -28,6 +28,8 @@
 
 #include <blip/Stereo_Buffer.h>
 
+extern unsigned int soundTS;
+
 namespace MDFN_IEN_GBA
 {
 
@@ -37,8 +39,6 @@ static Synth synth;
 
 static Gb_Apu gba_apu;
 static Stereo_Buffer gba_buf;
-
-extern uint32 soundTS;
 
 static int lleft = 0, lright = 0;
 
