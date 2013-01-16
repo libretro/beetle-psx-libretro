@@ -252,7 +252,7 @@ void VDC_SetPixelFormat(const MDFN_PixelFormat &format)
   {
    double y;
 
-   y = round(0.300 * r + 0.589 * g + 0.111 * b);
+   y = roundf(0.300 * r + 0.589 * g + 0.111 * b);
 
    if(y < 0)
     y = 0;

@@ -1,4 +1,4 @@
-#ifdef __CELLOS_LV2__
+#if defined(_WIN32) || defined(__CELLOS_LV2__)
  A &= 0x1FFF;
 
  unsigned val = ((A & 0x1C00) >> 8) | (A & 0x3);
