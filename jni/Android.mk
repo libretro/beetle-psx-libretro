@@ -81,17 +81,17 @@ else ifeq ($(core), pce-fast)
    CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
 
 CORE_SOURCES := $(CORE_DIR)/huc.cpp \
-	$(CORE_DIR)/pce_huc6280.cpp \
+	$(CORE_DIR)/huc6280.cpp \
 	$(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/pce.cpp \
 	$(CORE_DIR)/tsushin.cpp \
 	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
 
-HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/huc6280/huc6280.cpp
+HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/huc6280/cpu_huc6280.cpp
 HW_MISC_SOURCES := $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
 HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
-HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
 CORE_CD_SOURCES := $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 OKIADPCM_SOURCES := $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), wswan)
@@ -383,7 +383,7 @@ endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
-LOCAL_C_INCLUDES += .. ../mednafen ../mednafen/include ../mednafen/intl ../mednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
+LOCAL_C_INCLUDES += .. ../mednafen ../mednafen/include ../mednafen/intl ../mednafen/hw_cpu ../mednafen/hw_sound ../mednafen/hw_misc ../mednafen/hw_video $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(SOUND_DEFINE) -DLSB_FIRST
 
