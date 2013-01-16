@@ -67,11 +67,11 @@
     <ClCompile Include="..\..\..\mednafen\wswan\gfx.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\interrupt.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\main.cpp" />
-    <ClCompile Include="..\..\..\mednafen\wswan\memory.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\rtc.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\sound.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\tcache.cpp" />
     <ClCompile Include="..\..\..\mednafen\wswan\v30mz.cpp" />
+    <ClCompile Include="..\..\..\mednafen\wswan\wswan-memory.cpp" />
     <ClCompile Include="..\..\..\scrc32.cpp" />
     <ClCompile Include="..\..\..\stubs.cpp" />
   </ItemGroup>
