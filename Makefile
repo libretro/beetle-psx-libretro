@@ -94,7 +94,7 @@ else ifeq ($(core), wswan)
 
 CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/main.cpp \
-	$(CORE_DIR)/memory.cpp \
+	$(CORE_DIR)/wswan-memory.cpp \
 	$(CORE_DIR)/v30mz.cpp \
 	$(CORE_DIR)/sound.cpp \
 	$(CORE_DIR)/tcache.cpp \

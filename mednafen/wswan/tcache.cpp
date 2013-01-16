@@ -20,7 +20,7 @@
 
 #include "wswan.h"
 #include "gfx.h"
-#include "memory.h"
+#include "wswan-memory.h"
 
 namespace MDFN_IEN_WSWAN
 {

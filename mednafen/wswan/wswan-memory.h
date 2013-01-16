@@ -1,6 +1,8 @@
 #ifndef __WSWAN_MEMORY_H
 #define __WSWAN_MEMORY_H
 
+#include "../state.h"
+
 namespace MDFN_IEN_WSWAN
 {
 

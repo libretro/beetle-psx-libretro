@@ -24,13 +24,11 @@
 //#include "../player.h"
 
 #include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <math.h>
 //#include <zlib.h>
 
 #include "gfx.h"
-#include "memory.h"
+#include "wswan-memory.h"
 #include "start.inc"
 #include "sound.h"
 #include "v30mz.h"

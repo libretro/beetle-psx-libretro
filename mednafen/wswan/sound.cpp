@@ -22,7 +22,7 @@
 #include "wswan.h"
 #include "sound.h"
 #include "v30mz.h"
-#include "memory.h"
+#include "wswan-memory.h"
 
 #include <blip/Blip_Buffer.h>
 

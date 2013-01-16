@@ -100,7 +100,7 @@ else ifeq ($(core), wswan)
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/wswan-0922
+   CORE_DIR := $(MEDNAFEN_DIR)/wswan
 
 CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/main.cpp \
