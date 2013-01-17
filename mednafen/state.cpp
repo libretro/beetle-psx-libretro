@@ -29,8 +29,8 @@
 
 int32 smem_read(StateMem *st, void *buffer, uint32 len)
 {
- if((len + st->loc) > st->len)
-  return(0);
+ if ((len + st->loc) > st->len)
+  return 0;
 
  memcpy(buffer, st->data + st->loc, len);
  st->loc += len;
@@ -40,7 +40,7 @@ int32 smem_read(StateMem *st, void *buffer, uint32 len)
 
 int32 smem_write(StateMem *st, void *buffer, uint32 len)
 {
- if((len + st->loc) > st->malloced)
+ if ((len + st->loc) > st->malloced)
  {
   uint32 newsize = (st->malloced >= 32768) ? st->malloced : (st->initial_malloc ? st->initial_malloc : 32768);
 
@@ -52,7 +52,8 @@ int32 smem_write(StateMem *st, void *buffer, uint32 len)
  memcpy(st->data + st->loc, buffer, len);
  st->loc += len;
 
- if(st->loc > st->len) st->len = st->loc;
+ if (st->loc > st->len)
+    st->len = st->loc;
 
  return(len);
 }
