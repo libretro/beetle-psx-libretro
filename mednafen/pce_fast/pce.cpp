@@ -242,7 +242,7 @@ static int Load(const char *name, MDFNFILE *fp)
   IsSGX = 1;
  }
 
- if(crc == 0x8c4588e2)
+ if(crc == 0x8c4588e2 || crc == 0xd206e241)
  {
   MDFN_printf("SuperGfx:  1941 - Counter Attack\n");
   IsSGX = 1;
