@@ -278,10 +278,10 @@ static void DoSimpleCommand(int cmd)
 
 static const MDFNSetting_EnumList LanguageList[] =
 {
- { "japanese", 0, gettext_noop("Japanese") },
+ { "japanese", 0, "Japanese" },
  { "0", 0 },
 
- { "english", 1, gettext_noop("English") },
+ { "english", 1, "English" },
  { "1", 1 },
 
  { NULL, 0 },
@@ -289,7 +289,7 @@ static const MDFNSetting_EnumList LanguageList[] =
 
 static MDFNSetting NGPSettings[] =
 {
- { "ngp.language", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Language games should display text in."), NULL, MDFNST_ENUM, "english", NULL, NULL, NULL, NULL, LanguageList },
+ { "ngp.language", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Language games should display text in.", NULL, MDFNST_ENUM, "english", NULL, NULL, NULL, NULL, LanguageList },
  { NULL }
 };
 
@@ -366,8 +366,8 @@ static InputInfoStruct InputInfo =
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".ngp", gettext_noop("Neo Geo Pocket ROM Image") },
- { ".ngc", gettext_noop("Neo Geo Pocket Color ROM Image") },
+ { ".ngp", "Neo Geo Pocket ROM Image" },
+ { ".ngc", "Neo Geo Pocket Color ROM Image" },
  { NULL, NULL }
 };
 

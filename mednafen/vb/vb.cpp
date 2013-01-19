@@ -966,59 +966,59 @@ static void DoSimpleCommand(int cmd)
 
 static const MDFNSetting_EnumList V810Mode_List[] =
 {
- { "fast", (int)V810_EMU_MODE_FAST, gettext_noop("Fast Mode"), gettext_noop("Fast mode trades timing accuracy, cache emulation, and executing from hardware registers and RAM not intended for code use for performance.")},
- { "accurate", (int)V810_EMU_MODE_ACCURATE, gettext_noop("Accurate Mode"), gettext_noop("Increased timing accuracy, though not perfect, along with cache emulation, at the cost of decreased performance.  Additionally, even the pipeline isn't correctly and fully emulated in this mode.") },
+ { "fast", (int)V810_EMU_MODE_FAST, "Fast Mode", "Fast mode trades timing accuracy, cache emulation, and executing from hardware registers and RAM not intended for code use for performance."},
+ { "accurate", (int)V810_EMU_MODE_ACCURATE, "Accurate Mode", "Increased timing accuracy, though not perfect, along with cache emulation, at the cost of decreased performance.  Additionally, even the pipeline isn't correctly and fully emulated in this mode." },
  { NULL, 0 },
 };
 
 static const MDFNSetting_EnumList VB3DMode_List[] =
 {
- { "anaglyph", VB3DMODE_ANAGLYPH, gettext_noop("Anaglyph"), gettext_noop("Used in conjunction with classic dual-lens-color glasses.") },
- { "cscope",  VB3DMODE_CSCOPE, gettext_noop("CyberScope"), gettext_noop("Intended for use with the CyberScope 3D device.") },
- { "sidebyside", VB3DMODE_SIDEBYSIDE, gettext_noop("Side-by-Side"), gettext_noop("The left-eye image is displayed on the left, and the right-eye image is displayed on the right.") },
+ { "anaglyph", VB3DMODE_ANAGLYPH, "Anaglyph", "Used in conjunction with classic dual-lens-color glasses." },
+ { "cscope",  VB3DMODE_CSCOPE, "CyberScope", "Intended for use with the CyberScope 3D device." },
+ { "sidebyside", VB3DMODE_SIDEBYSIDE, "Side-by-Side", "The left-eye image is displayed on the left, and the right-eye image is displayed on the right." },
 // { "overunder", VB3DMODE_OVERUNDER },
- { "vli", VB3DMODE_VLI, gettext_noop("Vertical Line Interlaced"), gettext_noop("Vertical lines alternate between left view and right view.") },
- { "hli", VB3DMODE_HLI, gettext_noop("Horizontal Line Interlaced"), gettext_noop("Horizontal lines alternate between left view and right view.") },
+ { "vli", VB3DMODE_VLI, "Vertical Line Interlaced", "Vertical lines alternate between left view and right view." },
+ { "hli", VB3DMODE_HLI, "Horizontal Line Interlaced", "Horizontal lines alternate between left view and right view." },
  { NULL, 0 },
 };
 
 static const MDFNSetting_EnumList AnaglyphPreset_List[] =
 {
- { "disabled", ANAGLYPH_PRESET_DISABLED, gettext_noop("Disabled"), gettext_noop("Forces usage of custom anaglyph colors.") },
+ { "disabled", ANAGLYPH_PRESET_DISABLED, "Disabled", "Forces usage of custom anaglyph colors." },
  { "0", ANAGLYPH_PRESET_DISABLED },
 
- { "red_blue", ANAGLYPH_PRESET_RED_BLUE, gettext_noop("Red/Blue"), gettext_noop("Classic red/blue anaglyph.") },
- { "red_cyan", ANAGLYPH_PRESET_RED_CYAN, gettext_noop("Red/Cyan"), gettext_noop("Improved quality red/cyan anaglyph.") },
- { "red_electriccyan", ANAGLYPH_PRESET_RED_ELECTRICCYAN, gettext_noop("Red/Electric Cyan"), gettext_noop("Alternate version of red/cyan") },
- { "red_green", ANAGLYPH_PRESET_RED_GREEN, gettext_noop("Red/Green") },
- { "green_magenta", ANAGLYPH_PRESET_GREEN_MAGENTA, gettext_noop("Green/Magenta") },
- { "yellow_blue", ANAGLYPH_PRESET_YELLOW_BLUE, gettext_noop("Yellow/Blue") },
+ { "red_blue", ANAGLYPH_PRESET_RED_BLUE, "Red/Blue", "Classic red/blue anaglyph." },
+ { "red_cyan", ANAGLYPH_PRESET_RED_CYAN, "Red/Cyan", "Improved quality red/cyan anaglyph." },
+ { "red_electriccyan", ANAGLYPH_PRESET_RED_ELECTRICCYAN, "Red/Electric Cyan", "Alternate version of red/cyan" },
+ { "red_green", ANAGLYPH_PRESET_RED_GREEN, "Red/Green" },
+ { "green_magenta", ANAGLYPH_PRESET_GREEN_MAGENTA, "Green/Magenta" },
+ { "yellow_blue", ANAGLYPH_PRESET_YELLOW_BLUE, "Yellow/Blue" },
 
  { NULL, 0 },
 };
 
 static MDFNSetting VBSettings[] =
 {
- { "vb.cpu_emulation", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("CPU emulation mode."), NULL, MDFNST_ENUM, "fast", NULL, NULL, NULL, NULL, V810Mode_List },
- { "vb.input.instant_read_hack", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input latency reduction hack."), gettext_noop("Reduces latency in some games by 20ms by returning the current pad state, rather than latched state, on serial port data reads.  This hack may cause some homebrew software to malfunction, but it should be relatively safe for commercial official games."), MDFNST_BOOL, "1", NULL, NULL, NULL, SettingChanged },
+ { "vb.cpu_emulation", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "CPU emulation mode.", NULL, MDFNST_ENUM, "fast", NULL, NULL, NULL, NULL, V810Mode_List },
+ { "vb.input.instant_read_hack", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Input latency reduction hack.", "Reduces latency in some games by 20ms by returning the current pad state, rather than latched state, on serial port data reads.  This hack may cause some homebrew software to malfunction, but it should be relatively safe for commercial official games.", MDFNST_BOOL, "1", NULL, NULL, NULL, SettingChanged },
  
- { "vb.instant_display_hack", MDFNSF_NOFLAGS, gettext_noop("Display latency reduction hack."), gettext_noop("Reduces latency in games by displaying the framebuffer 20ms earlier.  This hack has some potential of causing graphical glitches, so it is disabled by default."), MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
- { "vb.allow_draw_skip", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Allow draw skipping."), gettext_noop("If vb.instant_display_hack is set to \"1\", and this setting is set to \"1\", then frame-skipping the drawing to the emulated framebuffer will be allowed.  THIS WILL CAUSE GRAPHICAL GLITCHES, AND THEORETICALLY(but unlikely) GAME CRASHES, ESPECIALLY WITH DIRECT FRAMEBUFFER DRAWING GAMES."), MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
+ { "vb.instant_display_hack", MDFNSF_NOFLAGS, "Display latency reduction hack.", "Reduces latency in games by displaying the framebuffer 20ms earlier.  This hack has some potential of causing graphical glitches, so it is disabled by default.", MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
+ { "vb.allow_draw_skip", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Allow draw skipping.", "If vb.instant_display_hack is set to \"1\", and this setting is set to \"1\", then frame-skipping the drawing to the emulated framebuffer will be allowed.  THIS WILL CAUSE GRAPHICAL GLITCHES, AND THEORETICALLY(but unlikely) GAME CRASHES, ESPECIALLY WITH DIRECT FRAMEBUFFER DRAWING GAMES.", MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
 
  // FIXME: We're going to have to set up some kind of video mode change notification for changing vb.3dmode while the game is running to work properly.
- { "vb.3dmode", MDFNSF_NOFLAGS, gettext_noop("3D mode."), NULL, MDFNST_ENUM, "anaglyph", NULL, NULL, NULL, /*SettingChanged*/NULL, VB3DMode_List },
- { "vb.liprescale", MDFNSF_NOFLAGS, gettext_noop("Line Interlaced prescale."), NULL, MDFNST_UINT, "2", "1", "10", NULL, NULL },
+ { "vb.3dmode", MDFNSF_NOFLAGS, "3D mode.", NULL, MDFNST_ENUM, "anaglyph", NULL, NULL, NULL, /*SettingChanged*/NULL, VB3DMode_List },
+ { "vb.liprescale", MDFNSF_NOFLAGS, "Line Interlaced prescale.", NULL, MDFNST_UINT, "2", "1", "10", NULL, NULL },
 
- { "vb.disable_parallax", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Disable parallax for BG and OBJ rendering."), NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
- { "vb.default_color", MDFNSF_NOFLAGS, gettext_noop("Default maximum-brightness color to use in non-anaglyph 3D modes."), NULL, MDFNST_UINT, "0xF0F0F0", "0x000000", "0xFFFFFF", NULL, SettingChanged },
+ { "vb.disable_parallax", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Disable parallax for BG and OBJ rendering.", NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
+ { "vb.default_color", MDFNSF_NOFLAGS, "Default maximum-brightness color to use in non-anaglyph 3D modes.", NULL, MDFNST_UINT, "0xF0F0F0", "0x000000", "0xFFFFFF", NULL, SettingChanged },
 
- { "vb.anaglyph.preset", MDFNSF_NOFLAGS, gettext_noop("Anaglyph preset colors."), NULL, MDFNST_ENUM, "red_blue", NULL, NULL, NULL, SettingChanged, AnaglyphPreset_List },
- { "vb.anaglyph.lcolor", MDFNSF_NOFLAGS, gettext_noop("Anaglyph maximum-brightness color for left view."), NULL, MDFNST_UINT, "0xffba00", "0x000000", "0xFFFFFF", NULL, SettingChanged },
- { "vb.anaglyph.rcolor", MDFNSF_NOFLAGS, gettext_noop("Anaglyph maximum-brightness color for right view."), NULL, MDFNST_UINT, "0x00baff", "0x000000", "0xFFFFFF", NULL, SettingChanged },
+ { "vb.anaglyph.preset", MDFNSF_NOFLAGS, "Anaglyph preset colors.", NULL, MDFNST_ENUM, "red_blue", NULL, NULL, NULL, SettingChanged, AnaglyphPreset_List },
+ { "vb.anaglyph.lcolor", MDFNSF_NOFLAGS, "Anaglyph maximum-brightness color for left view.", NULL, MDFNST_UINT, "0xffba00", "0x000000", "0xFFFFFF", NULL, SettingChanged },
+ { "vb.anaglyph.rcolor", MDFNSF_NOFLAGS, "Anaglyph maximum-brightness color for right view.", NULL, MDFNST_UINT, "0x00baff", "0x000000", "0xFFFFFF", NULL, SettingChanged },
 
- { "vb.sidebyside.separation", MDFNSF_NOFLAGS, gettext_noop("Number of pixels to separate L/R views by."), gettext_noop("This setting refers to pixels before vb.xscale(fs) scaling is taken into consideration.  For example, a value of \"100\" here will result in a separation of 300 screen pixels if vb.xscale(fs) is set to \"3\"."), MDFNST_UINT, /*"96"*/"0", "0", "1024", NULL, NULL },
+ { "vb.sidebyside.separation", MDFNSF_NOFLAGS, "Number of pixels to separate L/R views by.", "This setting refers to pixels before vb.xscale(fs) scaling is taken into consideration.  For example, a value of \"100\" here will result in a separation of 300 screen pixels if vb.xscale(fs) is set to \"3\".", MDFNST_UINT, /*"96"*/"0", "0", "1024", NULL, NULL },
 
- { "vb.3dreverse", MDFNSF_NOFLAGS, gettext_noop("Reverse left/right 3D views."), NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
+ { "vb.3dreverse", MDFNSF_NOFLAGS, "Reverse left/right 3D views.", NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, SettingChanged },
  { NULL }
 };
 
@@ -1071,10 +1071,10 @@ static InputInfoStruct InputInfo =
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".vb", gettext_noop("Nintendo Virtual Boy") },
- { ".vboy", gettext_noop("Nintendo Virtual Boy") },
+ { ".vb", "Nintendo Virtual Boy" },
+ { ".vboy", "Nintendo Virtual Boy" },
  #ifdef VB_SUPPORT_BIN_EXT
- { ".bin", gettext_noop("Nintendo Virtual Boy (Deprecated)") },
+ { ".bin", "Nintendo Virtual Boy (Deprecated)" },
  #endif
  { NULL, NULL }
 };

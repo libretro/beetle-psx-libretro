@@ -859,12 +859,12 @@ static InputInfoStruct SNESInputInfo =
 
 static const MDFNSetting SNESSettings[] =
 {
- { "snes.input.port1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on SNES port 1."), NULL, MDFNST_BOOL, "0", NULL, NULL },
- { "snes.input.port2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on SNES port 2."), NULL, MDFNST_BOOL, "0", NULL, NULL },
+ { "snes.input.port1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on SNES port 1.", NULL, MDFNST_BOOL, "0", NULL, NULL },
+ { "snes.input.port2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on SNES port 2.", NULL, MDFNST_BOOL, "0", NULL, NULL },
 
- { "snes.mouse_sensitivity", MDFNSF_NOFLAGS, gettext_noop("Emulated mouse sensitivity."), NULL, MDFNST_FLOAT, "0.50", NULL, NULL, NULL },
+ { "snes.mouse_sensitivity", MDFNSF_NOFLAGS, "Emulated mouse sensitivity.", NULL, MDFNST_FLOAT, "0.50", NULL, NULL, NULL },
 
- { "snes.correct_aspect", MDFNSF_CAT_VIDEO, gettext_noop("Correct the aspect ratio."), gettext_noop("Note that regardless of this setting's value, \"512\" and \"256\" width modes will be scaled to the same dimensions for display."), MDFNST_BOOL, "0" },
+ { "snes.correct_aspect", MDFNSF_CAT_VIDEO, "Correct the aspect ratio.", "Note that regardless of this setting's value, \"512\" and \"256\" width modes will be scaled to the same dimensions for display.", MDFNST_BOOL, "0" },
 
  { NULL }
 };

@@ -2450,10 +2450,10 @@ static bool CPUInit(const std::string bios_fn)
  {
   static const FileExtensionSpecStruct KnownBIOSExtensions[] =
   {
-   { ".gba", gettext_noop("GameBoy Advance ROM Image") },
-   { ".agb", gettext_noop("GameBoy Advance ROM Image") },
-   { ".bin", gettext_noop("GameBoy Advance ROM Image") },
-   { ".bios", gettext_noop("BIOS Image") },
+   { ".gba", "GameBoy Advance ROM Image" },
+   { ".agb", "GameBoy Advance ROM Image" },
+   { ".bin", "GameBoy Advance ROM Image" },
+   { ".bios", "BIOS Image" },
    { NULL, NULL }
   };
 
@@ -3223,7 +3223,7 @@ static void DoSimpleCommand(int cmd)
 
 static MDFNSetting GBASettings[] =
 {
- { "gba.bios", 	MDFNSF_EMU_STATE,	gettext_noop("Path to optional GBA BIOS ROM image."), NULL, MDFNST_STRING, "" },
+ { "gba.bios", 	MDFNSF_EMU_STATE,	"Path to optional GBA BIOS ROM image.", NULL, MDFNST_STRING, "" },
  { NULL }
 };
 
@@ -3275,11 +3275,11 @@ static InputInfoStruct InputInfo =
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".gsf", gettext_noop("GSF Rip") },
- { ".minigsf", gettext_noop("MiniGSF Rip") },
- { ".gba", gettext_noop("GameBoy Advance ROM Image") },
- { ".agb", gettext_noop("GameBoy Advance ROM Image") },
- { ".bin", gettext_noop("GameBoy Advance ROM Image") },
+ { ".gsf", "GSF Rip" },
+ { ".minigsf", "MiniGSF Rip" },
+ { ".gba", "GameBoy Advance ROM Image" },
+ { ".agb", "GameBoy Advance ROM Image" },
+ { ".bin", "GameBoy Advance ROM Image" },
  { NULL, NULL }
 };
 
