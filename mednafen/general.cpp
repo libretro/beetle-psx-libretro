@@ -23,8 +23,6 @@
 #include <sys/types.h>
 
 #include <string>
-#include <map>
-#include <trio/trio.h>
 
 #include "general.h"
 #include "state.h"
@@ -33,7 +31,6 @@
 
 using namespace std;
 
-// Really dumb, maybe we should use boost?
 static bool IsAbsolutePath(const char *path)
 {
    if (
