@@ -397,10 +397,10 @@ static void DoSimpleCommand(int cmd)
 static const MDFNSetting_EnumList SexList[] =
 {
  { "m", WSWAN_SEX_MALE },
- { "male", WSWAN_SEX_MALE, gettext_noop("Male") },
+ { "male", WSWAN_SEX_MALE, "Male" },
 
  { "f", WSWAN_SEX_FEMALE },
- { "female", WSWAN_SEX_FEMALE, gettext_noop("Female") },
+ { "female", WSWAN_SEX_FEMALE, "Female" },
 
  { "3", 3 },
 
@@ -421,10 +421,10 @@ static const MDFNSetting_EnumList BloodList[] =
 
 static const MDFNSetting_EnumList LanguageList[] =
 {
- { "japanese", 0, gettext_noop("Japanese") },
+ { "japanese", 0, "Japanese" },
  { "0", 0 },
 
- { "english", 1, gettext_noop("English") },
+ { "english", 1, "English" },
  { "1", 1 },
 
  { NULL, 0 },
@@ -432,14 +432,14 @@ static const MDFNSetting_EnumList LanguageList[] =
 
 static const MDFNSetting WSwanSettings[] =
 {
- { "wswan.rotateinput", MDFNSF_NOFLAGS, gettext_noop("Virtually rotate D-pads along with screen."), NULL, MDFNST_BOOL, "0" },
- { "wswan.language", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Language games should display text in."), gettext_noop("The only game this setting is known to affect is \"Digimon Tamers - Battle Spirit\"."), MDFNST_ENUM, "english", NULL, NULL, NULL, NULL, LanguageList },
- { "wswan.name", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Name"), NULL, MDFNST_STRING, "Mednafen" },
- { "wswan.byear", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Birth Year"), NULL, MDFNST_UINT, "1989", "0", "9999" },
- { "wswan.bmonth", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Birth Month"), NULL, MDFNST_UINT, "6", "1", "12" },
- { "wswan.bday", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Birth Day"), NULL, MDFNST_UINT, "23", "1", "31" },
- { "wswan.sex", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Sex"), NULL, MDFNST_ENUM, "F", NULL, NULL, NULL, NULL, SexList },
- { "wswan.blood", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Blood Type"), NULL, MDFNST_ENUM, "O", NULL, NULL, NULL, NULL, BloodList },
+ { "wswan.rotateinput", MDFNSF_NOFLAGS, "Virtually rotate D-pads along with screen.", NULL, MDFNST_BOOL, "0" },
+ { "wswan.language", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Language games should display text in.", "The only game this setting is known to affect is \"Digimon Tamers - Battle Spirit\".", MDFNST_ENUM, "english", NULL, NULL, NULL, NULL, LanguageList },
+ { "wswan.name", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Name", NULL, MDFNST_STRING, "Mednafen" },
+ { "wswan.byear", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Year", NULL, MDFNST_UINT, "1989", "0", "9999" },
+ { "wswan.bmonth", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Month", NULL, MDFNST_UINT, "6", "1", "12" },
+ { "wswan.bday", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Day", NULL, MDFNST_UINT, "23", "1", "31" },
+ { "wswan.sex", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Sex", NULL, MDFNST_ENUM, "F", NULL, NULL, NULL, NULL, SexList },
+ { "wswan.blood", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Blood Type", NULL, MDFNST_ENUM, "O", NULL, NULL, NULL, NULL, BloodList },
  { NULL }
 };
 
@@ -511,9 +511,9 @@ static DebuggerInfoStruct DBGInfo =
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".ws", gettext_noop("WonderSwan ROM Image") },
- { ".wsc", gettext_noop("WonderSwan Color ROM Image") },
- { ".wsr", gettext_noop("WonderSwan Music Rip") },
+ { ".ws", "WonderSwan ROM Image" },
+ { ".wsc", "WonderSwan Color ROM Image" },
+ { ".wsr", "WonderSwan Music Rip" },
  { NULL, NULL }
 };
 

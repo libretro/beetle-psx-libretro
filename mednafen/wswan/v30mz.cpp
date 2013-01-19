@@ -168,6 +168,10 @@ void v30mz_reset(void)
  InHLT = 0;
 }
 
+#ifdef _WIN32
+#pragma optimize("", off)
+#endif
+
 void v30mz_int(uint32 vector, bool IgnoreIF)
 {
 	InHLT = FALSE; // This is correct!  Standby mode is always exited when there is an INT signal, regardless of whether interrupt are disabled.
@@ -187,6 +191,10 @@ void v30mz_int(uint32 vector, bool IgnoreIF)
 		CLK(32);
 	}
 }
+
+#ifdef _WIN32
+#pragma optimize("", on)
+#endif
 
 static void nec_interrupt(unsigned int_num)
 {
