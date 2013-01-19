@@ -25,13 +25,13 @@
 #include <math.h>
 #include "vdc.h"
 
-#define VDC_DEBUG(x, ...)     { }
+//#define VDC_DEBUG(x, ...)     { }
 //#define VDC_DEBUG(x, ...)       printf(x ": HPhase=%d, HPhaseCounter=%d, RCRCount=%d\n", ## __VA_ARGS__, HPhase, HPhaseCounter, RCRCount);
 
-#define VDC_UNDEFINED(format, ...)   { }
+//#define VDC_UNDEFINED(format, ...)   { }
 //#define VDC_UNDEFINED(format, ...)      printf(format " RCRCount=%d" "\n", ## __VA_ARGS__, RCRCount)
 
-#define VDC_WARNING(format, ...)      { }
+//#define VDC_WARNING(format, ...)      { }
 //#define VDC_WARNING(format, ...)     { printf(format "\n", ## __VA_ARGS__); }
 
 #define ULE_BG		1
@@ -301,7 +301,7 @@ void VDC::RunSATDMA(int32 cycles, bool force_completion)
  {
   if(DCR & 0x01)
   {
-   VDC_DEBUG("Sprite DMA IRQ");
+   //VDC_DEBUG("Sprite DMA IRQ");
    status |= VDCS_DS;
    IRQHook(TRUE);
   }
@@ -331,8 +331,10 @@ void VDC::RunDMA(int32 cycles, bool force_completion)
  {
   if(!DMAReadWrite)
   {
+#if 0
    if(SOUR >= VRAM_Size)
     VDC_UNDEFINED("Unmapped VRAM DMA read");
+#endif
 
    DMAReadBuffer = VRAM[SOUR];
    //printf("DMA Read: %04x, %04x\n", SOUR, DMAReadBuffer);
@@ -359,7 +361,7 @@ void VDC::RunDMA(int32 cycles, bool force_completion)
     {
      status |= VDCS_DV;
      IRQHook(TRUE);
-     VDC_DEBUG("DMA IRQ");
+     //VDC_DEBUG("DMA IRQ");
     }
     break;
    }
@@ -444,7 +446,7 @@ void VDC::IncRCR(void)
 
  if((int)RCRCount == ((int)RCR - 0x40) && (CR & 0x04))
  {
-  VDC_DEBUG("RCR IRQ");
+  //VDC_DEBUG("RCR IRQ");
   status |= VDCS_RR;
   IRQHook(TRUE);
  }
@@ -454,7 +456,7 @@ void VDC::DoVBIRQTest(void)
 {
  if(CR & 0x08)
  {
-  VDC_DEBUG("VBlank IRQ");
+  //VDC_DEBUG("VBlank IRQ");
   status |= VDCS_VD;
   IRQHook(TRUE);
  }
@@ -495,7 +497,7 @@ void VDC::HDS_Start(void)
 
  if(sprite_cg_fetch_counter > 0)
  {
-  VDC_WARNING("Sprite truncation on %d.  Wanted sprites: %d, cycles needed but not left: %d\n", RCRCount, active_sprites, sprite_cg_fetch_counter);
+  //VDC_WARNING("Sprite truncation on %d.  Wanted sprites: %d, cycles needed but not left: %d\n", RCRCount, active_sprites, sprite_cg_fetch_counter);
   sprite_cg_fetch_counter = 0;
   CheckAndCommitPending();
  }
@@ -505,7 +507,7 @@ void VDC::HDS_Start(void)
  HDW_cache = M_vdc_HDW;
  HDE_cache = M_vdc_HDE;
 
- VDC_DEBUG("HDS Start!  HSW: %d, HDW: %d, HDW: %d, HDE: %d\n", HSW_cache, HDS_cache, HDW_cache, HDE_cache);
+ //VDC_DEBUG("HDS Start!  HSW: %d, HDW: %d, HDW: %d, HDE: %d\n", HSW_cache, HDS_cache, HDW_cache, HDE_cache);
 
  CR_cache = CR;
 
@@ -636,8 +638,10 @@ int32 VDC::Run(int32 clocks, uint16 *pixels, bool skip)
 
         sat_dma_counter = 1024;
 
+#if 0
         if(DVSSR > (VRAM_Size - 0x100))
          VDC_UNDEFINED("Unmapped VRAM DVSSR DMA read");
+#endif
 
         if(DVSSR < VRAM_Size)
         {
@@ -655,7 +659,7 @@ int32 VDC::Run(int32 clocks, uint16 *pixels, bool skip)
 
   if(DMAPending && burst_mode)
   {
-   VDC_DEBUG("DMA Started");
+   //VDC_DEBUG("DMA Started");
    DMAPending = false;
    DMARunning = true;
    VDMA_CycleCounter = 0;
@@ -880,8 +884,10 @@ void VDC::DrawBG(uint16 *target, int enabled)
    raw_pixel = bg_tile_cache[bat & 0xFFF][BG_YOffset & 7][BG_XOffset & 0x7] & dohmask;
    target[x] = palette_index | raw_pixel | pal_or;
 
+#if 0
    if((bat & 0xFFF) > VRAM_BGTileNoMask)
     VDC_UNDEFINED("Unmapped BG tile read");
+#endif
 
    BG_XOffset++;
   }
@@ -897,8 +903,10 @@ void VDC::DrawBG(uint16 *target, int enabled)
     const uint8 pal_or = ((bat >> 8) & 0xF0);
     uint8 *pix_lut = bg_tile_cache[bat & 0xFFF][line_sub];
 
+#if 0
     if((bat & 0xFFF) > VRAM_BGTileNoMask)
      VDC_UNDEFINED("Unmapped BG tile read");
+#endif
 
 
     (target + 0)[x] = (pix_lut[0] & dohmask) | pal_or;
@@ -923,8 +931,10 @@ void VDC::DrawBG(uint16 *target, int enabled)
    const uint8 pal_or = ((bat >> 8) & 0xF0);
    uint8 *pix_lut = bg_tile_cache[bat & 0xFFF][line_sub];
 
+#if 0
    if((bat & 0xFFF) > VRAM_BGTileNoMask)
     VDC_UNDEFINED("Unmapped BG tile read");
+#endif
 
    #ifdef LSB_FIRST
     #if SIZEOF_LONG == 8
@@ -1020,7 +1030,7 @@ void VDC::FetchSpriteData(void)
     {
      status |= VDCS_OR;
      IRQHook(TRUE);
-     VDC_DEBUG("Overflow IRQ");
+     //VDC_DEBUG("Overflow IRQ");
     }
     if(!unlimited_sprites)
      break;
@@ -1045,8 +1055,10 @@ void VDC::FetchSpriteData(void)
     SpriteList[active_sprites].x = x;
     SpriteList[active_sprites].palette_index = palette_index;
 
+#if 0
     if((no * 64) >= VRAM_Size)
      VDC_UNDEFINED("Unmapped VRAM sprite tile read");
+#endif
 
     if((MWR_cache & 0xC) == 4)
     {
@@ -1137,7 +1149,7 @@ void VDC::DrawSprites(uint16 *target, int enabled)
      if(sprite_line_buf[tx] & 0xF)
      {
       status |= VDCS_CR;
-      VDC_DEBUG("Sprite hit IRQ");
+      //VDC_DEBUG("Sprite hit IRQ");
       IRQHook(TRUE);
      }
      sprite_line_buf[tx] = pi | raw_pixel | prio_or;
@@ -1203,13 +1215,13 @@ void VDC::DoWaitStates(void)
   {
    if(DMARunning)
    {
-    VDC_WARNING("VRAM DMA completion forced.");
+    //VDC_WARNING("VRAM DMA completion forced.");
     RunDMA(0, TRUE);
    }
 
    if(sat_dma_counter > 0)
    {
-    VDC_WARNING("SAT DMA completion forced.");
+    //VDC_WARNING("SAT DMA completion forced.");
     RunSATDMA(0, TRUE);
    }
 
@@ -1337,8 +1349,10 @@ void VDC::CheckAndCommitPending(void)
 
   if(pending_read)
   {
+#if 0
    if(pending_read_addr >= VRAM_Size)
     VDC_UNDEFINED("Unmapped VRAM VRR read");
+#endif
 
    read_buffer = VRAM[pending_read_addr];
    pending_read = FALSE;
@@ -1429,6 +1443,7 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
             case 0x0d: VDC_REGSETP(VDR, V, msb); break;
        	    case 0x0e: VDC_REGSETP(VCR, V, msb); break;
             case 0x0f: VDC_REGSETP(DCR, V, msb);
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set DCR during DMA: %04x\n", DCR);
@@ -1438,10 +1453,12 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
                        {
                         VDC_UNDEFINED("Set DCR while DMAPending: %04x\n", DCR);
                        }
+#endif
 
 		       break;
 
             case 0x10: VDC_REGSETP(SOUR, V, msb); 
+#if 0
 		       if(DMARunning)
 		       {
 		        VDC_UNDEFINED("Set SOUR during DMA: %04x\n", SOUR);
@@ -1451,9 +1468,11 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
                        {
                         VDC_UNDEFINED("Set SOUR while DMAPending: %04x\n", SOUR);
                        }
+#endif
 		       break;
 
             case 0x11: VDC_REGSETP(DESR, V, msb);
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set DESR during DMA: %04x\n", DESR);
@@ -1462,9 +1481,11 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
                        {
                         VDC_UNDEFINED("Set DESR while DMAPending: %04x\n", DESR);
                        }
+#endif
 		       break;
 
             case 0x12: VDC_REGSETP(LENR, V, msb);
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set LENR during DMA: %04x\n", LENR);
@@ -1474,10 +1495,11 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
                        {
                         VDC_UNDEFINED("Set LENR while DMAPending: %04x\n", LENR);
                        }
+#endif
 
                        if(msb)
        	               {
-                        VDC_DEBUG("DMA: %04x %04x %04x, %02x", SOUR, DESR, LENR, DCR);
+                        //VDC_DEBUG("DMA: %04x %04x %04x, %02x", SOUR, DESR, LENR, DCR);
 			DMAPending = 1;
                        }
                        break;
@@ -1486,7 +1508,7 @@ void VDC::Write(uint32 A, uint8 V, int32 &next_event)
 		       SATBPending = 1;
 		       break;
 
-            default:   VDC_WARNING("Unknown VDC register write: %04x %02x", select, V);
+            default:   //VDC_WARNING("Unknown VDC register write: %04x %02x", select, V);
 		       break;
            }
            break;
@@ -1553,6 +1575,7 @@ void VDC::Write16(bool A, uint16 V)
        	    case 0x0e: VCR = V; break;
 
             case 0x0f: DCR = V;
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set DCR during DMA: %04x\n", DCR);
@@ -1562,10 +1585,12 @@ void VDC::Write16(bool A, uint16 V)
                        {
                         VDC_UNDEFINED("Set DCR while DMAPending: %04x\n", DCR);
                        }
+#endif
 
                        break;
 
             case 0x10: SOUR = V;
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set SOUR during DMA: %04x\n", SOUR);
@@ -1575,9 +1600,11 @@ void VDC::Write16(bool A, uint16 V)
                        {
                         VDC_UNDEFINED("Set SOUR while DMAPending: %04x\n", SOUR);
                        }
+#endif
                        break;
 
             case 0x11: DESR = V;
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set DESR during DMA: %04x\n", DESR);
@@ -1586,9 +1613,11 @@ void VDC::Write16(bool A, uint16 V)
                        {
                         VDC_UNDEFINED("Set DESR while DMAPending: %04x\n", DESR);
                        }
+#endif
                        break;
 
             case 0x12: LENR = V;
+#if 0
                        if(DMARunning)
                        {
                         VDC_UNDEFINED("Set LENR during DMA: %04x\n", LENR);
@@ -1598,8 +1627,9 @@ void VDC::Write16(bool A, uint16 V)
                        {
                         VDC_UNDEFINED("Set LENR while DMAPending: %04x\n", LENR);
                        }
+#endif
 
-                       VDC_DEBUG("DMA: %04x %04x %04x, %02x", SOUR, DESR, LENR, DCR);
+                       //VDC_DEBUG("DMA: %04x %04x %04x, %02x", SOUR, DESR, LENR, DCR);
 
 		       DMAPending = 1;
                        break;
@@ -1608,7 +1638,7 @@ void VDC::Write16(bool A, uint16 V)
 		       SATBPending = 1;
 		       break;
 
-            default:   VDC_WARNING("Oops 2: %04x %02x", select, V);
+            default:   //VDC_WARNING("Oops 2: %04x %02x", select, V);
 		       break;
   }
  }

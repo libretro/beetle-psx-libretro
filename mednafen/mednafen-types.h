@@ -31,7 +31,7 @@ typedef uint64_t uint64;
 
 #elif defined(_MSC_VER)
 #define roundf(in) (in >= 0.0f ? floorf(in + 0.5f) : ceilf(in - 0.5f))
-  #define INLINE inline __forceinline
+  #define INLINE inline
   #define NO_INLINE
 
   #define MDFN_FASTCALL

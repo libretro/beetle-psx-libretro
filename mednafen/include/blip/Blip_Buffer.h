@@ -269,11 +269,7 @@ public:
 	Silent_Blip_Buffer();
 };
 
-	#if defined (__GNUC__) || _MSC_VER >= 1100
-		#define BLIP_RESTRICT __restrict
-	#else
-		#define BLIP_RESTRICT
-	#endif
+#define BLIP_RESTRICT
 
 // Optimized reading from Blip_Buffer, for use in custom sample output
 

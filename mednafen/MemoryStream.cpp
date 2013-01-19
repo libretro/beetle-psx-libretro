@@ -1,5 +1,11 @@
-#include "MemoryStream.h"
 #include <stdint.h>
+#include "MemoryStream.h"
+
+#ifdef _XBOX
+#ifndef SIZE_MAX
+#define SIZE_MAX _UI32_MAX
+#endif
+#endif
 
 /*
  TODO:

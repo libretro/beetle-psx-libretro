@@ -624,22 +624,22 @@ static MDFNSetting PCESettings[] =
   { "pce_fast.input.port5", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 5."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
 */
 
-  { "pce_fast.correct_aspect", MDFNSF_CAT_VIDEO, gettext_noop("Correct the aspect ratio."), NULL, MDFNST_BOOL, "1" },
-  { "pce_fast.slstart", MDFNSF_NOFLAGS, gettext_noop("First rendered scanline."), NULL, MDFNST_UINT, "4", "0", "239" },
-  { "pce_fast.slend", MDFNSF_NOFLAGS, gettext_noop("Last rendered scanline."), NULL, MDFNST_UINT, "235", "0", "239" },
-  { "pce_fast.mouse_sensitivity", MDFNSF_NOFLAGS, gettext_noop("Mouse sensitivity."), NULL, MDFNST_FLOAT, "0.50", NULL, NULL, NULL, PCEINPUT_SettingChanged },
-  { "pce_fast.disable_softreset", MDFNSF_NOFLAGS, gettext_noop("If set, when RUN+SEL are pressed simultaneously, disable both buttons temporarily."), NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, PCEINPUT_SettingChanged },
-  { "pce_fast.forcesgx", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Force SuperGrafx emulation."), NULL, MDFNST_BOOL, "0" },
-  { "pce_fast.arcadecard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable Arcade Card emulation."), NULL, MDFNST_BOOL, "1" },
-  { "pce_fast.ocmultiplier", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("CPU overclock multiplier."), NULL, MDFNST_UINT, "1", "1", "100"},
-  { "pce_fast.cdspeed", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("CD-ROM data transfer speed multiplier."), NULL, MDFNST_UINT, "1", "1", "100" },
-  { "pce_fast.nospritelimit", MDFNSF_NOFLAGS, gettext_noop("Remove 16-sprites-per-scanline hardware limit."), NULL, MDFNST_BOOL, "0" },
+  { "pce_fast.correct_aspect", MDFNSF_CAT_VIDEO, "Correct the aspect ratio.", NULL, MDFNST_BOOL, "1" },
+  { "pce_fast.slstart", MDFNSF_NOFLAGS, "First rendered scanline.", NULL, MDFNST_UINT, "4", "0", "239" },
+  { "pce_fast.slend", MDFNSF_NOFLAGS, "Last rendered scanline.", NULL, MDFNST_UINT, "235", "0", "239" },
+  { "pce_fast.mouse_sensitivity", MDFNSF_NOFLAGS, "Mouse sensitivity.", NULL, MDFNST_FLOAT, "0.50", NULL, NULL, NULL, PCEINPUT_SettingChanged },
+  { "pce_fast.disable_softreset", MDFNSF_NOFLAGS, "If set, when RUN+SEL are pressed simultaneously, disable both buttons temporarily.", NULL, MDFNST_BOOL, "0", NULL, NULL, NULL, PCEINPUT_SettingChanged },
+  { "pce_fast.forcesgx", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Force SuperGrafx emulation.", NULL, MDFNST_BOOL, "0" },
+  { "pce_fast.arcadecard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable Arcade Card emulation.", NULL, MDFNST_BOOL, "1" },
+  { "pce_fast.ocmultiplier", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "CPU overclock multiplier.", NULL, MDFNST_UINT, "1", "1", "100"},
+  { "pce_fast.cdspeed", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "CD-ROM data transfer speed multiplier.", NULL, MDFNST_UINT, "1", "1", "100" },
+  { "pce_fast.nospritelimit", MDFNSF_NOFLAGS, "Remove 16-sprites-per-scanline hardware limit.", NULL, MDFNST_BOOL, "0" },
 
-  { "pce_fast.cdbios", MDFNSF_EMU_STATE, gettext_noop("Path to the CD BIOS"), NULL, MDFNST_STRING, "syscard3.pce" },
-  { "pce_fast.adpcmlp", MDFNSF_NOFLAGS, gettext_noop("Enable lowpass filter dependent on playback-frequency."), NULL, MDFNST_BOOL, "0" },
-  { "pce_fast.cdpsgvolume", MDFNSF_NOFLAGS, gettext_noop("PSG volume when playing a CD game."), NULL, MDFNST_UINT, "100", "0", "200" },
-  { "pce_fast.cddavolume", MDFNSF_NOFLAGS, gettext_noop("CD-DA volume."), NULL, MDFNST_UINT, "100", "0", "200" },
-  { "pce_fast.adpcmvolume", MDFNSF_NOFLAGS, gettext_noop("ADPCM volume."), NULL, MDFNST_UINT, "100", "0", "200" },
+  { "pce_fast.cdbios", MDFNSF_EMU_STATE, "Path to the CD BIOS", NULL, MDFNST_STRING, "syscard3.pce" },
+  { "pce_fast.adpcmlp", MDFNSF_NOFLAGS, "Enable lowpass filter dependent on playback-frequency.", NULL, MDFNST_BOOL, "0" },
+  { "pce_fast.cdpsgvolume", MDFNSF_NOFLAGS, "PSG volume when playing a CD game.", NULL, MDFNST_UINT, "100", "0", "200" },
+  { "pce_fast.cddavolume", MDFNSF_NOFLAGS, "CD-DA volume.", NULL, MDFNST_UINT, "100", "0", "200" },
+  { "pce_fast.adpcmvolume", MDFNSF_NOFLAGS, "ADPCM volume.", NULL, MDFNST_UINT, "100", "0", "200" },
   { NULL }
 };
 
@@ -650,9 +650,9 @@ static uint8 MemRead(uint32 addr)
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".pce", gettext_noop("PC Engine ROM Image") },
- { ".hes", gettext_noop("PC Engine Music Rip") },
- { ".sgx", gettext_noop("SuperGrafx ROM Image") },
+ { ".pce", "PC Engine ROM Image" },
+ { ".hes", "PC Engine Music Rip" },
+ { ".sgx", "SuperGrafx ROM Image" },
  { NULL, NULL }
 };
 

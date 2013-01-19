@@ -260,9 +260,9 @@ int HuCLoadCD(const char *bios_path)
 {
  static const FileExtensionSpecStruct KnownBIOSExtensions[] =
  {
-  { ".pce", gettext_noop("PC Engine ROM Image") },
-  { ".bin", gettext_noop("PC Engine ROM Image") },
-  { ".bios", gettext_noop("BIOS Image") },
+  { ".pce", "PC Engine ROM Image" },
+  { ".bin", "PC Engine ROM Image" },
+  { ".bios", "BIOS Image" },
   { NULL, NULL }
  };
 
