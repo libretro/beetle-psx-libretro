@@ -21,7 +21,7 @@
 				Optimization="0"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\pce_fast&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="_DEBUG;_XBOX;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="_DEBUG;_XBOX;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -55,7 +55,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\pce_fast&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -90,7 +90,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\pce_fast&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -126,7 +126,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\pce_fast&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -162,7 +162,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\pce_fast&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;LTCG;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;LTCG;_LIB;WANT_WSWAN_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -250,49 +250,6 @@
 				<File
 					RelativePath="..\..\..\mednafen\Stream.cpp">
 				</File>
-				<Filter
-					Name="cdrom"
-					Filter="">
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\audioreader.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\cd_crc32.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\CDAccess.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\CDAccess_Image.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\cdromif.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\CDUtility.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\galois.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\l-ec.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\lec.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\pcecd.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\recover-raw.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\scsicd.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\SimpleFIFO.cpp">
-					</File>
-				</Filter>
 				<Filter
 					Name="trio"
 					Filter="">
