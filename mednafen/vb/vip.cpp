@@ -19,7 +19,7 @@
 #include "vip.h"
 #include <math.h>
 
-#define VIP_DBGMSG(format, ...) { }
+//#define VIP_DBGMSG(format, ...) { }
 //#define VIP_DBGMSG(format, ...) printf(format "\n", ## __VA_ARGS__)
 
 namespace MDFN_IEN_VB
@@ -480,12 +480,14 @@ static INLINE uint16 ReadRegister(int32 &timestamp, uint32 A)
 {
  uint16 ret = 0;	//0xFFFF;
 
+#if 0
  if(A & 1)
   VIP_DBGMSG("Misaligned VIP Read: %08x", A);
+#endif
 
  switch(A & 0xFE)
  {
-  default: VIP_DBGMSG("Unknown VIP register read: %08x", A);
+  default: //VIP_DBGMSG("Unknown VIP register read: %08x", A);
 	   break;
 
   case 0x00: ret = InterruptPending;
@@ -564,12 +566,14 @@ static INLINE uint16 ReadRegister(int32 &timestamp, uint32 A)
 
 static INLINE void WriteRegister(int32 &timestamp, uint32 A, uint16 V)
 {
+#if 0
  if(A & 1)
   VIP_DBGMSG("Misaligned VIP Write: %08x %04x", A, V);
+#endif
 
  switch(A & 0xFE)
  {
-  default: VIP_DBGMSG("Unknown VIP register write: %08x %04x", A, V);
+  default: //VIP_DBGMSG("Unknown VIP register write: %08x %04x", A, V);
            break;
 
   case 0x00: break; // Interrupt pending, read-only
@@ -577,10 +581,12 @@ static INLINE void WriteRegister(int32 &timestamp, uint32 A, uint16 V)
   case 0x02: {
 	      InterruptEnable = V & 0xE01F;
 
-	      VIP_DBGMSG("Interrupt Enable: %04x", V);
+	      //VIP_DBGMSG("Interrupt Enable: %04x", V);
 
+#if 0
 	      if(V & 0x2000)
 	       VIP_DBGMSG("Warning: VIP SB Hit Interrupt enable: %04x\n", V);
+#endif
 	      CheckIRQ();
 	     }
 	     break;
@@ -628,7 +634,7 @@ static INLINE void WriteRegister(int32 &timestamp, uint32 A, uint16 V)
 
 	     if(V & 1)
 	     {
-	      VIP_DBGMSG("XPRST");
+	      //VIP_DBGMSG("XPRST");
 	      DrawingActive = 0;
 	      DrawingCounter = 0;
               InterruptPending &= ~(INT_SB_HIT | INT_XP_END | INT_TIME_ERR);
@@ -695,8 +701,10 @@ uint8 VIP_Read8(int32 &timestamp, uint32 A)
   case 0x4:
   case 0x5: if(A >= 0x5E000)
 	     ret = ReadRegister(timestamp, A);
+#if 0
 	    else
 	     VIP_DBGMSG("Unknown VIP Read: %08x", A);
+#endif
             break;
 
   case 0x6: break;
@@ -705,11 +713,13 @@ uint8 VIP_Read8(int32 &timestamp, uint32 A)
             {
              ret = VIP_MA16R8(CHR_RAM, A & 0x7FFF);
             }
+#if 0
 	    else
 	     VIP_DBGMSG("Unknown VIP Read: %08x", A);
+#endif
             break;
 
-  default: VIP_DBGMSG("Unknown VIP Read: %08x", A);
+  default: //VIP_DBGMSG("Unknown VIP Read: %08x", A);
 	   break;
  }
 
@@ -747,8 +757,10 @@ uint16 VIP_Read16(int32 &timestamp, uint32 A)
   case 0x5: 
 	    if(A >= 0x5E000)
 	     ret = ReadRegister(timestamp, A);
+#if 0
             else
              VIP_DBGMSG("Unknown VIP Read: %08x", A);
+#endif
             break;
 
   case 0x6: break;
@@ -757,11 +769,13 @@ uint16 VIP_Read16(int32 &timestamp, uint32 A)
             {
              ret = VIP_MA16R16(CHR_RAM, A & 0x7FFF);
             }
+#if 0
 	    else
 	     VIP_DBGMSG("Unknown VIP Read: %08x", A);
+#endif
             break;
 
-  default: VIP_DBGMSG("Unknown VIP Read: %08x", A);
+  default: //VIP_DBGMSG("Unknown VIP Read: %08x", A);
            break;
  }
 
@@ -794,20 +808,24 @@ void VIP_Write8(int32 &timestamp, uint32 A, uint8 V)
   case 0x4:
   case 0x5: if(A >= 0x5E000)
  	     WriteRegister(timestamp, A, V);
+#if 0
             else
              VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
+#endif
 	    break;
 
-  case 0x6: VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
+  case 0x6: //VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
 	    break;
 
   case 0x7: if(A >= 0x8000)
 	     VIP_MA16W8(CHR_RAM, A & 0x7FFF, V);
+#if 0
 	    else
 	     VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
+#endif
 	    break;
 
-  default: VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
+  default: //VIP_DBGMSG("Unknown VIP Write: %08x %02x", A, V);
            break;
  }
 
@@ -838,20 +856,24 @@ void VIP_Write16(int32 &timestamp, uint32 A, uint16 V)
   case 0x4:
   case 0x5: if(A >= 0x5E000)
  	     WriteRegister(timestamp, A, V);
+#if 0
             else
              VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
+#endif
             break;
 
-  case 0x6: VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
+  case 0x6: //VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
 	    break;
 
   case 0x7: if(A >= 0x8000)
              VIP_MA16W16(CHR_RAM, A & 0x7FFF, V);
+#if 0
 	    else
 	     VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
+#endif
             break;
 
-  default: VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
+  default: //VIP_DBGMSG("Unknown VIP Write: %08x %04x", A, V);
            break;
  }
 

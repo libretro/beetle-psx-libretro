@@ -76,7 +76,7 @@
 	 {
 	  v810_timestamp_t timestamp = timestamp_rl;
 
-	  tmpop = RB_RDOP(0, 0);
+	  tmpop = RB_RDOP2(0, 0);
 
 	  timestamp_rl = timestamp;
 	 }
@@ -1053,7 +1053,7 @@
 	    if(!RB_AccurateMode)
 	    {
 	     RB_SETPC(RB_GETPC());
-	     if((uint32)(RB_RDOP(0, 0) >> 9) != opcode)
+	     if((uint32)(RB_RDOP2(0, 0) >> 9) != opcode)
 	     {
 	      //printf("Trampoline: %08x %02x\n", RB_GETPC(), opcode >> 1);
 	     }
