@@ -648,7 +648,7 @@ void V810::Run_Accurate_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_ti
 //
 #define RB_GETPC()      	((uint32)(PC_ptr - PC_base))
 #define RB_RDOP(PC_offset) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
-#define RB_RDOP2(PC_offset) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
+#define RB_RDOP2(PC_offset, b) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
 
 void V810::Run_Fast(int32 MDFN_FASTCALL (*event_handler)(const v810_timestamp_t timestamp))
 {
