@@ -36,28 +36,19 @@ using namespace std;
 // Really dumb, maybe we should use boost?
 static bool IsAbsolutePath(const char *path)
 {
- #if PSS_STYLE==4
-  if(path[0] == ':')
- #elif PSS_STYLE==1
-  if(path[0] == '/')
- #else
-  if(path[0] == '\\'
-  #if PSS_STYLE!=3
-   || path[0] == '/'
-  #endif
- )
- #endif
- {
-  return(TRUE);
- }
+   if (
+#ifdef _WIN32
+         path[0] == '\\' ||
+#endif
+         path[0] == '/'
+      )
+         return(TRUE);
 
  #if defined(WIN32) || defined(DOS)
  if((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z'))
  {
-  if(path[1] == ':')
-  {
-   return(TRUE);
-  }
+    if(path[1] == ':')
+       return(TRUE);
  }
  #endif
 
@@ -93,29 +84,24 @@ bool MDFN_IsFIROPSafe(const std::string &path)
  return(true);
 }
 
-void MDFN_GetFilePathComponents(const std::string &file_path, std::string *dir_path_out, std::string *file_base_out, std::string *file_ext_out)
+void MDFN_GetFilePathComponents(const std::string &file_path, 
+      std::string *dir_path_out, std::string *file_base_out, 
+      std::string *file_ext_out)
 {
- size_t final_ds;		// in file_path
+ size_t final_ds;		                  // in file_path
  string file_name;
- size_t fn_final_dot;		// in local var file_name
- // Temporary output:
- string dir_path, file_base, file_ext;
+ size_t fn_final_dot;		            // in local var file_name
+ string dir_path, file_base, file_ext; // Temporary output
 
-#if PSS_STYLE==4
- final_ds = file_path.find_last_of(':');
-#elif PSS_STYLE==1
- final_ds = file_path.find_last_of('/');
-#else
+#ifdef _WIN32
  final_ds = file_path.find_last_of('\\');
 
- #if PSS_STYLE!=3
-  {
-   size_t alt_final_ds = file_path.find_last_of('/');
+ size_t alt_final_ds = file_path.find_last_of('/');
 
-   if(final_ds == string::npos || (alt_final_ds != string::npos && alt_final_ds > final_ds))
+ if(final_ds == string::npos || (alt_final_ds != string::npos && alt_final_ds > final_ds))
     final_ds = alt_final_ds;
-  }
- #endif
+#else
+ final_ds = file_path.find_last_of('/');
 #endif
 
  if(final_ds == string::npos)
@@ -154,40 +140,43 @@ void MDFN_GetFilePathComponents(const std::string &file_path, std::string *dir_p
 
 std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path, bool skip_safety_check)
 {
- if(!skip_safety_check && !MDFN_IsFIROPSafe(rel_path))
-  throw MDFN_Error(0, _("Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n"), rel_path.c_str());
+   char slash;
+#ifdef _WIN32
+   slash = '\\';
+#else
+   slash = '/';
+#endif
 
- if(IsAbsolutePath(rel_path.c_str()))
-  return(rel_path);
- else
- {
-  return(dir_path + std::string(PSS) + rel_path);
- }
+   if(!skip_safety_check && !MDFN_IsFIROPSafe(rel_path))
+      throw MDFN_Error(0, _("Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n"), rel_path.c_str());
+
+   if(IsAbsolutePath(rel_path.c_str()))
+      return(rel_path);
+   else
+      return(dir_path + slash + rel_path);
 }
 
 const char * GetFNComponent(const char *str)
 {
- const char *tp1;
+   const char *tp1;
 
- #if PSS_STYLE==4
-     tp1=((char *)strrchr(str,':'));
- #elif PSS_STYLE==1
-     tp1=((char *)strrchr(str,'/'));
- #else
-     tp1=((char *)strrchr(str,'\\'));
-  #if PSS_STYLE!=3
-  {
-     const char *tp3;
-     tp3=((char *)strrchr(str,'/'));
-     if(tp1<tp3) tp1=tp3;
-  }
-  #endif
- #endif
+#ifdef _WIN32
+   tp1 = ((char *)strrchr(str,'\\'));
 
- if(tp1)
-  return(tp1+1);
- else
-  return(str);
+   const char *tp3;
+
+   tp3 = ((char *)strrchr(str,'/'));
+
+   if (tp1<tp3)
+      tp1 = tp3;
+#else
+   tp1 = ((char *)strrchr(str,'/'));
+#endif
+
+   if (tp1)
+      return (tp1+1);
+   else
+      return (str);
 }
 
 // Remove whitespace from beginning of string
@@ -200,17 +189,17 @@ void MDFN_ltrim(char *string)
 
  while(string[si])
  {
-  if(InWhitespace && (string[si] == ' ' || string[si] == '\r' || string[si] == '\n' || string[si] == '\t' || string[si] == 0x0b))
-  {
+    if(InWhitespace && (string[si] == ' ' || string[si] == '\r' || string[si] == '\n' || string[si] == '\t' || string[si] == 0x0b))
+    {
 
-  }
-  else
-  {
-   InWhitespace = FALSE;
-   string[di] = string[si];
-   di++;
-  }
-  si++;
+    }
+    else
+    {
+       InWhitespace = FALSE;
+       string[di] = string[si];
+       di++;
+    }
+    si++;
  }
  string[di] = 0;
 }
@@ -218,23 +207,22 @@ void MDFN_ltrim(char *string)
 // Remove whitespace from end of string
 void MDFN_rtrim(char *string)
 {
- int32 len = strlen(string);
+   int32 len = strlen(string);
 
- if(len)
- {
-  for(int32 x = len - 1; x >= 0; x--)
-  {
-   if(string[x] == ' ' || string[x] == '\r' || string[x] == '\n' || string[x] == '\t' || string[x] == 0x0b)
-    string[x] = 0;
-   else
-    break;
-  }
- }
-
+   if(len)
+   {
+      for(int32 x = len - 1; x >= 0; x--)
+      {
+         if(string[x] == ' ' || string[x] == '\r' || string[x] == '\n' || string[x] == '\t' || string[x] == 0x0b)
+            string[x] = 0;
+         else
+            break;
+      }
+   }
 }
 
 void MDFN_trim(char *string)
 {
- MDFN_rtrim(string);
- MDFN_ltrim(string);
+   MDFN_rtrim(string);
+   MDFN_ltrim(string);
 }

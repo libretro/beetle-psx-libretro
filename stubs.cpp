@@ -38,24 +38,31 @@ static void sanitize_path(std::string &path)
 // Use a simpler approach to make sure that things go right for libretro.
 std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
+   char slash;
+#ifdef _WIN32
+   slash = '\\';
+#else
+   slash = '/';
+#endif
    std::string ret;
    switch (type)
    {
       case MDFNMKF_SAV:
-         ret = retro_base_directory + std::string(PSS) + retro_base_name +
+         ret = retro_base_directory + slash + retro_base_name +
             std::string(".") + md5_context::asciistr(MDFNGameInfo->MD5, 0) + std::string(".") +
             std::string(cd1);
          break;
       case MDFNMKF_FIRMWARE:
          ret = std::string(cd1);
+#ifdef _WIN32
+   sanitize_path(ret); // Because Windows path handling is mongoloid.
+#endif
          break;
       default:
          break;
    }
 
-#ifdef _WIN32
-   sanitize_path(ret); // Because Windows path handling is mongoloid.
-#endif
+   fprintf(stderr, "%s\n", ret.c_str());
    return ret;
 }
 

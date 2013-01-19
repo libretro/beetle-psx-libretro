@@ -94,29 +94,6 @@ typedef struct
  };
 } Uuint32;
 
-
-#if PSS_STYLE==2
-
-#define PSS "\\"
-#define MDFN_PS '\\'
-
-#elif PSS_STYLE==1
-
-#define PSS "/"
-#define MDFN_PS '/'
-
-#elif PSS_STYLE==3
-
-#define PSS "\\"
-#define MDFN_PS '\\'
-
-#elif PSS_STYLE==4
-
-#define PSS ":" 
-#define MDFN_PS ':'
-
-#endif
-
 typedef uint32   UTF32;  /* at least 32 bits */
 typedef uint16  UTF16;  /* at least 16 bits */
 typedef uint8   UTF8;   /* typically 8 bits */

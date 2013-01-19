@@ -188,7 +188,7 @@ void retro_init()
 
 #if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-   if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
+   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
       fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 #endif
 
@@ -249,20 +249,22 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game()
 {
-   if(game)
+   if (!game)
+      return;
+
+   MDFN_FlushGameCheats(0);
+
+   game->CloseGame();
+
+   if (game->name)
    {
-      MDFN_FlushGameCheats(0);
-
-      game->CloseGame();
-      if(game->name)
-      {
-         free(game->name);
-         game->name=0;
-      }
-      MDFNMP_Kill();
-
-      game = NULL;
+      free(game->name);
+      game->name=0;
    }
+
+   MDFNMP_Kill();
+
+   game = NULL;
 }
 
 static unsigned retro_devices[2];
@@ -653,14 +655,14 @@ void retro_run()
    spec.VideoFormatChanged = false;
    spec.SoundFormatChanged = false;
 
-   if(memcmp(&last_pixel_format, &spec.surface->format, sizeof(MDFN_PixelFormat)))
+   if (memcmp(&last_pixel_format, &spec.surface->format, sizeof(MDFN_PixelFormat)))
    {
       spec.VideoFormatChanged = TRUE;
 
       last_pixel_format = spec.surface->format;
    }
 
-   if(spec.SoundRate != last_sound_rate)
+   if (spec.SoundRate != last_sound_rate)
    {
       spec.SoundFormatChanged = true;
       last_sound_rate = spec.SoundRate;
@@ -669,9 +671,9 @@ void retro_run()
    curgame->Emulate(&spec);
 
 #ifdef NEED_DEINTERLACER
-   if(spec.InterlaceOn)
+   if (spec.InterlaceOn)
    {
-      if(!PrevInterlaced)
+      if (!PrevInterlaced)
          deint.ClearState();
 
       deint.Process(spec.surface, spec.DisplayRect, spec.LineWidths, spec.InterlaceField);
