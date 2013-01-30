@@ -86,7 +86,7 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 OKIADPCM_SOURCES += $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), wswan)
    core = wswan
-   NEED_BPP = 16
+   NEED_BPP = 32
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
