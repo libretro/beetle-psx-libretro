@@ -55,10 +55,12 @@ static uint32 ReadCounter = 0;
 static uint32 WriteCounter = 0;
 #endif
 
-static std::vector<CDIF*> *cdifs = NULL;
 static std::vector<const char *> cdifs_scex_ids;
 static bool CD_TrayOpen;
-static int CD_SelectedDisc;     // -1 for no disc
+
+// Libretro. Needs to be global.
+int CD_SelectedDisc;     // -1 for no disc
+std::vector<CDIF*> *cdifs;
 
 static uint64 Memcard_PrevDC[8];
 static int64 Memcard_SaveDelay[8];

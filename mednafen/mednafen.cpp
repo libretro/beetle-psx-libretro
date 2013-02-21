@@ -156,7 +156,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
  uint8 LayoutMD5[16];
 #ifdef NEED_CD
- std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
+ static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 #endif
 
  MDFN_printf(_("Loading %s...\n\n"), devicename ? devicename : _("PHYSICAL CD"));
