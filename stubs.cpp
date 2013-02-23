@@ -96,6 +96,14 @@ void MDFND_PrintError(const char* err)
 #endif
 }
 
+void MDFND_Sleep(unsigned int time)
+{
+#ifdef _WIN32
+   Sleep(time);
+#else
+   usleep(time * 1000);
+#endif
+}
 
 #ifdef WANT_THREADING
 

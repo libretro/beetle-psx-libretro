@@ -171,12 +171,12 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
    for(unsigned i = 0; i < file_list.size(); i++)
    {
-    CDInterfaces.push_back(new CDIF_ST(file_list[i].c_str()));
+    CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false /* cdimage_memcache */));
    }
   }
   else
   {
-   CDInterfaces.push_back(new CDIF_ST(devicename));
+   CDInterfaces.push_back(CDIF_Open(devicename, false /* cdimage_memcache */));
   }
  }
  catch(std::exception &e)
