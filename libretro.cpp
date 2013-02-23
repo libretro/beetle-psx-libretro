@@ -696,46 +696,12 @@ void retro_run()
 #if defined(WANT_PSX_EMU)
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
-   unsigned int ptrDiff = 0;
 #else
    unsigned width  = spec.DisplayRect.w;
    unsigned height = spec.DisplayRect.h;
 #endif
 
-#if defined(WANT_PSX_EMU)
-   // This is for PAL, the core implements PAL over NTSC TV so you get the
-   // infamous PAL borders. This removes them. The PS1 supports only two horizontal
-   // resolutions so it's OK to use constants and not percentage.
-   bool isPal = false;
-   if (height == FB_HEIGHT)
-   {
-       ptrDiff += width * 47;
-       height = 480;
-       isPal = true;
-   }
-   else if (height == 288)
-   {
-       // TODO: This seems to be OK as is, but I might be wrong.
-       isPal = true;
-   }
-
-   if (isPal && width == FB_WIDTH)
-       ptrDiff += 7;
-
-   // The core handles vertical overscan for NTSC pretty well, but it ignores
-   // horizontal overscan. This is a tough estimation of what the horizontal
-   // overscan should be, tested with all major NTSC resolutions. Mayeb make it
-   // configurable?
-   float hoverscan = 0.941176471;
-
-   width = width * hoverscan;
-   ptrDiff += ((rects[0].w - width) / 2);
-
-   const uint32_t *ptr = surf->pixels;
-   ptr += ptrDiff;
-
-   video_cb(ptr, width, height, FB_WIDTH << 2);
-#elif defined(WANT_32BPP)
+#if defined(WANT_32BPP)
    const uint32_t *pix = surf->pixels;
    video_cb(pix, width, height, FB_WIDTH << 2);
 #elif defined(WANT_16BPP)
