@@ -1,10 +1,13 @@
 static int16 ReverbSat(int32 samp) MDFN_WARN_UNUSED_RESULT;
 static INLINE int16 ReverbSat(int32 samp)
 {
-   if ( (int16_t) samp != samp )
-   samp = (samp >> 31) ^ 0x7FFF;
+ if(samp > 32767)
+  samp = 32767;
 
-   return(samp);
+ if(samp < -32768)
+  samp = -32768;
+
+ return(samp);
 }
 
 
@@ -37,7 +40,7 @@ INLINE int32 PS_SPU::Get_Reverb_Offset(int32 in_offset)
  if(offset >= 0x40000)
   offset = (offset & 0x3FFFF) + ReverbWA;
 
- //assert(offset >= ReverbWA && offset < 0x40000);
+ assert(offset >= ReverbWA && offset < 0x40000);
 
  return(offset);
 }
@@ -111,8 +114,11 @@ static INLINE int32 Reverb4422(const int16 *src)
 
  out >>= 15;
 
- if ( (int16_t) out != out )
- out = (out >> 31) ^ 0x7FFF;
+ if(out < -32768)
+  out = -32768;
+
+ if(out > 32767)
+  out = 32767;
 
  return(out);
 }

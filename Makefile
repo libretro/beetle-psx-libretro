@@ -57,7 +57,7 @@ ifeq ($(core), psx)
 	$(CORE_DIR)/input/memcard.cpp \
 	$(CORE_DIR)/input/multitap.cpp \
 	$(CORE_DIR)/input/mouse.cpp
-TARGET_NAME := mednafen_psx_libretro
+   TARGET_NAME := mednafen_psx_libretro
 else ifeq ($(core), pce-fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
@@ -301,21 +301,21 @@ ifeq ($(platform), unix)
       IS_X86 = 1
    endif
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    ENDIANNESS_DEFINES := -DLSB_FIRST
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
-OLD_GCC := 1
+   OLD_GCC := 1
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
@@ -323,8 +323,8 @@ else ifeq ($(platform), sncps3)
    AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    CXXFLAGS += -Xc+=exceptions
-OLD_GCC := 1
-NO_GCC := 1
+   OLD_GCC := 1
+   NO_GCC := 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
@@ -370,6 +370,7 @@ IS_X86 = 1
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
+   FLAGS += -DHAVE__MKDIR
 endif
 
 ifeq ($(NEED_THREADING), 1)
@@ -436,9 +437,19 @@ LIBRETRO_SOURCES := libretro.cpp stubs.cpp $(THREAD_STUBS)
 TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
 
-SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
+RESAMPLER_SRC_C += $(MEDNAFEN_DIR)/resampler/resample.c
+
+SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES) $(RESAMPLER_SRC_C)
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
+
+ifneq ($(OLD_GCC),1)
+NEW_GCC_WARNING_FLAGS += -Wno-narrowing \
+	-Wno-unused-but-set-variable \
+	-Wno-unused-result \
+	-Wno-overflow
+NEW_GCC_FLAGS += -fno-strict-overflow
+endif
 
 WARNINGS := -Wall \
 	-Wno-sign-compare \
@@ -466,19 +477,11 @@ else
    FLAGS += -O0 -g
 endif
 
-ifneq ($(OLD_GCC),1)
-NEW_GCC_WARNING_FLAGS += -Wno-narrowing \
-	-Wno-unused-but-set-variable \
-	-Wno-unused-result \
-	-Wno-overflow
-NEW_GCC_FLAGS += -fno-strict-overflow
-endif
-
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_misc -Imednafen/hw_sound -Imednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE)
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.28\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=928 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -Dgettext_noop\(a\)=a
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86

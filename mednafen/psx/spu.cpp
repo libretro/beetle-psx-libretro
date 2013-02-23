@@ -91,8 +91,13 @@ static const uint32 NoiseFreqTable[64] =
 
 PS_SPU::PS_SPU()
 {
+ last_rate = -1;
+ last_quality = ~0U;
+
  IntermediateBufferPos = 0;
  memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
+
+ resampler = NULL;
 }
 
 PS_SPU::~PS_SPU()
@@ -306,8 +311,11 @@ void PS_SPU::DecodeADPCM(const uint8 *input, int16 *output, const unsigned shift
 
   sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-  if ( (int16_t) sample != sample )
-     sample = (sample >> 31) ^ 0x7FFF;
+  if(sample < -32768)
+   sample = -32768;
+
+  if(sample > 32767)
+   sample = 32767;
 
   output[i] = sample;
  }
@@ -370,9 +378,11 @@ void PS_SPU::DecodeSamples(SPU_Voice *voice)
 
   sample += ((voice->DecodeBuffer[(voice->DecodeWritePos - 1) & 0x1F] * Weights[weight][0]) >> 6)
 			   	      + ((voice->DecodeBuffer[(voice->DecodeWritePos - 2) & 0x1F] * Weights[weight][1]) >> 6);
+  if(sample < -32768)
+   sample = -32768;
 
-  if ( (int16_t) sample != sample )
-     sample = (sample >> 31) ^ 0x7FFF;
+  if(sample > 32767)
+   sample = 32767;
 
   voice->DecodeBuffer[voice->DecodeWritePos] = sample;
   voice->DecodeWritePos = (voice->DecodeWritePos + 1) & 0x1F;
@@ -876,6 +886,10 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
   IntermediateBuffer[IntermediateBufferPos][1] = output_r;
   IntermediateBufferPos++;
 
+  //resampler.buffer()[0] = (int16)(rand() & 0xFFFF) >> 1;
+  //resampler.buffer()[1] = (int16)(rand() & 0xFFFF) >> 1;
+  //resampler.write(2);
+
   sample_clocks--;
 
   // Clock global sweep
@@ -1169,18 +1183,66 @@ uint16 PS_SPU::Read(pscpu_timestamp_t timestamp, uint32 A)
 
 void PS_SPU::StartFrame(double rate, uint32 quality)
 {
+ if((int)rate != last_rate || quality != last_quality)
+ {
+  //double ratio = (double)44100 / (rate ? rate : 44100);
+  //resampler.time_ratio(ratio, 0.9965);
+  int err = 0;
+
+  if(resampler)
+  {
+   speex_resampler_destroy(resampler);
+   resampler = NULL;
+  }
+
+  if((int)rate && (int)rate != 44100)
+  {
+   resampler = speex_resampler_init(2, 44100, (int)rate, quality, &err);
+  }
+
+  last_rate = (int)rate;
+  last_quality = quality;
+ }
+
 }
 
 int32 PS_SPU::EndFrame(int16 *SoundBuf)
 {
  //lastts = 0;
 
+ if(last_rate == 44100)
+ {
   int32 ret = IntermediateBufferPos;
 
   memcpy(SoundBuf, IntermediateBuffer, IntermediateBufferPos * 2 * sizeof(int16));
   IntermediateBufferPos = 0;
 
   return(ret);
+ }
+ else if(resampler)
+ {
+  spx_uint32_t in_len;
+  spx_uint32_t out_len;
+
+  in_len = IntermediateBufferPos;
+  out_len = 524288; //8192;	// FIXME, real size.
+
+  speex_resampler_process_interleaved_int(resampler, (const spx_int16_t *)IntermediateBuffer, &in_len, (spx_int16_t *)SoundBuf, &out_len);
+
+  assert(in_len <= IntermediateBufferPos);
+
+  if((IntermediateBufferPos - in_len) > 0)
+   memmove(IntermediateBuffer, IntermediateBuffer + in_len, (IntermediateBufferPos - in_len) * sizeof(int16) * 2);
+
+  IntermediateBufferPos -= in_len;
+
+  return(out_len);
+ }
+ else
+ {
+  IntermediateBufferPos = 0;
+  return 0;
+ }
 }
 
 int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
@@ -1449,38 +1511,7 @@ uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 speci
 	break;
 
 
-  case GSREG_FB_SRC_A:
-  case GSREG_FB_SRC_B:
-  case GSREG_IIR_ALPHA:
-  case GSREG_ACC_COEF_A:
-  case GSREG_ACC_COEF_B:
-  case GSREG_ACC_COEF_C:
-  case GSREG_ACC_COEF_D:
-  case GSREG_IIR_COEF:
-  case GSREG_FB_ALPHA:
-  case GSREG_FB_X:
-  case GSREG_IIR_DEST_A0:
-  case GSREG_IIR_DEST_A1:
-  case GSREG_ACC_SRC_A0:
-  case GSREG_ACC_SRC_A1:
-  case GSREG_ACC_SRC_B0:
-  case GSREG_ACC_SRC_B1:
-  case GSREG_IIR_SRC_A0:
-  case GSREG_IIR_SRC_A1:
-  case GSREG_IIR_DEST_B0:
-  case GSREG_IIR_DEST_B1:
-  case GSREG_ACC_SRC_C0:
-  case GSREG_ACC_SRC_C1:
-  case GSREG_ACC_SRC_D0:
-  case GSREG_ACC_SRC_D1:
-  case GSREG_IIR_SRC_B1:
-  case GSREG_IIR_SRC_B0:
-  case GSREG_MIX_DEST_A0:
-  case GSREG_MIX_DEST_A1:
-  case GSREG_MIX_DEST_B0:
-  case GSREG_MIX_DEST_B1:
-  case GSREG_IN_COEF_L:
-  case GSREG_IN_COEF_R:
+  case GSREG_FB_SRC_A ... GSREG_IN_COEF_R:
 	ret = ReverbRegs[which - GSREG_FB_SRC_A] & 0xFFFF;
 	break;
  }

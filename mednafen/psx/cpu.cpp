@@ -25,6 +25,13 @@
 	un-restartable sequences of instructions.
 */
 
+#define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
+#define BIU_ENABLE_DCACHE	0x00000080	// Enable D-cache
+#define BIU_TAG_TEST_MODE	0x00000004	// Enable TAG test mode(IsC must be set to 1 as well presumably?)
+#define BIU_INVALIDATE_MODE	0x00000002	// Enable Invalidate mode(IsC must be set to 1 as well presumably?)
+#define BIU_LOCK		0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
+						// Does lock mode prevent the actual data payload from being modified, while allowing tags to be modified/updated???
+
 namespace MDFN_IEN_PSX
 {
 
@@ -96,9 +103,21 @@ void PS_CPU::Power(void)
  CP0.SR |= (1 << 22);	// BEV
  CP0.SR |= (1 << 21);	// TS
 
- CP0.PRID = 0x300;	// PRId: FIXME(test on real thing)
+ CP0.PRID = 0x2;
 
  RecalcIPCache();
+
+
+ BIU = 0;
+
+#if PS_CPU_EMULATE_ICACHE
+ // Not quite sure about these poweron/reset values:
+ for(unsigned i = 0; i < 1024; i++)
+ {
+  ICache[i].TV = 0x2 | ((BIU & 0x800) ? 0x0 : 0x1);
+  ICache[i].Data = 0;
+ }
+#endif
 
  GTE_Power();
 }
@@ -151,6 +170,35 @@ void PS_CPU::AssertIRQ(int which, bool asserted)
  RecalcIPCache();
 }
 
+void PS_CPU::SetBIU(uint32 val)
+{
+ const uint32 old_BIU = BIU;
+
+ BIU = val & ~(0x440);
+
+#if PS_CPU_EMULATE_ICACHE
+ if((BIU ^ old_BIU) & 0x800)
+ {
+  if(BIU & 0x800)	// ICache enabled
+  {
+   for(unsigned i = 0; i < 1024; i++)
+    ICache[i].TV &= ~0x1;
+  }
+  else			// ICache disabled
+  {
+   for(unsigned i = 0; i < 1024; i++)
+    ICache[i].TV |= 0x1;
+  }
+ }
+#endif
+ PSX_WARNING("[CPU] Set BIU=0x%08x", BIU);
+}
+
+uint32 PS_CPU::GetBIU(void)
+{
+ return BIU;
+}
+
 template<typename T>
 INLINE T PS_CPU::ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool DS24)
 {
@@ -178,7 +226,7 @@ INLINE T PS_CPU::ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool D
 template<typename T>
 INLINE void PS_CPU::WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, uint32 value, bool DS24)
 {
- if(!(CP0.SR & 0x10000))
+ if(MDFN_LIKELY(!(CP0.SR & 0x10000)))
  {
   if(sizeof(T) == 1)
    PSX_MemWrite8(timestamp, address, value);
@@ -192,8 +240,35 @@ INLINE void PS_CPU::WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, ui
     PSX_MemWrite32(timestamp, address, value);
   }
  }
- //else
- // printf("ISC WRITE%d %08x %08x\n", (int)sizeof(T), address, value);
+ else
+ {
+#if PS_CPU_EMULATE_ICACHE
+  if(BIU & 0x800)	// Instruction cache is enabled/active
+  {
+   if(BIU & 0x4)	// TAG test mode.
+   {
+    // TODO: Respect written value.
+    __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
+    const uint8 valid_bits = 0x00;
+
+    ICI[0].TV = ((valid_bits & 0x01) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
+    ICI[1].TV = ((valid_bits & 0x02) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
+    ICI[2].TV = ((valid_bits & 0x04) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
+    ICI[3].TV = ((valid_bits & 0x08) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
+   }
+   else if(!(BIU & 0x1))
+   {
+    ICache[(address & 0xFFC) >> 2].Data = value << ((address & 0x3) * 8);
+   }
+  }
+
+  if((BIU & 0x081) == 0x080)	// Writes to the scratchpad(TODO)
+  {
+
+  }
+#endif
+  //printf("IsC WRITE%d 0x%08x 0x%08x -- CP0.SR=0x%08x\n", (int)sizeof(T), address, value, CP0.SR);
+ }
 }
 
 uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
@@ -201,7 +276,6 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
  const bool InBDSlot = !(NPM & 0x3);
  uint32 handler = 0x80000080;
 
-#if 0
  assert(code < 16);
 
  if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
@@ -210,7 +284,6 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
 	IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
   //assert(0);
  }
-#endif
 
  if(CP0.SR & (1 << 22))	// BEV
   handler = 0xBFC00180;
@@ -252,7 +325,6 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
 	BACKED_LDWhich = LDWhich;		\
 	BACKED_LDValue = LDValue;
 
-
 template<bool DebugMode, bool ILHMode>
 pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 {
@@ -269,7 +341,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
  do
  {
   //printf("Running: %d %d\n", timestamp, next_event_ts);
-  while(timestamp < next_event_ts)
+  while(MDFN_LIKELY(timestamp < next_event_ts))
   {
    uint32 instr;
    uint32 opf;
@@ -277,16 +349,90 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
+   if(DebugMode && CPUHook)
+   {
+    ACTIVE_TO_BACKING;
 
+    CPUHook(PC);
+
+    BACKING_TO_ACTIVE;
+   }
+
+   if(!ILHMode)
+   {
     if(PC == 0xB0)
     {
      if(GPR[9] == 0x3D)
      {
+      //if(GPR[4] == 'L')
+      // DBG_Break();
       fputc(GPR[4], stderr);
+      //if(GPR[4] == '\n')
+      //{
+      // fputc('%', stderr);
+      // fputc(' ', stderr);
+      //}
      }
     }
+   }
 
+/*
+   if(PC == 0xB0)
+   {
+    if(GPR[9] != 0xB)
+    PSX_WARNING("[BIOS] 0xB0 t1=0x%02x", GPR[9]);
+   }
+*/
+#if PS_CPU_EMULATE_ICACHE
+   instr = ICache[(PC & 0xFFC) >> 2].Data;
+
+   if(ICache[(PC & 0xFFC) >> 2].TV != PC)
+   {
+    // FIXME: Handle executing out of scratchpad.
+    if(PC >= 0xA0000000 || !(BIU & 0x800))
+    {
+     instr = LoadU32_LE((uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC]);
+     timestamp += 4;	// Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
+    }
+    else
+    {
+     __ICache *ICI = &ICache[((PC & 0xFF0) >> 2)];
+     const uint32 *FMP = (uint32 *)&FastMap[(PC &~ 0xF) >> FAST_MAP_SHIFT][PC &~ 0xF];
+
+     // | 0x2 to simulate (in)validity bits.
+     ICI[0x00].TV = (PC &~ 0xF) | 0x00 | 0x2;
+     ICI[0x01].TV = (PC &~ 0xF) | 0x04 | 0x2;
+     ICI[0x02].TV = (PC &~ 0xF) | 0x08 | 0x2;
+     ICI[0x03].TV = (PC &~ 0xF) | 0x0C | 0x2;
+
+     timestamp += 3;
+
+     switch(PC & 0xC)
+     {
+      case 0x0:
+	timestamp++;
+        ICI[0x00].TV &= ~0x2;
+	ICI[0x00].Data = LoadU32_LE(&FMP[0]);
+      case 0x4:
+	timestamp++;
+        ICI[0x01].TV &= ~0x2;
+	ICI[0x01].Data = LoadU32_LE(&FMP[1]);
+      case 0x8:
+	timestamp++;
+        ICI[0x02].TV &= ~0x2;
+	ICI[0x02].Data = LoadU32_LE(&FMP[2]);
+      case 0xC:
+	timestamp++;
+        ICI[0x03].TV &= ~0x2;
+	ICI[0x03].Data = LoadU32_LE(&FMP[3]);
+	break;
+     }
+     instr = ICache[(PC & 0xFFC) >> 2].Data;
+    }
+   }
+#else
    instr = LoadU32_LE((uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC]);
+#endif
 
    //printf("PC=%08x, SP=%08x - op=0x%02x - funct=0x%02x - instr=0x%08x\n", PC, GPR[29], instr >> 26, instr & 0x3F, instr);
    //for(int i = 0; i < 32; i++)
@@ -303,85 +449,44 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    timestamp++;
 
    #define DO_LDS() { GPR[LDWhich] = LDValue; LDWhich = 0x20; }
-   #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name:
+   #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name: /*assert( ((arg_op) ? (0x40 | (arg_op)) : (arg_funct)) == opf); */
    #define END_OPF goto OpDone; }
 
    #define DO_BRANCH(offset, mask)			\
 	{						\
+	 if(ILHMode)					\
+	 {								\
+	  uint32 old_PC = PC;						\
+	  PC = (PC & new_PC_mask) + new_PC;				\
+	  if(old_PC == ((PC & (mask)) + (offset)))			\
+	  {								\
+	   if(*(uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC] == 0)	\
+	   {								\
+	    if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
+	    {								\
+	     timestamp = next_event_ts;					\
+	    }								\
+	   }								\
+	  }								\
+	 }						\
+	 else						\
 	  PC = (PC & new_PC_mask) + new_PC;		\
 	 new_PC = (offset);				\
 	 new_PC_mask = (mask) & ~3;			\
 	 /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
 							\
+         if(DebugMode && ADDBT)                 	\
+	 {						\
+          ADDBT(PC, (PC & new_PC_mask) + new_PC, false);	\
+	 }						\
 	 goto SkipNPCStuff;				\
 	}
 
-   #define ITYPE uint32 rs = (instr >> 21) & 0x1F; uint32 rt  = (instr >> 16) & 0x1F; int32 immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define ITYPE_ZE uint32 rs = (instr >> 21) & 0x1F; uint32 rt = (instr >> 16) & 0x1F; uint32 immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define JTYPE uint32 target = instr & ((1 << 26) - 1);
-   #define RTYPE uint32 rs = (instr >> 21) & 0x1F; uint32 rt = (instr >> 16) & 0x1F; uint32 rd = (instr >> 11) & 0x1F; uint32 shamt = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
+   #define ITYPE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; int32 immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define ITYPE_ZE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32 immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define JTYPE uint32 target = instr & ((1 << 26) - 1); /*printf(" target=(%08x) ", target);*/
+   #define RTYPE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32 rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32 shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
 
-#ifdef _MSC_VER
-static __int32 op_goto_table[256] = {0};
-static __int32* op_goto_table_ptr = &op_goto_table[0];
-#  define STORE_ADDRESS(index,label) { int _idx = index; \
-     __asm lea eax, label\
-     __asm mov edx,op_goto_table_ptr\
-     __asm mov ebx, _idx\
-     __asm mov [edx + ebx*4],eax\
-}
-#  define JUMP_TO_IP(opf) { int addr = op_goto_table[opf]; __asm jmp addr }
-
-   static bool table_generated = false;
-   if(!table_generated)
-     {
-       table_generated = true;
-      int __ctr=0;
- STORE_ADDRESS(__ctr++,op_SLL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SRL); STORE_ADDRESS(__ctr++,op_SRA); STORE_ADDRESS(__ctr++,op_SLLV); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SRLV); STORE_ADDRESS(__ctr++,op_SRAV);
-    STORE_ADDRESS(__ctr++,op_JR); STORE_ADDRESS(__ctr++,op_JALR); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SYSCALL); STORE_ADDRESS(__ctr++,op_BREAK); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_MFHI); STORE_ADDRESS(__ctr++,op_MTHI); STORE_ADDRESS(__ctr++,op_MFLO); STORE_ADDRESS(__ctr++,op_MTLO); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_MULT); STORE_ADDRESS(__ctr++,op_MULTU); STORE_ADDRESS(__ctr++,op_DIV); STORE_ADDRESS(__ctr++,op_DIVU); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_ADD); STORE_ADDRESS(__ctr++,op_ADDU); STORE_ADDRESS(__ctr++,op_SUB); STORE_ADDRESS(__ctr++,op_SUBU); STORE_ADDRESS(__ctr++,op_AND); STORE_ADDRESS(__ctr++,op_OR); STORE_ADDRESS(__ctr++,op_XOR); STORE_ADDRESS(__ctr++,op_NOR);
-    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SLT); STORE_ADDRESS(__ctr++,op_SLTU); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-
-    __ctr++; STORE_ADDRESS(__ctr++,op_BCOND); STORE_ADDRESS(__ctr++,op_J); STORE_ADDRESS(__ctr++,op_JAL); STORE_ADDRESS(__ctr++,op_BEQ); STORE_ADDRESS(__ctr++,op_BNE); STORE_ADDRESS(__ctr++,op_BLEZ); STORE_ADDRESS(__ctr++,op_BGTZ);
-    STORE_ADDRESS(__ctr++,op_ADDI); STORE_ADDRESS(__ctr++,op_ADDIU); STORE_ADDRESS(__ctr++,op_SLTI); STORE_ADDRESS(__ctr++,op_SLTIU); STORE_ADDRESS(__ctr++,op_ANDI); STORE_ADDRESS(__ctr++,op_ORI); STORE_ADDRESS(__ctr++,op_XORI); STORE_ADDRESS(__ctr++,op_LUI);
-    STORE_ADDRESS(__ctr++,op_COP0); STORE_ADDRESS(__ctr++,op_COP1); STORE_ADDRESS(__ctr++,op_COP2); STORE_ADDRESS(__ctr++,op_COP3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_LB); STORE_ADDRESS(__ctr++,op_LH); STORE_ADDRESS(__ctr++,op_LWL); STORE_ADDRESS(__ctr++,op_LW); STORE_ADDRESS(__ctr++,op_LBU); STORE_ADDRESS(__ctr++,op_LHU); STORE_ADDRESS(__ctr++,op_LWR); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_SB); STORE_ADDRESS(__ctr++,op_SH); STORE_ADDRESS(__ctr++,op_SWL); STORE_ADDRESS(__ctr++,op_SW); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_SWR); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_LWC0); STORE_ADDRESS(__ctr++,op_LWC1); STORE_ADDRESS(__ctr++,op_LWC2); STORE_ADDRESS(__ctr++,op_LWC3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-    STORE_ADDRESS(__ctr++,op_SWC0); STORE_ADDRESS(__ctr++,op_SWC1); STORE_ADDRESS(__ctr++,op_SWC2); STORE_ADDRESS(__ctr++,op_SWC3); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL); STORE_ADDRESS(__ctr++,op_ILL);
-
-    // Interrupt portion of this table is constructed so that an interrupt won't be taken when the PC is pointing to a GTE instruction,
-    // to avoid problems caused by pipeline vs coprocessor nuances that aren't emulated.
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-
-    __ctr++; STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_COP2); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-    STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT); STORE_ADDRESS(__ctr++,op_INTERRUPT);
-   }
-
-            //counter++;
-   const uint32 opc = instr>>26;
-   const uint32 func = instr&0x3F;
-   //if(dotrace) DEBUG_TRACE("{%12lld} %08X: [%08X] (%d,%d) %s\n",counter,PC, instr,opc,func,MDFN_IEN_PSX::DisassembleMIPS(PC,instr).c_str());
-   JUMP_TO_IP(opf);
-#else
    static const void *const op_goto_table[256] =
    {
     &&op_SLL, &&op_ILL, &&op_SRL, &&op_SRA, &&op_SLLV, &&op_ILL, &&op_SRLV, &&op_SRAV,
@@ -422,13 +527,12 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
     &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT,
     &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT, &&op_INTERRUPT,
    };
-   
+
    goto *op_goto_table[opf];
-#endif
 
    {
     BEGIN_OPF(ILL, 0, 0);
-	     //PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
+	     PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
 	     DO_LDS();
 	     new_PC = Exception(EXCEPTION_RI, PC, new_PC_mask);
 	     new_PC_mask = 0;
@@ -444,7 +548,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-	if(ep)
+	if(MDFN_UNLIKELY(ep))
 	{
 	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -464,7 +568,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-        if(ep)
+        if(MDFN_UNLIKELY(ep))
 	{
 	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -615,7 +719,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
     // BREAK - Breakpoint
     //
     BEGIN_OPF(BREAK, 0, 0x0D);
-	//PSX_WARNING("[CPU] BREAK BREAK BREAK BREAK DAAANCE -- PC=0x%08x", PC);
+	PSX_WARNING("[CPU] BREAK BREAK BREAK BREAK DAAANCE -- PC=0x%08x", PC);
 
 	DO_LDS();
 	new_PC = Exception(EXCEPTION_BP, PC, new_PC_mask);
@@ -657,12 +761,10 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 		 uint32 rd = (instr >> 11) & 0x1F;
 		 uint32 val = GPR[rt];
 
-#if 0
-		 if(rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
+		 if(rd != CP0REG_PRID && rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
 		 {
 	 	  PSX_WARNING("[CPU] Unimplemented MTC0: rt=%d(%08x) -> rd=%d", rt, GPR[rt], rd);
 		 }
-#endif
 
 		 switch(rd)
 		 {
@@ -697,13 +799,11 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 			break;
 
 		  case CP0REG_SR:
+			if((CP0.SR ^ val) & 0x10000)
+			 PSX_WARNING("[CPU] IsC %u->%u", (bool)(CP0.SR & (1U << 16)), (bool)(val & (1U << 16)));
+
 			CP0.SR = val & ~( (0x3 << 26) | (0x3 << 23) | (0x3 << 6));
 			RecalcIPCache();
-
-#if 0
-			if(CP0.SR & 0x10000)
-			 PSX_WARNING("[CPU] IsC set");
-#endif
 			break;
 		 }
 		}
@@ -802,8 +902,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 		}
 		break;
 
-   case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x1F:
-
+	 case 0x10 ... 0x1F:
 		//printf("%08x\n", PC);
 	        if(timestamp < gte_ts_done)
 	         timestamp = gte_ts_done;
@@ -847,7 +946,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
-        if(address & 3)
+        if(MDFN_UNLIKELY(address & 3))
 	{
          new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -898,17 +997,17 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
-	if(address & 0x3)
+	if(MDFN_UNLIKELY(address & 0x3))
 	{
 	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
          new_PC_mask = 0;
 	}
-	else if(!(CP0.SR & 0x10000))
+	else
 	{
          if(timestamp < gte_ts_done)
           timestamp = gte_ts_done;
 
-	 PSX_MemWrite32(timestamp, address, GTE_ReadDR(rt));
+	 WriteMemory<uint32>(timestamp, address, GTE_ReadDR(rt));
 	}
 	DO_LDS();
     END_OPF;
@@ -1315,7 +1414,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-	if(ep)
+	if(MDFN_UNLIKELY(ep))
 	{
 	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1415,7 +1514,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-	if(address & 1)
+	if(MDFN_UNLIKELY(address & 1))
 	{
 	 new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1436,7 +1535,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-        if(address & 1)
+        if(MDFN_UNLIKELY(address & 1))
 	{
          new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1458,7 +1557,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
 	DO_LDS();
 
-        if(address & 3)
+        if(MDFN_UNLIKELY(address & 3))
 	{
          new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1489,7 +1588,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
-	if(address & 0x1)
+	if(MDFN_UNLIKELY(address & 0x1))
 	{
 	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1507,7 +1606,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
-	if(address & 0x3)
+	if(MDFN_UNLIKELY(address & 0x3))
 	{
 	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
          new_PC_mask = 0;
@@ -1667,7 +1766,7 @@ static __int32* op_goto_table_ptr = &op_goto_table[0];
 
    //printf("\n");
   }
- } while(PSX_EventHandler(timestamp));
+ } while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
 
  if(gte_ts_done > 0)
   gte_ts_done -= timestamp;
@@ -1682,7 +1781,12 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool ILHMode)
  if(CPUHook || ADDBT)
   return(RunReal<true, false>(timestamp_in));
  else
+ {
+  if(ILHMode)
+   return(RunReal<false, true>(timestamp_in));
+  else
    return(RunReal<false, false>(timestamp_in));
+ }
 }
 
 void PS_CPU::SetCPUHook(void (*cpuh)(uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
@@ -1772,6 +1876,18 @@ void PS_CPU::SetRegister(unsigned int which, uint32 value)
 
  }
 }
+
+bool PS_CPU::PeekCheckICache(uint32 PC, uint32 *iw)
+{
+ if(ICache[(PC & 0xFFC) >> 2].TV == PC)
+ {
+  *iw = ICache[(PC & 0xFFC) >> 2].Data;
+  return(true);
+ }
+
+ return(false);
+}
+
 
 #undef BEGIN_OPF
 #undef END_OPF

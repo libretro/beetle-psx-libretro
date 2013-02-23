@@ -1,6 +1,11 @@
 template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
 void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset)
 {
+ const int32 r = color & 0xFF;
+ const int32 g = (color >> 8) & 0xFF;
+ const int32 b = (color >> 16) & 0xFF;
+ const uint16 fill_color = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
+
  int32 x_start, x_bound;
  int32 y_start, y_bound;
  uint8 u, v;
@@ -119,13 +124,13 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
      {
       if(TexMult)
       {
-       fbw = ModTexel(fbw, color & 0xFF, (color >> 8) & 0xFF, (color >> 16) & 0xFF, 3, 2);
+       fbw = ModTexel(fbw, r, g, b, 3, 2);
       }
       PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
      }
     }
     else
-     PlotPixel<BlendMode, MaskEval_TA, false>(x, y, 0x8000 | (((color & 0xFF) >> 3) << 0) | ((((color >> 8) & 0xFF) >> 3) << 5) | ((((color >> 16) & 0xFF) >> 3) << 10));
+     PlotPixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
 
     if(textured)
      u_r += u_inc;

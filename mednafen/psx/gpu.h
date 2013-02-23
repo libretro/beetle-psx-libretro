@@ -75,13 +75,8 @@ class PS_GPU
   return CalcFIFOReadyBit();
  }
 
- INLINE void AbortDMA(void)
- {
-  BlitterFIFO.Flush();
-  InCmd = INCMD_NONE;
- }
-
  void WriteDMA(uint32 V);
+ uint32 ReadDMA(void);
 
  uint32 Read(const pscpu_timestamp_t timestamp, uint32 A);
 
@@ -104,6 +99,7 @@ class PS_GPU
 
  void ProcessFIFO(void);
  void WriteCB(uint32 data);
+ uint32 ReadData(void);
  void SoftReset(void);
 
  // Y, X
@@ -262,32 +258,15 @@ class PS_GPU
  //
  // Display work vars
  //
-/*
- uint32 DisplayMode_Latch;
-
- bool DisplayOff_Latch;
- uint32 DisplayFB_XStart_Latch;
- uint32 DisplayFB_YStart_Latch;
-
- uint32 HorizStart_Latch;
- uint32 HorizEnd_Latch;
-
- uint32 VertStart_Latch;
- uint32 VertEnd_Latch;
-*/
  uint32 DisplayFB_CurYOffset;
  uint32 DisplayFB_CurLineYReadout;
 
- uint32 DisplayHeightCounter;
+ bool InVBlank;
 
  //
  //
  //
  uint32 LinesPerField;
- uint32 VisibleStartLine;
- bool FrameInterlaced;
- bool PALMode;
- bool HeightMode;
  uint32 scanline;
  bool field;
  bool field_atvs;
@@ -307,6 +286,11 @@ class PS_GPU
  //
  //
  //
+
+ bool sl_zero_reached;
+ //
+ //
+
  EmulateSpecStruct *espec;
  MDFN_Surface *surface;
  MDFN_Rect *DisplayRect;
@@ -316,6 +300,9 @@ class PS_GPU
 
  uint32 OutputLUT[32768];
  void ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift, bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x);
+
+ template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
+ void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
 };
 
 }

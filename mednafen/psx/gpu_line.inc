@@ -111,9 +111,14 @@ void PS_GPU::DrawLine(line_point *points)
  i_dy = abs(points[1].y - points[0].y);
  k = (i_dx > i_dy) ? i_dx : i_dy;
 
- if(i_dx >= 1024 || i_dy >= 512)
+ if(i_dx >= 1024)
  {
   //PSX_WARNING("[GPU] Line too long: i_dx=%d", i_dx);
+  return;
+ }
+
+ if(i_dy >= 512)
+ {
   //PSX_WARNING("[GPU] Line too long: i_dy=%d", i_dy);
   return;
  }
@@ -144,11 +149,11 @@ void PS_GPU::DrawLine(line_point *points)
   // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
   const int32 x = (cur_point.x >> Line_XY_FractBits) & 2047;
   const int32 y = (cur_point.y >> Line_XY_FractBits) & 2047;
+  uint16 pix = 0x8000;
 
   if(!LineSkipTest(y))
   {
    uint8 r, g, b;
-   uint16 pix;
 
    if(goraud)
    {
@@ -164,9 +169,17 @@ void PS_GPU::DrawLine(line_point *points)
    }
 
    if(goraud && dtd)
-      pix = (0x8000) | (DitherLUT[y & 3][x & 3][r] << 0) | (DitherLUT[y & 3][x & 3][g] << 5) | (DitherLUT[y & 3][x & 3][b] << 10);
+   {
+    pix |= DitherLUT[y & 3][x & 3][r] << 0;
+    pix |= DitherLUT[y & 3][x & 3][g] << 5;
+    pix |= DitherLUT[y & 3][x & 3][b] << 10;
+   }
    else
-      pix = (0x8000) | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
+   {
+    pix |= (r >> 3) << 0;
+    pix |= (g >> 3) << 5;
+    pix |= (b >> 3) << 10;
+   }
 
    // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
    if(x >= ClipX0 && x <= ClipX1 && y >= ClipY0 && y <= ClipY1)
