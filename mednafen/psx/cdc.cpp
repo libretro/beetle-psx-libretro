@@ -780,7 +780,7 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
        if(XA_Test(buf))
        {
 	if(AudioBuffer_ReadPos & 0xFFF)
-	 printf("readpos=%04x(rabl=%04x) writepos=%04x\n", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
+	 PSX_WARNING("readpos=%04x(rabl=%04x) writepos=%04x\n", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
 
 	//if(AudioBuffer_UsedCount == 0)
 	// AudioBuffer_InPrebuffer = true;
@@ -993,10 +993,10 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      //PSX_WARNING("[CDC] Command: %s --- %d", command->name, Results.CanRead());
 
 #if 1
-     printf("[CDC] Command: %s --- ", command->name);
+     PSX_WARNING("[CDC] Command: %s --- ", command->name);
      for(unsigned int i = 0; i < ArgsIn; i++)
-      printf(" 0x%02x", ArgsBuf[i]);
-     printf("\n");
+      PSX_WARNING(" 0x%02x", ArgsBuf[i]);
+     PSX_WARNING("\n");
 #endif
      next_time = (this->*(command->func))(ArgsIn, ArgsBuf);
      PendingCommandPhase = 1;
@@ -1344,7 +1344,7 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
 
  ret += PSX_GetRandU32(0, 20000);
 
- printf("%d\n", ret);
+ PSX_WARNING("%d\n", ret);
 
  return(ret);
 }
@@ -1417,7 +1417,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 
   PlayTrackMatch = track;
 
-  printf("[CDC] Play track: %d\n", track);
+  PSX_WARNING("[CDC] Play track: %d\n", track);
   SeekTarget = toc.tracks[track].lba;
   PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
