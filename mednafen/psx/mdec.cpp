@@ -45,20 +45,12 @@ static uint32 Command;
 static uint8 QMatrix[2][64];
 static uint32 QMIndex;
 
-#ifdef _MSC_VER
-static MDFN_ALIGN(16) int16 IDCTMatrix[64];
-#else
 static int16 IDCTMatrix[64] MDFN_ALIGN(16);
-#endif
 static uint32 IDCTMIndex;
 
 static uint8 QScale;
 
-#ifdef _MSC_VER
-static MDFN_ALIGN(16) int16 Coeff[6][64];
-#else
 static int16 Coeff[6][64] MDFN_ALIGN(16);
-#endif
 static uint32 CoeffIndex;
 static uint32 DecodeWB;
 
@@ -424,12 +416,10 @@ void MDEC_DMAWrite(uint32 V)
    InCounter--;
   }
  }
-#if 0
  else
  {
   printf("MYSTERY1: %08x\n", V);
  }
-#endif
 }
 
 uint32 MDEC_DMARead(void)
@@ -448,6 +438,15 @@ uint32 MDEC_DMARead(void)
  return(V);
 }
 
+// Test case related to this: GameShark Version 4.0 intro movie(coupled with (clever) abuse of DMA channel 0).
+bool MDEC_DMACanWrite(void)
+{
+ if((Command & 0xF5FF0000) == 0x30000000)
+  return(InCounter > 0);
+
+ return(true);	// TODO: Refine/correct.
+}
+
 bool MDEC_DMACanRead(void)
 {
  return(OutBuffer.CanRead() >= 2); //(OutBuffer.CanRead() >= 2) || ((Command & 0xF5FF0000) != 0x30000000);
@@ -455,7 +454,7 @@ bool MDEC_DMACanRead(void)
 
 void MDEC_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d", A, V, timestamp);
+ PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d", A, V, timestamp);
  if(A & 4)
  {
   if(V & 0x80000000) // Reset?

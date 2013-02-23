@@ -318,7 +318,7 @@ INLINE void FrontIO::DoDSRIRQ(void)
 {
  if(Control & 0x1000)
  {
-  //PSX_FIODBGINFO("[DSR] IRQ");
+  PSX_FIODBGINFO("[DSR] IRQ");
   istatus = true;
   IRQ_Assert(IRQ_SIO, true);
  }
@@ -329,7 +329,7 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
  assert(!(A & 0x1));
 
- //PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
+ PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
 
  Update(timestamp);
 
@@ -346,10 +346,8 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	break;
 
   case 0xa:
-#if 0
 	if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
 	 fprintf(stderr, "FIO device selection changed during comm %04x->%04x", Control, V);
-#endif
 
 	//printf("Control: %d, %04x\n", timestamp, V);
 	Control = V & 0x3F2F;
@@ -474,10 +472,8 @@ uint32 FrontIO::Read(pscpu_timestamp_t timestamp, uint32 A)
 	break;
  }
 
-#if 0
  if((A & 0xF) != 0x4)
   PSX_FIODBGINFO("[FIO] Read: %08x %08x", A, ret);
-#endif
 
  return(ret);
 }
@@ -527,7 +523,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
      if(!TransmitBitCounter)
      {
       need_start_stop_check = true;
-      //PSX_FIODBGINFO("[FIO] Data transmitted: %08x", TransmitBuffer);
+      PSX_FIODBGINFO("[FIO] Data transmitted: %08x", TransmitBuffer);
       TransmitInProgress = false;
 
       if(Control & 0x400)
@@ -551,7 +547,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
      if(!ReceiveBitCounter)
      {
       need_start_stop_check = true;
-      //PSX_FIODBGINFO("[FIO] Data received: %08x", ReceiveBuffer);
+      PSX_FIODBGINFO("[FIO] Data received: %08x", ReceiveBuffer);
 
       ReceiveInProgress = false;
       ReceiveBufferAvail = true;
@@ -719,26 +715,28 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
  assert(which < 8);
 
- FILE * memcard = fopen(path, "rb");
- if (memcard)
+ try
  {
-    fclose(memcard);
-    if(DevicesMC[which]->GetNVSize())
-    {
-       FileWrapper mf(path, FileWrapper::MODE_READ);
-       std::vector<uint8> tmpbuf;
+  if(DevicesMC[which]->GetNVSize())
+  {
+   FileWrapper mf(path, FileWrapper::MODE_READ);
+   std::vector<uint8> tmpbuf;
 
-       tmpbuf.resize(DevicesMC[which]->GetNVSize());
+   tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
-       if(mf.size() != (int64)tmpbuf.size())
-          throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
+   if(mf.size() != (int64)tmpbuf.size())
+    throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
 
-       mf.read(&tmpbuf[0], tmpbuf.size());
+   mf.read(&tmpbuf[0], tmpbuf.size());
 
-       DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
-       DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
-    }
-
+   DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
+   DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
+  }
+ }
+ catch(MDFN_Error &e)
+ {
+  if(e.GetErrno() != ENOENT)
+   throw(e);
  }
 }
 
@@ -821,7 +819,7 @@ static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =
  {
   "dualshock",
   "DualShock",
-  "DualShock gamepad; SCPH-1200.  Emulation in Mednafen includes the analog mode toggle button.",
+  "DualShock gamepad; SCPH-1200.  Emulation in Mednafen includes the analog mode toggle button.  Rumble is emulated, but currently only supported on Linux, and MS Windows via the XInput API and XInput-compatible gamepads/joysticks.  If you're having trouble getting rumble to work on Linux, see if Mednafen is printing out error messages during startup regarding /dev/input/event*, and resolve the issue(s) as necessary.",
   NULL,
   sizeof(Device_DualShock_IDII) / sizeof(InputDeviceInputInfoStruct),
   Device_DualShock_IDII,
