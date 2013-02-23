@@ -9,8 +9,13 @@
 #include "../general.h"
 #include "../FileWrapper.h"
 
+#ifdef __LIBRETRO__
+#define PSX_WARNING(format, ...)
+#define PSX_DBGINFO(format, ...)
+#else
 #define PSX_WARNING(format, ...) { printf(format "\n", ## __VA_ARGS__); }
 #define PSX_DBGINFO(format, ...) { /*printf(format "\n", ## __VA_ARGS__);*/ }
+#endif
 
 namespace MDFN_IEN_PSX
 {
