@@ -316,6 +316,7 @@ else ifeq ($(platform), ps3)
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    OLD_GCC := 1
+   FLAGS += -DHAVE_MKDIR
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
@@ -325,12 +326,14 @@ else ifeq ($(platform), sncps3)
    CXXFLAGS += -Xc+=exceptions
    OLD_GCC := 1
    NO_GCC := 1
+   FLAGS += -DHAVE_MKDIR
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    CXX = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+   FLAGS += -DHAVE_MKDIR
 else ifeq ($(platform), psp1)
 	TARGET := $(TARGET_NAME)_psp1.a
 	CC = psp-gcc$(EXE_EXT)
@@ -338,6 +341,7 @@ else ifeq ($(platform), psp1)
 	AR = psp-ar$(EXE_EXT)
 	ENDIANNESS_DEFINES := -DLSB_FIRST
 	FLAGS += -DPSP -G0
+   FLAGS += -DHAVE_MKDIR
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
@@ -345,6 +349,7 @@ else ifeq ($(platform), xenon)
    AR = xenon-ar$(EXE_EXT)
    ENDIANNESS_DEFINES += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    LIBS := $(PTHREAD_FLAGS)
+   FLAGS += -DHAVE_MKDIR
 else ifeq ($(platform), ngc)
    TARGET := $(TARGET_NAME)_ngc.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
@@ -353,6 +358,7 @@ else ifeq ($(platform), ngc)
    ENDIANNESS_DEFINES += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
 
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
+   FLAGS += -DHAVE_MKDIR
 
 else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_wii.a
@@ -362,6 +368,7 @@ else ifeq ($(platform), wii)
    ENDIANNESS_DEFINES += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
 
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
+   FLAGS += -DHAVE_MKDIR
 else
    TARGET := retro.dll
    CC = gcc
