@@ -793,12 +793,7 @@ void PS_GPU::ProcessFIFO(void)
 
   PrimitiveCounter[cc]++;
 
-  if(!command->func[TexMode])
-  {
-   //if(CB[0])
-   // PSX_WARNING("[GPU] Unknown command: %08x, %d", CB[0], scanline);
-  }
-  else
+  if(command->func[TexMode])
   {
 #if 0
    PSX_WARNING("[GPU] Command: %08x %s %d %d %d", CB[0], command->name, command->len, scanline, DrawTimeAvail);
@@ -1353,11 +1348,13 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      {
       const uint16 *src = GPURAM[DisplayFB_CurLineYReadout];
 
-      for(int32 x = 0; x < dx_start; x++)
-       dest[x] = 0;
+      memset(dest, 0, dx_start * sizeof(int32));
 
       //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
       ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
+
+      for(uint32 x = dx_end; x < dmw; x++)
+       dest[x] = 0;
      }
 
      //if(scanline == 64)

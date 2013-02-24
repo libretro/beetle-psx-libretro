@@ -42,8 +42,8 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 640
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
-#define FB_WIDTH 680
-#define FB_HEIGHT 576
+#define FB_WIDTH 640
+#define FB_HEIGHT 480
 
 #elif defined(WANT_PCE_FAST_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
