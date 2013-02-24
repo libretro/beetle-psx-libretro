@@ -1081,13 +1081,6 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 
 
 }
 
-
-template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
-void PS_GPU::ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
-{
- ReorderRGB_Var(out_Rshift, out_Gshift, out_Bshift, bpp24, src, dest, dx_start, dx_end, fb_x);
-}
-
 pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 {
  static const uint32 DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -1222,8 +1215,6 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      {
       if((bool)(DisplayMode & 0x08) != HardwarePALType)
       {
-       const uint32 black = surface->MakeColor(0, 0, 0);
-
        DisplayRect->x = 0;
        DisplayRect->y = 0;
        DisplayRect->w = 384;
@@ -1237,9 +1228,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
         LineWidths[y].w = 384;
 
         for(int32 x = 0; x < 384; x++)
-        {
-         dest[x] = black;
-        }
+         dest[x] = 0;
        }
        char buffer[256];
 
@@ -1247,13 +1236,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 #ifndef __LIBRETRO__
        trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
        DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
-		surface->MakeColor(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13);
+		MAKECOLOR(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13);
 #endif
       }
       else
       {
-       const uint32 black = surface->MakeColor(0, 0, 0);
-
        espec->InterlaceOn = (bool)(DisplayMode & 0x20);
        espec->InterlaceField = field;
 
@@ -1268,7 +1255,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
        for(int i = 0; i < (DisplayRect->y + DisplayRect->h); i++)
        {
 	surface->pixels[i * surface->pitch32 + 0] =
-	surface->pixels[i * surface->pitch32 + 1] = black;
+	surface->pixels[i * surface->pitch32 + 1] = 0;
         LineWidths[i].x = 0;
         LineWidths[i].w = 2;
        }
@@ -1365,25 +1352,12 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
      {
       const uint16 *src = GPURAM[DisplayFB_CurLineYReadout];
-      const uint32 black = surface->MakeColor(0, 0, 0);
 
       for(int32 x = 0; x < dx_start; x++)
-       dest[x] = black;
+       dest[x] = 0;
 
       //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-      if(surface->format.Rshift == 0 && surface->format.Gshift == 8 && surface->format.Bshift == 16)
-       ReorderRGB<0, 8, 16>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 8 && surface->format.Gshift == 16 && surface->format.Bshift == 24)
-       ReorderRGB<8, 16, 24>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 16 && surface->format.Gshift == 8 && surface->format.Bshift == 0)
-       ReorderRGB<16, 8, 0>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else if(surface->format.Rshift == 24 && surface->format.Gshift == 16 && surface->format.Bshift == 8)
-       ReorderRGB<24, 16, 8>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-      else
-       ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-
-      for(uint32 x = dx_end; x < dmw; x++)
-       dest[x] = black;
+      ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
      }
 
      //if(scanline == 64)
@@ -1453,7 +1427,7 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
    r = ((rc >> 0) & 0x1F) << 3;
    g = ((rc >> 5) & 0x1F) << 3;
    b = ((rc >> 10) & 0x1F) << 3;
-   OutputLUT[rc] = espec->surface->format.MakeColor(r, g, b, 0);
+   OutputLUT[rc] = MAKECOLOR(r, g, b, 0);
   }
  }
 }
