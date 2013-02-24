@@ -211,8 +211,6 @@ void FrontIO::SetAMCT(bool enabled)
 
 void FrontIO::SetCrosshairsColor(unsigned port, uint32 color)
 {
- assert(port >= 0 && port < 8);
-
  chair_colors[port] = color;
  Devices[port]->SetCrosshairsColor(color);
 }
@@ -327,10 +325,6 @@ INLINE void FrontIO::DoDSRIRQ(void)
 
 void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- assert(!(A & 0x1));
-
- PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
-
  Update(timestamp);
 
  switch(A & 0xF)
@@ -346,9 +340,6 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	break;
 
   case 0xa:
-	if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
-	 fprintf(stderr, "FIO device selection changed during comm %04x->%04x", Control, V);
-
 	//printf("Control: %d, %04x\n", timestamp, V);
 	Control = V & 0x3F2F;
 
@@ -427,8 +418,6 @@ if(!((Control & 0x2) && (Control & 0x2000)))
 uint32 FrontIO::Read(pscpu_timestamp_t timestamp, uint32 A)
 {
  uint32 ret = 0;
-
- assert(!(A & 0x1));
 
  Update(timestamp);
 
@@ -706,15 +695,11 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
 
 uint64 FrontIO::GetMemcardDirtyCount(unsigned int which)
 {
- assert(which < 8);
-
  return(DevicesMC[which]->GetNVDirtyCount());
 }
 
 void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
- assert(which < 8);
-
  try
  {
   if(DevicesMC[which]->GetNVSize())
@@ -742,8 +727,6 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
 
 void FrontIO::SaveMemcard(unsigned int which, const char *path)
 {
- assert(which < 8);
-
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
   FileWrapper mf(path, FileWrapper::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE

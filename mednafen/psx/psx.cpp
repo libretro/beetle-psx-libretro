@@ -207,7 +207,6 @@ static void RebaseTS(const pscpu_timestamp_t timestamp)
   if(i == PSX_EVENT__SYNFIRST || i == PSX_EVENT__SYNLAST)
    continue;
 
-  assert(events[i].event_time > timestamp);
   events[i].event_time -= timestamp;
  }
 
@@ -216,7 +215,6 @@ static void RebaseTS(const pscpu_timestamp_t timestamp)
 
 void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp)
 {
- assert(type > PSX_EVENT__SYNFIRST && type < PSX_EVENT__SYNLAST);
  event_list_entry *e = &events[type];
 
  if(next_timestamp < e->event_time)
@@ -635,7 +633,6 @@ uint32 MDFN_FASTCALL PSX_MemRead24(const pscpu_timestamp_t timestamp, uint32 A)
 {
  uint32 V;
 
- //assert(0);
  MemRW<uint32, false, true, false>(timestamp, A, V);
 
  return(V);
@@ -763,11 +760,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
  timestamp = CPU->Run(timestamp, 0);
 
- assert(timestamp);
-
  ForceEventUpdates(timestamp);
- if(GPU->GetScanlineNum() < 100)
-  printf("[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
  //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
@@ -799,20 +792,11 @@ static void Emulate(EmulateSpecStruct *espec)
    Memcard_SaveDelay[i] += timestamp;
    if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
    {
-    fprintf(stderr, "Saving memcard %d...\n", i);
-    try
-    {
-     char ext[64];
-     trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
-     FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
-     Memcard_SaveDelay[i] = -1;
-     Memcard_PrevDC[i] = 0;
-    }
-    catch(std::exception &e)
-    {
-     MDFN_PrintError("Memcard %d save error: %s", i, e.what());
-     MDFN_DispMessage("Memcard %d save error: %s", i, e.what());
-    }
+    char ext[64];
+    trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+    FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+    Memcard_SaveDelay[i] = -1;
+    Memcard_PrevDC[i] = 0;
     //MDFN_DispMessage("Memcard %d saved.", i);
    }
   }

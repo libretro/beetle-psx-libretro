@@ -209,8 +209,6 @@ void PS_CDC::Power(void)
 
 int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 {
- assert(AudioBuffer_Count == 4);
-
  SFORMAT StateRegs[] =
  {
  SFVAR(DiscChanged),
@@ -335,9 +333,6 @@ void PS_CDC::RecalcIRQ(void)
 //static int32 doom_ts;
 void PS_CDC::WriteIRQ(uint8 V)
 {
- assert(CDCReadyReceiveCounter <= 0);
- assert(!IRQBuffer);
-
  //PSX_WARNING("[CDC] ***IRQTHINGY: 0x%02x -- %u", V, doom_ts);
 
  CDCReadyReceiveCounter = 1024;
@@ -364,9 +359,6 @@ void PS_CDC::WriteResult(uint8 V)
  ResultsBuffer[ResultsWP] = V;
  ResultsWP = (ResultsWP + 1) & 0xF;
  ResultsIn = (ResultsIn + 1) & 0x1F;
-
- if(!ResultsIn)
-  PSX_WARNING("[CDC] Results buffer overflow!");
 }
 
 uint8 PS_CDC::ReadResult(void)
@@ -556,9 +548,6 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
    uint8 ibuffer[28];
    int16 obuffer[2 + 28];
 
-   if(param != param_copy)
-    printf("%d %02x %02x\n", unit, param, param_copy);
-
    for(unsigned i = 0; i < 28; i++)
    {
     uint8 tmp = sg->samples[i * 4 + (unit >> unit_index_shift)];
@@ -627,10 +616,6 @@ void PS_CDC::CheckAIP(void)
 
 void PS_CDC::SetAIP(unsigned irq, unsigned result_count, uint8 *r)
 {
- if(AsyncIRQPending)
- {
-  PSX_WARNING("***WARNING*** Previous notification skipped: CurSector=%d, old_notification=0x%02x", CurSector, AsyncIRQPending);
- }
  ClearAIP();
 
  AsyncResultsPendingCount = result_count;
@@ -779,9 +764,6 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
       {
        if(XA_Test(buf))
        {
-	if(AudioBuffer_ReadPos & 0xFFF)
-	 PSX_WARNING("readpos=%04x(rabl=%04x) writepos=%04x\n", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
-
 	//if(AudioBuffer_UsedCount == 0)
 	// AudioBuffer_InPrebuffer = true;
 
@@ -796,31 +778,19 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
       }
       else
       {
-       // maybe if(!(Mode & 0x30)) too?
-       if(!(buf[12 + 6] & 0x20))
-       {
-	if(!edc_lec_check_correct(buf, true))
-	{
-	 MDFN_DispMessage("Bad sector? - %d", CurSector);
-	}
-       }
+         {
+            int32 offs = (Mode & 0x20) ? 0 : 12;
+            int32 size = (Mode & 0x20) ? 2340 : 2048;
 
-       if(!(Mode & 0x30) && (buf[12 + 6] & 0x20))
-	PSX_WARNING("BORK: %d", CurSector);
+            if(Mode & 0x10)
+            {
+               offs = 12;
+               size = 2328;
+            }
 
-       {
-	int32 offs = (Mode & 0x20) ? 0 : 12;
-	int32 size = (Mode & 0x20) ? 2340 : 2048;
-
-	if(Mode & 0x10)
-	{
-	 offs = 12;
-	 size = 2328;
-	}
-
- 	memcpy(SB, buf + 12 + offs, size);
- 	SB_In = size;
-       }
+            memcpy(SB, buf + 12 + offs, size);
+            SB_In = size;
+         }
 
        SetAIP(CDCIRQ_DATA_READY, MakeStatus());
       }
@@ -935,8 +905,6 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
        else
         CurSector++;
       }
-      else
-       PSX_WARNING("[CDC] BUG CDDA buffer full");
 
      }
     } // end if playing
@@ -992,12 +960,6 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      const CDC_CTEntry *command = &Commands[PendingCommand];
      //PSX_WARNING("[CDC] Command: %s --- %d", command->name, Results.CanRead());
 
-#if 1
-     PSX_WARNING("[CDC] Command: %s --- ", command->name);
-     for(unsigned int i = 0; i < ArgsIn; i++)
-      PSX_WARNING(" 0x%02x", ArgsBuf[i]);
-     PSX_WARNING("\n");
-#endif
      next_time = (this->*(command->func))(ArgsIn, ArgsBuf);
      PendingCommandPhase = 1;
      ArgsIn = 0;
@@ -1044,22 +1006,6 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		break;
 
 	 case 0x00:
-		if(PendingCommandCounter > 0)
-		{
-		 PSX_WARNING("[CDC] WARNING: Interrupting command 0x%02x, phase=%d, timeleft=%d with command=0x%02x", PendingCommand, PendingCommandPhase,
-			PendingCommandCounter, V);
-		}
-
-		if(IRQBuffer)
-		{
-		 PSX_WARNING("[CDC] Attempting to start command(0x%02x) while IRQBuffer(0x%02x) is not clear.", V, IRQBuffer);
-		}
-
-		if(ResultsIn > 0)
-		{
-		 PSX_WARNING("[CDC] Attempting to start command(0x%02x) while command results(count=%d) still in buffer.", V, ResultsIn);
-		}
-
 		// Real times are more like 20000+, test and FIXME when we add more complete pipeline stall emulation to the CPU core.
          	PendingCommandCounter = 8192 + PSX_GetRandU32(0, 4000);	
 	 	PendingCommand = V;
@@ -1070,10 +1016,6 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		ArgsBuf[ArgsIn & 0xF] = V;
 		ArgsIn = (ArgsIn + 1) & 0x1F;
 
-		if(!(ArgsIn & 0x0F))
-		{
-		 PSX_WARNING("[CDC] Argument buffer overflow");
-		}
 		break;
 
 	 case 0x02:
@@ -1096,10 +1038,6 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		   SB_In = 0;
 		  }
 	  	 }
-		 else
-		 {
-		  //PSX_WARNING("[CDC] Attempt to start data transfer via 0x80->1803 when %d bytes still in buffer", DMABuffer.CanRead());
-		 }
 	 	}
 	 	else if(V & 0x40)	// Something CD-DA related(along with & 0x20 ???)?
 	 	{
@@ -1124,13 +1062,6 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		break;
 
 	 case 0x05:
-		if((IRQBuffer &~ V) != IRQBuffer && ResultsIn)
-		{
-		 // To debug icky race-condition related problems in "Psychic Detective", and to see if any games suffer from the same potential issue
-		 // (to know what to test when we emulate CPU more accurately in regards to pipeline stalls and timing, which could throw off our kludge
-		 //  for this issue)
-		 PSX_WARNING("[CDC] Acknowledged IRQ(wrote 0x%02x, before_IRQBuffer=0x%02x) while %u bytes in results buffer.", V, IRQBuffer, ResultsIn);
-		}
 
 	 	IRQBuffer &= ~V;
 	 	RecalcIRQ();
@@ -1167,14 +1098,6 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 		if(V & 0x20)
 		{
 		 memcpy(DecodeVolume, Pending_DecodeVolume, sizeof(DecodeVolume));
-
-		 for(int i = 0; i < 2; i++)
-		 {
-		  for(int o = 0; o < 2; o++)
-		  {
-		   //fprintf(stderr, "Input Channel %d, Output Channel %d -- Volume=%d\n", i, o, DecodeVolume[i][o]);
-		  }
-		 }
 		}
 		break;
   }
@@ -1216,10 +1139,6 @@ uint8 PS_CDC::Read(const pscpu_timestamp_t timestamp, uint32 A)
    case 0x02:
 	if(DMABuffer.CanRead())
 	 ret = DMABuffer.ReadByte();
-	else
-	{
-	 PSX_WARNING("[CDC] CD data transfer port read, but no data present!");
-	}
 	break;
 
    case 0x03:
@@ -1252,10 +1171,6 @@ uint32 PS_CDC::DMARead(void)
  {
   if(DMABuffer.CanRead())
    data |= DMABuffer.ReadByte() << (i * 8);
-  else
-  {
-   //assert(0);
-  }
  }
 
  return(data);
@@ -1278,7 +1193,6 @@ bool PS_CDC::CommandCheckDiscPresent(void)
 
 int32 PS_CDC::Command_Sync(const int arg_count, const uint8 *args)
 {
- PSX_WARNING("[CDC] Unimplemented command: 0x%02x", PendingCommand);
  return(0);
 }
 

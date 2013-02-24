@@ -416,10 +416,12 @@ void MDEC_DMAWrite(uint32 V)
    InCounter--;
   }
  }
+#if 0
  else
  {
   printf("MYSTERY1: %08x\n", V);
  }
+#endif
 }
 
 uint32 MDEC_DMARead(void)
@@ -432,7 +434,7 @@ uint32 MDEC_DMARead(void)
  }
  else
  {
-  puts("BONUS GNOMES");
+  //puts("BONUS GNOMES");
   V = rand();
  }
  return(V);
@@ -454,7 +456,7 @@ bool MDEC_DMACanRead(void)
 
 void MDEC_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 {
- PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d", A, V, timestamp);
+ //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d", A, V, timestamp);
  if(A & 4)
  {
   if(V & 0x80000000) // Reset?

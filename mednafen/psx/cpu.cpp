@@ -46,7 +46,6 @@ PS_CPU::PS_CPU()
  for(uint64 a = 0x00000000; a < (1ULL << 32); a += FAST_MAP_PSIZE)
   SetFastMap(DummyPage, a, FAST_MAP_PSIZE);
 
- CPUHook = NULL;
  ADDBT = NULL;
 }
 
@@ -160,8 +159,6 @@ int PS_CPU::StateAction(StateMem *sm, int load, int data_only)
 
 void PS_CPU::AssertIRQ(int which, bool asserted)
 {
- assert(which >= 0 && which <= 5);
-
  CP0.CAUSE &= ~(1 << (10 + which));
 
  if(asserted)
@@ -276,13 +273,10 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
  const bool InBDSlot = !(NPM & 0x3);
  uint32 handler = 0x80000080;
 
- assert(code < 16);
-
  if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
  {
   printf("Exception: %08x @ PC=0x%08x(IBDS=%d) -- IPCache=0x%02x -- IPEND=0x%02x -- SR=0x%08x ; IRQC_Status=0x%04x -- IRQC_Mask=0x%04x\n", code, PC, InBDSlot, IPCache, (CP0.CAUSE >> 8) & 0xFF, CP0.SR,
 	IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
-  //assert(0);
  }
 
  if(CP0.SR & (1 << 22))	// BEV
@@ -325,8 +319,7 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
 	BACKED_LDWhich = LDWhich;		\
 	BACKED_LDValue = LDValue;
 
-template<bool DebugMode, bool ILHMode>
-pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
+pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool ILHMode)
 {
  register pscpu_timestamp_t timestamp = timestamp_in;
 
@@ -349,16 +342,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
-   if(DebugMode && CPUHook)
-   {
-    ACTIVE_TO_BACKING;
-
-    CPUHook(PC);
-
-    BACKING_TO_ACTIVE;
-   }
-
-   if(!ILHMode)
    {
     if(PC == 0xB0)
     {
@@ -454,31 +437,11 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    #define DO_BRANCH(offset, mask)			\
 	{						\
-	 if(ILHMode)					\
-	 {								\
-	  uint32 old_PC = PC;						\
-	  PC = (PC & new_PC_mask) + new_PC;				\
-	  if(old_PC == ((PC & (mask)) + (offset)))			\
-	  {								\
-	   if(*(uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC] == 0)	\
-	   {								\
-	    if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
-	    {								\
-	     timestamp = next_event_ts;					\
-	    }								\
-	   }								\
-	  }								\
-	 }						\
-	 else						\
 	  PC = (PC & new_PC_mask) + new_PC;		\
 	 new_PC = (offset);				\
 	 new_PC_mask = (mask) & ~3;			\
 	 /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
 							\
-         if(DebugMode && ADDBT)                 	\
-	 {						\
-          ADDBT(PC, (PC & new_PC_mask) + new_PC, false);	\
-	 }						\
 	 goto SkipNPCStuff;				\
 	}
 
@@ -532,7 +495,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    {
     BEGIN_OPF(ILL, 0, 0);
-	     PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
+	     //PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
 	     DO_LDS();
 	     new_PC = Exception(EXCEPTION_RI, PC, new_PC_mask);
 	     new_PC_mask = 0;
@@ -1774,25 +1737,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
  ACTIVE_TO_BACKING;
 
  return(timestamp);
-}
-
-pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool ILHMode)
-{
- if(CPUHook || ADDBT)
-  return(RunReal<true, false>(timestamp_in));
- else
- {
-  if(ILHMode)
-   return(RunReal<false, true>(timestamp_in));
-  else
-   return(RunReal<false, false>(timestamp_in));
- }
-}
-
-void PS_CPU::SetCPUHook(void (*cpuh)(uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
-{
- ADDBT = addbt;
- CPUHook = cpuh;
 }
 
 uint32 PS_CPU::GetRegister(unsigned int which, char *special, const uint32 special_len)

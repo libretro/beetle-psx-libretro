@@ -144,8 +144,6 @@ class PS_CPU
 
  uint32 Exception(uint32 code, uint32 PC, const uint32 NPM) MDFN_WARN_UNUSED_RESULT;
 
- template<bool DebugMode, bool ILHMode> pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
-
  template<typename T> T ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool DS24 = false);
  template<typename T> void WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, uint32 value, bool DS24 = false);
 

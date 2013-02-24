@@ -187,15 +187,7 @@ int CDIF_MT::ReadThreadStart()
  ra_count = 0;
  last_read_lba = ~0U;
 
- try
- {
-  RT_EjectDisc(false, true);
- }
- catch(std::exception &e)
- {
-  EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
-  return(0);
- }
+ RT_EjectDisc(false, true);
 
  is_phys_cache = false /* will never be physical CD access */;
 
@@ -216,15 +208,8 @@ int CDIF_MT::ReadThreadStart()
  		 	 break;
 
     case CDIF_MSG_EJECT:
-			try
-			{
-			 RT_EjectDisc(msg.args[0]);
-			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
-			}
-			catch(std::exception &e)
-			{
-			 EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_FATAL_ERROR, std::string(e.what())));
-			}
+          RT_EjectDisc(msg.args[0]);
+          EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
 			break;
 
     case CDIF_MSG_READ_SECTOR:
@@ -233,8 +218,6 @@ int CDIF_MT::ReadThreadStart()
 			  static const int initial_ra = 1;
 			  static const int speedmult_ra = 2;
 			  uint32 new_lba = msg.args[0];
-
-			  assert((unsigned int)max_ra < (SBSize / 4));
 
 			  if(last_read_lba != ~0U && new_lba == (last_read_lba + 1))
 			  {
@@ -269,16 +252,7 @@ int CDIF_MT::ReadThreadStart()
    uint8 tmpbuf[2352 + 96];
    bool error_condition = false;
 
-   try
-   {
-    disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
-   }
-   catch(std::exception &e)
-   {
-    MDFN_PrintError(_("Sector %u read error: %s"), ra_lba, e.what());
-    memset(tmpbuf, 0, sizeof(tmpbuf));
-    error_condition = true;
-   }
+   disc_cdaccess->Read_Raw_Sector(tmpbuf, ra_lba);
    
    MDFND_LockMutex(SBMutex);
 
