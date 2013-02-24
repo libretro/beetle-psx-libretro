@@ -533,14 +533,7 @@ void CDIF_Stream_Thing::unmap(void)
 uint64 CDIF_Stream_Thing::read(void *data, uint64 count, bool error_on_eos)
 {
  if(count > (((uint64)sector_count * 2048) - position))
- {
-  if(error_on_eos)
-  {
-   throw MDFN_Error(0, "EOF");
-  }
-
   count = ((uint64)sector_count * 2048) - position;
- }
 
  if(!count)
   return(0);
@@ -549,12 +542,7 @@ uint64 CDIF_Stream_Thing::read(void *data, uint64 count, bool error_on_eos)
  {
   uint8 buf[2048];  
 
-  if(!cdintf->ReadSector(buf, start_lba + (rp / 2048), 1))
-  {
-   throw MDFN_Error(ErrnoHolder(EIO));
-  }
-  
-  //::printf("Meow: %08llx -- %08llx\n", count, (rp - position) + std::min<uint64>(2048 - (rp & 2047), count - (rp - position)));
+  cdintf->ReadSector(buf, start_lba + (rp / 2048), 1);
   memcpy((uint8*)data + (rp - position), buf + (rp & 2047), std::min<uint64>(2048 - (rp & 2047), count - (rp - position)));
  }
 
@@ -570,31 +558,20 @@ void CDIF_Stream_Thing::write(const void *data, uint64 count)
 
 void CDIF_Stream_Thing::seek(int64 offset, int whence)
 {
- int64 new_position;
-
  switch(whence)
  {
-  default:
-	throw MDFN_Error(ErrnoHolder(EINVAL));
-	break;
-
   case SEEK_SET:
-	new_position = offset;
+	position = offset;
 	break;
 
   case SEEK_CUR:
-	new_position = position + offset;
+	position += offset;
 	break;
 
   case SEEK_END:
-	new_position = ((int64)sector_count * 2048) + offset;
+	position = ((int64)sector_count * 2048) + offset;
 	break;
  }
-
- if(new_position < 0 || new_position > ((int64)sector_count * 2048))
-  throw MDFN_Error(ErrnoHolder(EINVAL));
-
- position = new_position;
 }
 
 int64 CDIF_Stream_Thing::tell(void)
