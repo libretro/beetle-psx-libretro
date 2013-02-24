@@ -1,8 +1,6 @@
 #ifndef __MDFN_PSX_SPU_H
 #define __MDFN_PSX_SPU_H
 
-#include <mednafen/resampler/resampler.h>
-
 namespace MDFN_IEN_PSX
 {
 
@@ -239,10 +237,6 @@ class PS_SPU
  int32 clock_divider;
 
  uint16 SPURAM[524288 / sizeof(uint16)];
-
- int last_rate;
- uint32 last_quality;
- SpeexResamplerState *resampler;
 
  // Buffers 44.1KHz samples, should have enough for two(worst-case scenario) video frames(2* ~735 frames NTSC, 2* ~882 PAL) plus jitter plus enough for the resampler leftovers.
  // We'll just go with 4096 because powers of 2 are AWESOME and such.
