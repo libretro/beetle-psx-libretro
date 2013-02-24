@@ -118,9 +118,6 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
 {
   int32 xs = x_start, xb = x_bound;
 
-  if(LineSkipTest(y))
-   return;
-
   if(xs < xb)	// (xs != xb)
   {
    if(xs < ClipX0)
@@ -191,20 +188,12 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
     }
     else
     {
-     uint16 pix = 0x8000;
+     uint16 pix;
 
      if(goraud && dtd)
-     {
-      pix |= DitherLUT[y & 3][x & 3][r] << 0;
-      pix |= DitherLUT[y & 3][x & 3][g] << 5;
-      pix |= DitherLUT[y & 3][x & 3][b] << 10;
-     }
+      pix = (0x8000) | (DitherLUT[y & 3][x & 3][r] << 0) | (DitherLUT[y & 3][x & 3][g] << 5) | (DitherLUT[y & 3][x & 3][b] << 10);
      else
-     {
-      pix |= (r >> 3) << 0;
-      pix |= (g >> 3) << 5;
-      pix |= (b >> 3) << 10;
-     }
+      pix = (0x8000) | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
     
      PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
     }
