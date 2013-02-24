@@ -27,7 +27,7 @@ class PS_CPU
   next_event_ts = next_event_ts_arg;
  }
 
- pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, bool ILHMode);
+ pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in);
 
  void Power(void);
 
@@ -144,7 +144,7 @@ class PS_CPU
 
  uint32 Exception(uint32 code, uint32 PC, const uint32 NPM) MDFN_WARN_UNUSED_RESULT;
 
- template<bool DebugMode, bool ILHMode> pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
+ pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
 
  template<typename T> T ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool DS24 = false);
  template<typename T> void WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, uint32 value, bool DS24 = false);

@@ -761,13 +761,11 @@ static void Emulate(EmulateSpecStruct *espec)
 
  Running = -1;
 
- timestamp = CPU->Run(timestamp, 0);
-
- assert(timestamp);
+ timestamp = CPU->Run(timestamp);
 
  ForceEventUpdates(timestamp);
- if(GPU->GetScanlineNum() < 100)
-  printf("[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
+ //if(GPU->GetScanlineNum() < 100)
+  //printf("[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
  //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
