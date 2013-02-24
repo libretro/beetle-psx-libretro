@@ -1025,6 +1025,11 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
  else		// "Data"
   ret = ReadData();
 
+ if(DMAControl & 2)
+ {
+  //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
+ }
+
  return(ret >> ((A & 3) * 8));
 }
 
