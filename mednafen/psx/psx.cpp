@@ -1724,6 +1724,8 @@ static void Cleanup(void)
   PIOMem = NULL;
  }
 
+ for (unsigned i = 0; i < cdifs->size(); i++)
+    delete cdifs->at(i);
  cdifs = NULL;
 }
 
