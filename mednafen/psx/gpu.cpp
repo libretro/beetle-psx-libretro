@@ -1184,58 +1184,28 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
     if(scanline == 0)
     {
-     assert(sl_zero_reached == false);
-     sl_zero_reached = true;
+       assert(sl_zero_reached == false);
+       sl_zero_reached = true;
 
-     if(DisplayMode & 0x20)
-     {
-      skip = false;
-
-      if(DisplayMode & 0x08)	// PAL
-       LinesPerField = 313 - field;
-      else			// NTSC
-       LinesPerField = 263 - field;
-     }
-     else
-     {
-      field = 0;	// May not be correct.
-
-      if(DisplayMode & 0x08)	// PAL
-       LinesPerField = 314;
-      else			// NTSC
-       LinesPerField = 263;
-     }
-
-     if(espec)
-     {
-      if((bool)(DisplayMode & 0x08) != HardwarePALType)
-      {
-       DisplayRect->x = 0;
-       DisplayRect->y = 0;
-       DisplayRect->w = 384;
-       DisplayRect->h = VisibleLineCount;
-
-       for(int32 y = 0; y < DisplayRect->h; y++)
+       if(DisplayMode & 0x20)
        {
-        uint32 *dest = surface->pixels + y * surface->pitch32;
+          skip = false;
 
-        LineWidths[y].x = 0;
-        LineWidths[y].w = 384;
-
-        for(int32 x = 0; x < 384; x++)
-         dest[x] = 0;
+          if(DisplayMode & 0x08)	// PAL
+             LinesPerField = 313 - field;
+          else			// NTSC
+             LinesPerField = 263 - field;
        }
-       char buffer[256];
+       else
+       {
+          field = 0;	// May not be correct.
 
-       // Avoid having to drag in lots of dependencies.
-#ifndef __LIBRETRO__
-       trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
-       DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
-		MAKECOLOR(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13);
-#endif
-      }
-      else
-      {
+          if(DisplayMode & 0x08)	// PAL
+             LinesPerField = 314;
+          else			// NTSC
+             LinesPerField = 263;
+       }
+
        espec->InterlaceOn = (bool)(DisplayMode & 0x20);
        espec->InterlaceField = field;
 
@@ -1249,13 +1219,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
        for(int i = 0; i < (DisplayRect->y + DisplayRect->h); i++)
        {
-	surface->pixels[i * surface->pitch32 + 0] =
-	surface->pixels[i * surface->pitch32 + 1] = 0;
-        LineWidths[i].x = 0;
-        LineWidths[i].w = 2;
+          surface->pixels[i * surface->pitch32 + 0] =
+             surface->pixels[i * surface->pitch32 + 1] = 0;
+          LineWidths[i].x = 0;
+          LineWidths[i].w = 2;
        }
-      }
-     }
     }
 
     //
@@ -1398,16 +1366,6 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
 {
  sl_zero_reached = false;
 
- if(!espec_arg)
- {
-  espec = NULL;
-  surface = NULL;
-  DisplayRect = NULL;
-  LineWidths = NULL;
-  skip = true;
-  return;
- }
-
  espec = espec_arg;
 
  surface = espec->surface;
@@ -1418,14 +1376,7 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
  if(espec->VideoFormatChanged)
  {
   for(int rc = 0; rc < 0x8000; rc++)
-  {
-   uint32 r, g, b;
-
-   r = ((rc >> 0) & 0x1F) << 3;
-   g = ((rc >> 5) & 0x1F) << 3;
-   b = ((rc >> 10) & 0x1F) << 3;
-   OutputLUT[rc] = MAKECOLOR(r, g, b, 0);
-  }
+   OutputLUT[rc] = MAKECOLOR((((rc >> 0) & 0x1F) << 3), (((rc >> 5) & 0x1F) << 3), (((rc >> 10) & 0x1F) << 3), 0);
  }
 }
 
