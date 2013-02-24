@@ -162,7 +162,7 @@ static struct
 // Event stuff
 //
 // Comment out this define for extra speeeeed.
-#define PSX_EVENT_SYSTEM_CHECKS	1
+//#define PSX_EVENT_SYSTEM_CHECKS	1
 
 static pscpu_timestamp_t Running;	// Set to -1 when not desiring exit, and 0 when we are.
 
@@ -283,42 +283,11 @@ static void ForceEventUpdates(const pscpu_timestamp_t timestamp)
 bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp)
 {
  event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
-#ifdef PSX_EVENT_SYSTEM_CHECKS
- pscpu_timestamp_t prev_event_time = 0;
-#endif
-#if 0
- {
-   printf("EventHandler - timestamp=%8d\n", timestamp);
-   event_list_entry *moo = &events[PSX_EVENT__SYNFIRST];
-   while(moo)
-   {
-    printf("%u: %8d\n", moo->which, moo->event_time);
-    moo = moo->next;
-   }
- }
-#endif
-
-#ifdef PSX_EVENT_SYSTEM_CHECKS
- assert(Running == 0 || timestamp >= e->event_time);	// If Running == 0, our EventHandler 
-#endif
 
  while(timestamp >= e->event_time)	// If Running = 0, PSX_EventHandler() may be called even if there isn't an event per-se, so while() instead of do { ... } while
  {
   event_list_entry *prev = e->prev;
   pscpu_timestamp_t nt;
-
-#ifdef PSX_EVENT_SYSTEM_CHECKS
- // Sanity test to make sure events are being evaluated in temporal order.
-  if(e->event_time < prev_event_time)
-   abort();
-  prev_event_time = e->event_time;
-#endif
-
-  //printf("Event: %u %8d\n", e->which, e->event_time);
-#ifdef PSX_EVENT_SYSTEM_CHECKS
-  if((timestamp - e->event_time) > 50)
-   printf("Late: %u %d --- %8d\n", e->which, timestamp - e->event_time, timestamp);
-#endif
 
   switch(e->which)
   {
@@ -344,39 +313,12 @@ bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp)
 	nt = FIO->Update(e->event_time);
 	break;
   }
-#ifdef PSX_EVENT_SYSTEM_CHECKS
-  assert(nt > e->event_time);
-#endif
 
   PSX_SetEventNT(e->which, nt);
 
   // Order of events can change due to calling PSX_SetEventNT(), this prev business ensures we don't miss an event due to reordering.
   e = prev->next;
  }
-
-#ifdef PSX_EVENT_SYSTEM_CHECKS
- for(int i = PSX_EVENT__SYNFIRST + 1; i < PSX_EVENT__SYNLAST; i++)
- {
-  if(timestamp >= events[i].event_time)
-  {
-   printf("BUG: %u\n", i);
-
-   event_list_entry *moo = &events[PSX_EVENT__SYNFIRST];
-
-   while(moo)
-   {
-    printf("%u: %8d\n", moo->which, moo->event_time);
-    moo = moo->next;
-   }
-
-   abort();
-  }
- }
-#endif
-
-//#ifdef PSX_EVENT_SYSTEM_CHECKS
-// abort();
-//#endif
 
  return(Running);
 }
@@ -402,16 +344,6 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
  //if(IsWrite)
  // V = (T)V;
-
- if(!Peek)
- {
-  #if 0
-  if(IsWrite)
-   printf("Write%d: %08x(orig=%08x), %08x\n", (int)(sizeof(T) * 8), A & mask[A >> 29], A, V);
-  else
-   printf("Read%d: %08x(orig=%08x)\n", (int)(sizeof(T) * 8), A & mask[A >> 29], A);
-  #endif
- }
 
  A &= mask[A >> 29];
 
@@ -478,16 +410,6 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
  if(A >= 0x1F801000 && A <= 0x1F802FFF && !Peek)	// Hardware register region. (TODO: Implement proper peek suppor)
  {
-#if 0
-  if(!IsWrite)
-  {
-   ReadCounter++;
-   PortReadCounter[A & 0x3FFF]++;
-  }
-  else
-   WriteCounter++;
-#endif
-
   //if(IsWrite)
   // printf("HW Write%d: %08x %08x\n", (unsigned int)(sizeof(T)*8), (unsigned int)A, (unsigned int)V);
   //else
@@ -585,22 +507,6 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
    return;
   }
 
-#if 0
-  if(A >= 0x1F801060 && A <= 0x1F801063)
-  {
-   if(IsWrite)
-   {
-
-   }
-   else
-   {
-
-   }
-
-   return;
-  }
-#endif
-
   if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
   {
    if(IsWrite)
@@ -675,11 +581,7 @@ template<typename T, bool IsWrite, bool Access24, bool Peek> static INLINE void 
 
  if(!Peek)
  {
-  if(IsWrite)
-  {
-   PSX_WARNING("[MEM] Unknown write%d to %08x at time %d, =%08x(%d)", (int)(sizeof(T) * 8), A, timestamp, V, V);
-  }
-  else
+  if(!IsWrite)
   {
    V = 0;
    PSX_WARNING("[MEM] Unknown read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
@@ -843,11 +745,7 @@ static void Emulate(EmulateSpecStruct *espec)
 {
  pscpu_timestamp_t timestamp = 0;
 
- if(FIO->RequireNoFrameskip())
- {
-  //puts("MEOW");
-  espec->skip = false;	//TODO: Save here, and restore at end of Emulate() ?
- }
+ espec->skip = false;	//TODO: Save here, and restore at end of Emulate() ?
 
  MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 
