@@ -25,11 +25,6 @@
 #include "../mempatcher.h"
 #include "../cputest/cputest.h"
 
-#ifndef __LIBRETRO__
-#include "../player.h"
-#include "../PSFLoader.h"
-#endif
-
 extern MDFNGI EmulatedPSX;
 
 namespace MDFN_IEN_PSX
@@ -96,20 +91,6 @@ uint32 PSX_GetRandU32(uint32 mina, uint32 maxa)
  return PSX_PRNG.RandU32(mina, maxa);
 }
 
-#ifndef __LIBRETRO__
-class PSF1Loader : public PSFLoader
-{
- public:
-
- PSF1Loader(MDFNFILE *fp);
- virtual ~PSF1Loader();
-
- virtual void HandleEXE(const uint8 *data, uint32 len, bool ignore_pcsp = false);
-
- PSFTags tags;
-};
-#endif
-
 enum
 {
  REGION_JP = 0,
@@ -121,10 +102,6 @@ enum
 static uint32 PortReadCounter[0x4000] = { 0 };	// Debugging(performance)
 static uint32 ReadCounter = 0;
 static uint32 WriteCounter = 0;
-#endif
-
-#ifndef __LIBRETRO__
-static PSF1Loader *psf_loader = NULL;
 #endif
 
 static std::vector<CDIF*> *cdifs = NULL;
@@ -881,20 +858,12 @@ static void Emulate(EmulateSpecStruct *espec)
  espec->SoundBufSize = 0;
 
  FIO->UpdateInput();
-#ifdef __LIBRETRO__
  GPU->StartFrame(espec);
-#else
- GPU->StartFrame(psf_loader ? NULL : espec);
-#endif
  SPU->StartFrame(espec->SoundRate, MDFN_GetSettingUI("psx.spu.resamp_quality"));
 
  Running = -1;
 
-#ifdef __LIBRETRO__
  timestamp = CPU->Run(timestamp, 0);
-#else
- timestamp = CPU->Run(timestamp, psf_loader != NULL);
-#endif
 
  assert(timestamp);
 
@@ -915,18 +884,6 @@ static void Emulate(EmulateSpecStruct *espec)
  RebaseTS(timestamp);
 
  espec->MasterCycles = timestamp;
-
- // Avoid deps.
-#ifndef __LIBRETRO__
- if(psf_loader)
- {
-  if(!espec->skip)
-  {
-   espec->LineWidths[0].w = ~0;
-   Player_Draw(espec->surface, &espec->DisplayRect, 0, espec->SoundBuf, espec->SoundBufSize);
-  }
- }
-#endif
 
  // Save memcards if dirty.
  for(int i = 0; i < 8; i++)
@@ -980,11 +937,6 @@ static void Emulate(EmulateSpecStruct *espec)
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {
-#ifndef __LIBRETRO__
- if(PSFLoader::TestMagic(0x01, fp))
-  return(true);
-#endif
-
  if(fp->f_size < 0x800)
   return(false);
 
@@ -1572,30 +1524,9 @@ static void LoadEXE(const uint8 *data, const uint32 size, bool ignore_pcsp = fal
  po += 4;
 }
 
-#ifndef __LIBRETRO__
-PSF1Loader::PSF1Loader(MDFNFILE *fp)
-{
- tags = Load(0x01, 2033664, fp);
-}
-
-PSF1Loader::~PSF1Loader()
-{
-
-}
-
-void PSF1Loader::HandleEXE(const uint8 *data, uint32 size, bool ignore_pcsp)
-{
- LoadEXE(data, size, ignore_pcsp);
-}
-#endif
-
 static void Cleanup(void);
 static int Load(const char *name, MDFNFILE *fp)
 {
-#ifndef __LIBRETRO__
- const bool IsPSF = PSFLoader::TestMagic(0x01, fp);
-#endif
-
  if(!TestMagic(name, fp))
  {
   MDFN_PrintError(_("File format is unknown to module \"%s\"."), MDFNGameInfo->shortname);
@@ -1615,11 +1546,7 @@ static int Load(const char *name, MDFNFILE *fp)
  if(!InitCommon(&CDInterfaces, !IsPSF))
   return(0);
 #else
-#ifdef __LIBRETRO__
  if(!InitCommon(NULL, 1))
-#else
- if(!InitCommon(NULL, !IsPSF))
-#endif
   return(0);
 #endif
 
@@ -1627,20 +1554,6 @@ static int Load(const char *name, MDFNFILE *fp)
 
  try
  {
-    // Don't care about PSF in libretro.
-#ifndef __LIBRETRO__
-  if(IsPSF)
-  {
-   psf_loader = new PSF1Loader(fp);
-
-   std::vector<std::string> SongNames;
-
-   SongNames.push_back(psf_loader->tags.GetTag("title"));
-
-   Player_Init(1, psf_loader->tags.GetTag("game"), psf_loader->tags.GetTag("artist"), psf_loader->tags.GetTag("copyright"), SongNames);
-  }
-  else
-#endif
    LoadEXE(fp->f_data, fp->f_size);
  }
  catch(std::exception &e)
@@ -1669,14 +1582,6 @@ static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 static void Cleanup(void)
 {
  TextMem.resize(0);
-
-#ifndef __LIBRETRO__
- if(psf_loader)
- {
-  delete psf_loader;
-  psf_loader = NULL;
- }
-#endif
 
  if(CDC)
  {
@@ -1729,27 +1634,15 @@ static void Cleanup(void)
 
 static void CloseGame(void)
 {
-#ifndef __LIBRETRO__
- if(!psf_loader)
-#endif
- {
   for(int i = 0; i < 8; i++)
   {
-   // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
-   // we can reduce potential data loss!
-   try
-   {
-    char ext[64];
-    trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+     // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
+     // we can reduce potential data loss!
+     char ext[64];
+     trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
 
-    FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
-   }
-   catch(std::exception &e)
-   {
-    MDFN_PrintError("%s", e.what());
-   }
+     FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
   }
- }
 
  Cleanup();
 }
@@ -1757,11 +1650,6 @@ static void CloseGame(void)
 
 static void SetInput(int port, const char *type, void *ptr)
 {
-#ifndef __LIBRETRO__
- if(psf_loader)
-  FIO->SetInput(port, "none", NULL);
- else
-#endif
   FIO->SetInput(port, type, ptr);
 }
 
@@ -1877,10 +1765,6 @@ static void DoSimpleCommand(int cmd)
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
-#ifndef __LIBRETRO__
- { ".psf", gettext_noop("PSF1 Rip") },
- { ".minipsf", gettext_noop("MiniPSF1 Rip") },
-#endif
  { ".psx", gettext_noop("PS-X Executable") },
  { ".exe", gettext_noop("PS-X Executable") },
  { NULL, NULL }
