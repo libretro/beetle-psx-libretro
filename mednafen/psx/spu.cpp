@@ -306,11 +306,8 @@ void PS_SPU::DecodeADPCM(const uint8 *input, int16 *output, const unsigned shift
 
   sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-  if(sample < -32768)
-   sample = -32768;
-
-  if(sample > 32767)
-   sample = 32767;
+  if ( (int16_t)sample != sample)
+     sample = (sample >> 31) ^ 0x7FFF;
 
   output[i] = sample;
  }
@@ -373,11 +370,9 @@ void PS_SPU::DecodeSamples(SPU_Voice *voice)
 
   sample += ((voice->DecodeBuffer[(voice->DecodeWritePos - 1) & 0x1F] * Weights[weight][0]) >> 6)
 			   	      + ((voice->DecodeBuffer[(voice->DecodeWritePos - 2) & 0x1F] * Weights[weight][1]) >> 6);
-  if(sample < -32768)
-   sample = -32768;
 
-  if(sample > 32767)
-   sample = 32767;
+  if ( (int16_t)sample != sample)
+     sample = (sample >> 31) ^ 0x7FFF;
 
   voice->DecodeBuffer[voice->DecodeWritePos] = sample;
   voice->DecodeWritePos = (voice->DecodeWritePos + 1) & 0x1F;
@@ -850,17 +845,17 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
    LFSR = (LFSR << 1) | (((LFSR >> 15) ^ (LFSR >> 12) ^ (LFSR >> 11) ^ (LFSR >> 10) ^ 1) & 1);
   }
 
-  clamp(&accum_l, -32768, 32767);
-  clamp(&accum_r, -32768, 32767);
-  clamp(&accum_fv_l, -32768, 32767);
-  clamp(&accum_fv_r, -32768, 32767);
-  
-#if 0
-  accum_l = 0;
-  accum_r = 0;
-  //accum_fv_l = (short)(rand());
-  //accum_fv_r = (short)(rand());
-#endif
+  if ( (int16_t)accum_l != accum_l)
+     accum_l = (accum_l >> 31) ^ 0x7FFF;
+
+  if ( (int16_t)accum_r != accum_r)
+     accum_r = (accum_r >> 31) ^ 0x7FFF;
+
+  if ( (int16_t)accum_fv_l != accum_fv_l)
+     accum_fv_l = (accum_fv_l >> 31) ^ 0x7FFF;
+
+  if ( (int16_t)accum_fv_r != accum_fv_r)
+     accum_fv_r = (accum_fv_r >> 31) ^ 0x7FFF;
 
   RunReverb(accum_fv_l, accum_fv_r, reverb_l, reverb_r);
 
@@ -872,9 +867,12 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
   //output_l = reverb_l;
   //output_r = reverb_r;
+  //
+  if ( (int16_t)output_l != output_l)
+     output_l = (output_l >> 31) ^ 0x7FFF;
 
-  clamp(&output_l, -32768, 32767);
-  clamp(&output_r, -32768, 32767);
+  if ( (int16_t)output_r != output_r)
+     output_r = (output_r >> 31) ^ 0x7FFF;
 
   assert(IntermediateBufferPos < 4096);
   IntermediateBuffer[IntermediateBufferPos][0] = output_l;
