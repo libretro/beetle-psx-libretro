@@ -778,6 +778,14 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
       }
       else
       {
+       if(!(buf[12 + 6] & 0x20))
+       {
+          if(!edc_lec_check_correct(buf, true))
+          {
+             MDFN_DispMessage("Bad sector? - %d", CurSector);
+          }
+       }
+
          {
             int32 offs = (Mode & 0x20) ? 0 : 12;
             int32 size = (Mode & 0x20) ? 2340 : 2048;
