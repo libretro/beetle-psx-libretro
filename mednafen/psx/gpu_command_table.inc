@@ -2,9 +2,9 @@
 	 &PS_GPU::Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? BLENDMODE_MAC : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam >
 
 #define POLY_HELPER(cv) { 1 + (3 /*+ ((cv & 0x8) >> 3)*/) * ( 1 + ((cv & 0x4) >> 2) + ((cv & 0x10) >> 4) ) - ((cv & 0x10) >> 4),	\
-	1, false, "Polygon", { POLY_HELPER_SUB(cv, ((cv & 0x4) ? 0 : 0), 0), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 0),	\
+	1, false, "Polygon", { POLY_HELPER_SUB(cv, 0, 0), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 0),	\
 		     POLY_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 0), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		     POLY_HELPER_SUB(cv, ((cv & 0x4) ? 0 : 0), 1), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		     POLY_HELPER_SUB(cv, 0, 1), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 1),	\
 		     POLY_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 1), POLY_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 1),	\
 		    }	}
 
@@ -14,9 +14,9 @@
 #define SPR_HELPER_SUB(cv, tm, mam) &PS_GPU::Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? BLENDMODE_MAC : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
 
 #define SPR_HELPER(cv) { 2 + ((cv & 0x4) >> 2) + ((cv & 0x18) ? 0 : 1), 2 | ((cv & 0x4) >> 2) | ((cv & 0x18) ? 0 : 1), false, "Sprite", {	\
-		SPR_HELPER_SUB(cv, ((cv & 0x4) ? 0 : 0), 0), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 0),	\
+		SPR_HELPER_SUB(cv, 0, 0), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 0),	\
 		SPR_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 0), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		SPR_HELPER_SUB(cv, ((cv & 0x4) ? 0 : 0), 1), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		SPR_HELPER_SUB(cv, 0, 1), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 1 : 0), 1),	\
 		SPR_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 1), SPR_HELPER_SUB(cv, ((cv & 0x4) ? 2 : 0), 1),	\
 		 } }
 

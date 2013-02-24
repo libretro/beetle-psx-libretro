@@ -675,8 +675,6 @@ CTEntry PS_GPU::Commands[4][256] =
  #undef BLENDMODE_MAC
 };
 
-static uint64 PrimitiveCounter[256] = { 0 }; // Debug
-
 void PS_GPU::ProcessFIFO(void)
 {
  if(!BlitterFIFO.CanRead())
@@ -791,20 +789,8 @@ void PS_GPU::ProcessFIFO(void)
   if(!command->ss_cmd)
    DrawTimeAvail -= 2;
 
-  PrimitiveCounter[cc]++;
-
   if(command->func[TexMode])
   {
-#if 0
-   PSX_WARNING("[GPU] Command: %08x %s %d %d %d", CB[0], command->name, command->len, scanline, DrawTimeAvail);
-   if(1)
-   {
-    printf("[GPU]    ");
-    for(unsigned i = 0; i < command->len; i++)
-     printf("0x%08x ", CB[i]);
-    printf("\n");
-   }
-#endif
    // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
    if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
    {
@@ -861,7 +847,8 @@ void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 
   switch(command)
   {
-   default: PSX_WARNING("[GPU] Unknown control command %02x - %06x", command, V);
+   default:
+      //PSX_WARNING("[GPU] Unknown control command %02x - %06x", command, V);
 	    break;
 
    case 0x00:	// Reset GPU
@@ -950,33 +937,33 @@ void PS_GPU::WriteDMA(uint32 V)
 
 INLINE uint32 PS_GPU::ReadData(void)
 {
- if(InCmd == INCMD_FBREAD)
- {
-  DataReadBuffer = 0;
-  for(int i = 0; i < 2; i++)
-  {
-   DataReadBuffer |= GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] << (i * 16);
-
-   FBRW_CurX++;
-   if(FBRW_CurX == (FBRW_X + FBRW_W))
+   DataReadBuffer = 0;
+   for(int i = 0; i < 2; i++)
    {
-    FBRW_CurX = FBRW_X;
-    FBRW_CurY++;
-    if(FBRW_CurY == (FBRW_Y + FBRW_H))
-    {
-     InCmd = INCMD_NONE;
-     break;
-    }
-   }
-  }
- }
+      DataReadBuffer |= GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] << (i * 16);
 
- return DataReadBuffer;
+      FBRW_CurX++;
+      if(FBRW_CurX == (FBRW_X + FBRW_W))
+      {
+         FBRW_CurX = FBRW_X;
+         FBRW_CurY++;
+         if(FBRW_CurY == (FBRW_Y + FBRW_H))
+         {
+            InCmd = INCMD_NONE;
+            break;
+         }
+      }
+   }
+
+   return DataReadBuffer;
 }
 
 uint32 PS_GPU::ReadDMA(void)
 {
- return ReadData();
+   if (InCmd == INCMD_FBREAD)
+      return ReadData();
+   else
+      return DataReadBuffer;
 }
 
 uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
@@ -1022,8 +1009,10 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
   if(MaskEvalAND)
    ret |= 1 << 12;
  }
- else		// "Data"
-  ret = ReadData();
+ else if (InCmd == INCMD_FBREAD) // "Data"
+    ret = ReadData();
+ else
+    ret = DataReadBuffer;
 
  return(ret >> ((A & 3) * 8));
 }
