@@ -325,6 +325,7 @@ uint32 PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NPM)
 	BACKED_LDWhich = LDWhich;		\
 	BACKED_LDValue = LDValue;
 
+template<bool DebugMode, bool ILHMode>
 pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 {
  register pscpu_timestamp_t timestamp = timestamp_in;
@@ -348,19 +349,31 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
-   if(PC == 0xB0)
+   if(DebugMode && CPUHook)
    {
-      if(GPR[9] == 0x3D)
-      {
-         //if(GPR[4] == 'L')
-         // DBG_Break();
-         fputc(GPR[4], stderr);
-         //if(GPR[4] == '\n')
-         //{
-         // fputc('%', stderr);
-         // fputc(' ', stderr);
-         //}
-      }
+    ACTIVE_TO_BACKING;
+
+    CPUHook(PC);
+
+    BACKING_TO_ACTIVE;
+   }
+
+   if(!ILHMode)
+   {
+    if(PC == 0xB0)
+    {
+     if(GPR[9] == 0x3D)
+     {
+      //if(GPR[4] == 'L')
+      // DBG_Break();
+      fputc(GPR[4], stderr);
+      //if(GPR[4] == '\n')
+      //{
+      // fputc('%', stderr);
+      // fputc(' ', stderr);
+      //}
+     }
+    }
    }
 
 /*
@@ -441,11 +454,31 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    #define DO_BRANCH(offset, mask)			\
 	{						\
+	 if(ILHMode)					\
+	 {								\
+	  uint32 old_PC = PC;						\
+	  PC = (PC & new_PC_mask) + new_PC;				\
+	  if(old_PC == ((PC & (mask)) + (offset)))			\
+	  {								\
+	   if(*(uint32 *)&FastMap[PC >> FAST_MAP_SHIFT][PC] == 0)	\
+	   {								\
+	    if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
+	    {								\
+	     timestamp = next_event_ts;					\
+	    }								\
+	   }								\
+	  }								\
+	 }						\
+	 else						\
 	  PC = (PC & new_PC_mask) + new_PC;		\
 	 new_PC = (offset);				\
 	 new_PC_mask = (mask) & ~3;			\
 	 /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
 							\
+         if(DebugMode && ADDBT)                 	\
+	 {						\
+          ADDBT(PC, (PC & new_PC_mask) + new_PC, false);	\
+	 }						\
 	 goto SkipNPCStuff;				\
 	}
 
@@ -1743,9 +1776,17 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
  return(timestamp);
 }
 
-pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in)
+pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool ILHMode)
 {
-   return(RunReal(timestamp_in));
+ if(CPUHook || ADDBT)
+  return(RunReal<true, false>(timestamp_in));
+ else
+ {
+  if(ILHMode)
+   return(RunReal<false, true>(timestamp_in));
+  else
+   return(RunReal<false, false>(timestamp_in));
+ }
 }
 
 void PS_CPU::SetCPUHook(void (*cpuh)(uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
