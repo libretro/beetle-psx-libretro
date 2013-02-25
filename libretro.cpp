@@ -42,7 +42,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 640
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
-#define FB_WIDTH 680
+#define FB_WIDTH 700
 #define FB_HEIGHT 480
 
 #elif defined(WANT_PCE_FAST_EMU)
@@ -693,13 +693,29 @@ void retro_run()
 
    spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
+   // PSX is rather special, and needs specific handling ...
 #if defined(WANT_PSX_EMU)
    unsigned width = rects[0].w;
    unsigned height = spec.DisplayRect.h;
+   // PSX core inserts weird padding on left and right edges.
+   // 320 width -> 350 width.
+   // 640 width -> 700 width.
+   // Rectify this.
+   const uint32_t *pix = surf->pixels;
+   if (width == 350)
+   {
+      pix += 14; // Not a typo. 15 shifts the image slightly too far.
+      width = 320;
+   }
+   else if (width == 700)
+   {
+      pix += 33; // Not a typo. Needs to shift by exactly 33, or it's bad.
+      width = 640;
+   }
+   video_cb(pix, width, height, FB_WIDTH << 2);
 #else
    unsigned width  = spec.DisplayRect.w;
    unsigned height = spec.DisplayRect.h;
-#endif
 
 #if defined(WANT_32BPP)
    const uint32_t *pix = surf->pixels;
@@ -707,6 +723,7 @@ void retro_run()
 #elif defined(WANT_16BPP)
    const uint16_t *pix = surf->pixels16;
    video_cb(pix, width, height, FB_WIDTH << 1);
+#endif
 #endif
 
    video_frames++;
