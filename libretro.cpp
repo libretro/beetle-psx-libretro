@@ -16,6 +16,7 @@ static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
+static bool overscan;
 static double last_sound_rate;
 static MDFN_PixelFormat last_pixel_format;
 
@@ -39,7 +40,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_TIMING_FPS 59.82704 // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
-#define MEDNAFEN_CORE_GEOMETRY_MAX_W 640
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 700
@@ -218,6 +219,9 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
    }
 #endif
+
+   overscan = false;
+   environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
 
    const char *base = strrchr(info->path, '/');
    if (!base)
@@ -698,45 +702,49 @@ void retro_run()
    unsigned width = rects[0].w; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
    unsigned height = spec.DisplayRect.h;
    //fprintf(stderr, "(%u x %u)\n", width, height);
-   // PSX core inserts weird padding on left and right edges.
-   // 320 width -> 350 width.
-   // 364 width -> 400 width.
-   // 256 width -> 280 width.
-   // 560 width -> 512 width.
-   // 640 width -> 700 width.
-   // Rectify this.
+   // PSX core inserts padding on left and right (overscan). Optionally crop this.
+
    const uint32_t *pix = surf->pixels;
-   switch (width)
+   if (!overscan)
    {
-      // The shifts are not simply (padded_width - real_width) / 2.
-      case 350:
-         pix += 14;
-         width = 320;
-         break;
+      // 320 width -> 350 width.
+      // 364 width -> 400 width.
+      // 256 width -> 280 width.
+      // 560 width -> 512 width.
+      // 640 width -> 700 width.
+      // Rectify this.
+      switch (width)
+      {
+         // The shifts are not simply (padded_width - real_width) / 2.
+         case 350:
+            pix += 14;
+            width = 320;
+            break;
 
-      case 700:
-         pix += 33;
-         width = 640;
-         break;
+         case 700:
+            pix += 33;
+            width = 640;
+            break;
 
-      case 400:
-         pix += 15;
-         width = 364;
-         break;
+         case 400:
+            pix += 15;
+            width = 364;
+            break;
 
-      case 280:
-         pix += 10;
-         width = 256;
-         break;
+         case 280:
+            pix += 10;
+            width = 256;
+            break;
 
-      case 560:
-         pix += 26;
-         width = 512;
-         break;
+         case 560:
+            pix += 26;
+            width = 512;
+            break;
 
-      default:
-         // This shouldn't happen.
-         break;
+         default:
+            // This shouldn't happen.
+            break;
+      }
    }
    video_cb(pix, width, height, FB_WIDTH << 2);
 #else
