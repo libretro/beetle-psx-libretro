@@ -695,22 +695,48 @@ void retro_run()
 
    // PSX is rather special, and needs specific handling ...
 #if defined(WANT_PSX_EMU)
-   unsigned width = rects[0].w;
+   unsigned width = rects[0].w; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
    unsigned height = spec.DisplayRect.h;
+   fprintf(stderr, "(%u x %u)\n", width, height);
    // PSX core inserts weird padding on left and right edges.
    // 320 width -> 350 width.
+   // 364 width -> 400 width.
+   // 256 width -> 280 width.
+   // 560 width -> 512 width.
    // 640 width -> 700 width.
    // Rectify this.
    const uint32_t *pix = surf->pixels;
-   if (width == 350)
+   switch (width)
    {
-      pix += 14; // Not a typo. 15 shifts the image slightly too far.
-      width = 320;
-   }
-   else if (width == 700)
-   {
-      pix += 33; // Not a typo. Needs to shift by exactly 33, or it's bad.
-      width = 640;
+      // The shifts are not simply (padded_width - real_width) / 2.
+      case 350:
+         pix += 14;
+         width = 320;
+         break;
+
+      case 700:
+         pix += 33;
+         width = 640;
+         break;
+
+      case 400:
+         pix += 15;
+         width = 364;
+         break;
+
+      case 280:
+         pix += 10;
+         width = 256;
+         break;
+
+      case 560:
+         pix += 26;
+         width = 512;
+         break;
+
+      default:
+         // This shouldn't happen.
+         break;
    }
    video_cb(pix, width, height, FB_WIDTH << 2);
 #else
