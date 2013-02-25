@@ -697,7 +697,7 @@ void retro_run()
 #if defined(WANT_PSX_EMU)
    unsigned width = rects[0].w; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
    unsigned height = spec.DisplayRect.h;
-   fprintf(stderr, "(%u x %u)\n", width, height);
+   //fprintf(stderr, "(%u x %u)\n", width, height);
    // PSX core inserts weird padding on left and right edges.
    // 320 width -> 350 width.
    // 364 width -> 400 width.
