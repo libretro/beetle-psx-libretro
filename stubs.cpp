@@ -99,8 +99,10 @@ void MDFND_PrintError(const char* err)
 
 void MDFND_Sleep(unsigned int time)
 {
-#ifdef _WIN32
+#if defined(_WIN32)
    Sleep(time);
+#elif defined(__CELLOS_LV2__)
+   sys_timer_usleep(time * 1000);
 #else
    usleep(time * 1000);
 #endif
