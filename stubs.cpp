@@ -12,7 +12,11 @@
 
 #ifdef _WIN32
 #include <io.h>
+#ifdef _XBOX
+#include <xtl.h>
+#else
 #include <windows.h>
+#endif
 #else
 #include <unistd.h>
 #endif
