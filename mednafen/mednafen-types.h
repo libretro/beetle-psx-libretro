@@ -118,4 +118,7 @@ typedef unsigned char   Boolean; /* 0 or 1 */
 
 #include "error.h"
 
+#define MDFN_LIKELY(n)
+#define MDFN_UNLIKELY(n)
+
 #endif
