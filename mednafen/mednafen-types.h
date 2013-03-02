@@ -15,8 +15,8 @@ typedef uint32_t uint32;
 typedef uint64_t uint64;
 
 #ifdef __GNUC__
-#define MDFN_LIKELY(n) __builtin_expect((n) != 0, 0)
-#define MDFN_UNLIKELY(n) __builtin_expect((n) != 0, 1)
+#define MDFN_UNLIKELY(n) __builtin_expect((n) != 0, 0)
+#define MDFN_LIKELY(n) __builtin_expect((n) != 0, 1)
 
   #define INLINE inline __attribute__((always_inline))
   #define NO_INLINE __attribute__((noinline))
