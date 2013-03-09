@@ -162,9 +162,71 @@ static void check_system_specs(void)
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
+#if defined(WANT_PSX_EMU)
+#include "mednafen/psx/psx.h"
+namespace MDFN_IEN_PSX
+{
+   extern int CD_SelectedDisc;
+   extern std::vector<CDIF*> *cdifs;
+}
+
+using MDFN_IEN_PSX::CD_SelectedDisc;
+using MDFN_IEN_PSX::cdifs;
+
+static unsigned disk_get_num_images(void)
+{
+   return cdifs ? cdifs->size() : 0;
+}
+
+static bool eject_state;
+static bool disk_set_eject_state(bool ejected)
+{
+   fprintf(stderr, "[Mednafen]: Ejected: %u.\n", ejected);
+   if (ejected == eject_state)
+      return false;
+
+   game->DoSimpleCommand(ejected ? MDFN_MSC_EJECT_DISK : MDFN_MSC_INSERT_DISK);
+   eject_state = ejected;
+   return true;
+}
+
+static bool disk_get_eject_state(void)
+{
+   return eject_state;
+}
+
+static unsigned disk_get_image_index(void)
+{
+   // PSX global. Hacky.
+   return MDFN_IEN_PSX::CD_SelectedDisc;
+}
+
+static bool disk_set_image_index(unsigned index)
+{
+   CD_SelectedDisc = index;
+   if (CD_SelectedDisc > disk_get_num_images())
+      CD_SelectedDisc = disk_get_num_images();
+
+   // Very hacky. CDSelect command will increment first.
+   CD_SelectedDisc--;
+
+   game->DoSimpleCommand(MDFN_MSC_SELECT_DISK);
+   return true;
+}
+
+static struct retro_disk_control_callback disk_interface = {
+   disk_set_eject_state,
+   disk_get_eject_state,
+   disk_get_image_index,
+   disk_set_image_index,
+   disk_get_num_images,
+};
+#endif
+
 void retro_init()
 {
    MDFNI_InitializeModule();
+   eject_state = false;
 
    const char *dir = NULL;
 
@@ -191,6 +253,10 @@ void retro_init()
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
       fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+#endif
+
+#if defined(WANT_PSX_EMU)
+   environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
 #endif
 
    check_system_specs();
