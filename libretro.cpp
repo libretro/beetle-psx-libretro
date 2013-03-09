@@ -198,7 +198,7 @@ static bool disk_get_eject_state(void)
 static unsigned disk_get_image_index(void)
 {
    // PSX global. Hacky.
-   return MDFN_IEN_PSX::CD_SelectedDisc;
+   return CD_SelectedDisc;
 }
 
 static bool disk_set_image_index(unsigned index)
@@ -214,12 +214,43 @@ static bool disk_set_image_index(unsigned index)
    return true;
 }
 
+// Untested ...
+static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
+{
+   if (index >= disk_get_num_images())
+      return false;
+
+   if (!eject_state)
+      return false;
+
+   try
+   {
+      CDIF *iface = CDIF_Open(info->path, false);
+      delete cdifs->at(index);
+      cdifs->at(index) = iface;
+      return true;
+   }
+   catch (const std::exception &e)
+   {
+      return false;
+   }
+}
+
+static bool disk_add_image_index(void)
+{
+   cdifs->push_back(NULL);
+   return true;
+}
+///////
+
 static struct retro_disk_control_callback disk_interface = {
    disk_set_eject_state,
    disk_get_eject_state,
    disk_get_image_index,
    disk_set_image_index,
    disk_get_num_images,
+   disk_replace_image_index,
+   disk_add_image_index,
 };
 #endif
 
