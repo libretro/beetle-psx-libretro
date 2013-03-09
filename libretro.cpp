@@ -223,6 +223,15 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
    if (!eject_state)
       return false;
 
+   if (!info)
+   {
+      delete cdifs->at(index);
+      cdifs->erase(cdifs->begin() + index);
+      if (index < CD_SelectedDisc)
+         CD_SelectedDisc--;
+      return true;
+   }
+
    try
    {
       CDIF *iface = CDIF_Open(info->path, false);
