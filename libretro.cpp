@@ -266,7 +266,9 @@ static struct retro_disk_control_callback disk_interface = {
 void retro_init()
 {
    MDFNI_InitializeModule();
+#if defined(WANT_PSX_EMU)
    eject_state = false;
+#endif
 
    const char *dir = NULL;
 
