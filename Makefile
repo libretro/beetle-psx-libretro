@@ -322,6 +322,17 @@ else ifeq ($(platform), ios)
 
    CC = clang -arch armv7 -isysroot $(IOSSDK)
    CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
+else ifeq ($(platform), qnx)
+   TARGET := $(TARGET_NAME).so
+   fpic := -fPIC
+   SHARED := -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   LDFLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+	CC = qcc -Vgcc_ntoarmv7le
+	CXX = QCC -Vgcc_ntoarmv7le
+	AR = QCC -Vgcc_ntoarmv7le
+	FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
