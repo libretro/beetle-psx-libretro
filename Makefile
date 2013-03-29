@@ -325,12 +325,13 @@ else ifeq ($(platform), ios)
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
-   SHARED := -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ENDIANNESS_DEFINES := -DLSB_FIRST
-   LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+   #LDFLAGS += $(PTHREAD_FLAGS)
+   #FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+	FLAGS += -DHAVE_MKDIR
 	CC = qcc -Vgcc_ntoarmv7le
-	CXX = QCC -Vgcc_ntoarmv7le
+	CXX = QCC -Vgcc_ntoarmv7le_cpp
 	AR = QCC -Vgcc_ntoarmv7le
 	FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 else ifeq ($(platform), ps3)
@@ -471,14 +472,6 @@ TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
-
-ifneq ($(OLD_GCC),1)
-NEW_GCC_WARNING_FLAGS += -Wno-narrowing \
-	-Wno-unused-but-set-variable \
-	-Wno-unused-result \
-	-Wno-overflow
-NEW_GCC_FLAGS += -fno-strict-overflow
-endif
 
 WARNINGS := -Wall \
 	-Wno-sign-compare \
