@@ -76,6 +76,7 @@ else ifeq ($(core), pce-fast)
    NEED_CD = 1
 	NEED_STEREO_SOUND = 1
 	NEED_SCSI_CD = 1
+	NEED_THREADING = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
