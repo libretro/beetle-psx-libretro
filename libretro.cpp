@@ -331,6 +331,120 @@ static void check_variables(void)
 #endif
 }
 
+#if defined(WANT_PSX_EMU)
+#define MAX_PLAYERS 2
+#define MAX_BUTTONS 16
+union
+{
+   uint32_t u32[MAX_PLAYERS][1 + 8];
+   uint8_t u8[MAX_PLAYERS][MAX_PLAYERS * sizeof(uint16_t) + 8 * sizeof(uint32_t)];
+} static buf;
+static uint16_t input_buf[MAX_PLAYERS] = {0};
+
+#elif defined(WANT_PCE_FAST_EMU)
+
+#define MAX_PLAYERS 5
+#define MAX_BUTTONS 13
+static uint8_t input_buf[MAX_PLAYERS][2] = {0};
+
+#elif defined(WANT_WSWAN_EMU)
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 11
+static uint16_t input_buf;
+
+#elif defined(WANT_NGP_EMU)
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 8
+static uint16_t input_buf;
+
+#elif defined(WANT_GBA_EMU)
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 11
+static uint16_t input_buf;
+
+#elif defined(WANT_SNES_EMU)
+
+#define MAX_PLAYERS 5
+#define MAX_BUTTONS 14
+static uint8_t input_buf[MAX_PLAYERS][2];
+
+#elif defined(WANT_VB_EMU)
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 14
+static uint16_t input_buf[MAX_PLAYERS];
+
+#elif defined(WANT_PCFX_EMU)
+
+#define MAX_PLAYERS 2
+#define MAX_BUTTONS 12
+static uint16_t input_buf[MAX_PLAYERS];
+
+#else
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 7
+
+static uint16_t input_buf[1];
+#endif
+
+
+static unsigned retro_devices[2];
+
+static bool initial_ports_hookup = false;
+
+static void hookup_ports(bool force)
+{
+   MDFNGI *currgame = game;
+
+   if (initial_ports_hookup && !force)
+      return;
+
+#if defined(WANT_PSX_EMU)
+   for (int j = 0; j < MAX_PLAYERS; j++)
+   {
+      switch (retro_devices[j])
+      {
+         case RETRO_DEVICE_ANALOG:
+            currgame->SetInput(j, "dualanalog", &buf.u8[j]);
+            break;
+         default:
+            currgame->SetInput(j, "gamepad", &buf.u8[j]);
+            break;
+      }
+   }
+#elif defined(WANT_PCE_FAST_EMU)
+   // Possible endian bug ...
+   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
+#elif defined(WANT_WSWAN_EMU)
+   currgame->SetInput(0, "gamepad", &input_buf);
+#elif defined(WANT_NGP_EMU)
+   currgame->SetInput(0, "gamepad", &input_buf);
+#elif defined(WANT_GBA_EMU)
+   // Possible endian bug ...
+   currgame->SetInput(0, "gamepad", &input_buf);
+#elif defined(WANT_SNES_EMU)
+   // Possible endian bug ...
+   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
+#elif defined(WANT_VB_EMU)
+   // Possible endian bug ...
+   currgame->SetInput(0, "gamepad", &input_buf[0]);
+#elif defined(WANT_PCFX_EMU)
+   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+      currgame->SetInput(i, "gamepad", &input_buf[i]);
+#else
+   // Possible endian bug ...
+   currgame->SetInput(0, "gamepad", &input_buf[0]);
+#endif
+
+   initial_ports_hookup = true;
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    if (failed_init)
@@ -373,6 +487,8 @@ bool retro_load_game(const struct retro_game_info *info)
 	deint.ClearState();
 #endif
 
+   hookup_ports(true);
+
    check_variables();
 
    return game;
@@ -398,7 +514,7 @@ void retro_unload_game()
    game = NULL;
 }
 
-static unsigned retro_devices[2];
+
 
 // Hardcoded for PSX. No reason to parse lots of structures ...
 // See mednafen/psx/input/gamepad.cpp
@@ -406,13 +522,9 @@ static void update_input(void)
 {
    MDFNGI *currgame = game;
 #if defined(WANT_PSX_EMU)
-   union
-   {
-      uint32_t u32[2][1 + 8];
-      uint8_t u8[2][2 * sizeof(uint16_t) + 8 * sizeof(uint32_t)];
-   } static buf;
+   input_buf[0] = 0;
+   input_buf[1] = 0;
 
-   uint16_t input_buf[2] = {0};
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_SELECT,
       RETRO_DEVICE_ID_JOYPAD_L3,
@@ -432,9 +544,9 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_Y,
    };
 
-   for (unsigned j = 0; j < 2; j++)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned i = 0; i < 16; i++)
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
          input_buf[j] |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
    }
 
@@ -479,21 +591,7 @@ static void update_input(void)
       buf.u32[j][7] = l_down;
       buf.u32[j][8] = l_up;
    }
-
-   for (int j = 0; j < 2; j++)
-   {
-      switch (retro_devices[j])
-      {
-         case RETRO_DEVICE_ANALOG:
-            currgame->SetInput(j, "dualanalog", &buf.u8[j]);
-            break;
-         default:
-            currgame->SetInput(j, "gamepad", &buf.u8[j]);
-            break;
-      }
-   }
 #elif defined(WANT_PCE_FAST_EMU)
-   static uint8_t input_buf[5][2];
 
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_A,
@@ -511,25 +609,17 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_L2
    };
 
-   if (input_state_cb)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned j = 0; j < 5; j++)
-      {
-         uint16_t input_state = 0;
-         for (unsigned i = 0; i < 13; i++)
-            input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+      uint16_t input_state = 0;
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
+         input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
-         // Input data must be little endian.
-         input_buf[j][0] = (input_state >> 0) & 0xff;
-         input_buf[j][1] = (input_state >> 8) & 0xff;
-      }
+      // Input data must be little endian.
+      input_buf[j][0] = (input_state >> 0) & 0xff;
+      input_buf[j][1] = (input_state >> 8) & 0xff;
    }
-
-   // Possible endian bug ...
-   for (unsigned i = 0; i < 5; i++)
-      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
 #elif defined(WANT_WSWAN_EMU)
-   static uint16_t input_buf;
    input_buf = 0;
 
    static unsigned map[] = {
@@ -546,7 +636,7 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_B,
    };
 
-   for (unsigned i = 0; i < 11; i++)
+   for (unsigned i = 0; i < MAX_BUTTONS; i++)
       input_buf |= map[i] != -1u &&
          input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
@@ -559,9 +649,7 @@ static void update_input(void)
    input_buf = u.b[0] | u.b[1] << 8;
 #endif
 
-   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_NGP_EMU)
-   static uint16_t input_buf;
    input_buf = 0;
 
    static unsigned map[] = {
@@ -574,7 +662,7 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_START,
    };
 
-   for (unsigned i = 0; i < 8; i++)
+   for (unsigned i = 0; i < MAX_BUTTONS; i++)
       input_buf |= map[i] != -1u &&
          input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
@@ -587,9 +675,7 @@ static void update_input(void)
    input_buf = u.b[0] | u.b[1] << 8;
 #endif
 
-   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_GBA_EMU)
-   static uint16_t input_buf;
    input_buf = 0;
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_A, //A button
@@ -604,7 +690,7 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_L,
    };
 
-   for (unsigned i = 0; i < 11; i++)
+   for (unsigned i = 0; i < MAX_BUTTONS; i++)
       input_buf |= map[i] != -1u &&
          input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
@@ -617,10 +703,7 @@ static void update_input(void)
    input_buf = u.b[0] | u.b[1] << 8;
 #endif
 
-   // Possible endian bug ...
-   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_SNES_EMU)
-   static uint8_t input_buf[5][2];
 
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_B,
@@ -637,13 +720,11 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_R,
    };
 
-   if (input_state_cb)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned j = 0; j < 5; j++)
-      {
-         uint16_t input_state = 0;
-         for (unsigned i = 0; i < 13; i++)
-            input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+      uint16_t input_state = 0;
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
+         input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
 #ifdef MSB_FIRST
       union {
@@ -656,14 +737,9 @@ static void update_input(void)
       input_buf[j][0] = (input_state >> 0) & 0xff;
       input_buf[j][1] = (input_state >> 8) & 0xff;
 #endif
-      }
    }
 
-   // Possible endian bug ...
-   for (unsigned i = 0; i < 5; i++)
-      currgame->SetInput(i, "gamepad", &input_buf[i][0]);
 #elif defined(WANT_VB_EMU)
-   static uint16_t input_buf[1];
    input_buf[0] = 0;
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_A,
@@ -682,9 +758,9 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_L3, //right d-pad DOWN
    };
 
-   for (unsigned j = 0; j < 1; j++)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned i = 0; i < 14; i++)
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
          input_buf[j] |= map[i] != -1u &&
             input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
@@ -698,10 +774,7 @@ static void update_input(void)
 #endif
    }
 
-   // Possible endian bug ...
-   currgame->SetInput(0, "gamepad", &input_buf[0]);
 #elif defined(WANT_PCFX_EMU)
-   static uint16_t input_buf[2];
    input_buf[0] = input_buf[1] = 0;
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_A,
@@ -718,9 +791,9 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_LEFT,
    };
 
-   for (unsigned j = 0; j < 2; j++)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned i = 0; i < 12; i++)
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
          input_buf[j] |= map[i] != -1u &&
             input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
 
@@ -733,10 +806,8 @@ static void update_input(void)
       input_buf[j] = u.b[0] | u.b[1] << 8;
 #endif
 
-      currgame->SetInput(j, "gamepad", &input_buf[j]);
    }
 #else
-   static uint16_t input_buf[1];
    input_buf[0] = 0;
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_UP,
@@ -748,15 +819,13 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_START, //Option button
    };
 
-   for (unsigned j = 0; j < 1; j++)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-      for (unsigned i = 0; i < 7; i++)
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
          input_buf[j] |= map[i] != -1u &&
             input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
    }
 
-   // Possible endian bug ...
-   currgame->SetInput(0, "gamepad", &input_buf[0]);
 #endif
 }
 
