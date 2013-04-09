@@ -21,6 +21,8 @@
 #include <string>
 #include "settings.h"
 
+uint32_t setting_pce_fast_nospritelimit = 0;
+
 bool MDFN_SaveSettings(const char *path)
 {
    return(1);
@@ -137,7 +139,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("pce_fast.forcesgx", name))
       return 0;
    if (!strcmp("pce_fast.nospritelimit", name))
-      return 0;
+      return setting_pce_fast_nospritelimit;
    if (!strcmp("pce_fast.forcemono", name))
       return 0;
    if (!strcmp("pce_fast.disable_softreset", name))

@@ -314,6 +314,23 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
    return false;
 }
 
+static void check_variables(void)
+{
+   struct retro_variable var = {0};
+
+#if defined(WANT_PCE_FAST_EMU)
+   var.key = "pce_nospritelimit";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         setting_pce_fast_nospritelimit = 0;
+      else if (strcmp(var.value, "enabled") == 0)
+         setting_pce_fast_nospritelimit = 1;
+   }
+#endif
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    if (failed_init)
@@ -355,6 +372,8 @@ bool retro_load_game(const struct retro_game_info *info)
 	PrevInterlaced = false;
 	deint.ClearState();
 #endif
+
+   check_variables();
 
    return game;
 }
@@ -743,6 +762,7 @@ static void update_input(void)
 
 static uint64_t video_frames, audio_frames;
 
+
 void retro_run()
 {
    MDFNGI *curgame = game;
@@ -872,6 +892,10 @@ void retro_run()
    audio_frames += spec.SoundBufSize;
 
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
+
+   bool updated = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+      check_variables();
 }
 
 void retro_get_system_info(struct retro_system_info *info)
@@ -947,6 +971,15 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
 void retro_set_environment(retro_environment_t cb)
 {
    environ_cb = cb;
+
+#if defined(WANT_PCE_FAST_EMU)
+   static const struct retro_variable vars[] = {
+      { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
+      { NULL, NULL },
+   };
+   
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+#endif
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)

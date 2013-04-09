@@ -3,6 +3,8 @@
 
 #include <string>
 
+extern uint32_t setting_pce_fast_nospritelimit;
+
 bool MDFN_LoadSettings(const char *path, const char *section = NULL, bool override = false);
 bool MDFN_MergeSettings(const void*);
 bool MDFN_MergeSettings(const std::vector<void> &);
