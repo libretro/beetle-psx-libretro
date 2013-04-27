@@ -2,6 +2,7 @@
 #include "mednafen/mempatcher.h"
 #include "mednafen/git.h"
 #include "mednafen/general.h"
+#include "mednafen/md5.h"
 #ifdef NEED_DEINTERLACER
 #include	"mednafen/video/Deinterlacer.h"
 #endif
@@ -26,6 +27,20 @@ static bool failed_init;
 
 std::string retro_base_directory;
 std::string retro_base_name;
+
+static void set_basename(const char *path)
+{
+   const char *base = strrchr(path, '/');
+   if (!base)
+      base = strrchr(path, '\\');
+
+   if (base)
+      retro_base_name = base + 1;
+   else
+      retro_base_name = path;
+
+   retro_base_name = retro_base_name.substr(0, retro_base_name.find_last_of('.'));
+}
 
 #ifdef NEED_DEINTERLACER
 static bool PrevInterlaced;
@@ -218,6 +233,36 @@ static bool disk_set_image_index(unsigned index)
    return true;
 }
 
+// Mednafen PSX really doesn't support adding disk images on the fly ...
+// Hack around this.
+static void update_md5_checksum(CDIF *iface)
+{
+   uint8 LayoutMD5[16];
+   md5_context layout_md5;
+
+   layout_md5.starts();
+
+   CD_TOC toc;
+
+   iface->ReadTOC(&toc);
+
+   layout_md5.update_u32_as_lsb(toc.first_track);
+   layout_md5.update_u32_as_lsb(toc.last_track);
+   layout_md5.update_u32_as_lsb(toc.tracks[100].lba);
+
+   for (uint32 track = toc.first_track; track <= toc.last_track; track++)
+   {
+      layout_md5.update_u32_as_lsb(toc.tracks[track].lba);
+      layout_md5.update_u32_as_lsb(toc.tracks[track].control & 0x4);
+   }
+
+   layout_md5.finish(LayoutMD5);
+   memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
+   
+   std::string md5 = md5_context::asciistr(MDFNGameInfo->MD5, 0);
+   fprintf(stderr, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
+}
+
 // Untested ...
 static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
 {
@@ -245,6 +290,8 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       delete cdifs->at(index);
       cdifs->at(index) = iface;
       CalcDiscSCEx();
+      set_basename(info->path); // If we replace, we want the "swap disk manually effect".
+      update_md5_checksum(iface); // Ugly, but needed to get proper disk swapping effect.
       return true;
    }
    catch (const std::exception &e)
@@ -470,17 +517,8 @@ bool retro_load_game(const struct retro_game_info *info)
    overscan = false;
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
 
-   const char *base = strrchr(info->path, '/');
-   if (!base)
-      base = strrchr(info->path, '\\');
+   set_basename(info->path);
 
-   if (base)
-      retro_base_name = base + 1;
-   else
-      retro_base_name = info->path;
-
-   retro_base_name = retro_base_name.substr(0, retro_base_name.find_last_of('.'));
- 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
    if (!game)
       return false;
