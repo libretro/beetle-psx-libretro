@@ -163,6 +163,8 @@ static void check_system_specs(void)
 }
 
 #if defined(WANT_PSX_EMU)
+
+// Ugly poking. There's no public interface for this.
 #include "mednafen/psx/psx.h"
 namespace MDFN_IEN_PSX
 {
@@ -170,6 +172,8 @@ namespace MDFN_IEN_PSX
    extern std::vector<CDIF*> *cdifs;
 }
 
+// Poke into psx.cpp
+unsigned CalcDiscSCEx();
 using MDFN_IEN_PSX::CD_SelectedDisc;
 using MDFN_IEN_PSX::cdifs;
 
@@ -229,6 +233,9 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       cdifs->erase(cdifs->begin() + index);
       if (index < CD_SelectedDisc)
          CD_SelectedDisc--;
+      
+      // Poke into psx.cpp
+      CalcDiscSCEx();
       return true;
    }
 
@@ -237,6 +244,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       CDIF *iface = CDIF_Open(info->path, false);
       delete cdifs->at(index);
       cdifs->at(index) = iface;
+      CalcDiscSCEx();
       return true;
    }
    catch (const std::exception &e)

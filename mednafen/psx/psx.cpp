@@ -994,7 +994,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
  return(ret);
 }
 
-static unsigned CalcDiscSCEx(void)
+unsigned CalcDiscSCEx()
 {
  const char *prev_valid_id = NULL;
  unsigned ret_region = MDFN_GetSettingI("psx.region_default");
