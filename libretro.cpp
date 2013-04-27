@@ -1034,6 +1034,8 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
          fprintf(stderr,
                "[%s]: Unsupported controller device, falling back to gamepad", mednafen_core_str);
    }
+
+   hookup_ports(true);
 #endif
 }
 
