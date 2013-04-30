@@ -51,7 +51,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.28"
-#define MEDNAFEN_CORE_EXTENSIONS "cue|CUE|toc|TOC|m3u"
+#define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82704 // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
@@ -65,7 +65,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
 #define MEDNAFEN_CORE_VERSION "v0.9.28"
-#define MEDNAFEN_CORE_EXTENSIONS "pce|PCE|sgx|SGX|cue|CUE|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "pce|sgx|cue"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -79,7 +79,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "wswan"
 #define MEDNAFEN_CORE_NAME "Mednafen WonderSwan"
 #define MEDNAFEN_CORE_VERSION "v0.9.28"
-#define MEDNAFEN_CORE_EXTENSIONS "ws|WS|wsc|WSC|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "ws|wsc"
 #define MEDNAFEN_CORE_TIMING_FPS 75.47
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -93,7 +93,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "ngp"
 #define MEDNAFEN_CORE_NAME "Mednafen Neopop"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "ngp|NGP|ngc|NGC|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "ngp|ngc"
 #define MEDNAFEN_CORE_TIMING_FPS 60.25
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -107,7 +107,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "gba"
 #define MEDNAFEN_CORE_NAME "Mednafen VBA-M"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "gba|GBA|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "gba"
 #define MEDNAFEN_CORE_TIMING_FPS 59.73
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -121,7 +121,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "snes"
 #define MEDNAFEN_CORE_NAME "Mednafen bSNES"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "smc|SMC|fig|FIG|bs|BS|st|ST|sfc|SFC|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "smc|fig|bs|st|sfc"
 #define MEDNAFEN_CORE_TIMING_FPS 60.10
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -135,7 +135,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "vb"
 #define MEDNAFEN_CORE_NAME "Mednafen VB"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "vb|VB|vboy|VBOY|bin|BIN|zip|ZIP"
+#define MEDNAFEN_CORE_EXTENSIONS "vb|vboy|bin"
 #define MEDNAFEN_CORE_TIMING_FPS 50.27
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
@@ -149,7 +149,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "pcfx"
 #define MEDNAFEN_CORE_NAME "Mednafen PCFX"
 #define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "cue|CUE"
+#define MEDNAFEN_CORE_EXTENSIONS "cue"
 #define MEDNAFEN_CORE_TIMING_FPS 59.94
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)

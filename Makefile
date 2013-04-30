@@ -481,7 +481,7 @@ WARNINGS := -Wall \
 	$(NEW_GCC_WARNING_FLAGS) \
 	-Wno-strict-aliasing
 
-EXTRA_GCC_FLAGS := -funroll-loops -ffast-math
+EXTRA_GCC_FLAGS := -funroll-loops
 
 ifeq ($(NO_GCC),1)
 	EXTRA_GCC_FLAGS :=
@@ -494,7 +494,7 @@ OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
 all: $(TARGET)
 
 ifeq ($(DEBUG),0)
-   FLAGS += -O3 $(EXTRA_GCC_FLAGS)
+   FLAGS += -O2 $(EXTRA_GCC_FLAGS)
 else
    FLAGS += -O0 -g
 endif
