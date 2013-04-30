@@ -323,7 +323,7 @@ else ifeq ($(platform), ios)
    CC = clang -arch armv7 -isysroot $(IOSSDK)
    CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
 else ifeq ($(platform), qnx)
-   TARGET := $(TARGET_NAME).so
+   TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
    SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ENDIANNESS_DEFINES := -DLSB_FIRST
