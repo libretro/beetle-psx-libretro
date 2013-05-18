@@ -313,7 +313,7 @@ else ifeq ($(platform), osx)
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 else ifeq ($(platform), ios)
-   TARGET := $(TARGET_NAME).dylib
+   TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    ENDIANNESS_DEFINES := -DLSB_FIRST
