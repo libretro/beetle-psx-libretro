@@ -401,7 +401,7 @@ else ifeq ($(platform), wii)
    FLAGS += -DHAVE_MKDIR
 	STATIC_LINKING = 1
 else
-   TARGET := $(TARGET_NAME)_libretro.dll
+   TARGET := $(TARGET_NAME).dll
    CC = gcc
    CXX = g++
 IS_X86 = 1
