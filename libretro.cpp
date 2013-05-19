@@ -383,6 +383,19 @@ static void check_variables(void)
       else if (strcmp(var.value, "enabled") == 0)
          setting_pce_fast_nospritelimit = 1;
    }
+#elif defined(WANT_PSX_EMU)
+   var.key = "psx_dithering";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      bool apply_dither = true;
+      if (strcmp(var.value, "enabled") == 0)
+         apply_dither = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         apply_dither = false;
+
+      PSXDitherApply(apply_dither);
+   }
 #endif
 }
 
@@ -1094,9 +1107,13 @@ void retro_set_environment(retro_environment_t cb)
       { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
       { NULL, NULL },
    };
-   
-   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+#elif defined(WANT_PSX_EMU)
+   static const struct retro_variable vars[] = {
+      { "psx_dithering", "Dithering; enabled|disabled" },
+      { NULL, NULL },
+   };
 #endif
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)

@@ -176,7 +176,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
       return 1;
    if (!strcmp("psx.fastboot", name))
-      return 1;
+      return 0;
    /* WSWAN */
    if (!strcmp("wswan.forcemono", name))
       return 0;

@@ -18,6 +18,8 @@
 #include "psx.h"
 #include "timer.h"
 
+uint8 DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
+
 /*
  TODO:
 	Test and clean up line, particularly polyline, drawing.
@@ -87,11 +89,6 @@
   Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything 
   different from vs0->ve0.
 */
-
-namespace MDFN_IEN_PSX
-{
-//FILE *fp;
-
 static const int32 dither_table[4][4] =
 {
  { -4,  0, -3,  1 },
@@ -100,26 +97,39 @@ static const int32 dither_table[4][4] =
  {  3, -1,  2, -2 },
 };
 
-PS_GPU::PS_GPU(bool pal_clock_and_tv) : BlitterFIFO(0x20) // 0x10 on actual PS1 GPU, 0x20 here(see comment at top of gpu.h)	// 0x10)
+void PSXDitherApply(bool enable)
 {
- HardwarePALType = pal_clock_and_tv;
-
  for(int y = 0; y < 4; y++)
   for(int x = 0; x < 4; x++)
    for(int v = 0; v < 512; v++)
    {
-    int value = v + dither_table[y][x];
+      int value = v;
+      if (enable)
+         value += dither_table[y][x];
 
-    value >>= 3;
- 
-    if(value < 0)
-     value = 0;
+      value >>= 3;
 
-    if(value > 0x1F)
-     value = 0x1F;
+      if(value < 0)
+         value = 0;
 
-    DitherLUT[y][x][v] = value;
+      if(value > 0x1F)
+         value = 0x1F;
+
+      DitherLUT[y][x][v] = value;
    }
+}
+
+namespace MDFN_IEN_PSX
+{
+//FILE *fp;
+
+
+
+PS_GPU::PS_GPU(bool pal_clock_and_tv) : BlitterFIFO(0x20) // 0x10 on actual PS1 GPU, 0x20 here(see comment at top of gpu.h)	// 0x10)
+{
+ HardwarePALType = pal_clock_and_tv;
+
+ PSXDitherApply(true);
 
  if(HardwarePALType == false)	// NTSC clock
  {

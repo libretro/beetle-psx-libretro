@@ -6,6 +6,8 @@
 
 #include "../cdrom/SimpleFIFO.h"
 
+extern uint8 DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
+
 namespace MDFN_IEN_PSX
 {
 
@@ -35,6 +37,7 @@ struct line_point
  int32 x, y;
  uint8 r, g, b;
 };
+
 
 class PS_GPU
 {
@@ -160,7 +163,6 @@ class PS_GPU
   uint8 RGB8SAT_Over[256];
  };
 
- uint8 DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
 
  bool LineSkipTest(unsigned y);
 
@@ -306,4 +308,5 @@ class PS_GPU
 };
 
 }
+void PSXDitherApply(bool enable);
 #endif
