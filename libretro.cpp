@@ -1107,13 +1107,14 @@ void retro_set_environment(retro_environment_t cb)
       { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
       { NULL, NULL },
    };
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
       { "psx_dithering", "Dithering; enabled|disabled" },
       { NULL, NULL },
    };
-#endif
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+#endif
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
