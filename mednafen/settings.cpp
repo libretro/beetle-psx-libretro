@@ -22,8 +22,8 @@
 #include "settings.h"
 
 uint32_t setting_pce_fast_nospritelimit = 0;
-uint32_t setting_psx_multitap_port_1 = 1;
-uint32_t setting_psx_multitap_port_2 = 1;
+uint32_t setting_psx_multitap_port_1 = 0;
+uint32_t setting_psx_multitap_port_2 = 0;
 
 bool MDFN_SaveSettings(const char *path)
 {
@@ -176,7 +176,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
       return 1;
    if (!strcmp("psx.fastboot", name))
-      return 0;
+      return 1;
    /* WSWAN */
    if (!strcmp("wswan.forcemono", name))
       return 0;
