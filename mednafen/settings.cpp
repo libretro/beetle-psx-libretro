@@ -22,6 +22,8 @@
 #include "settings.h"
 
 uint32_t setting_pce_fast_nospritelimit = 0;
+uint32_t setting_psx_multitap_port_1 = 1;
+uint32_t setting_psx_multitap_port_2 = 1;
 
 bool MDFN_SaveSettings(const char *path)
 {
@@ -166,9 +168,9 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("psx.input.port8.memcard", name))
       return 1;
    if (!strcmp("psx.input.port1.multitap", name)) /* make configurable */
-      return 1;
+      return setting_psx_multitap_port_1;
    if (!strcmp("psx.input.port2.multitap", name)) /* make configurable */
-      return 1;
+      return setting_psx_multitap_port_2;
    if (!strcmp("psx.region_autodetect", name)) /* make configurable */
       return 1;
    if (!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */

@@ -973,6 +973,15 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
       }
      }
     }
+
+    fprintf(stderr, "Boot ID: %s\n", bootpos);
+
+    if (strchr(bootpos, 'SLPS_017'))
+    {
+       fprintf(stderr, "Disabling multitap(s) ...\n");
+       setting_psx_multitap_port_1 = 0;
+       setting_psx_multitap_port_2 = 0;
+    }
   
     //puts((char*)fb);
     //puts("ASOFKOASDFKO");
@@ -1098,6 +1107,9 @@ static bool InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
  bool emulate_memcard[8];
  bool emulate_multitap[2];
 
+ cdifs = CDInterfaces;
+ region = CalcDiscSCEx();
+
  for(unsigned i = 0; i < 8; i++)
  {
   char buf[64];
@@ -1111,10 +1123,6 @@ static bool InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
   trio_snprintf(buf, sizeof(buf), "psx.input.port%u.multitap", i + 1);
   emulate_multitap[i] = MDFN_GetSettingB(buf);
  }
-
-
- cdifs = CDInterfaces;
- region = CalcDiscSCEx();
 
  if(!MDFN_GetSettingB("psx.region_autodetect"))
   region = MDFN_GetSettingI("psx.region_default");

@@ -4,6 +4,8 @@
 #include <string>
 
 extern uint32_t setting_pce_fast_nospritelimit;
+extern uint32_t setting_psx_multitap_port_1;
+extern uint32_t setting_psx_multitap_port_2;
 
 bool MDFN_LoadSettings(const char *path, const char *section = NULL, bool override = false);
 bool MDFN_MergeSettings(const void*);
