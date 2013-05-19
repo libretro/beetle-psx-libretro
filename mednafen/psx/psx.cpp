@@ -976,13 +976,6 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
     fprintf(stderr, "Boot ID: %s\n", bootpos);
 
-    if (strchr(bootpos, 'SLPS_017'))
-    {
-       fprintf(stderr, "Disabling multitap(s) ...\n");
-       setting_psx_multitap_port_1 = 0;
-       setting_psx_multitap_port_2 = 0;
-    }
-  
     //puts((char*)fb);
     //puts("ASOFKOASDFKO");
    }
