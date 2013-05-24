@@ -25,9 +25,7 @@
 #include "spu.h"
 #include "../mempatcher.h"
 #include "../cputest/cputest.h"
-#ifdef __BLACKBERRY_QNX__
 #include <ctype.h>
-#endif
 
 extern MDFNGI EmulatedPSX;
 

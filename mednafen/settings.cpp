@@ -31,6 +31,8 @@ uint32_t setting_pce_keepaspect = 1;
 #elif defined(WANT_PSX_EMU)
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
+#elif defined(WANT_NGP_EMU)
+uint32_t setting_ngp_language = 0;
 #endif
 
 bool MDFN_SaveSettings(const char *path)
@@ -189,6 +191,9 @@ bool MDFN_GetSettingB(const char *name)
       return 1;
    if (!strcmp("psx.fastboot", name))
       return 1;
+#elif defined(WANT_NGP_EMU)
+   if (!strcmp("ngp.language", name))
+      return setting_ngp_language;
 #endif
    /* WSWAN */
    if (!strcmp("wswan.forcemono", name))

@@ -481,6 +481,18 @@ static void check_variables(void)
 
       PSXDitherApply(apply_dither);
    }
+#elif defined(WANT_NGP_EMU)
+   var.key = "ngp_language";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "japanese") == 0)
+         setting_ngp_language = 0;
+      else if (strcmp(var.value, "english") == 0)
+         setting_ngp_language = 1;
+      
+      retro_reset();
+   }
 #endif
 }
 
@@ -1201,6 +1213,12 @@ void retro_set_environment(retro_environment_t cb)
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
       { "psx_dithering", "Dithering; enabled|disabled" },
+      { NULL, NULL },
+   };
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+#elif defined(WANT_NGP_EMU)
+   static const struct retro_variable vars[] = {
+      { "ngp_language", "Language; japanese|english" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
