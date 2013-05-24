@@ -405,6 +405,26 @@ static void check_variables(void)
          setting_pce_fast_nospritelimit = 1;
    }
 
+   var.key = "pce_keepaspect";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "disabled") == 0)
+      {
+         setting_pce_keepaspect = 0;
+         game->fb_width = 512;
+         game->nominal_width = 341;
+         game->lcm_width = 341;
+      }
+      else if (strcmp(var.value, "enabled") == 0)
+      {
+         setting_pce_keepaspect = 1;
+         game->fb_width = 682;
+         game->nominal_width = 288;
+         game->lcm_width = 1024;
+      }
+   }
+
    bool do_cdsettings = false;
    var.key = "pce_cddavolume";
 
@@ -1170,6 +1190,7 @@ void retro_set_environment(retro_environment_t cb)
 #if defined(WANT_PCE_FAST_EMU)
    static const struct retro_variable vars[] = {
       { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
+      { "pce_keepaspect", "Keep Aspect; enabled|disabled" },
       { "pce_cddavolume", "(CD) CDDA Volume; 100|90|80|70|60|50|40|30|20|10|0" },
       { "pce_adpcmvolume", "(CD) ADPCM Volume; 100|90|80|70|60|50|40|30|20|10|0" },
       { "pce_cdpsgvolume", "(CD) CD PSG Volume; 100|90|80|70|60|50|40|30|20|10|0" },

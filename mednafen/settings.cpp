@@ -27,6 +27,7 @@ int setting_pce_fast_cddavolume = 100;
 int setting_pce_fast_adpcmvolume = 100;
 int setting_pce_fast_cdpsgvolume = 100;
 uint32_t setting_pce_fast_cdspeed = 1;
+uint32_t setting_pce_keepaspect = 1;
 #elif defined(WANT_PSX_EMU)
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
@@ -157,7 +158,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("pce_fast.adpcmlp", name))
       return 0;
    if (!strcmp("pce_fast.correct_aspect", name))
-      return 1;
+      return setting_pce_keepaspect;
 #elif defined(WANT_PSX_EMU)
    /* PSX */
    if (!strcmp("psx.input.port1.memcard", name))

@@ -9,6 +9,7 @@ extern int setting_pce_fast_cddavolume;
 extern int setting_pce_fast_adpcmvolume;
 extern int setting_pce_fast_cdpsgvolume;
 extern uint32_t setting_pce_fast_cdspeed;
+extern uint32_t setting_pce_keepaspect;
 #elif defined(WANT_PSX_EMU)
 extern uint32_t setting_psx_multitap_port_1;
 extern uint32_t setting_psx_multitap_port_2;
