@@ -31,6 +31,7 @@ uint32_t setting_pce_keepaspect = 1;
 #elif defined(WANT_PSX_EMU)
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
+uint32_t setting_psx_fastboot = 1;
 #elif defined(WANT_NGP_EMU)
 uint32_t setting_ngp_language = 0;
 #endif
@@ -181,7 +182,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("psx.input.analog_mode_ct", name)) /* make configurable */
       return 1;
    if (!strcmp("psx.fastboot", name))
-      return 1;
+      return setting_psx_fastboot;
 #elif defined(WANT_NGP_EMU)
    if (!strcmp("ngp.language", name))
       return setting_ngp_language;

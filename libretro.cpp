@@ -481,6 +481,36 @@ static void check_variables(void)
 
       PSXDitherApply(apply_dither);
    }
+
+   var.key = "psx_fastboot";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         setting_psx_fastboot = 1;
+      else if (strcmp(var.value, "disabled") == 0)
+         setting_psx_fastboot = 0;
+   }
+
+   var.key = "psx_enable_multitap_port1";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         setting_psx_multitap_port_1 = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         setting_psx_multitap_port_1 = false;
+   }
+
+   var.key = "psx_enable_multitap_port2";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         setting_psx_multitap_port_2 = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         setting_psx_multitap_port_2 = false;
+   }
 #elif defined(WANT_NGP_EMU)
    var.key = "ngp_language";
 
@@ -1212,7 +1242,10 @@ void retro_set_environment(retro_environment_t cb)
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
+      { "psx_fastboot", "Skip BIOS sequence; enabled|disabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
+      { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
+      { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);

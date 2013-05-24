@@ -13,6 +13,7 @@ extern uint32_t setting_pce_keepaspect;
 #elif defined(WANT_PSX_EMU)
 extern uint32_t setting_psx_multitap_port_1;
 extern uint32_t setting_psx_multitap_port_2;
+extern uint32_t setting_psx_fastboot;
 #elif defined(WANT_NGP_EMU)
 extern uint32_t setting_ngp_language;
 #endif
