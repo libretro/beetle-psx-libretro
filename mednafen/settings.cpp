@@ -46,6 +46,7 @@ uint64 MDFN_GetSettingUI(const char *name)
    if (!strcmp("vb.anaglyph.rcolor", name))
       return 0x000000;
    /* PCE FAST */
+#if defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cddavolume", name))
       return setting_pce_fast_cddavolume;
    if (!strcmp("pce_fast.adpcmvolume", name))
@@ -60,6 +61,7 @@ uint64 MDFN_GetSettingUI(const char *name)
       return 4;
    if (!strcmp("pce_fast.slend", name))
       return 235;
+#endif
    /* WSWAN */
    if (!strcmp("wswan.ocmultiplier", name))
       return 1;
