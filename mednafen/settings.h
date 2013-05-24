@@ -3,9 +3,16 @@
 
 #include <string>
 
-extern uint32_t setting_pce_fast_nospritelimit;
+#if defined(WANT_PCE_FAST_EMU)
+extern int setting_pce_fast_nospritelimit;
+extern int setting_pce_fast_cddavolume;
+extern int setting_pce_fast_adpcmvolume;
+extern int setting_pce_fast_cdpsgvolume;
+extern uint32_t setting_pce_fast_cdspeed;
+#elif defined(WANT_PSX_EMU)
 extern uint32_t setting_psx_multitap_port_1;
 extern uint32_t setting_psx_multitap_port_2;
+#endif
 
 bool MDFN_LoadSettings(const char *path, const char *section = NULL, bool override = false);
 bool MDFN_MergeSettings(const void*);

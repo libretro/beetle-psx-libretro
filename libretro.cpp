@@ -62,6 +62,7 @@ static Deinterlacer deint;
 #define FB_HEIGHT 480
 
 #elif defined(WANT_PCE_FAST_EMU)
+#include "mednafen/cdrom/pcecd.h"
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
 #define MEDNAFEN_CORE_VERSION "v0.9.28"
@@ -369,6 +370,16 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
    return false;
 }
 
+static void set_volume (uint32_t *ptr, unsigned number)
+{
+   switch(number)
+   {
+      default:
+         *ptr = number;
+         break;
+   }
+}
+
 static void check_variables(void)
 {
    struct retro_variable var = {0};
@@ -382,6 +393,60 @@ static void check_variables(void)
          setting_pce_fast_nospritelimit = 0;
       else if (strcmp(var.value, "enabled") == 0)
          setting_pce_fast_nospritelimit = 1;
+   }
+
+   var.key = "pce_nospritelimit";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         setting_pce_fast_nospritelimit = 0;
+      else if (strcmp(var.value, "enabled") == 0)
+         setting_pce_fast_nospritelimit = 1;
+   }
+
+   bool do_cdsettings = false;
+   var.key = "pce_cddavolume";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      do_cdsettings = true;
+      setting_pce_fast_cddavolume = atoi(var.value);
+   }
+
+   var.key = "pce_adpcmvolume";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      do_cdsettings = true;
+      setting_pce_fast_adpcmvolume = atoi(var.value);
+   }
+
+   var.key = "pce_cdpsgvolume";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      do_cdsettings = true;
+      setting_pce_fast_cdpsgvolume = atoi(var.value);
+   }
+
+   var.key = "pce_cdspeed";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      do_cdsettings = true;
+      setting_pce_fast_cdspeed = atoi(var.value);
+   }
+
+   if (do_cdsettings)
+   {
+      PCECD_Settings settings = {0};
+      settings.CDDA_Volume = (double)setting_pce_fast_adpcmvolume / 100;
+      settings.CD_Speed = setting_pce_fast_cdspeed;
+      settings.ADPCM_Volume = (double)setting_pce_fast_cddavolume / 100;
+
+      if (PCECD_SetSettings(&settings))
+         fprintf(stderr, "PCE CD Audio settings changed.\n");
    }
 #elif defined(WANT_PSX_EMU)
    var.key = "psx_dithering";
@@ -1105,6 +1170,10 @@ void retro_set_environment(retro_environment_t cb)
 #if defined(WANT_PCE_FAST_EMU)
    static const struct retro_variable vars[] = {
       { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
+      { "pce_cddavolume", "(CD) CDDA Volume; 100|90|80|70|60|50|40|30|20|10|0" },
+      { "pce_adpcmvolume", "(CD) ADPCM Volume; 100|90|80|70|60|50|40|30|20|10|0" },
+      { "pce_cdpsgvolume", "(CD) CD PSG Volume; 100|90|80|70|60|50|40|30|20|10|0" },
+      { "pce_cdspeed", "(CD) CD Speed; 1|2|4|8" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);

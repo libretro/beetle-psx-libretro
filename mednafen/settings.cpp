@@ -21,9 +21,16 @@
 #include <string>
 #include "settings.h"
 
-uint32_t setting_pce_fast_nospritelimit = 0;
+#if defined(WANT_PCE_FAST_EMU)
+int setting_pce_fast_nospritelimit = 0;
+int setting_pce_fast_cddavolume = 100;
+int setting_pce_fast_adpcmvolume = 100;
+int setting_pce_fast_cdpsgvolume = 100;
+uint32_t setting_pce_fast_cdspeed = 1;
+#elif defined(WANT_PSX_EMU)
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
+#endif
 
 bool MDFN_SaveSettings(const char *path)
 {
@@ -38,14 +45,14 @@ uint64 MDFN_GetSettingUI(const char *name)
    if (!strcmp("vb.anaglyph.rcolor", name))
       return 0x000000;
    /* PCE FAST */
-   if (!strcmp("pce_fast.cddavolume", name)) /* make configurable */
-      return 100;
-   if (!strcmp("pce_fast.adpcmvolume", name)) /* make configurable */
-      return 100;
-   if (!strcmp("pce_fast.cdpsgvolume", name)) /* make configurable */
-      return 100;
-   if (!strcmp("pce_fast.cdspeed", name)) /* make configurable */
-      return 1;
+   if (!strcmp("pce_fast.cddavolume", name))
+      return setting_pce_fast_cddavolume;
+   if (!strcmp("pce_fast.adpcmvolume", name))
+      return setting_pce_fast_adpcmvolume;
+   if (!strcmp("pce_fast.cdpsgvolume", name))
+      return setting_pce_fast_cdpsgvolume;
+   if (!strcmp("pce_fast.cdspeed", name))
+      return setting_pce_fast_cdspeed;
    if (!strcmp("pce_fast.ocmultiplier", name)) /* make configurable */
       return 1;
    if (!strcmp("pce_fast.slstart", name))
@@ -134,6 +141,7 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("snes.input.port2.multitap", name))
       return 0;
    /* PCE_FAST */
+#if defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.input.multitap", name))
       return 1;
    if (!strcmp("pce_fast.arcadecard", name))
@@ -150,6 +158,7 @@ bool MDFN_GetSettingB(const char *name)
       return 0;
    if (!strcmp("pce_fast.correct_aspect", name))
       return 1;
+#elif defined(WANT_PSX_EMU)
    /* PSX */
    if (!strcmp("psx.input.port1.memcard", name))
       return 1;
@@ -177,6 +186,7 @@ bool MDFN_GetSettingB(const char *name)
       return 1;
    if (!strcmp("psx.fastboot", name))
       return 1;
+#endif
    /* WSWAN */
    if (!strcmp("wswan.forcemono", name))
       return 0;
