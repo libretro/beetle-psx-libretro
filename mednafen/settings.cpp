@@ -42,13 +42,12 @@ bool MDFN_SaveSettings(const char *path)
 
 uint64 MDFN_GetSettingUI(const char *name)
 {
-   /* VB */
+#if defined(WANT_VB_EMU)
    if (!strcmp("vb.anaglyph.lcolor", name))
       return 0xFF0000;
    if (!strcmp("vb.anaglyph.rcolor", name))
       return 0x000000;
-   /* PCE FAST */
-#if defined(WANT_PCE_FAST_EMU)
+#elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cddavolume", name))
       return setting_pce_fast_cddavolume;
    if (!strcmp("pce_fast.adpcmvolume", name))
@@ -63,8 +62,7 @@ uint64 MDFN_GetSettingUI(const char *name)
       return 4;
    if (!strcmp("pce_fast.slend", name))
       return 235;
-#endif
-   /* WSWAN */
+#elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.ocmultiplier", name))
       return 1;
    if (!strcmp("wswan.bday", name))
@@ -73,21 +71,14 @@ uint64 MDFN_GetSettingUI(const char *name)
       return 6;
    if (!strcmp("wswan.byear", name))
       return 1989;
-   if (!strcmp("wswan.cdspeed", name))
-      return 2;
-   if (!strcmp("wswan.cdpsgvolume", name))
-      return 100;
-   if (!strcmp("wswan.cddavolume", name))
-      return 100;
-   if (!strcmp("wswan.adpcmvolume", name))
-      return 100;
    if (!strcmp("wswan.slstart", name))
       return 4;
    if (!strcmp("wswan.slend", name))
       return 235;
-   /* PSX */
+#elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
       return 4;
+#endif
 
    fprintf(stderr, "unhandled setting UI: %s\n", name);
    assert(0);
@@ -96,17 +87,18 @@ uint64 MDFN_GetSettingUI(const char *name)
 
 int64 MDFN_GetSettingI(const char *name)
 {
-   /* VB */
+#if defined(WANT_VB_EMU)
    if (!strcmp("vb.anaglyph.preset", name))
       return 0;
-   /* PSX */
+#elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
-   /* WSWAN */
+#elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.sex", name))
       return 0;
    if (!strcmp("wswan.blood", name))
       return 0;
+#endif
    fprintf(stderr, "unhandled setting I: %s\n", name);
    assert(0);
    return 0;
@@ -114,12 +106,13 @@ int64 MDFN_GetSettingI(const char *name)
 
 double MDFN_GetSettingF(const char *name)
 {
-   /* PSX */
+#if defined(WANT_PSX_EMU)
    if (!strcmp("psx.input.mouse_sensitivity", name)) /* make configurable */
       return 1.00;
-   /* WSWAN */
+#elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.mouse_sensitivity", name))
       return 0.50;
+#endif
 
    fprintf(stderr, "unhandled setting F: %s\n", name);
    assert(0);
@@ -133,20 +126,19 @@ bool MDFN_GetSettingB(const char *name)
    /* LIBRETRO */
    if (!strcmp("libretro.cd_load_into_ram", name))
       return 0;
-   /* VB */
+#if defined(WANT_VB_EMU)
    if (!strcmp("vb.instant_display_hack", name))
       return 1;
    if (!strcmp("vb.allow_draw_skip", name))
       return 1;
-   /* SNES */
+#elif defined(WANT_SNES_EMU)
    if (!strcmp("snes.correct_aspect", name))
       return 0;
    if (!strcmp("snes.input.port1.multitap", name))
       return 0;
    if (!strcmp("snes.input.port2.multitap", name))
       return 0;
-   /* PCE_FAST */
-#if defined(WANT_PCE_FAST_EMU)
+#elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.input.multitap", name))
       return 1;
    if (!strcmp("pce_fast.arcadecard", name))
@@ -164,7 +156,6 @@ bool MDFN_GetSettingB(const char *name)
    if (!strcmp("pce_fast.correct_aspect", name))
       return setting_pce_keepaspect;
 #elif defined(WANT_PSX_EMU)
-   /* PSX */
    if (!strcmp("psx.input.port1.memcard", name))
       return 1;
    if (!strcmp("psx.input.port2.memcard", name))
@@ -194,14 +185,14 @@ bool MDFN_GetSettingB(const char *name)
 #elif defined(WANT_NGP_EMU)
    if (!strcmp("ngp.language", name))
       return setting_ngp_language;
-#endif
-   /* WSWAN */
+#elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.forcemono", name))
       return 0;
    if (!strcmp("wswan.language", name))
       return 1;
    if (!strcmp("wswan.correct_aspect", name))
       return 1;
+#endif
    /* CDROM */
    if (!strcmp("cdrom.lec_eval", name))
       return 1;
@@ -226,19 +217,20 @@ std::string MDFN_GetSettingS(const char *name)
 #else
    slash = '/';
 #endif
-   /* GBA */
+
+#if defined(WANT_GBA_EMU)
    if (!strcmp("gba.bios", name))
    {
       fprintf(stderr, "gba.bios: %s\n", std::string("gba_bios.bin").c_str());
       return std::string(retro_base_directory) + slash + std::string("gba_bios.bin");
    }
-   /* PCE_FAST */
+#elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cdbios", name))
    {
       fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
       return std::string(retro_base_directory) + slash + std::string("syscard3.pce");
    }
-   /* PSX */
+#elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.bios_eu", name))
    {
       std::string ret = std::string(retro_base_directory) + slash + std::string("scph5502.bin");
@@ -259,11 +251,12 @@ std::string MDFN_GetSettingS(const char *name)
    }
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return "na";
-   /* WSWAN */
+#elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.name", name))
    {
       return std::string("Mednafen");
    }
+#endif
    /* FILESYS */
    if (!strcmp("filesys.path_firmware", name))
    {
