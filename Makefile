@@ -401,7 +401,7 @@ else ifeq ($(platform), wii)
    FLAGS += -DHAVE_MKDIR
 	STATIC_LINKING = 1
 else ifneq (,$(findstring armv,$(platform)))
-   TARGET := $(TARGET_NAME)_libretro.so
+   TARGET := $(TARGET_NAME).so
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ENDIANNESS_DEFINES := -DLSB_FIRST
