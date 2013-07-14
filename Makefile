@@ -400,6 +400,33 @@ else ifeq ($(platform), wii)
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
    FLAGS += -DHAVE_MKDIR
 	STATIC_LINKING = 1
+else ifneq (,$(findstring armv,$(platform)))
+   TARGET := $(TARGET_NAME)_libretro.so
+   fpic := -fPIC
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   CC = gcc
+   LDFLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+ifneq (,$(findstring cortexa8,$(platform)))
+   FLAGS += -marm -mcpu=cortex-a8
+   ASFLAGS += -mcpu=cortex-a8
+else ifneq (,$(findstring cortexa9,$(platform)))
+   FLAGS += -marm -mcpu=cortex-a9
+   ASFLAGS += -mcpu=cortex-a9
+endif
+   FLAGS += -marm
+ifneq (,$(findstring neon,$(platform)))
+   FLAGS += -mfpu=neon
+   ASFLAGS += -mfpu=neon
+   HAVE_NEON = 1
+endif
+ifneq (,$(findstring softfloat,$(platform)))
+   FLAGS += -mfloat-abi=softfp
+else ifneq (,$(findstring hardfloat,$(platform)))
+   FLAGS += -mfloat-abi=hard
+endif
+   FLAGS += -DARM
 else
    TARGET := $(TARGET_NAME).dll
    CC = gcc
