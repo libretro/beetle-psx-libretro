@@ -408,6 +408,7 @@ else ifneq (,$(findstring armv,$(platform)))
    CC = gcc
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+   IS_X86 = 0
 ifneq (,$(findstring cortexa8,$(platform)))
    FLAGS += -marm -mcpu=cortex-a8
    ASFLAGS += -mcpu=cortex-a8
