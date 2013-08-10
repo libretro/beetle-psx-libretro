@@ -551,8 +551,8 @@ static uint16_t input_buf;
 #elif defined(WANT_NGP_EMU)
 
 #define MAX_PLAYERS 1
-#define MAX_BUTTONS 8
-static uint16_t input_buf;
+#define MAX_BUTTONS 7
+static uint8_t input_buf;
 
 #elif defined(WANT_GBA_EMU)
 
