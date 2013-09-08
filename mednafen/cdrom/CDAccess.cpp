@@ -15,11 +15,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <sys/stat.h>
 #include "../mednafen.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
+#include "CDAccess_CCD.h"
+
+#ifdef HAVE_LIBCDIO
+#include "CDAccess_Physical.h"
+#endif
 
 using namespace CDUtility;
 
@@ -33,8 +42,23 @@ CDAccess::~CDAccess()
 
 }
 
-CDAccess *cdaccess_open(const char *path, bool image_memcache)
+CDAccess *cdaccess_open_image(const char *path, bool image_memcache)
 {
- return new CDAccess_Image(path, image_memcache);
+ CDAccess *ret = NULL;
+
+ if(strlen(path) >= 4 && !strcasecmp(path + strlen(path) - 4, ".ccd"))
+  ret = new CDAccess_CCD(path, image_memcache);
+ else
+  ret = new CDAccess_Image(path, image_memcache);
+
+ return ret;
 }
 
+CDAccess *cdaccess_open_phys(const char *devicename)
+{
+ #ifdef HAVE_LIBCDIO
+ return new CDAccess_Physical(devicename);
+ #else
+ throw MDFN_Error(0, _("Physical CD access support not compiled in."));
+ #endif
+}

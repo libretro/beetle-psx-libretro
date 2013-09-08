@@ -223,3 +223,62 @@ void MDFN_trim(char *string)
    MDFN_rtrim(string);
    MDFN_ltrim(string);
 }
+
+// Remove whitespace from beginning of string
+void MDFN_ltrim(std::string &string)
+{
+ size_t len = string.length();
+ size_t di, si;
+ bool InWhitespace = TRUE;
+
+ di = si = 0;
+
+ while(si < len)
+ {
+  if(InWhitespace && (string[si] == ' ' || string[si] == '\r' || string[si] == '\n' || string[si] == '\t' || string[si] == 0x0b))
+  {
+
+  }
+  else
+  {
+   InWhitespace = FALSE;
+   string[di] = string[si];
+   di++;
+  }
+  si++;
+ }
+
+ string.resize(di);
+}
+
+// Remove whitespace from end of string
+void MDFN_rtrim(std::string &string)
+{
+ size_t len = string.length();
+
+ if(len)
+ {
+  size_t x = len;
+  size_t new_len = len;
+
+  do
+  {
+   x--;
+
+   if(!(string[x] == ' ' || string[x] == '\r' || string[x] == '\n' || string[x] == '\t' || string[x] == 0x0b))
+    break;
+ 
+   new_len--;
+  } while(x);
+
+  string.resize(new_len);
+ }
+}
+
+
+void MDFN_trim(std::string &string)
+{
+ MDFN_rtrim(string);
+ MDFN_ltrim(string);
+}
+

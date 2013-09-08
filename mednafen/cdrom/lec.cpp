@@ -17,7 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <assert.h>
+#include <sys/types.h>
 
 #include "lec.h"
 
@@ -38,39 +43,39 @@
 #define LEC_MODE2_FORM2_EDC_OFFSET 2348
 
 
-typedef uint8_t gf8_t;
+typedef u_int8_t gf8_t;
 
-static uint8_t GF8_LOG[256];
+static u_int8_t GF8_LOG[256];
 static gf8_t GF8_ILOG[256];
 
 static const class Gf8_Q_Coeffs_Results_01 {
 private:
-  uint16_t table[43][256];
+  u_int16_t table[43][256];
 public:
   Gf8_Q_Coeffs_Results_01();
   ~Gf8_Q_Coeffs_Results_01() {}
-  const uint16_t *operator[] (int i) const { return &table[i][0]; }
-  operator const uint16_t *() const	    { return &table[0][0]; }
+  const u_int16_t *operator[] (int i) const { return &table[i][0]; }
+  operator const u_int16_t *() const	    { return &table[0][0]; }
 } CF8_Q_COEFFS_RESULTS_01;
 
 static const class CrcTable {
 private:
-  uint32_t table[256];
+  u_int32_t table[256];
 public:
   CrcTable();
   ~CrcTable() {}
-  uint32_t operator[](int i) const	{ return table[i]; }
-  operator const uint32_t *() const	{ return table;    }
+  u_int32_t operator[](int i) const	{ return table[i]; }
+  operator const u_int32_t *() const	{ return table;    }
 } CRCTABLE;
 
 static const class ScrambleTable {
 private:
-  uint8_t table[2340];
+  u_int8_t table[2340];
 public:
   ScrambleTable();
   ~ScrambleTable() {}
-  uint8_t operator[](int i) const	{ return table[i]; }
-  operator const uint8_t *() const	{ return table;    }
+  u_int8_t operator[](int i) const	{ return table[i]; }
+  operator const u_int8_t *() const	{ return table;    }
 } SCRAMBLE_TABLE;
 
 /* Creates the logarithm and inverse logarithm table that is required
@@ -78,8 +83,8 @@ public:
  */
 static void gf8_create_log_tables()
 {
-  uint8_t log;
-  uint16_t b;
+  u_int8_t log;
+  u_int16_t b;
 
   for (b = 0; b <= 255; b++) {
     GF8_LOG[b] = 0;
@@ -89,8 +94,8 @@ static void gf8_create_log_tables()
   b = 1;
 
   for (log = 0; log < 255; log++) {
-    GF8_LOG[(uint8_t)b] = log;
-    GF8_ILOG[log] = (uint8_t)b;
+    GF8_LOG[(u_int8_t)b] = log;
+    GF8_ILOG[log] = (u_int8_t)b;
 
     b <<= 1;
 
@@ -147,9 +152,9 @@ static gf8_t gf8_div(gf8_t a, gf8_t b)
 Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
 {
   int i, j;
-  uint16_t c;
+  u_int16_t c;
   gf8_t GF8_COEFFS_HELP[2][45]; 
-  uint8_t GF8_Q_COEFFS[2][45];
+  u_int8_t GF8_Q_COEFFS[2][45];
 
 
   gf8_create_log_tables();
@@ -220,10 +225,10 @@ Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
 
 /* Reverses the bits in 'd'. 'bits' defines the bit width of 'd'.
  */
-static uint32_t mirror_bits(uint32_t d, int bits)
+static u_int32_t mirror_bits(u_int32_t d, int bits)
 {
   int i;
-  uint32_t r = 0;
+  u_int32_t r = 0;
 
   for (i = 0; i < bits; i++) {
     r <<= 1;
@@ -243,8 +248,8 @@ static uint32_t mirror_bits(uint32_t d, int bits)
  */
 CrcTable::CrcTable ()
 {
-  uint32_t i, j;
-  uint32_t r;
+  u_int32_t i, j;
+  u_int32_t r;
   
   for (i = 0; i < 256; i++) {
     r = mirror_bits(i, 8);
@@ -270,9 +275,9 @@ CrcTable::CrcTable ()
 /* Calculates the CRC of given data with given lengths based on the
  * table lookup algorithm.
  */
-static uint32_t calc_edc(uint8_t *data, int len)
+static u_int32_t calc_edc(u_int8_t *data, int len)
 {
-  uint32_t crc = 0;
+  u_int32_t crc = 0;
 
   while (len--) {
     crc = CRCTABLE[(int)(crc ^ *data++) & 0xff] ^ (crc >> 8);
@@ -286,9 +291,9 @@ static uint32_t calc_edc(uint8_t *data, int len)
  */
 ScrambleTable::ScrambleTable()
 {
-  uint16_t i, j;
-  uint16_t reg = 1;
-  uint8_t d;
+  u_int16_t i, j;
+  u_int16_t reg = 1;
+  u_int8_t d;
 
   for (i = 0; i < 2340; i++) {
     d = 0;
@@ -314,9 +319,9 @@ ScrambleTable::ScrambleTable()
 
 /* Calc EDC for a MODE 1 sector
  */
-static void calc_mode1_edc(uint8_t *sector)
+static void calc_mode1_edc(u_int8_t *sector)
 {
-  uint32_t crc = calc_edc(sector, LEC_MODE1_DATA_LEN + 16);
+  u_int32_t crc = calc_edc(sector, LEC_MODE1_DATA_LEN + 16);
 
   sector[LEC_MODE1_EDC_OFFSET] = crc & 0xffL;
   sector[LEC_MODE1_EDC_OFFSET + 1] = (crc >> 8) & 0xffL;
@@ -326,9 +331,9 @@ static void calc_mode1_edc(uint8_t *sector)
 
 /* Calc EDC for a XA form 1 sector
  */
-static void calc_mode2_form1_edc(uint8_t *sector)
+static void calc_mode2_form1_edc(u_int8_t *sector)
 {
-  uint32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
+  u_int32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
 			   LEC_MODE2_FORM1_DATA_LEN);
 
   sector[LEC_MODE2_FORM1_EDC_OFFSET] = crc & 0xffL;
@@ -339,9 +344,9 @@ static void calc_mode2_form1_edc(uint8_t *sector)
 
 /* Calc EDC for a XA form 2 sector
  */
-static void calc_mode2_form2_edc(uint8_t *sector)
+static void calc_mode2_form2_edc(u_int8_t *sector)
 {
-  uint32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
+  u_int32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
 			   LEC_MODE2_FORM2_DATA_LEN);
 
   sector[LEC_MODE2_FORM2_EDC_OFFSET] = crc & 0xffL;
@@ -352,7 +357,7 @@ static void calc_mode2_form2_edc(uint8_t *sector)
 
 /* Writes the sync pattern to the given sector.
  */
-static void set_sync_pattern(uint8_t *sector)
+static void set_sync_pattern(u_int8_t *sector)
 {
   sector[0] = 0;
 
@@ -363,14 +368,14 @@ static void set_sync_pattern(uint8_t *sector)
 }
 
 
-static uint8_t bin2bcd(uint8_t b)
+static u_int8_t bin2bcd(u_int8_t b)
 {
   return (((b/10) << 4) & 0xf0) | ((b%10) & 0x0f);
 }
 
 /* Builds the sector header.
  */
-static void set_sector_header(uint8_t mode, uint32_t adr, uint8_t *sector)
+static void set_sector_header(u_int8_t mode, u_int32_t adr, u_int8_t *sector)
 {
   sector[LEC_HEADER_OFFSET] = bin2bcd(adr / (60*75));
   sector[LEC_HEADER_OFFSET + 1] = bin2bcd((adr / 75) % 60);
@@ -381,14 +386,14 @@ static void set_sector_header(uint8_t mode, uint32_t adr, uint8_t *sector)
 /* Calculate the P parities for the sector.
  * The 43 P vectors of length 24 are combined with the GF8_P_COEFFS.
  */
-static void calc_P_parity(uint8_t *sector)
+static void calc_P_parity(u_int8_t *sector)
 {
   int i, j;
-  uint16_t p01_msb, p01_lsb;
-  uint8_t *p_lsb_start;
-  uint8_t *p_lsb;
-  uint8_t *p0, *p1;
-  uint8_t d0,d1;
+  u_int16_t p01_msb, p01_lsb;
+  u_int8_t *p_lsb_start;
+  u_int8_t *p_lsb;
+  u_int8_t *p0, *p1;
+  u_int8_t d0,d1;
 
   p_lsb_start = sector + LEC_HEADER_OFFSET;
 
@@ -426,14 +431,14 @@ static void calc_P_parity(uint8_t *sector)
 /* Calculate the Q parities for the sector.
  * The 26 Q vectors of length 43 are combined with the GF8_Q_COEFFS.
  */
-static void calc_Q_parity(uint8_t *sector)
+static void calc_Q_parity(u_int8_t *sector)
 {
   int i, j;
-  uint16_t q01_lsb, q01_msb;
-  uint8_t *q_lsb_start;
-  uint8_t *q_lsb;
-  uint8_t *q0, *q1, *q_start;
-  uint8_t d0,d1;
+  u_int16_t q01_lsb, q01_msb;
+  u_int8_t *q_lsb_start;
+  u_int8_t *q_lsb;
+  u_int8_t *q0, *q1, *q_start;
+  u_int8_t d0,d1;
 
   q_lsb_start = sector + LEC_HEADER_OFFSET;
 
@@ -477,9 +482,9 @@ static void calc_Q_parity(uint8_t *sector)
  * 'adr' is the current physical sector address
  * 'sector' must be 2352 byte wide
  */
-void lec_encode_mode0_sector(uint32_t adr, uint8_t *sector)
+void lec_encode_mode0_sector(u_int32_t adr, u_int8_t *sector)
 {
-  uint16_t i;
+  u_int16_t i;
 
   set_sync_pattern(sector);
   set_sector_header(0, adr, sector);
@@ -495,7 +500,7 @@ void lec_encode_mode0_sector(uint32_t adr, uint8_t *sector)
  * 'sector' must be 2352 byte wide containing 2048 bytes user data at
  * offset 16
  */
-void lec_encode_mode1_sector(uint32_t adr, uint8_t *sector)
+void lec_encode_mode1_sector(u_int32_t adr, u_int8_t *sector)
 {
   set_sync_pattern(sector);
   set_sector_header(1, adr, sector);
@@ -521,7 +526,7 @@ void lec_encode_mode1_sector(uint32_t adr, uint8_t *sector)
  * 'sector' must be 2352 byte wide containing 2336 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_sector(uint32_t adr, uint8_t *sector)
+void lec_encode_mode2_sector(u_int32_t adr, u_int8_t *sector)
 {
   set_sync_pattern(sector);
   set_sector_header(2, adr, sector);
@@ -532,7 +537,7 @@ void lec_encode_mode2_sector(uint32_t adr, uint8_t *sector)
  * 'sector' must be 2352 byte wide containing 2048+8 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_form1_sector(uint32_t adr, uint8_t *sector)
+void lec_encode_mode2_form1_sector(u_int32_t adr, u_int8_t *sector)
 {
   set_sync_pattern(sector);
 
@@ -556,7 +561,7 @@ void lec_encode_mode2_form1_sector(uint32_t adr, uint8_t *sector)
  * 'sector' must be 2352 byte wide containing 2324+8 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector)
+void lec_encode_mode2_form2_sector(u_int32_t adr, u_int8_t *sector)
 {
   set_sync_pattern(sector);
 
@@ -568,12 +573,12 @@ void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector)
 /* Scrambles and byte swaps an encoded sector.
  * 'sector' must be 2352 byte wide.
  */
-void lec_scramble(uint8_t *sector)
+void lec_scramble(u_int8_t *sector)
 {
-  uint16_t i;
-  const uint8_t *stable = SCRAMBLE_TABLE;
-  uint8_t *p = sector;
-  uint8_t tmp;
+  u_int16_t i;
+  const u_int8_t *stable = SCRAMBLE_TABLE;
+  u_int8_t *p = sector;
+  u_int8_t tmp;
 
 
   for (i = 0; i < 6; i++) {
@@ -592,3 +597,95 @@ void lec_scramble(uint8_t *sector)
     }
 }
 
+#if 0
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+  char *infile;
+  char *outfile;
+  int fd_in, fd_out;
+  u_int8_t buffer1[2352];
+  u_int8_t buffer2[2352];
+  u_int32_t lba;
+  int i;
+
+#if 0
+  for (i = 0; i < 2048; i++)
+    buffer1[i + 16] = 234;
+
+  lba = 150;
+
+  for (i = 0; i < 100000; i++) {
+    lec_encode_mode1_sector(lba, buffer1);
+    lec_scramble(buffer2);
+    lba++;
+  }
+
+#else
+
+  if (argc != 3)
+    return 1;
+
+  infile = argv[1];
+  outfile = argv[2];
+
+
+  if ((fd_in = open(infile, O_RDONLY)) < 0) {
+    perror("Cannot open input file");
+    return 1;
+  }
+
+  if ((fd_out = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+    perror("Cannot open output file");
+    return 1;
+  }
+
+  lba = 150;
+
+  do {
+    if (read(fd_in, buffer1, 2352) != 2352)
+      break;
+
+    switch (*(buffer1 + 12 + 3)) {
+    case 1:
+      memcpy(buffer2 + 16, buffer1 + 16, 2048);
+
+      lec_encode_mode1_sector(lba, buffer2);
+      break;
+
+    case 2:
+      if ((*(buffer1 + 12 + 4 + 2) & 0x20) != 0) {
+	/* form 2 sector */
+	memcpy(buffer2 + 16, buffer1 + 16, 2324 + 8);
+	lec_encode_mode2_form2_sector(lba, buffer2);
+      }
+      else {
+	/* form 1 sector */
+	memcpy(buffer2 + 16, buffer1 + 16, 2048 + 8);
+	lec_encode_mode2_form1_sector(lba, buffer2);
+      }
+      break;
+    }
+
+    if (memcmp(buffer1, buffer2, 2352) != 0) {
+      printf("Verify error at lba %ld\n", lba);
+    }
+
+    lec_scramble(buffer2);
+    write(fd_out, buffer2, 2352);
+
+    lba++;
+  } while (1);
+
+  close(fd_in);
+  close(fd_out);
+
+#endif
+
+  return 0;
+}
+#endif

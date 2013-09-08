@@ -50,8 +50,8 @@ static Deinterlacer deint;
 #if defined(WANT_PSX_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.28"
-#define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u"
+#define MEDNAFEN_CORE_VERSION "v0.9.31"
+#define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82704 // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
@@ -287,7 +287,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    try
    {
-      CDIF *iface = CDIF_Open(info->path, false);
+      CDIF *iface = CDIF_Open(info->path, false, false);
       delete cdifs->at(index);
       cdifs->at(index) = iface;
       CalcDiscSCEx();
@@ -469,6 +469,8 @@ static void check_variables(void)
          fprintf(stderr, "PCE CD Audio settings changed.\n");
    }
 #elif defined(WANT_PSX_EMU)
+
+#if 0
    var.key = "psx_dithering";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
@@ -481,6 +483,7 @@ static void check_variables(void)
 
       PSXDitherApply(apply_dither);
    }
+#endif
 
    var.key = "psx_fastboot";
 
@@ -531,8 +534,8 @@ static void check_variables(void)
 #define MAX_BUTTONS 16
 union
 {
-   uint32_t u32[MAX_PLAYERS][1 + 8];
-   uint8_t u8[MAX_PLAYERS][MAX_PLAYERS * sizeof(uint16_t) + 8 * sizeof(uint32_t)];
+   uint32_t u32[MAX_PLAYERS][1 + 8 + 1]; // Buttons + Axes + Rumble
+   uint8_t u8[MAX_PLAYERS][(1 + 8 + 1) * sizeof(uint32_t)];
 } static buf;
 static uint16_t input_buf[MAX_PLAYERS] = {0};
 
@@ -659,6 +662,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
    set_basename(info->path);
 
+   check_variables();
+
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
    if (!game)
       return false;
@@ -674,8 +679,6 @@ bool retro_load_game(const struct retro_game_info *info)
 #endif
 
    hookup_ports(true);
-
-   check_variables();
 
    return game;
 }
@@ -1212,13 +1215,13 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       // TODO: Add support for other input types
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_ANALOG:
-         fprintf(stderr, "[%s]: Selected controller type %u", mednafen_core_str, device);
+         fprintf(stderr, "[%s]: Selected controller type %u.\n", mednafen_core_str, device);
          retro_devices[in_port] = device;
          break;
       default:
          retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
          fprintf(stderr,
-               "[%s]: Unsupported controller device, falling back to gamepad", mednafen_core_str);
+               "[%s]: Unsupported controller device, falling back to gamepad.\n", mednafen_core_str);
    }
 
    hookup_ports(true);

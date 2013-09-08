@@ -1,6 +1,8 @@
 #ifndef __MDFN_CDACCESS_IMAGE_H
 #define __MDFN_CDACCESS_IMAGE_H
 
+#include <map>
+
 class Stream;
 class AudioReader;
 
@@ -29,6 +31,33 @@ struct CDRFILE_TRACK_INFO
 
 	AudioReader *AReader;
 };
+#if 0
+struct Medium_Chunk
+{
+	int64 Offset;		// Offset in [..TODO..]
+	uint32 DIFormat;
+
+        FILE *fp;
+        bool FirstFileInstance;
+        bool RawAudioMSBFirst;
+        unsigned int SubchannelMode;
+
+        uint32 LastSamplePos;
+        AudioReader *AReader;
+};
+
+struct CD_Chunk
+{
+	int32 LBA;
+	int32 Track;
+	int32 Index;
+	bool DataType;
+
+	Medium_Chunk Medium;
+};
+
+static std::vector<CD_Chunk> Chunks;
+#endif
 
 class CDAccess_Image : public CDAccess
 {
@@ -41,7 +70,7 @@ class CDAccess_Image : public CDAccess
 
  virtual void Read_TOC(CDUtility::TOC *toc);
 
- virtual bool Is_Physical(void);
+ virtual bool Is_Physical(void) throw();
 
  virtual void Eject(bool eject_status);
  private:
@@ -60,7 +89,7 @@ class CDAccess_Image : public CDAccess
  // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.
  void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
 
- bool ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache);
+ void ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache);
  uint32 GetSectorCount(CDRFILE_TRACK_INFO *track);
 };
 

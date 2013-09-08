@@ -20,19 +20,10 @@
 
 #include "CDUtility.h"
 #include "../Stream.h"
-#include "CDAccess.h"
 
 #include <queue>
 
 typedef CDUtility::TOC CD_TOC;
-
-typedef struct
-{
- bool valid;
- bool error;
- uint32 lba;
- uint8 data[2352 + 96];
-} CDIF_Sector_Buffer;
 
 class CDIF
 {
@@ -74,86 +65,6 @@ class CDIF
  bool DiscEjected;
 };
 
-class CDIF_Message
-{
- public:
-
- CDIF_Message();
- CDIF_Message(unsigned int message_, uint32 arg0 = 0, uint32 arg1 = 0, uint32 arg2 = 0, uint32 arg3 = 0);
- CDIF_Message(unsigned int message_, const std::string &str);
- ~CDIF_Message();
-
- unsigned int message;
- uint32 args[4];
- void *parg;
- std::string str_message;
-};
-
-class CDIF_Queue
-{
- public:
-
- CDIF_Queue();
- ~CDIF_Queue();
-
- bool Read(CDIF_Message *message, bool blocking = TRUE);
-
- void Write(const CDIF_Message &message);
-
- private:
- std::queue<CDIF_Message> ze_queue;
- MDFN_Mutex *ze_mutex;
-};
-
-// TODO: prohibit copy constructor
-class CDIF_MT : public CDIF
-{
- public:
-
- CDIF_MT(CDAccess *cda);
- virtual ~CDIF_MT();
-
- virtual void HintReadSector(uint32 lba);
- virtual bool ReadRawSector(uint8 *buf, uint32 lba);
-
- // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
- // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
- virtual bool Eject(bool eject_status);
-
- // FIXME: Semi-private:
- int ReadThreadStart(void);
-
- private:
-
- CDAccess *disc_cdaccess;
-
- MDFN_Thread *CDReadThread;
-
- // Queue for messages to the read thread.
- CDIF_Queue ReadThreadQueue;
-
- // Queue for messages to the emu thread.
- CDIF_Queue EmuThreadQueue;
-
-
- enum { SBSize = 256 };
- CDIF_Sector_Buffer SectorBuffers[SBSize];
-
- uint32 SBWritePos;
- 
- MDFN_Mutex *SBMutex;
-
-
- //
- // Read-thread-only:
- //
- void RT_EjectDisc(bool eject_status, bool skip_actual_eject = false);
-
- uint32 ra_lba;
- int ra_count;
- uint32 last_read_lba;
-};
-
-CDIF *CDIF_Open(const char *path, bool image_memcache);
+CDIF *CDIF_Open(const char *path, const bool is_device, bool image_memcache);
 
 #endif

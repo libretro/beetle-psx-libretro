@@ -29,11 +29,12 @@ ifeq ($(core), psx)
    core = psx
    PTHREAD_FLAGS = -pthread
    NEED_CD = 1
+   NEED_TREMOR = 1
    NEED_BPP = 32
    NEED_BLIP = 1
    NEED_DEINTERLACER = 1
-	NEED_THREADING = 1
-	NEED_STEREO_SOUND = 1
+   NEED_THREADING = 1
+   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_PSX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/psx
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
@@ -65,9 +66,9 @@ else ifeq ($(core), pce-fast)
    NEED_BPP = 32
    NEED_BLIP = 1
    NEED_CD = 1
-	NEED_STEREO_SOUND = 1
-	NEED_SCSI_CD = 1
-	NEED_THREADING = 1
+   NEED_STEREO_SOUND = 1
+   NEED_SCSI_CD = 1
+   NEED_THREADING = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
@@ -90,7 +91,7 @@ else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
+   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/wswan
 
@@ -108,7 +109,7 @@ else ifeq ($(core), ngp)
    core = ngp
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
+   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_NGP_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/ngp
 
@@ -146,7 +147,7 @@ else ifeq ($(core), gba)
    core = gba
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
+   NEED_STEREO_SOUND = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_GBA_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/gba
@@ -179,7 +180,7 @@ else ifeq ($(core), vb)
    core = vb
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
+   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_VB_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/vb
 
@@ -198,10 +199,10 @@ else ifeq ($(core), pcfx)
    core = pcfx
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
-	NEED_CD = 1
-	NEED_SCSI_CD = 1
-	NEED_THREADING = 1
+   NEED_STEREO_SOUND = 1
+   NEED_CD = 1
+   NEED_SCSI_CD = 1
+   NEED_THREADING = 1
    CORE_DEFINE := -DWANT_PCFX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pcfx
 
@@ -229,7 +230,7 @@ else ifeq ($(core), snes)
    core = snes
    NEED_BPP = 32
    NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
+   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_SNES_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/snes
 
@@ -329,11 +330,11 @@ else ifeq ($(platform), qnx)
    ENDIANNESS_DEFINES := -DLSB_FIRST
    #LDFLAGS += $(PTHREAD_FLAGS)
    #FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
-	FLAGS += -DHAVE_MKDIR
-	CC = qcc -Vgcc_ntoarmv7le
-	CXX = QCC -Vgcc_ntoarmv7le_cpp
-	AR = QCC -Vgcc_ntoarmv7le
-	FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
+   FLAGS += -DHAVE_MKDIR
+   CC = qcc -Vgcc_ntoarmv7le
+   CXX = QCC -Vgcc_ntoarmv7le_cpp
+   AR = QCC -Vgcc_ntoarmv7le
+   FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -342,7 +343,7 @@ else ifeq ($(platform), ps3)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    OLD_GCC := 1
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
@@ -353,7 +354,7 @@ else ifeq ($(platform), sncps3)
    OLD_GCC := 1
    NO_GCC := 1
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
@@ -361,16 +362,16 @@ else ifeq ($(platform), psl1ght)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), psp1)
-	TARGET := $(TARGET_NAME)_psp1.a
-	CC = psp-gcc$(EXE_EXT)
-	CXX = psp-g++$(EXE_EXT)
-	AR = psp-ar$(EXE_EXT)
-	ENDIANNESS_DEFINES := -DLSB_FIRST
-	FLAGS += -DPSP -G0
+   TARGET := $(TARGET_NAME)_psp1.a
+   CC = psp-gcc$(EXE_EXT)
+   CXX = psp-g++$(EXE_EXT)
+   AR = psp-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+   FLAGS += -DPSP -G0
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
@@ -379,7 +380,7 @@ else ifeq ($(platform), xenon)
    ENDIANNESS_DEFINES += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    LIBS := $(PTHREAD_FLAGS)
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), ngc)
    TARGET := $(TARGET_NAME)_ngc.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
@@ -389,7 +390,7 @@ else ifeq ($(platform), ngc)
 
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
@@ -399,7 +400,7 @@ else ifeq ($(platform), wii)
 
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
    FLAGS += -DHAVE_MKDIR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifneq (,$(findstring armv,$(platform)))
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
@@ -432,7 +433,7 @@ else
    TARGET := $(TARGET_NAME).dll
    CC = gcc
    CXX = g++
-IS_X86 = 1
+   IS_X86 = 1
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    ENDIANNESS_DEFINES := -DLSB_FIRST
@@ -440,24 +441,25 @@ IS_X86 = 1
 endif
 
 ifeq ($(NEED_THREADING), 1)
-FLAGS += -DWANT_THREADING
+   FLAGS += -DWANT_THREADING
 endif
 
 ifeq ($(NEED_CRC32), 1)
-FLAGS += -DWANT_CRC32
+   FLAGS += -DWANT_CRC32
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)
-FLAGS += -DNEED_DEINTERLACER
+   FLAGS += -DNEED_DEINTERLACER
 endif
 
 ifeq ($(NEED_SCSI_CD), 1)
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
+   CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
 endif
 
 ifeq ($(NEED_CD), 1)
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
+	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
 	$(MEDNAFEN_DIR)/cdrom/lec.cpp \
 	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
@@ -465,14 +467,14 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/galois.cpp \
 	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
-	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp \
-	$(MEDNAFEN_DIR)/cdrom/cd_crc32.cpp
-FLAGS += -DNEED_CD
+	$(MEDNAFEN_DIR)/cdrom/crc32.cpp \
+	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
+   FLAGS += -DNEED_CD
 endif
 
 ifeq ($(NEED_TREMOR), 1)
-TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
-FLAGS += -DNEED_TREMOR
+   TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+   FLAGS += -DNEED_TREMOR
 endif
 
 
@@ -512,6 +514,7 @@ WARNINGS := -Wall \
 	-Wno-unused-variable \
 	-Wno-unused-function \
 	-Wno-uninitialized \
+	-Wno-narrowing \
 	$(NEW_GCC_WARNING_FLAGS) \
 	-Wno-strict-aliasing
 
@@ -537,7 +540,7 @@ LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_misc -Imednafen/hw_sound -Imednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.28\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=928 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -Dgettext_noop\(a\)=a
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.31\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=931 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -Dgettext_noop\(a\)=a
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86
