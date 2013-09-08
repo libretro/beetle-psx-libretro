@@ -64,6 +64,7 @@ else ifeq ($(core), pce-fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
    NEED_BPP = 32
+   NEED_TREMOR = 1
    NEED_BLIP = 1
    NEED_CD = 1
    NEED_STEREO_SOUND = 1
