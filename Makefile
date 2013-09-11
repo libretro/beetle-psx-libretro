@@ -515,7 +515,6 @@ WARNINGS := -Wall \
 	-Wno-unused-variable \
 	-Wno-unused-function \
 	-Wno-uninitialized \
-	-Wno-narrowing \
 	$(NEW_GCC_WARNING_FLAGS) \
 	-Wno-strict-aliasing
 
