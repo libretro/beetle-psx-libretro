@@ -269,7 +269,7 @@ class PS_GPU
  uint32 LinesPerField;
  uint32 scanline;
  bool field;
- bool field_atvs;
+ bool field_ram_readout;
  bool PhaseChange;
 
  uint32 DotClockCounter;

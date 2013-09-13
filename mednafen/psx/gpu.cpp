@@ -286,7 +286,7 @@ void PS_GPU::Power(void)
  //
  scanline = 0;
  field = 0;
- field_atvs = 0;
+ field_ram_readout = 0;
  PhaseChange = 0;
 
  //
@@ -435,7 +435,7 @@ INLINE bool PS_GPU::LineSkipTest(unsigned y)
  if((DisplayMode & 0x24) != 0x24)
   return false;
 
- if(!dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1))/* && !DisplayOff*/) //&& (y >> 1) >= DisplayFB_YStart && (y >> 1) < (DisplayFB_YStart + (VertEnd - VertStart)))
+ if(!dfe && ((y & 1) == ((DisplayFB_YStart + field_ram_readout) & 1))/* && !DisplayOff*/) //&& (y >> 1) >= DisplayFB_YStart && (y >> 1) < (DisplayFB_YStart + (VertEnd - VertStart)))
   return true;
 
  return false;
@@ -870,6 +870,7 @@ void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	    break;
 
    case 0x00:	// Reset GPU
+	//printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
 	SoftReset();
 	break;
 
@@ -907,6 +908,7 @@ void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 	break;
 
    case 0x08:
+	//printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
 	DisplayMode = V & 0xFF;
 	break;
 
@@ -996,7 +998,7 @@ uint32 PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32 A)
 
   ret |= (DisplayFB_CurLineYReadout & 1) << 31;
 
-  ret |= field << 13;
+  ret |= (!field) << 13;
 
   if(DMAControl & 0x02)
    ret |= 1 << 25;
@@ -1191,7 +1193,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      if(DisplayMode & 0x20)
       field = !field;
      else
-      field = 1; // May not be correct.
+      field = 0;
     }
 
     if(scanline == 0)
@@ -1210,7 +1212,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      }
      else
      {
-      field = 1;	// May not be correct.
+      field = 0;	// May not be the correct place for this?
 
       if(DisplayMode & 0x08)	// PAL
        LinesPerField = 314;
@@ -1243,7 +1245,8 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
        }
        char buffer[256];
 
-       //trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
+       trio_snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
+       fprintf(stderr, "%s\n", buffer);
        //DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
 		//surface->MakeColor(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13);
       }
@@ -1295,7 +1298,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
      InVBlank = true;
 
      DisplayFB_CurYOffset = 0;
-     field_atvs = field;
+
+     if((DisplayMode & 0x24) == 0x24)
+      field_ram_readout = !field;
+     else
+      field_ram_readout = 0;
     }
 
     if(scanline == VertStart && InVBlank)
@@ -1317,7 +1324,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
     // Not particularly confident about the timing of this in regards to vblank and the upper bit(ODE) of the GPU status port, though the test that
     // showed an oddity was pathological in that VertEnd < VertStart in it.
     if((DisplayMode & 0x24) == 0x24)
-     DisplayFB_CurLineYReadout = (DisplayFB_YStart + (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : !field_atvs)) & 0x1FF;
+     DisplayFB_CurLineYReadout = (DisplayFB_YStart + (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : field_ram_readout)) & 0x1FF;
     else
      DisplayFB_CurLineYReadout = (DisplayFB_YStart + DisplayFB_CurYOffset) & 0x1FF;
 

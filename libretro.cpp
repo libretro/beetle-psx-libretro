@@ -50,7 +50,7 @@ static Deinterlacer deint;
 #if defined(WANT_PSX_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.31"
+#define MEDNAFEN_CORE_VERSION "v0.9.32"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82704 // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
