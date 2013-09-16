@@ -27,7 +27,9 @@ endif
 
 ifeq ($(core), psx)
    core = psx
+ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
+endif
    NEED_CD = 1
    NEED_TREMOR = 1
    NEED_BPP = 32
@@ -62,7 +64,9 @@ ifeq ($(core), psx)
    TARGET_NAME := mednafen_psx_libretro
 else ifeq ($(core), pce-fast)
    core = pce_fast
+ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
+endif
    NEED_BPP = 32
    NEED_TREMOR = 1
    NEED_BLIP = 1
