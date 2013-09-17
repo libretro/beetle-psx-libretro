@@ -662,7 +662,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
    set_basename(info->path);
 
+#if !defined(WANT_NGP_EMU)
    check_variables();
+#endif
 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
    if (!game)
@@ -679,6 +681,10 @@ bool retro_load_game(const struct retro_game_info *info)
 #endif
 
    hookup_ports(true);
+
+#if defined(WANT_NGP_EMU)
+   check_variables();
+#endif
 
    return game;
 }
