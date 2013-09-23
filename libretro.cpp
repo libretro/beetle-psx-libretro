@@ -662,7 +662,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    set_basename(info->path);
 
-#if !defined(WANT_NGP_EMU)
+#if defined(WANT_PSX_EMU)
    check_variables();
 #endif
 
@@ -682,7 +682,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    hookup_ports(true);
 
-#if defined(WANT_NGP_EMU)
+#if !defined(WANT_PSX_EMU)
    check_variables();
 #endif
 
