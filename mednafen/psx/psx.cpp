@@ -1480,9 +1480,18 @@ static bool InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
   {
    std::string biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
-   FileStream BIOSFile(biospath.c_str(), FileStream::MODE_READ);
-
-   BIOSFile.read(BIOSROM->data8, 512 * 1024);
+   try
+   {
+    FileStream BIOSFile(biospath.c_str(), FileStream::MODE_READ);
+    BIOSFile.read(BIOSROM->data8, 512 * 1024);
+   }
+   catch(...)
+   {
+#ifdef __LIBRETRO__
+    fprintf(stderr, "FATAL: Did not find PSX BIOS: %s.\nPlace the BIOS in the system directory.\n", biospath.c_str());
+#endif
+    return(false);
+   }
   }
 
   for(int i = 0; i < 8; i++)
