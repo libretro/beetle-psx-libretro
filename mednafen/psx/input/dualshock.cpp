@@ -224,7 +224,11 @@ void InputDevice_DualShock::Power(void)
  transmit_pos = 0;
  transmit_count = 0;
 
+#ifdef __LIBRETRO__ // This is a hack. Couldn't figure out how to do it otherwise.
+ analog_mode = true;
+#else
  analog_mode = false;
+#endif
  analog_mode_locked = false;
 
  mad_munchkins = false;

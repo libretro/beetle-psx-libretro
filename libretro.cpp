@@ -17,6 +17,8 @@ static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
+static retro_rumble_interface rumble;
+
 static bool overscan;
 static double last_sound_rate;
 static MDFN_PixelFormat last_pixel_format;
@@ -607,11 +609,18 @@ static void hookup_ports(bool force)
       switch (retro_devices[j])
       {
          case RETRO_DEVICE_ANALOG:
-            currgame->SetInput(j, "dualanalog", &buf.u8[j]);
+            currgame->SetInput(j, "dualshock", &buf.u8[j]);
             break;
          default:
             currgame->SetInput(j, "gamepad", &buf.u8[j]);
             break;
+      }
+
+      if (rumble.set_rumble_state)
+      {
+         rumble.set_rumble_state(j, RETRO_RUMBLE_STRONG, 0);
+         rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, 0);
+         buf.u32[j][9] = 0;
       }
    }
 #elif defined(WANT_PCE_FAST_EMU)
@@ -664,6 +673,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #if defined(WANT_PSX_EMU)
    check_variables();
+   if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble))
+      fprintf(stderr, "Rumble interface supported!\n");
 #endif
 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
@@ -785,6 +796,16 @@ static void update_input(void)
       buf.u32[j][6] = l_left;
       buf.u32[j][7] = l_down;
       buf.u32[j][8] = l_up;
+   }
+
+   fprintf(stderr, "Rumble strong: %u, weak: %u.\n", buf.u8[0][9 * 4 + 1], buf.u8[0][9 * 4]);
+   if (rumble.set_rumble_state)
+   {
+      // Appears to be correct.
+      rumble.set_rumble_state(0, RETRO_RUMBLE_WEAK, buf.u8[0][9 * 4] * 0x101);
+      rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
+      rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
+      rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
    }
 #elif defined(WANT_PCE_FAST_EMU)
 
