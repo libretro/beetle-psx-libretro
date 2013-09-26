@@ -798,7 +798,7 @@ static void update_input(void)
       buf.u32[j][8] = l_up;
    }
 
-   fprintf(stderr, "Rumble strong: %u, weak: %u.\n", buf.u8[0][9 * 4 + 1], buf.u8[0][9 * 4]);
+   //fprintf(stderr, "Rumble strong: %u, weak: %u.\n", buf.u8[0][9 * 4 + 1], buf.u8[0][9 * 4]);
    if (rumble.set_rumble_state)
    {
       // Appears to be correct.
