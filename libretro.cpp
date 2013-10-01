@@ -54,14 +54,15 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.32"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
-#define MEDNAFEN_CORE_TIMING_FPS 59.82704 // Hardcoded for NTSC atm.
+static int mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 700
-#define FB_HEIGHT 480
+static int mednafen_psx_fb_height;
+static bool is_pal = false;
 
 #elif defined(WANT_PCE_FAST_EMU)
 #include "mednafen/cdrom/pcecd.h"
@@ -163,10 +164,18 @@ static Deinterlacer deint;
 #define FB_HEIGHT 480
 #endif
 
-#ifdef WANT_16BPP
-static uint16_t mednafen_buf[FB_WIDTH * FB_HEIGHT];
+
+#if defined(WANT_PSX_EMU)
+#define FB_MAX_HEIGHT 576
 #else
-static uint32_t mednafen_buf[FB_WIDTH * FB_HEIGHT];
+#define FB_MAX_HEIGHT FB_HEIGHT
+#endif
+
+// Wastes a little space for NTSC PSX, but better than dynamically allocating.
+#ifdef WANT_16BPP
+static uint16_t mednafen_buf[FB_WIDTH * FB_MAX_HEIGHT];
+#else
+static uint32_t mednafen_buf[FB_WIDTH * FB_MAX_HEIGHT];
 #endif
 const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
@@ -194,6 +203,13 @@ namespace MDFN_IEN_PSX
 unsigned CalcDiscSCEx();
 using MDFN_IEN_PSX::CD_SelectedDisc;
 using MDFN_IEN_PSX::cdifs;
+
+enum
+{
+ REGION_JP = 0,
+ REGION_NA = 1,
+ REGION_EU = 2,
+};
 
 static unsigned disk_get_num_images(void)
 {
@@ -683,8 +699,15 @@ bool retro_load_game(const struct retro_game_info *info)
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
-
+   
+#if defined(WANT_PSX_EMU)
+   is_pal = (CalcDiscSCEx() == REGION_EU);
+   mednafen_psx_fb_height = is_pal ? 576  : 480;
+   mednafen_psx_fps       = is_pal ? 50.0 : 59.82704;
+   surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, mednafen_psx_fb_height, FB_WIDTH, pix_fmt);
+#else
    surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, FB_HEIGHT, FB_WIDTH, pix_fmt);
+#endif
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
@@ -1057,7 +1080,7 @@ void retro_run()
    update_input();
 
    static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[FB_HEIGHT];
+   static MDFN_Rect rects[FB_MAX_HEIGHT];
    rects[0].w = ~0;
 
    EmulateSpecStruct spec = {0};
@@ -1196,7 +1219,11 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->timing.fps            = MEDNAFEN_CORE_TIMING_FPS; // Determined from empirical testing.
+#ifdef WANT_PSX_EMU
+   info->timing.fps            = mednafen_psx_fps; // Determined for NTSC from empirical testing.
+#else
+   info->timing.fps            = MEDNAFEN_CORE_TIMING_FPS;
+#endif
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
@@ -1219,7 +1246,11 @@ void retro_deinit()
 
 unsigned retro_get_region(void)
 {
-   return RETRO_REGION_NTSC;
+#ifdef WANT_PSX_EMU
+   return is_pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
+#else
+   return RETRO_REGION_NTSC; // FIXME: Regions for other cores.
+#endif
 }
 
 unsigned retro_api_version(void)
