@@ -1483,6 +1483,7 @@ static bool LoadCustomPalette(const char *path)
    MDFN_indent(-1);
    MDFN_free(CustomColorMap);
    CustomColorMap = NULL;
+   fclose(gp);
    return(FALSE);
   }
 
@@ -1490,6 +1491,7 @@ static bool LoadCustomPalette(const char *path)
  }
  MDFN_indent(-1);
 
+ fclose(gp);
  return(TRUE);
 }
 

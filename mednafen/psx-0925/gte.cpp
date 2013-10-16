@@ -273,7 +273,6 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
   SFARRAY(RGB_FIFO[0].Raw8, 4),
   SFARRAY(RGB_FIFO[1].Raw8, 4),
   SFARRAY(RGB_FIFO[2].Raw8, 4),
-  SFARRAY(RGB_FIFO[3].Raw8, 4),
 
   SFARRAY32(MAC, 4),
 
