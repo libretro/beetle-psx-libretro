@@ -1303,7 +1303,7 @@ void retro_set_environment(retro_environment_t cb)
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
-      { "psx_fastboot", "Skip BIOS sequence; enabled|disabled" },
+      { "psx_fastboot", "Skip BIOS sequence; disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
