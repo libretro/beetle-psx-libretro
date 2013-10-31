@@ -15,12 +15,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "../mednafen.h"
 
-#include <sys/types.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
 #include <unistd.h>
+#endif
 
+#include "../mednafen.h"
 
 #include "CDAccess.h"
 #include "CDAccess_Image.h"

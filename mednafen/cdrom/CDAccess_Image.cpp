@@ -30,10 +30,9 @@
 	Trying to read sectors at an LBA of less than 0 is not supported.  TODO: support it(at least up to -150).
 */
 
-#include "../mednafen.h"
-
-#include <sys/types.h>
 #include <sys/stat.h>
+
+#include "../mednafen.h"
 
 #include <string.h>
 #include <errno.h>
