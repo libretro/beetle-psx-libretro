@@ -45,6 +45,7 @@ ifeq ($(core), psx)
 	NEED_STEREO_SOUND = 1
 	NEED_SCSI_CD = 1
 	NEED_THREADING = 1
+	NEED_TREMOR = 1
    CORE_DEFINE := -DWANT_PSX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/psx
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
