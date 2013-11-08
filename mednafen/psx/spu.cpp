@@ -309,11 +309,7 @@ void PS_SPU::DecodeADPCM(const uint8 *input, int16 *output, const unsigned shift
 
   sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-  if(sample < -32768)
-   sample = -32768;
-
-  if(sample > 32767)
-   sample = 32767;
+  clamp_simple(sample);
 
   output[i] = sample;
  }
@@ -376,11 +372,8 @@ void PS_SPU::DecodeSamples(SPU_Voice *voice)
 
   sample += ((voice->DecodeBuffer[(voice->DecodeWritePos - 1) & 0x1F] * Weights[weight][0]) >> 6)
 			   	      + ((voice->DecodeBuffer[(voice->DecodeWritePos - 2) & 0x1F] * Weights[weight][1]) >> 6);
-  if(sample < -32768)
-   sample = -32768;
 
-  if(sample > 32767)
-   sample = 32767;
+  clamp_simple(sample);
 
   voice->DecodeBuffer[voice->DecodeWritePos] = sample;
   voice->DecodeWritePos = (voice->DecodeWritePos + 1) & 0x1F;
@@ -853,10 +846,10 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
    LFSR = (LFSR << 1) | (((LFSR >> 15) ^ (LFSR >> 12) ^ (LFSR >> 11) ^ (LFSR >> 10) ^ 1) & 1);
   }
 
-  clamp(&accum_l, -32768, 32767);
-  clamp(&accum_r, -32768, 32767);
-  clamp(&accum_fv_l, -32768, 32767);
-  clamp(&accum_fv_r, -32768, 32767);
+  clamp_simple(accum_l);
+  clamp_simple(accum_r);
+  clamp_simple(accum_fv_l);
+  clamp_simple(accum_fv_r);
   
 #if 0
   accum_l = 0;
@@ -876,8 +869,8 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
   //output_l = reverb_l;
   //output_r = reverb_r;
 
-  clamp(&output_l, -32768, 32767);
-  clamp(&output_r, -32768, 32767);
+  clamp_simple(output_l);
+  clamp_simple(output_r);
 
   assert(IntermediateBufferPos < 4096);
   IntermediateBuffer[IntermediateBufferPos][0] = output_l;
