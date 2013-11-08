@@ -23,8 +23,6 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA */
 	#include BLARGG_ENABLE_OPTIMIZER
 #endif
 
-int const silent_buf_size = 1; // size used for Silent_Blip_Buffer
-
 Blip_Buffer::Blip_Buffer()
 {
 	factor_       = (blip_u64)ULLONG_MAX;
@@ -37,31 +35,12 @@ Blip_Buffer::Blip_Buffer()
 	clock_rate_   = 0;
 	bass_freq_    = 16;
 	length_       = 0;
-	
-	// assumptions code makes about implementation-defined features
-	#ifndef NDEBUG
-		// right shift of negative value preserves sign
-		buf_t_ i = -0x7FFFFFFE;
-		assert( (i >> 1) == -0x3FFFFFFF );
-		
-		// casting to short truncates to 16 bits and sign-extends
-		i = 0x18000;
-		assert( (short) i == -0x8000 );
-	#endif
 }
 
 Blip_Buffer::~Blip_Buffer()
 {
-	if ( buffer_size_ != silent_buf_size )
-		free( buffer_ );
-}
-
-Silent_Blip_Buffer::Silent_Blip_Buffer()
-{
-	factor_      = 0;
-	buffer_      = buf;
-	buffer_size_ = silent_buf_size;
-	memset( buf, 0, sizeof buf ); // in case machine takes exception for signed overflow
+   if (buffer_)
+      free( buffer_ );
 }
 
 void Blip_Buffer::clear( int entire_buffer )
@@ -78,12 +57,6 @@ void Blip_Buffer::clear( int entire_buffer )
 
 Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( long new_rate, int msec )
 {
-	if ( buffer_size_ == silent_buf_size )
-	{
-		assert( 0 );
-		return "Internal (tried to resize Silent_Blip_Buffer)";
-	}
-	
 	// start with maximum length that resampled time can represent
 	blip_s64 new_size = (ULLONG_MAX >> BLIP_BUFFER_ACCURACY) - blip_buffer_extra_ - 64;
 
@@ -106,14 +79,10 @@ Blip_Buffer::blargg_err_t Blip_Buffer::set_sample_rate( long new_rate, int msec 
 		if ( !p )
 			return "Out of memory";
 
-		//if(new_size > buffer_size_)
-		//	memset(buffer_ + buffer_size_, 0, (new_size + blip_buffer_extra_) * sizeof *buffer_
-
 		buffer_ = (buf_t_*) p;
 	}
 	
 	buffer_size_ = new_size;
-	assert( buffer_size_ != silent_buf_size );
 	
 	// update things based on the sample rate
 	sample_rate_ = new_rate;
@@ -255,12 +224,6 @@ long Blip_Buffer::read_samples( blip_sample_t* BLIP_RESTRICT out, long max_sampl
 
 void Blip_Buffer::mix_samples( blip_sample_t const* in, long count )
 {
-	if ( buffer_size_ == silent_buf_size )
-	{
-		assert( 0 );
-		return;
-	}
-	
 	buf_t_* out = buffer_ + (offset_ >> BLIP_BUFFER_ACCURACY) + blip_widest_impulse_ / 2;
 	
 	int const sample_shift = blip_sample_bits - 16;

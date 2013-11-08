@@ -256,19 +256,6 @@ private:
 
 int const blip_sample_bits = 30;
 
-// Dummy Blip_Buffer to direct sound output to, for easy muting without
-// having to stop sound code.
-class Silent_Blip_Buffer : public Blip_Buffer {
-	buf_t_ buf [blip_buffer_extra_ + 1];
-public:
-	// The following cannot be used (an assertion will fail if attempted):
-	blargg_err_t set_sample_rate( long samples_per_sec, int msec_length );
-	blip_time_t count_clocks( long count ) const;
-	void mix_samples( blip_sample_t const* buf, long count );
-	
-	Silent_Blip_Buffer();
-};
-
 #define BLIP_RESTRICT
 
 // Optimized reading from Blip_Buffer, for use in custom sample output
