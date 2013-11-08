@@ -1,12 +1,7 @@
 static int16 ReverbSat(int32 samp) MDFN_WARN_UNUSED_RESULT;
 static INLINE int16 ReverbSat(int32 samp)
 {
- if(samp > 32767)
-  samp = 32767;
-
- if(samp < -32768)
-  samp = -32768;
-
+   clamp_simple(samp);
  return(samp);
 }
 
@@ -114,12 +109,7 @@ static INLINE int32 Reverb4422(const int16 *src)
 
  out >>= 15;
 
- if(out < -32768)
-  out = -32768;
-
- if(out > 32767)
-  out = 32767;
-
+ clamp_simple(out);
  return(out);
 }
 
