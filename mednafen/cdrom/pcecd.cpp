@@ -106,7 +106,7 @@ static int32 lastts;
 static int32 scsicd_ne = 0;
 
 // ADPCM variables and whatnot
-#define ADPCM_DEBUG(x, ...) {  /*printf("[Half=%d, End=%d, Playing=%d] "x, ADPCM.HalfReached, ADPCM.EndReached, ADPCM.Playing, ## __VA_ARGS__);*/  }
+//#define ADPCM_DEBUG(x, ...) {  /*printf("[Half=%d, End=%d, Playing=%d] "x, ADPCM.HalfReached, ADPCM.EndReached, ADPCM.Playing, ## __VA_ARGS__);*/  }
 
 typedef Blip_Synth<blip_good_quality, 4096> ADSynth;
 static ADSynth ADPCMSynth;
@@ -607,7 +607,7 @@ uint8 PCECD_Read(uint32 timestamp, uint32 A, int32 &next_event, const bool PeekM
    case 0xa: 
     if(!PeekMode)
     {
-     ADPCM_DEBUG("ReadBuffer\n");
+     //ADPCM_DEBUG("ReadBuffer\n");
      ADPCM.ReadPending = 19 * 3; //24 * 3;
     }
 
@@ -744,12 +744,12 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 			ADPCM.Addr &= 0xFF00;
 			ADPCM.Addr |= V;
 
-			ADPCM_DEBUG("SAL: %02x, %d\n", V, timestamp);
+			//ADPCM_DEBUG("SAL: %02x, %d\n", V, timestamp);
 
                         // Length appears to be constantly latched when D4 is set(tested on a real system)
                         if(ADPCM.LastCmd & 0x10)
                         {
-                         ADPCM_DEBUG("Set length(crazy way L): %04x\n", ADPCM.Addr);
+                         //ADPCM_DEBUG("Set length(crazy way L): %04x\n", ADPCM.Addr);
                          ADPCM.LengthCount = ADPCM.Addr;
                         }
 			break;
@@ -761,12 +761,12 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 			ADPCM.Addr &= 0x00FF;
 			ADPCM.Addr |= V << 8;
 
-			ADPCM_DEBUG("SAH: %02x, %d\n", V, timestamp);
+			//ADPCM_DEBUG("SAH: %02x, %d\n", V, timestamp);
 
                         // Length appears to be constantly latched when D4 is set(tested on a real system)
                         if(ADPCM.LastCmd & 0x10)
                         {
-                         ADPCM_DEBUG("Set length(crazy way H): %04x\n", ADPCM.Addr);
+                         //ADPCM_DEBUG("Set length(crazy way H): %04x\n", ADPCM.Addr);
                          ADPCM.LengthCount = ADPCM.Addr;
                         }
 			break;
@@ -778,7 +778,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 			break;
 
 		case 0xb:	// adpcm dma
-			ADPCM_DEBUG("DMA: %02x\n", V);
+			//ADPCM_DEBUG("DMA: %02x\n", V);
                         _Port[0xb] = data;
 			break;
 
@@ -786,7 +786,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 			break;
 
 		case 0xd:
-		        ADPCM_DEBUG("Write180D: %02x\n", V);
+		        //ADPCM_DEBUG("Write180D: %02x\n", V);
 		        if(data & 0x80)
 		        {
 		         ADPCM.Addr = 0;
@@ -824,7 +824,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 			// Length appears to be constantly latched when D4 is set(tested on a real system)
 		        if(data & 0x10)
 		        {
-		         ADPCM_DEBUG("Set length: %04x\n", ADPCM.Addr);
+		         //ADPCM_DEBUG("Set length: %04x\n", ADPCM.Addr);
 		         ADPCM.LengthCount = ADPCM.Addr;
 			 ADPCM.EndReached = false;
 		        }
@@ -837,7 +837,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 		         else
 		          ADPCM.ReadAddr = (ADPCM.Addr - 1) & 0xFFFF;
 
-		         ADPCM_DEBUG("Set ReadAddr: %04x, %06x\n", ADPCM.Addr, ADPCM.ReadAddr);
+		         //ADPCM_DEBUG("Set ReadAddr: %04x, %06x\n", ADPCM.Addr, ADPCM.ReadAddr);
 		        }
 
 		        // D0 and D1 control write address
@@ -846,7 +846,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 		         ADPCM.WriteAddr = ADPCM.Addr;
 		         if(!(data & 0x1))
 		          ADPCM.WriteAddr = (ADPCM.WriteAddr - 1) & 0xFFFF;
-		         ADPCM_DEBUG("Set WriteAddr: %04x, %06x\n", ADPCM.Addr, ADPCM.WriteAddr);
+		         //ADPCM_DEBUG("Set WriteAddr: %04x, %06x\n", ADPCM.Addr, ADPCM.WriteAddr);
 		        }
 		        ADPCM.LastCmd = data;
 			UpdateADPCMIRQState();
@@ -858,7 +858,7 @@ int32 PCECD_Write(uint32 timestamp, uint32 physAddr, uint8 data)
 
 		         ADPCM.SampleFreq = freq;
 
-			 ADPCM_DEBUG("Freq: %02x\n", freq);
+			 //ADPCM_DEBUG("Freq: %02x\n", freq);
 			}
 			break;
 
