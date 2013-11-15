@@ -23,8 +23,8 @@
 #include "cdromif.h"
 #include "SimpleFIFO.h"
 
-#define SCSIDBG(format, ...) { printf("SCSI: " format "\n",  ## __VA_ARGS__); }
-//#define SCSIDBG(format, ...) { }
+//#define SCSIDBG(format, ...) { printf("SCSI: " format "\n",  ## __VA_ARGS__); }
+#define SCSIDBG(format, ...) { }
 
 using namespace CDUtility;
 
