@@ -257,9 +257,6 @@
 						RelativePath="..\..\..\mednafen\cdrom\audioreader.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\cdrom\cd_crc32.cpp">
-					</File>
-					<File
 						RelativePath="..\..\..\mednafen\cdrom\CDAccess.cpp">
 					</File>
 					<File
