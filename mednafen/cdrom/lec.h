@@ -24,8 +24,7 @@
 #include <config.h>
 #endif
 
-#include <sys/types.h>
-#include <inttypes.h>
+#include <stdint.h>
 
 typedef uint32_t u_int32_t;
 typedef uint16_t u_int16_t;
