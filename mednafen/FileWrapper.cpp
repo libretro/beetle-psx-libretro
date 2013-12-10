@@ -35,29 +35,6 @@
 #define fseeko fseek
 #define ftello ftell
 
-#if SIZEOF_OFF_T == 4
-
- #ifdef HAVE_FOPEN64
-  #define fopen fopen64
- #endif
-
- #ifdef HAVE_FTELLO64
-  #undef ftello
-  #define ftello ftello64
- #endif
-
- #ifdef HAVE_FSEEKO64
-  #undef fseeko
-  #define fseeko fseeko64
- #endif
-
- #ifdef HAVE_FSTAT64
-  #define fstat fstat64
-  #define stat stat64
- #endif
-
-#endif
-
 // For special uses, IE in classes that take a path or a FileWrapper & in the constructor, and the FileWrapper non-pointer member
 // is in the initialization list for the path constructor but not the constructor with FileWrapper&
 
