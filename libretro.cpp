@@ -678,7 +678,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef WANT_32BPP
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt) && log_cb)
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
       if (log_cb)
          log_cb(RETRO_LOG_ERROR, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
@@ -1267,9 +1267,10 @@ unsigned retro_api_version(void)
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
 #ifdef WANT_PSX_EMU
-   if (in_port > 1 && log_cb)
+   if (in_port > 1)
    {
-      log_cb(RETRO_LOG_WARN, "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
+      if (log_cb)
+         log_cb(RETRO_LOG_WARN, "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
       return;
    }
 
