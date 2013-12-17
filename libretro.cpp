@@ -6,10 +6,10 @@
 #ifdef NEED_DEINTERLACER
 #include	"mednafen/video/Deinterlacer.h"
 #endif
-#include <iostream>
 #include "libretro.h"
 
 static MDFNGI *game;
+static retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
@@ -219,7 +219,8 @@ static unsigned disk_get_num_images(void)
 static bool eject_state;
 static bool disk_set_eject_state(bool ejected)
 {
-   fprintf(stderr, "[Mednafen]: Ejected: %u.\n", ejected);
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "[Mednafen]: Ejected: %u.\n", ejected);
    if (ejected == eject_state)
       return false;
 
@@ -279,7 +280,8 @@ static void update_md5_checksum(CDIF *iface)
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
    
    std::string md5 = md5_context::asciistr(MDFNGameInfo->MD5, 0);
-   fprintf(stderr, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
 }
 
 // Untested ...
@@ -360,15 +362,16 @@ void retro_init()
    }
    else
    {
-	/* TODO: Add proper fallback */
-      fprintf(stderr, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
+      /* TODO: Add proper fallback */
+      if (log_cb)
+         log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
 
 #if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
-      fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
+      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 #endif
 
 #if defined(WANT_PSX_EMU)
@@ -483,8 +486,8 @@ static void check_variables(void)
       settings.CD_Speed = setting_pce_fast_cdspeed;
       settings.ADPCM_Volume = (double)setting_pce_fast_cddavolume / 100;
 
-      if (PCECD_SetSettings(&settings))
-         fprintf(stderr, "PCE CD Audio settings changed.\n");
+      if (PCECD_SetSettings(&settings) && log_cb)
+         log_cb(RETRO_LOG_INFO, "PCE CD Audio settings changed.\n");
    }
 #elif defined(WANT_PSX_EMU)
 
@@ -675,9 +678,10 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef WANT_32BPP
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt) && log_cb)
    {
-      fprintf(stderr, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
       return false;
    }
 #endif
@@ -689,8 +693,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #if defined(WANT_PSX_EMU)
    check_variables();
-   if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble))
-      fprintf(stderr, "Rumble interface supported!\n");
+   if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
+      log_cb(RETRO_LOG_ERROR, "Rumble interface supported!\n");
 #endif
 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
@@ -1237,11 +1241,13 @@ void retro_deinit()
    delete surf;
    surf = NULL;
 
-   fprintf(stderr, "[%s]: Samples / Frame: %.5f\n",
-         mednafen_core_str, (double)audio_frames / video_frames);
-
-   fprintf(stderr, "[%s]: Estimated FPS: %.5f\n",
-         mednafen_core_str, (double)video_frames * 44100 / audio_frames);
+   if (log_cb)
+   {
+      log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
+            mednafen_core_str, (double)audio_frames / video_frames);
+      log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
+            mednafen_core_str, (double)video_frames * 44100 / audio_frames);
+   }
 }
 
 unsigned retro_get_region(void)
@@ -1261,10 +1267,9 @@ unsigned retro_api_version(void)
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
 #ifdef WANT_PSX_EMU
-   if (in_port > 1)
+   if (in_port > 1 && log_cb)
    {
-      fprintf(stderr,
-            "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
+      log_cb(RETRO_LOG_WARN, "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
       return;
    }
 
@@ -1273,13 +1278,14 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       // TODO: Add support for other input types
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_ANALOG:
-         fprintf(stderr, "[%s]: Selected controller type %u.\n", mednafen_core_str, device);
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type %u.\n", mednafen_core_str, device);
          retro_devices[in_port] = device;
          break;
       default:
          retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
-         fprintf(stderr,
-               "[%s]: Unsupported controller device, falling back to gamepad.\n", mednafen_core_str);
+         if (log_cb)
+            log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device, falling back to gamepad.\n", mednafen_core_str);
    }
 
    hookup_ports(true);
@@ -1354,7 +1360,8 @@ size_t retro_serialize_size(void)
 
    if (!curgame->StateAction)
    {
-      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
+      if (log_cb)
+         log_cb(RETRO_LOG_WARN, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
       return 0;
    }
 
@@ -1363,7 +1370,8 @@ size_t retro_serialize_size(void)
 
    if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
    {
-      fprintf(stderr, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
+      if (log_cb)
+         log_cb(RETRO_LOG_WARN, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
       return 0;
    }
 
