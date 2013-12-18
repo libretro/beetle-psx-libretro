@@ -61,7 +61,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
             std::string(cd1);
          break;
       case MDFNMKF_FIRMWARE:
-         ret = std::string(cd1);
+         ret = retro_base_directory + slash + std::string(cd1);
 #ifdef _WIN32
    sanitize_path(ret); // Because Windows path handling is mongoloid.
 #endif
