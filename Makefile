@@ -92,6 +92,24 @@ HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 OKIADPCM_SOURCES += $(MEDNAFEN_DIR)/okiadpcm.cpp
+else ifeq ($(core), lynx)
+   core = lynx
+   NEED_BPP = 32
+   NEED_BLIP = 1
+   NEED_STEREO_SOUND = 1
+   CORE_DEFINE := -DWANT_LYNX_EMU
+   CORE_DIR := $(MEDNAFEN_DIR)/lynx
+   NEED_CRC32 = 1
+
+CORE_SOURCES := $(CORE_DIR)/cart.cpp \
+	$(CORE_DIR)/c65c02.cpp \
+	$(CORE_DIR)/memmap.cpp \
+	$(CORE_DIR)/mikie.cpp \
+	$(CORE_DIR)/ram.cpp \
+	$(CORE_DIR)/rom.cpp \
+	$(CORE_DIR)/susie.cpp \
+	$(CORE_DIR)/system.cpp
+TARGET_NAME := mednafen_lynx_libretro
 else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 32

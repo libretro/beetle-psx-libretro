@@ -64,6 +64,21 @@ static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 static int mednafen_psx_fb_height;
 static bool is_pal = false;
 
+#elif defined(WANT_LYNX_EMU)
+#define MEDNAFEN_CORE_NAME_MODULE "lynx"
+#define MEDNAFEN_CORE_NAME "Mednafen Lynx"
+#define MEDNAFEN_CORE_VERSION "v0.9.32"
+#define MEDNAFEN_CORE_EXTENSIONS "lnx"
+#define MEDNAFEN_CORE_TIMING_FPS 75
+#define MEDNAFEN_CORE_GEOMETRY_BASE_W 160
+#define MEDNAFEN_CORE_GEOMETRY_BASE_H 102
+#define MEDNAFEN_CORE_GEOMETRY_MAX_W 160
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 102
+#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+#define FB_WIDTH 160
+#define FB_HEIGHT 102
+static bool is_pal = false;
+
 #elif defined(WANT_PCE_FAST_EMU)
 #include "mednafen/cdrom/pcecd.h"
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
@@ -566,6 +581,12 @@ static uint16_t input_buf[MAX_PLAYERS] = {0};
 #define MAX_BUTTONS 13
 static uint8_t input_buf[MAX_PLAYERS][2] = {0};
 
+#elif defined(WANT_LYNX_EMU)
+
+#define MAX_PLAYERS 1
+#define MAX_BUTTONS 9
+static uint8_t input_buf[MAX_PLAYERS][2] = {0};
+
 #elif defined(WANT_WSWAN_EMU)
 
 #define MAX_PLAYERS 1
@@ -646,6 +667,8 @@ static void hookup_ports(bool force)
    // Possible endian bug ...
    for (unsigned i = 0; i < MAX_PLAYERS; i++)
       currgame->SetInput(i, "gamepad", &input_buf[i][0]);
+#elif defined(WANT_LYNX_EMU)
+   currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_WSWAN_EMU)
    currgame->SetInput(0, "gamepad", &input_buf);
 #elif defined(WANT_NGP_EMU)
@@ -833,6 +856,29 @@ static void update_input(void)
       rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
       rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
       rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
+   }
+#elif defined(WANT_LYNX_EMU)
+   static unsigned map[] = {
+      RETRO_DEVICE_ID_JOYPAD_A,
+      RETRO_DEVICE_ID_JOYPAD_B,
+      RETRO_DEVICE_ID_JOYPAD_L,
+      RETRO_DEVICE_ID_JOYPAD_R,
+      RETRO_DEVICE_ID_JOYPAD_LEFT,
+      RETRO_DEVICE_ID_JOYPAD_RIGHT,
+      RETRO_DEVICE_ID_JOYPAD_UP,
+      RETRO_DEVICE_ID_JOYPAD_DOWN,
+      RETRO_DEVICE_ID_JOYPAD_START,
+   };
+
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   {
+      uint16_t input_state = 0;
+      for (unsigned i = 0; i < MAX_BUTTONS; i++)
+         input_state |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
+
+      // Input data must be little endian.
+      input_buf[j][0] = (input_state >> 0) & 0xff;
+      input_buf[j][1] = (input_state >> 8) & 0xff;
    }
 #elif defined(WANT_PCE_FAST_EMU)
 
