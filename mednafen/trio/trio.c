@@ -48,6 +48,12 @@
 #include <trio/trio.h>
 #include <trio/triop.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
+
 #if defined(TRIO_EMBED_NAN)
 # define TRIO_PUBLIC_NAN static
 # if TRIO_FEATURE_FLOAT
