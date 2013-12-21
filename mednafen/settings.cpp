@@ -222,31 +222,33 @@ std::string MDFN_GetSettingS(const char *name)
 #if defined(WANT_GBA_EMU)
    if (!strcmp("gba.bios", name))
    {
-      fprintf(stderr, "gba.bios: %s\n", std::string("gba_bios.bin").c_str());
-      return std::string(retro_base_directory) + slash + std::string("gba_bios.bin");
+      std::string ret = std::string("gba_bios.bin");
+      fprintf(stderr, "gba.bios: %s\n", ret.c_str());
+      return ret;
    }
 #elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cdbios", name))
    {
-      fprintf(stderr, "pce_fast.cdbios: %s\n", std::string("syscard3.pce").c_str());
-      return std::string(retro_base_directory) + slash + std::string("syscard3.pce");
+      std::string ret = std::string("syscard3.pce");
+      fprintf(stderr, "pce_fast.cdbios: %s\n", ret.c_str());
+      return ret;
    }
 #elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.bios_eu", name))
    {
-      std::string ret = std::string(retro_base_directory) + slash + std::string("scph5502.bin");
+      std::string ret = std::string("scph5502.bin");
       fprintf(stderr, "psx.bios_eu: %s\n", ret.c_str());
       return ret;
    }
    if (!strcmp("psx.bios_jp", name))
    {
-      std::string ret = std::string(retro_base_directory) + slash + std::string("scph5500.bin");
+      std::string ret = std::string("scph5500.bin");
       fprintf(stderr, "psx.bios_jp: %s\n", ret.c_str());
       return ret;
    }
    if (!strcmp("psx.bios_na", name))
    {
-      std::string ret = std::string(retro_base_directory) + slash + std::string("scph5501.bin");
+      std::string ret = std::string("scph5501.bin");
       fprintf(stderr, "psx.bios_na: %s\n", ret.c_str());
       return ret;
    }
