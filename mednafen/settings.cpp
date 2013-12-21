@@ -214,81 +214,38 @@ std::string MDFN_GetSettingS(const char *name)
 {
 #if defined(WANT_GBA_EMU)
    if (!strcmp("gba.bios", name))
-   {
-      std::string ret = std::string("gba_bios.bin");
-      fprintf(stderr, "gba.bios: %s\n", ret.c_str());
-      return ret;
-   }
+      return std::string("gba_bios.bin");
 #elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cdbios", name))
-   {
-      std::string ret = std::string("syscard3.pce");
-      fprintf(stderr, "pce_fast.cdbios: %s\n", ret.c_str());
-      return ret;
-   }
+      return std::string("syscard3.pce");
 #elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.bios_eu", name))
-   {
-      std::string ret = std::string("scph5502.bin");
-      fprintf(stderr, "psx.bios_eu: %s\n", ret.c_str());
-      return ret;
-   }
+      return std::string("scph5502.bin");
    if (!strcmp("psx.bios_jp", name))
-   {
-      std::string ret = std::string("scph5500.bin");
-      fprintf(stderr, "psx.bios_jp: %s\n", ret.c_str());
-      return ret;
-   }
+      return std::string("scph5500.bin");
    if (!strcmp("psx.bios_na", name))
-   {
-      std::string ret = std::string("scph5501.bin");
-      fprintf(stderr, "psx.bios_na: %s\n", ret.c_str());
-      return ret;
-   }
+      return std::string("scph5501.bin");
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return "na";
 #elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.name", name))
-   {
       return std::string("Mednafen");
-   }
 #endif
    /* FILESYS */
    if (!strcmp("filesys.path_firmware", name))
-   {
-      fprintf(stderr, "filesys.path_firmware: %s\n", retro_base_directory.c_str());
       return retro_base_directory;
-   }
    if (!strcmp("filesys.path_palette", name))
-   {
-      fprintf(stderr, "filesys.path_palette: %s\n", retro_base_directory.c_str());
       return retro_base_directory;
-   }
    if (!strcmp("filesys.path_sav", name))
-   {
-      fprintf(stderr, "filesys.path_sav: %s\n", retro_base_directory.c_str());
       return retro_base_directory;
-   }
    if (!strcmp("filesys.path_state", name))
-   {
-      fprintf(stderr, "filesys.path_state: %s\n", retro_base_directory.c_str());
       return retro_base_directory;
-   }
    if (!strcmp("filesys.path_cheat", name))
-   {
-      fprintf(stderr, "filesys.path_cheat: %s\n", retro_base_directory.c_str());
       return retro_base_directory;
-   }
    if (!strcmp("filesys.fname_state", name))
-   {
-      fprintf(stderr, "filesys.fname_state: %s%s\n", retro_base_name.c_str(), std::string(".sav").c_str());
       return retro_base_name + std::string(".sav");
-   }
    if (!strcmp("filesys.fname_sav", name))
-   {
-      fprintf(stderr, "filesys.fname_sav: %s%s\n", retro_base_name.c_str(), std::string(".bsv").c_str());
       return retro_base_name + std::string(".bsv");
-   }
    fprintf(stderr, "unhandled setting S: %s\n", name);
    assert(0);
    return 0;
