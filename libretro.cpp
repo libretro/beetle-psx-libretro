@@ -1231,6 +1231,15 @@ void retro_run()
             // This shouldn't happen.
             break;
       }
+      
+      if (is_pal)
+      {
+         // Attempt to remove black bars.
+         // These numbers are arbitrary since the bars differ some by game.
+         // Changes aspect ratio in the process.
+         height -= 36;
+         pix += 5*(FB_WIDTH << 2);
+      }
    }
    video_cb(pix, width, height, FB_WIDTH << 2);
 #else
