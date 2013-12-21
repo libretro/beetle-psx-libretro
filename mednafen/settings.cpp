@@ -212,13 +212,6 @@ extern std::string retro_base_name;
 
 std::string MDFN_GetSettingS(const char *name)
 {
-   char slash;
-#ifdef _WIN32
-   slash = '\\';
-#else
-   slash = '/';
-#endif
-
 #if defined(WANT_GBA_EMU)
    if (!strcmp("gba.bios", name))
    {
