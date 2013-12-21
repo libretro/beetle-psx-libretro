@@ -191,7 +191,7 @@ static void ClockTimer(int i, uint32 clocks)
 
  if((before < target && Timers[i].Counter >= target) || zero_tm || Timers[i].Counter > 0xFFFF)
  {
-#if 1
+#if 0
   if(Timers[i].Mode & 0x10)
   {
    if((Timers[i].Counter - target) > 3)
