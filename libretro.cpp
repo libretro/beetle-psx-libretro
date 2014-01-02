@@ -356,6 +356,12 @@ static struct retro_disk_control_callback disk_interface = {
 
 void retro_init()
 {
+   struct retro_log_callback log;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
+      log_cb = log.log;
+   else 
+      log_cb = NULL;
+
    MDFNI_InitializeModule();
 #if defined(WANT_PSX_EMU)
    eject_state = false;
