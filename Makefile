@@ -331,7 +331,7 @@ ifeq ($(platform), unix)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
-   fpic := -fPIC
+   fpic := -fPIC -mmacosx-version-min=10.6
    SHARED := -dynamiclib
    ENDIANNESS_DEFINES := -DLSB_FIRST
    LDFLAGS += $(PTHREAD_FLAGS)
