@@ -723,7 +723,7 @@ bool retro_load_game(const struct retro_game_info *info)
 #if defined(WANT_PSX_EMU)
    check_variables();
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
-      log_cb(RETRO_LOG_ERROR, "Rumble interface supported!\n");
+      log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 #endif
 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
