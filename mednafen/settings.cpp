@@ -29,6 +29,7 @@ int setting_pce_fast_cdpsgvolume = 100;
 uint32_t setting_pce_fast_cdspeed = 1;
 uint32_t setting_pce_keepaspect = 1;
 #elif defined(WANT_PSX_EMU)
+char *setting_psx_analog_port_1 = "gamepad";
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
 uint32_t setting_psx_fastboot = 1;
