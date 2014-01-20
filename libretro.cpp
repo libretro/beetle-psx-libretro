@@ -27,6 +27,14 @@ static MDFN_Surface *surf;
 
 static bool failed_init;
 
+static void hookup_ports(bool force);
+
+static bool initial_ports_hookup = false;
+
+char *psx_analog_type;
+
+
+
 std::string retro_base_directory;
 std::string retro_base_name;
 
@@ -535,15 +543,17 @@ static void check_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
    {	
 		if((strcmp(var.value, "disabled") == 0))
-			setting_psx_analog_type="gamepad";
+			psx_analog_type="gamepad";
 		else if((strcmp(var.value, "dualshock") == 0))
-			setting_psx_analog_type="dualshock";
+			psx_analog_type="dualshock";
 		else if((strcmp(var.value, "dualanalog") == 0))
-			setting_psx_analog_type="dualanalog";
-		else if((strcmp(var.value, "analogjoy") == 0))
-			setting_psx_analog_type="analogjoy";
+			psx_analog_type="dualanalog";
+		else if((strcmp(var.value, "flightstick") == 0))
+			psx_analog_type="analogjoy";
 		else
-			setting_psx_analog_type="gamepad";
+			psx_analog_type="gamepad";	
+		if(initial_ports_hookup==true)
+			hookup_ports(true);
    }	
    
        
@@ -660,8 +670,6 @@ static uint16_t input_buf[1];
 
 static unsigned retro_devices[2];
 
-static bool initial_ports_hookup = false;
-
 static void hookup_ports(bool force)
 {
    MDFNGI *currgame = game;
@@ -672,13 +680,12 @@ static void hookup_ports(bool force)
 #if defined(WANT_PSX_EMU)
    for (int j = 0; j < MAX_PLAYERS; j++)
    {
-	  check_variables();
       switch (retro_devices[j])
       { 
         case RETRO_DEVICE_ANALOG:
 		{
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, setting_psx_analog_type);
-            currgame->SetInput(j, setting_psx_analog_type, &buf.u8[j]);            
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, psx_analog_type);
+            currgame->SetInput(j, psx_analog_type, &buf.u8[j]);            
 			break;          
 		}
         default:
@@ -810,7 +817,7 @@ static void update_input(void)
 #if defined(WANT_PSX_EMU)
    input_buf[0] = 0;
    input_buf[1] = 0;
-
+   	
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_SELECT,
       RETRO_DEVICE_ID_JOYPAD_L3,
@@ -1397,7 +1404,7 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "psx_fastboot", "Skip BIOS sequence; disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
-      { "psx_enable_dual_analog_type", "Analog mode; disabled|dualshock|dualanalog|analogjoy" },	  
+      { "psx_enable_dual_analog_type", "Analog controller mode; disabled|dualshock|dualanalog|flightstick" },	  
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
 
