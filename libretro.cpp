@@ -530,23 +530,23 @@ static void check_variables(void)
 #endif
 
 
-   var.key = "psx_enable_dual_analog_port1";
+   var.key = "psx_enable_dual_analog_type";
    
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
    {	
 		if((strcmp(var.value, "disabled") == 0))
-			setting_psx_analog_port_1="gamepad";
+			setting_psx_analog_type="gamepad";
 		else if((strcmp(var.value, "dualshock") == 0))
-			setting_psx_analog_port_1="dualshock";
+			setting_psx_analog_type="dualshock";
 		else if((strcmp(var.value, "dualanalog") == 0))
-			setting_psx_analog_port_1="dualanalog";
+			setting_psx_analog_type="dualanalog";
 		else if((strcmp(var.value, "analogjoy") == 0))
-			setting_psx_analog_port_1="analogjoy";
+			setting_psx_analog_type="analogjoy";
 		else
-			setting_psx_analog_port_1="gamepad";
-		log_cb(RETRO_LOG_INFO, "Variables %s.\n", setting_psx_analog_port_1);	
+			setting_psx_analog_type="gamepad";
    }	
-    
+   
+       
    var.key = "psx_fastboot";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
@@ -677,8 +677,8 @@ static void hookup_ports(bool force)
       { 
         case RETRO_DEVICE_ANALOG:
 		{
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, setting_psx_analog_port_1);
-            currgame->SetInput(j, setting_psx_analog_port_1, &buf.u8[j]);            
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, setting_psx_analog_type);
+            currgame->SetInput(j, setting_psx_analog_type, &buf.u8[j]);            
 			break;          
 		}
         default:
@@ -1397,8 +1397,7 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "psx_fastboot", "Skip BIOS sequence; disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
-      { "psx_enable_dual_analog_port1", "Port 1: Analog mode; disabled|dualshock|dualanalog|analogjoy" },	  
-	  { "psx_enable_dual_analog_port2", "Port 2: Analog mode; disabled|dualshock|dualanalog|analogjoy" },	  
+      { "psx_enable_dual_analog_type", "Analog mode; disabled|dualshock|dualanalog|analogjoy" },	  
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
 
