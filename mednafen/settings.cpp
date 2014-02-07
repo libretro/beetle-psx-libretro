@@ -34,6 +34,9 @@ uint32_t setting_psx_multitap_port_2 = 0;
 uint32_t setting_psx_fastboot = 1;
 #elif defined(WANT_NGP_EMU)
 uint32_t setting_ngp_language = 0;
+#elif defined(WANT_VB_EMU)
+uint32_t setting_vb_lcolor=0xFF0000;
+uint32_t setting_vb_rcolor=0x000000;
 #endif
 
 bool MDFN_SaveSettings(const char *path)
@@ -45,9 +48,9 @@ uint64 MDFN_GetSettingUI(const char *name)
 {
 #if defined(WANT_VB_EMU)
    if (!strcmp("vb.anaglyph.lcolor", name))
-      return 0xFF0000;
+      return setting_vb_lcolor;
    if (!strcmp("vb.anaglyph.rcolor", name))
-      return 0x000000;
+      return setting_vb_rcolor;
 #elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cddavolume", name))
       return setting_pce_fast_cddavolume;
