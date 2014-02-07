@@ -413,7 +413,6 @@ void retro_init()
       /* TODO: Add proper fallback */
       if (log_cb)
          log_cb(RETRO_LOG_WARN, "SRAM directory is not defined. Fallback on using SYSTEM directory ...\n");
-      failed_init = true;
 	  retro_save_directory = retro_base_directory;
    }      
 
