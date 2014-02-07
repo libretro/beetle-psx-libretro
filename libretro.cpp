@@ -37,6 +37,7 @@ char *psx_analog_type;
 
 std::string retro_base_directory;
 std::string retro_base_name;
+std::string retro_save_directory;
 
 static void set_basename(const char *path)
 {
