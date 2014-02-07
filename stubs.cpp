@@ -29,6 +29,7 @@
 
 extern std::string retro_base_directory;
 extern std::string retro_base_name;
+extern std::string retro_save_directory;
 
 #ifdef _WIN32
 static void sanitize_path(std::string &path)
@@ -53,7 +54,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    switch (type)
    {
       case MDFNMKF_SAV:
-         ret = retro_base_directory + slash + retro_base_name +
+         ret = retro_save_directory +slash + retro_base_name +
             std::string(".") +
 #ifndef _XBOX
 	    md5_context::asciistr(MDFNGameInfo->MD5, 0) + std::string(".") +
@@ -66,7 +67,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    sanitize_path(ret); // Because Windows path handling is mongoloid.
 #endif
          break;
-      default:
+      default:	  
          break;
    }
 
