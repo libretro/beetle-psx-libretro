@@ -37,6 +37,7 @@ char *psx_analog_type;
 
 std::string retro_base_directory;
 std::string retro_base_name;
+std::string retro_save_directory;
 
 static void set_basename(const char *path)
 {
@@ -396,6 +397,24 @@ void retro_init()
          log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir)
+   {
+      retro_save_directory = dir;
+      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
+      size_t last = retro_save_directory.find_last_not_of("/\\");
+      if (last != std::string::npos)
+         last++;
+
+      retro_save_directory = retro_save_directory.substr(0, last);      
+   }
+   else
+   {
+      /* TODO: Add proper fallback */
+      if (log_cb)
+         log_cb(RETRO_LOG_WARN, "SRAM directory is not defined. Fallback on using SYSTEM directory ...\n");
+	  retro_save_directory = retro_base_directory;
+   }      
 
 #if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
