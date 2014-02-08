@@ -622,13 +622,42 @@ static void check_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
    {
-      if (strcmp(var.value, "red") == 0)
+      if (strcmp(var.value, "black & red") == 0)
+	  {
          setting_vb_lcolor = 0xFF0000;
-      else if (strcmp(var.value, "white") == 0)
+		 setting_vb_rcolor = 0x000000;
+	  }
+      else if (strcmp(var.value, "black & white") == 0)
+	  {
          setting_vb_lcolor = 0xFFFFFF;      
-      log_cb(RETRO_LOG_INFO, "[%s]: Color mode changed %s %x.\n", mednafen_core_str, var.value, setting_vb_lcolor);
-     
+		 setting_vb_rcolor = 0x000000;
+	  }
+      log_cb(RETRO_LOG_INFO, "[%s]: Palette changed: %s .\n", mednafen_core_str, var.value);  
    }   
+   
+    var.key = "vb_anaglyph_preset";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+   
+   
+      if (strcmp(var.value, "disabled") == 0)
+		setting_vb_anaglyph_preset = 0; 
+      else if (strcmp(var.value, "red & blue") == 0)
+         setting_vb_anaglyph_preset = 1;      
+      else if (strcmp(var.value, "red & cyan") == 0)
+         setting_vb_anaglyph_preset = 2;      
+	  else if (strcmp(var.value, "red & electric cyan") == 0)	 
+         setting_vb_anaglyph_preset = 3;      
+      else if (strcmp(var.value, "red & green") == 0)
+         setting_vb_anaglyph_preset = 4;      
+      else if (strcmp(var.value, "green & magenta") == 0)
+         setting_vb_anaglyph_preset = 5;      
+      else if (strcmp(var.value, "yellow & blue") == 0)
+         setting_vb_anaglyph_preset = 6;      
+
+      log_cb(RETRO_LOG_INFO, "[%s]: Palette changed: %s .\n", mednafen_core_str, var.value);  
+   }      
 #endif
 }
 
@@ -786,6 +815,10 @@ bool retro_load_game(const struct retro_game_info *info)
    check_variables();
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
+#endif
+
+#if defined(WANT_VB_EMU)
+   check_variables();
 #endif
 
    game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
@@ -1450,7 +1483,8 @@ void retro_set_environment(retro_environment_t cb)
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 #elif defined(WANT_VB_EMU)
     static const struct retro_variable vars[] = {
-      { "vb_color_mode", "Color mode; red|white" },
+	  { "vb_anaglyph_preset", "Anaglyph preset (restart); disabled|red & blue|red & cyan|red & electric cyan|red & green|green & magenta|yellow & blue" },
+      { "vb_color_mode", "Palette (restart); black & red|black & white" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);

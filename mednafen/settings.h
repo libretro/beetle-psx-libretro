@@ -19,6 +19,7 @@ extern uint32_t setting_ngp_language;
 #elif defined(WANT_VB_EMU)
 extern uint32_t setting_vb_lcolor;
 extern uint32_t setting_vb_rcolor;
+extern uint32_t setting_vb_anaglyph_preset;
 #endif
 
 bool MDFN_LoadSettings(const char *path, const char *section = NULL, bool override = false);
