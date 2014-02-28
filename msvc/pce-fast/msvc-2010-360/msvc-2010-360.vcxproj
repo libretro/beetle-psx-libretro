@@ -33,7 +33,6 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\CDAccess_Image.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\cdromif.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\CDUtility.cpp" />
-    <ClCompile Include="..\..\..\mednafen\cdrom\cd_crc32.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\galois.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\l-ec.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\lec.cpp" />

@@ -128,9 +128,6 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\scsicd.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\cdrom\cd_crc32.cpp">
-      <Filter>Source Files\mednafen\cdrom</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\cdrom\CDAccess.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
