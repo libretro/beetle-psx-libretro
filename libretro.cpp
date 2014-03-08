@@ -617,6 +617,16 @@ static void check_variables(void)
          setting_ngp_language = 1;    
       retro_reset();
    }
+#elif defined (WANT_GBA_EMU)
+   var.key = "gba_hle";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         setting_gba_hle = 1;
+      else if (strcmp(var.value, "disabled") == 0)
+         setting_gba_hle = 0;
+   }
 #elif defined (WANT_VB_EMU)   
     var.key = "vb_color_mode";
 
@@ -810,6 +820,10 @@ bool retro_load_game(const struct retro_game_info *info)
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
 
    set_basename(info->path);
+
+#if defined(WANT_GBA_EMU)
+   check_variables();
+#endif
 
 #if defined(WANT_PSX_EMU)
    check_variables();
@@ -1472,6 +1486,12 @@ void retro_set_environment(retro_environment_t cb)
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
 
+      { NULL, NULL },
+   };
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+#elif defined(WANT_GBA_EMU)
+   static const struct retro_variable vars[] = {
+      { "gba_hle", "HLE bios emulation; enabled|disabled" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
