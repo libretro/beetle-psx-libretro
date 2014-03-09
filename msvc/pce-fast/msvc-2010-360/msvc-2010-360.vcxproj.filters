@@ -51,6 +51,9 @@
     <Filter Include="Source Files\mednafen\hw_video\huc6270">
       <UniqueIdentifier>{384ba939-89be-4acd-b3ff-5f6460b0fcf1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\tremor">
+      <UniqueIdentifier>{6e70f6f2-5174-46d4-9bd6-33725139e84c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\mednafen\Stream.cpp">
@@ -190,6 +193,60 @@
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp">
       <Filter>Source Files\mednafen\hw_cpu\huc6280</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\cdrom\CDAccess_CCD.cpp">
+      <Filter>Source Files\mednafen\cdrom</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\cdrom\crc32.cpp">
+      <Filter>Source Files\mednafen\cdrom</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\window.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\bitwise.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\block.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\codebook.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\floor0.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\floor1.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\framing.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\info.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\ivorbisfile_example.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\mapping0.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\mdct.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\registry.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\res012.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\sharedbook.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\synthesis.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\tremor\vorbisfile.c">
+      <Filter>Source Files\mednafen\tremor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
