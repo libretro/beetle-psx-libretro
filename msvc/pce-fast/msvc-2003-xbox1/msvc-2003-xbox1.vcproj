@@ -260,6 +260,9 @@
 						RelativePath="..\..\..\mednafen\cdrom\CDAccess.cpp">
 					</File>
 					<File
+						RelativePath="..\..\..\mednafen\cdrom\CDAccess_CCD.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\mednafen\cdrom\CDAccess_Image.cpp">
 					</File>
 					<File
@@ -267,6 +270,9 @@
 					</File>
 					<File
 						RelativePath="..\..\..\mednafen\cdrom\CDUtility.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\cdrom\crc32.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\mednafen\cdrom\galois.cpp">
@@ -407,6 +413,58 @@
 					Filter="">
 					<File
 						RelativePath="..\..\..\mednafen\video\surface.cpp">
+					</File>
+				</Filter>
+				<Filter
+					Name="tremor"
+					Filter="">
+					<File
+						RelativePath="..\..\..\mednafen\tremor\bitwise.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\block.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\codebook.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\floor0.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\floor1.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\framing.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\info.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\ivorbisfile_example.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\mapping0.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\mdct.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\registry.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\res012.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\sharedbook.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\synthesis.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\vorbisfile.c">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\tremor\window.c">
 					</File>
 				</Filter>
 			</Filter>
