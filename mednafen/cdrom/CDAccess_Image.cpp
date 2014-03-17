@@ -30,9 +30,10 @@
 	Trying to read sectors at an LBA of less than 0 is not supported.  TODO: support it(at least up to -150).
 */
 
-#include <sys/stat.h>
-
 #include "../mednafen.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <string.h>
 #include <errno.h>
@@ -40,7 +41,6 @@
 #include <trio/trio.h>
 
 #include "../general.h"
-#include "../mednafen-endian.h"
 #include "../FileStream.h"
 #include "../MemoryStream.h"
 
@@ -346,6 +346,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
  std::string file_base, file_ext;
  std::map<std::string, Stream*> toc_streamcache;
 
+ disc_type = DISC_TYPE_CDDA_OR_M1;
  memset(&TmpTrack, 0, sizeof(TmpTrack));
 
  MDFN_GetFilePathComponents(path, &base_dir, &file_base, &file_ext);
@@ -463,11 +464,15 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
     } // end to TRACK
     else if(cmdbuf == "SILENCE")
     {
-
+     //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
     }
     else if(cmdbuf == "ZERO")
     {
-
+     //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+    }
+    else if(cmdbuf == "FIFO")
+    {
+     throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
     }
     else if(cmdbuf == "FILE" || cmdbuf == "AUDIOFILE")
     {
@@ -528,6 +533,52 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      trio_sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
      TmpTrack.pregap = (m * 60 + s) * 75 + f;
     }
+    else if(cmdbuf == "TWO_CHANNEL_AUDIO")
+    {
+     TmpTrack.subq_control &= ~SUBQ_CTRLF_4CH;
+    }
+    else if(cmdbuf == "FOUR_CHANNEL_AUDIO")
+    {
+     TmpTrack.subq_control |= SUBQ_CTRLF_4CH;
+    }
+    else if(cmdbuf == "NO")
+    {
+     MDFN_strtoupper(args[0]);
+
+     if(args[0] == "COPY")
+     {
+      TmpTrack.subq_control &= ~SUBQ_CTRLF_DCP; 
+     }
+     else if(args[0] == "PRE_EMPHASIS")
+     {
+      TmpTrack.subq_control &= ~SUBQ_CTRLF_PRE;
+     }
+     else
+     {
+      throw MDFN_Error(0, _("Unsupported argument to \"NO\" directive: %s"), args[0].c_str());
+     }
+    }
+    else if(cmdbuf == "COPY")
+    {
+     TmpTrack.subq_control |= SUBQ_CTRLF_DCP;
+    } 
+    else if(cmdbuf == "PRE_EMPHASIS")
+    {
+     TmpTrack.subq_control |= SUBQ_CTRLF_PRE;
+    }
+    // TODO: Confirm that these are taken from the TOC of the disc, and not synthesized by cdrdao.
+    else if(cmdbuf == "CD_DA")
+     disc_type = DISC_TYPE_CDDA_OR_M1;
+    else if(cmdbuf == "CD_ROM")
+     disc_type = DISC_TYPE_CDDA_OR_M1;
+    else if(cmdbuf == "CD_ROM_XA")
+     disc_type = DISC_TYPE_CD_XA;
+    else
+    {
+     //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+    }
+    // TODO: CATALOG
+
    } /*********** END TOC HANDLING ************/
    else // now for CUE sheet handling
    {
@@ -661,7 +712,35 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
     {
 
     }
-    else if(cmdbuf == "CDTEXTFILE" || cmdbuf == "FLAGS" || cmdbuf == "CATALOG" || cmdbuf == "ISRC" ||
+    else if(cmdbuf == "FLAGS")
+    {
+     TmpTrack.subq_control &= ~(SUBQ_CTRLF_PRE | SUBQ_CTRLF_DCP | SUBQ_CTRLF_4CH);
+     for(unsigned i = 0; i < argcount; i++)
+     {
+      if(args[i] == "DCP")
+      {
+       TmpTrack.subq_control |= SUBQ_CTRLF_DCP;
+      }
+      else if(args[i] == "4CH")
+      {
+       TmpTrack.subq_control |= SUBQ_CTRLF_4CH;
+      }
+      else if(args[i] == "PRE")
+      {
+       TmpTrack.subq_control |= SUBQ_CTRLF_PRE;
+      }
+      else if(args[i] == "SCMS")
+      {
+	// Not implemented, likely pointless.  PROBABLY indicates that the copy bit of the subchannel Q control field is supposed to
+	// alternate between 1 and 0 at 9.375 Hz(four 1, four 0, four 1, four 0, etc.).
+      }
+      else
+      {
+       throw MDFN_Error(0, _("Unknown CUE sheet \"FLAGS\" directive flag \"%s\".\n"), args[i].c_str());
+      }
+     }
+    }
+    else if(cmdbuf == "CDTEXTFILE" || cmdbuf == "CATALOG" || cmdbuf == "ISRC" ||
 	    cmdbuf == "TITLE" || cmdbuf == "PERFORMER" || cmdbuf == "SONGWRITER")
     {
      MDFN_printf(_("Unsupported CUE sheet directive: \"%s\".\n"), cmdbuf.c_str());	// FIXME, generic logger passed by pointer to constructor
@@ -691,9 +770,24 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
  for(int x = FirstTrack; x < (FirstTrack + NumTracks); x++)
  {
   if(Tracks[x].DIFormat == DI_FORMAT_AUDIO)
-   Tracks[x].Format = CD_TRACK_FORMAT_AUDIO;
+   Tracks[x].subq_control &= ~SUBQ_CTRLF_DATA;
   else
-   Tracks[x].Format = CD_TRACK_FORMAT_DATA;
+   Tracks[x].subq_control |= SUBQ_CTRLF_DATA;
+
+  if(!IsTOC)	// TOC-format disc_type calculation is handled differently.
+  {
+   switch(Tracks[x].DIFormat)
+   {
+    default: break;
+
+    case DI_FORMAT_MODE2:
+    case DI_FORMAT_MODE2_FORM1:
+    case DI_FORMAT_MODE2_FORM2:
+    case DI_FORMAT_MODE2_RAW:
+	disc_type = DISC_TYPE_CD_XA;	
+	break;
+   }
+  }
 
   if(IsTOC)
   {
@@ -780,15 +874,7 @@ CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : NumTrack
 {
  memset(Tracks, 0, sizeof(Tracks));
 
- try
- {
-  ImageOpen(path, image_memcache);
- }
- catch(...)
- {
-  Cleanup();
-  throw;
- }
+ ImageOpen(path, image_memcache);
 }
 
 CDAccess_Image::~CDAccess_Image()
@@ -936,6 +1022,9 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
  //printf("%02x\n", buf[12 + 3]);
 }
 
+//
+// Note: this function makes use of the current contents(as in |=) in SubPWBuf.
+//
 void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 {
  uint8 buf[0xC];
@@ -974,7 +1063,7 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
  ma = ((lba + 150) / 75 / 60);
 
  uint8 adr = 0x1; // Q channel data encodes position
- uint8 control = (Tracks[track].Format == CD_TRACK_FORMAT_AUDIO) ? 0x00 : 0x04;
+ uint8 control = Tracks[track].subq_control;
 
  // Handle pause(D7 of interleaved subchannel byte) bit, should be set to 1 when in pregap or postgap.
  if((lba < Tracks[track].LBA) || (lba >= Tracks[track].LBA + Tracks[track].sectors))
@@ -988,14 +1077,16 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
   int32 pg_offset = (int32)lba - Tracks[track].LBA;
 
   // If we're more than 2 seconds(150 sectors) from the real "start" of the track/INDEX 01, and the track is a data track,
-  // and the preceding track is an audio track, encode it as audio.
+  // and the preceding track is an audio track, encode it as audio(by taking the SubQ control field from the preceding track).
+  //
+  // TODO: Look into how we're supposed to handle subq control field in the four combinations of track types(data/audio).
+  //
   if(pg_offset < -150)
   {
-   if(Tracks[track].Format == CD_TRACK_FORMAT_DATA && (FirstTrack < track) && 
-	Tracks[track - 1].Format == CD_TRACK_FORMAT_AUDIO)
+   if((Tracks[track].subq_control & SUBQ_CTRLF_DATA) && (FirstTrack < track) && !(Tracks[track - 1].subq_control & SUBQ_CTRLF_DATA))
    {
     //printf("Pregap part 1 audio->data: lba=%d track_lba=%d\n", lba, Tracks[track].LBA);
-    control = 0x00;
+    control = Tracks[track - 1].subq_control;
    }
   }
  }
@@ -1034,21 +1125,18 @@ void CDAccess_Image::Read_TOC(TOC *toc)
 
  toc->first_track = FirstTrack;
  toc->last_track = FirstTrack + NumTracks - 1;
- toc->disc_type = DISC_TYPE_CDDA_OR_M1;	// FIXME
+ toc->disc_type = disc_type;
 
  for(int i = toc->first_track; i <= toc->last_track; i++)
  {
   toc->tracks[i].lba = Tracks[i].LBA;
   toc->tracks[i].adr = ADR_CURPOS;
-  toc->tracks[i].control = 0x0;
-
-  if(Tracks[i].Format != CD_TRACK_FORMAT_AUDIO)
-   toc->tracks[i].control |= 0x4;
+  toc->tracks[i].control = Tracks[i].subq_control;
  }
 
  toc->tracks[100].lba = total_sectors;
  toc->tracks[100].adr = ADR_CURPOS;
- toc->tracks[100].control = 0x00;	// Audio...
+ toc->tracks[100].control = toc->tracks[toc->last_track].control & 0x4;
 
  // Convenience leadout track duplication.
  if(toc->last_track < 99)

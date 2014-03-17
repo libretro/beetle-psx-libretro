@@ -18,14 +18,6 @@ namespace CDUtility
  //  lba = aba - 150
 
 
- // Track formats(more abstract and simple)
- typedef enum
- {
-  CD_TRACK_FORMAT_AUDIO = 0x00,
-  CD_TRACK_FORMAT_DATA = 0x01,
-  //CDRF_FORMAT_CDI = 0x02
- } CD_Track_Format_t;
-
  enum
  {
   ADR_NOQINFO = 0x00,
@@ -40,6 +32,15 @@ namespace CDUtility
   uint8 adr;
   uint8 control;
   uint32 lba;
+ };
+
+ // SubQ control field flags.
+ enum
+ {
+  SUBQ_CTRLF_PRE  = 0x01,	// With 50/15us pre-emphasis.
+  SUBQ_CTRLF_DCP  = 0x02,	// Digital copy permitted.
+  SUBQ_CTRLF_DATA = 0x04,	// Data track.
+  SUBQ_CTRLF_4CH  = 0x08,	// 4-channel CD-DA.
  };
 
  enum
@@ -169,6 +170,11 @@ namespace CDUtility
  void encode_mode2_sector(uint32 aba, uint8 *sector_data);	// 2336 bytes of user data at offset 16 
  void encode_mode2_form1_sector(uint32 aba, uint8 *sector_data);	// 2048+8 bytes of user data at offset 16
  void encode_mode2_form2_sector(uint32 aba, uint8 *sector_data);	// 2324+8 bytes of user data at offset 16
+
+
+ // out_buf must be able to contain 2352+96 bytes.
+ // "mode" is only used if(toc.tracks[100].control & 0x4)
+ void synth_leadout_sector_lba(const uint8 mode, const TOC& toc, const int32 lba, uint8* out_buf);
 
  //
  // User data error detection and correction
