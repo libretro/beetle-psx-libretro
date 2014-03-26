@@ -34,6 +34,8 @@ uint32_t setting_psx_multitap_port_2 = 0;
 uint32_t setting_psx_fastboot = 1;
 #elif defined(WANT_NGP_EMU)
 uint32_t setting_ngp_language = 0;
+#elif defined(WANT_GBA_EMU)
+uint32_t setting_gba_hle = 1;
 #elif defined(WANT_VB_EMU)
 uint32_t setting_vb_lcolor=0xFF0000;
 uint32_t setting_vb_rcolor=0x000000;
@@ -221,7 +223,7 @@ std::string MDFN_GetSettingS(const char *name)
 {
 #if defined(WANT_GBA_EMU)
    if (!strcmp("gba.bios", name))
-      return std::string("gba_bios.bin");
+      return setting_gba_hle ? std::string("") : std::string("gba_bios.bin");
 #elif defined(WANT_PCE_FAST_EMU)
    if (!strcmp("pce_fast.cdbios", name))
       return std::string("syscard3.pce");
