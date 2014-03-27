@@ -103,6 +103,14 @@ int64 MDFN_GetSettingI(const char *name)
 #elif defined(WANT_PSX_EMU)
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
+   if (!strcmp("psx.slstart", name))
+      return 0;
+   if (!strcmp("psx.slstartp", name))
+      return 0;
+   if (!strcmp("psx.slend", name))
+      return 239;
+   if (!strcmp("psx.slendp", name))
+      return 287;
 #elif defined(WANT_WSWAN_EMU)
    if (!strcmp("wswan.sex", name))
       return 0;
