@@ -1069,21 +1069,13 @@ static void Emulate(EmulateSpecStruct *espec)
    Memcard_SaveDelay[i] += timestamp;
    if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
    {
-    PSX_DBG(PSX_DBG_SPARSE, "Saving memcard %d...\n", i);
-    try
-    {
-     char ext[64];
-     trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
-     FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
-     Memcard_SaveDelay[i] = -1;
-     Memcard_PrevDC[i] = 0;
-    }
-    catch(std::exception &e)
-    {
-     MDFN_PrintError("Memcard %d save error: %s", i, e.what());
-     MDFN_DispMessage("Memcard %d save error: %s", i, e.what());
-    }
-    //MDFN_DispMessage("Memcard %d saved.", i);
+      PSX_DBG(PSX_DBG_SPARSE, "Saving memcard %d...\n", i);
+      char ext[64];
+      trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+      FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+      Memcard_SaveDelay[i] = -1;
+      Memcard_PrevDC[i] = 0;
+      //MDFN_DispMessage("Memcard %d saved.", i);
    }
   }
  }
@@ -1163,7 +1155,6 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
  //if(toc.first_track > 1 || toc.
 
- try
  {
   uint8 pvd[2048];
   unsigned pvd_search_count = 0;
@@ -1265,14 +1256,6 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
     //puts("ASOFKOASDFKO");
    }
   }
- }
- catch(std::exception &e)
- {
-  //puts(e.what());
- }
- catch(...)
- {
-
  }
 
  Breakout:
@@ -1742,18 +1725,9 @@ static int Load(const char *name, MDFNFILE *fp)
 
 static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 {
- try
- {
   InitCommon(CDInterfaces);
 
   MDFNGameInfo->GameType = GMT_CDROM;
- }
- catch(std::exception &e)
- {
-  MDFND_PrintError(e.what());
-  Cleanup();
-  return(0);
- }
 
  return(1);
 }
@@ -1813,19 +1787,12 @@ static void CloseGame(void)
 {
   for(int i = 0; i < 8; i++)
   {
-   // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
-   // we can reduce potential data loss!
-   try
-   {
-    char ext[64];
-    trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+     // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
+     // we can reduce potential data loss!
+     char ext[64];
+     trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
 
-    FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
-   }
-   catch(std::exception &e)
-   {
-    MDFN_PrintError("%s", e.what());
-   }
+     FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
   }
 
  Cleanup();
