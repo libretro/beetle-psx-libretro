@@ -376,7 +376,7 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 
   case 0xa:
 	if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
-	 PSX_DBG(PSX_DBG_WARNING, "FIO device selection changed during comm %04x->%04x\n", Control, V);
+	 fprintf(stderr, "FIO device selection changed during comm %04x->%04x", Control, V);
 
 	//printf("Control: %d, %04x\n", timestamp, V);
 	Control = V & 0x3F2F;
@@ -744,30 +744,26 @@ uint64 FrontIO::GetMemcardDirtyCount(unsigned int which)
 
 void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
- assert(which < 8);
+ FILE *memcard = fopen(path, "rb");
 
- try
+ if (memcard)
  {
-  if(DevicesMC[which]->GetNVSize())
-  {
-   FileStream mf(path, FileStream::MODE_READ);
-   std::vector<uint8> tmpbuf;
+    fclose(memcard);
+    if(DevicesMC[which]->GetNVSize())
+    {
+       FileStream mf(path, FileStream::MODE_READ);
+       std::vector<uint8> tmpbuf;
 
-   tmpbuf.resize(DevicesMC[which]->GetNVSize());
+       tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
-   if(mf.size() != (int64)tmpbuf.size())
-    throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
+       if(mf.size() != (int64)tmpbuf.size())
+          throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
 
-   mf.read(&tmpbuf[0], tmpbuf.size());
+       mf.read(&tmpbuf[0], tmpbuf.size());
 
-   DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
-   DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
-  }
- }
- catch(MDFN_Error &e)
- {
-  if(e.GetErrno() != ENOENT)
-   throw(e);
+       DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
+       DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
+    }
  }
 }
 
