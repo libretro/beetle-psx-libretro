@@ -22,6 +22,7 @@
  #endif
 #endif
 
+#ifndef ANDROID
 #ifndef htole32
 #define htole32 le32toh
 #endif
@@ -29,7 +30,7 @@
 #ifndef htole16
 #define htole16 le16toh
 #endif
-
+#endif
 
 int write16le(uint16 b, FILE *fp);
 int write32le(uint32 b, FILE *fp);
