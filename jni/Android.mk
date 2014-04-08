@@ -47,7 +47,7 @@ ifeq ($(core), psx)
 	NEED_THREADING = 1
 	NEED_TREMOR = 1
    CORE_DEFINE := -DWANT_PSX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/psx
+   CORE_DIR := $(MEDNAFEN_DIR)/psx-0932
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
 	$(CORE_DIR)/irq.cpp \
 	$(CORE_DIR)/timer.cpp \
