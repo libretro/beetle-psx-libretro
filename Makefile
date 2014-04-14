@@ -11,6 +11,10 @@ ifeq ($(shell uname -a),)
    platform = win
 else ifneq ($(findstring Darwin,$(shell uname -a)),)
    platform = osx
+   arch = intel
+ifeq ($(shell uname -p),powerpc)
+   arch = ppc
+endif
 else ifneq ($(findstring MINGW,$(shell uname -a)),)
    platform = win
 endif
@@ -85,6 +89,11 @@ CORE_SOURCES := $(CORE_DIR)/huc.cpp \
 	$(CORE_DIR)/tsushin.cpp \
 	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
+
+arch = intel
+ifeq ($(shell uname -p),powerpc)
+arch = ppc
+endif
 
 HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/huc6280/cpu_huc6280.cpp
 HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
@@ -331,11 +340,17 @@ ifeq ($(platform), unix)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
-   fpic := -fPIC -mmacosx-version-min=10.6
+   fpic := -fPIC
    SHARED := -dynamiclib
-   ENDIANNESS_DEFINES := -DLSB_FIRST
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+ifeq ($(arch),ppc)
+   ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
+   OLD_GCC := 1
+else
+   fpic += -fPIC -mmacosx-version-min=10.6
+   ENDIANNESS_DEFINES := -DLSB_FIRST
+endif
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
