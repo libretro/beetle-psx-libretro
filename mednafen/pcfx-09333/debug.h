@@ -11,12 +11,12 @@ uint32 PCFXDBG_MemPeek(uint32 A, unsigned int bsize, bool hl, bool logical);
 uint32 PCFXDBG_GetRegister(const std::string &name, std::string *special);
 void PCFXDBG_SetRegister(const std::string &name, uint32 value);
 
-void PCFXDBG_SetCPUCallback(void (*callb)(uint32 PC));
-void PCFXDBG_SetBPCallback(void (*callb)(uint32 PC));
+void PCFXDBG_SetCPUCallback(void (*callb)(uint32 PC, bool bpoint), bool continuous);
 
+void PCFXDBG_EnableBranchTrace(bool enable);
 std::vector<BranchTraceResult> PCFXDBG_GetBranchTrace(void);
 
-void PCFXDBG_CheckBP(int type, uint32 address, unsigned int len);
+void PCFXDBG_CheckBP(int type, uint32 address, uint32 value, unsigned int len);
 
 void PCFXDBG_SetLogFunc(void (*func)(const char *, const char *));
 

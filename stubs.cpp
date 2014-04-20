@@ -73,7 +73,8 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
          break;
    }
 
-   fprintf(stderr, "%s\n", ret.c_str());
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "MDFN_MakeFName: %s\n", ret.c_str());
    return ret;
 }
 

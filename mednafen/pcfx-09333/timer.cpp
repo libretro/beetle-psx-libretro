@@ -59,9 +59,9 @@ v810_timestamp_t FXTIMER_Update(const v810_timestamp_t timestamp)
  return(CalcNextEventTS(timestamp));
 }
 
-void FXTIMER_ResetTS(void)
+void FXTIMER_ResetTS(int32 ts_base)
 {
- lastts = 0;
+ lastts = ts_base;
 }
 
 uint16 FXTIMER_Read16(uint32 A, const v810_timestamp_t timestamp)
@@ -178,3 +178,8 @@ void FXTIMER_Reset(void)
  counter = 0;
 }
 
+void FXTIMER_Init(void)
+{
+ lastts = 0;
+ FXTIMER_Reset();
+}

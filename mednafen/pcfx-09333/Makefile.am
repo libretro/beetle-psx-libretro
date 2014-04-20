@@ -1,5 +1,5 @@
 AUTOMAKE_OPTIONS = subdir-objects
-DEFS = -DLOCALEDIR=\"$(datadir)/locale\" @DEFS@ @MATH_OPTIMIZER_FLAGS@
+DEFS = -DLOCALEDIR=\"$(datadir)/locale\" @DEFS@ 
 DEFAULT_INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/intl -I$(top_srcdir) -I$(top_srcdir)/src/hw_cpu -I$(top_srcdir)/src/hw_sound -I$(top_srcdir)/src/hw_video
 
 noinst_LIBRARIES	=	libpcfx.a

@@ -30,8 +30,8 @@
 #include "input.h"
 #include "../cdrom/scsicd.h"
 
-static void (*CPUHook)(uint32);
-static void (*BPCallB)(uint32 PC) = NULL;
+static void (*CPUHook)(uint32, bool bpoint) = NULL;
+static bool CPUHookContinuous = false;
 static void (*LogFunc)(const char *, const char *);
 static iconv_t sjis_ict = (iconv_t)-1;
 bool PCFX_LoggingOn = FALSE;
@@ -55,6 +55,7 @@ struct BTEntry
 };
 
 #define NUMBT 24
+static bool BTEnabled = false;
 static BTEntry BTEntries[NUMBT];
 static int BTIndex = 0;
 
@@ -74,6 +75,16 @@ static void AddBranchTrace(uint32 from, uint32 to, uint32 ecode)
   BTEntries[BTIndex].branch_count = 1;
 
   BTIndex = (BTIndex + 1) % NUMBT;
+ }
+}
+
+void PCFXDBG_EnableBranchTrace(bool enable)
+{
+ BTEnabled = enable;
+ if(!enable)
+ {
+  BTIndex = 0;
+  memset(BTEntries, 0, sizeof(BTEntries));
  }
 }
 
@@ -156,7 +167,7 @@ std::vector<BranchTraceResult> PCFXDBG_GetBranchTrace(void)
  return(ret);
 }
 
-void PCFXDBG_CheckBP(int type, uint32 address, unsigned int len)
+void PCFXDBG_CheckBP(int type, uint32 address, uint32 value, unsigned int len)
 {
  std::vector<PCFX_BPOINT>::iterator bpit, bpit_end;
 
@@ -164,21 +175,77 @@ void PCFXDBG_CheckBP(int type, uint32 address, unsigned int len)
  {
   bpit = BreakPointsRead.begin();
   bpit_end = BreakPointsRead.end();
+
+  if(MDFN_UNLIKELY(address >= 0xA4000000 && address <= 0xABFFFFFF))
+  {
+   VDC_SimulateResult result;
+   unsigned which_vdc = (bool)(address & 0x8000000);
+
+   fx_vdc_chips[which_vdc]->SimulateRead16(1, &result);
+
+   if(result.ReadCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_READ, 0x80000 | (which_vdc << 16) | result.ReadStart, 0, result.ReadCount);
+
+   if(result.WriteCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_WRITE, 0x80000 | (which_vdc << 16) | result.WriteStart, 0/*FIXME(HOW? :b)*/, result.WriteCount);
+  }
  }
  else if(type == BPOINT_WRITE)
  {
   bpit = BreakPointsWrite.begin();
   bpit_end = BreakPointsWrite.end();
+
+  if(MDFN_UNLIKELY(address >= 0xB4000000 && address <= 0xBBFFFFFF))
+  {
+   VDC_SimulateResult result;
+   unsigned which_vdc = (bool)(address & 0x8000000);
+
+   fx_vdc_chips[which_vdc]->SimulateWrite16(1, value, &result);
+
+   if(result.ReadCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_READ, 0x80000 | (which_vdc << 16) | result.ReadStart, 0, result.ReadCount);
+
+   if(result.WriteCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_WRITE, 0x80000 | (which_vdc << 16) | result.WriteStart, 0/*FIXME(HOW? :b)*/, result.WriteCount);
+  }
  }
  else if(type == BPOINT_IO_READ)
  {
   bpit = BreakPointsIORead.begin();
   bpit_end = BreakPointsIORead.end();
+
+  if(address >= 0x400 && address <= 0x5FF)
+  {
+   VDC_SimulateResult result;
+   unsigned which_vdc = (bool)(address & 0x100);
+
+   fx_vdc_chips[which_vdc]->SimulateRead16((bool)(address & 4), &result);
+
+   if(result.ReadCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_READ, 0x80000 | (which_vdc << 16) | result.ReadStart, 0, result.ReadCount);
+
+   if(result.WriteCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_WRITE, 0x80000 | (which_vdc << 16) | result.WriteStart, 0/*FIXME(HOW? :b)*/, result.WriteCount);
+  }
  }
  else if(type == BPOINT_IO_WRITE)
  {
   bpit = BreakPointsIOWrite.begin();
   bpit_end = BreakPointsIOWrite.end();
+
+  if(address >= 0x400 && address <= 0x5FF)
+  {
+   VDC_SimulateResult result;
+   unsigned which_vdc = (bool)(address & 0x100);
+
+   fx_vdc_chips[which_vdc]->SimulateWrite16((bool)(address & 4), value, &result);
+
+   if(result.ReadCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_READ, 0x80000 | (which_vdc << 16) | result.ReadStart, 0, result.ReadCount);
+
+   if(result.WriteCount)
+    PCFXDBG_CheckBP(BPOINT_AUX_WRITE, 0x80000 | (which_vdc << 16) | result.WriteStart, 0/*FIXME(HOW? :b)*/, result.WriteCount);
+  }
  }
  else if(type == BPOINT_AUX_READ)
  {
@@ -352,7 +419,7 @@ static void DoSyscallLog(void)
  PCFXDBG_DoLog("SYSCALL", "0x%02x, %s: %s", PCFX_V810.GetPR(10), func_name, argsbuffer);
 }
 
-static void CPUHandler(uint32 PC)
+static void CPUHandler(const v810_timestamp_t timestamp, uint32 PC)
 {
  std::vector<PCFX_BPOINT>::iterator bpit;
 
@@ -364,6 +431,10 @@ static void CPUHandler(uint32 PC)
    break;
   }
  }
+
+ fx_vdc_chips[0]->ResetSimulate();
+ fx_vdc_chips[1]->ResetSimulate();
+
  PCFX_V810.CheckBreakpoints(PCFXDBG_CheckBP, mem_peekhword, NULL);	// FIXME: mem_peekword
 
  if(PCFX_LoggingOn)
@@ -390,28 +461,25 @@ static void CPUHandler(uint32 PC)
   lastPC = PC;
  }
 
- if(FoundBPoint)
+ CPUHookContinuous |= FoundBPoint;
+
+ if(CPUHookContinuous && CPUHook)
  {
-  BPCallB(PC);
-  FoundBPoint = 0;
+  ForceEventUpdates(timestamp);
+  CPUHook(PC, FoundBPoint);
  }
 
- if(CPUHook)
-  CPUHook(PC);
+ FoundBPoint = false;
 }
 
 static void RedoCPUHook(void)
 {
  bool HappyTest;
 
- HappyTest = PCFX_LoggingOn || BreakPointsPC.size() || BreakPointsRead.size() || BreakPointsWrite.size() ||
+ HappyTest = CPUHook || PCFX_LoggingOn || BreakPointsPC.size() || BreakPointsRead.size() || BreakPointsWrite.size() ||
 		BreakPointsIOWrite.size() || BreakPointsIORead.size() || BreakPointsAux0Read.size() || BreakPointsAux0Write.size();
 
- void (*cpuh)(uint32);
-
- cpuh = HappyTest ? CPUHandler : CPUHook;
-
- PCFX_V810.SetCPUHook(cpuh, cpuh ? AddBranchTrace : NULL);
+ PCFX_V810.SetCPUHook(HappyTest ? CPUHandler : NULL, BTEnabled ? AddBranchTrace : NULL);
 }
 
 void PCFXDBG_FlushBreakPoints(int type)
@@ -521,7 +589,7 @@ uint32 PCFXDBG_GetRegister(const std::string &name, std::string *special)
   if(special && which_one == PSW)
   {
    char buf[256];
-   snprintf(buf, 256, "Z: %d, S: %d, OV: %d, CY: %d, ID: %d, AE: %d, EP: %d, NP: %d, IA: %2d",
+   trio_snprintf(buf, 256, "Z: %d, S: %d, OV: %d, CY: %d, ID: %d, AE: %d, EP: %d, NP: %d, IA: %2d",
 	(int)(bool)(val & PSW_Z), (int)(bool)(val & PSW_S), (int)(bool)(val & PSW_OV), (int)(bool)(val & PSW_CY),
 	(int)(bool)(val & PSW_ID), (int)(bool)(val & PSW_AE), (int)(bool)(val & PSW_EP), (int)(bool)(val & PSW_NP),
 	(val & PSW_IA) >> 16);
@@ -572,15 +640,11 @@ void PCFXDBG_SetRegister(const std::string &name, uint32 value)
 
 }
 
-void PCFXDBG_SetCPUCallback(void (*callb)(uint32 PC))
+void PCFXDBG_SetCPUCallback(void (*callb)(uint32 PC, bool bpoint), bool continuous)
 {
  CPUHook = callb;
+ CPUHookContinuous = continuous;
  RedoCPUHook();
-}
-
-void PCFXDBG_SetBPCallback(void (*callb)(uint32 PC))
-{
- BPCallB = callb;
 }
 
 void PCFXDBG_DoLog(const char *type, const char *format, ...)

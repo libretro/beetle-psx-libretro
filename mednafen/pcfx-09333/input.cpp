@@ -22,6 +22,8 @@
 #include "input/gamepad.h"
 #include "input/mouse.h"
 
+#include <trio/trio.h>
+
 #define PCFX_PORTS	2
 #define TOTAL_PORTS	8
 
@@ -126,7 +128,7 @@ bool FXINPUT_GetRegister(const std::string &name, uint32 &value, std::string *sp
   {
    char buf[256];
 
-   snprintf(buf, 256, "Trigger: %d, MOD: %d, IOS: %s", value & 0x1, value & 0x2, (value & 0x4) ? "Input" : "Output");
+   trio_snprintf(buf, 256, "Trigger: %d, MOD: %d, IOS: %s", value & 0x1, value & 0x2, (value & 0x4) ? "Input" : "Output");
 
    *special = std::string(buf);
   }
@@ -335,9 +337,9 @@ v810_timestamp_t FXINPUT_Update(const v810_timestamp_t timestamp)
  return(CalcNextEventTS(timestamp));
 }
 
-void FXINPUT_ResetTS(void)
+void FXINPUT_ResetTS(int32 ts_base)
 {
- lastts = 0;
+ lastts = ts_base;
 }
 
 
@@ -358,7 +360,7 @@ int FXINPUT_StateAction(StateMem *sm, int load, int data_only)
  for(int i = 0; i < TOTAL_PORTS; i++)
  {
   char sname[256];
-  snprintf(sname, 256, "INPUT%d:%d", i, InputTypes[i]);
+  trio_snprintf(sname, 256, "INPUT%d:%d", i, InputTypes[i]);
   ret &= devices[i]->StateAction(sm, load, data_only, sname);
  }
 

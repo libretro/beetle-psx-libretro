@@ -4,6 +4,8 @@
 #include "../mednafen.h"
 #include "../state.h"
 #include "../general.h"
+#include "v810/v810_cpu.h"
+#include "../hw_video/huc6270/vdc.h"
 
 #define PCFX_MASTER_CLOCK	21477272.72
 
@@ -13,9 +15,6 @@
  #define FXDBG(format, ...) ((void)0)
 #endif
 
-#include "v810/v810_cpu.h"
-#include "../hw_video/huc6270/vdc.h"
-
 extern V810 PCFX_V810;
 
 uint8 MDFN_FASTCALL mem_peekbyte(const v810_timestamp_t timestamp, const uint32 A);
@@ -23,8 +22,9 @@ uint16 MDFN_FASTCALL mem_peekhword(const v810_timestamp_t timestamp, const uint3
 
 int32 MDFN_FASTCALL pcfx_event_handler(const v810_timestamp_t timestamp);
 
+void ForceEventUpdates(const uint32 timestamp);
+
 extern VDC *fx_vdc_chips[2];
-extern int64 pcfx_timestamp_base;
 
 #define REGSETHW(_reg, _data, _msh) { _reg &= 0xFFFF << (_msh ? 0 : 16); _reg |= _data << (_msh ? 16 : 0); }
 #define REGGETHW(_reg, _msh) ((_reg >> (_msh ? 16 : 0)) & 0xFFFF)

@@ -18,7 +18,7 @@ void KING_Write8(const v810_timestamp_t timestamp, uint32 A, uint8 V);
 void KING_Write16(const v810_timestamp_t timestamp, uint32 A, uint16 V);
 bool KING_Init(void);
 void KING_Close(void);
-void KING_Reset(void);
+void KING_Reset(const v810_timestamp_t timestamp);
 
 uint16 KING_GetADPCMHalfWord(int ch);
 
@@ -41,7 +41,7 @@ void KING_NotifyOfBPE(bool read, bool write);
 
 void KING_SetLogFunc(void (*logfunc)(const char *, const char *, ...));
 
-void KING_EndFrame(v810_timestamp_t timestamp);
+void KING_EndFrame(v810_timestamp_t timestamp, v810_timestamp_t ts_base);
 
 v810_timestamp_t MDFN_FASTCALL KING_Update(const v810_timestamp_t timestamp);
 #endif

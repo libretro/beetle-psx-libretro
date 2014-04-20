@@ -244,13 +244,18 @@ TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), pcfx)
    core = pcfx
    NEED_BPP = 32
+ifneq ($(platform), osx)
+   PTHREAD_FLAGS = -pthread
+endif
    NEED_BLIP = 1
+   NEED_TREMOR = 1
+	WANT_NEW_API = 1
    NEED_STEREO_SOUND = 1
    NEED_CD = 1
    NEED_SCSI_CD = 1
    NEED_THREADING = 1
    CORE_DEFINE := -DWANT_PCFX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/pcfx
+   CORE_DIR := $(MEDNAFEN_DIR)/pcfx-09333
 
 CORE_SOURCES := $(CORE_DIR)/king.cpp \
 	$(CORE_DIR)/soundbox.cpp \
@@ -263,13 +268,14 @@ CORE_SOURCES := $(CORE_DIR)/king.cpp \
 	$(CORE_DIR)/huc6273.cpp \
 	$(CORE_DIR)/fxscsi.cpp \
 	$(CORE_DIR)/input/gamepad.cpp \
-	$(CORE_DIR)/input/mouse.cpp
+	$(CORE_DIR)/input/mouse.cpp \
+	$(MEDNAFEN_DIR)/sound/OwlResampler.cpp
 
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
 HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
-HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
 EXTRA_CORE_INCDIR = -I$(MEDNAFEN_DIR)/hw_sound/ -I$(MEDNAFEN_DIR)/include/blip -I$(MEDNAFEN_DIR)/hw_video/huc6270
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
@@ -557,7 +563,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 LIBRETRO_SOURCES += libretro.cpp stubs.cpp $(THREAD_STUBS)
 
 TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
-	$(MEDNAFEN_DIR)/trio/triostr.c
+	$(MEDNAFEN_DIR)/trio/triostr.c $(MEDNAFEN_DIR)/cputest/cputest.c
 
 SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES)
 
@@ -599,6 +605,7 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86
+CORE_SOURCES += $(MEDNAFEN_DIR)/cputest/x86_cpu.c
 endif
 
 ifeq ($(CACHE_CD), 1)

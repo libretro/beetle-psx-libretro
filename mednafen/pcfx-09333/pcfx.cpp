@@ -46,8 +46,6 @@ static int CD_SelectedDisc;	// -1 for no disc
 
 V810 PCFX_V810;
 
-int64 pcfx_timestamp_base;
-
 static uint8 *BIOSROM = NULL; 	// 1MB
 static uint8 *RAM = NULL; 	// 2MB
 static uint8 *FXSCSIROM = NULL;	// 512KiB
@@ -122,17 +120,19 @@ static INLINE uint32 CalcNextTS(void)
  return(next_timestamp);
 }
 
-static void RebaseTS(const v810_timestamp_t timestamp)
+static void RebaseTS(const v810_timestamp_t timestamp, const v810_timestamp_t new_base_timestamp)
 {
  assert(next_pad_ts > timestamp);
  assert(next_timer_ts > timestamp);
  assert(next_adpcm_ts > timestamp);
  assert(next_king_ts > timestamp);
 
- next_pad_ts -= timestamp;
- next_timer_ts -= timestamp;
- next_adpcm_ts -= timestamp;
- next_king_ts -= timestamp;
+ next_pad_ts -= (timestamp - new_base_timestamp);
+ next_timer_ts -= (timestamp - new_base_timestamp);
+ next_adpcm_ts -= (timestamp - new_base_timestamp);
+ next_king_ts -= (timestamp - new_base_timestamp);
+
+ //printf("RTS: %d %d %d %d\n", next_pad_ts, next_timer_ts, next_adpcm_ts, next_king_ts);
 }
 
 
@@ -176,7 +176,8 @@ int32 MDFN_FASTCALL pcfx_event_handler(const v810_timestamp_t timestamp)
      return(CalcNextTS());
 }
 
-static void ForceEventUpdates(const uint32 timestamp)
+// Called externally from debug.cpp
+void ForceEventUpdates(const uint32 timestamp)
 {
  next_king_ts = KING_Update(timestamp);
  next_pad_ts = FXINPUT_Update(timestamp);
@@ -185,6 +186,8 @@ static void ForceEventUpdates(const uint32 timestamp)
 
  //printf("Meow: %d\n", CalcNextTS());
  PCFX_V810.SetEventNT(CalcNextTS());
+
+ //printf("FEU: %d %d %d %d\n", next_pad_ts, next_timer_ts, next_adpcm_ts, next_king_ts);
 }
 
 #include "io-handler.inc"
@@ -223,6 +226,9 @@ static CDGameEntry GameList[] =
 static void Emulate(EmulateSpecStruct *espec)
 {
  v810_timestamp_t v810_timestamp;
+ v810_timestamp_t new_base_ts;
+
+ //printf("%d\n", PCFX_V810.v810_timestamp);
 
  FXINPUT_Frame();
 
@@ -242,28 +248,37 @@ static void Emulate(EmulateSpecStruct *espec)
 
  PCFX_FixNonEvents();
 
- // Call before resetting v810_timestamp to 0
+ // Call before resetting v810_timestamp
  ForceEventUpdates(v810_timestamp);
 
- espec->SoundBufSize = SoundBox_Flush(v810_timestamp, espec->SoundBuf, espec->SoundBufMaxSize);
+ //
+ // new_base_ts is guaranteed to be <= v810_timestamp
+ //
+ espec->SoundBufSize = SoundBox_Flush(v810_timestamp, &new_base_ts, espec->SoundBuf, espec->SoundBufMaxSize);
 
- KING_EndFrame(v810_timestamp);
- FXTIMER_ResetTS();
- FXINPUT_ResetTS();
- SoundBox_ResetTS();
+ KING_EndFrame(v810_timestamp, new_base_ts);
+ FXTIMER_ResetTS(new_base_ts);
+ FXINPUT_ResetTS(new_base_ts);
+ SoundBox_ResetTS(new_base_ts);
 
  // Call this AFTER all the EndFrame/Flush/ResetTS stuff
- RebaseTS(v810_timestamp);
+ RebaseTS(v810_timestamp, new_base_ts);
 
- espec->MasterCycles = v810_timestamp;
+ espec->MasterCycles = v810_timestamp - new_base_ts;
 
- pcfx_timestamp_base += v810_timestamp;
-
- PCFX_V810.ResetTS();
+ PCFX_V810.ResetTS(new_base_ts);
 }
 
 static void PCFX_Reset(void)
 {
+ const uint32 timestamp = PCFX_V810.v810_timestamp;
+
+ //printf("Reset: %d\n", timestamp);
+
+ // Make sure all devices are synched to current timestamp before calling their Reset()/Power()(though devices should already do this sort of thing on their
+ // own, but it's not implemented for all of them yet, and even if it was all implemented this is also INSURANCE).
+ ForceEventUpdates(timestamp);
+
  PCFX_Event_Reset();
 
  RAM_LPA = 0;
@@ -278,13 +293,13 @@ static void PCFX_Reset(void)
 
  for(int i = 0; i < 2; i++)
  {
-  int32 dummy_ne;
+  int32 dummy_ne MDFN_NOWARN_UNUSED;
 
   dummy_ne = fx_vdc_chips[i]->Reset();
  }
 
- KING_Reset();	// SCSICD_Power() is called from KING_Reset()
- SoundBox_Reset();
+ KING_Reset(timestamp);	// SCSICD_Power() is called from KING_Reset()
+ SoundBox_Reset(timestamp);
  RAINBOW_Reset();
 
  if(WantHuC6273)
@@ -293,9 +308,9 @@ static void PCFX_Reset(void)
  PCFXIRQ_Reset();
  FXTIMER_Reset();
  PCFX_V810.Reset();
- pcfx_timestamp_base = 0;
 
- ForceEventUpdates(0);
+ // Force device updates so we can get new next event timestamp values.
+ ForceEventUpdates(timestamp);
 }
 
 static void PCFX_Power(void)
@@ -517,16 +532,17 @@ static bool LoadCommon(std::vector<CDIF *> *CDInterfaces)
   return(0);
  }
 
- if(BIOSFile.f_size != 1024 * 1024)
+ if(GET_FSIZE(BIOSFile) != 1024 * 1024)
  {
   MDFN_PrintError(_("BIOS ROM file is incorrect size.\n"));
   return(0);
  }
 
- memcpy(BIOSROM, BIOSFile.f_data, 1024 * 1024);
+ memcpy(BIOSROM, GET_FDATA(BIOSFile), 1024 * 1024);
 
  BIOSFile.Close();
 
+#if 0
  if(fxscsi_path != "0" && fxscsi_path != "" && fxscsi_path != "none")
  {
   MDFNFILE FXSCSIFile;
@@ -534,7 +550,7 @@ static bool LoadCommon(std::vector<CDIF *> *CDInterfaces)
   if(!FXSCSIFile.Open(fxscsi_path, NULL, "FX-SCSI ROM"))
    return(0);
 
-  if(FXSCSIFile.f_size != 1024 * 512)
+  if(GET_FSIZE(FXSCSIFile) != 1024 * 512)
   {
    MDFN_PrintError(_("BIOS ROM file is incorrect size.\n"));
    return(0);
@@ -547,10 +563,11 @@ static bool LoadCommon(std::vector<CDIF *> *CDInterfaces)
    return(0);
   }
 
-  memcpy(FXSCSIROM, FXSCSIFile.f_data, 1024 * 512);
+  memcpy(FXSCSIROM, GET_FDATA(FXSCSIFile), 1024 * 512);
 
   FXSCSIFile.Close();
  }
+#endif
 
  #ifdef WANT_DEBUGGER
  ASpace_Add(PCFXDBG_GetAddressSpaceBytes, PCFXDBG_PutAddressSpaceBytes, "cpu", "CPU Physical", 32);
@@ -573,6 +590,7 @@ static bool LoadCommon(std::vector<CDIF *> *CDInterfaces)
  SoundBox_Init(MDFN_GetSettingB("pcfx.adpcm.emulate_buggy_codec"), MDFN_GetSettingB("pcfx.adpcm.suppress_channel_reset_clicks"));
  RAINBOW_Init(MDFN_GetSettingB("pcfx.rainbow.chromaip"));
  FXINPUT_Init();
+ FXTIMER_Init();
 
  if(WantHuC6273)
   HuC6273_Init();
@@ -663,11 +681,11 @@ static bool LoadCommon(std::vector<CDIF *> *CDInterfaces)
   memcpy(ExBackupRAM + 0x80, ExBRInit80, sizeof(ExBRInit80));
 
   FILE *savefp;
-  if((savefp = fopen(MDFN_MakeFName(MDFNMKF_SAV, 0, "sav").c_str(), "rb")))
+  if((savefp = gzopen(MDFN_MakeFName(MDFNMKF_SAV, 0, "sav").c_str(), "rb")))
   {
-   fread(BackupRAM, 0x8000, 1, savefp);
-   fread(ExBackupRAM, 0x8000, 1, savefp);
-   fclose(savefp);
+   gzread(savefp, BackupRAM, 0x8000);
+   gzread(savefp, ExBackupRAM, 0x8000);
+   gzclose(savefp);
   }
  }
 
@@ -937,7 +955,7 @@ static void CloseGame(void)
   EvilRams.push_back(PtrLengthPair(BackupRAM, 0x8000));
   EvilRams.push_back(PtrLengthPair(ExBackupRAM, 0x8000));
 
-  MDFN_DumpToFile(MDFN_MakeFName(MDFNMKF_SAV, 0, "sav").c_str(), 6, EvilRams);
+  MDFN_DumpToFile(MDFN_MakeFName(MDFNMKF_SAV, 0, "sav").c_str(), 0, EvilRams);
  }
 
  for(int i = 0; i < 2; i++)
@@ -979,6 +997,8 @@ static void DoSimpleCommand(int cmd)
 
 static int StateAction(StateMem *sm, int load, int data_only)
 {
+ const v810_timestamp_t timestamp = PCFX_V810.v810_timestamp;
+
  SFORMAT StateRegs[] =
  {
   SFARRAY(RAM, 0x200000),
@@ -987,13 +1007,6 @@ static int StateAction(StateMem *sm, int load, int data_only)
   SFVAR(ExBusReset),
   SFARRAY(BackupRAM, BRAMDisabled ? 0 : 0x8000),
   SFARRAY(ExBackupRAM, BRAMDisabled ? 0 : 0x8000),
-
-  SFVAR(pcfx_timestamp_base),
-
-  SFVAR(next_pad_ts),
-  SFVAR(next_timer_ts),
-  SFVAR(next_adpcm_ts),
-  SFVAR(next_king_ts),
 
   SFVAR(CD_TrayOpen),
   SFVAR(CD_SelectedDisc),
@@ -1017,8 +1030,11 @@ static int StateAction(StateMem *sm, int load, int data_only)
 
  if(load)
  {
-  //clamp(&PCFX_V810.v810_timestamp, 0, 30 * 1000 * 1000);
-  //PCFX_SetEvent(PCFX_EVENT_SCSI, SCSICD_Run(v810_timestamp)); // hmm, fixme?
+  //
+  // Rather than bothering to store next event timestamp deltas in save states, we'll just recalculate next event times on save state load as a side effect
+  // of this call.
+  //
+  ForceEventUpdates(timestamp);
 
   if(cdifs)
   {
@@ -1029,6 +1045,8 @@ static int StateAction(StateMem *sm, int load, int data_only)
    SCSICD_SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL, true);
   }
  }
+
+ //printf("0x%08x, %d %d %d %d\n", load, next_pad_ts, next_timer_ts, next_adpcm_ts, next_king_ts);
 
  return(ret);
 }
@@ -1052,17 +1070,6 @@ static const MDFNSetting_EnumList HDCWidthList[] =
 
 static MDFNSetting PCFXSettings[] =
 {
-/*
-  { "pcfx.input.port1", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 1."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port2", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 2."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port3", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 3."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port4", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 4."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port5", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 5."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port6", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 6."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port7", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 7."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-  { "pcfx.input.port8", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Input device for input port 8."), NULL, MDFNST_STRING, "gamepad", NULL, NULL },
-*/
-
   { "pcfx.input.port1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on PC-FX port 1."), gettext_noop("EXPERIMENTAL emulation of the unreleased multitap.  Enables ports 3 4 5."), MDFNST_BOOL, "0", NULL, NULL },
   { "pcfx.input.port2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on PC-FX port 2."), gettext_noop("EXPERIMENTAL emulation of the unreleased multitap.  Enables ports 6 7 8."), MDFNST_BOOL, "0", NULL, NULL },
 
@@ -1082,13 +1089,16 @@ static MDFNSetting PCFXSettings[] =
   { "pcfx.slstart", MDFNSF_NOFLAGS, gettext_noop("First rendered scanline."), NULL, MDFNST_UINT, "4", "0", "239" },
   { "pcfx.slend", MDFNSF_NOFLAGS, gettext_noop("Last rendered scanline."), NULL, MDFNST_UINT, "235", "0", "239" },
 
-  { "pcfx.rainbow.chromaip", MDFNSF_NOFLAGS, gettext_noop("Enable bilinear interpolation on the chroma channel of RAINBOW YUV output."), NULL, MDFNST_BOOL, "1" },
+  { "pcfx.rainbow.chromaip", MDFNSF_NOFLAGS, gettext_noop("Enable bilinear interpolation on the chroma channel of RAINBOW YUV output."), gettext_noop("This is an enhancement-related setting.  Enabling it may cause graphical glitches with some games."), MDFNST_BOOL, "0" },
 
   { "pcfx.adpcm.suppress_channel_reset_clicks", MDFNSF_NOFLAGS, gettext_noop("Hack to suppress clicks caused by forced channel resets."), NULL, MDFNST_BOOL, "1" },
 
   // Hack that emulates the codec a buggy ADPCM encoder used for some games' ADPCM.  Not enabled by default because it makes some games(with 
   //correctly-encoded  ADPCM?) sound worse
   { "pcfx.adpcm.emulate_buggy_codec", MDFNSF_NOFLAGS, gettext_noop("Hack that emulates the codec a buggy ADPCM encoder used for some games' ADPCM."), NULL, MDFNST_BOOL, "0" },
+
+  { "pcfx.resamp_quality", MDFNSF_NOFLAGS, gettext_noop("Sound quality."), gettext_noop("Higher values correspond to better SNR and better preservation of higher frequencies(\"brightness\"), at the cost of increased computational complexity and a negligible increase in latency."), MDFNST_INT, "3", "0", "5" },
+  { "pcfx.resamp_rate_error", MDFNSF_NOFLAGS, gettext_noop("Output rate tolerance."), gettext_noop("Lower values correspond to better matching of the output rate of the resampler to the actual desired output rate, at the expense of increased RAM usage and poorer CPU cache utilization."), MDFNST_FLOAT, "0.0000009", "0.0000001", "0.0000350" },
 
   { NULL }
 };
@@ -1355,7 +1365,7 @@ static DebuggerInfoStruct DBGInfo =
  32,
  32,
  0x00000000,
- ~0,
+ ~0U,
 
  PCFXDBG_MemPeek,
  PCFXDBG_Disassemble,
@@ -1365,7 +1375,7 @@ static DebuggerInfoStruct DBGInfo =
  PCFXDBG_FlushBreakPoints,
  PCFXDBG_AddBreakPoint,
  PCFXDBG_SetCPUCallback,
- PCFXDBG_SetBPCallback,
+ PCFXDBG_EnableBranchTrace,
  PCFXDBG_GetBranchTrace,
  KING_SetGraphicsDecode,
  PCFXDBG_SetLogFunc,
@@ -1397,6 +1407,7 @@ MDFNGI EmulatedPCFX =
  CloseGame,
  KING_SetLayerEnableMask,
  "BG0\0BG1\0BG2\0BG3\0VDC-A BG\0VDC-A SPR\0VDC-B BG\0VDC-B SPR\0RAINBOW\0",
+ NULL,
  NULL,
  NULL,
  NULL,
