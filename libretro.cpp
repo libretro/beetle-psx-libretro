@@ -879,8 +879,6 @@ void retro_unload_game()
    game->name = 0;
 
    MDFNMP_Kill();
-
-   game = NULL;
 }
 
 

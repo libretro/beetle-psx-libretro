@@ -23,7 +23,6 @@
 #include "cdc.h"
 #include "spu.h"
 #include "../mempatcher.h"
-#include "../cputest/cputest.h"
 
 #include <stdarg.h>
 
