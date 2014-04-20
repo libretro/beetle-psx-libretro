@@ -555,11 +555,9 @@ void HuC6280::RunSub(void)
 {
 	uint32 old_PC;
 
-	if(DebugMode)
-	 old_PC = PC;
-
         if(in_block_move)
         {
+	 IBM_Dispatch: ;
          switch(in_block_move)
          {
           default: exit(1);
@@ -573,9 +571,6 @@ void HuC6280::RunSub(void)
 
 	do
         {
-         if(DebugMode)
-          old_PC = PC;
-
 	 #include "huc6280_step.inc"
 	} while(runrunrun > 0);
 }
@@ -673,6 +668,8 @@ int HuC6280::StateAction(StateMem *sm, int load, int data_only)
 
  SFORMAT StateRegs[]=
  {
+  SFVAR(runrunrun),	// For the benefit of save states while in step mode in the debugger.
+
   SFVARN(tmp_PC, "PC"),
   SFVARN(A, "A"),
   SFVARN(P, "P"),
@@ -701,11 +698,8 @@ int HuC6280::StateAction(StateMem *sm, int load, int data_only)
   SFVARN(bmt_length, "IBM_LENGTH"),
   SFVARN(bmt_alternate, "IBM_ALTERNATE"),
 
-  SFVARN(timestamp, "timestamp"),
   SFVARN(next_event, "next_event"),
   SFVARN(next_user_event, "next_user_event"),
-
-  // timer_lastts
 
   SFVAR(IODataBuffer),
   SFEND

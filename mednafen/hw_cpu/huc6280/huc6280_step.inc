@@ -1,9 +1,15 @@
+         if(DebugMode)
+          old_PC = PC;
+
          if(DebugMode && CPUHook)
          {
           TimerSync();
           CalcNextEvent();
-
-          CPUHook(PC);
+          if(CPUHook(PC))
+	  {
+	   if(in_block_move)
+	    goto IBM_Dispatch;
+	  }
          }
 
 	 if(IRQSample | IRQlow)

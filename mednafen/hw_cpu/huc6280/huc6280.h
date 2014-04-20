@@ -91,12 +91,12 @@ class HuC6280
 	 runrunrun = 0;
 	}
 
-	INLINE void SyncAndResetTimestamp(void)
+	INLINE void SyncAndResetTimestamp(uint32 ts_base = 0)
 	{
          TimerSync();
 
-	 timer_lastts = 0;
-	 timestamp = 0;
+	 timer_lastts = ts_base;
+	 timestamp = ts_base;
 	}
 
 	INLINE bool InBlockMove(void)
@@ -127,7 +127,7 @@ class HuC6280
 	//
 	// Debugger support methods:
 	//
-	INLINE void SetCPUHook(void (*new_CPUHook)(uint32), void (*new_ADDBT)(uint32, uint32, uint32))
+	INLINE void SetCPUHook(bool (*new_CPUHook)(uint32), void (*new_ADDBT)(uint32, uint32, uint32))
 	{
 	 CPUHook = new_CPUHook;
 	 ADDBT = new_ADDBT;
@@ -508,7 +508,7 @@ class HuC6280
 	void BBSi(const uint8 val, const unsigned int bitto);
 
 	private:
-	int runrunrun;
+	int runrunrun;		// Don't change to bool(main possibles values are -1, 0, 1).
 
 	uint32 timestamp;
         uint32 PC;		// Program Counter(16-bit, but as a 32-bit variable for performance reasons)
@@ -564,7 +564,7 @@ class HuC6280
 	uint32 bmt_alternate;
 	bool isopread;
 
-	void (*CPUHook)(uint32);
+	bool (*CPUHook)(uint32);
 	void (*ADDBT)(uint32, uint32, uint32);
 
 	HuC6280_Support *EventHandler;
