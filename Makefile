@@ -134,8 +134,9 @@ else ifeq ($(core), wswan)
    NEED_BPP = 32
    NEED_BLIP = 1
    NEED_STEREO_SOUND = 1
+	WANT_NEW_API = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/wswan
+   CORE_DIR := $(MEDNAFEN_DIR)/wswan-09333
 
 CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/main.cpp \
@@ -545,6 +546,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(RESAMPLER_SOURCES) \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
+	$(MEDNAFEN_DIR)/player.cpp \
 	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 

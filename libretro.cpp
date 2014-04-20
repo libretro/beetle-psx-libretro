@@ -106,7 +106,7 @@ static bool is_pal = false;
 #elif defined(WANT_WSWAN_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "wswan"
 #define MEDNAFEN_CORE_NAME "Mednafen WonderSwan"
-#define MEDNAFEN_CORE_VERSION "v0.9.28"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
 #define MEDNAFEN_CORE_EXTENSIONS "ws|wsc"
 #define MEDNAFEN_CORE_TIMING_FPS 75.47
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)

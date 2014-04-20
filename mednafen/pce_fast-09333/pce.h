@@ -7,23 +7,6 @@
 #include "../general.h"
 #include "../mednafen-memory.h"
 
-#ifdef __LIBRETRO__
-#define GET_FDATA(fp) (fp.f_data)
-#define GET_FSIZE(fp) (fp.f_size)
-#define GET_FEXTS(fp) (fp.f_ext)
-#define GET_FDATA_PTR(fp) (fp->f_data)
-#define GET_FSIZE_PTR(fp) (fp->f_size)
-#define GET_FEXTS_PTR(fp) (fp->f_ext)
-#define gzread(a, b, c) fread(b, c, 1, a)
-#else
-#define GET_FDATA(fp) (fp.Data())
-#define GET_FSIZE(fp) (fp.Size())
-#define GET_FDATA_PTR(fp) (fp->data)
-#define GET_FSIZE_PTR(fp) (fp->size)
-#define GET_FEXTS_PTR(fp) (fp->ext)
-#define gzread(a, b, c) gzread(a, b, c)
-#endif
-
 #define PCE_MASTER_CLOCK        21477272.727273
 
 #define DECLFR(x) uint8 MDFN_FASTCALL x (uint32 A)
