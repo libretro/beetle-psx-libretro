@@ -56,66 +56,57 @@ FileStream::~FileStream()
 
 uint64 FileStream::attributes(void)
 {
- uint64 ret = ATTRIBUTE_SEEKABLE;
+   uint64 ret = ATTRIBUTE_SEEKABLE;
 
- switch(OpenedMode)
- {
-    case FileStream::MODE_READ:
-       ret |= ATTRIBUTE_READABLE;
-       break;
-    case FileStream::MODE_WRITE_SAFE:
-    case FileStream::MODE_WRITE:
-       ret |= ATTRIBUTE_WRITEABLE;
-       break;
- }
+   switch(OpenedMode)
+   {
+      case FileStream::MODE_READ:
+         ret |= ATTRIBUTE_READABLE;
+         break;
+      case FileStream::MODE_WRITE_SAFE:
+      case FileStream::MODE_WRITE:
+         ret |= ATTRIBUTE_WRITEABLE;
+         break;
+   }
 
- return ret;
+   return ret;
 }
 
 uint64 FileStream::read(void *data, uint64 count, bool error_on_eos)
 {
- uint64 read_count = fread(data, 1, count, fp);
-
- return(read_count);
+   return fread(data, 1, count, fp);
 }
 
 void FileStream::write(const void *data, uint64 count)
 {
- fwrite(data, 1, count, fp);
+   fwrite(data, 1, count, fp);
 }
 
 void FileStream::seek(int64 offset, int whence)
 {
- fseeko(fp, offset, whence);
+   fseeko(fp, offset, whence);
 }
 
 int64 FileStream::tell(void)
 {
- return ftello(fp);
+   return ftello(fp);
 }
 
 int64 FileStream::size(void)
 {
- struct stat buf;
+   struct stat buf;
 
- fstat(fileno(fp), &buf);
+   fstat(fileno(fp), &buf);
 
- return(buf.st_size);
+   return(buf.st_size);
 }
 
 void FileStream::close(void)
 {
- if(fp)
- {
-  FILE *tmp = fp;
+   if(!fp)
+      return;
 
-  fp = NULL;
-
-  if(fclose(tmp) == EOF)
-  {
-   ErrnoHolder ene(errno);
-
-   throw(MDFN_Error(ene.Errno(), _("Error closing opened file %s"), ene.StrError()));
-  }
- }
+   FILE *tmp = fp;
+   fp = NULL;
+   fclose(tmp);
 }

@@ -60,90 +60,81 @@ FileWrapper::~FileWrapper()
 
 void FileWrapper::close(void)
 {
- if(fp)
- {
-  FILE *tmp = fp;
+   if(!fp)
+      return;
 
-  fp = NULL;
-
-  if(fclose(tmp) == EOF)
-  {
-   ErrnoHolder ene(errno);
-
-   throw(MDFN_Error(ene.Errno(), _("Error closing opened file %s"), ene.StrError()));
-  }
- }
+   FILE *tmp = fp;
+   fp = NULL;
+   fclose(tmp);
 }
 
 uint64 FileWrapper::read(void *data, uint64 count, bool error_on_eof)
 {
- uint64 read_count = fread(data, 1, count, fp);
-
- return(read_count);
+   return fread(data, 1, count, fp);
 }
 
 void FileWrapper::flush(void)
 {
- fflush(fp);
+   fflush(fp);
 }
 
 void FileWrapper::write(const void *data, uint64 count)
 {
- fwrite(data, 1, count, fp);
+   fwrite(data, 1, count, fp);
 }
 
 int FileWrapper::scanf(const char *format, ...)
 {
- va_list ap;
- int ret;
+   va_list ap;
+   int ret;
 
- va_start(ap, format);
+   va_start(ap, format);
 
- ret = trio_vfscanf(fp, format, ap);
+   ret = trio_vfscanf(fp, format, ap);
 
- va_end(ap);
+   va_end(ap);
 
- return ret;
+   return ret;
 }
 
 void FileWrapper::put_char(int c)
 {
- fputc(c, fp);
+   fputc(c, fp);
 }
 
 void FileWrapper::put_string(const char *str)
 {
- write(str, strlen(str));
+   write(str, strlen(str));
 }
 
 // We need to decide whether to prohibit NULL characters in output and input strings via std::string.
 // Yes for correctness, no for potential security issues(though unlikely in context all things considered).
 void FileWrapper::put_string(const std::string &str)
 {
- write(str.data(), str.size());
+   write(str.data(), str.size());
 }
 
 char *FileWrapper::get_line(char *buf_s, int buf_size)
 {
- return ::fgets(buf_s, buf_size, fp);
+   return ::fgets(buf_s, buf_size, fp);
 }
 
 
 void FileWrapper::seek(int64 offset, int whence)
 {
- fseeko(fp, offset, whence);
+   fseeko(fp, offset, whence);
 }
 
 int64 FileWrapper::size(void)
 {
- struct stat buf;
+   struct stat buf;
 
- fstat(fileno(fp), &buf);
+   fstat(fileno(fp), &buf);
 
- return(buf.st_size);
+   return(buf.st_size);
 }
 
 int64 FileWrapper::tell(void)
 {
- return ftello(fp);
+   return ftello(fp);
 }

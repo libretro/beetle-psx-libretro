@@ -35,8 +35,6 @@ bool MDFNFILE::ApplyIPS(void *unused)
 // even if it errors out.
 bool MDFNFILE::MakeMemWrapAndClose(void *fp)
 {
-   bool ret = FALSE;
-
    location = 0;
 
    ::fseek((FILE *)fp, 0, SEEK_END);
@@ -44,22 +42,13 @@ bool MDFNFILE::MakeMemWrapAndClose(void *fp)
    ::fseek((FILE *)fp, 0, SEEK_SET);
 
    if (!(f_data = (uint8*)MDFN_malloc(f_size, _("file read buffer"))))
-      goto doret;
-   if ((int64)::fread(f_data, 1, f_size, (FILE *)fp) != f_size)
-   {
-      ErrnoHolder ene(errno);
-      MDFN_PrintError(_("Error reading file: %s"), ene.StrError());
+      goto fail;
+   ::fread(f_data, 1, f_size, (FILE *)fp);
 
-      free(f_data);
-      goto doret;
-   }
-
-   ret = TRUE;
-
-doret:
-   fclose((FILE *)fp);
-
-   return ret;
+   return TRUE;
+fail:
+   fclose((FILE*)fp);
+   return FALSE;
 }
 
 MDFNFILE::MDFNFILE()
@@ -91,24 +80,15 @@ bool MDFNFILE::Open(const char *path, const void *known_ext, const char *purpose
    (void)known_ext;
 
    if (!(fp = fopen(path, "rb")))
-   {
-      ErrnoHolder ene(errno);
-
-      if (ene.Errno() != ENOENT || !suppress_notfound_pe)
-         MDFN_PrintError(_("Error opening \"%s\": %s"), path, ene.StrError());
-
-      return 0;
-   }
+      return FALSE;
 
    ::fseek(fp, 0, SEEK_SET);
 
    if (!MakeMemWrapAndClose(fp))
-      return 0;
+      return FALSE;
 
-   const char *ld = strrchr(path, '.');
+   const char *ld = (const char*)strrchr(path, '.');
    f_ext = strdup(ld ? ld + 1 : "");
-
-   // FIXME:  Handle extension fixing for cases where loaded filename is like "moo.moo/lalala"
 
    return(TRUE);
 }
@@ -116,16 +96,12 @@ bool MDFNFILE::Open(const char *path, const void *known_ext, const char *purpose
 bool MDFNFILE::Close(void)
 {
    if (f_ext)
-   {
       free(f_ext);
-      f_ext = NULL;
-   }
+   f_ext = 0;
 
    if (f_data)
-   {
       free(f_data);
-      f_data = NULL;
-   }
+   f_data = 0;
 
    return(1);
 }
