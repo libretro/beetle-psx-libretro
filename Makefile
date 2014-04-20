@@ -225,9 +225,10 @@ else ifeq ($(core), vb)
    core = vb
    NEED_BPP = 32
    NEED_BLIP = 1
+	WANT_NEW_API = 1
    NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_VB_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/vb-0926
+   CORE_DIR := $(MEDNAFEN_DIR)/vb-09333
 
 CORE_SOURCES := $(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/timer.cpp \

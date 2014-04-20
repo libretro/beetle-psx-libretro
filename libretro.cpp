@@ -162,7 +162,7 @@ static bool is_pal = false;
 #elif defined(WANT_VB_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "vb"
 #define MEDNAFEN_CORE_NAME "Mednafen VB"
-#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
 #define MEDNAFEN_CORE_EXTENSIONS "vb|vboy|bin"
 #define MEDNAFEN_CORE_TIMING_FPS 50.27
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)

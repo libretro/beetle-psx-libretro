@@ -39,11 +39,6 @@ these four paragraphs for those parts of this code that are retained.
 | The result is stored in the location pointed to by `zPtr'.
 *----------------------------------------------------------------------------*/
 
-#ifdef _WIN32
-#undef INLINE
-#define INLINE
-#endif
-
 INLINE void shift32RightJamming( bits32 a, int16 count, bits32 *zPtr )
 {
     bits32 z;

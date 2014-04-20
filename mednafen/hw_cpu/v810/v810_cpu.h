@@ -168,12 +168,12 @@ class V810
  // Length specifies the number of bytes to map in, at each location specified by addresses[] (for mirroring)
  uint8 *SetFastMap(uint32 addresses[], uint32 length, unsigned int num_addresses, const char *name);
 
- INLINE void ResetTS(void)
+ INLINE void ResetTS(v810_timestamp_t new_base_timestamp)
  {
   assert(next_event_ts > v810_timestamp);
 
-  next_event_ts -= v810_timestamp;
-  v810_timestamp = 0;
+  next_event_ts -= (v810_timestamp - new_base_timestamp);
+  v810_timestamp = new_base_timestamp;
  }
 
  INLINE void SetEventNT(const v810_timestamp_t timestamp)
@@ -194,8 +194,8 @@ class V810
  int StateAction(StateMem *sm, int load, int data_only);
 
  #ifdef WANT_DEBUGGER
- void CheckBreakpoints(void (*callback)(int type, uint32 address, unsigned int len), uint16 MDFN_FASTCALL (*peek16)(const v810_timestamp_t, uint32), uint32 MDFN_FASTCALL (*peek32)(const v810_timestamp_t, uint32));
- void SetCPUHook(void (*newhook)(uint32 PC), void (*new_ADDBT)(uint32, uint32, uint32));
+ void CheckBreakpoints(void (*callback)(int type, uint32 address, uint32 value, unsigned int len), uint16 MDFN_FASTCALL (*peek16)(const v810_timestamp_t, uint32), uint32 MDFN_FASTCALL (*peek32)(const v810_timestamp_t, uint32));
+ void SetCPUHook(void (*newhook)(const v810_timestamp_t timestamp, uint32 PC), void (*new_ADDBT)(uint32, uint32, uint32));
  #endif
  uint32 GetPC(void);
  void SetPC(uint32);
@@ -313,7 +313,7 @@ class V810
 
 
  #ifdef WANT_DEBUGGER
- void (*CPUHook)(uint32 PC);
+ void (*CPUHook)(const v810_timestamp_t timestamp, uint32 PC);
  void (*ADDBT)(uint32 old_PC, uint32 new_PC, uint32);
  #endif
 

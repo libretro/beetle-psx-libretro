@@ -67,16 +67,14 @@
 
         P_REG[0] = 0; //Zero the Zero Reg!!!
 
-	//v810_timestamp = timestamp_rl;
 	RB_CPUHOOK(RB_GETPC());
-	//timestamp_rl = v810_timestamp;
 
 	{
 	 //printf("%08x\n", RB_GETPC());
 	 {
 	  v810_timestamp_t timestamp = timestamp_rl;
 
-	  tmpop = RB_RDOP2(0, 0);
+	  tmpop = RB_RDOP(0, 0);
 
 	  timestamp_rl = timestamp;
 	 }
@@ -85,16 +83,12 @@
 
 	 //printf("%02x\n", opcode >> 1);
 
-	 #ifdef _MSC_VER
-	 #include "v810_op_table_msvc.inc"
-	 #else
 	 static const void *const op_goto_table[256] =
 	 {
 	  #include "v810_op_table.inc"
 	 };
 
 	 goto *op_goto_table[opcode];
-	 #endif
 
 	// Bit string subopcodes
         #define DO_AM_BSTR()							\
@@ -292,12 +286,8 @@
 	BEGIN_OP(SETF);
 		ADDCLOCK(1);
 
-		//SETF may contain bugs
 		P_REG[arg2] = 0;
 
-		//if(arg1 != 0xe)
-		//printf("SETF: %02x\n", arg1);
-		//snortus();
 		switch (arg1 & 0x0F) 
 		{
 			case COND_V:
@@ -841,7 +831,7 @@
              SetPREG(30, (uint32)(temp >> 32));
              SetPREG(arg2, temp);
 	     SetSZ(P_REG[arg2]);
-	     SetFlag(PSW_OV, temp != (uint32)temp);
+	     SetFlag(PSW_OV, temp != (uint64)(int64)(int32)(uint32)temp);
 	     lastop = -1;
 	END_OP_SKIPLO();
 
@@ -1053,7 +1043,7 @@
 	    if(!RB_AccurateMode)
 	    {
 	     RB_SETPC(RB_GETPC());
-	     if((uint32)(RB_RDOP2(0, 0) >> 9) != opcode)
+	     if((uint32)(RB_RDOP(0, 0) >> 9) != opcode)
 	     {
 	      //printf("Trampoline: %08x %02x\n", RB_GETPC(), opcode >> 1);
 	     }

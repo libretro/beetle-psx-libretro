@@ -83,6 +83,9 @@ V810::V810()
 
  memset(MemReadBus32, 0, sizeof(MemReadBus32));
  memset(MemWriteBus32, 0, sizeof(MemWriteBus32));
+
+ v810_timestamp = 0;
+ next_event_ts = 0x7FFFFFFF;
 }
 
 V810::~V810()
@@ -286,9 +289,6 @@ void V810::Reset()
  if(ADDBT)
   ADDBT(GetPC(), 0xFFFFFFF0, 0xFFF0);
 #endif
- v810_timestamp = 0;
- next_event_ts = 0x7FFFFFFF; // fixme
-
  memset(&Cache, 0, sizeof(Cache));
 
  memset(P_REG, 0, sizeof(P_REG));
@@ -449,7 +449,7 @@ INLINE void V810::SetSZ(uint32 value)
 }
 
 #ifdef WANT_DEBUGGER
-void V810::CheckBreakpoints(void (*callback)(int type, uint32 address, unsigned int len), uint16 MDFN_FASTCALL (*peek16)(const v810_timestamp_t, uint32), uint32 MDFN_FASTCALL (*peek32)(const v810_timestamp_t, uint32))
+void V810::CheckBreakpoints(void (*callback)(int type, uint32 address, uint32 value, unsigned int len), uint16 MDFN_FASTCALL (*peek16)(const v810_timestamp_t, uint32), uint32 MDFN_FASTCALL (*peek32)(const v810_timestamp_t, uint32))
 {
  unsigned int opcode;
  uint16 tmpop;
@@ -472,21 +472,21 @@ void V810::CheckBreakpoints(void (*callback)(int type, uint32 address, unsigned 
 
 	default: break;
 
-	case LD_B: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 1); break;
-	case LD_H: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 2); break;
-	case LD_W: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 4); break;
+	case LD_B: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 0, 1); break;
+	case LD_H: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 0, 2); break;
+	case LD_W: callback(BPOINT_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 0, 4); break;
 
-	case ST_B: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 1); break;
-	case ST_H: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 2); break;
-	case ST_W: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 4); break;
+	case ST_B: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, P_REG[(tmpop >> 5) & 0x1F] & 0x00FF, 1); break;
+	case ST_H: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, P_REG[(tmpop >> 5) & 0x1F] & 0xFFFF, 2); break;
+	case ST_W: callback(BPOINT_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, P_REG[(tmpop >> 5) & 0x1F], 4); break;
 
-	case IN_B: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 1); break;
-	case IN_H: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 2); break;
-	case IN_W: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 4); break;
+	case IN_B: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 0, 1); break;
+	case IN_H: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 0, 2); break;
+	case IN_W: callback(BPOINT_IO_READ, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 0, 4); break;
 
-	case OUT_B: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, 1); break; 
-	case OUT_H: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, 2); break;
-	case OUT_W: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, 4); break;
+	case OUT_B: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFF, P_REG[(tmpop >> 5) & 0x1F] & 0xFF, 1); break; 
+	case OUT_H: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFE, P_REG[(tmpop >> 5) & 0x1F] & 0xFFFF, 2); break;
+	case OUT_W: callback(BPOINT_IO_WRITE, (sign_16(tmpop_high)+P_REG[tmpop & 0x1F])&0xFFFFFFFC, P_REG[(tmpop >> 5) & 0x1F], 4); break;
  }
 
 }
@@ -600,8 +600,7 @@ INLINE uint32 V810::GetSREG(unsigned int which)
 
 // Define accurate mode defines
 #define RB_GETPC()      PC
-#define RB_RDOP2(PC_offset, b) RDOP(timestamp, PC + PC_offset, b)
-#define RB_RDOP(PC_offset) RDOP(timestamp, PC + PC_offset)
+#define RB_RDOP(PC_offset, ...) RDOP(timestamp, PC + PC_offset, ## __VA_ARGS__)
 
 
 void V810::Run_Accurate(int32 MDFN_FASTCALL (*event_handler)(const v810_timestamp_t timestamp))
@@ -618,12 +617,21 @@ void V810::Run_Accurate(int32 MDFN_FASTCALL (*event_handler)(const v810_timestam
 }
 
 #ifdef WANT_DEBUGGER
+
+/* Make sure class member variable v810_timestamp is synchronized to our local copy, since we'll read it externally if a system
+   reset/power occurs when in step mode or similar.
+*/
+#define RB_CPUHOOK_DBG(n) { if(CPUHook) { v810_timestamp = timestamp_rl; CPUHook(timestamp_rl, n); } }
+
 void V810::Run_Accurate_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_timestamp_t timestamp))
 {
  const bool RB_AccurateMode = true;
 
- #define RB_ADDBT(n,o,p) ADDBT(n,o,p)
- #define RB_CPUHOOK(n) {if(CPUHook) CPUHook(n); }
+ #define RB_ADDBT(n,o,p) { if(ADDBT) ADDBT(n,o,p); }
+ /* Make sure class member variable v810_timestamp is synchronized to our local copy, since we'll read it externally if a system
+    reset/power occurs when in step mode or similar.
+ */
+ #define RB_CPUHOOK(n) RB_CPUHOOK_DBG(n)
  #define RB_DEBUGMODE
 
  #include "v810_oploop.inc"
@@ -639,7 +647,6 @@ void V810::Run_Accurate_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_ti
 //
 #undef RB_GETPC
 #undef RB_RDOP
-#undef RB_RDOP2
 
 
 
@@ -647,8 +654,8 @@ void V810::Run_Accurate_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_ti
 // Define fast mode defines
 //
 #define RB_GETPC()      	((uint32)(PC_ptr - PC_base))
-#define RB_RDOP(PC_offset) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
-#define RB_RDOP2(PC_offset, b) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
+
+#define RB_RDOP(PC_offset, ...) LoadU16_LE((uint16 *)&PC_ptr[PC_offset])
 
 void V810::Run_Fast(int32 MDFN_FASTCALL (*event_handler)(const v810_timestamp_t timestamp))
 {
@@ -668,8 +675,8 @@ void V810::Run_Fast_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_timest
 {
  const bool RB_AccurateMode = false;
 
- #define RB_ADDBT(n,o,p) ADDBT(n,o,p)
- #define RB_CPUHOOK(n) { if(CPUHook) CPUHook(n); }
+ #define RB_ADDBT(n,o,p) { if(ADDBT) ADDBT(n,o,p); }
+ #define RB_CPUHOOK(n) RB_CPUHOOK_DBG(n)
  #define RB_DEBUGMODE
 
  #include "v810_oploop.inc"
@@ -685,14 +692,13 @@ void V810::Run_Fast_Debug(int32 MDFN_FASTCALL (*event_handler)(const v810_timest
 //
 #undef RB_GETPC
 #undef RB_RDOP
-#undef RB_RDOP2
 
 v810_timestamp_t V810::Run(int32 MDFN_FASTCALL (*event_handler)(const v810_timestamp_t timestamp))
 {
  Running = true;
 
  #ifdef WANT_DEBUGGER
- if(CPUHook)
+ if(CPUHook || ADDBT)
  {
   if(EmuMode == V810_EMU_MODE_FAST)
    Run_Fast_Debug(event_handler);
@@ -716,7 +722,7 @@ void V810::Exit(void)
 }
 
 #ifdef WANT_DEBUGGER
-void V810::SetCPUHook(void (*newhook)(uint32 PC), void (*new_ADDBT)(uint32 old_PC, uint32 new_PC, uint32))
+void V810::SetCPUHook(void (*newhook)(const v810_timestamp_t timestamp, uint32 PC), void (*new_ADDBT)(uint32 old_PC, uint32 new_PC, uint32))
 {
  CPUHook = newhook;
  ADDBT = new_ADDBT;
@@ -952,6 +958,104 @@ bool V810::bstr_subop(v810_timestamp_t &timestamp, int sub_op, int arg1)
 	uint32 len =     P_REG[28];
 	uint32 dst =    (P_REG[29] & 0xFFFFFFFC);
 	uint32 src =    (P_REG[30] & 0xFFFFFFFC);
+
+#if 0
+	// Be careful not to cause 32-bit integer overflow, and careful about not shifting by 32.
+	// TODO:
+
+	// Read src[0], src[4] into shifter.
+	// Read dest[0].
+	DO_BSTR_PROLOGUE();	// if(len) { blah blah blah masking blah }
+                src_cache = BSTR_RWORD(timestamp, src);
+
+		if((uint64)(srcoff + len) > 0x20)
+                 src_cache |= (uint64)BSTR_RWORD(timestamp, src + 4) << 32;
+
+                dst_cache = BSTR_RWORD(timestamp, dst);
+
+		if(len)
+		{
+		 uint32 dst_preserve_mask;
+		 uint32 dst_change_mask;
+
+		 dst_preserve_mask = (1U << dstoff) - 1;
+
+		 if((uint64)(dstoff + len) < 0x20)
+ 		  dst_preserve_mask |= ((1U << ((0x20 - (dstoff + len)) & 0x1F)) - 1) << (dstoff + len);
+
+		 dst_change_mask = ~dst_preserve_mask;
+
+		 src_cache = BSTR_RWORD(timestamp, src);
+		 src_cache |= (uint64)BSTR_RWORD(timestamp, src + 4) << 32;
+		 dst_cache = BSTR_RWORD(timestamp, dst);
+
+		 dst_cache = (dst_cache & dst_preserve_mask) | ((dst_cache OP_THINGY_HERE (src_cache >> srcoff)) & dst_change_mask);
+		 BSTR_WWORD(timestamp, dst, dst_cache);
+
+		 if((uint64)(dstoff + len) < 0x20)
+		 {
+	          srcoff += len;
+		  dstoff += len;
+		  len = 0;
+		 }
+		 else
+		 {
+		  srcoff += (0x20 - dstoff);
+		  dstoff = 0;
+		  len -= (0x20 - dstoff);
+		  dst += 4;
+		 }
+
+		 if(srcoff >= 0x20)
+		 {
+		  srcoff &= 0x1F;
+		  src += 4;
+
+		  if(len)
+		  {
+		   src_cache >>= 32;
+		   src_cache |= (uint64)BSTR_RWORD(timestamp, src + 4) << 32;
+		  }
+		 }
+		}
+
+	DO_BSTR_PRIMARY();	// while(len >= 32) (do allow interruption; interrupt and emulator-return -
+				// they must be handled differently!)
+		while(len >= 32)
+  		{
+                 dst_cache = BSTR_RWORD(timestamp, dst);
+                 dst_cache = OP_THINGY_HERE(dst_cache, src_cache >> srcoff);
+		 BSTR_WWORD(timestamp, dst, dst_cache);
+		 len -= 32;
+		 dst += 4;
+		 src += 4;
+                 src_cache >>= 32;
+                 src_cache |= (uint64)BSTR_RWORD(timestamp, src + 4) << 32;
+		}
+
+	DO_BSTR_EPILOGUE();	// if(len) { blah blah blah masking blah }
+		if(len)
+		{
+		 uint32 dst_preserve_mask;
+		 uint32 dst_change_mask;
+
+		 dst_preserve_mask = (1U << ((0x20 - len) & 0x1F) << len;
+		 dst_change_mask = ~dst_preserve_mask;
+
+                 dst_cache = BSTR_RWORD(timestamp, dst);
+		 dst_cache = OP_THINGY_HERE(dst_cache, src_cache >> srcoff);
+		 BSTR_WWORD(timestamp, dst, dst_cache);
+		 dstoff += len;
+		 srcoff += len;
+
+                 if(srcoff >= 0x20)
+                 {
+                  srcoff &= 0x1F;
+                  src += 4;
+                 }
+		 len = 0;
+		}
+#endif
 
 	switch(sub_op)
 	{
@@ -1431,6 +1535,8 @@ int V810::StateAction(StateMem *sm, int load, int data_only)
   }
  }
 
+ int32 next_event_ts_delta = next_event_ts - v810_timestamp;
+
  SFORMAT StateRegs[] =
  {
   SFARRAY32(P_REG, 32),
@@ -1444,11 +1550,8 @@ int V810::StateAction(StateMem *sm, int load, int data_only)
   SFARRAY32(cache_data_temp, 128 * 2),
   SFARRAYB(cache_data_valid_temp, 128 * 2),
 
-  SFVAR(ilevel),	// Perhaps remove in future?
-  SFVAR(next_event_ts),	// This too
-
-  //SFVAR(tmp_timestamp),
-  SFVAR(v810_timestamp),
+  SFVAR(ilevel),		// Perhaps remove in future?
+  SFVAR(next_event_ts_delta),
 
   // Bitstring stuff:
   SFVAR(src_cache),
@@ -1465,7 +1568,12 @@ int V810::StateAction(StateMem *sm, int load, int data_only)
 
  if(load)
  {
-  //clamp(&PCFX_V810.v810_timestamp, 0, 30 * 1000 * 1000);
+  // std::max is sanity check for a corrupted save state to not crash emulation,
+  // std::min<int64>(0x7FF... is a sanity check and for the case where next_event_ts is set to an extremely large value to
+  // denote that it's not happening anytime soon, which could cause an overflow if our current timestamp is larger
+  // than what it was when the state was saved.
+  next_event_ts = std::max<int64>(v810_timestamp, std::min<int64>(0x7FFFFFFF, (int64)v810_timestamp + next_event_ts_delta));
+
   RecalcIPendingCache();
 
   SetPC(PC_tmp);

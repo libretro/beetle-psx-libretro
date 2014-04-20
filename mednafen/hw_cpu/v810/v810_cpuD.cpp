@@ -73,7 +73,7 @@ static const operation optable[80] = {
   { AM_II,      "cmp  " },           // 0x13
   { AM_II,      "shl  " },           // 0x14
   { AM_II,      "shr  " },           // 0x15
-  { AM_UDEF,    "???  " },           // 0x16  // Unknown
+  {0x8000|AM_IX,"ei   " },	     // 0x16  // EI(VB only)
   { AM_II,      "sar  " },           // 0x17
   { AM_II,      "trap " },           // 0x18
 
@@ -83,7 +83,7 @@ static const operation optable[80] = {
   {AM_UDEF,     "???  " },           // 0x1B  // Unknown
   { AM_II,      "ldsr " },           // 0x1C
   { AM_II,      "stsr " },           // 0x1D
-  { AM_UDEF,    "???  " },           // 0x1E  // Unknown
+  {0x8000|AM_IX,"di   " },           // 0x1E  // DI(VB only)
   {AM_BSTR,     "BSTR " },           // 0x1F  // Special Bit String Instructions
 
   {AM_UDEF,     "???  " },           // 0x20  // Unknown   // This is a fudg on our part
@@ -177,6 +177,26 @@ static const suboperation fpsuboptable[16] = {
   { "subf.s " },           // 0x05
   { "mulf.s " },           // 0x06
   { "divf.s " },           // 0x07
+
+  { "FError8" },           // 0x08  // Invalid
+  { "FError9" },           // 0x09  // Invalid
+  { "FErrorA" },           // 0x0A  // Invalid
+  { "FErrorB" },           // 0x0B  // Invalid
+  { "FErrorC" },           // 0x0C  // Invalid
+  { "FErrorD" },           // 0x0D  // Invalid
+  { "FErrorE" },           // 0x0E  // Invalid
+  { "FErrorF" }            // 0x0F  // Invalid
+};
+
+static const suboperation fpsuboptable_vb[16] = {
+  { "cmpf.s " },           // 0x00
+  { "FError1" },           // 0x01  // Unknown
+  { "cvt.ws " },           // 0x02
+  { "cvt.sw " },           // 0x03
+  { "addf.s " },           // 0x04
+  { "subf.s " },           // 0x05
+  { "mulf.s " },           // 0x06
+  { "divf.s " },           // 0x07
   { "XB" },                // 0x08  // undocumented
   { "XH" },                // 0x09  // undocumented //VFishing???
   { "REV" },               // 0x0A  // undocumented
@@ -205,7 +225,7 @@ static const char *pretty_sreg_names[32] =
  "sr31(invalid)" 
 };
 
-void v810_dis(uint32 &tPC, int num, char *buf, uint16 (*rhword)(uint32))
+void v810_dis(uint32 &tPC, int num, char *buf, uint16 (*rhword)(uint32), bool vbmode)
 {
     int lowB, highB, lowB2, highB2;             // up to 4 bytes for instruction (either 16 or 32 bits)
     int opcode, arg1, arg2, arg3;
@@ -215,31 +235,33 @@ void v810_dis(uint32 &tPC, int num, char *buf, uint16 (*rhword)(uint32))
 
     for(i = 0; i< num; i++) 
     {
-     uint16 tmp;
+     const uint16 hw0 = rhword(tPC);
+     const uint16 hw1 = rhword(tPC + 2);
 
-     tmp = rhword(tPC);
-     //   lowB   = mem_rbyte(tPC);
-     //   highB  = mem_rbyte(tPC+1);
-     lowB = tmp & 0xFF;
-     highB = tmp >> 8;
+     lowB = hw0 & 0xFF;
+     highB = hw0 >> 8;
 
-     tmp = rhword(tPC + 2);
-     //   lowB2  = mem_rbyte(tPC+2);
-     //   highB2 = mem_rbyte(tPC+3);
-     lowB2 = tmp & 0xFF;
-     highB2 = tmp >> 8;
+     lowB2 = hw1 & 0xFF;
+     highB2 = hw1 >> 8;
 
         opcode = highB >> 2;
-        if((highB & 0xE0) == 0x80)        // Special opcode format for          
+        if((highB & 0xE0) == 0x80)        // Special opcode format for
             opcode = (highB >> 1);            // type III instructions.
-    
+
         if((opcode > 0x4F) | (opcode < 0)) {
             //Error Invalid opcode!
-            sprintf(&buf[strlen(buf)],"0x%2x 0x%2x  ;Invalid Opcode", lowB, highB);
-            tPC += 2;                                               
+            sprintf(&buf[strlen(buf)], "0x%04x", hw0);
+            tPC += 2;
         }
-        
-        switch(optable[opcode].addr_mode) {
+
+	int am = optable[opcode].addr_mode;
+
+	if((am & 0x8000) && !vbmode)
+	 am = AM_UDEF;
+
+	am &= ~0x8000;
+
+        switch(am) {
         case AM_I:       // Do the same Ither way =)
             arg1 = (lowB >> 5) + ((highB & 0x3) << 3);
             arg2 = (lowB & 0x1F);
@@ -350,14 +372,14 @@ void v810_dis(uint32 &tPC, int num, char *buf, uint16 (*rhword)(uint32))
             if(arg3 > 15) {
                 sprintf(&buf[strlen(buf)],"(Invalid FPU: 0x%02x)", arg3);
             } else {
-                sprintf(&buf[strlen(buf)],"%s  %s, %s", fpsuboptable[arg3].opname, pretty_preg_names[arg2], pretty_preg_names[arg1]);
+                sprintf(&buf[strlen(buf)],"%s  %s, %s", (vbmode ? fpsuboptable_vb[arg3].opname : fpsuboptable[arg3].opname), pretty_preg_names[arg2], pretty_preg_names[arg1]);
             }
             tPC += 4;   // 32 bit instruction
             break;
         case AM_UDEF:  // Invalid opcode.
         default:       // Invalid opcode.
-            sprintf(&buf[strlen(buf)],"0x%2x 0x%2x  ;Invalid Opcode", lowB, highB);
-            tPC += 2;                                               
+            sprintf(&buf[strlen(buf)],"0x%04x", hw0);
+            tPC += 2;
         }
     }
 }
