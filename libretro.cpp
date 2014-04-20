@@ -9,7 +9,7 @@
 #include "libretro.h"
 
 static MDFNGI *game;
-static retro_log_printf_t log_cb;
+retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
@@ -430,7 +430,7 @@ void retro_init()
    check_system_specs();
 }
 
-void retro_reset()
+void retro_reset(void)
 {
    game->DoSimpleCommand(MDFN_MSC_RESET);
 }
@@ -875,10 +875,8 @@ void retro_unload_game()
    game->CloseGame();
 
    if (game->name)
-   {
       free(game->name);
-      game->name=0;
-   }
+   game->name = 0;
 
    MDFNMP_Kill();
 

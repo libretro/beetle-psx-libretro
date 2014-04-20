@@ -5,6 +5,10 @@
 #include "mednafen/general.h"
 #include "mednafen/mednafen-driver.h"
 
+#include "libretro.h"
+
+extern retro_log_printf_t log_cb;
+
 #if defined(__CELLOS_LV2__)
 #include <sys/timer.h>
 #include <ppu_intrinsics.h>
@@ -22,8 +26,6 @@
 #endif
 
 #include <iostream>
-
-//#define LIBRETRO_DEBUG
 
 // Stubs
 
@@ -62,6 +64,8 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
             std::string(cd1);
          break;
       case MDFNMKF_FIRMWARE:
+      case MDFNMKF_AUX:
+      case MDFNMKF_PALETTE:
          ret = retro_base_directory + slash + std::string(cd1);
 #ifdef _WIN32
    sanitize_path(ret); // Because Windows path handling is mongoloid.
@@ -77,18 +81,14 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 
 void MDFND_DispMessage(unsigned char *str)
 {
-#ifdef LIBRETRO_DEBUG
-   if(str != NULL)
-      fprintf(stderr, "DISPMSG: %s\n", str);
-#endif
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "%s\n", str);
 }
 
 void MDFND_Message(const char *str)
 {
-#ifdef LIBRETRO_DEBUG
-   if(str != NULL)
-      fprintf(stderr, "MSG: %s\n", str);
-#endif
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "%s\n", str);
 }
 
 void MDFND_MidSync(const EmulateSpecStruct *)
@@ -96,10 +96,8 @@ void MDFND_MidSync(const EmulateSpecStruct *)
 
 void MDFND_PrintError(const char* err)
 {
-#ifdef LIBRETRO_DEBUG
-   if(err != NULL)
-      fprintf(stderr, "ERR: %s\n", err);
-#endif
+   if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "%s\n", err);
 }
 
 void MDFND_Sleep(unsigned int time)
