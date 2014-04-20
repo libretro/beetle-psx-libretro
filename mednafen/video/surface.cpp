@@ -69,14 +69,26 @@ void MDFN_Surface::Init(void *const p_pixels, const uint32 p_width, const uint32
 
    pixels16 = NULL;
    pixels = NULL;
+#if defined(WANT_8BPP)
+   palette = NULL;
+#endif
 
    if(!(rpix = calloc(1, p_pitchinpix * p_height * (nf.bpp / 8))))
       throw(1);
 
-   if(nf.bpp == 16)
+#if defined(WANT_8BPP)
+   //if(nf.bpp == 8)
+   {
+      pixels8 = (uint8 *)rpix;
+      palette = (MDFN_PaletteEntry*)calloc(sizeof(MDFN_PaletteEntry), 256);
+   }
+#elif defined(WANT_16BPP)
+   //if(nf.bpp == 16)
       pixels16 = (uint16 *)rpix;
-   else
+#elif defined(WANT_32BPP)
+   //else
       pixels = (uint32 *)rpix;
+#endif
 
    w = p_width;
    h = p_height;
@@ -94,9 +106,17 @@ void MDFN_Surface::SetFormat(const MDFN_PixelFormat &nf, bool convert)
 
 MDFN_Surface::~MDFN_Surface()
 {
-   if(pixels)
-      free(pixels);
+#if defined(WANT_16BPP)
    if(pixels16)
       free(pixels16);
+#elif defined(WANT_32BPP)
+   if(pixels)
+      free(pixels);
+#elif defined(WANT_8BPP)
+   pixels8 = NULL;
+   if(palette)
+      free(palette);
+   palette = NULL;
+#endif
 }
 

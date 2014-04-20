@@ -92,7 +92,7 @@ static bool is_pal = false;
 #include "mednafen/cdrom/pcecd.h"
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
-#define MEDNAFEN_CORE_VERSION "v0.9.28"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
 #define MEDNAFEN_CORE_EXTENSIONS "pce|sgx|cue"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)

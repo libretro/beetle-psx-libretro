@@ -4,6 +4,7 @@ FRONTEND_SUPPORTS_RGB565 = 1
 MEDNAFEN_DIR := mednafen
 MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
 NEED_TREMOR = 0
+LIBRETRO_SOURCES :=
 
 ifeq ($(platform),)
 platform = unix
@@ -71,7 +72,8 @@ else ifeq ($(core), pce-fast)
 ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
 endif
-   NEED_BPP = 32
+   HAVE_HES = 0
+   NEED_BPP = 16
    NEED_TREMOR = 1
    NEED_BLIP = 1
    NEED_CD = 1
@@ -79,15 +81,23 @@ endif
    NEED_SCSI_CD = 1
    NEED_THREADING = 1
    NEED_CRC32 = 1
+	WANT_NEW_API = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
+   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-09333
 
-CORE_SOURCES := $(CORE_DIR)/huc.cpp \
+CORE_SOURCES := \
+   $(CORE_DIR)/huc.cpp \
 	$(CORE_DIR)/huc6280.cpp \
 	$(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/pce.cpp \
-	$(CORE_DIR)/tsushin.cpp \
+	$(CORE_DIR)/pcecd.cpp \
+	$(CORE_DIR)/pcecd_drive.cpp \
+	$(CORE_DIR)/psg.cpp \
 	$(CORE_DIR)/vdc.cpp
+
+ifeq ($(HAVE_HES),1)
+CORE_SOURCES += $(CORE_DIR)/hes.cpp
+endif
 TARGET_NAME := mednafen_pce_fast_libretro
 
 arch = intel
@@ -484,6 +494,7 @@ endif
 
 ifeq ($(NEED_CRC32), 1)
    FLAGS += -DWANT_CRC32
+	LIBRETRO_SOURCES += scrc32.cpp
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)
@@ -538,7 +549,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/md5.cpp
 
 
-LIBRETRO_SOURCES := libretro.cpp stubs.cpp $(THREAD_STUBS)
+LIBRETRO_SOURCES += libretro.cpp stubs.cpp $(THREAD_STUBS)
 
 TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c
@@ -589,6 +600,10 @@ ifeq ($(CACHE_CD), 1)
 FLAGS += -D__LIBRETRO_CACHE_CD__
 endif
 
+ifeq ($(NEED_BPP), 8)
+FLAGS += -DWANT_8BPP
+endif
+
 ifeq ($(NEED_BPP), 16)
 FLAGS += -DWANT_16BPP
 endif
@@ -601,6 +616,9 @@ ifeq ($(NEED_BPP), 32)
 FLAGS += -DWANT_32BPP
 endif
 
+ifeq ($(WANT_NEW_API), 1)
+FLAGS += -DWANT_NEW_API
+endif
 
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS)

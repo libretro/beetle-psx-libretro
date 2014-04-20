@@ -92,6 +92,11 @@ void MDFND_Message(const char *str)
 void MDFND_MidSync(const EmulateSpecStruct *)
 {}
 
+void MDFN_MidLineUpdate(EmulateSpecStruct *espec, int y)
+{
+ //MDFND_MidLineUpdate(espec, y);
+}
+
 void MDFND_PrintError(const char* err)
 {
    if (log_cb)

@@ -33,6 +33,11 @@
 #define MAKECOLOR(r, g, b, a) (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT))
 #endif
 
+struct MDFN_PaletteEntry
+{
+ uint8 r, g, b;
+};
+
 typedef struct
 {
  int32 x, y, w, h;
@@ -125,6 +130,8 @@ class MDFN_Surface //typedef struct
   int32 pitch32; // In pixels, not in bytes.
   int32 pitchinpix;	// New name, new code should use this.
  };
+
+ MDFN_PaletteEntry *palette;
 
  MDFN_PixelFormat format;
 

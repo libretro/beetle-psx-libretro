@@ -104,6 +104,27 @@ typedef struct
  const InputPortInfoStruct *Types;
 } InputInfoStruct;
 
+struct MemoryPatch;
+
+struct CheatFormatStruct
+{
+ const char *FullName;		//"Game Genie", "GameShark", "Pro Action Catplay", etc.
+ const char *Description;	// Whatever?
+
+ bool (*DecodeCheat)(const std::string& cheat_string, MemoryPatch* patch);	// *patch should be left as initialized by MemoryPatch::MemoryPatch(), unless this is the
+										// second(or third or whatever) part of a multipart cheat.
+										//
+										// Will throw an std::exception(or derivative) on format error.
+										//
+										// Will return true if this is part of a multipart cheat.
+};
+
+struct CheatFormatInfoStruct
+{
+ unsigned NumFormats;
+
+ CheatFormatStruct *Formats;
+};
 
 // Miscellaneous system/simple commands(power, reset, dip switch toggles, coin insert, etc.)
 // (for DoSimpleCommand() )
@@ -301,6 +322,10 @@ typedef struct
  void (*InstallReadPatch)(uint32 address);
  void (*RemoveReadPatches)(void);
  uint8 (*MemRead)(uint32 addr);
+
+#ifdef WANT_NEW_API
+ CheatFormatInfoStruct *CheatFormatInfo;
+#endif
 
  bool SaveStateAltersState;	// true for bsnes and some libco-style emulators, false otherwise.
  // Main save state routine, called by the save state code in state.cpp.
