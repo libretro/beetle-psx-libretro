@@ -352,11 +352,11 @@ void MDFNI_CloseGame(void)
    MDFN_FlushGameCheats(0);
 
    MDFNGameInfo->CloseGame();
+
    if(MDFNGameInfo->name)
-   {
       free(MDFNGameInfo->name);
-      MDFNGameInfo->name = NULL;
-   }
+   MDFNGameInfo->name = NULL;
+
    MDFNMP_Kill();
 
    MDFNGameInfo = NULL;
