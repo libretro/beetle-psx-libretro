@@ -261,10 +261,6 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
  //MDFNI_SetLayerEnableMask(~0ULL);
 
- #ifdef WANT_DEBUGGER
- MDFNDBG_PostGameLoad(); 
- #endif
-
  MDFN_ResetMessages();   // Save state, status messages, etc.
 
  MDFN_LoadGameCheats(NULL);
@@ -325,10 +321,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
 
-	#ifdef WANT_DEBUGGER
-	MDFNDBG_PostGameLoad();
-	#endif
-
 	MDFN_ResetMessages();	// Save state, status messages, etc.
 
 	MDFN_indent(-2);
@@ -365,10 +357,6 @@ bool MDFNI_InitializeModule(void)
 
 int MDFNI_Initialize(const char *basedir)
 {
-#ifdef WANT_DEBUGGER
-	MDFNDBG_Init();
-#endif
-
 	return(1);
 }
 
