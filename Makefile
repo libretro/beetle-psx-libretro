@@ -154,7 +154,7 @@ else ifeq ($(core), ngp)
    NEED_BLIP = 1
    NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_NGP_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/ngp
+   CORE_DIR := $(MEDNAFEN_DIR)/ngp-0928
 
 CORE_SOURCES := $(CORE_DIR)/bios.cpp \
 	$(CORE_DIR)/biosHLE.cpp \
