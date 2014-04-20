@@ -120,7 +120,7 @@ static bool is_pal = false;
 #elif defined(WANT_NGP_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "ngp"
 #define MEDNAFEN_CORE_NAME "Mednafen Neopop"
-#define MEDNAFEN_CORE_VERSION "v0.9.26"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
 #define MEDNAFEN_CORE_EXTENSIONS "ngp|ngc"
 #define MEDNAFEN_CORE_TIMING_FPS 60.25
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
