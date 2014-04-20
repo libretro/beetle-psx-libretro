@@ -150,14 +150,14 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
  }
 }
 
+#ifdef NEED_CD
+ static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
+#endif
 // TODO: LoadCommon()
 
 MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
  uint8 LayoutMD5[16];
-#ifdef NEED_CD
- static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
-#endif
 
  MDFN_printf(_("Loading %s...\n\n"), devicename ? devicename : _("PHYSICAL CD"));
 
@@ -344,6 +344,29 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
    return(MDFNGameInfo);
 }
 
+void MDFNI_CloseGame(void)
+{
+   if(!MDFNGameInfo)
+      return;
+
+   MDFN_FlushGameCheats(0);
+
+   MDFNGameInfo->CloseGame();
+   if(MDFNGameInfo->name)
+   {
+      free(MDFNGameInfo->name);
+      MDFNGameInfo->name = NULL;
+   }
+   MDFNMP_Kill();
+
+   MDFNGameInfo = NULL;
+
+#ifdef NEED_CD
+   for(unsigned i = 0; i < CDInterfaces.size(); i++)
+      delete CDInterfaces[i];
+   CDInterfaces.clear();
+#endif
+}
 
 bool MDFNI_InitializeModule(void)
 {

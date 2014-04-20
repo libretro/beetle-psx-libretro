@@ -870,15 +870,7 @@ void retro_unload_game()
    if (!game)
       return;
 
-   MDFN_FlushGameCheats(0);
-
-   game->CloseGame();
-
-   if (game->name)
-      free(game->name);
-   game->name = 0;
-
-   MDFNMP_Kill();
+   MDFNI_CloseGame();
 }
 
 
@@ -887,7 +879,7 @@ void retro_unload_game()
 // See mednafen/psx/input/gamepad.cpp
 static void update_input(void)
 {
-   MDFNGI *currgame = game;
+   MDFNGI *currgame = (MDFNGI*)game;
 #if defined(WANT_PSX_EMU)
    input_buf[0] = 0;
    input_buf[1] = 0;
@@ -1537,7 +1529,7 @@ static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {
-   MDFNGI *curgame = game;
+   MDFNGI *curgame = (MDFNGI*)game;
    //if (serialize_size)
    //   return serialize_size;
 
