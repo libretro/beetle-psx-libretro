@@ -38,12 +38,13 @@ endif
    NEED_CD = 1
    NEED_TREMOR = 1
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
    NEED_DEINTERLACER = 1
    NEED_THREADING = 1
    NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_PSX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/psx-0932
+   CORE_DIR := $(MEDNAFEN_DIR)/psx-09333
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
 	$(CORE_DIR)/irq.cpp \
 	$(CORE_DIR)/timer.cpp \

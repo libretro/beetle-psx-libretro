@@ -61,7 +61,7 @@ static Deinterlacer deint;
 #if defined(WANT_PSX_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.32"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
@@ -93,7 +93,7 @@ static bool is_pal = false;
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
 #define MEDNAFEN_CORE_VERSION "v0.9.33.3"
-#define MEDNAFEN_CORE_EXTENSIONS "pce|sgx|cue"
+#define MEDNAFEN_CORE_EXTENSIONS "pce|sgx|cue|ccd"
 #define MEDNAFEN_CORE_TIMING_FPS 59.82
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
