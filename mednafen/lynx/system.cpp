@@ -202,7 +202,7 @@ static bool TestMagic(const char *name, MDFNFILE *fp)
 
 static int Load(const char *name, MDFNFILE *fp)
 {
-   lynxie = new CSystem(fp->f_data, fp->f_size);
+   lynxie = new CSystem(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp));
 
  int rot = lynxie->CartGetRotate();
  if(rot == CART_ROTATE_LEFT) MDFNGameInfo->rotated = MDFN_ROTATE270;
