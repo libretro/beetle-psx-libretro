@@ -9,6 +9,9 @@
 #include "libretro.h"
 
 static MDFNGI *game;
+
+struct retro_perf_callback perf_cb;
+retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
@@ -363,7 +366,7 @@ static struct retro_disk_control_callback disk_interface = {
 };
 #endif
 
-void retro_init()
+void retro_init(void)
 {
    struct retro_log_callback log;
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
@@ -426,6 +429,11 @@ void retro_init()
 #if defined(WANT_PSX_EMU)
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
 #endif
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
+      perf_get_cpu_features_cb = perf_cb.get_cpu_features;
+   else
+      perf_get_cpu_features_cb = NULL;
 
    check_system_specs();
 }

@@ -17,32 +17,41 @@
  */
 
 #include "cputest.h"
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
+#include "../libretro.h"
+
+extern retro_get_cpu_features_t perf_get_cpu_features_cb;
 
 static int flags, checked = 0;
 
-
 void cputest_force_flags(int arg)
 {
-    flags   = arg;
-    checked = 1;
 }
 
 int cputest_get_flags(void)
 {
-    if (checked)
-        return flags;
+   unsigned cpu = 0;
+   flags = 0;
+   if (perf_get_cpu_features_cb)
+      cpu = perf_get_cpu_features_cb();
 
-//    if (ARCH_ARM) flags = ff_get_cpu_flags_arm();
-#if ARCH_POWERPC
-    flags = ff_get_cpu_flags_ppc();
-#endif
-
-#if ARCH_X86
-    flags = ff_get_cpu_flags_x86();
-#endif
+   if (cpu & RETRO_SIMD_MMX)
+      flags |= CPUTEST_FLAG_MMX;
+   if (cpu & RETRO_SIMD_SSE)
+      flags |= CPUTEST_FLAG_SSE;
+   if (cpu & RETRO_SIMD_SSE2)
+      flags |= CPUTEST_FLAG_SSE2;
+   if (cpu & RETRO_SIMD_SSE3)
+      flags |= CPUTEST_FLAG_SSE3;
+   if (cpu & RETRO_SIMD_SSSE3)
+      flags |= CPUTEST_FLAG_SSSE3;
+   if (cpu & RETRO_SIMD_SSE4)
+      flags |= CPUTEST_FLAG_SSE4;
+   if (cpu & RETRO_SIMD_SSE42)
+      flags |= CPUTEST_FLAG_SSE42;
+   if (cpu & RETRO_SIMD_AVX)
+      flags |= CPUTEST_FLAG_AVX;
+   if (cpu & RETRO_SIMD_VMX)
+      flags |= CPUTEST_FLAG_ALTIVEC;
 
     checked = 1;
     return flags;
