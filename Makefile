@@ -110,7 +110,6 @@ HW_CPU_SOURCES += $(MEDNAFEN_DIR)/hw_cpu/huc6280/cpu_huc6280.cpp
 HW_MISC_SOURCES += $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
 HW_SOUND_SOURCES += $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES += $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 OKIADPCM_SOURCES += $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), lynx)
    core = lynx

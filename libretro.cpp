@@ -92,7 +92,7 @@ static bool is_pal = false;
 static bool is_pal = false;
 
 #elif defined(WANT_PCE_FAST_EMU)
-#include "mednafen/cdrom/pcecd.h"
+#include <pcecd.h>
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
 #define MEDNAFEN_CORE_VERSION "v0.9.33.3"
@@ -538,7 +538,7 @@ static void check_variables(void)
 
    if (do_cdsettings)
    {
-      PCECD_Settings settings = {0};
+      PCE_Fast::PCECD_Settings settings = {0};
       settings.CDDA_Volume = (double)setting_pce_fast_adpcmvolume / 100;
       settings.CD_Speed = setting_pce_fast_cdspeed;
       settings.ADPCM_Volume = (double)setting_pce_fast_cddavolume / 100;
