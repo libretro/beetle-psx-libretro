@@ -57,7 +57,10 @@ static int32 lastts;
 static int32 pcecd_drive_ne = 0;
 
 // ADPCM variables and whatnot
-#define ADPCM_DEBUG(x, ...) {  /*printf("[Half=%d, End=%d, Playing=%d] "x, ADPCM.HalfReached, ADPCM.EndReached, ADPCM.Playing, ## __VA_ARGS__);*/  }
+static inline ADPCM_DEBUG(const char *format, ...)
+{
+/*printf("[Half=%d, End=%d, Playing=%d] "x, ADPCM.HalfReached, ADPCM.EndReached, ADPCM.Playing, ## __VA_ARGS__);*/ 
+}
 
 typedef Blip_Synth<blip_good_quality, 16384> ADSynth;
 static ADSynth ADPCMSynth;

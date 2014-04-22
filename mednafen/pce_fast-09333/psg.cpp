@@ -169,7 +169,7 @@ PCEFast_PSG::PCEFast_PSG(Blip_Buffer *bb_l, Blip_Buffer *bb_r)
          double flub = 1;
 
          if(vl)
-          flub /= pow(2, (double)1 / 4 * vl);                  // ~1.5dB reduction per increment of vl 
+          flub /= powf(2, (double)1 / 4 * vl);                  // ~1.5dB reduction per increment of vl 
 
 	 if(vl == 0x1F)
 	  flub = 0;

@@ -25,7 +25,10 @@
 
 namespace PCE_Fast
 {
-#define SCSIDBG(format, ...) { printf("SCSI: " format "\n",  ## __VA_ARGS__); }
+static inline void SCSIDBG(const char *format, ...)
+{
+//printf("SCSI: " format "\n",  ## __VA_ARGS__);
+}
 //#define SCSIDBG(format, ...) { }
 
 using namespace CDUtility;

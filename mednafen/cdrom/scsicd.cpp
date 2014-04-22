@@ -31,7 +31,10 @@
 #include "cdromif.h"
 #include "SimpleFIFO.h"
 
-#define SCSIDBG(format, ...) { printf("[SCSICD] " format "\n",  ## __VA_ARGS__); }
+static inline void SCSIDBG(const char *format, ...)
+{
+   //printf("[SCSICD] " format "\n",  ## __VA_ARGS__); 
+}
 //#define SCSIDBG(format, ...) { }
 
 using namespace CDUtility;

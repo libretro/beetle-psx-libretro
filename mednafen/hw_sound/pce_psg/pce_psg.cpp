@@ -32,7 +32,7 @@ void PCE_PSG::SetVolume(double new_volume)
          double flub = 1.0 * new_volume * 8 / 6;
 
          if(vl)
-          flub /= pow(2, (double)1 / 4 * vl);                  // ~1.5dB reduction per increment of vl 
+          flub /= powf(2, (double)1 / 4 * vl);                  // ~1.5dB reduction per increment of vl 
 
 	 if(vl == 0x1F)
 	  flub = 0;
