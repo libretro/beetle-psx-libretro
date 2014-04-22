@@ -25,13 +25,23 @@
 #include <math.h>
 #include "vdc.h"
 
-#define VDC_DEBUG(x, ...)     { }
+static inline void VDC_DEBUG(const char *fmt, ...)
+{
+}
+//#define VDC_DEBUG(x, ...)     { }
 //#define VDC_DEBUG(x, ...)       printf(x ": HPhase=%d, HPhaseCounter=%d, RCRCount=%d\n", ## __VA_ARGS__, HPhase, HPhaseCounter, RCRCount);
+//
+static inline void VDC_UNDEFINED(const char *fmt, ...)
+{
+}
 
-#define VDC_UNDEFINED(format, ...)   { }
+//#define VDC_UNDEFINED(format, ...)   { }
 //#define VDC_UNDEFINED(format, ...)      printf(format " RCRCount=%d" "\n", ## __VA_ARGS__, RCRCount)
 
-#define VDC_WARNING(format, ...)      { }
+static inline void VDC_WARNING(const char *fmt, ...)
+{
+}
+//#define VDC_WARNING(format, ...)      { }
 //#define VDC_WARNING(format, ...)     { printf(format "\n", ## __VA_ARGS__); }
 
 #define ULE_BG		1
