@@ -18,10 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef AVUTIL_CPU_H
 #define AVUTIL_CPU_H
 
@@ -66,8 +62,3 @@ int ff_get_cpu_flags_ppc(void);
 int ff_get_cpu_flags_x86(void);
 
 #endif /* AVUTIL_CPU_H */
-
-#ifdef __cplusplus
-} //extern "C"
-#endif
-

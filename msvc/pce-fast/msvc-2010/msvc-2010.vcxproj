@@ -26,8 +26,8 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\scsicd.cpp" />
     <ClCompile Include="..\..\..\mednafen\cdrom\SimpleFIFO.cpp" />
     <ClCompile Include="..\..\..\mednafen\cputest\cputest.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\endian.cpp" />
     <ClCompile Include="..\..\..\mednafen\error.cpp" />
@@ -54,6 +54,7 @@
     <ClCompile Include="..\..\..\mednafen\pce_fast-09333\pcecd_drive.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast-09333\psg.cpp" />
     <ClCompile Include="..\..\..\mednafen\pce_fast-09333\vdc.cpp" />
+    <ClCompile Include="..\..\..\mednafen\player.cpp" />
     <ClCompile Include="..\..\..\mednafen\settings.cpp" />
     <ClCompile Include="..\..\..\mednafen\sound\Blip_Buffer.cpp" />
     <ClCompile Include="..\..\..\mednafen\sound\Stereo_Buffer.cpp" />
@@ -178,7 +179,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_WIN32;_LIB;LSB_FIRST;WANT_PCE_FAST_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions);WANT_THREADING;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WIN32;_LIB;LSB_FIRST;WANT_PCE_FAST_EMU;WANT_16BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions);WANT_THREADING;_CRT_SECURE_NO_WARNINGS;WANT_NEW_API</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -200,7 +201,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_WIN32;_LIB;LSB_FIRST;WANT_PCE_FAST_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions);WANT_THREADING;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WIN32;_LIB;LSB_FIRST;WANT_PCE_FAST_EMU;WANT_16BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;NEED_CD;WANT_CRC32;%(PreprocessorDefinitions);WANT_THREADING;_CRT_SECURE_NO_WARNINGS;WANT_NEW_API</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;$(SolutionDir)\..\..\mednafen\hw_sound;$(SolutionDir)\..\..\mednafen\hw_video;$(SolutionDir)\..\..\mednafen\hw_misc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
