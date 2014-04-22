@@ -57,7 +57,7 @@ static int32 lastts;
 static int32 pcecd_drive_ne = 0;
 
 // ADPCM variables and whatnot
-static inline ADPCM_DEBUG(const char *format, ...)
+static inline void ADPCM_DEBUG(const char *format, ...)
 {
 /*printf("[Half=%d, End=%d, Playing=%d] "x, ADPCM.HalfReached, ADPCM.EndReached, ADPCM.Playing, ## __VA_ARGS__);*/ 
 }
