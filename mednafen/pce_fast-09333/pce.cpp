@@ -23,7 +23,7 @@
 #include "pcecd.h"
 #include "pcecd_drive.h"
 #include "hes.h"
-#include "arcade_card/arcade_card.h"
+#include "../hw_misc/arcade_card/arcade_card.h"
 #include "../mempatcher.h"
 #include "../cdrom/cdromif.h"
 
