@@ -242,6 +242,9 @@
 					RelativePath="..\..\..\mednafen\okiadpcm.cpp">
 				</File>
 				<File
+					RelativePath="..\..\..\mednafen\player.cpp">
+				</File>
+				<File
 					RelativePath="..\..\..\mednafen\settings.cpp">
 				</File>
 				<File
@@ -282,9 +285,6 @@
 					</File>
 					<File
 						RelativePath="..\..\..\mednafen\cdrom\lec.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\cdrom\pcecd.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\mednafen\cdrom\recover-raw.cpp">
@@ -350,22 +350,31 @@
 					Name="pce_fast"
 					Filter="">
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\huc.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\hes.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\huc6280.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\huc.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\input.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\huc6280.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\pce.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\input.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\tsushin.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\pce.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pce_fast\vdc.cpp">
+						RelativePath="..\..\..\mednafen\pce_fast-09333\pcecd.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\pce_fast-09333\pcecd_drive.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\pce_fast-09333\psg.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\pce_fast-09333\vdc.cpp">
 					</File>
 				</Filter>
 				<Filter

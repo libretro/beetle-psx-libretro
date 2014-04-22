@@ -242,6 +242,9 @@
 					RelativePath="..\..\..\mednafen\okiadpcm.cpp">
 				</File>
 				<File
+					RelativePath="..\..\..\mednafen\player.cpp">
+				</File>
+				<File
 					RelativePath="..\..\..\mednafen\settings.cpp">
 				</File>
 				<File
@@ -304,19 +307,19 @@
 					Name="vb"
 					Filter="">
 					<File
-						RelativePath="..\..\..\mednafen\vb\input.cpp">
+						RelativePath="..\..\..\mednafen\vb-09333\input.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\vb\timer.cpp">
+						RelativePath="..\..\..\mednafen\vb-09333\timer.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\vb\vb.cpp">
+						RelativePath="..\..\..\mednafen\vb-09333\vb.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\vb\vip.cpp">
+						RelativePath="..\..\..\mednafen\vb-09333\vip.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\vb\vsu.cpp">
+						RelativePath="..\..\..\mednafen\vb-09333\vsu.cpp">
 					</File>
 				</Filter>
 				<Filter
@@ -375,6 +378,43 @@
 					Filter="">
 					<File
 						RelativePath="..\..\..\mednafen\video\surface.cpp">
+					</File>
+				</Filter>
+				<Filter
+					Name="cpu_test"
+					Filter="">
+					<File
+						RelativePath="..\..\..\mednafen\cputest\cputest.c">
+						<FileConfiguration
+							Name="Debug|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Profile|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Profile_FastCap|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release_LTCG|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
 					</File>
 				</Filter>
 			</Filter>
