@@ -33,6 +33,9 @@
     <Filter Include="Source Files\mednafen\hw_cpu\v810\fpu-new">
       <UniqueIdentifier>{3e634eaf-5bc6-4067-b223-18448d4686c8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\cputest">
+      <UniqueIdentifier>{d6b5ad30-82b7-4bd6-8c63-7af9e1ea40d3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\mednafen\Stream.cpp">
@@ -107,21 +110,6 @@
     <ClCompile Include="..\..\..\mednafen\sound\Stereo_Buffer.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\input.cpp">
-      <Filter>Source Files\mednafen\vb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\timer.cpp">
-      <Filter>Source Files\mednafen\vb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\vb.cpp">
-      <Filter>Source Files\mednafen\vb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\vip.cpp">
-      <Filter>Source Files\mednafen\vb</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\vsu.cpp">
-      <Filter>Source Files\mednafen\vb</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\fpu-new\softfloat.c">
       <Filter>Source Files\mednafen\hw_cpu\v810\fpu-new</Filter>
     </ClCompile>
@@ -131,7 +119,25 @@
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpu.cpp">
       <Filter>Source Files\mednafen\hw_cpu\v810</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\vb\debug.cpp">
+    <ClCompile Include="..\..\..\mednafen\player.cpp">
+      <Filter>Source Files\mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\cputest\cputest.c">
+      <Filter>Source Files\mednafen\cputest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\vb-09333\input.cpp">
+      <Filter>Source Files\mednafen\vb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\vb-09333\timer.cpp">
+      <Filter>Source Files\mednafen\vb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\vb-09333\vb.cpp">
+      <Filter>Source Files\mednafen\vb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\vb-09333\vip.cpp">
+      <Filter>Source Files\mednafen\vb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\vb-09333\vsu.cpp">
       <Filter>Source Files\mednafen\vb</Filter>
     </ClCompile>
   </ItemGroup>
