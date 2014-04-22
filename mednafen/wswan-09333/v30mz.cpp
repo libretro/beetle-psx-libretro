@@ -28,7 +28,7 @@
 */
 
 #include "wswan.h"
-#include "memory.h"
+#include "wswan-memory.h"
 
 #include <string.h>
 

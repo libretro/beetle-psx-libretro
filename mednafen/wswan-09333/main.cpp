@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <math.h>
-#include <zlib.h>
 
 #include "gfx.h"
 #include "wswan-memory.h"

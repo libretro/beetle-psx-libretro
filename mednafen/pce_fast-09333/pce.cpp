@@ -16,7 +16,6 @@
  */
 
 #include "pce.h"
-#include <zlib.h>
 #include "vdc.h"
 #include "psg.h"
 #include "input.h"
@@ -27,6 +26,8 @@
 #include "arcade_card/arcade_card.h"
 #include "../mempatcher.h"
 #include "../cdrom/cdromif.h"
+
+extern "C" unsigned long crc32(unsigned long crc, const unsigned char *buf, unsigned int len);
 
 namespace PCE_Fast
 {
