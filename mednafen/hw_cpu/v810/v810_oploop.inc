@@ -83,12 +83,16 @@
 
 	 //printf("%02x\n", opcode >> 1);
 
-	 static const void *const op_goto_table[256] =
-	 {
-	  #include "v810_op_table.inc"
-	 };
+          #ifdef _MSC_VER
+             #include "v810_op_table_msvc.inc"
+          #else
+             static const void *const op_goto_table[256] =
+             {
+                #include "v810_op_table.inc"
+             };
 
-	 goto *op_goto_table[opcode];
+             goto *op_goto_table[opcode];
+             #endif
 
 	// Bit string subopcodes
         #define DO_AM_BSTR()							\
