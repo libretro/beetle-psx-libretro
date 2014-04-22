@@ -92,7 +92,7 @@ static bool is_pal = false;
 static bool is_pal = false;
 
 #elif defined(WANT_PCE_FAST_EMU)
-#include <pcecd.h>
+#include "mednafen/pce_fast-09333/pcecd.h"
 #define MEDNAFEN_CORE_NAME_MODULE "pce_fast"
 #define MEDNAFEN_CORE_NAME "Mednafen PCE Fast"
 #define MEDNAFEN_CORE_VERSION "v0.9.33.3"

@@ -20,7 +20,7 @@
 #include "huc.h"
 #include "pcecd.h"
 #include "../player.h"
-#include "../endian.h"
+#include "../mednafen-endian.h"
 
 namespace PCE_Fast
 {
