@@ -794,7 +794,15 @@ OP( 0xd5, i_aad    ) { uint32 mult=FETCH; mult=0; I.regs.b[AL] = I.regs.b[AH] * 
 OP( 0xd6, i_setalc ) { I.regs.b[AL] = (CF)?0xff:0x00; CLK(3);  } OP_EPILOGUE;
 OP( 0xd7, i_trans  ) { uint32 dest = (I.regs.w[BW]+I.regs.b[AL])&0xffff; I.regs.b[AL] = GetMemB(DS0, dest); CLK(5); } OP_EPILOGUE;
 
-OP_RANGE(0xd8, 0xdf, i_fpo) { /*printf("FPO1, Op:%02x\n", opcode);*/ GetModRM; CLK(1); } OP_EPILOGUE;
+case 0xd8:
+case 0xd9:
+case 0xda:
+case 0xdb:
+case 0xdc:
+case 0xdd:
+case 0xde:
+case 0xdf:
+{ GetModRM; CLK(1); } OP_EPILOGUE;
 
 OP( 0xe0, i_loopne ) { int8 disp = (int8)FETCH; I.regs.w[CW]--; if (!ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
 OP( 0xe1, i_loope  ) { int8 disp = (int8)FETCH; I.regs.w[CW]--; if ( ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
