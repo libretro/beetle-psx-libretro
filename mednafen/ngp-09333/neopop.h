@@ -17,6 +17,7 @@
 //=============================================================================
 
 #include "../mednafen.h"
+#include "../mednafen-endian.h"
 #include "../mempatcher.h"
 #include <mednafen/masmem.h>
 

@@ -40,6 +40,7 @@ ifeq ($(core), psx)
    PTHREAD_FLAGS = -pthread
    NEED_CD = 1
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
    NEED_DEINTERLACER = 1
 	NEED_STEREO_SOUND = 1
@@ -47,7 +48,7 @@ ifeq ($(core), psx)
 	NEED_THREADING = 1
 	NEED_TREMOR = 1
    CORE_DEFINE := -DWANT_PSX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/psx-0932
+   CORE_DIR := $(MEDNAFEN_DIR)/psx-09333
    CORE_SOURCES := $(CORE_DIR)/psx.cpp \
 	$(CORE_DIR)/irq.cpp \
 	$(CORE_DIR)/timer.cpp \
@@ -75,6 +76,7 @@ else ifeq ($(core), pce-fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
    NEED_CD = 1
 	NEED_STEREO_SOUND = 1
@@ -83,29 +85,30 @@ else ifeq ($(core), pce-fast)
 	NEED_TREMOR = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_PCE_FAST_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast
+   CORE_DIR := $(MEDNAFEN_DIR)/pce_fast-09333
 
 CORE_SOURCES := $(CORE_DIR)/huc.cpp \
 	$(CORE_DIR)/huc6280.cpp \
 	$(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/pce.cpp \
-	$(CORE_DIR)/tsushin.cpp \
+	$(CORE_DIR)/pcecd.cpp \
+	$(CORE_DIR)/pcecd_drive.cpp \
+	$(CORE_DIR)/psg.cpp \
 	$(CORE_DIR)/vdc.cpp
 TARGET_NAME := mednafen_pce_fast_libretro
 
 HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/huc6280/cpu_huc6280.cpp
 HW_MISC_SOURCES := $(MEDNAFEN_DIR)/hw_misc/arcade_card/arcade_card.cpp
-HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
 HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
-CORE_CD_SOURCES := $(MEDNAFEN_DIR)/cdrom/pcecd.cpp
 OKIADPCM_SOURCES := $(MEDNAFEN_DIR)/okiadpcm.cpp
 else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/wswan
+   CORE_DIR := $(MEDNAFEN_DIR)/wswan-09333
 
 CORE_SOURCES := $(CORE_DIR)/gfx.cpp \
 	$(CORE_DIR)/main.cpp \
@@ -120,10 +123,11 @@ TARGET_NAME := mednafen_wswan_libretro
 else ifeq ($(core), ngp)
    core = ngp
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_NGP_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/ngp
+   CORE_DIR := $(MEDNAFEN_DIR)/ngp-09333
 
 CORE_SOURCES := $(CORE_DIR)/bios.cpp \
 	$(CORE_DIR)/biosHLE.cpp \
@@ -162,7 +166,7 @@ else ifeq ($(core), gba)
 	NEED_STEREO_SOUND = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_GBA_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/gba
+   CORE_DIR := $(MEDNAFEN_DIR)/gba-09333
 
 CORE_SOURCES := $(CORE_DIR)/arm.cpp \
 	$(CORE_DIR)/bios.cpp \
@@ -191,10 +195,11 @@ TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), vb)
    core = vb
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_VB_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/vb
+   CORE_DIR := $(MEDNAFEN_DIR)/vb-09333
 
 CORE_SOURCES := $(CORE_DIR)/input.cpp \
 	$(CORE_DIR)/timer.cpp \
@@ -210,12 +215,13 @@ TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), pcfx)
    core = pcfx
    NEED_BPP = 32
+	WANT_NEW_API = 1
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
 	NEED_CD = 1
 	NEED_SCSI_CD = 1
    CORE_DEFINE := -DWANT_PCFX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/pcfx
+   CORE_DIR := $(MEDNAFEN_DIR)/pcfx-09333
 
 CORE_SOURCES := $(CORE_DIR)/king.cpp \
 	$(CORE_DIR)/soundbox.cpp \
@@ -309,6 +315,7 @@ endif
 
 ifeq ($(NEED_CRC32), 1)
 FLAGS += -DWANT_CRC32
+CORE_SOURCES += $(MEDNAFEN_LIBRETRO_DIR)/scrc32.cpp
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)
@@ -340,13 +347,15 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/MemoryStream.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
-	$(MEDNAFEN_DIR)/endian.cpp \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
 	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
+	$(MEDNAFEN_DIR)/player.cpp \
+	$(MEDNAFEN_DIR)/endian.cpp \
+	$(MEDNAFEN_DIR)/cputest/cputest.c \
 	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 
@@ -390,7 +399,7 @@ LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
 LOCAL_C_INCLUDES += .. ../mednafen ../mednafen/include ../mednafen/intl ../mednafen/hw_cpu ../mednafen/hw_sound ../mednafen/hw_misc ../mednafen/hw_video $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(SOUND_DEFINE) -DLSB_FIRST -Dgettext_noop\(a\)=a
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -DNDEBUG -D_LOW_ACCURACY_ $(SOUND_DEFINE) -DLSB_FIRST
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86
@@ -402,6 +411,10 @@ endif
 
 ifeq ($(NEED_BPP), 16)
 FLAGS += -DWANT_16BPP
+endif
+
+ifeq ($(WANT_NEW_API), 1)
+FLAGS += -DWANT_NEW_API
 endif
 
 ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
