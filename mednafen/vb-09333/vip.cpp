@@ -19,8 +19,9 @@
 #include "vip.h"
 #include <math.h>
 
-#define VIP_DBGMSG(format, ...) { }
-//#define VIP_DBGMSG(format, ...) printf(format "\n", ## __VA_ARGS__)
+static inline void VIP_DBGMSG(const char *format, ...)
+{
+}
 
 namespace MDFN_IEN_VB
 {
