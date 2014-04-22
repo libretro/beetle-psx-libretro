@@ -35,8 +35,8 @@
 //---------------------------------------------------------------------------
 */
 
-#include "neopop.h"
-#include "interrupt.h"
+#include "../neopop.h"
+#include "../interrupt.h"
 #include "TLCS900h_registers.h"
 
 namespace TLCS900H

@@ -77,6 +77,9 @@ RomInfo;
 //RomHeader
 typedef struct
 {
+#ifdef _WIN32
+#pragma pack(push, 1)
+#endif
 	uint8		licence[28];		// 0x00 - 0x1B
 	uint32	startPC;			// 0x1C - 0x1F
 	uint16	catalog;			// 0x20 - 0x21
@@ -88,7 +91,12 @@ typedef struct
 	uint32	reserved2;			// 0x34 - 0x37
 	uint32	reserved3;			// 0x38 - 0x3B
 	uint32	reserved4;			// 0x3C - 0x3F
+#ifdef _WIN32
+#pragma pack(pop)
+} RomHeader;
+#else
 } __attribute__((__packed__)) RomHeader;
+#endif
 
 //=============================================================================
 

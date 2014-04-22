@@ -62,11 +62,11 @@
 //---------------------------------------------------------------------------
 */
 
-#include "neopop.h"
+#include "../neopop.h"
 #include "TLCS900h_interpret.h"
 #include "TLCS900h_registers.h"
-#include "mem.h"
-#include "dma.h"
+#include "../mem.h"
+#include "../dma.h"
 
 namespace TLCS900H
 {
