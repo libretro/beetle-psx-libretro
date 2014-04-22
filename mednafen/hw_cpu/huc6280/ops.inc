@@ -223,25 +223,25 @@ case 0xC2: OP_CLEARR(Y); // CLY
 #define OP_SETF(f, ...)	{ ADDCYC(1); LASTCYCLE; P |= f; __VA_ARGS__ break; }
 
 case 0x18: /* CLC */
-	   OP_CLEARF(C_FLAG);
+	   { ADDCYC(1); LASTCYCLE; P &= ~(C_FLAG); break; }
 
 case 0xD8: /* CLD */
-	   OP_CLEARF(D_FLAG);
+	   { ADDCYC(1); LASTCYCLE; P &= ~(D_FLAG); break; }
 
 case 0x58: /* CLI */
-	   OP_CLEARF(I_FLAG, REDOPIMCACHE(););
+	   { ADDCYC(1); LASTCYCLE; P &= ~(I_FLAG); REDOPIMCACHE(); break; }
 
 case 0xB8: /* CLV */
-	   OP_CLEARF(V_FLAG);
+	   { ADDCYC(1); LASTCYCLE; P &= ~(V_FLAG); break; }
 
 case 0x38: /* SEC */
-	   OP_SETF(C_FLAG);
+      { ADDCYC(1); LASTCYCLE; P |= (C_FLAG); break; }
 
 case 0xF8: /* SED */
-	   OP_SETF(D_FLAG);
+      { ADDCYC(1); LASTCYCLE; P |= (D_FLAG); break; }
 
 case 0x78: /* SEI */
-	   OP_SETF(I_FLAG, REDOPIMCACHE(););
+      { ADDCYC(1); LASTCYCLE; P |= (I_FLAG); REDOPIMCACHE(); break; }
 
 case 0xF4: /* SET */
 	   //puts("SET");
