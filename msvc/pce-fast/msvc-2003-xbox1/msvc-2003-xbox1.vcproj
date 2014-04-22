@@ -389,17 +389,6 @@
 					</Filter>
 				</Filter>
 				<Filter
-					Name="hw_sound"
-					Filter="">
-					<Filter
-						Name="pce_psg"
-						Filter="">
-						<File
-							RelativePath="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp">
-						</File>
-					</Filter>
-				</Filter>
-				<Filter
 					Name="hw_video"
 					Filter="">
 					<File

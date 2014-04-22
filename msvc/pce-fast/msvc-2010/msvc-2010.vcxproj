@@ -37,7 +37,6 @@
     <ClCompile Include="..\..\..\mednafen\general.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp" />
-    <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc_video.cpp" />
     <ClCompile Include="..\..\..\mednafen\math_ops.cpp" />
     <ClCompile Include="..\..\..\mednafen\md5.cpp" />
