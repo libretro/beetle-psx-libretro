@@ -12,7 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\libretro.cpp" />
-    <ClCompile Include="..\..\..\mednafen\cputest\cputest.c" />
+    <ClCompile Include="..\..\..\mednafen\cputest\cputest.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\endian.cpp" />
     <ClCompile Include="..\..\..\mednafen\error.cpp" />
     <ClCompile Include="..\..\..\mednafen\file.cpp" />
@@ -20,8 +23,8 @@
     <ClCompile Include="..\..\..\mednafen\FileWrapper.cpp" />
     <ClCompile Include="..\..\..\mednafen\general.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\fpu-new\softfloat.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpu.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpuD.cpp" />
