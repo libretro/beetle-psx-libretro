@@ -219,8 +219,8 @@ case 0x82: OP_CLEARR(X); // CLX
 case 0xC2: OP_CLEARR(Y); // CLY
 
 // The optional argument(s) will run at the end, immediately before the break.
-#define OP_CLEARF(f, ...)	{ ADDCYC(1); LASTCYCLE; P &= ~f; __VA_ARGS__ break; }
-#define OP_SETF(f, ...)	{ ADDCYC(1); LASTCYCLE; P |= f; __VA_ARGS__ break; }
+//#define OP_CLEARF(f, ...)	{ ADDCYC(1); LASTCYCLE; P &= ~f; __VA_ARGS__ break; }
+//#define OP_SETF(f, ...)	{ ADDCYC(1); LASTCYCLE; P |= f; __VA_ARGS__ break; }
 
 case 0x18: /* CLC */
 	   { ADDCYC(1); LASTCYCLE; P &= ~(C_FLAG); break; }
