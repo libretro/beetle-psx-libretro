@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\libretro.cpp" />
+    <ClCompile Include="..\..\..\mednafen\cputest\cputest.c" />
     <ClCompile Include="..\..\..\mednafen\endian.cpp" />
     <ClCompile Include="..\..\..\mednafen\error.cpp" />
     <ClCompile Include="..\..\..\mednafen\file.cpp" />
@@ -41,33 +42,34 @@
     <ClCompile Include="..\..\..\mednafen\mednafen.cpp" />
     <ClCompile Include="..\..\..\mednafen\MemoryStream.cpp" />
     <ClCompile Include="..\..\..\mednafen\mempatcher.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\bios.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\biosHLE.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\dma.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\flash.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\gfx.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\gfx_scanline_colour.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\gfx_scanline_mono.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\interrupt.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\mem.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\neopop.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\rom.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\rtc.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\sound.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\T6W28_Apu.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_dst.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_extra.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_reg.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_src.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_dst.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_reg.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_single.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_src.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_registers.cpp" />
-    <ClCompile Include="..\..\..\mednafen\ngp\Z80_interface.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\bios.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\biosHLE.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\dma.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\flash.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\gfx.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\gfx_scanline_colour.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\gfx_scanline_mono.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\interrupt.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\mem.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\neopop.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\rom.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\rtc.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\sound.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\T6W28_Apu.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_dst.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_extra.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_reg.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_src.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_dst.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_reg.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_single.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_src.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_registers.cpp" />
+    <ClCompile Include="..\..\..\mednafen\ngp-09333\Z80_interface.cpp" />
     <ClCompile Include="..\..\..\mednafen\okiadpcm.cpp" />
+    <ClCompile Include="..\..\..\mednafen\player.cpp" />
     <ClCompile Include="..\..\..\mednafen\settings.cpp" />
     <ClCompile Include="..\..\..\mednafen\sound\Blip_Buffer.cpp" />
     <ClCompile Include="..\..\..\mednafen\sound\Stereo_Buffer.cpp" />
@@ -175,7 +177,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -195,7 +197,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -216,7 +218,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -241,7 +243,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -263,7 +265,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -285,7 +287,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;LTCG;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;LTCG;_LIB;MSB_FIRST;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.26;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;PSS_STYLE=2;MEDNAFEN_VERSION_NUMERIC=926;BYTE_ORDER=1;%(PreprocessorDefinitions);WANT_NEW_API</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)\..\..\;$(SolutionDir)\..\..\mednafen;$(SolutionDir)\..\..\mednafen\cdrom;$(SolutionDir)\..\..\mednafen\include;$(SolutionDir)\..\..\mednafen\sound;$(SolutionDir)\..\..\mednafen\ngp;$(SolutionDir)\..\..\mednafen\hw_cpu;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
