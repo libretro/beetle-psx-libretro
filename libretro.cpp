@@ -585,16 +585,6 @@ static void check_variables(void)
    }	
    
        
-   var.key = "psx_fastboot";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-   {
-      if (strcmp(var.value, "enabled") == 0)
-         setting_psx_fastboot = 1;
-      else if (strcmp(var.value, "disabled") == 0)
-         setting_psx_fastboot = 0;
-   }
-  
    var.key = "psx_enable_multitap_port1";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
@@ -1476,7 +1466,6 @@ void retro_set_environment(retro_environment_t cb)
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
-      { "psx_fastboot", "Skip BIOS sequence; disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
       { "psx_enable_dual_analog_type", "Analog controller mode; disabled|dualshock|dualanalog|flightstick" },	  
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
