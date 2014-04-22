@@ -35,6 +35,10 @@
 #define gzclose(a) gzclose(a)
 #endif
 
+#ifndef gettext_noop
+#define gettext_noop(a) (a)
+#endif
+
 extern MDFNGI *MDFNGameInfo;
 
 #include "settings.h"
