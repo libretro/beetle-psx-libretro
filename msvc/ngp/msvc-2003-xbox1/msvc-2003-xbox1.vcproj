@@ -21,7 +21,7 @@
 				Optimization="0"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\ngp&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="_DEBUG;_XBOX;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="_DEBUG;_XBOX;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN;WANT_NEW_API"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -55,7 +55,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\ngp&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN;WANT_NEW_API"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -90,7 +90,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\ngp&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN;WANT_NEW_API"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -126,7 +126,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\ngp&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN;WANT_NEW_API"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -162,7 +162,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;;&quot;$(SolutionDir)\..\..\&quot;;&quot;$(SolutionDir)\..\..\mednafen&quot;;&quot;$(SolutionDir)\..\..\mednafen\include&quot;;&quot;$(SolutionDir)\..\..\mednafen\cdrom&quot;;&quot;$(SolutionDir)\..\..\mednafen\sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\ngp&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_cpu&quot;;&quot;$(SolutionDir)\..\..\mednafen\include\blip&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_sound&quot;;&quot;$(SolutionDir)\..\..\mednafen\hw_misc&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;LTCG;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN"
+				PreprocessorDefinitions="NDEBUG;_XBOX;LTCG;_LIB;WANT_NGP_EMU;WANT_32BPP;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION=0.9.28;MPC_FIXED_POINT;__LIBRETRO__;_LOW_ACCURACY;WANT_STEREO_SOUND;FRONTEND_SUPPORTS_RGB565;MEDNAFEN_VERSION_NUMERIC=926;WANT_CRC32;LSB_FIRST;BYTE_ORDER=LITTLE_ENDIAN;WANT_NEW_API"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"
@@ -242,6 +242,9 @@
 					RelativePath="..\..\..\mednafen\okiadpcm.cpp">
 				</File>
 				<File
+					RelativePath="..\..\..\mednafen\player.cpp">
+				</File>
+				<File
 					RelativePath="..\..\..\mednafen\settings.cpp">
 				</File>
 				<File
@@ -304,85 +307,85 @@
 					Name="ngp"
 					Filter="">
 					<File
-						RelativePath="..\..\..\mednafen\ngp\bios.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\bios.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\biosHLE.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\biosHLE.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\dma.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\dma.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\flash.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\flash.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\gfx.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\gfx.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\gfx_scanline_colour.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\gfx_scanline_colour.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\gfx_scanline_mono.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\gfx_scanline_mono.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\interrupt.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\interrupt.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\mem.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\mem.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\neopop.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\neopop.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\rom.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\rom.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\rtc.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\rtc.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\sound.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\sound.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\T6W28_Apu.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\T6W28_Apu.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\ngp\Z80_interface.cpp">
+						RelativePath="..\..\..\mednafen\ngp-09333\Z80_interface.cpp">
 					</File>
 					<Filter
 						Name="TLCS-900h"
 						Filter="">
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_dst.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_dst.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_extra.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_extra.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_reg.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_reg.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_disassemble_src.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_disassemble_src.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_dst.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_dst.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_reg.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_reg.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_single.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_single.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_interpret_src.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_interpret_src.cpp">
 						</File>
 						<File
-							RelativePath="..\..\..\mednafen\ngp\TLCS-900h\TLCS900h_registers.cpp">
+							RelativePath="..\..\..\mednafen\ngp-09333\TLCS-900h\TLCS900h_registers.cpp">
 						</File>
 					</Filter>
 				</Filter>
@@ -406,6 +409,43 @@
 							RelativePath="..\..\..\mednafen\hw_cpu\z80-fuse\z80_ops.cpp">
 						</File>
 					</Filter>
+				</Filter>
+				<Filter
+					Name="cpu_test"
+					Filter="">
+					<File
+						RelativePath="..\..\..\mednafen\cputest\cputest.c">
+						<FileConfiguration
+							Name="Debug|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Profile|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Profile_FastCap|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release_LTCG|Xbox">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+					</File>
 				</Filter>
 			</Filter>
 		</Filter>
