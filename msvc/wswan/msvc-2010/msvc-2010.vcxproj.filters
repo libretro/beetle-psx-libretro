@@ -24,6 +24,9 @@
     <Filter Include="Source Files\mednafen\wswan">
       <UniqueIdentifier>{67b0fb70-90af-4316-b8fb-60ec05d88029}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\cputest">
+      <UniqueIdentifier>{371e39e8-7bd6-4cc1-897d-651db028a4b1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\mednafen\Stream.cpp">
@@ -98,32 +101,38 @@
     <ClCompile Include="..\..\..\mednafen\sound\Stereo_Buffer.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\v30mz.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\eeprom.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\eeprom.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\gfx.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\gfx.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\interrupt.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\interrupt.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\main.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\main.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\rtc.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\rtc.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\sound.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\sound.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\tcache.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\tcache.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\v30mz.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\wswan\wswan-memory.cpp">
+    <ClCompile Include="..\..\..\mednafen\wswan-09333\wswan-memory.cpp">
       <Filter>Source Files\mednafen\wswan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\player.cpp">
+      <Filter>Source Files\mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\cputest\cputest.c">
+      <Filter>Source Files\mednafen\cputest</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
