@@ -152,15 +152,11 @@ void InputDevice_DualShock::SetAMCT(bool enabled)
 {
  amct_enabled = enabled;
  if(amct_enabled)
- {
-    analog_mode = false;
-	fprintf(stderr, "Analog button enabled, analog mode false\n");
- }
+     analog_mode = false;
  else
- {
-    analog_mode = true;
-	fprintf(stderr, "Analog button disabled, analog mode true\n");
- } 
+     analog_mode = true;
+
+ MDFN_DispMessage(_("%s: Mode button is %s, analogs are now %s"), gp_name.c_str(), amct_enabled ? _("enabled") : _("disabled"), analog_mode?_("on") : _("off"));
 }
 
 //
@@ -294,7 +290,6 @@ void InputDevice_DualShock::UpdateInput(const void *data)
  //
  CheckManualAnaModeChange();
 
- //MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
  if(am_prev_info != analog_mode || aml_prev_info != analog_mode_locked)
  {
   MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
