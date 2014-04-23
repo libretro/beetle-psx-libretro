@@ -584,9 +584,18 @@ static void check_variables(void)
 			hookup_ports(true);
    }	
    
-       
-   var.key = "psx_enable_multitap_port1";
+   var.key = "psx_enable_analog_toggle";
 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         setting_psx_analog_toggle = 1;
+      else if (strcmp(var.value, "disabled") == 0)
+         setting_psx_analog_toggle = 0;
+   }  
+   
+   var.key = "psx_enable_multitap_port1";
+   
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
    {
       if (strcmp(var.value, "enabled") == 0)
@@ -753,7 +762,8 @@ static void hookup_ports(bool force)
         case RETRO_DEVICE_ANALOG:
 		{
             log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, psx_analog_type);
-            currgame->SetInput(j, psx_analog_type, &buf.u8[j]);            
+            currgame->SetInput(j, psx_analog_type, &buf.u8[j]);    
+
 			break;          
 		}
         default:
@@ -1467,9 +1477,11 @@ void retro_set_environment(retro_environment_t cb)
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
       { "psx_dithering", "Dithering; enabled|disabled" },
-      { "psx_enable_dual_analog_type", "Analog controller mode; disabled|dualshock|dualanalog|flightstick" },	  
+      { "psx_enable_dual_analog_type", "Analog controller mode; disabled|dualshock|dualanalog|flightstick" },
+      { "psx_enable_analog_toggle", "Dualshock analog button; disabled|enabled" },
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
+	  
 
       { NULL, NULL },
    };

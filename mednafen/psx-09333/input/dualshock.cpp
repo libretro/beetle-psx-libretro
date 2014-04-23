@@ -151,6 +151,12 @@ void InputDevice_DualShock::ResetTS(void)
 void InputDevice_DualShock::SetAMCT(bool enabled)
 {
  amct_enabled = enabled;
+ if(amct_enabled)
+     analog_mode = false;
+ else
+     analog_mode = true;
+
+ MDFN_DispMessage(_("%s: Mode button is %s, analogs are now %s"), gp_name.c_str(), amct_enabled ? _("enabled") : _("disabled"), analog_mode?_("on") : _("off"));
 }
 
 //
@@ -224,7 +230,6 @@ void InputDevice_DualShock::Power(void)
  transmit_pos = 0;
  transmit_count = 0;
 
- analog_mode = false;
  analog_mode_locked = false;
 
  mad_munchkins = false;
