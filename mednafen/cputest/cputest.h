@@ -21,6 +21,10 @@
 #ifndef AVUTIL_CPU_H
 #define AVUTIL_CPU_H
 
+#if defined(__cplusplus) && !defined(_MSC_VER)
+extern "C" {
+#endif
+
 #define CPUTEST_FLAG_FORCE    0x80000000 /* force usage of selected flags (OR) */
 
     /* lower 16 bits - CPU features */
@@ -56,9 +60,8 @@ int cputest_get_flags(void);
 void cputest_force_flags(int flags);
 
 
-/* The following CPU-specific functions shall not be called directly. */
-int ff_get_cpu_flags_arm(void);
-int ff_get_cpu_flags_ppc(void);
-int ff_get_cpu_flags_x86(void);
+#if defined(__cplusplus) && !defined(_MSC_VER)
+}
+#endif
 
 #endif /* AVUTIL_CPU_H */
