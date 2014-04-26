@@ -24,20 +24,11 @@
     <Filter Include="Source Files\mednafen\trio">
       <UniqueIdentifier>{35dd6f7d-5243-42fb-bf3b-66ae5808c1da}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\mednafen\pce_fast">
-      <UniqueIdentifier>{6ba4afd0-4a16-411a-9fa9-c63e451b35bf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\mednafen\cdrom">
       <UniqueIdentifier>{84c0bb6f-44c5-45dd-8bd0-80caa8076b21}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\mednafen\hw_cpu\huc6280">
-      <UniqueIdentifier>{585fa68d-736e-4485-95f8-065fb31a5cc4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\mednafen\hw_misc">
       <UniqueIdentifier>{8daa3df8-836e-4061-b2b1-2dc7da46390f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\mednafen\hw_misc\arcade_card">
-      <UniqueIdentifier>{691cb3fc-62c8-4ac6-9c02-9f23e66368f7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\mednafen\hw_sound">
       <UniqueIdentifier>{105e8413-1815-4b73-b6e5-61453de5430f}</UniqueIdentifier>
@@ -56,6 +47,15 @@
     </Filter>
     <Filter Include="Source Files\mednafen\cputest">
       <UniqueIdentifier>{f70d6936-5cd9-4fba-9309-a48fe85d6517}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mednafen\hw_cpu\v810">
+      <UniqueIdentifier>{585fa68d-736e-4485-95f8-065fb31a5cc4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mednafen\pcfx">
+      <UniqueIdentifier>{0ea565e8-c5d5-4ff5-b69c-22977b083095}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mednafen\pcfx\input">
+      <UniqueIdentifier>{0da14ec6-c46c-4f80-a694-1c9e65a87ec1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -164,17 +164,8 @@
     <ClCompile Include="..\..\..\mednafen\cdrom\audioreader.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp">
-      <Filter>Source Files\mednafen\hw_misc\arcade_card</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp">
-      <Filter>Source Files\mednafen\hw_sound\pce_psg</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc_video.cpp">
       <Filter>Source Files\mednafen\hw_video\huc6270</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp">
-      <Filter>Source Files\mednafen\hw_cpu\huc6280</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\cdrom\CDAccess_CCD.cpp">
       <Filter>Source Files\mednafen\cdrom</Filter>
@@ -236,32 +227,56 @@
     <ClCompile Include="..\..\..\mednafen\player.cpp">
       <Filter>Source Files\mednafen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\hes.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp">
+      <Filter>Source Files\mednafen\hw_sound\pce_psg</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\huc.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpu.cpp">
+      <Filter>Source Files\mednafen\hw_cpu\v810</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\huc6280.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpuD.cpp">
+      <Filter>Source Files\mednafen\hw_cpu\v810</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\input.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\fpu-new\softfloat.c">
+      <Filter>Source Files\mednafen\hw_cpu\v810</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\pce.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\sound\OwlResampler.cpp">
+      <Filter>Source Files\mednafen\sound</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\pcecd.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\fxscsi.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\pcecd_drive.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\huc6273.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\psg.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\mednafen\pce_fast-09333\vdc.cpp">
-      <Filter>Source Files\mednafen\pce_fast</Filter>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\interrupt.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\jrevdct.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\king.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\pcfx.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\rainbow.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\soundbox.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\timer.cpp">
+      <Filter>Source Files\mednafen\pcfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\gamepad.cpp">
+      <Filter>Source Files\mednafen\pcfx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\mouse.cpp">
+      <Filter>Source Files\mednafen\pcfx\input</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
