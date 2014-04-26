@@ -26,6 +26,10 @@
 #include "OwlResampler.h"
 #include "../cputest/cputest.h"
 
+#ifndef M_PI
+#define M_PI 3.1415926535
+#endif
+
 #if defined(ARCH_POWERPC_ALTIVEC) && defined(HAVE_ALTIVEC_H)
  #include <altivec.h>
 #endif
@@ -973,10 +977,11 @@ OwlResampler::OwlResampler(double input_rate, double output_rate, double rate_er
   NumCoeffs_Padded = NumCoeffs;
  }
 
+#if 0
  #if !defined(ARCH_X86) && !defined(ARCH_POWERPC_ALTIVEC)
   #warning "OwlResampler is being compiled without SIMD support."
  #endif
-
+#endif
  //
  // Adjust cutoff now that NumCoeffs may have been increased.
  //
