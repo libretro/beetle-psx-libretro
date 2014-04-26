@@ -366,19 +366,29 @@ ifeq ($(arch),ppc)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    OLD_GCC := 1
 else
-   fpic += -fPIC -mmacosx-version-min=10.6
    ENDIANNESS_DEFINES := -DLSB_FIRST
+endif
+OSXVER = `sw_vers -productVersion | cut -c 4`
+ifneq ($(OSXVER),9)
+   fpic += -mmacosx-version-min=10.5
 endif
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    ENDIANNESS_DEFINES := -DLSB_FIRST
-   LDFLAGS += $(PTHREAD_FLAGS) -miphone-version-min=5.0
-   FLAGS += $(PTHREAD_FLAGS) -miphone-version-min=5.0
+   LDFLAGS += $(PTHREAD_FLAGS)
+   FLAGS += $(PTHREAD_FLAGS)
 
-   CC = clang -arch armv7 -isysroot $(IOSSDK) -miphone-version-min=5.0
-   CXX = clang++ -arch armv7 -isysroot $(IOSSDK) -miphone-version-min=5.0
+   CC = clang -arch armv7 -isysroot $(IOSSDK)
+   CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
+OSXVER = `sw_vers -productVersion | cut -c 4`
+ifneq ($(OSXVER),9)
+   LDFLAGS += -miphone-version-min=5.0
+   FLAGS += -miphone-version-min=5.0
+   CC +=  -miphone-version-min=5.0
+   CXX +=  -miphone-version-min=5.0
+endif
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
