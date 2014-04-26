@@ -14,6 +14,7 @@ endif
 ifeq ($(TARGET_ARCH),x86)
 LOCAL_CXXFLAGS +=  -DANDROID_X86
 LOCAL_CFLAGS += -DANDROID_X86
+IS_X86 = 1
 endif
 
 ifeq ($(TARGET_ARCH),mips)

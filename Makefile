@@ -408,7 +408,7 @@ else ifeq ($(platform), ps3)
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
    OLD_GCC := 1
-   FLAGS += -DHAVE_MKDIR
+   FLAGS += -DHAVE_MKDIR -DARCH_POWERPC_ALTIVEC
    STATIC_LINKING = 1
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
@@ -419,7 +419,7 @@ else ifeq ($(platform), sncps3)
    CXXFLAGS += -Xc+=exceptions
    OLD_GCC := 1
    NO_GCC := 1
-   FLAGS += -DHAVE_MKDIR
+   FLAGS += -DHAVE_MKDIR -DARCH_POWERPC_ALTIVEC
    STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
@@ -427,7 +427,7 @@ else ifeq ($(platform), psl1ght)
    CXX = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    ENDIANNESS_DEFINES := -DMSB_FIRST -DBYTE_ORDER=BIG_ENDIAN
-   FLAGS += -DHAVE_MKDIR
+   FLAGS += -DHAVE_MKDIR -DBYTE_ORDER=BIG_ENDIAN
    STATIC_LINKING = 1
 else ifeq ($(platform), psp1)
    TARGET := $(TARGET_NAME)_psp1.a
