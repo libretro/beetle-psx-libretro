@@ -316,7 +316,7 @@ int SoundBox_Init(bool arg_EmulateBuggyCodec, bool arg_ResetAntiClickEnabled)
      int vti = 0x3F - x;
 
      if(x) 
-      flub /= pow(2, (double)1 / 4 * x);
+      flub /= powf(2, (double)1 / 4 * x);
 
      if(vti <= 0x1B)
       ADPCMVolTable[vti] = 0;

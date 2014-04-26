@@ -4,7 +4,14 @@
 // Loop postfix non-endless
 #define DRAWBG8x1_LPOST() } bat_x = (bat_x + 1) & bat_width_mask;
 
+#ifdef _WIN32
+static inline void CDBG_REASON(const char *format, ...)
+{
+   (void)0;
+}
+#else
 #define CDBG_REASON(format, ...) 
+#endif
 //printf("BG%d Reason: " format "\n", n, ## __VA_ARGS__);
 static bool CanDrawBG_Fast(int n)
 {

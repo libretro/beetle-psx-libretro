@@ -343,6 +343,9 @@
 						RelativePath="..\..\..\mednafen\sound\Blip_Buffer.cpp">
 					</File>
 					<File
+						RelativePath="..\..\..\mednafen\sound\OwlResampler.cpp">
+					</File>
+					<File
 						RelativePath="..\..\..\mednafen\sound\Stereo_Buffer.cpp">
 					</File>
 				</Filter>
@@ -350,43 +353,49 @@
 					Name="pcfx"
 					Filter="">
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\hes.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\fxscsi.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\huc.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\huc6280.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\huc6273.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\mednafen\pcfx-09333\input.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\pce.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\interrupt.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\pcecd.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\jrevdct.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\pcecd_drive.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\king.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\psg.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\pcfx.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\mednafen\pcfx-09333\vdc.cpp">
+						RelativePath="..\..\..\mednafen\pcfx-09333\rainbow.cpp">
 					</File>
+					<File
+						RelativePath="..\..\..\mednafen\pcfx-09333\soundbox.cpp">
+					</File>
+					<File
+						RelativePath="..\..\..\mednafen\pcfx-09333\timer.cpp">
+					</File>
+					<Filter
+						Name="input"
+						Filter="">
+						<File
+							RelativePath="..\..\..\mednafen\pcfx-09333\input\gamepad.cpp">
+						</File>
+						<File
+							RelativePath="..\..\..\mednafen\pcfx-09333\input\mouse.cpp">
+						</File>
+					</Filter>
 				</Filter>
 				<Filter
 					Name="hw_misc"
 					Filter="">
-					<Filter
-						Name="arcade_card"
-						Filter="">
-						<File
-							RelativePath="..\..\..\mednafen\hw_misc\arcade_card\arcade_card.cpp">
-						</File>
-					</Filter>
 				</Filter>
 				<Filter
 					Name="hw_video"
@@ -399,10 +408,46 @@
 					Name="hw_cpu"
 					Filter="">
 					<Filter
-						Name="huc6280"
+						Name="v810"
 						Filter="">
 						<File
-							RelativePath="..\..\..\mednafen\hw_cpu\huc6280\cpu_huc6280.cpp">
+							RelativePath="..\..\..\mednafen\hw_cpu\v810\fpu-new\softfloat.c">
+							<FileConfiguration
+								Name="Debug|Xbox">
+								<Tool
+									Name="VCCLCompilerTool"
+									CompileAs="2"/>
+							</FileConfiguration>
+							<FileConfiguration
+								Name="Profile|Xbox">
+								<Tool
+									Name="VCCLCompilerTool"
+									CompileAs="2"/>
+							</FileConfiguration>
+							<FileConfiguration
+								Name="Profile_FastCap|Xbox">
+								<Tool
+									Name="VCCLCompilerTool"
+									CompileAs="2"/>
+							</FileConfiguration>
+							<FileConfiguration
+								Name="Release|Xbox">
+								<Tool
+									Name="VCCLCompilerTool"
+									CompileAs="2"/>
+							</FileConfiguration>
+							<FileConfiguration
+								Name="Release_LTCG|Xbox">
+								<Tool
+									Name="VCCLCompilerTool"
+									CompileAs="2"/>
+							</FileConfiguration>
+						</File>
+						<File
+							RelativePath="..\..\..\mednafen\hw_cpu\v810\v810_cpu.cpp">
+						</File>
+						<File
+							RelativePath="..\..\..\mednafen\hw_cpu\v810\v810_cpuD.cpp">
 						</File>
 					</Filter>
 				</Filter>

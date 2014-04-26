@@ -52,10 +52,15 @@
 #include <mmintrin.h>
 #endif
 
+#ifdef _WIN32
+static inline void KINGDBG(const char *format, ...) { (void)0; }
+static inline void ADPCMDBG(const char *format, ...) { (void)0; }
+#else
 #define KINGDBG(format, ...) (void)0
+#define ADPCMDBG(format, ...) (void)0
+#endif
 //#define KINGDBG FXDBG
 #define KING_UNDEF FXDBG
-#define ADPCMDBG(format, ...) (void)0
 //FXDBG
 
 /*

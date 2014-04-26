@@ -11,6 +11,8 @@
 
 #if 0
  #define FXDBG(format, ...) MDFN_DebugPrint(format, ## __VA_ARGS__)
+#elif defined(_WIN32)
+static inline void FXDBG(const char *format, ...) { (void)0; }
 #else
  #define FXDBG(format, ...) ((void)0)
 #endif
