@@ -38,7 +38,7 @@ namespace MDFN_IEN_PSX
 
  #define PSX_WARNING(format, ...) { PSX_DBG(PSX_DBG_WARNING, format "\n", ## __VA_ARGS__); }
  #define PSX_DBGINFO(format, ...) { }
-#elif defined(_MSC_VER)
+#elif defined(_WIN32)
  static INLINE void PSX_DBG(unsigned level, const char* format, ...) { }
  static INLINE void PSX_WARNING(const char* format, ...) { }
  static INLINE void PSX_DBGINFO(const char* format, ...) { }
