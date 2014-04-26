@@ -218,8 +218,10 @@ else ifeq ($(core), pcfx)
 	WANT_NEW_API = 1
    NEED_BLIP = 1
 	NEED_STEREO_SOUND = 1
+	NEED_THREADING = 1
 	NEED_CD = 1
 	NEED_SCSI_CD = 1
+	NEED_TREMOR = 1
    CORE_DEFINE := -DWANT_PCFX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/pcfx-09333
 
@@ -234,13 +236,14 @@ CORE_SOURCES := $(CORE_DIR)/king.cpp \
 	$(CORE_DIR)/huc6273.cpp \
 	$(CORE_DIR)/fxscsi.cpp \
 	$(CORE_DIR)/input/gamepad.cpp \
-	$(CORE_DIR)/input/mouse.cpp
+	$(CORE_DIR)/input/mouse.cpp \
+	$(MEDNAFEN_DIR)/sound/OwlResampler.cpp
 
 LIBRETRO_SOURCES_C := $(MEDNAFEN_DIR)/hw_cpu/v810/fpu-new/softfloat.c
 HW_CPU_SOURCES := $(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpu.cpp \
 						$(MEDNAFEN_DIR)/hw_cpu/v810/v810_cpuD.cpp
 HW_SOUND_SOURCES := $(MEDNAFEN_DIR)/hw_sound/pce_psg/pce_psg.cpp
-HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc.cpp
+HW_VIDEO_SOURCES := $(MEDNAFEN_DIR)/hw_video/huc6270/vdc_video.cpp
 EXTRA_CORE_INCDIR = $(MEDNAFEN_DIR)/hw_sound/ $(MEDNAFEN_DIR)/include/blip $(MEDNAFEN_DIR)/hw_video/huc6270
 TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
@@ -374,7 +377,7 @@ WARNINGS := -Wall \
 	$(NEW_GCC_WARNING_FLAGS) \
 	-Wno-strict-aliasing
 
-EXTRA_GCC_FLAGS := -funroll-loops -ffast-math
+EXTRA_GCC_FLAGS := -funroll-loops
 
 ifeq ($(NO_GCC),1)
 	EXTRA_GCC_FLAGS :=
