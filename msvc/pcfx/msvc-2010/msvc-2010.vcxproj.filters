@@ -54,6 +54,9 @@
     <Filter Include="Source Files\mednafen\hw_cpu\v810\softfloat">
       <UniqueIdentifier>{6b23fbcc-e078-45cf-a496-2000f8f2ef74}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\mednafen\pcfx\input">
+      <UniqueIdentifier>{b89853b5-c545-4858-9060-46c32183190f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\mednafen\Stream.cpp">
@@ -265,6 +268,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\sound\OwlResampler.cpp">
       <Filter>Source Files\mednafen\sound</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp">
+      <Filter>Source Files\mednafen\hw_sound\pce_psg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\gamepad.cpp">
+      <Filter>Source Files\mednafen\pcfx\input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\mouse.cpp">
+      <Filter>Source Files\mednafen\pcfx\input</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

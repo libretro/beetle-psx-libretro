@@ -36,11 +36,12 @@
     <ClCompile Include="..\..\..\mednafen\FileWrapper.cpp" />
     <ClCompile Include="..\..\..\mednafen\general.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\fpu-new\softfloat.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpu.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_cpu\v810\v810_cpuD.cpp" />
+    <ClCompile Include="..\..\..\mednafen\hw_sound\pce_psg\pce_psg.cpp" />
     <ClCompile Include="..\..\..\mednafen\hw_video\huc6270\vdc_video.cpp" />
     <ClCompile Include="..\..\..\mednafen\math_ops.cpp" />
     <ClCompile Include="..\..\..\mednafen\md5.cpp" />
@@ -51,6 +52,8 @@
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\fxscsi.cpp" />
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\huc6273.cpp" />
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\input.cpp" />
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\gamepad.cpp" />
+    <ClCompile Include="..\..\..\mednafen\pcfx-09333\input\mouse.cpp" />
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\interrupt.cpp" />
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\jrevdct.cpp" />
     <ClCompile Include="..\..\..\mednafen\pcfx-09333\king.cpp" />
