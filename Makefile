@@ -68,7 +68,7 @@ endif
 	$(CORE_DIR)/input/multitap.cpp \
 	$(CORE_DIR)/input/mouse.cpp
    TARGET_NAME := mednafen_psx_libretro
-else ifeq ($(core), pce-fast)
+else ifeq ($(core), pce_fast)
    core = pce_fast
 ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
