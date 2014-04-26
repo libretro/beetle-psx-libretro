@@ -30,6 +30,7 @@
 #include "../cputest/cputest.h"
 
 #include <stdarg.h>
+#include <ctype.h>
 
 extern MDFNGI EmulatedPSX;
 
