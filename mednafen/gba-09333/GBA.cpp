@@ -2835,7 +2835,7 @@ void CPUInterrupt()
   biosProtected[3] = 0xe5;
 }
 
-int32 soundTS = 0;
+unsigned int soundTS = 0;
 static uint8 *padq;
 
 static void SetInput(int port, const char *type, void *ptr) MDFN_COLD;
