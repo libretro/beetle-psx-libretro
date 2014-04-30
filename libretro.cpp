@@ -137,8 +137,8 @@ static bool is_pal = false;
 #elif defined(WANT_GBA_EMU)
 #define MEDNAFEN_CORE_NAME_MODULE "gba"
 #define MEDNAFEN_CORE_NAME "Mednafen VBA-M"
-#define MEDNAFEN_CORE_VERSION "v0.9.26"
-#define MEDNAFEN_CORE_EXTENSIONS "gba"
+#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
+#define MEDNAFEN_CORE_EXTENSIONS "gba|agb|bin"
 #define MEDNAFEN_CORE_TIMING_FPS 59.73
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
