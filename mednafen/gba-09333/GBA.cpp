@@ -37,7 +37,6 @@
 #include "arm.h"
 #include "thumb.h"
 
-#include <memory.h>
 #include <stdarg.h>
 #include <string.h>
 #include <trio/trio.h>

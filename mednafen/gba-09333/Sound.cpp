@@ -21,7 +21,6 @@
 #include "Sound.h"
 #include "Port.h"
 
-#include <memory.h>
 #include <math.h>
 
 #include <blip/Blip_Buffer.h>

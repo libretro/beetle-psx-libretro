@@ -21,8 +21,6 @@
 #include "flash.h"
 #include "sram.h"
 
-#include <memory.h>
-
 namespace MDFN_IEN_GBA
 {
 

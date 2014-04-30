@@ -22,7 +22,6 @@
 #include "Globals.h"
 
 #include <math.h>
-#include <memory.h>
 
 namespace MDFN_IEN_GBA
 {

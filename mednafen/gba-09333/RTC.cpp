@@ -22,7 +22,6 @@
 #include "Port.h"
 
 #include <time.h>
-#include <memory.h>
 
 namespace MDFN_IEN_GBA
 {
