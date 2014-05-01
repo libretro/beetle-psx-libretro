@@ -36,6 +36,12 @@ static bool initial_ports_hookup = false;
 
 char *psx_analog_type;
 
+#ifdef WANT_PSX_EMU
+#define RETRO_DEVICE_PS1PAD       RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0)
+#define RETRO_DEVICE_DUALANALOG   RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
+#define RETRO_DEVICE_DUALSHOCK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
+#define RETRO_DEVICE_FLIGHTSTICK  RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+#endif
 
 
 std::string retro_base_directory;
@@ -565,25 +571,6 @@ static void check_variables(void)
     
 #endif
 
-
-   var.key = "psx_enable_dual_analog_type";
-   
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-   {	
-		if((strcmp(var.value, "disabled") == 0))
-			psx_analog_type="gamepad";
-		else if((strcmp(var.value, "dualshock") == 0))
-			psx_analog_type="dualshock";
-		else if((strcmp(var.value, "dualanalog") == 0))
-			psx_analog_type="dualanalog";
-		else if((strcmp(var.value, "flightstick") == 0))
-			psx_analog_type="analogjoy";
-		else
-			psx_analog_type="gamepad";	
-		if(initial_ports_hookup==true)
-			hookup_ports(true);
-   }	
-   
    var.key = "psx_enable_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
@@ -686,6 +673,7 @@ union
    uint32_t u32[MAX_PLAYERS][1 + 8 + 1]; // Buttons + Axes + Rumble
    uint8_t u8[MAX_PLAYERS][(1 + 8 + 1) * sizeof(uint32_t)];
 } static buf;
+
 static uint16_t input_buf[MAX_PLAYERS] = {0};
 
 #elif defined(WANT_PCE_FAST_EMU)
@@ -754,31 +742,7 @@ static void hookup_ports(bool force)
    if (initial_ports_hookup && !force)
       return;
 
-#if defined(WANT_PSX_EMU)
-   for (int j = 0; j < MAX_PLAYERS; j++)
-   {
-      switch (retro_devices[j])
-      { 
-        case RETRO_DEVICE_ANALOG:
-		{
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected analog controller type %s.\n", mednafen_core_str, psx_analog_type);
-            currgame->SetInput(j, psx_analog_type, &buf.u8[j]);    
-
-			break;          
-		}
-        default:
-			currgame->SetInput(j, "gamepad", &buf.u8[j]);
-			break;
-      }
-
-      if (rumble.set_rumble_state)
-      {
-         rumble.set_rumble_state(j, RETRO_RUMBLE_STRONG, 0);
-         rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, 0);
-         buf.u32[j][9] = 0;
-      }
-   }
-#elif defined(WANT_PCE_FAST_EMU)
+#if defined(WANT_PCE_FAST_EMU)
    // Possible endian bug ...
    for (unsigned i = 0; i < MAX_PLAYERS; i++)
       currgame->SetInput(i, "gamepad", &input_buf[i][0]);
@@ -1432,30 +1396,51 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
-#ifdef WANT_PSX_EMU
-   if (in_port > 1)
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[%s]: Only the 2 main ports are supported at the moment", mednafen_core_str);
-      return;
-   }
+   MDFNGI *currgame = (MDFNGI*)game;
 
+   if (!currgame)
+      return;
+
+#ifdef WANT_PSX_EMU
    switch (device)
    {
       // TODO: Add support for other input types
       case RETRO_DEVICE_JOYPAD:
-      case RETRO_DEVICE_ANALOG:
+      case RETRO_DEVICE_PS1PAD:
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type %u.\n", mednafen_core_str, device);
-         retro_devices[in_port] = device;
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", mednafen_core_str);
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "gamepad", &buf.u8[in_port]);    
+         break;
+      case RETRO_DEVICE_DUALANALOG:
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", mednafen_core_str);
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
+         break;
+      case RETRO_DEVICE_DUALSHOCK:
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", mednafen_core_str);
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "dualshock", &buf.u8[in_port]);    
+         break;
+      case RETRO_DEVICE_FLIGHTSTICK:
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", mednafen_core_str);
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "flightstick", &buf.u8[in_port]);    
          break;
       default:
-         retro_devices[in_port] = RETRO_DEVICE_JOYPAD;
          if (log_cb)
             log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device %u, falling back to gamepad.\n", mednafen_core_str,device);
    }
-   check_variables();
-   hookup_ports(true);
+
+   if (rumble.set_rumble_state)
+   {
+      rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
+      rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
+      buf.u32[in_port][9] = 0;
+   }
 #endif
 }
 
@@ -1477,7 +1462,6 @@ void retro_set_environment(retro_environment_t cb)
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
       { "psx_dithering", "Dithering; enabled|disabled" },
-      { "psx_enable_dual_analog_type", "Analog controller mode; disabled|dualshock|dualanalog|flightstick" },
       { "psx_enable_analog_toggle", "Dualshock analog button; disabled|enabled" },
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
@@ -1485,7 +1469,21 @@ void retro_set_environment(retro_environment_t cb)
 
       { NULL, NULL },
    };
+   static const struct retro_controller_description pads[] = {
+      { "PS1 Joypad", RETRO_DEVICE_JOYPAD },
+      { "DualAnalog", RETRO_DEVICE_DUALANALOG },
+      { "DualShock", RETRO_DEVICE_DUALSHOCK },
+      { "FlightStick", RETRO_DEVICE_FLIGHTSTICK },
+   };
+
+   static const struct retro_controller_info ports[] = {
+      { pads, 4 },
+      { pads, 4 },
+      { 0 },
+   };
+
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 #elif defined(WANT_GBA_EMU)
    static const struct retro_variable vars[] = {
       { "gba_hle", "HLE bios emulation; enabled|disabled" },
