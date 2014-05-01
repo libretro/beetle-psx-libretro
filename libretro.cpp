@@ -552,6 +552,19 @@ static void check_variables(void)
       if (PCECD_SetSettings(&settings) && log_cb)
          log_cb(RETRO_LOG_INFO, "PCE CD Audio settings changed.\n");
    }
+
+   static const struct retro_controller_description pads[] = {
+      { "PCE Joypad", RETRO_DEVICE_JOYPAD },
+      { "Mouse", RETRO_DEVICE_MOUSE },
+   };
+
+   static const struct retro_controller_info ports[] = {
+      { pads, 2 },
+      { pads, 2 },
+      { 0 },
+   };
+
+   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 #elif defined(WANT_PSX_EMU)
 
 #if 0
@@ -732,9 +745,6 @@ static uint16_t input_buf[MAX_PLAYERS];
 static uint16_t input_buf[1];
 #endif
 
-
-static unsigned retro_devices[2];
-
 static void hookup_ports(bool force)
 {
    MDFNGI *currgame = game;
@@ -828,7 +838,9 @@ bool retro_load_game(const struct retro_game_info *info)
 	deint.ClearState();
 #endif
 
+#if !defined(WANT_PSX_EMU) || !defined(WANT_PCE_FAST_EMU)
    hookup_ports(true);
+#endif
 
 #if !defined(WANT_PSX_EMU)
    check_variables();
@@ -1401,10 +1413,21 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
    if (!currgame)
       return;
 
-#ifdef WANT_PSX_EMU
+#if defined(WANT_PCE_FAST_EMU)
+   switch(device)
+   {
+      case RETRO_DEVICE_JOYPAD:
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "gamepad", &input_buf[in_port][0]);
+         break;
+      case RETRO_DEVICE_MOUSE:
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "mouse", &input_buf[in_port][0]);
+         break;
+   }
+#elif defined(WANT_PSX_EMU)
    switch (device)
    {
-      // TODO: Add support for other input types
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_PS1PAD:
          if (log_cb)
