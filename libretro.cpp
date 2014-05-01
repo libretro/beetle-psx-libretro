@@ -479,16 +479,6 @@ static void check_variables(void)
          setting_pce_fast_nospritelimit = 1;
    }
 
-   var.key = "pce_nospritelimit";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-   {
-      if (strcmp(var.value, "disabled") == 0)
-         setting_pce_fast_nospritelimit = 0;
-      else if (strcmp(var.value, "enabled") == 0)
-         setting_pce_fast_nospritelimit = 1;
-   }
-
    var.key = "pce_keepaspect";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
