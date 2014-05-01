@@ -160,8 +160,6 @@ class PS_GPU
   uint8 RGB8SAT_Over[256];
  };
 
- uint8 DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-
  bool LineSkipTest(unsigned y);
 
  template<int BlendMode, bool MaskEval_TA, bool textured>

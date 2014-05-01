@@ -543,6 +543,25 @@ static void check_variables(void)
          log_cb(RETRO_LOG_INFO, "PCE CD Audio settings changed.\n");
    }
 #elif defined(WANT_PSX_EMU)
+   extern void PSXDitherApply(bool);
+
+   var.key = "psx_dithering";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      static bool old_apply_dither = false;
+      bool apply_dither = true;
+      if (strcmp(var.value, "enabled") == 0)
+         apply_dither = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         apply_dither = false;
+      if (apply_dither != old_apply_dither)
+      {
+         PSXDitherApply(apply_dither);
+         old_apply_dither = apply_dither;
+      }
+   }
+   
    var.key = "psx_enable_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
