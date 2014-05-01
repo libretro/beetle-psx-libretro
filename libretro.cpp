@@ -553,20 +553,6 @@ static void check_variables(void)
          log_cb(RETRO_LOG_INFO, "PCE CD Audio settings changed.\n");
    }
 
-   static const struct retro_controller_description pads[] = {
-      { "PCE Joypad", RETRO_DEVICE_JOYPAD },
-      { "Mouse", RETRO_DEVICE_MOUSE },
-   };
-
-   static const struct retro_controller_info ports[] = {
-      { pads, 2 },
-      { pads, 2 },
-      { 0 },
-   };
-
-   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
-#elif defined(WANT_PSX_EMU)
-
 #if 0
    
    var.key = "psx_dithering";
@@ -772,9 +758,6 @@ static void hookup_ports(bool force)
 #elif defined(WANT_VB_EMU)
    // Possible endian bug ...
    currgame->SetInput(0, "gamepad", &input_buf[0]);
-#elif defined(WANT_PCFX_EMU)
-   for (unsigned i = 0; i < MAX_PLAYERS; i++)
-      currgame->SetInput(i, "gamepad", &input_buf[i]);
 #else
    // Possible endian bug ...
    currgame->SetInput(0, "gamepad", &input_buf[0]);
@@ -838,7 +821,7 @@ bool retro_load_game(const struct retro_game_info *info)
 	deint.ClearState();
 #endif
 
-#if !defined(WANT_PSX_EMU) || !defined(WANT_PCE_FAST_EMU)
+#if !defined(WANT_PSX_EMU) || !defined(WANT_PCE_FAST_EMU) || !defined(WANT_PCFX_EMU)
    hookup_ports(true);
 #endif
 
@@ -1425,6 +1408,18 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
             currgame->SetInput(in_port, "mouse", &input_buf[in_port][0]);
          break;
    }
+#elif defined(WANT_PCFX_EMU)
+   switch(device)
+   {
+      case RETRO_DEVICE_JOYPAD:
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "gamepad", &input_buf[in_port]);
+         break;
+      case RETRO_DEVICE_MOUSE:
+         if (currgame->SetInput)
+            currgame->SetInput(in_port, "mouse", &input_buf[in_port]);
+         break;
+   }
 #elif defined(WANT_PSX_EMU)
    switch (device)
    {
@@ -1481,7 +1476,33 @@ void retro_set_environment(retro_environment_t cb)
       { "pce_cdspeed", "(CD) CD Speed; 1|2|4|8" },
       { NULL, NULL },
    };
+
+   static const struct retro_controller_description pads[] = {
+      { "PCE Joypad", RETRO_DEVICE_JOYPAD },
+      { "Mouse", RETRO_DEVICE_MOUSE },
+   };
+
+   static const struct retro_controller_info ports[] = {
+      { pads, 2 },
+      { pads, 2 },
+      { 0 },
+   };
+
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+#elif defined(WANT_PCFX_EMU)
+   static const struct retro_controller_description pads[] = {
+      { "PCFX Joypad", RETRO_DEVICE_JOYPAD },
+      { "Mouse", RETRO_DEVICE_MOUSE },
+   };
+
+   static const struct retro_controller_info ports[] = {
+      { pads, 2 },
+      { pads, 2 },
+      { 0 },
+   };
+
+   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 #elif defined(WANT_PSX_EMU)
    static const struct retro_variable vars[] = {
       { "psx_dithering", "Dithering; enabled|disabled" },
