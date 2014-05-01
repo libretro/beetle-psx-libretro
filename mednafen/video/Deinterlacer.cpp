@@ -73,10 +73,8 @@ void Deinterlacer::Process(MDFN_Surface *surface, const MDFN_Rect &DisplayRect, 
 
    if(y == 0 && field)
    {
-    uint32 black = surface->MakeColor(0, 0, 0);
-
-    LineWidths[dly - 2] = *src_lw;
-    memset(&surface->pixels[(dly - 2) * surface->pitch32], black, src_lw->w * sizeof(uint32));
+      LineWidths[dly - 2] = *src_lw;
+      memset(&surface->pixels[(dly - 2) * surface->pitch32], 0, src_lw->w * sizeof(uint32));
    }
 
    if(dly < (DisplayRect.y + DisplayRect.h))
