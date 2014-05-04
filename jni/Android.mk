@@ -94,7 +94,7 @@ TARGET_NAME := mednafen_lynx_libretro
 else ifeq ($(core), pce_fast)
    core = pce_fast
    PTHREAD_FLAGS = -pthread
-   NEED_BPP = 32
+   NEED_BPP = 16
 	WANT_NEW_API = 1
    NEED_BLIP = 1
    NEED_CD = 1

@@ -74,7 +74,7 @@ ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
 endif
    HAVE_HES = 0
-   NEED_BPP = 16
+   NEED_BPP = 32
    NEED_TREMOR = 1
    NEED_BLIP = 1
    NEED_CD = 1
