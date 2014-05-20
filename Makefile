@@ -369,7 +369,7 @@ ifeq ($(arch),ppc)
 else
    ENDIANNESS_DEFINES := -DLSB_FIRST
 endif
-OSXVER = `sw_vers -productVersion | cut -c 4`
+OSXVER = $(shell sw_vers -productVersion | cut -c 4)
 ifneq ($(OSXVER),9)
    fpic += -mmacosx-version-min=10.5
 endif
@@ -383,13 +383,16 @@ else ifeq ($(platform), ios)
 
    CC = clang -arch armv7 -isysroot $(IOSSDK)
    CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
-OSXVER = `sw_vers -productVersion | cut -c 4`
-ifneq ($(OSXVER),9)
-   LDFLAGS += -miphone-version-min=5.0
-   FLAGS += -miphone-version-min=5.0
-   CC +=  -miphone-version-min=5.0
-   CXX +=  -miphone-version-min=5.0
+OSXVER = $(shell sw_vers -productVersion | cut -c 4)
+ifeq ($(OSXVER),5)
+   IPHONEMINVER = -miphone-version-min=5.0
+else
+   IPHONEMINVER = -miphoneos-version-min=5.0
 endif
+   LDFLAGS += $(IPHONEMINVER)
+   FLAGS += $(IPHONEMINVER)
+   CC += $(IPHONEMINVER)
+   CXX += $(IPHONEMINVER)
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
