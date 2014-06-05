@@ -535,9 +535,9 @@ static void check_variables(void)
    if (do_cdsettings)
    {
       PCE_Fast::PCECD_Settings settings = {0};
-      settings.CDDA_Volume = (double)setting_pce_fast_adpcmvolume / 100;
+      settings.CDDA_Volume = (double)setting_pce_fast_cddavolume / 100;
       settings.CD_Speed = setting_pce_fast_cdspeed;
-      settings.ADPCM_Volume = (double)setting_pce_fast_cddavolume / 100;
+      settings.ADPCM_Volume = (double)setting_pce_fast_adpcmvolume / 100;
 
       if (PCECD_SetSettings(&settings) && log_cb)
          log_cb(RETRO_LOG_INFO, "PCE CD Audio settings changed.\n");
@@ -1462,9 +1462,9 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "pce_nospritelimit", "No Sprite Limit; disabled|enabled" },
       { "pce_keepaspect", "Keep Aspect; enabled|disabled" },
-      { "pce_cddavolume", "(CD) CDDA Volume; 100|90|80|70|60|50|40|30|20|10|0" },
-      { "pce_adpcmvolume", "(CD) ADPCM Volume; 100|90|80|70|60|50|40|30|20|10|0" },
-      { "pce_cdpsgvolume", "(CD) CD PSG Volume; 100|90|80|70|60|50|40|30|20|10|0" },
+      { "pce_cddavolume", "(CD) CDDA Volume; 0|10|20|30|40|50|60|70|80|90|100" },
+      { "pce_adpcmvolume", "(CD) ADPCM Volume; 0|10|20|30|40|50|60|70|80|90|100" },
+      { "pce_cdpsgvolume", "(CD) CD PSG Volume; 0|10|20|30|40|50|60|70|80|90|100" },
       { "pce_cdspeed", "(CD) CD Speed; 1|2|4|8" },
       { NULL, NULL },
    };
