@@ -134,218 +134,210 @@ void PSX_SetDMASuckSuck(unsigned);
 
 static INLINE bool ChCan(const unsigned ch, const uint32 CRModeCache)
 {
- switch(ch)
- {
-  default:
-	abort();
-
-  case CH_MDEC_IN:
-	return(MDEC_DMACanWrite());
-
-  case CH_MDEC_OUT:
-	return(MDEC_DMACanRead());
-  
-  case CH_GPU: 
-	if(CRModeCache & 0x1)
-	 return(GPU->DMACanWrite());
-	else
-	 return(true);
-
-  case CH_CDC:
-	return(true);
-
-  case CH_SPU:
-	return(true);
-
-  case CH_FIVE:
-	return(false);
-
-  case CH_OT:
-	 return((bool)(DMACH[ch].ChanControl & (1U << 28)));
- }
+   switch(ch)
+   {
+      default:
+         abort();
+      case CH_MDEC_IN:
+         return(MDEC_DMACanWrite());
+      case CH_MDEC_OUT:
+         return(MDEC_DMACanRead());
+      case CH_GPU: 
+         if(CRModeCache & 0x1)
+            return(GPU->DMACanWrite());
+         return(true);
+      case CH_CDC:
+         return(true);
+      case CH_SPU:
+         return(true);
+      case CH_FIVE:
+         return(false);
+      case CH_OT:
+         return((bool)(DMACH[ch].ChanControl & (1U << 28)));
+   }
 }
 
 static void RecalcHalt(void)
 {
- bool Halt = false;
- unsigned ch = 0;
+   bool Halt = false;
+   unsigned ch, tmp;
+   ch = 0;
+   tmp = 0;
 
- for(ch = 0; ch < 7; ch++)
- {
-  if(DMACH[ch].ChanControl & (1U << 24))
-  {
-   if(!(DMACH[ch].ChanControl & (7U << 8)))
+   for(ch = 0; ch < 7; ch++)
    {
-    if(DMACH[ch].WordCounter > 0)
-    {
-     Halt = true;
-     break;
-    }
+      if(DMACH[ch].ChanControl & (1U << 24))
+      {
+         if(!(DMACH[ch].ChanControl & (7U << 8)))
+         {
+            if(DMACH[ch].WordCounter > 0)
+            {
+               Halt = true;
+               break;
+            }
+         }
+
+#if 0
+         if(DMACH[ch].ChanControl & 0x100)	// DMA doesn't hog the bus when this bit is set, though the DMA takes longer.
+            continue;
+
+         if(ch == 4 || ch == 5)	// Not sure if these channels will typically hog the bus or not...investigate.
+            continue;
+
+         if(!(DMACH[ch].ChanControl & (1U << 10)))	// Not sure about HOGGERYNESS with linked-list mode, and it likely wouldn't work well either in regards
+            // to GPU commands due to the rather large DMA update granularity.
+         {
+            if((DMACH[ch].WordCounter > 0) || ChCan(ch, DMACH[ch].ChanControl & 0x1))
+            {
+               Halt = true;
+               break;
+            }
+         }
+#endif
+      }
    }
 
 #if 0
-   if(DMACH[ch].ChanControl & 0x100)	// DMA doesn't hog the bus when this bit is set, though the DMA takes longer.
-    continue;
+   if((DMACH[0].WordCounter || (DMACH[0].ChanControl & (1 << 24))) && (DMACH[0].ChanControl & 0x200) /*&& MDEC_DMACanWrite()*/)
+      Halt = true;
 
-   if(ch == 4 || ch == 5)	// Not sure if these channels will typically hog the bus or not...investigate.
-    continue;
+   if((DMACH[1].WordCounter || (DMACH[1].ChanControl & (1 << 24))) && (DMACH[1].ChanControl & 0x200) && (DMACH[1].WordCounter || MDEC_DMACanRead()))
+      Halt = true;
 
-   if(!(DMACH[ch].ChanControl & (1U << 10)))	// Not sure about HOGGERYNESS with linked-list mode, and it likely wouldn't work well either in regards
-						// to GPU commands due to the rather large DMA update granularity.
+   if((DMACH[2].WordCounter || (DMACH[2].ChanControl & (1 << 24))) && (DMACH[2].ChanControl & 0x200) && ((DMACH[2].ChanControl & 0x1) && (DMACH[2].WordCounter || GPU->DMACanWrite())))
+      Halt = true;
+
+   if((DMACH[3].WordCounter || (DMACH[3].ChanControl & (1 << 24))) && !(DMACH[3].ChanControl & 0x100))
+      Halt = true;
+
+   if(DMACH[6].WordCounter || (DMACH[6].ChanControl & (1 << 24)))
+      Halt = true;
+#endif
+
+   //printf("Halt: %d\n", Halt);
+
+   if(!Halt && (DMACH[2].ChanControl & (1U << 24)) && ((DMACH[2].ChanControl & 0x700) == 0x200) && ChCan(2, DMACH[2].ChanControl))
    {
-    if((DMACH[ch].WordCounter > 0) || ChCan(ch, DMACH[ch].ChanControl & 0x1))
-    {
-     Halt = true;
-     break;
-    }
+      tmp = DMACH[2].BlockControl & 0xFFFF;
+
+      if(tmp > 0)
+         tmp--;
+
+      if(tmp > 200)	// Due to 8-bit limitations in the CPU core.
+         tmp = 200;
    }
-#endif
-  }
- }
 
-#if 0
- if((DMACH[0].WordCounter || (DMACH[0].ChanControl & (1 << 24))) && (DMACH[0].ChanControl & 0x200) /*&& MDEC_DMACanWrite()*/)
-  Halt = true;
+   PSX_SetDMASuckSuck(tmp);
 
- if((DMACH[1].WordCounter || (DMACH[1].ChanControl & (1 << 24))) && (DMACH[1].ChanControl & 0x200) && (DMACH[1].WordCounter || MDEC_DMACanRead()))
-  Halt = true;
-
- if((DMACH[2].WordCounter || (DMACH[2].ChanControl & (1 << 24))) && (DMACH[2].ChanControl & 0x200) && ((DMACH[2].ChanControl & 0x1) && (DMACH[2].WordCounter || GPU->DMACanWrite())))
-  Halt = true;
-
- if((DMACH[3].WordCounter || (DMACH[3].ChanControl & (1 << 24))) && !(DMACH[3].ChanControl & 0x100))
-  Halt = true;
-
- if(DMACH[6].WordCounter || (DMACH[6].ChanControl & (1 << 24)))
-  Halt = true;
-#endif
-
- //printf("Halt: %d\n", Halt);
-
- if(!Halt && (DMACH[2].ChanControl & (1U << 24)) && ((DMACH[2].ChanControl & 0x700) == 0x200) && ChCan(2, DMACH[2].ChanControl))
- {
-  unsigned tmp = DMACH[2].BlockControl & 0xFFFF;
-
-  if(tmp > 0)
-   tmp--;
-
-  if(tmp > 200)	// Due to 8-bit limitations in the CPU core.
-   tmp = 200;
-
-  PSX_SetDMASuckSuck(tmp);
- }
- else
-  PSX_SetDMASuckSuck(0);
-
- CPU->SetHalt(Halt);
+   CPU->SetHalt(Halt);
 }
 
 
 static INLINE void ChRW(const unsigned ch, const uint32 CRModeCache, uint32 *V)
 {
- unsigned extra_cyc_overhead = 0;
+   unsigned extra_cyc_overhead = 0;
 
- switch(ch)
- {
-  default:
-	abort();
-	break;
+   switch(ch)
+   {
+      default:
+         abort();
+         break;
 
-  case CH_MDEC_IN:
-	  if(CRModeCache & 0x1)
-	   MDEC_DMAWrite(*V);
-	  else
-	   *V = 0;
-	  break;
+      case CH_MDEC_IN:
+         if(CRModeCache & 0x1)
+            MDEC_DMAWrite(*V);
+         else
+            *V = 0;
+         break;
 
-  case CH_MDEC_OUT:
-	  if(CRModeCache & 0x1)
-	  {
-	  }
-	  else
-	   *V = MDEC_DMARead();
-	  break;
+      case CH_MDEC_OUT:
+         if(CRModeCache & 0x1)
+         {
+         }
+         else
+            *V = MDEC_DMARead();
+         break;
 
-  case CH_GPU:
-	  if(CRModeCache & 0x1)
-	   GPU->WriteDMA(*V);
-	  else
-	   *V = GPU->ReadDMA();
-	  break;
+      case CH_GPU:
+         if(CRModeCache & 0x1)
+            GPU->WriteDMA(*V);
+         else
+            *V = GPU->ReadDMA();
+         break;
 
-  case CH_CDC:
-	  // 0x1f801018 affects CDC DMA timing.
+      case CH_CDC:
+         // 0x1f801018 affects CDC DMA timing.
 #if 0
-	  if(CRModeCache & 0x100)		// For CDC DMA(at least): When this bit is set, DMA controller doesn't appear to hog the (RAM?) bus.
-	  {
-	   if(CRModeCache & 0x00400000)	// For CDC DMA(at least): When this bit is set, DMA controller appears to get even less bus time(or has a lower priority??)
-	   {
-	    DMACH[ch].ClockCounter -= 44 * 20 / 12;
-	   }
-	   else
-	   {
-	    DMACH[ch].ClockCounter -= 29 * 20 / 12;
-	   }
-	  }
-	  else
-	  {
-	   DMACH[ch].ClockCounter -= 23 * 20 / 12; // (23 + 1) = 24.  (Though closer to 24.5 or 24.4 on average per tests on a PS1)
-	  }
+         if(CRModeCache & 0x100)		// For CDC DMA(at least): When this bit is set, DMA controller doesn't appear to hog the (RAM?) bus.
+         {
+            if(CRModeCache & 0x00400000)	// For CDC DMA(at least): When this bit is set, DMA controller appears to get even less bus time(or has a lower priority??)
+            {
+               DMACH[ch].ClockCounter -= 44 * 20 / 12;
+            }
+            else
+            {
+               DMACH[ch].ClockCounter -= 29 * 20 / 12;
+            }
+         }
+         else
+         {
+            DMACH[ch].ClockCounter -= 23 * 20 / 12; // (23 + 1) = 24.  (Though closer to 24.5 or 24.4 on average per tests on a PS1)
+         }
 #endif
-	  if(CRModeCache & 0x1)
-	  {
-	  }
-	  else
-	  {
-	   extra_cyc_overhead = 8;	// FIXME: Test.
-	   *V = CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
-	  }
-	  break;
+         if(CRModeCache & 0x1)
+         {
+         }
+         else
+         {
+            extra_cyc_overhead = 8;	// FIXME: Test.
+            *V = CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
+         }
+         break;
 
-  case CH_SPU:
-	  // 0x1f801014 affects SPU DMA timing.
-	  // Wild conjecture about 0x1f801014:
-	  //
-	  //  & 0x0000000F
-	  //  & 0x000001E0  --- Used if (& 0x20000000) == 0?
-	  //  & 0x00001000  --- Double total bus cycle time if value == 0?
-	  //  & 0x0f000000  --- (value << 1) 33MHz cycles, bus cycle extension(added to 4?)?
-	  //  & 0x20000000  --- 
-	  //
-	  //
-	  // TODO?: SPU DMA will "complete" much faster if there's a mismatch between the CHCR read/write mode bit and the SPU control register DMA mode.
-	  //
-	  //
-	  // Investigate: SPU DMA doesn't seem to work right if the value written to 0x1F801DAA doesn't have the upper bit set to 1(0x8000) on a PS1.
+      case CH_SPU:
+         // 0x1f801014 affects SPU DMA timing.
+         // Wild conjecture about 0x1f801014:
+         //
+         //  & 0x0000000F
+         //  & 0x000001E0  --- Used if (& 0x20000000) == 0?
+         //  & 0x00001000  --- Double total bus cycle time if value == 0?
+         //  & 0x0f000000  --- (value << 1) 33MHz cycles, bus cycle extension(added to 4?)?
+         //  & 0x20000000  --- 
+         //
+         //
+         // TODO?: SPU DMA will "complete" much faster if there's a mismatch between the CHCR read/write mode bit and the SPU control register DMA mode.
+         //
+         //
+         // Investigate: SPU DMA doesn't seem to work right if the value written to 0x1F801DAA doesn't have the upper bit set to 1(0x8000) on a PS1.
 
-	  extra_cyc_overhead = 47;	// Should be closer to 69, average, but actual timing is...complicated.
+         extra_cyc_overhead = 47;	// Should be closer to 69, average, but actual timing is...complicated.
 
-	  if(CRModeCache & 0x1)
-	   SPU->WriteDMA(*V);
-	  else
-	   *V = SPU->ReadDMA();
-	  break;
+         if(CRModeCache & 0x1)
+            SPU->WriteDMA(*V);
+         else
+            *V = SPU->ReadDMA();
+         break;
 
-  case CH_FIVE:
-	  if(CRModeCache & 0x1)
-	  {
-	  }
-	  else
-	  {
-	   *V = 0;
-	  }
-	  break;
+      case CH_FIVE:
+         if(CRModeCache & 0x1)
+         {
+         }
+         else
+         {
+            *V = 0;
+         }
+         break;
 
-  case CH_OT:
-	  if(DMACH[ch].WordCounter == 1)
-	   *V = 0xFFFFFF;
-	  else
-	   *V = (DMACH[ch].CurAddr - 4) & 0x1FFFFF;
-	  break;
- }
+      case CH_OT:
+         if(DMACH[ch].WordCounter == 1)
+            *V = 0xFFFFFF;
+         else
+            *V = (DMACH[ch].CurAddr - 4) & 0x1FFFFF;
+         break;
+   }
 
- // GROSS APPROXIMATION, shoehorning multiple effects together, TODO separate(especially SPU and CDC)
- DMACH[ch].ClockCounter -= std::max<int>(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
+   // GROSS APPROXIMATION, shoehorning multiple effects together, TODO separate(especially SPU and CDC)
+   DMACH[ch].ClockCounter -= std::max<int>(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
 }
 
 //
@@ -355,255 +347,240 @@ static INLINE void ChRW(const unsigned ch, const uint32 CRModeCache, uint32 *V)
 //
 static INLINE void RunChannelI(const unsigned ch, const uint32 CRModeCache, int32 clocks)
 {
- //const uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
+   //const uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
 
- DMACH[ch].ClockCounter += clocks;
+   DMACH[ch].ClockCounter += clocks;
 
- while(MDFN_LIKELY(DMACH[ch].ClockCounter > 0))
- {
-  if(DMACH[ch].WordCounter == 0)	// Begin WordCounter reload.
-  {
-   if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
-    break;
-
-   if(!ChCan(ch, CRModeCache))
-    break;
-
-   DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
-
-   if(CRModeCache & (1U << 10))
+   while(MDFN_LIKELY(DMACH[ch].ClockCounter > 0))
    {
-    uint32 header;
+      if(DMACH[ch].WordCounter == 0)	// Begin WordCounter reload.
+      {
+         if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
+            break;
 
-    if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
-    {
-     DMACH[ch].ChanControl &= ~(0x11 << 24);
-     DMAIntControl |= 0x8000;
-     RecalcIRQOut();
-     break;
-    }
+         if(!ChCan(ch, CRModeCache))
+            break;
 
-    header = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
-    DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
+         DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
 
-    DMACH[ch].WordCounter = header >> 24;
-    DMACH[ch].BaseAddr = header & 0xFFFFFF;
+         if(CRModeCache & (1U << 10))
+         {
+            uint32 header;
 
-    // printf to debug Soul Reaver ;)
-    //if(DMACH[ch].WordCounter > 0x10) 
-    // printf("What the lala?  0x%02x @ 0x%08x\n", DMACH[ch].WordCounter, DMACH[ch].CurAddr - 4);
+            if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
+            {
+               DMACH[ch].ChanControl &= ~(0x11 << 24);
+               DMAIntControl |= 0x8000;
+               RecalcIRQOut();
+               break;
+            }
 
-    if(DMACH[ch].WordCounter)
-     DMACH[ch].ClockCounter -= 15;
-    else
-     DMACH[ch].ClockCounter -= 10;
+            header = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+            DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
 
-    goto SkipPayloadStuff;	// 3 cheers for gluten-free spaghetticode(necessary because the newly-loaded WordCounter might be 0, and we actually
-				// want 0 to mean 0 and not 65536 in this context)!
+            DMACH[ch].WordCounter = header >> 24;
+            DMACH[ch].BaseAddr = header & 0xFFFFFF;
+
+            // printf to debug Soul Reaver ;)
+            //if(DMACH[ch].WordCounter > 0x10) 
+            // printf("What the lala?  0x%02x @ 0x%08x\n", DMACH[ch].WordCounter, DMACH[ch].CurAddr - 4);
+
+            if(DMACH[ch].WordCounter)
+               DMACH[ch].ClockCounter -= 15;
+            else
+               DMACH[ch].ClockCounter -= 10;
+
+            goto SkipPayloadStuff;	// 3 cheers for gluten-free spaghetticode(necessary because the newly-loaded WordCounter might be 0, and we actually
+            // want 0 to mean 0 and not 65536 in this context)!
+         }
+         else
+         {
+            DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
+
+            if(CRModeCache & (1U << 9))
+            {
+               if(ch == 2)	// Technically should apply to all channels, but since we don't implement CPU read penalties for channels other than 2 yet, it's like this to avoid making DMA longer than what games can handle.
+                  DMACH[ch].ClockCounter -= 7;
+
+               DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF) | ((DMACH[ch].BlockControl - (1U << 16)) & 0xFFFF0000);
+            }
+         }
+      }	// End WordCounter reload.
+      else if(CRModeCache & 0x100) // BLARGH BLARGH FISHWHALE
+      {
+         //printf("LoadWC: %u(oldWC=%u)\n", DMACH[ch].BlockControl & 0xFFFF, DMACH[ch].WordCounter);
+         //MDFN_DispMessage("SPOOOON\n");
+         DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
+         DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
+      }
+
+      //
+      // Do the payload read/write
+      //
+      {
+         uint32 vtmp;
+
+         if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
+         {
+            DMACH[ch].ChanControl &= ~(0x11 << 24);
+            DMAIntControl |= 0x8000;
+            RecalcIRQOut();
+            break;
+         }
+
+         if(CRModeCache & 0x1)
+            vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+
+         ChRW(ch, CRModeCache, &vtmp);
+
+         if(!(CRModeCache & 0x1))
+            MainRAM.WriteU32(DMACH[ch].CurAddr & 0x1FFFFC, vtmp);
+      }
+
+      if(CRModeCache & 0x2)
+         DMACH[ch].CurAddr = (DMACH[ch].CurAddr - 4) & 0xFFFFFF;
+      else
+         DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
+
+      DMACH[ch].WordCounter--;
+      DMACH[ch].ClockCounter--;
+
+SkipPayloadStuff: ;
+
+                  if(CRModeCache & 0x100) // BLARGH BLARGH WHALEFISH
+                  {
+                     DMACH[ch].BaseAddr = DMACH[ch].CurAddr;
+                     DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF0000) | DMACH[ch].WordCounter;
+                     //printf("SaveWC: %u\n", DMACH[ch].WordCounter);
+                  }
+
+                  //
+                  // Handle channel end condition:
+                  //
+                  if(DMACH[ch].WordCounter == 0)
+                  {
+                     bool ChannelEndTC = false;
+
+                     if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
+                        break;
+
+                     switch((CRModeCache >> 9) & 0x3)
+                     {
+                        case 0x0:
+                           ChannelEndTC = true;
+                           break;
+
+                        case 0x1:
+                           DMACH[ch].BaseAddr = DMACH[ch].CurAddr;
+                           if((DMACH[ch].BlockControl >> 16) == 0)
+                              ChannelEndTC = true;
+                           break;
+
+                        case 0x2:
+                        case 0x3:	// Not sure about 0x3.
+                           if(DMACH[ch].BaseAddr == 0xFFFFFF)
+                              ChannelEndTC = true;
+                           break;
+                     }
+
+                     if(ChannelEndTC)
+                     {
+                        DMACH[ch].ChanControl &= ~(0x11 << 24);
+                        if(DMAIntControl & (1U << (16 + ch)))
+                        {
+                           DMAIntStatus |= 1U << ch;
+                           RecalcIRQOut();
+                        }
+                        break;
+                     }
+                  }
    }
-   else
-   {
-    DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
 
-    if(CRModeCache & (1U << 9))
-    {
-     if(ch == 2)	// Technically should apply to all channels, but since we don't implement CPU read penalties for channels other than 2 yet, it's like this to avoid making DMA longer than what games can handle.
-      DMACH[ch].ClockCounter -= 7;
-
-     DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF) | ((DMACH[ch].BlockControl - (1U << 16)) & 0xFFFF0000);
-    }
-   }
-  }	// End WordCounter reload.
-  else if(CRModeCache & 0x100) // BLARGH BLARGH FISHWHALE
-  {
-   //printf("LoadWC: %u(oldWC=%u)\n", DMACH[ch].BlockControl & 0xFFFF, DMACH[ch].WordCounter);
-   //MDFN_DispMessage("SPOOOON\n");
-   DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
-   DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
-  }
-
-  //
-  // Do the payload read/write
-  //
-  {
-   uint32 vtmp;
-
-   if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
-   {
-    DMACH[ch].ChanControl &= ~(0x11 << 24);
-    DMAIntControl |= 0x8000;
-    RecalcIRQOut();
-    break;
-   }
-
-   if(CRModeCache & 0x1)
-    vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
-
-   ChRW(ch, CRModeCache, &vtmp);
-
-   if(!(CRModeCache & 0x1))
-    MainRAM.WriteU32(DMACH[ch].CurAddr & 0x1FFFFC, vtmp);
-  }
-
-  if(CRModeCache & 0x2)
-   DMACH[ch].CurAddr = (DMACH[ch].CurAddr - 4) & 0xFFFFFF;
-  else
-   DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
-
-  DMACH[ch].WordCounter--;
-  DMACH[ch].ClockCounter--;
-
-  SkipPayloadStuff: ;
-
-  if(CRModeCache & 0x100) // BLARGH BLARGH WHALEFISH
-  {
-   DMACH[ch].BaseAddr = DMACH[ch].CurAddr;
-   DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF0000) | DMACH[ch].WordCounter;
-   //printf("SaveWC: %u\n", DMACH[ch].WordCounter);
-  }
-
-  //
-  // Handle channel end condition:
-  //
-  if(DMACH[ch].WordCounter == 0)
-  {
-   bool ChannelEndTC = false;
-
-   if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
-    break;
-
-   switch((CRModeCache >> 9) & 0x3)
-   {
-    case 0x0:
-	ChannelEndTC = true;
-	break;
-
-    case 0x1:
-	DMACH[ch].BaseAddr = DMACH[ch].CurAddr;
-	if((DMACH[ch].BlockControl >> 16) == 0)
-   	 ChannelEndTC = true;
-	break;
-
-    case 0x2:
-    case 0x3:	// Not sure about 0x3.
-	if(DMACH[ch].BaseAddr == 0xFFFFFF)
-	 ChannelEndTC = true;
-	break;
-   }
-
-   if(ChannelEndTC)
-   {
-    DMACH[ch].ChanControl &= ~(0x11 << 24);
-    if(DMAIntControl & (1U << (16 + ch)))
-    {
-     DMAIntStatus |= 1U << ch;
-     RecalcIRQOut();
-    }
-    break;
-   }
-  }
- }
-
- if(DMACH[ch].ClockCounter > 0)
-  DMACH[ch].ClockCounter = 0;
+   if(DMACH[ch].ClockCounter > 0)
+      DMACH[ch].ClockCounter = 0;
 }
 
 static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32 clocks, int ch)
 {
- // Mask out the bits that the DMA controller will modify during the course of operation.
- const uint32 CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
+   // Mask out the bits that the DMA controller will modify during the course of operation.
+   const uint32 CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
+   uint32_t crmodecache = CRModeCache;
 
- switch(ch)
- {
-  default: abort();
+   switch(ch)
+   {
+      default:
+         abort();
+      case 0:
+         if(MDFN_LIKELY(CRModeCache == 0x00000201))
+            crmodecache = 0x00000201;
+         break;
+      case 1:
+         if(MDFN_LIKELY(CRModeCache == 0x00000200))
+            crmodecache = 0x00000200;
+         break;
+      case 2:
+         if(MDFN_LIKELY(CRModeCache == 0x00000401))
+            crmodecache = 0x00000401;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000201))
+            crmodecache = 0x00000201;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
+            crmodecache = 0x00000200;
+         break;
+      case 3:
+         if(MDFN_LIKELY(CRModeCache == 0x00000000))
+            crmodecache = 0x00000000;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000100))
+            crmodecache = 0x00000100;
+         break;
+      case 4:
+         if(MDFN_LIKELY(CRModeCache == 0x00000201))
+            crmodecache = 0x00000201;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
+            crmodecache = 0x00000200;
+         break;
+      case 5:
+         break;
+      case 6:
+         if(MDFN_LIKELY(CRModeCache == 0x00000002))
+            crmodecache = 0x00000002;
+         break;
+   }
 
-  case 0:
-	if(MDFN_LIKELY(CRModeCache == 0x00000201))
-	 RunChannelI(0, 0x00000201, clocks);
-	else
-	 RunChannelI(0, CRModeCache, clocks);
-	break;
-
-  case 1:
-	if(MDFN_LIKELY(CRModeCache == 0x00000200))
-	 RunChannelI(1, 0x00000200, clocks);
-	else
-	 RunChannelI(1, CRModeCache, clocks);
-	break;
-
-  case 2:
-	if(MDFN_LIKELY(CRModeCache == 0x00000401))
-	 RunChannelI(2, 0x00000401, clocks);
-	else if(MDFN_LIKELY(CRModeCache == 0x00000201))
-	 RunChannelI(2, 0x00000201, clocks);
-	else if(MDFN_LIKELY(CRModeCache == 0x00000200))
-	 RunChannelI(2, 0x00000200, clocks);
-	else
-	 RunChannelI(2, CRModeCache, clocks);
-	break;
-
-  case 3:
-	if(MDFN_LIKELY(CRModeCache == 0x00000000))
-	 RunChannelI(3, 0x00000000, clocks);
-	else if(MDFN_LIKELY(CRModeCache == 0x00000100))
-	 RunChannelI(3, 0x00000100, clocks);
-	else
-	 RunChannelI(3, CRModeCache, clocks);
-	break;
-
-  case 4:
-	if(MDFN_LIKELY(CRModeCache == 0x00000201))
-	 RunChannelI(4, 0x00000201, clocks);
-	else if(MDFN_LIKELY(CRModeCache == 0x00000200))
-	 RunChannelI(4, 0x00000200, clocks);
-	else
-	 RunChannelI(4, CRModeCache, clocks);
-	break;
-
-  case 5:
-	RunChannelI(5, CRModeCache, clocks);
-	break;
-
-  case 6:
-	if(MDFN_LIKELY(CRModeCache == 0x00000002))
-	 RunChannelI(6, 0x00000002, clocks);
-	else
-	 RunChannelI(6, CRModeCache, clocks);
-	break;
- }
+   if (ch >= 0 && ch <= 6)
+      RunChannelI(ch, crmodecache, clocks);
 }
 
 static INLINE int32 CalcNextEvent(int32 next_event)
 {
- if(DMACycleCounter < next_event)
-  next_event = DMACycleCounter;
+   if(DMACycleCounter < next_event)
+      next_event = DMACycleCounter;
 
- return(next_event);
+   return(next_event);
 }
 
 pscpu_timestamp_t DMA_Update(const pscpu_timestamp_t timestamp)
 {
-//   uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
- int32 clocks = timestamp - lastts;
- lastts = timestamp;
+   //   uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
+   int32 clocks = timestamp - lastts;
+   lastts = timestamp;
 
- GPU->Update(timestamp);
- MDEC_Run(clocks);
+   GPU->Update(timestamp);
+   MDEC_Run(clocks);
 
- RunChannel(timestamp, clocks, 0);
- RunChannel(timestamp, clocks, 1);
- RunChannel(timestamp, clocks, 2);
- RunChannel(timestamp, clocks, 3);
- RunChannel(timestamp, clocks, 4);
- RunChannel(timestamp, clocks, 6);
+   RunChannel(timestamp, clocks, 0);
+   RunChannel(timestamp, clocks, 1);
+   RunChannel(timestamp, clocks, 2);
+   RunChannel(timestamp, clocks, 3);
+   RunChannel(timestamp, clocks, 4);
+   RunChannel(timestamp, clocks, 6);
 
- DMACycleCounter -= clocks;
- while(DMACycleCounter <= 0)
-  DMACycleCounter += 128;
+   DMACycleCounter -= clocks;
+   while(DMACycleCounter <= 0)
+      DMACycleCounter += 128;
 
- RecalcHalt();
+   RecalcHalt();
 
- return(timestamp + CalcNextEvent(0x10000000));
+   return(timestamp + CalcNextEvent(0x10000000));
 }
 
 #if 0
