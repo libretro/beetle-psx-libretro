@@ -14,22 +14,22 @@ enum
 
 struct SPU_ADSR
 {
- uint16 EnvLevel;	// We typecast it to (int16) in several places, but keep it here as (uint16) to prevent signed overflow/underflow, which compilers
+ uint16_t EnvLevel;	// We typecast it to (int16) in several places, but keep it here as (uint16) to prevent signed overflow/underflow, which compilers
 			// may not treat consistently.
- uint32 Divider;
- uint32 Phase;
+ uint32_t Divider;
+ uint32_t Phase;
 
  bool AttackExp;
  bool SustainExp;
  bool SustainDec;
  bool ReleaseExp;
 
- int32 AttackRate;	// Ar
- int32 DecayRate;	// Dr * 4
- int32 SustainRate;	// Sr
- int32 ReleaseRate;	// Rr * 4
+ int32_t AttackRate;	// Ar
+ int32_t DecayRate;	// Dr * 4
+ int32_t SustainRate;	// Sr
+ int32_t ReleaseRate;	// Rr * 4
 
- int32 SustainLevel;	// (Sl + 1) << 11
+ int32_t SustainLevel;	// (Sl + 1) << 11
 };
 
 class PS_SPU;
@@ -43,7 +43,7 @@ class SPU_Sweep
 
  void Power(void);
 
- void WriteControl(uint16 value);
+ void WriteControl(uint16_t value);
  int16 ReadVolume(void);
 
  void WriteVolume(int16 value);
@@ -51,33 +51,33 @@ class SPU_Sweep
  void Clock(void);
 
  private:
- uint16 Control;
+ uint16_t Control;
  int16 Current;
- uint32 Divider;
+ uint32_t Divider;
 };
 
 struct SPU_Voice
 {
- int32 DecodeBuffer[32 + 4]; // + 4 so we don't have to do & 0x1F in our MAC
- int32 DecodeWritePos;
+ int32_t DecodeBuffer[32 + 4]; // + 4 so we don't have to do & 0x1F in our MAC
+ int32_t DecodeWritePos;
 
- uint8 DecodeFlags;
+ uint8_t DecodeFlags;
 
  SPU_Sweep Sweep[2];
 
- uint16 Pitch;
- uint32 CurPhase;
- int32 CurPhase_SD;	// Offseted compared to CurPhase, used for triggering sample decode.
+ uint16_t Pitch;
+ uint32_t CurPhase;
+ int32_t CurPhase_SD;	// Offseted compared to CurPhase, used for triggering sample decode.
 
- uint32 StartAddr;
+ uint32_t StartAddr;
 
- uint32 CurAddr;
+ uint32_t CurAddr;
 
- uint32 ADSRControl;
+ uint32_t ADSRControl;
 
- uint32 LoopAddr;
+ uint32_t LoopAddr;
 
- int32 PreLRSample;	// After enveloping, but before L/R volume.  Range of -32768 to 32767
+ int32_t PreLRSample;	// After enveloping, but before L/R volume.  Range of -32768 to 32767
 
  SPU_ADSR ADSR;
 };
@@ -92,23 +92,23 @@ class PS_SPU
  int StateAction(StateMem *sm, int load, int data_only);
 
  void Power(void);
- void Write(pscpu_timestamp_t timestamp, uint32 A, uint16 V);
- uint16 Read(pscpu_timestamp_t timestamp, uint32 A);
+ void Write(pscpu_timestamp_t timestamp, uint32_t A, uint16_t V);
+ uint16_t Read(pscpu_timestamp_t timestamp, uint32_t A);
 
- void WriteDMA(uint32 V);
- uint32 ReadDMA(void);
+ void WriteDMA(uint32_t V);
+ uint32_t ReadDMA(void);
 
- void StartFrame(double rate, uint32 quality);
- int32 EndFrame(int16 *SoundBuf);
+ void StartFrame(double rate, uint32_t quality);
+ int32_t EndFrame(int16 *SoundBuf);
 
- int32 UpdateFromCDC(int32 clocks);
+ int32_t UpdateFromCDC(int32_t clocks);
  //pscpu_timestamp_t Update(pscpu_timestamp_t timestamp);
 
  private:
 
- void CheckIRQAddr(uint32 addr);
- void WriteSPURAM(uint32 addr, uint16 value);
- uint16 ReadSPURAM(uint32 addr);
+ void CheckIRQAddr(uint32_t addr);
+ void WriteSPURAM(uint32_t addr, uint16_t value);
+ uint16_t ReadSPURAM(uint32_t addr);
 
  void DecodeSamples(SPU_Voice *voice);
 
@@ -118,54 +118,54 @@ class PS_SPU
  void RunEnvelope(SPU_Voice *voice);
 
 
- void RunReverb(int32 in_l, int32 in_r, int32 &out_l, int32 &out_r);
- bool GetCDAudio(int32 &l, int32 &r);
+ void RunReverb(int32_t in_l, int32_t in_r, int32_t &out_l, int32_t &out_r);
+ bool GetCDAudio(int32_t &l, int32_t &r);
 
  SPU_Voice Voices[24];
 
- uint32 NoiseCounter;
- uint16 LFSR;
+ uint32_t NoiseCounter;
+ uint16_t LFSR;
 
- uint32 FM_Mode;
- uint32 Noise_Mode;
- uint32 Reverb_Mode;
+ uint32_t FM_Mode;
+ uint32_t Noise_Mode;
+ uint32_t Reverb_Mode;
 
- int32 ReverbWA;
+ int32_t ReverbWA;
 
  SPU_Sweep GlobalSweep[2];	// Doesn't affect reverb volume!
 
- int32 ReverbVol[2];
+ int32_t ReverbVol[2];
 
- int32 CDVol[2];
- int32 ExternVol[2];
+ int32_t CDVol[2];
+ int32_t ExternVol[2];
  
- uint32 IRQAddr;
+ uint32_t IRQAddr;
 
- uint32 RWAddr;
+ uint32_t RWAddr;
 
- uint16 SPUControl;
+ uint16_t SPUControl;
 
- uint32 VoiceOn;
- uint32 VoiceOff;
+ uint32_t VoiceOn;
+ uint32_t VoiceOff;
 
- uint32 BlockEnd;
+ uint32_t BlockEnd;
 
- uint32 CWA;
+ uint32_t CWA;
 
  union
  {
-  uint16 Regs[0x100];
+  uint16_t Regs[0x100];
   struct
   {
-   uint16 VoiceRegs[0xC0];
+   uint16_t VoiceRegs[0xC0];
    union
    {
-    uint16 GlobalRegs[0x20];
+    uint16_t GlobalRegs[0x20];
     struct
     {
-     uint16 _Global0[0x17];
-     uint16 SPUStatus;
-     uint16 _Global1[0x08];
+     uint16_t _Global0[0x17];
+     uint16_t SPUStatus;
+     uint16_t _Global1[0x08];
     };
    };
    union
@@ -211,32 +211,32 @@ class PS_SPU
   };
  };
 
- uint16 AuxRegs[0x10];
+ uint16_t AuxRegs[0x10];
 
  int16 RDSB[2][128];	// [40]
- int32 RDSB_WP;
+ int32_t RDSB_WP;
 
  int16 RUSB[2][128];
- int32 RUSB_WP;
+ int32_t RUSB_WP;
 
- int32 ReverbCur;
+ int32_t ReverbCur;
 
- int32 Get_Reverb_Offset(int32 offset);
- int32 RD_RVB(int16 raw_offs);
- void WR_RVB(int16 raw_offs, int32 sample, int32 extra_offs = 0);
+ int32_t Get_Reverb_Offset(int32_t offset);
+ int32_t RD_RVB(int16 raw_offs);
+ void WR_RVB(int16 raw_offs, int32_t sample, int32_t extra_offs = 0);
 
  bool IRQAsserted;
 
  //pscpu_timestamp_t lastts;
- int32 clock_divider;
+ int32_t clock_divider;
 
- uint16 SPURAM[524288 / sizeof(uint16)];
+ uint16_t SPURAM[524288 / sizeof(uint16)];
 
  int last_rate;
- uint32 last_quality;
+ uint32_t last_quality;
  // Buffers 44.1KHz samples, should have enough for two(worst-case scenario) video frames(2* ~735 frames NTSC, 2* ~882 PAL) plus jitter plus enough for the resampler leftovers.
  // We'll just go with 4096 because powers of 2 are AWESOME and such.
- uint32 IntermediateBufferPos;
+ uint32_t IntermediateBufferPos;
  int16 IntermediateBuffer[4096][2];
 
  public:
@@ -318,11 +318,11 @@ class PS_SPU
   GSREG_V0_READ_ADDR
  };
 
- uint32 GetRegister(unsigned int which, char *special, const uint32 special_len);
- void SetRegister(unsigned int which, uint32 value);
+ uint32_t GetRegister(unsigned int which, char *special, const uint32_t special_len);
+ void SetRegister(unsigned int which, uint32_t value);
 
- uint16 PeekSPURAM(uint32 address);
- void PokeSPURAM(uint32 address, uint16 value);
+ uint16_t PeekSPURAM(uint32_t address);
+ void PokeSPURAM(uint32_t address, uint16_t value);
 };
 
 

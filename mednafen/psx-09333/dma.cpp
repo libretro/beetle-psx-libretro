@@ -56,28 +56,28 @@ enum
 namespace MDFN_IEN_PSX
 {
 
-static int32 DMACycleCounter;
+static int32_t DMACycleCounter;
 
-static uint32 DMAControl;
-static uint32 DMAIntControl;
-static uint8 DMAIntStatus;
+static uint32_t DMAControl;
+static uint32_t DMAIntControl;
+static uint8_t DMAIntStatus;
 static bool IRQOut;
 
 struct Channel
 {
- uint32 BaseAddr;
- uint32 BlockControl;
- uint32 ChanControl;
+ uint32_t BaseAddr;
+ uint32_t BlockControl;
+ uint32_t ChanControl;
 
  //
  //
  //
- uint32 CurAddr;
- uint16 WordCounter; 
+ uint32_t CurAddr;
+ uint16_t WordCounter; 
 
  //
  //
- int32 ClockCounter;
+ int32_t ClockCounter;
 };
 
 static Channel DMACH[7];
@@ -132,7 +132,7 @@ void DMA_Power(void)
 
 void PSX_SetDMASuckSuck(unsigned);
 
-static INLINE bool ChCan(const unsigned ch, const uint32 CRModeCache)
+static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
 {
    switch(ch)
    {
@@ -233,7 +233,7 @@ static void RecalcHalt(void)
 }
 
 
-static INLINE void ChRW(const unsigned ch, const uint32 CRModeCache, uint32 *V)
+static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V)
 {
    unsigned extra_cyc_overhead = 0;
 
@@ -345,9 +345,9 @@ static INLINE void ChRW(const unsigned ch, const uint32 CRModeCache, uint32 *V)
 // otherwise RecalcHalt() might take the CPU out of a halted state before the end-of-DMA is signaled(especially a problem considering our largeish
 // DMA update timing granularity).
 //
-static INLINE void RunChannelI(const unsigned ch, const uint32 CRModeCache, int32 clocks)
+static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, int32_t clocks)
 {
-   //const uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
+   //const uint32_t dc = (DMAControl >> (ch * 4)) & 0xF;
 
    DMACH[ch].ClockCounter += clocks;
 
@@ -365,7 +365,7 @@ static INLINE void RunChannelI(const unsigned ch, const uint32 CRModeCache, int3
 
          if(CRModeCache & (1U << 10))
          {
-            uint32 header;
+            uint32_t header;
 
             if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
             {
@@ -418,7 +418,7 @@ static INLINE void RunChannelI(const unsigned ch, const uint32 CRModeCache, int3
       // Do the payload read/write
       //
       {
-         uint32 vtmp;
+         uint32_t vtmp;
 
          if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
          {
@@ -500,10 +500,10 @@ SkipPayloadStuff: ;
       DMACH[ch].ClockCounter = 0;
 }
 
-static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32 clocks, int ch)
+static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32_t clocks, int ch)
 {
    // Mask out the bits that the DMA controller will modify during the course of operation.
-   const uint32 CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
+   const uint32_t CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
    uint32_t crmodecache = CRModeCache;
 
    switch(ch)
@@ -550,7 +550,7 @@ static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32 clocks, int ch)
       RunChannelI(ch, crmodecache, clocks);
 }
 
-static INLINE int32 CalcNextEvent(int32 next_event)
+static INLINE int32_t CalcNextEvent(int32_t next_event)
 {
    if(DMACycleCounter < next_event)
       next_event = DMACycleCounter;
@@ -560,19 +560,16 @@ static INLINE int32 CalcNextEvent(int32 next_event)
 
 pscpu_timestamp_t DMA_Update(const pscpu_timestamp_t timestamp)
 {
-   //   uint32 dc = (DMAControl >> (ch * 4)) & 0xF;
-   int32 clocks = timestamp - lastts;
+   int32_t clocks, i;
+   //   uint32_t dc = (DMAControl >> (ch * 4)) & 0xF;
+   clocks = timestamp - lastts;
    lastts = timestamp;
 
    GPU->Update(timestamp);
    MDEC_Run(clocks);
 
-   RunChannel(timestamp, clocks, 0);
-   RunChannel(timestamp, clocks, 1);
-   RunChannel(timestamp, clocks, 2);
-   RunChannel(timestamp, clocks, 3);
-   RunChannel(timestamp, clocks, 4);
-   RunChannel(timestamp, clocks, 6);
+   for (i = 0; i < 7; i++)
+      RunChannel(timestamp, clocks, i);
 
    DMACycleCounter -= clocks;
    while(DMACycleCounter <= 0)
@@ -580,11 +577,11 @@ pscpu_timestamp_t DMA_Update(const pscpu_timestamp_t timestamp)
 
    RecalcHalt();
 
-   return(timestamp + CalcNextEvent(0x10000000));
+   return (timestamp + CalcNextEvent(0x10000000));
 }
 
 #if 0
-static void CheckLinkedList(uint32 addr)
+static void CheckLinkedList(uint32_t addr)
 {
  std::map<uint32, bool> zoom;
 
@@ -597,7 +594,7 @@ static void CheckLinkedList(uint32 addr)
   }
   zoom[addr] = 1;
 
-  uint32 header = MainRAM.ReadU32(addr & 0x1FFFFC);
+  uint32_t header = MainRAM.ReadU32(addr & 0x1FFFFC);
 
   addr = header & 0xFFFFFF;
 
@@ -605,153 +602,162 @@ static void CheckLinkedList(uint32 addr)
 }
 #endif
 
-void DMA_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
+void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 {
- int ch = (A & 0x7F) >> 4;
+   int ch = (A & 0x7F) >> 4;
 
- //if(ch == 2 || ch == 7)
- //PSX_WARNING("[DMA] Write: %08x %08x, DMAIntStatus=%08x", A, V, DMAIntStatus);
+   //if(ch == 2 || ch == 7)
+   //PSX_WARNING("[DMA] Write: %08x %08x, DMAIntStatus=%08x", A, V, DMAIntStatus);
 
- // FIXME if we ever have "accurate" bus emulation
- V <<= (A & 3) * 8;
+   // FIXME if we ever have "accurate" bus emulation
+   V <<= (A & 3) * 8;
 
- DMA_Update(timestamp);
+   DMA_Update(timestamp);
 
- if(ch == 7)
- {
-  switch(A & 0xC)
-  {
-   case 0x0: //fprintf(stderr, "Global DMA control: 0x%08x\n", V);
-	     DMAControl = V;
-	     RecalcHalt();
-	     break;
-
-   case 0x4: 
-	     //for(int x = 0; x < 7; x++)
-	     //{
-             // if(DMACH[x].WordCounter || (DMACH[x].ChanControl & (1 << 24)))
-	     // {
-	     //  fprintf(stderr, "Write DMAIntControl while channel %d active: 0x%08x\n", x, V);
-	     // }
-	     //}
-	     DMAIntControl = V & 0x00ff803f;
-	     DMAIntStatus &= ~(V >> 24);
-
-	     //if(DMAIntStatus ^ (DMAIntStatus & (V >> 16)))
-	     // fprintf(stderr, "DMAINT Fudge: %02x\n", DMAIntStatus ^ (DMAIntStatus & (V >> 16)));
-	     DMAIntStatus &= (V >> 16);	// THIS IS ALMOST CERTAINLY WRONG AND A HACK.  Remove when CDC emulation is better.
-     	     RecalcIRQOut();
-	     break;
-
-   default: PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
-	    break;
-  }
-  return;
- }
- switch(A & 0xC)
- {
-  case 0x0: DMACH[ch].BaseAddr = V & 0xFFFFFF;
-	    break;
-
-  case 0x4: DMACH[ch].BlockControl = V;
-	    break;
-
-  case 0xC:
-  case 0x8: 
-	   {
-	    uint32 OldCC = DMACH[ch].ChanControl;
-
-	    //printf("CHCR: %u, %08x --- 0x%08x\n", ch, V, DMACH[ch].BlockControl);
-	    //
-            // Kludge for DMA timing granularity and other issues.  Needs to occur before setting all bits of ChanControl to the new value, to accommodate the
-	    // case of a game cancelling DMA and changing the type of DMA(read/write, etc.) at the same time.
-            //
-	    if((DMACH[ch].ChanControl & (1 << 24)) && !(V & (1 << 24)))
-	    {
-	     DMACH[ch].ChanControl &= ~(1 << 24);	// Clear bit before RunChannel(), so it will only finish the block it's on at most.
-	     RunChannel(timestamp, 128 * 16, ch);
-	     DMACH[ch].WordCounter = 0;
-
-#if 0	// TODO(maybe, need to work out worst-case performance for abnormally/brokenly large block sizes)
-	     DMACH[ch].ClockCounter = (1 << 30);
-	     RunChannel(timestamp, 1, ch);
-	     DMACH[ch].ClockCounter = 0;
-#endif
-	     PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
-	     //MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
-	    }
-
-	    if(ch == 6)
-	     DMACH[ch].ChanControl = (V & 0x51000000) | 0x2;
-	    else
-	     DMACH[ch].ChanControl = V & 0x71770703;
-
-	    if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
-	    {
-	     //PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU->GetScanlineNum());
-
-	     DMACH[ch].WordCounter = 0;
-	     DMACH[ch].ClockCounter = 0;
-
-	     //
-	     // Viewpoint starts a short MEM->GPU LL DMA and apparently has race conditions that can cause a crash if it doesn't finish almost immediately(
-	     // or at least very quickly, which the current DMA granularity has issues with, so run the channel ahead a bit to take of this issue and potentially
-	     // games with similar issues).
-	     //
-	     // Though, Viewpoint isn't exactly a good game, so maybe we shouldn't bother? ;)
-	     //
-	     // Also, it's needed for RecalcHalt() to work with some semblance of workiness.
-	     //
-	     RunChannel(timestamp, 64, ch);	//std::max<int>(128 - DMACycleCounter, 1)); //64); //1); //128 - DMACycleCounter);
-	    }
-
-	    RecalcHalt();
-	   }
-	   break;
- }
- PSX_SetEventNT(PSX_EVENT_DMA, timestamp + CalcNextEvent(0x10000000));
-}
-
-uint32 DMA_Read(const pscpu_timestamp_t timestamp, uint32 A)
-{
- int ch = (A & 0x7F) >> 4;
- uint32 ret = 0;
-
- if(ch == 7)
- {
-  switch(A & 0xC)
-  {
-   default: PSX_WARNING("[DMA] Unknown read: %08x", A);
-	    break;
-
-   case 0x0: ret = DMAControl;
-	     break;
-
-   case 0x4: ret = DMAIntControl | (DMAIntStatus << 24) | (IRQOut << 31);
-	     break;
-  }
- }
- else switch(A & 0xC)
- {
-  case 0x0: ret = DMACH[ch].BaseAddr;
-  	    break;
-
-  case 0x4: ret = DMACH[ch].BlockControl;
-	    break;
-
-  case 0xC:
-  case 0x8: ret = DMACH[ch].ChanControl;
+   if(ch == 7)
+   {
+      switch(A & 0xC)
+      {
+         case 0x0: //fprintf(stderr, "Global DMA control: 0x%08x\n", V);
+            DMAControl = V;
+            RecalcHalt();
             break;
 
- }
+         case 0x4: 
+            //for(int x = 0; x < 7; x++)
+            //{
+            // if(DMACH[x].WordCounter || (DMACH[x].ChanControl & (1 << 24)))
+            // {
+            //  fprintf(stderr, "Write DMAIntControl while channel %d active: 0x%08x\n", x, V);
+            // }
+            //}
+            DMAIntControl = V & 0x00ff803f;
+            DMAIntStatus &= ~(V >> 24);
 
- ret >>= (A & 3) * 8;
+            //if(DMAIntStatus ^ (DMAIntStatus & (V >> 16)))
+            // fprintf(stderr, "DMAINT Fudge: %02x\n", DMAIntStatus ^ (DMAIntStatus & (V >> 16)));
+            DMAIntStatus &= (V >> 16);	// THIS IS ALMOST CERTAINLY WRONG AND A HACK.  Remove when CDC emulation is better.
+            RecalcIRQOut();
+            break;
 
- //PSX_WARNING("[DMA] Read: %08x %08x", A, ret);
+         default:
+            PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
+            break;
+      }
+      return;
+   }
 
- return(ret);
+   switch(A & 0xC)
+   {
+      case 0x0:
+         DMACH[ch].BaseAddr = V & 0xFFFFFF;
+         break;
+      case 0x4:
+         DMACH[ch].BlockControl = V;
+         break;
+      case 0xC:
+      case 0x8: 
+         {
+            uint32_t OldCC = DMACH[ch].ChanControl;
+
+            //printf("CHCR: %u, %08x --- 0x%08x\n", ch, V, DMACH[ch].BlockControl);
+            //
+            // Kludge for DMA timing granularity and other issues.  Needs to occur before setting all bits of ChanControl to the new value, to accommodate the
+            // case of a game cancelling DMA and changing the type of DMA(read/write, etc.) at the same time.
+            //
+            if((DMACH[ch].ChanControl & (1 << 24)) && !(V & (1 << 24)))
+            {
+               DMACH[ch].ChanControl &= ~(1 << 24);	// Clear bit before RunChannel(), so it will only finish the block it's on at most.
+               RunChannel(timestamp, 128 * 16, ch);
+               DMACH[ch].WordCounter = 0;
+
+#if 0	// TODO(maybe, need to work out worst-case performance for abnormally/brokenly large block sizes)
+               DMACH[ch].ClockCounter = (1 << 30);
+               RunChannel(timestamp, 1, ch);
+               DMACH[ch].ClockCounter = 0;
+#endif
+               PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
+               //MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
+            }
+
+            if(ch == 6)
+               DMACH[ch].ChanControl = (V & 0x51000000) | 0x2;
+            else
+               DMACH[ch].ChanControl = V & 0x71770703;
+
+            if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
+            {
+               //PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU->GetScanlineNum());
+
+               DMACH[ch].WordCounter = 0;
+               DMACH[ch].ClockCounter = 0;
+
+               //
+               // Viewpoint starts a short MEM->GPU LL DMA and apparently has race conditions that can cause a crash if it doesn't finish almost immediately(
+               // or at least very quickly, which the current DMA granularity has issues with, so run the channel ahead a bit to take of this issue and potentially
+               // games with similar issues).
+               //
+               // Though, Viewpoint isn't exactly a good game, so maybe we shouldn't bother? ;)
+               //
+               // Also, it's needed for RecalcHalt() to work with some semblance of workiness.
+               //
+               RunChannel(timestamp, 64, ch);	//std::max<int>(128 - DMACycleCounter, 1)); //64); //1); //128 - DMACycleCounter);
+            }
+
+            RecalcHalt();
+         }
+         break;
+   }
+   PSX_SetEventNT(PSX_EVENT_DMA, timestamp + CalcNextEvent(0x10000000));
 }
 
+uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A)
+{
+   int ch = (A & 0x7F) >> 4;
+   uint32_t ret = 0;
+
+   if(ch == 7)
+   {
+      switch(A & 0xC)
+      {
+         default:
+            PSX_WARNING("[DMA] Unknown read: %08x", A);
+            break;
+         case 0x0:
+            ret = DMAControl;
+            break;
+         case 0x4:
+            ret = DMAIntControl | (DMAIntStatus << 24) | (IRQOut << 31);
+            break;
+      }
+   }
+   else switch(A & 0xC)
+   {
+      case 0x0:
+         ret = DMACH[ch].BaseAddr;
+         break;
+      case 0x4:
+         ret = DMACH[ch].BlockControl;
+         break;
+      case 0xC:
+      case 0x8:
+         ret = DMACH[ch].ChanControl;
+         break;
+   }
+
+   ret >>= (A & 3) * 8;
+
+   //PSX_WARNING("[DMA] Read: %08x %08x", A, ret);
+
+   return ret;
+}
+
+#define SFDMACH(n)	SFVARN(DMACH[n].BaseAddr, #n "BaseAddr"),		\
+			SFVARN(DMACH[n].BlockControl, #n "BlockControl"),	\
+			SFVARN(DMACH[n].ChanControl, #n "ChanControl"),		\
+			SFVARN(DMACH[n].CurAddr, #n "CurAddr"),			\
+			SFVARN(DMACH[n].WordCounter, #n "WordCounter"),		\
+			SFVARN(DMACH[n].ClockCounter, #n "ClockCounter")
 
 int DMA_StateAction(StateMem *sm, int load, int data_only)
 {
@@ -763,12 +769,6 @@ int DMA_StateAction(StateMem *sm, int load, int data_only)
   SFVAR(DMAIntStatus),
   SFVAR(IRQOut),
 
-#define SFDMACH(n)	SFVARN(DMACH[n].BaseAddr, #n "BaseAddr"),		\
-			SFVARN(DMACH[n].BlockControl, #n "BlockControl"),	\
-			SFVARN(DMACH[n].ChanControl, #n "ChanControl"),		\
-			SFVARN(DMACH[n].CurAddr, #n "CurAddr"),			\
-			SFVARN(DMACH[n].WordCounter, #n "WordCounter"),		\
-			SFVARN(DMACH[n].ClockCounter, #n "ClockCounter")
 
   SFDMACH(0),
   SFDMACH(1),
@@ -778,12 +778,11 @@ int DMA_StateAction(StateMem *sm, int load, int data_only)
   SFDMACH(5),
   SFDMACH(6),
 
-#undef SFDMACH
-
   SFVAR(lastts),
 
   SFEND
  };
+
  int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "DMA");
 
  if(load)

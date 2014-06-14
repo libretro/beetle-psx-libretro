@@ -23,11 +23,11 @@ namespace MDFN_IEN_PSX
 
 // Dummy implementation.
 
-static uint16 Status;
-static uint16 Mode;
-static uint16 Control;
-static uint16 BaudRate;
-static uint32 DataBuffer;
+static uint16_t Status;
+static uint16_t Mode;
+static uint16_t Control;
+static uint16_t BaudRate;
+static uint32_t DataBuffer;
 
 void SIO_Power(void)
 {
@@ -38,69 +38,69 @@ void SIO_Power(void)
  DataBuffer = 0;
 }
 
-uint32 SIO_Read(pscpu_timestamp_t timestamp, uint32 A)
+uint32_t SIO_Read(pscpu_timestamp_t timestamp, uint32_t A)
 {
- uint32 ret = 0;
+   uint32_t ret = 0;
 
- switch(A & 0xE)
- {
-  default:
-	PSX_WARNING("[SIO] Unknown read: 0x%08x -- %d\n", A, timestamp);
-	break;
+   switch(A & 0xE)
+   {
+      default:
+         PSX_WARNING("[SIO] Unknown read: 0x%08x -- %d\n", A, timestamp);
+         break;
 
-  case 0x0:
-  //case 0x2:
-	ret = DataBuffer >> ((A & 2) * 8);
-	break;
+      case 0x0:
+         //case 0x2:
+         ret = DataBuffer >> ((A & 2) * 8);
+         break;
 
-  case 0x4:
-	ret = Status;
-	break;
+      case 0x4:
+         ret = Status;
+         break;
 
-  case 0x8:
-	ret = Mode;
-	break;
+      case 0x8:
+         ret = Mode;
+         break;
 
-  case 0xA:
-	ret = Control;
-	break;
+      case 0xA:
+         ret = Control;
+         break;
 
-  case 0xE:
-	ret = BaudRate;
-	break;
- }
+      case 0xE:
+         ret = BaudRate;
+         break;
+   }
 
- return(ret >> ((A & 1) * 8));
+   return (ret >> ((A & 1) * 8));
 }
 
-void SIO_Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
+void SIO_Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 {
- V <<= (A & 1) * 8;
+   V <<= (A & 1) * 8;
 
- switch(A & 0xE)
- {
-  default:
-	PSX_WARNING("[SIO] Unknown write: 0x%08x 0x%08x -- %d\n", A, V, timestamp);
-	break;
+   switch(A & 0xE)
+   {
+      default:
+         PSX_WARNING("[SIO] Unknown write: 0x%08x 0x%08x -- %d\n", A, V, timestamp);
+         break;
 
-  case 0x0:
-  //case 0x2:
-	V <<= (A & 2) * 8;
-	DataBuffer = V;
-        break;
+      case 0x0:
+         //case 0x2:
+         V <<= (A & 2) * 8;
+         DataBuffer = V;
+         break;
 
-  case 0x8:
-        Mode = V;
-        break;
+      case 0x8:
+         Mode = V;
+         break;
 
-  case 0xA:
-        Control = V;
-        break;
+      case 0xA:
+         Control = V;
+         break;
 
-  case 0xE:
-        BaudRate = V;
-        break;
- }
+      case 0xE:
+         BaudRate = V;
+         break;
+   }
 }
 
 }
