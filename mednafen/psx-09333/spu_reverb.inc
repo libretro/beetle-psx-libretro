@@ -1,67 +1,67 @@
-static int16 ReverbSat(int32 samp) MDFN_WARN_UNUSED_RESULT;
-static INLINE int16 ReverbSat(int32 samp)
+static int16_t ReverbSat(int32_t samp) MDFN_WARN_UNUSED_RESULT;
+static INLINE int16_t ReverbSat(int32_t samp)
 {
- if(samp > 32767)
-  samp = 32767;
+   if(samp > 32767)
+   samp = 32767;
 
- if(samp < -32768)
-  samp = -32768;
+   if(samp < -32768)
+   samp = -32768;
 
- return(samp);
+   return(samp);
 }
 
 
-INLINE int32 PS_SPU::Get_Reverb_Offset(int32 in_offset)
+INLINE int32_t PS_SPU::Get_Reverb_Offset(int32_t in_offset)
 {
- int32 offset = in_offset & 0x3FFFF;
- int32 wa_size = 0x40000 - ReverbWA;
+   int32_t offset = in_offset & 0x3FFFF;
+   int32_t wa_size = 0x40000 - ReverbWA;
 
- if(offset & 0x20000)
- {
-  offset -= ReverbWA;
+   if(offset & 0x20000)
+   {
+      offset -= ReverbWA;
 
-  if(offset < 0)
-  {
-   offset = 0;
-   //PSX_WARNING("[SPU] A reverb offset is broken(-).");
-  }
- }
- else
- {
-  if(offset >= wa_size)
-  {
-   offset = wa_size - 1;
-   //PSX_WARNING("[SPU] A reverb offset is broken(+): WASize=0x%04x, 0x%04x.", wa_size >> 2, in_offset >> 2);
-  }
- }
+      if(offset < 0)
+      {
+         offset = 0;
+         //PSX_WARNING("[SPU] A reverb offset is broken(-).");
+      }
+   }
+   else
+   {
+      if(offset >= wa_size)
+      {
+         offset = wa_size - 1;
+         //PSX_WARNING("[SPU] A reverb offset is broken(+): WASize=0x%04x, 0x%04x.", wa_size >> 2, in_offset >> 2);
+      }
+   }
 
- offset += ReverbCur;
+   offset += ReverbCur;
 
- if(offset >= 0x40000)
-  offset = (offset & 0x3FFFF) + ReverbWA;
+   if(offset >= 0x40000)
+   offset = (offset & 0x3FFFF) + ReverbWA;
 
- assert(offset >= ReverbWA && offset < 0x40000);
+   assert(offset >= ReverbWA && offset < 0x40000);
 
- return(offset);
+   return(offset);
 }
 
-int32 PS_SPU::RD_RVB(int16 raw_offs)
+int32_t PS_SPU::RD_RVB(int16_t raw_offs)
 {
  //raw_offs = rand() & 0xFFFF;
 
  return((int16)SPURAM[Get_Reverb_Offset(raw_offs << 2)]);
 }
 
-void PS_SPU::WR_RVB(int16 raw_offs, int32 sample, int32 extra_offs)
+void PS_SPU::WR_RVB(int16_t raw_offs, int32_t sample, int32_t extra_offs)
 {
  //raw_offs = rand() & 0xFFFF;
 
  SPURAM[Get_Reverb_Offset((raw_offs << 2) + extra_offs)] = ReverbSat(sample);
 }
 
-static INLINE int32 Reverb4422(const int16 *src)
+static INLINE int32_t Reverb4422(const int16_t *src)
 {
- static const int16 ResampTable[40] =
+ static const int16_t ResampTable[40] =
  {
   (int16)0xffff,
   (int16)0x0000,
@@ -104,7 +104,7 @@ static INLINE int32 Reverb4422(const int16 *src)
   (int16)0xffff,				     
   (int16)0x0000,
  };
- int32 out = 0;	// 32-bits is adequate(it won't overflow)
+ int32_t out = 0;	// 32-bits is adequate(it won't overflow)
 
  for(int i = 0; i < 40; i += 2)
   out += ResampTable[i] * src[i];
@@ -123,9 +123,9 @@ static INLINE int32 Reverb4422(const int16 *src)
  return(out);
 }
 
-void PS_SPU::RunReverb(int32 in_l, int32 in_r, int32 &out_l, int32 &out_r)
+void PS_SPU::RunReverb(int32_t in_l, int32_t in_r, int32_t &out_l, int32_t &out_r)
 {
- int32 upsampled[2] = { 0, 0 };
+ int32_t upsampled[2] = { 0, 0 };
 
  RDSB[0][RDSB_WP] = in_l;
  RDSB[1][RDSB_WP] = in_r;
@@ -136,7 +136,7 @@ void PS_SPU::RunReverb(int32 in_l, int32 in_r, int32 &out_l, int32 &out_r)
 
  if(!(RDSB_WP & 1))
  {
-  int32 downsampled[2];
+  int32_t downsampled[2];
 
   for(int lr = 0; lr < 2; lr++)
    downsampled[lr] = Reverb4422(&RDSB[lr][(RDSB_WP - 40) & 0x3F]);
@@ -146,13 +146,13 @@ void PS_SPU::RunReverb(int32 in_l, int32 in_r, int32 &out_l, int32 &out_r)
   ///
  if(SPUControl & 0x80)
  {
-  int32 IIR_INPUT_A0;
-  int32 IIR_INPUT_A1;
-  int32 IIR_INPUT_B0;
-  int32 IIR_INPUT_B1;
-  int32 IIR_A0, IIR_A1, IIR_B0, IIR_B1;
-  int32 ACC0, ACC1;
-  int32 FB_A0, FB_A1, FB_B0, FB_B1;
+  int32_t IIR_INPUT_A0;
+  int32_t IIR_INPUT_A1;
+  int32_t IIR_INPUT_B0;
+  int32_t IIR_INPUT_B1;
+  int32_t IIR_A0, IIR_A1, IIR_B0, IIR_B1;
+  int32_t ACC0, ACC1;
+  int32_t FB_A0, FB_A1, FB_B0, FB_B1;
 
   IIR_INPUT_A0 = ((RD_RVB(IIR_SRC_A0) * IIR_COEF) >> 15) + ((downsampled[0] * IN_COEF_L) >> 15);
   IIR_INPUT_A1 = ((RD_RVB(IIR_SRC_A1) * IIR_COEF) >> 15) + ((downsampled[1] * IN_COEF_R) >> 15);

@@ -44,29 +44,29 @@ namespace MDFN_IEN_PSX
  static void PSX_DBGINFO(const char* format, ...) { }
 #endif
 
- typedef int32 pscpu_timestamp_t;
+ typedef int32_t pscpu_timestamp_t;
 
  bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp);
 
- void MDFN_FASTCALL PSX_MemWrite8(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite16(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite24(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite32(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
+ void MDFN_FASTCALL PSX_MemWrite8(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite16(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite24(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite32(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
 
- uint8 MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32 A);
- uint16 MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32 A);
- uint32 MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32 A);
- uint32 MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32 A);
+ uint8_t MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint16_t MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint32_t MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint32_t MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32_t A);
 
- uint8 PSX_MemPeek8(uint32 A);
- uint16 PSX_MemPeek16(uint32 A);
- uint32 PSX_MemPeek32(uint32 A);
+ uint8_t PSX_MemPeek8(uint32_t A);
+ uint16_t PSX_MemPeek16(uint32_t A);
+ uint32_t PSX_MemPeek32(uint32_t A);
 
  // Should write to WO-locations if possible
  #if 0
- void PSX_MemPoke8(uint32 A, uint8 V);
- void PSX_MemPoke16(uint32 A, uint16 V);
- void PSX_MemPoke32(uint32 A, uint32 V);
+ void PSX_MemPoke8(uint32_t A, uint8_t V);
+ void PSX_MemPoke16(uint32_t A, uint16_t V);
+ void PSX_MemPoke32(uint32_t A, uint32_t V);
  #endif
 
  void PSX_RequestMLExit(void);
@@ -88,9 +88,9 @@ namespace MDFN_IEN_PSX
  #define PSX_EVENT_MAXTS       		0x20000000
  void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp);
 
- void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
+ void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
 
- uint32 PSX_GetRandU32(uint32 mina, uint32 maxa);
+ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 };
 
 

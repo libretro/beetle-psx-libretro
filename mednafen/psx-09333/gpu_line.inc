@@ -1,13 +1,13 @@
 struct line_fxp_coord
 {
- int64 x, y;
- int32 r, g, b;
+ int64_t x, y;
+ int32_t r, g, b;
 };
 
 struct line_fxp_step
 {
- int64 dx_dk, dy_dk;
- int32 dr_dk, dg_dk, db_dk;
+ int64_t dx_dk, dy_dk;
+ int32_t dr_dk, dg_dk, db_dk;
 };
 
 enum { Line_XY_FractBits = 32 };
@@ -44,7 +44,7 @@ static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_s
 }
 
 template<typename T, unsigned bits>
-static INLINE T LineDivide(T delta, int32 dk)
+static INLINE T LineDivide(T delta, int32_t dk)
 {
  delta <<= bits;
 
@@ -57,7 +57,7 @@ static INLINE T LineDivide(T delta, int32 dk)
 }
 
 template<bool goraud>
-static INLINE void LinePointsToFXPStep(const line_point &point0, const line_point &point1, const int32 dk, line_fxp_step &step)
+static INLINE void LinePointsToFXPStep(const line_point &point0, const line_point &point1, const int32_t dk, line_fxp_step &step)
 {
  if(!dk)
  {
@@ -85,7 +85,7 @@ static INLINE void LinePointsToFXPStep(const line_point &point0, const line_poin
 }
 
 template<bool goraud>
-static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step, int32 count = 1)
+static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step, int32_t count = 1)
 {
  point.x += step.dx_dk * count;
  point.y += step.dy_dk * count;
@@ -101,9 +101,9 @@ static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step,
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
- int32 i_dx;
- int32 i_dy;
- int32 k;
+ int32_t i_dx;
+ int32_t i_dy;
+ int32_t k;
  line_fxp_coord cur_point;
  line_fxp_step step;
 
@@ -144,16 +144,16 @@ void PS_GPU::DrawLine(line_point *points)
  //
  //
  //
- for(int32 i = 0; i <= k; i++)	// <= is not a typo.
+ for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
  {
   // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
-  const int32 x = (cur_point.x >> Line_XY_FractBits) & 2047;
-  const int32 y = (cur_point.y >> Line_XY_FractBits) & 2047;
+  const int32_t x = (cur_point.x >> Line_XY_FractBits) & 2047;
+  const int32_t y = (cur_point.y >> Line_XY_FractBits) & 2047;
   uint16 pix = 0x8000;
 
   if(!LineSkipTest(y))
   {
-   uint8 r, g, b;
+   uint8_t r, g, b;
 
    if(goraud)
    {
@@ -191,9 +191,9 @@ void PS_GPU::DrawLine(line_point *points)
 }
 
 template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
-void PS_GPU::Command_DrawLine(const uint32 *cb)
+void PS_GPU::Command_DrawLine(const uint32_t *cb)
 {
- const uint8 cc = cb[0] >> 24; // For pline handling later.
+ const uint8_t cc = cb[0] >> 24; // For pline handling later.
  line_point points[2];
 
  DrawTimeAvail -= 16;	// FIXME, correct time.

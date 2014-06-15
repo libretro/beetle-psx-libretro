@@ -62,7 +62,7 @@ void InputDevice::SetAMCT(bool)
 
 }
 
-void InputDevice::SetCrosshairsColor(uint32 color)
+void InputDevice::SetCrosshairsColor(uint32_t color)
 {
 
 }
@@ -72,7 +72,7 @@ bool InputDevice::RequireNoFrameskip(void)
  return false;
 }
 
-pscpu_timestamp_t InputDevice::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
+pscpu_timestamp_t InputDevice::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
 {
  return(PSX_EVENT_MAXTS);
 }
@@ -93,29 +93,29 @@ bool InputDevice::GetDSR(void)
    return 0;
 }
 
-bool InputDevice::Clock(bool TxD, int32 &dsr_pulse_delay)
+bool InputDevice::Clock(bool TxD, int32_t &dsr_pulse_delay)
 {
    dsr_pulse_delay = 0;
 
    return 1;
 }
 
-uint32 InputDevice::GetNVSize(void)
+uint32_t InputDevice::GetNVSize(void)
 {
    return 0;
 }
 
-void InputDevice::ReadNV(uint8 *buffer, uint32 offset, uint32 count)
+void InputDevice::ReadNV(uint8_t *buffer, uint32_t offset, uint32_t count)
 {
 
 }
 
-void InputDevice::WriteNV(const uint8 *buffer, uint32 offset, uint32 count)
+void InputDevice::WriteNV(const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
 
 }
 
-uint64 InputDevice::GetNVDirtyCount(void)
+uint64_t InputDevice::GetNVDirtyCount(void)
 {
    return 0;
 }
@@ -230,7 +230,7 @@ void FrontIO::SetAMCT(bool enabled)
    amct_enabled = enabled;
 }
 
-void FrontIO::SetCrosshairsColor(unsigned port, uint32 color)
+void FrontIO::SetCrosshairsColor(unsigned port, uint32_t color)
 {
    assert(port >= 0 && port < 8);
 
@@ -263,7 +263,7 @@ FrontIO::~FrontIO()
    DummyDevice = NULL;
 }
 
-pscpu_timestamp_t FrontIO::CalcNextEventTS(pscpu_timestamp_t timestamp, int32 next_event)
+pscpu_timestamp_t FrontIO::CalcNextEventTS(pscpu_timestamp_t timestamp, int32_t next_event)
 {
    pscpu_timestamp_t ret;
    int i;
@@ -286,7 +286,7 @@ pscpu_timestamp_t FrontIO::CalcNextEventTS(pscpu_timestamp_t timestamp, int32 ne
    return(ret);
 }
 
-static const uint8 ScaleShift[4] = { 0, 0, 4, 6 };
+static const uint8_t ScaleShift[4] = { 0, 0, 4, 6 };
 
 void FrontIO::CheckStartStopPending(pscpu_timestamp_t timestamp, bool skip_event_set)
 {
@@ -343,7 +343,7 @@ INLINE void FrontIO::DoDSRIRQ(void)
 }
 
 
-void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
+void FrontIO::Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 {
    assert(!(A & 0x1));
 
@@ -443,7 +443,7 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32 A, uint32 V)
 }
 
 
-uint32 FrontIO::Read(pscpu_timestamp_t timestamp, uint32 A)
+uint32_t FrontIO::Read(pscpu_timestamp_t timestamp, uint32_t A)
 {
    uint32_t ret = 0;
 
@@ -536,7 +536,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
          if(ReceiveInProgress || TransmitInProgress)
          {
             bool rxd = 0, txd = 0;
-            const uint32 BCMask = 0x07;
+            const uint32_t BCMask = 0x07;
 
             if(TransmitInProgress)
             {
@@ -727,7 +727,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
    MapDevicesToPorts();
 }
 
-uint64 FrontIO::GetMemcardDirtyCount(unsigned int which)
+uint64_t FrontIO::GetMemcardDirtyCount(unsigned int which)
 {
  assert(which < 8);
 
@@ -743,11 +743,11 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
   if(DevicesMC[which]->GetNVSize())
   {
    FileStream mf(path, FileStream::MODE_READ);
-   std::vector<uint8> tmpbuf;
+   std::vector<uint8_t> tmpbuf;
 
    tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
-   if(mf.size() != (int64)tmpbuf.size())
+   if(mf.size() != (int64_t)tmpbuf.size())
     throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
 
    mf.read(&tmpbuf[0], tmpbuf.size());
@@ -770,7 +770,7 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
   FileStream mf(path, FileStream::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
-  std::vector<uint8> tmpbuf;
+  std::vector<uint8_t> tmpbuf;
 
   tmpbuf.resize(DevicesMC[which]->GetNVSize());
 
@@ -794,7 +794,7 @@ bool FrontIO::RequireNoFrameskip(void)
    return(false);
 }
 
-void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
+void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
 {
  Update(timestamp);
 
