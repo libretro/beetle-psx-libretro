@@ -16,10 +16,7 @@ struct i_deltas
  int32_t dummy1[3];
 };
 
-static INLINE int64_t MakePolyXFP(int32_t x)
-{
- return ((int64)x << 32) + ((1LL << 32) - (1 << 11));
-}
+#define MakePolyXFP(x) (((int64_t)(x) << 32) + ((1LL << 32) - (1 << 11)))
 
 static INLINE int64_t MakePolyXFPStep(int32_t dx, int32_t dy)
 {
@@ -37,64 +34,56 @@ static INLINE int64_t MakePolyXFPStep(int32_t dx, int32_t dy)
  return(ret);
 }
 
-static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
-{
- return(xfp >> 32);
-}
-
-//#define CALCIS(x,y) ( A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y) )
+#define GetPolyXFP_Int(xfp) (xfp >> 32)
 #define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
+
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
 {
- int64_t num = ((int64)COORD_MF_INT(1)) << 32;
- int64_t denom = CALCIS(x, y);
- int64_t one_div;
+   int64_t num = ((int64)COORD_MF_INT(1)) << 32;
+   int64_t denom = CALCIS(x, y);
+   int64_t one_div;
 
- if(!denom)
-  return(false);
+   if(!denom)
+   return(false);
 
-//num -= abs(denom) - 1;
-// num += abs(denom) >> 1;
+   //num -= abs(denom) - 1;
+   // num += abs(denom) >> 1;
 
- one_div = num / denom;
+   one_div = num / denom;
 
- idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> 32;
- idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> 32;
+   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> 32;
+   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> 32;
 
- idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> 32;
- idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> 32;
+   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> 32;
+   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> 32;
 
- idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> 32;
- idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> 32;
+   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> 32;
+   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> 32;
 
- idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> 32;
- idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> 32;
+   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> 32;
+   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> 32;
 
- idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> 32;
- idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> 32;
+   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> 32;
+   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> 32;
 
-// printf("  du_dx=%08x, du_dy=%08x\n", idl.du_dx, idl.du_dy);
+   // printf("  du_dx=%08x, du_dy=%08x\n", idl.du_dx, idl.du_dy);
 
- return(true);
+   return(true);
 }
 #undef CALCIS
 
-template<bool goraud, bool textured>
-static INLINE void AddIDeltas_DX(i_group &ig, const i_deltas &idl)
-{
- if(textured)
- {
-  ig.u += idl.du_dx;
-  ig.v += idl.dv_dx;
+#define AddIDeltas_DX(gouraud, textured, ig, idl) \
+ if(textured) \
+ { \
+  ig.u += idl.du_dx; \
+  ig.v += idl.dv_dx; \
+ } \
+ if(goraud) \
+ { \
+  ig.r += idl.dr_dx; \
+  ig.g += idl.dg_dx; \
+  ig.b += idl.db_dx; \
  }
-
- if(goraud)
- {
-  ig.r += idl.dr_dx;
-  ig.g += idl.dg_dx;
-  ig.b += idl.db_dx;
- }
-}
 
 template<bool goraud, bool textured>
 static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, int32_t count = 1)
@@ -180,12 +169,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
      if(fbw)
      {
       if(TexMult)
-      {
-       if(dtd)
-        fbw = ModTexel(fbw, r, g, b, x & 3, y & 3);
-       else
-        fbw = ModTexel(fbw, r, g, b, 3, 2); //x & 3, y & 3);
-      }
+         fbw = ModTexel(fbw, r, g, b, (dtd) ? (x & 3) : 3, (dtd) ? (y & 3) : 2); //x & 3, y & 3);
       PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
      }
     }
@@ -209,8 +193,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
      PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
     }
 
-    AddIDeltas_DX<goraud, textured>(ig, idl);
-    //AddStep<goraud, textured>(perp_coord, perp_step);
+    AddIDeltas_DX(goraud, textured, ig, idl);
    }
   }
 }
