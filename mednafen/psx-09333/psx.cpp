@@ -24,7 +24,6 @@
 #include "spu.h"
 #include "../mempatcher.h"
 #include "../player.h"
-#include "../cputest/cputest.h"
 
 #include <stdarg.h>
 #include <ctype.h>
