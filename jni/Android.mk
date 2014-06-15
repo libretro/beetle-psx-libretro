@@ -42,9 +42,7 @@ ifeq ($(core), psx)
    NEED_CD = 1
    NEED_BPP = 32
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
    NEED_DEINTERLACER = 1
-	NEED_STEREO_SOUND = 1
 	NEED_SCSI_CD = 1
 	NEED_THREADING = 1
 	NEED_TREMOR = 1
@@ -76,8 +74,6 @@ TARGET_NAME := mednafen_psx_libretro
 else ifeq ($(core), lynx)
    core = lynx
    NEED_BPP = 32
-   NEED_BLIP = 1
-   NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_LYNX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/lynx
    NEED_CRC32 = 1
@@ -96,9 +92,7 @@ else ifeq ($(core), pce_fast)
    PTHREAD_FLAGS = -pthread
    NEED_BPP = 16
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
    NEED_CD = 1
-	NEED_STEREO_SOUND = 1
 	NEED_SCSI_CD = 1
 	NEED_THREADING = 1
 	NEED_TREMOR = 1
@@ -124,8 +118,6 @@ else ifeq ($(core), wswan)
    core = wswan
    NEED_BPP = 32
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_WSWAN_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/wswan-09333
 
@@ -143,8 +135,6 @@ else ifeq ($(core), ngp)
    core = ngp
    NEED_BPP = 32
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_NGP_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/ngp-09333
 
@@ -181,8 +171,6 @@ TARGET_NAME := mednafen_ngp_libretro
 else ifeq ($(core), gba)
    core = gba
    NEED_BPP = 32
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
    NEED_CRC32 = 1
    CORE_DEFINE := -DWANT_GBA_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/gba-09333
@@ -215,8 +203,6 @@ else ifeq ($(core), vb)
    core = vb
    NEED_BPP = 32
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_VB_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/vb-09333
 
@@ -235,8 +221,6 @@ else ifeq ($(core), pcfx)
    core = pcfx
    NEED_BPP = 32
 	WANT_NEW_API = 1
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
 	NEED_THREADING = 1
 	NEED_CD = 1
 	NEED_SCSI_CD = 1
@@ -268,8 +252,6 @@ TARGET_NAME := mednafen_$(core)_libretro
 else ifeq ($(core), snes)
    core = snes
    NEED_BPP = 32
-   NEED_BLIP = 1
-	NEED_STEREO_SOUND = 1
    CORE_DEFINE := -DWANT_SNES_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/snes
 
@@ -325,10 +307,6 @@ TARGET_NAME := mednafen_snes_libretro
 LDFLAGS += -ldl
 endif
 
-ifeq ($(NEED_STEREO_SOUND), 1)
-SOUND_DEFINE := -DWANT_STEREO_SOUND
-endif
-
 CORE_INCDIR := $(CORE_DIR)
 
 ifeq ($(NEED_THREADING), 1)
@@ -372,8 +350,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/sound/Blip_Buffer.cpp \
-	$(MEDNAFEN_DIR)/sound/Stereo_Buffer.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
 	$(MEDNAFEN_DIR)/player.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
