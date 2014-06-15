@@ -217,9 +217,6 @@
 /* Define to 1 if you have the `asound' library (-lasound). */
 #undef HAVE_LIBASOUND
 
-/* Define if we are compiling with libcdio support. */
-#undef HAVE_LIBCDIO
-
 /* Define if we are compiling with libsndfile support. */
 #undef HAVE_LIBSNDFILE
 

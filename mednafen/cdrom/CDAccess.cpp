@@ -29,10 +29,6 @@
 #include "CDAccess_Image.h"
 #include "CDAccess_CCD.h"
 
-#ifdef HAVE_LIBCDIO
-#include "CDAccess_Physical.h"
-#endif
-
 using namespace CDUtility;
 
 CDAccess::CDAccess()
@@ -59,9 +55,5 @@ CDAccess *cdaccess_open_image(const char *path, bool image_memcache)
 
 CDAccess *cdaccess_open_phys(const char *devicename)
 {
- #ifdef HAVE_LIBCDIO
- return new CDAccess_Physical(devicename);
- #else
  throw MDFN_Error(0, _("Physical CD access support not compiled in."));
- #endif
 }
