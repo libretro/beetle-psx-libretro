@@ -44,11 +44,8 @@
 #include "msvc_compat.h"
 #endif
 
-MDFNGI *MDFNGameInfo = NULL;
-
 extern MDFNGI EmulatedPSX;
-#define MDFNGI_CORE &EmulatedPSX
-
+MDFNGI *MDFNGameInfo = &EmulatedPSX;
 
 /* forward declarations */
 extern void MDFND_DispMessage(unsigned char *str);
@@ -230,7 +227,6 @@ MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 {
    MDFNFILE GameFile;
 	std::vector<FileExtensionSpecStruct> valid_iae;
-   MDFNGameInfo = MDFNGI_CORE;
 
 #ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
