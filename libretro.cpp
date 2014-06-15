@@ -8,8 +8,6 @@
 #endif
 #include "libretro.h"
 
-static MDFNGI *game;
-
 //forward decls
 extern void Emulate(EmulateSpecStruct *espec);
 extern void SetInput(int port, const char *type, void *ptr);
@@ -132,7 +130,7 @@ static bool disk_set_eject_state(bool ejected)
    if (ejected == eject_state)
       return false;
 
-   game->DoSimpleCommand(ejected ? MDFN_MSC_EJECT_DISK : MDFN_MSC_INSERT_DISK);
+   DoSimpleCommand(ejected ? MDFN_MSC_EJECT_DISK : MDFN_MSC_INSERT_DISK);
    eject_state = ejected;
    return true;
 }
@@ -157,7 +155,7 @@ static bool disk_set_image_index(unsigned index)
    // Very hacky. CDSelect command will increment first.
    CD_SelectedDisc--;
 
-   game->DoSimpleCommand(MDFN_MSC_SELECT_DISK);
+   DoSimpleCommand(MDFN_MSC_SELECT_DISK);
    return true;
 }
 
@@ -316,7 +314,7 @@ void retro_init(void)
 
 void retro_reset(void)
 {
-   game->DoSimpleCommand(MDFN_MSC_RESET);
+   DoSimpleCommand(MDFN_MSC_RESET);
 }
 
 bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
@@ -434,8 +432,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
-   game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path);
-   if (!game)
+   if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path))
       return false;
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
@@ -452,14 +449,11 @@ bool retro_load_game(const struct retro_game_info *info)
 
    hookup_ports(true);
 
-   return game;
+   return true;
 }
 
-void retro_unload_game()
+void retro_unload_game(void)
 {
-   if (!game)
-      return;
-
    MDFNI_CloseGame();
 }
 
@@ -821,14 +815,13 @@ static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {
-   MDFNGI *curgame = (MDFNGI*)game;
    //if (serialize_size)
    //   return serialize_size;
 
-   if (!curgame->StateAction)
+   if (!StateAction)
    {
       if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
+         log_cb(RETRO_LOG_WARN, "[mednafen]: Module doesn't support save states.\n");
       return 0;
    }
 
@@ -838,7 +831,7 @@ size_t retro_serialize_size(void)
    if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
    {
       if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[mednafen]: Module %s doesn't support save states.\n", curgame->shortname);
+         log_cb(RETRO_LOG_WARN, "[mednafen]: Module %s doesn't support save states.\n");
       return 0;
    }
 

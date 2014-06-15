@@ -1828,7 +1828,7 @@ void SetInput(int port, const char *type, void *ptr)
    FIO->SetInput(port, type, ptr);
 }
 
-static int StateAction(StateMem *sm, int load, int data_only)
+int StateAction(StateMem *sm, int load, int data_only)
 {
    return(0);
    SFORMAT StateRegs[] =
@@ -1916,7 +1916,7 @@ static void CDSelect(void)
 }
 
 
-static void DoSimpleCommand(int cmd)
+void DoSimpleCommand(int cmd)
 {
    switch(cmd)
    {
