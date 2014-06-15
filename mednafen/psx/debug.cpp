@@ -141,14 +141,6 @@ static void CPUHandler(const pscpu_timestamp_t timestamp, uint32 PC)
 {
  std::vector<PSX_BPOINT>::iterator bpit;
 
- if(PC == 0xB0 && CPU->GetRegister(PS_CPU::GSREG_GPR + 9, NULL, 0) == 0x3D)
- {
-  putchar(CPU->GetRegister(PS_CPU::GSREG_GPR + 4, NULL, 0));
-  //exit(1);
-  //puts((const char *)&MainRAM[CPU->GetRegister(PS_CPU::GSREG_GPR + 4, NULL, 0) & 0x1FFFFF]);
- }
-
-
  for(bpit = BreakPointsPC.begin(); bpit != BreakPointsPC.end(); bpit++)
  {
   if(PC >= bpit->A[0] && PC <= bpit->A[1])

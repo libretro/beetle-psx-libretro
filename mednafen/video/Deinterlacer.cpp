@@ -5,13 +5,13 @@
 #include "../driver.h"
 
 #include "Deinterlacer.h"
-
-Deinterlacer::Deinterlacer()
+Deinterlacer::Deinterlacer() : FieldBuffer(NULL), StateValid(false), DeintType(DEINT_WEAVE)
 {
- FieldBuffer = NULL;
+ PrevDRect.x = 0;
+ PrevDRect.y = 0;
 
- StateValid = false;
- PrevHeight = 0;
+ PrevDRect.w = 0;
+ PrevDRect.h = 0;
 }
 
 Deinterlacer::~Deinterlacer()
@@ -23,26 +23,46 @@ Deinterlacer::~Deinterlacer()
  }
 }
 
-void Deinterlacer::Process(MDFN_Surface *surface, const MDFN_Rect &DisplayRect, MDFN_Rect *LineWidths, const bool field)
+void Deinterlacer::SetType(unsigned dt)
 {
- if(!FieldBuffer || FieldBuffer->w < surface->w || FieldBuffer->h < (surface->h / 2))
+ if(DeintType != dt)
  {
+  DeintType = dt;
+
+  LWBuffer.resize(0);
   if(FieldBuffer)
+  {
    delete FieldBuffer;
-
-  FieldBuffer = new MDFN_Surface(NULL, surface->w, surface->h / 2, surface->w, surface->format);
-  LWBuffer.resize(FieldBuffer->h);
+   FieldBuffer = NULL;
+  }
+  StateValid = false;
  }
+}
 
+template<typename T>
+void Deinterlacer::InternalProcess(MDFN_Surface *surface, MDFN_Rect &DisplayRect, int32 *LineWidths, const bool field)
+{
  //
  // We need to output with LineWidths as always being valid to handle the case of horizontal resolution change between fields
  // while in interlace mode, so clear the first LineWidths entry if it's == ~0, and
  // [...]
- const bool LineWidths_In_Valid = (LineWidths[0].w != ~0);
+ const bool LineWidths_In_Valid = (LineWidths[0] != ~0);
+ const bool WeaveGood = (StateValid && PrevDRect.h == DisplayRect.h && DeintType == DEINT_WEAVE);
+ //
+ // XReposition stuff is to prevent exceeding the dimensions of the video surface under certain conditions(weave deinterlacer, previous field has higher
+ // horizontal resolution than current field, and current field's rectangle has an x offset that's too large when taking into consideration the previous field's
+ // width; for simplicity, we don't check widths, but just assume that the previous field's maximum width is >= than the current field's maximum width).
+ //
+ const int32 XReposition = ((WeaveGood && DisplayRect.x > PrevDRect.x) ? DisplayRect.x : 0);
+
+ //printf("%2d %2d, %d\n", DisplayRect.x, PrevDRect.x, XReposition);
+
+ if(XReposition)
+  DisplayRect.x = 0;
+
  if(surface->h && !LineWidths_In_Valid)
  {
-  LineWidths[0].x = 0;
-  LineWidths[0].w = 0;
+  LineWidths[0] = 0;
  }
 
  for(int y = 0; y < DisplayRect.h / 2; y++)
@@ -51,36 +71,58 @@ void Deinterlacer::Process(MDFN_Surface *surface, const MDFN_Rect &DisplayRect, 
   // set all relevant source line widths to the contents of DisplayRect(also simplifies the src_lw and related pointer calculation code
   // farther below.
   if(!LineWidths_In_Valid)
-   LineWidths[(y * 2) + field + DisplayRect.y] = DisplayRect;
+   LineWidths[(y * 2) + field + DisplayRect.y] = DisplayRect.w;
 
-  if(StateValid && PrevHeight == DisplayRect.h)
+  if(XReposition)
   {
-   const uint32 *src = FieldBuffer->pixels + y * FieldBuffer->pitch32;
-   uint32 *dest = surface->pixels + ((y * 2) + (field ^ 1) + DisplayRect.y) * surface->pitch32;
-   MDFN_Rect *dest_lw = &LineWidths[(y * 2) + (field ^ 1) + DisplayRect.y];
+    memmove(surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix,
+	    surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix + XReposition,
+	    LineWidths[(y * 2) + field + DisplayRect.y] * sizeof(T));
+  }
 
-   dest_lw->x = 0;
-   dest_lw->w = LWBuffer[y];
+  if(WeaveGood)
+  {
+   const T* src = FieldBuffer->pixels + y * FieldBuffer->pitchinpix;
+   T* dest = surface->pixels + ((y * 2) + (field ^ 1) + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
+   int32 *dest_lw = &LineWidths[(y * 2) + (field ^ 1) + DisplayRect.y];
 
-   memcpy(dest, src, LWBuffer[y] * sizeof(uint32));
+   *dest_lw = LWBuffer[y];
+
+   memcpy(dest, src, LWBuffer[y] * sizeof(T));
+  }
+  else if(DeintType == DEINT_BOB)
+  {
+   const T* src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
+   T* dest = surface->pixels + ((y * 2) + (field ^ 1) + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
+   const int32 *src_lw = &LineWidths[(y * 2) + field + DisplayRect.y];
+   int32 *dest_lw = &LineWidths[(y * 2) + (field ^ 1) + DisplayRect.y];
+
+   *dest_lw = *src_lw;
+
+   memcpy(dest, src, *src_lw * sizeof(T));
   }
   else
   {
-   const MDFN_Rect *src_lw = &LineWidths[(y * 2) + field + DisplayRect.y];
-   const uint32 *src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitch32 + src_lw->x;
+   const int32 *src_lw = &LineWidths[(y * 2) + field + DisplayRect.y];
+   const T* src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
    const int32 dly = ((y * 2) + (field + 1) + DisplayRect.y);
-   uint32 *dest = surface->pixels + dly * surface->pitch32;
+   T* dest = surface->pixels + dly * surface->pitchinpix + DisplayRect.x;
 
    if(y == 0 && field)
    {
-      LineWidths[dly - 2] = *src_lw;
-      memset(&surface->pixels[(dly - 2) * surface->pitch32], 0, src_lw->w * sizeof(uint32));
+    T black = surface->MakeColor(0, 0, 0);
+    T* dm2 = surface->pixels + (dly - 2) * surface->pitchinpix;
+
+    LineWidths[dly - 2] = *src_lw;
+
+    for(int x = 0; x < *src_lw; x++)
+     dm2[x] = black;
    }
 
    if(dly < (DisplayRect.y + DisplayRect.h))
    {
     LineWidths[dly] = *src_lw;
-    memcpy(dest, src, src_lw->w * sizeof(uint32));
+    memcpy(dest, src, *src_lw * sizeof(T));
    }
   }
 
@@ -90,23 +132,56 @@ void Deinterlacer::Process(MDFN_Surface *surface, const MDFN_Rect &DisplayRect, 
   //
   //
   //
+  if(DeintType == DEINT_WEAVE)
   {
-   const MDFN_Rect *src_lw = &LineWidths[(y * 2) + field + DisplayRect.y];
-   const uint32 *src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitch32 + src_lw->x;
-   uint32 *dest = FieldBuffer->pixels + y * FieldBuffer->pitch32;
+   const int32 *src_lw = &LineWidths[(y * 2) + field + DisplayRect.y];
+   const T* src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
+   T* dest = FieldBuffer->pixels + y * FieldBuffer->pitchinpix;
 
-   memcpy(dest, src, src_lw->w * sizeof(uint32));
-   LWBuffer[y] = src_lw->w;
+   memcpy(dest, src, *src_lw * sizeof(uint32));
+   LWBuffer[y] = *src_lw;
+
+   StateValid = true;
+  }
+ }
+}
+
+void Deinterlacer::Process(MDFN_Surface *surface, MDFN_Rect &DisplayRect, int32 *LineWidths, const bool field)
+{
+ const MDFN_Rect DisplayRect_Original = DisplayRect;
+
+ if(DeintType == DEINT_WEAVE)
+ {
+  if(!FieldBuffer || FieldBuffer->w < surface->w || FieldBuffer->h < (surface->h / 2))
+  {
+   if(FieldBuffer)
+    delete FieldBuffer;
+
+   FieldBuffer = new MDFN_Surface(NULL, surface->w, surface->h / 2, surface->w, surface->format);
+   LWBuffer.resize(FieldBuffer->h);
+  }
+  else if(memcmp(&surface->format, &FieldBuffer->format, sizeof(MDFN_PixelFormat)))
+  {
+   FieldBuffer->SetFormat(surface->format, StateValid && PrevDRect.h == DisplayRect.h);
   }
  }
 
- PrevHeight = DisplayRect.h;
- StateValid = true;
-}
+#if defined(WANT_32BPP)
+ InternalProcess<uint32>(surface, DisplayRect, LineWidths, field);
+#elif defined(WANT_16BPP)
+ InternalProcess<uint16>(surface, DisplayRect, LineWidths, field);
+#endif
 
+ PrevDRect = DisplayRect_Original;
+}
 
 void Deinterlacer::ClearState(void)
 {
  StateValid = false;
- PrevHeight = 0;
+
+ PrevDRect.x = 0;
+ PrevDRect.y = 0;
+
+ PrevDRect.w = 0;
+ PrevDRect.h = 0;
 }

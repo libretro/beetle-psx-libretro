@@ -455,21 +455,25 @@ void TIMER_Power(void)
    memset(Timers, 0, sizeof(Timers));
 }
 
-#define SFTIMER_PSX(n)	SFVARN(Timers[n].Mode, #n "Mode"),			\
-      SFVARN(Timers[n].Counter, #n "Counter"),		\
-      SFVARN(Timers[n].Target, #n "Target"),			\
-      SFVARN(Timers[n].Div8Counter, #n "Div8Counter"),	\
-      SFVARN(Timers[n].IRQDone, #n "IRQDone")
 
 int TIMER_StateAction(StateMem *sm, int load, int data_only)
 {
    int ret;
    SFORMAT StateRegs[] =
    {
-      SFTIMER_PSX(0),
-      SFTIMER_PSX(1),
-      SFTIMER_PSX(2),
-      SFVAR(lastts),
+#define SFTIMER(n)	SFVARN(Timers[n].Mode, #n "Mode"),			\
+      SFVARN(Timers[n].Counter, #n "Counter"),		\
+      SFVARN(Timers[n].Target, #n "Target"),			\
+      SFVARN(Timers[n].Div8Counter, #n "Div8Counter"),	\
+      SFVARN(Timers[n].IRQDone, #n "IRQDone"),     \
+      SFVARN(Timers[n].DoZeCounting, #n "DoZeCounting")
+      SFTIMER(0),
+      SFTIMER(1),
+      SFTIMER(2),
+#undef SFTIMER
+
+      SFVAR(vblank),
+      SFVAR(hretrace),
       SFEND
    };
    ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "TIMER");

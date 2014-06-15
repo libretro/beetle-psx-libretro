@@ -13,6 +13,7 @@ class InputDevice_DualAnalog : public InputDevice
  virtual ~InputDevice_DualAnalog();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
  virtual void UpdateInput(const void *data);
 
  //
@@ -71,6 +72,41 @@ void InputDevice_DualAnalog::Power(void)
  transmit_count = 0;
 }
 
+int InputDevice_DualAnalog::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(dtr),
+
+  SFARRAY(buttons, sizeof(buttons)),
+  SFARRAY(&axes[0][0], sizeof(axes)),
+
+  SFVAR(command_phase),
+  SFVAR(bitpos),
+  SFVAR(receive_buffer),
+
+  SFVAR(command),
+
+  SFARRAY(transmit_buffer, sizeof(transmit_buffer)),
+  SFVAR(transmit_pos),
+  SFVAR(transmit_count),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+ if(load)
+ {
+  if((transmit_pos + transmit_count) > sizeof(transmit_buffer))
+  {
+   transmit_pos = 0;
+   transmit_count = 0;
+  }
+ }
+
+ return(ret);
+}
+
 void InputDevice_DualAnalog::UpdateInput(const void *data)
 {
  uint8 *d8 = (uint8 *)data;
@@ -82,9 +118,10 @@ void InputDevice_DualAnalog::UpdateInput(const void *data)
  {
   for(int axis = 0; axis < 2; axis++)
   {
+     const uint8* aba = &d8[2] + stick * 8 + axis * 4;
    int32 tmp;
 
-   tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+   tmp = 32768 + MDFN_de16lsb(&aba[0]) - ((int32)MDFN_de16lsb(&aba[2]) * 32768 / 32767);
    tmp >>= 8;
 
    axes[stick][axis] = tmp;
@@ -235,15 +272,15 @@ InputDeviceInputInfoStruct Device_DualAnalog_IDII[24] =
  { "cross", "x (lower)", 7, IDIT_BUTTON_CAN_RAPID, NULL },
  { "square", "□ (left)", 8, IDIT_BUTTON_CAN_RAPID, NULL },
 
- { "rstick_right", "Right Stick RIGHT →", 22, IDIT_BUTTON_ANALOG },
- { "rstick_left", "Right Stick LEFT ←", 21, IDIT_BUTTON_ANALOG },
- { "rstick_down", "Right Stick DOWN ↓", 20, IDIT_BUTTON_ANALOG },
- { "rstick_up", "Right Stick UP ↑", 19, IDIT_BUTTON_ANALOG },
+ { "rstick_right", "Right Stick RIGHT →", 22, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_left", "Right Stick LEFT ←", 21, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_down", "Right Stick DOWN ↓", 20, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_up", "Right Stick UP ↑", 19, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
- { "lstick_right", "Left Stick RIGHT →", 17, IDIT_BUTTON_ANALOG },
- { "lstick_left", "Left Stick LEFT ←", 16, IDIT_BUTTON_ANALOG },
- { "lstick_down", "Left Stick DOWN ↓", 15, IDIT_BUTTON_ANALOG },
- { "lstick_up", "Left Stick UP ↑", 14, IDIT_BUTTON_ANALOG },
+ { "lstick_right", "Left Stick RIGHT →", 17, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_left", "Left Stick LEFT ←", 16, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_down", "Left Stick DOWN ↓", 15, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_up", "Left Stick UP ↑", 14, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
 };
 
@@ -269,15 +306,15 @@ InputDeviceInputInfoStruct Device_AnalogJoy_IDII[24] =
  { "cross",  "Right stick, L-thumb", 10, IDIT_BUTTON, NULL },
  { "square", "Right stick, Trigger", 12, IDIT_BUTTON, NULL },
 
- { "rstick_right", "Right Stick, RIGHT →", 21, IDIT_BUTTON_ANALOG },
- { "rstick_left", "Right Stick, LEFT ←", 20, IDIT_BUTTON_ANALOG },
- { "rstick_down", "Right Stick, BACK ↓", 19, IDIT_BUTTON_ANALOG },
- { "rstick_up", "Right Stick, FORE ↑", 18, IDIT_BUTTON_ANALOG },
+ { "rstick_right", "Right Stick, RIGHT →", 21, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_left", "Right Stick, LEFT ←", 20, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_down", "Right Stick, BACK ↓", 19, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_up", "Right Stick, FORE ↑", 18, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
- { "lstick_right", "Left Stick, RIGHT →", 7, IDIT_BUTTON_ANALOG },
- { "lstick_left", "Left Stick, LEFT ←", 6, IDIT_BUTTON_ANALOG },
- { "lstick_down", "Left Stick, BACK ↓", 5, IDIT_BUTTON_ANALOG },
- { "lstick_up", "Left Stick, FORE ↑", 4, IDIT_BUTTON_ANALOG },
+ { "lstick_right", "Left Stick, RIGHT →", 7, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_left", "Left Stick, LEFT ←", 6, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_down", "Left Stick, BACK ↓", 5, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_up", "Left Stick, FORE ↑", 4, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
 };
 

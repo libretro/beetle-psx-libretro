@@ -47,6 +47,11 @@ void InputDevice::Power(void)
 {
 }
 
+int InputDevice::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ return(1);
+}
+
 void InputDevice::Update(const pscpu_timestamp_t timestamp)
 {
 
@@ -65,6 +70,72 @@ void InputDevice::SetAMCT(bool)
 void InputDevice::SetCrosshairsColor(uint32_t color)
 {
 
+}
+
+int FrontIO::StateAction(StateMem* sm, int load, int data_only)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(ClockDivider),
+
+  SFVAR(ReceivePending),
+  SFVAR(TransmitPending),
+
+  SFVAR(ReceiveInProgress),
+  SFVAR(TransmitInProgress),
+
+  SFVAR(ReceiveBufferAvail),
+
+  SFVAR(ReceiveBuffer),
+  SFVAR(TransmitBuffer),
+
+  SFVAR(ReceiveBitCounter),
+  SFVAR(TransmitBitCounter),
+
+  SFVAR(Mode),
+  SFVAR(Control),
+  SFVAR(Baudrate),
+
+  SFVAR(istatus),
+
+  // FIXME:
+#if 0
+  pscpu_timestamp_t irq10_pulse_ts[2];
+
+  int32 dsr_pulse_delay[4];
+  int32 dsr_active_until_ts[4];
+#endif
+
+  SFEND
+ };
+
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "FIO");
+
+ for(unsigned i = 0; i < 8; i++)
+ {
+  char tmpbuf[32];
+  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIODEV%u", i);
+
+  ret &= Devices[i]->StateAction(sm, load, data_only, tmpbuf);
+ }
+
+ for(unsigned i = 0; i < 8; i++)
+ {
+  char tmpbuf[32];
+  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIOMC%u", i);
+
+  ret &= DevicesMC[i]->StateAction(sm, load, data_only, tmpbuf);
+ }
+
+ for(unsigned i = 0; i < 2; i++)
+ {
+  char tmpbuf[32];
+  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIOTAP%u", i);
+
+  ret &= DevicesTap[i]->StateAction(sm, load, data_only, tmpbuf);
+ }
+
+ return(ret);
 }
 
 bool InputDevice::RequireNoFrameskip(void)

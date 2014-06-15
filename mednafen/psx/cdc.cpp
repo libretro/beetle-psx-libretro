@@ -219,21 +219,10 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
  SFVAR(DiscChanged),
  SFVAR(DiscStartupDelay),
 
-#if 0
-#define SFAB(n)	SFARRAY16N(&AudioBuffer[n].Samples[0][0], sizeof(AudioBuffer[n].Samples) / sizeof(AudioBuffer[n].Samples[0][0]), #n "Samples"),	\
-		SFVARN(AudioBuffer[n].Size, #n "Size"),											\
-		SFVARN(AudioBuffer[n].Freq, #n "Freq")
-
- SFAB(0),
- SFAB(1),
- SFAB(2),
- SFAB(3),
-
- SFVAR(AudioBuffer_ReadPos),
- SFVAR(AudioBuffer_WritePos),
- SFVAR(AudioBuffer_UsedCount),
- SFVAR(AudioBuffer_InPrebuffer),
-#endif
+ SFARRAY16(&AudioBuffer.Samples[0][0], sizeof(AudioBuffer.Samples) / sizeof(AudioBuffer.Samples[0][0])),
+ SFVAR(AudioBuffer.Size),
+ SFVAR(AudioBuffer.Freq),
+ SFVAR(AudioBuffer.ReadPos),
 
  SFARRAY(&Pending_DecodeVolume[0][0], 2 * 2),
  SFARRAY(&DecodeVolume[0][0], 2 * 2),
@@ -249,69 +238,75 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
  SFVAR(ArgsWP),
  SFVAR(ArgsRP),
 
+ SFVAR(ArgsReceiveLatch),
+ SFARRAY(ArgsReceiveBuf, 32),
+ SFVAR(ArgsReceiveIn),
+
  SFARRAY(ResultsBuffer, 16),
  SFVAR(ResultsIn),
  SFVAR(ResultsWP),
  SFVAR(ResultsRP),
 
-//
-//
-//
- SFARRAY(&DMABuffer.data[0], DMABuffer.data.size()),
- SFVAR(DMABuffer.read_pos),
- SFVAR(DMABuffer.write_pos),
- SFVAR(DMABuffer.in_count),
-//
-//
-//
+  //
+  //
+  //
+  SFARRAY(&DMABuffer.data[0], DMABuffer.data.size()),
+  SFVAR(DMABuffer.read_pos),
+  SFVAR(DMABuffer.write_pos),
+  SFVAR(DMABuffer.in_count),
+  //
+  //
+  //
 
- SFARRAY(SB, sizeof(SB) / sizeof(SB[0])),
- SFVAR(SB_In),
- //SectorPipe_Pos = SectorPipe_In = 0;
- SFARRAY(SubQBuf, sizeof(SubQBuf) / sizeof(SubQBuf[0])),
- SFARRAY(SubQBuf_Safe, sizeof(SubQBuf_Safe) / sizeof(SubQBuf_Safe[0])),
+  SFARRAY(SB, sizeof(SB) / sizeof(SB[0])),
+  SFVAR(SB_In),
 
- SFVAR(SubQChecksumOK),
- SFARRAY(HeaderBuf, sizeof(HeaderBuf) / sizeof(HeaderBuf[0])),
+  SFARRAY(&SectorPipe[0][0], sizeof(SectorPipe) / sizeof(SectorPipe[0][0])),
+  SFVAR(SectorPipe_Pos),
+  SFVAR(SectorPipe_In),
+ 
+  SFARRAY(SubQBuf, sizeof(SubQBuf) / sizeof(SubQBuf[0])),
+  SFARRAY(SubQBuf_Safe, sizeof(SubQBuf_Safe) / sizeof(SubQBuf_Safe[0])),
+ 
+  SFVAR(SubQChecksumOK),
 
- SFVAR(IRQBuffer),
- SFVAR(IRQOutTestMask),
- SFVAR(CDCReadyReceiveCounter),
+  SFVAR(HeaderBufValid),
+  SFARRAY(HeaderBuf, sizeof(HeaderBuf) / sizeof(HeaderBuf[0])),
+ 
+  SFVAR(IRQBuffer),
+  SFVAR(IRQOutTestMask),
+  SFVAR(CDCReadyReceiveCounter),
+
+  SFVAR(FilterFile),
+  SFVAR(FilterChan),
+
+  SFVAR(PendingCommand),
+  SFVAR(PendingCommandPhase),
+  SFVAR(PendingCommandCounter),
+
+  SFVAR(SPUCounter),
+
+  SFVAR(Mode),
+  SFVAR(DriveStatus),
+  SFVAR(StatusAfterSeek),
+  SFVAR(Forward),
+  SFVAR(Backward),
+  SFVAR(Muted),
+
+  SFVAR(PlayTrackMatch),
+
+  SFVAR(PSRCounter),
+
+  SFVAR(CurSector),
 
 
+  SFVAR(AsyncIRQPending),
+  SFARRAY(AsyncResultsPending, sizeof(AsyncResultsPending) / sizeof(AsyncResultsPending[0])),
+  SFVAR(AsyncResultsPendingCount),
 
- SFVAR(FilterFile),
- SFVAR(FilterChan),
+  SFVAR(SeekTarget),
 
-
- SFVAR(PendingCommand),
- SFVAR(PendingCommandPhase),
- SFVAR(PendingCommandCounter),
-
- SFVAR(SPUCounter),
-
- SFVAR(Mode),
- SFVAR(DriveStatus),
- SFVAR(StatusAfterSeek),
- SFVAR(Forward),
- SFVAR(Backward),
- SFVAR(Muted),
-
- SFVAR(PlayTrackMatch),
-
- SFVAR(PSRCounter),
-
- SFVAR(CurSector),
-
- SFVAR(AsyncIRQPending),
- SFARRAY(AsyncResultsPending, sizeof(AsyncResultsPending) / sizeof(AsyncResultsPending[0])),
- SFVAR(AsyncResultsPendingCount),
-
-
- SFVAR(SeekTarget),
-
- SFVAR(lastts),
-
+  // FIXME: Save TOC stuff?
 #if 0
  CDUtility::TOC toc;
  bool IsPSXDisc;
@@ -324,6 +319,9 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
   SFVAR(xa_cur_set),
   SFVAR(xa_cur_file),
   SFVAR(xa_cur_chan),
+
+  SFVAR(ReportLastF),
+
   SFEND
  };
 
@@ -903,9 +901,19 @@ void PS_CDC::HandlePlayRead(void)
    return;
   }
 
-  if((Mode & MODE_REPORT) && (!(SubQBuf_Safe[0x9] & 0xF) || Forward || Backward) && SubQChecksumOK)	// Not sure about accurate notification behavior for corrupt SubQ data
+  if((Mode & MODE_REPORT) && (((SubQBuf_Safe[0x9] >> 4) != ReportLastF) || Forward || Backward) && SubQChecksumOK)
   {
    uint8 tr[8];
+#if 0
+   uint16 abs_lev_max = 0;
+   bool abs_lev_chselect = SubQBuf_Safe[0x8] & 0x01;
+
+   for(int i = 0; i < 588; i++)
+      abs_lev_max = std::max<uint16>(abs_lev_max, std::min<int>(abs((int16)MDFN_de16lsb(&read_buf[i * 4 + (abs_lev_chselect * 2)])), 32767));
+   abs_lev_max |= abs_lev_chselect << 15;
+#endif
+   
+   ReportLastF = SubQBuf_Safe[0x9] >> 4;
 
    tr[0] = MakeStatus();
    tr[1] = SubQBuf_Safe[0x1];	// Track
@@ -924,8 +932,8 @@ void PS_CDC::HandlePlayRead(void)
     tr[5] = SubQBuf_Safe[0x9];	// A F
    }
 
-   tr[6] = 0;	// ??
-   tr[7] = 0;	// ??
+   tr[6] = 0; //abs_lev_max >> 0;
+   tr[7] = 0; //abs_lev_max >> 8;
 
    SetAIP(CDCIRQ_DATA_READY, 8, tr);
   }
@@ -1657,6 +1665,8 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
   HeaderBufValid = false;
   PreSeekHack(false, SeekTarget);
 
+  ReportLastF = 0xFF;
+
   DriveStatus = DS_SEEKING;
   StatusAfterSeek = DS_PLAYING;
  }
@@ -1675,6 +1685,8 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
   PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
   PreSeekHack(false, SeekTarget);
+
+  ReportLastF = 0xFF;
 
   DriveStatus = DS_SEEKING;
   StatusAfterSeek = DS_PLAYING;

@@ -112,7 +112,13 @@ class PS_CPU
  {
   uint32_t TV;
   uint32_t Data;
- } ICache[1024];
+ };
+
+ union
+ {
+  __ICache ICache[1024];
+  uint32 ICache_Bulk[2048];
+ };
 
  enum
  {

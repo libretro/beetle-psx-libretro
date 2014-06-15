@@ -60,6 +60,7 @@ class InputDevice_DualShock : public InputDevice
  virtual ~InputDevice_DualShock();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
  virtual void Update(const pscpu_timestamp_t timestamp);
  virtual void ResetTS(void);
  virtual void UpdateInput(const void *data);
@@ -241,9 +242,59 @@ void InputDevice_DualShock::Power(void)
  prev_ana_button_state = false;
 }
 
+int InputDevice_DualShock::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(cur_ana_button_state),
+  SFVAR(prev_ana_button_state),
+  SFVAR(combo_anatoggle_counter),
+
+  SFVAR(da_rumble_compat),
+
+  SFVAR(analog_mode),
+  SFVAR(analog_mode_locked),
+
+  SFVAR(mad_munchkins),
+  SFARRAY(rumble_magic, sizeof(rumble_magic)),
+
+  SFARRAY(rumble_param, sizeof(rumble_param)),
+
+  SFVAR(dtr),
+
+  SFARRAY(buttons, sizeof(buttons)),
+  SFARRAY(&axes[0][0], sizeof(axes)),
+
+  SFVAR(command_phase),
+  SFVAR(bitpos),
+  SFVAR(receive_buffer),
+
+  SFVAR(command),
+
+  SFARRAY(transmit_buffer, sizeof(transmit_buffer)),
+  SFVAR(transmit_pos),
+  SFVAR(transmit_count),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+ if(load)
+ {
+  if((transmit_pos + transmit_count) > sizeof(transmit_buffer))
+  {
+   transmit_pos = 0;
+   transmit_count = 0;
+  }
+ }
+
+ return(ret);
+}
+
 void InputDevice_DualShock::UpdateInput(const void *data)
 {
  uint8 *d8 = (uint8 *)data;
+ uint8* const rumb_dp = &d8[3 + 16];
 
  buttons[0] = d8[0];
  buttons[1] = d8[1];
@@ -253,14 +304,17 @@ void InputDevice_DualShock::UpdateInput(const void *data)
  {
   for(int axis = 0; axis < 2; axis++)
   {
+     const uint8* aba = &d8[3] + stick * 8 + axis * 4;
    int32 tmp;
 
-   tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
-   tmp >>= 8;
+   tmp = 32767 + MDFN_de16lsb(&aba[0]) - MDFN_de16lsb(&aba[2]);
+   tmp = (tmp * 0x100) / 0xFFFF;
 
    axes[stick][axis] = tmp;
   }
  }
+
+ //printf("%3d:%3d, %3d:%3d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]);
 
  //printf("RUMBLE: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", rumble_magic[0], rumble_magic[1], rumble_magic[2], rumble_magic[3], rumble_magic[4], rumble_magic[5]);
  //printf("%d, 0x%02x 0x%02x\n", da_rumble_compat, rumble_param[0], rumble_param[1]);
@@ -271,7 +325,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
   if(rumble_param[0] == 0x01)
    sneaky_weaky = 0xFF;
 
-  MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
+  MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8));
  }
  else
  {
@@ -280,7 +334,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
   if(((rumble_param[0] & 0xC0) == 0x40) && ((rumble_param[1] & 0x01) == 0x01))
    sneaky_weaky = 0xFF;
 
-  MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
+  MDFN_en16lsb(rumb_dp, sneaky_weaky << 0);
  }
 
  //printf("%d %d %d %d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]);
@@ -294,8 +348,8 @@ void InputDevice_DualShock::UpdateInput(const void *data)
  {
   MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
  }
- am_prev_info = analog_mode;
  aml_prev_info = analog_mode_locked;
+ am_prev_info = analog_mode;
 }
 
 
@@ -1040,15 +1094,15 @@ InputDeviceInputInfoStruct Device_DualShock_IDII[26] =
 
  { "analog", "Analog(mode toggle)", 24, IDIT_BUTTON, NULL },
 
- { "rstick_right", "Right Stick RIGHT →", 22, IDIT_BUTTON_ANALOG },
- { "rstick_left", "Right Stick LEFT ←", 21, IDIT_BUTTON_ANALOG },
- { "rstick_down", "Right Stick DOWN ↓", 20, IDIT_BUTTON_ANALOG },
- { "rstick_up", "Right Stick UP ↑", 19, IDIT_BUTTON_ANALOG },
+ { "rstick_right", "Right Stick RIGHT →", 22, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_left", "Right Stick LEFT ←", 21, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_down", "Right Stick DOWN ↓", 20, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "rstick_up", "Right Stick UP ↑", 19, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
- { "lstick_right", "Left Stick RIGHT →", 17, IDIT_BUTTON_ANALOG },
- { "lstick_left", "Left Stick LEFT ←", 16, IDIT_BUTTON_ANALOG },
- { "lstick_down", "Left Stick DOWN ↓", 15, IDIT_BUTTON_ANALOG },
- { "lstick_up", "Left Stick UP ↑", 14, IDIT_BUTTON_ANALOG },
+ { "lstick_right", "Left Stick RIGHT →", 17, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_left", "Left Stick LEFT ←", 16, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_down", "Left Stick DOWN ↓", 15, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
+ { "lstick_up", "Left Stick UP ↑", 14, IDIT_BUTTON_ANALOG, NULL, { NULL, NULL, NULL }, IDIT_BUTTON_ANALOG_FLAG_SQLR },
 
  { "rumble", "RUMBLE MONSTER RUMBA", 100, IDIT_RUMBLE },
 };

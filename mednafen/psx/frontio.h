@@ -15,6 +15,7 @@ class InputDevice
 
  virtual void Power(void);
  virtual void UpdateInput(const void *data);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
 
  virtual bool RequireNoFrameskip(void);
  virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
@@ -75,6 +76,8 @@ class FrontIO
  uint64_t GetMemcardDirtyCount(unsigned int which);
  void LoadMemcard(unsigned int which, const char *path);
  void SaveMemcard(unsigned int which, const char *path); //, bool force_save = false);
+
+ int StateAction(StateMem* sm, int load, int data_only);
 
  private:
 

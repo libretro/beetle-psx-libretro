@@ -32,6 +32,7 @@ class InputDevice_Memcard : public InputDevice
  virtual ~InputDevice_Memcard();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
 
  //
  //
@@ -132,6 +133,41 @@ void InputDevice_Memcard::Power(void)
  addr = 0;
 
  presence_new = true;
+}
+
+int InputDevice_Memcard::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ // Don't save dirty_count.
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(presence_new),
+
+  SFARRAY(card_data, sizeof(card_data)),
+  SFARRAY(rw_buffer, sizeof(rw_buffer)),
+  SFVAR(write_xor),
+
+  SFVAR(dtr),
+  SFVAR(command_phase),
+  SFVAR(bitpos),
+  SFVAR(receive_buffer),
+
+  SFVAR(command),
+  SFVAR(addr),
+  SFVAR(calced_xor),
+
+  SFVAR(transmit_buffer),
+  SFVAR(transmit_count),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+ if(load)
+ {
+  dirty_count++;
+ }
+
+ return(ret);
 }
 
 void InputDevice_Memcard::SetDTR(bool new_dtr)

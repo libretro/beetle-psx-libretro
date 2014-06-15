@@ -778,8 +778,6 @@ int DMA_StateAction(StateMem *sm, int load, int data_only)
   SFDMACH(5),
   SFDMACH(6),
 
-  SFVAR(lastts),
-
   SFEND
  };
 

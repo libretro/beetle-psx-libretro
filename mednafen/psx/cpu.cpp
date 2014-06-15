@@ -84,6 +84,8 @@ void PS_CPU::Power(void)
 {
    unsigned i;
 
+   assert(sizeof(ICache) == sizeof(ICache_Bulk));
+
    memset(GPR, 0, sizeof(GPR));
    memset(&CP0, 0, sizeof(CP0));
    LO = 0;
@@ -117,7 +119,7 @@ void PS_CPU::Power(void)
 
    BIU = 0;
 
-   memset(ScratchRAM.data32, 0, 1024);
+   memset(ScratchRAM.data8, 0, 1024);
 
    // Not quite sure about these poweron/reset values:
    for(i = 0; i < 1024; i++)
@@ -129,7 +131,6 @@ void PS_CPU::Power(void)
    GTE_Power();
 }
 
-// FIXME: save/restore icache data.
 int PS_CPU::StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
@@ -148,18 +149,21 @@ int PS_CPU::StateAction(StateMem *sm, int load, int data_only)
       SFVAR(BACKED_LDValue),
       SFVAR(LDAbsorb),
 
+      SFVAR(next_event_ts),
+      SFVAR(gte_ts_done),
+      SFVAR(muldiv_ts_done),
+
+      SFVAR(BIU),
+      SFARRAY32(ICache_Bulk, 2048),
+
+      SFARRAY32(CP0.Regs, 32),
+
       SFARRAY(ReadAbsorb, 0x20),
       SFVAR(ReadAbsorbDummy),
       SFVAR(ReadAbsorbWhich),
       SFVAR(ReadFudge),
 
       SFARRAY(ScratchRAM.data8, 1024),
-
-      SFVAR(next_event_ts),
-      SFVAR(gte_ts_done),
-      SFVAR(muldiv_ts_done),
-
-      SFARRAY32(CP0.Regs, 32),
 
       SFEND
    };
@@ -435,6 +439,11 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    register uint32_t LDWhich;
    register uint32_t LDValue;
 
+   //printf("%d %d\n", gte_ts_done, muldiv_ts_done);
+
+   gte_ts_done += timestamp;
+   muldiv_ts_done += timestamp;
+
    BACKING_TO_ACTIVE;
 
    do
@@ -452,7 +461,15 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
          {
             ACTIVE_TO_BACKING;
 
+            // For save states in step mode.
+            gte_ts_done -= timestamp;
+            muldiv_ts_done -= timestamp;
+
             CPUHook(timestamp, PC);
+
+            // For save states in step mode.
+            gte_ts_done += timestamp;
+            muldiv_ts_done += timestamp;
 
             BACKING_TO_ACTIVE;
          }

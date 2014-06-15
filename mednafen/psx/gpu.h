@@ -292,7 +292,7 @@ class PS_GPU
  EmulateSpecStruct *espec;
  MDFN_Surface *surface;
  MDFN_Rect *DisplayRect;
- MDFN_Rect *LineWidths;
+ int32 *LineWidths;
  bool HardwarePALType;
  int LineVisFirst, LineVisLast;
 

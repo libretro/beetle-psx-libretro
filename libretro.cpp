@@ -130,13 +130,6 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
  return PSX_PRNG.RandU32(mina, maxa);
 }
 
-
-#if 0
-static uint32_t PortReadCounter[0x4000] = { 0 };	// Debugging(performance)
-static uint32_t ReadCounter = 0;
-static uint32_t WriteCounter = 0;
-#endif
-
 std::vector<CDIF*> *cdifs = NULL;
 std::vector<const char *> cdifs_scex_ids;
 bool CD_TrayOpen;
@@ -491,15 +484,6 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(pscpu
 
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
    {
-#if 0
-      if(!IsWrite)
-      {
-         ReadCounter++;
-         PortReadCounter[A & 0x3FFF]++;
-      }
-      else
-         WriteCounter++;
-#endif
 
       //if(IsWrite)
       // printf("HW Write%d: %08x %08x\n", (unsigned int)(sizeof(T)*8), (unsigned int)A, (unsigned int)V);
@@ -1361,6 +1345,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       EmulatedPSX.fb_width = 768;
       EmulatedPSX.fb_height = 576;
 
+      EmulatedPSX.fps = 836203078;
+
       MDFNGameInfo->VideoSystem = VIDSYS_PAL;
    }
    else
@@ -1373,6 +1359,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
       EmulatedPSX.fb_width = 768;
       EmulatedPSX.fb_height = 480;
+
+      EmulatedPSX.fps = 1005643085;
 
       MDFNGameInfo->VideoSystem = VIDSYS_NTSC;
    }
@@ -1754,11 +1742,15 @@ int StateAction(StateMem *sm, int load, int data_only)
       SFVAR(CD_TrayOpen),
       SFVAR(CD_SelectedDisc),
       SFARRAY(MainRAM.data8, 1024 * 2048),
-      //SFARRAY(ScratchRAM.data8, 1024),
       SFARRAY32(SysControl.Regs, 9),
-      //SFARRAY32(next_timestamps, sizeof(next_timestamps) / sizeof(next_timestamps[0])),
+      SFVAR(PSX_PRNG.lcgo),
+      SFVAR(PSX_PRNG.x),
+      SFVAR(PSX_PRNG.y),
+      SFVAR(PSX_PRNG.z),
+      SFVAR(PSX_PRNG.c),
       SFEND
    };
+
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
 
@@ -1775,15 +1767,20 @@ int StateAction(StateMem *sm, int load, int data_only)
    ret &= DMA_StateAction(sm, load, data_only);
    ret &= TIMER_StateAction(sm, load, data_only);
    ret &= CDC->StateAction(sm, load, data_only);
-   ret &= MDEC_StateAction(sm, load, data_only);
-   ret &= SPU->StateAction(sm, load, data_only);
-   //ret &= FIO->StateAction(sm, load, data_only);
+
+   // These need some work still:
+   //ret &= MDEC_StateAction(sm, load, data_only);
+   //ret &= SPU->StateAction(sm, load, data_only);
+   ret &= FIO->StateAction(sm, load, data_only);
+   //ret &= SIO_StateAction(sm, load, data_only);
    //ret &= GPU->StateAction(sm, load, data_only);
-   ret &= IRQ_StateAction(sm, load, data_only);
+   //// End needing work
+   
+   ret &= IRQ_StateAction(sm, load, data_only);	// Do it last.
 
    if(load)
    {
-
+      ForceEventUpdates(0); // FIXME to work with debugger step mode.
    }
 
    return(ret);
@@ -2055,7 +2052,7 @@ static Deinterlacer deint;
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.33.3"
+#define MEDNAFEN_CORE_VERSION "v0.9.34.1"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
@@ -2524,8 +2521,8 @@ void retro_run(void)
    update_input();
 
    static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[FB_MAX_HEIGHT];
-   rects[0].w = ~0;
+   static int32 rects[FB_MAX_HEIGHT];
+   rects[0] = ~0;
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
@@ -2608,19 +2605,6 @@ void retro_run(void)
       }
    }
 
-#if 0
-   printf("read=%6d, write=%6d\n", ReadCounter, WriteCounter);
-   ReadCounter = 0;
-   WriteCounter = 0;
-   printf("HW Port reads for this frame:\n");
-   for(unsigned i = 0; i < 0x4000; i++)
-   {
-      if(PortReadCounter[i] > 100)
-         printf("0x%08x: %d\n", 0x1f800000 + i, PortReadCounter[i]);
-   }
-   memset(PortReadCounter, 0, sizeof(PortReadCounter));
-   printf("\n");
-#endif
    /* end of Emulate */
 
 #ifdef NEED_DEINTERLACER
@@ -2649,7 +2633,7 @@ void retro_run(void)
 
    // PSX is rather special, and needs specific handling ...
    
-   unsigned width = rects[0].w; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
+   unsigned width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
    unsigned height = spec.DisplayRect.h;
    //fprintf(stderr, "(%u x %u)\n", width, height);
    // PSX core inserts padding on left and right (overscan). Optionally crop this.

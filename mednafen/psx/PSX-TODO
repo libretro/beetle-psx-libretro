@@ -22,6 +22,10 @@ Tales of Destiny (Japanese version 1.0)
 Simple 1500 Series Vol. 057 - The Maze
 	Locks up during startup;  looks to be poorly programmed and extremely sensitive to seek timing.
 
+Wing Commander 4
+   Frequently locks up during FMV sequences(might be sensitive to seek delays or SPU IRQ timings).
+
+
 ----------------------------------------------------------------------------------------------
 
 ***Medium issues***

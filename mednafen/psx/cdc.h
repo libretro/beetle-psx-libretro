@@ -208,6 +208,8 @@ class PS_CDC
  uint8 xa_cur_file;
  uint8 xa_cur_chan;
 
+ uint8 ReportLastF;
+
  void HandlePlayRead(void);
 
  struct CDC_CTEntry
