@@ -1010,7 +1010,7 @@ void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t 
 
 using namespace MDFN_IEN_PSX;
 
-static void Emulate(EmulateSpecStruct *espec)
+void Emulate(EmulateSpecStruct *espec)
 {
    pscpu_timestamp_t timestamp = 0;
 
@@ -1025,7 +1025,6 @@ static void Emulate(EmulateSpecStruct *espec)
 
    FIO->UpdateInput();
    GPU->StartFrame(espec);
-   SPU->StartFrame(espec->SoundRate, MDFN_GetSettingUI("psx.spu.resamp_quality"));
 
    Running = -1;
    timestamp = CPU->Run(timestamp, false);
@@ -1824,7 +1823,7 @@ static void CloseGame(void)
 }
 
 
-static void SetInput(int port, const char *type, void *ptr)
+void SetInput(int port, const char *type, void *ptr)
 {
    FIO->SetInput(port, type, ptr);
 }

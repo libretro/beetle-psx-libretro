@@ -10,6 +10,10 @@
 
 static MDFNGI *game;
 
+//forward decls
+extern void Emulate(EmulateSpecStruct *espec);
+extern void SetInput(int port, const char *type, void *ptr);
+
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
@@ -398,12 +402,10 @@ static uint16_t input_buf[MAX_PLAYERS] = {0};
 
 static void hookup_ports(bool force)
 {
-   MDFNGI *currgame = game;
-
    if (initial_ports_hookup && !force)
       return;
 
-   currgame->SetInput(0, "gamepad", &input_buf[0]);
+   SetInput(0, "gamepad", &input_buf[0]);
 
    initial_ports_hookup = true;
 }
@@ -468,7 +470,6 @@ void retro_unload_game()
 // See mednafen/psx/input/gamepad.cpp
 static void update_input(void)
 {
-   MDFNGI *currgame = (MDFNGI*)game;
    input_buf[0] = 0;
    input_buf[1] = 0;
    	
@@ -590,7 +591,7 @@ void retro_run(void)
       last_sound_rate = spec.SoundRate;
    }
 
-   curgame->Emulate(&spec);
+   Emulate(&spec);
 
 #ifdef NEED_DEINTERLACER
    if (spec.InterlaceOn)
@@ -733,37 +734,28 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
-   MDFNGI *currgame = (MDFNGI*)game;
-
-   if (!currgame)
-      return;
-
    switch (device)
    {
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_PS1PAD:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", mednafen_core_str);
-         if (currgame->SetInput)
-            currgame->SetInput(in_port, "gamepad", &buf.u8[in_port]);    
+         SetInput(in_port, "gamepad", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALANALOG:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", mednafen_core_str);
-         if (currgame->SetInput)
-            currgame->SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
+         SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALSHOCK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", mednafen_core_str);
-         if (currgame->SetInput)
-            currgame->SetInput(in_port, "dualshock", &buf.u8[in_port]);    
+         SetInput(in_port, "dualshock", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", mednafen_core_str);
-         if (currgame->SetInput)
-            currgame->SetInput(in_port, "flightstick", &buf.u8[in_port]);    
+         SetInput(in_port, "flightstick", &buf.u8[in_port]);    
          break;
       default:
          if (log_cb)
