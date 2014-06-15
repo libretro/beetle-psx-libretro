@@ -28,7 +28,6 @@ static retro_rumble_interface rumble;
 
 static bool overscan;
 static double last_sound_rate;
-static MDFN_PixelFormat last_pixel_format;
 
 static MDFN_Surface *surf;
 
@@ -440,7 +439,6 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-   memset(&last_pixel_format, 0, sizeof(MDFN_PixelFormat));
    
    is_pal = (CalcDiscSCEx() == REGION_EU);
    mednafen_psx_fb_height = is_pal ? 576  : 480;
@@ -554,11 +552,10 @@ static void update_input(void)
 
 static uint64_t video_frames, audio_frames;
 
+#define SOUND_CHANNELS 2
 
 void retro_run(void)
 {
-   MDFNGI *curgame = game;
-
    input_poll_cb();
 
    update_input();
@@ -578,13 +575,6 @@ void retro_run(void)
    spec.SoundBufSize = 0;
    spec.VideoFormatChanged = false;
    spec.SoundFormatChanged = false;
-
-   if (memcmp(&last_pixel_format, &spec.surface->format, sizeof(MDFN_PixelFormat)))
-   {
-      spec.VideoFormatChanged = TRUE;
-
-      last_pixel_format = spec.surface->format;
-   }
 
    if (spec.SoundRate != last_sound_rate)
    {
@@ -612,7 +602,7 @@ void retro_run(void)
 #endif
 
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-   int16_t *const SoundBuf = interbuf + spec.SoundBufSizeALMS * curgame->soundchan;
+   int16_t *const SoundBuf = interbuf + spec.SoundBufSizeALMS * SOUND_CHANNELS;
    int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
    const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 

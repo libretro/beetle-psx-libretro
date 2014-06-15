@@ -1081,8 +1081,8 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
          srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + 1) & 0x7FF] << 16);
          srcpix >>= (fb_x & 1) * 8;
 
-         dest[x] = (((srcpix >> 0) << out_Rshift) & (0xFF << out_Rshift)) | (((srcpix >> 8) << out_Gshift) & (0xFF << out_Gshift)) |
-            (((srcpix >> 16) << out_Bshift) & (0xFF << out_Bshift));
+         dest[x] = (((srcpix >> 0) << RED_SHIFT) & (0xFF << RED_SHIFT)) | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) |
+            (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
          fb_x = (fb_x + 3) & 0x7FF;
       }
@@ -1092,23 +1092,12 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
       for(int32 x = dx_start; x < dx_end; x++)
       {
          uint32_t srcpix = src[fb_x >> 1];
-
-         dest[x] = OutputLUT[srcpix & 0x7FFF];
-         //dest[x] = ShiftHelper(srcpix, out_Rshift + 3 -  0, (0xF8 << out_Rshift)) |
-         //	         ShiftHelper(srcpix, out_Gshift + 3 -  5, (0xF8 << out_Gshift)) |
-         //	         ShiftHelper(srcpix, out_Bshift + 3 - 10, (0xF8 << out_Bshift));
+         dest[x] = MAKECOLOR((((srcpix >> 0) & 0x1F) << 3), (((srcpix >> 5) & 0x1F) << 3), (((srcpix >> 10) & 0x1F) << 3), 0);
 
          fb_x = (fb_x + 2) & 0x7FF;
       }
    }
 
-}
-
-
-template<uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift>
-void PS_GPU::ReorderRGB(bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
-{
-   ReorderRGB_Var(out_Rshift, out_Gshift, out_Bshift, bpp24, src, dest, dx_start, dx_end, fb_x);
 }
 
 pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
@@ -1389,16 +1378,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                   memset(dest, 0, dx_start * sizeof(int32));
 
                   //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                  if(surface->format.Rshift == 0 && surface->format.Gshift == 8 && surface->format.Bshift == 16)
-                     ReorderRGB<0, 8, 16>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-                  else if(surface->format.Rshift == 8 && surface->format.Gshift == 16 && surface->format.Bshift == 24)
-                     ReorderRGB<8, 16, 24>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-                  else if(surface->format.Rshift == 16 && surface->format.Gshift == 8 && surface->format.Bshift == 0)
-                     ReorderRGB<16, 8, 0>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-                  else if(surface->format.Rshift == 24 && surface->format.Gshift == 16 && surface->format.Bshift == 8)
-                     ReorderRGB<24, 16, 8>(DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
-                  else
-                     ReorderRGB_Var(surface->format.Rshift, surface->format.Gshift, surface->format.Bshift, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
+                  ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
 
                   for(x = dx_end; x < dmw; x++)
                      dest[x] = 0;
@@ -1461,20 +1441,6 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
    DisplayRect = &espec->DisplayRect;
    LineWidths = espec->LineWidths;
    skip = espec->skip;
-
-   if(espec->VideoFormatChanged)
-   {
-      int rc;
-      for(rc = 0; rc < 0x8000; rc++)
-      {
-         uint32_t r, g, b;
-
-         r = ((rc >> 0) & 0x1F) << 3;
-         g = ((rc >> 5) & 0x1F) << 3;
-         b = ((rc >> 10) & 0x1F) << 3;
-         OutputLUT[rc] = espec->surface->format.MakeColor(r, g, b, 0);
-      }
-   }
 }
 
 }
