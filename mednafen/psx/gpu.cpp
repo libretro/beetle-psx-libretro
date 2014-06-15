@@ -547,40 +547,52 @@ INLINE void PS_GPU::Command_FBFill(const uint32_t *cb)
    }
 }
 
-INLINE void PS_GPU::Command_FBCopy(const uint32_t *cb)
+INLINE void PS_GPU::Command_FBCopy(const uint32 *cb)
 {
-   int32_t x, y;
-   int32 sourceX = (cb[1] >> 0) & 0x3FF;
-   int32 sourceY = (cb[1] >> 16) & 0x3FF;
-   int32 destX = (cb[2] >> 0) & 0x3FF;
-   int32 destY = (cb[2] >> 16) & 0x3FF;
+ int32 sourceX = (cb[1] >> 0) & 0x3FF;
+ int32 sourceY = (cb[1] >> 16) & 0x3FF;
+ int32 destX = (cb[2] >> 0) & 0x3FF;
+ int32 destY = (cb[2] >> 16) & 0x3FF;
 
-   int32 width = (cb[3] >> 0) & 0x3FF;
-   int32 height = (cb[3] >> 16) & 0x1FF;
+ int32 width = (cb[3] >> 0) & 0x3FF;
+ int32 height = (cb[3] >> 16) & 0x1FF;
 
-   if(!width)
-      width = 0x400;
+ if(!width)
+  width = 0x400;
 
-   if(!height)
-      height = 0x200;
+ if(!height)
+  height = 0x200;
 
-   //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
+ //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
 
-   DrawTimeAvail -= (width * height) * 2;
+ DrawTimeAvail -= (width * height) * 2;
 
-   for(y = 0; y < height; y++)
+ for(int32 y = 0; y < height; y++)
+ {
+  for(int32 x = 0; x < width; x += 128)
+  {
+   const int32 chunk_x_max = std::min<int32>(width - x, 128);
+   uint16 tmpbuf[128];	// TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
+
+   for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
    {
-      for(x = 0; x < width; x++)
-      {
-         int32 s_y = (y + sourceY) & 511;
-         int32 s_x = (x + sourceX) & 1023;
-         int32 d_y = (y + destY) & 511;
-         int32 d_x = (x + destX) & 1023;
+    int32 s_y = (y + sourceY) & 511;
+    int32 s_x = (x + chunk_x + sourceX) & 1023;
 
-         if(!(GPURAM[d_y][d_x] & MaskEvalAND))
-            GPURAM[d_y][d_x] = GPURAM[s_y][s_x] | MaskSetOR;
-      }
+    tmpbuf[chunk_x] = GPURAM[s_y][s_x];
    }
+
+   for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+   {
+    int32 d_y = (y + destY) & 511;
+    int32 d_x = (x + chunk_x + destX) & 1023;
+
+    if(!(GPURAM[d_y][d_x] & MaskEvalAND))
+     GPURAM[d_y][d_x] = tmpbuf[chunk_x] | MaskSetOR;
+   }
+  }
+ }
+
 }
 
 INLINE void PS_GPU::Command_FBWrite(const uint32_t *cb)

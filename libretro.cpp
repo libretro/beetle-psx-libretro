@@ -2023,7 +2023,7 @@ static Deinterlacer deint;
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.35"
+#define MEDNAFEN_CORE_VERSION "v0.9.35.1"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
