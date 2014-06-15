@@ -76,6 +76,9 @@
 
 #include "../clamp.h"
 
+uint32_t IntermediateBufferPos;
+int16_t IntermediateBuffer[4096][2];
+
 namespace MDFN_IEN_PSX
 {
 
@@ -1091,14 +1094,7 @@ void PS_SPU::StartFrame(double rate, uint32_t quality)
 
 int32_t PS_SPU::EndFrame(int16_t *SoundBuf)
 {
-   int32_t ret;
-   //lastts = 0;
-   ret = IntermediateBufferPos;
-
-   memcpy(SoundBuf, IntermediateBuffer, IntermediateBufferPos * 2 * sizeof(int16));
-   IntermediateBufferPos = 0;
-
-   return ret;
+   return 0;
 }
 
 #define SFSWEEP(r) SFVAR((r).Control),	\

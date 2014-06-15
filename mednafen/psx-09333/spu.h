@@ -1,6 +1,9 @@
 #ifndef __MDFN_PSX_SPU_H
 #define __MDFN_PSX_SPU_H
 
+extern uint32_t IntermediateBufferPos;
+extern int16_t IntermediateBuffer[4096][2];
+
 namespace MDFN_IEN_PSX
 {
 
@@ -11,6 +14,9 @@ enum
  ADSR_SUSTAIN = 2,
  ADSR_RELEASE = 3
 };
+
+// Buffers 44.1KHz samples, should have enough for two(worst-case scenario) video frames(2* ~735 frames NTSC, 2* ~882 PAL) plus jitter plus enough for the resampler leftovers.
+// We'll just go with 4096 because powers of 2 are AWESOME and such.
 
 struct SPU_ADSR
 {
@@ -234,10 +240,6 @@ class PS_SPU
 
  int last_rate;
  uint32_t last_quality;
- // Buffers 44.1KHz samples, should have enough for two(worst-case scenario) video frames(2* ~735 frames NTSC, 2* ~882 PAL) plus jitter plus enough for the resampler leftovers.
- // We'll just go with 4096 because powers of 2 are AWESOME and such.
- uint32_t IntermediateBufferPos;
- int16 IntermediateBuffer[4096][2];
 
  public:
  enum

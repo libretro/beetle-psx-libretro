@@ -101,6 +101,7 @@ static void check_system_specs(void)
 
 // Ugly poking. There's no public interface for this.
 #include "mednafen/psx/psx.h"
+#include "mednafen/psx-09333/spu.h"
 namespace MDFN_IEN_PSX
 {
    extern int CD_SelectedDisc;
@@ -610,9 +611,10 @@ void retro_run(void)
       PrevInterlaced = false;
 #endif
 
-   int16 *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * curgame->soundchan;
-   int32 SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
-   const int32 SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
+   int16_t *interbuf = (int16_t*)&IntermediateBuffer;
+   int16_t *const SoundBuf = interbuf + spec.SoundBufSizeALMS * curgame->soundchan;
+   int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
+   const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 
    spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
@@ -679,7 +681,7 @@ void retro_run(void)
    video_frames++;
    audio_frames += spec.SoundBufSize;
 
-   audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
+   audio_batch_cb(interbuf, spec.SoundBufSize);
 
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)

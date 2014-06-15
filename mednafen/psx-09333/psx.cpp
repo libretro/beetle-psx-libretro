@@ -1037,7 +1037,8 @@ void Emulate(EmulateSpecStruct *espec)
 
    //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
-   espec->SoundBufSize = SPU->EndFrame(espec->SoundBuf);
+   espec->SoundBufSize = IntermediateBufferPos;
+   IntermediateBufferPos = 0;
 
    CDC->ResetTS();
    TIMER_ResetTS();
