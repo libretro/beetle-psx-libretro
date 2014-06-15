@@ -667,12 +667,7 @@ static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shif
 
   sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-  if(sample < -32768)
-   sample = -32768;
-
-  if(sample > 32767)
-   sample = 32767;
-
+  clamp(&sample, -32768, 32767);
   output[i] = sample;
  }
 }

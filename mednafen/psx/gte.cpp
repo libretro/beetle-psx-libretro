@@ -20,6 +20,8 @@
 #include "gte.h"
 #endif
 
+#include "../clamp.h"
+
 static uint32_t ReciprocalTable[0x8000] =
 {
  #include "gte_divrecip.inc"
@@ -779,11 +781,7 @@ INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_value, in
    if(ftv_value > 32767)
       FLAGS |= 1 << (24 - which);
 
-   if(value < (-32768 + tmp))
-      value = -32768 + tmp;
-
-   if(value > 32767)
-      value = 32767;
+   clamp(&value, (-32768 + tmp), 32767);
 
    return(value);
 }

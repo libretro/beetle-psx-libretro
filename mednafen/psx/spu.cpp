@@ -333,11 +333,7 @@ void PS_SPU::DecodeSamples(SPU_Voice *voice)
 
       sample += ((voice->DecodeBuffer[(voice->DecodeWritePos - 1) & 0x1F] * Weights[weight][0]) >> 6)
          + ((voice->DecodeBuffer[(voice->DecodeWritePos - 2) & 0x1F] * Weights[weight][1]) >> 6);
-      if(sample < -32768)
-         sample = -32768;
-
-      if(sample > 32767)
-         sample = 32767;
+      clamp(&sample, -32768, 32767);
 
       voice->DecodeBuffer[voice->DecodeWritePos] = sample;
       voice->DecodeWritePos = (voice->DecodeWritePos + 1) & 0x1F;
