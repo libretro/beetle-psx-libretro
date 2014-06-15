@@ -540,7 +540,6 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/mednafen.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(RESAMPLER_SOURCES) \
 	$(MEDNAFEN_DIR)/file.cpp \
-	$(MEDNAFEN_DIR)/player.cpp \
 	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 

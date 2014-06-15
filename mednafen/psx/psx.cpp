@@ -23,7 +23,6 @@
 #include "cdc.h"
 #include "spu.h"
 #include "../mempatcher.h"
-#include "../player.h"
 
 #include <stdarg.h>
 #include <ctype.h>
