@@ -330,11 +330,6 @@ bool MDFNI_InitializeModule(void)
  return(1);
 }
 
-int MDFNI_Initialize(const char *basedir)
-{
-	return(1);
-}
-
 static int curindent = 0;
 
 void MDFN_indent(int indent)

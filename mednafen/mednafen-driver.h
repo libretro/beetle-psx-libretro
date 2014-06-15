@@ -50,10 +50,6 @@ MDFNGI *MDFNI_LoadCD(const char *sysname, const char *devicename);
 // Call this function as early as possible, even before MDFNI_Initialize()
 bool MDFNI_InitializeModule(void);
 
-/* allocates memory.  0 on failure, 1 on success. */
-/* Also pass it the base directory to load the configuration file. */
-int MDFNI_Initialize(const char *basedir);
-
 /* Sets the base directory(save states, snapshots, etc. are saved in directories
    below this directory. */
 void MDFNI_SetBaseDirectory(const char *dir);

@@ -266,8 +266,6 @@ void retro_init(void)
          last++;
 
       retro_base_directory = retro_base_directory.substr(0, last);
-
-      MDFNI_Initialize(retro_base_directory.c_str());
    }
    else
    {
@@ -320,16 +318,6 @@ void retro_reset(void)
 bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 {
    return false;
-}
-
-static void set_volume (uint32_t *ptr, unsigned number)
-{
-   switch(number)
-   {
-      default:
-         *ptr = number;
-         break;
-   }
 }
 
 static void check_variables(void)
