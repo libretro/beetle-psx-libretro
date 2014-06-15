@@ -9,42 +9,68 @@
 #include "../general.h"
 #include "../FileStream.h"
 
-#ifdef __LIBRETRO__
-#define PSX_WARNING(format, ...)
-#define PSX_DBGINFO(format, ...)
-#else
-#define PSX_WARNING(format, ...) { printf(format "\n", ## __VA_ARGS__); }
-#define PSX_DBGINFO(format, ...) { /*printf(format "\n", ## __VA_ARGS__);*/ }
+//
+// Comment out these 2 defines for extra speeeeed.
+//
+#define PSX_DBGPRINT_ENABLE    1
+#define PSX_EVENT_SYSTEM_CHECKS 1
+
+//
+// It's highly unlikely the user will want these if they're intentionally compiling without the debugger.
+#ifndef WANT_DEBUGGER
+ #undef PSX_DBGPRINT_ENABLE
+ #undef PSX_EVENT_SYSTEM_CHECKS
 #endif
+//
+//
+//
 
 namespace MDFN_IEN_PSX
 {
- typedef int32 pscpu_timestamp_t;
+ #define PSX_DBG_ERROR		0	// Emulator-level error.
+ #define PSX_DBG_WARNING	1	// Warning about game doing questionable things/hitting stuff that might not be emulated correctly.
+ #define PSX_DBG_BIOS_PRINT	2	// BIOS printf/putchar output.
+ #define PSX_DBG_SPARSE		3	// Sparse(relatively) information debug messages(CDC commands).
+ #define PSX_DBG_FLOOD		4	// Heavy informational debug messages(GPU commands; TODO).
+
+#if PSX_DBGPRINT_ENABLE
+ void PSX_DBG(unsigned level, const char *format, ...) throw() MDFN_COLD MDFN_FORMATSTR(printf, 2, 3);
+
+ #define PSX_WARNING(format, ...) { PSX_DBG(PSX_DBG_WARNING, format "\n", ## __VA_ARGS__); }
+ #define PSX_DBGINFO(format, ...) { }
+#else
+ static void PSX_DBG(unsigned level, const char* format, ...) { }
+ static void PSX_WARNING(const char* format, ...) { }
+ static void PSX_DBGINFO(const char* format, ...) { }
+#endif
+
+ typedef int32_t pscpu_timestamp_t;
 
  bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp);
 
- void MDFN_FASTCALL PSX_MemWrite8(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite16(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite24(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
- void MDFN_FASTCALL PSX_MemWrite32(pscpu_timestamp_t timestamp, uint32 A, uint32 V);
+ void MDFN_FASTCALL PSX_MemWrite8(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite16(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite24(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
+ void MDFN_FASTCALL PSX_MemWrite32(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
 
- uint8 MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32 A);
- uint16 MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32 A);
- uint32 MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32 A);
- uint32 MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32 A);
+ uint8_t MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint16_t MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint32_t MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32_t A);
+ uint32_t MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32_t A);
 
- uint8 PSX_MemPeek8(uint32 A);
- uint16 PSX_MemPeek16(uint32 A);
- uint32 PSX_MemPeek32(uint32 A);
+ uint8_t PSX_MemPeek8(uint32_t A);
+ uint16_t PSX_MemPeek16(uint32_t A);
+ uint32_t PSX_MemPeek32(uint32_t A);
 
  // Should write to WO-locations if possible
  #if 0
- void PSX_MemPoke8(uint32 A, uint8 V);
- void PSX_MemPoke16(uint32 A, uint16 V);
- void PSX_MemPoke32(uint32 A, uint32 V);
+ void PSX_MemPoke8(uint32_t A, uint8_t V);
+ void PSX_MemPoke16(uint32_t A, uint16_t V);
+ void PSX_MemPoke32(uint32_t A, uint32_t V);
  #endif
 
  void PSX_RequestMLExit(void);
+ void ForceEventUpdates(const pscpu_timestamp_t timestamp);
 
  enum
  {
@@ -62,9 +88,9 @@ namespace MDFN_IEN_PSX
  #define PSX_EVENT_MAXTS       		0x20000000
  void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp);
 
- void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
+ void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
 
- uint32 PSX_GetRandU32(uint32 mina, uint32 maxa);
+ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 };
 
 
@@ -85,7 +111,7 @@ namespace MDFN_IEN_PSX
  extern PS_GPU *GPU;
  extern PS_CDC *CDC;
  extern PS_SPU *SPU;
- extern MultiAccessSizeMem<2048 * 1024, uint32, false> MainRAM;
+ extern MultiAccessSizeMem<2048 * 1024, uint32_t, false> MainRAM;
 };
 
 

@@ -13,6 +13,7 @@ struct CD_Audio_Buffer
  int16 Samples[2][0x1000];	// [0][...] = l, [1][...] = r
  int32 Size;
  uint32 Freq;
+ int32 ReadPos;
 };
 
 class PS_CDC
@@ -37,82 +38,33 @@ class PS_CDC
 
  bool DMACanRead(void);
  uint32 DMARead(void);
-
- INLINE uint32 GetCDAudioFreq(void)
- {
-  if(AudioBuffer_UsedCount && !AudioBuffer_InPrebuffer)
-  {
-   const unsigned wb = AudioBuffer_ReadPos >> 12;
-   return AudioBuffer[wb].Freq;
-  }
-  return 0;
- }
-
- private:
- inline void ApplyVolume(int32 samples[2])
- {
-  int32 left_source = samples[0]; //(int16)MDFN_de16lsb(&buf[i * sizeof(int16) * 2 + 0]);
-  int32 right_source = samples[1]; //(int16)MDFN_de16lsb(&buf[i * sizeof(int16) * 2 + 2]);
-  int32 left_out = ((left_source * DecodeVolume[0][0]) >> 7) + ((right_source * DecodeVolume[1][0]) >> 7);
-  int32 right_out = ((left_source * DecodeVolume[0][1]) >> 7) + ((right_source * DecodeVolume[1][1]) >> 7);
-
-  clamp(&left_out, -32768, 32767);
-  clamp(&right_out, -32768, 32767);
-
-  if(Muted)
-  {
-   left_out = right_out = 0;
-  }
-
-  samples[0] = left_out;
-  samples[1] = right_out;
- }
- public:
-
- INLINE void GetCDAudio(int32 &l, int32 &r)
- {
-  if(AudioBuffer_UsedCount && !AudioBuffer_InPrebuffer)
-  {
-   const unsigned wb = AudioBuffer_ReadPos >> 12;
-   int32 samples[2] = { AudioBuffer[wb].Samples[0][AudioBuffer_ReadPos & 0xFFF], AudioBuffer[wb].Samples[1][AudioBuffer_ReadPos & 0xFFF] };
-
-   ApplyVolume(samples);
-
-   l = samples[0];
-   r = samples[1];
-
-   AudioBuffer_ReadPos = ((AudioBuffer_ReadPos + 1) & 0xFFF) | (AudioBuffer_ReadPos & ~0xFFF);
-
-   if((AudioBuffer_ReadPos & 0xFFF) == (AudioBuffer[wb].Size & 0xFFF))
-   {
-    //printf("RP == size; usedcount(predec)= %d, PSRCounter=%d\n", AudioBuffer_UsedCount, PSRCounter);
-    AudioBuffer_ReadPos = ((((AudioBuffer_ReadPos >> 12) + 1) % AudioBuffer_Count) << 12);
-    AudioBuffer_UsedCount--;
-   }
-  }
- }
-
- private:
-
  void SoftReset(void);
 
+ void GetCDAudio(int32 samples[2]);
+
+ private:
  CDIF *Cur_CDIF;
  bool DiscChanged;
  int32 DiscStartupDelay;
 
-
- enum { AudioBuffer_PreBufferCount = 2 };
- enum { AudioBuffer_Count = 4 };
-
- CD_Audio_Buffer AudioBuffer[AudioBuffer_Count];
- uint32 AudioBuffer_ReadPos;
- uint32 AudioBuffer_WritePos;
- uint32 AudioBuffer_UsedCount;
- bool AudioBuffer_InPrebuffer;
+ CD_Audio_Buffer AudioBuffer;
 
  uint8 Pending_DecodeVolume[2][2], DecodeVolume[2][2];		// [data_source][output_port]
 
+ int16 ADPCM_ResampBuf[2][32 * 2];
+ uint8 ADPCM_ResampCurPos;
+ uint8 ADPCM_ResampCurPhase;
+
+ void ApplyVolume(int32 samples[2]);
+ void ReadAudioBuffer(int32 samples[2]);
+
  void ClearAudioBuffers(void);
+
+
+ //
+ //
+ //
+
 
  uint8 RegSelector;
  uint8 ArgsBuf[16];
@@ -132,6 +84,10 @@ class PS_CDC
  uint8 SB[2340];
  uint32 SB_In;
 
+ enum { SectorPipe_Count = 2 };
+ uint8 SectorPipe[SectorPipe_Count][2352];
+ uint8 SectorPipe_Pos;
+ uint8 SectorPipe_In;
 
  uint8 SubQBuf[0xC];
  uint8 SubQBuf_Safe[0xC];
@@ -251,6 +207,8 @@ class PS_CDC
  bool xa_cur_set;
  uint8 xa_cur_file;
  uint8 xa_cur_chan;
+
+ void HandlePlayRead(void);
 
  struct CDC_CTEntry
  {

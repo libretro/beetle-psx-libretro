@@ -269,21 +269,21 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
    char s_c[16];
    char s_C[16];
 
-   snprintf(s_a, sizeof(s_a), "%d", shamt);
+   trio_snprintf(s_a, sizeof(s_a), "%d", shamt);
 
    if(immediate < 0)
-    snprintf(s_i, sizeof(s_i), "%d", immediate);
+    trio_snprintf(s_i, sizeof(s_i), "%d", immediate);
    else
-    snprintf(s_i, sizeof(s_i), "0x%04x", (uint32)immediate);
+    trio_snprintf(s_i, sizeof(s_i), "0x%04x", (uint32)immediate);
 
-   snprintf(s_z, sizeof(s_z), "0x%04x", immediate_ze);
+   trio_snprintf(s_z, sizeof(s_z), "0x%04x", immediate_ze);
 
-   snprintf(s_p, sizeof(s_p), "0x%08x", PC + 4 + (immediate << 2));
+   trio_snprintf(s_p, sizeof(s_p), "0x%08x", PC + 4 + (immediate << 2));
 
-   snprintf(s_P, sizeof(s_P), "0x%08x", ((PC + 4) & 0xF0000000) | (jt << 2));
+   trio_snprintf(s_P, sizeof(s_P), "0x%08x", ((PC + 4) & 0xF0000000) | (jt << 2));
 
-   snprintf(s_c, sizeof(s_c), "CPR%d", rd);
-   snprintf(s_C, sizeof(s_C), "CCR%d", rd);
+   trio_snprintf(s_c, sizeof(s_c), "CPR%d", rd);
+   trio_snprintf(s_C, sizeof(s_C), "CCR%d", rd);
 
    ret = std::string(op->mnemonic);
    ret.append(10 - ret.size(), ' ');
@@ -301,27 +301,27 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
 	 if(!strncmp(&op->format[i], "#sf#", 4))
 	 {
 	  i += 3;
-	  snprintf(as, 16, "sf=%d", (int)(bool)(instr & (1 << 19)));
+	  trio_snprintf(as, 16, "sf=%d", (int)(bool)(instr & (1 << 19)));
 	 }
          else if(!strncmp(&op->format[i], "#mx#", 4))
 	 {
 	  i += 3;
-          snprintf(as, 16, "mx=%d", (instr >> 17) & 0x3);
+          trio_snprintf(as, 16, "mx=%d", (instr >> 17) & 0x3);
 	 }
          else if(!strncmp(&op->format[i], "#v#", 3))
          {
           i += 2;
-	  snprintf(as, 16, "v=%d", (instr >> 15) & 0x3);
+	  trio_snprintf(as, 16, "v=%d", (instr >> 15) & 0x3);
          }
          else if(!strncmp(&op->format[i], "#cv#", 4))
          {
           i += 3;
-	  snprintf(as, 16, "cv=%d", (instr >> 13) & 0x3);
+	  trio_snprintf(as, 16, "cv=%d", (instr >> 13) & 0x3);
          }
          else if(!strncmp(&op->format[i], "#lm#", 4))
          {
           i += 3;
-	  snprintf(as, 16, "lm=%d", (int)(bool)(instr & (1 << 10)));
+	  trio_snprintf(as, 16, "lm=%d", (int)(bool)(instr & (1 << 10)));
          }
 	 ret.append(as);
 	}
@@ -330,7 +330,7 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
 	{
 	 char s_F[16];
 
-	 snprintf(s_F, 16, "0x%07x", instr & 0x1FFFFFF);
+	 trio_snprintf(s_F, 16, "0x%07x", instr & 0x1FFFFFF);
 	 ret.append(s_F);
 	}
 	break;

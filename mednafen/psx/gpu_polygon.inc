@@ -1,30 +1,30 @@
 struct i_group
 {
- int32 u, v;
- int32 r, g, b;
- int32 dummy0[3];
+ int32_t u, v;
+ int32_t r, g, b;
+ int32_t dummy0[3];
 };
 
 struct i_deltas
 {
- int32 du_dx, dv_dx;
- int32 dr_dx, dg_dx, db_dx;
- int32 dummy0[3];
+ int32_t du_dx, dv_dx;
+ int32_t dr_dx, dg_dx, db_dx;
+ int32_t dummy0[3];
 
- int32 du_dy, dv_dy;
- int32 dr_dy, dg_dy, db_dy;
- int32 dummy1[3];
+ int32_t du_dy, dv_dy;
+ int32_t dr_dy, dg_dy, db_dy;
+ int32_t dummy1[3];
 };
 
-static INLINE int64 MakePolyXFP(int32 x)
+static INLINE int64_t MakePolyXFP(int32_t x)
 {
  return ((int64)x << 32) + ((1LL << 32) - (1 << 11));
 }
 
-static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)
+static INLINE int64_t MakePolyXFPStep(int32_t dx, int32_t dy)
 {
- int64 ret;
- int64 dx_ex = (int64)dx << 32;
+ int64_t ret;
+ int64_t dx_ex = (int64)dx << 32;
 
  if(dx_ex < 0)
   dx_ex -= dy - 1;
@@ -37,7 +37,7 @@ static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)
  return(ret);
 }
 
-static INLINE int32 GetPolyXFP_Int(int64 xfp)
+static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
 {
  return(xfp >> 32);
 }
@@ -46,9 +46,9 @@ static INLINE int32 GetPolyXFP_Int(int64 xfp)
 #define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
 {
- int64 num = ((int64)COORD_MF_INT(1)) << 32;
- int64 denom = CALCIS(x, y);
- int64 one_div;
+ int64_t num = ((int64)COORD_MF_INT(1)) << 32;
+ int64_t denom = CALCIS(x, y);
+ int64_t one_div;
 
  if(!denom)
   return(false);
@@ -97,7 +97,7 @@ static INLINE void AddIDeltas_DX(i_group &ig, const i_deltas &idl)
 }
 
 template<bool goraud, bool textured>
-static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, int32 count = 1)
+static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, int32_t count = 1)
 {
  if(textured)
  {
@@ -113,10 +113,10 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, int32 count =
  }
 }
 
-template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, const int32 bv_x, i_group ig, const i_deltas &idl)
+template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
+INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, const int32_t bv_x, i_group ig, const i_deltas &idl)
 {
-  int32 xs = x_start, xb = x_bound;
+  int32_t xs = x_start, xb = x_bound;
 
   if(LineSkipTest(y))
    return;
@@ -156,9 +156,9 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
     ig.b += (xs - bv_x) * idl.db_dx;
    }
 
-   for(int32 x = xs; x < xb; x++)
+   for(int32_t x = xs; x < xb; x++)
    {
-    uint32 r, g, b;
+    uint32_t r, g, b;
 
     if(goraud)
     {
@@ -215,8 +215,8 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
   }
 }
 
-template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
+template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
+void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 {
  i_deltas idl;
 
@@ -274,18 +274,18 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
  // [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex.
  //
  //
- int32 y_start = vertices[0].y;
- int32 y_middle = vertices[1].y;
- int32 y_bound = vertices[2].y;
+ int32_t y_start = vertices[0].y;
+ int32_t y_middle = vertices[1].y;
+ int32_t y_bound = vertices[2].y;
 
- int64 base_coord;
- int64 base_step;
+ int64_t base_coord;
+ int64_t base_step;
 
- int64 bound_coord_ul;
- int64 bound_coord_us;
+ int64_t bound_coord_ul;
+ int64_t bound_coord_us;
 
- int64 bound_coord_ll;
- int64 bound_coord_ls;
+ int64_t bound_coord_ll;
+ int64_t bound_coord_ls;
 
  bool right_facing;
  //bool bottom_up;
@@ -326,7 +326,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 
  if(y_start < ClipY0)
  {
-  int32 count = ClipY0 - y_start;
+  int32_t count = ClipY0 - y_start;
 
   y_start = ClipY0;
   base_coord += base_step * count;
@@ -336,7 +336,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 
   if(y_middle < ClipY0)
   {
-   int32 count_ls = ClipY0 - y_middle;
+   int32_t count_ls = ClipY0 - y_middle;
 
    y_middle = ClipY0;
    bound_coord_ll += bound_coord_ls * count_ls;
@@ -353,7 +353,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 
  if(right_facing)
  {
-  for(int32 y = y_start; y < y_middle; y++)
+  for(int32_t y = y_start; y < y_middle; y++)
   {
    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), vertices[0].x, ig, idl);
    base_coord += base_step;
@@ -361,7 +361,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
    AddIDeltas_DY<goraud, textured>(ig, idl);
   }
 
-  for(int32 y = y_middle; y < y_bound; y++)
+  for(int32_t y = y_middle; y < y_bound; y++)
   {
    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), vertices[0].x, ig, idl);
    base_coord += base_step;
@@ -371,7 +371,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
  }
  else
  {
-  for(int32 y = y_start; y < y_middle; y++)
+  for(int32_t y = y_start; y < y_middle; y++)
   {
    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), vertices[0].x, ig, idl);
    base_coord += base_step;
@@ -379,7 +379,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
    AddIDeltas_DY<goraud, textured>(ig, idl);
   }
 
-  for(int32 y = y_middle; y < y_bound; y++)
+  for(int32_t y = y_middle; y < y_bound; y++)
   {
    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), vertices[0].x, ig, idl);
    base_coord += base_step;
@@ -398,14 +398,14 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32 clut)
 #endif
 }
 
-template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-void PS_GPU::Command_DrawPolygon(const uint32 *cb)
+template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
+void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 {
  const unsigned cb0 = cb[0];
  tri_vertex vertices[3];
- uint32 clut = 0;
+ uint32_t clut = 0;
  unsigned sv = 0;
- //uint32 tpage = 0;
+ //uint32_t tpage = 0;
 
  // Base timing is approximate, and could be improved.
  if(numvertices == 4 && InCmd == INCMD_QUAD)
@@ -436,7 +436,7 @@ void PS_GPU::Command_DrawPolygon(const uint32 *cb)
  {
   if(v == 0 || goraud)
   {
-   uint32 raw_color = (*cb & 0xFFFFFF);
+   uint32_t raw_color = (*cb & 0xFFFFFF);
 
    vertices[v].r = raw_color & 0xFF;
    vertices[v].g = (raw_color >> 8) & 0xFF;

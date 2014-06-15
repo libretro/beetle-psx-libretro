@@ -22,8 +22,8 @@ enum
 void IRQ_Power(void);
 void IRQ_Assert(int which, bool asserted);
 
-void IRQ_Write(uint32 A, uint32 V);
-uint32 IRQ_Read(uint32 A);
+void IRQ_Write(uint32_t A, uint32_t V);
+uint32_t IRQ_Read(uint32_t A);
 
 
 enum
@@ -33,8 +33,8 @@ enum
  IRQ_GSREG_MASK = 2
 };
 
-uint32 IRQ_GetRegister(unsigned int which, char *special, const uint32 special_len);
-void IRQ_SetRegister(unsigned int which, uint32 value);
+uint32_t IRQ_GetRegister(unsigned int which, char *special, const uint32_t special_len);
+void IRQ_SetRegister(unsigned int which, uint32_t value);
 
 int IRQ_StateAction(StateMem *sm, int load, int data_only);
 };

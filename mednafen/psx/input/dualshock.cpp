@@ -151,6 +151,12 @@ void InputDevice_DualShock::ResetTS(void)
 void InputDevice_DualShock::SetAMCT(bool enabled)
 {
  amct_enabled = enabled;
+ if(amct_enabled)
+     analog_mode = false;
+ else
+     analog_mode = true;
+
+ MDFN_DispMessage(_("%s: Mode button is %s, analogs are now %s"), gp_name.c_str(), amct_enabled ? _("enabled") : _("disabled"), analog_mode?_("on") : _("off"));
 }
 
 //
@@ -224,15 +230,10 @@ void InputDevice_DualShock::Power(void)
  transmit_pos = 0;
  transmit_count = 0;
 
-#ifdef __LIBRETRO__ // This is a hack. Couldn't figure out how to do it otherwise.
- analog_mode = true;
-#else
- analog_mode = false;
-#endif
  analog_mode_locked = false;
 
  mad_munchkins = false;
- memset(rumble_magic, 0, sizeof(rumble_magic));
+ memset(rumble_magic, 0xFF, sizeof(rumble_magic));
  memset(rumble_param, 0, sizeof(rumble_param));
 
  da_rumble_compat = true;
@@ -261,6 +262,8 @@ void InputDevice_DualShock::UpdateInput(const void *data)
   }
  }
 
+ //printf("RUMBLE: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", rumble_magic[0], rumble_magic[1], rumble_magic[2], rumble_magic[3], rumble_magic[4], rumble_magic[5]);
+ //printf("%d, 0x%02x 0x%02x\n", da_rumble_compat, rumble_param[0], rumble_param[1]);
  if(da_rumble_compat == false)
  {
   uint8 sneaky_weaky = 0;
@@ -346,7 +349,7 @@ bool InputDevice_DualShock::Clock(bool TxD, int32 &dsr_pulse_delay)
  if(!bitpos)
  {
   //if(command == 0x44)
-  //if(mad_munchkins || command == 0x43)
+  //if(command == 0x4D) //mad_munchkins) // || command == 0x43)
   // fprintf(stderr, "[PAD] Receive: %02x -- command=%02x, command_phase=%d, transmit_pos=%d\n", receive_buffer, command, command_phase, transmit_pos);
 
   if(transmit_count)
@@ -532,19 +535,43 @@ bool InputDevice_DualShock::Clock(bool TxD, int32 &dsr_pulse_delay)
 	 transmit_buffer[0] = 0xFF ^ buttons[0];
 	 transmit_buffer[1] = 0xFF ^ buttons[1];
 	 transmit_count = 2;
+
+	 if(!(rumble_magic[2] & 0xFE))
+	 {
+	  transmit_buffer[transmit_count++] = 0x00;
+	  transmit_buffer[transmit_count++] = 0x00;
+	 }
 	}
 	command_phase++;
 	break;
  
   case 0x4201:			// Weak(in DS mode)
-	if(da_rumble_compat || (rumble_magic[0] == 0x00 && rumble_magic[2] != 0x00 && rumble_magic[3] != 0x00 && rumble_magic[4] != 0x00 && rumble_magic[5] != 0x00))
+	if(da_rumble_compat)
+	 rumble_param[0] = receive_buffer;
+	// Dualshock weak
+	else if(rumble_magic[0] == 0x00 && rumble_magic[2] != 0x00 && rumble_magic[3] != 0x00 && rumble_magic[4] != 0x00 && rumble_magic[5] != 0x00)
 	 rumble_param[0] = receive_buffer;
 	command_phase++;
 	break;
 
-  case 0x4202:			// Strong(in DS mode)
-	if(da_rumble_compat || rumble_magic[1] == 0x01)
+  case 0x4202:
+	if(da_rumble_compat)
 	 rumble_param[1] = receive_buffer;
+	else if(rumble_magic[1] == 0x01)	// DualShock strong
+	 rumble_param[1] = receive_buffer;
+	else if(rumble_magic[1] == 0x00 && rumble_magic[2] != 0x00 && rumble_magic[3] != 0x00 && rumble_magic[4] != 0x00 && rumble_magic[5] != 0x00)	// DualShock weak
+	 rumble_param[0] = receive_buffer;
+
+	command_phase++;
+	break;
+
+  case 0x4203:
+	if(da_rumble_compat)
+	{
+
+	}
+	else if(rumble_magic[1] == 0x00 && rumble_magic[2] == 0x01)
+	 rumble_param[1] = receive_buffer;	// DualShock strong.
 	command_phase++;	// Nowhere here we come!
 	break;
 

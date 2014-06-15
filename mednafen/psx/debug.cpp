@@ -26,8 +26,10 @@ namespace MDFN_IEN_PSX
 extern PS_GPU *GPU;
 extern PS_SPU *SPU;
 
-static void (*CPUHook)(uint32) = NULL;
-static void (*BPCallB)(uint32 PC) = NULL;
+static void RedoCPUHook(void);
+
+static void (*CPUHook)(uint32, bool) = NULL;
+static bool CPUHookContinuous = false;
 
 struct PSX_BPOINT
 {
@@ -38,7 +40,8 @@ struct PSX_BPOINT
 static std::vector<PSX_BPOINT> BreakPointsPC, BreakPointsRead, BreakPointsWrite;
 static bool FoundBPoint;
 
-static int BTIndex = 0;
+static bool BTEnabled;
+static int BTIndex;
 
 struct BTEntry
 {
@@ -46,6 +49,7 @@ struct BTEntry
  uint32 to;
  uint32 branch_count;
  bool exception;
+ bool valid;
 };
 
 #define NUMBT 24
@@ -62,7 +66,7 @@ static void AddBranchTrace(uint32 from, uint32 to, bool exception)
 
  //if(BTEntries[(BTIndex - 1) & 0xF] == PC) return;
 
- if(prevbt->from == from && prevbt->to == to && prevbt->exception == exception && prevbt->branch_count < 0xFFFFFFFF)
+ if(prevbt->from == from && prevbt->to == to && prevbt->exception == exception && prevbt->branch_count < 0xFFFFFFFF && prevbt->valid)
   prevbt->branch_count++;
  else
  {
@@ -70,9 +74,21 @@ static void AddBranchTrace(uint32 from, uint32 to, bool exception)
   BTEntries[BTIndex].to = to;
   BTEntries[BTIndex].exception = exception;
   BTEntries[BTIndex].branch_count = 1;
+  BTEntries[BTIndex].valid = true;
 
   BTIndex = (BTIndex + 1) % NUMBT;
  }
+}
+
+static void EnableBranchTrace(bool enable)
+{
+ BTEnabled = enable;
+ if(!enable)
+ {
+  BTIndex = 0;
+  memset(BTEntries, 0, sizeof(BTEntries));
+ }
+ RedoCPUHook();
 }
 
 static std::vector<BranchTraceResult> GetBranchTrace(void)
@@ -121,7 +137,7 @@ void CheckCPUBPCallB(bool write, uint32 address, unsigned int len)
  }
 }
 
-static void CPUHandler(uint32 PC)
+static void CPUHandler(const pscpu_timestamp_t timestamp, uint32 PC)
 {
  std::vector<PSX_BPOINT>::iterator bpit;
 
@@ -131,9 +147,7 @@ static void CPUHandler(uint32 PC)
   //exit(1);
   //puts((const char *)&MainRAM[CPU->GetRegister(PS_CPU::GSREG_GPR + 4, NULL, 0) & 0x1FFFFF]);
  }
-  
 
- // FIXME/TODO: Call ForceEventUpdates() somewhere
 
  for(bpit = BreakPointsPC.begin(); bpit != BreakPointsPC.end(); bpit++)
  {
@@ -146,25 +160,23 @@ static void CPUHandler(uint32 PC)
 
  CPU->CheckBreakpoints(CheckCPUBPCallB, CPU->PeekMem32(PC));
 
- if(FoundBPoint)
+ CPUHookContinuous |= FoundBPoint;
+
+ if(CPUHookContinuous && CPUHook)
  {
-  BPCallB(PC);
-  FoundBPoint = 0;
+  ForceEventUpdates(timestamp);
+  CPUHook(PC, FoundBPoint);
  }
 
- if(CPUHook)
-  CPUHook(PC);
+ FoundBPoint = false;
 }
 
 
 static void RedoCPUHook(void)
 {
- const bool HappyTest = BreakPointsPC.size() || BreakPointsRead.size() || BreakPointsWrite.size();
- void (*cpuh)(uint32);
+ const bool HappyTest = CPUHook || BreakPointsPC.size() || BreakPointsRead.size() || BreakPointsWrite.size();
 
- cpuh = HappyTest ? CPUHandler : CPUHook;
-
- CPU->SetCPUHook(cpuh, cpuh ? AddBranchTrace : NULL);
+ CPU->SetCPUHook(HappyTest ? CPUHandler : NULL, BTEnabled ? AddBranchTrace : NULL);
 }
 
 static void FlushBreakPoints(int type)
@@ -197,17 +209,12 @@ static void AddBreakPoint(int type, unsigned int A1, unsigned int A2, bool logic
  RedoCPUHook();
 }
 
-static void SetCPUCallback(void (*callb)(uint32 PC))
+static void SetCPUCallback(void (*callb)(uint32 PC, bool bpoint), bool continuous)
 {
  CPUHook = callb;
+ CPUHookContinuous = continuous;
  RedoCPUHook();
 }
-
-static void SetBPCallback(void (*callb)(uint32 PC))
-{
- BPCallB = callb;
-}
-
 
 static void GetAddressSpaceBytes(const char *name, uint32 Address, uint32 Length, uint8 *Buffer)
 {
@@ -397,7 +404,7 @@ DebuggerInfoStruct PSX_DBGInfo =
  FlushBreakPoints,
  AddBreakPoint,
  SetCPUCallback,
- SetBPCallback,
+ EnableBranchTrace,
  GetBranchTrace,
  SetGraphicsDecode,
  NULL, //PCFXDBG_SetLogFunc,
@@ -405,27 +412,27 @@ DebuggerInfoStruct PSX_DBGInfo =
 
 static RegType Regs_Misc[] =
 {
- { TIMER_GSREG_COUNTER0,	"COUNTER0", "Counter 0", 2 	},
+ { TIMER_GSREG_COUNTER0,	"COUNT0", "Counter 0", 2 	},
  { TIMER_GSREG_MODE0,		"MODE0", "Mode 0", 	2   	},
  { TIMER_GSREG_TARGET0,		"TARGET0", "Target 0",	2	},
 
  { 0, "------", "", 0xFFFF },
 
 
- { TIMER_GSREG_COUNTER1,	"COUNTER1", "Counter 1", 2 	},
+ { TIMER_GSREG_COUNTER1,	"COUNT1", "Counter 1", 2 	},
  { TIMER_GSREG_MODE1,		"MODE1", "Mode 1", 	2   	},
  { TIMER_GSREG_TARGET1,		"TARGET1", "Target 1",	2	},
 
  { 0, "------", "", 0xFFFF },
 
- { TIMER_GSREG_COUNTER2,	"COUNTER2", "Counter 2", 2 	},
+ { TIMER_GSREG_COUNTER2,	"COUNT2", "Counter 2", 2 	},
  { TIMER_GSREG_MODE2,		"MODE2", "Mode 2", 	2   	},
  { TIMER_GSREG_TARGET2,		"TARGET2", "Target 2",	2	},
 
  { 0, "------", "", 0xFFFF },
  { 0, "------", "", 0xFFFF },
 
- { 0x10000 | IRQ_GSREG_ASSERTED,		"ASSERTED",	"IRQ Asserted",	2 },
+ { 0x10000 | IRQ_GSREG_ASSERTED,	"ASSERTD",	"IRQ Asserted",	2 },
  { 0x10000 | IRQ_GSREG_STATUS,		"STATUS",	"IRQ Status", 2 },
  { 0x10000 | IRQ_GSREG_MASK,		"MASK",		"IRQ Mask", 2 },
 
@@ -500,26 +507,26 @@ static RegType Regs_SPU[] =
  { PS_SPU::GSREG_IIR_COEF, "IIR_COEF", "", 2 },
  { PS_SPU::GSREG_FB_ALPHA, "FB_ALPHA", "", 2 },
  { PS_SPU::GSREG_FB_X, "FB_X", "", 2 },
- { PS_SPU::GSREG_IIR_DEST_A0, "IIR_DEST_A0", "", 2 },
- { PS_SPU::GSREG_IIR_DEST_A1, "IIR_DEST_A1", "", 2 },
+ { PS_SPU::GSREG_IIR_DEST_A0, "IIR_DST_A0", "", 2 },
+ { PS_SPU::GSREG_IIR_DEST_A1, "IIR_DST_A1", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_A0, "ACC_SRC_A0", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_A1, "ACC_SRC_A1", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_B0, "ACC_SRC_B0", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_B1, "ACC_SRC_B1", "", 2 },
  { PS_SPU::GSREG_IIR_SRC_A0, "IIR_SRC_A0", "", 2 },
  { PS_SPU::GSREG_IIR_SRC_A1, "IIR_SRC_A1", "", 2 },
- { PS_SPU::GSREG_IIR_DEST_B0, "IIR_DEST_B0", "", 2 },
- { PS_SPU::GSREG_IIR_DEST_B1, "IIR_DEST_B1", "", 2 },
+ { PS_SPU::GSREG_IIR_DEST_B0, "IIR_DST_B0", "", 2 },
+ { PS_SPU::GSREG_IIR_DEST_B1, "IIR_DST_B1", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_C0, "ACC_SRC_C0", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_C1, "ACC_SRC_C1", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_D0, "ACC_SRC_D0", "", 2 },
  { PS_SPU::GSREG_ACC_SRC_D1, "ACC_SRC_D1", "", 2 },
  { PS_SPU::GSREG_IIR_SRC_B1, "IIR_SRC_B1", "", 2 },
  { PS_SPU::GSREG_IIR_SRC_B0, "IIR_SRC_B0", "", 2 },
- { PS_SPU::GSREG_MIX_DEST_A0, "MIX_DEST_A0", "", 2 },
- { PS_SPU::GSREG_MIX_DEST_A1, "MIX_DEST_A1", "", 2 },
- { PS_SPU::GSREG_MIX_DEST_B0, "MIX_DEST_B0", "", 2 },
- { PS_SPU::GSREG_MIX_DEST_B1, "MIX_DEST_B1", "", 2 },
+ { PS_SPU::GSREG_MIX_DEST_A0, "MIX_DST_A0", "", 2 },
+ { PS_SPU::GSREG_MIX_DEST_A1, "MIX_DST_A1", "", 2 },
+ { PS_SPU::GSREG_MIX_DEST_B0, "MIX_DST_B0", "", 2 },
+ { PS_SPU::GSREG_MIX_DEST_B1, "MIX_DST_B1", "", 2 },
  { PS_SPU::GSREG_IN_COEF_L, "IN_COEF_L", "", 2 },
  { PS_SPU::GSREG_IN_COEF_R, "IN_COEF_R", "", 2 },
 
@@ -656,8 +663,12 @@ static RegGroupType CPURegsGroup =
 bool DBG_Init(void)
 {
  CPUHook = NULL;
- BPCallB = NULL;
+ CPUHookContinuous = false;
  FoundBPoint = false;
+
+ BTEnabled = false;
+ BTIndex = false;
+ memset(BTEntries, 0, sizeof(BTEntries));
 
  MDFNDBG_AddRegGroup(&CPURegsGroup);
  MDFNDBG_AddRegGroup(&MiscRegsGroup);

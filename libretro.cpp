@@ -100,7 +100,7 @@ static void check_system_specs(void)
 
 // Ugly poking. There's no public interface for this.
 #include "mednafen/psx/psx.h"
-#include "mednafen/psx-09333/spu.h"
+#include "mednafen/psx/spu.h"
 namespace MDFN_IEN_PSX
 {
    extern int CD_SelectedDisc;

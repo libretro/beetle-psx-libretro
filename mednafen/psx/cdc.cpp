@@ -54,6 +54,9 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
 {
  IsPSXDisc = false;
  Cur_CDIF = NULL;
+
+ DriveStatus = DS_STOPPED;
+ PendingCommandPhase = 0;
 }
 
 PS_CDC::~PS_CDC()
@@ -84,6 +87,7 @@ void PS_CDC::SetDisc(bool tray_open, CDIF *cdif, const char *disc_id)
   HeaderBufValid = false;
   DriveStatus = DS_STOPPED;
   ClearAIP();
+  SectorPipe_Pos = SectorPipe_In = 0;
  }
  else
  {
@@ -153,6 +157,7 @@ void PS_CDC::SoftReset(void)
 
  DMABuffer.Flush();
  SB_In = 0;
+ SectorPipe_Pos = SectorPipe_In = 0;
 
  memset(SubQBuf, 0, sizeof(SubQBuf));
  memset(SubQBuf_Safe, 0, sizeof(SubQBuf_Safe));
@@ -209,13 +214,12 @@ void PS_CDC::Power(void)
 
 int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 {
- assert(AudioBuffer_Count == 4);
-
  SFORMAT StateRegs[] =
  {
  SFVAR(DiscChanged),
  SFVAR(DiscStartupDelay),
 
+#if 0
 #define SFAB(n)	SFARRAY16N(&AudioBuffer[n].Samples[0][0], sizeof(AudioBuffer[n].Samples) / sizeof(AudioBuffer[n].Samples[0][0]), #n "Samples"),	\
 		SFVARN(AudioBuffer[n].Size, #n "Size"),											\
 		SFVARN(AudioBuffer[n].Freq, #n "Freq")
@@ -229,9 +233,16 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
  SFVAR(AudioBuffer_WritePos),
  SFVAR(AudioBuffer_UsedCount),
  SFVAR(AudioBuffer_InPrebuffer),
+#endif
 
  SFARRAY(&Pending_DecodeVolume[0][0], 2 * 2),
  SFARRAY(&DecodeVolume[0][0], 2 * 2),
+
+ SFARRAY16(&ADPCM_ResampBuf[0][0], sizeof(ADPCM_ResampBuf) / sizeof(ADPCM_ResampBuf[0][0])),
+ SFVAR(ADPCM_ResampCurPhase),
+ SFVAR(ADPCM_ResampCurPos),
+
+
 
  SFVAR(RegSelector),
  SFARRAY(ArgsBuf, 16),
@@ -256,6 +267,7 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 
  SFARRAY(SB, sizeof(SB) / sizeof(SB[0])),
  SFVAR(SB_In),
+ //SectorPipe_Pos = SectorPipe_In = 0;
  SFARRAY(SubQBuf, sizeof(SubQBuf) / sizeof(SubQBuf[0])),
  SFARRAY(SubQBuf_Safe, sizeof(SubQBuf_Safe) / sizeof(SubQBuf_Safe[0])),
 
@@ -434,6 +446,109 @@ bool PS_CDC::DecodeSubQ(uint8 *subpw)
  return(false);
 }
 
+static const int16 CDADPCMImpulse[7][25] =
+{
+ {     0,    -5,    17,   -35,    70,   -23,   -68,   347,  -839,  2062, -4681, 15367, 21472, -5882,  2810, -1352,   635,  -235,    26,    43,   -35,    16,    -8,     2,     0,  }, /* 0 */
+ {     0,    -2,    10,   -34,    65,   -84,    52,     9,  -266,  1024, -2680,  9036, 26516, -6016,  3021, -1571,   848,  -365,   107,    10,   -16,    17,    -8,     3,    -1,  }, /* 1 */
+ {    -2,     0,     3,   -19,    60,   -75,   162,  -227,   306,   -67,  -615,  3229, 29883, -4532,  2488, -1471,   882,  -424,   166,   -27,     5,     6,    -8,     3,    -1,  }, /* 2 */
+ {    -1,     3,    -2,    -5,    31,   -74,   179,  -402,   689,  -926,  1272, -1446, 31033, -1446,  1272,  -926,   689,  -402,   179,   -74,    31,    -5,    -2,     3,    -1,  }, /* 3 */
+ {    -1,     3,    -8,     6,     5,   -27,   166,  -424,   882, -1471,  2488, -4532, 29883,  3229,  -615,   -67,   306,  -227,   162,   -75,    60,   -19,     3,     0,    -2,  }, /* 4 */
+ {    -1,     3,    -8,    17,   -16,    10,   107,  -365,   848, -1571,  3021, -6016, 26516,  9036, -2680,  1024,  -266,     9,    52,   -84,    65,   -34,    10,    -2,     0,  }, /* 5 */
+ {     0,     2,    -8,    16,   -35,    43,    26,  -235,   635, -1352,  2810, -5882, 21472, 15367, -4681,  2062,  -839,   347,   -68,   -23,    70,   -35,    17,    -5,     0,  }, /* 6 */
+};
+
+void PS_CDC::ReadAudioBuffer(int32 samples[2])
+{
+ samples[0] = AudioBuffer.Samples[0][AudioBuffer.ReadPos];
+ samples[1] = AudioBuffer.Samples[1][AudioBuffer.ReadPos];
+
+ AudioBuffer.ReadPos++;
+}
+
+INLINE void PS_CDC::ApplyVolume(int32 samples[2])
+{
+ //
+ // Take care not to alter samples[] before we're done calculating the new output samples!
+ //
+ int32 left_out = ((samples[0] * DecodeVolume[0][0]) >> 7) + ((samples[1] * DecodeVolume[1][0]) >> 7);
+ int32 right_out = ((samples[0] * DecodeVolume[0][1]) >> 7) + ((samples[1] * DecodeVolume[1][1]) >> 7);
+
+ clamp(&left_out, -32768, 32767);
+ clamp(&right_out, -32768, 32767);
+
+ if(Muted)
+ {
+  left_out = 0;
+  right_out = 0;
+ }
+
+ samples[0] = left_out;
+ samples[1] = right_out;
+}
+
+//
+// This function must always set samples[0] and samples[1], even if just to 0; range of samples[n] shall be restricted to -32768 through 32767.
+//
+void PS_CDC::GetCDAudio(int32 samples[2])
+{
+ const unsigned freq = (AudioBuffer.ReadPos < AudioBuffer.Size) ? AudioBuffer.Freq : 0;
+
+ samples[0] = 0;
+ samples[1] = 0;
+
+ if(!freq)
+  return;
+
+ if(freq == 7 || freq == 14)
+ {
+  ReadAudioBuffer(samples);
+  if(freq == 14)
+   ReadAudioBuffer(samples);
+ }
+ else
+ {
+  int32 out_tmp[2] = { 0, 0 };
+
+  for(unsigned i = 0; i < 2; i++)
+  {
+   const int16* imp = CDADPCMImpulse[ADPCM_ResampCurPhase];
+   int16* wf = &ADPCM_ResampBuf[i][(ADPCM_ResampCurPos + 32 - 25) & 0x1F];
+
+   for(unsigned s = 0; s < 25; s++)
+   {
+    out_tmp[i] += imp[s] * wf[s];
+   }
+
+   out_tmp[i] >>= 15;
+   clamp(&out_tmp[i], -32768, 32767);
+   samples[i] = out_tmp[i];
+  }
+
+  ADPCM_ResampCurPhase += freq;
+
+  if(ADPCM_ResampCurPhase >= 7)
+  {
+   int32 raw[2] = { 0, 0 };
+
+   ADPCM_ResampCurPhase -= 7;
+   ReadAudioBuffer(raw);
+
+   for(unsigned i = 0; i < 2; i++)
+   {
+    ADPCM_ResampBuf[i][ADPCM_ResampCurPos +  0] = 
+    ADPCM_ResampBuf[i][ADPCM_ResampCurPos + 32] = raw[i];
+   }
+   ADPCM_ResampCurPos = (ADPCM_ResampCurPos + 1) & 0x1F;
+  }
+ }
+
+ //
+ // Algorithmically, volume is applied after resampling for CD-XA ADPCM playback, per PS1 tests(though when "mute" is applied wasn't tested).
+ //
+ ApplyVolume(samples);
+}
+
+
 struct XA_Subheader
 {
  uint8 file;
@@ -516,18 +631,50 @@ bool PS_CDC::XA_Test(const uint8 *sdata)
 
 void PS_CDC::ClearAudioBuffers(void)
 {
- memset(AudioBuffer, 0, sizeof(AudioBuffer));
+ memset(&AudioBuffer, 0, sizeof(AudioBuffer));
  memset(xa_previous, 0, sizeof(xa_previous));
 
  xa_cur_set = false;
  xa_cur_file = 0;
  xa_cur_chan = 0;
 
- AudioBuffer_ReadPos = 0;
- AudioBuffer_WritePos = 0;
- AudioBuffer_UsedCount = 0;
+ memset(ADPCM_ResampBuf, 0, sizeof(ADPCM_ResampBuf));
+ ADPCM_ResampCurPhase = 0;
+ ADPCM_ResampCurPos = 0;
+}
 
- AudioBuffer_InPrebuffer = true;
+//
+// output should be readable at -2 and -1
+static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shift, const unsigned weight)
+{
+ // Weights copied over from SPU channel ADPCM playback code, may not be entirely the same for CD-XA ADPCM, we need to run tests.
+ static const int32 Weights[16][2] =
+ {
+  // s-1    s-2
+  {   0,    0 },
+  {  60,    0 },
+  { 115,  -52 },
+  {  98,  -55 },
+  { 122,  -60 },
+ };
+
+ for(int i = 0; i < 28; i++)
+ {
+  int32 sample;
+
+  sample = (int16)(input[i] << 8);
+  sample >>= shift;
+
+  sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
+
+  if(sample < -32768)
+   sample = -32768;
+
+  if(sample > 32767)
+   sample = 32767;
+
+  output[i] = sample;
+ }
 }
 
 void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
@@ -536,7 +683,7 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
  const unsigned unit_index_shift = (sh->coding & XA_CODING_8BIT) ? 0 : 1;
 
  //printf("File: 0x%02x 0x%02x - Channel: 0x%02x 0x%02x - Submode: 0x%02x 0x%02x - Coding: 0x%02x 0x%02x - \n", sh->file, sh->file_dup, sh->channel, sh->channel_dup, sh->submode, sh->submode_dup, sh->coding, sh->coding_dup);
-
+ ab->ReadPos = 0;
  ab->Size = 18 * (4 << unit_index_shift) * 28;
 
  if(sh->coding & XA_CODING_STEREO)
@@ -580,7 +727,7 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
    obuffer[0] = xa_previous[ocn][0];
    obuffer[1] = xa_previous[ocn][1];
 
-   PS_SPU::DecodeADPCM(ibuffer, &obuffer[2], param & 0x0F, param >> 4);
+   DecodeXAADPCM(ibuffer, &obuffer[2], param & 0x0F, param >> 4);
 
    xa_previous[ocn][0] = obuffer[28];
    xa_previous[ocn][1] = obuffer[29];
@@ -605,6 +752,18 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
    }
   }
  }
+
+#if 0
+ // Test
+ for(unsigned i = 0; i < ab->Size; i++)
+ {
+  static unsigned counter = 0;
+
+  ab->Samples[0][i] = (counter & 2) ? -0x6000 : 0x6000;
+  ab->Samples[1][i] = rand();
+  counter++;
+ }
+#endif
 }
 
 void PS_CDC::ClearAIP(void)
@@ -661,7 +820,7 @@ void PS_CDC::SetAIP(unsigned irq, uint8 result0, uint8 result1)
 
 void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
 {
-	CD_Audio_Buffer *ab = &AudioBuffer[AudioBuffer_WritePos >> 12];
+	CD_Audio_Buffer *ab = &AudioBuffer;
 
         ab->Freq = 7 * ((Mode & MODE_SPEED) ? 2 : 1);
         ab->Size = 588;
@@ -683,15 +842,193 @@ void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
 	 }
 	}
 
-	//if(AudioBuffer_UsedCount == 0)
- 	// AudioBuffer_InPrebuffer = true;
+	ab->ReadPos = 0;
+}
 
-	AudioBuffer_UsedCount++;
+// SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
+void PS_CDC::HandlePlayRead(void)
+{
+ uint8 read_buf[2352 + 96];
 
-	if(AudioBuffer_UsedCount == AudioBuffer_PreBufferCount)
-	 AudioBuffer_InPrebuffer = false;
+ //PSX_WARNING("Read sector: %d", CurSector);
 
-	AudioBuffer_WritePos = (AudioBuffer_WritePos & 0xFFF) | ((((AudioBuffer_WritePos >> 12) + 1) % AudioBuffer_Count) << 12);
+ if(CurSector >= ((int32)toc.tracks[100].lba + 300) && CurSector >= (75 * 60 * 75 - 150))
+ {
+  PSX_WARNING("[CDC] Read/Play position waaay too far out(%u), forcing STOP", CurSector);
+  DriveStatus = DS_STOPPED;
+  SectorPipe_Pos = SectorPipe_In = 0;
+  return;
+ }
+
+ if(CurSector >= (int32)toc.tracks[100].lba)
+ {
+  PSX_WARNING("[CDC] In leadout area: %u", CurSector);
+
+  //
+  // Synthesis is a bit of a kludge... :/
+  //
+  synth_leadout_sector_lba(0x02, toc, CurSector, read_buf);
+  DecodeSubQ(read_buf + 2352);
+ }
+ else
+ {
+  Cur_CDIF->ReadRawSector(read_buf, CurSector);	// FIXME: error out on error.
+  DecodeSubQ(read_buf + 2352);
+ }
+ 
+
+ if(SubQBuf_Safe[1] == 0xAA && (DriveStatus == DS_PLAYING || (!(SubQBuf_Safe[0] & 0x40) && (Mode & MODE_CDDA))))
+ {
+  HeaderBufValid = false;
+
+  PSX_WARNING("[CDC] CD-DA leadout reached: %u", CurSector);
+
+  // Status in this end-of-disc context here should be generated after we're in the pause state.
+  DriveStatus = DS_PAUSED;
+  SectorPipe_Pos = SectorPipe_In = 0;
+  SetAIP(CDCIRQ_DATA_END, MakeStatus());
+
+  return;
+ }
+
+ if(DriveStatus == DS_PLAYING)
+ {
+  // Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause).
+  if(PlayTrackMatch == -1 && SubQChecksumOK)
+   PlayTrackMatch = SubQBuf_Safe[0x1];
+
+  if((Mode & MODE_AUTOPAUSE) && PlayTrackMatch != -1 && SubQBuf_Safe[0x1] != PlayTrackMatch)
+  {
+   // Status needs to be taken before we're paused(IE it should still report playing).
+   SetAIP(CDCIRQ_DATA_END, MakeStatus());
+
+   DriveStatus = DS_PAUSED;
+   SectorPipe_Pos = SectorPipe_In = 0;
+   PSRCounter = 0;
+   return;
+  }
+
+  if((Mode & MODE_REPORT) && (!(SubQBuf_Safe[0x9] & 0xF) || Forward || Backward) && SubQChecksumOK)	// Not sure about accurate notification behavior for corrupt SubQ data
+  {
+   uint8 tr[8];
+
+   tr[0] = MakeStatus();
+   tr[1] = SubQBuf_Safe[0x1];	// Track
+   tr[2] = SubQBuf_Safe[0x2];	// Index
+
+   if(SubQBuf_Safe[0x9] & 0x10)
+   {
+    tr[3] = SubQBuf_Safe[0x3];		// R M
+    tr[4] = SubQBuf_Safe[0x4] | 0x80;	// R S
+    tr[5] = SubQBuf_Safe[0x5];		// R F
+   }
+   else	
+   {
+    tr[3] = SubQBuf_Safe[0x7];	// A M
+    tr[4] = SubQBuf_Safe[0x8];	// A S
+    tr[5] = SubQBuf_Safe[0x9];	// A F
+   }
+
+   tr[6] = 0;	// ??
+   tr[7] = 0;	// ??
+
+   SetAIP(CDCIRQ_DATA_READY, 8, tr);
+  }
+ }
+
+ if(SectorPipe_In >= SectorPipe_Count)
+ {
+  uint8* buf = SectorPipe[SectorPipe_Pos];
+  SectorPipe_In--;
+
+  if(DriveStatus == DS_READING)
+  {
+   if(SubQBuf_Safe[0] & 0x40) //) || !(Mode & MODE_CDDA))
+   {
+    memcpy(HeaderBuf, buf + 12, 12);
+    HeaderBufValid = true;
+
+    if((Mode & MODE_STRSND) && (buf[12 + 3] == 0x2) && ((buf[12 + 6] & 0x64) == 0x64))
+    {
+     if(XA_Test(buf))
+     {
+      if(AudioBuffer.ReadPos < AudioBuffer.Size)
+      {
+       PSX_WARNING("[CDC] CD-XA ADPCM sector skipped - readpos=0x%04x, size=0x%04x", AudioBuffer.ReadPos, AudioBuffer.Size);
+      }
+      else
+      {
+       XA_ProcessSector(buf, &AudioBuffer);
+      }
+     }
+    }
+    else
+    {
+     // maybe if(!(Mode & 0x30)) too?
+     if(!(buf[12 + 6] & 0x20))
+     {
+      if(!edc_lec_check_and_correct(buf, true))
+      {
+       MDFN_DispMessage("Bad sector? - %d", CurSector);
+      }
+     }
+
+     if(!(Mode & 0x30) && (buf[12 + 6] & 0x20))
+      PSX_WARNING("[CDC] BORK: %d", CurSector);
+
+     int32 offs = (Mode & 0x20) ? 0 : 12;
+     int32 size = (Mode & 0x20) ? 2340 : 2048;
+
+     if(Mode & 0x10)
+     {
+      offs = 12;
+      size = 2328;
+     }
+
+     memcpy(SB, buf + 12 + offs, size);
+     SB_In = size;
+     SetAIP(CDCIRQ_DATA_READY, MakeStatus());
+    }
+   }
+  }
+
+  if(!(SubQBuf_Safe[0] & 0x40) && ((Mode & MODE_CDDA) || DriveStatus == DS_PLAYING))
+  {
+   if(AudioBuffer.ReadPos < AudioBuffer.Size)
+   {
+    PSX_WARNING("[CDC] BUG CDDA buffer full");
+   }
+   else
+   {
+    EnbufferizeCDDASector(buf);
+   }
+  }
+ }
+
+ memcpy(SectorPipe[SectorPipe_Pos], read_buf, 2352);
+ SectorPipe_Pos = (SectorPipe_Pos + 1) % SectorPipe_Count;
+ SectorPipe_In++;
+
+ PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+
+ if(DriveStatus == DS_PLAYING)
+ {
+  // FIXME: What's the real fast-forward and backward speed?
+  if(Forward)
+   CurSector += 12;
+  else if(Backward)
+  {
+   CurSector -= 12;
+
+   if(CurSector < 0)	// FIXME: How does a real PS handle this condition?
+    CurSector = 0;
+  }
+  else
+   CurSector++;
+ }
+ else
+  CurSector++;
+
 }
 
 pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
@@ -755,6 +1092,7 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      ClearAudioBuffers();
 
      SB_In = 0;
+     SectorPipe_Pos = SectorPipe_In = 0;
 
      Mode = 0;
      CurSector = 0;
@@ -787,176 +1125,14 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
 
      if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
      {
+      // TODO: SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);  when !(Mode & MODE_CDDA) and the sector isn't a data sector.
       PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
      }
     }
-    else if(DriveStatus == DS_READING)
+    else if(DriveStatus == DS_READING || DriveStatus == DS_PLAYING)
     {
-     if(CurSector >= (int32)toc.tracks[100].lba)
-     {
-      PSX_WARNING("[CDC] Beyond end!");
-      DriveStatus = DS_STOPPED;
-
-      SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
-     }
-     else if((Mode & MODE_STRSND) && AudioBuffer_UsedCount == AudioBuffer_Count)
-     {
-      PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1)) / 4;
-     }
-     else
-     {
-      //PSX_WARNING("Read sector: %d", CurSector);
-
-      Cur_CDIF->ReadRawSector(buf, CurSector);	// FIXME: error out on error.
-      DecodeSubQ(buf + 2352);
-
-      if(SubQBuf_Safe[0] & 0x40)
-      {
-       memcpy(HeaderBuf, buf + 12, 12);
-       HeaderBufValid = true;
-
-       if((Mode & MODE_STRSND) && (buf[12 + 3] == 0x2) && (buf[12 + 6] & 0x20) && (buf[12 + 6] & 0x04))
-       {
-        if(XA_Test(buf))
-        {
-	 if(AudioBuffer_ReadPos & 0xFFF)
-	 {
-	  PSX_WARNING("[CDC] CD-XA readpos=%04x(rabl=%04x) writepos=%04x", AudioBuffer_ReadPos, AudioBuffer[AudioBuffer_ReadPos >> 12].Size, AudioBuffer_WritePos);
-	 }
-
-	 //if(AudioBuffer_UsedCount == 0)
-	 // AudioBuffer_InPrebuffer = true;
-
-         XA_ProcessSector(buf, &AudioBuffer[AudioBuffer_WritePos >> 12]);
-	 AudioBuffer_UsedCount++;
-
-	 if(AudioBuffer_UsedCount == AudioBuffer_PreBufferCount)
-	  AudioBuffer_InPrebuffer = false;
-
-	 AudioBuffer_WritePos = (AudioBuffer_WritePos & 0xFFF) | ((((AudioBuffer_WritePos >> 12) + 1) % AudioBuffer_Count) << 12);
-        }
-       }
-       else
-       {
-        // maybe if(!(Mode & 0x30)) too?
-        if(!(buf[12 + 6] & 0x20))
-        {
-	 if(!edc_lec_check_and_correct(buf, true))
-	 {
-	  MDFN_DispMessage("Bad sector? - %d", CurSector);
-	 }
-        }
-
-        if(!(Mode & 0x30) && (buf[12 + 6] & 0x20))
-	 PSX_WARNING("BORK: %d", CurSector);
-
-        {
- 	 int32 offs = (Mode & 0x20) ? 0 : 12;
-	 int32 size = (Mode & 0x20) ? 2340 : 2048;
-
-	 if(Mode & 0x10)
-	 {
-	  offs = 12;
-	  size = 2328;
-	 }
-
- 	 memcpy(SB, buf + 12 + offs, size);
- 	 SB_In = size;
-        }
-
-        SetAIP(CDCIRQ_DATA_READY, MakeStatus());
-       }
-      }
-      else // else to if(SubQBuf_Safe[0] & 0x40)
-      {
-       if(Mode & MODE_CDDA)
-       {
-        EnbufferizeCDDASector(buf);
-       }
-      }
-
-      PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
-      CurSector++;
-     }
+     HandlePlayRead();
     }
-    else if(DriveStatus == DS_PLAYING)
-    {
-     if(CurSector >= (int32)toc.tracks[100].lba)
-     {
-      HeaderBufValid = false;
-
-      // Status in this end-of-disc context here should be generated after we're in the pause state.
-      DriveStatus = DS_PAUSED;
-      SetAIP(CDCIRQ_DATA_END, MakeStatus());
-     }
-     else
-     {
-      if(AudioBuffer_UsedCount < AudioBuffer_Count)
-      {
-       Cur_CDIF->ReadRawSector(buf, CurSector);	// FIXME: error out on error.
-       DecodeSubQ(buf + 2352);
-
-       // Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause).
-       if(PlayTrackMatch == -1 && SubQChecksumOK)
-	PlayTrackMatch = SubQBuf_Safe[0x1];
-
-       EnbufferizeCDDASector(buf);
-
-       PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
-
-       if((Mode & MODE_AUTOPAUSE) && PlayTrackMatch != -1 && SubQBuf_Safe[0x1] != PlayTrackMatch)
-       {
-	// Status needs to be taken before we're paused(IE it should still report playing).
-	SetAIP(CDCIRQ_DATA_END, MakeStatus());
-
-	DriveStatus = DS_PAUSED;
-	PSRCounter = 0;
-       }
-       else if((Mode & MODE_REPORT) && (!(SubQBuf_Safe[0x9] & 0xF) || Forward || Backward) && SubQChecksumOK)	// Not sure about accurate notification behavior for corrupt SubQ data
-       {
-	uint8 tr[8];
-
-	tr[0] = MakeStatus();
-	tr[1] = SubQBuf_Safe[0x1];	// Track
-	tr[2] = SubQBuf_Safe[0x2];	// Index
-
-	if(SubQBuf_Safe[0x9] & 0x10)
-	{
-	 tr[3] = SubQBuf_Safe[0x3];		// R M
-	 tr[4] = SubQBuf_Safe[0x4] | 0x80;	// R S
- 	 tr[5] = SubQBuf_Safe[0x5];		// R F
-	}
-	else	
-	{
-	 tr[3] = SubQBuf_Safe[0x7];	// A M
-	 tr[4] = SubQBuf_Safe[0x8];	// A S
-	 tr[5] = SubQBuf_Safe[0x9];	// A F
-	}
-
-	tr[6] = 0;	// ??
-	tr[7] = 0;	// ??
-
-	SetAIP(CDCIRQ_DATA_READY, 8, tr);
-       }
-
-	// FIXME: What's the real fast-forward and backward speed?
-       if(Forward)
-        CurSector += 12;
-       else if(Backward)
-       {
-        CurSector -= 12;
-
-        if(CurSector < 0)	// FIXME: How does a real PS handle this condition?
-         CurSector = 0;
-       }
-       else
-        CurSector++;
-      }
-      else
-       PSX_WARNING("[CDC] BUG CDDA buffer full");
-
-     }
-    } // end if playing
    }
   }
 
@@ -1032,10 +1208,10 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
      {
       BeginResults();
 
-      PSX_WARNING("[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
+      PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
       for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-       printf(" 0x%02x", ArgsReceiveBuf[i]);
-      printf("\n");
+       PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
+      PSX_DBG(PSX_DBG_WARNING, "\n");
 
       WriteResult(MakeStatus(true));
       WriteResult(ERRCODE_BAD_NUMARGS);
@@ -1046,14 +1222,12 @@ pscpu_timestamp_t PS_CDC::Update(const pscpu_timestamp_t timestamp)
       BeginResults();
 
       const CDC_CTEntry *command = &Commands[PendingCommand];
-      //PSX_WARNING("[CDC] Command: %s --- %d", command->name, Results.CanRead());
 
-#if 0
-      printf("[CDC] Command: %s --- ", command->name);
+      PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
       for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-       printf(" 0x%02x", ArgsReceiveBuf[i]);
-      printf("\n");
-#endif
+       PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
+      PSX_DBG(PSX_DBG_SPARSE, "\n");
+
       next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
       PendingCommandPhase = 2;
      }
@@ -1406,7 +1580,7 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
 
  ret += PSX_GetRandU32(0, 25000);
 
- PSX_WARNING("[CDC] CalcSeekTime() = %d", ret);
+ PSX_DBG(PSX_DBG_SPARSE, "[CDC] CalcSeekTime() = %d\n", ret);
 
  return(ret);
 }
@@ -1477,6 +1651,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
   }
 
   ClearAudioBuffers();
+  SectorPipe_Pos = SectorPipe_In = 0;
 
   PlayTrackMatch = track;
 
@@ -1493,6 +1668,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
  else if(CommandLoc_Dirty || DriveStatus != DS_PLAYING)
  {
   ClearAudioBuffers();
+  SectorPipe_Pos = SectorPipe_In = 0;
 
   if(CommandLoc_Dirty)
    SeekTarget = CommandLoc;
@@ -1562,6 +1738,7 @@ void PS_CDC::ReadBase(void)
   ClearAIP();
   ClearAudioBuffers();
   SB_In = 0;
+  SectorPipe_Pos = SectorPipe_In = 0;
 
   // TODO: separate motor start from seek phase?
 
@@ -1570,7 +1747,7 @@ void PS_CDC::ReadBase(void)
   else
    SeekTarget = CurSector;
 
-  PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
+  PSRCounter = /*903168 * 1.5 +*/ CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
   PreSeekHack(true, SeekTarget);
 
@@ -1609,6 +1786,8 @@ int32 PS_CDC::Command_Stop(const int arg_count, const uint8 *args)
  {
   ClearAudioBuffers();
   ClearAIP();
+  SectorPipe_Pos = SectorPipe_In = 0;
+
   DriveStatus = DS_STOPPED;
   HeaderBufValid = false;
 
@@ -1644,6 +1823,8 @@ int32 PS_CDC::Command_Standby(const int arg_count, const uint8 *args)
 
  ClearAudioBuffers();
  ClearAIP();
+ SectorPipe_Pos = SectorPipe_In = 0;
+
  DriveStatus = DS_STANDBY;
 
  return((int64)33868800 * 100 / 1000);	// No idea, FIXME.
@@ -1674,7 +1855,8 @@ int32 PS_CDC::Command_Pause(const int arg_count, const uint8 *args)
  else
  {
   // "Viewpoint" flips out and crashes if reading isn't stopped (almost?) immediately.
-  ClearAudioBuffers();
+  //ClearAudioBuffers();
+  SectorPipe_Pos = SectorPipe_In = 0;
   ClearAIP();
   DriveStatus = DS_PAUSED;
 
@@ -1743,7 +1925,6 @@ int32 PS_CDC::Command_Setfilter(const int arg_count, const uint8 *args)
 
 int32 PS_CDC::Command_Setmode(const int arg_count, const uint8 *args)
 {
- PSX_DBGINFO("[CDC] Set mode 0x%02x", args[0]);
  Mode = args[0];
 
  WriteResult(MakeStatus());
@@ -2082,7 +2263,7 @@ int32 PS_CDC::Command_ID_Part2(void)
  {
   WriteResult(MakeStatus() | 0x08);
   WriteResult(0x90);
-  WriteResult(0x00);
+  WriteResult(toc.disc_type);
   WriteResult(0x00);
  }
 
