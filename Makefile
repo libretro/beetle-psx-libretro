@@ -43,8 +43,7 @@ endif
    NEED_THREADING = 1
    CORE_DEFINE := -DWANT_PSX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/psx
-   CORE_SOURCES := $(CORE_DIR)/psx.cpp \
-	$(CORE_DIR)/irq.cpp \
+   CORE_SOURCES := $(CORE_DIR)/irq.cpp \
 	$(CORE_DIR)/timer.cpp \
 	$(CORE_DIR)/dma.cpp \
 	$(CORE_DIR)/frontio.cpp \
