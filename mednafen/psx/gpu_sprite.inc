@@ -108,7 +108,7 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
  //HeightMode && !dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1)) && !DisplayOff
  //printf("%d:%d, %d, %d ---- heightmode=%d displayfb_ystart=%d field_atvs=%d displayoff=%d\n", w, h, scanline, dfe, HeightMode, DisplayFB_YStart, field_atvs, DisplayOff);
 
- for(int32 y = y_start; y < y_bound; y++)
+ for(int32 y = y_start; MDFN_LIKELY(y < y_bound); y++)
  {
   uint8 u_r;
 
@@ -117,7 +117,7 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
 
   if(!LineSkipTest(y))
   {
-   for(int32 x = x_start; x < x_bound; x++)
+   for(int32 x = x_start; MDFN_LIKELY(x < x_bound); x++)
    {
     if(textured)
     {
@@ -145,7 +145,7 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
 }
 
 template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-void PS_GPU::Command_DrawSprite(const uint32 *cb)
+INLINE void PS_GPU::Command_DrawSprite(const uint32 *cb)
 {
  int32 x, y;
  int32 w, h;

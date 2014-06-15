@@ -19,28 +19,17 @@ static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_s
  coord.x = ((int64)point.x << Line_XY_FractBits) | (1LL << (Line_XY_FractBits - 1));
  coord.y = ((int64)point.y << Line_XY_FractBits) | (1LL << (Line_XY_FractBits - 1));
 
+ coord.x -= 1024;
+
+ if(step.dy_dk < 0)
+   coord.y -= 1024;
+
  if(goraud)
  {
   coord.r = (point.r << Line_RGB_FractBits) | (1 << (Line_RGB_FractBits - 1));
   coord.g = (point.g << Line_RGB_FractBits) | (1 << (Line_RGB_FractBits - 1));
   coord.b = (point.b << Line_RGB_FractBits) | (1 << (Line_RGB_FractBits - 1));
  }
-
- // Not sure if this is correct or just roughly corresponds to behavior of real system(need more testing):
- if(step.dx_dk < 0)
-  coord.x--;
-
- if(step.dy_dk < 0)
-  coord.y--;
-
- if(step.dr_dk < 0)
-  coord.r--;
-
- if(step.dg_dk < 0)
-  coord.g--;
-
- if(step.db_dk < 0)
-  coord.b--;
 }
 
 template<typename T, unsigned bits>
@@ -78,9 +67,9 @@ static INLINE void LinePointsToFXPStep(const line_point &point0, const line_poin
 
  if(goraud)
  {
-  step.dr_dk = LineDivide<int32, Line_RGB_FractBits>(point1.r - point0.r, dk);
-  step.dg_dk = LineDivide<int32, Line_RGB_FractBits>(point1.g - point0.g, dk);
-  step.db_dk = LineDivide<int32, Line_RGB_FractBits>(point1.b - point0.b, dk);
+    step.dr_dk = ((point1.r - point0.r) << Line_RGB_FractBits) / dk;
+    step.dg_dk = ((point1.g - point0.g) << Line_RGB_FractBits) / dk;
+    step.db_dk = ((point1.b - point0.b) << Line_RGB_FractBits) / dk;
  }
 }
 
@@ -113,14 +102,14 @@ void PS_GPU::DrawLine(line_point *points)
 
  if(i_dx >= 1024)
  {
-  //PSX_WARNING("[GPU] Line too long: i_dx=%d", i_dx);
-  return;
+    PSX_DBG(PSX_DBG_WARNING, "[GPU] Line too long: i_dx=%d\n", i_dx);
+    return;
  }
 
  if(i_dy >= 512)
  {
-  //PSX_WARNING("[GPU] Line too long: i_dy=%d", i_dy);
-  return;
+    PSX_DBG(PSX_DBG_WARNING, "[GPU] Line too long: i_dy=%d\n", i_dy);
+    return;
  }
 
  // May not be correct(do tests for the case of k == i_dy on real thing.
@@ -191,7 +180,7 @@ void PS_GPU::DrawLine(line_point *points)
 }
 
 template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
-void PS_GPU::Command_DrawLine(const uint32_t *cb)
+INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
 {
  const uint8_t cc = cb[0] >> 24; // For pline handling later.
  line_point points[2];

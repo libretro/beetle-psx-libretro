@@ -18,10 +18,13 @@ class InputDevice
  virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
 
  virtual bool RequireNoFrameskip(void);
- virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
+ // Divide mouse X coordinate by pix_clock_divider in the lightgun code to get the coordinate in pixel(clocks).
+ virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
  virtual void Update(const pscpu_timestamp_t timestamp);	// Partially-implemented, don't rely on for timing any more fine-grained than a video frame for now.
  virtual void ResetTS(void);
+
+ void DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock);
 
  //
  //
@@ -49,6 +52,12 @@ class InputDevice
  //
  virtual uint64_t GetNVDirtyCount(void);
  virtual void ResetNVDirtyCount(void);
+
+ private:
+ unsigned chair_r, chair_g, chair_b;
+ bool draw_chair;
+ protected:
+ int32 chair_x, chair_y;
 };
 
 class FrontIO
@@ -66,7 +75,7 @@ class FrontIO
  void ResetTS(void);
 
  bool RequireNoFrameskip(void);
- void GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
+ void GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
  void UpdateInput(void);
  void SetInput(unsigned int port, const char *type, void *ptr);

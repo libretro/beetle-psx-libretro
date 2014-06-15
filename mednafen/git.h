@@ -48,8 +48,8 @@ typedef enum
  IDIT_BUTTON,		// 1-bit
  IDIT_BUTTON_CAN_RAPID, // 1-bit
 
- IDIT_X_AXIS,	   // (mouse) 32-bits, signed, fixed-point: 1.15.16 - in-screen/window range: [0.0, nominal_width)
- IDIT_Y_AXIS,	   // (mouse) 32-bits, signed, fixed-point: 1.15.16 - in-screen/window range: [0.0, nominal_height)
+ IDIT_X_AXIS,		// (mouse) 16-bits, signed - in-screen/window range: [0.0, nominal_width)
+ IDIT_Y_AXIS,		// (mouse) 16-bits, signed - in-screen/window range: [0.0, nominal_height)
 
  IDIT_X_AXIS_REL,  // (mouse) 32-bits, signed
  IDIT_Y_AXIS_REL,  // (mouse) 32-bits, signed
@@ -386,6 +386,8 @@ typedef struct
  uint8 GameSetMD5[16];	/* A unique ID for the game set this CD belongs to, only used in PC-FX emulation. */
  bool GameSetMD5Valid; /* True if GameSetMD5 is valid. */
 
+ uint8 StateMD5[16];	// ID to use in save state naming and netplay session IDs, if
+ bool StateMD5Valid;	// StateMD5Valid is true(useful for systems with multiple BIOS revisions, e.g. PS1).
 
  int soundrate;  /* For Ogg Vorbis expansion sound wacky support.  0 for default. */
 
@@ -399,7 +401,15 @@ typedef struct
 
  std::vector<const char *>DesiredInput; // Desired input device for the input ports, NULL for don't care
 
+ // For mouse relative motion.
  double mouse_sensitivity;
+ 
+
+ //
+ // For absolute coordinates(IDIT_X_AXIS and IDIT_Y_AXIS), usually mapped to a mouse(hence the naming).
+ //
+ float mouse_scale_x, mouse_scale_y;
+ float mouse_offs_x, mouse_offs_y;
 } MDFNGI;
 
 

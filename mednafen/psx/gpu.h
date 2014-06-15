@@ -13,11 +13,10 @@ class PS_GPU;
 
 struct CTEntry
 {
+ void (*func[4][8])(PS_GPU* g, const uint32 *cb);
  uint8 len;
  uint8 fifo_fb_len;
  bool ss_cmd;
- const char *name;
- void (PS_GPU::*func[8])(const uint32 *cb);
 };
 
 struct tri_vertex
@@ -43,6 +42,8 @@ class PS_GPU
  PS_GPU(bool pal_clock_and_tv, int sls, int sle) MDFN_COLD;
  ~PS_GPU() MDFN_COLD;
 
+ void FillVideoParams(MDFNGI* gi) MDFN_COLD;
+
  void Power(void) MDFN_COLD;
 
  void ResetTS(void);
@@ -64,7 +65,7 @@ class PS_GPU
   if(InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
    return(false);
 
-  if(BlitterFIFO.CanRead() >= Commands[0][BlitterFIFO.ReadUnit(true) >> 24].fifo_fb_len)
+  if(BlitterFIFO.CanRead() >= Commands[BlitterFIFO.ReadUnit(true) >> 24].fifo_fb_len)
    return(false);
 
   return(true);
@@ -171,27 +172,30 @@ class PS_GPU
  uint16 ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y);
 
  template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode, bool MaskEval_TA>
- void DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, const int32 bv_x, i_group ig, const i_deltas &idl);
+ void DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl);
 
  template<bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
  void DrawTriangle(tri_vertex *vertices, uint32 clut);
 
- template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void Command_DrawPolygon(const uint32 *cb);
-
  template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
  void DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset);
+
+ template<bool goraud, int BlendMode, bool MaskEval_TA>
+ void DrawLine(line_point *vertices);
+
+ public:
+ template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void Command_DrawPolygon(const uint32 *cb);
 
  template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
  void Command_DrawSprite(const uint32 *cb);
 
- template<bool goraud, int BlendMode, bool MaskEval_TA>
- void DrawLine(line_point *vertices);
 
  template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
  void Command_DrawLine(const uint32 *cb);
 
  void Command_ClearCache(const uint32 *cb);
+ void Command_IRQ(const uint32 *cb);
 
  void Command_FBFill(const uint32 *cb);
  void Command_FBCopy(const uint32 *cb);
@@ -205,11 +209,14 @@ class PS_GPU
  void Command_DrawingOffset(const uint32 *cb);
  void Command_MaskSetting(const uint32 *cb);
 
- static CTEntry Commands[4][256];
+ private:
+ static CTEntry Commands[256];
 
  SimpleFIFO<uint32> BlitterFIFO;
 
  uint32 DataReadBuffer;
+
+ bool IRQPending;
 
  //
  //

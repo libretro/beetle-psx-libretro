@@ -31,9 +31,8 @@ class InputDevice_Justifier : public InputDevice
 
  virtual void Power(void);
  virtual void UpdateInput(const void *data);
- virtual void SetCrosshairsColor(uint32 color);
  virtual bool RequireNoFrameskip(void);
- virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock);
+ virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
  //
  //
@@ -52,7 +51,7 @@ class InputDevice_Justifier : public InputDevice
 
  bool need_hit_detect;
 
- int32 nom_x, nom_y;
+ int16 nom_x, nom_y;
  int32 os_shot_counter;
  bool prev_oss;
 
@@ -71,12 +70,9 @@ class InputDevice_Justifier : public InputDevice
  bool prev_vsync;
  int line_counter;
 
- //
- unsigned chair_r, chair_g, chair_b;
- bool draw_chair;
 };
 
-InputDevice_Justifier::InputDevice_Justifier(void) : chair_r(0), chair_g(0), chair_b(0), draw_chair(false)
+InputDevice_Justifier::InputDevice_Justifier(void)
 {
  Power();
 }
@@ -84,15 +80,6 @@ InputDevice_Justifier::InputDevice_Justifier(void) : chair_r(0), chair_g(0), cha
 InputDevice_Justifier::~InputDevice_Justifier()
 {
 
-}
-
-void InputDevice_Justifier::SetCrosshairsColor(uint32 color)
-{
- chair_r = (color >> 16) & 0xFF;
- chair_g = (color >>  8) & 0xFF;
- chair_b = (color >>  0) & 0xFF;
-
- draw_chair = (color != (1 << 24));
 }
 
 void InputDevice_Justifier::Power(void)
@@ -132,20 +119,20 @@ void InputDevice_Justifier::UpdateInput(const void *data)
 {
  uint8 *d8 = (uint8 *)data;
 
- nom_x = MDFN_de32lsb(&d8[0]);
- nom_y = MDFN_de32lsb(&d8[4]);
+ nom_x = (int16)MDFN_de16lsb(&d8[0]);
+ nom_y = (int16)MDFN_de16lsb(&d8[2]);
 
- trigger_noclear = (bool)(d8[8] & 0x1);
+ trigger_noclear = (bool)(d8[4] & 0x1);
  trigger_eff |= trigger_noclear;
 
- buttons = (d8[8] >> 1) & 0x3;
+ buttons = (d8[4] >> 1) & 0x3;
 
  if(os_shot_counter > 0)	// FIXME if UpdateInput() is ever called more than once per video frame(at ~50 or ~60Hz).
   os_shot_counter--;
 
- if((d8[8] & 0x8) && !prev_oss && os_shot_counter == 0)
+ if((d8[4] & 0x8) && !prev_oss && os_shot_counter == 0)
   os_shot_counter = 10;
- prev_oss = d8[8] & 0x8;
+ prev_oss = d8[4] & 0x8;
 }
 
 bool InputDevice_Justifier::RequireNoFrameskip(void)
@@ -153,8 +140,7 @@ bool InputDevice_Justifier::RequireNoFrameskip(void)
  return(true);
 }
 
-pscpu_timestamp_t InputDevice_Justifier::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width,
-				     const unsigned pix_clock_offset, const unsigned pix_clock)
+pscpu_timestamp_t InputDevice_Justifier::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
  pscpu_timestamp_t ret = PSX_EVENT_MAXTS;
 
@@ -168,8 +154,8 @@ pscpu_timestamp_t InputDevice_Justifier::GPULineHook(const pscpu_timestamp_t tim
   int32 gy;
   int32 gxa;
 
-  gx = ((int64)nom_x * width / MDFNGameInfo->nominal_width + 0x8000) >> 16;
-  gy = (nom_y + 0x8000) >> 16;
+  gx = (nom_x * 2 + pix_clock_divider) / (pix_clock_divider * 2);
+  gy = nom_y;
   gxa = gx; // - (pix_clock / 400000);
   //if(gxa < 0 && gx >= 0)
   // gxa = 0;
@@ -186,54 +172,8 @@ pscpu_timestamp_t InputDevice_Justifier::GPULineHook(const pscpu_timestamp_t tim
    }
   }
 
-  if(draw_chair)
-  {
-   if(line_counter == (avs + gy))
-   {
-    const int ic = pix_clock / 762925;
-
-    for(int32 x = std::max<int32>(0, gx - ic); x < std::min<int32>(width, gx + ic); x++)
-    {
-     int r, g, b, a;
-     int nr, ng, nb;
-
-     format->DecodeColor(pixels[x], r, g, b, a);
-
-     nr = (r + chair_r * 3) >> 2;
-     ng = (g + chair_g * 3) >> 2;
-     nb = (b + chair_b * 3) >> 2;
-
-     if(abs((r * 76 + g * 150 + b * 29) - (nr * 76 + ng * 150 + nb * 29)) < 16384)
-     { 
-      nr >>= 1;
-      ng >>= 1;
-      nb >>= 1;
-     }
-
-     pixels[x] = format->MakeColor(nr, ng, nb, a);
-    }
-   }
-   else if(line_counter >= (avs + gy - 8) && line_counter <= (avs + gy + 8))
-   {
-    int r, g, b, a;
-    int nr, ng, nb;
-
-    format->DecodeColor(pixels[gx], r, g, b, a);
-
-    nr = (r + chair_r * 3) >> 2;
-    ng = (g + chair_g * 3) >> 2;
-    nb = (b + chair_b * 3) >> 2;
-
-    if(abs((r * 76 + g * 150 + b * 29) - (nr * 76 + ng * 150 + nb * 29)) < 16384)
-    { 
-     nr >>= 1;
-     ng >>= 1;
-     nb >>= 1;
-    }
-
-    pixels[gx] = format->MakeColor(nr, ng, nb, a);
-   }
-  }
+  chair_x = gx;
+  chair_y = (avs + gy) - line_counter;
  }
 
  line_counter++;

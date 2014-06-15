@@ -35,7 +35,7 @@
 namespace MDFN_IEN_PSX
 {
 
-InputDevice::InputDevice()
+InputDevice::InputDevice() : chair_r(0), chair_g(0), chair_b(0), draw_chair(0), chair_x(-1000), chair_y(-1000)
 {
 }
 
@@ -69,7 +69,58 @@ void InputDevice::SetAMCT(bool)
 
 void InputDevice::SetCrosshairsColor(uint32_t color)
 {
+   chair_r = (color >> 16) & 0xFF;
+   chair_g = (color >>  8) & 0xFF;
+   chair_b = (color >>  0) & 0xFF;
 
+   draw_chair = (color != (1 << 24));
+}
+
+INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock)
+{
+   if(draw_chair && chair_y >= -8 && chair_y <= 8)
+   {
+      int32 ic;
+      int32 x_start, x_bound;
+
+      if(chair_y == 0)
+         ic = pix_clock / 762925;
+      else
+         ic = 0;
+
+      x_start = std::max<int32>(0, chair_x - ic);
+      x_bound = std::min<int32>(width, chair_x + ic + 1);
+
+      for(int32 x = x_start; x < x_bound; x++)
+      {
+         int r, g, b, a;
+         int nr, ng, nb;
+
+         format->DecodeColor(pixels[x], r, g, b, a);
+
+         nr = (r + chair_r * 3) >> 2;
+         ng = (g + chair_g * 3) >> 2;
+         nb = (b + chair_b * 3) >> 2;
+
+         if((int)((abs(r - nr) - 0x40) & (abs(g - ng) - 0x40) & (abs(b - nb) - 0x40)) < 0)
+         {
+            if((nr | ng | nb) & 0x80)
+            {
+               nr >>= 1;
+               ng >>= 1;
+               nb >>= 1;
+            }
+            else
+            {
+               nr ^= 0x80;
+               ng ^= 0x80;
+               nb ^= 0x80;
+            }
+         }
+
+         pixels[x] = format->MakeColor(nr, ng, nb, a);
+      }
+   }
 }
 
 int FrontIO::StateAction(StateMem* sm, int load, int data_only)
@@ -143,7 +194,7 @@ bool InputDevice::RequireNoFrameskip(void)
  return false;
 }
 
-pscpu_timestamp_t InputDevice::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
+pscpu_timestamp_t InputDevice::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
  return(PSX_EVENT_MAXTS);
 }
@@ -865,13 +916,13 @@ bool FrontIO::RequireNoFrameskip(void)
    return(false);
 }
 
-void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock)
+void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
  Update(timestamp);
 
  for(unsigned i = 0; i < 8; i++)
  {
-  pscpu_timestamp_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock);
+    pscpu_timestamp_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
 
   if(i < 2)
   {
@@ -883,6 +934,17 @@ void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timesta
     IRQ_Assert(IRQ_PIO, true);
     IRQ_Assert(IRQ_PIO, false);
    }
+  }
+ }
+
+ //
+ // Draw crosshairs in a separate pass so the crosshairs won't mess up the color evaluation of later lightun GPULineHook()s.
+ //
+ if(pixels && pix_clock)
+ {
+  for(unsigned i = 0; i < 8; i++)
+  {
+   Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock);
   }
  }
 
