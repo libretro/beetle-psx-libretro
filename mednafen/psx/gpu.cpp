@@ -1211,24 +1211,15 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                assert(sl_zero_reached == false);
                sl_zero_reached = true;
 
+               if(DisplayMode & 0x08)	// PAL
+                  LinesPerField = 314;
+               else			// NTSC
+                  LinesPerField = 263;
+
                if(DisplayMode & 0x20)
-               {
-                  skip = false;
-
-                  if(DisplayMode & 0x08)	// PAL
-                     LinesPerField = 313 - field;
-                  else			// NTSC
-                     LinesPerField = 263 - field;
-               }
+                  LinesPerField -= field;
                else
-               {
                   field = 0;	// May not be the correct place for this?
-
-                  if(DisplayMode & 0x08)	// PAL
-                     LinesPerField = 314;
-                  else			// NTSC
-                     LinesPerField = 263;
-               }
 
                if(espec)
                {
@@ -1336,7 +1327,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
             unsigned pix_clock_offset = 0;
             unsigned pix_clock = 0;
             uint32_t *dest = NULL;
-            if((bool)(DisplayMode & 0x08) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount) && !skip && espec)
+            if((bool)(DisplayMode & 0x08) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32 dest_line;
                int32 fb_x = DisplayFB_XStart * 2;
@@ -1427,22 +1418,11 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
 {
    sl_zero_reached = false;
 
-   if(!espec_arg)
-   {
-      espec = NULL;
-      surface = NULL;
-      DisplayRect = NULL;
-      LineWidths = NULL;
-      skip = true;
-      return;
-   }
-
    espec = espec_arg;
 
    surface = espec->surface;
    DisplayRect = &espec->DisplayRect;
    LineWidths = espec->LineWidths;
-   skip = espec->skip;
 }
 
 }

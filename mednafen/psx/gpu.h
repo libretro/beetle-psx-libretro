@@ -293,7 +293,6 @@ class PS_GPU
  MDFN_Surface *surface;
  MDFN_Rect *DisplayRect;
  MDFN_Rect *LineWidths;
- bool skip;
  bool HardwarePALType;
  int LineVisFirst, LineVisLast;
 
