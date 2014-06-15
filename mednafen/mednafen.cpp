@@ -46,52 +46,8 @@
 
 MDFNGI *MDFNGameInfo = NULL;
 
-#if defined(WANT_NES_EMU)
-extern MDFNGI EmulatedNES;
-#define MDFNGI_CORE &EmulatedNES
-#elif defined WANT_SNES_EMU
-extern MDFNGI EmulatedSNES;
-#define MDFNGI_CORE &EmulatedSNES
-extern MDFNGI EmulatedGB;
-#elif defined WANT_GB_EMU
-#define MDFNGI_CORE &EmulatedGB
-#elif defined WANT_GBA_EMU
-extern MDFNGI EmulatedGBA;
-#define MDFNGI_CORE &EmulatedGBA
-#elif defined WANT_PCE_EMU
-extern MDFNGI EmulatedPCE;
-#define MDFNGI_CORE &EmulatedPCE
-#elif defined WANT_PCE_FAST_EMU
-extern MDFNGI EmulatedPCE_Fast;
-#define MDFNGI_CORE &EmulatedPCE_Fast
-#elif defined WANT_LYNX_EMU
-extern MDFNGI EmulatedLynx;
-#define MDFNGI_CORE &EmulatedLynx
-#elif defined WANT_MD_EMU
-extern MDFNGI EmulatedMD;
-#define MDFNGI_CORE &EmulatedMD
-#elif defined WANT_PCFX_EMU
-extern MDFNGI EmulatedPCFX;
-#define MDFNGI_CORE &EmulatedPCFX
-#elif defined WANT_NGP_EMU
-extern MDFNGI EmulatedNGP;
-#define MDFNGI_CORE &EmulatedNGP
-#elif defined WANT_PSX_EMU
 extern MDFNGI EmulatedPSX;
 #define MDFNGI_CORE &EmulatedPSX
-#elif defined WANT_VB_EMU
-extern MDFNGI EmulatedVB;
-#define MDFNGI_CORE &EmulatedVB
-#elif defined WANT_WSWAN_EMU
-extern MDFNGI EmulatedWSwan;
-#define MDFNGI_CORE &EmulatedWSwan
-#elif defined WANT_SMS_EMU
-extern MDFNGI EmulatedSMS;
-#define MDFNGI_CORE &EmulatedSMS
-#elif defined(WANT_SMS_EMU) && defined(WANT_GG_EMU)
-extern MDFNGI EmulatedGG;
-#define MDFNGI_CORE &EmulatedGG
-#endif
 
 
 /* forward declarations */
