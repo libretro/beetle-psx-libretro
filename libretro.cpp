@@ -353,27 +353,23 @@ bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp)
 
       switch(e->which)
       {
-         default: abort();
-
+         default:
+            abort();
          case PSX_EVENT_GPU:
-                  nt = GPU->Update(e->event_time);
-                  break;
-
+            nt = GPU->Update(e->event_time);
+            break;
          case PSX_EVENT_CDC:
-                  nt = CDC->Update(e->event_time);
-                  break;
-
+            nt = CDC->Update(e->event_time);
+            break;
          case PSX_EVENT_TIMER:
-                  nt = TIMER_Update(e->event_time);
-                  break;
-
+            nt = TIMER_Update(e->event_time);
+            break;
          case PSX_EVENT_DMA:
-                  nt = DMA_Update(e->event_time);
-                  break;
-
+            nt = DMA_Update(e->event_time);
+            break;
          case PSX_EVENT_FIO:
-                  nt = FIO->Update(e->event_time);
-                  break;
+            nt = FIO->Update(e->event_time);
+            break;
       }
 #if PSX_EVENT_SYSTEM_CHECKS
       assert(nt > e->event_time);
@@ -2543,12 +2539,6 @@ void retro_run(void)
    spec.VideoFormatChanged = false;
    spec.SoundFormatChanged = false;
 
-   if (spec.SoundRate != last_sound_rate)
-   {
-      spec.SoundFormatChanged = true;
-      last_sound_rate = spec.SoundRate;
-   }
-
    EmulateSpecStruct *espec = (EmulateSpecStruct*)&spec;
    /* start of Emulate */
    pscpu_timestamp_t timestamp = 0;
@@ -2605,20 +2595,14 @@ void retro_run(void)
          Memcard_SaveDelay[i] += timestamp;
          if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
          {
-            PSX_DBG(PSX_DBG_SPARSE, "Saving memcard %d...\n", i);
-            try
-            {
-               char ext[64];
-               trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
-               FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
-               Memcard_SaveDelay[i] = -1;
-               Memcard_PrevDC[i] = 0;
-            }
-            catch(std::exception &e)
-            {
-               MDFN_PrintError("Memcard %d save error: %s", i, e.what());
-               MDFN_DispMessage("Memcard %d save error: %s", i, e.what());
-            }
+            if (log_cb)
+               log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
+
+            char ext[64];
+            trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+            FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+            Memcard_SaveDelay[i] = -1;
+            Memcard_PrevDC[i] = 0;
             //MDFN_DispMessage("Memcard %d saved.", i);
          }
       }
