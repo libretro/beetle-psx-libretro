@@ -1332,9 +1332,12 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
             else
                DisplayFB_CurLineYReadout = (DisplayFB_YStart + DisplayFB_CurYOffset) & 0x1FF;
 
+            unsigned dmw_width = 0;
+            unsigned pix_clock_offset = 0;
+            unsigned pix_clock = 0;
+            uint32_t *dest = NULL;
             if((bool)(DisplayMode & 0x08) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount) && !skip && espec)
             {
-               uint32_t *dest;	// = surface->pixels + (scanline - VisibleStartLine) * surface->pitch32;
                int32 dest_line;
                int32 fb_x = DisplayFB_XStart * 2;
                int32 dx_start = HorizStart, dx_end = HorizEnd;
@@ -1387,12 +1390,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                //if(scanline == 64)
                // printf("%u\n", sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio);
 
-               PSX_GPULineHook(sys_timestamp, sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0, dest, &surface->format, dmw, (488 - 146) / DotClockRatios[dmc], (HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc]);
+               dmw_width = dmw;
+               pix_clock_offset = (488 - 146) / DotClockRatios[dmc];
+               pix_clock = (HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
             }
-            else
-            {
-               PSX_GPULineHook(sys_timestamp, sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0, NULL, &surface->format, 0, 0, 0);
-            }
+            PSX_GPULineHook(sys_timestamp, sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0, dest, &surface->format, dmw_width, pix_clock_offset, pix_clock);
 
             if(!InVBlank)
             {
