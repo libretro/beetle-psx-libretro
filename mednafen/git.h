@@ -62,8 +62,6 @@ typedef enum
 		// It's also rather a special case of game module->driver code communication.
 } InputDeviceInputType;
 
-#include "git-virtb.h"
-
 #define IDIT_BUTTON_ANALOG_FLAG_SQLR	0x00000001	// Denotes analog data that may need to be scaled to ensure a more squareish logical range(for emulated
 							// analog sticks).
 
