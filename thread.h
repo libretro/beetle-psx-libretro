@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2012 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel de Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,6 +17,9 @@
 #ifndef THREAD_H__
 #define THREAD_H__
 
+#include "boolean.h"
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,6 +30,7 @@ typedef struct sthread sthread_t;
 
 // Threading
 sthread_t *sthread_create(void (*thread_func)(void*), void *userdata);
+int sthread_detach(sthread_t *thread);
 void sthread_join(sthread_t *thread);
 
 // Mutexes
@@ -44,12 +49,49 @@ scond_t *scond_new(void);
 void scond_free(scond_t *cond);
 
 void scond_wait(scond_t *cond, slock_t *lock);
+#ifndef RARCH_CONSOLE
+bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us);
+int scond_broadcast(scond_t *cond);
+#endif
 void scond_signal(scond_t *cond);
 
-void retro_sleep(unsigned msec);
+#ifndef RARCH_INTERNAL
+#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
+#include <sys/timer.h>
+#elif defined(XENON)
+#include <time/time.h>
+#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
+#include <unistd.h>
+#elif defined(PSP)
+#include <pspthreadman.h>
+#else
+#include <time.h>
+#endif
+
+static inline void retro_sleep(unsigned msec)
+{
+#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
+   sys_timer_usleep(1000 * msec);
+#elif defined(PSP)
+   sceKernelDelayThread(1000 * msec);
+#elif defined(_WIN32)
+   Sleep(msec);
+#elif defined(XENON)
+   udelay(1000 * msec);
+#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
+   usleep(1000 * msec);
+#else
+   struct timespec tv = {0};
+   tv.tv_sec = msec / 1000;
+   tv.tv_nsec = (msec % 1000) * 1000000;
+   nanosleep(&tv, NULL);
+#endif
+}
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+

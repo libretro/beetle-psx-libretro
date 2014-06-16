@@ -9,11 +9,6 @@
 #include "libretro.h"
 #include "thread.h"
 
-#if defined(__CELLOS_LV2__)
-#include <sys/timer.h>
-#include <ppu_intrinsics.h>
-#endif
-
 /* start of Mednafen psx.cpp */
 
 /* Mednafen - Multi-system Emulator
