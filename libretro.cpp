@@ -2034,9 +2034,6 @@ static Deinterlacer deint;
 
 #define FB_MAX_HEIGHT 576
 
-// Wastes a little space for NTSC PSX, but better than dynamically allocating.
-const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
-
 static void check_system_specs(void)
 {
    // Hints that we need a fairly powerful system to run this.
@@ -2677,9 +2674,9 @@ void retro_deinit(void)
    if (log_cb)
    {
       log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
-            mednafen_core_str, (double)audio_frames / video_frames);
+            MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
       log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
-            mednafen_core_str, (double)video_frames * 44100 / audio_frames);
+            MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
    }
 }
 
@@ -2702,27 +2699,27 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_PS1PAD:
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", mednafen_core_str);
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "gamepad", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALANALOG:
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", mednafen_core_str);
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALSHOCK:
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", mednafen_core_str);
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "dualshock", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", mednafen_core_str);
+            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "flightstick", &buf.u8[in_port]);    
          break;
       default:
          if (log_cb)
-            log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device %u, falling back to gamepad.\n", mednafen_core_str,device);
+            log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device %u, falling back to gamepad.\n", MEDNAFEN_CORE_NAME,device);
    }
 
    if (rumble.set_rumble_state)
