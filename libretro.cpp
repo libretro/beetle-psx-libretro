@@ -2570,10 +2570,6 @@ void retro_run(void)
 #endif
 
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-   int16_t *const SoundBuf = interbuf + spec.SoundBufSizeALMS * SOUND_CHANNELS;
-   int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
-
-   spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
    // PSX is rather special, and needs specific handling ...
    
