@@ -2459,16 +2459,15 @@ void retro_run(void)
 
    update_input();
 
-   static int16_t sound_buf[0x10000];
    static int32 rects[FB_MAX_HEIGHT];
    rects[0] = ~0;
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
    spec.SoundRate = 44100;
-   spec.SoundBuf = sound_buf;
+   spec.SoundBuf = NULL;
    spec.LineWidths = rects;
-   spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
+   spec.SoundBufMaxSize = 0;
    spec.SoundVolume = 1.0;
    spec.soundmultiplier = 1.0;
    spec.SoundBufSize = 0;
@@ -2573,7 +2572,6 @@ void retro_run(void)
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
    int16_t *const SoundBuf = interbuf + spec.SoundBufSizeALMS * SOUND_CHANNELS;
    int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
-   const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 
    spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
