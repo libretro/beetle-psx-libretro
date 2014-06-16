@@ -2848,8 +2848,6 @@ bool retro_unserialize(const void *data, size_t size)
    return MDFNSS_LoadSM(&st, 0, 0);
 }
 
-extern uint8_t mcbuf[8][1 << 17];
-
 void *retro_get_memory_data(unsigned type)
 {
    uint8_t *data;
@@ -2857,7 +2855,7 @@ void *retro_get_memory_data(unsigned type)
    switch (type)
    {
       case RETRO_MEMORY_SAVE_RAM:
-         data = mcbuf[0];
+         data = FIO->GetMemcardDevice(0)->GetNVData();
          break;
       default:
          data = NULL;

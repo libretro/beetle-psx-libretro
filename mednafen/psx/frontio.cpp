@@ -32,8 +32,6 @@
 
 #define PSX_FIODBGINFO(format, ...) { /* printf(format " -- timestamp=%d -- PAD temp\n", ## __VA_ARGS__, timestamp); */  }
 
-uint8_t mcbuf[8][1 << 17];
-
 namespace MDFN_IEN_PSX
 {
 
@@ -271,6 +269,11 @@ static INLINE unsigned EP_to_SP(bool emulate_multitap[2], unsigned ep)
       return(ep - 4);
    }
    return(ep & 0x3);
+}
+
+InputDevice *FrontIO::GetMemcardDevice(unsigned int which)
+{
+   return DevicesMC[which];
 }
 
 void FrontIO::MapDevicesToPorts(void)
@@ -864,7 +867,7 @@ void FrontIO::LoadMemcard(unsigned int which)
 
    if(DevicesMC[which]->GetNVSize())
    {
-      DevicesMC[which]->WriteNV(&mcbuf[which][0], 0, (1 << 17));
+      DevicesMC[which]->WriteNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
       DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
    }
 }
@@ -879,9 +882,9 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
   {
    FileStream mf(path, FileStream::MODE_READ);
 
-   mf.read(&mcbuf[which][0], (1 << 17));
+   mf.read(DevicesMC[which]->GetNVData(), (1 << 17));
 
-   DevicesMC[which]->WriteNV(&mcbuf[which][0], 0, (1 << 17));
+   DevicesMC[which]->WriteNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
    DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
   }
  }
@@ -898,7 +901,7 @@ void FrontIO::SaveMemcard(unsigned int which)
 
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
-  DevicesMC[which]->ReadNV(&mcbuf[which][0], 0, (1 << 17));
+  DevicesMC[which]->ReadNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
   DevicesMC[which]->ResetNVDirtyCount();
  }
 }
@@ -911,8 +914,8 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
  {
   FileStream mf(path, FileStream::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
 
-  DevicesMC[which]->ReadNV(&mcbuf[which][0], 0, (1 << 17));
-  mf.write(&mcbuf[which][0], (1 << 17));
+  DevicesMC[which]->ReadNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
+  mf.write(DevicesMC[which]->GetNVData(), (1 << 17));
 
   mf.close();	// Call before resetting the NV dirty count!
 

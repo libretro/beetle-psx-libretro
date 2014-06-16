@@ -42,6 +42,7 @@ class InputDevice
 
  //
  //
+ virtual uint8 *GetNVData() { return NULL; }
  virtual uint32_t GetNVSize(void);
  virtual void ReadNV(uint8_t *buffer, uint32_t offset, uint32_t count);
  virtual void WriteNV(const uint8_t *buffer, uint32_t offset, uint32_t count);
@@ -82,6 +83,7 @@ class FrontIO
  void SetAMCT(bool enabled);
  void SetCrosshairsColor(unsigned port, uint32_t color);
 
+ InputDevice *GetMemcardDevice(unsigned int which);
  uint64_t GetMemcardDirtyCount(unsigned int which);
  void LoadMemcard(unsigned int which, const char *path);
  void LoadMemcard(unsigned int which);

@@ -43,6 +43,7 @@ class InputDevice_Memcard : public InputDevice
 
  //
  //
+ virtual uint8 *GetNVData(void);
  virtual uint32 GetNVSize(void);
  virtual void ReadNV(uint8 *buffer, uint32 offset, uint32 size);
  virtual void WriteNV(const uint8 *buffer, uint32 offset, uint32 size);
@@ -435,6 +436,11 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
  //SkipDPD: ;
 
  return(ret);
+}
+
+uint8 *InputDevice_Memcard::GetNVData(void)
+{
+   return card_data;
 }
 
 uint32 InputDevice_Memcard::GetNVSize(void)
