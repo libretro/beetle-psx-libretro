@@ -39,6 +39,8 @@
 #include <stdarg.h>
 #include <ctype.h>
 
+bool setting_apply_analog_toggle = false;
+
 extern MDFNGI EmulatedPSX;
 
 enum
@@ -2270,10 +2272,18 @@ static void check_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
    {
-      if (strcmp(var.value, "enabled") == 0)
+      if ((strcmp(var.value, "enabled") == 0)
+            && setting_psx_analog_toggle != 1)
+      {
          setting_psx_analog_toggle = 1;
-      else if (strcmp(var.value, "disabled") == 0)
+         setting_apply_analog_toggle = true;
+      }
+      else if ((strcmp(var.value, "disabled") == 0)
+            && setting_psx_analog_toggle != 0)
+      {
          setting_psx_analog_toggle = 0;
+         setting_apply_analog_toggle = true;
+      }
    }  
    
    var.key = "psx_enable_multitap_port1";
@@ -2451,6 +2461,12 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       check_variables();
+
+   if (setting_apply_analog_toggle)
+   {
+      FIO->SetAMCT(setting_psx_analog_toggle);
+      setting_apply_analog_toggle = false;
+   }
 
    input_poll_cb();
 
