@@ -2030,11 +2030,8 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
-#define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
+#define MEDNAFEN_CORE_GEOMETRY_MAX_H 576
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
-#define FB_WIDTH 700
-
-#define FB_MAX_HEIGHT 576
 
 static void check_system_specs(void)
 {
@@ -2340,7 +2337,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
-   surf = new MDFN_Surface(NULL, FB_WIDTH, (CalcDiscSCEx() == REGION_EU) ? 576  : 480, FB_WIDTH, pix_fmt);
+   surf = new MDFN_Surface(NULL, MEDNAFEN_CORE_GEOMETRY_MAX_W, (CalcDiscSCEx() == REGION_EU) ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480, MEDNAFEN_CORE_GEOMETRY_MAX_W, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
@@ -2459,7 +2456,7 @@ void retro_run(void)
 
    update_input();
 
-   static int32 rects[FB_MAX_HEIGHT];
+   static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    rects[0] = ~0;
 
    EmulateSpecStruct spec = {0};
@@ -2627,10 +2624,10 @@ void retro_run(void)
          // These numbers are arbitrary since the bars differ some by game.
          // Changes aspect ratio in the process.
          height -= 36;
-         pix += 5*(FB_WIDTH << 2);
+         pix += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
       }
    }
-   video_cb(pix, width, height, FB_WIDTH << 2);
+   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
