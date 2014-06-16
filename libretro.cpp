@@ -43,6 +43,7 @@
 bool setting_apply_analog_toggle = false;
 
 extern MDFNGI EmulatedPSX;
+MDFNGI *MDFNGameInfo = &EmulatedPSX;
 
 enum
 {
@@ -57,16 +58,13 @@ namespace MDFN_IEN_PSX
 #if PSX_DBGPRINT_ENABLE
 static unsigned psx_dbg_level = 0;
 
-void PSX_DBG(unsigned level, const char *format, ...) throw()
+void PSX_DBG(unsigned level, const char *format, ...)
 {
    if(psx_dbg_level >= level)
    {
       va_list ap;
-
       va_start(ap, format);
-
       trio_vprintf(format, ap);
-
       va_end(ap);
    }
 }
@@ -2178,7 +2176,10 @@ void retro_init(void)
    else 
       log_cb = NULL;
 
-   MDFNI_InitializeModule();
+#ifdef NEED_CD
+ CDUtility::CDUtility_Init();
+#endif
+
    eject_state = false;
 
    const char *dir = NULL;
@@ -2308,6 +2309,237 @@ static void check_variables(void)
    }
 }
 
+#ifdef NEED_CD
+static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsigned depth = 0)
+{
+   std::vector<std::string> ret;
+   FileWrapper m3u_file(path.c_str(), FileWrapper::MODE_READ, _("M3U CD Set"));
+   std::string dir_path;
+   char linebuf[2048];
+
+   MDFN_GetFilePathComponents(path, &dir_path);
+
+   while(m3u_file.get_line(linebuf, sizeof(linebuf)))
+   {
+      std::string efp;
+
+      if(linebuf[0] == '#') continue;
+      MDFN_rtrim(linebuf);
+      if(linebuf[0] == 0) continue;
+
+      efp = MDFN_EvalFIP(dir_path, std::string(linebuf));
+
+      if(efp.size() >= 4 && efp.substr(efp.size() - 4) == ".m3u")
+      {
+         if(efp == path)
+         {
+            if (log_cb)
+               log_cb(RETRO_LOG_ERROR, "M3U at \"%s\" references self.\n", efp.c_str());
+            return;
+         }
+
+         if(depth == 99)
+         {
+            if (log_cb)
+               log_cb(RETRO_LOG_ERROR, "M3U load recursion too deep!\n");
+            return;
+         }
+
+         ReadM3U(file_list, efp, depth++);
+      }
+      else
+         file_list.push_back(efp);
+   }
+}
+
+#ifdef NEED_CD
+static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
+#endif
+// TODO: LoadCommon()
+
+MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
+{
+ uint8 LayoutMD5[16];
+
+ if (log_cb)
+    log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
+
+ try
+ {
+  if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".m3u"))
+  {
+   std::vector<std::string> file_list;
+
+   ReadM3U(file_list, devicename);
+
+   for(unsigned i = 0; i < file_list.size(); i++)
+   {
+    CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false, false /* cdimage_memcache */));
+   }
+  }
+  else
+  {
+   CDInterfaces.push_back(CDIF_Open(devicename, false, false /* cdimage_memcache */));
+  }
+ }
+ catch(std::exception &e)
+ {
+    if (log_cb)
+       log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
+    return(0);
+ }
+
+ //
+ // Print out a track list for all discs.  //
+ for(unsigned i = 0; i < CDInterfaces.size(); i++)
+ {
+  CDUtility::TOC toc;
+
+  CDInterfaces[i]->ReadTOC(&toc);
+
+  if (log_cb)
+     log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
+
+  for(int32 track = toc.first_track; track <= toc.last_track; track++)
+  {
+   if (log_cb)
+      log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
+  }
+
+  if (log_cb)
+     log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
+ }
+
+ // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
+ // its own, or to use it to look up a game in its database.
+ {
+  md5_context layout_md5;
+
+  layout_md5.starts();
+
+  for(unsigned i = 0; i < CDInterfaces.size(); i++)
+  {
+   CD_TOC toc;
+
+   CDInterfaces[i]->ReadTOC(&toc);
+
+   layout_md5.update_u32_as_lsb(toc.first_track);
+   layout_md5.update_u32_as_lsb(toc.last_track);
+   layout_md5.update_u32_as_lsb(toc.tracks[100].lba);
+
+   for(uint32 track = toc.first_track; track <= toc.last_track; track++)
+   {
+    layout_md5.update_u32_as_lsb(toc.tracks[track].lba);
+    layout_md5.update_u32_as_lsb(toc.tracks[track].control & 0x4);
+   }
+  }
+
+  layout_md5.finish(LayoutMD5);
+ }
+
+ // This if statement will be true if force_module references a system without CDROM support.
+ if(!MDFNGameInfo->LoadCD)
+ {
+    if (log_cb)
+       log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
+    return 0;
+ }
+
+ if (log_cb)
+ log_cb(RETRO_LOG_INFO, "Using module: %s(%s)\n", MDFNGameInfo->shortname, MDFNGameInfo->fullname);
+
+ // TODO: include module name in hash
+ memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
+
+ if(!(MDFNGameInfo->LoadCD(&CDInterfaces)))
+ {
+  for(unsigned i = 0; i < CDInterfaces.size(); i++)
+   delete CDInterfaces[i];
+  CDInterfaces.clear();
+
+  MDFNGameInfo = NULL;
+  return(0);
+ }
+
+ //MDFNI_SetLayerEnableMask(~0ULL);
+
+ MDFN_LoadGameCheats(NULL);
+ MDFNMP_InstallReadPatches();
+
+ return(MDFNGameInfo);
+}
+#endif
+
+static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
+{
+   MDFNFILE GameFile;
+	std::vector<FileExtensionSpecStruct> valid_iae;
+
+#ifdef NEED_CD
+	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
+	 return(MDFNI_LoadCD(force_module, name));
+#endif
+
+	MDFN_printf(_("Loading %s...\n"),name);
+
+	MDFN_indent(1);
+
+	// Construct a NULL-delimited list of known file extensions for MDFN_fopen()
+   const FileExtensionSpecStruct *curexts = MDFNGameInfo->FileExtensions;
+
+   while(curexts->extension && curexts->description)
+   {
+      valid_iae.push_back(*curexts);
+      curexts++;
+   }
+
+	if(!GameFile.Open(name, &valid_iae[0], _("game")))
+   {
+      MDFNGameInfo = NULL;
+      return 0;
+   }
+
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "Using module: %s(%s)\n", MDFNGameInfo->shortname, MDFNGameInfo->fullname);
+
+	//
+	// Load per-game settings
+	//
+	// Maybe we should make a "pgcfg" subdir, and automatically load all files in it?
+	// End load per-game settings
+	//
+
+   if(MDFNGameInfo->Load(name, &GameFile) <= 0)
+   {
+      GameFile.Close();
+      MDFNGameInfo = NULL;
+      return(0);
+   }
+
+	MDFN_LoadGameCheats(NULL);
+	MDFNMP_InstallReadPatches();
+
+	MDFN_indent(-2);
+
+	if(!MDFNGameInfo->name)
+   {
+      unsigned int x;
+      char *tmp;
+
+      MDFNGameInfo->name = (UTF8 *)strdup(GetFNComponent(name));
+
+      for(x=0;x<strlen((char *)MDFNGameInfo->name);x++)
+      {
+         if(MDFNGameInfo->name[x] == '_')
+            MDFNGameInfo->name[x] = ' ';
+      }
+      if((tmp = strrchr((char *)MDFNGameInfo->name, '.')))
+         *tmp = 0;
+   }
+
+   return(MDFNGameInfo);
+}
+
 #define MAX_PLAYERS 2
 #define MAX_BUTTONS 16
 
@@ -2363,9 +2595,27 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game(void)
 {
-   MDFNI_CloseGame();
-}
+   if(!MDFNGameInfo)
+      return;
 
+   MDFN_FlushGameCheats(0);
+
+   MDFNGameInfo->CloseGame();
+
+   if(MDFNGameInfo->name)
+      free(MDFNGameInfo->name);
+   MDFNGameInfo->name = NULL;
+
+   MDFNMP_Kill();
+
+   MDFNGameInfo = NULL;
+
+#ifdef NEED_CD
+   for(unsigned i = 0; i < CDInterfaces.size(); i++)
+      delete CDInterfaces[i];
+   CDInterfaces.clear();
+#endif
+}
 
 
 // Hardcoded for PSX. No reason to parse lots of structures ...

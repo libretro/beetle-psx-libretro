@@ -42,9 +42,6 @@ int MDFND_UnlockMutex(MDFN_Mutex *mutex);
 /* End threading support. */
 #endif
 
-/* path = path of game/file to load.  returns NULL on failure. */
-MDFNGI *MDFNI_LoadGame(const char *force_module, const char *path);
-
 MDFNGI *MDFNI_LoadCD(const char *sysname, const char *devicename);
 
 // Call this function as early as possible, even before MDFNI_Initialize()
