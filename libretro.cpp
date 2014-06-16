@@ -2592,14 +2592,14 @@ void retro_run(void)
       switch (width)
       {
          // The shifts are not simply (padded_width - real_width) / 2.
+         case 280:
+            pix += 10;
+            width = 256;
+            break;
+
          case 350:
             pix += 14;
             width = 320;
-            break;
-
-         case 700:
-            pix += 33;
-            width = 640;
             break;
 
          case 400:
@@ -2607,14 +2607,15 @@ void retro_run(void)
             width = 364;
             break;
 
-         case 280:
-            pix += 10;
-            width = 256;
-            break;
 
          case 560:
             pix += 26;
             width = 512;
+            break;
+
+         case 700:
+            pix += 33;
+            width = 640;
             break;
 
          default:
