@@ -2031,16 +2031,10 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 480
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 700
-static int mednafen_psx_fb_height;
 
 #define FB_MAX_HEIGHT 576
 
 // Wastes a little space for NTSC PSX, but better than dynamically allocating.
-#ifdef WANT_16BPP
-static uint16_t mednafen_buf[FB_WIDTH * FB_MAX_HEIGHT];
-#else
-static uint32_t mednafen_buf[FB_WIDTH * FB_MAX_HEIGHT];
-#endif
 const char *mednafen_core_str = MEDNAFEN_CORE_NAME;
 
 static void check_system_specs(void)
@@ -2358,8 +2352,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
-   mednafen_psx_fb_height = (CalcDiscSCEx() == REGION_EU) ? 576  : 480;
-   surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, mednafen_psx_fb_height, FB_WIDTH, pix_fmt);
+   surf = new MDFN_Surface(NULL, FB_WIDTH, (CalcDiscSCEx() == REGION_EU) ? 576  : 480, FB_WIDTH, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
