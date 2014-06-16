@@ -2025,7 +2025,6 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.35.1"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
-static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
@@ -2360,7 +2359,6 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
    mednafen_psx_fb_height = (CalcDiscSCEx() == REGION_EU) ? 576  : 480;
-   mednafen_psx_fps       = (CalcDiscSCEx() == REGION_EU) ? 50.0 : 59.82704;
    surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, mednafen_psx_fb_height, FB_WIDTH, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
@@ -2669,7 +2667,7 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->timing.fps            = mednafen_psx_fps; // Determined for NTSC from empirical testing.
+   info->timing.fps            = (CalcDiscSCEx() == REGION_EU) ? 49.842 : 59.941;
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
