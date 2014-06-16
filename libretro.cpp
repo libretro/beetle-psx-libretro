@@ -130,10 +130,10 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
  return PSX_PRNG.RandU32(mina, maxa);
 }
 
-std::vector<CDIF*> *cdifs = NULL;
-std::vector<const char *> cdifs_scex_ids;
-bool CD_TrayOpen;
-int CD_SelectedDisc;     // -1 for no disc
+static std::vector<CDIF*> *cdifs = NULL;
+static std::vector<const char *> cdifs_scex_ids;
+static bool CD_TrayOpen;
+static int CD_SelectedDisc;     // -1 for no disc
 
 static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
@@ -1051,7 +1051,7 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
    return(true);
 }
 
-const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
+static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
    const char *ret = NULL;
    Stream *fp = NULL;
@@ -1183,7 +1183,7 @@ Breakout:
    return(ret);
 }
 
-unsigned CalcDiscSCEx(void)
+static unsigned CalcDiscSCEx(void)
 {
    const char *prev_valid_id = NULL;
    unsigned ret_region = MDFN_GetSettingI("psx.region_default");
@@ -2051,20 +2051,6 @@ static void check_system_specs(void)
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
-// Ugly poking. There's no public interface for this.
-#include "mednafen/psx/psx.h"
-#include "mednafen/psx/spu.h"
-namespace MDFN_IEN_PSX
-{
-   extern int CD_SelectedDisc;
-   extern std::vector<CDIF*> *cdifs;
-}
-
-// Poke into psx.cpp
-unsigned CalcDiscSCEx();
-using MDFN_IEN_PSX::CD_SelectedDisc;
-using MDFN_IEN_PSX::cdifs;
-
 static unsigned disk_get_num_images(void)
 {
    return cdifs ? cdifs->size() : 0;
@@ -2692,7 +2678,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 }
 
-void retro_deinit()
+void retro_deinit(void)
 {
    delete surf;
    surf = NULL;
