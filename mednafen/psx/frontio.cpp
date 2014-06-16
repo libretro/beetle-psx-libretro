@@ -856,6 +856,8 @@ uint64_t FrontIO::GetMemcardDirtyCount(unsigned int which)
  return(DevicesMC[which]->GetNVDirtyCount());
 }
 
+uint8_t tmpbuf[8][1 << 17];
+
 void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
  assert(which < 8);
@@ -865,16 +867,10 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
   if(DevicesMC[which]->GetNVSize())
   {
    FileStream mf(path, FileStream::MODE_READ);
-   std::vector<uint8_t> tmpbuf;
 
-   tmpbuf.resize(DevicesMC[which]->GetNVSize());
+   mf.read(&tmpbuf[which][0], (1 << 17));
 
-   if(mf.size() != (int64_t)tmpbuf.size())
-    throw(MDFN_Error(0, _("Memory card file \"%s\" is an incorrect size(%d bytes).  The correct size is %d bytes."), path, (int)mf.size(), (int)tmpbuf.size()));
-
-   mf.read(&tmpbuf[0], tmpbuf.size());
-
-   DevicesMC[which]->WriteNV(&tmpbuf[0], 0, tmpbuf.size());
+   DevicesMC[which]->WriteNV(&tmpbuf[which][0], 0, (1 << 17));
    DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
   }
  }
@@ -892,12 +888,9 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
   FileStream mf(path, FileStream::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
-  std::vector<uint8_t> tmpbuf;
 
-  tmpbuf.resize(DevicesMC[which]->GetNVSize());
-
-  DevicesMC[which]->ReadNV(&tmpbuf[0], 0, tmpbuf.size());
-  mf.write(&tmpbuf[0], tmpbuf.size());
+  DevicesMC[which]->ReadNV(&tmpbuf[which][0], 0, (1 << 17));
+  mf.write(&tmpbuf[which][0], (1 << 17));
 
   mf.close();	// Call before resetting the NV dirty count!
 
