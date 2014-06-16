@@ -1707,13 +1707,12 @@ static void CloseGame(void)
    Cleanup();
 }
 
-
-void SetInput(int port, const char *type, void *ptr)
+static void SetInput(int port, const char *type, void *ptr)
 {
    FIO->SetInput(port, type, ptr);
 }
 
-int StateAction(StateMem *sm, int load, int data_only)
+static int StateAction(StateMem *sm, int load, int data_only)
 {
    return(0);
    SFORMAT StateRegs[] =
@@ -1809,8 +1808,7 @@ static void CDSelect(void)
  }
 }
 
-
-void DoSimpleCommand(int cmd)
+static void DoSimpleCommand(int cmd)
 {
    switch(cmd)
    {
@@ -1994,10 +1992,6 @@ static double last_sound_rate;
 static MDFN_Surface *surf;
 
 static bool failed_init;
-
-static void hookup_ports(bool force);
-
-static bool initial_ports_hookup = false;
 
 char *psx_analog_type;
 
@@ -2317,17 +2311,6 @@ union
 
 static uint16_t input_buf[MAX_PLAYERS] = {0};
 
-
-static void hookup_ports(bool force)
-{
-   if (initial_ports_hookup && !force)
-      return;
-
-   SetInput(0, "gamepad", &input_buf[0]);
-
-   initial_ports_hookup = true;
-}
-
 bool retro_load_game(const struct retro_game_info *info)
 {
    if (failed_init)
@@ -2364,7 +2347,8 @@ bool retro_load_game(const struct retro_game_info *info)
 	deint.ClearState();
 #endif
 
-   hookup_ports(true);
+   SetInput(0, "gamepad", &input_buf[0]);
+   SetInput(1, "gamepad", &input_buf[1]);
 
    return true;
 }

@@ -412,8 +412,4 @@ typedef struct
  float mouse_offs_x, mouse_offs_y;
 } MDFNGI;
 
-
-int StateAction(StateMem *sm, int load, int data_only);
-void DoSimpleCommand(int cmd);
-
 #endif
