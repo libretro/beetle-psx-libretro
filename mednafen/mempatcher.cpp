@@ -238,15 +238,19 @@ void MDFN_LoadGameCheats(void *override_ptr)
  {
   const char *fn = MDFN_MakeFName(MDFNMKF_CHEAT,0,0).c_str();
 
-  if (log_cb && fn)
+  if (log_cb && fn[0] != '\0')
+  {
      log_cb(RETRO_LOG_INFO, "Loading cheats from %s...\n", fn);
 
-  if(!(fp = fopen(fn,"rb")))
-  {
-     if (log_cb)
-        log_cb(RETRO_LOG_ERROR, "Error opening file.\n");
-     return;
+     if(!(fp = fopen(fn,"rb")))
+     {
+        if (log_cb)
+           log_cb(RETRO_LOG_ERROR, "Error opening file.\n");
+        return;
+     }
   }
+  else
+     return;
  }
 
  if(SeekToOurSection(fp))

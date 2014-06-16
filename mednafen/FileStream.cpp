@@ -37,12 +37,7 @@
 
 FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
- if(mode == FileStream::MODE_WRITE)
-  fp = fopen(path, "wb");
- else
-  fp = fopen(path, "rb");
-
- if(!fp)
+ if(!(fp = fopen(path, (mode == FileStream::MODE_WRITE) ? "wb" : "rb")))
  {
   ErrnoHolder ene(errno);
 
@@ -92,8 +87,7 @@ int64 FileStream::tell(void)
    return ftello(fp);
 }
 
-int64 FileStream::size(void)
-{
+int64 FileStream::size(void) {
    struct stat buf;
 
    fstat(fileno(fp), &buf);

@@ -40,12 +40,7 @@
 
 FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) : OpenedMode(mode)
 {
- if(mode == MODE_WRITE)
-  fp = fopen(path, "wb");
- else
-  fp = fopen(path, "rb");
-
- if(!fp)
+ if(!(fp = fopen(path, (mode == MODE_WRITE) ? "wb" : "rb")))
  {
   ErrnoHolder ene(errno);
 
