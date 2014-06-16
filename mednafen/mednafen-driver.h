@@ -9,10 +9,6 @@
 
 extern std::vector<MDFNGI *>MDFNSystems;
 
-/* Indent stdout newlines +- "indent" amount */
-void MDFN_indent(int indent);
-void MDFN_printf(const char *format, ...);
-
 /* Displays an error.  Can block or not. */
 void MDFND_Message(const char *s);
 

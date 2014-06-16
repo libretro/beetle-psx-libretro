@@ -236,19 +236,16 @@ void MDFN_LoadGameCheats(void *override_ptr)
   fp = override;
  else
  {
-  std::string fn = MDFN_MakeFName(MDFNMKF_CHEAT,0,0).c_str();
+  const char *fn = MDFN_MakeFName(MDFNMKF_CHEAT,0,0).c_str();
 
-  MDFN_printf("\n");
-  MDFN_printf(_("Loading cheats from %s...\n"), fn.c_str());
-  MDFN_indent(1);
+  if (log_cb && fn)
+     log_cb(RETRO_LOG_INFO, "Loading cheats from %s...\n", fn);
 
-  if(!(fp = fopen(fn.c_str(),"rb")))
+  if(!(fp = fopen(fn,"rb")))
   {
-   ErrnoHolder ene(errno);
-
-   MDFN_printf(_("Error opening file: %s\n"), ene.StrError());
-   MDFN_indent(-1);
-   return;
+     if (log_cb)
+        log_cb(RETRO_LOG_ERROR, "Error opening file.\n");
+     return;
   }
  }
 
@@ -273,8 +270,9 @@ void MDFN_LoadGameCheats(void *override_ptr)
 
    if(tbuf[0] != 'R' && tbuf[0] != 'C' && tbuf[0] != 'S')
    {
-    MDFN_printf(_("Invalid cheat type: %c\n"), tbuf[0]);
-    break;
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR, "Invalid cheat type: %c\n", tbuf[0]);
+      break;
    }
    type = tbuf[0];
    namebuf[0] = 0;
@@ -321,8 +319,8 @@ void MDFN_LoadGameCheats(void *override_ptr)
 
  if(!override)
  {
-  MDFN_printf(_("%lu cheats loaded.\n"), (unsigned long)cheats.size());
-  MDFN_indent(-1);
+    if (log_cb)
+       log_cb(RETRO_LOG_INFO, "%lu cheats loaded.\n", (unsigned long)cheats.size());
   fclose(fp);
  }
 }

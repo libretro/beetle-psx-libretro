@@ -1456,9 +1456,15 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    TextSize = MDFN_de32lsb(&data[0x1C]);
 
    if(ignore_pcsp)
-      MDFN_printf("TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
+   }
    else
-      MDFN_printf("PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
+   }
 
    TextStart &= 0x1FFFFF;
 
@@ -2482,9 +2488,8 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	 return(MDFNI_LoadCD(force_module, name));
 #endif
 
-	MDFN_printf(_("Loading %s...\n"),name);
-
-	MDFN_indent(1);
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "Loading %s...\n", name);
 
 	// Construct a NULL-delimited list of known file extensions for MDFN_fopen()
    const FileExtensionSpecStruct *curexts = MDFNGameInfo->FileExtensions;
@@ -2520,8 +2525,6 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
-
-	MDFN_indent(-2);
 
 	if(!MDFNGameInfo->name)
    {
@@ -3181,6 +3184,18 @@ void MDFND_DispMessage(unsigned char *str)
 {
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "%s\n", str);
+}
+
+void MDFN_DispMessage(const char *format, ...)
+{
+   va_list ap;
+   va_start(ap,format);
+   char *msg = NULL;
+
+   trio_vasprintf(&msg, format,ap);
+   va_end(ap);
+
+   MDFND_DispMessage((UTF8*)msg);
 }
 
 void MDFND_Message(const char *str)

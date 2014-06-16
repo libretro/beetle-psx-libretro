@@ -47,7 +47,6 @@ extern MDFNGI *MDFNGameInfo;
 
 #include "settings.h"
 
-void MDFN_printf(const char *format, ...);
 void MDFN_DispMessage(const char *format, ...);
 
 void MDFN_LoadGameCheats(void *override);

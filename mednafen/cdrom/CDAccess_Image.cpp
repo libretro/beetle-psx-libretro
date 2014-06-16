@@ -356,7 +356,8 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
  if(!strcasecmp(file_ext.c_str(), ".toc"))
  {
-  MDFN_printf(_("TOC file detected.\n"));
+    if (log_cb)
+       log_cb(RETRO_LOG_INFO, "TOC file detected.\n");
   IsTOC = true;
  }
 
@@ -747,7 +748,8 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
     else if(cmdbuf == "CDTEXTFILE" || cmdbuf == "CATALOG" || cmdbuf == "ISRC" ||
 	    cmdbuf == "TITLE" || cmdbuf == "PERFORMER" || cmdbuf == "SONGWRITER")
     {
-     MDFN_printf(_("Unsupported CUE sheet directive: \"%s\".\n"), cmdbuf.c_str());	// FIXME, generic logger passed by pointer to constructor
+       if (log_cb)
+          log_cb(RETRO_LOG_ERROR, "Unsupported CUE sheet directive: \"%s\".\n", cmdbuf.c_str());
     }
     else
     {
