@@ -48,6 +48,10 @@
 
 #include "audioreader.h"
 
+#include "../../libretro.h"
+
+extern retro_log_printf_t log_cb;
+
 #include <map>
 
 using namespace CDUtility;
@@ -363,8 +367,9 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
   if(fp.read(bom_tmp, 3, false) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
   {
-   // Print an annoying error message, but don't actually error out.
-   MDFN_PrintError(_("UTF-8 BOM detected at start of CUE sheet."));
+     // Print an annoying error message, but don't actually error out.
+     if (log_cb)
+        log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
   }
   else
    fp.seek(0, SEEK_SET);

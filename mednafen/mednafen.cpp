@@ -122,33 +122,3 @@ void MDFN_printf(const char *format, ...)
 
    va_end(ap);
 }
-
-void MDFN_PrintError(const char *format, ...)
-{
- char *temp;
-
- va_list ap;
-
- va_start(ap, format);
-
- temp = trio_vaprintf(format, ap);
- MDFND_PrintError(temp);
- free(temp);
-
- va_end(ap);
-}
-
-void MDFN_DebugPrintReal(const char *file, const int line, const char *format, ...)
-{
- char *temp;
-
- va_list ap;
-
- va_start(ap, format);
-
- temp = trio_vaprintf(format, ap);
- fprintf(stderr, "%s:%d  %s\n", file, line, temp);
- free(temp);
-
- va_end(ap);
-}

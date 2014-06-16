@@ -24,6 +24,9 @@
 #include "../general.h"
 
 #include <algorithm>
+#include "../../libretro.h"
+
+extern retro_log_printf_t log_cb;
 
 using namespace CDUtility;
 
@@ -381,7 +384,8 @@ int CDIF_MT::ReadThreadStart()
    }
    catch(std::exception &e)
    {
-    MDFN_PrintError(_("Sector %u read error: %s"), ra_lba, e.what());
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", ra_lba, e.what());
     memset(tmpbuf, 0, sizeof(tmpbuf));
     error_condition = true;
    }
@@ -454,8 +458,9 @@ CDIF_MT::~CDIF_MT()
  }
  catch(std::exception &e)
  {
-  MDFND_PrintError(e.what());
-  thread_deaded_failed = true;
+    if (log_cb)
+       log_cb(RETRO_LOG_ERROR, "%s.\n", e.what());
+    thread_deaded_failed = true;
  }
 
  if(!thread_deaded_failed)
@@ -558,9 +563,12 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 
   if(!ValidateRawSector(tmpbuf))
   {
-   MDFN_DispMessage(_("Uncorrectable data at sector %d"), lba);
-   MDFN_PrintError(_("Uncorrectable data at sector %d"), lba);
-   return(false);
+     if (log_cb)
+     {
+        log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
+        log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
+     }
+     return(false);
   }
 
   const int mode = tmpbuf[12 + 3];
@@ -603,8 +611,8 @@ bool CDIF_MT::Eject(bool eject_status)
  }
  catch(std::exception &e)
  {
-  MDFN_PrintError(_("Error on eject/insert attempt: %s"), e.what());
-  return(false);
+    log_cb(RETRO_LOG_ERROR, "Error on eject/insert attempt: %s\n", e.what());
+    return(false);
  }
 
  return(true);
@@ -660,7 +668,8 @@ bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
  }
  catch(std::exception &e)
  {
-  MDFN_PrintError(_("Sector %u read error: %s"), lba, e.what());
+    if (log_cb)
+       log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", lba, e.what());
   memset(buf, 0, 2352 + 96);
   return(false);
  }
@@ -696,8 +705,9 @@ bool CDIF_ST::Eject(bool eject_status)
  }
  catch(std::exception &e)
  {
-  MDFN_PrintError("%s", e.what());
-  return(false);
+    if (log_cb)
+       log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+    return(false);
  }
 
  return(true);

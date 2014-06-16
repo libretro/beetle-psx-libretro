@@ -9,6 +9,18 @@
 #include "libretro.h"
 #include "thread.h"
 
+struct retro_perf_callback perf_cb;
+retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
+retro_log_printf_t log_cb;
+static retro_video_refresh_t video_cb;
+static retro_audio_sample_t audio_cb;
+static retro_audio_sample_batch_t audio_batch_cb;
+static retro_environment_t environ_cb;
+static retro_input_poll_t input_poll_cb;
+static retro_input_state_t input_state_cb;
+
+static retro_rumble_interface rumble;
+
 /* start of Mednafen psx.cpp */
 
 /* Mednafen - Multi-system Emulator
@@ -1701,7 +1713,8 @@ static void CloseGame(void)
       }
       catch(std::exception &e)
       {
-         MDFN_PrintError("%s", e.what());
+         if (log_cb)
+            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
       }
    }
 
@@ -1975,17 +1988,6 @@ MDFNGI EmulatedPSX =
 extern void Emulate(EmulateSpecStruct *espec);
 extern void SetInput(int port, const char *type, void *ptr);
 
-struct retro_perf_callback perf_cb;
-retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
-retro_log_printf_t log_cb;
-static retro_video_refresh_t video_cb;
-static retro_audio_sample_t audio_cb;
-static retro_audio_sample_batch_t audio_batch_cb;
-static retro_environment_t environ_cb;
-static retro_input_poll_t input_poll_cb;
-static retro_input_state_t input_state_cb;
-
-static retro_rumble_interface rumble;
 
 static bool overscan;
 static double last_sound_rate;
@@ -3185,12 +3187,6 @@ void MDFND_Message(const char *str)
 {
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "%s\n", str);
-}
-
-void MDFND_PrintError(const char* err)
-{
-   if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "%s\n", err);
 }
 
 void MDFND_Sleep(unsigned int time)

@@ -31,6 +31,10 @@
 #include "msvc_compat.h"
 #endif
 
+#include "../libretro.h"
+
+extern retro_log_printf_t log_cb;
+
 static uint8 **RAMPtrs = NULL;
 static uint32 PageSize;
 static uint32 NumPages;
@@ -167,7 +171,8 @@ void MDFNMP_RemoveReadPatches(void)
 
 static void CheatMemErr(void)
 {
- MDFN_PrintError(_("Error allocating memory for cheat data."));
+   if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "Error allocating memory for cheat data.\n");
 }
 
 /* This function doesn't allocate any memory for "name" */
