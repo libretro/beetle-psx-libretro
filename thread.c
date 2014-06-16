@@ -1,19 +1,3 @@
-#include "mednafen/mednafen-types.h"
-#include "mednafen/mednafen.h"
-#include "mednafen/md5.h"
-#include "mednafen/git.h"
-#include "mednafen/general.h"
-#include "mednafen/mednafen-driver.h"
-
-#include "libretro.h"
-
-extern retro_log_printf_t log_cb;
-
-#if defined(__CELLOS_LV2__)
-#include <sys/timer.h>
-#include <ppu_intrinsics.h>
-#endif
-
 #ifdef _WIN32
 #include <io.h>
 #ifdef _XBOX
@@ -25,97 +9,7 @@ extern retro_log_printf_t log_cb;
 #include <unistd.h>
 #endif
 
-#include <iostream>
-
 // Stubs
-
-extern std::string retro_base_directory;
-extern std::string retro_base_name;
-extern std::string retro_save_directory;
-
-#ifdef _WIN32
-static void sanitize_path(std::string &path)
-{
-   size_t size = path.size();
-   for (size_t i = 0; i < size; i++)
-      if (path[i] == '/')
-         path[i] = '\\';
-}
-#endif
-
-// Use a simpler approach to make sure that things go right for libretro.
-std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
-{
-   char slash;
-#ifdef _WIN32
-   slash = '\\';
-#else
-   slash = '/';
-#endif
-   std::string ret;
-   switch (type)
-   {
-      case MDFNMKF_SAV:
-         ret = retro_save_directory +slash + retro_base_name +
-            std::string(".") +
-#ifndef _XBOX
-	    md5_context::asciistr(MDFNGameInfo->MD5, 0) + std::string(".") +
-#endif
-            std::string(cd1);
-         break;
-      case MDFNMKF_FIRMWARE:
-         ret = retro_base_directory + slash + std::string(cd1);
-#ifdef _WIN32
-   sanitize_path(ret); // Because Windows path handling is mongoloid.
-#endif
-         break;
-      default:	  
-         break;
-   }
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "MDFN_MakeFName: %s\n", ret.c_str());
-   return ret;
-}
-
-void MDFND_DispMessage(unsigned char *str)
-{
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "%s\n", str);
-}
-
-void MDFND_Message(const char *str)
-{
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "%s\n", str);
-}
-
-void MDFND_MidSync(const EmulateSpecStruct *)
-{}
-
-void MDFN_MidLineUpdate(EmulateSpecStruct *espec, int y)
-{
- //MDFND_MidLineUpdate(espec, y);
-}
-
-void MDFND_PrintError(const char* err)
-{
-   if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "%s\n", err);
-}
-
-void MDFND_Sleep(unsigned int time)
-{
-#if defined(_WIN32)
-   Sleep(time);
-#elif defined(__CELLOS_LV2__)
-   sys_timer_usleep(time * 1000);
-#else
-   usleep(time * 1000);
-#endif
-}
-
-#ifdef WANT_THREADING
 
 #include "thread.h"
 #include <stdlib.h>
@@ -397,47 +291,22 @@ void scond_signal(scond_t *cond)
 
 #endif
 
-MDFN_Thread *MDFND_CreateThread(int (*fn)(void *), void *data)
+void retro_sleep(unsigned msec)
 {
-   return (MDFN_Thread*)sthread_create((void (*)(void*))fn, data);
-}
-
-void MDFND_WaitThread(MDFN_Thread *thr, int *val)
-{
-   sthread_join((sthread_t*)thr);
-
-   if (val)
-   {
-      *val = 0;
-      fprintf(stderr, "WaitThread relies on return value.\n");
-   }
-}
-
-void MDFND_KillThread(MDFN_Thread *)
-{
-   fprintf(stderr, "Killing a thread is a BAD IDEA!\n");
-}
-
-MDFN_Mutex *MDFND_CreateMutex()
-{
-   return (MDFN_Mutex*)slock_new();
-}
-
-void MDFND_DestroyMutex(MDFN_Mutex *lock)
-{
-   slock_free((slock_t*)lock);
-}
-
-int MDFND_LockMutex(MDFN_Mutex *lock)
-{
-   slock_lock((slock_t*)lock);
-   return 0;
-}
-
-int MDFND_UnlockMutex(MDFN_Mutex *lock)
-{
-   slock_unlock((slock_t*)lock);
-   return 0;
-}
-
+#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
+   sys_timer_usleep(1000 * msec);
+#elif defined(PSP)
+   sceKernelDelayThread(1000 * msec);
+#elif defined(_WIN32)
+   Sleep(msec);
+#elif defined(XENON)
+   udelay(1000 * msec);
+#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
+   usleep(1000 * msec);
+#else
+   struct timespec tv = {0};
+   tv.tv_sec = msec / 1000;
+   tv.tv_nsec = (msec % 1000) * 1000000;
+   nanosleep(&tv, NULL);
 #endif
+}

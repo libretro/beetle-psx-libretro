@@ -16,6 +16,10 @@
 #ifndef THREAD_H__
 #define THREAD_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Implements the bare minimum needed for RetroArch. :)
 
 typedef struct sthread sthread_t;
@@ -42,5 +46,10 @@ void scond_free(scond_t *cond);
 void scond_wait(scond_t *cond, slock_t *lock);
 void scond_signal(scond_t *cond);
 
+void retro_sleep(unsigned msec);
+
+#ifdef __cplusplus
+}
 #endif
 
+#endif
