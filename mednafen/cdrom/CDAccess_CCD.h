@@ -32,8 +32,6 @@ class CDAccess_CCD : public CDAccess
 
  virtual void Read_TOC(CDUtility::TOC *toc);
 
- virtual bool Is_Physical(void) throw();
-
  virtual void Eject(bool eject_status);
 
  private:

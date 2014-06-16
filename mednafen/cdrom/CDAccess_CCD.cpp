@@ -507,11 +507,6 @@ void CDAccess_CCD::Read_TOC(CDUtility::TOC *toc)
  *toc = tocd;
 }
 
-bool CDAccess_CCD::Is_Physical(void) throw()
-{
- return false;
-}
-
 void CDAccess_CCD::Eject(bool eject_status)
 {
 

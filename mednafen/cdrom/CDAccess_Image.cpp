@@ -1149,11 +1149,6 @@ void CDAccess_Image::Read_TOC(TOC *toc)
   toc->tracks[toc->last_track + 1] = toc->tracks[100];
 }
 
-bool CDAccess_Image::Is_Physical(void) throw()
-{
- return(false);
-}
-
 void CDAccess_Image::Eject(bool eject_status)
 {
 

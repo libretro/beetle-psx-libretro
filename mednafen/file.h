@@ -22,7 +22,6 @@ class MDFNFILE
 	 return(Open(path.c_str(), known_ext, purpose, suppress_notfound_pe));
 	}
 
-   bool ApplyIPS(void*);
 	bool Close(void);
 
 	uint64 fread(void *ptr, size_t size, size_t nmemb);

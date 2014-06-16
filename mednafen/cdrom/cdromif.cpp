@@ -306,7 +306,7 @@ int CDIF_MT::ReadThreadStart()
   return(0);
  }
 
- is_phys_cache = disc_cdaccess->Is_Physical();
+ is_phys_cache = false;
 
  EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
 
@@ -628,7 +628,7 @@ CDIF_ST::CDIF_ST(CDAccess *cda) : disc_cdaccess(cda)
 {
  //puts("***WARNING USING SINGLE-THREADED CD READER***");
 
- is_phys_cache = disc_cdaccess->Is_Physical();
+ is_phys_cache = false;
  UnrecoverableError = false;
  DiscEjected = false;
 
@@ -856,15 +856,10 @@ Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 
 CDIF *CDIF_Open(const char *path, const bool is_device, bool image_memcache)
 {
- if(is_device)
-  return new CDIF_MT(cdaccess_open_phys(path));
- else
- {
-  CDAccess *cda = cdaccess_open_image(path, image_memcache);
+   CDAccess *cda = cdaccess_open_image(path, image_memcache);
 
-  if(!image_memcache)
-   return new CDIF_MT(cda);
-  else
-   return new CDIF_ST(cda); 
- }
+   if(!image_memcache)
+      return new CDIF_MT(cda);
+   else
+      return new CDIF_ST(cda); 
 }

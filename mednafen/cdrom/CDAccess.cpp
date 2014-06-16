@@ -52,8 +52,3 @@ CDAccess *cdaccess_open_image(const char *path, bool image_memcache)
 
  return ret;
 }
-
-CDAccess *cdaccess_open_phys(const char *devicename)
-{
- throw MDFN_Error(0, _("Physical CD access support not compiled in."));
-}

@@ -1628,20 +1628,7 @@ static int Load(const char *name, MDFNFILE *fp)
   if(!TestMagic(name, fp))
    throw MDFN_Error(0, _("File format is unknown to module \"%s\"."), MDFNGameInfo->shortname);
 
-// For testing.
-#if 0
-  #warning "GREMLINS GREMLINS EVERYWHEREE IYEEEEEE"
-  #warning "Seriously, GREMLINS!  Or peanut butter.  Or maybe...DINOSAURS."
-
-  static std::vector<CDIF *> CDInterfaces;
-
-  //CDInterfaces.push_back(CDIF_Open("/home/sarah-projects/psxdev/tests/cd/adpcm.cue", false, false));
-  //CDInterfaces.push_back(CDIF_Open("/extra/games/PSX/Tony Hawk's Pro Skater 2 (USA)/Tony Hawk's Pro Skater 2 (USA).cue", false, false));
-  CDInterfaces.push_back(CDIF_Open("/extra/games/PSX/Jumping Flash! (USA)/Jumping Flash! (USA).cue", false, false));
-  InitCommon(&CDInterfaces, !IsPSF, true);
-#else
   InitCommon(NULL, !IsPSF, true);
-#endif
 
   TextMem.resize(0);
 
