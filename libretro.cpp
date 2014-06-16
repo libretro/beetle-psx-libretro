@@ -2033,7 +2033,6 @@ static double mednafen_psx_fps = 59.82704; // Hardcoded for NTSC atm.
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
 #define FB_WIDTH 700
 static int mednafen_psx_fb_height;
-static bool is_pal = false;
 
 #define FB_MAX_HEIGHT 576
 
@@ -2374,9 +2373,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
-   is_pal = (CalcDiscSCEx() == REGION_EU);
-   mednafen_psx_fb_height = is_pal ? 576  : 480;
-   mednafen_psx_fps       = is_pal ? 50.0 : 59.82704;
+   mednafen_psx_fb_height = (CalcDiscSCEx() == REGION_EU) ? 576  : 480;
+   mednafen_psx_fps       = (CalcDiscSCEx() == REGION_EU) ? 50.0 : 59.82704;
    surf = new MDFN_Surface(mednafen_buf, FB_WIDTH, mednafen_psx_fb_height, FB_WIDTH, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
@@ -2651,7 +2649,7 @@ void retro_run(void)
             break;
       }
       
-      if (is_pal)
+      if ((CalcDiscSCEx() == REGION_EU))
       {
          // Attempt to remove black bars.
          // These numbers are arbitrary since the bars differ some by game.
@@ -2710,7 +2708,9 @@ void retro_deinit()
 
 unsigned retro_get_region(void)
 {
-   return is_pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
+   if (CalcDiscSCEx() == REGION_EU)
+      return RETRO_REGION_PAL;
+   return RETRO_REGION_NTSC;
 }
 
 unsigned retro_api_version(void)
