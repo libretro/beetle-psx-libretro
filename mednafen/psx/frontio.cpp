@@ -32,6 +32,8 @@
 
 #define PSX_FIODBGINFO(format, ...) { /* printf(format " -- timestamp=%d -- PAD temp\n", ## __VA_ARGS__, timestamp); */  }
 
+uint8_t mcbuf[8][1 << 17];
+
 namespace MDFN_IEN_PSX
 {
 
@@ -856,7 +858,16 @@ uint64_t FrontIO::GetMemcardDirtyCount(unsigned int which)
  return(DevicesMC[which]->GetNVDirtyCount());
 }
 
-uint8_t tmpbuf[8][1 << 17];
+void FrontIO::LoadMemcard(unsigned int which)
+{
+   assert(which < 8);
+
+   if(DevicesMC[which]->GetNVSize())
+   {
+      DevicesMC[which]->WriteNV(&mcbuf[which][0], 0, (1 << 17));
+      DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
+   }
+}
 
 void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
@@ -868,9 +879,9 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
   {
    FileStream mf(path, FileStream::MODE_READ);
 
-   mf.read(&tmpbuf[which][0], (1 << 17));
+   mf.read(&mcbuf[which][0], (1 << 17));
 
-   DevicesMC[which]->WriteNV(&tmpbuf[which][0], 0, (1 << 17));
+   DevicesMC[which]->WriteNV(&mcbuf[which][0], 0, (1 << 17));
    DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
   }
  }
@@ -878,6 +889,17 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
  {
   if(e.GetErrno() != ENOENT)
    throw(e);
+ }
+}
+
+void FrontIO::SaveMemcard(unsigned int which)
+{
+ assert(which < 8);
+
+ if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
+ {
+  DevicesMC[which]->ReadNV(&mcbuf[which][0], 0, (1 << 17));
+  DevicesMC[which]->ResetNVDirtyCount();
  }
 }
 
@@ -889,8 +911,8 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
  {
   FileStream mf(path, FileStream::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
 
-  DevicesMC[which]->ReadNV(&tmpbuf[which][0], 0, (1 << 17));
-  mf.write(&tmpbuf[which][0], (1 << 17));
+  DevicesMC[which]->ReadNV(&mcbuf[which][0], 0, (1 << 17));
+  mf.write(&mcbuf[which][0], (1 << 17));
 
   mf.close();	// Call before resetting the NV dirty count!
 

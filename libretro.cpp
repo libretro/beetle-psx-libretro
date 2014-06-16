@@ -1403,7 +1403,9 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       BIOSFile.read(BIOSROM->data8, 512 * 1024);
    }
 
-   for(i = 0; i < 8; i++)
+   FIO->LoadMemcard(0);
+
+   for(i = 1; i < 8; i++)
    {
       char ext[64];
       trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
@@ -1681,6 +1683,12 @@ static void CloseGame(void)
    int i;
    for(i = 0; i < 8; i++)
    {
+      if (i == 0)
+      {
+         FIO->SaveMemcard(i);
+         continue;
+      }
+
       // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
       // we can reduce potential data loss!
       try
@@ -2538,12 +2546,19 @@ void retro_run(void)
             if (log_cb)
                log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
 
+            if (i == 0)
+            {
+               FIO->SaveMemcard(i);
+               Memcard_SaveDelay[i] = -1;
+               Memcard_PrevDC[i] = 0;
+               continue;
+            }
+
             char ext[64];
             trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
             FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
-            //MDFN_DispMessage("Memcard %d saved.", i);
          }
       }
    }
@@ -2833,14 +2848,39 @@ bool retro_unserialize(const void *data, size_t size)
    return MDFNSS_LoadSM(&st, 0, 0);
 }
 
-void *retro_get_memory_data(unsigned)
+extern uint8_t mcbuf[8][1 << 17];
+
+void *retro_get_memory_data(unsigned type)
 {
-   return NULL;
+   uint8_t *data;
+
+   switch (type)
+   {
+      case RETRO_MEMORY_SAVE_RAM:
+         data = mcbuf[0];
+         break;
+      default:
+         data = NULL;
+         break;
+   }
+   return data; 
 }
 
-size_t retro_get_memory_size(unsigned)
+size_t retro_get_memory_size(unsigned type)
 {
-   return 0;
+   unsigned size;
+
+   switch (type)
+   {
+      case RETRO_MEMORY_SAVE_RAM:
+         size = (1 << 17);
+         break;
+      default:
+         size = 0;
+         break;
+   }
+
+   return size;
 }
 
 void retro_cheat_reset(void)
