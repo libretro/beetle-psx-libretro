@@ -197,12 +197,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
      if(fbw)
      {
       if(TexMult)
-      {
-       if(dtd)
-        fbw = ModTexel(fbw, r, g, b, x & 3, y & 3);
-       else
-        fbw = ModTexel(fbw, r, g, b, 3, 2); //x & 3, y & 3);
-      }
+        fbw = ModTexel(fbw, r, g, b, (dtd) ? (x & 3) : 3, (dtd) ? (y & 3) : 2);
       PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
      }
     }
