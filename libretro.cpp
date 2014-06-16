@@ -2451,6 +2451,10 @@ static uint64_t video_frames, audio_frames;
 
 void retro_run(void)
 {
+   bool updated = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+      check_variables();
+
    input_poll_cb();
 
    update_input();
@@ -2638,10 +2642,6 @@ void retro_run(void)
    audio_frames += spec.SoundBufSize;
 
    audio_batch_cb(interbuf, spec.SoundBufSize);
-
-   bool updated = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-      check_variables();
 }
 
 void retro_get_system_info(struct retro_system_info *info)
