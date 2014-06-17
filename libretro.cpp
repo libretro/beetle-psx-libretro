@@ -3169,26 +3169,32 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 
 void MDFND_DispMessage(unsigned char *str)
 {
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "%s\n", str);
+   const char *strc = (const char*)str;
+   struct retro_message msg =
+   {
+      strc,
+      180
+   };
+
+   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
 }
 
 void MDFN_DispMessage(const char *format, ...)
 {
+   struct retro_message msg;
    va_list ap;
    va_start(ap,format);
-   char *msg = NULL;
+   char *str = NULL;
+   const char *strc = NULL;
 
-   trio_vasprintf(&msg, format,ap);
+   trio_vasprintf(&str, format,ap);
    va_end(ap);
+   strc = str;
 
-   MDFND_DispMessage((UTF8*)msg);
-}
+   msg.frames = 180;
+   msg.msg = strc;
 
-void MDFND_Message(const char *str)
-{
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "%s\n", str);
+   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
 }
 
 void MDFND_Sleep(unsigned int time)

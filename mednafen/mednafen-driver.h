@@ -9,9 +9,6 @@
 
 extern std::vector<MDFNGI *>MDFNSystems;
 
-/* Displays an error.  Can block or not. */
-void MDFND_Message(const char *s);
-
 uint32 MDFND_GetTime(void);
 void MDFND_Sleep(uint32 ms);
 
