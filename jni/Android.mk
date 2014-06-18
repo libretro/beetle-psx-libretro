@@ -36,7 +36,6 @@ CACHE_CD = 0
    NEED_BPP = 32
 	WANT_NEW_API = 1
    NEED_DEINTERLACER = 1
-	NEED_SCSI_CD = 1
 	NEED_THREADING = 1
 	NEED_TREMOR = 1
    CORE_DEFINE := -DWANT_PSX_EMU
@@ -80,10 +79,6 @@ ifeq ($(NEED_DEINTERLACER), 1)
 FLAGS += -DNEED_DEINTERLACER
 endif
 
-ifeq ($(NEED_SCSI_CD), 1)
-SCSI_CD_SOURCES := $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
-endif
-
 ifeq ($(NEED_CD), 1)
 CDROM_SOURCES := $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp $(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp $(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp $(MEDNAFEN_DIR)/cdrom/CDUtility.cpp $(MEDNAFEN_DIR)/cdrom/lec.cpp $(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp $(MEDNAFEN_DIR)/cdrom/audioreader.cpp $(MEDNAFEN_DIR)/cdrom/galois.cpp $(MEDNAFEN_DIR)/cdrom/recover-raw.cpp $(MEDNAFEN_DIR)/cdrom/l-ec.cpp $(MEDNAFEN_DIR)/cdrom/cdromif.cpp $(MEDNAFEN_DIR)/cdrom/crc32.cpp
 FLAGS += -DNEED_CD
@@ -108,14 +103,11 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(MEDNAFEN_DIR)/file.cpp \
-	$(MEDNAFEN_DIR)/player.cpp \
 	$(MEDNAFEN_DIR)/endian.cpp \
-	$(MEDNAFEN_DIR)/cputest/cputest.c \
-	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 
 
-LIBRETRO_SOURCES := $(MEDNAFEN_LIBRETRO_DIR)/libretro.cpp $(THREAD_STUBS)
+LIBRETRO_SOURCES := $(MEDNAFEN_LIBRETRO_DIR)/libretro.cpp
 
 SOURCES_C := 	$(TREMOR_SRC) $(THREAD_SOURCES) $(LIBRETRO_SOURCES_C) $(MEDNAFEN_DIR)/trio/trio.c $(MEDNAFEN_DIR)/trio/triostr.c $(CRC32_SOURCES)
 
