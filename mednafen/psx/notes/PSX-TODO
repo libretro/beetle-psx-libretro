@@ -15,16 +15,12 @@ Monkey Hero
 	It's as easy to fix as changing a certain 2 to a 3 in the GPU command table, and probably won't break anything,
 	but I'm still reluctant to do it...
 
-Tales of Destiny (Japanese version 1.0)
-	Frequently locks up after random battles in the cave after Mary joins.  US version is reported to not suffer from this problem.
-	Looks like the game is stuck waiting for an SPU IRQ that never happens.  The problem seems to be related to usage of Mary's "Moushuuken" skill.
-
 Simple 1500 Series Vol. 057 - The Maze
 	Locks up during startup;  looks to be poorly programmed and extremely sensitive to seek timing.
 
-Wing Commander 4
-   Frequently locks up during FMV sequences(might be sensitive to seek delays or SPU IRQ timings).
-
+Transformers - Beast Wars Transmetals
+	Locks up during loading screen. (CD timing issue)
+	It looks like a terrible game though, at least.
 
 ----------------------------------------------------------------------------------------------
 
@@ -44,9 +40,6 @@ Resident Evil - Director's Cut(non-Dual Shock-version)
 -----------------------------------------------------------------------------------------------
 
 ***Lesser issues***
-
-Thousand Arms
-	Many dialogue voices cut off a half second or so early; related to SPU IRQs and playback SPU RAM read timing I think.
 
 Final Fantasy 8
 	Reported 3D model(character) flicker at some points in the game - look into it.
@@ -131,6 +124,13 @@ Resident Evil 2
 	here for reference.
 
 
+Nightmare Creatures
+	Shoddy CD reading code that's unreasonably sensitive to CD access timings.  It's a wonder it even ever works on an actual
+	PS1(my copy of it certainly doesn't).
+
+Wing Commander 4
+	Used to lock up sometimes during FMV sequences(might be sensitive to seek delays or SPU IRQ timings).
+
 -----------------------------------------------------------------------------------------------
 
 Star Wars Dark Forces notes(for working towards removing a kludge/hack in the DMA IRQ handling)
@@ -166,8 +166,6 @@ Test 0x0 and 1x1 polygon throughput for all triangle and quad drawing commands.
 
 Fix line drawing algorithm to match test results on the real thing.
 
-
-Test time between voice on and envelope reset; test time between voice on and first ADPCM block memory fetch.
 
 The SPU in the PS1 might sometimes drop voice-on events when playing an ADPCM block that loops to itself(and was also the first and only
 ADPCM block, at least in the test program I noticed the issue in); investigate further.
