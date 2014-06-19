@@ -245,12 +245,12 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
  if(track->SubchannelMode)
   sector_mult += 96;
 
- if(binoffset && trio_sscanf(binoffset, "%ld", &tmp_long) == 1)
+ if(binoffset && sscanf(binoffset, "%ld", &tmp_long) == 1)
  {
   offset += tmp_long;
  }
 
- if(msfoffset && trio_sscanf(msfoffset, "%d:%d:%d", &m, &s, &f) == 3)
+ if(msfoffset && sscanf(msfoffset, "%d:%d:%d", &m, &s, &f) == 3)
  {
   offset += ((m * 60 + s) * 75 + f) * sector_mult;
  }
@@ -263,7 +263,7 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
  {
   tmp_long = sectors;
 
-  if(trio_sscanf(length, "%d:%d:%d", &m, &s, &f) == 3)
+  if(sscanf(length, "%d:%d:%d", &m, &s, &f) == 3)
    tmp_long = (m * 60 + s) * 75 + f;
   else if(track->DIFormat == DI_FORMAT_AUDIO)
   {
@@ -525,7 +525,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       throw(MDFN_Error(0, _("Command %s is outside of a TRACK definition!\n"), cmdbuf.c_str()));
      }
      int m,s,f;
-     trio_sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
+     sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
      TmpTrack.pregap = (m * 60 + s) * 75 + f;
     } // end to PREGAP
     else if(cmdbuf == "START")
@@ -535,7 +535,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       throw(MDFN_Error(0, _("Command %s is outside of a TRACK definition!\n"), cmdbuf.c_str()));
      }
      int m,s,f;
-     trio_sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
+     sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
      TmpTrack.pregap = (m * 60 + s) * 75 + f;
     }
     else if(cmdbuf == "TWO_CHANNEL_AUDIO")
@@ -674,7 +674,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      {
       unsigned int m,s,f;
 
-      if(trio_sscanf(args[1].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
+      if(sscanf(args[1].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
       {
        throw MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
       }
@@ -691,7 +691,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      {
       unsigned int m,s,f;
 
-      if(trio_sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
+      if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
       {
        throw MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
       }
@@ -705,7 +705,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
      {
       unsigned int m,s,f;
 
-      if(trio_sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
+      if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
       {
        throw MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
       }      

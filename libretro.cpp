@@ -1304,14 +1304,14 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    for(i = 0; i < 8; i++)
    {
       char buf[64];
-      trio_snprintf(buf, sizeof(buf), "psx.input.port%u.memcard", i + 1);
+      snprintf(buf, sizeof(buf), "psx.input.port%u.memcard", i + 1);
       emulate_memcard[i] = EmulateMemcards && MDFN_GetSettingB(buf);
    }
 
    for(i = 0; i < 2; i++)
    {
       char buf[64];
-      trio_snprintf(buf, sizeof(buf), "psx.input.pport%u.multitap", i + 1);
+      snprintf(buf, sizeof(buf), "psx.input.pport%u.multitap", i + 1);
       emulate_multitap[i] = MDFN_GetSettingB(buf);
    }
 
@@ -1341,7 +1341,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    for(unsigned i = 0; i < 8; i++)
    {
       char buf[64];
-      trio_snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
+      snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
       FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
    }
 
@@ -1421,7 +1421,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    for(i = 1; i < 8; i++)
    {
       char ext[64];
-      trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+      snprintf(ext, sizeof(ext), "%d.mcr", i);
       FIO->LoadMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
    }
 
@@ -1700,7 +1700,7 @@ static void CloseGame(void)
       try
       {
          char ext[64];
-         trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+         snprintf(ext, sizeof(ext), "%d.mcr", i);
 
          FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
       }
@@ -2808,7 +2808,7 @@ void retro_run(void)
             }
 
             char ext[64];
-            trio_snprintf(ext, sizeof(ext), "%d.mcr", i);
+            snprintf(ext, sizeof(ext), "%d.mcr", i);
             FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;

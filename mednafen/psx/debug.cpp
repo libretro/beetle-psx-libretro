@@ -101,9 +101,9 @@ static std::vector<BranchTraceResult> GetBranchTrace(void)
   const BTEntry *bt = &BTEntries[(x + BTIndex) % NUMBT];
 
   tmp.count = bt->branch_count;
-  trio_snprintf(tmp.from, sizeof(tmp.from), "%08x", bt->from);
-  trio_snprintf(tmp.to, sizeof(tmp.to), "%08x", bt->to);
-  trio_snprintf(tmp.code, sizeof(tmp.code), "%s", bt->exception ? "e" : "");
+  snprintf(tmp.from, sizeof(tmp.from), "%08x", bt->from);
+  snprintf(tmp.to, sizeof(tmp.to), "%08x", bt->to);
+  snprintf(tmp.code, sizeof(tmp.code), "%s", bt->exception ? "e" : "");
 
   ret.push_back(tmp);
  }
@@ -319,7 +319,7 @@ static void Disassemble(uint32 &A, uint32 SpecialA, char *TextBuf)
  strncpy(TextBuf, DisassembleMIPS(A, instr).c_str(), 256);
  TextBuf[255] = 0;
 
-// trio_snprintf(TextBuf, 256, "0x%08x", instr);
+// snprintf(TextBuf, 256, "0x%08x", instr);
 
  A += 4;
 }

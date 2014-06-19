@@ -162,7 +162,7 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
  for(unsigned i = 0; i < 8; i++)
  {
   char tmpbuf[32];
-  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIODEV%u", i);
+  snprintf(tmpbuf, sizeof(tmpbuf), "FIODEV%u", i);
 
   ret &= Devices[i]->StateAction(sm, load, data_only, tmpbuf);
  }
@@ -170,7 +170,7 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
  for(unsigned i = 0; i < 8; i++)
  {
   char tmpbuf[32];
-  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIOMC%u", i);
+  snprintf(tmpbuf, sizeof(tmpbuf), "FIOMC%u", i);
 
   ret &= DevicesMC[i]->StateAction(sm, load, data_only, tmpbuf);
  }
@@ -178,7 +178,7 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
  for(unsigned i = 0; i < 2; i++)
  {
   char tmpbuf[32];
-  trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIOTAP%u", i);
+  snprintf(tmpbuf, sizeof(tmpbuf), "FIOTAP%u", i);
 
   ret &= DevicesTap[i]->StateAction(sm, load, data_only, tmpbuf);
  }
@@ -835,7 +835,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
    else if(!strcmp(type, "dualshock"))
    {
       char name[256];
-      trio_snprintf(name, 256, _("DualShock on port %u"), port + 1);
+      snprintf(name, 256, _("DualShock on port %u"), port + 1);
       Devices[port] = Device_DualShock_Create(std::string(name));
    }
    else if(!strcmp(type, "mouse"))
