@@ -144,6 +144,42 @@ void InputDevice_Multitap::Power(void)
  } 
 }
 
+int InputDevice_Multitap::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(dtr),
+
+  SFVAR(selected_device),
+  SFVAR(full_mode_setting),
+
+  SFVAR(full_mode),
+  SFVAR(mc_mode),
+
+  SFVAR(fm_dp),
+  SFARRAY(&fm_buffer[0][0], sizeof(fm_buffer) / sizeof(fm_buffer[0][0])),
+
+  SFVAR(fm_deferred_error_temp),
+  SFVAR(fm_deferred_error),
+  SFVAR(fm_command_error),
+
+  SFVAR(command),
+  SFVAR(receive_buffer),
+  SFVAR(bit_counter),
+  SFVAR(byte_counter),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+ if(load)
+ {
+
+ }
+
+ return(ret);
+}
+
 void InputDevice_Multitap::SetDTR(bool new_dtr)
 {
  bool old_dtr = dtr;

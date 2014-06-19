@@ -15,9 +15,48 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
+ MDEC_READ_FIFO(tfr) vs InCounter vs MDEC_DMACanRead() is a bit fragile right now.  Actually, the entire horrible state machine monstrosity is fragile.
+
+ TODO: OutFIFOReady, so <16bpp works right.
+
+ TODO CODE:
+
+  bool InFIFOReady;
+
+  if(InFIFO.CanWrite())
+  {
+   InFIFO.WriteUnit(V);
+
+   if(InCommand)
+   {
+    if(InCounter != 0xFFFF)
+    {
+     InCounter--;
+
+     // This condition when InFIFO.CanWrite() != 0 is a bit buggy on real hardware, decoding loop *seems* to be reading too
+     // much and pulling garbage from the FIFO.
+     if(InCounter == 0xFFFF)	
+      InFIFOReady = true;
+    }
+
+    if(InFIFO.CanWrite() == 0)
+     InFIFOReady = true;
+   }
+  }
+*/
+
+// Good test-case games:
+//	Dragon Knight 4(bad disc?)
+//	Final Fantasy 7 intro movie.
+//	GameShark Version 4.0 intro movie; (clever) abuse of DMA channel 0.
+//	SimCity 2000 startup.
+
+
 #include "psx.h"
 #include "mdec.h"
 
+#include "../masmem.h"
 #include "../cdrom/SimpleFIFO.h"
 #include <math.h>
 
@@ -33,35 +72,47 @@
 namespace MDFN_IEN_PSX
 {
 
+static int32 ClockCounter;
+static unsigned MDRPhase;
+static SimpleFIFO<uint32> InFIFO(0x20);
+static SimpleFIFO<uint32> OutFIFO(0x20);
 
-static bool block_ready;
-static int16_t block_y[2][2][8][8];
-static int16_t block_cb[8][8];	// [y >> 1][x >> 1]
-static int16_t block_cr[8][8];	// [y >> 1][x >> 1]
+static int8 block_y[8][8];
+static int8 block_cb[8][8];	// [y >> 1][x >> 1]
+static int8 block_cr[8][8];	// [y >> 1][x >> 1]
 
-static int32_t run_time;
-static uint32_t Command;
+static uint32 Control;
+static uint32 Command;
+static bool InCommand;
 
-static uint8_t QMatrix[2][64];
-static uint32_t QMIndex;
+static uint8 QMatrix[2][64];
+static uint32 QMIndex;
 
-static int16_t IDCTMatrix[64] MDFN_ALIGN(16);
-static uint32_t IDCTMIndex;
+static int16 IDCTMatrix[64] MDFN_ALIGN(16);
+static uint32 IDCTMIndex;
 
-static uint8_t QScale;
+static uint8 QScale;
 
-static int16_t Coeff[6][64] MDFN_ALIGN(16);
-static uint32_t CoeffIndex;
-static uint32_t DecodeWB;
+static int16 Coeff[64] MDFN_ALIGN(16);
+static uint32 CoeffIndex;
+static uint32 DecodeWB;
 
-static SimpleFIFO<uint16_t> InputBuffer(65536);
-static SimpleFIFO<uint16_t> OutBuffer(384);
+static union
+{
+ uint32 pix32[48];
+ uint16 pix16[96];
+ uint8   pix8[192];
+} PixelBuffer;
+static uint32 PixelBufferReadOffset;
+static uint32 PixelBufferCount32;
 
-static uint32_t InCounter;
-static bool BlockEnd;
-static bool DecodeEnd;
+static uint16 InCounter;
 
-static const uint8_t ZigZag[64] =
+static uint8 RAMOffsetY;
+static uint8 RAMOffsetCounter;
+static uint8 RAMOffsetWWS;
+
+static const uint8 ZigZag[64] =
 {
  0x00, 0x08, 0x01, 0x02, 0x09, 0x10, 0x18, 0x11, 
  0x0a, 0x03, 0x04, 0x0b, 0x12, 0x19, 0x20, 0x28, 
@@ -75,21 +126,20 @@ static const uint8_t ZigZag[64] =
 
 void MDEC_Power(void)
 {
-#if 0
- for(int i = 0; i < 64; i++)
- {
-  int d = ((ZigZag[i] & 0x7) << 3) | ((ZigZag[i] >> 3) & 0x7);
-  printf("0x%02x, ", d);
+ ClockCounter = 0;
+ MDRPhase = 0;
 
-  if((i & 0x7) == 7)
-   printf("\n");
- }
-#endif
+ InFIFO.Flush();
+ OutFIFO.Flush();
 
- run_time = 0;
- block_ready = false;
+ memset(block_y, 0, sizeof(block_y));
+ memset(block_cb, 0, sizeof(block_cb));
+ memset(block_cr, 0, sizeof(block_cr));
 
+ Control = 0;
  Command = 0;
+ InCommand = false;
+
  memset(QMatrix, 0, sizeof(QMatrix));
  QMIndex = 0;
 
@@ -102,30 +152,40 @@ void MDEC_Power(void)
  CoeffIndex = 0;
  DecodeWB = 0;
 
- OutBuffer.Flush();
+ memset(PixelBuffer.pix32, 0, sizeof(PixelBuffer.pix32));
+ PixelBufferReadOffset = 0;
+ PixelBufferCount32 = 0;
 
  InCounter = 0;
- BlockEnd = 0;
- DecodeEnd = 0;
-}
 
-#define SFFIFO16(fifoobj)  SFARRAY16(&fifoobj.data[0], fifoobj.data.size()),	\
-			 SFVAR(fifoobj.read_pos),				\
-			 SFVAR(fifoobj.write_pos),				\
-			 SFVAR(fifoobj.in_count)
+ RAMOffsetY = 0;
+ RAMOffsetCounter = 0;
+ RAMOffsetWWS = 0;
+}
 
 int MDEC_StateAction(StateMem *sm, int load, int data_only)
 {
  SFORMAT StateRegs[] =
  {
-  SFVAR(block_ready),
+  SFVAR(ClockCounter),
+  SFVAR(MDRPhase),
 
-  SFARRAY16(&block_y[0][0][0][0], sizeof(block_y) / sizeof(block_y[0][0][0][0])),
-  SFARRAY16(&block_cb[0][0], sizeof(block_cb) / sizeof(block_cb[0][0])),
-  SFARRAY16(&block_cr[0][0], sizeof(block_cr) / sizeof(block_cr[0][0])),
+#define SFFIFO32(fifoobj)  SFARRAY32(&fifoobj.data[0], fifoobj.data.size()),	\
+			 SFVAR(fifoobj.read_pos),				\
+			 SFVAR(fifoobj.write_pos),				\
+			 SFVAR(fifoobj.in_count)
 
-  SFVAR(run_time),
+  SFFIFO32(InFIFO),
+  SFFIFO32(OutFIFO),
+#undef SFFIFO
+
+  SFARRAY(&block_y[0][0], sizeof(block_y) / sizeof(block_y[0][0])),
+  SFARRAY(&block_cb[0][0], sizeof(block_cb) / sizeof(block_cb[0][0])),
+  SFARRAY(&block_cr[0][0], sizeof(block_cr) / sizeof(block_cr[0][0])),
+
+  SFVAR(Control),
   SFVAR(Command),
+  SFVAR(InCommand),
 
   SFARRAY(&QMatrix[0][0], sizeof(QMatrix) / sizeof(QMatrix[0][0])),
   SFVAR(QMIndex),
@@ -135,17 +195,19 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
 
   SFVAR(QScale),
 
-  SFARRAY16(&Coeff[0][0], sizeof(Coeff) / sizeof(Coeff[0][0])),
+  SFARRAY16(&Coeff[0], sizeof(Coeff) / sizeof(Coeff[0])),
   SFVAR(CoeffIndex),
   SFVAR(DecodeWB),
 
-
-  SFFIFO16(InputBuffer),
-  SFFIFO16(OutBuffer),
+  SFARRAY32(&PixelBuffer.pix32[0], sizeof(PixelBuffer.pix32) / sizeof(PixelBuffer.pix32[0])),
+  SFVAR(PixelBufferReadOffset),
+  SFVAR(PixelBufferCount32),
 
   SFVAR(InCounter),
-  SFVAR(BlockEnd),
-  SFVAR(DecodeEnd),
+
+  SFVAR(RAMOffsetY),
+  SFVAR(RAMOffsetCounter),
+  SFVAR(RAMOffsetWWS),
 
   SFEND
  };
@@ -154,542 +216,427 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
 
  if(load)
  {
-
+  InFIFO.SaveStatePostLoad();
+  OutFIFO.SaveStatePostLoad();
  }
 
  return(ret);
 }
 
-static void DecodeImage(void);
-static INLINE void WriteImageData(uint16_t V)
+static INLINE int8 Mask9ClampS8(int32 v)
 {
-   const uint32_t qmw = (bool)(DecodeWB < 2);
+ v = sign_x_to_s32(9, v);
 
-   //printf("MDEC DMA SubWrite: %04x\n", V);
+ if(v < -128)
+  v = -128;
 
-   if(!CoeffIndex)
-   {
-      if(DecodeWB == 0 && V == 0xFE00)
-      {
-         InputBuffer.Flush();
-         return;
-      }
-      QScale = V >> 10;
+ if(v > 127)
+  v = 127;
 
-      {
-         int q = QMatrix[qmw][0];	// No QScale here!
-         int ci = sign_10_to_s16(V & 0x3FF);
-         int tmp;
-
-         if(q != 0)
-            tmp = ((ci * q) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
-         else
-            tmp = (ci * 2) << 4;
-
-         // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
-         Coeff[DecodeWB][ZigZag[0]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
-         CoeffIndex++;
-      }
-   }
-   else
-   {
-      if(V == 0xFE00)
-      {
-         BlockEnd = true;
-         while(CoeffIndex < 64)
-            Coeff[DecodeWB][ZigZag[CoeffIndex++]] = 0;
-      }
-      else
-      {
-         uint32_t rlcount = V >> 10;
-
-         for(uint32_t i = 0; i < rlcount && CoeffIndex < 64; i++)
-         {
-            Coeff[DecodeWB][ZigZag[CoeffIndex]] = 0;
-            CoeffIndex++;
-         }
-
-         if(CoeffIndex < 64)
-         {
-            int q = QScale * QMatrix[qmw][CoeffIndex];
-            int ci = sign_10_to_s16(V & 0x3FF);
-            int tmp;
-
-            if(q != 0)
-               tmp = (((ci * q) >> 3) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
-            else
-               tmp = (ci * 2) << 4;
-
-            // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
-            Coeff[DecodeWB][ZigZag[CoeffIndex]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
-            CoeffIndex++;
-         }
-      }
-   }
-
-   if(CoeffIndex == 64 && BlockEnd)
-   {
-      BlockEnd = false;
-      CoeffIndex = 0;
-
-      //printf("Block %d finished\n", DecodeWB);
-
-      DecodeWB++;
-      if(DecodeWB == (((Command >> 27) & 2) ? 6 : 3))
-      {
-         DecodeWB = 0;
-
-         DecodeImage();
-      }
-   }
+ return v;
 }
 
-template<bool phase>
-static void IDCT_1D_Multi(int16_t *in_coeff, int16_t *out_coeff)
+template<typename T>
+static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
 {
-   unsigned col, x;
 #if defined(__SSE2__)
-   for(col = 0; col < 8; col++)
-   {
-      __m128i c =  _mm_load_si128((__m128i *)&in_coeff[(col * 8)]);
+{
+ for(unsigned col = 0; col < 8; col++)
+ {
+  __m128i c =  _mm_load_si128((__m128i *)&in_coeff[(col * 8)]);
 
-      for(x = 0; x < 8; x++)
-      {
-         __m128i sum;
-         __m128i m;
-         int32_t tmp[4] MDFN_ALIGN(16);
+  for(unsigned x = 0; x < 8; x++)
+  {
+   __m128i sum;
+   __m128i m;
+   int32 tmp[4] MDFN_ALIGN(16);
 
-         m = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
-         sum = _mm_madd_epi16(m, c);
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (1 << 0) | (0 << 2)));
+   m = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
+   sum = _mm_madd_epi16(m, c);
+   sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
+   sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (1 << 0) | (0 << 2)));
 
-         //_mm_store_ss((float *)&tmp[0], (__m128)sum);
-         _mm_store_si128((__m128i*)tmp, sum);
+   //_mm_store_ss((float *)&tmp[0], (__m128)sum);
+   _mm_store_si128((__m128i*)tmp, sum);
 
-         if(phase)
-            out_coeff[(col * 8) + x] = (tmp[0] + 0x4000) >> 15;
-         else
-            out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
-      }
-   }
+   if(sizeof(T) == 1)
+    out_coeff[(col * 8) + x] = Mask9ClampS8((tmp[0] + 0x4000) >> 15);
+   else
+    out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
+  }
+ }
+}
 #else
-   for(col = 0; col < 8; col++)
+ for(unsigned col = 0; col < 8; col++)
+ {
+  for(unsigned x = 0; x < 8; x++)
+  {
+   int32 sum = 0;
+
+   for(unsigned u = 0; u < 8; u++)
    {
-      for(x = 0; x < 8; x++)
-      {
-         unsigned u;
-         int32_t sum = 0;
-
-         for(u = 0; u < 8; u++)
-            sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
-
-         if(phase)
-            out_coeff[(col * 8) + x] = (sum + 0x4000) >> 15;
-         else
-            out_coeff[(x * 8) + col] = (sum + 0x4000) >> 15;
-      }
+    sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
    }
+
+   if(sizeof(T) == 1)
+    out_coeff[(col * 8) + x] = Mask9ClampS8((sum + 0x4000) >> 15);
+   else
+    out_coeff[(x * 8) + col] = (sum + 0x4000) >> 15;
+  }
+ }
 #endif
 }
 
-static void IDCT(int16_t *in_coeff, int16_t *out_coeff) NO_INLINE;
-static void IDCT(int16_t *in_coeff, int16_t *out_coeff)
+static void IDCT(int16 *in_coeff, int8 *out_coeff) NO_INLINE;
+static void IDCT(int16 *in_coeff, int8 *out_coeff)
 {
- int16_t tmpbuf[64] MDFN_ALIGN(16);
+ int16 tmpbuf[64] MDFN_ALIGN(16);
 
- IDCT_1D_Multi<0>(in_coeff, tmpbuf);
- IDCT_1D_Multi<1>(tmpbuf, out_coeff);
+ IDCT_1D_Multi<int16>(in_coeff, tmpbuf);
+ IDCT_1D_Multi<int8>(tmpbuf, out_coeff);
 }
 
-static void YCbCr_to_RGB(const int32_t y, const int32_t cb, const int32_t cr, uint8_t &r, uint8_t &g, uint8_t &b)
+static INLINE void YCbCr_to_RGB(const int8 y, const int8 cb, const int8 cr, int &r, int &g, int &b)
 {
- int rt = (y + 128) + ((91881 * cr) >> 16);
- int gt = (y + 128) - ((22525 * cb) >> 16) - ((46812 * cr) >> 16);
- int bt = (y + 128) + ((116130 * cb) >> 16);
+ //
+ // The formula for green is still a bit off(precision/rounding issues when both cb and cr are non-zero).
+ //
 
- r = std::max<int>(std::min<int>(rt, 255), 0);
- g = std::max<int>(std::min<int>(gt, 255), 0);
- b = std::max<int>(std::min<int>(bt, 255), 0);
+ r = Mask9ClampS8(y + (((359 * cr) + 0x80) >> 8));
+ //g = Mask9ClampS8(y + (((-88 * cb) + (-183 * cr) + 0x80) >> 8));
+ g = Mask9ClampS8(y + ((((-88 * cb) &~ 0x1F) + ((-183 * cr) &~ 0x07) + 0x80) >> 8));
+ b = Mask9ClampS8(y + (((454 * cb) + 0x80) >> 8));
+
+ r ^= 0x80;
+ g ^= 0x80;
+ b ^= 0x80;
 }
 
-static void DecodeImage(void)
+static INLINE uint16 RGB_to_RGB555(uint8 r, uint8 g, uint8 b)
 {
-   //puts("DECODE");
+ r = (r + 4) >> 3;
+ g = (g + 4) >> 3;
+ b = (b + 4) >> 3;
 
-   if((Command >> 27) & 0x2)
+ if(r > 0x1F)
+  r = 0x1F;
+
+ if(g > 0x1F)
+  g = 0x1F;
+
+ if(b > 0x1F)
+  b = 0x1F;
+
+ return((r << 0) | (g << 5) | (b << 10));
+}
+
+static void EncodeImage(const unsigned ybn)
+{
+ //printf("ENCODE, %d\n", (Command & 0x08000000) ? 256 : 384);
+
+ PixelBufferCount32 = 0;
+
+ switch((Command >> 27) & 0x3)
+ {
+  case 0:	// 4bpp
+  {
+   const uint8 us_xor = (Command & (1U << 26)) ? 0x00 : 0x88;
+   uint8* pix_out = PixelBuffer.pix8;
+
+   for(int y = 0; y < 8; y++)
    {
-      run_time -= 2048;
+    for(int x = 0; x < 8; x += 2)
+    {
+     uint8 p0 = std::min<int>(127, block_y[y][x + 0] + 8);
+     uint8 p1 = std::min<int>(127, block_y[y][x + 1] + 8);
 
-      IDCT(Coeff[0], &block_cr[0][0]);
-      IDCT(Coeff[1], &block_cb[0][0]);
-      IDCT(Coeff[2], &block_y[0][0][0][0]);
-      IDCT(Coeff[3], &block_y[0][1][0][0]);
-      IDCT(Coeff[4], &block_y[1][0][0][0]);
-      IDCT(Coeff[5], &block_y[1][1][0][0]);
+     *pix_out = ((p0 >> 4) | (p1 & 0xF0)) ^ us_xor;
+     pix_out++;
+    }
+   }
+   PixelBufferCount32 = 8;
+  }
+  break;
+
+
+  case 1:	// 8bpp
+  {
+   const uint8 us_xor = (Command & (1U << 26)) ? 0x00 : 0x80;
+   uint8* pix_out = PixelBuffer.pix8;
+
+   for(int y = 0; y < 8; y++)
+   {
+    for(int x = 0; x < 8; x++)
+    {
+     *pix_out = (uint8)block_y[y][x] ^ us_xor;
+     pix_out++;
+    }
+   }
+   PixelBufferCount32 = 16;
+  }
+  break;
+
+  case 2:	// 24bpp
+  {
+   const uint8 rgb_xor = (Command & (1U << 26)) ? 0x80 : 0x00;
+   uint8* pix_out = PixelBuffer.pix8;
+
+   for(int y = 0; y < 8; y++)
+   {
+    const int8* by = &block_y[y][0];
+    const int8* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+    const int8* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+    
+    for(int x = 0; x < 8; x++)
+    {
+     int r, g, b;
+
+     YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], r, g, b);
+
+     pix_out[0] = r ^ rgb_xor;
+     pix_out[1] = g ^ rgb_xor;
+     pix_out[2] = b ^ rgb_xor;
+     pix_out += 3;
+    }
+   }
+   PixelBufferCount32 = 48;
+  }
+  break;
+
+  case 3:	// 16bpp
+  {
+   uint16 pixel_xor = ((Command & 0x02000000) ? 0x8000 : 0x0000) | ((Command & (1U << 26)) ? 0x4210 : 0x0000);
+   uint16* pix_out = PixelBuffer.pix16;
+
+   for(int y = 0; y < 8; y++)
+   {
+    const int8* by = &block_y[y][0];
+    const int8* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+    const int8* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+
+    for(int x = 0; x < 8; x++)
+    {
+     int r, g, b;
+
+     YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], r, g, b);
+
+     StoreU16_LE(pix_out, pixel_xor ^ RGB_to_RGB555(r, g, b));
+     pix_out++;
+    }
+   }
+   PixelBufferCount32 = 32;
+  }
+  break;
+
+ }
+}
+
+static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
+{
+ const uint32 qmw = (bool)(DecodeWB < 2);
+
+  //printf("MDEC DMA SubWrite: %04x, %d\n", V, CoeffIndex);
+
+  if(!CoeffIndex)
+  {
+   if(V == 0xFE00)
+   {
+    //printf("FE00 @ %u\n", DecodeWB);
+    return;
+   }
+
+   QScale = V >> 10;
+
+   {
+    int q = QMatrix[qmw][0];	// No QScale here!
+    int ci = sign_10_to_s16(V & 0x3FF);
+    int tmp;
+
+    if(q != 0)
+     tmp = ((ci * q) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
+    else
+     tmp = (ci * 2) << 4;
+
+    // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
+    Coeff[ZigZag[0]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
+    CoeffIndex++;
+   }
+  }
+  else
+  {
+   if(V == 0xFE00)
+   {
+    while(CoeffIndex < 64)
+     Coeff[ZigZag[CoeffIndex++]] = 0;
    }
    else
    {
-      run_time -= 341;
-      IDCT(Coeff[2], &block_y[0][0][0][0]);
+    uint32 rlcount = V >> 10;
+
+    for(uint32 i = 0; i < rlcount && CoeffIndex < 64; i++)
+    {
+     Coeff[ZigZag[CoeffIndex]] = 0;
+     CoeffIndex++;
+    }
+
+    if(CoeffIndex < 64)
+    {
+     int q = QScale * QMatrix[qmw][CoeffIndex];
+     int ci = sign_10_to_s16(V & 0x3FF);
+     int tmp;
+
+     if(q != 0)
+      tmp = (((ci * q) >> 3) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
+     else
+      tmp = (ci * 2) << 4;
+
+     // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
+     Coeff[ZigZag[CoeffIndex]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
+     CoeffIndex++;
+    }
    }
+  }
 
-   block_ready = true;
-}
+  if(CoeffIndex == 64)
+  {
+   CoeffIndex = 0;
 
-static void EncodeImage(void)
-{
-   int x, y;
-   //printf("ENCODE, %d\n", (Command & 0x08000000) ? 256 : 384);
+   //printf("Block %d finished\n", DecodeWB);
 
-   block_ready = false;
-
-   switch((Command >> 27) & 0x3)
+   switch(DecodeWB)
    {
-      case 0:	// 4bpp, TODO
-         break;
-      case 1:	// 8bpp
-         {
-            uint8_t us_xor = (Command & (1U << 26)) ? 0x00 : 0x80;
+    case 0: IDCT(Coeff, &block_cr[0][0]); break;
+    case 1: IDCT(Coeff, &block_cb[0][0]); break;
+    case 2: IDCT(Coeff, &block_y[0][0]); break;
+    case 3: IDCT(Coeff, &block_y[0][0]); break;
+    case 4: IDCT(Coeff, &block_y[0][0]); break;
+    case 5: IDCT(Coeff, &block_y[0][0]); break;
+   }   
 
-            for(y = 0; y < 8; y++)
-            {
-               uint32_t qb = 0;
+   //
+   // Approximate, actual timing seems to be a bit complex.
+   //
+   *eat_cycles += 341;
 
-               for(x = 0; x < 8; x++)
-               {
-                  int yv = block_y[0][0][y][x];
-
-                  if(yv < -128)
-                     yv = -128;
-
-                  if(yv > 127)
-                     yv = 127;
-
-                  qb |= ((uint8)yv ^ us_xor) << ((x & 1) * 8);
-                  if((x & 1) == 1)
-                  {
-                     if(OutBuffer.CanWrite())
-                        OutBuffer.WriteUnit(qb);
-
-                     qb = 0;
-                  }
-
-#if 0
-                  qb |= yv << ((x & 3) * 8);
-                  if((x & 3) == 3)
-                  {
-                     if(OutBuffer.CanWrite())
-                     {
-                        printf("0x%08x\n", qb);
-                        OutBuffer.WriteUnit(qb);
-                     }
-                     qb = 0;
-                  }
-#endif
-               }
-            }
-         }
-         break;
-
-      case 2:	// 24bpp
-         {
-            uint8_t output[16][16][3];	// [y][x][cc]
-
-            for(y = 0; y < 16; y++)
-            {
-               for(x = 0; x < 16; x++)
-               {
-                  uint8_t r, g, b;
-
-                  YCbCr_to_RGB(block_y[(y >> 3) & 1][(x >> 3) & 1][y & 7][x & 7], block_cb[y >> 1][x >> 1], block_cr[y >> 1][x >> 1], r, g, b);
-
-                  output[y][x][0] = r;
-                  output[y][x][1] = g;
-                  output[y][x][2] = b;
-               }
-            }
-
-            for(int i = 0; i < 384; i++)
-            {
-               if(OutBuffer.CanWrite())
-                  OutBuffer.WriteUnit((&output[0][0][0])[i * 2 + 0] | ((&output[0][0][0])[i * 2 + 1] << 8));
-            }
-         }
-         break;
-
-      case 3:	// 16bpp
-         {
-            uint16_t pixel_or = (Command & 0x02000000) ? 0x8000 : 0x0000;
-
-            for(y = 0; y < 16; y++)
-            {
-               for(x = 0; x < 16; x++)
-               {
-                  uint8_t r, g, b;
-
-                  YCbCr_to_RGB(block_y[(y >> 3) & 1][(x >> 3) & 1][y & 7][x & 7], block_cb[y >> 1][x >> 1], block_cr[y >> 1][x >> 1], r, g, b);
-
-                  if(OutBuffer.CanWrite())
-                     OutBuffer.WriteUnit(pixel_or | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10));
-               }
-            }
-         }
-         break;
-
-   }
-}
-
-void MDEC_DMAWrite(uint32_t V)
-{
-   int i;
-   if (InCounter <= 0)
-      return;
-
-   InCounter--;
-
-   switch((Command >> 29) & 0x7)
+   if(DecodeWB >= 2)
    {
-      case 1:
-         for(i = 0; i < 2; i++)
-         {
-            if(InputBuffer.CanWrite())
-               InputBuffer.WriteUnit(V);
-
-            V >>= 16;
-         }
-         break;
-
-      case 2:
-         for(i = 0; i < 4; i++)
-         {
-            QMatrix[QMIndex >> 6][QMIndex & 0x3F] = (uint8)V;
-            QMIndex = (QMIndex + 1) & 0x7F;
-            V >>= 8;
-         }
-         break;
-
-      case 3:
-         for(i = 0; i < 2; i++)
-         {
-            IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16)(V & 0xFFFF) >> 3;
-            IDCTMIndex = (IDCTMIndex + 1) & 0x3F;
-
-            V >>= 16;
-         }
-         break;
-
-      default:
-         PSX_DBG(PSX_DBG_WARNING, "MYSTERY1: %08x\n", V);
-         break;
+    EncodeImage((DecodeWB + 4) % 6);
    }
-}
 
-uint32_t MDEC_DMARead(void)
-{
-   uint32_t V = 0;
-
-   if(((Command >> 29) & 0x7) == 0x1 && OutBuffer.CanRead() >= 2)
+   DecodeWB++;
+   if(DecodeWB == (((Command >> 27) & 2) ? 6 : 3))
    {
-      V = OutBuffer.ReadUnit() | (OutBuffer.ReadUnit() << 16);
+    DecodeWB = ((Command >> 27) & 2) ? 0 : 2;
    }
-   else
-   {
-      PSX_DBG(PSX_DBG_WARNING, "[MDEC] BONUS GNOMES\n");
-      V = rand();
-   }
-
-   return(V);
+  }
 }
 
-// Test case related to this: GameShark Version 4.0 intro movie(coupled with (clever) abuse of DMA channel 0).
-//			also: SimCity 2000 startup.
-bool MDEC_DMACanWrite(void)
+#if 1
+
+//
+//
+//
+#define MDEC_WAIT_COND(n)  { case __COUNTER__: if(!(n)) { MDRPhase = __COUNTER__ - MDRPhaseBias - 1; return; } }
+
+#define MDEC_WRITE_FIFO(n) { MDEC_WAIT_COND(OutFIFO.CanWrite()); OutFIFO.WriteUnit(n);  }
+#define MDEC_READ_FIFO(n)  { MDEC_WAIT_COND(InFIFO.CanRead()); n = InFIFO.ReadUnit(); }
+#define MDEC_EAT_CLOCKS(n) { ClockCounter -= (n); MDEC_WAIT_COND(ClockCounter > 0); }
+
+void MDEC_Run(int32 clocks)
 {
-   return (InCounter > 0 && ((Command >> 29) & 0x7) >= 1 && ((Command >> 29) & 0x7) <= 3);
-}
+ static const unsigned MDRPhaseBias = __COUNTER__ + 1;
 
-bool MDEC_DMACanRead(void)
-{
-   return (OutBuffer.CanRead() >= 2);
-}
+ //MDFN_DispMessage("%u", OutFIFO.CanRead());
 
-void MDEC_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
-{
-   //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d", A, V, timestamp);
-   if(A & 4)
-   {
-      if(V & 0x80000000) // Reset?
-      {
-         Command = 0;
-
-         block_ready = false;
-         run_time = 0;
-         QMIndex = 0;
-         IDCTMIndex = 0;
-
-         QScale = 0;
-
-         memset(Coeff, 0, sizeof(Coeff));
-         CoeffIndex = 0;
-         DecodeWB = 0;
-
-         InputBuffer.Flush();
-         OutBuffer.Flush();
-
-         InCounter = 0;
-         BlockEnd = false;
-      }
-   }
-   else
-   {
-      Command = V;
-
-      switch((Command >> 29) & 0x7)
-      {
-         case 1:
-            InputBuffer.Flush();
-            OutBuffer.Flush();
-
-            block_ready = false;
-            BlockEnd = false;
-            CoeffIndex = 0;
-
-            if((Command >> 27) & 2)
-               DecodeWB = 0;
-            else
-               DecodeWB = 2;
-
-            InCounter = V & 0xFFFF;
-            break;
-
-         case 2:
-            QMIndex = 0;
-            InCounter = 0x10 + ((Command & 0x1) ? 0x10 : 0x00);
-            break;
-
-         case 3:
-            IDCTMIndex = 0;
-            InCounter = 0x20;
-            break;
-
-         default:
-            InCounter = V & 0xFFFF;
-            break;
-      }
-   }
-}
-
-uint32_t MDEC_Read(const pscpu_timestamp_t timestamp, uint32_t A)
-{
-   uint32_t ret = 0;
-
-   if(A & 4)
-   {
-      ret = 0;
-
-      if(InputBuffer.CanRead())
-         ret |= 0x20000000;
-
-      ret |= ((Command >> 25) & 0xF) << 23;
-   }
-   else
-      ret = Command;
-
-   //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.CanRead(), InCounter);
-
-   return(ret);
-}
-
-void MDEC_Run(int32_t clocks)
-{
-   run_time += clocks;
-
-   while(run_time > 0)
-   {
-      run_time--;
-
-      if(block_ready && !OutBuffer.CanRead())
-         EncodeImage();
-
-      if(block_ready && OutBuffer.CanRead())
-         break;
-
-      if(!InputBuffer.CanRead())
-         break;
-
-      WriteImageData(InputBuffer.ReadUnit());
-   }
-
-   if(run_time > 0)
-      run_time = 0;
-}
-
-#if 0
-// Maybe we should just use libco....
-#define MDEC_WRITE_FIFO(n) case __COUNTER__: if(!InFIFO.CanRead()) { MDRPhase = __COUNTER__ - 1; return; } OutFIFO.Write(n); 
-#define MDEC_READ_FIFO(n) case __COUNTER__: if(!InFIFO.CanRead()) { MDRPhase = __COUNTER__ - 1; return; } n = InFIFO.Read();
-#define MDEC_EAT_CLOCKS(n) ClockCounter -= clocks;  case __COUNTER__: if(ClockCounter <= 0) { MDRPhase = __COUNTER__ - 1; return; }
-void MDEC_Run2(int32_t clocks)
-{
  ClockCounter += clocks;
 
  if(ClockCounter > 128)
-  ClockCounter = 128;
-
- switch(MDRPhase)
  {
-  MDEC_READ_FIFO(Command);
+  //if(MDRPhase != 0)
+  // printf("SNORT: %d\n", ClockCounter);
+  ClockCounter = 128;
+ }
 
-  //
-  //
-  //
-  if(((Command >> 29) & 0x7) == 1)
+ switch(MDRPhase + MDRPhaseBias)
+ {
+  for(;;)
   {
-   InCounter = Command & 0xFFFF;
-   OutBuffer.Flush();
+   InCommand = false;
+   MDEC_READ_FIFO(Command);	// This must be the first MDEC_* macro used!
+   InCommand = true;
+   MDEC_EAT_CLOCKS(1);
 
-   block_ready = false;
-   BlockEnd = false;
-   CoeffIndex = 0;
+   //printf("****************** Command: %08x, %02x\n", Command, Command >> 29);
 
-   if((Command >> 27) & 2)
-    DecodeWB = 0;
-   else
-    DecodeWB = 2;
-
-   InCounter--;
-   while(InCounter != 0xFFFF)
+   //
+   //
+   //
+   if(((Command >> 29) & 0x7) == 1)
    {
-	uint32_t tfr;
-	bool need_encode;
+    InCounter = Command & 0xFFFF;
+    OutFIFO.Flush();
+    //OutBuffer.Flush();
 
-	MDEC_READ_FIFO(tfr);
+    PixelBufferCount32 = 0;
+    CoeffIndex = 0;
 
-	need_encode = WriteImageData(tfr);
-	need_encode |= WriteImageData(tfr >> 16);
+    if((Command >> 27) & 2)
+     DecodeWB = 0;
+    else
+     DecodeWB = 2;
 
-	if(need_encode)
-	{
+    switch((Command >> 27) & 0x3)
+    {
+     case 0:
+     case 1: RAMOffsetWWS = 0; break;
+     case 2: RAMOffsetWWS = 6; break;
+     case 3: RAMOffsetWWS = 4; break;
+    }
+    RAMOffsetY = 0;
+    RAMOffsetCounter = RAMOffsetWWS;
 
+    InCounter--;
+    do
+    {
+     uint32 tfr;
+     int32 need_eat; // = 0;
 
-	}
+     MDEC_READ_FIFO(tfr);
+     InCounter--;
+
+//     printf("KA: %04x %08x\n", InCounter, tfr);
+
+     need_eat = 0;
+     PixelBufferCount32 = 0;
+     WriteImageData(tfr, &need_eat);
+     WriteImageData(tfr >> 16, &need_eat);
+
+     MDEC_EAT_CLOCKS(need_eat);
+
+     PixelBufferReadOffset = 0;
+     while(PixelBufferReadOffset != PixelBufferCount32)
+     {
+      MDEC_WRITE_FIFO(LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++]));
+     }
+    } while(InCounter != 0xFFFF);
    }
-  }
-  //
-  //
-  //
-  else if(((Command >> 29) & 0x7) == 2)
-  {
-   QMIndex = 0;
-   InCounter = 0x10 + ((Command & 0x1) ? 0x10 : 0x00);
-
-   InCounter--;
-   while(InCounter != 0xFFFF)
+   //
+   //
+   //
+   else if(((Command >> 29) & 0x7) == 2)
    {
-	uint32_t tfr;
+    QMIndex = 0;
+    InCounter = 0x10 + ((Command & 0x1) ? 0x10 : 0x00);
+
+    InCounter--;
+    do
+    {
+	uint32 tfr;
     
 	MDEC_READ_FIFO(tfr);
+	InCounter--;
+
+	//printf("KA: %04x %08x\n", InCounter, tfr);
 
 	for(int i = 0; i < 4; i++)
 	{
@@ -697,40 +644,176 @@ void MDEC_Run2(int32_t clocks)
 	 QMIndex = (QMIndex + 1) & 0x7F;
 	 tfr >>= 8;
 	}
+    } while(InCounter != 0xFFFF);
    }
-  }
-  //
-  //
-  //
-  else if(((Command >> 29) & 0x7) == 3)
-  {
-   IDCTMIndex = 0;
-   InCounter = 0x20;
-
-   InCounter--;
-   while(InCounter != 0xFFFF)
+   //
+   //
+   //
+   else if(((Command >> 29) & 0x7) == 3)
    {
-    uint32_t tfr;
+    IDCTMIndex = 0;
+    InCounter = 0x20;
 
-    MDEC_READ_FIFO(tfr);
-
-    for(unsigned i = 0; i < 2; i++)
+    InCounter--;
+    do
     {
-     int tmp = (int16)(tfr & 0xFFFF) >> 3;
+     uint32 tfr;
 
-     IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16)(V & 0xFFFF) >> 3;
-     IDCTMIndex = (IDCTMIndex + 1) & 0x3F;
+     MDEC_READ_FIFO(tfr);
+     InCounter--;
 
-     tfr >>= 16;
-    }
+     for(unsigned i = 0; i < 2; i++)
+     {
+      IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16)(tfr & 0xFFFF) >> 3;
+      IDCTMIndex = (IDCTMIndex + 1) & 0x3F;
+
+      tfr >>= 16;
+     }
+    } while(InCounter != 0xFFFF);
    }
+   else
+   {
+    InCounter = Command & 0xFFFF;
+   }
+  } // end for(;;)
+ }
+}
+#endif
+
+void MDEC_DMAWrite(uint32 V)
+{
+ if(InFIFO.CanWrite())
+ {
+  InFIFO.WriteUnit(V);
+  MDEC_Run(0);
+ }
+ else
+ {
+  PSX_DBG(PSX_DBG_WARNING, "Input FIFO DMA write overflow?!\n");
+ }
+}
+
+uint32 MDEC_DMARead(int32* offs)
+{
+ uint32 V = 0;
+
+ *offs = 0;
+
+ if(MDFN_LIKELY(OutFIFO.CanRead()))
+ {
+  V = OutFIFO.ReadUnit();
+
+  *offs = (RAMOffsetY & 0x7) * RAMOffsetWWS;
+
+  if(RAMOffsetY & 0x08)
+  {
+   *offs = (*offs - RAMOffsetWWS*7);
+  }
+
+  RAMOffsetCounter--;
+  if(!RAMOffsetCounter)
+  {
+   RAMOffsetCounter = RAMOffsetWWS;
+   RAMOffsetY++;
+  }
+ }
+ else
+ {
+  PSX_DBG(PSX_DBG_WARNING, "[MDEC] BONUS GNOMES\n");
+  V = rand();
+ }
+
+ return(V);
+}
+
+bool MDEC_DMACanWrite(void)
+{
+ return((InFIFO.CanWrite() >= 0x20) && (Control & (1U << 30)) && InCommand && InCounter != 0xFFFF);
+}
+
+bool MDEC_DMACanRead(void)
+{
+ return((OutFIFO.CanRead() >= 0x20) && (Control & (1U << 29)));
+}
+
+void MDEC_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
+{
+ //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d  --- %u %u", A, V, timestamp, InFIFO.CanRead(), OutFIFO.CanRead());
+ if(A & 4)
+ {
+  if(V & 0x80000000) // Reset?
+  {
+   MDRPhase = 0;
+   InCounter = 0;
+   Command = 0;
+   InCommand = false;
+
+   PixelBufferCount32 = 0;
+   ClockCounter = 0;
+   QMIndex = 0;
+   IDCTMIndex = 0;
+
+   QScale = 0;
+
+   memset(Coeff, 0, sizeof(Coeff));
+   CoeffIndex = 0;
+   DecodeWB = 0;
+
+   InFIFO.Flush();
+   OutFIFO.Flush();
+  }
+  Control = V & 0x7FFFFFFF;
+ }
+ else
+ {
+  if(InFIFO.CanWrite())
+  {
+   InFIFO.WriteUnit(V);
+
+   if(!InCommand)
+   {
+    if(ClockCounter < 1)
+     ClockCounter = 1;
+   }
+   MDEC_Run(0);
   }
   else
   {
-   InCounter = Command & 0xFFFF;
+   PSX_DBG(PSX_DBG_WARNING, "MDEC manual write FIFO overflow?!\n");
   }
  }
 }
 
-#endif
+uint32 MDEC_Read(const pscpu_timestamp_t timestamp, uint32 A)
+{
+ uint32 ret = 0;
+
+ if(A & 4)
+ {
+  ret = 0;
+
+  ret |= (OutFIFO.CanRead() == 0) << 31;
+  ret |= (InFIFO.CanWrite() == 0) << 30;
+  ret |= InCommand << 29;
+
+  ret |= MDEC_DMACanWrite() << 28;
+  ret |= MDEC_DMACanRead() << 27;
+
+  ret |= ((Command >> 25) & 0xF) << 23;
+
+  // Needs refactoring elsewhere to work right: ret |= ((DecodeWB + 4) % 6) << 16;
+
+  ret |= InCounter & 0xFFFF;
+ }
+ else
+ {
+  if(OutFIFO.CanRead())
+   ret = OutFIFO.ReadUnit();
+ }
+
+ //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.CanRead(), InCounter);
+
+ return(ret);
+}
+
 }

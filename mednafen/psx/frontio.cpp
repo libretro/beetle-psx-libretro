@@ -149,13 +149,10 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
 
   SFVAR(istatus),
 
-  // FIXME:
-#if 0
-  pscpu_timestamp_t irq10_pulse_ts[2];
-
-  int32 dsr_pulse_delay[4];
-  int32 dsr_active_until_ts[4];
-#endif
+  // FIXME: Step mode save states.
+  SFARRAY32(irq10_pulse_ts, sizeof(irq10_pulse_ts) / sizeof(irq10_pulse_ts[0])),
+  SFARRAY32(dsr_pulse_delay, sizeof(dsr_pulse_delay) / sizeof(dsr_pulse_delay[0])),
+  SFARRAY32(dsr_active_until_ts, sizeof(dsr_active_until_ts) / sizeof(dsr_active_until_ts[0])),
 
   SFEND
  };
@@ -184,6 +181,11 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
   trio_snprintf(tmpbuf, sizeof(tmpbuf), "FIOTAP%u", i);
 
   ret &= DevicesTap[i]->StateAction(sm, load, data_only, tmpbuf);
+ }
+
+ if(load)
+ {
+    IRQ_Assert(IRQ_SIO, istatus);
  }
 
  return(ret);

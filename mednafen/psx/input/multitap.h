@@ -11,6 +11,7 @@ class InputDevice_Multitap : public InputDevice
  InputDevice_Multitap();
  virtual ~InputDevice_Multitap();
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
 
  void SetSubDevice(unsigned int sub_index, InputDevice *device, InputDevice *mc_device);
 

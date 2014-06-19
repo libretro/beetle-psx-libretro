@@ -30,6 +30,7 @@ class InputDevice_Justifier : public InputDevice
  virtual ~InputDevice_Justifier();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
  virtual void UpdateInput(const void *data);
  virtual bool RequireNoFrameskip(void);
  virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
@@ -133,6 +134,52 @@ void InputDevice_Justifier::UpdateInput(const void *data)
  if((d8[4] & 0x8) && !prev_oss && os_shot_counter == 0)
   os_shot_counter = 10;
  prev_oss = d8[4] & 0x8;
+}
+
+int InputDevice_Justifier::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(dtr),
+
+      SFVAR(buttons),
+      SFVAR(trigger_eff),
+      SFVAR(trigger_noclear),
+
+      SFVAR(need_hit_detect),
+
+      SFVAR(nom_x),
+      SFVAR(nom_y),
+      SFVAR(os_shot_counter),
+      SFVAR(prev_oss),
+
+      SFVAR(command_phase),
+      SFVAR(bitpos),
+      SFVAR(receive_buffer),
+
+      SFVAR(command),
+
+      SFARRAY(transmit_buffer, sizeof(transmit_buffer)),
+      SFVAR(transmit_pos),
+      SFVAR(transmit_count),
+
+      SFVAR(prev_vsync),
+      SFVAR(line_counter),
+
+      SFEND
+   };
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+   if(load)
+   {
+      if((transmit_pos + transmit_count) > sizeof(transmit_buffer))
+      {
+         transmit_pos = 0;
+         transmit_count = 0;
+      }
+   }
+
+   return(ret);
 }
 
 bool InputDevice_Justifier::RequireNoFrameskip(void)

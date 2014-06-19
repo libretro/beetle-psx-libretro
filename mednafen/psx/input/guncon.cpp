@@ -30,6 +30,7 @@ class InputDevice_GunCon : public InputDevice
  virtual ~InputDevice_GunCon();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
  virtual void UpdateInput(const void *data);
  virtual bool RequireNoFrameskip(void);
  virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
@@ -111,6 +112,52 @@ void InputDevice_GunCon::Power(void)
 
  prev_vsync = 0;
  line_counter = 0;
+}
+
+int InputDevice_GunCon::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(dtr),
+
+      SFVAR(buttons),
+      SFVAR(trigger_eff),
+      SFVAR(trigger_noclear),
+      SFVAR(hit_x),
+      SFVAR(hit_y),
+
+      SFVAR(nom_x),
+      SFVAR(nom_y),
+      SFVAR(os_shot_counter),
+      SFVAR(prev_oss),
+
+      SFVAR(command_phase),
+      SFVAR(bitpos),
+      SFVAR(receive_buffer),
+
+      SFVAR(command),
+
+      SFARRAY(transmit_buffer, sizeof(transmit_buffer)),
+      SFVAR(transmit_pos),
+      SFVAR(transmit_count),
+
+      SFVAR(prev_vsync),
+      SFVAR(line_counter),
+
+      SFEND
+   };
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+   if(load)
+   {
+      if((transmit_pos + transmit_count) > sizeof(transmit_buffer))
+      {
+         transmit_pos = 0;
+         transmit_count = 0;
+      }
+   }
+
+   return(ret);
 }
 
 void InputDevice_GunCon::UpdateInput(const void *data)

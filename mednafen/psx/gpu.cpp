@@ -1538,4 +1538,119 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
    LineWidths = espec->LineWidths;
 }
 
+int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFARRAY16(&GPURAM[0][0], sizeof(GPURAM) / sizeof(GPURAM[0][0])),
+
+      SFVAR(DMAControl),
+
+      SFVAR(ClipX0),
+      SFVAR(ClipY0),
+      SFVAR(ClipX1),
+      SFVAR(ClipY1),
+
+      SFVAR(OffsX),
+      SFVAR(OffsY),
+
+      SFVAR(dtd),
+      SFVAR(dfe),
+
+      SFVAR(MaskSetOR),
+      SFVAR(MaskEvalAND),
+
+      SFVAR(tww),
+      SFVAR(twh),
+      SFVAR(twx),
+      SFVAR(twy),
+
+      SFVAR(TexPageX),
+      SFVAR(TexPageY),
+
+      SFVAR(SpriteFlip),
+
+      SFVAR(abr),
+      SFVAR(TexMode),
+
+      SFARRAY32(&BlitterFIFO.data[0], BlitterFIFO.data.size()),
+      SFVAR(BlitterFIFO.read_pos),
+      SFVAR(BlitterFIFO.write_pos),
+      SFVAR(BlitterFIFO.in_count),
+
+      SFVAR(DataReadBuffer),
+
+      SFVAR(IRQPending),
+
+      SFVAR(InCmd),
+      SFVAR(InCmd_CC),
+
+#define TVHELPER(n)	SFVAR(n.x), SFVAR(n.y), SFVAR(n.u), SFVAR(n.v), SFVAR(n.r), SFVAR(n.g), SFVAR(n.b)
+      TVHELPER(InQuad_F3Vertices[0]),
+      TVHELPER(InQuad_F3Vertices[1]),
+      TVHELPER(InQuad_F3Vertices[2]),
+#undef TVHELPER
+      SFVAR(InQuad_clut),
+
+      SFVAR(InPLine_PrevPoint.x),
+      SFVAR(InPLine_PrevPoint.y),
+      SFVAR(InPLine_PrevPoint.r),
+      SFVAR(InPLine_PrevPoint.g),
+      SFVAR(InPLine_PrevPoint.b),
+
+      SFVAR(FBRW_X),
+      SFVAR(FBRW_Y),
+      SFVAR(FBRW_W),
+      SFVAR(FBRW_H),
+      SFVAR(FBRW_CurY),
+      SFVAR(FBRW_CurX),
+
+      SFVAR(DisplayMode),
+      SFVAR(DisplayOff),
+      SFVAR(DisplayFB_XStart),
+      SFVAR(DisplayFB_YStart),
+
+      SFVAR(HorizStart),
+      SFVAR(HorizEnd),
+
+      SFVAR(VertStart),
+      SFVAR(VertEnd),
+
+      SFVAR(DisplayFB_CurYOffset),
+      SFVAR(DisplayFB_CurLineYReadout),
+
+      SFVAR(InVBlank),
+
+      SFVAR(LinesPerField),
+      SFVAR(scanline),
+      SFVAR(field),
+      SFVAR(field_ram_readout),
+      SFVAR(PhaseChange),
+
+      SFVAR(DotClockCounter),
+
+      SFVAR(GPUClockCounter),
+      SFVAR(LineClockCounter),
+      SFVAR(LinePhase),
+
+      SFVAR(DrawTimeAvail),
+
+      SFEND
+   };
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+
+   if(load)
+   {
+      RecalcTexWindowLUT();
+      BlitterFIFO.SaveStatePostLoad();
+
+      HorizStart &= 0xFFF;
+      HorizEnd &= 0xFFF;
+
+      IRQ_Assert(IRQ_GPU, IRQPending);
+   }
+
+   return(ret);
+}
+
 }

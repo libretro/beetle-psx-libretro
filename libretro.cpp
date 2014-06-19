@@ -1721,7 +1721,13 @@ static void SetInput(int port, const char *type, void *ptr)
 
 static int StateAction(StateMem *sm, int load, int data_only)
 {
-   return(0);
+#if 0
+   if(!MDFN_GetSettingB("psx.clobbers_lament"))
+   {
+      return(0);
+   }
+#endif
+
    SFORMAT StateRegs[] =
    {
       SFVAR(CD_TrayOpen),
@@ -1742,6 +1748,9 @@ static int StateAction(StateMem *sm, int load, int data_only)
    // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
    if(load)
    {
+      if(CD_SelectedDisc >= (int)cdifs->size())
+         CD_SelectedDisc = -1;
+
       CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
             (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
    }
@@ -1751,15 +1760,14 @@ static int StateAction(StateMem *sm, int load, int data_only)
    ret &= CPU->StateAction(sm, load, data_only);
    ret &= DMA_StateAction(sm, load, data_only);
    ret &= TIMER_StateAction(sm, load, data_only);
-   ret &= CDC->StateAction(sm, load, data_only);
+   ret &= SIO_StateAction(sm, load, data_only);
 
-   // These need some work still:
-   //ret &= MDEC_StateAction(sm, load, data_only);
-   //ret &= SPU->StateAction(sm, load, data_only);
+   ret &= CDC->StateAction(sm, load, data_only);
+   ret &= MDEC_StateAction(sm, load, data_only);
+   ret &= GPU->StateAction(sm, load, data_only);
+   ret &= SPU->StateAction(sm, load, data_only);
+
    ret &= FIO->StateAction(sm, load, data_only);
-   //ret &= SIO_StateAction(sm, load, data_only);
-   //ret &= GPU->StateAction(sm, load, data_only);
-   //// End needing work
    
    ret &= IRQ_StateAction(sm, load, data_only);	// Do it last.
 
@@ -1913,6 +1921,8 @@ static MDFNSetting PSXSettings[] =
  { "psx.dbg_level", MDFNSF_NOFLAGS, gettext_noop("Debug printf verbosity level."), NULL, MDFNST_UINT, "0", "0", "4" },
 #endif
 
+ { "psx.clobbers_lament", MDFNSF_NOFLAGS, gettext_noop("Enable experimental save state functionality."), gettext_noop("Save states will destroy your saved game/memory card data if you're careless, and that will make clobber sad.  Poor clobber."), MDFNST_BOOL, "0" },
+
  { NULL },
 };
 
@@ -2021,7 +2031,7 @@ static Deinterlacer deint;
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.35.1"
+#define MEDNAFEN_CORE_VERSION "v0.9.36"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
@@ -3039,16 +3049,6 @@ static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {
-   //if (serialize_size)
-   //   return serialize_size;
-
-   if (!StateAction)
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[mednafen]: Module doesn't support save states.\n");
-      return 0;
-   }
-
    StateMem st;
    memset(&st, 0, sizeof(st));
 

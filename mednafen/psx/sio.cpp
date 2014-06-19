@@ -103,4 +103,26 @@ void SIO_Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
    }
 }
 
+int SIO_StateAction(StateMem *sm, int load, int data_only)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(Status),
+  SFVAR(Mode),
+  SFVAR(Control),
+  SFVAR(BaudRate),
+  SFVAR(DataBuffer),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "SIO");
+
+ if(load)
+ {
+
+ }
+
+ return(ret);
+}
+
 }

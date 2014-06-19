@@ -233,7 +233,7 @@ static void RecalcHalt(void)
 }
 
 
-static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V)
+static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V, int32_t *offset)
 {
    unsigned extra_cyc_overhead = 0;
 
@@ -255,7 +255,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t 
          {
          }
          else
-            *V = MDEC_DMARead();
+            *V = MDEC_DMARead(offset);
          break;
 
       case CH_GPU:
@@ -419,6 +419,7 @@ static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, in
       //
       {
          uint32_t vtmp;
+         int32_t voffs = 0;
 
          if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
          {
@@ -431,10 +432,10 @@ static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, in
          if(CRModeCache & 0x1)
             vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
 
-         ChRW(ch, CRModeCache, &vtmp);
+         ChRW(ch, CRModeCache, &vtmp, &voffs);
 
          if(!(CRModeCache & 0x1))
-            MainRAM.WriteU32(DMACH[ch].CurAddr & 0x1FFFFC, vtmp);
+            MainRAM.WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
       }
 
       if(CRModeCache & 0x2)
@@ -687,7 +688,8 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 
             if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
             {
-               //PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU->GetScanlineNum());
+               //if(ch == 0 || ch == 1)
+               // PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU->GetScanlineNum());
 
                DMACH[ch].WordCounter = 0;
                DMACH[ch].ClockCounter = 0;

@@ -46,6 +46,8 @@ class PS_GPU
 
  void Power(void) MDFN_COLD;
 
+ int StateAction(StateMem *sm, int load, int data_only);
+
  void ResetTS(void);
 
  void StartFrame(EmulateSpecStruct *espec);

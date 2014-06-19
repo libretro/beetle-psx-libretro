@@ -13,6 +13,7 @@ class InputDevice_Mouse : public InputDevice
  virtual ~InputDevice_Mouse();
 
  virtual void Power(void);
+ virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
  virtual void UpdateInput(const void *data);
 
  virtual void Update(const pscpu_timestamp_t timestamp);
@@ -103,6 +104,45 @@ void InputDevice_Mouse::Power(void)
 
  transmit_pos = 0;
  transmit_count = 0;
+}
+
+int InputDevice_Mouse::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
+{
+ SFORMAT StateRegs[] =
+ {
+  SFVAR(clear_timeout),
+
+  SFVAR(dtr),
+
+  SFVAR(button),
+  SFVAR(button_post_mask),
+  SFVAR(accum_xdelta),
+  SFVAR(accum_ydelta),
+
+  SFVAR(command_phase),
+  SFVAR(bitpos),
+  SFVAR(receive_buffer),
+
+  SFVAR(command),
+
+  SFARRAY(transmit_buffer, sizeof(transmit_buffer)),
+  SFVAR(transmit_pos),
+  SFVAR(transmit_count),
+
+  SFEND
+ };
+ int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, section_name);
+
+ if(load)
+ {
+  if((transmit_pos + transmit_count) > sizeof(transmit_buffer))
+  {
+   transmit_pos = 0;
+   transmit_count = 0;
+  }
+ }
+
+ return(ret);
 }
 
 void InputDevice_Mouse::UpdateInput(const void *data)
