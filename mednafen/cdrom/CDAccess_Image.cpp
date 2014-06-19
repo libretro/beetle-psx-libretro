@@ -37,7 +37,6 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
-#include <trio/trio.h>
 
 #include "../general.h"
 #include "../FileStream.h"

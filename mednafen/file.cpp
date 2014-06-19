@@ -19,7 +19,6 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
-#include <trio/trio.h>
 
 #include "file.h"
 #include "general.h"

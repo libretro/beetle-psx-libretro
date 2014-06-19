@@ -22,7 +22,6 @@
 #include "Stream.h"
 #include "FileStream.h"
 
-#include <trio/trio.h>
 #include <stdarg.h>
 #include <string.h>
 

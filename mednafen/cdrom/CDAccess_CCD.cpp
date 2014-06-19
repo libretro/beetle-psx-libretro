@@ -18,7 +18,6 @@
 #include "../mednafen.h"
 #include "../general.h"
 #include "CDAccess_CCD.h"
-#include <trio/trio.h>
 
 #include <limits>
 #include <limits.h>
