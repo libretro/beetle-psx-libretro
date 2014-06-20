@@ -27,10 +27,6 @@ MEDNAFEN_LIBRETRO_DIR := ..
 
 LOCAL_MODULE    := libretro
 
-# If you have a system with 1GB RAM or more - cache the whole 
-# CD for CD-based systems in order to prevent file access delays/hiccups
-CACHE_CD = 0
-
    PTHREAD_FLAGS = -pthread
    NEED_CD = 1
    NEED_BPP = 32
@@ -150,10 +146,6 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86
-endif
-
-ifeq ($(CACHE_CD), 1)
-FLAGS += -D__LIBRETRO_CACHE_CD__
 endif
 
 ifeq ($(NEED_BPP), 16)

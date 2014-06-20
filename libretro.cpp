@@ -2252,11 +2252,28 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
    return false;
 }
 
+static bool old_cdimagecache = false;
+
 static void check_variables(void)
 {
    struct retro_variable var = {0};
 
    extern void PSXDitherApply(bool);
+
+   var.key = "psx_cdimagecache";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   {
+      bool cdimage_cache = true;
+      if (strcmp(var.value, "enabled") == 0)
+         cdimage_cache = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         cdimage_cache = false;
+      if (cdimage_cache != old_cdimagecache)
+      {
+         old_cdimagecache = cdimage_cache;
+      }
+   }
 
    var.key = "psx_dithering";
 
@@ -2379,12 +2396,12 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
    for(unsigned i = 0; i < file_list.size(); i++)
    {
-    CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false, false /* cdimage_memcache */));
+    CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false, old_cdimagecache));
    }
   }
   else
   {
-   CDInterfaces.push_back(CDIF_Open(devicename, false, false /* cdimage_memcache */));
+   CDInterfaces.push_back(CDIF_Open(devicename, false, old_cdimagecache));
   }
  }
  catch(std::exception &e)
@@ -2995,6 +3012,7 @@ void retro_set_environment(retro_environment_t cb)
    environ_cb = cb;
 
    static const struct retro_variable vars[] = {
+      { "psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
       { "psx_enable_analog_toggle", "Dualshock analog button; disabled|enabled" },
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },

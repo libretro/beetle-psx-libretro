@@ -21,10 +21,6 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
 endif
 endif
 
-# If you have a system with 1GB RAM or more - cache the whole 
-# CD for CD-based systems in order to prevent file access delays/hiccups
-CACHE_CD = 0
-
 ifneq ($(platform), osx)
    PTHREAD_FLAGS = -pthread
 endif
@@ -329,10 +325,6 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=
 
 ifeq ($(IS_X86), 1)
 FLAGS += -DARCH_X86
-endif
-
-ifeq ($(CACHE_CD), 1)
-FLAGS += -D__LIBRETRO_CACHE_CD__
 endif
 
 ifeq ($(NEED_BPP), 8)
