@@ -110,7 +110,7 @@ void Deinterlacer::InternalProcess(MDFN_Surface *surface, MDFN_Rect &DisplayRect
 
    if(y == 0 && field)
    {
-    T black = surface->MakeColor(0, 0, 0);
+    T black = MAKECOLOR(0, 0, 0, 0);
     T* dm2 = surface->pixels + (dly - 2) * surface->pitchinpix;
 
     LineWidths[dly - 2] = *src_lw;

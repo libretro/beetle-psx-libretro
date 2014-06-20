@@ -81,11 +81,6 @@ class MDFN_PixelFormat
  };
 
  uint8 Ashift;  // [...] alpha component.
- // Creates a color value for the surface corresponding to the 8-bit R/G/B/A color passed.
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-    return MAKECOLOR(r, g, b, a);
- }
 
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
 #if defined(WANT_32BPP)
@@ -136,12 +131,6 @@ class MDFN_Surface //typedef struct
  MDFN_PixelFormat format;
 
  void SetFormat(const MDFN_PixelFormat &new_format, bool convert);
-
- // Creates a value for the surface corresponding to the R/G/B/A color passed.
- INLINE uint32 MakeColor(uint8 r, uint8 g, uint8 b, uint8 a = 0) const
- {
-    return MAKECOLOR(r, g, b, a);
- }
 
 #if defined(WANT_32BPP)
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
