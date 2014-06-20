@@ -2262,7 +2262,7 @@ static void check_variables(void)
 
    var.key = "psx_cdimagecache";
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       bool cdimage_cache = true;
       if (strcmp(var.value, "enabled") == 0)
@@ -2277,7 +2277,7 @@ static void check_variables(void)
 
    var.key = "psx_dithering";
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       static bool old_apply_dither = false;
       bool apply_dither = true;
@@ -2294,7 +2294,7 @@ static void check_variables(void)
    
    var.key = "psx_enable_analog_toggle";
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if ((strcmp(var.value, "enabled") == 0)
             && setting_psx_analog_toggle != 1)
@@ -2312,7 +2312,7 @@ static void check_variables(void)
    
    var.key = "psx_enable_multitap_port1";
    
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
          setting_psx_multitap_port_1 = true;
@@ -2322,7 +2322,7 @@ static void check_variables(void)
 
    var.key = "psx_enable_multitap_port2";
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
          setting_psx_multitap_port_2 = true;
