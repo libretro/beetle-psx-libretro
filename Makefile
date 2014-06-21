@@ -222,7 +222,7 @@ endif
 
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING
-	THREAD_SOURCES += thread.c
+	THREAD_SOURCES += threads.c
 endif
 
 ifeq ($(NEED_CRC32), 1)
