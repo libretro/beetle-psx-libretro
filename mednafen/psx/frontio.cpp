@@ -118,7 +118,7 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
             }
          }
 
-         pixels[x] = format->MakeColor(nr, ng, nb, a);
+         pixels[x] = MAKECOLOR(nr, ng, nb, a);
       }
    }
 }
