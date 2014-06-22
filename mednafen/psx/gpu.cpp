@@ -386,11 +386,12 @@ template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
 {
    y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
+   uint16_t pix = fore_pix;
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
       uint16_t bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      uint16_t pix; // = fore_pix & 0x8000;
+      pix = 0;
 
       /*
          static const int32 tab[4][2] =
@@ -447,15 +448,10 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
             }
             break;
       }
+   }
 
-      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-         GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
-   }
-   else
-   {
-      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-         GPURAM[y][x] = (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR;
-   }
+   if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
+      GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
 }
 
 INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y)
