@@ -1441,11 +1441,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
 static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp = false)
 {
-   int i;
-   uint32_t PC;
-   uint32_t SP;
-   uint32_t TextStart;
-   uint32_t TextSize;
+   uint32 PC;
+   uint32 SP;
+   uint32 TextStart;
+   uint32 TextSize;
 
    if(size < 0x800)
       throw(MDFN_Error(0, "PS-EXE is too small."));
@@ -1456,15 +1455,9 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    TextSize = MDFN_de32lsb(&data[0x1C]);
 
    if(ignore_pcsp)
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
-   }
+      log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
    else
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
-   }
+      log_cb(RETRO_LOG_INFO, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
 
    TextStart &= 0x1FFFFF;
 
@@ -1487,7 +1480,7 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    if(TextStart < TextMem_Start)
    {
-      uint32_t old_size = TextMem.size();
+      uint32 old_size = TextMem.size();
 
       //printf("RESIZE: 0x%08x\n", TextMem_Start - TextStart);
 
@@ -1513,7 +1506,7 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    // printf("INSN: 0x%08x\n", BIOSROM->ReadU32(0x6990));
    // exit(1);
-   uint8_t *po;
+   uint8 *po;
 
    po = &PIOMem->data8[0x0800];
 
@@ -1541,7 +1534,7 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    //
 
    // Load source address into r8
-   uint32_t sa = 0x9F000000 + 65536;
+   uint32 sa = 0x9F000000 + 65536;
    MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));	// LUI
    po += 4;
    MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF)); 	// ORI
@@ -1604,7 +1597,7 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    }
 
    // Half-assed instruction cache flush. ;)
-   for(i = 0; i < 1024; i++)
+   for(unsigned i = 0; i < 1024; i++)
    {
       MDFN_en32lsb(po, 0);
       po += 4;
@@ -1848,7 +1841,6 @@ static void DoSimpleCommand(int cmd)
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
  { ".psf", gettext_noop("PSF1 Rip") },
- { ".minipsf", gettext_noop("MiniPSF1 Rip") },
  { ".psx", gettext_noop("PS-X Executable") },
  { ".exe", gettext_noop("PS-X Executable") },
  { NULL, NULL }
@@ -2032,7 +2024,7 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen/Beetle PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.36.1"
-#define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
+#define MEDNAFEN_CORE_EXTENSIONS "exe|cue|toc|m3u|ccd"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
