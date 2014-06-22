@@ -54,7 +54,11 @@ typedef struct
 {
    int16_t MX[3][3];
    int16_t dummy;
-}  __attribute__((__packed__)) gtematrix;
+}
+#ifndef _MSC_VER
+__attribute__((__packed__))
+#endif
+gtematrix;
 
 typedef struct
 {

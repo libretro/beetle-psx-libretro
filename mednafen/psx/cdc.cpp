@@ -559,7 +559,11 @@ struct XA_Subheader
  uint8 channel_dup;
  uint8 submode_dup;
  uint8 coding_dup;
-} __attribute__((__packed__));
+}
+#ifndef _MSC_VER
+__attribute__((__packed__))
+#endif
+;
 
 struct XA_SoundGroup
 {
