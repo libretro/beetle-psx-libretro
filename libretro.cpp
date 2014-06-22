@@ -2030,8 +2030,8 @@ static Deinterlacer deint;
 #endif
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
-#define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.36"
+#define MEDNAFEN_CORE_NAME "Mednafen/Beetle PSX"
+#define MEDNAFEN_CORE_VERSION "v0.9.36.1"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|m3u|ccd"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
