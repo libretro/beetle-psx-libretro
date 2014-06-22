@@ -85,17 +85,11 @@ static const int16 FIR_Table[256][4] =
  #include "spu_fir_table.inc"
 };
 
-static const uint32 NoiseFreqTable[64] =
-{
- #include "spu_nft.inc"
-};
-
 PS_SPU::PS_SPU()
 {
  IntermediateBufferPos = 0;
  memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
 
- for(int16 a = 32760; a >= 0; a++);
 }
 
 PS_SPU::~PS_SPU()
@@ -147,6 +141,7 @@ void PS_SPU::Power(void)
  GlobalSweep[0].Power();
  GlobalSweep[1].Power();
 
+ NoiseDivider = 0;
  NoiseCounter = 0;
  LFSR = 0;
 
@@ -356,7 +351,6 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
 
  //for(int z = 0; z < 4; z++)
  {
-  const uint16 CV = SPURAM[voice->CurAddr];
 
   if(SPUControl & 0x40)
   {
@@ -371,6 +365,7 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
 
   if((voice->CurAddr & 0x7) == 0)
   {
+     const uint16 CV = SPURAM[voice->CurAddr];
    voice->DecodeShift = CV & 0xF;
    voice->DecodeWeight = (CV >> 4) & 0xF;
    voice->DecodeFlags = (CV >> 8) & 0xFF;
@@ -389,9 +384,15 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
      }
     }
    }
+   voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
   }
-  else
+
+  //
+  // Don't else this block; we need to ALWAYS decode 4 samples per call to RunDecoder() if DecodeAvail < 11, or else sample playback
+  // at higher rates will fail horribly.
+  //
   {
+     const uint16 CV = SPURAM[voice->CurAddr];
    const unsigned shift = voice->DecodeShift;
    const int32 weight_m1 = Weights[voice->DecodeWeight][0];
    const int32 weight_m2 = Weights[voice->DecodeWeight][1];
@@ -414,8 +415,8 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
    }
    voice->DecodeWritePos = (voice->DecodeWritePos + 4) & 0x1F;
    voice->DecodeAvail += 4;
+   voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
   }
-  voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
  }
 }
 
@@ -552,6 +553,34 @@ INLINE uint16 PS_SPU::ReadSPURAM(uint32 addr)
 }
 
 #include "spu_reverb.inc"
+
+INLINE void PS_SPU::RunNoise(void)
+{
+   const unsigned rf = ((SPUControl >> 8) & 0x3F);
+   uint32 NoiseDividerInc = (2 << (rf >> 2));
+   uint32 NoiseCounterInc = 4 + (rf & 0x3);
+
+   if(rf >= 0x3C)
+   {
+      NoiseDividerInc = 0x8000;
+      NoiseCounterInc = 8;
+   }
+
+   NoiseDivider += NoiseDividerInc;
+
+   if(NoiseDivider & 0x8000)
+   {
+      NoiseDivider = 0;
+
+      NoiseCounter += NoiseCounterInc;
+
+      if(NoiseCounter & 0x8)
+      {
+         NoiseCounter &= 0x7;
+         LFSR = (LFSR << 1) | (((LFSR >> 15) ^ (LFSR >> 12) ^ (LFSR >> 11) ^ (LFSR >> 10) ^ 1) & 1);
+      }
+   }
+}
 
 int32 PS_SPU::UpdateFromCDC(int32 clocks)
 //pscpu_timestamp_t PS_SPU::Update(const pscpu_timestamp_t timestamp)
@@ -793,12 +822,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
   CWA = (CWA + 1) & 0x1FF;
 
-  NoiseCounter += NoiseFreqTable[(SPUControl >> 8) & 0x3F];
-  if(NoiseCounter >= 0x8000)
-  {
-   NoiseCounter -= 0x8000;
-   LFSR = (LFSR << 1) | (((LFSR >> 15) ^ (LFSR >> 12) ^ (LFSR >> 11) ^ (LFSR >> 10) ^ 1) & 1);
-  }
+  RunNoise();
 
   clamp(&accum_l, -32768, 32767);
   clamp(&accum_r, -32768, 32767);
@@ -1211,6 +1235,7 @@ int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
   SFVOICE(23),
 #undef SFVOICE
 
+  SFVAR(NoiseDivider),
   SFVAR(NoiseCounter),
   SFVAR(LFSR),
 

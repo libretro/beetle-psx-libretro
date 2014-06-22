@@ -134,10 +134,12 @@ class PS_SPU
 
 
  void RunReverb(int32_t in_l, int32_t in_r, int32_t &out_l, int32_t &out_r);
+ void RunNoise(void);
  bool GetCDAudio(int32_t &l, int32_t &r);
 
  SPU_Voice Voices[24];
 
+ uint32_t NoiseDivider;
  uint32_t NoiseCounter;
  uint16_t LFSR;
 
