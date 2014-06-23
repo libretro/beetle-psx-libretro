@@ -152,6 +152,7 @@ else ifeq ($(platform), psp1)
    FLAGS += -DPSP -G0
    FLAGS += -DHAVE_MKDIR
    STATIC_LINKING = 1
+   EXTRA_INCLUDES := -I$(shell psp-config --pspsdk-path)/include
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
