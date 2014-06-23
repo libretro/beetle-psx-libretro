@@ -164,16 +164,6 @@ void scond_wait(scond_t *cond, slock_t *lock)
    slock_lock(lock);
 }
 
-bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
-{
-   WaitForSingleObject(cond->event, 0);
-
-   DWORD res = SignalObjectAndWait(lock->lock, cond->event, (DWORD)(timeout_us) / 1000, FALSE);
-
-   slock_lock(lock);
-   return res == WAIT_OBJECT_0;
-}
-
 void scond_signal(scond_t *cond)
 {
    SetEvent(cond->event);
@@ -314,43 +304,6 @@ void scond_wait(scond_t *cond, slock_t *lock)
 int scond_broadcast(scond_t *cond)
 {
    return pthread_cond_broadcast(&cond->cond);
-}
-
-bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
-{
-   struct timespec now = {0};
-
-#ifdef __MACH__ // OSX doesn't have clock_gettime ... :(
-   clock_serv_t cclock;
-   mach_timespec_t mts;
-   host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
-   clock_get_time(cclock, &mts);
-   mach_port_deallocate(mach_task_self(), cclock);
-   now.tv_sec = mts.tv_sec;
-   now.tv_nsec = mts.tv_nsec;
-#elif defined(__CELLOS_LV2__)
-   sys_time_sec_t s;
-   sys_time_nsec_t n;
-   sys_time_get_current_time(&s, &n);
-   now.tv_sec  = s;
-   now.tv_nsec = n;
-#elif defined(__mips__)
-   struct timeval tm;
-   gettimeofday(&tm, NULL);
-   now.tv_sec = tm.tv_sec;
-   now.tv_nsec = tm.tv_usec * 1000;
-#elif !defined(GEKKO) // timeout on libogc is duration, not end time
-   clock_gettime(CLOCK_REALTIME, &now);
-#endif
-
-   now.tv_sec += timeout_us / 1000000LL;
-   now.tv_nsec += timeout_us * 1000LL;
-
-   now.tv_sec += now.tv_nsec / 1000000000LL;
-   now.tv_nsec = now.tv_nsec % 1000000000LL;
-
-   int ret = pthread_cond_timedwait(&cond->cond, &lock->lock, &now);
-   return ret == 0;
 }
 
 void scond_signal(scond_t *cond)
