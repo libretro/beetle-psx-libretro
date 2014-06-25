@@ -68,14 +68,19 @@
  system, though this will obviously need to change if we ever emulate the SPU with better precision than per-sample(pair).
 */
 
-#define SPUIRQ_DBG(format, ...) { printf("[SPUIRQDBG] " format " -- Voice 22 CA=0x%06x,LA=0x%06x\n", ## __VA_ARGS__, Voices[22].CurAddr, Voices[22].LoopAddr); }
-
 #include "psx.h"
 #include "cdc.h"
 #include "spu.h"
+#include "../../libretro.h"
 
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
+
+//#define SPUIRQ_DBG(format, ...) { printf("[SPUIRQDBG] " format " -- Voice 22 CA=0x%06x,LA=0x%06x\n", ## __VA_ARGS__, Voices[22].CurAddr, Voices[22].LoopAddr); }
+
+static INLINE void SPUIRQ_DBG(const char *fmt, ...)
+{
+}
 
 namespace MDFN_IEN_PSX
 {
