@@ -1,11 +1,6 @@
 #include <stdint.h>
 #include "MemoryStream.h"
-
-#ifdef _WIN32
-#ifndef SIZE_MAX
-#define SIZE_MAX _UI32_MAX
-#endif
-#endif
+#include "msvc_compat.h"
 
 /*
  TODO:

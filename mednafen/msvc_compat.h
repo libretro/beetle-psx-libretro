@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2012 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -19,8 +20,8 @@
 #ifdef _MSC_VER
 
 #undef UNICODE // Do not bother with UNICODE at this time.
+#include <direct.h>
 #include <stddef.h>
-#include <io.h>
 #include <math.h>
 
 // Python headers defines ssize_t and sets HAVE_SSIZE_T. Cannot duplicate these efforts.
@@ -32,31 +33,32 @@ typedef int ssize_t;
 #endif
 #endif
 
+#define mkdir(dirname, unused) _mkdir(dirname)
 #define snprintf _snprintf
-#define strtoll _strtoi64
 #define strtoull _strtoui64
+#undef strcasecmp
 #define strcasecmp _stricmp
+#undef strncasecmp
 #define strncasecmp _strnicmp
-#define strdup _strdup
-#define lseek _lseek
-
-#include <tchar.h>
-#define strlen _tcslen
-
-# define S_IRUSR  S_IREAD                      /* read, user */
-# define S_IWUSR  S_IWRITE                     /* write, user */
 
 // Disable some of the annoying warnings.
 #pragma warning(disable : 4800)
+#pragma warning(disable : 4805)
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4305)
 #pragma warning(disable : 4146)
 #pragma warning(disable : 4267)
+#pragma warning(disable : 4723)
+#pragma warning(disable : 4996)
 
 #define roundf(in) (in >= 0.0f ? floorf(in + 0.5f) : ceilf(in - 0.5f))
 
 #ifndef PATH_MAX
-#define PATH_MAX MAX_PATH
+#define PATH_MAX _MAX_PATH
+#endif
+
+#ifndef SIZE_MAX
+#define SIZE_MAX _UI32_MAX
 #endif
 
 #endif
