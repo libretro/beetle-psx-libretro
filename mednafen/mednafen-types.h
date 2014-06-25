@@ -41,7 +41,8 @@ typedef uint64_t uint64;
 
   #define MDFN_FASTCALL
 
-  #define MDFN_ALIGN(n) __declspec(align(n))
+  //#define MDFN_ALIGN(n) __declspec(align(n))
+#define MDFN_ALIGN(n)
 
   #define MDFN_FORMATSTR(a,b,c)
 
@@ -55,7 +56,7 @@ typedef uint64_t uint64;
 
   #define MDFN_FASTCALL
 
-  #define MDFN_ALIGN(n)	// hence the #error.
+  #define MDFN_ALIGN(n)
 
   #define MDFN_FORMATSTR(a,b,c)
 
