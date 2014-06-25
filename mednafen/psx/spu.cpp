@@ -1366,6 +1366,8 @@ uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 speci
 	break;
   }
  }
+ else if (which >= 18 && which <= 49)
+    ret = ReverbRegs[which - GSREG_FB_SRC_A] & 0xFFFF;
  else switch(which)
  {
   case GSREG_SPUCONTROL:
@@ -1440,10 +1442,6 @@ uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 speci
 	ret = BlockEnd;
 	break;
 
-
-  case GSREG_FB_SRC_A ... GSREG_IN_COEF_R:
-	ret = ReverbRegs[which - GSREG_FB_SRC_A] & 0xFFFF;
-	break;
  }
 
  return(ret);
