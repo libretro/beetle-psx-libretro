@@ -21,7 +21,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;LSB_FIRST;WANT_THREADING;WANT_32BPP;__LIBRETRO__"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;LSB_FIRST;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -70,7 +70,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;LSB_FIRST;WANT_THREADING;WANT_32BPP;__LIBRETRO__"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;LSB_FIRST;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
