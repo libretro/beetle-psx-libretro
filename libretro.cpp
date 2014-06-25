@@ -3,6 +3,7 @@
 #include "mednafen/git.h"
 #include "mednafen/general.h"
 #include "mednafen/md5.h"
+#include "mednafen/msvc_compat.h"
 #ifdef NEED_DEINTERLACER
 #include	"mednafen/video/Deinterlacer.h"
 #endif
