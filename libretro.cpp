@@ -2232,6 +2232,11 @@ void retro_init(void)
    else
       perf_get_cpu_features_cb = NULL;
 
+   setting_initial_scanline = 0;
+   setting_last_scanline = 239;
+   setting_initial_scanline_pal = 0;
+   setting_last_scanline_pal = 287;
+
    check_system_specs();
 }
 
@@ -2321,6 +2326,34 @@ static void check_variables(void)
          setting_psx_multitap_port_2 = true;
       else if (strcmp(var.value, "disabled") == 0)
          setting_psx_multitap_port_2 = false;
+   }
+
+   var.key = "psx_initial_scanline";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      setting_initial_scanline = atoi(var.value);
+   }
+
+   var.key = "psx_last_scanline";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      setting_last_scanline = atoi(var.value);
+   }
+
+   var.key = "psx_initial_scanline_pal";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      setting_initial_scanline_pal = atoi(var.value);
+   }
+
+   var.key = "psx_last_scanline_pal";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      setting_last_scanline_pal = atoi(var.value);
    }
 }
 
@@ -3007,6 +3040,10 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
       { "psx_dithering", "Dithering; enabled|disabled" },
+      { "psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { "psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { "psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
+      { "psx_last_scanline_pal", "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
       { "psx_enable_analog_toggle", "Dualshock analog button; disabled|enabled" },
       { "psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },

@@ -21,6 +21,11 @@
 #include <string>
 #include "settings.h"
 
+int setting_initial_scanline = 0;
+int setting_initial_scanline_pal = 0;
+int setting_last_scanline = 239;
+int setting_last_scanline_pal = 287;
+
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
 uint32_t setting_psx_analog_toggle = 0;
@@ -45,13 +50,13 @@ int64 MDFN_GetSettingI(const char *name)
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return 1; /* REGION_JP = 0, REGION_NA = 1, REGION_EU = 2 */
    if (!strcmp("psx.slstart", name))
-      return 0;
+      return setting_initial_scanline;
    if (!strcmp("psx.slstartp", name))
-      return 0;
+      return setting_initial_scanline_pal;
    if (!strcmp("psx.slend", name))
-      return 239;
+      return setting_last_scanline;
    if (!strcmp("psx.slendp", name))
-      return 287;
+      return setting_last_scanline_pal;
    fprintf(stderr, "unhandled setting I: %s\n", name);
    return 0;
 }
