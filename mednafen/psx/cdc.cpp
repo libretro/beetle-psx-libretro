@@ -559,7 +559,7 @@ struct XA_Subheader
  uint8 channel_dup;
  uint8 submode_dup;
  uint8 coding_dup;
-}
+};
 
 struct XA_SoundGroup
 {
