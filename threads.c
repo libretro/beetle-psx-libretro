@@ -159,7 +159,12 @@ void scond_wait(scond_t *cond, slock_t *lock)
 {
    WaitForSingleObject(cond->event, 0);
 
+#if MSC_VER <= 1310
+   slock_unlock(lock);
+   WaitForSingleObject(cond->event, INFINITE);
+#else
    SignalObjectAndWait(lock->lock, cond->event, INFINITE, FALSE);
+#endif
 
    slock_lock(lock);
 }
