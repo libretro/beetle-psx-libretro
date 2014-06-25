@@ -269,7 +269,24 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
    transmit_count--;
   }
 
+  if (command_phase >= 1024 && command_phase <= 1151)
+  {
+  // Transmit actual 128 bytes data
+	transmit_buffer = card_data[(addr << 7) + (command_phase - 1024)];
+	calced_xor ^= transmit_buffer;
+	transmit_count = 1;
+	command_phase++;
+  }
+  else if (command_phase >= 2048 && command_phase <= 2175)
+  {
+  	calced_xor ^= receive_buffer;
+	rw_buffer[command_phase - 2048] = receive_buffer;
 
+        transmit_buffer = receive_buffer;
+        transmit_count = 1;
+        command_phase++;
+  }
+  else
   switch(command_phase)
   {
    case 0:
@@ -379,13 +396,7 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
 	}
 	break;
 
-  // Transmit actual 128 bytes data
-  case (1024 + 0) ... (1024 + 128 - 1):
-	transmit_buffer = card_data[(addr << 7) + (command_phase - 1024)];
-	calced_xor ^= transmit_buffer;
-	transmit_count = 1;
-	command_phase++;
-	break;
+
 
   // XOR
   case (1024 + 128):
@@ -420,16 +431,6 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
         transmit_count = 1;
         command_phase = 2048;
         break;
-
-  case (2048 + 0) ... (2048 + 128 - 1):
-	calced_xor ^= receive_buffer;
-	rw_buffer[command_phase - 2048] = receive_buffer;
-
-        transmit_buffer = receive_buffer;
-        transmit_count = 1;
-        command_phase++;
-        break;
-
   case (2048 + 128):	// XOR
 	write_xor = receive_buffer;
 	transmit_buffer = '\\';

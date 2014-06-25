@@ -560,16 +560,12 @@ struct XA_Subheader
  uint8 submode_dup;
  uint8 coding_dup;
 }
-#ifndef _MSC_VER
-__attribute__((__packed__))
-#endif
-;
 
 struct XA_SoundGroup
 {
  uint8 params[16];
  uint8 samples[112];
-} __attribute__((__packed__));
+};
 
 #define XA_SUBMODE_EOF		0x80
 #define XA_SUBMODE_REALTIME	0x40

@@ -19,7 +19,7 @@
 
 #include <string.h>
 #include <ctype.h>
-#include <trio/trio.h>
+#include "include/trio/trio.h"
 #include <errno.h>
 #include <vector>
 

@@ -1207,6 +1207,15 @@
                   BEGIN_OPF(COP2, 0x12, 0);
                   uint32_t sub_op = (instr >> 21) & 0x1F;
 
+                  if (sub_op >= 16 && sub_op <= 31)
+                  {
+                        //printf("%08x\n", PC);
+                        if(timestamp < gte_ts_done)
+                           timestamp = gte_ts_done;
+                        gte_ts_done = timestamp + GTE_Instruction(instr);
+                        DO_LDS();
+                  }
+                  else
                   switch(sub_op)
                   {
                      default:
@@ -1285,15 +1294,8 @@
                            DO_LDS();
                         }
                         break;
-
-                     case 0x10 ... 0x1F:
-                        //printf("%08x\n", PC);
-                        if(timestamp < gte_ts_done)
-                           timestamp = gte_ts_done;
-                        gte_ts_done = timestamp + GTE_Instruction(instr);
-                        DO_LDS();
-                        break;
                   }
+
                   END_OPF;
                }
                break;

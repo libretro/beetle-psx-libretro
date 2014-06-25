@@ -1,9 +1,9 @@
 #ifndef __MDFN_PSX_PSX_H
 #define __MDFN_PSX_PSX_H
 
-#include <mednafen/mednafen.h>
-#include <mednafen/masmem.h>
-#include <trio/trio.h>
+#include "../mednafen.h"
+#include "../masmem.h"
+#include "../include/trio/trio.h"
 
 #include "../cdrom/cdromif.h"
 #include "../general.h"

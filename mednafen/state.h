@@ -86,10 +86,6 @@ INLINE uint32 SF_FORCE_D(double *) { return(0); }
 #define SFARRAY64N(x, l, n) { (x), (uint32)((l) * sizeof(uint64)), MDFNSTATE_RLSB64 | SF_FORCE_A64(x), n }
 #define SFARRAY64(x, l) SFARRAY64N((x), (l), #x)
 
-#if SIZEOF_DOUBLE != 8
-#error "sizeof(double) != 8"
-#endif
-
 #define SFARRAYDN(x, l, n) { (x), (uint32)((l) * 8), MDFNSTATE_RLSB64 | SF_FORCE_D(x), n }
 #define SFARRAYD(x, l) SFARRAYDN((x), (l), #x)
 

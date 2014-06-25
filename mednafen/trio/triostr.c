@@ -26,8 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <trio/triodef.h>
-#include <trio/triostr.h>
+#include "../include/trio/triodef.h"
+#include "../include/trio/triostr.h"
 #if defined(TRIO_FUNC_TO_LONG_DOUBLE)
 # define USE_MATH
 #endif

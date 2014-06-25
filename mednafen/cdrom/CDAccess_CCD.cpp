@@ -17,6 +17,7 @@
 
 #include "../mednafen.h"
 #include "../general.h"
+#include "../msvc_compat.h"
 #include "CDAccess_CCD.h"
 
 #include <limits>
