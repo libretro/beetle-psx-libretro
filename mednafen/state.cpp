@@ -117,37 +117,8 @@ int smem_read32le(StateMem *st, uint32 *b)
  return(4);
 }
 
-
-static bool ValidateSFStructure(SFORMAT *sf)
-{
- SFORMAT *saved_sf = sf;
-
- while(sf->size || sf->name)
- {
-  SFORMAT *sub_sf = saved_sf;
-  while(sub_sf->size || sub_sf->name)
-  {
-   if(sf != sub_sf)
-   {
-    if(!strncmp(sf->name, sub_sf->name, 32))
-    {
-     printf("Duplicate state variable name: %.32s\n", sf->name);
-    }
-   }
-   sub_sf++;
-  }
-
-  sf++;
- }
- return(1);
-}
-
-
 static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 {
- // FIXME?  It's kind of slow, and we definitely don't want it on with state rewinding...
- ValidateSFStructure(sf);
-
  while(sf->size || sf->name)	// Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct.
  {
   if(!sf->size || !sf->v)
