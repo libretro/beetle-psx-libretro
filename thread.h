@@ -20,7 +20,7 @@
 #include "boolean.h"
 #include <stdint.h>
 
-#ifdef __cplusplus
+#if defined(__cplusplus) && !defined(MSC_VER)
 extern "C" {
 #endif
 
@@ -49,9 +49,8 @@ scond_t *scond_new(void);
 void scond_free(scond_t *cond);
 
 void scond_wait(scond_t *cond, slock_t *lock);
-#ifndef RARCH_CONSOLE
+bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us);
 int scond_broadcast(scond_t *cond);
-#endif
 void scond_signal(scond_t *cond);
 
 #ifndef RARCH_INTERNAL
@@ -66,6 +65,8 @@ void scond_signal(scond_t *cond);
 #include <psputils.h>
 #elif defined(_WIN32) && !defined(_XBOX)
 #include <windows.h>
+#elif defined(_XBOX)
+#include <xtl.h>
 #else
 #include <time.h>
 #endif
@@ -91,9 +92,8 @@ static inline void retro_sleep(unsigned msec)
 }
 #endif
 
-#ifdef __cplusplus
+#if defined(__cplusplus) && !defined(MSC_VER)
 }
 #endif
 
 #endif
-
