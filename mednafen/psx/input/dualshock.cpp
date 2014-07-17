@@ -157,7 +157,7 @@ void InputDevice_DualShock::SetAMCT(bool enabled)
  else
      analog_mode = true;
 
- MDFN_DispMessage(_("%s: Mode button is %s, analogs are now %s"), gp_name.c_str(), amct_enabled ? _("enabled") : _("disabled"), analog_mode?_("on") : _("off"));
+  MDFN_DispMessage(_("%s: Analog toggle is %s, sticks are %s"), gp_name.c_str(), analog_mode_locked ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
 }
 
 //
@@ -197,7 +197,8 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
   {
    if(analog_mode_locked)
    {
-    MDFN_DispMessage(_("%s: Analog mode is locked %s."), gp_name.c_str(), analog_mode ? _("on") : _("off"));
+     //MDFN_DispMessage(_("%s: Analog mode is  %s."), gp_name.c_str(), analog_mode ? _("on") : _("off"));
+     MDFN_DispMessage(_("%s: Analog toggle is DISABLED, sticks are %s"), gp_name.c_str(), analog_mode ? _("ON") : _("OFF"));         
    }
    else
     analog_mode = !analog_mode;
@@ -307,9 +308,12 @@ void InputDevice_DualShock::UpdateInput(const void *data)
      const uint8* aba = &d8[3] + stick * 8 + axis * 4;
    int32 tmp;
 
-   tmp = 32767 + MDFN_de16lsb(&aba[0]) - MDFN_de16lsb(&aba[2]);
-   tmp = (tmp * 0x100) / 0xFFFF;
-
+   //revert to 0.9.33, should be fixed on libretro side instead
+   //tmp = 32767 + MDFN_de16lsb(&aba[0]) - MDFN_de16lsb(&aba[2]);
+   //tmp = (tmp * 0x100) / 0xFFFF;
+   
+   tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+   tmp >>= 8;
    axes[stick][axis] = tmp;
   }
  }
@@ -325,7 +329,10 @@ void InputDevice_DualShock::UpdateInput(const void *data)
   if(rumble_param[0] == 0x01)
    sneaky_weaky = 0xFF;
 
-  MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8));
+   //revert to 0.9.33, should be fixed on libretro side instead
+   //MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8));
+   
+   MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
  }
  else
  {
@@ -334,7 +341,9 @@ void InputDevice_DualShock::UpdateInput(const void *data)
   if(((rumble_param[0] & 0xC0) == 0x40) && ((rumble_param[1] & 0x01) == 0x01))
    sneaky_weaky = 0xFF;
 
-  MDFN_en16lsb(rumb_dp, sneaky_weaky << 0);
+   //revert to 0.9.33, should be fixed on libretro side instead
+   //MDFN_en16lsb(rumb_dp, sneaky_weaky << 0);
+   MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
  }
 
  //printf("%d %d %d %d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]);
@@ -346,7 +355,8 @@ void InputDevice_DualShock::UpdateInput(const void *data)
 
  if(am_prev_info != analog_mode || aml_prev_info != analog_mode_locked)
  {
-  MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
+	//MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
+    MDFN_DispMessage(_("%s: Analog toggle is %s, sticks are %s"), gp_name.c_str(), analog_mode_locked ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
  }
  aml_prev_info = analog_mode_locked;
  am_prev_info = analog_mode;
