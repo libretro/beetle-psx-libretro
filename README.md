@@ -24,6 +24,12 @@ Ideally, make sure to use rips that have cue-sheets.
 
 ## Core Options
 
-   
-
-
+* CD Image Cache - Loads the complete image in memory at startup
+* PSX Dithering - Enables Dithering
+* PSX Initial Scanline - Sets the first scanline to be drawn on screen
+* PSX Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems
+* PSX Last Scanline - Sets the last scanline to be drawn on screen
+* PSX Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems
+* Dualshock analog toggle - Enables/Disables the analog button from the Dualshock controller, if disabled analogs are always on, if disabled you can toggle state with START+SELECT+L1+L2+R1+R2
+* Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1
+* Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2
