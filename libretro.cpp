@@ -3018,7 +3018,7 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       case RETRO_DEVICE_FLIGHTSTICK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "flightstick", &buf.u8[in_port]);    
+         SetInput(in_port, "analogjoy", &buf.u8[in_port]);    
          break;
       default:
          if (log_cb)
