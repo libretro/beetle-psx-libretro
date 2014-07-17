@@ -1,6 +1,6 @@
-# Mednafen PSX libretro
+# Beetle PSX libretro
 
-This is port of Mednafen PSX core to the libretro API.
+This is fork of Mednafen PSX core, it has been ported to the libretro API.
 It currently runs on Linux, OSX and possibly Windows.
 
 ## Running
@@ -21,4 +21,9 @@ If you have e.g. <tt>foo.iso</tt>, you should create a foo.cue, and fill this in
 After that, you can load the <tt>foo.cue</tt> file as a ROM.
 Note that this is a dirty hack and will not work on all games.
 Ideally, make sure to use rips that have cue-sheets.
+
+## Core Options
+
+   
+
 
