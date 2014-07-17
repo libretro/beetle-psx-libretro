@@ -11,7 +11,7 @@ Memory cards will also be saved to this system directory.
 
 ## Loading ISOs
 
-Mednafen differs from other PS1 emulators in that it reads a .cue sheet that points to an .iso/.bin whatever.
+Mednafen/Beetle differ from other PS1 emulators in that it needs a .cue sheet that points to an .iso/.bin or other image format.
 If you have e.g. <tt>foo.iso</tt>, you should create a foo.cue, and fill this in:
 
     FILE "foo.iso" BINARY
@@ -30,6 +30,6 @@ Ideally, make sure to use rips that have cue-sheets.
 * PSX Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems
 * PSX Last Scanline - Sets the last scanline to be drawn on screen
 * PSX Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems
-* Dualshock analog toggle - Enables/Disables the analog button from the Dualshock controller, if disabled analogs are always on, if disabled you can toggle state with START+SELECT+L1+L2+R1+R2
+* Dualshock analog toggle - Enables/Disables the analog button from Dualshock controllers, if disabled analogs are always on, if enabled you can toggle it's state with START+SELECT+L1+L2+R1+R2
 * Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1
 * Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2
