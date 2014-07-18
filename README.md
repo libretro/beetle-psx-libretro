@@ -1,17 +1,20 @@
 # Beetle PSX libretro
 
-This is fork of Mednafen PSX core, it has been ported to the libretro API.
+This is fork of Mednafen PSX. It has been ported to the libretro API.
 It currently runs on Linux, OSX and possibly Windows.
 
 ## Running
 
 To run this core, the "system directory" must be defined if running in RetroArch.
-Here, the PSX BIOSes must be placed, $sysdir/SCPH550{0,1,2} for Japanese, NA and EU regions respectively.
-Memory cards will also be saved to this system directory.
+The PSX BIOS must be placed there, $sysdir/SCPH550{0,1,2} for Japanese, NA and EU regions respectively.
+
+Memory cards will be saved to "save directory"
+
+Core now supports save states. Keep in mind states might result on loss your memorycards if you are careless.
 
 ## Loading ISOs
 
-Mednafen/Beetle differ from other PS1 emulators in that it needs a .cue sheet that points to an .iso/.bin or other image format.
+Beetle differs from other PS1 emulators in that it needs a cue-sheets that points to an image file, usually an .iso/.bin file.
 If you have e.g. <tt>foo.iso</tt>, you should create a foo.cue, and fill this in:
 
     FILE "foo.iso" BINARY
@@ -22,7 +25,13 @@ After that, you can load the <tt>foo.cue</tt> file as a ROM.
 Note that this is a dirty hack and will not work on all games.
 Ideally, make sure to use rips that have cue-sheets.
 
-## Core Options
+## Suggested Firmware
+
+- scph5500.bin (8dd7d5296a650fac7319bce665a6a53c)
+- scph5501.bin (490f666e1afb15b7362b406ed1cea246)
+- scph5502.bin (32736f17079d0b2b7024407c39bd3050)
+
+## Options
 
 * CD Image Cache - Loads the complete image in memory at startup
 * PSX Dithering - Enables Dithering
