@@ -8,7 +8,8 @@ It currently runs on Linux, OSX and possibly Windows.
 To run this core, the "system directory" must be defined if running in RetroArch.
 The PSX BIOS must be placed there, $sysdir/SCPH550{0,1,2} for Japanese, NA and EU regions respectively.
 
-Memory cards will be saved to "save directory"
+Memory cards will be saved to "save directory", memory card #1 is saved using libretro's standard interface. The rest of memory cards are saved using Mednafen's starndard mechanism. You might have to rename your old 
+memory cards to gamename.srm. Alternatively you may just rename it from gamename.gamenamehash.0.mcr to gamename.gamenamehash.1.mcr and load them off the corresponding slot.
 
 Core now supports save states. Keep in mind states might result on loss your memorycards if you are careless.
 
