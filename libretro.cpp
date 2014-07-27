@@ -53,7 +53,8 @@ static retro_rumble_interface rumble;
 #include <stdarg.h>
 #include <ctype.h>
 
-bool setting_apply_analog_toggle = false;
+bool setting_apply_analog_toggle  = false;
+bool use_mednafen_memcard0_method = false;
 
 extern MDFNGI EmulatedPSX;
 MDFNGI *MDFNGameInfo = &EmulatedPSX;
@@ -1417,9 +1418,15 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       BIOSFile.read(BIOSROM->data8, 512 * 1024);
    }
 
-   FIO->LoadMemcard(0);
+   i = 0;
 
-   for(i = 1; i < 8; i++)
+   if (!use_mednafen_memcard0_method)
+   {
+      FIO->LoadMemcard(0);
+      i = 1;
+   }
+
+   for(; i < 8; i++)
    {
       char ext[64];
       snprintf(ext, sizeof(ext), "%d.mcr", i);
@@ -1683,7 +1690,7 @@ static void CloseGame(void)
    int i;
    for(i = 0; i < 8; i++)
    {
-      if (i == 0)
+      if (i == 0 && !use_mednafen_memcard0_method)
       {
          FIO->SaveMemcard(i);
          continue;
@@ -2289,6 +2296,16 @@ static void check_variables(void)
          old_apply_dither = apply_dither;
       }
    }
+
+   var.key = "beetle_psx_use_mednafen_memcard0_method";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "libretro") == 0)
+         use_mednafen_memcard0_method = false;
+      else if (strcmp(var.value, "mednafen") == 0)
+         use_mednafen_memcard0_method = true;
+   }
    
    var.key = "beetle_psx_analog_toggle";
 
@@ -2842,7 +2859,7 @@ void retro_run(void)
             if (log_cb)
                log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
 
-            if (i == 0)
+            if (i == 0 && !use_mednafen_memcard0_method)
             {
                FIO->SaveMemcard(i);
                Memcard_SaveDelay[i] = -1;
@@ -3040,6 +3057,7 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
       { "beetle_psx_dithering", "Dithering; enabled|disabled" },
+      { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 Method; libretro|mednafen" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
@@ -3138,7 +3156,10 @@ void *retro_get_memory_data(unsigned type)
    switch (type)
    {
       case RETRO_MEMORY_SAVE_RAM:
-         data = FIO->GetMemcardDevice(0)->GetNVData();
+         if (use_mednafen_memcard0_method)
+            data = NULL;
+         else
+            data = FIO->GetMemcardDevice(0)->GetNVData();
          break;
       default:
          data = NULL;
@@ -3154,7 +3175,10 @@ size_t retro_get_memory_size(unsigned type)
    switch (type)
    {
       case RETRO_MEMORY_SAVE_RAM:
-         size = (1 << 17);
+         if (use_mednafen_memcard0_method)
+            size = 0;
+         else
+            size = (1 << 17);
          break;
       default:
          size = 0;
