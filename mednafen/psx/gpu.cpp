@@ -411,9 +411,12 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
             break;
 
          case 1:
+         case 3:
             {
                uint32_t sum, carry;
                bg_pix &= ~0x8000;
+               if (BlendMode == 3)
+                  fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
 
                sum = fore_pix + bg_pix;
                carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
@@ -432,19 +435,6 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
                borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
                pix = (diff - borrow) & (borrow - (borrow >> 5));
-            }
-            break;
-
-         case 3:
-            {
-               uint32_t sum, carry;
-               bg_pix &= ~0x8000;
-               fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
-
-               sum = fore_pix + bg_pix;
-               carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-
-               pix = (sum - carry) | (carry - (carry >> 5));
             }
             break;
       }
