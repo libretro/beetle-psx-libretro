@@ -348,6 +348,10 @@ ifeq ($(WANT_NEW_API), 1)
 FLAGS += -DWANT_NEW_API
 endif
 
+ifeq ($(NO_COMPUTED_GOTO), 1)
+FLAGS += -DNO_COMPUTED_GOTO
+endif
+
 CXXFLAGS += $(FLAGS)
 CFLAGS += $(FLAGS)
 
