@@ -2602,7 +2602,7 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
    return(MDFNGameInfo);
 }
 
-#define MAX_PLAYERS 2
+#define MAX_PLAYERS 8
 #define MAX_BUTTONS 16
 
 union
@@ -2649,8 +2649,13 @@ bool retro_load_game(const struct retro_game_info *info)
 	deint.ClearState();
 #endif
 
-   SetInput(0, "gamepad", &input_buf[0]);
-   SetInput(1, "gamepad", &input_buf[1]);
+   //SetInput(0, "gamepad", &input_buf[0]);
+   //SetInput(1, "gamepad", &input_buf[1]);
+   
+   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+   {
+       SetInput(i, "gamepad", &input_buf[i]);
+   }
 
    return true;
 }
@@ -2684,8 +2689,13 @@ void retro_unload_game(void)
 // See mednafen/psx/input/gamepad.cpp
 static void update_input(void)
 {
-   input_buf[0] = 0;
-   input_buf[1] = 0;
+   //input_buf[0] = 0;
+   //input_buf[1] = 0;
+   
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   {
+       input_buf[j] = 0;
+   }
    	
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_SELECT,
@@ -2713,13 +2723,19 @@ static void update_input(void)
    }
 
    // Buttons.
-   buf.u8[0][0] = (input_buf[0] >> 0) & 0xff;
-   buf.u8[0][1] = (input_buf[0] >> 8) & 0xff;
-   buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
-   buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
+   //buf.u8[0][0] = (input_buf[0] >> 0) & 0xff;
+   //buf.u8[0][1] = (input_buf[0] >> 8) & 0xff;
+   //buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
+   //buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
+   
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   {
+        buf.u8[j][0] = (input_buf[0] >> 0) & 0xff;
+        buf.u8[j][1] = (input_buf[0] >> 8) & 0xff;
+   }
 
    // Analogs
-   for (unsigned j = 0; j < 2; j++)
+   for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
       int analog_left_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
             RETRO_DEVICE_ID_ANALOG_X);
@@ -2758,10 +2774,16 @@ static void update_input(void)
    if (rumble.set_rumble_state)
    {
       // Appears to be correct.
-      rumble.set_rumble_state(0, RETRO_RUMBLE_WEAK, buf.u8[0][9 * 4] * 0x101);
-      rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
-      rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
-      rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
+      //rumble.set_rumble_state(0, RETRO_RUMBLE_WEAK, buf.u8[0][9 * 4] * 0x101);
+      //rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
+      //rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
+      //rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
+      
+      for (unsigned j = 0; j < MAX_PLAYERS; j++)
+      {
+          rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, buf.u8[j][9 * 4] * 0x101);
+          rumble.set_rumble_state(j, RETRO_RUMBLE_STRONG, buf.u8[j][9 * 4 + 1] * 0x101);
+      }
    }
 }
 
@@ -3079,6 +3101,12 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_controller_info ports[] = {
       { pads, 4 },
       { pads, 4 },
+      { pads, 3 },
+      { pads, 3 },
+      { pads, 3 },
+      { pads, 3 },
+      { pads, 3 },
+      { pads, 3 },
       { 0 },
    };
 
