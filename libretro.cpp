@@ -1749,7 +1749,7 @@ static int StateAction(StateMem *sm, int load, int data_only)
    // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
    if(load)
    {
-      if(CD_SelectedDisc >= (int)cdifs->size())
+      if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
          CD_SelectedDisc = -1;
 
       CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
