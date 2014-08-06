@@ -2730,8 +2730,8 @@ static void update_input(void)
    
    for (unsigned j = 0; j < MAX_PLAYERS; j++)
    {
-        buf.u8[j][0] = (input_buf[0] >> 0) & 0xff;
-        buf.u8[j][1] = (input_buf[0] >> 8) & 0xff;
+        buf.u8[j][0] = (input_buf[j] >> 0) & 0xff;
+        buf.u8[j][1] = (input_buf[j] >> 8) & 0xff;
    }
 
    // Analogs
@@ -3042,22 +3042,22 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       case RETRO_DEVICE_PS1PAD:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "gamepad", &buf.u8[in_port]);    
+         SetInput(in_port, "gamepad", &input_buf[in_port]);    
          break;
       case RETRO_DEVICE_DUALANALOG:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
+         SetInput(in_port, "dualanalog", &input_buf[in_port]);    
          break;
       case RETRO_DEVICE_DUALSHOCK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualshock", &buf.u8[in_port]);    
+         SetInput(in_port, "dualshock", &input_buf[in_port]);    
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "analogjoy", &buf.u8[in_port]);    
+         SetInput(in_port, "analogjoy", &input_buf[in_port]);    
          break;
       default:
          if (log_cb)
