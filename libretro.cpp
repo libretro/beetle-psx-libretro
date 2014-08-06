@@ -1749,7 +1749,7 @@ static int StateAction(StateMem *sm, int load, int data_only)
    // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
    if(load)
    {
-      if(CD_SelectedDisc >= (int)cdifs->size())
+      if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
          CD_SelectedDisc = -1;
 
       CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
@@ -2031,7 +2031,7 @@ static Deinterlacer deint;
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Beetle PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.36.1"
+#define MEDNAFEN_CORE_VERSION "v0.9.36.3"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|ccd|m3u"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
