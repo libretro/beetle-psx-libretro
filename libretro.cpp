@@ -19,8 +19,8 @@ static retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
-
 static retro_rumble_interface rumble;
+static unsigned players = 2;
 
 /* start of Mednafen psx.cpp */
 
@@ -2372,6 +2372,21 @@ static void check_variables(void)
    {
       setting_last_scanline_pal = atoi(var.value);
    }
+   
+   if(setting_psx_multitap_port_1)
+   {
+      if(setting_psx_multitap_port_2)
+         players = 8;
+      else
+         players = 4;
+   }
+   else
+   {
+      if(setting_psx_multitap_port_2)
+         players = 4;
+      else
+         players = 2;      
+   }
 }
 
 #ifdef NEED_CD
@@ -2652,7 +2667,7 @@ bool retro_load_game(const struct retro_game_info *info)
    //SetInput(0, "gamepad", &input_buf[0]);
    //SetInput(1, "gamepad", &input_buf[1]);
    
-   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+   for (unsigned i = 0; i < players; i++)
    {
        SetInput(i, "gamepad", &input_buf[i]);
    }
@@ -2692,7 +2707,7 @@ static void update_input(void)
    //input_buf[0] = 0;
    //input_buf[1] = 0;
    
-   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   for (unsigned j = 0; j < players; j++)
    {
        input_buf[j] = 0;
    }
@@ -2716,7 +2731,7 @@ static void update_input(void)
       RETRO_DEVICE_ID_JOYPAD_Y,
    };
 
-   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   for (unsigned j = 0; j < players; j++)
    {
       for (unsigned i = 0; i < MAX_BUTTONS; i++)
          input_buf[j] |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
@@ -2728,14 +2743,14 @@ static void update_input(void)
    //buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
    //buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
    
-   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   for (unsigned j = 0; j < players; j++)
    {
         buf.u8[j][0] = (input_buf[j] >> 0) & 0xff;
         buf.u8[j][1] = (input_buf[j] >> 8) & 0xff;
    }
 
    // Analogs
-   for (unsigned j = 0; j < MAX_PLAYERS; j++)
+   for (unsigned j = 0; j < players; j++)
    {
       int analog_left_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
             RETRO_DEVICE_ID_ANALOG_X);
@@ -2779,7 +2794,7 @@ static void update_input(void)
       //rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
       //rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
       
-      for (unsigned j = 0; j < MAX_PLAYERS; j++)
+      for (unsigned j = 0; j < players; j++)
       {
           rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, buf.u8[j][9 * 4] * 0x101);
           rumble.set_rumble_state(j, RETRO_RUMBLE_STRONG, buf.u8[j][9 * 4 + 1] * 0x101);
@@ -3042,22 +3057,22 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       case RETRO_DEVICE_PS1PAD:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "gamepad", &input_buf[in_port]);    
+         SetInput(in_port, "gamepad", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALANALOG:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualanalog", &input_buf[in_port]);    
+         SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALSHOCK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualshock", &input_buf[in_port]);    
+         SetInput(in_port, "dualshock", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "analogjoy", &input_buf[in_port]);    
+         SetInput(in_port, "analogjoy", &buf.u8[in_port]);
          break;
       default:
          if (log_cb)
@@ -3101,12 +3116,12 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_controller_info ports[] = {
       { pads, 4 },
       { pads, 4 },
-      { pads, 3 },
-      { pads, 3 },
-      { pads, 3 },
-      { pads, 3 },
-      { pads, 3 },
-      { pads, 3 },
+      { pads, 4 },
+      { pads, 4 },
+      { pads, 4 },
+      { pads, 4 },
+      { pads, 4 },
+      { pads, 4 },
       { 0 },
    };
 
