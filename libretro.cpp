@@ -2678,7 +2678,7 @@ bool retro_load_game(const struct retro_game_info *info)
    //SetInput(0, "gamepad", &input_buf[0]);
    //SetInput(1, "gamepad", &input_buf[1]);
    
-   for (unsigned i = 0; i < 8; i++)
+   for (unsigned i = 0; i < players; i++)
    {
        SetInput(i, "gamepad", &input_buf[i]);
    }
@@ -3105,7 +3105,7 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
       { "beetle_psx_dithering", "Dithering; enabled|disabled" },
-	  { "beetle_psx_experimental_save_states", "Save state support; disabled|enabled" },
+      { "beetle_psx_experimental_save_states", "Save state support; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
