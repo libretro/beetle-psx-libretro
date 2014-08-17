@@ -3160,7 +3160,7 @@ void retro_set_environment(retro_environment_t cb)
    environ_cb = cb;
 
    static const struct retro_variable vars[] = {
-      { "beetle_psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
+      { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
       { "beetle_psx_dithering", "Dithering; enabled|disabled" },
       { "beetle_psx_experimental_save_states", "Save state support; disabled|enabled" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); enabled|disabled" },
