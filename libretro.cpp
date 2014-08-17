@@ -2259,18 +2259,26 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 
 static bool old_cdimagecache = false;
 
-// experimental save stated support
+// experimental save state support
+static bool boot = true;
+
+static bool experimental_savestates = false;
 static bool experimental_savestates_toggle = false;
-static bool old_experimental_savestates_toggle = false;
 
 // shared memory cards support
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
-static bool old_shared_memorycards_toggle = false;
 
-static char message1[200] = "SAVE STATES: experimental, might result in loss of memory card data";
-static char message2[200] = "SHARED MEMORY CARDS: requires memory card method to be mednafen";
- 
+
+const char *messages[] = {"SHARED MEMCARDS: restart required",
+                          "SHARED MEMCARDS DISABLED: memory card method mednafen required",
+                          "SAVESTATES: restart required",
+                          "SAVESTATES DISABLED: non-shared memcards required",
+                          "SAVE STATES ENABLED: experimental, might result in loss of memory card data"};
+
+static bool print_messages[] = {false,false,false,false,false};
+static bool pending_messages = false;
+
 static void check_variables(void)
 {
    struct retro_variable var = {0};
@@ -2308,17 +2316,7 @@ static void check_variables(void)
          old_apply_dither = apply_dither;
       }
    }
-
-   var.key = "beetle_psx_use_mednafen_memcard0_method";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "libretro") == 0)
-         use_mednafen_memcard0_method = false;
-      else if (strcmp(var.value, "mednafen") == 0)
-         use_mednafen_memcard0_method = true;
-   }
-   
+ 
    var.key = "beetle_psx_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2399,60 +2397,103 @@ static void check_variables(void)
       else
          players = 2;      
    }
-      
-   var.key = "beetle_psx_experimental_save_states";
-   bool print_message1 = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "enabled") == 0)
-      {
-         experimental_savestates_toggle = true;
-         if(old_experimental_savestates_toggle != experimental_savestates_toggle)
-               print_message1 = true;
-         else
-               print_message1 = false;
-      }
-      else if (strcmp(var.value, "disabled") == 0)
-         experimental_savestates_toggle = false;
-   }
-   old_experimental_savestates_toggle = experimental_savestates_toggle;
    
-   var.key = "beetle_psx_shared_memory_cards";   
-   bool print_message2 = false;
+   var.key = "beetle_psx_use_mednafen_memcard0_method";
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (strcmp(var.value, "enabled") == 0)
-      {
-         shared_memorycards_toggle = true;
-         if(!use_mednafen_memcard0_method)
-         {      
-            if(old_shared_memorycards_toggle != shared_memorycards_toggle)
-               print_message2 = true;
-            shared_memorycards_toggle = false;
+      if (strcmp(var.value, "libretro") == 0)
+         use_mednafen_memcard0_method = false;
+      else if (strcmp(var.value, "mednafen") == 0)
+         use_mednafen_memcard0_method = true;
+   }
+   
+   //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
+   var.key = "beetle_psx_shared_memory_cards";   
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      
+     if (strcmp(var.value, "enabled") == 0)
+     {
+         if(boot)
+         {
+            if(use_mednafen_memcard0_method)
+               shared_memorycards_toggle = true;
+            else
+               print_messages[1] = true;
          }
          else
-            print_message2 = false;
-      }      
-      else if (strcmp(var.value, "disabled") == 0)
-         shared_memorycards_toggle = false;
+         {
+            if(!shared_memorycards)
+               print_messages[0] = true;
+            if(use_mednafen_memcard0_method)
+               shared_memorycards_toggle = true;
+            else
+               print_messages[1] = true;
+         }
+     }
+     else if (strcmp(var.value, "disabled") == 0)
+     {
+         if(boot)
+            shared_memorycards_toggle = false;
+         else
+         {
+            if(shared_memorycards)
+               print_messages[0] = true;
+            shared_memorycards = false;
+         }
+     }
    }
-   old_shared_memorycards_toggle = shared_memorycards_toggle;
    
-   if(print_message1 && print_message2)
+   //this option depends on  beetle_psx_shared_memory_cards being disabled so it should be evaluated that
+   var.key = "beetle_psx_experimental_save_states";
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      MDFN_DispMessage("%s  |  %s",message1,message2);
-   }
-   else
-   {
-      if(print_message1)
-        MDFN_DispMessage(message1);
-      if(print_message2)
-        MDFN_DispMessage(message2);
-   }
-   
-   
+     if (strcmp(var.value, "enabled") == 0)
+     {   
+        if(boot)
+        {
+          if(!shared_memorycards_toggle)
+          {
+            print_messages[4] = true;
+            experimental_savestates_toggle = true;
+          }
+          else
+             print_messages[3] = true;
+        }
+        else
+        {
+          if(!shared_memorycards_toggle)
+          {
+            if(!experimental_savestates)
+               print_messages[2] = true;
+            else
+               print_messages[4] = true;
 
+            experimental_savestates_toggle = true;
+          }
+          else
+          {
+            if(!experimental_savestates)
+              print_messages[2] = true;
+            print_messages[3] = true;
+          }
+        }
+      }
+      else if (strcmp(var.value, "disabled") == 0)
+      {
+        if(experimental_savestates)
+          print_messages[2] = true;
+        experimental_savestates_toggle = false;
+      }
+   }
    
+   if(print_messages[0] || print_messages[1] || print_messages[2] || print_messages[3] || print_messages[4])
+      pending_messages = true;
+   else
+      pending_messages = false;
 }
 
 #ifdef NEED_CD
@@ -2715,8 +2756,11 @@ bool retro_load_game(const struct retro_game_info *info)
    set_basename(info->path);
 
    check_variables();
-   //make sure shared memory cards is enabled only at startup
+   //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
+   experimental_savestates = experimental_savestates_toggle;
+
+   
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
@@ -2739,7 +2783,7 @@ bool retro_load_game(const struct retro_game_info *info)
    {
        SetInput(i, "gamepad", &input_buf[i]);
    }
-
+   boot = false;
    return true;
 }
 
@@ -2871,7 +2915,6 @@ static void update_input(void)
 }
 
 static uint64_t video_frames, audio_frames;
-
 #define SOUND_CHANNELS 2
 
 void retro_run(void)
@@ -2880,6 +2923,25 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       check_variables();
 
+   if(pending_messages)
+   {
+      if(video_frames%120 == 0 && video_frames > 0)
+      {
+         for(int i=0;i<5;i++)
+         {
+            if(print_messages[i])
+            {
+               MDFN_DispMessage(messages[i]);
+               print_messages[i] = false;
+               break;
+            }
+            if(!print_messages[0] && !print_messages[1] && !print_messages[2] && !print_messages[3] && !print_messages[4])
+               pending_messages = false;
+         }
+      }  
+   }   
+   
+  
    if (setting_apply_analog_toggle)
    {
       FIO->SetAMCT(setting_psx_analog_toggle);
@@ -3162,18 +3224,15 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
       { "beetle_psx_dithering", "Dithering; enabled|disabled" },
-      { "beetle_psx_experimental_save_states", "Save state support; disabled|enabled" },
-      { "beetle_psx_shared_memory_cards", "Shared memcards (restart); enabled|disabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
-      { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
+      { "beetle_psx_experimental_save_states", "Savestates (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
       { "beetle_psx_last_scanline_pal", "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
       { "beetle_psx_analog_toggle", "Dualshock analog toggle; disabled|enabled" },
       { "beetle_psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
-	  
-
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {
@@ -3231,7 +3290,7 @@ size_t retro_serialize_size(void)
    StateMem st;
    memset(&st, 0, sizeof(st));
 
-   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates_toggle)
+   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates)
    {
       if (log_cb)
          log_cb(RETRO_LOG_WARN, "[mednafen]: Save states might destroy your memory card data\n");
