@@ -2258,8 +2258,19 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 }
 
 static bool old_cdimagecache = false;
-static bool experimental_savestates = false;
 
+// experimental save stated support
+static bool experimental_savestates_toggle = false;
+static bool old_experimental_savestates_toggle = false;
+
+// shared memory cards support
+static bool shared_memorycards = false;
+static bool shared_memorycards_toggle = false;
+static bool old_shared_memorycards_toggle = false;
+
+static char message1[200] = "SAVE STATES: experimental, might result in loss of memory card data";
+static char message2[200] = "SHARED MEMORY CARDS: requires memory card method to be mednafen";
+ 
 static void check_variables(void)
 {
    struct retro_variable var = {0};
@@ -2390,14 +2401,58 @@ static void check_variables(void)
    }
       
    var.key = "beetle_psx_experimental_save_states";
-
+   bool print_message1 = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
-         experimental_savestates = true;
+      {
+         experimental_savestates_toggle = true;
+         if(old_experimental_savestates_toggle != experimental_savestates_toggle)
+               print_message1 = true;
+         else
+               print_message1 = false;
+      }
       else if (strcmp(var.value, "disabled") == 0)
-         experimental_savestates = false;
+         experimental_savestates_toggle = false;
    }
+   old_experimental_savestates_toggle = experimental_savestates_toggle;
+   
+   var.key = "beetle_psx_shared_memory_cards";   
+   bool print_message2 = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+      {
+         shared_memorycards_toggle = true;
+         if(!use_mednafen_memcard0_method)
+         {      
+            if(old_shared_memorycards_toggle != shared_memorycards_toggle)
+               print_message2 = true;
+            shared_memorycards_toggle = false;
+         }
+         else
+            print_message2 = false;
+      }      
+      else if (strcmp(var.value, "disabled") == 0)
+         shared_memorycards_toggle = false;
+   }
+   old_shared_memorycards_toggle = shared_memorycards_toggle;
+   
+   if(print_message1 && print_message2)
+   {
+      MDFN_DispMessage("%s  |  %s",message1,message2);
+   }
+   else
+   {
+      if(print_message1)
+        MDFN_DispMessage(message1);
+      if(print_message2)
+        MDFN_DispMessage(message2);
+   }
+   
+   
+
+   
 }
 
 #ifdef NEED_CD
@@ -2660,6 +2715,8 @@ bool retro_load_game(const struct retro_game_info *info)
    set_basename(info->path);
 
    check_variables();
+   //make sure shared memory cards is enabled only at startup
+   shared_memorycards = shared_memorycards_toggle;
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
@@ -3106,6 +3163,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_cdimagecache", "CD Image Cache (Restart); disabled|enabled" },
       { "beetle_psx_dithering", "Dithering; enabled|disabled" },
       { "beetle_psx_experimental_save_states", "Save state support; disabled|enabled" },
+      { "beetle_psx_shared_memory_cards", "Shared memcards (restart); enabled|disabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
@@ -3173,10 +3231,10 @@ size_t retro_serialize_size(void)
    StateMem st;
    memset(&st, 0, sizeof(st));
 
-   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates)
+   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates_toggle)
    {
       if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[mednafen]: Save states are experimental and you might lose memory card data.\n");
+         log_cb(RETRO_LOG_WARN, "[mednafen]: Save states might destroy your memory card data\n");
       return 0;
    }
 
@@ -3272,12 +3330,12 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    switch (type)
    {
       case MDFNMKF_SAV:
-         ret = retro_save_directory +slash + retro_base_name +
-            std::string(".") +
+         ret = retro_save_directory + slash + (!shared_memorycards ? retro_base_name : "mednafen_psx_libretro_shared") +
+         std::string(".") +
 #ifndef _XBOX
-	    md5_context::asciistr(MDFNGameInfo->MD5, 0) + std::string(".") +
+          (!shared_memorycards ? md5_context::asciistr(MDFNGameInfo->MD5, 0) : "") + (!shared_memorycards ? std::string(".") : "") +
 #endif
-            std::string(cd1);
+          std::string(cd1);         
          break;
       case MDFNMKF_FIRMWARE:
          ret = retro_base_directory + slash + std::string(cd1);
