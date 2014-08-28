@@ -22,7 +22,9 @@ endif
 endif
 
 ifneq ($(platform), osx)
+ifeq ($(findstring Haiku,$(shell uname -a)),)
    PTHREAD_FLAGS = -pthread
+endif
 endif
    NEED_CD = 1
    NEED_TREMOR = 1
