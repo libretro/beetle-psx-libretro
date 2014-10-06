@@ -280,7 +280,9 @@ static INLINE unsigned EP_to_SP(bool emulate_multitap[2], unsigned ep)
 
 InputDevice *FrontIO::GetMemcardDevice(unsigned int which)
 {
-   return DevicesMC[which];
+   if (DevicesMC)
+      return DevicesMC[which];
+   return NULL;
 }
 
 void FrontIO::MapDevicesToPorts(void)
