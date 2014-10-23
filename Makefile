@@ -81,8 +81,9 @@ ifeq ($(arch),ppc)
 else
    ENDIANNESS_DEFINES := -DLSB_FIRST
 endif
-OSXVER = $(shell sw_vers -productVersion | cut -c 4)
-ifneq ($(OSXVER),9)
+   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+ifeq ($(OSX_LT_MAVERICKS),"YES")
    fpic += -mmacosx-version-min=10.5
 endif
 else ifeq ($(platform), ios)
@@ -93,13 +94,21 @@ else ifeq ($(platform), ios)
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS)
 
+ifeq ($(IOSSDK),)
+   IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+endif
+
    CC = clang -arch armv7 -isysroot $(IOSSDK)
    CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
-OSXVER = $(shell sw_vers -productVersion | cut -c 4)
-ifeq ($(OSXVER),5)
+   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+   OSX_IS_LEOPARD   = `(( $(OSXVER) == 5)) && echo "YES"`
+   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+IPHONEMINVER :=
+ifeq ($(OSX_IS_LEOPARD),"YES")
    IPHONEMINVER = -miphone-version-min=5.0
-else
-   IPHONEMINVER = -miphoneos-version-min=5.0
+endif
+ifeq ($(OSX_LT_MAVERICKS),"YES")
+	IPHONEMINVER = -miphoneos-version-min=5.0
 endif
    LDFLAGS += $(IPHONEMINVER)
    FLAGS += $(IPHONEMINVER)
