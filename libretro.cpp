@@ -2270,7 +2270,7 @@ static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
 
-const char *messages[] = {"SHARED MEMCARDS: restart required",
+const char *msgs[] = {"SHARED MEMCARDS: restart required",
                           "SHARED MEMCARDS DISABLED: memory card method mednafen required",
                           "SAVESTATES: restart required",
                           "SAVESTATES DISABLED: non-shared memcards required",
@@ -2931,7 +2931,7 @@ void retro_run(void)
          {
             if(print_messages[i])
             {
-               MDFN_DispMessage(messages[i]);
+               MDFN_DispMessage(msgs[i]);
                print_messages[i] = false;
                break;
             }

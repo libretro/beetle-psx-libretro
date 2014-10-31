@@ -222,4 +222,7 @@ namespace CDUtility
  void scrambleize_data_sector(uint8 *sector_data);
 }
 
+void MDFN_strtoupper(std::string &str);
+void MDFN_strtoupper(char *str);
+
 #endif

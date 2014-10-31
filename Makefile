@@ -5,6 +5,7 @@ MEDNAFEN_DIR := mednafen
 MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
 NEED_TREMOR = 0
 LIBRETRO_SOURCES :=
+HAVE_GRIFFIN = 1
 
 ifeq ($(platform),)
 platform = unix
@@ -34,6 +35,11 @@ endif
    NEED_THREADING = 1
    CORE_DEFINE := -DWANT_PSX_EMU
    CORE_DIR := $(MEDNAFEN_DIR)/psx
+ifeq ($(HAVE_GRIFFIN),1)
+   CORE_SOURCES := beetle_psx_griffin.cpp \
+	$(CORE_DIR)/dma.cpp \
+	$(CORE_DIR)/sio.cpp
+else
    CORE_SOURCES := $(CORE_DIR)/irq.cpp \
 	$(CORE_DIR)/timer.cpp \
 	$(CORE_DIR)/dma.cpp \
@@ -55,6 +61,7 @@ endif
 	$(CORE_DIR)/input/memcard.cpp \
 	$(CORE_DIR)/input/multitap.cpp \
 	$(CORE_DIR)/input/mouse.cpp
+endif
    TARGET_NAME := mednafen_psx_libretro
 
 CORE_INCDIR := -I$(CORE_DIR)
@@ -246,11 +253,8 @@ ifeq ($(NEED_DEINTERLACER), 1)
    FLAGS += -DNEED_DEINTERLACER
 endif
 
-ifeq ($(NEED_SCSI_CD), 1)
-   CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/scsicd.cpp
-endif
-
 ifeq ($(NEED_CD), 1)
+ifneq ($(HAVE_GRIFFIN),1)
 CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
@@ -263,6 +267,7 @@ CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.cpp \
 	$(MEDNAFEN_DIR)/cdrom/crc32.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
+endif
    FLAGS += -DNEED_CD
 endif
 
@@ -272,6 +277,7 @@ ifeq ($(NEED_TREMOR), 1)
 endif
 
 
+ifneq ($(HAVE_GRIFFIN), 1)
 MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/math_ops.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
@@ -281,9 +287,11 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/MemoryStream.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
-	$(MEDNAFEN_DIR)/endian.cpp \
-	$(CDROM_SOURCES) \
-	$(MEDNAFEN_DIR)/mempatcher.cpp \
+	$(MEDNAFEN_DIR)/endian.cpp
+
+MEDNAFEN_SOURCES += $(CDROM_SOURCES)
+
+MEDNAFEN_SOURCES += $(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(RESAMPLER_SOURCES) \
@@ -291,8 +299,8 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
 
-
 LIBRETRO_SOURCES += libretro.cpp
+endif
 
 TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 	$(MEDNAFEN_DIR)/trio/triostr.c 

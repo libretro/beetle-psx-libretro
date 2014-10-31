@@ -22,6 +22,9 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
+#ifndef _GALOIS_INLINES_H_
+#define _GALOIS_INLINES_H_
+
 #include "dvdisaster.h"
 
 /*
@@ -38,3 +41,5 @@ static inline int mod_fieldmax(int x)
 
   return x;
 }
+
+#endif

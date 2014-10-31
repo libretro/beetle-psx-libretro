@@ -44,6 +44,7 @@
 
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
+#include "CDUtility.h"
 
 #include "audioreader.h"
 
@@ -289,51 +290,6 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
  track->sectors = sectors;
 }
-
-
-static void MDFN_strtoupper(char *str)
-{
- for(size_t x = 0; str[x]; x++)
- {
-  if(str[x] >= 'a' && str[x] <= 'z')
-  {
-   str[x] = str[x] - 'a' + 'A';
-  }
- }
-}
-
-static void MDFN_strtoupper(std::string &str)
-{
- const size_t len = str.length();
-
- for(size_t x = 0; x < len; x++)
- {
-  if(str[x] >= 'a' && str[x] <= 'z')
-  {
-   str[x] = str[x] - 'a' + 'A';
-  }
- }
-}
-
-#if 0
-std::string MDFN_toupper(const std::string &str)
-{
- const size_t len = str.length();
- std::string new_str;
-
- new_str.reserve(len);
-
- for(size_t x = 0; x < len; x++)
- {
-  int c = str[x];
-
-  if(c >= 'a' && c <= 'z')
-   c = c - 'a' + 'A';
-
-  new_str.push_back(c);
- }
-}
-#endif
 
 void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 {

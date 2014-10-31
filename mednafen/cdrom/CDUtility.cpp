@@ -320,3 +320,27 @@ void scrambleize_data_sector(uint8 *sector_data)
 }
 
 }
+
+void MDFN_strtoupper(char *str)
+{
+ for(size_t x = 0; str[x]; x++)
+ {
+  if(str[x] >= 'a' && str[x] <= 'z')
+  {
+   str[x] = str[x] - 'a' + 'A';
+  }
+ }
+}
+
+void MDFN_strtoupper(std::string &str)
+{
+   const size_t len = str.length();
+
+   for(size_t x = 0; x < len; x++)
+   {
+      if(str[x] >= 'a' && str[x] <= 'z')
+      {
+         str[x] = str[x] - 'a' + 'A';
+      }
+   }
+}

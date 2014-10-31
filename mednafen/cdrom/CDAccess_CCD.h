@@ -15,6 +15,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef _CDROM_CDACCESS_CCD_H_
+#define _CDROM_CDACCESS_CCD_H_
+
 #include "../FileStream.h"
 #include "../MemoryStream.h"
 #include "CDAccess.h"
@@ -46,3 +49,5 @@ class CDAccess_CCD : public CDAccess
  size_t img_numsectors;
  CDUtility::TOC tocd;
 };
+
+#endif
