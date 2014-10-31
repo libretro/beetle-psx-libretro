@@ -115,7 +115,7 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
   if(textured)
    u_r = u;
 
-  if(!LineSkipTest(y))
+  if(!LineSkipTest(this, y))
   {
    for(int32 x = x_start; MDFN_LIKELY(x < x_bound); x++)
    {

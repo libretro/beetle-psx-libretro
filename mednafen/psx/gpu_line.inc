@@ -140,7 +140,7 @@ void PS_GPU::DrawLine(line_point *points)
   const int32 y = (cur_point.y >> Line_XY_FractBits) & 2047;
   uint16 pix = 0x8000;
 
-  if(!LineSkipTest(y))
+  if(!LineSkipTest(this, y))
   {
    uint8 r, g, b;
 

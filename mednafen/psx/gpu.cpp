@@ -480,15 +480,16 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 
    return(fbw);
 }
 
-INLINE bool PS_GPU::LineSkipTest(unsigned y)
+
+static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 {
    //DisplayFB_XStart >= OffsX && DisplayFB_YStart >= OffsY &&
    // ((y & 1) == (DisplayFB_CurLineYReadout & 1))
 
-   if((DisplayMode & 0x24) != 0x24)
+   if((g->DisplayMode & 0x24) != 0x24)
       return false;
 
-   if(!dfe && ((y & 1) == ((DisplayFB_YStart + field_ram_readout) & 1))/* && !DisplayOff*/) //&& (y >> 1) >= DisplayFB_YStart && (y >> 1) < (DisplayFB_YStart + (VertEnd - VertStart)))
+   if(!g->dfe && ((y & 1) == ((g->DisplayFB_YStart + g->field_ram_readout) & 1))/* && !DisplayOff*/) //&& (y >> 1) >= DisplayFB_YStart && (y >> 1) < (DisplayFB_YStart + (VertEnd - VertStart)))
       return true;
 
    return false;
@@ -498,221 +499,23 @@ INLINE bool PS_GPU::LineSkipTest(unsigned y)
 #include "gpu_sprite.inc"
 #include "gpu_line.inc"
 
-// Special RAM write mode(16 pixels at a time), does *not* appear to use mask drawing environment settings.
-INLINE void PS_GPU::Command_FBFill(const uint32_t *cb)
-{
-   int32_t x, y, r, g, b, destX, destY, width, height;
-   r = cb[0] & 0xFF;
-   g = (cb[0] >> 8) & 0xFF;
-   b = (cb[0] >> 16) & 0xFF;
-   const uint16_t fill_value = ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
-
-   destX = (cb[1] >>  0) & 0x3F0;
-   destY = (cb[1] >> 16) & 0x3FF;
-
-   width =  (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
-   height = (cb[2] >> 16) & 0x1FF;
-
-   //printf("[GPU] FB Fill %d:%d w=%d, h=%d\n", destX, destY, width, height);
-   DrawTimeAvail -= 46;	// Approximate
-   DrawTimeAvail -= ((width * height) >> 3) + (height * 9);
-
-   for(y = 0; y < height; y++)
-   {
-      const int32 d_y = (y + destY) & 511;
-
-      if(LineSkipTest(d_y))
-         continue;
-
-      for(x = 0; x < width; x++)
-      {
-         const int32 d_x = (x + destX) & 1023;
-
-         GPURAM[d_y][d_x] = fill_value;
-      }
-   }
-}
-
-INLINE void PS_GPU::Command_FBCopy(const uint32 *cb)
-{
- int32 sourceX = (cb[1] >> 0) & 0x3FF;
- int32 sourceY = (cb[1] >> 16) & 0x3FF;
- int32 destX = (cb[2] >> 0) & 0x3FF;
- int32 destY = (cb[2] >> 16) & 0x3FF;
-
- int32 width = (cb[3] >> 0) & 0x3FF;
- int32 height = (cb[3] >> 16) & 0x1FF;
-
- if(!width)
-  width = 0x400;
-
- if(!height)
-  height = 0x200;
-
- //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
-
- DrawTimeAvail -= (width * height) * 2;
-
- for(int32 y = 0; y < height; y++)
- {
-  for(int32 x = 0; x < width; x += 128)
-  {
-   const int32 chunk_x_max = std::min<int32>(width - x, 128);
-   uint16 tmpbuf[128];	// TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
-
-   for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
-   {
-    int32 s_y = (y + sourceY) & 511;
-    int32 s_x = (x + chunk_x + sourceX) & 1023;
-
-    tmpbuf[chunk_x] = GPURAM[s_y][s_x];
-   }
-
-   for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
-   {
-    int32 d_y = (y + destY) & 511;
-    int32 d_x = (x + chunk_x + destX) & 1023;
-
-    if(!(GPURAM[d_y][d_x] & MaskEvalAND))
-     GPURAM[d_y][d_x] = tmpbuf[chunk_x] | MaskSetOR;
-   }
-  }
- }
-
-}
-
-INLINE void PS_GPU::Command_FBWrite(const uint32_t *cb)
-{
-   assert(InCmd == INCMD_NONE);
-
-   FBRW_X = (cb[1] >>  0) & 0x3FF;
-   FBRW_Y = (cb[1] >> 16) & 0x3FF;
-
-   FBRW_W = (cb[2] >>  0) & 0x7FF;
-   FBRW_H = (cb[2] >> 16) & 0x3FF;
-
-   if(FBRW_W > 0x400)
-      FBRW_W &= 0x3FF;
-
-   if(FBRW_H > 0x200)
-      FBRW_H &= 0x1FF;
-
-   FBRW_CurX = FBRW_X;
-   FBRW_CurY = FBRW_Y;
-
-   if(FBRW_W != 0 && FBRW_H != 0)
-      InCmd = INCMD_FBWRITE;
-}
-
-INLINE void PS_GPU::Command_FBRead(const uint32_t *cb)
-{
-   assert(InCmd == INCMD_NONE);
-
-   FBRW_X = (cb[1] >>  0) & 0x3FF;
-   FBRW_Y = (cb[1] >> 16) & 0x3FF;
-
-   FBRW_W = (cb[2] >>  0) & 0x7FF;
-   FBRW_H = (cb[2] >> 16) & 0x3FF;
-
-   if(FBRW_W > 0x400)
-      FBRW_W &= 0x3FF;
-
-   if(FBRW_H > 0x200)
-      FBRW_H &= 0x1FF;
-
-   FBRW_CurX = FBRW_X;
-   FBRW_CurY = FBRW_Y;
-
-   if(FBRW_W != 0 && FBRW_H != 0)
-      InCmd = INCMD_FBREAD;
-}
-
 INLINE void PS_GPU::RecalcTexWindowLUT(void)
 {
    unsigned x, y;
    const unsigned TexWindowX_AND = ~(tww << 3);
    const unsigned TexWindowX_OR = (twx & tww) << 3;
-
    const unsigned TexWindowY_AND = ~(twh << 3);
    const unsigned TexWindowY_OR = (twy & twh) << 3;
-
    // printf("TWX: 0x%02x, TWW: 0x%02x\n", twx, tww);
    // printf("TWY: 0x%02x, TWH: 0x%02x\n", twy, twh);
-
    for(x = 0; x < 256; x++)
       TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
-
    for(y = 0; y < 256; y++)
       TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
-
    memset(TexWindowXLUT_Pre, TexWindowXLUT[0], sizeof(TexWindowXLUT_Pre));
    memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
-
    memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
    memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
-}
-
-INLINE void PS_GPU::Command_DrawMode(const uint32_t *cb)
-{
-   TexPageX = (*cb & 0xF) * 64;
-   TexPageY = (*cb & 0x10) * 16;
-
-   SpriteFlip = *cb & 0x3000;
-
-   abr = (*cb >> 5) & 0x3;
-   TexMode = (*cb >> 7) & 0x3;
-
-   dtd = (*cb >> 9) & 1;
-   dfe = (*cb >> 10) & 1;
-   //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
-}
-
-INLINE void PS_GPU::Command_TexWindow(const uint32_t *cb)
-{
-   tww = (*cb & 0x1F);
-   twh = ((*cb >> 5) & 0x1F);
-   twx = ((*cb >> 10) & 0x1F);
-   twy = ((*cb >> 15) & 0x1F);
-
-   RecalcTexWindowLUT();
-}
-
-INLINE void PS_GPU::Command_Clip0(const uint32_t *cb)
-{
-   ClipX0 = *cb & 1023;
-   ClipY0 = (*cb >> 10) & 1023;
-}
-
-INLINE void PS_GPU::Command_Clip1(const uint32_t *cb)
-{
-   ClipX1 = *cb & 1023;
-   ClipY1 = (*cb >> 10) & 1023;
-}
-
-INLINE void PS_GPU::Command_DrawingOffset(const uint32_t *cb)
-{
-   OffsX = sign_x_to_s32(11, (*cb & 2047));
-   OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
-
-   //fprintf(stderr, "[GPU] Drawing offset: %d(raw=%d) %d(raw=%d) -- %d\n", OffsX, *cb, OffsY, *cb >> 11, scanline);
-}
-
-INLINE void PS_GPU::Command_MaskSetting(const uint32_t *cb)
-{
-   //printf("Mask setting: %08x\n", *cb);
-   MaskSetOR = (*cb & 1) ? 0x8000 : 0x0000;
-   MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
-}
-
-INLINE void PS_GPU::Command_ClearCache(const uint32_t *cb)
-{
-
-}
-
-INLINE void PS_GPU::Command_IRQ(const uint32 *cb)
-{
-   IRQPending = true;
-   IRQ_Assert(IRQ_GPU, IRQPending);
 }
 
 //
@@ -738,62 +541,193 @@ static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
 
 static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_ClearCache(cb);
 }
 
 static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_IRQ(cb);
+   g->IRQPending = true;
+   IRQ_Assert(IRQ_GPU, g->IRQPending);
 }
 
-static void G_Command_FBFill(PS_GPU* g, const uint32 *cb)
+// Special RAM write mode(16 pixels at a time), does *not* appear to use mask drawing environment settings.
+//
+static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
-   g->Command_FBFill(cb);
+   int32_t x, y, r, g, b, destX, destY, width, height;
+   r = cb[0] & 0xFF;
+   g = (cb[0] >> 8) & 0xFF;
+   b = (cb[0] >> 16) & 0xFF;
+   const uint16_t fill_value = ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
+
+   destX = (cb[1] >>  0) & 0x3F0;
+   destY = (cb[1] >> 16) & 0x3FF;
+
+   width =  (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
+   height = (cb[2] >> 16) & 0x1FF;
+
+   //printf("[GPU] FB Fill %d:%d w=%d, h=%d\n", destX, destY, width, height);
+   gpu->DrawTimeAvail -= 46;	// Approximate
+   gpu->DrawTimeAvail -= ((width * height) >> 3) + (height * 9);
+
+   for(y = 0; y < height; y++)
+   {
+      const int32 d_y = (y + destY) & 511;
+
+      if(LineSkipTest(gpu, d_y))
+         continue;
+
+      for(x = 0; x < width; x++)
+      {
+         const int32 d_x = (x + destX) & 1023;
+
+         gpu->GPURAM[d_y][d_x] = fill_value;
+      }
+   }
 }
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_FBCopy(cb);
+   int32 sourceX = (cb[1] >> 0) & 0x3FF;
+   int32 sourceY = (cb[1] >> 16) & 0x3FF;
+   int32 destX = (cb[2] >> 0) & 0x3FF;
+   int32 destY = (cb[2] >> 16) & 0x3FF;
+
+   int32 width = (cb[3] >> 0) & 0x3FF;
+   int32 height = (cb[3] >> 16) & 0x1FF;
+
+   if(!width)
+      width = 0x400;
+
+   if(!height)
+      height = 0x200;
+
+   //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
+
+   g->DrawTimeAvail -= (width * height) * 2;
+
+   for(int32 y = 0; y < height; y++)
+   {
+      for(int32 x = 0; x < width; x += 128)
+      {
+         const int32 chunk_x_max = std::min<int32>(width - x, 128);
+         uint16 tmpbuf[128];	// TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
+
+         for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+         {
+            int32 s_y = (y + sourceY) & 511;
+            int32 s_x = (x + chunk_x + sourceX) & 1023;
+
+            tmpbuf[chunk_x] = g->GPURAM[s_y][s_x];
+         }
+
+         for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+         {
+            int32 d_y = (y + destY) & 511;
+            int32 d_x = (x + chunk_x + destX) & 1023;
+
+            if(!(g->GPURAM[d_y][d_x] & g->MaskEvalAND))
+               g->GPURAM[d_y][d_x] = tmpbuf[chunk_x] | g->MaskSetOR;
+         }
+      }
+   }
 }
 
 static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_FBWrite(cb);
+   //assert(InCmd == INCMD_NONE);
+
+   g->FBRW_X = (cb[1] >>  0) & 0x3FF;
+   g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
+
+   g->FBRW_W = (cb[2] >>  0) & 0x7FF;
+   g->FBRW_H = (cb[2] >> 16) & 0x3FF;
+
+   if(g->FBRW_W > 0x400)
+      g->FBRW_W &= 0x3FF;
+
+   if(g->FBRW_H > 0x200)
+      g->FBRW_H &= 0x1FF;
+
+   g->FBRW_CurX = g->FBRW_X;
+   g->FBRW_CurY = g->FBRW_Y;
+
+   if(g->FBRW_W != 0 && g->FBRW_H != 0)
+      g->InCmd = g->INCMD_FBWRITE;
 }
 
 static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_FBRead(cb);
+   //assert(g->InCmd == INCMD_NONE);
+
+   g->FBRW_X = (cb[1] >>  0) & 0x3FF;
+   g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
+
+   g->FBRW_W = (cb[2] >>  0) & 0x7FF;
+   g->FBRW_H = (cb[2] >> 16) & 0x3FF;
+
+   if(g->FBRW_W > 0x400)
+      g->FBRW_W &= 0x3FF;
+
+   if(g->FBRW_H > 0x200)
+      g->FBRW_H &= 0x1FF;
+
+   g->FBRW_CurX = g->FBRW_X;
+   g->FBRW_CurY = g->FBRW_Y;
+
+   if(g->FBRW_W != 0 && g->FBRW_H != 0)
+      g->InCmd = g->INCMD_FBREAD;
 }
 
 static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_DrawMode(cb);
+   g->TexPageX = (*cb & 0xF) * 64;
+   g->TexPageY = (*cb & 0x10) * 16;
+
+   g->SpriteFlip = *cb & 0x3000;
+
+   g->abr = (*cb >> 5) & 0x3;
+   g->TexMode = (*cb >> 7) & 0x3;
+
+   g->dtd = (*cb >> 9) & 1;
+   g->dfe = (*cb >> 10) & 1;
+   //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
 static void G_Command_TexWindow(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_TexWindow(cb);
+   g->tww = (*cb & 0x1F);
+   g->twh = ((*cb >> 5) & 0x1F);
+   g->twx = ((*cb >> 10) & 0x1F);
+   g->twy = ((*cb >> 15) & 0x1F);
+
+   g->RecalcTexWindowLUT();
 }
 
 static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_Clip0(cb);
+   g->ClipX0 = *cb & 1023;
+   g->ClipY0 = (*cb >> 10) & 1023;
 }
 
 static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_Clip1(cb);
+   g->ClipX1 = *cb & 1023;
+   g->ClipY1 = (*cb >> 10) & 1023;
 }
 
 static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_DrawingOffset(cb);
+   g->OffsX = sign_x_to_s32(11, (*cb & 2047));
+   g->OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
+
+   //fprintf(stderr, "[GPU] Drawing offset: %d(raw=%d) %d(raw=%d) -- %d\n", OffsX, *cb, OffsY, *cb >> 11, scanline);
 }
 
 static void G_Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_MaskSetting(cb);
+   //printf("Mask setting: %08x\n", *cb);
+   g->MaskSetOR = (*cb & 1) ? 0x8000 : 0x0000;
+   g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
 }
 
 

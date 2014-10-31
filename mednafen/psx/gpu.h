@@ -98,13 +98,6 @@ class PS_GPU
   GPURAM[(A >> 10) & 0x1FF][A & 0x3FF] = V;
  }
 
- private:
-
- void ProcessFIFO(void);
- void WriteCB(uint32 data);
- uint32 ReadData(void);
- void SoftReset(void);
-
  // Y, X
  uint16 GPURAM[512][1024];
 
@@ -163,55 +156,6 @@ class PS_GPU
   uint8 RGB8SAT_Over[256];
  };
 
- bool LineSkipTest(unsigned y);
-
- template<int BlendMode, bool MaskEval_TA, bool textured>
- void PlotPixel(int32 x, int32 y, uint16 pix);
-
- template<uint32 TexMode_TA>
- uint16 GetTexel(uint32 clut_offset, int32 u, int32 v);
-
- uint16 ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y);
-
- template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode, bool MaskEval_TA>
- void DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl);
-
- template<bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void DrawTriangle(tri_vertex *vertices, uint32 clut);
-
- template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
- void DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset);
-
- template<bool goraud, int BlendMode, bool MaskEval_TA>
- void DrawLine(line_point *vertices);
-
- public:
- template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void Command_DrawPolygon(const uint32 *cb);
-
- template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void Command_DrawSprite(const uint32 *cb);
-
-
- template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
- void Command_DrawLine(const uint32 *cb);
-
- void Command_ClearCache(const uint32 *cb);
- void Command_IRQ(const uint32 *cb);
-
- void Command_FBFill(const uint32 *cb);
- void Command_FBCopy(const uint32 *cb);
- void Command_FBWrite(const uint32 *cb);
- void Command_FBRead(const uint32 *cb);
-
- void Command_DrawMode(const uint32 *cb);
- void Command_TexWindow(const uint32 *cb);
- void Command_Clip0(const uint32 *cb);
- void Command_Clip1(const uint32 *cb);
- void Command_DrawingOffset(const uint32 *cb);
- void Command_MaskSetting(const uint32 *cb);
-
- private:
  static CTEntry Commands[256];
 
  SimpleFIFO<uint32> BlitterFIFO;
@@ -304,6 +248,62 @@ class PS_GPU
  int32 *LineWidths;
  bool HardwarePALType;
  int LineVisFirst, LineVisLast;
+
+ private:
+
+ void ProcessFIFO(void);
+ void WriteCB(uint32 data);
+ uint32 ReadData(void);
+ void SoftReset(void);
+
+ template<int BlendMode, bool MaskEval_TA, bool textured>
+ void PlotPixel(int32 x, int32 y, uint16 pix);
+
+ template<uint32 TexMode_TA>
+ uint16 GetTexel(uint32 clut_offset, int32 u, int32 v);
+
+ uint16 ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y);
+
+ template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode, bool MaskEval_TA>
+ void DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl);
+
+ template<bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void DrawTriangle(tri_vertex *vertices, uint32 clut);
+
+ template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
+ void DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset);
+
+ template<bool goraud, int BlendMode, bool MaskEval_TA>
+ void DrawLine(line_point *vertices);
+
+ public:
+ template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void Command_DrawPolygon(const uint32 *cb);
+
+ template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void Command_DrawSprite(const uint32 *cb);
+
+
+ template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
+ void Command_DrawLine(const uint32 *cb);
+
+ void Command_ClearCache(const uint32 *cb);
+ void Command_IRQ(const uint32 *cb);
+
+ void Command_FBFill(const uint32 *cb);
+ void Command_FBCopy(const uint32 *cb);
+ void Command_FBWrite(const uint32 *cb);
+ void Command_FBRead(const uint32 *cb);
+
+ void Command_DrawMode(const uint32 *cb);
+ void Command_TexWindow(const uint32 *cb);
+ void Command_Clip0(const uint32 *cb);
+ void Command_Clip1(const uint32 *cb);
+ void Command_DrawingOffset(const uint32 *cb);
+ void Command_MaskSetting(const uint32 *cb);
+
+ private:
+
 
  void ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift, bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x);
 

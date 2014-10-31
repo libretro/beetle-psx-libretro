@@ -135,7 +135,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32 clut_offset, const int32 x_start, con
 {
   int32 xs = x_start, xb = x_bound;
 
-  if(LineSkipTest(y))
+  if(LineSkipTest(this, y))
    return;
 
   if(xs < xb)	// (xs != xb)
