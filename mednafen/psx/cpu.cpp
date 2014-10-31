@@ -390,8 +390,10 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32_t NPM)
    if(InBDSlot)
       CP0.EPC -= 4;
 
+#ifdef HAVE_DEBUG
    if(ADDBT)
       ADDBT(PC, handler, true);
+#endif
 
    // "Push" IEc and KUc(so that the new IEc and KUc are 0)
    CP0.SR = (CP0.SR & ~0x3F) | ((CP0.SR << 2) & 0x3F);
@@ -457,6 +459,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
          // Zero must be zero...until the Master Plan is enacted.
          GPR[0] = 0;
 
+#ifdef HAVE_DEBUG
          if(DebugMode && CPUHook)
          {
             ACTIVE_TO_BACKING;
@@ -473,6 +476,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
             BACKING_TO_ACTIVE;
          }
+#endif
 
          instr = ICache[(PC & 0xFFC) >> 2].Data;
 
@@ -567,6 +571,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name: /*assert( ((arg_op) ? (0x40 | (arg_op)) : (arg_funct)) == opf); */
 #define END_OPF goto OpDone; }
 
+#ifdef HAVE_DEBUG
 #define DO_BRANCH(offset, mask)			\
          {						\
             PC = (PC & new_PC_mask) + new_PC;		\
@@ -580,6 +585,16 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
             }						\
             goto SkipNPCStuff;				\
          }
+#else
+#define DO_BRANCH(offset, mask)			\
+         {						\
+            PC = (PC & new_PC_mask) + new_PC;		\
+            new_PC = (offset);				\
+            new_PC_mask = (mask) & ~3;			\
+            /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
+            goto SkipNPCStuff;				\
+         }
+#endif
 
 #define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; int32_t immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
 #define ITYPE_ZE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
@@ -617,8 +632,10 @@ SkipNPCStuff:	;
 
 pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, const bool ILHMode)
 {
+#ifdef HAVE_DEBUG
    if(CPUHook || ADDBT)
       return(RunReal<true, false>(timestamp_in));
+#endif
    return(RunReal<false, false>(timestamp_in));
 }
 
