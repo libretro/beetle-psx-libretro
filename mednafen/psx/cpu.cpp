@@ -474,17 +474,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
             BACKING_TO_ACTIVE;
          }
 
-         if(!ILHMode)
-         {
-            if(PC == 0xB0)
-            {
-               if(MDFN_UNLIKELY(GPR[9] == 0x3D))
-               {
-                  PSX_DBG(PSX_DBG_BIOS_PRINT, "%c", GPR[4]);
-               }
-            }
-         }
-
          instr = ICache[(PC & 0xFFC) >> 2].Data;
 
          if(ICache[(PC & 0xFFC) >> 2].TV != PC)
@@ -580,22 +569,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
 #define DO_BRANCH(offset, mask)			\
          {						\
-            if(ILHMode)					\
-            {								\
-               uint32_t old_PC = PC;						\
-               PC = (PC & new_PC_mask) + new_PC;				\
-               if(old_PC == ((PC & (mask)) + (offset)))			\
-               {								\
-                  if(*(uint32_t *)&FastMap[PC >> FAST_MAP_SHIFT][PC] == 0)	\
-                  {								\
-                     if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
-                     {								\
-                        timestamp = next_event_ts;					\
-                     }								\
-                  }								\
-               }								\
-            }						\
-            else						\
             PC = (PC & new_PC_mask) + new_PC;		\
             new_PC = (offset);				\
             new_PC_mask = (mask) & ~3;			\
@@ -646,8 +619,6 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, const bool ILHMode
 {
    if(CPUHook || ADDBT)
       return(RunReal<true, false>(timestamp_in));
-   if (ILHMode)
-      return(RunReal<false, true>(timestamp_in));
    return(RunReal<false, false>(timestamp_in));
 }
 
