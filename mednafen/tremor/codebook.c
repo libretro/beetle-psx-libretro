@@ -22,6 +22,7 @@
 #include "ivorbiscodec.h"
 #include "codebook.h"
 #include "misc.h"
+#include "tremor_shared.h"
 
 /* unpacks a codebook from the packet buffer into the codebook struct,
    readies the codebook auxiliary structures for decode *************/
@@ -37,7 +38,7 @@ static_codebook *vorbis_staticbook_unpack(oggpack_buffer *opb){
   s->entries=oggpack_read(opb,24);
   if(s->entries==-1)goto _eofout;
 
-  if(_ilog(s->dim)+_ilog(s->entries)>24)goto _eofout;
+  if(ilog(s->dim)+ ilog(s->entries)>24)goto _eofout;
 
   /* codeword ordering.... length ordered or unordered? */
   switch((int)oggpack_read(opb,1)){
@@ -81,7 +82,7 @@ static_codebook *vorbis_staticbook_unpack(oggpack_buffer *opb){
       s->lengthlist=(long *)_ogg_malloc(sizeof(*s->lengthlist)*s->entries);
 
       for(i=0;i<s->entries;){
-	long num=oggpack_read(opb,_ilog(s->entries-i));
+	long num=oggpack_read(opb, ilog(s->entries-i));
 	if(num==-1)goto _eofout;
 	if(length>32 || num>s->entries-i ||
 	   (num>0 && (num-1)>>(length>>1)>>((length+1)>>1))>0){
@@ -145,22 +146,6 @@ static_codebook *vorbis_staticbook_unpack(oggpack_buffer *opb){
  _eofout:
   vorbis_staticbook_destroy(s);
   return(NULL); 
-}
-
-/* the 'eliminate the decode tree' optimization actually requires the
-   codewords to be MSb first, not LSb.  This is an annoying inelegancy
-   (and one of the first places where carefully thought out design
-   turned out to be wrong; Vorbis II and future Ogg codecs should go
-   to an MSb bitpacker), but not actually the huge hit it appears to
-   be.  The first-stage decode table catches most words so that
-   bitreverse is not in the main execution path. */
-
-static ogg_uint32_t bitreverse(ogg_uint32_t x){
-  x=    ((x>>16)&0x0000ffff) | ((x<<16)&0xffff0000);
-  x=    ((x>> 8)&0x00ff00ff) | ((x<< 8)&0xff00ff00);
-  x=    ((x>> 4)&0x0f0f0f0f) | ((x<< 4)&0xf0f0f0f0);
-  x=    ((x>> 2)&0x33333333) | ((x<< 2)&0xcccccccc);
-  return((x>> 1)&0x55555555) | ((x<< 1)&0xaaaaaaaa);
 }
 
 STIN long decode_packed_entry_number(codebook *book, 

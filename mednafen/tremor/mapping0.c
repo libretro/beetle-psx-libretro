@@ -27,6 +27,7 @@
 #include "window.h"
 #include "registry.h"
 #include "misc.h"
+#include "tremor_shared.h"
 
 /* simplistic, wasteful way of doing this (unique lookup for each
    mode/submapping); there should be a central repository for
@@ -112,16 +113,6 @@ static vorbis_look_mapping *mapping0_look(vorbis_dsp_state *vd,vorbis_info_mode 
   look->ch=vi->channels;
 
   return(look);
-}
-
-static int ilog(unsigned int v){
-  int ret=0;
-  if(v)--v;
-  while(v){
-    ret++;
-    v>>=1;
-  }
-  return(ret);
 }
 
 /* also responsible for range checking */

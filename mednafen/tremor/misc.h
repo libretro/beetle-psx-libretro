@@ -193,13 +193,11 @@ STIN ogg_int32_t VFLOAT_MULT(ogg_int32_t a,ogg_int32_t ap,
     return 0;
 }
 
-int _ilog(unsigned int);
-
 STIN ogg_int32_t VFLOAT_MULTI(ogg_int32_t a,ogg_int32_t ap,
 				      ogg_int32_t i,
 				      ogg_int32_t *p){
 
-  int ip=_ilog(abs(i))-31;
+  int ip= ilog(abs(i))-31;
   return VFLOAT_MULT(a,ap,i<<-ip,ip,p);
 }
 

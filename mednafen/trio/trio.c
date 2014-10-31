@@ -875,7 +875,7 @@ typedef struct _trio_reference_t {
  *
  *************************************************************************/
 
-static TRIO_CONST char rcsid[] = "@(#)$Id: trio.c,v 1.129 2009/09/20 11:37:15 breese Exp $";
+//static TRIO_CONST char rcsid[] = "@(#)$Id: trio.c,v 1.129 2009/09/20 11:37:15 breese Exp $";
 
 #if TRIO_FEATURE_FLOAT
 /*

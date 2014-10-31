@@ -26,6 +26,7 @@
 #include "misc.h"
 #include "os.h"
 #include "block.h"
+#include "tremor_shared.h"
 
 typedef struct {
   vorbis_info_residue0 *info;
@@ -66,15 +67,6 @@ void res0_free_look(vorbis_look_residue *i){
     memset(look,0,sizeof(*look));
     _ogg_free(look);
   }
-}
-
-static int ilog(unsigned int v){
-  int ret=0;
-  while(v){
-    ret++;
-    v>>=1;
-  }
-  return(ret);
 }
 
 static int icount(unsigned int v){

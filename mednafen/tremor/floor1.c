@@ -25,6 +25,7 @@
 #include "codebook.h"
 #include "misc.h"
 #include "block.h"
+#include "tremor_shared.h"
 
 #define floor1_rangedB 140 /* floor 1 fixed at -140dB to 0dB range */
 
@@ -57,15 +58,6 @@ static void floor1_free_look(vorbis_look_floor *i){
     memset(look,0,sizeof(*look));
     _ogg_free(look);
   }
-}
-
-static int ilog(unsigned int v){
-  int ret=0;
-  while(v){
-    ret++;
-    v>>=1;
-  }
-  return(ret);
 }
 
 static int icomp(const void *a,const void *b){

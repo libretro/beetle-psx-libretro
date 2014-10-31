@@ -22,16 +22,9 @@
 #include "misc.h"
 #include "ivorbiscodec.h"
 #include "codebook.h"
+#include "tremor_shared.h"
 
 /**** pack/unpack helpers ******************************************/
-int _ilog(unsigned int v){
-  int ret=0;
-  while(v){
-    ret++;
-    v>>=1;
-  }
-  return(ret);
-}
 
 /* 32 bit float (not IEEE; nonnormalized mantissa +
    biased exponent) : neeeeeee eeemmmmm mmmmmmmm mmmmmmmm 
@@ -159,7 +152,7 @@ ogg_uint32_t *_make_words(long *l,long n,long sparsecount){
    thought of it.  Therefore, we opt on the side of caution */
 long _book_maptype1_quantvals(const static_codebook *b){
   /* get us a starting hint, we'll polish it below */
-  int bits=_ilog(b->entries);
+  int bits= ilog(b->entries);
   int vals=b->entries>>((bits-1)*(b->dim-1)/b->dim);
 
   while(1){
@@ -314,14 +307,6 @@ void vorbis_book_clear(codebook *b){
   memset(b,0,sizeof(*b));
 }
 
-static ogg_uint32_t bitreverse(ogg_uint32_t x){
-  x=    ((x>>16)&0x0000ffffUL) | ((x<<16)&0xffff0000UL);
-  x=    ((x>> 8)&0x00ff00ffUL) | ((x<< 8)&0xff00ff00UL);
-  x=    ((x>> 4)&0x0f0f0f0fUL) | ((x<< 4)&0xf0f0f0f0UL);
-  x=    ((x>> 2)&0x33333333UL) | ((x<< 2)&0xccccccccUL);
-  return((x>> 1)&0x55555555UL) | ((x<< 1)&0xaaaaaaaaUL);
-}
-
 static int sort32a(const void *a,const void *b){
   return (**(ogg_uint32_t **)a>**(ogg_uint32_t **)b)-
     (**(ogg_uint32_t **)a<**(ogg_uint32_t **)b);
@@ -392,7 +377,7 @@ int vorbis_book_init_decode(codebook *c,const static_codebook *s){
       if(s->lengthlist[i]>0)
 	c->dec_codelengths[sortindex[n++]]=s->lengthlist[i];
     
-    c->dec_firsttablen=_ilog(c->used_entries)-4; /* this is magic */
+    c->dec_firsttablen= ilog(c->used_entries)-4; /* this is magic */
     if(c->dec_firsttablen<5)c->dec_firsttablen=5;
     if(c->dec_firsttablen>8)c->dec_firsttablen=8;
     
