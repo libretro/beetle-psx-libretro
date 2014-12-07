@@ -1,6 +1,30 @@
 #ifndef __MDFN_MEMPATCHER_DRIVER_H
 #define __MDFN_MEMPATCHER_DRIVER_H
 
+struct MemoryPatch
+{
+   MemoryPatch();
+   ~MemoryPatch();
+   std::string name;
+   std::string conditions;
+   uint32 addr;
+   uint64 val;
+   uint64 compare;
+   uint32 mltpl_count;
+   uint32 mltpl_addr_inc;
+   uint64 mltpl_val_inc;
+   uint32 copy_src_addr;
+   uint32 copy_src_addr_inc;
+   unsigned length;
+   bool bigendian;
+   bool status; // (in)active
+   unsigned icount;
+   char type; /* 'R' for replace, 'S' for substitute(GG), 'C' for substitute with compare */
+   /* 'T' for copy/transfer data, 'A' for add(variant of type R) */
+   //enum { TypeReplace, TypeSubst, TypeCompSubst };
+   //int type;
+};
+
 int MDFNI_DecodePAR(const char *code, uint32 *a, uint8 *v, uint8 *c, char *type);
 int MDFNI_DecodeGG(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type);
 int MDFNI_AddCheat(const char *name, uint32 addr, uint64 val, uint64 compare, char type, unsigned int length, bool bigendian);
