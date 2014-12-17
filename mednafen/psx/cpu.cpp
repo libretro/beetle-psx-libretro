@@ -48,6 +48,8 @@ PS_CPU::PS_CPU()
 
    CPUHook = NULL;
    ADDBT = NULL;
+
+   GTE_Init();
 }
 
 PS_CPU::~PS_CPU()
