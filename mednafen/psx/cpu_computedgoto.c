@@ -872,7 +872,7 @@
                uint64 result;
 
             result = (int64)(int32)GPR[rs] * (int32)GPR[rt];
-            muldiv_ts_done = timestamp + 7;
+            muldiv_ts_done = timestamp + MULT_Tab24[__builtin_clz((GPR[rs] ^ ((int32)GPR[rs] >> 31)) | 0x400)];
 
             DO_LDS();
 
@@ -895,7 +895,7 @@
                uint64 result;
 
             result = (uint64)GPR[rs] * GPR[rt];
-            muldiv_ts_done = timestamp + 7;
+            muldiv_ts_done = timestamp + MULT_Tab24[__builtin_clz(GPR[rs] | 0x400)];
 
             DO_LDS();
 
@@ -1038,7 +1038,7 @@
             GPR_RES(rt);
             GPR_DEPRES_END
 
-               uint32_t result = (bool)((int32)GPR[rs] < immediate);
+               uint32_t result = (bool)((int32)GPR[rs] < (int32)immediate);
 
             DO_LDS();
 

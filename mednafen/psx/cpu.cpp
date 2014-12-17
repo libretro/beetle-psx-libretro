@@ -50,6 +50,19 @@ PS_CPU::PS_CPU()
    ADDBT = NULL;
 
    GTE_Init();
+
+   for(unsigned i = 0; i < 24; i++)
+   {
+      uint8 v = 7;
+
+      if(i < 12)
+         v += 4;
+
+      if(i < 21)
+         v += 3;
+
+      MULT_Tab24[i] = v;
+   }
 }
 
 PS_CPU::~PS_CPU()
@@ -181,9 +194,9 @@ int PS_CPU::StateAction(StateMem *sm, int load, int data_only)
    return(ret);
 }
 
-void PS_CPU::AssertIRQ(int which, bool asserted)
+void PS_CPU::AssertIRQ(unsigned which, bool asserted)
 {
-   assert(which >= 0 && which <= 5);
+   assert(which <= 5);
 
    CP0.CAUSE &= ~(1 << (10 + which));
 
@@ -480,6 +493,17 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
          }
 #endif
 
+         // We can't fold this into the ICache[] != PC handling, since the lower 2 bits of TV
+         // are already used for cache management purposes and it assumes that the lower 2 bits of PC will be 0.
+         if(MDFN_UNLIKELY(PC & 0x3))
+         {
+            // This will block interrupt processing, but since we're going more for keeping broken homebrew/hacks from working
+            // than super-duper-accurate pipeline emulation, it shouldn't be a problem.
+            new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+            new_PC_mask = 0;
+            goto OpDone;
+         }
+
          instr = ICache[(PC & 0xFFC) >> 2].Data;
 
          if(ICache[(PC & 0xFFC) >> 2].TV != PC)
@@ -598,7 +622,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
          }
 #endif
 
-#define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; int32_t immediate = (int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+#define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = (int32)(int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
 #define ITYPE_ZE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
 #define JTYPE uint32_t target = instr & ((1 << 26) - 1); /*printf(" target=(%08x) ", target);*/
 #define RTYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32_t shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/

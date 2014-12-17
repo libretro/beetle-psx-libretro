@@ -69,7 +69,7 @@ class PS_CPU
  void Power(void);
 
  // which ranges 0-5, inclusive
- void AssertIRQ(int which, bool asserted);
+ void AssertIRQ(unsigned which, bool asserted);
 
  void SetHalt(bool status);
 
@@ -190,6 +190,7 @@ class PS_CPU
  //uint32_t WriteAbsorb;
  //uint8_t WriteAbsorbCount;
  //uint8_t WriteAbsorbMonkey;
+ uint8 MULT_Tab24[24];
 
  MultiAccessSizeMem<1024, uint32, false> ScratchRAM;
 
