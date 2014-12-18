@@ -28,9 +28,9 @@ struct i_deltas
  uint32 dummy1[3];
 };
 
-static INLINE int64 MakePolyXFP(int32 x)
+static INLINE int64 MakePolyXFP(uint32 x)
 {
- return ((int64)x << 32) + ((1LL << 32) - (1 << 11));
+ return ((uint64)x << 32) + ((1ULL << 32) - (1 << 11));
 }
 
 static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)

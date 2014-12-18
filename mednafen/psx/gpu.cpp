@@ -19,21 +19,6 @@
 #include "timer.h"
 
 /*
- TODO:
-	Test and clean up line, particularly polyline, drawing.
-
-	"abe" transparency testing might be not correct, the transparency in regards to mask bit setting and evaluation may not be correct.
-
-	Not everything is returned in the status port read yet(double check).
-
-	"dfe" bit of drawing mode is probably not implemented 100% correctly.
-
-	Initialize more stuff in the Power() function.
-
-	Fix triangle span rendering order(it's bottom-to-up sometimes on the real thing, to avoid negative x step/increment values).
-*/
-
-/*
  GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
 
  Non-interlaced NTSC mode line timing notes(real-world times calculated via PS1 timer and math with nominal CPU clock value):
@@ -59,24 +44,6 @@
 */
 
 /*
- Known problematic games to do regression testing on:
-
-	Dukes of Hazzard: Racing For Home
-		Sensitive about the GPU busy status flag being set long enough; double-check if we ever make CPU emulation more timing-accurate(
-		the fix will likely just involve reducing the timing granularity for DMA and GPU updates).
-
-	Final Fantasy 7
-		WHERE DO I BEGIN?!  (Currently broken as of Jan. 1, 2012)
-
-	Pro Pinball (series)
-		Sensitive to correct interlace and draw line skipping emulation.
-
-	Valkyrie Profile
-		Battle scenes will go all kaka with no graphics updates if GPU LL DMA completes too soon.
-
-*/
-
-/*
  November 29, 2012 notes:
 
   PAL mode can be turned on, and then off again, mid-frame(creates a neat effect).
@@ -87,13 +54,33 @@
   Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything 
   different from vs0->ve0.
 */
-static const int32_t dither_table[4][4] =
+static const int8 dither_table[4][4] =
 {
  { -4,  0, -3,  1 },
  {  2, -2,  3, -1 },
  { -3,  1, -4,  0 },
  {  3, -1,  2, -2 },
 };
+
+uint16 CLUT_Cache[256];
+
+uint32 CLUT_Cache_VB;	// Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
+
+struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
+{
+   // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
+   uint32 TWX_AND;
+   uint32 TWX_ADD;
+
+   uint32 TWY_AND;
+   uint32 TWY_ADD;
+} SUCV;
+
+struct
+{
+   uint16 Data[4];
+   uint32 Tag;
+} TexCache[256];
 
 uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
 
@@ -215,6 +202,11 @@ void PS_GPU::SoftReset(void) // Control command 0x00
 {
    IRQPending = false;
    IRQ_Assert(IRQ_GPU, IRQPending);
+
+#if 0
+   /* TODO */
+   G_Command_ClearCache();
+#endif
    DMAControl = 0;
 
    if(DrawTimeAvail < 0)
@@ -289,6 +281,11 @@ void PS_GPU::SoftReset(void) // Control command 0x00
 void PS_GPU::Power(void)
 {
    memset(GPURAM, 0, sizeof(GPURAM));
+
+   memset(CLUT_Cache, 0, sizeof(CLUT_Cache));
+   CLUT_Cache_VB = ~0U;
+
+   memset(TexCache, 0xFF, sizeof(TexCache));
 
    DMAControl = 0;
 
@@ -458,24 +455,68 @@ INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, cons
 template<uint32_t TexMode_TA>
 INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 v_arg)
 {
-   uint16_t fbw;
-   uint32_t u, v, fbtex_x, fbtex_y;
+#if 0
+   /* TODO */
+   uint32 u_ext = ((u_arg & SUCV.TWX_AND) + SUCV.TWX_ADD);
+   uint32 fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
+   uint32 fbtex_y = (v_arg & SUCV.TWY_AND) + SUCV.TWY_ADD;
+   uint32 gro = fbtex_y * 1024U + fbtex_x;
 
-   u = TexWindowXLUT[u_arg];
+   decltype(&TexCache[0]) c;
+
+   switch(TexMode_TA)
+   {
+      case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break;	// 64x64
+      case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 64x32 (NOT 32x64!)
+      case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 32x32
+   }
+
+   if(MDFN_UNLIKELY(c->Tag != (gro &~ 0x3)))
+   {
+      // SCPH-1001 old revision GPU is like(for sprites at least): (20 + 4)
+      // SCPH-5501 new revision GPU is like(for sprites at least): (12 + 4)
+      //
+      // We'll be conservative and just go with 4 for now, until we can run some tests with triangles too.
+      //
+      DrawTimeAvail -= 4;
+      c->Data[0] = (&GPURAM[0][0])[gro &~ 0x3];
+      c->Data[1] = (&GPURAM[0][1])[gro &~ 0x3];
+      c->Data[2] = (&GPURAM[0][2])[gro &~ 0x3];
+      c->Data[3] = (&GPURAM[0][3])[gro &~ 0x3];
+      c->Tag = (gro &~ 0x3);
+   }
+
+   uint16 fbw = c->Data[gro & 0x3];
+
+   if(TexMode_TA != 2)
+   {
+      if(TexMode_TA == 0)
+         fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
+      else
+         fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
+
+      fbw = CLUT_Cache[fbw];
+   }
+#else
+   uint16_t fbw;
+   uint32_t u_ext, v, fbtex_x, fbtex_y;
+
+   u_ext = TexWindowXLUT[u_arg];
    v = TexWindowYLUT[v_arg];
-   fbtex_x = TexPageX + (u >> (2 - TexMode_TA));
+   fbtex_x = TexPageX + (u_ext >> (2 - TexMode_TA));
    fbtex_y = TexPageY + v;
    fbw = GPURAM[fbtex_y][fbtex_x & 1023];
 
    if(TexMode_TA != 2)
    {
       if(TexMode_TA == 0)
-         fbw = (fbw >> ((u & 3) * 4)) & 0xF;
+         fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
       else
-         fbw = (fbw >> ((u & 1) * 8)) & 0xFF;
+         fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
 
       fbw = GPURAM[(clut_offset >> 10) & 511][(clut_offset + fbw) & 1023];
    }
+#endif
 
    return(fbw);
 }
@@ -501,6 +542,14 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
 INLINE void PS_GPU::RecalcTexWindowLUT(void)
 {
+#if 0
+   /* TODO */
+   SUCV.TWX_AND = ~(tww << 3);
+   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
+
+   SUCV.TWY_AND = ~(twh << 3);
+   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
+#else
    unsigned x, y;
    const unsigned TexWindowX_AND = ~(tww << 3);
    const unsigned TexWindowX_OR = (twx & tww) << 3;
@@ -516,6 +565,7 @@ INLINE void PS_GPU::RecalcTexWindowLUT(void)
    memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
    memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
    memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
+#endif
 }
 
 //
@@ -541,6 +591,13 @@ static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
 
 static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
 {
+#if 0
+   /* TODO */
+   CLUT_Cache_VB = ~0U;
+
+   for(auto& c : TexCache)
+      c.Tag = ~0U;
+#endif
 }
 
 static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
@@ -610,7 +667,7 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
       for(int32 x = 0; x < width; x += 128)
       {
          const int32 chunk_x_max = std::min<int32>(width - x, 128);
-         uint16 tmpbuf[128];	// TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
+         uint16 tmpbuf[128]; // TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
 
          for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
          {
@@ -690,6 +747,11 @@ static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
 
    g->dtd = (*cb >> 9) & 1;
    g->dfe = (*cb >> 10) & 1;
+
+#if 0
+   /* TODO */
+   g->RecalcTexWindowLUT();
+#endif
    //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
@@ -1460,6 +1522,17 @@ void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
 
 int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 {
+   uint32 TexCache_Tag[256];
+   uint16 TexCache_Data[256][4];
+
+   for(unsigned i = 0; i < 256; i++)
+   {
+      TexCache_Tag[i] = TexCache[i].Tag;
+
+      for(unsigned j = 0; j < 4; j++)
+         TexCache_Data[i][j] = TexCache[i].Data[j];
+
+ }
    SFORMAT StateRegs[] =
    {
       SFARRAY16(&GPURAM[0][0], sizeof(GPURAM) / sizeof(GPURAM[0][0])),
@@ -1561,6 +1634,13 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
    if(load)
    {
+      for(unsigned i = 0; i < 256; i++)
+      {
+         TexCache[i].Tag = TexCache_Tag[i];
+
+         for(unsigned j = 0; j < 4; j++)
+            TexCache[i].Data[j] = TexCache_Data[i][j];
+      }
       RecalcTexWindowLUT();
       BlitterFIFO.SaveStatePostLoad();
 
