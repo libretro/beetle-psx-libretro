@@ -14,6 +14,9 @@ else
 	$(CORE_DIR)/cdc.cpp \
 	$(CORE_DIR)/spu.cpp \
 	$(CORE_DIR)/gpu.cpp \
+	$(CORE_DIR)/gpu_polygon.cpp \
+	$(CORE_DIR)/gpu_sprite.cpp \
+	$(CORE_DIR)/gpu_line.cpp \
 	$(CORE_DIR)/mdec.cpp \
 	$(CORE_DIR)/input/gamepad.cpp \
 	$(CORE_DIR)/input/dualanalog.cpp \
