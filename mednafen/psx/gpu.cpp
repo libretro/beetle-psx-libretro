@@ -452,6 +452,31 @@ INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, cons
    return(ret);
 }
 
+template<uint32 TexMode_TA>
+INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
+{
+ if(TexMode_TA < 2)
+ {
+  const uint32 new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
+
+  if(CLUT_Cache_VB != new_ccvb)
+  {
+   uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
+   const uint32 cxo = (raw_clut & 0x3F) << 4;
+  const uint32 count = (TexMode_TA ? 256 : 16);
+
+   DrawTimeAvail -= count;
+
+   for(unsigned i = 0; i < count; i++)
+   {
+    CLUT_Cache[i] = gpulp[(cxo + i) & 0x3FF];
+   }
+
+   CLUT_Cache_VB = new_ccvb;
+  }
+ }
+}
+
 template<uint32_t TexMode_TA>
 INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 v_arg)
 {
