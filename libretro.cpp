@@ -1336,7 +1336,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = new PS_GPU(region == REGION_EU, sls, sle, true);
+   GPU = new PS_GPU(region == REGION_EU, sls, sle);
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -1765,7 +1765,7 @@ static int StateAction(StateMem *sm, int load, int data_only)
 
    ret &= CDC->StateAction(sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
-   GPU->StateAction(sm, load, data_only);
+   ret &= GPU->StateAction(sm, load, data_only);
    ret &= SPU->StateAction(sm, load, data_only);
 
    ret &= FIO->StateAction(sm, load, data_only);
@@ -2488,6 +2488,8 @@ static void check_variables(void)
 {
    struct retro_variable var = {0};
 
+   extern void PSXDitherApply(bool);
+
    var.key = "beetle_psx_cdimagecache";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2503,6 +2505,23 @@ static void check_variables(void)
       }
    }
 
+   var.key = "beetle_psx_dithering";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      static bool old_apply_dither = false;
+      bool apply_dither = true;
+      if (strcmp(var.value, "enabled") == 0)
+         apply_dither = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         apply_dither = false;
+      if (apply_dither != old_apply_dither)
+      {
+         PSXDitherApply(apply_dither);
+         old_apply_dither = apply_dither;
+      }
+   }
+ 
    var.key = "beetle_psx_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3584,6 +3603,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
+      { "beetle_psx_dithering", "Dithering; enabled|disabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_experimental_save_states", "Savestates (restart); disabled|enabled" },

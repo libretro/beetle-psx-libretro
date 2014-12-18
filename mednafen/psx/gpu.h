@@ -4,7 +4,7 @@
 #ifndef __MDFN_PSX_GPU_H
 #define __MDFN_PSX_GPU_H
 
-#include <mednafen/cdrom/SimpleFIFO.h>
+#include "../cdrom/SimpleFIFO.h"
 
 namespace MDFN_IEN_PSX
 {
@@ -35,24 +35,18 @@ struct line_point
  uint8 r, g, b;
 };
 
-struct texture_cache
-{
-   uint16 Data[4];
-   uint32 Tag;
-};
-
 class PS_GPU
 {
  public:
 
- PS_GPU(bool pal_clock_and_tv, int sls, int sle, bool show_h_overscan) MDFN_COLD;
+ PS_GPU(bool pal_clock_and_tv, int sls, int sle) MDFN_COLD;
  ~PS_GPU() MDFN_COLD;
 
  void FillVideoParams(MDFNGI* gi) MDFN_COLD;
 
  void Power(void) MDFN_COLD;
 
- void StateAction(StateMem *sm, const unsigned load, const bool data_only);
+ int StateAction(StateMem *sm, int load, int data_only);
 
  void ResetTS(void);
 
@@ -104,33 +98,8 @@ class PS_GPU
   GPURAM[(A >> 10) & 0x1FF][A & 0x3FF] = V;
  }
 
- private:
-
- uint16 CLUT_Cache[256];
- uint32 CLUT_Cache_VB;	// Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
-
- template<uint32 TexMode_TA>
- void Update_CLUT_Cache(uint16 raw_clut);
-
- struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
- {
-  // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
-  uint32 TWX_AND;
-  uint32 TWX_ADD;
-
-  uint32 TWY_AND;
-  uint32 TWY_ADD;
- } SUCV;
- void RecalcTexWindowStuff(void);
-
- texture_cache TexCache[256];
-
- void InvalidateCache(void);
-
- void ProcessFIFO(void);
- void WriteCB(uint32 data);
- uint32 ReadData(void);
- void SoftReset(void);
+ // Y, X
+ uint16 GPURAM[512][1024];
 
  uint32 DMAControl;
 
@@ -157,6 +126,20 @@ class PS_GPU
  uint32 MaskEvalAND;
 
  uint8 tww, twh, twx, twy;
+ struct
+ {
+  uint8 TexWindowXLUT_Pre[16];
+  uint8 TexWindowXLUT[256];
+  uint8 TexWindowXLUT_Post[16];
+ };
+
+ struct
+ {
+  uint8 TexWindowYLUT_Pre[16];
+  uint8 TexWindowYLUT[256];
+  uint8 TexWindowYLUT_Post[16];
+ };
+ void RecalcTexWindowLUT(void);
  
  int32 TexPageX;
  int32 TexPageY;
@@ -166,69 +149,21 @@ class PS_GPU
  uint32 abr;
  uint32 TexMode;
 
- uint8 DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
+ struct
+ {
+  uint8 RGB8SAT_Under[256];
+  uint8 RGB8SAT[256];
+  uint8 RGB8SAT_Over[256];
+ };
 
- bool LineSkipTest(unsigned y);
-
- template<int BlendMode, bool MaskEval_TA, bool textured>
- void PlotPixel(uint32 x, uint32 y, uint16 pix);
-
- template<uint32 TexMode_TA>
- uint16 GetTexel(uint32 u, uint32 v);
-
- uint16 ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y);
-
- template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode, bool MaskEval_TA>
- void DrawSpan(int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl);
-
- template<bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void DrawTriangle(tri_vertex *vertices);
-
- template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
- void DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color);
-
- template<bool goraud, int BlendMode, bool MaskEval_TA>
- void DrawLine(line_point *vertices);
-
-
- public:
- template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void Command_DrawPolygon(const uint32 *cb);
-
- template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
- void Command_DrawSprite(const uint32 *cb);
-
- template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
- void Command_DrawLine(const uint32 *cb);
-
- void Command_ClearCache(const uint32 *cb);
- void Command_IRQ(const uint32 *cb);
-
- void Command_FBFill(const uint32 *cb);
- void Command_FBCopy(const uint32 *cb);
- void Command_FBWrite(const uint32 *cb);
- void Command_FBRead(const uint32 *cb);
-
- void Command_DrawMode(const uint32 *cb);
- void Command_TexWindow(const uint32 *cb);
- void Command_Clip0(const uint32 *cb);
- void Command_Clip1(const uint32 *cb);
- void Command_DrawingOffset(const uint32 *cb);
- void Command_MaskSetting(const uint32 *cb);
-
- private:
  static CTEntry Commands[256];
- static const CTEntry Commands_00_1F[0x20];
- static const CTEntry Commands_20_3F[0x20];
- static const CTEntry Commands_40_5F[0x20];
- static const CTEntry Commands_60_7F[0x20];
- static const CTEntry Commands_80_FF[0x80];
 
  SimpleFIFO<uint32> BlitterFIFO;
 
  uint32 DataReadBuffer;
 
  bool IRQPending;
+
  //
  //
  //
@@ -245,6 +180,7 @@ class PS_GPU
  uint8 InCmd_CC;
 
  tri_vertex InQuad_F3Vertices[3];
+ uint32 InQuad_clut;
 
  line_point InPLine_PrevPoint;
 
@@ -298,14 +234,9 @@ class PS_GPU
 
  pscpu_timestamp_t lastts;
 
- // Y, X
- uint16 GPURAM[512][1024];
-
  //
  //
  //
- int32 hmc_to_visible;
- bool hide_hoverscan;
 
  bool sl_zero_reached;
  //
@@ -315,11 +246,65 @@ class PS_GPU
  MDFN_Surface *surface;
  MDFN_Rect *DisplayRect;
  int32 *LineWidths;
- bool skip;
  bool HardwarePALType;
  int LineVisFirst, LineVisLast;
 
- uint32 OutputLUT[384];
+ private:
+
+ void ProcessFIFO(void);
+ void WriteCB(uint32 data);
+ uint32 ReadData(void);
+ void SoftReset(void);
+
+ template<int BlendMode, bool MaskEval_TA, bool textured>
+ void PlotPixel(int32 x, int32 y, uint16 pix);
+
+ template<uint32 TexMode_TA>
+ uint16 GetTexel(uint32 clut_offset, int32 u, int32 v);
+
+ uint16 ModTexel(uint16 texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y);
+
+ template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode, bool MaskEval_TA>
+ void DrawSpan(int y, uint32 clut_offset, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl);
+
+ template<bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void DrawTriangle(tri_vertex *vertices, uint32 clut);
+
+ template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
+ void DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset);
+
+ template<bool goraud, int BlendMode, bool MaskEval_TA>
+ void DrawLine(line_point *vertices);
+
+ public:
+ template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void Command_DrawPolygon(const uint32 *cb);
+
+ template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+ void Command_DrawSprite(const uint32 *cb);
+
+
+ template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
+ void Command_DrawLine(const uint32 *cb);
+
+ void Command_ClearCache(const uint32 *cb);
+ void Command_IRQ(const uint32 *cb);
+
+ void Command_FBFill(const uint32 *cb);
+ void Command_FBCopy(const uint32 *cb);
+ void Command_FBWrite(const uint32 *cb);
+ void Command_FBRead(const uint32 *cb);
+
+ void Command_DrawMode(const uint32 *cb);
+ void Command_TexWindow(const uint32 *cb);
+ void Command_Clip0(const uint32 *cb);
+ void Command_Clip1(const uint32 *cb);
+ void Command_DrawingOffset(const uint32 *cb);
+ void Command_MaskSetting(const uint32 *cb);
+
+ private:
+
+
  void ReorderRGB_Var(uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift, bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x);
 
  template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
