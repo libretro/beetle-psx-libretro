@@ -72,30 +72,6 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
   //
   int32 suck_time = (x_bound - x_start) * (y_bound - y_start);
 
-  // Disabled until we can get it to take into account texture windowing, which can cause large sprites to be drawn entirely from cache(and not suffer from a texturing
-  // penalty); and disabled until we find a game that needs more accurate sprite draw timing. :b
-#if 0
-  if(textured)
-  {
-   // Empirically-observed approximations of time(66MHz cycles) taken to draw large textured sprites in the various texture depths, when the texture data and CLUT data
-   // was zero(non-zero takes longer to draw, TODO test that more):
-   //  4bpp - area * 2
-   //  8bpp - area * 3
-   //  15/16bpp - area * 5
-   // (other factors come into more importance for smaller sprites)
-   static const int cw[4] = { 64, 32, 32, 32 };
-   static const int ch[4] = { 64, 64, 32, 32 };
-   static const int mm[4] = { 2 - 1, 3 - 1, 5 - 1, 5 - 1 };
-
-   // Parts of the first few(up to texture cache height) horizontal lines can be in cache, so assume they are.
-   suck_time += mm[TexMode_TA] * std::max<int>(0, (x_bound - x_start) - cw[TexMode_TA]) * std::min<int>(ch[TexMode_TA], y_bound - y_start);
-
-   // The rest of the horizontal lines should not possibly have parts in the cache now.
-   suck_time += mm[TexMode_TA] * (x_bound - x_start) * std::max<int>(0, (y_bound - y_start) - ch[TexMode_TA]);
-  }
-  else
-#endif
-
   if((BlendMode >= 0) || MaskEval_TA)
   {
    suck_time += ((((x_bound + 1) & ~1) - (x_start & ~1)) * (y_bound - y_start)) >> 1;
