@@ -1,5 +1,29 @@
+/* Mednafen - Multi-system Emulator
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#include "psx.h"
+#include "gpu.h"
+
+namespace MDFN_IEN_PSX
+{
+#include "gpu_common.inc"
+
 template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
-void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset)
+void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color)
 {
  const int32 r = color & 0xFF;
  const int32 g = (color >> 8) & 0xFF;
@@ -91,13 +115,13 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
   if(textured)
    u_r = u;
 
-  if(!LineSkipTest(this, y))
+  if(!LineSkipTest(y))
   {
    for(int32 x = x_start; MDFN_LIKELY(x < x_bound); x++)
    {
     if(textured)
     {
-     uint16 fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
+     uint16 fbw = GetTexel<TexMode_TA>(u_r, v);
 
      if(fbw)
      {
@@ -127,7 +151,6 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32 *cb)
  int32 w, h;
  uint8 u = 0, v = 0;
  uint32 color = 0;
- uint32 clut = 0;
 
  DrawTimeAvail -= 16;	// FIXME, correct time.
 
@@ -142,7 +165,6 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32 *cb)
  {
   u = *cb & 0xFF;
   v = (*cb >> 8) & 0xFF;
-  clut = ((*cb >> 16) & 0xFFFF) << 4;
   Update_CLUT_Cache<TexMode_TA>((*cb >> 16) & 0xFFFF);
   cb++;
  }
@@ -181,32 +203,77 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32 *cb)
  {
   case 0x0000:
 	if(!TexMult || color == 0x808080)
-  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color, clut);
+  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color);
 	else
-	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color, clut);
+	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color);
 	break;
 
   case 0x1000:
 	if(!TexMult || color == 0x808080)
-  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color, clut);
+  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color);
 	else
-	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color, clut);
+	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color);
 	break;
 
   case 0x2000:
 	if(!TexMult || color == 0x808080)
-  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color, clut);
+  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color);
 	else
-	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color, clut);
+	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color);
 	break;
 
   case 0x3000:
 	if(!TexMult || color == 0x808080)
-  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color, clut);
+  	 DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color);
 	else
-	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color, clut);
+	 DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color);
 	break;
  }
 }
 
+//
+// C-style function wrappers so our command table isn't so ginormous(in memory usage).
+//
+template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
+{
+ g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
+}
 
+const CTEntry PS_GPU::Commands_60_7F[0x20] =
+{
+ SPR_HELPER(0x60),
+ SPR_HELPER(0x61),
+ SPR_HELPER(0x62),
+ SPR_HELPER(0x63),
+ SPR_HELPER(0x64),
+ SPR_HELPER(0x65),
+ SPR_HELPER(0x66),
+ SPR_HELPER(0x67),
+ SPR_HELPER(0x68),
+ SPR_HELPER(0x69),
+ SPR_HELPER(0x6a),
+ SPR_HELPER(0x6b),
+ SPR_HELPER(0x6c),
+ SPR_HELPER(0x6d),
+ SPR_HELPER(0x6e),
+ SPR_HELPER(0x6f),
+ SPR_HELPER(0x70),
+ SPR_HELPER(0x71),
+ SPR_HELPER(0x72),
+ SPR_HELPER(0x73),
+ SPR_HELPER(0x74),
+ SPR_HELPER(0x75),
+ SPR_HELPER(0x76),
+ SPR_HELPER(0x77),
+ SPR_HELPER(0x78),
+ SPR_HELPER(0x79),
+ SPR_HELPER(0x7a),
+ SPR_HELPER(0x7b),
+ SPR_HELPER(0x7c),
+ SPR_HELPER(0x7d),
+ SPR_HELPER(0x7e),
+ SPR_HELPER(0x7f)
+};
+
+}
