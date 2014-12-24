@@ -1336,7 +1336,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = new PS_GPU(region == REGION_EU, sls, sle, false);
+   GPU = new PS_GPU(region == REGION_EU, sls, sle);
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -1765,7 +1765,7 @@ static int StateAction(StateMem *sm, int load, int data_only)
 
    ret &= CDC->StateAction(sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
-   GPU->StateAction(sm, load, data_only);
+   ret &= GPU->StateAction(sm, load, data_only);
    ret &= SPU->StateAction(sm, load, data_only);
 
    ret &= FIO->StateAction(sm, load, data_only);
@@ -3155,7 +3155,7 @@ void retro_unload_game(void)
    if(!MDFNGameInfo)
       return;
 
-   MDFN_FlushGameCheats(1);
+   MDFN_FlushGameCheats(0);
 
    MDFNGameInfo->CloseGame();
 
