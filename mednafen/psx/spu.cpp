@@ -1457,90 +1457,86 @@ uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 speci
 
 void PS_SPU::SetRegister(unsigned int which, uint32 value)
 {
+   if(which >= GSREG_FB_SRC_A && which <= GSREG_IN_COEF_R)
+      ReverbRegs[which - GSREG_FB_SRC_A] = value;
+   else switch(which)
+   {
+      case GSREG_SPUCONTROL:
+         SPUControl = value;
+         break;
 
- switch(which)
- {
-  case GSREG_SPUCONTROL:
-	SPUControl = value;
-	break;
+      case GSREG_FM_ON:
+         FM_Mode = value & 0xFFFFFF;
+         break;
 
-  case GSREG_FM_ON:
-	FM_Mode = value & 0xFFFFFF;
-	break;
+      case GSREG_NOISE_ON:
+         Noise_Mode = value & 0xFFFFFF;
+         break;
 
-  case GSREG_NOISE_ON:
-	Noise_Mode = value & 0xFFFFFF;
-	break;
+      case GSREG_REVERB_ON:
+         Reverb_Mode = value & 0xFFFFFF;
+         break;
 
-  case GSREG_REVERB_ON:
-	Reverb_Mode = value & 0xFFFFFF;
-	break;
+      case GSREG_CDVOL_L:
+         CDVol[0] = (int16)value;
+         break;
 
-  case GSREG_CDVOL_L:
-	CDVol[0] = (int16)value;
-	break;
+      case GSREG_CDVOL_R:
+         CDVol[1] = (int16)value;
+         break;
 
-  case GSREG_CDVOL_R:
-	CDVol[1] = (int16)value;
-	break;
+      case GSREG_MAINVOL_CTRL_L:
+         Regs[0xC0] = value;
+         GlobalSweep[0].WriteControl(value);
+         //GlobalSweep[0].Control = value;
+         break;
 
-  case GSREG_MAINVOL_CTRL_L:
-	Regs[0xC0] = value;
-	GlobalSweep[0].WriteControl(value);
-	//GlobalSweep[0].Control = value;
-	break;
+      case GSREG_MAINVOL_CTRL_R:
+         Regs[0xC1] = value;
+         GlobalSweep[1].WriteControl(value);
+         //GlobalSweep[1].Control = value;
+         break;
 
-  case GSREG_MAINVOL_CTRL_R:
-	Regs[0xC1] = value;
-	GlobalSweep[1].WriteControl(value);
-	//GlobalSweep[1].Control = value;
-	break;
+      case GSREG_MAINVOL_L:
+         GlobalSweep[0].WriteVolume(value);
+         break;
 
-  case GSREG_MAINVOL_L:
-	GlobalSweep[0].WriteVolume(value);
-	break;
+      case GSREG_MAINVOL_R:
+         GlobalSweep[1].WriteVolume(value);
+         break;
 
-  case GSREG_MAINVOL_R:
-	GlobalSweep[1].WriteVolume(value);
-	break;
+      case GSREG_RVBVOL_L:
+         ReverbVol[0] = (int16)value;
+         break;
 
-  case GSREG_RVBVOL_L:
-	ReverbVol[0] = (int16)value;
-	break;
+      case GSREG_RVBVOL_R:
+         ReverbVol[1] = (int16)value;
+         break;
 
-  case GSREG_RVBVOL_R:
-	ReverbVol[1] = (int16)value;
-	break;
+      case GSREG_RWADDR:
+         RWAddr = value & 0x3FFFF;
+         break;
 
-  case GSREG_RWADDR:
-	RWAddr = value & 0x3FFFF;
-	break;
+      case GSREG_IRQADDR:
+         IRQAddr = value & 0x3FFFC;
+         break;
 
-  case GSREG_IRQADDR:
-	IRQAddr = value & 0x3FFFC;
-	break;
+         //
+         // REVERB_WA
+         //
 
-  //
-  // REVERB_WA
-  //
+      case GSREG_VOICEON:
+         VoiceOn = value & 0xFFFFFF;
+         break;
 
-  case GSREG_VOICEON:
-        VoiceOn = value & 0xFFFFFF;
-        break;
+      case GSREG_VOICEOFF:
+         VoiceOff = value & 0xFFFFFF;
+         break;
 
-  case GSREG_VOICEOFF:
-        VoiceOff = value & 0xFFFFFF;
-        break;
-
-  case GSREG_BLOCKEND:
-        BlockEnd = value & 0xFFFFFF;
-        break;
-
-  case GSREG_FB_SRC_A ... GSREG_IN_COEF_R:
-        ReverbRegs[which - GSREG_FB_SRC_A] = value;
-        break;
-
- }
+      case GSREG_BLOCKEND:
+         BlockEnd = value & 0xFFFFFF;
+         break;
+   }
 }
 
 
