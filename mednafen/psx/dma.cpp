@@ -231,7 +231,7 @@ static void RecalcHalt(void)
 }
 
 
-static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V, int32_t *offset)
+static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V, uint32_t *offset)
 {
    unsigned extra_cyc_overhead = 0;
 
@@ -417,7 +417,7 @@ static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, in
       //
       {
          uint32_t vtmp;
-         int32_t voffs = 0;
+         uint32_t voffs = 0;
 
          if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
          {
