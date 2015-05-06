@@ -128,10 +128,11 @@ void InputDevice_Multitap::Power(void)
  full_mode = false;
  full_mode_setting = false;
 
+ prev_fm_success = false;
+ memset(sb, 0, sizeof(sb));
+
  fm_dp = 0;
  memset(fm_buffer, 0, sizeof(fm_buffer));
- fm_deferred_error_temp = false;
- fm_deferred_error = false;
  fm_command_error = false;
 
  for(int i = 0; i < 4; i++)
@@ -156,11 +157,12 @@ int InputDevice_Multitap::StateAction(StateMem* sm, int load, int data_only, con
   SFVAR(full_mode),
   SFVAR(mc_mode),
 
+  SFVAR(prev_fm_success),
+
   SFVAR(fm_dp),
   SFARRAY(&fm_buffer[0][0], sizeof(fm_buffer) / sizeof(fm_buffer[0][0])),
+  SFARRAY(&sb[0][0], sizeof(sb) / sizeof(sb[0][0])),
 
-  SFVAR(fm_deferred_error_temp),
-  SFVAR(fm_deferred_error),
   SFVAR(fm_command_error),
 
   SFVAR(command),
@@ -202,6 +204,16 @@ void InputDevice_Multitap::SetDTR(bool new_dtr)
  if(!old_dtr && dtr)
  {
   full_mode = full_mode_setting;
+
+  if(!prev_fm_success)
+  {
+   unsigned i;
+   memset(sb, 0, sizeof(sb));
+   for(i = 0; i < 4; i++)
+    sb[i][0] = 0x42;
+  }
+   
+  prev_fm_success = false;
 
   byte_counter = 0;
 
@@ -255,26 +267,17 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
    if(full_mode)
    {
     if(byte_counter == 1)
-    {
      ret = (0x80 >> bit_counter) & 1;
-
-     for(unsigned i = 0; i < 4; i++)
-     { 
-      fm_buffer[i][0] &= (pad_devices[i]->Clock(TxD, tmp_pulse_delay[0][i]) << bit_counter) | (~(1U << bit_counter));
-     }
-    }
     else if(byte_counter == 2)
-    {
      ret = (0x5A >> bit_counter) & 1;
-    }
-    // || byte_counter == (0x03 + 0x08 * 1) || byte_counter == (0x03 + 0x08 * 2) || byte_counter == (0x03 + 0x08 * 3))
     else if(byte_counter >= 0x03 && byte_counter < 0x03 + 0x08 * 4)
     {
-     if(!fm_command_error && byte_counter >= (0x03 + 1) && byte_counter < (0x03 + 0x08))
+     if(!fm_command_error && byte_counter < (0x03 + 0x08))
      {
-      for(unsigned i = 0; i < 4; i++)
+      unsigned i;
+      for(i = 0; i < 4; i++)
       { 
-       fm_buffer[i][byte_counter - 0x03] &= (pad_devices[i]->Clock(0, tmp_pulse_delay[0][i]) << bit_counter) | (~(1U << bit_counter));
+       fm_buffer[i][byte_counter - 0x03] &= (pad_devices[i]->Clock((sb[i][byte_counter - 0x03] >> bit_counter) & 1, tmp_pulse_delay[0][i]) << bit_counter) | (~(1U << bit_counter));
       }
      }
      ret &= ((&fm_buffer[0][0])[byte_counter - 0x03] >> bit_counter) & 1;
@@ -298,7 +301,7 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
  bit_counter = (bit_counter + 1) & 0x7;
  if(bit_counter == 0)
  {
-  //printf("Receive: 0x%02x\n", receive_buffer);
+  //printf("MT Receive: 0x%02x\n", receive_buffer);
   if(byte_counter == 0)
   {
    mc_mode = (bool)(receive_buffer & 0xF0);
@@ -316,7 +319,6 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
    else
    {
     //printf("Device select: %02x\n", receive_buffer);
-    fm_deferred_error = false;
     selected_device = ((receive_buffer & 0xF) - 1) & 0xFF;
    }
   }
@@ -338,7 +340,6 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
    {
     fm_command_error = false;
    }
-   fm_deferred_error = false;
   }
 
   if((!mc_mode || full_mode) && byte_counter == 2)
@@ -349,23 +350,14 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
 
   if(full_mode)
   {
-   if(byte_counter == (3 + 8 * 0) || byte_counter == (3 + 8 * 1) || byte_counter == (3 + 8 * 2) || byte_counter == (3 + 8 * 3))
+   if(byte_counter >= 3 + 8 * 0 && byte_counter < (3 + 8 * 4))
    {
-    unsigned index = (byte_counter - 3) >> 3;
-    assert(index < 4);
-
-    if(index == 0)
-     fm_deferred_error_temp = false;     
-
-    if((fm_dp & (1U << index)) && receive_buffer != 0x42)
-    {
-     //printf("Multitap command check failed: %u, 0x%02x\n", byte_counter, receive_buffer);
-     fm_deferred_error_temp = true;
-    }
+      const unsigned adjbi = byte_counter - 3;
+      sb[adjbi >> 3][adjbi & 0x7] = receive_buffer;
    }
 
    if(byte_counter == 33)
-    fm_deferred_error = fm_deferred_error_temp;
+      prev_fm_success = true;
   }
 
   // Handle DSR stuff
@@ -386,17 +378,31 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
     if(fm_dp)
      dsr_pulse_delay = 0x40;
     else
+    {
+     byte_counter = 255;
      dsr_pulse_delay = 0;
+    }
    }
    else if(byte_counter >= 3 && byte_counter < 34)	// Next byte when byte_counter==3 (typically, controller-dependent): 0x5A
    {
     if(byte_counter < 10)
     { 
+     unsigned i;
      int d = 0x40;
 
-     for(unsigned i = 0; i < 4; i++)
-      if(tmp_pulse_delay[0][i] > d)
-       d = tmp_pulse_delay[0][i];
+     for(i = 0; i < 4; i++)
+     {
+        int32 tpd = tmp_pulse_delay[0][i];
+
+        if(byte_counter == 3 && (fm_dp & (1U << i)) && tpd == 0)
+        {
+           //printf("SNORG: %u %02x\n", i, sb[i][0]);
+           fm_command_error = true;
+        }
+
+        if(tpd > d)
+           d = tpd;
+     }
 
      dsr_pulse_delay = d;
     }
@@ -404,7 +410,10 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
      dsr_pulse_delay = 0x20;
 
     if(byte_counter == 3 && fm_command_error)
+    {
+     byte_counter = 255;
      dsr_pulse_delay = 0;
+    }
    }
   } // end if(full_mode)
   else
