@@ -162,12 +162,9 @@ static int32_t CalcNextEvent(int32_t next_event)
 
 static void ClockTimer(int i, uint32_t clocks)
 {
-   int32_t before, target;
-   bool zero_tm;
-
-   before = Timers[i].Counter;
-   target = 0x10000;
-   zero_tm = false;
+   int32_t before = Timers[i].Counter;
+   int32_t target = 0x10000;
+   bool zero_tm = false;
 
    if(Timers[i].DoZeCounting <= 0)
       clocks = 0;
@@ -200,7 +197,7 @@ static void ClockTimer(int i, uint32_t clocks)
 
    if((before < target && Timers[i].Counter >= target) || zero_tm || Timers[i].Counter > 0xFFFF)
    {
-#if 1
+#if 0
       if(Timers[i].Mode & 0x10)
       {
          if((Timers[i].Counter - target) > 3)
@@ -299,16 +296,17 @@ void TIMER_ClockHRetrace(void)
 
 pscpu_timestamp_t TIMER_Update(const pscpu_timestamp_t timestamp)
 {
-   int32_t cpu_clocks, i;
-
-   cpu_clocks = timestamp - lastts;
+   int32_t cpu_clocks = timestamp - lastts;
+   int32_t i;
 
    for(i = 0; i < 3; i++)
    {
+      uint32_t timer_clocks = cpu_clocks;
+
       if(Timers[i].Mode & 0x100)
          continue;
 
-      ClockTimer(i, cpu_clocks);
+      ClockTimer(i, timer_clocks);
    }
 
    lastts = timestamp;
@@ -341,10 +339,9 @@ static void CalcCountingStart(unsigned which)
 
 void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
 {
-   int which;
-   TIMER_Update(timestamp);
+   int which = (A >> 4) & 0x3;
 
-   which = (A >> 4) & 0x3;
+   TIMER_Update(timestamp);
 
    V <<= (A & 3) * 8;
 
@@ -405,11 +402,8 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
 
 uint16_t TIMER_Read(const pscpu_timestamp_t timestamp, uint32_t A)
 {
-   uint16_t ret;
-   int which;
-
-   ret = 0;
-   which = (A >> 4) & 0x3;
+   uint16_t ret = 0;
+   int which = (A >> 4) & 0x3;
 
    if(which >= 3)
    {
