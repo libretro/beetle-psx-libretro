@@ -4,7 +4,7 @@
 #ifndef __MDFN_PSX_GPU_H
 #define __MDFN_PSX_GPU_H
 
-#include "../cdrom/SimpleFIFO.h"
+#include "FastFIFO.h"
 
 namespace MDFN_IEN_PSX
 {
@@ -67,7 +67,7 @@ class PS_GPU
   if(InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
    return(false);
 
-  if(BlitterFIFO.CanRead() >= Commands[BlitterFIFO.ReadUnit(true) >> 24].fifo_fb_len)
+  if(BlitterFIFO.CanRead() >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
    return(false);
 
   return(true);
@@ -125,6 +125,9 @@ class PS_GPU
  uint32 MaskSetOR;
  uint32 MaskEvalAND;
 
+ bool TexDisable;
+ bool TexDisableAllowChange;
+
  uint8 tww, twh, twx, twy;
  struct
  {
@@ -141,8 +144,8 @@ class PS_GPU
  };
  void RecalcTexWindowLUT(void);
  
- int32 TexPageX;
- int32 TexPageY;
+ uint32_t TexPageX;
+ uint32_t TexPageY;
 
  uint32 SpriteFlip;
 
@@ -158,9 +161,10 @@ class PS_GPU
 
  static CTEntry Commands[256];
 
- SimpleFIFO<uint32> BlitterFIFO;
+ FastFIFO<uint32, 0x20> BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
 
  uint32 DataReadBuffer;
+ uint32 DataReadBufferEx;
 
  bool IRQPending;
 

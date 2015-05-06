@@ -111,8 +111,7 @@ void PSXDitherApply(bool enable)
 namespace MDFN_IEN_PSX
 {
 
-   // 0x10 on actual PS1 GPU, 0x20 here(see comment at top of gpu.h)	// 0x10)
-PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle) : BlitterFIFO(0x20)
+PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle)
 {
    int x, y, v;
    HardwarePALType = pal_clock_and_tv;
@@ -213,33 +212,14 @@ void PS_GPU::SoftReset(void) // Control command 0x00
       DrawTimeAvail = 0;
 
    BlitterFIFO.Flush();
+   DataReadBufferEx = 0;
    InCmd = INCMD_NONE;
 
    DisplayOff = 1;
    DisplayFB_XStart = 0;
    DisplayFB_YStart = 0;
 
-   if(HardwarePALType)
-   {
-      DisplayMode = 0x08;
-
-      // FIXME, timing values(I need a PAL PS1 to derive them); for now, just copy the NTSC ones.
-      HorizStart = 0x200;
-      HorizEnd = 0xC00;
-
-      VertStart = 0x10;
-      VertEnd = 0x100;
-   }
-   else
-   {
-      DisplayMode = 0;
-
-      HorizStart = 0x200;
-      HorizEnd = 0xC00;
-
-      VertStart = 0x10;
-      VertEnd = 0x100;
-   }
+   DisplayMode = 0;
 
    //
    TexPageX = 0;
@@ -276,6 +256,9 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    //
    MaskSetOR = 0;
    MaskEvalAND = 0;
+
+   TexDisable = false;
+   TexDisableAllowChange = false;
 }
 
 void PS_GPU::Power(void)
@@ -291,8 +274,8 @@ void PS_GPU::Power(void)
 
    ClipX0 = 0;
    ClipY0 = 0;
-   ClipX1 = 1023;
-   ClipY1 = 1023;
+   ClipX1 = 0;
+   ClipY1 = 0;
 
    OffsX = 0;
    OffsY = 0;
@@ -302,6 +285,9 @@ void PS_GPU::Power(void)
 
    MaskSetOR = 0;
    MaskEvalAND = 0;
+
+   TexDisable = false;
+   TexDisableAllowChange = false;
 
    tww = 0;
    twh = 0;
@@ -319,6 +305,8 @@ void PS_GPU::Power(void)
 
    BlitterFIFO.Flush();
 
+   DataReadBuffer = 0; // Don't reset in SoftReset()
+   DataReadBufferEx = 0;
    InCmd = INCMD_NONE;
    FBRW_X = 0;
    FBRW_Y = 0;
@@ -332,11 +320,11 @@ void PS_GPU::Power(void)
    DisplayFB_XStart = 0;
    DisplayFB_YStart = 0;
 
-   HorizStart = 0;
-   HorizEnd = 0;
+   HorizStart = 0x200;
+   HorizEnd = 0xC00;
 
-   VertStart = 0;
-   VertEnd = 0;
+   VertStart = 0x10;
+   VertEnd = 0x100;
 
    //
    //
@@ -721,14 +709,14 @@ static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
    g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
 
-   g->FBRW_W = (cb[2] >>  0) & 0x7FF;
-   g->FBRW_H = (cb[2] >> 16) & 0x3FF;
+   g->FBRW_W = (cb[2] >>  0) & 0x3FF;
+   g->FBRW_H = (cb[2] >> 16) & 0x1FF;
 
-   if(g->FBRW_W > 0x400)
-      g->FBRW_W &= 0x3FF;
+   if(!g->FBRW_W)
+      g->FBRW_W = 0x400;
 
-   if(g->FBRW_H > 0x200)
-      g->FBRW_H &= 0x1FF;
+   if(!g->FBRW_H)
+      g->FBRW_H = 0x200;
 
    g->FBRW_CurX = g->FBRW_X;
    g->FBRW_CurY = g->FBRW_Y;
@@ -737,6 +725,10 @@ static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
       g->InCmd = g->INCMD_FBWRITE;
 }
 
+/* FBRead: PS1 GPU in SCPH-5501 gives odd, inconsistent results when
+ * raw_height == 0, or raw_height != 0x200 && (raw_height & 0x1FF) == 0
+ */
+
 static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
 {
    //assert(g->InCmd == INCMD_NONE);
@@ -744,11 +736,11 @@ static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
    g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
 
-   g->FBRW_W = (cb[2] >>  0) & 0x7FF;
+   g->FBRW_W = (cb[2] >>  0) & 0x3FF;
    g->FBRW_H = (cb[2] >> 16) & 0x3FF;
 
-   if(g->FBRW_W > 0x400)
-      g->FBRW_W &= 0x3FF;
+   if(!g->FBRW_W)
+      g->FBRW_W = 0x400;
 
    if(g->FBRW_H > 0x200)
       g->FBRW_H &= 0x1FF;
@@ -762,21 +754,21 @@ static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
 
 static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
 {
-   g->TexPageX = (*cb & 0xF) * 64;
-   g->TexPageY = (*cb & 0x10) * 16;
+   const uint32 cmdw = *cb;
 
-   g->SpriteFlip = *cb & 0x3000;
+   g->TexPageX   = (cmdw & 0xF) * 64;
+   g->TexPageY   = (cmdw & 0x10) * 16;
+   g->SpriteFlip = (cmdw & 0x3000);
+   g->abr        = (cmdw >> 5) & 0x3;
+   g->TexMode    = (cmdw >> 7) & 0x3;
+   g->dtd =        (cmdw >> 9) & 1;
+   g->dfe =        (cmdw >> 10) & 1;
 
-   g->abr = (*cb >> 5) & 0x3;
-   g->TexMode = (*cb >> 7) & 0x3;
-
-   g->dtd = (*cb >> 9) & 1;
-   g->dfe = (*cb >> 10) & 1;
-
-#if 0
-   /* TODO */
-   g->RecalcTexWindowLUT();
-#endif
+   if(g->TexDisableAllowChange)
+   {
+      g->TexDisable = (cmdw >> 11) & 1;
+      //printf("TexDisable: %02x\n", TexDisable);
+   }
    //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
@@ -844,7 +836,7 @@ void PS_GPU::ProcessFIFO(void)
 
       case INCMD_FBWRITE:
          {
-            uint32_t InData = BlitterFIFO.ReadUnit();
+            uint32_t InData = BlitterFIFO.Read();
 
             for(int i = 0; i < 2; i++)
             {
@@ -882,7 +874,7 @@ void PS_GPU::ProcessFIFO(void)
             {
                for(unsigned i = 0; i < vl; i++)
                {
-                  CB[i] = BlitterFIFO.ReadUnit();
+                  CB[i] = BlitterFIFO.Read();
                }
 
                command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
@@ -901,9 +893,9 @@ void PS_GPU::ProcessFIFO(void)
             unsigned vl = 1 + (bool)(InCmd_CC & 0x10);
             uint32_t CB[2];
 
-            if((BlitterFIFO.ReadUnit(true) & 0xF000F000) == 0x50005000)
+            if((BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
             {
-               BlitterFIFO.ReadUnit();
+               BlitterFIFO.Read();
                InCmd = INCMD_NONE;
                return;
             }
@@ -912,7 +904,7 @@ void PS_GPU::ProcessFIFO(void)
             {
                for(unsigned i = 0; i < vl; i++)
                {
-                  CB[i] = BlitterFIFO.ReadUnit();
+                  CB[i] = BlitterFIFO.Read();
                }
 
                command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
@@ -922,7 +914,7 @@ void PS_GPU::ProcessFIFO(void)
          break;
    }
 
-   const uint32_t cc = BlitterFIFO.ReadUnit(true) >> 24;
+   const uint32_t cc = BlitterFIFO.Peek() >> 24;
    const CTEntry *command = &Commands[cc];
 
    if(DrawTimeAvail < 0 && !command->ss_cmd)
@@ -933,7 +925,7 @@ void PS_GPU::ProcessFIFO(void)
       uint32_t CB[0x10];
 
       for(unsigned i = 0; i < command->len; i++)
-         CB[i] = BlitterFIFO.ReadUnit();
+         CB[i] = BlitterFIFO.Read();
 
       if(!command->ss_cmd)
          DrawTimeAvail -= 2;
@@ -951,14 +943,11 @@ void PS_GPU::ProcessFIFO(void)
       // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
       {
-         uint32 tpage;
-
-         tpage = CB[4 + ((cc >> 4) & 0x1)] >> 16;
+         /* Don't alter SpriteFlip here. */
+         const uint32 tpage = CB[4 + ((cc >> 4) & 0x1)] >> 16;
 
          TexPageX = (tpage & 0xF) * 64;
          TexPageY = (tpage & 0x10) * 16;
-
-         SpriteFlip = tpage & 0x3000;
 
          abr = (tpage >> 5) & 0x3;
          TexMode = (tpage >> 7) & 0x3;
@@ -977,13 +966,13 @@ void PS_GPU::ProcessFIFO(void)
 
 INLINE void PS_GPU::WriteCB(uint32_t InData)
 {
-   if(BlitterFIFO.CanRead() >= 0x10 && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.ReadUnit(true) >> 24].fifo_fb_len))
+   if(BlitterFIFO.CanRead() >= 0x10 && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
    }
 
-   BlitterFIFO.WriteUnit(InData);
+   BlitterFIFO.Write(InData);
    ProcessFIFO();
 }
 
@@ -1052,28 +1041,48 @@ void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
             DisplayMode = V & 0xFF;
             break;
 
+         case 0x09:
+            TexDisableAllowChange = V & 1;
+            break;
+
          case 0x10:	// GPU info(?)
             switch(V & 0xF)
             {
                // DataReadBuffer must remain unchanged for any unhandled GPU info index.
                default:  break;
 
-               case 0x2: DataReadBuffer = (tww << 0) | (twh << 5) | (twx << 10) | (twy << 15);
+               case 0x2: 
+                         DataReadBufferEx &= 0xFFF00000;
+                         DataReadBufferEx |= (tww << 0) | (twh << 5) | (twx << 10) | (twy << 15);
+                         DataReadBuffer    = DataReadBufferEx;
                          break;
 
-               case 0x3: DataReadBuffer = (ClipY0 << 10) | ClipX0;
+               case 0x3:
+                         DataReadBufferEx &= 0xFFF00000;
+                         DataReadBufferEx |= (ClipY0 << 10) | ClipX0;
+                         DataReadBuffer = DataReadBufferEx;
                          break;
 
-               case 0x4: DataReadBuffer = (ClipY1 << 10) | ClipX1;
+               case 0x4:
+                         DataReadBufferEx &= 0xFFF00000;
+                         DataReadBufferEx |= (ClipY1 << 10) | ClipX1;
+                         DataReadBuffer = DataReadBufferEx;
                          break;
 
-               case 0x5: DataReadBuffer = (OffsX & 2047) | ((OffsY & 2047) << 11);
+               case 0x5: 
+                         DataReadBufferEx &= 0xFFC00000;
+                         DataReadBufferEx |= (OffsX & 2047) | ((OffsY & 2047) << 11);
+                         DataReadBuffer = DataReadBufferEx;
                          break;
 
-               case 0x7: DataReadBuffer = 2;
+               case 0x7: 
+                         DataReadBufferEx = 2;
+                         DataReadBuffer = DataReadBufferEx;
                          break;
 
-               case 0x8: DataReadBuffer = 0;
+               case 0x8:
+                         DataReadBufferEx = 0;
+                         DataReadBuffer = DataReadBufferEx;
                          break;
             }
             break;
@@ -1099,23 +1108,27 @@ INLINE uint32_t PS_GPU::ReadData(void)
 {
    if(InCmd == INCMD_FBREAD)
    {
-      DataReadBuffer = 0;
+      DataReadBufferEx = 0;
       for(int i = 0; i < 2; i++)
       {
-         DataReadBuffer |= GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] << (i * 16);
+         DataReadBufferEx |= GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] << (i * 16);
 
          FBRW_CurX++;
          if(FBRW_CurX == (FBRW_X + FBRW_W))
          {
-            FBRW_CurX = FBRW_X;
-            FBRW_CurY++;
-            if(FBRW_CurY == (FBRW_Y + FBRW_H))
+            if((FBRW_CurY + 1) == (FBRW_Y + FBRW_H))
             {
                InCmd = INCMD_NONE;
-               break;
+            }
+            else
+            {
+               FBRW_CurY++;
+               FBRW_CurX = FBRW_X;
             }
          }
       }
+
+      return DataReadBufferEx;
    }
 
    return DataReadBuffer;
@@ -1133,6 +1146,8 @@ uint32_t PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32_t A)
  if(A & 4)	// Status
  {
   ret = (((DisplayMode << 1) & 0x7F) | ((DisplayMode >> 6) & 1)) << 16;
+
+  ret |= (DisplayMode & 0x80) << 7;
 
   ret |= DMAControl << 29;
 
@@ -1170,6 +1185,8 @@ uint32_t PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32_t A)
 
   if(MaskEvalAND)
    ret |= 1 << 12;
+
+  ret |= TexDisable << 15;
  }
  else		// "Data"
   ret = ReadData();
@@ -1359,8 +1376,8 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
                         memset(dest, 0, 384 * sizeof(int32));
                      }
-                     char buffer[256];
 
+                     //char buffer[256];
                      //snprintf(buffer, sizeof(buffer), _("VIDEO STANDARD MISMATCH"));
                      //DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
                      //MAKECOLOR(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13, 0);
@@ -1397,15 +1414,21 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                if(sl_zero_reached)
                {
                   // Gameplay in Descent(NTSC) has vblank at scanline 236
-                  if(scanline >= (FirstVisibleLine + VisibleLineCount) || (scanline >= (HardwarePALType ? 260 : 232)))
+                  // 
+                  // Mikagura Shoujo Tanteidan has vblank at scanline 192 during intro
+                  //  FMV(which we don't handle here because low-latency in that case is not so important).
+                  //
+                  if(scanline >= (HardwarePALType ? 260 : 232))
                   {
                      //printf("Req Exit(vblank case): %u\n", scanline);
                      PSX_RequestMLExit();
                   }
+#if 0
                   else
                   {
-                     //printf("VBlank too early, chickening out early exit!\n");
+                     //printf("VBlank too early, chickening out early exit: %u!\n", scanline);
                   }
+#endif
                }
 
                //printf("VBLANK: %u\n", scanline);
@@ -1512,9 +1535,11 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                DisplayFB_CurYOffset = (DisplayFB_CurYOffset + 1) & 0x1FF;
             }
          }
-      }
-   }
-
+         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  // Mostly so the next event time gets recalculated properly in regards to our calls
+         // to TIMER_SetVBlank() and TIMER_SetHRetrace().
+      }	// end if(!LineClockCounter)
+   }	// end while(gpu_clocks > 0)
+ 
    //puts("GPU Update End");
 
 TheEnd:
@@ -1578,6 +1603,9 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       SFVAR(MaskSetOR),
       SFVAR(MaskEvalAND),
 
+      SFVAR(TexDisable),
+      SFVAR(TexDisableAllowChange),
+
       SFVAR(tww),
       SFVAR(twh),
       SFVAR(twx),
@@ -1591,12 +1619,13 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       SFVAR(abr),
       SFVAR(TexMode),
 
-      SFARRAY32(&BlitterFIFO.data[0], BlitterFIFO.data.size()),
+      SFARRAY32(&BlitterFIFO.data[0], sizeof(BlitterFIFO.data) / sizeof(BlitterFIFO.data[0])),
       SFVAR(BlitterFIFO.read_pos),
       SFVAR(BlitterFIFO.write_pos),
       SFVAR(BlitterFIFO.in_count),
 
       SFVAR(DataReadBuffer),
+      SFVAR(DataReadBufferEx),
 
       SFVAR(IRQPending),
 
