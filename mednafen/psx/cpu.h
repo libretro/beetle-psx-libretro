@@ -81,11 +81,7 @@ class PS_CPU
 
  private:
 
- struct
- {
-  uint32_t GPR[32];
-  uint32_t GPR_dummy;	// Used in load delay simulation(indexing past the end of GPR)
- };
+ uint32_t GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
  uint32_t LO;
  uint32_t HI;
 
@@ -179,11 +175,7 @@ class PS_CPU
  //WrAbsorbShift += 8;
 #endif
 
- struct
- {
-  uint8_t ReadAbsorb[0x20];
-  uint8_t ReadAbsorbDummy;
- };
+ uint8_t ReadAbsorb[0x20 + 1];
  uint8_t ReadAbsorbWhich;
  uint8_t ReadFudge;
 

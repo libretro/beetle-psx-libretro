@@ -853,10 +853,10 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
   for(unsigned lr = 0; lr < 2; lr++)
   {
      accum[lr] += ((reverb[lr] * ReverbVol[lr]) >> 15);
-     clamp(&accum[lr], -32768, 32767);
+     clamp(&accum[lr],  -32768, 32767);
      output[lr] = (accum[lr] * GlobalSweep[lr].ReadVolume()) >> 15;
+     clamp(&output[lr], -32768, 32767);
   }
-
 
   if(IntermediateBufferPos < 4096)	// Overflow might occur in some debugger use cases.
   {
