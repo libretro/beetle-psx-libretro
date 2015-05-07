@@ -187,7 +187,7 @@ void PS_CDC::SoftReset(void)
  PendingCommandPhase = 0;
  PendingCommandCounter = 0;
 
- Mode = 0;
+ Mode = 0x20;
 
  HeaderBufValid = false;
  DriveStatus = DS_STOPPED;
@@ -385,10 +385,11 @@ void PS_CDC::BeginResults(void)
  // printf("Cleared %d results. IRQBuffer=0x%02x\n", ResultsIn, IRQBuffer);
  //}
 
- // TODO: test semantics on real thing.
  ResultsIn = 0;
  ResultsWP = 0;
  ResultsRP = 0;
+
+ memset(ResultsBuffer, 0x00, sizeof(ResultsBuffer));
 }
 
 void PS_CDC::WriteResult(uint8 V)
@@ -405,6 +406,9 @@ uint8 PS_CDC::ReadResult(void)
 {
  uint8 ret = ResultsBuffer[ResultsRP];
 
+ if(!ResultsIn)
+  PSX_WARNING("[CDC] Results buffer underflow!");
+
  ResultsRP = (ResultsRP + 1) & 0xF;
  ResultsIn = (ResultsIn - 1) & 0x1F;
 
@@ -420,11 +424,17 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
  if(DriveStatus == DS_PLAYING)
   ret |= 0x80;
 
- if(DriveStatus == DS_SEEKING || DriveStatus == DS_SEEKING_LOGICAL)
-  ret |= 0x40;
-
+ // Probably will want to be careful with this HeaderBufValid versus seek/read bit business in the future as it is a bit fragile;
+// "Gran Turismo 1"'s music(or erroneous lack of) is a good test case.
  if(DriveStatus == DS_READING)
-  ret |= 0x20;
+ {
+  if(!HeaderBufValid)
+     ret |= 0x40;
+  else
+     ret |= 0x20;
+ }
+ else if(DriveStatus == DS_SEEKING || DriveStatus == DS_SEEKING_LOGICAL)
+  ret |= 0x40;
 
  // TODO: shell open and seek error
  if(!Cur_CDIF || DiscChanged)
@@ -1554,7 +1564,17 @@ int32 PS_CDC::Command_Setloc(const int arg_count, const uint8 *args)
 {
  uint8 m, s, f;
 
- m = BCD_to_U8(args[0] & 0x7F);
+ if((args[0] & 0x0F) > 0x09 || args[0] > 0x99 ||
+    (args[1] & 0x0F) > 0x09 || args[1] > 0x59 ||
+    (args[2] & 0x0F) > 0x09 || args[2] > 0x74)
+ {
+  WriteResult(MakeStatus(true));
+  WriteResult(ERRCODE_BAD_ARGVAL);
+  WriteIRQ(CDCIRQ_DISC_ERROR);
+  return(0);
+ }
+
+ m = BCD_to_U8(args[0]);
  s = BCD_to_U8(args[1]);
  f = BCD_to_U8(args[2]);
 
@@ -1649,6 +1669,10 @@ void PS_CDC::PreSeekHack(bool logical, uint32 target)
  }
 }
 
+/*
+ Play command with a track argument that's not a valid BCD quantity causes interesting half-buggy behavior on an actual PS1(unlike some of the other commands,
+ an error doesn't seem to be generated for a bad BCD argument).
+*/
 int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 {
  if(!CommandCheckDiscPresent())
@@ -1667,7 +1691,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 
   if(track < toc.first_track)
   {
-   PSX_WARNING("[CDC] Attempt to play track before first track.");
+   PSX_WARNING("[CDC] Attempt to play track after last track.");
    track = toc.first_track;
   }
   else if(track > toc.last_track)
@@ -2068,16 +2092,17 @@ int32 PS_CDC::Command_GetTD(const int arg_count, const uint8 *args)
  int track;
  uint8 m, s, f;
 
- if(!args[0] || args[0] == 0xAA)
+ if(!args[0])
   track = 100;
  else
  {
   track= BCD_to_U8(args[0]);
 
-  if(track < toc.first_track || track > toc.last_track)	// Error
+  if(!BCD_is_valid(args[0]) || track < toc.first_track || track > toc.last_track)	// Error
   {
    WriteResult(MakeStatus(true));
-   WriteIRQ(CDCIRQ_ACKNOWLEDGE);
+   WriteResult(ERRCODE_BAD_ARGVAL);
+   WriteIRQ(CDCIRQ_DISC_ERROR);
    return(0);
   }
  }
@@ -2104,7 +2129,7 @@ int32 PS_CDC::Command_SeekL(const int arg_count, const uint8 *args)
 
  SeekTarget = CommandLoc;
 
- PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
+ PSRCounter = (33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1))) + CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
  HeaderBufValid = false;
  PreSeekHack(true, SeekTarget);
  DriveStatus = DS_SEEKING_LOGICAL;
