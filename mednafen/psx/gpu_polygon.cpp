@@ -1,5 +1,21 @@
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
+#define COORD_POST_PADDING	12
+
+struct i_group
+{
+ uint32 u, v;
+ uint32 r, g, b;
+};
+
+struct i_deltas
+{
+ uint32 du_dx, dv_dx;
+ uint32 dr_dx, dg_dx, db_dx;
+
+ uint32 du_dy, dv_dy;
+ uint32 dr_dy, dg_dy, db_dy;
+};
 
 /*
  Store and do most math with interpolant coordinates and deltas as unsigned to avoid violating strict overflow(due to biasing),
@@ -9,24 +25,6 @@ static INLINE int32 COORD_GET_INT(int32 n)
 {
  return(n >> COORD_FBS);
 }
-
-struct i_group
-{
- uint32 u, v;
- uint32 r, g, b;
- uint32 dummy0[3];
-};
-
-struct i_deltas
-{
- uint32 du_dx, dv_dx;
- uint32 dr_dx, dg_dx, db_dx;
- uint32 dummy0[3];
-
- uint32 du_dy, dv_dy;
- uint32 dr_dy, dg_dy, db_dy;
- uint32 dummy1[3];
-};
 
 static INLINE int64 MakePolyXFP(uint32 x)
 {
@@ -54,8 +52,8 @@ static INLINE int32 GetPolyXFP_Int(int64 xfp)
  return(xfp >> 32);
 }
 
-//#define CALCIS(x,y) ( A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y) )
 #define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
+
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
 {
  const unsigned sa = 32;
@@ -505,5 +503,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32 *cb)
  DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
 }
 
+#undef COORD_POST_PADDING
 #undef COORD_FBS
 #undef COORD_MF_INT
+
