@@ -161,7 +161,7 @@ void PS_GPU::FillVideoParams(MDFNGI* gi)
       gi->lcm_width = 2800;
       gi->lcm_height = (LineVisLast + 1 - LineVisFirst) * 2; //576;
 
-      gi->nominal_width = 377;	// Dunno. :(
+      gi->nominal_width = 384;	// Dunno. :(
       gi->nominal_height = LineVisLast + 1 - LineVisFirst; //288;
 
       gi->fb_width = 768;
@@ -220,6 +220,13 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    DisplayFB_YStart = 0;
 
    DisplayMode = 0;
+
+   HorizStart = 0x200;
+   HorizEnd = 0xC00;
+
+   VertStart = 0x10;
+   VertEnd = 0x100;
+   
 
    //
    TexPageX = 0;
@@ -320,11 +327,11 @@ void PS_GPU::Power(void)
    DisplayFB_XStart = 0;
    DisplayFB_YStart = 0;
 
-   HorizStart = 0x200;
-   HorizEnd = 0xC00;
+   HorizStart = 0;
+   HorizEnd = 0;
 
-   VertStart = 0x10;
-   VertEnd = 0x100;
+   VertStart = 0;
+   VertEnd = 0;
 
    //
    //
