@@ -62,51 +62,6 @@ static const int8 dither_table[4][4] =
  {  3, -1,  2, -2 },
 };
 
-uint16 CLUT_Cache[256];
-
-uint32 CLUT_Cache_VB;	// Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
-
-struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
-{
-   // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
-   uint32 TWX_AND;
-   uint32 TWX_ADD;
-
-   uint32 TWY_AND;
-   uint32 TWY_ADD;
-} SUCV;
-
-struct
-{
-   uint16 Data[4];
-   uint32 Tag;
-} TexCache[256];
-
-uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-
-void PSXDitherApply(bool enable)
-{
-   int x, y, v;
-
-   for(y = 0; y < 4; y++)
-      for(x = 0; x < 4; x++)
-         for(v = 0; v < 512; v++)
-         {
-            int value = v;
-            if (enable)
-               value += dither_table[y][x];
-
-            value >>= 3;
-
-            if(value < 0)
-               value = 0;
-
-            if(value > 0x1F)
-               value = 0x1F;
-
-            DitherLUT[y][x][v] = value;
-         }
-}
 
 namespace MDFN_IEN_PSX
 {
@@ -202,10 +157,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    IRQPending = false;
    IRQ_Assert(IRQ_GPU, IRQPending);
 
-#if 0
-   /* TODO */
-   G_Command_ClearCache();
-#endif
+   InvalidateCache();
    DMAControl = 0;
 
    if(DrawTimeAvail < 0)
@@ -428,13 +380,18 @@ static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
    g->Command_DrawLine<polyline, goraud, BlendMode, MaskEval_TA>(cb);
 }
 
-static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
+void PS_GPU::InvalidateCache()
 {
    unsigned i;
    CLUT_Cache_VB = ~0U;
 
    for (i = 0; i < 256; i++)
       TexCache[i].Tag = ~0U;
+}
+
+static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
+{
+   g->InvalidateCache();
 }
 
 static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)

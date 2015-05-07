@@ -253,23 +253,36 @@ class PS_GPU
  bool HardwarePALType;
  int LineVisFirst, LineVisLast;
 
- private:
-
  uint16 CLUT_Cache[256];
+
  uint32 CLUT_Cache_VB;	// Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
+
+ struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
+ {
+    // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
+    uint32 TWX_AND;
+    uint32 TWX_ADD;
+
+    uint32 TWY_AND;
+    uint32 TWY_ADD;
+ } SUCV;
+
+ struct
+ {
+    uint16 Data[4];
+    uint32 Tag;
+ } TexCache[256];
+
+ void InvalidateTexCache(void);
+ void InvalidateCache(void);
+
+ uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
+
+ private:
 
  template<uint32 TexMode_TA>
  void Update_CLUT_Cache(uint16 raw_clut);
 
- struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
- {
-  // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
-  uint32 TWX_AND;
-  uint32 TWX_ADD;
-
-  uint32 TWY_AND;
-  uint32 TWY_ADD;
- } SUCV;
  void RecalcTexWindowStuff(void);
 
  void ProcessFIFO(void);
