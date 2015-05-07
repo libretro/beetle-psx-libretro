@@ -549,9 +549,9 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
    return false;
 }
 
-#include "gpu_polygon.inc"
-#include "gpu_sprite.inc"
-#include "gpu_line.inc"
+#include "gpu_polygon.cpp"
+#include "gpu_sprite.cpp"
+#include "gpu_line.cpp"
 
 INLINE void PS_GPU::RecalcTexWindowLUT(void)
 {
