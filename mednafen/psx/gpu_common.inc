@@ -107,6 +107,39 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
  }
 }
 
+#if 0
+ TexWindowX_AND = ~(tww << 3);
+ TexWindowX_ADD = ((twx & tww) << 3;
+
+ TexWindowY_AND = ~(twh << 3);
+ TexWindowY_OR = (twy & twh) << 3;
+
+     uint32 u = (u_arg & TexWindowX_AND)  TexWindowX_OR;
+     uint32 v = (v_arg & TexWindowY_AND) | TexWindowY_OR;
+     uint32 fbtex_x = TexPageX + (u >> (2 - TexMode_TA));
+     uint32 fbtex_y = TexPageY + v;
+     uint16 fbw = GPURAM[fbtex_y][fbtex_x & 1023];
+
+     if(TexMode_TA != 2)
+     {
+      if(TexMode_TA == 0)
+       fbw = (fbw >> ((u & 3) * 4)) & 0xF;
+      else
+       fbw = (fbw >> ((u & 1) * 8)) & 0xFF;
+ 
+      fbw = CLUT_Cache[fbw];
+     }
+#endif
+
+INLINE void PS_GPU::RecalcTexWindowStuff(void)
+{
+ SUCV.TWX_AND = ~(tww << 3);
+ SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
+
+ SUCV.TWY_AND = ~(twh << 3);
+ SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
+}
+
 template<uint32_t TexMode_TA>
 INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 v_arg)
 {
@@ -189,3 +222,97 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
    return false;
 }
+
+//
+// Command table generation macros follow:
+//
+
+//#define BM_HELPER(fg) { fg(0), fg(1), fg(2), fg(3) }
+
+#define POLY_HELPER_SUB(bm, cv, tm, mam)	\
+	 G_Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam >
+
+#define POLY_HELPER_FG(bm, cv)						\
+	 {								\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+	 }
+
+#define POLY_HELPER(cv)														\
+	{ 															\
+	 { POLY_HELPER_FG(0, cv), POLY_HELPER_FG(1, cv), POLY_HELPER_FG(2, cv), POLY_HELPER_FG(3, cv) },			\
+	 1 + (3 /*+ ((cv & 0x8) >> 3)*/) * ( 1 + ((cv & 0x4) >> 2) + ((cv & 0x10) >> 4) ) - ((cv & 0x10) >> 4),			\
+	 1,															\
+ 	 false															\
+	}
+
+//
+//
+
+#define SPR_HELPER_SUB(bm, cv, tm, mam) G_Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
+
+#define SPR_HELPER_FG(bm, cv)						\
+	 {								\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+	 }
+
+
+#define SPR_HELPER(cv)												\
+	{													\
+	 { SPR_HELPER_FG(0, cv), SPR_HELPER_FG(1, cv), SPR_HELPER_FG(2, cv), SPR_HELPER_FG(3, cv) },		\
+	 2 + ((cv & 0x4) >> 2) + ((cv & 0x18) ? 0 : 1),								\
+	 2 | ((cv & 0x4) >> 2) | ((cv & 0x18) ? 0 : 1),		/* |, not +, for this */			\
+	 false													\
+	}
+
+//
+//
+
+#define LINE_HELPER_SUB(bm, cv, mam) G_Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1, mam>
+
+#define LINE_HELPER_FG(bm, cv)											\
+	 {													\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1)									\
+	 }
+
+#define LINE_HELPER(cv)												\
+	{ 													\
+	 { LINE_HELPER_FG(0, cv), LINE_HELPER_FG(1, cv), LINE_HELPER_FG(2, cv), LINE_HELPER_FG(3, cv) },	\
+	 3 + ((cv & 0x10) >> 4),										\
+	 1,													\
+	 false													\
+	}
+
+//
+//
+
+#define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr }
+#define OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr) { { OTHER_HELPER_FG(0, arg_ptr), OTHER_HELPER_FG(1, arg_ptr), OTHER_HELPER_FG(2, arg_ptr), OTHER_HELPER_FG(3, arg_ptr) }, arg_cs, arg_fbcs, arg_ss }
+#define OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr)
+#define OTHER_HELPER_X4(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr)
+#define OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X4(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X4(arg_cs, arg_fbcs, arg_ss, arg_ptr)
+#define OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr)
+#define OTHER_HELPER_X32(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)
+
+#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL } 
+#define NULLCMD() { { NULLCMD_FG(0), NULLCMD_FG(1), NULLCMD_FG(2), NULLCMD_FG(3) }, 1, 1, true }
