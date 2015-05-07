@@ -380,13 +380,17 @@ static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
    g->Command_DrawLine<polyline, goraud, BlendMode, MaskEval_TA>(cb);
 }
 
-void PS_GPU::InvalidateCache()
+void PS_GPU::InvalidateTexCache()
 {
    unsigned i;
-   CLUT_Cache_VB = ~0U;
-
    for (i = 0; i < 256; i++)
       TexCache[i].Tag = ~0U;
+}
+
+void PS_GPU::InvalidateCache()
+{
+   CLUT_Cache_VB = ~0U;
+   InvalidateTexCache();
 }
 
 static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
