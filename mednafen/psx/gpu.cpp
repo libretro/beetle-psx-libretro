@@ -770,7 +770,11 @@ void PS_GPU::ProcessFIFO(void)
 
          abr = (tpage >> 5) & 0x3;
          TexMode = (tpage >> 7) & 0x3;
+#if 0
+         RecalcTexWindowStuff();
+#endif
       }
+
       if(!command->func[abr][TexMode])
       {
          if(CB[0])
@@ -1018,15 +1022,6 @@ uint32_t PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32_t A)
  return(ret >> ((A & 3) * 8));
 }
 
-/*
-static INLINE uint32_t ShiftHelper(uint32_t val, int shamt, uint32_t mask)
-{
- if(shamt < 0)
-  return((val >> (-shamt)) & mask);
- else
-  return((val << shamt) & mask);
-}
-*/
 INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
    if(bpp24)	// 24bpp
