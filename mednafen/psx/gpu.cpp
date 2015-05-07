@@ -1168,15 +1168,23 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
                assert(sl_zero_reached == false);
                sl_zero_reached = true;
 
-               if(DisplayMode & 0x08)	// PAL
-                  LinesPerField = 314;
-               else			// NTSC
-                  LinesPerField = 263;
-
                if(DisplayMode & 0x20)
-                  LinesPerField -= field;
+               {
+                  if(DisplayMode & 0x08) // PAL
+                     LinesPerField = 313 - field;
+                  else                   // NTSC
+                     LinesPerField = 263 - field;
+               }
                else
-                  field = 0;	// May not be the correct place for this?
+               {
+                  field = 0;  // May not be the correct place for this?
+
+                  if(DisplayMode & 0x08)	// PAL
+                     LinesPerField = 314;
+                  else			// NTSC
+                     LinesPerField = 263;
+               }
+
 
                if(espec)
                {
@@ -1319,10 +1327,6 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
 
                if(InVBlank || DisplayOff)
                   dx_start = dx_end = 0;
-
-               // TODO, but there are problems with this, as not all blitter busy cycles(crudely abstracted with DrawTimeAvail) are GPU RAM access cycles.
-               // Also, it shouldn't be here per-se, since this code won't be all if we're frameskipping or there's a video standard mismatch
-               //DrawTimeAvail -= (dx_end - dx_start) + ((DisplayMode & 0x10) ? ((dx_end - dx_start + 1) >> 1) : 0);
 
                LineWidths[dest_line] = dmw;
 
