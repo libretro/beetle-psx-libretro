@@ -1,63 +1,74 @@
 template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
 {
-   y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
-   uint16_t pix = fore_pix;
+ y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
-   if(BlendMode >= 0 && (fore_pix & 0x8000))
-   {
-      uint16_t bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      pix = 0;
+ if(BlendMode >= 0 && (fore_pix & 0x8000))
+ {
+  uint16 bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+  uint16 pix; // = fore_pix & 0x8000;
 
-      /*
-         static const int32 tab[4][2] =
-         {
-         { 2,  2 },
-         { 4,  4 },
-         { 4, -4 },
-         { 4,  1 }
-         };
-         */
-      // Efficient 15bpp pixel math algorithms from blargg
-      switch(BlendMode)
-      {
-         case 0:
-            bg_pix |= 0x8000;
-            pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
-            break;
+/*
+ static const int32 tab[4][2] =
+ {
+  { 2,  2 },
+  { 4,  4 },
+  { 4, -4 },
+  { 4,  1 }
+ };
+*/
+  // Efficient 15bpp pixel math algorithms from blargg
+  switch(BlendMode)
+  {
+   case 0:
+	bg_pix |= 0x8000;
+	pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
+	break;
+	  
+   case 1:
+       {
+	bg_pix &= ~0x8000;
 
-         case 1:
-         case 3:
-            {
-               uint32_t sum, carry;
-               bg_pix &= ~0x8000;
-               if (BlendMode == 3)
-                  fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
+	uint32 sum = fore_pix + bg_pix;
+	uint32 carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-               sum = fore_pix + bg_pix;
-               carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+	pix = (sum - carry) | (carry - (carry >> 5));
+       }
+       break;
 
-               pix = (sum - carry) | (carry - (carry >> 5));
-            }
-            break;
+   case 2:
+       {
+	bg_pix |= 0x8000;
+        fore_pix &= ~0x8000;
 
-         case 2:
-            {
-               uint32_t diff, borrow;
-               bg_pix |= 0x8000;
-               fore_pix &= ~0x8000;
+	uint32 diff = bg_pix - fore_pix + 0x108420;
+	uint32 borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
-               diff = bg_pix - fore_pix + 0x108420;
-               borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
+	pix = (diff - borrow) & (borrow - (borrow >> 5));
+       }
+       break;
 
-               pix = (diff - borrow) & (borrow - (borrow >> 5));
-            }
-            break;
-      }
-   }
+   case 3:
+       {
+	bg_pix &= ~0x8000;
+	fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
 
-   if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-      GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
+	uint32 sum = fore_pix + bg_pix;
+	uint32 carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+
+	pix = (sum - carry) | (carry - (carry >> 5));
+       }
+       break;
+  }
+
+  if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
+   GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
+ }
+ else
+ {
+  if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
+   GPURAM[y][x] = (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR;
+ }
 }
 
 INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y)
