@@ -430,13 +430,11 @@ static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
 
 static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
 {
-#if 0
-   /* TODO */
+   unsigned i;
    CLUT_Cache_VB = ~0U;
 
-   for(auto& c : TexCache)
-      c.Tag = ~0U;
-#endif
+   for (i = 0; i < 256; i++)
+      TexCache[i].Tag = ~0U;
 }
 
 static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
