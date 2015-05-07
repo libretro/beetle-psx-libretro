@@ -198,7 +198,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    twx = 0;
    twy = 0;
 
-   RecalcTexWindowLUT();
+   RecalcTexWindowStuff();
 
    //
    ClipX0 = 0;
@@ -253,7 +253,7 @@ void PS_GPU::Power(void)
    twx = 0;
    twy = 0;
 
-   RecalcTexWindowLUT();
+   RecalcTexWindowStuff();
 
    TexPageX = 0;
    TexPageY = 0;
@@ -330,34 +330,6 @@ void PS_GPU::ResetTS(void)
 #include "gpu_polygon.cpp"
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
-
-INLINE void PS_GPU::RecalcTexWindowLUT(void)
-{
-#if 0
-   /* TODO */
-   SUCV.TWX_AND = ~(tww << 3);
-   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
-
-   SUCV.TWY_AND = ~(twh << 3);
-   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
-#else
-   unsigned x, y;
-   const unsigned TexWindowX_AND = ~(tww << 3);
-   const unsigned TexWindowX_OR = (twx & tww) << 3;
-   const unsigned TexWindowY_AND = ~(twh << 3);
-   const unsigned TexWindowY_OR = (twy & twh) << 3;
-   // printf("TWX: 0x%02x, TWW: 0x%02x\n", twx, tww);
-   // printf("TWY: 0x%02x, TWH: 0x%02x\n", twy, twh);
-   for(x = 0; x < 256; x++)
-      TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
-   for(y = 0; y < 256; y++)
-      TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
-   memset(TexWindowXLUT_Pre, TexWindowXLUT[0], sizeof(TexWindowXLUT_Pre));
-   memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
-   memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
-   memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
-#endif
-}
 
 //
 // C-style function wrappers so our command table isn't so ginormous(in memory usage).
@@ -506,6 +478,8 @@ static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
    g->FBRW_CurX = g->FBRW_X;
    g->FBRW_CurY = g->FBRW_Y;
 
+   g->InvalidateTexCache();
+
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = g->INCMD_FBWRITE;
 }
@@ -532,6 +506,8 @@ static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
 
    g->FBRW_CurX = g->FBRW_X;
    g->FBRW_CurY = g->FBRW_Y;
+
+   g->InvalidateTexCache();
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = g->INCMD_FBREAD;
@@ -564,7 +540,7 @@ static void G_Command_TexWindow(PS_GPU* g, const uint32 *cb)
    g->twx = ((*cb >> 10) & 0x1F);
    g->twy = ((*cb >> 15) & 0x1F);
 
-   g->RecalcTexWindowLUT();
+   g->RecalcTexWindowStuff();
 }
 
 static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
@@ -1560,7 +1536,6 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       TVHELPER(InQuad_F3Vertices[1]),
       TVHELPER(InQuad_F3Vertices[2]),
 #undef TVHELPER
-      SFVAR(InQuad_clut),
 
       SFVAR(InPLine_PrevPoint.x),
       SFVAR(InPLine_PrevPoint.y),
@@ -1618,7 +1593,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
          for(unsigned j = 0; j < 4; j++)
             TexCache[i].Data[j] = TexCache_Data[i][j];
       }
-      RecalcTexWindowLUT();
+      RecalcTexWindowStuff();
       BlitterFIFO.SaveStatePostLoad();
 
       HorizStart &= 0xFFF;

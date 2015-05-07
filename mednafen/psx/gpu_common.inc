@@ -133,11 +133,30 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 
 INLINE void PS_GPU::RecalcTexWindowStuff(void)
 {
- SUCV.TWX_AND = ~(tww << 3);
- SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
+#if 0
+   /* TODO */
+   SUCV.TWX_AND = ~(tww << 3);
+   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
 
- SUCV.TWY_AND = ~(twh << 3);
- SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
+   SUCV.TWY_AND = ~(twh << 3);
+   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
+#else
+   unsigned x, y;
+   const unsigned TexWindowX_AND = ~(tww << 3);
+   const unsigned TexWindowX_OR = (twx & tww) << 3;
+   const unsigned TexWindowY_AND = ~(twh << 3);
+   const unsigned TexWindowY_OR = (twy & twh) << 3;
+   // printf("TWX: 0x%02x, TWW: 0x%02x\n", twx, tww);
+   // printf("TWY: 0x%02x, TWH: 0x%02x\n", twy, twh);
+   for(x = 0; x < 256; x++)
+      TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
+   for(y = 0; y < 256; y++)
+      TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
+   memset(TexWindowXLUT_Pre, TexWindowXLUT[0], sizeof(TexWindowXLUT_Pre));
+   memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
+   memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
+   memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
+#endif
 }
 
 template<uint32_t TexMode_TA>

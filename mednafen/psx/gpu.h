@@ -142,7 +142,7 @@ class PS_GPU
   uint8 TexWindowYLUT[256];
   uint8 TexWindowYLUT_Post[16];
  };
- void RecalcTexWindowLUT(void);
+ void RecalcTexWindowStuff(void);
  
  uint32_t TexPageX;
  uint32_t TexPageY;
@@ -283,7 +283,6 @@ class PS_GPU
  template<uint32 TexMode_TA>
  void Update_CLUT_Cache(uint16 raw_clut);
 
- void RecalcTexWindowStuff(void);
 
  void ProcessFIFO(void);
  void WriteCB(uint32 data);
