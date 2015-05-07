@@ -608,11 +608,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	 new_PC = (offset);				\
 	 new_PC_mask = (mask) & ~3;			\
 	 /* Lower bits of new_PC_mask being clear signifies being in a branch delay slot. (overloaded behavior for performance) */	\
-							\
-         if(DebugMode && ADDBT)                 	\
-	 {						\
-          ADDBT(PC, (PC & new_PC_mask) + new_PC, false);	\
-	 }						\
 	 goto SkipNPCStuff;				\
 	}
 
