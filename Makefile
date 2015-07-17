@@ -5,7 +5,7 @@ MEDNAFEN_DIR := mednafen
 MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
 NEED_TREMOR = 0
 LIBRETRO_SOURCES :=
-HAVE_GRIFFIN = 1
+HAVE_GRIFFIN = 0
 
 ifeq ($(platform),)
 platform = unix

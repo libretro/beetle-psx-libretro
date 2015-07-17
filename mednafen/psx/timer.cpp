@@ -79,9 +79,6 @@
  TODO: If we ever return randomish values to "simulate" open bus, remember to change the return type and such of the TIMER_Read() function to full 32-bit too.
 */
 
-namespace MDFN_IEN_PSX
-{
-
 struct Timer
 {
    uint32_t Mode;
@@ -97,7 +94,7 @@ struct Timer
 static bool vblank;
 static bool hretrace;
 static Timer Timers[3];
-static pscpu_timestamp_t lastts;
+static int32_t lastts;
 
 static int32_t CalcNextEvent(int32_t next_event)
 {
@@ -127,11 +124,9 @@ static int32_t CalcNextEvent(int32_t next_event)
 
       count_delta = target - Timers[i].Counter;
 
+      //PSX_DBG(PSX_DBG_ERROR, "timer %d count_delta <= 0!!! %d %d\n", i, target, Timers[i].Counter);
       if(count_delta <= 0)
-      {
-         PSX_DBG(PSX_DBG_ERROR, "timer %d count_delta <= 0!!! %d %d\n", i, target, Timers[i].Counter);
          continue;
-      }
 
       {
          int32_t tmp_clocks;
@@ -294,7 +289,7 @@ void TIMER_ClockHRetrace(void)
       ClockTimer(1, 1);
 }
 
-pscpu_timestamp_t TIMER_Update(const pscpu_timestamp_t timestamp)
+int32_t TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
    int32_t i;
@@ -330,7 +325,7 @@ static void CalcCountingStart(unsigned which)
    }
 }
 
-void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
+void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 {
    int which = (A >> 4) & 0x3;
 
@@ -338,7 +333,7 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
 
    V <<= (A & 3) * 8;
 
-   PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V);
+   //PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V);
 
    if(which >= 3)
       return;
@@ -392,10 +387,10 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
 
    // TIMER_Update(timestamp);
 
-   PSX_SetEventNT(PSX_EVENT_TIMER, timestamp + CalcNextEvent(1024));
+   PSX_SetEventNT(MDFN_IEN_PSX::PSX_EVENT_TIMER, timestamp + CalcNextEvent(1024));
 }
 
-uint16_t TIMER_Read(const pscpu_timestamp_t timestamp, uint32_t A)
+uint16_t TIMER_Read(const int32_t timestamp, uint32_t A)
 {
    uint16_t ret = 0;
    int which = (A >> 4) & 0x3;
@@ -420,7 +415,7 @@ uint16_t TIMER_Read(const pscpu_timestamp_t timestamp, uint32_t A)
             ret = Timers[which].Target;
             break;
          case 0xC:
-            PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+            //PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
             break;
       }
    }
@@ -444,7 +439,7 @@ void TIMER_Power(void)
 }
 
 
-int TIMER_StateAction(StateMem *sm, int load, int data_only)
+int TIMER_StateAction(void *data, int load, int data_only)
 {
    int ret;
    SFORMAT StateRegs[] =
@@ -464,7 +459,7 @@ int TIMER_StateAction(StateMem *sm, int load, int data_only)
       SFVAR(hretrace),
       SFEND
    };
-   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "TIMER");
+   ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "TIMER");
 
    if(load)
    {
@@ -509,8 +504,5 @@ void TIMER_SetRegister(unsigned int which, uint32_t value)
          Timers[tw].Target = value & 0xFFFF;
          break;
    }
-
-}
-
 
 }
