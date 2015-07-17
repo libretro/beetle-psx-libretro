@@ -60,45 +60,31 @@ static INLINE int32 Reverb4422(const int16 *src)
  return(out);
 }
 
-template<bool phase>
 static INLINE int32 Reverb2244(const int16 *src)
 {
- int32 out;	// 32-bits is adequate(it won't overflow)
+   unsigned i;
+   int32_t out = 0; /* 32bits is adequate (it won't overflow) */
 
- if(phase)
- {
-  // Middle non-zero
-  out = src[9];
- }
- else
- {
-  out = 0;
-
-  for(unsigned i = 0; i < 20; i++)
+   for(i = 0; i < 20; i++)
    out += ResampTable[i] * src[i];
 
-  out >>= 14;
+   out >>= 14;
 
-  clamp(&out, -32768, 32767);
- }
+   clamp(&out, -32768, 32767);
 
- return(out);
+   return out;
 }
 
 static int32 IIASM(const int16 IIR_ALPHA, const int16 insamp)
 {
- if(MDFN_UNLIKELY(IIR_ALPHA == -32768))
- {
-  //const int32 iai_adj = sign_x_to_s32(17, (32768 - IIR_ALPHA));
-  //tmp = iai_adj * in_samp
+   if(MDFN_UNLIKELY(IIR_ALPHA == -32768))
+   {
+      if(insamp == -32768)
+         return 0;
+      return insamp * -65536;
+   }
 
-  if(insamp == -32768)
-   return 0;
-  else
-   return insamp * -65536;
- }
- else
-  return insamp * (32768 - IIR_ALPHA);
+   return insamp * (32768 - IIR_ALPHA);
 }
 
 //
@@ -179,12 +165,18 @@ void PS_SPU::RunReverb(const int32* in, int32* out)
    ReverbCur = ReverbWA;
 
   for(unsigned lr = 0; lr < 2; lr++)
-   upsampled[lr] = Reverb2244<true>(&RUSB[lr][((RvbResPos - 39) & 0x3F) >> 1]);
+  {
+     const int16 *src = &RUSB[lr][((RvbResPos - 39) & 0x3F) >> 1];
+     upsampled[lr] = src[9]; /* Reverb 2244 (Middle non-zero */
+  }
  }
  else
  {
   for(unsigned lr = 0; lr < 2; lr++)
-   upsampled[lr] = Reverb2244<false>(&RUSB[lr][((RvbResPos - 39) & 0x3F) >> 1]);
+  {
+     const int16 *src = &RUSB[lr][((RvbResPos - 39) & 0x3F) >> 1];
+     upsampled[lr] = Reverb2244(src);
+  }
  }
 
  RvbResPos = (RvbResPos + 1) & 0x3F;
