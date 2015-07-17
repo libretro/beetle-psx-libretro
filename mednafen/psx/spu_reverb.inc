@@ -1,4 +1,3 @@
-static int16 ReverbSat(int32 samp) MDFN_WARN_UNUSED_RESULT;
 static INLINE int16 ReverbSat(int32 samp)
 {
  if(samp > 32767)
@@ -107,25 +106,21 @@ void PS_SPU::RunReverb(const int32* in, int32* out)
   for(unsigned lr = 0; lr < 2; lr++)
    downsampled[lr] = Reverb4422(&RDSB[lr][(RvbResPos - 39) & 0x3F]);
 
-  //
-  // Run algorithm
-  ///
+  /* Run algorithm */
   if(SPUControl & 0x80)
   {
-   int16 IIR_INPUT_A0, IIR_INPUT_A1, IIR_INPUT_B0, IIR_INPUT_B1;
-   int16 IIR_A0, IIR_A1, IIR_B0, IIR_B1;
    int16 ACC0, ACC1;
    int16 FB_A0, FB_A1, FB_B0, FB_B1;
 
-   IIR_INPUT_A0 = ReverbSat(((RD_RVB(IIR_SRC_A0) * IIR_COEF) >> 15) + ((downsampled[0] * IN_COEF_L) >> 15));
-   IIR_INPUT_A1 = ReverbSat(((RD_RVB(IIR_SRC_A1) * IIR_COEF) >> 15) + ((downsampled[1] * IN_COEF_R) >> 15));
-   IIR_INPUT_B0 = ReverbSat(((RD_RVB(IIR_SRC_B0) * IIR_COEF) >> 15) + ((downsampled[0] * IN_COEF_L) >> 15));
-   IIR_INPUT_B1 = ReverbSat(((RD_RVB(IIR_SRC_B1) * IIR_COEF) >> 15) + ((downsampled[1] * IN_COEF_R) >> 15));
+   int16 IIR_INPUT_A0 = ReverbSat(((RD_RVB(IIR_SRC_A0) * IIR_COEF) >> 15) + ((downsampled[0] * IN_COEF_L) >> 15));
+   int16 IIR_INPUT_A1 = ReverbSat(((RD_RVB(IIR_SRC_A1) * IIR_COEF) >> 15) + ((downsampled[1] * IN_COEF_R) >> 15));
+   int16 IIR_INPUT_B0 = ReverbSat(((RD_RVB(IIR_SRC_B0) * IIR_COEF) >> 15) + ((downsampled[0] * IN_COEF_L) >> 15));
+   int16 IIR_INPUT_B1 = ReverbSat(((RD_RVB(IIR_SRC_B1) * IIR_COEF) >> 15) + ((downsampled[1] * IN_COEF_R) >> 15));
 
-   IIR_A0 = ReverbSat((((IIR_INPUT_A0 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_A0, -1)) >> 14)) >> 1);
-   IIR_A1 = ReverbSat((((IIR_INPUT_A1 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_A1, -1)) >> 14)) >> 1);
-   IIR_B0 = ReverbSat((((IIR_INPUT_B0 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_B0, -1)) >> 14)) >> 1);
-   IIR_B1 = ReverbSat((((IIR_INPUT_B1 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_B1, -1)) >> 14)) >> 1);
+   int16 IIR_A0 = ReverbSat((((IIR_INPUT_A0 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_A0, -1)) >> 14)) >> 1);
+   int16 IIR_A1 = ReverbSat((((IIR_INPUT_A1 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_A1, -1)) >> 14)) >> 1);
+   int16 IIR_B0 = ReverbSat((((IIR_INPUT_B0 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_B0, -1)) >> 14)) >> 1);
+   int16 IIR_B1 = ReverbSat((((IIR_INPUT_B1 * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_B1, -1)) >> 14)) >> 1);
 
    WR_RVB(IIR_DEST_A0, IIR_A0);
    WR_RVB(IIR_DEST_A1, IIR_A1);
@@ -154,9 +149,7 @@ void PS_SPU::RunReverb(const int32* in, int32* out)
    WR_RVB(MIX_DEST_B1, ReverbSat(((FB_ALPHA * ACC1) >> 15) - ((FB_A1 * (int16)(0x8000 ^ FB_ALPHA)) >> 15) - ((FB_B1 * FB_X) >> 15)));
   }
 
-  // 
-  // Get output samples
-  //
+  /* Get output samplesq */
   RUSB[0][(RvbResPos >> 1) | 0x20] = RUSB[0][RvbResPos >> 1] = (RD_RVB(MIX_DEST_A0) + RD_RVB(MIX_DEST_B0)) >> 1;
   RUSB[1][(RvbResPos >> 1) | 0x20] = RUSB[1][RvbResPos >> 1] = (RD_RVB(MIX_DEST_A1) + RD_RVB(MIX_DEST_B1)) >> 1;
 
