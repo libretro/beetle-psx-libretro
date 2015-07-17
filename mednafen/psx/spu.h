@@ -113,9 +113,6 @@ class PS_SPU
  void WriteDMA(uint32_t V);
  uint32_t ReadDMA(void);
 
- void StartFrame(double rate, uint32_t quality);
- int32_t EndFrame(int16 *SoundBuf);
-
  int32_t UpdateFromCDC(int32_t clocks);
  //pscpu_timestamp_t Update(pscpu_timestamp_t timestamp);
 

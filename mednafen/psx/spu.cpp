@@ -550,12 +550,12 @@ INLINE void PS_SPU::CheckIRQAddr(uint32 addr)
 {
  if(SPUControl & 0x40)
  {
-  if(IRQAddr == addr)
-  {
-   //SPUIRQ_DBG("SPU IRQ (ALT): 0x%06x", addr);
-   IRQAsserted = true;
-   IRQ_Assert(IRQ_SPU, IRQAsserted);
-  }
+    if(IRQAddr != addr)
+       return;
+
+    //SPUIRQ_DBG("SPU IRQ (ALT): 0x%06x", addr);
+    IRQAsserted = true;
+    IRQ_Assert(IRQ_SPU, IRQAsserted);
  }
 }
 
@@ -878,292 +878,289 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
 void PS_SPU::WriteDMA(uint32 V)
 {
- //SPUIRQ_DBG("DMA Write, RWAddr after=0x%06x", RWAddr);
- WriteSPURAM(RWAddr, V);
- RWAddr = (RWAddr + 1) & 0x3FFFF;
+   //SPUIRQ_DBG("DMA Write, RWAddr after=0x%06x", RWAddr);
+   WriteSPURAM(RWAddr, V);
+   RWAddr = (RWAddr + 1) & 0x3FFFF;
 
- WriteSPURAM(RWAddr, V >> 16);
- RWAddr = (RWAddr + 1) & 0x3FFFF;
+   WriteSPURAM(RWAddr, V >> 16);
+   RWAddr = (RWAddr + 1) & 0x3FFFF;
 
 
- CheckIRQAddr(RWAddr);
+   CheckIRQAddr(RWAddr);
 }
 
 uint32 PS_SPU::ReadDMA(void)
 {
- uint32 ret = (uint16)ReadSPURAM(RWAddr);
- RWAddr = (RWAddr + 1) & 0x3FFFF;
+   uint32 ret = (uint16)ReadSPURAM(RWAddr);
+   RWAddr = (RWAddr + 1) & 0x3FFFF;
 
- ret |= (uint32)(uint16)ReadSPURAM(RWAddr) << 16;
- RWAddr = (RWAddr + 1) & 0x3FFFF;
+   ret |= (uint32)(uint16)ReadSPURAM(RWAddr) << 16;
+   RWAddr = (RWAddr + 1) & 0x3FFFF;
 
- CheckIRQAddr(RWAddr);
+   CheckIRQAddr(RWAddr);
 
- //SPUIRQ_DBG("DMA Read, RWAddr after=0x%06x", RWAddr);
+   //SPUIRQ_DBG("DMA Read, RWAddr after=0x%06x", RWAddr);
 
- return(ret);
+   return(ret);
 }
 
 void PS_SPU::Write(pscpu_timestamp_t timestamp, uint32 A, uint16 V)
 {
- //if((A & 0x3FF) < 0x180)
- // PSX_WARNING("[SPU] Write: %08x %04x", A, V);
+   //if((A & 0x3FF) < 0x180)
+   // PSX_WARNING("[SPU] Write: %08x %04x", A, V);
 
- A &= 0x3FF;
+   A &= 0x3FF;
 
- if(A >= 0x200)
- {
-  //printf("Write: %08x %04x\n", A, V);
-  if(A < 0x260)
-  {
-   SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
-   voice->Sweep[(A & 2) >> 1].WriteVolume(V);
-  }
-  else if(A < 0x280)
-   AuxRegs[(A & 0x1F) >> 1] = V;
+   if(A >= 0x200)
+   {
+      //printf("Write: %08x %04x\n", A, V);
+      if(A < 0x260)
+      {
+         SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
+         voice->Sweep[(A & 2) >> 1].WriteVolume(V);
+      }
+      else if(A < 0x280)
+         AuxRegs[(A & 0x1F) >> 1] = V;
 
-  return;
- }
+      return;
+   }
 
- if(A < 0x180)
- {
-  SPU_Voice *voice = &Voices[A >> 4];
+   if(A < 0x180)
+   {
+      SPU_Voice *voice = &Voices[A >> 4];
 
-  switch(A & 0xF)
-  {
-   case 0x00:
-   case 0x02:
-	     voice->Sweep[(A & 2) >> 1].WriteControl(V);
-	     break;
+      switch(A & 0xF)
+      {
+         case 0x00:
+         case 0x02:
+            voice->Sweep[(A & 2) >> 1].WriteControl(V);
+            break;
+         case 0x04:
+            voice->Pitch = V;
+            break;
+         case 0x06:
+            voice->StartAddr = (V << 2) & 0x3FFFF;
+            break;
+         case 0x08:
+            voice->ADSRControl &= 0xFFFF0000;
+            voice->ADSRControl |= V;
+            CacheEnvelope(voice);
+            break;
+         case 0x0A:
+            voice->ADSRControl &= 0x0000FFFF;
+            voice->ADSRControl |= V << 16;
+            CacheEnvelope(voice);
+            break;
+         case 0x0C:
+            voice->ADSR.EnvLevel = V;
+            break;
+         case 0x0E:
+            voice->LoopAddr = (V << 2) & 0x3FFFF;
+            voice->IgnoreSampLA = true;
+#if 0
+            if((voice - Voices) == 22)
+            {
+               SPUIRQ_DBG("Manual loop address setting for voice %d: %04x", (int)(voice - Voices), V);
+            }
+#endif
+            break;
+      }
+   }
+   else
+   {
+      switch(A & 0x7F)
+      {
+         case 0x00:
+         case 0x02: GlobalSweep[(A & 2) >> 1].WriteControl(V);
+                    break;
 
-   case 0x04: voice->Pitch = V;
-	      break;
+         case 0x04: ReverbVol[0] = (int16)V;
+                    break;
 
-   case 0x06: voice->StartAddr = (V << 2) & 0x3FFFF;
-	      break;
+         case 0x06: ReverbVol[1] = (int16)V;
+                    break;
 
-   case 0x08: voice->ADSRControl &= 0xFFFF0000;
-	      voice->ADSRControl |= V;
-	      CacheEnvelope(voice);
-	      break;
+                    // Voice ON:
+         case 0x08: VoiceOn &= 0xFFFF0000;
+                    VoiceOn |= V << 0;
+                    break;
 
-   case 0x0A: voice->ADSRControl &= 0x0000FFFF;
-	      voice->ADSRControl |= V << 16;
-	      CacheEnvelope(voice);
-	      break;
+         case 0x0a: VoiceOn &= 0x0000FFFF;
+                    VoiceOn |= (V & 0xFF) << 16;
+                    break;
 
-   case 0x0C: voice->ADSR.EnvLevel = V;
-	      break;
+                    // Voice OFF:
+         case 0x0c: VoiceOff &= 0xFFFF0000;
+                    VoiceOff |= V << 0;
+                    break;
 
-   case 0x0E: voice->LoopAddr = (V << 2) & 0x3FFFF;
-	      voice->IgnoreSampLA = true;
-	      //if((voice - Voices) == 22)
-	      //{
-	      // SPUIRQ_DBG("Manual loop address setting for voice %d: %04x", (int)(voice - Voices), V);
-	      //}
-	      break;
-  }
- }
- else
- {
-  switch(A & 0x7F)
-  {
-   case 0x00:
-   case 0x02: GlobalSweep[(A & 2) >> 1].WriteControl(V);
-	      break;
+         case 0x0e: VoiceOff &= 0x0000FFFF;
+                    VoiceOff |= (V & 0xFF) << 16;
+                    break;
 
-   case 0x04: ReverbVol[0] = (int16)V;
-	      break;
+         case 0x10: FM_Mode &= 0xFFFF0000;
+                    FM_Mode |= V << 0;
+                    break;
 
-   case 0x06: ReverbVol[1] = (int16)V;
-	      break;
+         case 0x12: FM_Mode &= 0x0000FFFF;
+                    FM_Mode |= (V & 0xFF) << 16;
+                    break;
 
-   // Voice ON:
-   case 0x08: VoiceOn &= 0xFFFF0000;
-	      VoiceOn |= V << 0;
-	      break;
+         case 0x14: Noise_Mode &= 0xFFFF0000;
+                    Noise_Mode |= V << 0;
+                    break;
 
-   case 0x0a: VoiceOn &= 0x0000FFFF;
-              VoiceOn |= (V & 0xFF) << 16;
-	      break;
+         case 0x16: Noise_Mode &= 0x0000FFFF;
+                    Noise_Mode |= (V & 0xFF) << 16;
+                    break;
 
-   // Voice OFF:
-   case 0x0c: VoiceOff &= 0xFFFF0000;
-              VoiceOff |= V << 0;
-	      break;
+         case 0x18: Reverb_Mode &= 0xFFFF0000;
+                    Reverb_Mode |= V << 0;
+                    break;
 
-   case 0x0e: VoiceOff &= 0x0000FFFF;
-              VoiceOff |= (V & 0xFF) << 16;
-	      break;
+         case 0x1A: Reverb_Mode &= 0x0000FFFF;
+                    Reverb_Mode |= (V & 0xFF) << 16;
+                    break;
 
-   case 0x10: FM_Mode &= 0xFFFF0000;
-	      FM_Mode |= V << 0;
-	      break;
+         case 0x1C: BlockEnd &= 0xFFFF0000;
+                    BlockEnd |= V << 0;
+                    break;
 
-   case 0x12: FM_Mode &= 0x0000FFFF;
-	      FM_Mode |= (V & 0xFF) << 16;
-	      break;
+         case 0x1E: BlockEnd &= 0x0000FFFF;
+                    BlockEnd |= V << 16;
+                    break;
 
-   case 0x14: Noise_Mode &= 0xFFFF0000;
-	      Noise_Mode |= V << 0;
-	      break;
+         case 0x22: ReverbWA = (V << 2) & 0x3FFFF;
+                    ReverbCur = ReverbWA;
+                    //PSX_WARNING("[SPU] Reverb WA set: 0x%04x", V);
+                    break;
 
-   case 0x16: Noise_Mode &= 0x0000FFFF;
-	      Noise_Mode |= (V & 0xFF) << 16;
-	      break;
+         case 0x24:
+                    IRQAddr = (V << 2) & 0x3FFFF;
+                    CheckIRQAddr(RWAddr);
+                    //SPUIRQ_DBG("Set IRQAddr=0x%06x", IRQAddr);
+                    break;
 
-   case 0x18: Reverb_Mode &= 0xFFFF0000;
-	      Reverb_Mode |= V << 0;
-	      break;
+         case 0x26:
+                    RWAddr = (V << 2) & 0x3FFFF;	      
+                    CheckIRQAddr(RWAddr);
+                    //SPUIRQ_DBG("Set RWAddr=0x%06x", RWAddr);
+                    break;
 
-   case 0x1A: Reverb_Mode &= 0x0000FFFF;
-	      Reverb_Mode |= (V & 0xFF) << 16;
-	      break;
+         case 0x28: WriteSPURAM(RWAddr, V);
+                    RWAddr = (RWAddr + 1) & 0x3FFFF;
+                    CheckIRQAddr(RWAddr);
+                    break;
 
-   case 0x1C: BlockEnd &= 0xFFFF0000;
-	      BlockEnd |= V << 0;
-	      break;
+         case 0x2A: //if((SPUControl & 0x80) && !(V & 0x80))
+                    // printf("\n\n\n\n ************** REVERB PROCESSING DISABLED\n\n\n\n");
 
-   case 0x1E: BlockEnd &= 0x0000FFFF;
-	      BlockEnd |= V << 16;
-	      break;
+                    SPUControl = V;
+                    //SPUIRQ_DBG("Set SPUControl=0x%04x -- IRQA=%06x, RWA=%06x", V, IRQAddr, RWAddr);
+                    //printf("SPU control write: %04x\n", V);
+                    if(!(V & 0x40))
+                    {
+                       IRQAsserted = false;
+                       IRQ_Assert(IRQ_SPU, IRQAsserted);
+                    }
+                    CheckIRQAddr(RWAddr);
+                    break;
 
-   case 0x22: ReverbWA = (V << 2) & 0x3FFFF;
-	      ReverbCur = ReverbWA;
-	      //PSX_WARNING("[SPU] Reverb WA set: 0x%04x", V);
-	      break;
+         case 0x2C: PSX_WARNING("[SPU] Global reg 0x2c set: 0x%04x", V);
+                    break;
 
-   case 0x24: IRQAddr = (V << 2) & 0x3FFFF;
-	      CheckIRQAddr(RWAddr);
-	      //SPUIRQ_DBG("Set IRQAddr=0x%06x", IRQAddr);
-	      break;
+         case 0x30: CDVol[0] = V;
+                    break;
 
-   case 0x26: RWAddr = (V << 2) & 0x3FFFF;	      
-	      CheckIRQAddr(RWAddr);
-	      //SPUIRQ_DBG("Set RWAddr=0x%06x", RWAddr);
-	      break;
+         case 0x32: CDVol[1] = V;
+                    break;
 
-   case 0x28: WriteSPURAM(RWAddr, V);
-	      RWAddr = (RWAddr + 1) & 0x3FFFF;
-	      CheckIRQAddr(RWAddr);
-	      break;
+         case 0x34: ExternVol[0] = V;
+                    break;
 
-   case 0x2A: //if((SPUControl & 0x80) && !(V & 0x80))
-	      // printf("\n\n\n\n ************** REVERB PROCESSING DISABLED\n\n\n\n");
+         case 0x36: ExternVol[1] = V;
+                    break;
 
-	      SPUControl = V;
-	      //SPUIRQ_DBG("Set SPUControl=0x%04x -- IRQA=%06x, RWA=%06x", V, IRQAddr, RWAddr);
-	      //printf("SPU control write: %04x\n", V);
-	      if(!(V & 0x40))
-	      {
-	       IRQAsserted = false;
-	       IRQ_Assert(IRQ_SPU, IRQAsserted);
-	      }
-	      CheckIRQAddr(RWAddr);
-	      break;
+         case 0x38:
+         case 0x3A: GlobalSweep[(A & 2) >> 1].WriteVolume(V);
+                    break;
+      }
+   }
 
-   case 0x2C: PSX_WARNING("[SPU] Global reg 0x2c set: 0x%04x", V);
-	      break;
-
-   case 0x30: CDVol[0] = V;
-	      break;
-
-   case 0x32: CDVol[1] = V;
-	      break;
-
-   case 0x34: ExternVol[0] = V;
-	      break;
-
-   case 0x36: ExternVol[1] = V;
-	      break;
-
-   case 0x38:
-   case 0x3A: GlobalSweep[(A & 2) >> 1].WriteVolume(V);
-	      break;
-  }
- }
-
- Regs[(A & 0x1FF) >> 1] = V;
+   Regs[(A & 0x1FF) >> 1] = V;
 }
 
 uint16 PS_SPU::Read(pscpu_timestamp_t timestamp, uint32 A)
 {
- A &= 0x3FF;
+   A &= 0x3FF;
 
- PSX_DBGINFO("[SPU] Read: %08x", A);
+   PSX_DBGINFO("[SPU] Read: %08x", A);
 
- if(A >= 0x200)
- {
-  if(A < 0x260)
-  {
-   SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
+   if(A >= 0x200)
+   {
+      if(A < 0x260)
+      {
+         SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
 
-   //printf("Read: %08x %04x\n", A, voice->Sweep[(A & 2) >> 1].ReadVolume());
+         //printf("Read: %08x %04x\n", A, voice->Sweep[(A & 2) >> 1].ReadVolume());
 
-   return voice->Sweep[(A & 2) >> 1].ReadVolume();
-  }
-  else if(A < 0x280)
-   return(AuxRegs[(A & 0x1F) >> 1]);
+         return voice->Sweep[(A & 2) >> 1].ReadVolume();
+      }
+      else if(A < 0x280)
+         return(AuxRegs[(A & 0x1F) >> 1]);
 
-  return(0xFFFF);
- }
-
-
- if(A < 0x180)
- {
-  SPU_Voice *voice = &Voices[A >> 4];
-
-  switch(A & 0xF)
-  {
-   case 0x0C: return(voice->ADSR.EnvLevel);
-   case 0x0E: return(voice->LoopAddr >> 2);
-  }
- }
- else
- {
-  switch(A & 0x7F)
-  {
-   case 0x1C: return(BlockEnd);
-   case 0x1E: return(BlockEnd >> 16);
-
-   case 0x26: //PSX_WARNING("[SPU] RWADDR Read");
-	      break;
-
-   case 0x28: PSX_WARNING("[SPU] SPURAM Read port(?) Read");
-
-	      {
-	       uint16 ret = ReadSPURAM(RWAddr);
-
-	       RWAddr = (RWAddr + 1) & 0x3FFFF;
-	       CheckIRQAddr(RWAddr);
-
-	       return(ret);
-	      }
-
-   case 0x2a:
-	return(SPUControl);
-
-/* FIXME: What is this used for? */
-   case 0x3C:
-	//PSX_WARNING("[SPU] Read Unknown: %08x", A);
-	return(0);
-
-   case 0x38:
-   case 0x3A: return(GlobalSweep[(A & 2) >> 1].ReadVolume());
-  }
- }
-
- return(Regs[(A & 0x1FF) >> 1]);
-}
+      return(0xFFFF);
+   }
 
 
-void PS_SPU::StartFrame(double rate, uint32 quality)
-{
-}
+   if(A < 0x180)
+   {
+      SPU_Voice *voice = &Voices[A >> 4];
 
-int32 PS_SPU::EndFrame(int16 *SoundBuf)
-{
-   return 0;
+      switch(A & 0xF)
+      {
+         case 0x0C:
+            return(voice->ADSR.EnvLevel);
+         case 0x0E:
+            return(voice->LoopAddr >> 2);
+      }
+   }
+   else
+   {
+      switch(A & 0x7F)
+      {
+         case 0x1C:
+            return(BlockEnd);
+         case 0x1E:
+            return(BlockEnd >> 16);
+         case 0x26:
+            //PSX_WARNING("[SPU] RWADDR Read");
+            break;
+         case 0x28:
+            //PSX_WARNING("[SPU] SPURAM Read port(?) Read");
+            {
+               uint16 ret = ReadSPURAM(RWAddr);
+
+               RWAddr = (RWAddr + 1) & 0x3FFFF;
+               CheckIRQAddr(RWAddr);
+
+               return (ret);
+            }
+
+         case 0x2a:
+            return(SPUControl);
+
+            /* FIXME: What is this used for? */
+         case 0x3C:
+            //PSX_WARNING("[SPU] Read Unknown: %08x", A);
+            return(0);
+         case 0x38:
+         case 0x3A:
+            return(GlobalSweep[(A & 2) >> 1].ReadVolume());
+      }
+   }
+
+   return(Regs[(A & 0x1FF) >> 1]);
 }
 
 int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
@@ -1320,134 +1317,77 @@ void PS_SPU::PokeSPURAM(uint32 address, uint16 value)
 
 uint32 PS_SPU::GetRegister(unsigned int which, char *special, const uint32 special_len)
 {
- uint32 ret = 0xDEADBEEF;
+   if(which >= 0x8000)
+   {
+      unsigned int v = (which - 0x8000) >> 8;
 
- if(which >= 0x8000)
- {
-  unsigned int v = (which - 0x8000) >> 8;
+      switch((which & 0xFF) | 0x8000)
+      {
+         case GSREG_V0_VOL_CTRL_L:
+            return Regs[v * 8 + 0x0];
+         case GSREG_V0_VOL_CTRL_R:
+            return Regs[v * 8 + 0x1];
+         case GSREG_V0_VOL_L:
+            return Voices[v].Sweep[0].ReadVolume() & 0xFFFF;
+         case GSREG_V0_VOL_R:
+            return Voices[v].Sweep[1].ReadVolume() & 0xFFFF;
+         case GSREG_V0_PITCH:
+            return Voices[v].Pitch;
+         case GSREG_V0_STARTADDR:
+            return Voices[v].StartAddr;
+         case GSREG_V0_ADSR_CTRL:
+            return Voices[v].ADSRControl;
+         case GSREG_V0_ADSR_LEVEL:
+            return Voices[v].ADSR.EnvLevel;
+         case GSREG_V0_LOOP_ADDR:
+            return Voices[v].LoopAddr;
+         case GSREG_V0_READ_ADDR:
+            return Voices[v].CurAddr;
+      }
+   }
+   else if (which >= 18 && which <= 49)
+      return ReverbRegs[which - GSREG_FB_SRC_A];
+   else switch(which)
+   {
+      case GSREG_SPUCONTROL:
+         return SPUControl;
+      case GSREG_FM_ON:
+         return FM_Mode;
+      case GSREG_NOISE_ON:
+         return Noise_Mode;
+      case GSREG_REVERB_ON:
+         return Reverb_Mode;
+      case GSREG_CDVOL_L:
+         return (uint16)CDVol[0];
+      case GSREG_CDVOL_R:
+         return (uint16)CDVol[1];
+      case GSREG_MAINVOL_CTRL_L:
+         return Regs[0xC0];
+      case GSREG_MAINVOL_CTRL_R:
+         return Regs[0xC1];
+      case GSREG_MAINVOL_L:
+         return GlobalSweep[0].ReadVolume() & 0xFFFF;
+      case GSREG_MAINVOL_R:
+         return GlobalSweep[1].ReadVolume() & 0xFFFF;
+      case GSREG_RVBVOL_L:
+         return (uint16)ReverbVol[0];
+      case GSREG_RVBVOL_R:
+         return (uint16)ReverbVol[1];
+      case GSREG_RWADDR:
+         return RWAddr;
+      case GSREG_IRQADDR:
+         return IRQAddr;
+      case GSREG_REVERBWA:
+         return ReverbWA >> 2;
+      case GSREG_VOICEON:
+         return VoiceOn;
+      case GSREG_VOICEOFF:
+         return VoiceOff;
+      case GSREG_BLOCKEND:
+         return BlockEnd;
+   }
 
-  switch((which & 0xFF) | 0x8000)
-  {
-   case GSREG_V0_VOL_CTRL_L:
-	ret = Regs[v * 8 + 0x0];
-	break;
-
-   case GSREG_V0_VOL_CTRL_R:
-	ret = Regs[v * 8 + 0x1];
-	break;
-
-   case GSREG_V0_VOL_L:
-	ret = Voices[v].Sweep[0].ReadVolume() & 0xFFFF;
-	break;
-
-   case GSREG_V0_VOL_R:
-	ret = Voices[v].Sweep[1].ReadVolume() & 0xFFFF;
-	break;
-
-   case GSREG_V0_PITCH:
-	ret = Voices[v].Pitch;
-	break;
-
-   case GSREG_V0_STARTADDR:
-	ret = Voices[v].StartAddr;
-	break;
-
-   case GSREG_V0_ADSR_CTRL:
-	ret = Voices[v].ADSRControl;
-	break;
-
-   case GSREG_V0_ADSR_LEVEL:
-	ret = Voices[v].ADSR.EnvLevel;
-	break;
-
-   case GSREG_V0_LOOP_ADDR:
-	ret = Voices[v].LoopAddr;
-	break;
-
-   case GSREG_V0_READ_ADDR:
-	ret = Voices[v].CurAddr;
-	break;
-  }
- }
- else if (which >= 18 && which <= 49)
-    ret = ReverbRegs[which - GSREG_FB_SRC_A];
- else switch(which)
- {
-  case GSREG_SPUCONTROL:
-	ret = SPUControl;
-	break;
-
-  case GSREG_FM_ON:
-	ret = FM_Mode;
-	break;
-
-  case GSREG_NOISE_ON:
-	ret = Noise_Mode;
-	break;
-
-  case GSREG_REVERB_ON:
-	ret = Reverb_Mode;
-	break;
-
-  case GSREG_CDVOL_L:
-	ret = (uint16)CDVol[0];
-	break;
-
-  case GSREG_CDVOL_R:
-	ret = (uint16)CDVol[1];
-	break;
-
-  case GSREG_MAINVOL_CTRL_L:
-	ret = Regs[0xC0];
-	break;
-
-  case GSREG_MAINVOL_CTRL_R:
-	ret = Regs[0xC1];
-	break;
-
-  case GSREG_MAINVOL_L:
-	ret = GlobalSweep[0].ReadVolume() & 0xFFFF;
-	break;
-
-  case GSREG_MAINVOL_R:
-	ret = GlobalSweep[1].ReadVolume() & 0xFFFF;
-	break;
-
-  case GSREG_RVBVOL_L:
-	ret = (uint16)ReverbVol[0];
-	break;
-
-  case GSREG_RVBVOL_R:
-	ret = (uint16)ReverbVol[1];
-	break;
-
-  case GSREG_RWADDR:
-	ret = RWAddr;
-	break;
-
-  case GSREG_IRQADDR:
-	ret = IRQAddr;
-	break;
-
-  case GSREG_REVERBWA:
-	ret = ReverbWA >> 2;
-	break;
-
-  case GSREG_VOICEON:
-	ret = VoiceOn;
-	break;
-
-  case GSREG_VOICEOFF:
-	ret = VoiceOff;
-	break;
-
-  case GSREG_BLOCKEND:
-	ret = BlockEnd;
-	break;
-
- }
-
- return(ret);
+   return 0xDEADBEEF;
 }
 
 void PS_SPU::SetRegister(unsigned int which, uint32 value)
