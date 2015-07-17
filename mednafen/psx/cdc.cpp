@@ -1455,15 +1455,13 @@ void PS_CDC::Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V)
 
 uint8 PS_CDC::Read(const pscpu_timestamp_t timestamp, uint32 A)
 {
- uint8 ret = 0;
-
  A &= 0x03;
 
  //printf("Read %08x\n", A);
 
  if(A == 0x00)
  {
-	ret = RegSelector & 0x3;
+	uint8 ret = RegSelector & 0x3;
 
 	if(ArgsWP == ArgsRP)
 	 ret |= 0x08;	// Args FIFO empty.
@@ -1477,41 +1475,31 @@ uint8 PS_CDC::Read(const pscpu_timestamp_t timestamp, uint32 A)
 	if(DMABuffer.CanRead())
 	 ret |= 0x40;
 
-        if(PendingCommandCounter > 0 && PendingCommandPhase <= 1)
-	 ret |= 0x80;
+   if(PendingCommandCounter > 0 && PendingCommandPhase <= 1)
+      ret |= 0x80;
+
+   return ret;
  }
- else
+
+ switch(A & 0x3)
  {
-  switch(A & 0x3)
-  {
-   case 0x01:
-	ret = ReadResult();
-	break;
+    case 0x01:
+       return ReadResult();
+    case 0x02:
+       //PSX_WARNING("[CDC] DMA Buffer manual read");
+       if(DMABuffer.CanRead())
+          return DMABuffer.ReadByte();
+       else
+          PSX_WARNING("[CDC] CD data transfer port read, but no data present!");
+       break;
 
-   case 0x02:
-	//PSX_WARNING("[CDC] DMA Buffer manual read");
-	if(DMABuffer.CanRead())
-	 ret = DMABuffer.ReadByte();
-	else
-	{
-	 PSX_WARNING("[CDC] CD data transfer port read, but no data present!");
-	}
-	break;
-
-   case 0x03:
-	if(RegSelector & 0x1)
-	{
-	 ret = 0xE0 | IRQBuffer;
-	}
-	else
-	{
-	 ret = 0xFF;
-	}
-	break;
-  }
+    case 0x03:
+       if(RegSelector & 0x1)
+          return 0xE0 | IRQBuffer;
+       return 0xFF;
  }
 
- return(ret);
+ return 0;
 }
 
 
