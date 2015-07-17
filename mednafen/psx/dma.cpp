@@ -102,7 +102,7 @@ static INLINE void RecalcIRQOut(void)
  irqo |= (DMAIntControl >> 15) & 1;
 
  IRQOut = irqo;
- IRQ_Assert(IRQ_DMA, irqo);
+ ::IRQ_Assert(IRQ_DMA, irqo);
 }
 
 void DMA_ResetTS(void)

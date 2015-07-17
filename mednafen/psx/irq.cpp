@@ -17,17 +17,11 @@
 
 #include "psx.h"
 
-namespace MDFN_IEN_PSX
-{
-
 static uint16_t Asserted;
 static uint16_t Mask;
 static uint16_t Status;
 
-static INLINE void Recalc(void)
-{
-   CPU->AssertIRQ(0, (bool)(Status & Mask));
-}
+#define Recalc() MDFN_IEN_PSX::CPU->AssertIRQ(0, (bool)(Status & Mask))
 
 void IRQ_Power(void)
 {
@@ -38,7 +32,7 @@ void IRQ_Power(void)
    Recalc();
 }
 
-int IRQ_StateAction(StateMem *sm, int load, int data_only)
+int IRQ_StateAction(void *data, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
@@ -47,7 +41,7 @@ int IRQ_StateAction(StateMem *sm, int load, int data_only)
       SFVAR(Status),
       SFEND
    };
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "IRQ");
+   int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "IRQ");
 
    if(load)
    {
@@ -146,20 +140,18 @@ void IRQ_SetRegister(unsigned int which, uint32_t value)
    {
       case IRQ_GSREG_ASSERTED:
          Asserted = value;
-         Recalc();
          break;
 
       case IRQ_GSREG_STATUS:
          Status = value;
-         Recalc();
          break;
 
       case IRQ_GSREG_MASK:
          Mask = value;
-         Recalc();
          break;
+      default:
+         return;
    }
-}
 
-
+   Recalc();
 }

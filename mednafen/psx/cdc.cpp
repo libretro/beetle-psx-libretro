@@ -362,7 +362,7 @@ void PS_CDC::ResetTS(void)
 
 void PS_CDC::RecalcIRQ(void)
 {
- IRQ_Assert(IRQ_CD, (bool)(IRQBuffer & (IRQOutTestMask & 0x1F)));
+ ::IRQ_Assert(IRQ_CD, (bool)(IRQBuffer & (IRQOutTestMask & 0x1F)));
 }
 //static int32 doom_ts;
 void PS_CDC::WriteIRQ(uint8 V)

@@ -625,9 +625,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(pscpu
             timestamp++;
 
          if(IsWrite)
-            IRQ_Write(A, V);
+            ::IRQ_Write(A, V);
          else
-            V = IRQ_Read(A);
+            V = ::IRQ_Read(A);
          return;
       }
 

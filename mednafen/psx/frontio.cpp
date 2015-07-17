@@ -190,7 +190,7 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
 
  if(load)
  {
-    IRQ_Assert(IRQ_SIO, istatus);
+    ::IRQ_Assert(IRQ_SIO, istatus);
  }
 
  return(ret);
@@ -472,7 +472,7 @@ INLINE void FrontIO::DoDSRIRQ(void)
    {
       PSX_FIODBGINFO("[DSR] IRQ");
       istatus = true;
-      IRQ_Assert(IRQ_SIO, true);
+      ::IRQ_Assert(IRQ_SIO, true);
    }
 }
 
@@ -507,13 +507,13 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
          if(V & 0x10)
          {
             istatus = false;
-            IRQ_Assert(IRQ_SIO, false);
+            ::IRQ_Assert(IRQ_SIO, false);
          }
 
          if(V & 0x40)	// Reset
          {
             istatus = false;
-            IRQ_Assert(IRQ_SIO, false);
+            ::IRQ_Assert(IRQ_SIO, false);
 
             ClockDivider = 0;
             ReceivePending = false;
@@ -656,8 +656,8 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
       {
          //printf("Yay: %d %u\n", i, timestamp);
          irq10_pulse_ts[i] = PSX_EVENT_MAXTS;
-         IRQ_Assert(IRQ_PIO, true);
-         IRQ_Assert(IRQ_PIO, false);
+         ::IRQ_Assert(IRQ_PIO, true);
+         ::IRQ_Assert(IRQ_PIO, false);
       }
    }
 
@@ -685,7 +685,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
                   if(Control & 0x400)
                   {
                      istatus = true;
-                     IRQ_Assert(IRQ_SIO, true);
+                     ::IRQ_Assert(IRQ_SIO, true);
                   }
                }
             }
@@ -711,7 +711,7 @@ pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
                   if(Control & 0x800)
                   {
                      istatus = true;
-                     IRQ_Assert(IRQ_SIO, true);
+                     ::IRQ_Assert(IRQ_SIO, true);
                   }
                }
             }
@@ -956,8 +956,8 @@ void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timesta
    if(irq10_pulse_ts[i] <= timestamp)
    {
     irq10_pulse_ts[i] = PSX_EVENT_MAXTS;
-    IRQ_Assert(IRQ_PIO, true);
-    IRQ_Assert(IRQ_PIO, false);
+    ::IRQ_Assert(IRQ_PIO, true);
+    ::IRQ_Assert(IRQ_PIO, false);
    }
   }
  }
