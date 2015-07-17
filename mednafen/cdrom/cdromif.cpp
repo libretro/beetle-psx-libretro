@@ -828,31 +828,27 @@ void CDIF_Stream_Thing::write(const void *data, uint64 count)
 
 void CDIF_Stream_Thing::seek(int64 offset, int whence)
 {
- int64 new_position;
+   int64 new_position;
 
- switch(whence)
- {
-  default:
-	throw MDFN_Error(ErrnoHolder(EINVAL));
-	break;
+   switch(whence)
+   {
+      case SEEK_SET:
+         new_position = offset;
+         break;
 
-  case SEEK_SET:
-	new_position = offset;
-	break;
+      case SEEK_CUR:
+         new_position = position + offset;
+         break;
 
-  case SEEK_CUR:
-	new_position = position + offset;
-	break;
+      case SEEK_END:
+         new_position = ((int64)sector_count * 2048) + offset;
+         break;
+   }
 
-  case SEEK_END:
-	new_position = ((int64)sector_count * 2048) + offset;
-	break;
- }
+   if(new_position < 0 || new_position > ((int64)sector_count * 2048))
+      throw MDFN_Error(ErrnoHolder(EINVAL));
 
- if(new_position < 0 || new_position > ((int64)sector_count * 2048))
-  throw MDFN_Error(ErrnoHolder(EINVAL));
-
- position = new_position;
+   position = new_position;
 }
 
 int64 CDIF_Stream_Thing::tell(void)

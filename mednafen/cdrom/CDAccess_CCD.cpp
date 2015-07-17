@@ -213,7 +213,6 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
    {
     default:
 	throw MDFN_Error(0, "Unsupported TOC entry Point value: %u", point);
-	break;
 
     case 0xA0:
 	tocd.first_track = pmin;

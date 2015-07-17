@@ -118,16 +118,16 @@ class PS_CPU
 
  enum
  {
-  CP0REG_BPC = 3,		// PC breakpoint address.
-  CP0REG_BDA = 5,		// Data load/store breakpoint address.
-  CP0REG_TAR = 6,		// Target address(???)
-  CP0REG_DCIC = 7,		// Cache control
-  CP0REG_BDAM = 9,		// Data load/store address mask.
-  CP0REG_BPCM = 11,		// PC breakpoint address mask.
-  CP0REG_SR = 12,
+  CP0REG_BPC   = 3,		// PC breakpoint address.
+  CP0REG_BDA   = 5,		// Data load/store breakpoint address.
+  CP0REG_TAR   = 6,		// Target address
+  CP0REG_DCIC  = 7,	   // Cache control
+  CP0REG_BDAM  = 9,	   // Data load/store address mask.
+  CP0REG_BPCM  = 11,	   // PC breakpoint address mask.
+  CP0REG_SR    = 12,
   CP0REG_CAUSE = 13,
-  CP0REG_EPC = 14,
-  CP0REG_PRID = 15,		// Product ID
+  CP0REG_EPC   = 14,
+  CP0REG_PRID  = 15,	   // Product ID
   CP0REG_ERREG = 16
  };
 

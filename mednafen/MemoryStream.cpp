@@ -16,7 +16,7 @@ MemoryStream::MemoryStream() : data_buffer(NULL), data_buffer_size(0), data_buff
 {
  data_buffer_size = 0;
  data_buffer_alloced = 64;
- if(!(data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced)))
+ if(!(data_buffer = (uint8*)realloc(data_buffer, (size_t)data_buffer_alloced)))
   throw MDFN_Error(ErrnoHolder(errno));
 }
 
@@ -25,7 +25,7 @@ MemoryStream::MemoryStream(uint64 size_hint) : data_buffer(NULL), data_buffer_si
  data_buffer_size = 0;
  data_buffer_alloced = (size_hint > SIZE_MAX) ? SIZE_MAX : size_hint;
 
- if(!(data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced)))
+ if(!(data_buffer = (uint8*)realloc(data_buffer, (size_t)data_buffer_alloced)))
   throw MDFN_Error(ErrnoHolder(errno));
 }
 
@@ -36,7 +36,7 @@ MemoryStream::MemoryStream(Stream *stream) : data_buffer(NULL), data_buffer_size
 
    data_buffer_size = stream->size();
    data_buffer_alloced = data_buffer_size;
-   if(!(data_buffer = (uint8*)realloc(data_buffer, data_buffer_alloced)))
+   if(!(data_buffer = (uint8*)realloc(data_buffer, (size_t)data_buffer_alloced)))
       throw MDFN_Error(ErrnoHolder(errno));
 
    stream->read(data_buffer, data_buffer_size);
@@ -49,10 +49,10 @@ MemoryStream::MemoryStream(const MemoryStream &zs)
 {
  data_buffer_size = zs.data_buffer_size;
  data_buffer_alloced = zs.data_buffer_alloced;
- if(!(data_buffer = (uint8*)malloc(data_buffer_alloced)))
+ if(!(data_buffer = (uint8*)malloc((size_t)data_buffer_alloced)))
   throw MDFN_Error(ErrnoHolder(errno));
 
- memcpy(data_buffer, zs.data_buffer, data_buffer_size);
+ memcpy(data_buffer, zs.data_buffer, (size_t)data_buffer_size);
 
  position = zs.position;
 }
@@ -101,7 +101,7 @@ INLINE void MemoryStream::grow_if_necessary(uint64 new_required_size)
    if(new_required_alloced < new_required_size)
     throw MDFN_Error(ErrnoHolder(ENOMEM));
 
-   if(!(new_data_buffer = (uint8*)realloc(data_buffer, new_required_alloced)))
+   if(!(new_data_buffer = (uint8*)realloc(data_buffer, (size_t)new_required_alloced)))
     throw MDFN_Error(ErrnoHolder(errno));
 
    //
@@ -128,7 +128,7 @@ uint64 MemoryStream::read(void *data, uint64 count, bool error_on_eos)
   count = data_buffer_size - position;
  }
 
- memmove(data, &data_buffer[position], count);
+ memmove(data, &data_buffer[position], (size_t)count);
  position += count;
 
  return count;
@@ -143,7 +143,7 @@ void MemoryStream::write(const void *data, uint64 count)
 
  grow_if_necessary(nrs);
 
- memmove(&data_buffer[position], data, count);
+ memmove(&data_buffer[position], data, (size_t)count);
  position += count;
 }
 
@@ -153,21 +153,17 @@ void MemoryStream::seek(int64 offset, int whence)
 
  switch(whence)
  {
-  default:
-	throw MDFN_Error(ErrnoHolder(EINVAL));
-	break;
+    case SEEK_SET:
+       new_position = offset;
+       break;
 
-  case SEEK_SET:
-	new_position = offset;
-	break;
+    case SEEK_CUR:
+       new_position = position + offset;
+       break;
 
-  case SEEK_CUR:
-	new_position = position + offset;
-	break;
-
-  case SEEK_END:
-	new_position = data_buffer_size + offset;
-	break;
+    case SEEK_END:
+       new_position = data_buffer_size + offset;
+       break;
  }
 
  if(new_position < 0)

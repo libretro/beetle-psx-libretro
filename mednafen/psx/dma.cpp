@@ -238,7 +238,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t 
 #if 0
          if(CRModeCache & 0x100)		// For CDC DMA(at least): When this bit is set, DMA controller doesn't appear to hog the (RAM?) bus.
          {
-            if(CRModeCache & 0x00400000)	// For CDC DMA(at least): When this bit is set, DMA controller appears to get even less bus time(or has a lower priority??)
+            if(CRModeCache & 0x00400000)	// For CDC DMA(at least): When this bit is set, DMA controller appears to get even less bus time(or has a lower priority?)
             {
                DMACH[ch].ClockCounter -= 44 * 20 / 12;
             }

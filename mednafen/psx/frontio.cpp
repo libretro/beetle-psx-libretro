@@ -368,8 +368,6 @@ void FrontIO::SetAMCT(bool enabled)
 
 void FrontIO::SetCrosshairsColor(unsigned port, uint32_t color)
 {
-   assert(port >= 0 && port < 8);
-
    chair_colors[port] = color;
    Devices[port]->SetCrosshairsColor(color);
 }

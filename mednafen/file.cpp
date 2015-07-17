@@ -35,9 +35,9 @@ bool MDFNFILE::MakeMemWrapAndClose(void *fp)
    f_size = ::ftell((FILE *)fp);
    ::fseek((FILE *)fp, 0, SEEK_SET);
 
-   if (!(f_data = (uint8*)MDFN_malloc(f_size, _("file read buffer"))))
+   if (!(f_data = (uint8*)MDFN_malloc((size_t)f_size, _("file read buffer"))))
       goto fail;
-   ::fread(f_data, 1, f_size, (FILE *)fp);
+   ::fread(f_data, 1, (size_t)f_size, (FILE *)fp);
 
    ret = TRUE;
 fail:
@@ -109,7 +109,7 @@ uint64 MDFNFILE::fread(void *ptr, size_t element_size, size_t nmemb)
 
    if ((location + total) > f_size)
    {
-      int64 ak = f_size - location;
+      size_t ak = f_size - location;
 
       memcpy((uint8*)ptr, f_data + location, ak);
 
@@ -117,14 +117,12 @@ uint64 MDFNFILE::fread(void *ptr, size_t element_size, size_t nmemb)
 
       return(ak / element_size);
    }
-   else
-   {
-      memcpy((uint8*)ptr, f_data + location, total);
 
-      location += total;
+   memcpy((uint8*)ptr, f_data + location, total);
 
-      return nmemb;
-   }
+   location += total;
+
+   return nmemb;
 }
 
 int MDFNFILE::fseek(int64 offset, int whence)

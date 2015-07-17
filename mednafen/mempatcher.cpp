@@ -779,70 +779,69 @@ static int GGtobin(char c)
 /* Returns 1 on success, 0 on failure. Sets *a,*v,*c. */
 int MDFNI_DecodeGG(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)
 {
- uint16 A;
- uint8 V,C;
- uint8 t;
- int s;
+   uint16 A;
+   uint8 V,C;
+   uint8 t;
+   int s;
 
- A=0x8000;
- V=0;
- C=0;
+   A=0x8000;
+   V=0;
+   C=0;
 
- s=strlen(str);
- if(s!=6 && s!=8) return(0);
+   s=strlen(str);
+   if(s!=6 && s!=8) return(0);
 
- t=GGtobin(*str++);
- V|=(t&0x07);
- V|=(t&0x08)<<4;
+   t=GGtobin(*str++);
+   V|=(t&0x07);
+   V|=(t&0x08)<<4;
 
- t=GGtobin(*str++);
- V|=(t&0x07)<<4;
- A|=(t&0x08)<<4;
+   t=GGtobin(*str++);
+   V|=(t&0x07)<<4;
+   A|=(t&0x08)<<4;
 
- t=GGtobin(*str++);
- A|=(t&0x07)<<4;
- //if(t&0x08) return(0);	/* 8-character code?! */
+   t=GGtobin(*str++);
+   A|=(t&0x07)<<4;
+   //if(t&0x08) return(0);	/* 8-character code?! */
 
- t=GGtobin(*str++);
- A|=(t&0x07)<<12;
- A|=(t&0x08);
+   t=GGtobin(*str++);
+   A|=(t&0x07)<<12;
+   A|=(t&0x08);
 
- t=GGtobin(*str++);
- A|=(t&0x07);
- A|=(t&0x08)<<8;
+   t=GGtobin(*str++);
+   A|=(t&0x07);
+   A|=(t&0x08)<<8;
 
- if(s==6)
- {
-  t=GGtobin(*str++);
-  A|=(t&0x07)<<8;
-  V|=(t&0x08);
+   if(s==6)
+   {
+      t=GGtobin(*str++);
+      A|=(t&0x07)<<8;
+      V|=(t&0x08);
 
-  *a=A;
-  *v=V;
-  *type = 'S';
-  *c = 0;
-  return(1);
- }
- else
- {
-  t=GGtobin(*str++);
-  A|=(t&0x07)<<8;
-  C|=(t&0x08);
+      *a=A;
+      *v=V;
+      *type = 'S';
+      *c = 0;
+   }
+   else
+   {
+      t=GGtobin(*str++);
+      A|=(t&0x07)<<8;
+      C|=(t&0x08);
 
-  t=GGtobin(*str++);
-  C|=(t&0x07);
-  C|=(t&0x08)<<4;
-  
-  t=GGtobin(*str++);
-  C|=(t&0x07)<<4;
-  V|=(t&0x08);
-  *a=A;
-  *v=V;
-  *c=C;
-  *type = 'C';
-  return(1);
- }
- return(0);
+      t=GGtobin(*str++);
+      C|=(t&0x07);
+      C|=(t&0x08)<<4;
+
+      t=GGtobin(*str++);
+      C|=(t&0x07)<<4;
+      V|=(t&0x08);
+      *a=A;
+      *v=V;
+      *c=C;
+      *type = 'C';
+   }
+
+   return(1);
 }
 
 int MDFNI_DecodePAR(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)

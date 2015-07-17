@@ -174,29 +174,24 @@ static size_t UnQuotify(const std::string &src, size_t source_offset, std::strin
 
 uint32 CDAccess_Image::GetSectorCount(CDRFILE_TRACK_INFO *track)
 {
- if(track->DIFormat == DI_FORMAT_AUDIO)
- {
-  if(track->AReader)
-   return(((track->AReader->FrameCount() * 4) - track->FileOffset) / 2352);
-  else
-  {
-   const int64 size = track->fp->size();
+   int64 size;
 
-   //printf("%d %d %d\n", (int)stat_buf.st_size, (int)track->FileOffset, (int)stat_buf.st_size - (int)track->FileOffset);
-   if(track->SubchannelMode)
-    return((size - track->FileOffset) / (2352 + 96));
-   else
-    return((size - track->FileOffset) / 2352);
-  }
- }
- else
- {
-  const int64 size = track->fp->size();
-  
-  return((size - track->FileOffset) / DI_Size_Table[track->DIFormat]);
- }
+   if(track->DIFormat == DI_FORMAT_AUDIO)
+   {
+      if(track->AReader)
+         return(((track->AReader->FrameCount() * 4) - track->FileOffset) / 2352);
 
- return(0);
+      size = track->fp->size();
+
+      //printf("%d %d %d\n", (int)stat_buf.st_size, (int)track->FileOffset, (int)stat_buf.st_size - (int)track->FileOffset);
+      if(track->SubchannelMode)
+         return((size - track->FileOffset) / (2352 + 96));
+      return((size - track->FileOffset) / 2352);
+   }
+
+   size = track->fp->size();
+
+   return((size - track->FileOffset) / DI_Size_Table[track->DIFormat]);
 }
 
 void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache)

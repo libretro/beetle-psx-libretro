@@ -1547,7 +1547,7 @@ int32_t GTE_Instruction(uint32_t instr)
          break;
 
          /*
-            case 0x17:	// PARTIALLY UNSTABLE(depending on sf or v or cv or mx or lm???), similar behavior under some conditions to 0x16?
+            case 0x17:	// PARTIALLY UNSTABLE(depending on sf or v or cv or mx or lm), similar behavior under some conditions to 0x16?
             break;
 
             case 0x18:
