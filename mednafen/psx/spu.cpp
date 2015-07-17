@@ -445,25 +445,22 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
 
 void PS_SPU::CacheEnvelope(SPU_Voice *voice)
 {
- uint32 raw = voice->ADSRControl;
- SPU_ADSR *ADSR = &voice->ADSR;
- int32 Sl, Dr, Ar, Rr, Sr;
+ uint32_t   raw    = voice->ADSRControl;
+ SPU_ADSR *ADSR    = &voice->ADSR;
+ int32_t     Sl    = (raw >> 0) & 0x0F;
+ int32_t     Dr    = (raw >> 4) & 0x0F;
+ int32_t     Ar    = (raw >> 8) & 0x7F;
 
- Sl = (raw >> 0) & 0x0F;
- Dr = (raw >> 4) & 0x0F;
- Ar = (raw >> 8) & 0x7F;
+ int32_t     Rr    = (raw >> 16) & 0x1F;
+ int32_t     Sr    = (raw >> 22) & 0x7F;
 
- Rr = (raw >> 16) & 0x1F;
- Sr = (raw >> 22) & 0x7F;
+ ADSR->AttackExp   = (bool)(raw & (1 << 15));
+ ADSR->ReleaseExp  = (bool)(raw & (1 << 21));
+ ADSR->SustainExp  = (bool)(raw & (1 << 31));
+ ADSR->SustainDec  = (bool)(raw & (1 << 30));
 
-
- ADSR->AttackExp = (bool)(raw & (1 << 15));
- ADSR->ReleaseExp = (bool)(raw & (1 << 21));
- ADSR->SustainExp = (bool)(raw & (1 << 31));
- ADSR->SustainDec = (bool)(raw & (1 << 30));
-
- ADSR->AttackRate = Ar;
- ADSR->DecayRate = Dr << 2;
+ ADSR->AttackRate  = Ar;
+ ADSR->DecayRate   = Dr << 2;
  ADSR->SustainRate = Sr;
  ADSR->ReleaseRate = Rr << 2;
 
@@ -894,9 +891,7 @@ void PS_SPU::WriteDMA(uint32 V)
 
 uint32 PS_SPU::ReadDMA(void)
 {
- uint32 ret;
-
- ret = (uint16)ReadSPURAM(RWAddr);
+ uint32 ret = (uint16)ReadSPURAM(RWAddr);
  RWAddr = (RWAddr + 1) & 0x3FFFF;
 
  ret |= (uint32)(uint16)ReadSPURAM(RWAddr) << 16;
