@@ -135,9 +135,7 @@ static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
       case CH_GPU: 
          if(CRModeCache & 0x1)
             return(GPU->DMACanWrite());
-         return(true);
       case CH_CDC:
-         return(true);
       case CH_SPU:
          return(true);
       case CH_FIVE:
@@ -169,24 +167,6 @@ static void RecalcHalt(void)
                break;
             }
          }
-
-#if 0
-         if(DMACH[ch].ChanControl & 0x100)	// DMA doesn't hog the bus when this bit is set, though the DMA takes longer.
-            continue;
-
-         if(ch == 4 || ch == 5)	// Not sure if these channels will typically hog the bus or not...investigate.
-            continue;
-
-         if(!(DMACH[ch].ChanControl & (1U << 10)))	// Not sure about HOGGERYNESS with linked-list mode, and it likely wouldn't work well either in regards
-            // to GPU commands due to the rather large DMA update granularity.
-         {
-            if((DMACH[ch].WordCounter > 0) || ChCan(ch, DMACH[ch].ChanControl & 0x1))
-            {
-               Halt = true;
-               break;
-            }
-         }
-#endif
       }
    }
 
@@ -231,10 +211,6 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t 
 
    switch(ch)
    {
-      default:
-         abort();
-         break;
-
       case CH_MDEC_IN:
          if(CRModeCache & 0x1)
             MDEC_DMAWrite(*V);
@@ -501,8 +477,6 @@ static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32_t clocks, int c
 
    switch(ch)
    {
-      default:
-         abort();
       case 0:
          if(MDFN_LIKELY(CRModeCache == 0x00000201))
             crmodecache = 0x00000201;
@@ -530,8 +504,6 @@ static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32_t clocks, int c
             crmodecache = 0x00000201;
          else if(MDFN_LIKELY(CRModeCache == 0x00000200))
             crmodecache = 0x00000200;
-         break;
-      case 5:
          break;
       case 6:
          if(MDFN_LIKELY(CRModeCache == 0x00000002))
@@ -597,6 +569,7 @@ static void CheckLinkedList(uint32_t addr)
 
 void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 {
+   bool will_set_event = false;
    int ch = (A & 0x7F) >> 4;
 
    //if(ch == 2 || ch == 7)
@@ -607,39 +580,38 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 
    DMA_Update(timestamp);
 
-   if(ch == 7)
+   switch(A & 0xC)
    {
-      switch(A & 0xC)
-      {
-         case 0x0: //fprintf(stderr, "Global DMA control: 0x%08x\n", V);
+      case 0x0:
+         if (ch == 7)
+         {
             DMAControl = V;
             RecalcHalt();
-            break;
+         }
+         else
+         {
+            DMACH[ch].BaseAddr = V & 0xFFFFFF;
+            will_set_event = true;
+         }
+         break;
 
-         case 0x4: 
+      case 0x4: 
+         if (ch == 7)
+         {
             DMAIntControl = V & 0x00ff803f;
             DMAIntStatus &= ~(V >> 24);
 
             RecalcIRQOut();
-            break;
-
-         default:
-            PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
-            break;
-      }
-      return;
-   }
-
-   switch(A & 0xC)
-   {
-      case 0x0:
-         DMACH[ch].BaseAddr = V & 0xFFFFFF;
-         break;
-      case 0x4:
-         DMACH[ch].BlockControl = V;
+         }
+         else
+         {
+            DMACH[ch].BlockControl = V;
+            will_set_event = true;
+         }
          break;
       case 0xC:
       case 0x8: 
+         if (ch != 7)
          {
             uint32_t OldCC = DMACH[ch].ChanControl;
 
@@ -689,10 +661,16 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
             }
 
             RecalcHalt();
+            will_set_event = true;
+            break;
          }
+      default:
+         PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
          break;
    }
-   PSX_SetEventNT(PSX_EVENT_DMA, timestamp + CalcNextEvent(0x10000000));
+
+   if (will_set_event)
+      PSX_SetEventNT(PSX_EVENT_DMA, timestamp + CalcNextEvent(0x10000000));
 }
 
 uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A)
