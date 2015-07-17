@@ -128,8 +128,6 @@ static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
 {
    switch(ch)
    {
-      default:
-         abort();
       case CH_MDEC_IN:
          return(MDEC_DMACanWrite());
       case CH_MDEC_OUT:
@@ -147,6 +145,9 @@ static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
       case CH_OT:
          return((bool)(DMACH[ch].ChanControl & (1U << 28)));
    }
+
+   /* should not happen */
+   return false;
 }
 
 static void RecalcHalt(void)
@@ -696,43 +697,37 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 
 uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A)
 {
+   
    int ch = (A & 0x7F) >> 4;
    uint32_t ret = 0;
 
-   if(ch == 7)
-   {
-      switch(A & 0xC)
-      {
-         default:
-            PSX_WARNING("[DMA] Unknown read: %08x", A);
-            break;
-         case 0x0:
-            ret = DMAControl;
-            break;
-         case 0x4:
-            ret = DMAIntControl | (DMAIntStatus << 24) | (IRQOut << 31);
-            break;
-      }
-   }
-   else switch(A & 0xC)
+   switch(A & 0xC)
    {
       case 0x0:
-         ret = DMACH[ch].BaseAddr;
+         if (ch == 7)
+            ret = DMAControl;
+         else
+            ret = DMACH[ch].BaseAddr;
          break;
       case 0x4:
-         ret = DMACH[ch].BlockControl;
+         if (ch == 7)
+            ret = DMAIntControl | (DMAIntStatus << 24) | (IRQOut << 31);
+         else
+            ret = DMACH[ch].BlockControl;
          break;
       case 0xC:
       case 0x8:
-         ret = DMACH[ch].ChanControl;
+         if (ch != 7)
+         {
+            ret = DMACH[ch].ChanControl;
+            break;
+         }
+      default:
+         PSX_WARNING("[DMA] Unknown read: %08x", A);
          break;
    }
 
-   ret >>= (A & 3) * 8;
-
-   //PSX_WARNING("[DMA] Read: %08x %08x", A, ret);
-
-   return ret;
+   return (ret >> ((A & 3) * 8));
 }
 
 #define SFDMACH(n)	SFVARN(DMACH[n].BaseAddr, #n "BaseAddr"),		\
