@@ -1,3 +1,11 @@
+#ifdef __cplusplus
+#define __STDC_CONSTANT_MACROS
+#ifdef _STDINT_H
+#undef _STDINT_H
+#endif
+# include <stdint.h>
+#endif
+
 struct line_fxp_coord
 {
  uint64 x, y;
