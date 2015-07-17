@@ -100,17 +100,14 @@ void IRQ_Write(uint32_t A, uint32_t V)
 
 uint32_t IRQ_Read(uint32_t A)
 {
-   uint32_t ret = 0;
+   uint32_t ret = Status;
 
    if(A & 4)
       ret = Mask;
-   else
-      ret = Status;
 
    // FIXME: Might want to move this out to psx.cpp eventually.
    ret |= 0x1F800000;
    ret >>= (A & 3) * 8;
-
 
    //printf("[IRQ] Read: 0x%08x 0x%08x --- PAD TEMP\n", A, ret);
 
@@ -130,23 +127,17 @@ void IRQ_Reset(void)
 
 uint32_t IRQ_GetRegister(unsigned int which, char *special, const uint32_t special_len)
 {
-   uint32_t ret = 0;
-
    switch(which)
    {
       case IRQ_GSREG_ASSERTED:
-         ret = Asserted;
-         break;
-
+         return Asserted;
       case IRQ_GSREG_STATUS:
-         ret = Status;
-         break;
-
+         return Status;
       case IRQ_GSREG_MASK:
-         ret = Mask;
-         break;
+         return Mask;
    }
-   return(ret);
+
+   return 0;
 }
 
 void IRQ_SetRegister(unsigned int which, uint32_t value)
