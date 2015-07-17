@@ -18,9 +18,6 @@
 #include "psx.h"
 #include "sio.h"
 
-namespace MDFN_IEN_PSX
-{
-
 // Dummy implementation.
 
 static uint16_t Status;
@@ -31,23 +28,19 @@ static uint32_t DataBuffer;
 
 void SIO_Power(void)
 {
- Status = 0;
- Mode = 0;
- Control = 0;
- BaudRate = 0;
- DataBuffer = 0;
+   Status = 0;
+   Mode = 0;
+   Control = 0;
+   BaudRate = 0;
+   DataBuffer = 0;
 }
 
-uint32_t SIO_Read(pscpu_timestamp_t timestamp, uint32_t A)
+uint32_t SIO_Read(int32_t timestamp, uint32_t A)
 {
    uint32_t ret = 0;
 
    switch(A & 0xE)
    {
-      default:
-         PSX_WARNING("[SIO] Unknown read: 0x%08x -- %d\n", A, timestamp);
-         break;
-
       case 0x0:
          //case 0x2:
          ret = DataBuffer >> ((A & 2) * 8);
@@ -68,20 +61,22 @@ uint32_t SIO_Read(pscpu_timestamp_t timestamp, uint32_t A)
       case 0xE:
          ret = BaudRate;
          break;
+      default:
+#if 0
+         PSX_WARNING("[SIO] Unknown read: 0x%08x -- %d\n", A, timestamp);
+#endif
+         break;
    }
 
    return (ret >> ((A & 1) * 8));
 }
 
-void SIO_Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void SIO_Write(int32_t timestamp, uint32_t A, uint32_t V)
 {
    V <<= (A & 1) * 8;
 
    switch(A & 0xE)
    {
-      default:
-         PSX_WARNING("[SIO] Unknown write: 0x%08x 0x%08x -- %d\n", A, V, timestamp);
-         break;
 
       case 0x0:
          //case 0x2:
@@ -100,29 +95,32 @@ void SIO_Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
       case 0xE:
          BaudRate = V;
          break;
+      default:
+#if 0
+         PSX_WARNING("[SIO] Unknown write: 0x%08x 0x%08x -- %d\n", A, V, timestamp);
+#endif
+         break;
    }
 }
 
-int SIO_StateAction(StateMem *sm, int load, int data_only)
+int SIO_StateAction(void *data, int load, int data_only)
 {
- SFORMAT StateRegs[] =
- {
-  SFVAR(Status),
-  SFVAR(Mode),
-  SFVAR(Control),
-  SFVAR(BaudRate),
-  SFVAR(DataBuffer),
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(Status),
+      SFVAR(Mode),
+      SFVAR(Control),
+      SFVAR(BaudRate),
+      SFVAR(DataBuffer),
 
-  SFEND
- };
- int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "SIO");
+      SFEND
+   };
+   int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "SIO");
 
- if(load)
- {
+   if(load)
+   {
 
- }
+   }
 
- return(ret);
-}
-
+   return(ret);
 }
