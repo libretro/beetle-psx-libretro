@@ -301,12 +301,10 @@ pscpu_timestamp_t TIMER_Update(const pscpu_timestamp_t timestamp)
 
    for(i = 0; i < 3; i++)
    {
-      uint32_t timer_clocks = cpu_clocks;
-
       if(Timers[i].Mode & 0x100)
          continue;
 
-      ClockTimer(i, timer_clocks);
+      ClockTimer(i, cpu_clocks);
    }
 
    lastts = timestamp;
@@ -316,24 +314,19 @@ pscpu_timestamp_t TIMER_Update(const pscpu_timestamp_t timestamp)
 
 static void CalcCountingStart(unsigned which)
 {
-   Timers[which].DoZeCounting = true;
-
-   if (which == 1)
+   switch(Timers[which].Mode & 0x07)
    {
-      switch(Timers[which].Mode & 0x07)
-      {
-         case 0x1:
-            Timers[which].DoZeCounting = !vblank;
-            break;
+      case 0x1:
+         Timers[which].DoZeCounting = !vblank;
+         break;
 
-         case 0x5:
-            Timers[which].DoZeCounting = vblank;
-            break;
+      case 0x5:
+         Timers[which].DoZeCounting = vblank;
+         break;
 
-         case 0x7:
-            Timers[which].DoZeCounting = -1;
-            break;
-      }
+      case 0x7:
+         Timers[which].DoZeCounting = -1;
+         break;
    }
 }
 
@@ -385,7 +378,9 @@ void TIMER_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint16_t V)
          }
          Timers[which].Counter = 0;
 #endif
-         CalcCountingStart(which);	// Call after setting .Mode
+         Timers[which].DoZeCounting = true;
+         if (which == 1)
+            CalcCountingStart(which);	// Call after setting .Mode
          break;
       case 0x8:
          Timers[which].Target = V & 0xFFFF;
@@ -405,30 +400,29 @@ uint16_t TIMER_Read(const pscpu_timestamp_t timestamp, uint32_t A)
    uint16_t ret = 0;
    int which = (A >> 4) & 0x3;
 
-   if(which >= 3)
+   /* if which is greater than or equal to 3,
+    * Open Bus Read. */
+
+   if(which < 3)
    {
-      PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+      TIMER_Update(timestamp);
 
-      return(ret >> ((A & 3) * 8));
-   }
-
-   TIMER_Update(timestamp);
-
-   switch(A & 0xC)
-   {
-      case 0x0:
-         ret = Timers[which].Counter;
-         break;
-      case 0x4:
-         ret = Timers[which].Mode;
-         Timers[which].Mode &= ~0x1800;
-         break;
-      case 0x8:
-         ret = Timers[which].Target;
-         break;
-      case 0xC:
-         PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
-         break;
+      switch(A & 0xC)
+      {
+         case 0x0:
+            ret = Timers[which].Counter;
+            break;
+         case 0x4:
+            ret = Timers[which].Mode;
+            Timers[which].Mode &= ~0x1800;
+            break;
+         case 0x8:
+            ret = Timers[which].Target;
+            break;
+         case 0xC:
+            PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+            break;
+      }
    }
 
    return(ret >> ((A & 3) * 8));
@@ -483,24 +477,18 @@ int TIMER_StateAction(StateMem *sm, int load, int data_only)
 uint32_t TIMER_GetRegister(unsigned int which, char *special, const uint32_t special_len)
 {
    int tw = (which >> 4) & 0x3;
-   uint32_t ret = 0;
 
    switch(which & 0xF)
    {
       case TIMER_GSREG_COUNTER0:
-         ret = Timers[tw].Counter;
-         break;
-
+         return Timers[tw].Counter;
       case TIMER_GSREG_MODE0:
-         ret = Timers[tw].Mode;
-         break;
-
+         return Timers[tw].Mode;
       case TIMER_GSREG_TARGET0:
-         ret = Timers[tw].Target;
-         break;
+         return Timers[tw].Target;
    }
 
-   return ret;
+   return 0;
 }
 
 void TIMER_SetRegister(unsigned int which, uint32_t value)
