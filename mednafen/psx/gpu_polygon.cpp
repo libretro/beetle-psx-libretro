@@ -28,7 +28,7 @@ static INLINE int32 COORD_GET_INT(int32 n)
 
 static INLINE int64 MakePolyXFP(uint32 x)
 {
- return ((uint64)x << 32) + ((1ULL << 32) - (1 << 11));
+ return ((uint64)x << 32) + ((UINT64_C(1) << 32) - (1 << 11));
 }
 
 static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)

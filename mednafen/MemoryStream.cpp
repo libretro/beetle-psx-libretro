@@ -92,7 +92,7 @@ INLINE void MemoryStream::grow_if_necessary(uint64 new_required_size)
    uint64 new_required_alloced = round_up_pow2(new_required_size);
    uint8 *new_data_buffer;
 
-   // first condition will happen at new_required_size > (1ULL << 63) due to round_up_pow2() "wrapping".
+   // first condition will happen at new_required_size > (UINT64_C(1) << 63) due to round_up_pow2() "wrapping".
    // second condition can occur when running on a 32-bit system.
    if(new_required_alloced < new_required_size || new_required_alloced > SIZE_MAX)
     new_required_alloced = SIZE_MAX;

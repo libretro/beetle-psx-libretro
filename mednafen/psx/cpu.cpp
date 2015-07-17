@@ -45,7 +45,7 @@ PS_CPU::PS_CPU()
    memset(FastMap, 0, sizeof(FastMap));
    memset(DummyPage, 0xFF, sizeof(DummyPage));	// 0xFF to trigger an illegal instruction exception, so we'll know what's up when debugging.
 
-   for(a = 0x00000000; a < (1ULL << 32); a += FAST_MAP_PSIZE)
+   for(a = 0x00000000; a < (UINT64_C(1) << 32); a += FAST_MAP_PSIZE)
       SetFastMap(DummyPage, a, FAST_MAP_PSIZE);
 
    CPUHook = NULL;

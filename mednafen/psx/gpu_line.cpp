@@ -16,8 +16,8 @@ enum { Line_RGB_FractBits = 12 };
 template<bool goraud>
 static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_step &step, line_fxp_coord &coord)
 {
- coord.x = ((uint64)point.x << Line_XY_FractBits) | (1ULL << (Line_XY_FractBits - 1));
- coord.y = ((uint64)point.y << Line_XY_FractBits) | (1ULL << (Line_XY_FractBits - 1));
+ coord.x = ((uint64)point.x << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
+ coord.y = ((uint64)point.y << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
 
  coord.x -= 1024;
 
