@@ -102,41 +102,41 @@ class Stream
  template<typename T>
  INLINE T get_LE(void)
  {
-  #ifdef LSB_FIRST
-  return get_NE<T>();
-  #else
-  return get_RE<T>();
-  #endif
+#ifdef MSB_FIRST
+    return get_RE<T>();
+#else
+    return get_NE<T>();
+#endif
  }
 
  template<typename T>
  INLINE void put_LE(T c)
  {
-  #ifdef LSB_FIRST
-  return put_NE<T>(c);
-  #else
-  return put_RE<T>(c);
-  #endif
+#ifdef MSB_FIRST
+    return put_RE<T>(c);
+#else
+    return put_NE<T>(c);
+#endif
  }
 
  template<typename T>
  INLINE T get_BE(void)
  {
-  #ifndef LSB_FIRST
-  return get_NE<T>();
-  #else
-  return get_RE<T>();
-  #endif
+#ifdef MSB_FIRST
+    return get_NE<T>();
+#else
+    return get_RE<T>();
+#endif
  }
 
  template<typename T>
  INLINE void put_BE(T c)
  {
-  #ifndef LSB_FIRST
-  return put_NE<T>(c);
-  #else
-  return put_RE<T>(c);
-  #endif
+#ifdef MSB_FIRST
+    return put_NE<T>(c);
+#else
+    return put_RE<T>(c);
+#endif
  }
 
  // Reads a line into "str", overwriting its contents; returns the line-end char('\n' or '\r' or '\0'), or -1 on EOF.

@@ -109,18 +109,18 @@ void Endian_A16_LE_to_NE(void *src, uint32 nelements)
 
 void Endian_A16_BE_to_NE(void *src, uint32 nelements)
 {
- #ifdef LSB_FIRST
- uint32 i;
- uint8 *nsrc = (uint8 *)src;
+#ifndef MSB_FIRST
+   uint32 i;
+   uint8 *nsrc = (uint8 *)src;
 
- for(i = 0; i < nelements; i++)
- {
-  uint8 tmp = nsrc[i * 2];
+   for(i = 0; i < nelements; i++)
+   {
+      uint8 tmp = nsrc[i * 2];
 
-  nsrc[i * 2] = nsrc[i * 2 + 1];
-  nsrc[i * 2 + 1] = tmp;
- }
- #endif
+      nsrc[i * 2] = nsrc[i * 2 + 1];
+      nsrc[i * 2 + 1] = tmp;
+   }
+#endif
 }
 
 
@@ -220,26 +220,26 @@ int write32le(uint32 b, FILE *fp)
 
 int read32le(uint32 *Bufo, FILE *fp)
 {
- uint32 buf;
- if(fread(&buf,1,4,fp)<4)
-  return 0;
- #ifdef LSB_FIRST
- *(uint32*)Bufo=buf;
- #else
- *(uint32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
- #endif
- return 1;
+   uint32 buf;
+   if(fread(&buf,1,4,fp)<4)
+      return 0;
+#ifdef MSB_FIRST
+   *(uint32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
+#else
+   *(uint32*)Bufo=buf;
+#endif
+   return 1;
 }
 
 int read16le(char *d, FILE *fp)
 {
- #ifdef LSB_FIRST
- return((fread(d,1,2,fp)<2)?0:2);
- #else
- int ret;
- ret=fread(d+1,1,1,fp);
- ret+=fread(d,1,1,fp);
- return ret<2?0:2;
- #endif
+#ifdef MSB_FIRST
+   int ret;
+   ret=fread(d+1,1,1,fp);
+   ret+=fread(d,1,1,fp);
+   return ret<2?0:2;
+#else
+   return((fread(d,1,2,fp)<2)?0:2);
+#endif
 }
 

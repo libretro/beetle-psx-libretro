@@ -119,10 +119,6 @@ typedef unsigned char   Boolean; /* 0 or 1 */
 #undef require
 #define require( expr ) assert( expr )
 
-#if !defined(MSB_FIRST) && !defined(LSB_FIRST)
- #error "Define MSB_FIRST or LSB_FIRST!"
-#endif
-
 #include "error.h"
 
 

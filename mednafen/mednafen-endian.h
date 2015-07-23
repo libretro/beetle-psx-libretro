@@ -2,24 +2,20 @@
 #define __MDFN_ENDIAN_H
 
 #ifdef MSB_FIRST
- #ifdef LSB_FIRST
-  #error Only define one of LSB_FIRST and MSB_FIRST
- #endif
-
- #ifndef le32toh
-  #define le32toh(l)      ((((l)>>24) & 0xff) | (((l)>>8) & 0xff00) \
-                         | (((l)<<8) & 0xff0000) | (((l)<<24) & 0xff000000))
- #endif
- #ifndef le16toh
-  #define le16toh(l)      ((((l)>>8) & 0xff) | (((l)<<8) & 0xff00))
- #endif
+#ifndef le32toh
+#define le32toh(l)      ((((l)>>24) & 0xff) | (((l)>>8) & 0xff00) \
+      | (((l)<<8) & 0xff0000) | (((l)<<24) & 0xff000000))
+#endif
+#ifndef le16toh
+#define le16toh(l)      ((((l)>>8) & 0xff) | (((l)<<8) & 0xff00))
+#endif
 #else
- #ifndef le32toh
-  #define le32toh(l)      (l)
- #endif
- #ifndef le16toh
-  #define le16toh(l)      (l)
- #endif
+#ifndef le32toh
+#define le32toh(l)      (l)
+#endif
+#ifndef le16toh
+#define le16toh(l)      (l)
+#endif
 #endif
 
 #ifndef htole32

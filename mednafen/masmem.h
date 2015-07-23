@@ -3,10 +3,10 @@
 
 // TODO, WIP (big-endian stores and loads not fully supported yet)
 
-#ifdef LSB_FIRST
- #define MAS_NATIVE_IS_BIGENDIAN 0
+#ifdef MSB_FIRST
+#define MAS_NATIVE_IS_BIGENDIAN 1
 #else
- #define MAS_NATIVE_IS_BIGENDIAN 1
+#define MAS_NATIVE_IS_BIGENDIAN 0
 #endif
 
 static INLINE uint16 LoadU16_RBO(const uint16 *a)
