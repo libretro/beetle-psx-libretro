@@ -1,6 +1,9 @@
 #ifndef __MDFN_ENDIAN_H
 #define __MDFN_ENDIAN_H
 
+#include <stdio.h>
+#include "mednafen-types.h"
+
 #ifdef MSB_FIRST
 #ifndef le32toh
 #define le32toh(l)      ((((l)>>24) & 0xff) | (((l)>>8) & 0xff00) \
@@ -118,29 +121,10 @@ static inline void MDFN_en64msb(uint8 *buf, uint64 morp)
  buf[7] = morp >> 0;
 }
 
-
-// Overloaded functions, yay.
-static inline void MDFN_enlsb(uint16 * buf, uint16 value)
-{
- MDFN_en16lsb((uint8 *)buf, value);
-}
-
-static inline void MDFN_enlsb(uint32 * buf, uint32 value)
-{
- MDFN_en32lsb((uint8 *)buf, value);
-}
-
-static inline void MDFN_enlsb(uint64 * buf, uint64 value)
-{
- MDFN_en64lsb((uint8 *)buf, value);
-}
-
-
 static inline uint16 MDFN_de16lsb(const uint8 *morp)
 {
  return(morp[0] | (morp[1] << 8));
 }
-
 
 static inline uint32 MDFN_de24lsb(const uint8 *morp)
 {
@@ -166,21 +150,6 @@ static inline uint64 MDFN_de64lsb(const uint8 *morp)
  ret |= (uint64)morp[7] << 56;
 
  return(ret);
-}
-
-static inline uint16 MDFN_delsb(const uint16 *buf)
-{
- return(MDFN_de16lsb((uint8 *)buf));
-}
-
-static inline uint32 MDFN_delsb(const uint32 *buf)
-{
- return(MDFN_de32lsb((uint8 *)buf));
-}
-
-static inline uint64 MDFN_delsb(const uint64 *buf)
-{
- return(MDFN_de64lsb((uint8 *)buf));
 }
 
 static inline uint16 MDFN_de16msb(const uint8 *morp)
