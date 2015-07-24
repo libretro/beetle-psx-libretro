@@ -52,11 +52,6 @@ static bool IsAbsolutePath(const char *path)
  return(FALSE);
 }
 
-static bool IsAbsolutePath(const std::string &path)
-{
- return(IsAbsolutePath(path.c_str()));
-}
-
 bool MDFN_IsFIROPSafe(const std::string &path)
 {
  // We could make this more OS-specific, but it shouldn't hurt to try to weed out usage of characters that are path
