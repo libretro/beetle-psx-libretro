@@ -19,52 +19,49 @@
 #include "timer.h"
 
 /*
- GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
+   GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
 
- Non-interlaced NTSC mode line timing notes(real-world times calculated via PS1 timer and math with nominal CPU clock value):
+   Non-interlaced NTSC mode line timing notes(real-world times calculated via PS1 timer and math with nominal CPU clock value):
 
-	263 lines per frame
+   263 lines per frame
 
-	~16714.85 us per frame, average.
-	~63.55456 us per line, average.
+   ~16714.85 us per frame, average.
+   ~63.55456 us per line, average.
 
-	Multiplying the results of counter 0 in pixel clock mode by the clock divider of the current dot clock mode/width gives a result that's slightly less
-	than expected; the dot clock divider is probably being reset each scanline.
+   Multiplying the results of counter 0 in pixel clock mode by the clock divider of the current dot clock mode/width gives a result that's slightly less
+   than expected; the dot clock divider is probably being reset each scanline.
 
- Non-interlaced PAL mode(but with an NTSC source clock in an NTSC PS1; calculated same way as NTSC values):
+   Non-interlaced PAL mode(but with an NTSC source clock in an NTSC PS1; calculated same way as NTSC values):
 
-	314 lines per frame
+   314 lines per frame
 
-	~19912.27 us per frame, average.
-	~63.41486 us per line, average.
+   ~19912.27 us per frame, average.
+   ~63.41486 us per line, average.
 
- FB X and Y display positions can be changed during active display; and Y display position appears to be treated as an offset to the current Y readout
- position that gets reset around vblank time.
+   FB X and Y display positions can be changed during active display; and Y display position appears to be treated as an offset to the current Y readout
+   position that gets reset around vblank time.
 
 */
 
 /*
- November 29, 2012 notes:
+   November 29, 2012 notes:
 
-  PAL mode can be turned on, and then off again, mid-frame(creates a neat effect).
+   PAL mode can be turned on, and then off again, mid-frame(creates a neat effect).
 
-  Pixel clock can be changed mid-frame with effect(the effect is either instantaneous, or cached at some point in the scanline, not tested to see which);
-  interestingly, alignment is off on a PS1 when going 5MHz->10MHz>5MHz with a grid image.
+   Pixel clock can be changed mid-frame with effect(the effect is either instantaneous, or cached at some point in the scanline, not tested to see which);
+   interestingly, alignment is off on a PS1 when going 5MHz->10MHz>5MHz with a grid image.
 
-  Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything 
-  different from vs0->ve0.
-*/
+   Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything 
+   different from vs0->ve0.
+   */
 static const int8 dither_table[4][4] =
 {
- { -4,  0, -3,  1 },
- {  2, -2,  3, -1 },
- { -3,  1, -4,  0 },
- {  3, -1,  2, -2 },
+   { -4,  0, -3,  1 },
+   {  2, -2,  3, -1 },
+   { -3,  1, -4,  0 },
+   {  3, -1,  2, -2 },
 };
 
-
-namespace MDFN_IEN_PSX
-{
 
 PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle)
 {
@@ -178,7 +175,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
 
    VertStart = 0x10;
    VertEnd = 0x100;
-   
+
 
    //
    TexPageX = 0;
@@ -334,19 +331,19 @@ void PS_GPU::ResetTS(void)
 //
 // C-style function wrappers so our command table isn't so ginormous(in memory usage).
 //
-template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+   template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
    g->Command_DrawPolygon<numvertices, shaded, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
 }
 
-template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+   template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
 {
    g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
 }
 
-template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
+   template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
 static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
 {
    g->Command_DrawLine<polyline, goraud, BlendMode, MaskEval_TA>(cb);
@@ -573,145 +570,145 @@ static void G_Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 
 CTEntry PS_GPU::Commands[256] =
 {
- /* 0x00 */
- NULLCMD(),
- OTHER_HELPER(1, 2, false, G_Command_ClearCache),
- OTHER_HELPER(3, 3, false, G_Command_FBFill),
+   /* 0x00 */
+   NULLCMD(),
+   OTHER_HELPER(1, 2, false, G_Command_ClearCache),
+   OTHER_HELPER(3, 3, false, G_Command_FBFill),
 
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
 
- /* 0x10 */
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   /* 0x10 */
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
 
- OTHER_HELPER(1, 1, false,  G_Command_IRQ),
+   OTHER_HELPER(1, 1, false,  G_Command_IRQ),
 
- /* 0x20 */
- POLY_HELPER(0x20),
- POLY_HELPER(0x21),
- POLY_HELPER(0x22),
- POLY_HELPER(0x23),
- POLY_HELPER(0x24),
- POLY_HELPER(0x25),
- POLY_HELPER(0x26),
- POLY_HELPER(0x27),
- POLY_HELPER(0x28),
- POLY_HELPER(0x29),
- POLY_HELPER(0x2a),
- POLY_HELPER(0x2b),
- POLY_HELPER(0x2c),
- POLY_HELPER(0x2d),
- POLY_HELPER(0x2e),
- POLY_HELPER(0x2f),
- POLY_HELPER(0x30),
- POLY_HELPER(0x31),
- POLY_HELPER(0x32),
- POLY_HELPER(0x33),
- POLY_HELPER(0x34),
- POLY_HELPER(0x35),
- POLY_HELPER(0x36),
- POLY_HELPER(0x37),
- POLY_HELPER(0x38),
- POLY_HELPER(0x39),
- POLY_HELPER(0x3a),
- POLY_HELPER(0x3b),
- POLY_HELPER(0x3c),
- POLY_HELPER(0x3d),
- POLY_HELPER(0x3e),
- POLY_HELPER(0x3f),
+   /* 0x20 */
+   POLY_HELPER(0x20),
+   POLY_HELPER(0x21),
+   POLY_HELPER(0x22),
+   POLY_HELPER(0x23),
+   POLY_HELPER(0x24),
+   POLY_HELPER(0x25),
+   POLY_HELPER(0x26),
+   POLY_HELPER(0x27),
+   POLY_HELPER(0x28),
+   POLY_HELPER(0x29),
+   POLY_HELPER(0x2a),
+   POLY_HELPER(0x2b),
+   POLY_HELPER(0x2c),
+   POLY_HELPER(0x2d),
+   POLY_HELPER(0x2e),
+   POLY_HELPER(0x2f),
+   POLY_HELPER(0x30),
+   POLY_HELPER(0x31),
+   POLY_HELPER(0x32),
+   POLY_HELPER(0x33),
+   POLY_HELPER(0x34),
+   POLY_HELPER(0x35),
+   POLY_HELPER(0x36),
+   POLY_HELPER(0x37),
+   POLY_HELPER(0x38),
+   POLY_HELPER(0x39),
+   POLY_HELPER(0x3a),
+   POLY_HELPER(0x3b),
+   POLY_HELPER(0x3c),
+   POLY_HELPER(0x3d),
+   POLY_HELPER(0x3e),
+   POLY_HELPER(0x3f),
 
- LINE_HELPER(0x40),
- LINE_HELPER(0x41),
- LINE_HELPER(0x42),
- LINE_HELPER(0x43),
- LINE_HELPER(0x44),
- LINE_HELPER(0x45),
- LINE_HELPER(0x46),
- LINE_HELPER(0x47),
- LINE_HELPER(0x48),
- LINE_HELPER(0x49),
- LINE_HELPER(0x4a),
- LINE_HELPER(0x4b),
- LINE_HELPER(0x4c),
- LINE_HELPER(0x4d),
- LINE_HELPER(0x4e),
- LINE_HELPER(0x4f),
- LINE_HELPER(0x50),
- LINE_HELPER(0x51),
- LINE_HELPER(0x52),
- LINE_HELPER(0x53),
- LINE_HELPER(0x54),
- LINE_HELPER(0x55),
- LINE_HELPER(0x56),
- LINE_HELPER(0x57),
- LINE_HELPER(0x58),
- LINE_HELPER(0x59),
- LINE_HELPER(0x5a),
- LINE_HELPER(0x5b),
- LINE_HELPER(0x5c),
- LINE_HELPER(0x5d),
- LINE_HELPER(0x5e),
- LINE_HELPER(0x5f),
+   LINE_HELPER(0x40),
+   LINE_HELPER(0x41),
+   LINE_HELPER(0x42),
+   LINE_HELPER(0x43),
+   LINE_HELPER(0x44),
+   LINE_HELPER(0x45),
+   LINE_HELPER(0x46),
+   LINE_HELPER(0x47),
+   LINE_HELPER(0x48),
+   LINE_HELPER(0x49),
+   LINE_HELPER(0x4a),
+   LINE_HELPER(0x4b),
+   LINE_HELPER(0x4c),
+   LINE_HELPER(0x4d),
+   LINE_HELPER(0x4e),
+   LINE_HELPER(0x4f),
+   LINE_HELPER(0x50),
+   LINE_HELPER(0x51),
+   LINE_HELPER(0x52),
+   LINE_HELPER(0x53),
+   LINE_HELPER(0x54),
+   LINE_HELPER(0x55),
+   LINE_HELPER(0x56),
+   LINE_HELPER(0x57),
+   LINE_HELPER(0x58),
+   LINE_HELPER(0x59),
+   LINE_HELPER(0x5a),
+   LINE_HELPER(0x5b),
+   LINE_HELPER(0x5c),
+   LINE_HELPER(0x5d),
+   LINE_HELPER(0x5e),
+   LINE_HELPER(0x5f),
 
- SPR_HELPER(0x60),
- SPR_HELPER(0x61),
- SPR_HELPER(0x62),
- SPR_HELPER(0x63),
- SPR_HELPER(0x64),
- SPR_HELPER(0x65),
- SPR_HELPER(0x66),
- SPR_HELPER(0x67),
- SPR_HELPER(0x68),
- SPR_HELPER(0x69),
- SPR_HELPER(0x6a),
- SPR_HELPER(0x6b),
- SPR_HELPER(0x6c),
- SPR_HELPER(0x6d),
- SPR_HELPER(0x6e),
- SPR_HELPER(0x6f),
- SPR_HELPER(0x70),
- SPR_HELPER(0x71),
- SPR_HELPER(0x72),
- SPR_HELPER(0x73),
- SPR_HELPER(0x74),
- SPR_HELPER(0x75),
- SPR_HELPER(0x76),
- SPR_HELPER(0x77),
- SPR_HELPER(0x78),
- SPR_HELPER(0x79),
- SPR_HELPER(0x7a),
- SPR_HELPER(0x7b),
- SPR_HELPER(0x7c),
- SPR_HELPER(0x7d),
- SPR_HELPER(0x7e),
- SPR_HELPER(0x7f),
+   SPR_HELPER(0x60),
+   SPR_HELPER(0x61),
+   SPR_HELPER(0x62),
+   SPR_HELPER(0x63),
+   SPR_HELPER(0x64),
+   SPR_HELPER(0x65),
+   SPR_HELPER(0x66),
+   SPR_HELPER(0x67),
+   SPR_HELPER(0x68),
+   SPR_HELPER(0x69),
+   SPR_HELPER(0x6a),
+   SPR_HELPER(0x6b),
+   SPR_HELPER(0x6c),
+   SPR_HELPER(0x6d),
+   SPR_HELPER(0x6e),
+   SPR_HELPER(0x6f),
+   SPR_HELPER(0x70),
+   SPR_HELPER(0x71),
+   SPR_HELPER(0x72),
+   SPR_HELPER(0x73),
+   SPR_HELPER(0x74),
+   SPR_HELPER(0x75),
+   SPR_HELPER(0x76),
+   SPR_HELPER(0x77),
+   SPR_HELPER(0x78),
+   SPR_HELPER(0x79),
+   SPR_HELPER(0x7a),
+   SPR_HELPER(0x7b),
+   SPR_HELPER(0x7c),
+   SPR_HELPER(0x7d),
+   SPR_HELPER(0x7e),
+   SPR_HELPER(0x7f),
 
- /* 0x80 ... 0x9F */
- OTHER_HELPER_X32(4, 2, false, G_Command_FBCopy),
+   /* 0x80 ... 0x9F */
+   OTHER_HELPER_X32(4, 2, false, G_Command_FBCopy),
 
- /* 0xA0 ... 0xBF */
- OTHER_HELPER_X32(3, 2, false, G_Command_FBWrite),
+   /* 0xA0 ... 0xBF */
+   OTHER_HELPER_X32(3, 2, false, G_Command_FBWrite),
 
- /* 0xC0 ... 0xDF */
- OTHER_HELPER_X32(3, 2, false, G_Command_FBRead),
+   /* 0xC0 ... 0xDF */
+   OTHER_HELPER_X32(3, 2, false, G_Command_FBRead),
 
- /* 0xE0 */
+   /* 0xE0 */
 
- NULLCMD(),
- OTHER_HELPER(1, 2, false, G_Command_DrawMode),
- OTHER_HELPER(1, 2, false, G_Command_TexWindow),
- OTHER_HELPER(1, 1, true,  G_Command_Clip0),
- OTHER_HELPER(1, 1, true,  G_Command_Clip1),
- OTHER_HELPER(1, 1, true,  G_Command_DrawingOffset),
- OTHER_HELPER(1, 2, false, G_Command_MaskSetting),
+   NULLCMD(),
+   OTHER_HELPER(1, 2, false, G_Command_DrawMode),
+   OTHER_HELPER(1, 2, false, G_Command_TexWindow),
+   OTHER_HELPER(1, 1, true,  G_Command_Clip0),
+   OTHER_HELPER(1, 1, true,  G_Command_Clip1),
+   OTHER_HELPER(1, 1, true,  G_Command_DrawingOffset),
+   OTHER_HELPER(1, 2, false, G_Command_MaskSetting),
 
- NULLCMD(),
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   NULLCMD(),
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
 
- /* 0xF0 */
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
- NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   /* 0xF0 */
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
+   NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
 
 };
 
@@ -1040,67 +1037,67 @@ INLINE uint32_t PS_GPU::ReadData(void)
 
 uint32_t PS_GPU::ReadDMA(void)
 {
- return ReadData();
+   return ReadData();
 }
 
 uint32_t PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32_t A)
 {
- uint32_t ret = 0;
+   uint32_t ret = 0;
 
- if(A & 4)	// Status
- {
-  ret = (((DisplayMode << 1) & 0x7F) | ((DisplayMode >> 6) & 1)) << 16;
+   if(A & 4)	// Status
+   {
+      ret = (((DisplayMode << 1) & 0x7F) | ((DisplayMode >> 6) & 1)) << 16;
 
-  ret |= (DisplayMode & 0x80) << 7;
+      ret |= (DisplayMode & 0x80) << 7;
 
-  ret |= DMAControl << 29;
+      ret |= DMAControl << 29;
 
-  ret |= (DisplayFB_CurLineYReadout & 1) << 31;
+      ret |= (DisplayFB_CurLineYReadout & 1) << 31;
 
-  ret |= (!field) << 13;
+      ret |= (!field) << 13;
 
-  if(DMAControl & 0x02)
-   ret |= 1 << 25;
+      if(DMAControl & 0x02)
+         ret |= 1 << 25;
 
-  ret |= IRQPending << 24;
+      ret |= IRQPending << 24;
 
-  ret |= DisplayOff << 23;
+      ret |= DisplayOff << 23;
 
-  if(InCmd == INCMD_NONE && DrawTimeAvail >= 0 && BlitterFIFO.CanRead() == 0x00)	// GPU idle bit.
-   ret |= 1 << 26;
+      if(InCmd == INCMD_NONE && DrawTimeAvail >= 0 && BlitterFIFO.CanRead() == 0x00)	// GPU idle bit.
+         ret |= 1 << 26;
 
-  if(InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
-   ret |= (1 << 27);
+      if(InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
+         ret |= (1 << 27);
 
-  ret |= CalcFIFOReadyBit() << 28;		// FIFO has room bit? (kinda).
+      ret |= CalcFIFOReadyBit() << 28;		// FIFO has room bit? (kinda).
 
-  //
-  //
-  ret |= TexPageX >> 6;
-  ret |= TexPageY >> 4;
-  ret |= abr << 5;
-  ret |= TexMode << 7;
+      //
+      //
+      ret |= TexPageX >> 6;
+      ret |= TexPageY >> 4;
+      ret |= abr << 5;
+      ret |= TexMode << 7;
 
-  ret |= dtd << 9;
-  ret |= dfe << 10;
+      ret |= dtd << 9;
+      ret |= dfe << 10;
 
-  if(MaskSetOR)
-   ret |= 1 << 11;
+      if(MaskSetOR)
+         ret |= 1 << 11;
 
-  if(MaskEvalAND)
-   ret |= 1 << 12;
+      if(MaskEvalAND)
+         ret |= 1 << 12;
 
-  ret |= TexDisable << 15;
- }
- else		// "Data"
-  ret = ReadData();
+      ret |= TexDisable << 15;
+   }
+   else		// "Data"
+      ret = ReadData();
 
- if(DMAControl & 2)
- {
-  //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
- }
+   if(DMAControl & 2)
+   {
+      //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
+   }
 
- return(ret >> ((A & 3) * 8));
+   return(ret >> ((A & 3) * 8));
 }
 
 INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
@@ -1438,7 +1435,7 @@ pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
          // to TIMER_SetVBlank() and TIMER_SetHRetrace().
       }	// end if(!LineClockCounter)
    }	// end while(gpu_clocks > 0)
- 
+
    //puts("GPU Update End");
 
 TheEnd:
@@ -1481,7 +1478,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       for(unsigned j = 0; j < 4; j++)
          TexCache_Data[i][j] = TexCache[i].Data[j];
 
- }
+   }
    SFORMAT StateRegs[] =
    {
       SFARRAY16(&GPURAM[0][0], sizeof(GPURAM) / sizeof(GPURAM[0][0])),
@@ -1603,6 +1600,4 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    }
 
    return(ret);
-}
-
 }

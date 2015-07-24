@@ -69,9 +69,6 @@
  #include <altivec.h>
 #endif
 
-namespace MDFN_IEN_PSX
-{
-
 static int32 ClockCounter;
 static unsigned MDRPhase;
 static FastFIFO<uint32, 0x20> InFIFO;
@@ -816,6 +813,4 @@ uint32 MDEC_Read(const pscpu_timestamp_t timestamp, uint32 A)
  //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.CanRead(), InCounter);
 
  return(ret);
-}
-
 }

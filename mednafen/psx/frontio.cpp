@@ -37,9 +37,6 @@ static void PSX_FIODBGINFO(const char *format, ...)
 {
 }
 
-namespace MDFN_IEN_PSX
-{
-
 InputDevice::InputDevice() : chair_r(0), chair_g(0), chair_b(0), draw_chair(0), chair_x(-1000), chair_y(-1000)
 {
 }
@@ -1093,6 +1090,3 @@ InputInfoStruct FIO_InputInfo =
  sizeof(PortInfo) / sizeof(InputPortInfoStruct),
  PortInfo
 };
-
-
-}

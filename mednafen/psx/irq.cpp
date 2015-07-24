@@ -21,7 +21,7 @@ static uint16_t Asserted;
 static uint16_t Mask;
 static uint16_t Status;
 
-#define Recalc() MDFN_IEN_PSX::CPU->AssertIRQ(0, (bool)(Status & Mask))
+#define Recalc() CPU->AssertIRQ(0, (bool)(Status & Mask))
 
 void IRQ_Power(void)
 {

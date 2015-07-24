@@ -54,9 +54,6 @@
 
 using namespace CDUtility;
 
-namespace MDFN_IEN_PSX
-{
-
 PS_CDC::PS_CDC() : DMABuffer(4096)
 {
  IsPSXDisc = false;
@@ -2394,41 +2391,38 @@ int32 PS_CDC::Command_0x1d(const int arg_count, const uint8 *args)
 
 PS_CDC::CDC_CTEntry PS_CDC::Commands[0x20] =
 {
- { /* 0x00, */ 0, 0, NULL, NULL, NULL },
- { /* 0x01, */ 0, 0, "Nop", &PS_CDC::Command_Nop, NULL },
- { /* 0x02, */ 3, 3, "Setloc", &PS_CDC::Command_Setloc, NULL },
- { /* 0x03, */ 0, 1, "Play", &PS_CDC::Command_Play, NULL },
- { /* 0x04, */ 0, 0, "Forward", &PS_CDC::Command_Forward, NULL },
- { /* 0x05, */ 0, 0, "Backward", &PS_CDC::Command_Backward, NULL },
- { /* 0x06, */ 0, 0, "ReadN", &PS_CDC::Command_ReadN, NULL },
- { /* 0x07, */ 0, 0, "Standby", &PS_CDC::Command_Standby, &PS_CDC::Command_Standby_Part2 },
- { /* 0x08, */ 0, 0, "Stop", &PS_CDC::Command_Stop, &PS_CDC::Command_Stop_Part2 },
- { /* 0x09, */ 0, 0, "Pause", &PS_CDC::Command_Pause, &PS_CDC::Command_Pause_Part2 },
- { /* 0x0A, */ 0, 0, "Reset", &PS_CDC::Command_Reset, NULL },
- { /* 0x0B, */ 0, 0, "Mute", &PS_CDC::Command_Mute, NULL },
- { /* 0x0C, */ 0, 0, "Demute", &PS_CDC::Command_Demute, NULL },
- { /* 0x0D, */ 2, 2, "Setfilter", &PS_CDC::Command_Setfilter, NULL },
- { /* 0x0E, */ 1, 1, "Setmode", &PS_CDC::Command_Setmode, NULL },
- { /* 0x0F, */ 0, 0, "Getparam", &PS_CDC::Command_Getparam, NULL },
- { /* 0x10, */ 0, 0, "GetlocL", &PS_CDC::Command_GetlocL, NULL },
- { /* 0x11, */ 0, 0, "GetlocP", &PS_CDC::Command_GetlocP, NULL },
- { /* 0x12, */ 1, 1, "ReadT", &PS_CDC::Command_ReadT, &PS_CDC::Command_ReadT_Part2 },
- { /* 0x13, */ 0, 0, "GetTN", &PS_CDC::Command_GetTN, NULL },
- { /* 0x14, */ 1, 1, "GetTD", &PS_CDC::Command_GetTD, NULL },
- { /* 0x15, */ 0, 0, "SeekL", &PS_CDC::Command_SeekL, &PS_CDC::Command_Seek_PartN },
- { /* 0x16, */ 0, 0, "SeekP", &PS_CDC::Command_SeekP, &PS_CDC::Command_Seek_PartN },
+   { /* 0x00, */ 0, 0, NULL, NULL, NULL },
+   { /* 0x01, */ 0, 0, "Nop", &PS_CDC::Command_Nop, NULL },
+   { /* 0x02, */ 3, 3, "Setloc", &PS_CDC::Command_Setloc, NULL },
+   { /* 0x03, */ 0, 1, "Play", &PS_CDC::Command_Play, NULL },
+   { /* 0x04, */ 0, 0, "Forward", &PS_CDC::Command_Forward, NULL },
+   { /* 0x05, */ 0, 0, "Backward", &PS_CDC::Command_Backward, NULL },
+   { /* 0x06, */ 0, 0, "ReadN", &PS_CDC::Command_ReadN, NULL },
+   { /* 0x07, */ 0, 0, "Standby", &PS_CDC::Command_Standby, &PS_CDC::Command_Standby_Part2 },
+   { /* 0x08, */ 0, 0, "Stop", &PS_CDC::Command_Stop, &PS_CDC::Command_Stop_Part2 },
+   { /* 0x09, */ 0, 0, "Pause", &PS_CDC::Command_Pause, &PS_CDC::Command_Pause_Part2 },
+   { /* 0x0A, */ 0, 0, "Reset", &PS_CDC::Command_Reset, NULL },
+   { /* 0x0B, */ 0, 0, "Mute", &PS_CDC::Command_Mute, NULL },
+   { /* 0x0C, */ 0, 0, "Demute", &PS_CDC::Command_Demute, NULL },
+   { /* 0x0D, */ 2, 2, "Setfilter", &PS_CDC::Command_Setfilter, NULL },
+   { /* 0x0E, */ 1, 1, "Setmode", &PS_CDC::Command_Setmode, NULL },
+   { /* 0x0F, */ 0, 0, "Getparam", &PS_CDC::Command_Getparam, NULL },
+   { /* 0x10, */ 0, 0, "GetlocL", &PS_CDC::Command_GetlocL, NULL },
+   { /* 0x11, */ 0, 0, "GetlocP", &PS_CDC::Command_GetlocP, NULL },
+   { /* 0x12, */ 1, 1, "ReadT", &PS_CDC::Command_ReadT, &PS_CDC::Command_ReadT_Part2 },
+   { /* 0x13, */ 0, 0, "GetTN", &PS_CDC::Command_GetTN, NULL },
+   { /* 0x14, */ 1, 1, "GetTD", &PS_CDC::Command_GetTD, NULL },
+   { /* 0x15, */ 0, 0, "SeekL", &PS_CDC::Command_SeekL, &PS_CDC::Command_Seek_PartN },
+   { /* 0x16, */ 0, 0, "SeekP", &PS_CDC::Command_SeekP, &PS_CDC::Command_Seek_PartN },
 
- { /* 0x17, */ 0, 0, NULL, NULL, NULL },
- { /* 0x18, */ 0, 0, NULL, NULL, NULL },
+   { /* 0x17, */ 0, 0, NULL, NULL, NULL },
+   { /* 0x18, */ 0, 0, NULL, NULL, NULL },
 
- { /* 0x19, */ 1, 1/* ??? */, "Test", &PS_CDC::Command_Test, NULL },
- { /* 0x1A, */ 0, 0, "ID", &PS_CDC::Command_ID, &PS_CDC::Command_ID_Part2 },
- { /* 0x1B, */ 0, 0, "ReadS", &PS_CDC::Command_ReadS, NULL },
- { /* 0x1C, */ 0, 0, "Init", &PS_CDC::Command_Init, NULL },
- { /* 0x1D, */ 2, 2, "Unknown 0x1D", &PS_CDC::Command_0x1d, NULL },
- { /* 0x1E, */ 0, 0, "ReadTOC", &PS_CDC::Command_ReadTOC, &PS_CDC::Command_ReadTOC_Part2 },
- { /* 0x1F, */ 0, 0, NULL, NULL, NULL },
+   { /* 0x19, */ 1, 1/* ??? */, "Test", &PS_CDC::Command_Test, NULL },
+   { /* 0x1A, */ 0, 0, "ID", &PS_CDC::Command_ID, &PS_CDC::Command_ID_Part2 },
+   { /* 0x1B, */ 0, 0, "ReadS", &PS_CDC::Command_ReadS, NULL },
+   { /* 0x1C, */ 0, 0, "Init", &PS_CDC::Command_Init, NULL },
+   { /* 0x1D, */ 2, 2, "Unknown 0x1D", &PS_CDC::Command_0x1d, NULL },
+   { /* 0x1E, */ 0, 0, "ReadTOC", &PS_CDC::Command_ReadTOC, &PS_CDC::Command_ReadTOC_Part2 },
+   { /* 0x1F, */ 0, 0, NULL, NULL, NULL },
 };
-
-
-}

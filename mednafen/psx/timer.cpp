@@ -387,7 +387,7 @@ void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 
    // TIMER_Update(timestamp);
 
-   PSX_SetEventNT(MDFN_IEN_PSX::PSX_EVENT_TIMER, timestamp + CalcNextEvent(1024));
+   PSX_SetEventNT(PSX_EVENT_TIMER, timestamp + CalcNextEvent(1024));
 }
 
 uint16_t TIMER_Read(const int32_t timestamp, uint32_t A)

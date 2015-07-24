@@ -66,9 +66,6 @@ enum
  REGION_EU = 2,
 };
 
-namespace MDFN_IEN_PSX
-{
-
 #if PSX_DBGPRINT_ENABLE
 static unsigned psx_dbg_level = 0;
 
@@ -959,10 +956,6 @@ void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t 
 {
    FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
 }
-
-}
-
-using namespace MDFN_IEN_PSX;
 
 static bool TestMagic(const char *name, MDFNFILE *fp)
 {

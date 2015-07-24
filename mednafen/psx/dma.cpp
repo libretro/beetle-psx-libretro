@@ -49,9 +49,6 @@ enum
 //
 // GPU next event, std::max<128, wait_time>, or something similar, for handling FIFO.
 
-namespace MDFN_IEN_PSX
-{
-
 static int32_t DMACycleCounter;
 
 static uint32_t DMAControl;
@@ -717,35 +714,32 @@ uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A)
 
 int DMA_StateAction(StateMem *sm, int load, int data_only)
 {
- SFORMAT StateRegs[] =
- {
-  SFVAR(DMACycleCounter),
-  SFVAR(DMAControl),
-  SFVAR(DMAIntControl),
-  SFVAR(DMAIntStatus),
-  SFVAR(IRQOut),
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(DMACycleCounter),
+      SFVAR(DMAControl),
+      SFVAR(DMAIntControl),
+      SFVAR(DMAIntStatus),
+      SFVAR(IRQOut),
 
 
-  SFDMACH(0),
-  SFDMACH(1),
-  SFDMACH(2),
-  SFDMACH(3),
-  SFDMACH(4),
-  SFDMACH(5),
-  SFDMACH(6),
+      SFDMACH(0),
+      SFDMACH(1),
+      SFDMACH(2),
+      SFDMACH(3),
+      SFDMACH(4),
+      SFDMACH(5),
+      SFDMACH(6),
 
-  SFEND
- };
+      SFEND
+   };
 
- int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "DMA");
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "DMA");
 
- if(load)
- {
+   if(load)
+   {
 
- }
+   }
 
- return(ret);
-}
-
-
+   return(ret);
 }

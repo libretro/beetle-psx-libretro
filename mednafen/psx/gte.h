@@ -1,9 +1,6 @@
 #ifndef __MDFN_PSX_GTE_H
 #define __MDFN_PSX_GTE_H
 
-namespace MDFN_IEN_PSX
-{
-
 void GTE_Init(void);
 void GTE_Power(void);
 int GTE_StateAction(StateMem *sm, int load, int data_only);
@@ -15,8 +12,5 @@ void GTE_WriteDR(unsigned int which, uint32_t value);
 
 uint32_t GTE_ReadCR(unsigned int which);
 uint32_t GTE_ReadDR(unsigned int which);
-
-
-}
 
 #endif

@@ -40,11 +40,6 @@
 
 */
 
-#ifndef PSXDEV_GTE_TESTING
-namespace MDFN_IEN_PSX
-{
-#endif
-
 typedef struct
 {
    int16_t MX[3][3];
@@ -1704,7 +1699,3 @@ int32_t GTE_Instruction(uint32_t instr)
 
    return(ret - 1);
 }
-
-#ifndef PSXDEV_GTE_TESTING
-}
-#endif

@@ -20,9 +20,6 @@
 #include "cdc.h"
 #include "spu.h"
 
-namespace MDFN_IEN_PSX
-{
-
 extern PS_GPU *GPU;
 extern PS_SPU *SPU;
 
@@ -645,35 +642,29 @@ static void SetRegister_CPU(const unsigned int id, uint32 value)
 
 static RegGroupType CPURegsGroup =
 {
- NULL,
- Regs_CPU,
- GetRegister_CPU,
- SetRegister_CPU
+   NULL,
+   Regs_CPU,
+   GetRegister_CPU,
+   SetRegister_CPU
 };
-
 
 bool DBG_Init(void)
 {
- CPUHook = NULL;
- CPUHookContinuous = false;
- FoundBPoint = false;
+   CPUHook = NULL;
+   CPUHookContinuous = false;
+   FoundBPoint = false;
 
- BTEnabled = false;
- BTIndex = false;
- memset(BTEntries, 0, sizeof(BTEntries));
+   BTEnabled = false;
+   BTIndex = false;
+   memset(BTEntries, 0, sizeof(BTEntries));
 
- MDFNDBG_AddRegGroup(&CPURegsGroup);
- MDFNDBG_AddRegGroup(&MiscRegsGroup);
- MDFNDBG_AddRegGroup(&SPURegsGroup);
- MDFNDBG_AddRegGroup(&SPUVoicesRegsGroup);
- ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "cpu", "CPU Physical", 32);
- ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "ram", "CPU Main Ram", 21);
- ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "spu", "SPU RAM", 19);
- ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "gpu", "GPU RAM", 20);
- return(true);
+   MDFNDBG_AddRegGroup(&CPURegsGroup);
+   MDFNDBG_AddRegGroup(&MiscRegsGroup);
+   MDFNDBG_AddRegGroup(&SPURegsGroup);
+   MDFNDBG_AddRegGroup(&SPUVoicesRegsGroup);
+   ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "cpu", "CPU Physical", 32);
+   ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "ram", "CPU Main Ram", 21);
+   ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "spu", "SPU RAM", 19);
+   ASpace_Add(GetAddressSpaceBytes, PutAddressSpaceBytes, "gpu", "GPU RAM", 20);
+   return(true);
 }
-
-
-
-}
-

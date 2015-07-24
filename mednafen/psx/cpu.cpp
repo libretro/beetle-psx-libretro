@@ -32,10 +32,6 @@
 #define BIU_LOCK		0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
 						// Does lock mode prevent the actual data payload from being modified, while allowing tags to be modified/updated???
 
-namespace MDFN_IEN_PSX
-{
-
-
 PS_CPU::PS_CPU()
 {
    uint64_t a;
@@ -2403,178 +2399,175 @@ uint32_t PS_CPU::PeekMem32(uint32_t A)
 // FIXME: should we breakpoint on an illegal address?  And with LWC2/SWC2 if CP2 isn't enabled?
 void PS_CPU::CheckBreakpoints(void (*callback)(bool write, uint32_t address, unsigned int len), uint32_t instr)
 {
- uint32 opf;
+   uint32 opf;
 
- opf = instr & 0x3F;
+   opf = instr & 0x3F;
 
- if(instr & (0x3F << 26))
-  opf = 0x40 | (instr >> 26);
-
-
- switch(opf)
- {
-  default:
-	break;
-
-    //
-    // LB - Load Byte
-    //
-    BEGIN_OPF(0x20, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 1);
-    END_OPF;
-
-    //
-    // LBU - Load Byte Unsigned
-    //
-    BEGIN_OPF(0x24, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 1);
-    END_OPF;
-
-    //
-    // LH - Load Halfword
-    //
-    BEGIN_OPF(0x21, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 2);
-    END_OPF;
-
-    //
-    // LHU - Load Halfword Unsigned
-    //
-    BEGIN_OPF(0x25, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 2);
-    END_OPF;
+   if(instr & (0x3F << 26))
+      opf = 0x40 | (instr >> 26);
 
 
-    //
-    // LW - Load Word
-    //
-    BEGIN_OPF(0x23, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
+   switch(opf)
+   {
+      default:
+         break;
 
-        callback(false, address, 4);
-    END_OPF;
+         //
+         // LB - Load Byte
+         //
+         BEGIN_OPF(0x20, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
 
-    //
-    // SB - Store Byte
-    //
-    BEGIN_OPF(0x28, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 1);
-    END_OPF;
-
-    // 
-    // SH - Store Halfword
-    //
-    BEGIN_OPF(0x29, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 2);
-    END_OPF;
-
-    // 
-    // SW - Store Word
-    //
-    BEGIN_OPF(0x2B, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 4);
-    END_OPF;
-
-    //
-    // LWL - Load Word Left
-    //
-    BEGIN_OPF(0x22, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-	do
-	{
          callback(false, address, 1);
-	} while((address--) & 0x3);
+         END_OPF;
 
-    END_OPF;
+         //
+         // LBU - Load Byte Unsigned
+         //
+         BEGIN_OPF(0x24, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
 
-    //
-    // SWL - Store Word Left
-    //
-    BEGIN_OPF(0x2A, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
+         callback(false, address, 1);
+         END_OPF;
 
-        do
-        {
-	 callback(true, address, 1);
-        } while((address--) & 0x3);
+         //
+         // LH - Load Halfword
+         //
+         BEGIN_OPF(0x21, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
 
-    END_OPF;
+         callback(false, address, 2);
+         END_OPF;
 
-    //
-    // LWR - Load Word Right
-    //
-    BEGIN_OPF(0x26, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
+         //
+         // LHU - Load Halfword Unsigned
+         //
+         BEGIN_OPF(0x25, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
 
-        do
-        {
-	 callback(false, address, 1);
-        } while((++address) & 0x3);
-
-    END_OPF;
-
-    //
-    // SWR - Store Word Right
-    //
-    BEGIN_OPF(0x2E, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        do
-        {
-	 callback(true, address, 1);
-        } while((++address) & 0x3);
-
-    END_OPF;
-
-    //
-    // LWC2
-    //
-    BEGIN_OPF(0x32, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-	callback(false, address, 4);
-    END_OPF;
-
-    //
-    // SWC2
-    //
-    BEGIN_OPF(0x3A, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-	callback(true, address, 4);
-    END_OPF;
-
- }
-}
+         callback(false, address, 2);
+         END_OPF;
 
 
+         //
+         // LW - Load Word
+         //
+         BEGIN_OPF(0x23, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(false, address, 4);
+         END_OPF;
+
+         //
+         // SB - Store Byte
+         //
+         BEGIN_OPF(0x28, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(true, address, 1);
+         END_OPF;
+
+         // 
+         // SH - Store Halfword
+         //
+         BEGIN_OPF(0x29, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(true, address, 2);
+         END_OPF;
+
+         // 
+         // SW - Store Word
+         //
+         BEGIN_OPF(0x2B, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(true, address, 4);
+         END_OPF;
+
+         //
+         // LWL - Load Word Left
+         //
+         BEGIN_OPF(0x22, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         do
+         {
+            callback(false, address, 1);
+         } while((address--) & 0x3);
+
+         END_OPF;
+
+         //
+         // SWL - Store Word Left
+         //
+         BEGIN_OPF(0x2A, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         do
+         {
+            callback(true, address, 1);
+         } while((address--) & 0x3);
+
+         END_OPF;
+
+         //
+         // LWR - Load Word Right
+         //
+         BEGIN_OPF(0x26, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         do
+         {
+            callback(false, address, 1);
+         } while((++address) & 0x3);
+
+         END_OPF;
+
+         //
+         // SWR - Store Word Right
+         //
+         BEGIN_OPF(0x2E, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         do
+         {
+            callback(true, address, 1);
+         } while((++address) & 0x3);
+
+         END_OPF;
+
+         //
+         // LWC2
+         //
+         BEGIN_OPF(0x32, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(false, address, 4);
+         END_OPF;
+
+         //
+         // SWC2
+         //
+         BEGIN_OPF(0x3A, 0);
+         ITYPE;
+         uint32 address = GPR[rs] + immediate;
+
+         callback(true, address, 4);
+         END_OPF;
+
+   }
 }
