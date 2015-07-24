@@ -35,7 +35,7 @@ bool MDFNFILE::MakeMemWrapAndClose(void *fp)
    f_size = ::ftell((FILE *)fp);
    ::fseek((FILE *)fp, 0, SEEK_SET);
 
-   if (!(f_data = (uint8*)MDFN_malloc((size_t)f_size, _("file read buffer"))))
+   if (!(f_data = (uint8*)malloc((size_t)f_size)))
       goto fail;
    ::fread(f_data, 1, (size_t)f_size, (FILE *)fp);
 

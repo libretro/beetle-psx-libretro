@@ -55,6 +55,5 @@ void MDFN_FlushGameCheats(int nosave);
 #include "mednafen-driver.h"
 
 #include "mednafen-endian.h"
-#include "mednafen-memory.h"
 
 #endif
