@@ -162,9 +162,6 @@
 					RelativePath="..\..\mednafen\general.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\math_ops.cpp">
-				</File>
-				<File
 					RelativePath="..\..\mednafen\md5.cpp">
 				</File>
 				<File
