@@ -15,10 +15,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef PSXDEV_GTE_TESTING
 #include "psx.h"
 #include "gte.h"
-#endif
 
 #include "../clamp.h"
 
@@ -1450,11 +1448,7 @@ int32_t GTE_Instruction(uint32_t instr)
    switch(code)
    {
       default: 
-#ifndef PSXDEV_GTE_TESTING
-         PSX_WARNING("[GTE] Unknown instruction code: 0x%02x", code);
-#endif
          break;
-
       case 0x00:	// alternate?
       case 0x01:
          ret = RTPS(instr);

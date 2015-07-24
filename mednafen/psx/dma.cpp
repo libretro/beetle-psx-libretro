@@ -35,19 +35,14 @@
 
 enum
 {
- CH_MDEC_IN = 0,
- CH_MDEC_OUT = 1,
- CH_GPU = 2,
- CH_CDC = 3,
- CH_SPU = 4,
- CH_FIVE = 5,
- CH_OT = 6,
+   CH_MDEC_IN  = 0,
+   CH_MDEC_OUT = 1,
+   CH_GPU      = 2,
+   CH_CDC      = 3,
+   CH_SPU      = 4,
+   CH_FIVE     = 5,
+   CH_OT       = 6
 };
-
-
-// RunChannels(128 - whatevercounter);
-//
-// GPU next event, std::max<128, wait_time>, or something similar, for handling FIFO.
 
 static int32_t DMACycleCounter;
 
@@ -58,19 +53,14 @@ static bool IRQOut;
 
 struct Channel
 {
- uint32_t BaseAddr;
- uint32_t BlockControl;
- uint32_t ChanControl;
+   uint32_t BaseAddr;
+   uint32_t BlockControl;
+   uint32_t ChanControl;
 
- //
- //
- //
- uint32_t CurAddr;
- uint16_t WordCounter; 
+   uint32_t CurAddr;
+   uint16_t WordCounter; 
 
- //
- //
- int32_t ClockCounter;
+   int32_t ClockCounter;
 };
 
 static Channel DMACH[7];
@@ -91,34 +81,32 @@ void DMA_Kill(void)
 
 static INLINE void RecalcIRQOut(void)
 {
- bool irqo;
+   bool irqo = (bool)DMAIntStatus;
+   irqo &= (DMAIntControl >> 23) & 1;
 
- irqo = (bool)DMAIntStatus;
- irqo &= (DMAIntControl >> 23) & 1;
+   irqo |= (DMAIntControl >> 15) & 1;
 
- irqo |= (DMAIntControl >> 15) & 1;
-
- IRQOut = irqo;
- ::IRQ_Assert(IRQ_DMA, irqo);
+   IRQOut = irqo;
+   ::IRQ_Assert(IRQ_DMA, irqo);
 }
 
 void DMA_ResetTS(void)
 {
- lastts = 0;
+   lastts = 0;
 }
 
 void DMA_Power(void)
 {
- lastts = 0;
+   lastts = 0;
 
- memset(DMACH, 0, sizeof(DMACH));
+   memset(DMACH, 0, sizeof(DMACH));
 
- DMACycleCounter = 128;
+   DMACycleCounter = 128;
 
- DMAControl = 0;
- DMAIntControl = 0;
- DMAIntStatus = 0;
- RecalcIRQOut();
+   DMAControl = 0;
+   DMAIntControl = 0;
+   DMAIntStatus = 0;
+   RecalcIRQOut();
 }
 
 static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)

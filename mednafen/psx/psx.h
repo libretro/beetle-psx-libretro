@@ -74,7 +74,7 @@ enum
    PSX_EVENT_DMA,
    PSX_EVENT_FIO,
    PSX_EVENT__SYNLAST,
-   PSX_EVENT__COUNT,
+   PSX_EVENT__COUNT
 };
 
 #define PSX_EVENT_MAXTS       		0x20000000
@@ -91,7 +91,6 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 #include "irq.h"
 #include "gpu.h"
 #include "dma.h"
-//#include "sio.h"
 #include "debug.h"
 
 class PS_CDC;

@@ -57,12 +57,6 @@ class PS_CDC
 
       void ClearAudioBuffers(void);
 
-
-      //
-      //
-      //
-
-
       uint8 RegSelector;
       uint8 ArgsBuf[16];
       uint8 ArgsWP;		// 5-bit(0 ... 31)
@@ -110,7 +104,7 @@ class PS_CDC
          ERRCODE_BAD_ARGVAL  = 0x10,
          ERRCODE_BAD_NUMARGS = 0x20,
          ERRCODE_BAD_COMMAND = 0x40,
-         ERRCODE_NOT_READY = 0x80,	// 0x80 (happens with getlocl when drive isn't reading, pause when tray is open, and MAYBE when trying to run an async
+         ERRCODE_NOT_READY   = 0x80	// 0x80 (happens with getlocl when drive isn't reading, pause when tray is open, and MAYBE when trying to run an async
          //	 command while another async command is currently in its asynch phase being executed[pause when in readtoc, todo test more])
       };
 
