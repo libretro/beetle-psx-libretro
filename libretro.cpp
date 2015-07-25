@@ -3616,35 +3616,27 @@ void *retro_get_memory_data(unsigned type)
    {
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
-            data = NULL;
-         else
-            data = FIO->GetMemcardDevice(0)->GetNVData();
-         break;
+            return NULL;
+         return FIO->GetMemcardDevice(0)->GetNVData();
       default:
-         data = NULL;
          break;
    }
-   return data; 
+   return NULL; 
 }
 
 size_t retro_get_memory_size(unsigned type)
 {
-   unsigned size;
-
    switch (type)
    {
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
-            size = 0;
-         else
-            size = (1 << 17);
-         break;
+            return 0;
+         return (1 << 17);
       default:
-         size = 0;
          break;
    }
 
-   return size;
+   return 0;
 }
 
 void retro_cheat_reset(void)
