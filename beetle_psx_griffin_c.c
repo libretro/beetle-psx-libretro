@@ -15,6 +15,7 @@
 #include "mednafen/tremor/bitwise.c"
 #include "mednafen/tremor/window.c"
 
+#include "mednafen/file.c"
 #include "mednafen/trio/trio.c"
 #include "mednafen/trio/triostr.c"
 

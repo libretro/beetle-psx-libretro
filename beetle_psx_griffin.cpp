@@ -48,7 +48,6 @@
 #include "mednafen/mempatcher.cpp"
 #include "mednafen/video/Deinterlacer.cpp"
 #include "mednafen/video/surface.cpp"
-#include "mednafen/file.cpp"
 #include "mednafen/md5.cpp"
 
 #include "libretro.cpp"

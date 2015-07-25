@@ -3,9 +3,9 @@
 
 #include <errno.h>
 #include <string.h>
-#include <stdexcept>
 
 #ifdef __cplusplus
+#include <stdexcept>
 
 class ErrnoHolder;
 class MDFN_Error : public std::exception

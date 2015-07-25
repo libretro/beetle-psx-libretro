@@ -65,7 +65,8 @@ endif
 
 
 ifneq ($(HAVE_GRIFFIN), 1)
-MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
+MEDNAFEN_SOURCES := \
+	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
 	$(MEDNAFEN_DIR)/FileWrapper.cpp \
@@ -73,17 +74,17 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/MemoryStream.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
-	$(MEDNAFEN_DIR)/endian.cpp
-
-MEDNAFEN_SOURCES += $(CDROM_SOURCES)
-
-MEDNAFEN_SOURCES += $(MEDNAFEN_DIR)/mempatcher.cpp \
+	$(MEDNAFEN_DIR)/endian.cpp \
+	$(CDROM_SOURCES) \
+	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
 	$(RESAMPLER_SOURCES) \
-	$(MEDNAFEN_DIR)/file.cpp \
 	$(OKIADPCM_SOURCES) \
 	$(MEDNAFEN_DIR)/md5.cpp
+
+MEDNAFEN_SOURCES_C += \
+	$(MEDNAFEN_DIR)/file.c
 
 LIBRETRO_SOURCES += libretro.cpp
 endif
@@ -94,7 +95,7 @@ TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
 ifeq ($(HAVE_GRIFFIN), 1)
 SOURCES_C := beetle_psx_griffin_c.c
 else
-SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES) $(THREAD_SOURCES) $(CRC32_SOURCES)
+SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES) $(THREAD_SOURCES) $(CRC32_SOURCES) $(MEDNAFEN_SOURCES_C)
 endif
 
 SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)

@@ -1983,7 +1983,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
 
 static CheatFormatStruct CheatFormats[] =
 {
- { "GameShark", gettext_noop("Sharks with lamprey eels for eyes."), DecodeGS },
+ { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
 };
 
 static CheatFormatInfoStruct CheatFormatInfo =
@@ -1994,80 +1994,80 @@ static CheatFormatInfoStruct CheatFormatInfo =
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".psf", gettext_noop("PSF1 Rip") },
- { ".psx", gettext_noop("PS-X Executable") },
- { ".exe", gettext_noop("PS-X Executable") },
+ { ".psf", "PSF1 Rip" },
+ { ".psx", "PS-X Executable" },
+ { ".exe", "PS-X Executable" },
  { NULL, NULL }
 };
 
 static const MDFNSetting_EnumList Region_List[] =
 {
- { "jp", REGION_JP, gettext_noop("Japan") },
- { "na", REGION_NA, gettext_noop("North America") },
- { "eu", REGION_EU, gettext_noop("Europe") },
+ { "jp", REGION_JP, "Japan" },
+ { "na", REGION_NA, "North America" },
+ { "eu", REGION_EU, "Europe" },
  { NULL, 0 },
 };
 
 #if 0
 static const MDFNSetting_EnumList MultiTap_List[] =
 {
- { "0", 0, gettext_noop("Disabled") },
- { "1", 1, gettext_noop("Enabled") },
- { "auto", 0, gettext_noop("Automatically-enable multitap."), gettext_noop("NOT IMPLEMENTED YET(currently equivalent to 0)") },
+ { "0", 0, "Disabled" },
+ { "1", 1, "Enabled" },
+ { "auto", 0, "Automatically-enable multitap.", "NOT IMPLEMENTED YET(currently equivalent to 0") },
  { NULL, 0 },
 };
 #endif
 
 static MDFNSetting PSXSettings[] =
 {
- { "psx.input.mouse_sensitivity", MDFNSF_NOFLAGS, gettext_noop("Emulated mouse sensitivity."), NULL, MDFNST_FLOAT, "1.00", NULL, NULL },
+ { "psx.input.mouse_sensitivity", MDFNSF_NOFLAGS, "Emulated mouse sensitivity.", NULL, MDFNST_FLOAT, "1.00", NULL, NULL },
 
- { "psx.input.analog_mode_ct", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable analog mode combo-button alternate toggle."), gettext_noop("When enabled, instead of the configured Analog mode toggle button for the emulated DualShock, use a combination of buttons to toggle it instead.  When Select, Start, and all four shoulder buttons are held down for about 1 second, the mode will toggle."), MDFNST_BOOL, "0", NULL, NULL },
+ { "psx.input.analog_mode_ct", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable analog mode combo-button alternate toggle.", "When enabled, instead of the configured Analog mode toggle button for the emulated DualShock, use a combination of buttons to toggle it instead.  When Select, Start, and all four shoulder buttons are held down for about 1 second, the mode will toggle.", MDFNST_BOOL, "0", NULL, NULL },
 
- { "psx.input.pport1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on PSX port 1."), gettext_noop("Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects."), MDFNST_BOOL, "0", NULL, NULL }, //MDFNST_ENUM, "auto", NULL, NULL, NULL, NULL, MultiTap_List },
- { "psx.input.pport2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Enable multitap on PSX port 2."), gettext_noop("Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects."), MDFNST_BOOL, "0", NULL, NULL },
+ { "psx.input.pport1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 1.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL }, //MDFNST_ENUM, "auto", NULL, NULL, NULL, NULL, MultiTap_List },
+ { "psx.input.pport2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 2.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL },
 
- { "psx.input.port1.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 1."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port2.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 2."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port3.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 3."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port4.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 4."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port5.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 5."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port6.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 6."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port7.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 7."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port8.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Emulate memcard on virtual port 8."), NULL, MDFNST_BOOL, "1", NULL, NULL, },
-
-
- { "psx.input.port1.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 1."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0xFF0000", "0x000000", "0x1000000" },
- { "psx.input.port2.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 2."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x00FF00", "0x000000", "0x1000000" },
- { "psx.input.port3.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 3."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0xFF00FF", "0x000000", "0x1000000" },
- { "psx.input.port4.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 4."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0xFF8000", "0x000000", "0x1000000" },
- { "psx.input.port5.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 5."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0xFFFF00", "0x000000", "0x1000000" },
- { "psx.input.port6.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 6."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x00FFFF", "0x000000", "0x1000000" },
- { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 7."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
- { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, gettext_noop("Crosshairs color for lightgun on virtual port 8."), gettext_noop("A value of 0x1000000 disables crosshair drawing."), MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
-
- { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Attempt to auto-detect region of game."), NULL, MDFNST_BOOL, "1" },
- { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, gettext_noop("Default region to use."), gettext_noop("Used if region autodetection fails or is disabled."), MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
-
- { "psx.bios_jp", MDFNSF_EMU_STATE, gettext_noop("Path to the Japan SCPH-5500 ROM BIOS"), NULL, MDFNST_STRING, "scph5500.bin" },
- { "psx.bios_na", MDFNSF_EMU_STATE, gettext_noop("Path to the North America SCPH-5501 ROM BIOS"), gettext_noop("SHA1 0555c6fae8906f3f09baf5988f00e55f88e9f30b"), MDFNST_STRING, "scph5501.bin" },
- { "psx.bios_eu", MDFNSF_EMU_STATE, gettext_noop("Path to the Europe SCPH-5502 ROM BIOS"), NULL, MDFNST_STRING, "scph5502.bin" },
-
- { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, gettext_noop("SPU output resampler quality."),
-	gettext_noop("0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors."), MDFNST_UINT, "5", "0", "10" },
+ { "psx.input.port1.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 1.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port2.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 2.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port3.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 3.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port4.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 4.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port5.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 5.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port6.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 6.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port7.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 7.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+ { "psx.input.port8.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 8.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
 
 
- { "psx.slstart", MDFNSF_NOFLAGS, gettext_noop("First displayed scanline in NTSC mode."), NULL, MDFNST_INT, "0", "0", "239" },
- { "psx.slend", MDFNSF_NOFLAGS, gettext_noop("Last displayed scanline in NTSC mode."), NULL, MDFNST_INT, "239", "0", "239" },
+ { "psx.input.port1.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 1.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF0000", "0x000000", "0x1000000" },
+ { "psx.input.port2.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 2.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FF00", "0x000000", "0x1000000" },
+ { "psx.input.port3.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 3.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF00FF", "0x000000", "0x1000000" },
+ { "psx.input.port4.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 4.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF8000", "0x000000", "0x1000000" },
+ { "psx.input.port5.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 5.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFFFF00", "0x000000", "0x1000000" },
+ { "psx.input.port6.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 6.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FFFF", "0x000000", "0x1000000" },
+ { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 7.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
+ { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 8.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
 
- { "psx.slstartp", MDFNSF_NOFLAGS, gettext_noop("First displayed scanline in PAL mode."), NULL, MDFNST_INT, "0", "0", "287" },
- { "psx.slendp", MDFNSF_NOFLAGS, gettext_noop("Last displayed scanline in PAL mode."), NULL, MDFNST_INT, "287", "0", "287" },
+ { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Attempt to auto-detect region of game.", NULL, MDFNST_BOOL, "1" },
+ { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Default region to use.", "Used if region autodetection fails or is disabled.", MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
+
+ { "psx.bios_jp", MDFNSF_EMU_STATE, "Path to the Japan SCPH-5500 ROM BIOS", NULL, MDFNST_STRING, "scph5500.bin" },
+ { "psx.bios_na", MDFNSF_EMU_STATE, "Path to the North America SCPH-5501 ROM BIOS", "SHA1 0555c6fae8906f3f09baf5988f00e55f88e9f30b", MDFNST_STRING, "scph5501.bin" },
+ { "psx.bios_eu", MDFNSF_EMU_STATE, "Path to the Europe SCPH-5502 ROM BIOS", NULL, MDFNST_STRING, "scph5502.bin" },
+
+ { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, "SPU output resampler quality.",
+	"0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors.", MDFNST_UINT, "5", "0", "10" },
+
+
+ { "psx.slstart", MDFNSF_NOFLAGS, "First displayed scanline in NTSC mode.", NULL, MDFNST_INT, "0", "0", "239" },
+ { "psx.slend", MDFNSF_NOFLAGS, "Last displayed scanline in NTSC mode.", NULL, MDFNST_INT, "239", "0", "239" },
+
+ { "psx.slstartp", MDFNSF_NOFLAGS, "First displayed scanline in PAL mode.", NULL, MDFNST_INT, "0", "0", "287" },
+ { "psx.slendp", MDFNSF_NOFLAGS, "Last displayed scanline in PAL mode.", NULL, MDFNST_INT, "287", "0", "287" },
 
 #if PSX_DBGPRINT_ENABLE
- { "psx.dbg_level", MDFNSF_NOFLAGS, gettext_noop("Debug printf verbosity level."), NULL, MDFNST_UINT, "0", "0", "4" },
+ { "psx.dbg_level", MDFNSF_NOFLAGS, "Debug printf verbosity level.", NULL, MDFNST_UINT, "0", "0", "4" },
 #endif
 
- { "psx.clobbers_lament", MDFNSF_NOFLAGS, gettext_noop("Enable experimental save state functionality."), gettext_noop("Save states will destroy your saved game/memory card data if you're careless, and that will make clobber sad.  Poor clobber."), MDFNST_BOOL, "0" },
+ { "psx.clobbers_lament", MDFNSF_NOFLAGS, "Enable experimental save state functionality.", "Save states will destroy your saved game/memory card data if you're careless, and that will make clobber sad.  Poor clobber.", MDFNST_BOOL, "0" },
 
  { NULL },
 };
@@ -2788,8 +2788,10 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
 static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 {
-   MDFNFILE GameFile;
-	std::vector<FileExtensionSpecStruct> valid_iae;
+   MDFNFILE *GameFile = file_open(name);
+
+   if(!GameFile)
+      goto error;
 
 #ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
@@ -2799,40 +2801,11 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "Loading %s...\n", name);
 
-	// Construct a NULL-delimited list of known file extensions for MDFN_fopen()
-   const FileExtensionSpecStruct *curexts = MDFNGameInfo->FileExtensions;
+   if(MDFNGameInfo->Load(name, GameFile) <= 0)
+      goto error;
 
-   while(curexts->extension && curexts->description)
-   {
-      valid_iae.push_back(*curexts);
-      curexts++;
-   }
-
-	if(!GameFile.Open(name, &valid_iae[0], _("game")))
-   {
-      MDFNGameInfo = NULL;
-      return 0;
-   }
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "Using module: %s(%s)\n", MDFNGameInfo->shortname, MDFNGameInfo->fullname);
-
-	//
-	// Load per-game settings
-	//
-	// Maybe we should make a "pgcfg" subdir, and automatically load all files in it?
-	// End load per-game settings
-	//
-
-   if(MDFNGameInfo->Load(name, &GameFile) <= 0)
-   {
-      GameFile.Close();
-      MDFNGameInfo = NULL;
-      return(0);
-   }
-
-	MDFN_LoadGameCheats(NULL);
-	MDFNMP_InstallReadPatches();
+   file_close(GameFile);
+   GameFile   = NULL;
 
 	if(!MDFNGameInfo->name)
    {
@@ -2851,6 +2824,13 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
    }
 
    return(MDFNGameInfo);
+
+error:
+   if (GameFile)
+      file_close(GameFile);
+   GameFile     = NULL;
+   MDFNGameInfo = NULL;
+   return NULL;
 }
 
 #define MAX_PLAYERS 8
@@ -3070,6 +3050,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
    if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path))
       return false;
+
+	MDFN_LoadGameCheats(NULL);
+	MDFNMP_InstallReadPatches();
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
