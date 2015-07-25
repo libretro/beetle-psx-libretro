@@ -18,10 +18,12 @@ static INLINE int32 clamp_to_u16(int32 i)
  return(i);
 }
 
-static INLINE void clamp(int32_t *val, size_t, size_t)
+static INLINE void clamp(int32_t *val, ssize_t min, ssize_t max)
 {
-   if ( (int16_t) *val != *val )
-      *val = (*val >> 31) ^ 0x7FFF;
+   if(*val < min)
+      *val = min;
+   if(*val > max)
+      *val = max;
 }
 
 #define clamp_simple(val) \
