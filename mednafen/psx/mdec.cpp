@@ -537,17 +537,6 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
    }
 }
 
-#if 1
-
-//
-//
-//
-#define MDEC_WAIT_COND(n)  { case __COUNTER__: if(!(n)) { MDRPhase = __COUNTER__ - MDRPhaseBias - 1; return; } }
-
-#define MDEC_WRITE_FIFO(n) { MDEC_WAIT_COND(OutFIFO.CanWrite()); OutFIFO.Write(n);  }
-#define MDEC_READ_FIFO(n)  { MDEC_WAIT_COND(InFIFO.CanRead()); n = InFIFO.Read(); }
-#define MDEC_EAT_CLOCKS(n) { ClockCounter -= (n); MDEC_WAIT_COND(ClockCounter > 0); }
-
 void MDEC_Run(int32 clocks)
 {
    static const unsigned MDRPhaseBias = __COUNTER__ + 1;
@@ -568,9 +557,9 @@ void MDEC_Run(int32 clocks)
       for(;;)
       {
          InCommand = false;
-         MDEC_READ_FIFO(Command);	// This must be the first MDEC_* macro used!
+         { { case 1: if(!(InFIFO.CanRead())) { MDRPhase = 2 - MDRPhaseBias - 1; return; } }; Command = InFIFO.Read(); };
          InCommand = true;
-         MDEC_EAT_CLOCKS(1);
+         { ClockCounter -= (1); { case 3: if(!(ClockCounter > 0)) { MDRPhase = 4 - MDRPhaseBias - 1; return; } }; };
 
          //printf("****************** Command: %08x, %02x\n", Command, Command >> 29);
 
@@ -607,7 +596,7 @@ void MDEC_Run(int32 clocks)
                uint32 tfr;
                int32 need_eat; // = 0;
 
-               MDEC_READ_FIFO(tfr);
+               { { case 5: if(!(InFIFO.CanRead())) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                //     printf("KA: %04x %08x\n", InCounter, tfr);
@@ -617,12 +606,12 @@ void MDEC_Run(int32 clocks)
                WriteImageData(tfr, &need_eat);
                WriteImageData(tfr >> 16, &need_eat);
 
-               MDEC_EAT_CLOCKS(need_eat);
+               { ClockCounter -= (need_eat); { case 7: if(!(ClockCounter > 0)) { MDRPhase = 8 - MDRPhaseBias - 1; return; } }; };
 
                PixelBufferReadOffset = 0;
                while(PixelBufferReadOffset != PixelBufferCount32)
                {
-                  MDEC_WRITE_FIFO(LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++]));
+                  { { case 9: if(!(OutFIFO.CanWrite())) { MDRPhase = 10 - MDRPhaseBias - 1; return; } }; OutFIFO.Write(LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++])); };
                }
             } while(InCounter != 0xFFFF);
          }
@@ -639,7 +628,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               MDEC_READ_FIFO(tfr);
+               { { case 11: if(!(InFIFO.CanRead())) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                //printf("KA: %04x %08x\n", InCounter, tfr);
@@ -665,7 +654,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               MDEC_READ_FIFO(tfr);
+               { { case 13: if(!(InFIFO.CanRead())) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                for(unsigned i = 0; i < 2; i++)
@@ -684,7 +673,6 @@ void MDEC_Run(int32 clocks)
       } // end for(;;)
    }
 }
-#endif
 
 void MDEC_DMAWrite(uint32 V)
 {
