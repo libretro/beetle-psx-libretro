@@ -216,25 +216,24 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
-      SFARRAY32(CR, 32),
-      SFVAR(FLAGS),
-
+      { CR, (uint32)(32 * sizeof(uint32)), MDFNSTATE_RLSB32 | 0, "CR" },
+      { &FLAGS, sizeof(FLAGS), MDFNSTATE_RLSB | 0, "FLAGS" },
       SFARRAY16(&Matrices.Raw16[0][0], 4 * 10),
 
       SFARRAY32(&CRVectors.All[0][0], 4 * 4),
 
-      SFVAR(OFX),
-      SFVAR(OFY),
-      SFVAR(H),
-      SFVAR(DQA),
-      SFVAR(DQB),
+      SFVARN(OFX, "OFX"),
+      SFVARN(OFY, "OFY"),
+      SFVARN(H, "H"),
+      SFVARN(DQA, "DQA"),
+      SFVARN(DQB, "DQB"),
 
-      SFVAR(ZSF3),
-      SFVAR(ZSF4),
+      SFVARN(ZSF3, "ZSF3"),
+      SFVARN(ZSF4, "ZSF4"),
       SFARRAY16(&Vectors[0][0], 3 * 4),
 
       SFARRAY(RGB.Raw8, 4),
-      SFVAR(OTZ),
+      SFVARN(OTZ, "OTZ"),
       SFARRAY16(IR, 4),
 
       SFVAR(XY_FIFO[0].X),
@@ -254,9 +253,9 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
 
       SFARRAY32(MAC, 4),
 
-      SFVAR(LZCS),
-      SFVAR(LZCR),
-      SFVAR(Reg23),
+      SFVARN(LZCS, "LZCS"),
+      SFVARN(LZCR, "LZCR"),
+      SFVARN(Reg23, "Reg23"),
 
       SFEND
    };
