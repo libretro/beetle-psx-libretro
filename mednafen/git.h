@@ -344,7 +344,7 @@ typedef struct
  const MDFNSetting *Settings;
 
  // Time base for EmulateSpecStruct::MasterCycles
- #define MDFN_MASTERCLOCK_FIXED(n)	((int64)((double)(n) * (INT32_C(1) << 32)))
+ #define MDFN_MASTERCLOCK_FIXED(n)	((int64)((double)(n) * (INT64_C(1) << 32)))
  int64 MasterClock;
 
  uint32 fps; // frames per second * 65536 * 256, truncated
