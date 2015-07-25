@@ -539,7 +539,7 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
 
 void MDEC_Run(int32 clocks)
 {
-   static const unsigned MDRPhaseBias = __COUNTER__ + 1;
+   static const unsigned MDRPhaseBias = 0 + 1;
 
    //MDFN_DispMessage("%u", OutFIFO.CanRead());
 
