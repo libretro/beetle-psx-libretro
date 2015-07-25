@@ -1,8 +1,6 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include "state-common.h"
-
 typedef struct
 {
    uint8 *data;
