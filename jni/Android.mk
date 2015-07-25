@@ -100,7 +100,7 @@ MEDNAFEN_SOURCES := $(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/md5.cpp
 
 MEDNAFEN_SOURCES_C := \
-	$(MEDNAFEN_DIR)/file.p \
+	$(MEDNAFEN_DIR)/file.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
 
 LIBRETRO_SOURCES := $(MEDNAFEN_LIBRETRO_DIR)/libretro.cpp

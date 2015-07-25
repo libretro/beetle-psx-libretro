@@ -1,8 +1,13 @@
 #ifdef __cplusplus
+
+#ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
+#endif
+
 #ifdef _STDINT_H
 #undef _STDINT_H
 #endif
+
 # include <stdint.h>
 #endif
 
