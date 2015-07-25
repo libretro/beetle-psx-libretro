@@ -702,10 +702,10 @@ uint32_t GTE_ReadDR(unsigned int which)
 
 static INLINE int64_t A_MV(unsigned which, int64_t value)
 {
-   if(value >= (INT32_C(1) << 43))
+   if(value >= (INT64_C(1) << 43))
       FLAGS |= 1 << (30 - which);
 
-   if(value < -(INT32_C(1) << 43))
+   if(value < -(INT64_C(1) << 43))
       FLAGS |= 1 << (27 - which);
 
    return sign_x_to_s64(44, value);
