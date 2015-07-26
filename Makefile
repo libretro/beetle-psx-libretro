@@ -1,10 +1,7 @@
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 
-MEDNAFEN_DIR := mednafen
-MEDNAFEN_LIBRETRO_DIR := mednafen-libretro
-NEED_TREMOR = 0
-LIBRETRO_SOURCES :=
+CORE_DIR := .
 HAVE_GRIFFIN = 0
 
 ifeq ($(platform),)
@@ -27,17 +24,15 @@ ifeq ($(findstring Haiku,$(shell uname -a)),)
    PTHREAD_FLAGS = -pthread
 endif
 endif
-   NEED_CD = 1
-   NEED_TREMOR = 1
-   NEED_BPP = 32
-	WANT_NEW_API = 1
-   NEED_DEINTERLACER = 1
-   NEED_THREADING = 1
-   CORE_DEFINE := -DWANT_PSX_EMU
-   CORE_DIR := $(MEDNAFEN_DIR)/psx
-   TARGET_NAME := mednafen_psx_libretro
 
-CORE_INCDIR := -I$(CORE_DIR)
+NEED_CD = 1
+NEED_TREMOR = 1
+NEED_BPP = 32
+WANT_NEW_API = 1
+NEED_DEINTERLACER = 1
+NEED_THREADING = 1
+CORE_DEFINE := -DWANT_PSX_EMU
+TARGET_NAME := mednafen_psx_libretro
 
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME).so
@@ -224,7 +219,7 @@ else
 	EXTRA_GCC_FLAGS := -g
 endif
 
-OBJECTS := $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
+OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
@@ -236,40 +231,12 @@ endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
-FLAGS += -I. -Imednafen -Imednafen/include -Imednafen/intl -Imednafen/hw_misc -Imednafen/hw_sound -Imednafen/hw_cpu $(CORE_INCDIR) $(EXTRA_CORE_INCDIR)
+FLAGS += $(INC_FLAGS)
 
 FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.31\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=931 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -D__STDC_CONSTANT_MACROS
 
-ifeq ($(IS_X86), 1)
-FLAGS += -DARCH_X86
-endif
-
-ifeq ($(NEED_BPP), 8)
-FLAGS += -DWANT_8BPP
-endif
-
-ifeq ($(NEED_BPP), 16)
-FLAGS += -DWANT_16BPP
-endif
-
-ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
-FLAGS += -DFRONTEND_SUPPORTS_RGB565
-endif
-
-ifeq ($(NEED_BPP), 32)
-FLAGS += -DWANT_32BPP
-endif
-
-ifeq ($(WANT_NEW_API), 1)
-FLAGS += -DWANT_NEW_API
-endif
-
-ifeq ($(NO_COMPUTED_GOTO), 1)
-FLAGS += -DNO_COMPUTED_GOTO
-endif
-
 CXXFLAGS += $(FLAGS)
-CFLAGS += $(FLAGS)
+CFLAGS   += $(FLAGS)
 
 $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)

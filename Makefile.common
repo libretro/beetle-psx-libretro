@@ -1,48 +1,85 @@
+SOURCES_CXX :=
+SOURCES_C   :=
+
+MEDNAFEN_DIR := $(CORE_DIR)/mednafen
+CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
+
+INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc
+
 ifeq ($(HAVE_GRIFFIN),1)
-   CORE_SOURCES := beetle_psx_griffin.cpp \
-	$(CORE_DIR)/dma.cpp \
-	$(CORE_DIR)/sio.cpp
+   SOURCES_CXX += beetle_psx_griffin.cpp \
+	$(CORE_EMU_DIR)/dma.cpp \
+	$(CORE_EMU_DIR)/sio.cpp
 else
-   CORE_SOURCES := $(CORE_DIR)/irq.cpp \
-	$(CORE_DIR)/timer.cpp \
-	$(CORE_DIR)/dma.cpp \
-	$(CORE_DIR)/frontio.cpp \
-	$(CORE_DIR)/sio.cpp \
-	$(CORE_DIR)/cpu.cpp \
-	$(CORE_DIR)/gte.cpp \
-	$(CORE_DIR)/dis.cpp \
-	$(CORE_DIR)/cdc.cpp \
-	$(CORE_DIR)/spu.cpp \
-	$(CORE_DIR)/gpu.cpp \
-	$(CORE_DIR)/mdec.cpp \
-	$(CORE_DIR)/input/gamepad.cpp \
-	$(CORE_DIR)/input/dualanalog.cpp \
-	$(CORE_DIR)/input/dualshock.cpp \
-	$(CORE_DIR)/input/justifier.cpp \
-	$(CORE_DIR)/input/guncon.cpp \
-	$(CORE_DIR)/input/negcon.cpp \
-	$(CORE_DIR)/input/memcard.cpp \
-	$(CORE_DIR)/input/multitap.cpp \
-	$(CORE_DIR)/input/mouse.cpp
+   SOURCES_CXX += $(CORE_EMU_DIR)/irq.cpp \
+	$(CORE_EMU_DIR)/timer.cpp \
+	$(CORE_EMU_DIR)/dma.cpp \
+	$(CORE_EMU_DIR)/frontio.cpp \
+	$(CORE_EMU_DIR)/sio.cpp \
+	$(CORE_EMU_DIR)/cpu.cpp \
+	$(CORE_EMU_DIR)/gte.cpp \
+	$(CORE_EMU_DIR)/dis.cpp \
+	$(CORE_EMU_DIR)/cdc.cpp \
+	$(CORE_EMU_DIR)/spu.cpp \
+	$(CORE_EMU_DIR)/gpu.cpp \
+	$(CORE_EMU_DIR)/mdec.cpp \
+	$(CORE_EMU_DIR)/input/gamepad.cpp \
+	$(CORE_EMU_DIR)/input/dualanalog.cpp \
+	$(CORE_EMU_DIR)/input/dualshock.cpp \
+	$(CORE_EMU_DIR)/input/justifier.cpp \
+	$(CORE_EMU_DIR)/input/guncon.cpp \
+	$(CORE_EMU_DIR)/input/negcon.cpp \
+	$(CORE_EMU_DIR)/input/memcard.cpp \
+	$(CORE_EMU_DIR)/input/multitap.cpp \
+	$(CORE_EMU_DIR)/input/mouse.cpp
 endif
 
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING
-	THREAD_SOURCES += threads.c
+	SOURCES_C += $(CORE_DIR)/threads.c
 endif
 
 ifeq ($(NEED_CRC32), 1)
    FLAGS += -DWANT_CRC32
-	CRC32_SOURCES += scrc32.c
+	SOURCES_C += $(CORE_DIR)/scrc32.c
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)
    FLAGS += -DNEED_DEINTERLACER
 endif
 
+ifeq ($(IS_X86), 1)
+FLAGS += -DARCH_X86
+endif
+
+ifeq ($(NEED_BPP), 8)
+FLAGS += -DWANT_8BPP
+endif
+
+ifeq ($(NEED_BPP), 16)
+FLAGS += -DWANT_16BPP
+endif
+
+ifeq ($(NEED_BPP), 32)
+FLAGS += -DWANT_32BPP
+endif
+
+ifeq ($(WANT_NEW_API), 1)
+FLAGS += -DWANT_NEW_API
+endif
+
+ifeq ($(NO_COMPUTED_GOTO), 1)
+FLAGS += -DNO_COMPUTED_GOTO
+endif
+
+ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
+FLAGS += -DFRONTEND_SUPPORTS_RGB565
+endif
+
+
 ifeq ($(NEED_CD), 1)
 ifneq ($(HAVE_GRIFFIN),1)
-CDROM_SOURCES += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
+SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
@@ -59,13 +96,13 @@ endif
 endif
 
 ifeq ($(NEED_TREMOR), 1)
-   TREMOR_SRC := $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+   SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
    FLAGS += -DNEED_TREMOR
 endif
 
 
 ifneq ($(HAVE_GRIFFIN), 1)
-MEDNAFEN_SOURCES := \
+SOURCES_CXX += \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
 	$(MEDNAFEN_DIR)/general.cpp \
@@ -74,26 +111,20 @@ MEDNAFEN_SOURCES := \
 	$(MEDNAFEN_DIR)/MemoryStream.cpp \
 	$(MEDNAFEN_DIR)/Stream.cpp \
 	$(MEDNAFEN_DIR)/state.cpp \
-	$(CDROM_SOURCES) \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/md5.cpp
+	$(MEDNAFEN_DIR)/md5.cpp \
+	$(CORE_DIR)/libretro.cpp
 
-MEDNAFEN_SOURCES_C += \
+SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
-
-LIBRETRO_SOURCES += libretro.cpp
 endif
 
-TRIO_SOURCES += $(MEDNAFEN_DIR)/trio/trio.c \
-	$(MEDNAFEN_DIR)/trio/triostr.c 
+SOURCES_C += $(MEDNAFEN_DIR)/trio/trio.c \
+				 $(MEDNAFEN_DIR)/trio/triostr.c 
 
 ifeq ($(HAVE_GRIFFIN), 1)
-SOURCES_C := beetle_psx_griffin_c.c
-else
-SOURCES_C := 	$(TREMOR_SRC) $(LIBRETRO_SOURCES_C) $(TRIO_SOURCES) $(THREAD_SOURCES) $(CRC32_SOURCES) $(MEDNAFEN_SOURCES_C)
+SOURCES_C += beetle_psx_griffin_c.c
 endif
-
-SOURCES := $(LIBRETRO_SOURCES) $(CORE_SOURCES) $(MEDNAFEN_SOURCES) $(HW_CPU_SOURCES) $(HW_MISC_SOURCES) $(HW_SOUND_SOURCES) $(HW_VIDEO_SOURCES)
