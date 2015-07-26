@@ -100,14 +100,7 @@ class PS_GPU
 
       uint32 DMAControl;
 
-      //
       // Drawing stuff
-      //
-      //int32 TexPageX;	// 0, 64, 128, 192, etc up to 960
-      //int32 TexPageY;	// 0 or 256
-      //uint32 abr;		// Semi-transparency mode(0~3)
-      //bool dtd;		// Dithering enable
-
       int32 ClipX0;
       int32 ClipY0;
       int32 ClipX1;
@@ -116,7 +109,7 @@ class PS_GPU
       int32 OffsX;
       int32 OffsY;
 
-      bool dtd;
+      bool dtd;            // Dithering enable 
       bool dfe;
 
       uint32 MaskSetOR;
@@ -141,12 +134,12 @@ class PS_GPU
       };
       void RecalcTexWindowStuff(void);
 
-      uint32_t TexPageX;
-      uint32_t TexPageY;
+      uint32_t TexPageX; // 0, 64, 128, 192, etc up to 960
+      uint32_t TexPageY; // 0 or 256
 
       uint32 SpriteFlip;
 
-      uint32 abr;
+      uint32 abr;        // Semi-transparency mode(0~3)
       uint32 TexMode;
 
       struct
