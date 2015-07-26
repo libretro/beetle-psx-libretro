@@ -133,14 +133,6 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 
 INLINE void PS_GPU::RecalcTexWindowStuff(void)
 {
-#if 0
-   /* TODO */
-   SUCV.TWX_AND = ~(tww << 3);
-   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
-
-   SUCV.TWY_AND = ~(twh << 3);
-   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
-#else
    unsigned x, y;
    const unsigned TexWindowX_AND = ~(tww << 3);
    const unsigned TexWindowX_OR = (twx & tww) << 3;
@@ -156,7 +148,12 @@ INLINE void PS_GPU::RecalcTexWindowStuff(void)
    memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
    memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
    memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
-#endif
+
+   SUCV.TWX_AND = ~(tww << 3);
+   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
+
+   SUCV.TWY_AND = ~(twh << 3);
+   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
 }
 
 template<uint32_t TexMode_TA>
@@ -194,26 +191,13 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 
    }
 
    uint16 fbw = c->Data[gro & 0x3];
-
-   if(TexMode_TA != 2)
-   {
-      if(TexMode_TA == 0)
-         fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
-      else
-         fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
-
-      fbw = CLUT_Cache[fbw];
-   }
 #else
-   uint16_t fbw;
-   uint32_t u_ext, v, fbtex_x, fbtex_y;
-
-   u_ext = TexWindowXLUT[u_arg];
-   v = TexWindowYLUT[v_arg];
-   fbtex_x = TexPageX + (u_ext >> (2 - TexMode_TA));
-   fbtex_y = TexPageY + v;
-   fbw = GPURAM[fbtex_y][fbtex_x & 1023];
-
+   uint32_t u_ext = TexWindowXLUT[u_arg];
+   uint32_t v = TexWindowYLUT[v_arg];
+   uint32_t fbtex_x = TexPageX + (u_ext >> (2 - TexMode_TA));
+   uint32_t fbtex_y = TexPageY + v;
+   uint16_t fbw = GPURAM[fbtex_y][fbtex_x & 1023];
+#endif
    if(TexMode_TA != 2)
    {
       if(TexMode_TA == 0)
@@ -221,9 +205,12 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 
       else
          fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
 
+#if 0
+      fbw = CLUT_Cache[fbw];
+#else
       fbw = GPURAM[(clut_offset >> 10) & 511][(clut_offset + fbw) & 1023];
-   }
 #endif
+   }
 
    return(fbw);
 }
