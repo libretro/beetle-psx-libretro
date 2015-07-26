@@ -356,9 +356,6 @@ bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp)
             nt = FIO->Update(e->event_time);
             break;
       }
-#if PSX_EVENT_SYSTEM_CHECKS
-      assert(nt > e->event_time);
-#endif
 
       PSX_SetEventNT(e->which, nt);
 
