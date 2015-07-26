@@ -722,7 +722,7 @@ void PS_GPU::ProcessFIFO(void)
          break;
 
       case INCMD_FBREAD:
-         puts("BOGUS SALAMANDERS, CAPTAIN!");
+         puts("[GPU] Command FIFO not empty while in FB Read?");
          return;
 
       case INCMD_FBWRITE:
