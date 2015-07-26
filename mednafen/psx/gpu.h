@@ -272,6 +272,7 @@ class PS_GPU
 
       void InvalidateTexCache(void);
       void InvalidateCache(void);
+      void SetTPage(uint32_t data);
 
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
 

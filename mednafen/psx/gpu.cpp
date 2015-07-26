@@ -425,6 +425,7 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
    if(!height)
       height = 0x200;
 
+   g->InvalidateTexCache();
    //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
 
    g->DrawTimeAvail -= (width * height) * 2;
@@ -514,19 +515,12 @@ static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
 {
    const uint32 cmdw = *cb;
 
-   g->TexPageX   = (cmdw & 0xF) * 64;
-   g->TexPageY   = (cmdw & 0x10) * 16;
+   g->SetTPage(cmdw);
+
    g->SpriteFlip = (cmdw & 0x3000);
-   g->abr        = (cmdw >> 5) & 0x3;
-   g->TexMode    = (cmdw >> 7) & 0x3;
    g->dtd =        (cmdw >> 9) & 1;
    g->dfe =        (cmdw >> 10) & 1;
 
-   if(g->TexDisableAllowChange)
-   {
-      g->TexDisable = (cmdw >> 11) & 1;
-      //printf("TexDisable: %02x\n", TexDisable);
-   }
    //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
@@ -841,16 +835,7 @@ void PS_GPU::ProcessFIFO(void)
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
       {
          /* Don't alter SpriteFlip here. */
-         const uint32 tpage = CB[4 + ((cc >> 4) & 0x1)] >> 16;
-
-         TexPageX = (tpage & 0xF) * 64;
-         TexPageY = (tpage & 0x10) * 16;
-
-         abr = (tpage >> 5) & 0x3;
-         TexMode = (tpage >> 7) & 0x3;
-#if 0
-         RecalcTexWindowStuff();
-#endif
+         SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
       }
 
       if(!command->func[abr][TexMode])
@@ -875,6 +860,35 @@ INLINE void PS_GPU::WriteCB(uint32_t InData)
 
    BlitterFIFO.Write(InData);
    ProcessFIFO();
+}
+
+void PS_GPU::SetTPage(const uint32_t cmdw)
+{
+   const unsigned NewTexPageX = (cmdw & 0xF) * 64;
+   const unsigned NewTexPageY = (cmdw & 0x10) * 16;
+   const unsigned NewTexMode = (cmdw >> 7) & 0x3;
+
+   abr = (cmdw >> 5) & 0x3;
+
+   if(!NewTexMode != !TexMode || NewTexPageX != TexPageX || NewTexPageY != TexPageY)
+   {
+      InvalidateTexCache();
+   }
+
+   if(TexDisableAllowChange)
+   {
+      bool NewTexDisable = (cmdw >> 11) & 1;
+
+      if (NewTexDisable != TexDisable)
+         InvalidateTexCache();
+
+      TexDisable = NewTexDisable;
+      //printf("TexDisable: %02x\n", TexDisable);
+   }
+
+   TexPageX = NewTexPageX;
+   TexPageY = NewTexPageY;
+   TexMode  = NewTexMode;
 }
 
 void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
