@@ -64,8 +64,7 @@ struct Channel
 };
 
 static Channel DMACH[7];
-static pscpu_timestamp_t lastts;
-
+static int32_t lastts;
 
 static const char *PrettyChannelNames[7] = { "MDEC IN", "MDEC OUT", "GPU", "CDC", "SPU", "PIO", "OTC" };
 
@@ -454,7 +453,7 @@ SkipPayloadStuff: ;
       DMACH[ch].ClockCounter = 0;
 }
 
-static INLINE void RunChannel(pscpu_timestamp_t timestamp, int32_t clocks, int ch)
+static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
 {
    // Mask out the bits that the DMA controller will modify during the course of operation.
    const uint32_t CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
@@ -508,7 +507,7 @@ static INLINE int32_t CalcNextEvent(int32_t next_event)
    return(next_event);
 }
 
-pscpu_timestamp_t DMA_Update(const pscpu_timestamp_t timestamp)
+int32_t DMA_Update(const int32_t timestamp)
 {
    int32_t clocks, i;
    //   uint32_t dc = (DMAControl >> (ch * 4)) & 0xF;
@@ -552,7 +551,7 @@ static void CheckLinkedList(uint32_t addr)
 }
 #endif
 
-void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
    bool will_set_event = false;
    int ch = (A & 0x7F) >> 4;
@@ -658,7 +657,7 @@ void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
       PSX_SetEventNT(PSX_EVENT_DMA, timestamp + CalcNextEvent(0x10000000));
 }
 
-uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A)
+uint32_t DMA_Read(const int32_t timestamp, uint32_t A)
 {
    
    int ch = (A & 0x7F) >> 4;

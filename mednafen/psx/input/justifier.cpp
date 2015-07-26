@@ -30,7 +30,7 @@ class InputDevice_Justifier : public InputDevice
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
       virtual bool RequireNoFrameskip(void);
-      virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
+      virtual int32_t GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
       //
       //
@@ -184,9 +184,9 @@ bool InputDevice_Justifier::RequireNoFrameskip(void)
    return(true);
 }
 
-pscpu_timestamp_t InputDevice_Justifier::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+int32_t InputDevice_Justifier::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
-   pscpu_timestamp_t ret = PSX_EVENT_MAXTS;
+   int32_t ret = PSX_EVENT_MAXTS;
 
    if(vsync && !prev_vsync)
       line_counter = 0;

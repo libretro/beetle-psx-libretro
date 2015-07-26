@@ -49,9 +49,9 @@ class PS_GPU
 
       void StartFrame(EmulateSpecStruct *espec);
 
-      pscpu_timestamp_t Update(const pscpu_timestamp_t timestamp);
+      int32_t Update(const int32_t timestamp);
 
-      void Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V);
+      void Write(const int32_t timestamp, uint32 A, uint32 V);
 
       INLINE bool CalcFIFOReadyBit(void)
       {
@@ -78,7 +78,7 @@ class PS_GPU
       void WriteDMA(uint32 V);
       uint32 ReadDMA(void);
 
-      uint32 Read(const pscpu_timestamp_t timestamp, uint32 A);
+      uint32 Read(const int32_t timestamp, uint32 A);
 
       inline int32 GetScanlineNum(void)
       {
@@ -226,7 +226,7 @@ class PS_GPU
 
       int32 DrawTimeAvail;
 
-      pscpu_timestamp_t lastts;
+      int32_t lastts;
 
       //
       //

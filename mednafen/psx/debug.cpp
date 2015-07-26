@@ -134,7 +134,7 @@ void CheckCPUBPCallB(bool write, uint32 address, unsigned int len)
  }
 }
 
-static void CPUHandler(const pscpu_timestamp_t timestamp, uint32 PC)
+static void CPUHandler(const int32_t timestamp, uint32 PC)
 {
  std::vector<PSX_BPOINT>::iterator bpit;
 
@@ -256,7 +256,7 @@ static void PutAddressSpaceBytes(const char *name, uint32 Address, uint32 Length
  {
   while(Length--)
   {
-   pscpu_timestamp_t dummy = 0;
+   int32_t dummy = 0;
    Address &= 0xFFFFFFFF;
 
    // TODO

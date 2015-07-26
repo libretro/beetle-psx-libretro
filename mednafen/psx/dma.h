@@ -1,9 +1,9 @@
 #ifndef __MDFN_PSX_DMA_H
 #define __MDFN_PSX_DMA_H
 
-pscpu_timestamp_t DMA_Update(const pscpu_timestamp_t timestamp);
-void DMA_Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
-uint32_t DMA_Read(const pscpu_timestamp_t timestamp, uint32_t A);
+int32_t DMA_Update(const int32_t timestamp);
+void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V);
+uint32_t DMA_Read(const int32_t timestamp, uint32_t A);
 
 void DMA_ResetTS(void);
 

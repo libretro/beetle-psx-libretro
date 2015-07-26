@@ -104,14 +104,13 @@ class PS_SPU
       int StateAction(StateMem *sm, int load, int data_only);
 
       void Power(void);
-      void Write(pscpu_timestamp_t timestamp, uint32_t A, uint16_t V);
-      uint16_t Read(pscpu_timestamp_t timestamp, uint32_t A);
+      void Write(int32_t timestamp, uint32_t A, uint16_t V);
+      uint16_t Read(int32_t timestamp, uint32_t A);
 
       void WriteDMA(uint32_t V);
       uint32_t ReadDMA(void);
 
       int32_t UpdateFromCDC(int32_t clocks);
-      //pscpu_timestamp_t Update(pscpu_timestamp_t timestamp);
 
    private:
 
@@ -236,7 +235,6 @@ class PS_SPU
 
       bool IRQAsserted;
 
-      //pscpu_timestamp_t lastts;
       int32_t clock_divider;
 
       uint16_t SPURAM[524288 / sizeof(uint16)];

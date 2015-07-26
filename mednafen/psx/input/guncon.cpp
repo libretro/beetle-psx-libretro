@@ -30,7 +30,7 @@ class InputDevice_GunCon : public InputDevice
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
       virtual bool RequireNoFrameskip(void);
-      virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
+      virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
       //
       //
@@ -184,7 +184,7 @@ bool InputDevice_GunCon::RequireNoFrameskip(void)
    return(true);
 }
 
-pscpu_timestamp_t InputDevice_GunCon::GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width,
+int32_t InputDevice_GunCon::GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width,
       const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
    if(vsync && !prev_vsync)

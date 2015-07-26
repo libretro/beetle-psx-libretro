@@ -891,7 +891,7 @@ void PS_GPU::SetTPage(const uint32_t cmdw)
    TexMode  = NewTexMode;
 }
 
-void PS_GPU::Write(const pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
    V <<= (A & 3) * 8;
 
@@ -1054,7 +1054,7 @@ uint32_t PS_GPU::ReadDMA(void)
    return ReadData();
 }
 
-uint32_t PS_GPU::Read(const pscpu_timestamp_t timestamp, uint32_t A)
+uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 {
    uint32_t ret = 0;
 
@@ -1144,7 +1144,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
 
 }
 
-pscpu_timestamp_t PS_GPU::Update(const pscpu_timestamp_t sys_timestamp)
+int32_t PS_GPU::Update(const int32_t sys_timestamp)
 {
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
    const uint32_t dmc = (DisplayMode & 0x40) ? 4 : (DisplayMode & 0x3);

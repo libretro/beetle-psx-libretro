@@ -13,7 +13,7 @@ class InputDevice_Mouse : public InputDevice
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
 
-      virtual void Update(const pscpu_timestamp_t timestamp);
+      virtual void Update(const int32_t timestamp);
       virtual void ResetTS(void);
 
       //
@@ -55,7 +55,7 @@ InputDevice_Mouse::~InputDevice_Mouse()
 
 }
 
-void InputDevice_Mouse::Update(const pscpu_timestamp_t timestamp)
+void InputDevice_Mouse::Update(const int32_t timestamp)
 {
    int32 cycles = timestamp - lastts;
 

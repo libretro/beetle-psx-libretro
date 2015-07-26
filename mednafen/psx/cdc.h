@@ -28,10 +28,10 @@ class PS_CDC
 
       int32 CalcNextEvent(void);	// Returns in master cycles to next event.
 
-      pscpu_timestamp_t Update(const pscpu_timestamp_t timestamp);
+      int32_t Update(const int32_t timestamp);
 
-      void Write(const pscpu_timestamp_t timestamp, uint32 A, uint8 V);
-      uint8 Read(const pscpu_timestamp_t timestamp, uint32 A);
+      void Write(const int32_t timestamp, uint32 A, uint8 V);
+      uint8 Read(const int32_t timestamp, uint32 A);
 
       bool DMACanRead(void);
       uint32 DMARead(void);
@@ -179,7 +179,7 @@ class PS_CDC
 
       int32 SeekTarget;
 
-      pscpu_timestamp_t lastts;
+      int32_t lastts;
 
       CDUtility::TOC toc;
       bool IsPSXDisc;

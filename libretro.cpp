@@ -209,12 +209,12 @@ void PSX_SetDMACycleSteal(unsigned stealage)
 // Event stuff
 //
 
-static pscpu_timestamp_t Running;	// Set to -1 when not desiring exit, and 0 when we are.
+static int32_t Running;	// Set to -1 when not desiring exit, and 0 when we are.
 
 struct event_list_entry
 {
  uint32_t which;
- pscpu_timestamp_t event_time;
+ int32_t event_time;
  event_list_entry *prev;
  event_list_entry *next;
 };
@@ -246,7 +246,7 @@ static void EventReset(void)
 // e->next->prev = e->prev;
 //}
 
-static void RebaseTS(const pscpu_timestamp_t timestamp)
+static void RebaseTS(const int32_t timestamp)
 {
    unsigned i;
    for(i = 0; i < PSX_EVENT__COUNT; i++)
@@ -261,7 +261,7 @@ static void RebaseTS(const pscpu_timestamp_t timestamp)
    CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
 
-void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp)
+void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 {
    assert(type > PSX_EVENT__SYNFIRST && type < PSX_EVENT__SYNLAST);
    event_list_entry *e = &events[type];
@@ -313,7 +313,7 @@ void PSX_SetEventNT(const int type, const pscpu_timestamp_t next_timestamp)
 }
 
 // Called from debug.cpp too.
-void ForceEventUpdates(const pscpu_timestamp_t timestamp)
+void ForceEventUpdates(const int32_t timestamp)
 {
    PSX_SetEventNT(PSX_EVENT_GPU, GPU->Update(timestamp));
    PSX_SetEventNT(PSX_EVENT_CDC, CDC->Update(timestamp));
@@ -327,14 +327,14 @@ void ForceEventUpdates(const pscpu_timestamp_t timestamp)
    CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
 
-bool MDFN_FASTCALL PSX_EventHandler(const pscpu_timestamp_t timestamp)
+bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
 {
    event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
 
    while(timestamp >= e->event_time)	// If Running = 0, PSX_EventHandler() may be called even if there isn't an event per-se, so while() instead of do { ... } while
    {
+      int32_t nt;
       event_list_entry *prev = e->prev;
-      pscpu_timestamp_t nt;
 
       switch(e->which)
       {
@@ -380,7 +380,7 @@ void PSX_RequestMLExit(void)
 
 
 // Remember to update MemPeek<>() when we change address decoding in MemRW()
-template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(pscpu_timestamp_t &timestamp, uint32_t A, uint32_t &V)
+template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32_t &timestamp, uint32_t A, uint32_t &V)
 {
 #if 0
    if(IsWrite)
@@ -708,27 +708,27 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(pscpu
    }
 }
 
-void MDFN_FASTCALL PSX_MemWrite8(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V)
 {
    MemRW<uint8, true, false>(timestamp, A, V);
 }
 
-void MDFN_FASTCALL PSX_MemWrite16(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void MDFN_FASTCALL PSX_MemWrite16(int32_t timestamp, uint32_t A, uint32_t V)
 {
    MemRW<uint16, true, false>(timestamp, A, V);
 }
 
-void MDFN_FASTCALL PSX_MemWrite24(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V)
 {
  MemRW<uint32, true, true>(timestamp, A, V);
 }
 
-void MDFN_FASTCALL PSX_MemWrite32(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void MDFN_FASTCALL PSX_MemWrite32(int32_t timestamp, uint32_t A, uint32_t V)
 {
  MemRW<uint32, true, false>(timestamp, A, V);
 }
 
-uint8_t MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32_t A)
+uint8_t MDFN_FASTCALL PSX_MemRead8(int32_t &timestamp, uint32_t A)
 {
  uint32_t V;
 
@@ -737,7 +737,7 @@ uint8_t MDFN_FASTCALL PSX_MemRead8(pscpu_timestamp_t &timestamp, uint32_t A)
  return(V);
 }
 
-uint16_t MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32_t A)
+uint16_t MDFN_FASTCALL PSX_MemRead16(int32_t &timestamp, uint32_t A)
 {
  uint32_t V;
 
@@ -746,7 +746,7 @@ uint16_t MDFN_FASTCALL PSX_MemRead16(pscpu_timestamp_t &timestamp, uint32_t A)
  return(V);
 }
 
-uint32_t MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32_t A)
+uint32_t MDFN_FASTCALL PSX_MemRead24(int32_t &timestamp, uint32_t A)
 {
  uint32_t V;
 
@@ -755,7 +755,7 @@ uint32_t MDFN_FASTCALL PSX_MemRead24(pscpu_timestamp_t &timestamp, uint32_t A)
  return(V);
 }
 
-uint32_t MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32_t A)
+uint32_t MDFN_FASTCALL PSX_MemRead32(int32_t &timestamp, uint32_t A)
 {
  uint32_t V;
 
@@ -764,7 +764,7 @@ uint32_t MDFN_FASTCALL PSX_MemRead32(pscpu_timestamp_t &timestamp, uint32_t A)
  return(V);
 }
 
-template<typename T, bool Access24> static INLINE uint32_t MemPeek(pscpu_timestamp_t timestamp, uint32_t A)
+template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A)
 {
    if(A < 0x00800000)
    {
@@ -949,7 +949,7 @@ static void PSX_Power(void)
 }
 
 
-void PSX_GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
    FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
 }
@@ -3253,7 +3253,7 @@ void retro_run(void)
 
    EmulateSpecStruct *espec = (EmulateSpecStruct*)&spec;
    /* start of Emulate */
-   pscpu_timestamp_t timestamp = 0;
+   int32_t timestamp = 0;
 
    espec->skip = false;	
    MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");

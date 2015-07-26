@@ -723,7 +723,7 @@ bool MDEC_DMACanRead(void)
  return((OutFIFO.CanRead() >= 0x20) && (Control & (1U << 29)));
 }
 
-void MDEC_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
+void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
 {
    //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d  --- %u %u", A, V, timestamp, InFIFO.CanRead(), OutFIFO.CanRead());
    if(A & 4)
@@ -767,7 +767,7 @@ void MDEC_Write(const pscpu_timestamp_t timestamp, uint32 A, uint32 V)
    }
 }
 
-uint32 MDEC_Read(const pscpu_timestamp_t timestamp, uint32 A)
+uint32 MDEC_Read(const int32_t timestamp, uint32 A)
 {
  uint32 ret = 0;
 

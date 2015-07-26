@@ -54,7 +54,7 @@ int InputDevice::StateAction(StateMem* sm, int load, int data_only, const char* 
  return(1);
 }
 
-void InputDevice::Update(const pscpu_timestamp_t timestamp)
+void InputDevice::Update(const int32_t timestamp)
 {
 
 }
@@ -198,7 +198,7 @@ bool InputDevice::RequireNoFrameskip(void)
  return false;
 }
 
-pscpu_timestamp_t InputDevice::GPULineHook(const pscpu_timestamp_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
  return(PSX_EVENT_MAXTS);
 }
@@ -394,9 +394,9 @@ FrontIO::~FrontIO()
    DummyDevice = NULL;
 }
 
-pscpu_timestamp_t FrontIO::CalcNextEventTS(pscpu_timestamp_t timestamp, int32_t next_event)
+int32_t FrontIO::CalcNextEventTS(int32_t timestamp, int32_t next_event)
 {
-   pscpu_timestamp_t ret;
+   int32_t ret;
    int i;
 
    if(ClockDivider > 0 && ClockDivider < next_event)
@@ -419,7 +419,7 @@ pscpu_timestamp_t FrontIO::CalcNextEventTS(pscpu_timestamp_t timestamp, int32_t 
 
 static const uint8_t ScaleShift[4] = { 0, 0, 4, 6 };
 
-void FrontIO::CheckStartStopPending(pscpu_timestamp_t timestamp, bool skip_event_set)
+void FrontIO::CheckStartStopPending(int32_t timestamp, bool skip_event_set)
 {
    //const bool prior_ReceiveInProgress = ReceiveInProgress;
    //const bool prior_TransmitInProgress = TransmitInProgress;
@@ -474,7 +474,7 @@ INLINE void FrontIO::DoDSRIRQ(void)
 }
 
 
-void FrontIO::Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
+void FrontIO::Write(int32_t timestamp, uint32_t A, uint32_t V)
 {
    assert(!(A & 0x1));
 
@@ -574,7 +574,7 @@ void FrontIO::Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V)
 }
 
 
-uint32_t FrontIO::Read(pscpu_timestamp_t timestamp, uint32_t A)
+uint32_t FrontIO::Read(int32_t timestamp, uint32_t A)
 {
    uint32_t ret = 0;
 
@@ -629,7 +629,7 @@ uint32_t FrontIO::Read(pscpu_timestamp_t timestamp, uint32_t A)
    return(ret);
 }
 
-pscpu_timestamp_t FrontIO::Update(pscpu_timestamp_t timestamp)
+int32_t FrontIO::Update(int32_t timestamp)
 {
    int32_t clocks, i;
    bool need_start_stop_check = false;
@@ -938,39 +938,39 @@ bool FrontIO::RequireNoFrameskip(void)
    return(false);
 }
 
-void FrontIO::GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
- Update(timestamp);
+   Update(timestamp);
 
- for(unsigned i = 0; i < 8; i++)
- {
-    pscpu_timestamp_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
-
-  if(i < 2)
-  {
-   irq10_pulse_ts[i] = plts;
-
-   if(irq10_pulse_ts[i] <= timestamp)
+   for(unsigned i = 0; i < 8; i++)
    {
-    irq10_pulse_ts[i] = PSX_EVENT_MAXTS;
-    ::IRQ_Assert(IRQ_PIO, true);
-    ::IRQ_Assert(IRQ_PIO, false);
+      int32_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
+
+      if(i < 2)
+      {
+         irq10_pulse_ts[i] = plts;
+
+         if(irq10_pulse_ts[i] <= timestamp)
+         {
+            irq10_pulse_ts[i] = PSX_EVENT_MAXTS;
+            ::IRQ_Assert(IRQ_PIO, true);
+            ::IRQ_Assert(IRQ_PIO, false);
+         }
+      }
    }
-  }
- }
 
- //
- // Draw crosshairs in a separate pass so the crosshairs won't mess up the color evaluation of later lightun GPULineHook()s.
- //
- if(pixels && pix_clock)
- {
-  for(unsigned i = 0; i < 8; i++)
-  {
-   Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock);
-  }
- }
+   //
+   // Draw crosshairs in a separate pass so the crosshairs won't mess up the color evaluation of later lightun GPULineHook()s.
+   //
+   if(pixels && pix_clock)
+   {
+      for(unsigned i = 0; i < 8; i++)
+      {
+         Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock);
+      }
+   }
 
- PSX_SetEventNT(PSX_EVENT_FIO, CalcNextEventTS(timestamp, 0x10000000));
+   PSX_SetEventNT(PSX_EVENT_FIO, CalcNextEventTS(timestamp, 0x10000000));
 }
 
 static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =

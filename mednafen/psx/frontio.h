@@ -16,9 +16,9 @@ class InputDevice
 
       virtual bool RequireNoFrameskip(void);
       // Divide mouse X coordinate by pix_clock_divider in the lightgun code to get the coordinate in pixel(clocks).
-      virtual pscpu_timestamp_t GPULineHook(const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
+      virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
-      virtual void Update(const pscpu_timestamp_t timestamp);	// Partially-implemented, don't rely on for timing any more fine-grained than a video frame for now.
+      virtual void Update(const int32_t timestamp);	// Partially-implemented, don't rely on for timing any more fine-grained than a video frame for now.
       virtual void ResetTS(void);
 
       void DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock);
@@ -66,14 +66,14 @@ class FrontIO
       ~FrontIO();
 
       void Power(void);
-      void Write(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V);
-      uint32_t Read(pscpu_timestamp_t timestamp, uint32_t A);
-      pscpu_timestamp_t CalcNextEventTS(pscpu_timestamp_t timestamp, int32_t next_event);
-      pscpu_timestamp_t Update(pscpu_timestamp_t timestamp);
+      void Write(int32_t timestamp, uint32_t A, uint32_t V);
+      uint32_t Read(int32_t timestamp, uint32_t A);
+      int32_t CalcNextEventTS(int32_t timestamp, int32_t next_event);
+      int32_t Update(int32_t timestamp);
       void ResetTS(void);
 
       bool RequireNoFrameskip(void);
-      void GPULineHook(const pscpu_timestamp_t timestamp, const pscpu_timestamp_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
+      void GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider);
 
       void UpdateInput(void);
       void SetInput(unsigned int port, const char *type, void *ptr);
@@ -92,7 +92,7 @@ class FrontIO
    private:
 
       void DoDSRIRQ(void);
-      void CheckStartStopPending(pscpu_timestamp_t timestamp, bool skip_event_set = false);
+      void CheckStartStopPending(int32_t timestamp, bool skip_event_set = false);
 
       void MapDevicesToPorts(void);
 
@@ -138,7 +138,7 @@ class FrontIO
       bool istatus;
       //
       //
-      pscpu_timestamp_t irq10_pulse_ts[2];
+      int32_t irq10_pulse_ts[2];
 
       int32_t dsr_pulse_delay[4];
       int32_t dsr_active_until_ts[4];

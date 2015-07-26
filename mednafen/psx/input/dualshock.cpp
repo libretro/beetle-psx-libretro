@@ -58,7 +58,7 @@ class InputDevice_DualShock : public InputDevice
 
       virtual void Power(void);
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
-      virtual void Update(const pscpu_timestamp_t timestamp);
+      virtual void Update(const int32_t timestamp);
       virtual void ResetTS(void);
       virtual void UpdateInput(const void *data);
 
@@ -112,7 +112,7 @@ class InputDevice_DualShock : public InputDevice
       bool am_prev_info;
       bool aml_prev_info;
       std::string gp_name;
-      pscpu_timestamp_t lastts;
+      int32_t lastts;
 
       //
       //
@@ -133,7 +133,7 @@ InputDevice_DualShock::~InputDevice_DualShock()
 
 }
 
-void InputDevice_DualShock::Update(const pscpu_timestamp_t timestamp)
+void InputDevice_DualShock::Update(const int32_t timestamp)
 {
    lastts = timestamp;
 }

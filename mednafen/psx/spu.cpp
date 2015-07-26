@@ -779,7 +779,6 @@ INLINE void PS_SPU::RunNoise(void)
 }
 
 int32 PS_SPU::UpdateFromCDC(int32 clocks)
-   //pscpu_timestamp_t PS_SPU::Update(const pscpu_timestamp_t timestamp)
 {
    //int32 clocks = timestamp - lastts;
    int32 sample_clocks = 0;
@@ -1080,7 +1079,7 @@ uint32 PS_SPU::ReadDMA(void)
    return(ret);
 }
 
-void PS_SPU::Write(pscpu_timestamp_t timestamp, uint32 A, uint16 V)
+void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 {
    //if((A & 0x3FF) < 0x180)
    // PSX_WARNING("[SPU] Write: %08x %04x", A, V);
@@ -1266,7 +1265,7 @@ void PS_SPU::Write(pscpu_timestamp_t timestamp, uint32 A, uint16 V)
    Regs[(A & 0x1FF) >> 1] = V;
 }
 
-uint16 PS_SPU::Read(pscpu_timestamp_t timestamp, uint32 A)
+uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
 {
    A &= 0x3FF;
 

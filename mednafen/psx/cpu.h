@@ -56,12 +56,12 @@ class PS_CPU
 
       void SetFastMap(void *region_mem, uint32_t region_address, uint32_t region_size);
 
-      INLINE void SetEventNT(const pscpu_timestamp_t next_event_ts_arg)
+      INLINE void SetEventNT(const int32_t next_event_ts_arg)
       {
          next_event_ts = next_event_ts_arg;
       }
 
-      pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, const bool ILHMode);
+      int32_t Run(int32_t timestamp_in, const bool ILHMode);
 
       void Power(void);
 
@@ -95,9 +95,9 @@ class PS_CPU
       uint32_t BACKED_LDValue;
       uint32_t LDAbsorb;
 
-      pscpu_timestamp_t next_event_ts;
-      pscpu_timestamp_t gte_ts_done;
-      pscpu_timestamp_t muldiv_ts_done;
+      int32_t next_event_ts;
+      int32_t gte_ts_done;
+      int32_t muldiv_ts_done;
 
       uint32_t BIU;
 
@@ -207,18 +207,18 @@ class PS_CPU
 
       uint32_t Exception(uint32_t code, uint32_t PC, const uint32_t NPM) MDFN_WARN_UNUSED_RESULT;
 
-      template<bool DebugMode, bool ILHMode> pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
+      template<bool DebugMode, bool ILHMode> int32_t RunReal(int32_t timestamp_in);
 
       template<typename T> T PeekMemory(uint32_t address) MDFN_COLD;
-      template<typename T> T ReadMemory(pscpu_timestamp_t &timestamp, uint32_t address, bool DS24 = false, bool LWC_timing = false);
-      template<typename T> void WriteMemory(pscpu_timestamp_t &timestamp, uint32_t address, uint32_t value, bool DS24 = false);
+      template<typename T> T ReadMemory(int32_t &timestamp, uint32_t address, bool DS24 = false, bool LWC_timing = false);
+      template<typename T> void WriteMemory(int32_t &timestamp, uint32_t address, uint32_t value, bool DS24 = false);
 
 
       //
       // Mednafen debugger stuff follows:
       //
    public:
-      void SetCPUHook(void (*cpuh)(const pscpu_timestamp_t timestamp, uint32_t pc), void (*addbt)(uint32_t from, uint32_t to, bool exception));
+      void SetCPUHook(void (*cpuh)(const int32_t timestamp, uint32_t pc), void (*addbt)(uint32_t from, uint32_t to, bool exception));
       void CheckBreakpoints(void (*callback)(bool write, uint32_t address, unsigned int len), uint32_t instr);
 
       enum
@@ -241,7 +241,7 @@ class PS_CPU
       uint16_t PeekMem16(uint32_t A);
       uint32_t PeekMem32(uint32_t A);
    private:
-      void (*CPUHook)(const pscpu_timestamp_t timestamp, uint32_t pc);
+      void (*CPUHook)(const int32_t timestamp, uint32_t pc);
       void (*ADDBT)(uint32_t from, uint32_t to, bool exception);
 };
 
