@@ -26,6 +26,7 @@
 #ifdef NEED_CD
 #include "mednafen/cdrom/edc_crc32.c"
 #include "mednafen/cdrom/l-ec.c"
+#include "mednafen/cdrom/lec.c"
 #include "mednafen/cdrom/recover-raw.c"
 #include "mednafen/cdrom/galois.c"
 #endif
