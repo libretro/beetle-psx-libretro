@@ -25,4 +25,5 @@
 
 #ifdef NEED_CD
 #include "mednafen/cdrom/edc_crc32.c"
+#include "mednafen/cdrom/galois.c"
 #endif

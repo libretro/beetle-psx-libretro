@@ -24,7 +24,7 @@
 
 #include "dvdisaster.h"
 
-#include "galois-inlines.h"
+#include "galois.h"
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 

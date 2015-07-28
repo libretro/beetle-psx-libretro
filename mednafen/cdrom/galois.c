@@ -22,9 +22,7 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
-#include "dvdisaster.h"
-
-#include "galois-inlines.h"
+#include "galois.h"
 
 /***
  *** Galois field arithmetic.
@@ -36,9 +34,9 @@
 
 /* Initialize the Galois field tables */
 
-GaloisTables* CreateGaloisTables(int32 gf_generator)
+GaloisTables* CreateGaloisTables(int32_t gf_generator)
 {
-   int32 b,log;
+   int32_t b,log;
    GaloisTables *gt = (GaloisTables *)calloc(1, sizeof(GaloisTables));
 
    /* Allocate the tables.
@@ -47,9 +45,9 @@ GaloisTables* CreateGaloisTables(int32 gf_generator)
 
    gt->gfGenerator = gf_generator;
 
-   gt->indexOf     = (int32 *)calloc(GF_FIELDSIZE, sizeof(int32));
-   gt->alphaTo     = (int32 *)calloc(GF_FIELDSIZE, sizeof(int32));
-   gt->encAlphaTo  = (int32 *)calloc(2*GF_FIELDSIZE, sizeof(int32));
+   gt->indexOf     = (int32_t *)calloc(GF_FIELDSIZE, sizeof(int32_t));
+   gt->alphaTo     = (int32_t *)calloc(GF_FIELDSIZE, sizeof(int32_t));
+   gt->encAlphaTo  = (int32_t *)calloc(2*GF_FIELDSIZE, sizeof(int32_t));
 
    /* create the log/ilog values */
 
@@ -96,12 +94,13 @@ void FreeGaloisTables(GaloisTables *gt)
  */
 
 ReedSolomonTables *CreateReedSolomonTables(GaloisTables *gt,
-      int32 first_consecutive_root,
-      int32 prim_elem,
+      int32_t first_consecutive_root,
+      int32_t prim_elem,
       int nroots_in)
 {
-   ReedSolomonTables *rt = (ReedSolomonTables *)calloc(1, sizeof(ReedSolomonTables));
-   int32 i,j,root;
+   int32_t i,j,root;
+   ReedSolomonTables *rt = (ReedSolomonTables *)
+      calloc(1, sizeof(ReedSolomonTables));
 
    rt->gfTables = gt;
    rt->fcr      = first_consecutive_root;
@@ -109,7 +108,7 @@ ReedSolomonTables *CreateReedSolomonTables(GaloisTables *gt,
    rt->nroots   = nroots_in;
    rt->ndata    = GF_FIELDMAX - rt->nroots;
 
-   rt->gpoly    = (int32 *)calloc((rt->nroots+1), sizeof(int32));
+   rt->gpoly    = (int32_t *)calloc((rt->nroots+1), sizeof(int32_t));
 
    /* Create the RS code generator polynomial */
 

@@ -73,50 +73,7 @@ uint32_t EDCCrc32(const unsigned char*, int);
 }
 #endif
 
-/***
- *** galois.c
- ***
- * This is currently the hardcoded GF(2**8).
- * int32 gives abundant space for the GF.
- * Squeezing it down to uint8 won't probably gain much,
- * so we implement this defensively here.
- *
- * Note that some performance critical stuff needs to
- * be #included from galois-inlines.h
- */  
-
-/* Galois field parameters for 8bit symbol Reed-Solomon code */
-
-#define GF_SYMBOLSIZE 8
-#define GF_FIELDSIZE (1<<GF_SYMBOLSIZE)
-#define GF_FIELDMAX (GF_FIELDSIZE-1)
-#define GF_ALPHA0 GF_FIELDMAX
-
-/* Lookup tables for Galois field arithmetic */
-
-typedef struct _GaloisTables
-{  int32 gfGenerator;  /* GF generator polynomial */ 
-   int32 *indexOf;     /* log */
-   int32 *alphaTo;     /* inverse log */
-   int32 *encAlphaTo; /* inverse log optimized for encoder */
-} GaloisTables;
-
-/* Lookup and working tables for the ReedSolomon codecs */
-
-typedef struct _ReedSolomonTables
-{  GaloisTables *gfTables;/* from above */
-   int32 *gpoly;        /* RS code generator polynomial */
-   int32 fcr;           /* first consecutive root of RS generator polynomial */
-   int32 primElem;      /* primitive field element */
-   int32 nroots;        /* degree of RS generator polynomial */
-   int32 ndata;         /* data bytes per ecc block */
-} ReedSolomonTables;
-
-GaloisTables* CreateGaloisTables(int32);
-void FreeGaloisTables(GaloisTables*);
-
-ReedSolomonTables *CreateReedSolomonTables(GaloisTables*, int32, int32, int);
-void FreeReedSolomonTables(ReedSolomonTables*);
+#include "galois.h"
 
 /*** 
  *** l-ec.c
