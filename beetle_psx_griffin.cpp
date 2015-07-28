@@ -38,6 +38,7 @@
 #include "mednafen/cdrom/SimpleFIFO.cpp"
 #include "mednafen/cdrom/audioreader.cpp"
 #include "mednafen/cdrom/cdromif.cpp"
+#include "mednafen/cdrom/misc.cpp"
 #endif
 
 #include "mednafen/mempatcher.cpp"

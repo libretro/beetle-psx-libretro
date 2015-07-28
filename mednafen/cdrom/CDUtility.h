@@ -1,6 +1,11 @@
 #ifndef __MDFN_CDROM_CDUTILITY_H
 #define __MDFN_CDROM_CDUTILITY_H
 
+#include <stdint.h>
+#include <string.h>
+
+#include <retro_inline.h>
+
 // Call once at app startup before creating any threads that could potentially cause re-entrancy to these functions.
 // It will also be called automatically if needed for the first time a function in this namespace that requires
 // the initialization function to be called is called, for potential
@@ -27,9 +32,9 @@ enum
 
 struct TOC_Track
 {
-   uint8 adr;
-   uint8 control;
-   uint32 lba;
+   uint8_t adr;
+   uint8_t control;
+   uint32_t lba;
 };
 
 // SubQ control field flags.
@@ -92,34 +97,34 @@ static INLINE int TOC_FindTrackByLBA(TOC *toc, uint32_t LBA)
 //
 // Address conversion functions.
 //
-static INLINE uint32 AMSF_to_ABA(int32 m_a, int32 s_a, int32 f_a)
+static INLINE uint32_t AMSF_to_ABA(int32_t m_a, int32_t s_a, int32_t f_a)
 {
    return(f_a + 75 * s_a + 75 * 60 * m_a);
 }
 
-static INLINE void ABA_to_AMSF(uint32 aba, uint8 *m_a, uint8 *s_a, uint8 *f_a)
+static INLINE void ABA_to_AMSF(uint32_t aba, uint8_t *m_a, uint8_t *s_a, uint8_t *f_a)
 {
    *m_a = aba / 75 / 60;
    *s_a = (aba - *m_a * 75 * 60) / 75;
    *f_a = aba - (*m_a * 75 * 60) - (*s_a * 75);
 }
 
-static INLINE int32 ABA_to_LBA(uint32 aba)
+static INLINE int32_t ABA_to_LBA(uint32_t aba)
 {
    return(aba - 150);
 }
 
-static INLINE uint32 LBA_to_ABA(int32 lba)
+static INLINE uint32_t LBA_to_ABA(int32_t lba)
 {
    return(lba + 150);
 }
 
-static INLINE int32 AMSF_to_LBA(uint8 m_a, uint8 s_a, uint8 f_a)
+static INLINE int32_t AMSF_to_LBA(uint8_t m_a, uint8_t s_a, uint8_t f_a)
 {
    return(ABA_to_LBA(AMSF_to_ABA(m_a, s_a, f_a)));
 }
 
-static INLINE void LBA_to_AMSF(int32 lba, uint8 *m_a, uint8 *s_a, uint8 *f_a)
+static INLINE void LBA_to_AMSF(int32_t lba, uint8_t *m_a, uint8_t *s_a, uint8_t *f_a)
 {
    ABA_to_AMSF(LBA_to_ABA(lba), m_a, s_a, f_a);
 }
@@ -127,7 +132,7 @@ static INLINE void LBA_to_AMSF(int32 lba, uint8 *m_a, uint8 *s_a, uint8 *f_a)
 //
 // BCD conversion functions
 //
-static INLINE bool BCD_is_valid(uint8 bcd_number)
+static INLINE bool BCD_is_valid(uint8_t bcd_number)
 {
    if((bcd_number & 0xF0) >= 0xA0)
       return(false);
@@ -138,18 +143,18 @@ static INLINE bool BCD_is_valid(uint8 bcd_number)
    return(true);
 }
 
-static INLINE uint8 BCD_to_U8(uint8 bcd_number)
+static INLINE uint8_t BCD_to_U8(uint8_t bcd_number)
 {
    return( ((bcd_number >> 4) * 10) + (bcd_number & 0x0F) );
 }
 
-static INLINE uint8 U8_to_BCD(uint8 num)
+static INLINE uint8_t U8_to_BCD(uint8_t num)
 {
    return( ((num / 10) << 4) + (num % 10) );
 }
 
 // should always perform the conversion, even if the bcd number is invalid.
-static INLINE bool BCD_to_U8_check(uint8 bcd_number, uint8 *out_number)
+static INLINE bool BCD_to_U8_check(uint8_t bcd_number, uint8_t *out_number)
 {
    *out_number = BCD_to_U8(bcd_number);
 
@@ -163,16 +168,16 @@ static INLINE bool BCD_to_U8_check(uint8 bcd_number, uint8 *out_number)
 // Sector data encoding functions(to full 2352 bytes raw sector).
 //
 //  sector_data must be able to contain at least 2352 bytes.
-void encode_mode0_sector(uint32 aba, uint8 *sector_data);
-void encode_mode1_sector(uint32 aba, uint8 *sector_data);	// 2048 bytes of user data at offset 16
-void encode_mode2_sector(uint32 aba, uint8 *sector_data);	// 2336 bytes of user data at offset 16 
-void encode_mode2_form1_sector(uint32 aba, uint8 *sector_data);	// 2048+8 bytes of user data at offset 16
-void encode_mode2_form2_sector(uint32 aba, uint8 *sector_data);	// 2324+8 bytes of user data at offset 16
+void encode_mode0_sector(uint32_t aba, uint8_t *sector_data);
+void encode_mode1_sector(uint32_t aba, uint8_t *sector_data);	// 2048 bytes of user data at offset 16
+void encode_mode2_sector(uint32_t aba, uint8_t *sector_data);	// 2336 bytes of user data at offset 16 
+void encode_mode2_form1_sector(uint32_t aba, uint8_t *sector_data);	// 2048+8 bytes of user data at offset 16
+void encode_mode2_form2_sector(uint32_t aba, uint8_t *sector_data);	// 2324+8 bytes of user data at offset 16
 
 
 // out_buf must be able to contain 2352+96 bytes.
 // "mode" is only used if(toc.tracks[100].control & 0x4)
-void synth_leadout_sector_lba(const uint8 mode, const TOC& toc, const int32 lba, uint8* out_buf);
+void synth_leadout_sector_lba(const uint8_t mode, const TOC& toc, const int32_t lba, uint8_t* out_buf);
 
 //
 // User data error detection and correction
@@ -182,44 +187,41 @@ void synth_leadout_sector_lba(const uint8 mode, const TOC& toc, const int32 lba,
 //  Returns "true" if checksum is ok(matches).
 //  Returns "false" if checksum mismatch.
 //  sector_data should contain 2352 bytes of raw sector data.
-bool edc_check(const uint8 *sector_data, bool xa);
+bool edc_check(const uint8_t *sector_data, bool xa);
 
 // Check EDC and L-EC data of a mode 1 or mode 2 form 1 sector, and correct bit errors if any exist.
 //  Returns "true" if errors weren't detected, or they were corrected succesfully.
 //  Returns "false" if errors couldn't be corrected.
 //  sector_data should contain 2352 bytes of raw sector data.
-bool edc_lec_check_and_correct(uint8 *sector_data, bool xa);
+bool edc_lec_check_and_correct(uint8_t *sector_data, bool xa);
 
 //
 // Subchannel(Q in particular) functions
 //
 
 // Returns false on checksum mismatch, true on match.
-bool subq_check_checksum(const uint8 *subq_buf);
+bool subq_check_checksum(const uint8_t *subq_buf);
 
 // Calculates the checksum of Q subchannel data(not including the checksum bytes of course ;)) from subq_buf, and stores it into the appropriate position
 // in subq_buf.
-void subq_generate_checksum(uint8 *subq_buf);
+void subq_generate_checksum(uint8_t *subq_buf);
 
 // Deinterleaves 12 bytes of subchannel Q data from 96 bytes of interleaved subchannel PW data.
-void subq_deinterleave(const uint8 *subpw_buf, uint8 *subq_buf);
+void subq_deinterleave(const uint8_t *subpw_buf, uint8_t *subq_buf);
 
 // Deinterleaves 96 bytes of subchannel P-W data from 96 bytes of interleaved subchannel PW data.
-void subpw_deinterleave(const uint8 *in_buf, uint8 *out_buf);
+void subpw_deinterleave(const uint8_t *in_buf, uint8_t *out_buf);
 
 // Interleaves 96 bytes of subchannel P-W data from 96 bytes of uninterleaved subchannel PW data.
-void subpw_interleave(const uint8 *in_buf, uint8 *out_buf);
+void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf);
 
 // Extrapolates Q subchannel current position data from subq_input, with frame/sector delta position_delta, and writes to subq_output.
 // Only valid for ADR_CURPOS.
 // subq_input must pass subq_check_checksum().
 // TODO
-//void subq_extrapolate(const uint8 *subq_input, int32 position_delta, uint8 *subq_output);
+//void subq_extrapolate(const uint8_t *subq_input, int32_t position_delta, uint8_t *subq_output);
 
 // (De)Scrambles data sector.
-void scrambleize_data_sector(uint8 *sector_data);
-
-void MDFN_strtoupper(std::string &str);
-void MDFN_strtoupper(char *str);
+void scrambleize_data_sector(uint8_t *sector_data);
 
 #endif

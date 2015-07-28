@@ -2,8 +2,10 @@
 #define __MDFN_CDROMFILE_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include "CDUtility.h"
+#include "misc.h"
 
 class CDAccess
 {
@@ -12,7 +14,7 @@ class CDAccess
  CDAccess();
  virtual ~CDAccess();
 
- virtual void Read_Raw_Sector(uint8 *buf, int32 lba) = 0;
+ virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
 
  virtual void Read_TOC(TOC *toc) = 0;
 

@@ -17,7 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "../mednafen.h"
 #include "CDUtility.h"
 #include "edc_crc32.h"
 #include "galois.h"
@@ -28,7 +27,7 @@
 #include <assert.h>
 
 // lookup table for crc calculation
-static uint16 subq_crctab[256] = 
+static uint16_t subq_crctab[256] = 
 {
    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7, 0x8108,
    0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF, 0x1231, 0x0210,
@@ -62,7 +61,7 @@ static uint16 subq_crctab[256] =
 };
 
 
-static uint8 scramble_table[2352 - 12];
+static uint8_t scramble_table[2352 - 12];
 
 static bool CDUtility_Inited = false;
 
@@ -101,49 +100,49 @@ void CDUtility_Init(void)
    }
 }
 
-void encode_mode0_sector(uint32 aba, uint8 *sector_data)
+void encode_mode0_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
 
    lec_encode_mode0_sector(aba, sector_data);
 }
 
-void encode_mode1_sector(uint32 aba, uint8 *sector_data)
+void encode_mode1_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
 
    lec_encode_mode1_sector(aba, sector_data);
 }
 
-void encode_mode2_sector(uint32 aba, uint8 *sector_data)
+void encode_mode2_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
 
    lec_encode_mode2_sector(aba, sector_data);
 }
 
-void encode_mode2_form1_sector(uint32 aba, uint8 *sector_data)
+void encode_mode2_form1_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
 
    lec_encode_mode2_form1_sector(aba, sector_data);
 }
 
-void encode_mode2_form2_sector(uint32 aba, uint8 *sector_data)
+void encode_mode2_form2_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
 
    lec_encode_mode2_form2_sector(aba, sector_data);
 }
 
-bool edc_check(const uint8 *sector_data, bool xa)
+bool edc_check(const uint8_t *sector_data, bool xa)
 {
    CDUtility_Init();
 
    return(CheckEDC(sector_data, xa));
 }
 
-bool edc_lec_check_and_correct(uint8 *sector_data, bool xa)
+bool edc_lec_check_and_correct(uint8_t *sector_data, bool xa)
 {
    CDUtility_Init();
 
@@ -151,10 +150,10 @@ bool edc_lec_check_and_correct(uint8 *sector_data, bool xa)
 }
 
 
-bool subq_check_checksum(const uint8 *SubQBuf)
+bool subq_check_checksum(const uint8_t *SubQBuf)
 {
-   uint16 crc = 0;
-   uint16 stored_crc = 0;
+   uint16_t crc = 0;
+   uint16_t stored_crc = 0;
 
    stored_crc = SubQBuf[0xA] << 8;
    stored_crc |= SubQBuf[0xB];
@@ -167,9 +166,9 @@ bool subq_check_checksum(const uint8 *SubQBuf)
    return(crc == stored_crc);
 }
 
-void subq_generate_checksum(uint8 *buf)
+void subq_generate_checksum(uint8_t *buf)
 {
-   uint16 crc = 0;
+   uint16_t crc = 0;
 
    for(int i = 0; i < 0xA; i++)
       crc = subq_crctab[(crc >> 8) ^ buf[i]] ^ (crc << 8);
@@ -179,7 +178,7 @@ void subq_generate_checksum(uint8 *buf)
    buf[0xb] = ~(crc);
 }
 
-void subq_deinterleave(const uint8 *SubPWBuf, uint8 *qbuf)
+void subq_deinterleave(const uint8_t *SubPWBuf, uint8_t *qbuf)
 {
    memset(qbuf, 0, 0xC);
 
@@ -189,7 +188,7 @@ void subq_deinterleave(const uint8 *SubPWBuf, uint8 *qbuf)
 
 
 // Deinterleaves 96 bytes of subchannel P-W data from 96 bytes of interleaved subchannel PW data.
-void subpw_deinterleave(const uint8 *in_buf, uint8 *out_buf)
+void subpw_deinterleave(const uint8_t *in_buf, uint8_t *out_buf)
 {
    assert(in_buf != out_buf);
 
@@ -204,7 +203,7 @@ void subpw_deinterleave(const uint8 *in_buf, uint8 *out_buf)
 }
 
 // Interleaves 96 bytes of subchannel P-W data from 96 bytes of uninterleaved subchannel PW data.
-void subpw_interleave(const uint8 *in_buf, uint8 *out_buf)
+void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf)
 {
    assert(in_buf != out_buf);
 
@@ -212,7 +211,7 @@ void subpw_interleave(const uint8 *in_buf, uint8 *out_buf)
    {
       for(unsigned bitpoodle = 0; bitpoodle < 8; bitpoodle++)
       {
-         uint8 rawb = 0;
+         uint8_t rawb = 0;
 
          for(unsigned ch = 0; ch < 8; ch++)
          {
@@ -229,12 +228,12 @@ void subpw_interleave(const uint8 *in_buf, uint8 *out_buf)
 //  and the leadout entry together before extracting the D2 bit.  Audio track->data leadout is fairly benign though maybe noisy(especially if we ever implement
 //  data scrambling properly), but data track->audio leadout could break things in an insidious manner for the more accurate drive emulation code).
 //
-void subpw_synth_leadout_lba(const TOC& toc, const int32 lba, uint8* SubPWBuf)
+void subpw_synth_leadout_lba(const TOC& toc, const int32_t lba, uint8_t* SubPWBuf)
 {
-   uint8 buf[0xC];
-   uint32 lba_relative;
-   uint32 ma, sa, fa;
-   uint32 m, s, f;
+   uint8_t buf[0xC];
+   uint32_t lba_relative;
+   uint32_t ma, sa, fa;
+   uint32_t m, s, f;
 
    lba_relative = lba - toc.tracks[100].lba;
 
@@ -246,8 +245,8 @@ void subpw_synth_leadout_lba(const TOC& toc, const int32 lba, uint8* SubPWBuf)
    sa = ((lba + 150) / 75) % 60;
    ma = ((lba + 150) / 75 / 60);
 
-   uint8 adr = 0x1; // Q channel data encodes position
-   uint8 control = (toc.tracks[toc.last_track].control & 0x4) | toc.tracks[100].control;
+   uint8_t adr = 0x1; // Q channel data encodes position
+   uint8_t control = (toc.tracks[toc.last_track].control & 0x4) | toc.tracks[100].control;
 
    memset(buf, 0, 0xC);
    buf[0] = (adr << 0) | (control << 4);
@@ -272,7 +271,7 @@ void subpw_synth_leadout_lba(const TOC& toc, const int32 lba, uint8* SubPWBuf)
       SubPWBuf[i] = (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | 0x80;
 }
 
-void synth_leadout_sector_lba(const uint8 mode, const TOC& toc, const int32 lba, uint8* out_buf)
+void synth_leadout_sector_lba(const uint8_t mode, const TOC& toc, const int32_t lba, uint8_t* out_buf)
 {
    memset(out_buf, 0, 2352 + 96);
    subpw_synth_leadout_lba(toc, lba, out_buf + 2352);
@@ -297,28 +296,8 @@ void synth_leadout_sector_lba(const uint8 mode, const TOC& toc, const int32 lba,
    }
 }
 
-void scrambleize_data_sector(uint8 *sector_data)
+void scrambleize_data_sector(uint8_t *sector_data)
 {
    for(unsigned i = 12; i < 2352; i++)
       sector_data[i] ^= scramble_table[i - 12];
-}
-
-void MDFN_strtoupper(char *str)
-{
-   for(size_t x = 0; str[x]; x++)
-   {
-      if(str[x] >= 'a' && str[x] <= 'z')
-         str[x] = str[x] - 'a' + 'A';
-   }
-}
-
-void MDFN_strtoupper(std::string &str)
-{
-   const size_t len = str.length();
-
-   for(size_t x = 0; x < len; x++)
-   {
-      if(str[x] >= 'a' && str[x] <= 'z')
-         str[x] = str[x] - 'a' + 'A';
-   }
 }
