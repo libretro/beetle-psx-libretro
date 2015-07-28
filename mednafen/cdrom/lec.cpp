@@ -19,6 +19,7 @@
 
 #include <assert.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 #include "lec.h"
 
@@ -41,38 +42,125 @@
 static uint8_t GF8_LOG[256];
 static uint8_t GF8_ILOG[256];
 
-static const class Gf8_Q_Coeffs_Results_01
-{
-   private:
-      uint16_t table[43][256];
-   public:
-      Gf8_Q_Coeffs_Results_01();
-      ~Gf8_Q_Coeffs_Results_01() {}
-      const uint16_t *operator[] (int i) const { return &table[i][0]; }
-      operator const uint16_t *() const	    { return &table[0][0]; }
-} CF8_Q_COEFFS_RESULTS_01;
+uint16_t cf8_table[43][256];
+uint32_t crc_table[256];
+uint8_t scramble_table[2340];
 
-static const class CrcTable
-{
-   private:
-      uint32_t table[256];
-   public:
-      CrcTable();
-      ~CrcTable() {}
-      uint32_t operator[](int i) const	{ return table[i]; }
-      operator const uint32_t *() const	{ return table;    }
-} CRCTABLE;
+/* Addition in the GF(8) domain: just the XOR of the values.
+ */
+#define gf8_add(a,  b) (a) ^ (b)
 
-static const class ScrambleTable
+/* Division in the GF(8) domain: Like multiplication but logarithms a
+ * subtracted.
+ */
+static uint8_t gf8_div(uint8_t a, uint8_t b)
 {
-   private:
-      uint8_t table[2340];
-   public:
-      ScrambleTable();
-      ~ScrambleTable() {}
-      uint8_t operator[](int i) const	{ return table[i]; }
-      operator const uint8_t *() const	{ return table;    }
-} SCRAMBLE_TABLE;
+  int16_t sum;
+
+  assert(b != 0);
+
+  if (a == 0)
+    return 0;
+
+  sum = GF8_LOG[a] - GF8_LOG[b];
+
+  if (sum < 0)
+    sum += 255;
+
+  return GF8_ILOG[sum];
+}
+
+
+/* Reverses the bits in 'd'. 'bits' defines the bit width of 'd'.
+ */
+static uint32_t mirror_bits(uint32_t d, int bits)
+{
+  int i;
+  uint32_t r = 0;
+
+  for (i = 0; i < bits; i++)
+  {
+    r <<= 1;
+
+    if ((d & 0x1) != 0)
+      r |= 0x1;
+
+    d >>= 1;
+  }
+
+  return r;
+}
+
+
+/* Calculates the CRC of given data with given lengths based on the
+ * table lookup algorithm.
+ */
+static uint32_t calc_edc(uint8_t *data, int len)
+{
+  uint32_t crc = 0;
+
+  while (len--)
+    crc = crc_table[(int)(crc ^ *data++) & 0xff] ^ (crc >> 8);
+
+  return crc;
+}
+
+/* Build the scramble table as defined in the yellow book. The bytes
+   12 to 2351 of a sector will be XORed with the data of this table.
+ */
+static void scramble_table_init(void)
+{
+   uint8_t d;
+   uint16_t i, j;
+   uint16_t reg = 1;
+
+   for (i = 0; i < 2340; i++)
+   {
+      d = 0;
+
+      for (j = 0; j < 8; j++)
+      {
+         d >>= 1;
+
+         if ((reg & 0x1) != 0)
+            d |= 0x80;
+
+         reg >>= 1;
+         if ((reg & 0x1) != ((reg >> 1) & 0x1))
+            reg |= 0x4000; /* 15-bit register */
+      }
+
+      scramble_table[i] = d;
+   }
+}
+
+/* Build the CRC lookup table for EDC_POLY poly. The CRC is 32 bit wide
+ * and reversed (i.e. the bit stream is divided by the EDC_POLY with the
+ * LSB first order).
+ */
+static void crc_table_init(void)
+{
+   uint32_t i, j;
+   uint32_t r;
+
+   for (i = 0; i < 256; i++)
+   {
+      r = mirror_bits(i, 8);
+
+      r <<= 24;
+
+      for (j = 0; j < 8; j++)
+      {
+         r <<= 1;
+         if ((r & 0x80000000) != 0)
+            r ^= EDC_POLY;
+      }
+
+      r = mirror_bits(r, 32);
+
+      crc_table[i] = r;
+   }
+}
 
 /* Creates the logarithm and inverse logarithm table that is required
  * for performing multiplication in the GF(8) domain.
@@ -102,192 +190,83 @@ static void gf8_create_log_tables(void)
    }
 }
 
-/* Addition in the GF(8) domain: just the XOR of the values.
- */
-#define gf8_add(a,  b) (a) ^ (b)
-
-
-/* Division in the GF(8) domain: Like multiplication but logarithms a
- * subtracted.
- */
-static uint8_t gf8_div(uint8_t a, uint8_t b)
+static void cf8_table_init(void)
 {
-  int16_t sum;
+   int i, j;
+   uint16_t c;
+   uint8_t GF8_COEFFS_HELP[2][45]; 
+   uint8_t GF8_Q_COEFFS[2][45];
 
-  assert(b != 0);
+   gf8_create_log_tables();
 
-  if (a == 0)
-    return 0;
+   /* build matrix H:
+    *  1    1   ...  1   1
+    * a^44 a^43 ... a^1 a^0
+    *
+    * 
+    */
 
-  sum = GF8_LOG[a] - GF8_LOG[b];
-
-  if (sum < 0)
-    sum += 255;
-
-  return GF8_ILOG[sum];
-}
-
-Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
-{
-  int i, j;
-  uint16_t c;
-  uint8_t GF8_COEFFS_HELP[2][45]; 
-  uint8_t GF8_Q_COEFFS[2][45];
-
-
-  gf8_create_log_tables();
-
-  /* build matrix H:
-   *  1    1   ...  1   1
-   * a^44 a^43 ... a^1 a^0
-   *
-   * 
-   */
-
-  for (j = 0; j < 45; j++)
-  {
-    GF8_COEFFS_HELP[0][j] = 1;               /* e0 */
-    GF8_COEFFS_HELP[1][j] = GF8_ILOG[44-j];  /* e1 */
-  }
-
-  
-  /* resolve equation system for parity byte 0 and 1 */
- 
-  /* e1' = e1 + e0 */
-  for (j = 0; j < 45; j++)
-    GF8_Q_COEFFS[1][j] = gf8_add(GF8_COEFFS_HELP[1][j],
-				 GF8_COEFFS_HELP[0][j]);
-
-  /* e1'' = e1' / (a^1 + 1) */
-  for (j = 0; j < 45; j++)
-    GF8_Q_COEFFS[1][j] = gf8_div(GF8_Q_COEFFS[1][j], GF8_Q_COEFFS[1][43]);
-
-  /* e0' = e0 + e1 / a^1 */
-  for (j = 0; j < 45; j++)
-    GF8_Q_COEFFS[0][j] = gf8_add(GF8_COEFFS_HELP[0][j],
-				 gf8_div(GF8_COEFFS_HELP[1][j],
-					 GF8_ILOG[1]));
-
-  /* e0'' = e0' / (1 + 1 / a^1) */
-  for (j = 0; j < 45; j++)
-    GF8_Q_COEFFS[0][j] = gf8_div(GF8_Q_COEFFS[0][j], GF8_Q_COEFFS[0][44]);
-
-  /* 
-   * Compute the products of 0..255 with all of the Q coefficients in
-   * advance. When building the scalar product between the data vectors
-   * and the P/Q vectors the individual products can be looked up in
-   * this table
-   *
-   * The P parity coefficients are just a subset of the Q coefficients so
-   * that we do not need to create a separate table for them. 
-   */
-  
-  for (j = 0; j < 43; j++)
-  {
-
-    table[j][0] = 0;
-
-    for (i = 1; i < 256; i++)
-    {
-       c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[0][j]];
-       if (c >= 255) c -= 255;
-       table[j][i] = GF8_ILOG[c];
-
-       c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[1][j]];
-       if (c >= 255) c -= 255;
-       table[j][i] |= GF8_ILOG[c]<<8;
-    }
-  }
-}
-
-/* Reverses the bits in 'd'. 'bits' defines the bit width of 'd'.
- */
-static uint32_t mirror_bits(uint32_t d, int bits)
-{
-  int i;
-  uint32_t r = 0;
-
-  for (i = 0; i < bits; i++)
-  {
-    r <<= 1;
-
-    if ((d & 0x1) != 0)
-      r |= 0x1;
-
-    d >>= 1;
-  }
-
-  return r;
-}
-
-/* Build the CRC lookup table for EDC_POLY poly. The CRC is 32 bit wide
- * and reversed (i.e. the bit stream is divided by the EDC_POLY with the
- * LSB first order).
- */
-CrcTable::CrcTable ()
-{
-   uint32_t i, j;
-   uint32_t r;
-
-   for (i = 0; i < 256; i++)
+   for (j = 0; j < 45; j++)
    {
-      r = mirror_bits(i, 8);
+      GF8_COEFFS_HELP[0][j] = 1;               /* e0 */
+      GF8_COEFFS_HELP[1][j] = GF8_ILOG[44-j];  /* e1 */
+   }
 
-      r <<= 24;
 
-      for (j = 0; j < 8; j++)
+   /* resolve equation system for parity byte 0 and 1 */
+
+   /* e1' = e1 + e0 */
+   for (j = 0; j < 45; j++)
+      GF8_Q_COEFFS[1][j] = gf8_add(GF8_COEFFS_HELP[1][j],
+            GF8_COEFFS_HELP[0][j]);
+
+   /* e1'' = e1' / (a^1 + 1) */
+   for (j = 0; j < 45; j++)
+      GF8_Q_COEFFS[1][j] = gf8_div(GF8_Q_COEFFS[1][j], GF8_Q_COEFFS[1][43]);
+
+   /* e0' = e0 + e1 / a^1 */
+   for (j = 0; j < 45; j++)
+      GF8_Q_COEFFS[0][j] = gf8_add(GF8_COEFFS_HELP[0][j],
+            gf8_div(GF8_COEFFS_HELP[1][j],
+               GF8_ILOG[1]));
+
+   /* e0'' = e0' / (1 + 1 / a^1) */
+   for (j = 0; j < 45; j++)
+      GF8_Q_COEFFS[0][j] = gf8_div(GF8_Q_COEFFS[0][j], GF8_Q_COEFFS[0][44]);
+
+   /* 
+    * Compute the products of 0..255 with all of the Q coefficients in
+    * advance. When building the scalar product between the data vectors
+    * and the P/Q vectors the individual products can be looked up in
+    * this table
+    *
+    * The P parity coefficients are just a subset of the Q coefficients so
+    * that we do not need to create a separate table for them. 
+    */
+
+   for (j = 0; j < 43; j++)
+   {
+
+      cf8_table[j][0] = 0;
+
+      for (i = 1; i < 256; i++)
       {
-         r <<= 1;
-         if ((r & 0x80000000) != 0)
-            r ^= EDC_POLY;
+         c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[0][j]];
+         if (c >= 255) c -= 255;
+         cf8_table[j][i] = GF8_ILOG[c];
+
+         c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[1][j]];
+         if (c >= 255) c -= 255;
+         cf8_table[j][i] |= GF8_ILOG[c]<<8;
       }
-
-      r = mirror_bits(r, 32);
-
-      table[i] = r;
    }
 }
 
-/* Calculates the CRC of given data with given lengths based on the
- * table lookup algorithm.
- */
-static uint32_t calc_edc(uint8_t *data, int len)
+void lec_tables_init(void)
 {
-  uint32_t crc = 0;
-
-  while (len--)
-    crc = CRCTABLE[(int)(crc ^ *data++) & 0xff] ^ (crc >> 8);
-
-  return crc;
-}
-
-/* Build the scramble table as defined in the yellow book. The bytes
-   12 to 2351 of a sector will be XORed with the data of this table.
- */
-ScrambleTable::ScrambleTable()
-{
-   uint8_t d;
-   uint16_t i, j;
-   uint16_t reg = 1;
-
-   for (i = 0; i < 2340; i++)
-   {
-      d = 0;
-
-      for (j = 0; j < 8; j++)
-      {
-         d >>= 1;
-
-         if ((reg & 0x1) != 0)
-            d |= 0x80;
-
-         reg >>= 1;
-         if ((reg & 0x1) != ((reg >> 1) & 0x1))
-            reg |= 0x4000; /* 15-bit register */
-      }
-
-      table[i] = d;
-   }
+   scramble_table_init();
+   crc_table_init();
+   cf8_table_init();
 }
 
 /* Calc EDC for a MODE 1 sector
@@ -384,8 +363,8 @@ static void calc_P_parity(uint8_t *sector)
          d0 = *p_lsb;
          d1 = *(p_lsb+1);
 
-         p01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
-         p01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
+         p01_lsb ^= cf8_table[j][d0];
+         p01_msb ^= cf8_table[j][d1];
 
          p_lsb += 2 * 43;
       }
@@ -432,8 +411,8 @@ static void calc_Q_parity(uint8_t *sector)
          d0 = *q_lsb;
          d1 = *(q_lsb+1);
 
-         q01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
-         q01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
+         q01_lsb ^= cf8_table[j][d0];
+         q01_msb ^= cf8_table[j][d1];
 
          q_lsb += 2 * 44;
 
@@ -552,9 +531,9 @@ void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector)
 void lec_scramble(uint8_t *sector)
 {
    uint16_t i;
-   const uint8_t *stable = SCRAMBLE_TABLE;
    uint8_t *p = sector;
    uint8_t tmp;
+   const uint8_t *stable = scramble_table;
 
    for (i = 0; i < 6; i++)
    {

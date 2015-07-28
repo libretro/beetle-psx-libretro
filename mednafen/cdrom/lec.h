@@ -66,4 +66,6 @@ void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector);
  */
 void lec_scramble(uint8_t *sector);
 
+void lec_tables_init(void);
+
 #endif

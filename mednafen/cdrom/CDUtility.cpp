@@ -95,6 +95,7 @@ void CDUtility_Init(void)
       Init_LEC_Correct();
 
       InitScrambleTable();
+      lec_tables_init();
 
       CDUtility_Inited = true;
    }
