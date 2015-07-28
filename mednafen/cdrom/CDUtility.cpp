@@ -19,7 +19,10 @@
 
 #include "../mednafen.h"
 #include "CDUtility.h"
-#include "dvdisaster.h"
+#include "edc_crc32.h"
+#include "galois.h"
+#include "l-ec.h"
+#include "recover-raw.h"
 #include "lec.h"
 
 #include <assert.h>
