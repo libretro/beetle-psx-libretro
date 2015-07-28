@@ -569,6 +569,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 	|| !strcasecmp(args[1].c_str(), "MPC") || !strcasecmp(args[1].c_str(), "MP+"))
      {
       TmpTrack.AReader = AR_Open(TmpTrack.fp);
+
       if(!TmpTrack.AReader)
       {
        throw(MDFN_Error(0, _("Unsupported audio track file format: %s\n"), args[0].c_str()));
