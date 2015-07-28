@@ -19,23 +19,28 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
-#include "dvdisaster.h"
+#include <stdint.h>
+#include <string.h>
+#include "recover-raw.h"
+#include "l-ec.h"
+#include "edc_crc32.h"
+#include "galois.h"
 
 static GaloisTables *gt = NULL;		/* for L-EC Reed-Solomon */
 static ReedSolomonTables *rt = NULL;
 
 bool Init_LEC_Correct(void)
 {
- gt = CreateGaloisTables(0x11d);
- rt = CreateReedSolomonTables(gt, 0, 1, 10);
+   gt = CreateGaloisTables(0x11d);
+   rt = CreateReedSolomonTables(gt, 0, 1, 10);
 
- return(1);
+   return(1);
 }
 
 void Kill_LEC_Correct(void)
 {
- FreeGaloisTables(gt);
- FreeReedSolomonTables(rt);
+   FreeGaloisTables(gt);
+   FreeReedSolomonTables(rt);
 }
 
 /***
@@ -178,8 +183,8 @@ static int simple_lec(unsigned char *frame)
  ***/
 
 int ValidateRawSector(unsigned char *frame, bool xaMode)
-{  
-   int lec_did_sth = FALSE;
+{
+   int lec_did_sth = false;
 
    /* Do simple L-EC.
       It seems that drives stop their internal L-EC as soon as the
@@ -193,7 +198,7 @@ int ValidateRawSector(unsigned char *frame, bool xaMode)
 
    /* EDC failure in RAW sector */
    if(!CheckEDC(frame, xaMode))
-      return FALSE;
+      return false;
 
-   return TRUE;
+   return true;
 }

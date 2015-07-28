@@ -37,7 +37,6 @@
 #include "mednafen/cdrom/lec.cpp"
 #include "mednafen/cdrom/SimpleFIFO.cpp"
 #include "mednafen/cdrom/audioreader.cpp"
-#include "mednafen/cdrom/recover-raw.cpp"
 #include "mednafen/cdrom/cdromif.cpp"
 #endif
 

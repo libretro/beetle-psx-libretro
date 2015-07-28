@@ -17,8 +17,8 @@
 #ifndef THREAD_H__
 #define THREAD_H__
 
-#include "boolean.h"
 #include <stdint.h>
+#include <boolean.h>
 
 #if defined(__cplusplus) && !defined(MSC_VER)
 extern "C" {

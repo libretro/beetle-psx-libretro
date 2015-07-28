@@ -86,12 +86,12 @@ SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/lec.cpp \
 	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
 	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
-	$(MEDNAFEN_DIR)/cdrom/recover-raw.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
 
 SOURCES_C += \
 	$(MEDNAFEN_DIR)/cdrom/galois.c \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.c \
+	$(MEDNAFEN_DIR)/cdrom/recover-raw.c \
 	$(MEDNAFEN_DIR)/cdrom/edc_crc32.c
 endif
    FLAGS += -DNEED_CD

@@ -63,16 +63,7 @@ void CreateEcc(void);
 void FixEcc(void);
 void Verify(void);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-uint32_t EDCCrc32(const unsigned char*, int);
-
-#ifdef __cplusplus
-}
-#endif
-
+#include "edc_crc32.h"
 #include "galois.h"
 #include "l-ec.h"
 
@@ -88,20 +79,8 @@ void int64_to_uchar(unsigned char*, int64);
 
 void CalcSectors(int64, int64*, int*);
 
-/***
- *** recover-raw.c
- ***/
+#include "recover-raw.h"
 
-#define CD_RAW_SECTOR_SIZE 2352  
-#define CD_RAW_C2_SECTOR_SIZE (2352+294)  /* main channel plus C2 vector */
-
-int CheckEDC(const unsigned char*, bool);
-int CheckMSF(unsigned char*, int);
-
-
-int ValidateRawSector(unsigned char *frame, bool xaMode);
-bool Init_LEC_Correct(void);
-void Kill_LEC_Correct(void);
 
 
 #endif				/* DVDISASTER_H */

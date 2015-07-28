@@ -2,7 +2,7 @@
 #define _GALOIS_H
 
 #include <stdint.h>
-#include "../include/retro_inline.h"
+#include <retro_inline.h>
 
 #ifdef __cplusplus
 extern "C" {
