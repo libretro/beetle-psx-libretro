@@ -50,44 +50,44 @@ enum
 
 struct TOC
 {
-   INLINE TOC()
-   {
-      Clear();
-   }
-
-   INLINE void Clear(void)
-   {
-      first_track = last_track = 0;
-      disc_type = 0;
-
-      memset(tracks, 0, sizeof(tracks));	// FIXME if we change TOC_Track to non-POD type.
-   }
-
-   INLINE int FindTrackByLBA(uint32 LBA)
-   {
-      for(int32 track = first_track; track <= (last_track + 1); track++)
-      {
-         if(track == (last_track + 1))
-         {
-            if(LBA < tracks[100].lba)
-               return(track - 1);
-         }
-         else
-         {
-            if(LBA < tracks[track].lba)
-               return(track - 1);
-         }
-      }
-      return(0);
-   }
-
-   uint8 first_track;
-   uint8 last_track;
-   uint8 disc_type;
-   TOC_Track tracks[100 + 1];  // [0] is unused, [100] is for the leadout track.
-   // Also, for convenience, tracks[last_track + 1] will always refer
-   // to the leadout track(even if last_track < 99, IE the leadout track details are duplicated).
+   uint8_t first_track;
+   uint8_t last_track;
+   uint8_t disc_type;
+   TOC_Track tracks[100 + 1];
 };
+
+static INLINE void TOC_Clear(TOC *toc)
+{
+   if (!toc)
+      return;
+
+   toc->first_track = 0;
+   toc->last_track  = 0;
+   toc->disc_type   = 0;
+
+   memset(toc->tracks, 0, sizeof(toc->tracks));
+}
+
+static INLINE int TOC_FindTrackByLBA(TOC *toc, uint32_t LBA)
+{
+   int32_t track;
+
+   for(track = toc->first_track; track <= (toc->last_track + 1); track++)
+   {
+      if(track == (toc->last_track + 1))
+      {
+         if(LBA < toc->tracks[100].lba)
+            return(track - 1);
+      }
+      else
+      {
+         if(LBA < toc->tracks[track].lba)
+            return(track - 1);
+      }
+   }
+
+   return 0;
+}
 
 //
 // Address conversion functions.

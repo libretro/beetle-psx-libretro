@@ -156,7 +156,7 @@ class CDIF_ST : public CDIF
 
 CDIF::CDIF() : UnrecoverableError(false), DiscEjected(false)
 {
-
+   TOC_Clear(&disc_toc);
 }
 
 CDIF::~CDIF()

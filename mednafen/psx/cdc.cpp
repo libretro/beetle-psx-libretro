@@ -59,6 +59,8 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
 
  DriveStatus = DS_STOPPED;
  PendingCommandPhase = 0;
+
+ TOC_Clear(&toc);
 }
 
 PS_CDC::~PS_CDC()

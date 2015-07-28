@@ -975,9 +975,12 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
    TOC toc;
    int dt;
 
+   TOC_Clear(&toc);
+
    (*CDInterfaces)[0]->ReadTOC(&toc);
 
-   dt = toc.FindTrackByLBA(4);
+   dt = TOC_FindTrackByLBA(&toc, 4);
+
    if(dt > 0 && !(toc.tracks[dt].control & 0x4))
       return(false);
 
@@ -1012,126 +1015,110 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
    const char *ret = NULL;
    Stream *fp = NULL;
-   TOC toc;
 
-   //(*CDInterfaces)[disc]->ReadTOC(&toc);
+   uint8_t pvd[2048];
+   unsigned pvd_search_count = 0;
 
-   //if(toc.first_track > 1 || toc.
+   fp = c->MakeStream(0, ~0U);
+   fp->seek(0x8000, SEEK_SET);
 
-   try
+   do
    {
-      uint8_t pvd[2048];
-      unsigned pvd_search_count = 0;
+      if((pvd_search_count++) == 32)
+         throw MDFN_Error(0, "PVD search count limit met.");
 
-      fp = c->MakeStream(0, ~0U);
-      fp->seek(0x8000, SEEK_SET);
+      fp->read(pvd, 2048);
 
-      do
+      if(memcmp(&pvd[1], "CD001", 5))
+         throw MDFN_Error(0, "Not ISO-9660");
+
+      if(pvd[0] == 0xFF)
+         throw MDFN_Error(0, "Missing Primary Volume Descriptor");
+   } while(pvd[0] != 0x01);
+   //[156 ... 189], 34 bytes
+   uint32_t rdel = MDFN_de32lsb(&pvd[0x9E]);
+   uint32_t rdel_len = MDFN_de32lsb(&pvd[0xA6]);
+
+   if(rdel_len >= (1024 * 1024 * 10))	// Arbitrary sanity check.
+      throw MDFN_Error(0, "Root directory table too large");
+
+   fp->seek((int64)rdel * 2048, SEEK_SET);
+   //printf("%08x, %08x\n", rdel * 2048, rdel_len);
+   while(fp->tell() < (((int64)rdel * 2048) + rdel_len))
+   {
+      uint8_t len_dr = fp->get_u8();
+      uint8_t dr[256 + 1];
+
+      memset(dr, 0xFF, sizeof(dr));
+
+      if(!len_dr)
+         break;
+
+      memset(dr, 0, sizeof(dr));
+      dr[0] = len_dr;
+      fp->read(dr + 1, len_dr - 1);
+
+      uint8_t len_fi = dr[0x20];
+
+      if(len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
       {
-         if((pvd_search_count++) == 32)
-            throw MDFN_Error(0, "PVD search count limit met.");
+         uint32_t file_lba = MDFN_de32lsb(&dr[0x02]);
+         //uint32_t file_len = MDFN_de32lsb(&dr[0x0A]);
+         uint8_t fb[2048 + 1];
+         char *bootpos;
 
-         fp->read(pvd, 2048);
+         memset(fb, 0, sizeof(fb));
+         fp->seek(file_lba * 2048, SEEK_SET);
+         fp->read(fb, 2048);
 
-         if(memcmp(&pvd[1], "CD001", 5))
-            throw MDFN_Error(0, "Not ISO-9660");
-
-         if(pvd[0] == 0xFF)
-            throw MDFN_Error(0, "Missing Primary Volume Descriptor");
-      } while(pvd[0] != 0x01);
-      //[156 ... 189], 34 bytes
-      uint32_t rdel = MDFN_de32lsb(&pvd[0x9E]);
-      uint32_t rdel_len = MDFN_de32lsb(&pvd[0xA6]);
-
-      if(rdel_len >= (1024 * 1024 * 10))	// Arbitrary sanity check.
-         throw MDFN_Error(0, "Root directory table too large");
-
-      fp->seek((int64)rdel * 2048, SEEK_SET);
-      //printf("%08x, %08x\n", rdel * 2048, rdel_len);
-      while(fp->tell() < (((int64)rdel * 2048) + rdel_len))
-      {
-         uint8_t len_dr = fp->get_u8();
-         uint8_t dr[256 + 1];
-
-         memset(dr, 0xFF, sizeof(dr));
-
-         if(!len_dr)
-            break;
-
-         memset(dr, 0, sizeof(dr));
-         dr[0] = len_dr;
-         fp->read(dr + 1, len_dr - 1);
-
-         uint8_t len_fi = dr[0x20];
-
-         if(len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
+         bootpos = strstr((char*)fb, "BOOT") + 4;
+         while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
+         if(*bootpos == '=')
          {
-            uint32_t file_lba = MDFN_de32lsb(&dr[0x02]);
-            //uint32_t file_len = MDFN_de32lsb(&dr[0x0A]);
-            uint8_t fb[2048 + 1];
-            char *bootpos;
-
-            memset(fb, 0, sizeof(fb));
-            fp->seek(file_lba * 2048, SEEK_SET);
-            fp->read(fb, 2048);
-
-            bootpos = strstr((char*)fb, "BOOT") + 4;
+            bootpos++;
             while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-            if(*bootpos == '=')
-            {
-               bootpos++;
-               while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-               if(!strncasecmp(bootpos, "cdrom:\\", 7))
-               { 
-                  bootpos += 7;
-                  char *tmp;
+            if(!strncasecmp(bootpos, "cdrom:\\", 7))
+            { 
+               bootpos += 7;
+               char *tmp;
 
-                  if((tmp = strchr(bootpos, '_'))) *tmp = 0;
-                  if((tmp = strchr(bootpos, '.'))) *tmp = 0;
-                  if((tmp = strchr(bootpos, ';'))) *tmp = 0;
-                  //puts(bootpos);
+               if((tmp = strchr(bootpos, '_'))) *tmp = 0;
+               if((tmp = strchr(bootpos, '.'))) *tmp = 0;
+               if((tmp = strchr(bootpos, ';'))) *tmp = 0;
+               //puts(bootpos);
 
-                  if(strlen(bootpos) == 4 && bootpos[0] == 'S' && (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
+               if(strlen(bootpos) == 4 && bootpos[0] == 'S' && (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
+               {
+                  switch(bootpos[2])
                   {
-                     switch(bootpos[2])
-                     {
-                        case 'E': if(rr)
-                                     *rr = REGION_EU;
-                                  ret = "SCEE";
-                                  goto Breakout;
+                     case 'E': if(rr)
+                                  *rr = REGION_EU;
+                               ret = "SCEE";
+                               goto Breakout;
 
-                        case 'U': if(rr)
-                                     *rr = REGION_NA;
-                                  ret = "SCEA";
-                                  goto Breakout;
+                     case 'U': if(rr)
+                                  *rr = REGION_NA;
+                               ret = "SCEA";
+                               goto Breakout;
 
-                        case 'K':	// Korea?
-                        case 'B':
-                        case 'P': if(rr)
-                                     *rr = REGION_JP;
-                                  ret = "SCEI";
-                                  goto Breakout;
-                     }
+                     case 'K':	// Korea?
+                     case 'B':
+                     case 'P': if(rr)
+                                  *rr = REGION_JP;
+                               ret = "SCEI";
+                               goto Breakout;
                   }
                }
             }
-
-            //puts((char*)fb);
-            //puts("ASOFKOASDFKO");
          }
-      }
-   }
-   catch(std::exception &e)
-   {
-      //puts(e.what());
-   }
-   catch(...)
-   {
 
+         //puts((char*)fb);
+         //puts("ASOFKOASDFKO");
+      }
    }
 
 Breakout:
-   if(fp != NULL)
+   if(fp)
    {
       delete fp;
       fp = NULL;

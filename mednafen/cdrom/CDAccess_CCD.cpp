@@ -75,6 +75,7 @@ CDAccess_CCD::CDAccess_CCD(const char *path, bool image_memcache) : img_stream(N
    try
    {
       Load(path, image_memcache);
+      TOC_Clear(&tocd);
    }
    catch(...)
    {
