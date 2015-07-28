@@ -2228,10 +2228,11 @@ static void update_md5_checksum(CDIF *iface)
 {
    uint8 LayoutMD5[16];
    md5_context layout_md5;
+   CD_TOC toc;
 
    layout_md5.starts();
 
-   CD_TOC toc;
+   TOC_Clear(&toc);
 
    iface->ReadTOC(&toc);
 
@@ -2721,21 +2722,22 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  // Print out a track list for all discs.  //
  for(unsigned i = 0; i < CDInterfaces.size(); i++)
  {
-  TOC toc;
+    TOC toc;
+    TOC_Clear(&toc);
 
-  CDInterfaces[i]->ReadTOC(&toc);
+    CDInterfaces[i]->ReadTOC(&toc);
 
-  if (log_cb)
-     log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
+    if (log_cb)
+       log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
 
-  for(int32 track = toc.first_track; track <= toc.last_track; track++)
-  {
-   if (log_cb)
-      log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
-  }
+    for(int32 track = toc.first_track; track <= toc.last_track; track++)
+    {
+       if (log_cb)
+          log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
+    }
 
-  if (log_cb)
-     log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
+    if (log_cb)
+       log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
  }
 
  // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
@@ -2749,6 +2751,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
   {
    CD_TOC toc;
 
+   TOC_Clear(&toc);
    CDInterfaces[i]->ReadTOC(&toc);
 
    layout_md5.update_u32_as_lsb(toc.first_track);
