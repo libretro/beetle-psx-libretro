@@ -42,66 +42,68 @@
 #define LEC_MODE2_FORM2_DATA_LEN (2324+8)
 #define LEC_MODE2_FORM2_EDC_OFFSET 2348
 
+static uint8_t GF8_LOG[256];
+static uint8_t GF8_ILOG[256];
 
-typedef u_int8_t gf8_t;
-
-static u_int8_t GF8_LOG[256];
-static gf8_t GF8_ILOG[256];
-
-static const class Gf8_Q_Coeffs_Results_01 {
-private:
-  u_int16_t table[43][256];
-public:
-  Gf8_Q_Coeffs_Results_01();
-  ~Gf8_Q_Coeffs_Results_01() {}
-  const u_int16_t *operator[] (int i) const { return &table[i][0]; }
-  operator const u_int16_t *() const	    { return &table[0][0]; }
+static const class Gf8_Q_Coeffs_Results_01
+{
+   private:
+      uint16_t table[43][256];
+   public:
+      Gf8_Q_Coeffs_Results_01();
+      ~Gf8_Q_Coeffs_Results_01() {}
+      const uint16_t *operator[] (int i) const { return &table[i][0]; }
+      operator const uint16_t *() const	    { return &table[0][0]; }
 } CF8_Q_COEFFS_RESULTS_01;
 
-static const class CrcTable {
-private:
-  u_int32_t table[256];
-public:
-  CrcTable();
-  ~CrcTable() {}
-  u_int32_t operator[](int i) const	{ return table[i]; }
-  operator const u_int32_t *() const	{ return table;    }
+static const class CrcTable
+{
+   private:
+      uint32_t table[256];
+   public:
+      CrcTable();
+      ~CrcTable() {}
+      uint32_t operator[](int i) const	{ return table[i]; }
+      operator const uint32_t *() const	{ return table;    }
 } CRCTABLE;
 
-static const class ScrambleTable {
-private:
-  u_int8_t table[2340];
-public:
-  ScrambleTable();
-  ~ScrambleTable() {}
-  u_int8_t operator[](int i) const	{ return table[i]; }
-  operator const u_int8_t *() const	{ return table;    }
+static const class ScrambleTable
+{
+   private:
+      uint8_t table[2340];
+   public:
+      ScrambleTable();
+      ~ScrambleTable() {}
+      uint8_t operator[](int i) const	{ return table[i]; }
+      operator const uint8_t *() const	{ return table;    }
 } SCRAMBLE_TABLE;
 
 /* Creates the logarithm and inverse logarithm table that is required
  * for performing multiplication in the GF(8) domain.
  */
-static void gf8_create_log_tables()
+static void gf8_create_log_tables(void)
 {
-  u_int8_t log;
-  u_int16_t b;
+   uint8_t log;
+   uint16_t b;
 
-  for (b = 0; b <= 255; b++) {
-    GF8_LOG[b] = 0;
-    GF8_ILOG[b] = 0;
-  }
+   for (b = 0; b <= 255; b++)
+   {
+      GF8_LOG[b] = 0;
+      GF8_ILOG[b] = 0;
+   }
 
-  b = 1;
+   b = 1;
 
-  for (log = 0; log < 255; log++) {
-    GF8_LOG[(u_int8_t)b] = log;
-    GF8_ILOG[log] = (u_int8_t)b;
+   for (log = 0; log < 255; log++)
+   {
+      GF8_LOG[(uint8_t)b] = log;
+      GF8_ILOG[log] = (uint8_t)b;
 
-    b <<= 1;
+      b <<= 1;
 
-    if ((b & 0x100) != 0) 
-      b ^= GF8_PRIM_POLY;
-  }
+      if ((b & 0x100) != 0) 
+         b ^= GF8_PRIM_POLY;
+   }
 }
 
 /* Addition in the GF(8) domain: just the XOR of the values.
@@ -109,30 +111,10 @@ static void gf8_create_log_tables()
 #define gf8_add(a,  b) (a) ^ (b)
 
 
-/* Multiplication in the GF(8) domain: add the logarithms (modulo 255)
- * and return the inverse logarithm. Not used!
- */
-#if 0
-static gf8_t gf8_mult(gf8_t a, gf8_t b)
-{
-  int16_t sum;
-
-  if (a == 0 || b == 0)
-    return 0;
-
-  sum = GF8_LOG[a] + GF8_LOG[b];
-
-  if (sum >= 255)
-    sum -= 255;
-
-  return GF8_ILOG[sum];
-}
-#endif
-
 /* Division in the GF(8) domain: Like multiplication but logarithms a
  * subtracted.
  */
-static gf8_t gf8_div(gf8_t a, gf8_t b)
+static uint8_t gf8_div(uint8_t a, uint8_t b)
 {
   int16_t sum;
 
@@ -152,9 +134,9 @@ static gf8_t gf8_div(gf8_t a, gf8_t b)
 Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
 {
   int i, j;
-  u_int16_t c;
-  gf8_t GF8_COEFFS_HELP[2][45]; 
-  u_int8_t GF8_Q_COEFFS[2][45];
+  uint16_t c;
+  uint8_t GF8_COEFFS_HELP[2][45]; 
+  uint8_t GF8_Q_COEFFS[2][45];
 
 
   gf8_create_log_tables();
@@ -166,7 +148,8 @@ Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
    * 
    */
 
-  for (j = 0; j < 45; j++) {
+  for (j = 0; j < 45; j++)
+  {
     GF8_COEFFS_HELP[0][j] = 1;               /* e0 */
     GF8_COEFFS_HELP[1][j] = GF8_ILOG[44-j];  /* e1 */
   }
@@ -175,27 +158,23 @@ Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
   /* resolve equation system for parity byte 0 and 1 */
  
   /* e1' = e1 + e0 */
-  for (j = 0; j < 45; j++) {
+  for (j = 0; j < 45; j++)
     GF8_Q_COEFFS[1][j] = gf8_add(GF8_COEFFS_HELP[1][j],
 				 GF8_COEFFS_HELP[0][j]);
-  }
 
   /* e1'' = e1' / (a^1 + 1) */
-  for (j = 0; j < 45; j++) {
+  for (j = 0; j < 45; j++)
     GF8_Q_COEFFS[1][j] = gf8_div(GF8_Q_COEFFS[1][j], GF8_Q_COEFFS[1][43]);
-  }
 
   /* e0' = e0 + e1 / a^1 */
-  for (j = 0; j < 45; j++) {
+  for (j = 0; j < 45; j++)
     GF8_Q_COEFFS[0][j] = gf8_add(GF8_COEFFS_HELP[0][j],
 				 gf8_div(GF8_COEFFS_HELP[1][j],
 					 GF8_ILOG[1]));
-  }    
 
   /* e0'' = e0' / (1 + 1 / a^1) */
-  for (j = 0; j < 45; j++) {
+  for (j = 0; j < 45; j++)
     GF8_Q_COEFFS[0][j] = gf8_div(GF8_Q_COEFFS[0][j], GF8_Q_COEFFS[0][44]);
-  }
 
   /* 
    * Compute the products of 0..255 with all of the Q coefficients in
@@ -207,30 +186,33 @@ Gf8_Q_Coeffs_Results_01::Gf8_Q_Coeffs_Results_01()
    * that we do not need to create a separate table for them. 
    */
   
-  for (j = 0; j < 43; j++) {
+  for (j = 0; j < 43; j++)
+  {
 
     table[j][0] = 0;
 
-    for (i = 1; i < 256; i++) {
-      c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[0][j]];
-      if (c >= 255) c -= 255;
-      table[j][i] = GF8_ILOG[c];
+    for (i = 1; i < 256; i++)
+    {
+       c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[0][j]];
+       if (c >= 255) c -= 255;
+       table[j][i] = GF8_ILOG[c];
 
-      c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[1][j]];
-      if (c >= 255) c -= 255;
-      table[j][i] |= GF8_ILOG[c]<<8;
+       c = GF8_LOG[i] + GF8_LOG[GF8_Q_COEFFS[1][j]];
+       if (c >= 255) c -= 255;
+       table[j][i] |= GF8_ILOG[c]<<8;
     }
   }
 }
 
 /* Reverses the bits in 'd'. 'bits' defines the bit width of 'd'.
  */
-static u_int32_t mirror_bits(u_int32_t d, int bits)
+static uint32_t mirror_bits(uint32_t d, int bits)
 {
   int i;
-  u_int32_t r = 0;
+  uint32_t r = 0;
 
-  for (i = 0; i < bits; i++) {
+  for (i = 0; i < bits; i++)
+  {
     r <<= 1;
 
     if ((d & 0x1) != 0)
@@ -248,40 +230,37 @@ static u_int32_t mirror_bits(u_int32_t d, int bits)
  */
 CrcTable::CrcTable ()
 {
-  u_int32_t i, j;
-  u_int32_t r;
-  
-  for (i = 0; i < 256; i++) {
-    r = mirror_bits(i, 8);
+   uint32_t i, j;
+   uint32_t r;
 
-    r <<= 24;
+   for (i = 0; i < 256; i++)
+   {
+      r = mirror_bits(i, 8);
 
-    for (j = 0; j < 8; j++) {
-      if ((r & 0x80000000) != 0) {
-	r <<= 1;
-	r ^= EDC_POLY;
+      r <<= 24;
+
+      for (j = 0; j < 8; j++)
+      {
+         r <<= 1;
+         if ((r & 0x80000000) != 0)
+            r ^= EDC_POLY;
       }
-      else {
-	r <<= 1;
-      }
-    }
 
-    r = mirror_bits(r, 32);
+      r = mirror_bits(r, 32);
 
-    table[i] = r;
-  }
+      table[i] = r;
+   }
 }
 
 /* Calculates the CRC of given data with given lengths based on the
  * table lookup algorithm.
  */
-static u_int32_t calc_edc(u_int8_t *data, int len)
+static uint32_t calc_edc(uint8_t *data, int len)
 {
-  u_int32_t crc = 0;
+  uint32_t crc = 0;
 
-  while (len--) {
+  while (len--)
     crc = CRCTABLE[(int)(crc ^ *data++) & 0xff] ^ (crc >> 8);
-  }
 
   return crc;
 }
@@ -291,49 +270,47 @@ static u_int32_t calc_edc(u_int8_t *data, int len)
  */
 ScrambleTable::ScrambleTable()
 {
-  u_int16_t i, j;
-  u_int16_t reg = 1;
-  u_int8_t d;
+   uint8_t d;
+   uint16_t i, j;
+   uint16_t reg = 1;
 
-  for (i = 0; i < 2340; i++) {
-    d = 0;
+   for (i = 0; i < 2340; i++)
+   {
+      d = 0;
 
-    for (j = 0; j < 8; j++) {
-      d >>= 1;
+      for (j = 0; j < 8; j++)
+      {
+         d >>= 1;
 
-      if ((reg & 0x1) != 0)
-	d |= 0x80;
+         if ((reg & 0x1) != 0)
+            d |= 0x80;
 
-      if ((reg & 0x1) != ((reg >> 1) & 0x1)) {
-	reg >>= 1;
-	reg |= 0x4000; /* 15-bit register */
+         reg >>= 1;
+         if ((reg & 0x1) != ((reg >> 1) & 0x1))
+            reg |= 0x4000; /* 15-bit register */
       }
-      else {
-	reg >>= 1;
-      }
-    }
 
-    table[i] = d;
-  }
+      table[i] = d;
+   }
 }
 
 /* Calc EDC for a MODE 1 sector
  */
-static void calc_mode1_edc(u_int8_t *sector)
+static void calc_mode1_edc(uint8_t *sector)
 {
-  u_int32_t crc = calc_edc(sector, LEC_MODE1_DATA_LEN + 16);
+   uint32_t crc = calc_edc(sector, LEC_MODE1_DATA_LEN + 16);
 
-  sector[LEC_MODE1_EDC_OFFSET] = crc & 0xffL;
-  sector[LEC_MODE1_EDC_OFFSET + 1] = (crc >> 8) & 0xffL;
-  sector[LEC_MODE1_EDC_OFFSET + 2] = (crc >> 16) & 0xffL;
-  sector[LEC_MODE1_EDC_OFFSET + 3] = (crc >> 24) & 0xffL;
+   sector[LEC_MODE1_EDC_OFFSET] = crc & 0xffL;
+   sector[LEC_MODE1_EDC_OFFSET + 1] = (crc >> 8) & 0xffL;
+   sector[LEC_MODE1_EDC_OFFSET + 2] = (crc >> 16) & 0xffL;
+   sector[LEC_MODE1_EDC_OFFSET + 3] = (crc >> 24) & 0xffL;
 }
 
 /* Calc EDC for a XA form 1 sector
  */
-static void calc_mode2_form1_edc(u_int8_t *sector)
+static void calc_mode2_form1_edc(uint8_t *sector)
 {
-  u_int32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
+  uint32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
 			   LEC_MODE2_FORM1_DATA_LEN);
 
   sector[LEC_MODE2_FORM1_EDC_OFFSET] = crc & 0xffL;
@@ -344,38 +321,38 @@ static void calc_mode2_form1_edc(u_int8_t *sector)
 
 /* Calc EDC for a XA form 2 sector
  */
-static void calc_mode2_form2_edc(u_int8_t *sector)
+static void calc_mode2_form2_edc(uint8_t *sector)
 {
-  u_int32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
-			   LEC_MODE2_FORM2_DATA_LEN);
+   uint32_t crc = calc_edc(sector + LEC_DATA_OFFSET,
+         LEC_MODE2_FORM2_DATA_LEN);
 
-  sector[LEC_MODE2_FORM2_EDC_OFFSET] = crc & 0xffL;
-  sector[LEC_MODE2_FORM2_EDC_OFFSET + 1] = (crc >> 8) & 0xffL;
-  sector[LEC_MODE2_FORM2_EDC_OFFSET + 2] = (crc >> 16) & 0xffL;
-  sector[LEC_MODE2_FORM2_EDC_OFFSET + 3] = (crc >> 24) & 0xffL;
+   sector[LEC_MODE2_FORM2_EDC_OFFSET] = crc & 0xffL;
+   sector[LEC_MODE2_FORM2_EDC_OFFSET + 1] = (crc >> 8) & 0xffL;
+   sector[LEC_MODE2_FORM2_EDC_OFFSET + 2] = (crc >> 16) & 0xffL;
+   sector[LEC_MODE2_FORM2_EDC_OFFSET + 3] = (crc >> 24) & 0xffL;
 }
 
 /* Writes the sync pattern to the given sector.
  */
-static void set_sync_pattern(u_int8_t *sector)
+static void set_sync_pattern(uint8_t *sector)
 {
-  sector[0] = 0;
+   sector[0] = 0;
 
-  sector[1] = sector[2] = sector[3] = sector[4] = sector[5] = 
-    sector[6] = sector[7] = sector[8] = sector[9] = sector[10] = 0xff;
+   sector[1] = sector[2] = sector[3] = sector[4] = sector[5] = 
+      sector[6] = sector[7] = sector[8] = sector[9] = sector[10] = 0xff;
 
-  sector[11] = 0;
+   sector[11] = 0;
 }
 
 
-static u_int8_t bin2bcd(u_int8_t b)
+static uint8_t bin2bcd(uint8_t b)
 {
-  return (((b/10) << 4) & 0xf0) | ((b%10) & 0x0f);
+   return (((b/10) << 4) & 0xf0) | ((b%10) & 0x0f);
 }
 
 /* Builds the sector header.
  */
-static void set_sector_header(u_int8_t mode, u_int32_t adr, u_int8_t *sector)
+static void set_sector_header(uint8_t mode, uint32_t adr, uint8_t *sector)
 {
   sector[LEC_HEADER_OFFSET] = bin2bcd(adr / (60*75));
   sector[LEC_HEADER_OFFSET + 1] = bin2bcd((adr / 75) % 60);
@@ -386,113 +363,116 @@ static void set_sector_header(u_int8_t mode, u_int32_t adr, u_int8_t *sector)
 /* Calculate the P parities for the sector.
  * The 43 P vectors of length 24 are combined with the GF8_P_COEFFS.
  */
-static void calc_P_parity(u_int8_t *sector)
+static void calc_P_parity(uint8_t *sector)
 {
-  int i, j;
-  u_int16_t p01_msb, p01_lsb;
-  u_int8_t *p_lsb_start;
-  u_int8_t *p_lsb;
-  u_int8_t *p0, *p1;
-  u_int8_t d0,d1;
+   int i, j;
+   uint16_t p01_msb, p01_lsb;
+   uint8_t *p_lsb_start;
+   uint8_t *p_lsb;
+   uint8_t *p0, *p1;
+   uint8_t d0,d1;
 
-  p_lsb_start = sector + LEC_HEADER_OFFSET;
+   p_lsb_start = sector + LEC_HEADER_OFFSET;
 
-  p1 = sector + LEC_MODE1_P_PARITY_OFFSET;
-  p0 = sector + LEC_MODE1_P_PARITY_OFFSET + 2 * 43;
+   p1 = sector + LEC_MODE1_P_PARITY_OFFSET;
+   p0 = sector + LEC_MODE1_P_PARITY_OFFSET + 2 * 43;
 
-  for (i = 0; i <= 42; i++) {
-    p_lsb = p_lsb_start;
+   for (i = 0; i <= 42; i++)
+   {
+      p_lsb = p_lsb_start;
 
-    p01_lsb = p01_msb = 0;
+      p01_lsb = p01_msb = 0;
 
-    for (j = 19; j <= 42; j++) {
-      d0 = *p_lsb;
-      d1 = *(p_lsb+1);
+      for (j = 19; j <= 42; j++)
+      {
+         d0 = *p_lsb;
+         d1 = *(p_lsb+1);
 
-      p01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
-      p01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
+         p01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
+         p01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
 
-      p_lsb += 2 * 43;
-    }
+         p_lsb += 2 * 43;
+      }
 
-    *p0 = p01_lsb;
-    *(p0 + 1) = p01_msb;
-    
-    *p1 = p01_lsb>>8;
-    *(p1 + 1) = p01_msb>>8;
+      *p0 = p01_lsb;
+      *(p0 + 1) = p01_msb;
 
-    p0 += 2;
-    p1 += 2;
+      *p1 = p01_lsb>>8;
+      *(p1 + 1) = p01_msb>>8;
 
-    p_lsb_start += 2;
-  }
+      p0 += 2;
+      p1 += 2;
+
+      p_lsb_start += 2;
+   }
 }
 
 /* Calculate the Q parities for the sector.
  * The 26 Q vectors of length 43 are combined with the GF8_Q_COEFFS.
  */
-static void calc_Q_parity(u_int8_t *sector)
+static void calc_Q_parity(uint8_t *sector)
 {
-  int i, j;
-  u_int16_t q01_lsb, q01_msb;
-  u_int8_t *q_lsb_start;
-  u_int8_t *q_lsb;
-  u_int8_t *q0, *q1, *q_start;
-  u_int8_t d0,d1;
+   int i, j;
+   uint16_t q01_lsb, q01_msb;
+   uint8_t *q_lsb_start;
+   uint8_t *q_lsb;
+   uint8_t *q0, *q1, *q_start;
+   uint8_t d0,d1;
 
-  q_lsb_start = sector + LEC_HEADER_OFFSET;
+   q_lsb_start = sector + LEC_HEADER_OFFSET;
 
-  q_start = sector + LEC_MODE1_Q_PARITY_OFFSET;
-  q1 = sector + LEC_MODE1_Q_PARITY_OFFSET;
-  q0 = sector + LEC_MODE1_Q_PARITY_OFFSET + 2 * 26;
+   q_start = sector + LEC_MODE1_Q_PARITY_OFFSET;
+   q1 = sector + LEC_MODE1_Q_PARITY_OFFSET;
+   q0 = sector + LEC_MODE1_Q_PARITY_OFFSET + 2 * 26;
 
-  for (i = 0; i <= 25; i++) {
-    q_lsb = q_lsb_start;
+   for (i = 0; i <= 25; i++)
+   {
+      q_lsb = q_lsb_start;
 
-    q01_lsb = q01_msb = 0;
+      q01_lsb = q01_msb = 0;
 
-    for (j = 0; j <= 42; j++) {
-      d0 = *q_lsb;
-      d1 = *(q_lsb+1);
+      for (j = 0; j <= 42; j++)
+      {
+         d0 = *q_lsb;
+         d1 = *(q_lsb+1);
 
-      q01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
-      q01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
+         q01_lsb ^= CF8_Q_COEFFS_RESULTS_01[j][d0];
+         q01_msb ^= CF8_Q_COEFFS_RESULTS_01[j][d1];
 
-      q_lsb += 2 * 44;
+         q_lsb += 2 * 44;
 
-      if (q_lsb >= q_start) {
-	q_lsb -= 2 * 1118;
+         if (q_lsb >= q_start)
+            q_lsb -= 2 * 1118;
       }
-    }
 
-    *q0 = q01_lsb;
-    *(q0 + 1) = q01_msb;
-    
-    *q1 = q01_lsb>>8;
-    *(q1 + 1) = q01_msb>>8;
+      *q0 = q01_lsb;
+      *(q0 + 1) = q01_msb;
 
-    q0 += 2;
-    q1 += 2;
+      *q1 = q01_lsb>>8;
+      *(q1 + 1) = q01_msb>>8;
 
-    q_lsb_start += 2 * 43;
-  }
+      q0 += 2;
+      q1 += 2;
+
+      q_lsb_start += 2 * 43;
+   }
 }
 
 /* Encodes a MODE 0 sector.
  * 'adr' is the current physical sector address
  * 'sector' must be 2352 byte wide
  */
-void lec_encode_mode0_sector(u_int32_t adr, u_int8_t *sector)
+void lec_encode_mode0_sector(uint32_t adr, uint8_t *sector)
 {
-  u_int16_t i;
+   uint16_t i;
 
-  set_sync_pattern(sector);
-  set_sector_header(0, adr, sector);
+   set_sync_pattern(sector);
+   set_sector_header(0, adr, sector);
 
-  sector += 16;
+   sector += 16;
 
-  for (i = 0; i < 2336; i++)
-    *sector++ = 0;
+   for (i = 0; i < 2336; i++)
+      *sector++ = 0;
 }
 
 /* Encodes a MODE 1 sector.
@@ -500,25 +480,25 @@ void lec_encode_mode0_sector(u_int32_t adr, u_int8_t *sector)
  * 'sector' must be 2352 byte wide containing 2048 bytes user data at
  * offset 16
  */
-void lec_encode_mode1_sector(u_int32_t adr, u_int8_t *sector)
+void lec_encode_mode1_sector(uint32_t adr, uint8_t *sector)
 {
-  set_sync_pattern(sector);
-  set_sector_header(1, adr, sector);
+   set_sync_pattern(sector);
+   set_sector_header(1, adr, sector);
 
-  calc_mode1_edc(sector);
+   calc_mode1_edc(sector);
 
-  /* clear the intermediate field */
-  sector[LEC_MODE1_INTERMEDIATE_OFFSET] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 1] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 2] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 3] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 4] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 5] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 6] =
-    sector[LEC_MODE1_INTERMEDIATE_OFFSET + 7] = 0;
+   /* clear the intermediate field */
+   sector[LEC_MODE1_INTERMEDIATE_OFFSET] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 1] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 2] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 3] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 4] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 5] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 6] =
+      sector[LEC_MODE1_INTERMEDIATE_OFFSET + 7] = 0;
 
-  calc_P_parity(sector);
-  calc_Q_parity(sector);
+   calc_P_parity(sector);
+   calc_Q_parity(sector);
 }
 
 /* Encodes a MODE 2 sector.
@@ -526,10 +506,10 @@ void lec_encode_mode1_sector(u_int32_t adr, u_int8_t *sector)
  * 'sector' must be 2352 byte wide containing 2336 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_sector(u_int32_t adr, u_int8_t *sector)
+void lec_encode_mode2_sector(uint32_t adr, uint8_t *sector)
 {
-  set_sync_pattern(sector);
-  set_sector_header(2, adr, sector);
+   set_sync_pattern(sector);
+   set_sector_header(2, adr, sector);
 }
 
 /* Encodes a XA form 1 sector.
@@ -537,23 +517,23 @@ void lec_encode_mode2_sector(u_int32_t adr, u_int8_t *sector)
  * 'sector' must be 2352 byte wide containing 2048+8 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_form1_sector(u_int32_t adr, u_int8_t *sector)
+void lec_encode_mode2_form1_sector(uint32_t adr, uint8_t *sector)
 {
-  set_sync_pattern(sector);
+   set_sync_pattern(sector);
 
-  calc_mode2_form1_edc(sector);
+   calc_mode2_form1_edc(sector);
 
-  /* P/Q partiy must not contain the sector header so clear it */
-  sector[LEC_HEADER_OFFSET] =
-    sector[LEC_HEADER_OFFSET + 1] =
-    sector[LEC_HEADER_OFFSET + 2] =
-    sector[LEC_HEADER_OFFSET + 3] = 0;
+   /* P/Q partiy must not contain the sector header so clear it */
+   sector[LEC_HEADER_OFFSET] =
+      sector[LEC_HEADER_OFFSET + 1] =
+      sector[LEC_HEADER_OFFSET + 2] =
+      sector[LEC_HEADER_OFFSET + 3] = 0;
 
-  calc_P_parity(sector);
-  calc_Q_parity(sector);
-  
-  /* finally add the sector header */
-  set_sector_header(2, adr, sector);
+   calc_P_parity(sector);
+   calc_Q_parity(sector);
+
+   /* finally add the sector header */
+   set_sector_header(2, adr, sector);
 }
 
 /* Encodes a XA form 2 sector.
@@ -561,25 +541,24 @@ void lec_encode_mode2_form1_sector(u_int32_t adr, u_int8_t *sector)
  * 'sector' must be 2352 byte wide containing 2324+8 bytes user data at
  * offset 16
  */
-void lec_encode_mode2_form2_sector(u_int32_t adr, u_int8_t *sector)
+void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector)
 {
-  set_sync_pattern(sector);
+   set_sync_pattern(sector);
 
-  calc_mode2_form2_edc(sector);
+   calc_mode2_form2_edc(sector);
 
-  set_sector_header(2, adr, sector);
+   set_sector_header(2, adr, sector);
 }
 
 /* Scrambles and byte swaps an encoded sector.
  * 'sector' must be 2352 byte wide.
  */
-void lec_scramble(u_int8_t *sector)
+void lec_scramble(uint8_t *sector)
 {
-   u_int16_t i;
-   const u_int8_t *stable = SCRAMBLE_TABLE;
-   u_int8_t *p = sector;
-   u_int8_t tmp;
-
+   uint16_t i;
+   const uint8_t *stable = SCRAMBLE_TABLE;
+   uint8_t *p = sector;
+   uint8_t tmp;
 
    for (i = 0; i < 6; i++)
    {
@@ -589,7 +568,9 @@ void lec_scramble(u_int8_t *sector)
       p++;
       *p++ = tmp;
    }
-   for (;i < (2352 / 2); i++) {
+
+   for (;i < (2352 / 2); i++)
+   {
       /* scramble and swap bytes */
       tmp = *p ^ *stable++;
       *p = *(p + 1) ^ *stable++;
