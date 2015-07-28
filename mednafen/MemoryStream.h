@@ -32,8 +32,8 @@ class MemoryStream : public Stream
 				// Will only work if stream->tell() == 0, or if "stream" is seekable.
 				// stream will be deleted even if this constructor throws.
 
- MemoryStream(const MemoryStream &zs);
- MemoryStream & operator=(const MemoryStream &zs);
+ MemoryStream(const MemoryStream *zs);
+ MemoryStream & operator=(const MemoryStream *zs);
 
  virtual ~MemoryStream();
 

@@ -972,7 +972,7 @@ static bool TestMagic(const char *name, MDFNFILE *fp)
 static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
 {
    uint8_t buf[2048];
-   CDUtility::TOC toc;
+   TOC toc;
    int dt;
 
    (*CDInterfaces)[0]->ReadTOC(&toc);
@@ -1012,7 +1012,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
    const char *ret = NULL;
    Stream *fp = NULL;
-   CDUtility::TOC toc;
+   TOC toc;
 
    //(*CDInterfaces)[disc]->ReadTOC(&toc);
 
@@ -2329,7 +2329,7 @@ void retro_init(void)
       log_cb = NULL;
 
 #ifdef NEED_CD
- CDUtility::CDUtility_Init();
+   CDUtility_Init();
 #endif
 
    eject_state = false;
@@ -2353,10 +2353,10 @@ void retro_init(void)
          log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir)
    {
-	  // If save directory is defined use it, otherwise use system directory
+      // If save directory is defined use it, otherwise use system directory
       retro_save_directory = *dir ? dir : retro_base_directory;
       // Make sure that we don't have any lingering slashes, etc, as they break Windows.
       size_t last = retro_save_directory.find_last_not_of("/\\");
@@ -2370,7 +2370,7 @@ void retro_init(void)
       /* TODO: Add proper fallback */
       if (log_cb)
          log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
-	  retro_save_directory = retro_base_directory;
+      retro_save_directory = retro_base_directory;
    }      
 
 #if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
@@ -2734,7 +2734,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  // Print out a track list for all discs.  //
  for(unsigned i = 0; i < CDInterfaces.size(); i++)
  {
-  CDUtility::TOC toc;
+  TOC toc;
 
   CDInterfaces[i]->ReadTOC(&toc);
 

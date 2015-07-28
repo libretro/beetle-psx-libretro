@@ -181,7 +181,7 @@ class PS_CDC
 
       int32_t lastts;
 
-      CDUtility::TOC toc;
+      TOC toc;
       bool IsPSXDisc;
       uint8 DiscID[4];
 

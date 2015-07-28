@@ -45,16 +45,16 @@ MemoryStream::MemoryStream(Stream *stream) : data_buffer(NULL), data_buffer_size
    delete stream;
 }
 
-MemoryStream::MemoryStream(const MemoryStream &zs)
+MemoryStream::MemoryStream(const MemoryStream *zs)
 {
- data_buffer_size = zs.data_buffer_size;
- data_buffer_alloced = zs.data_buffer_alloced;
+ data_buffer_size = zs->data_buffer_size;
+ data_buffer_alloced = zs->data_buffer_alloced;
  if(!(data_buffer = (uint8*)malloc((size_t)data_buffer_alloced)))
   throw MDFN_Error(ErrnoHolder(errno));
 
- memcpy(data_buffer, zs.data_buffer, (size_t)data_buffer_size);
+ memcpy(data_buffer, zs->data_buffer, (size_t)data_buffer_size);
 
- position = zs.position;
+ position = zs->position;
 }
 
 MemoryStream::~MemoryStream()

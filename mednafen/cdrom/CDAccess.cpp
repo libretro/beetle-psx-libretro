@@ -29,8 +29,6 @@
 #include "CDAccess_Image.h"
 #include "CDAccess_CCD.h"
 
-using namespace CDUtility;
-
 CDAccess::CDAccess()
 {
 

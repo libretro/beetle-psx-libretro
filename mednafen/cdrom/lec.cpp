@@ -575,117 +575,25 @@ void lec_encode_mode2_form2_sector(u_int32_t adr, u_int8_t *sector)
  */
 void lec_scramble(u_int8_t *sector)
 {
-  u_int16_t i;
-  const u_int8_t *stable = SCRAMBLE_TABLE;
-  u_int8_t *p = sector;
-  u_int8_t tmp;
+   u_int16_t i;
+   const u_int8_t *stable = SCRAMBLE_TABLE;
+   u_int8_t *p = sector;
+   u_int8_t tmp;
 
 
-  for (i = 0; i < 6; i++) {
+   for (i = 0; i < 6; i++)
+   {
       /* just swap bytes of sector sync */
       tmp = *p;
       *p = *(p + 1);
       p++;
       *p++ = tmp;
-    }
-  for (;i < (2352 / 2); i++) {
+   }
+   for (;i < (2352 / 2); i++) {
       /* scramble and swap bytes */
       tmp = *p ^ *stable++;
       *p = *(p + 1) ^ *stable++;
       p++;
       *p++ = tmp;
-    }
+   }
 }
-
-#if 0
-#include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-
-int main(int argc, char **argv)
-{
-  char *infile;
-  char *outfile;
-  int fd_in, fd_out;
-  u_int8_t buffer1[2352];
-  u_int8_t buffer2[2352];
-  u_int32_t lba;
-  int i;
-
-#if 0
-  for (i = 0; i < 2048; i++)
-    buffer1[i + 16] = 234;
-
-  lba = 150;
-
-  for (i = 0; i < 100000; i++) {
-    lec_encode_mode1_sector(lba, buffer1);
-    lec_scramble(buffer2);
-    lba++;
-  }
-
-#else
-
-  if (argc != 3)
-    return 1;
-
-  infile = argv[1];
-  outfile = argv[2];
-
-
-  if ((fd_in = open(infile, O_RDONLY)) < 0) {
-    perror("Cannot open input file");
-    return 1;
-  }
-
-  if ((fd_out = open(outfile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
-    perror("Cannot open output file");
-    return 1;
-  }
-
-  lba = 150;
-
-  do {
-    if (read(fd_in, buffer1, 2352) != 2352)
-      break;
-
-    switch (*(buffer1 + 12 + 3)) {
-    case 1:
-      memcpy(buffer2 + 16, buffer1 + 16, 2048);
-
-      lec_encode_mode1_sector(lba, buffer2);
-      break;
-
-    case 2:
-      if ((*(buffer1 + 12 + 4 + 2) & 0x20) != 0) {
-	/* form 2 sector */
-	memcpy(buffer2 + 16, buffer1 + 16, 2324 + 8);
-	lec_encode_mode2_form2_sector(lba, buffer2);
-      }
-      else {
-	/* form 1 sector */
-	memcpy(buffer2 + 16, buffer1 + 16, 2048 + 8);
-	lec_encode_mode2_form1_sector(lba, buffer2);
-      }
-      break;
-    }
-
-    if (memcmp(buffer1, buffer2, 2352) != 0) {
-      printf("Verify error at lba %ld\n", lba);
-    }
-
-    lec_scramble(buffer2);
-    write(fd_out, buffer2, 2352);
-
-    lba++;
-  } while (1);
-
-  close(fd_in);
-  close(fd_out);
-
-#endif
-
-  return 0;
-}
-#endif

@@ -54,8 +54,6 @@ extern retro_log_printf_t log_cb;
 
 #include <map>
 
-using namespace CDUtility;
-
 enum
 {
  CDRF_SUBM_NONE = 0,

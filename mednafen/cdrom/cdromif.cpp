@@ -27,8 +27,6 @@
 
 extern retro_log_printf_t log_cb;
 
-using namespace CDUtility;
-
 enum
 {
  // Status/Error messages

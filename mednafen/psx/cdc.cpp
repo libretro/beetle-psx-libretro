@@ -52,8 +52,6 @@
 #include "cdc.h"
 #include "spu.h"
 
-using namespace CDUtility;
-
 PS_CDC::PS_CDC() : DMABuffer(4096)
 {
  IsPSXDisc = false;
