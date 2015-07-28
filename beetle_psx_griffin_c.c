@@ -22,3 +22,7 @@
 
 #include "threads.c"
 #include "scrc32.c"
+
+#ifdef NEED_CD
+#include "mednafen/cdrom/edc_crc32.c"
+#endif

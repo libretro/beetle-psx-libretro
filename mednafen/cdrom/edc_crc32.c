@@ -21,7 +21,7 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
-#include "dvdisaster.h"
+#include <stdint.h>
 
 /***
  *** EDC checksum used in CDROM sectors
@@ -119,12 +119,12 @@ unsigned long  edctable[256] =
  * CDROM EDC calculation
  */
 
-uint32 EDCCrc32(const unsigned char *data, int len)
-{  
- uint32 crc = 0;
+uint32_t EDCCrc32(const unsigned char *data, int len)
+{
+   uint32_t crc = 0;
 
- while(len--)
-  crc = edctable[(crc ^ *data++) & 0xFF] ^ (crc >> 8);
+   while(len--)
+      crc = edctable[(crc ^ *data++) & 0xFF] ^ (crc >> 8);
 
- return crc;
+   return crc;
 }

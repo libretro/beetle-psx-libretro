@@ -40,7 +40,6 @@
 #include "mednafen/cdrom/galois.cpp"
 #include "mednafen/cdrom/recover-raw.cpp"
 #include "mednafen/cdrom/l-ec.cpp"
-#include "mednafen/cdrom/crc32.cpp"
 #include "mednafen/cdrom/cdromif.cpp"
 #endif
 

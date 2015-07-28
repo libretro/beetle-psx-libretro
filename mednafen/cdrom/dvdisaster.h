@@ -63,7 +63,15 @@ void CreateEcc(void);
 void FixEcc(void);
 void Verify(void);
 
-uint32 EDCCrc32(const unsigned char*, int);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+uint32_t EDCCrc32(const unsigned char*, int);
+
+#ifdef __cplusplus
+}
+#endif
 
 /***
  *** galois.c
