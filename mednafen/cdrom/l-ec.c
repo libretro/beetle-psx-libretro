@@ -22,9 +22,9 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
-#include "dvdisaster.h"
-
-#include "galois.h"
+#include "l-ec.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 
@@ -228,7 +228,8 @@ int CountC2Errors(unsigned char *frame)
 
 int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
 	     int *erasure_list, int erasure_count)
-{  GaloisTables *gt = rt->gfTables;
+{
+   GaloisTables *gt = rt->gfTables;
    int syndrome[NROOTS];
    int lambda[NROOTS+1];
    int omega[NROOTS+1];

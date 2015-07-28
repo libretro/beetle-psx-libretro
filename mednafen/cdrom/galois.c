@@ -22,6 +22,8 @@
  *  or direct your browser at http://www.gnu.org.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "galois.h"
 
 /***
