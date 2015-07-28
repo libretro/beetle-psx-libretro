@@ -134,6 +134,8 @@ static uint32_t LZCR;
 static uint32_t Reg23;
 // end DR
 
+extern unsigned char widescreen_hack;
+
 static INLINE uint8_t Sat5(int16_t cc)
 {
    if(cc < 0)
@@ -1051,7 +1053,7 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
 
 static INLINE void TransformXY(int64_t h_div_sz)
 {
-   MAC[0] = F((int64)OFX + IR1 * h_div_sz) >> 16;
+   MAC[0] = F((int64)OFX + IR1 * h_div_sz * (widescreen_hack) ? 0.75 : 1.00) >> 16;
    XY_FIFO[3].X = Lm_G(0, MAC[0]);
 
    MAC[0] = F((int64)OFY + IR2 * h_div_sz) >> 16;

@@ -22,6 +22,10 @@ static retro_input_state_t input_state_cb;
 static retro_rumble_interface rumble;
 static unsigned players = 2;
 
+unsigned char widescreen_hack;
+unsigned char widescreen_auto_ar;
+unsigned char widescreen_auto_ar_old;
+
 /* start of Mednafen psx.cpp */
 
 /* Mednafen - Multi-system Emulator
@@ -2443,6 +2447,30 @@ static void check_variables(void)
       }
    }
 
+   var.key = "beetle_psx_widescreen_hack";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         widescreen_hack = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         widescreen_hack = false;
+   }
+   else
+      widescreen_hack = false;
+
+   var.key = "beetle_psx_widescreen_auto_ar";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0 && widescreen_hack)
+         widescreen_auto_ar = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         widescreen_auto_ar = false;
+   }
+   else
+      widescreen_auto_ar = false;
+
    var.key = "beetle_psx_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3205,7 +3233,17 @@ void retro_run(void)
 {
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+   {
+      widescreen_auto_ar_old = widescreen_auto_ar;
       check_variables();
+
+      if (widescreen_auto_ar != widescreen_auto_ar_old)
+      {
+         struct retro_system_av_info new_av_info;
+         retro_get_system_av_info(&new_av_info);
+         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+      }
+   }
 
    if(pending_messages)
    {
@@ -3434,7 +3472,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W;
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H;
-   info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+   info->geometry.aspect_ratio = !widescreen_auto_ar ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 }
 
 void retro_deinit(void)
@@ -3507,6 +3545,8 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
+      { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
+      { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_experimental_save_states", "Savestates (restart); disabled|enabled" },
