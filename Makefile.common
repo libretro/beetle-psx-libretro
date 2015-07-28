@@ -82,13 +82,13 @@ ifneq ($(HAVE_GRIFFIN),1)
 SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDUtility.cpp \
 	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
 	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
 	$(MEDNAFEN_DIR)/cdrom/misc.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
 
 SOURCES_C += \
+	$(MEDNAFEN_DIR)/cdrom/CDUtility.c \
 	$(MEDNAFEN_DIR)/cdrom/galois.c \
 	$(MEDNAFEN_DIR)/cdrom/l-ec.c \
 	$(MEDNAFEN_DIR)/cdrom/lec.c \

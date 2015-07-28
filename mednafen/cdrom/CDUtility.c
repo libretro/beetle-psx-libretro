@@ -229,14 +229,14 @@ void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf)
 //  and the leadout entry together before extracting the D2 bit.  Audio track->data leadout is fairly benign though maybe noisy(especially if we ever implement
 //  data scrambling properly), but data track->audio leadout could break things in an insidious manner for the more accurate drive emulation code).
 //
-void subpw_synth_leadout_lba(const TOC& toc, const int32_t lba, uint8_t* SubPWBuf)
+void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* SubPWBuf)
 {
    uint8_t buf[0xC];
    uint32_t lba_relative;
    uint32_t ma, sa, fa;
    uint32_t m, s, f;
 
-   lba_relative = lba - toc.tracks[100].lba;
+   lba_relative = lba - toc->tracks[100].lba;
 
    f = (lba_relative % 75);
    s = ((lba_relative / 75) % 60);
@@ -247,7 +247,7 @@ void subpw_synth_leadout_lba(const TOC& toc, const int32_t lba, uint8_t* SubPWBu
    ma = ((lba + 150) / 75 / 60);
 
    uint8_t adr = 0x1; // Q channel data encodes position
-   uint8_t control = (toc.tracks[toc.last_track].control & 0x4) | toc.tracks[100].control;
+   uint8_t control = (toc->tracks[toc->last_track].control & 0x4) | toc->tracks[100].control;
 
    memset(buf, 0, 0xC);
    buf[0] = (adr << 0) | (control << 4);
@@ -272,12 +272,12 @@ void subpw_synth_leadout_lba(const TOC& toc, const int32_t lba, uint8_t* SubPWBu
       SubPWBuf[i] = (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | 0x80;
 }
 
-void synth_leadout_sector_lba(const uint8_t mode, const TOC& toc, const int32_t lba, uint8_t* out_buf)
+void synth_leadout_sector_lba(const uint8_t mode, const struct TOC *toc, const int32_t lba, uint8_t* out_buf)
 {
    memset(out_buf, 0, 2352 + 96);
    subpw_synth_leadout_lba(toc, lba, out_buf + 2352);
 
-   if((toc.tracks[toc.last_track].control | toc.tracks[100].control) & 0x4)
+   if((toc->tracks[toc->last_track].control | toc->tracks[100].control) & 0x4)
    {
       switch(mode)
       {

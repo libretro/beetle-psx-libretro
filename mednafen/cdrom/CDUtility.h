@@ -4,22 +4,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <boolean.h>
 #include <retro_inline.h>
 
-// Call once at app startup before creating any threads that could potentially cause re-entrancy to these functions.
-// It will also be called automatically if needed for the first time a function in this namespace that requires
-// the initialization function to be called is called, for potential
-// usage in constructors of statically-declared objects.
-void CDUtility_Init(void);
-
-// Quick definitions here:
-//
-// ABA - Absolute block address, synonymous to absolute MSF
-//  aba = (m_a * 60 * 75) + (s_a * 75) + f_a
-//
-// LBA - Logical block address(related: data CDs are required to have a pregap of 2 seconds, IE 150 frames/sectors)
-//  lba = aba - 150
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum
 {
@@ -28,7 +18,6 @@ enum
    ADR_MCN     = 0x02,
    ADR_ISRC    = 0x03
 };
-
 
 struct TOC_Track
 {
@@ -58,10 +47,24 @@ struct TOC
    uint8_t first_track;
    uint8_t last_track;
    uint8_t disc_type;
-   TOC_Track tracks[100 + 1];
+   struct TOC_Track tracks[100 + 1];
 };
 
-static INLINE void TOC_Clear(TOC *toc)
+// Call once at app startup before creating any threads that could potentially cause re-entrancy to these functions.
+// It will also be called automatically if needed for the first time a function in this namespace that requires
+// the initialization function to be called is called, for potential
+// usage in constructors of statically-declared objects.
+void CDUtility_Init(void);
+
+// Quick definitions here:
+//
+// ABA - Absolute block address, synonymous to absolute MSF
+//  aba = (m_a * 60 * 75) + (s_a * 75) + f_a
+//
+// LBA - Logical block address(related: data CDs are required to have a pregap of 2 seconds, IE 150 frames/sectors)
+//  lba = aba - 150
+
+static INLINE void TOC_Clear(struct TOC *toc)
 {
    if (!toc)
       return;
@@ -73,7 +76,7 @@ static INLINE void TOC_Clear(TOC *toc)
    memset(toc->tracks, 0, sizeof(toc->tracks));
 }
 
-static INLINE int TOC_FindTrackByLBA(TOC *toc, uint32_t LBA)
+static INLINE int TOC_FindTrackByLBA(struct TOC *toc, uint32_t LBA)
 {
    int32_t track;
 
@@ -94,9 +97,7 @@ static INLINE int TOC_FindTrackByLBA(TOC *toc, uint32_t LBA)
    return 0;
 }
 
-//
 // Address conversion functions.
-//
 static INLINE uint32_t AMSF_to_ABA(int32_t m_a, int32_t s_a, int32_t f_a)
 {
    return(f_a + 75 * s_a + 75 * 60 * m_a);
@@ -177,7 +178,7 @@ void encode_mode2_form2_sector(uint32_t aba, uint8_t *sector_data);	// 2324+8 by
 
 // out_buf must be able to contain 2352+96 bytes.
 // "mode" is only used if(toc.tracks[100].control & 0x4)
-void synth_leadout_sector_lba(const uint8_t mode, const TOC& toc, const int32_t lba, uint8_t* out_buf);
+void synth_leadout_sector_lba(const uint8_t mode, const struct TOC *toc, const int32_t lba, uint8_t* out_buf);
 
 //
 // User data error detection and correction
@@ -223,5 +224,9 @@ void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf);
 
 // (De)Scrambles data sector.
 void scrambleize_data_sector(uint8_t *sector_data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

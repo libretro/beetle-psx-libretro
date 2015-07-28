@@ -889,7 +889,7 @@ void PS_CDC::HandlePlayRead(void)
   //
   // Synthesis is a bit of a kludge... :/
   //
-  synth_leadout_sector_lba(0x02, toc, CurSector, read_buf);
+  synth_leadout_sector_lba(0x02, &toc, CurSector, read_buf);
   DecodeSubQ(read_buf + 2352);
  }
  else

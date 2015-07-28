@@ -24,6 +24,7 @@
 #include "scrc32.c"
 
 #ifdef NEED_CD
+#include "mednafen/cdrom/CDUtility.c"
 #include "mednafen/cdrom/edc_crc32.c"
 #include "mednafen/cdrom/l-ec.c"
 #include "mednafen/cdrom/lec.c"
