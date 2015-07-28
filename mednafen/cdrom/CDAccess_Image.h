@@ -8,28 +8,28 @@ class AudioReader;
 
 struct CDRFILE_TRACK_INFO
 {
-        int32 LBA;
-	
-	uint32 DIFormat;
-	uint8 subq_control;
+   int32 LBA;
 
-        int32 pregap;
-	int32 pregap_dv;
+   uint32 DIFormat;
+   uint8 subq_control;
 
-	int32 postgap;
+   int32 pregap;
+   int32 pregap_dv;
 
-	int32 index[2];
+   int32 postgap;
 
-	int32 sectors;	// Not including pregap sectors!
-        Stream *fp;
-	bool FirstFileInstance;
-	bool RawAudioMSBFirst;
-	long FileOffset;
-	unsigned int SubchannelMode;
+   int32 index[2];
 
-	uint32 LastSamplePos;
+   int32 sectors;	// Not including pregap sectors!
+   Stream *fp;
+   bool FirstFileInstance;
+   bool RawAudioMSBFirst;
+   long FileOffset;
+   unsigned int SubchannelMode;
 
-	AudioReader *AReader;
+   uint32 LastSamplePos;
+
+   AudioReader *AReader;
 };
 
 class CDAccess_Image : public CDAccess
