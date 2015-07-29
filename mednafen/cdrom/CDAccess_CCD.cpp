@@ -30,6 +30,11 @@ typedef std::map<std::string, std::string> CCD_Section;
 template<typename T>
 static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool have_defval = false, const int defval = 0)
 {
+   const char *vp;
+   char *ep           = NULL;
+   int scan_base      = 10;
+   size_t scan_offset = 0;
+   long ret           = 0;
    CCD_Section::iterator zit = s.find(propname);
 
    if(zit == s.end())
@@ -40,9 +45,6 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
    }
 
    const std::string &v = zit->second;
-   int scan_base = 10;
-   size_t scan_offset = 0;
-   long ret = 0;
 
    if(v.length() >= 3 && v[0] == '0' && v[1] == 'x')
    {
@@ -50,8 +52,7 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
       scan_offset = 2;
    }
 
-   const char *vp = v.c_str() + scan_offset;
-   char *ep = NULL;
+   vp = v.c_str() + scan_offset;
 
    if(std::numeric_limits<T>::is_signed)
       ret = strtol(vp, &ep, scan_base);
@@ -60,11 +61,6 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
 
    if(!vp[0] || ep[0])
       throw MDFN_Error(0, _("Property %s: Malformed integer: %s"), propname.c_str(), v.c_str());
-
-   //if(ret < minv || ret > maxv)
-   //{
-   // throw MDFN_Error(0, _("Property %s: Integer %ld out of range(accepted: %d through %d)."), propname.c_str(), ret, minv, maxv);
-   //}
 
    return ret;
 }
@@ -98,9 +94,11 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
 
    if(file_ext.length() == 4 && file_ext[0] == '.')
    {
+      int i;
+      signed char        av = -1;
       signed char extupt[3] = { -1, -1, -1 };
 
-      for(int i = 1; i < 4; i++)
+      for(i = 1; i < 4; i++)
       {
          if(file_ext[i] >= 'A' && file_ext[i] <= 'Z')
             extupt[i - 1] = 'A' - 'a';
@@ -108,8 +106,7 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
             extupt[i - 1] = 0;
       }
 
-      signed char av = -1;
-      for(int i = 0; i < 3; i++)
+      for(i = 0; i < 3; i++)
       {
          if(extupt[i] != -1)
             av = extupt[i];
@@ -120,13 +117,13 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       if(av == -1)
          av = 0;
 
-      for(int i = 0; i < 3; i++)
+      for(i = 0; i < 3; i++)
       {
          if(extupt[i] == -1)
             extupt[i] = av;
       }
 
-      for(int i = 0; i < 3; i++)
+      for(i = 0; i < 3; i++)
       {
          img_extsd[i] += extupt[i];
          sub_extsd[i] += extupt[i];
@@ -154,9 +151,9 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       }
       else
       {
+         std::string k, v;
          const size_t feqpos = linebuf.find('=');
          const size_t leqpos = linebuf.rfind('=');
-         std::string k, v;
 
          if(feqpos == std::string::npos || feqpos != leqpos)
             throw MDFN_Error(0, _("Malformed value pair specifier: %s"), linebuf.c_str());
@@ -174,9 +171,10 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
    }
 
    {
-      CCD_Section& ds = Sections["DISC"];
-      unsigned toc_entries = CCD_ReadInt<unsigned>(ds, "TOCENTRIES");
-      unsigned num_sessions = CCD_ReadInt<unsigned>(ds, "SESSIONS");
+      unsigned te;
+      CCD_Section            &ds = Sections["DISC"];
+      unsigned       toc_entries = CCD_ReadInt<unsigned>(ds, "TOCENTRIES");
+      unsigned      num_sessions = CCD_ReadInt<unsigned>(ds, "SESSIONS");
       bool data_tracks_scrambled = CCD_ReadInt<unsigned>(ds, "DATATRACKSSCRAMBLED");
 
       if(num_sessions != 1)
@@ -187,19 +185,19 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
 
       //printf("MOO: %d\n", toc_entries);
 
-      for(unsigned te = 0; te < toc_entries; te++)
+      for(te = 0; te < toc_entries; te++)
       {
          char tmpbuf[64];
          snprintf(tmpbuf, sizeof(tmpbuf), "ENTRY %u", te);
-         CCD_Section& ts = Sections[std::string(tmpbuf)];
+         CCD_Section & ts = Sections[std::string(tmpbuf)];
          unsigned session = CCD_ReadInt<unsigned>(ts, "SESSION");
-         uint8 point = CCD_ReadInt<uint8>(ts, "POINT");
-         uint8 adr = CCD_ReadInt<uint8>(ts, "ADR");
-         uint8 control = CCD_ReadInt<uint8>(ts, "CONTROL");
-         uint8 pmin = CCD_ReadInt<uint8>(ts, "PMIN");
-         uint8 psec = CCD_ReadInt<uint8>(ts, "PSEC");
-         uint8 pframe = CCD_ReadInt<uint8>(ts, "PFRAME");
-         signed plba = CCD_ReadInt<signed>(ts, "PLBA");
+         uint8_t    point = CCD_ReadInt<uint8>(ts, "POINT");
+         uint8_t      adr = CCD_ReadInt<uint8>(ts, "ADR");
+         uint8_t  control = CCD_ReadInt<uint8>(ts, "CONTROL");
+         uint8_t     pmin = CCD_ReadInt<uint8>(ts, "PMIN");
+         uint8_t     psec = CCD_ReadInt<uint8>(ts, "PSEC");
+         uint8_t   pframe = CCD_ReadInt<uint8>(ts, "PFRAME");
+         signed      plba = CCD_ReadInt<signed>(ts, "PLBA");
 
          if(session != 1)
             throw MDFN_Error(0, "Unsupported TOC entry Session value: %u", session);
@@ -235,12 +233,11 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       }
    }
 
-   // Convenience leadout track duplication.
+   /* Convenience leadout track duplication. */
    if(tocd.last_track < 99)
       tocd.tracks[tocd.last_track + 1] = tocd.tracks[100];
 
-   //
-   // Open image stream.
+   /* Open image stream. */
    {
       std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd), true);
       FileStream *str        = new FileStream(image_path.c_str(), FileStream::MODE_READ);
@@ -259,13 +256,14 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
    }
 
    {
-      // Open subchannel stream
+      /* Open subchannel stream */
       std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd), true);
+      FileStream *str      = new FileStream(sub_path.c_str(), FileStream::MODE_READ);
 
       if(image_memcache)
-         sub_stream = new MemoryStream(new FileStream(sub_path.c_str(), FileStream::MODE_READ));
+         sub_stream = new MemoryStream(str);
       else
-         sub_stream = new FileStream(sub_path.c_str(), FileStream::MODE_READ);
+         sub_stream = str;
 
       if(sub_stream->size() != (int64)img_numsectors * 96)
          throw MDFN_Error(0, _("CCD SUB file size mismatch."));
@@ -284,12 +282,14 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
 //
 void CDAccess_CCD::CheckSubQSanity(void)
 {
+   size_t s;
    size_t checksum_pass_counter = 0;
-   int prev_lba = INT_MAX;
-   uint8 prev_track = 0;
+   int                 prev_lba = INT_MAX;
+   uint8_t           prev_track = 0;
 
-   for(size_t s = 0; s < img_numsectors; s++)
+   for(s = 0; s < img_numsectors; s++)
    {
+      uint8_t adr;
       union
       {
          uint8 full[96];
@@ -303,44 +303,41 @@ void CDAccess_CCD::CheckSubQSanity(void)
       sub_stream->seek(s * 96, SEEK_SET);
       sub_stream->read(buf.full, 96);
 
-      if(subq_check_checksum(buf.qbuf))
+      if(!subq_check_checksum(buf.qbuf))
+         continue;
+
+      adr = buf.qbuf[0] & 0xF;
+
+      if(adr == 0x01)
       {
-         uint8 adr = buf.qbuf[0] & 0xF;
+         int lba;
+         uint8_t track;
+         uint8_t track_bcd = buf.qbuf[1];
+         uint8_t index_bcd = buf.qbuf[2];
+         uint8_t rm_bcd = buf.qbuf[3];
+         uint8_t rs_bcd = buf.qbuf[4];
+         uint8_t rf_bcd = buf.qbuf[5];
+         uint8_t am_bcd = buf.qbuf[7];
+         uint8_t as_bcd = buf.qbuf[8];
+         uint8_t af_bcd = buf.qbuf[9];
 
-         if(adr == 0x01)
-         {
-            uint8 track_bcd = buf.qbuf[1];
-            uint8 index_bcd = buf.qbuf[2];
-            uint8 rm_bcd = buf.qbuf[3];
-            uint8 rs_bcd = buf.qbuf[4];
-            uint8 rf_bcd = buf.qbuf[5];
-            uint8 am_bcd = buf.qbuf[7];
-            uint8 as_bcd = buf.qbuf[8];
-            uint8 af_bcd = buf.qbuf[9];
+         //printf("%2x %2x %2x\n", am_bcd, as_bcd, af_bcd);
 
-            //printf("%2x %2x %2x\n", am_bcd, as_bcd, af_bcd);
+         if(!BCD_is_valid(track_bcd) || !BCD_is_valid(index_bcd) || !BCD_is_valid(rm_bcd) || !BCD_is_valid(rs_bcd) || !BCD_is_valid(rf_bcd) ||
+               !BCD_is_valid(am_bcd) || !BCD_is_valid(as_bcd) || !BCD_is_valid(af_bcd) ||
+               rs_bcd > 0x59 || rf_bcd > 0x74 || as_bcd > 0x59 || af_bcd > 0x74)
+            throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x"), rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
 
-            if(!BCD_is_valid(track_bcd) || !BCD_is_valid(index_bcd) || !BCD_is_valid(rm_bcd) || !BCD_is_valid(rs_bcd) || !BCD_is_valid(rf_bcd) ||
-                  !BCD_is_valid(am_bcd) || !BCD_is_valid(as_bcd) || !BCD_is_valid(af_bcd) ||
-                  rs_bcd > 0x59 || rf_bcd > 0x74 || as_bcd > 0x59 || af_bcd > 0x74)
-            {
-               throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x"), rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
-            }
-            else
-            {
-               int lba = ((BCD_to_U8(am_bcd) * 60 + BCD_to_U8(as_bcd)) * 75 + BCD_to_U8(af_bcd)) - 150;
-               uint8 track = BCD_to_U8(track_bcd);
+         lba = ((BCD_to_U8(am_bcd) * 60 + BCD_to_U8(as_bcd)) * 75 + BCD_to_U8(af_bcd)) - 150;
+         track = BCD_to_U8(track_bcd);
 
-               prev_lba = lba;
+         prev_lba = lba;
 
-               if(track < prev_track)
-                  throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad track number)"));
-               //else if(prev_track && track - pre
+         if(track < prev_track)
+            throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad track number)"));
 
-               prev_track = track;
-            }
-            checksum_pass_counter++;
-         }
+         prev_track = track;
+         checksum_pass_counter++;
       }
    }
 
@@ -369,10 +366,10 @@ CDAccess_CCD::~CDAccess_CCD()
 
 void CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
+   uint8_t sub_buf[96];
+
    if(lba < 0 || (size_t)lba >= img_numsectors)
       throw(MDFN_Error(0, _("LBA out of range.")));
-
-   uint8 sub_buf[96];
 
    img_stream->seek(lba * 2352, SEEK_SET);
    img_stream->read(buf, 2352);

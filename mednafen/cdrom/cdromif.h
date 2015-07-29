@@ -27,39 +27,39 @@ typedef TOC CD_TOC;
 
 class CDIF
 {
- public:
+   public:
 
- CDIF();
- virtual ~CDIF();
+      CDIF();
+      virtual ~CDIF();
 
- inline void ReadTOC(TOC *read_target)
- {
-  *read_target = disc_toc;
- }
+      inline void ReadTOC(TOC *read_target)
+      {
+         *read_target = disc_toc;
+      }
 
- virtual void HintReadSector(uint32 lba) = 0;
- virtual bool ReadRawSector(uint8 *buf, uint32 lba) = 0;
+      virtual void HintReadSector(uint32 lba) = 0;
+      virtual bool ReadRawSector(uint8 *buf, uint32 lba) = 0;
 
- // Call for mode 1 or mode 2 form 1 only.
- bool ValidateRawSector(uint8 *buf);
+      // Call for mode 1 or mode 2 form 1 only.
+      bool ValidateRawSector(uint8 *buf);
 
- // Utility/Wrapped functions
- // Reads mode 1 and mode2 form 1 sectors(2048 bytes per sector returned)
- // Will return the type(1, 2) of the first sector read to the buffer supplied, 0 on error
- int ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors);
+      // Utility/Wrapped functions
+      // Reads mode 1 and mode2 form 1 sectors(2048 bytes per sector returned)
+      // Will return the type(1, 2) of the first sector read to the buffer supplied, 0 on error
+      int ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors);
 
- // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
- // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
- virtual bool Eject(bool eject_status) = 0;
+      // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
+      // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
+      virtual bool Eject(bool eject_status) = 0;
 
- // For Mode 1, or Mode 2 Form 1.
- // No reference counting or whatever is done, so if you destroy the CDIF object before you destroy the returned Stream, things will go BOOM.
- Stream *MakeStream(uint32 lba, uint32 sector_count);
+      // For Mode 1, or Mode 2 Form 1.
+      // No reference counting or whatever is done, so if you destroy the CDIF object before you destroy the returned Stream, things will go BOOM.
+      Stream *MakeStream(uint32 lba, uint32 sector_count);
 
- protected:
- bool UnrecoverableError;
- TOC disc_toc;
- bool DiscEjected;
+   protected:
+      bool UnrecoverableError;
+      TOC disc_toc;
+      bool DiscEjected;
 };
 
 CDIF *CDIF_Open(const char *path, const bool is_device, bool image_memcache);

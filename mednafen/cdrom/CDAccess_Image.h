@@ -34,35 +34,35 @@ struct CDRFILE_TRACK_INFO
 
 class CDAccess_Image : public CDAccess
 {
- public:
+   public:
 
- CDAccess_Image(const char *path, bool image_memcache);
- virtual ~CDAccess_Image();
+      CDAccess_Image(const char *path, bool image_memcache);
+      virtual ~CDAccess_Image();
 
- virtual void Read_Raw_Sector(uint8 *buf, int32 lba);
+      virtual void Read_Raw_Sector(uint8 *buf, int32 lba);
 
- virtual void Read_TOC(TOC *toc);
+      virtual void Read_TOC(TOC *toc);
 
- virtual void Eject(bool eject_status);
- private:
+      virtual void Eject(bool eject_status);
+   private:
 
- int32 NumTracks;
- int32 FirstTrack;
- int32 LastTrack;
- int32 total_sectors;
- uint8 disc_type;
- CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
+      int32 NumTracks;
+      int32 FirstTrack;
+      int32 LastTrack;
+      int32 total_sectors;
+      uint8 disc_type;
+      CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
 
- std::string base_dir;
+      std::string base_dir;
 
- void ImageOpen(const char *path, bool image_memcache);
- void Cleanup(void);
+      void ImageOpen(const char *path, bool image_memcache);
+      void Cleanup(void);
 
- // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.
- void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
+      // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.
+      void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
 
- void ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache);
- uint32 GetSectorCount(CDRFILE_TRACK_INFO *track);
+      void ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache);
+      uint32 GetSectorCount(CDRFILE_TRACK_INFO *track);
 };
 
 
