@@ -1143,9 +1143,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
              break;
        }
 
-       Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
-       DecodeSubQ(pwbuf);
-
        DriveStatus = StatusAfterSeek;
 
        if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
