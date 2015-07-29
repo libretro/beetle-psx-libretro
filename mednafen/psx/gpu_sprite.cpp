@@ -1,15 +1,15 @@
 
-template<bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
-void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg, uint8 v_arg, uint32 color, uint32 clut_offset)
+template<bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool FlipX, bool FlipY>
+void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint8_t u_arg, uint8_t v_arg, uint32_t color, uint32_t clut_offset)
 {
- const int32 r = color & 0xFF;
- const int32 g = (color >> 8) & 0xFF;
- const int32 b = (color >> 16) & 0xFF;
- const uint16 fill_color = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
+ const int32_t r = color & 0xFF;
+ const int32_t g = (color >> 8) & 0xFF;
+ const int32_t b = (color >> 16) & 0xFF;
+ const uint16_t fill_color = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
 
- int32 x_start, x_bound;
- int32 y_start, y_bound;
- uint8 u, v;
+ int32_t x_start, x_bound;
+ int32_t y_start, y_bound;
+ uint8_t u, v;
  int v_inc = 1, u_inc = 1;
 
  //printf("[GPU] Sprite: x=%d, y=%d, w=%d, h=%d\n", x_arg, y_arg, w, h);
@@ -71,7 +71,7 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
   //
   // Note(TODO): From tests on a PS1, even a 0-width sprite takes up time to "draw" proportional to its height.
   //
-  int32 suck_time = (x_bound - x_start) * (y_bound - y_start);
+  int32_t suck_time = (x_bound - x_start) * (y_bound - y_start);
 
   if((BlendMode >= 0) || MaskEval_TA)
   {
@@ -85,20 +85,20 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
  //HeightMode && !dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1)) && !DisplayOff
  //printf("%d:%d, %d, %d ---- heightmode=%d displayfb_ystart=%d field_atvs=%d displayoff=%d\n", w, h, scanline, dfe, HeightMode, DisplayFB_YStart, field_atvs, DisplayOff);
 
- for(int32 y = y_start; MDFN_LIKELY(y < y_bound); y++)
+ for(int32_t y = y_start; MDFN_LIKELY(y < y_bound); y++)
  {
-  uint8 u_r;
+  uint8_t u_r;
 
   if(textured)
    u_r = u;
 
   if(!LineSkipTest(this, y))
   {
-   for(int32 x = x_start; MDFN_LIKELY(x < x_bound); x++)
+   for(int32_t x = x_start; MDFN_LIKELY(x < x_bound); x++)
    {
     if(textured)
     {
-     uint16 fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
+     uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
 
      if(fbw)
      {
@@ -121,14 +121,14 @@ void PS_GPU::DrawSprite(int32 x_arg, int32 y_arg, int32 w, int32 h, uint8 u_arg,
  }
 }
 
-template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-INLINE void PS_GPU::Command_DrawSprite(const uint32 *cb)
+template<uint8_t raw_size, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
+INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 {
- int32 x, y;
- int32 w, h;
- uint8 u = 0, v = 0;
- uint32 color = 0;
- uint32 clut = 0;
+ int32_t x, y;
+ int32_t w, h;
+ uint8_t u = 0, v = 0;
+ uint32_t color = 0;
+ uint32_t clut = 0;
 
  DrawTimeAvail -= 16;	// FIXME, correct time.
 

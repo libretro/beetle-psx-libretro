@@ -1,5 +1,5 @@
 template<int BlendMode, bool MaskEval_TA, bool textured>
-INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
+INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
  y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
@@ -9,7 +9,7 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
   uint16 pix; // = fore_pix & 0x8000;
 
 /*
- static const int32 tab[4][2] =
+ static const int32_t tab[4][2] =
  {
   { 2,  2 },
   { 4,  4 },
@@ -29,8 +29,8 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
        {
 	bg_pix &= ~0x8000;
 
-	uint32 sum = fore_pix + bg_pix;
-	uint32 carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+	uint32_t sum = fore_pix + bg_pix;
+	uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
 	pix = (sum - carry) | (carry - (carry >> 5));
        }
@@ -41,8 +41,8 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
 	bg_pix |= 0x8000;
         fore_pix &= ~0x8000;
 
-	uint32 diff = bg_pix - fore_pix + 0x108420;
-	uint32 borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
+	uint32_t diff = bg_pix - fore_pix + 0x108420;
+	uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
 	pix = (diff - borrow) & (borrow - (borrow >> 5));
        }
@@ -53,8 +53,8 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
 	bg_pix &= ~0x8000;
 	fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
 
-	uint32 sum = fore_pix + bg_pix;
-	uint32 carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+	uint32_t sum = fore_pix + bg_pix;
+	uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
 	pix = (sum - carry) | (carry - (carry >> 5));
        }
@@ -71,7 +71,7 @@ INLINE void PS_GPU::PlotPixel(int32 x, int32 y, uint16_t fore_pix)
  }
 }
 
-INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, const int32 dither_x, const int32 dither_y)
+INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32_t r, int32_t g, int32_t b, const int32_t dither_x, const int32_t dither_y)
 {
    uint16_t ret = texel & 0x8000;
 
@@ -82,18 +82,18 @@ INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32 r, int32 g, int32 b, cons
    return(ret);
 }
 
-template<uint32 TexMode_TA>
+template<uint32_t TexMode_TA>
 INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 {
  if(TexMode_TA < 2)
  {
-  const uint32 new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
+  const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
 
   if(CLUT_Cache_VB != new_ccvb)
   {
    uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
-   const uint32 cxo = (raw_clut & 0x3F) << 4;
-  const uint32 count = (TexMode_TA ? 256 : 16);
+   const uint32_t cxo = (raw_clut & 0x3F) << 4;
+  const uint32_t count = (TexMode_TA ? 256 : 16);
 
    DrawTimeAvail -= count;
 
@@ -114,10 +114,10 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
  TexWindowY_AND = ~(twh << 3);
  TexWindowY_OR = (twy & twh) << 3;
 
-     uint32 u = (u_arg & TexWindowX_AND)  TexWindowX_OR;
-     uint32 v = (v_arg & TexWindowY_AND) | TexWindowY_OR;
-     uint32 fbtex_x = TexPageX + (u >> (2 - TexMode_TA));
-     uint32 fbtex_y = TexPageY + v;
+     uint32_t u = (u_arg & TexWindowX_AND)  TexWindowX_OR;
+     uint32_t v = (v_arg & TexWindowY_AND) | TexWindowY_OR;
+     uint32_t fbtex_x = TexPageX + (u >> (2 - TexMode_TA));
+     uint32_t fbtex_y = TexPageY + v;
      uint16 fbw = GPURAM[fbtex_y][fbtex_x & 1023];
 
      if(TexMode_TA != 2)
@@ -150,21 +150,21 @@ INLINE void PS_GPU::RecalcTexWindowStuff(void)
    memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
 
    SUCV.TWX_AND = ~(tww << 3);
-   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32>(2, TexMode)));
+   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32_t>(2, TexMode)));
 
    SUCV.TWY_AND = ~(twh << 3);
    SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
 }
 
 template<uint32_t TexMode_TA>
-INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32 u_arg, int32 v_arg)
+INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int32_t v_arg)
 {
 #if 0
    /* TODO */
-   uint32 u_ext = ((u_arg & SUCV.TWX_AND) + SUCV.TWX_ADD);
-   uint32 fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
-   uint32 fbtex_y = (v_arg & SUCV.TWY_AND) + SUCV.TWY_ADD;
-   uint32 gro = fbtex_y * 1024U + fbtex_x;
+   uint32_t u_ext = ((u_arg & SUCV.TWX_AND) + SUCV.TWX_ADD);
+   uint32_t fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
+   uint32_t fbtex_y = (v_arg & SUCV.TWY_AND) + SUCV.TWY_ADD;
+   uint32_t gro = fbtex_y * 1024U + fbtex_x;
 
    decltype(&TexCache[0]) c;
 

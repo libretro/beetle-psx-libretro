@@ -148,34 +148,34 @@ static INLINE uint8_t Sat5(int16_t cc)
 //
 // Newton-Raphson division table.  (Initialized at startup; do NOT save in save states!)
 //
-static uint8 DivTable[0x100 + 1];
-static INLINE int32 CalcRecip(uint16 divisor)
+static uint8_t DivTable[0x100 + 1];
+static INLINE int32_t CalcRecip(uint16 divisor)
 {
- int32 x = (0x101 + DivTable[(((divisor & 0x7FFF) + 0x40) >> 7)]);
- int32 tmp = (((int32)divisor * -x) + 0x80) >> 8;
- int32 tmp2 = ((x * (131072 + tmp)) + 0x80) >> 8;
+ int32_t x = (0x101 + DivTable[(((divisor & 0x7FFF) + 0x40) >> 7)]);
+ int32_t tmp = (((int32_t)divisor * -x) + 0x80) >> 8;
+ int32_t tmp2 = ((x * (131072 + tmp)) + 0x80) >> 8;
 
  return(tmp2);
 }
 
 void GTE_Init(void)
 {
- for(uint32_t divisor = 0x8000; divisor < 0x10000; divisor += 0x80)
- {
-  uint32_t xa = 512;
+   uint32_t divisor;
 
-  for(unsigned i = 1; i < 5; i++)
-  {
-   xa = (xa * (1024 * 512 - ((divisor >> 7) * xa))) >> 18;
-  }
+   for(divisor = 0x8000; divisor < 0x10000; divisor += 0x80)
+   {
+      unsigned i;
+      uint32_t xa = 512;
 
-  DivTable[(divisor >> 7) & 0xFF] = ((xa + 1) >> 1) - 0x101;
-  //printf("%04x, %02x\n", divisor, ((xa + 1) >> 1) - 0x101);
- }
+      for(i = 1; i < 5; i++)
+         xa = (xa * (1024 * 512 - ((divisor >> 7) * xa))) >> 18;
 
- //
- // To avoid a bounds limiting if statement in the emulation code:
- DivTable[0x100] = DivTable[0xFF];
+      DivTable[(divisor >> 7) & 0xFF] = ((xa + 1) >> 1) - 0x101;
+      //printf("%04x, %02x\n", divisor, ((xa + 1) >> 1) - 0x101);
+   }
+
+   // To avoid a bounds limiting if statement in the emulation code:
+   DivTable[0x100] = DivTable[0xFF];
 }
 
 
@@ -218,7 +218,7 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
-      { CR, (uint32)(32 * sizeof(uint32)), MDFNSTATE_RLSB32 | 0, "CR" },
+      { CR, (uint32_t)(32 * sizeof(uint32_t)), MDFNSTATE_RLSB32 | 0, "CR" },
       { &FLAGS, sizeof(FLAGS), MDFNSTATE_RLSB | 0, "FLAGS" },
       SFARRAY16(&Matrices.Raw16[0][0], 4 * 10),
 
@@ -572,27 +572,27 @@ uint32_t GTE_ReadDR(unsigned int which)
    switch(which & 0x1F)
    {
       case 0:
-         ret = (uint16)Vectors[0][0] | ((uint16)Vectors[0][1] << 16);
+         ret = (uint16_t)Vectors[0][0] | ((uint16_t)Vectors[0][1] << 16);
          break;
 
       case 1:
-         ret = (int16)Vectors[0][2];
+         ret = (int16_t)Vectors[0][2];
          break;
 
       case 2:
-         ret = (uint16)Vectors[1][0] | ((uint16)Vectors[1][1] << 16);
+         ret = (uint16_t)Vectors[1][0] | ((uint16_t)Vectors[1][1] << 16);
          break;
 
       case 3:
-         ret = (int16)Vectors[1][2];
+         ret = (int16_t)Vectors[1][2];
          break;
 
       case 4:
-         ret = (uint16)Vectors[2][0] | ((uint16)Vectors[2][1] << 16);
+         ret = (uint16_t)Vectors[2][0] | ((uint16_t)Vectors[2][1] << 16);
          break;
 
       case 5:
-         ret = (int16)Vectors[2][2];
+         ret = (int16_t)Vectors[2][2];
          break;
 
       case 6:
@@ -600,55 +600,55 @@ uint32_t GTE_ReadDR(unsigned int which)
          break;
 
       case 7:
-         ret = (uint16)OTZ;
+         ret = (uint16_t)OTZ;
          break;
 
       case 8:
-         ret = (int16)IR0;
+         ret = (int16_t)IR0;
          break;
 
       case 9:
-         ret = (int16)IR1;
+         ret = (int16_t)IR1;
          break;
 
       case 10:
-         ret = (int16)IR2;
+         ret = (int16_t)IR2;
          break;
 
       case 11:
-         ret = (int16)IR3;
+         ret = (int16_t)IR3;
          break;
 
       case 12:
-         ret = (uint16)XY_FIFO[0].X | ((uint16)XY_FIFO[0].Y << 16);
+         ret = (uint16_t)XY_FIFO[0].X | ((uint16_t)XY_FIFO[0].Y << 16);
          break;
 
       case 13:
-         ret = (uint16)XY_FIFO[1].X | ((uint16)XY_FIFO[1].Y << 16);
+         ret = (uint16_t)XY_FIFO[1].X | ((uint16_t)XY_FIFO[1].Y << 16);
          break;
 
       case 14:
-         ret = (uint16)XY_FIFO[2].X | ((uint16)XY_FIFO[2].Y << 16);
+         ret = (uint16_t)XY_FIFO[2].X | ((uint16_t)XY_FIFO[2].Y << 16);
          break;
 
       case 15:
-         ret = (uint16)XY_FIFO[3].X | ((uint16)XY_FIFO[3].Y << 16);
+         ret = (uint16_t)XY_FIFO[3].X | ((uint16_t)XY_FIFO[3].Y << 16);
          break;
 
       case 16:
-         ret = (uint16)Z_FIFO[0];
+         ret = (uint16_t)Z_FIFO[0];
          break;
 
       case 17:
-         ret = (uint16)Z_FIFO[1];
+         ret = (uint16_t)Z_FIFO[1];
          break;
 
       case 18:
-         ret = (uint16)Z_FIFO[2];
+         ret = (uint16_t)Z_FIFO[2];
          break;
 
       case 19:
-         ret = (uint16)Z_FIFO[3];
+         ret = (uint16_t)Z_FIFO[3];
          break;
 
       case 20:
@@ -699,7 +699,7 @@ uint32_t GTE_ReadDR(unsigned int which)
    return(ret);
 }
 
-#define sign_x_to_s64(_bits, _value) (((int64)((uint64)(_value) << (64 - _bits))) >> (64 - _bits))
+#define sign_x_to_s64(_bits, _value) (((int64_t)((uint64_t)(_value) << (64 - _bits))) >> (64 - _bits))
 
 static INLINE int64_t A_MV(unsigned which, int64_t value)
 {
@@ -896,7 +896,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       int64_t tmp;
       int32_t mulr[3];
 
-      tmp = (uint64)(int64)crv[i] << 12;
+      tmp = (uint64_t)(int64_t)crv[i] << 12;
 
       if(matrix == &Matrices.AbbyNormal)
       {
@@ -950,7 +950,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    {
       int32_t mulr[3];
 
-      tmp[i] = (uint64)(int64)crv[i] << 12;
+      tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
 
       mulr[0] = matrix->MX[i][0] * v[0];
       mulr[1] = matrix->MX[i][1] * v[1];
@@ -1042,21 +1042,19 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
       dividend <<= shift_bias;
       divisor <<= shift_bias;
 
-      return ((int64)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16;
+      return ((int64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16;
    }
-   else
-   {
-      FLAGS |= 1 << 17;
-      return 0x1FFFF;
-   }
+
+   FLAGS |= 1 << 17;
+   return 0x1FFFF;
 }
 
 static INLINE void TransformXY(int64_t h_div_sz)
 {
-   MAC[0] = F((int64)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
+   MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
    XY_FIFO[3].X = Lm_G(0, MAC[0]);
 
-   MAC[0] = F((int64)OFY + IR2 * h_div_sz) >> 16;
+   MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
    XY_FIFO[3].Y = Lm_G(1, MAC[0]);
 
    XY_FIFO[0] = XY_FIFO[1];
@@ -1066,8 +1064,8 @@ static INLINE void TransformXY(int64_t h_div_sz)
 
 static INLINE void TransformDQ(int64_t h_div_sz)
 {
-   MAC[0] = F((int64)DQB + DQA * h_div_sz);
-   IR0 = Lm_H(((int64)DQB + DQA * h_div_sz) >> 12);
+   MAC[0] = F((int64_t)DQB + DQA * h_div_sz);
+   IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
 }
 
 static int32_t RTPS(uint32_t instr)
@@ -1200,7 +1198,7 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64)((uint64)(int64)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
          MAC[1 + i] = A_MV(i, (RGB_temp[i] * IR_temp[i] + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
@@ -1208,8 +1206,8 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64)((uint64)(int64)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-         MAC[1 + i] = A_MV(i, ((int64)((uint64)(int64)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
 
@@ -1253,13 +1251,13 @@ static int32_t INTPL(uint32_t instr)
 {
    DECODE_FIELDS;
 
-   MAC[1] = A_MV(0, ((int64)((uint64)(int64)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
-   MAC[2] = A_MV(1, ((int64)((uint64)(int64)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
-   MAC[3] = A_MV(2, ((int64)((uint64)(int64)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
 
-   MAC[1] = A_MV(0, ((int64)((uint64)(int64)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = A_MV(1, ((int64)((uint64)(int64)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = A_MV(2, ((int64)((uint64)(int64)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
 
    MAC_to_IR(lm);
 
@@ -1339,7 +1337,7 @@ static int32_t NCLIP(uint32_t instr)
 {
    DECODE_FIELDS;
 
-   MAC[0] = F( (int64)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
+   MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
          );
 
    return(8);
@@ -1349,7 +1347,7 @@ static int32_t AVSZ3(uint32_t instr)
 {
    DECODE_FIELDS;
 
-   MAC[0] = F(((int64)ZSF3 * (Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
+   MAC[0] = F(((int64_t)ZSF3 * (Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
 
    OTZ = Lm_D(MAC[0] >> 12, FALSE);
 
@@ -1360,7 +1358,7 @@ static int32_t AVSZ4(uint32_t instr)
 {
    DECODE_FIELDS;
 
-   MAC[0] = F(((int64)ZSF4 * (Z_FIFO[0] + Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
+   MAC[0] = F(((int64_t)ZSF4 * (Z_FIFO[0] + Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
 
    OTZ = Lm_D(MAC[0] >> 12, FALSE);
 
@@ -1402,9 +1400,9 @@ static int32_t GPL(uint32_t instr)
 {
    DECODE_FIELDS;
 
-   MAC[1] = A_MV(0, (int64)((uint64)(int64)MAC[1] << sf) + (IR0 * IR1)) >> sf;
-   MAC[2] = A_MV(1, (int64)((uint64)(int64)MAC[2] << sf) + (IR0 * IR2)) >> sf;
-   MAC[3] = A_MV(2, (int64)((uint64)(int64)MAC[3] << sf) + (IR0 * IR3)) >> sf;
+   MAC[1] = A_MV(0, (int64_t)((uint64_t)(int64_t)MAC[1] << sf) + (IR0 * IR1)) >> sf;
+   MAC[2] = A_MV(1, (int64_t)((uint64_t)(int64_t)MAC[2] << sf) + (IR0 * IR2)) >> sf;
+   MAC[3] = A_MV(2, (int64_t)((uint64_t)(int64_t)MAC[3] << sf) + (IR0 * IR3)) >> sf;
 
    MAC_to_IR(lm);
 

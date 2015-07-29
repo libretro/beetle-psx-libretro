@@ -13,14 +13,14 @@
 
 struct line_fxp_coord
 {
- uint64 x, y;
- uint32 r, g, b;
+ uint64_t x, y;
+ uint32_t r, g, b;
 };
 
 struct line_fxp_step
 {
- int64 dx_dk, dy_dk;
- int32 dr_dk, dg_dk, db_dk;
+ int64_t dx_dk, dy_dk;
+ int32_t dr_dk, dg_dk, db_dk;
 };
 
 enum { Line_XY_FractBits = 32 };
@@ -29,8 +29,8 @@ enum { Line_RGB_FractBits = 12 };
 template<bool goraud>
 static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_step &step, line_fxp_coord &coord)
 {
- coord.x = ((uint64)point.x << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
- coord.y = ((uint64)point.y << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
+ coord.x = ((uint64_t)point.x << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
+ coord.y = ((uint64_t)point.y << Line_XY_FractBits) | (UINT64_C(1) << (Line_XY_FractBits - 1));
 
  coord.x -= 1024;
 
@@ -45,9 +45,9 @@ static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_s
  }
 }
 
-static INLINE int64 LineDivide(int64 delta, int32 dk)
+static INLINE int64_t LineDivide(int64_t delta, int32_t dk)
 {
- delta = (uint64)delta << Line_XY_FractBits;
+ delta = (uint64_t)delta << Line_XY_FractBits;
 
  if(delta < 0)
   delta -= dk - 1;
@@ -58,7 +58,7 @@ static INLINE int64 LineDivide(int64 delta, int32 dk)
 }
 
 template<bool goraud>
-static INLINE void LinePointsToFXPStep(const line_point &point0, const line_point &point1, const int32 dk, line_fxp_step &step)
+static INLINE void LinePointsToFXPStep(const line_point &point0, const line_point &point1, const int32_t dk, line_fxp_step &step)
 {
  if(!dk)
  {
@@ -79,9 +79,9 @@ static INLINE void LinePointsToFXPStep(const line_point &point0, const line_poin
 
  if(goraud)
  {
-  step.dr_dk = (int32)((uint32)(point1.r - point0.r) << Line_RGB_FractBits) / dk;
-  step.dg_dk = (int32)((uint32)(point1.g - point0.g) << Line_RGB_FractBits) / dk;
-  step.db_dk = (int32)((uint32)(point1.b - point0.b) << Line_RGB_FractBits) / dk;
+  step.dr_dk = (int32_t)((uint32_t)(point1.r - point0.r) << Line_RGB_FractBits) / dk;
+  step.dg_dk = (int32_t)((uint32_t)(point1.g - point0.g) << Line_RGB_FractBits) / dk;
+  step.db_dk = (int32_t)((uint32_t)(point1.b - point0.b) << Line_RGB_FractBits) / dk;
  }
 }
 
@@ -102,9 +102,9 @@ static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step)
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
- int32 i_dx;
- int32 i_dy;
- int32 k;
+ int32_t i_dx;
+ int32_t i_dy;
+ int32_t k;
  line_fxp_coord cur_point;
  line_fxp_step step;
 
@@ -131,16 +131,16 @@ void PS_GPU::DrawLine(line_point *points)
  LinePointsToFXPStep<goraud>(points[0], points[1], k, step);
  LinePointToFXPCoord<goraud>(points[0], step, cur_point);
  
- for(int32 i = 0; i <= k; i++)	// <= is not a typo.
+ for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
  {
   // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
-  const int32 x = (cur_point.x >> Line_XY_FractBits) & 2047;
-  const int32 y = (cur_point.y >> Line_XY_FractBits) & 2047;
-  uint16 pix = 0x8000;
+  const int32_t x = (cur_point.x >> Line_XY_FractBits) & 2047;
+  const int32_t y = (cur_point.y >> Line_XY_FractBits) & 2047;
+  uint16_t pix = 0x8000;
 
   if(!LineSkipTest(this, y))
   {
-   uint8 r, g, b;
+   uint8_t r, g, b;
 
    if(goraud)
    {
@@ -178,9 +178,9 @@ void PS_GPU::DrawLine(line_point *points)
 }
 
 template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
-INLINE void PS_GPU::Command_DrawLine(const uint32 *cb)
+INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
 {
- const uint8 cc = cb[0] >> 24; // For pline handling later.
+ const uint8_t cc = cb[0] >> 24; // For pline handling later.
  line_point points[2];
 
  DrawTimeAvail -= 16;	// FIXME, correct time.
