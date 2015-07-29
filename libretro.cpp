@@ -8,7 +8,7 @@
 #include	"mednafen/video/Deinterlacer.h"
 #endif
 #include "libretro.h"
-#include "thread.h"
+#include <rthreads/rthreads.h>
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -3745,74 +3745,4 @@ void MDFN_DispMessage(const char *format, ...)
    msg.msg = strc;
 
    environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
-}
-
-void MDFND_Sleep(unsigned int time)
-{
-   retro_sleep(time);
-}
-
-MDFN_Thread *MDFND_CreateThread(int (*fn)(void *), void *data)
-{
-   return (MDFN_Thread*)sthread_create((void (*)(void*))fn, data);
-}
-
-void MDFND_WaitThread(MDFN_Thread *thr, int *val)
-{
-   sthread_join((sthread_t*)thr);
-
-   if (val)
-   {
-      *val = 0;
-      fprintf(stderr, "WaitThread relies on return value.\n");
-   }
-}
-
-void MDFND_KillThread(MDFN_Thread *)
-{
-   fprintf(stderr, "Killing a thread is a BAD IDEA!\n");
-}
-
-MDFN_Mutex *MDFND_CreateMutex()
-{
-   return (MDFN_Mutex*)slock_new();
-}
-
-void MDFND_DestroyMutex(MDFN_Mutex *lock)
-{
-   slock_free((slock_t*)lock);
-}
-
-int MDFND_LockMutex(MDFN_Mutex *lock)
-{
-   slock_lock((slock_t*)lock);
-   return 0;
-}
-
-int MDFND_UnlockMutex(MDFN_Mutex *lock)
-{
-   slock_unlock((slock_t*)lock);
-   return 0;
-}
-
-MDFN_Cond *MDFND_CreateCond(void)
-{
-   return (MDFN_Cond*)scond_new();
-}
-
-void MDFND_DestroyCond(MDFN_Cond *cond)
-{
-   scond_free((scond_t*)cond);
-}
-
-int MDFND_WaitCond(MDFN_Cond *cond, MDFN_Mutex *mutex)
-{
-   scond_wait((scond_t*)cond, (slock_t*)mutex);
-   return 0; // not sure about this return
-}
-
-int MDFND_SignalCond(MDFN_Cond *cond)
-{
-   scond_signal((scond_t*)cond);
-   return 0; // not sure about this return
 }

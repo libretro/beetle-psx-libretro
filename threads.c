@@ -14,7 +14,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "thread.h"
+#include <rthreads/rthreads.h>
 #include <stdlib.h>
 
 #if defined(_WIN32)

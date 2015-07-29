@@ -9,34 +9,6 @@
 
 extern std::vector<MDFNGI *>MDFNSystems;
 
-uint32 MDFND_GetTime(void);
-void MDFND_Sleep(uint32 ms);
-
-#ifdef WANT_THREADING
-/* Being threading support. */
-// Mostly based off SDL's prototypes and semantics.
-// Driver code should actually define MDFN_Thread and MDFN_Mutex.
-
-struct MDFN_Thread;
-struct MDFN_Mutex;
-struct MDFN_Cond;
-
-MDFN_Thread *MDFND_CreateThread(int (*fn)(void *), void *data);
-void MDFND_WaitThread(MDFN_Thread *thread, int *status);
-void MDFND_KillThread(MDFN_Thread *thread);
-
-MDFN_Mutex *MDFND_CreateMutex(void);
-MDFN_Cond *MDFND_CreateCond(void);
-void MDFND_DestroyCond(MDFN_Cond *cond);
-void MDFND_DestroyMutex(MDFN_Mutex *mutex);
-int MDFND_WaitCond(MDFN_Cond *cond, MDFN_Mutex *mutex);
-int MDFND_SignalCond(MDFN_Cond *cond);
-int MDFND_LockMutex(MDFN_Mutex *mutex);
-int MDFND_UnlockMutex(MDFN_Mutex *mutex);
-
-/* End threading support. */
-#endif
-
 MDFNGI *MDFNI_LoadCD(const char *sysname, const char *devicename);
 
 // Call this function as early as possible, even before MDFNI_Initialize()
