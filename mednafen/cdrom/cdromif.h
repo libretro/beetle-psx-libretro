@@ -39,6 +39,7 @@ class CDIF
 
       virtual void HintReadSector(uint32_t lba) = 0;
       virtual bool ReadRawSector(uint8_t *buf, uint32_t lba) = 0;
+      virtual bool ReadRawSectorPWOnly(uint8_t *buf, uint32_t lba, bool hint_fullread) = 0;
 
       // Call for mode 1 or mode 2 form 1 only.
       bool ValidateRawSector(uint8_t *buf);

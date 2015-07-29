@@ -92,6 +92,7 @@ class CDIF_MT : public CDIF
 
       virtual void HintReadSector(uint32 lba);
       virtual bool ReadRawSector(uint8 *buf, uint32 lba);
+      virtual bool ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread);
 
       // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
       // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
@@ -140,6 +141,7 @@ class CDIF_ST : public CDIF
 
       virtual void HintReadSector(uint32 lba);
       virtual bool ReadRawSector(uint8 *buf, uint32 lba);
+      virtual bool ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread);
       virtual bool Eject(bool eject_status);
 
    private:
@@ -534,6 +536,32 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
    return(!error_condition);
 }
 
+bool CDIF_MT::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
+{
+   uint8 tmpbuf[2352 + 96];
+   bool ret;
+
+   if(UnrecoverableError)
+   {
+      memset(buf, 0, 96);
+      return(false);
+   }
+
+   // This shouldn't happen, the emulated-system-specific CDROM emulation code should make sure the emulated program doesn't try
+   // to read past the last "real" sector of the disc.
+   if(lba >= disc_toc.tracks[100].lba)
+   {
+      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      memset(buf, 0, 96);
+      return(FALSE);
+   }
+
+   ret = ReadRawSector(tmpbuf, lba);
+   memcpy(buf, tmpbuf + 2352, 96);
+
+   return ret;
+}
+
 void CDIF_MT::HintReadSector(uint32 lba)
 {
    if(UnrecoverableError)
@@ -561,14 +589,7 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
       }
 
       if(!ValidateRawSector(tmpbuf))
-      {
-         if (log_cb)
-         {
-            log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
-            log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
-         }
          return(false);
-      }
 
       mode = tmpbuf[12 + 3];
 
@@ -666,6 +687,32 @@ bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
    }
 
    return(true);
+}
+
+bool CDIF_ST::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
+{
+   uint8 tmpbuf[2352 + 96];
+   bool ret;
+
+   if(UnrecoverableError)
+   {
+      memset(buf, 0, 96);
+      return(false);
+   }
+
+   // This shouldn't happen, the emulated-system-specific CDROM emulation code should make sure the emulated program doesn't try
+   // to read past the last "real" sector of the disc.
+   if(lba >= disc_toc.tracks[100].lba)
+   {
+      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      memset(buf, 0, 96);
+      return(FALSE);
+   }
+
+   ret = ReadRawSector(tmpbuf, lba);
+   memcpy(buf, tmpbuf + 2352, 96);
+
+   return ret;
 }
 
 bool CDIF_ST::Eject(bool eject_status)
