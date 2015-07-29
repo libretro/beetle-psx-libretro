@@ -885,18 +885,10 @@ void PS_CDC::HandlePlayRead(void)
  if(CurSector >= (int32)toc.tracks[100].lba)
  {
   PSX_WARNING("[CDC] In leadout area: %u", CurSector);
-
-  //
-  // Synthesis is a bit of a kludge... :/
-  //
-  synth_leadout_sector_lba(0x02, &toc, CurSector, read_buf);
-  DecodeSubQ(read_buf + 2352);
  }
- else
- {
+
   Cur_CDIF->ReadRawSector(read_buf, CurSector);	// FIXME: error out on error.
   DecodeSubQ(read_buf + 2352);
- }
  
 
  if(SubQBuf_Safe[1] == 0xAA && (DriveStatus == DS_PLAYING || (!(SubQBuf_Safe[0] & 0x40) && (Mode & MODE_CDDA))))
@@ -1113,57 +1105,56 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
   if(PSRCounter > 0)
   {
-   uint8 buf[2352 + 96];
+   uint8 pwbuf[96];
 
    PSRCounter -= chunk_clocks;
 
    if(PSRCounter <= 0) 
    {
-    if(DriveStatus == DS_RESETTING)
-    {
-     SetAIP(CDCIRQ_COMPLETE, MakeStatus());
+      if(DriveStatus == DS_RESETTING)
+      {
+         SetAIP(CDCIRQ_COMPLETE, MakeStatus());
 
-     Muted = false; // Does it get reset here?
-     ClearAudioBuffers();
+         Muted = false; // Does it get reset here?
+         ClearAudioBuffers();
 
-     SB_In = 0;
-     SectorPipe_Pos = SectorPipe_In = 0;
-     SectorsRead = 0;
+         SB_In          = 0;
+         SectorPipe_Pos = 0;
+         SectorPipe_In  = 0;
+         SectorsRead    = 0;
+         Mode           = 0x20; /* Confirmed (and see "This Is Football 2"). */
+         CurSector      = 0;
+         CommandLoc     = 0;
 
-     Mode = 0;
-     CurSector = 0;
-     CommandLoc = 0;
-
-     DriveStatus = DS_PAUSED;	// or DS_STANDBY?
-     ClearAIP();
-    }
+         DriveStatus    = DS_PAUSED;	// or DS_STANDBY?
+         ClearAIP();
+      }
     else if(DriveStatus == DS_SEEKING)
     {
-     CurSector = SeekTarget;
-     Cur_CDIF->ReadRawSector(buf, CurSector);
-     DecodeSubQ(buf + 2352);
+       CurSector = SeekTarget;
+       Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
+       DecodeSubQ(pwbuf);
 
-     DriveStatus = StatusAfterSeek;
+       DriveStatus = StatusAfterSeek;
 
-     if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
-     {
-      PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
-     }
+       if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+       {
+          PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+       }
     }
     else if(DriveStatus == DS_SEEKING_LOGICAL)
     {
-     CurSector = SeekTarget;
-     Cur_CDIF->ReadRawSector(buf, CurSector);
-     DecodeSubQ(buf + 2352);
-     memcpy(HeaderBuf, buf + 12, 12);
+       CurSector = SeekTarget;
+       Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
+       DecodeSubQ(pwbuf);
 
-     DriveStatus = StatusAfterSeek;
+       DriveStatus = StatusAfterSeek;
 
-     if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
-     {
-      // TODO: SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);  when !(Mode & MODE_CDDA) and the sector isn't a data sector.
-      PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
-     }
+       if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+       {
+          // TODO: SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);  when !(Mode & MODE_CDDA) and the sector isn't a data sector.
+          PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+       }
     }
     else if(DriveStatus == DS_READING || DriveStatus == DS_PLAYING)
     {
@@ -1507,19 +1498,20 @@ bool PS_CDC::DMACanRead(void)
 
 uint32 PS_CDC::DMARead(void)
 {
- uint32 data = 0;
+   unsigned i;
+   uint32_t data = 0;
 
- for(int i = 0; i < 4; i++)
- {
-  if(DMABuffer.CanRead())
-   data |= DMABuffer.ReadByte() << (i * 8);
-  else
-  {
-   //assert(0);
-  }
- }
+   for(i = 0; i < 4; i++)
+   {
+      if(DMABuffer.CanRead())
+         data |= DMABuffer.ReadByte() << (i * 8);
+      else
+      {
+         PSX_WARNING("[CDC] DMA read buffer underflow!");
+      }
+   }
 
- return(data);
+   return data;
 }
 
 bool PS_CDC::CommandCheckDiscPresent(void)
@@ -1616,42 +1608,20 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
  return(ret);
 }
 
-#if 0
-void PS_CDC::BeginSeek(uint32 target, int after_seek)
-{
- SeekTarget = target;
- StatusAfterSeek = after_seek;
-
- PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
-}
-#endif
-
 // Remove this function when we have better seek emulation; it's here because the Rockman complete works games(at least 2 and 4) apparently have finicky fubared CD
 // access code.
-void PS_CDC::PreSeekHack(bool logical, uint32 target)
+void PS_CDC::PreSeekHack(uint32 target)
 {
- uint8 buf[2352 + 96];
- int max_try = 32;
- bool NeedHBuf = logical;
+   uint8 pwbuf[96];
+   int max_try = 32;
 
- CurSector = target;	// If removing/changing this, take into account how it will affect ReadN/ReadS/Play/etc command calls that interrupt a seek.
+   CurSector = target;	// If removing/changing this, take into account how it will affect ReadN/ReadS/Play/etc command calls that interrupt a seek.
 
- // If removing this SubQ reading bit, think about how it will interact with a Read command of data(or audio :b) sectors when Mode bit0 is 1.
- if(target < toc.tracks[100].lba)
- {
-  do
-  {
-   Cur_CDIF->ReadRawSector(buf, target++);
-
-   // GetLocL related kludge, for Gran Turismo 1 music, perhaps others?
-   if(NeedHBuf)
+   // If removing this SubQ reading bit, think about how it will interact with a Read command of data(or audio :b) sectors when Mode bit0 is 1.
+   do
    {
-    NeedHBuf = false;
-    memcpy(HeaderBuf, buf + 12, 12);
-    HeaderBufValid = true;
-   }
-  } while(!DecodeSubQ(buf + 2352) && --max_try > 0 && target < toc.tracks[100].lba);
- }
+      Cur_CDIF->ReadRawSectorPWOnly(pwbuf, target++, true);
+   } while (!DecodeSubQ(pwbuf) && --max_try > 0);
 }
 
 /*
@@ -1676,12 +1646,12 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 
   if(track < toc.first_track)
   {
-   PSX_WARNING("[CDC] Attempt to play track after last track.");
+   PSX_WARNING("[CDC] Attempt to play track before first track.");
    track = toc.first_track;
   }
   else if(track > toc.last_track)
   {
-   PSX_WARNING("[CDC] Attempt to play track before first track.");
+   PSX_WARNING("[CDC] Attempt to play track after last track.");
    track = toc.last_track;
   }
 
@@ -1696,7 +1666,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
   SeekTarget = toc.tracks[track].lba;
   PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
-  PreSeekHack(false, SeekTarget);
+  PreSeekHack(SeekTarget);
 
   ReportLastF = 0xFF;
 
@@ -1718,7 +1688,7 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
 
   PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
-  PreSeekHack(false, SeekTarget);
+  PreSeekHack(SeekTarget);
 
   ReportLastF = 0xFF;
 
@@ -1791,7 +1761,7 @@ void PS_CDC::ReadBase(void)
 
   PSRCounter = /*903168 * 1.5 +*/ CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
   HeaderBufValid = false;
-  PreSeekHack(true, SeekTarget);
+  PreSeekHack(SeekTarget);
 
   DriveStatus = DS_SEEKING_LOGICAL;
   StatusAfterSeek = DS_READING;
@@ -2116,7 +2086,7 @@ int32 PS_CDC::Command_SeekL(const int arg_count, const uint8 *args)
 
  PSRCounter = (33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1))) + CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
  HeaderBufValid = false;
- PreSeekHack(true, SeekTarget);
+ PreSeekHack(SeekTarget);
  DriveStatus = DS_SEEKING_LOGICAL;
  StatusAfterSeek = DS_STANDBY;
  ClearAIP();
@@ -2136,7 +2106,7 @@ int32 PS_CDC::Command_SeekP(const int arg_count, const uint8 *args)
 
  PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
  HeaderBufValid = false;
- PreSeekHack(false, SeekTarget);
+ PreSeekHack(SeekTarget);
  DriveStatus = DS_SEEKING;
  StatusAfterSeek = DS_STANDBY;
  ClearAIP();

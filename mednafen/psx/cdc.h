@@ -214,8 +214,7 @@ class PS_CDC
          int32 (PS_CDC::*func2)(void);
       };
 
-      void BeginSeek(uint32 target);
-      void PreSeekHack(bool logical, uint32 target);
+      void PreSeekHack(uint32_t target);
       void ReadBase(void);
 
       static CDC_CTEntry Commands[0x20];
