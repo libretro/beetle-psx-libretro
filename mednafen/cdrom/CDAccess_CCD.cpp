@@ -82,7 +82,7 @@ CDAccess_CCD::CDAccess_CCD(const char *path, bool image_memcache) : img_stream(N
 
 void CDAccess_CCD::Load(const char *path, bool image_memcache)
 {
-   FileStream cf(path, FileStream::MODE_READ);
+   FileStream cf(path, MODE_READ);
    std::map<std::string, CCD_Section> Sections;
    std::string linebuf;
    std::string cur_section_name;
@@ -240,7 +240,7 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
    /* Open image stream. */
    {
       std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd), true);
-      FileStream *str        = new FileStream(image_path.c_str(), FileStream::MODE_READ);
+      FileStream *str        = new FileStream(image_path.c_str(), MODE_READ);
 
       if(image_memcache)
          img_stream = new MemoryStream(str);
@@ -258,7 +258,7 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
    {
       /* Open subchannel stream */
       std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd), true);
-      FileStream *str      = new FileStream(sub_path.c_str(), FileStream::MODE_READ);
+      FileStream *str      = new FileStream(sub_path.c_str(), MODE_READ);
 
       if(image_memcache)
          sub_stream = new MemoryStream(str);

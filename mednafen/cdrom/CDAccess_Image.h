@@ -8,26 +8,26 @@ class AudioReader;
 
 struct CDRFILE_TRACK_INFO
 {
-   int32 LBA;
+   int32_t LBA;
 
-   uint32 DIFormat;
-   uint8 subq_control;
+   uint32_t DIFormat;
+   uint8_t subq_control;
 
-   int32 pregap;
-   int32 pregap_dv;
+   int32_t pregap;
+   int32_t pregap_dv;
 
-   int32 postgap;
+   int32_t postgap;
 
-   int32 index[2];
+   int32_t index[2];
 
-   int32 sectors;	// Not including pregap sectors!
+   int32_t sectors;	// Not including pregap sectors!
    Stream *fp;
    bool FirstFileInstance;
    bool RawAudioMSBFirst;
    long FileOffset;
    unsigned int SubchannelMode;
 
-   uint32 LastSamplePos;
+   uint32_t LastSamplePos;
 
    AudioReader *AReader;
 };
@@ -39,18 +39,18 @@ class CDAccess_Image : public CDAccess
       CDAccess_Image(const char *path, bool image_memcache);
       virtual ~CDAccess_Image();
 
-      virtual void Read_Raw_Sector(uint8 *buf, int32 lba);
+      virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
       virtual void Read_TOC(TOC *toc);
 
       virtual void Eject(bool eject_status);
    private:
 
-      int32 NumTracks;
-      int32 FirstTrack;
-      int32 LastTrack;
-      int32 total_sectors;
-      uint8 disc_type;
+      int32_t NumTracks;
+      int32_t FirstTrack;
+      int32_t LastTrack;
+      int32_t total_sectors;
+      uint8_t disc_type;
       CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
 
       std::string base_dir;
@@ -59,10 +59,10 @@ class CDAccess_Image : public CDAccess
       void Cleanup(void);
 
       // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.
-      void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
+      void MakeSubPQ(int32_t lba, uint8_t *SubPWBuf);
 
       void ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache);
-      uint32 GetSectorCount(CDRFILE_TRACK_INFO *track);
+      uint32_t GetSectorCount(CDRFILE_TRACK_INFO *track);
 };
 
 

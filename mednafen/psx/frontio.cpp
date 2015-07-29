@@ -884,7 +884,7 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
  {
   if(DevicesMC[which]->GetNVSize())
   {
-   FileStream mf(path, FileStream::MODE_READ);
+   FileStream mf(path, MODE_READ);
 
    mf.read(DevicesMC[which]->GetNVData(), (1 << 17));
 
@@ -916,7 +916,7 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
 
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
-  FileStream mf(path, FileStream::MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
+  FileStream mf(path, MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
 
   DevicesMC[which]->ReadNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
   mf.write(DevicesMC[which]->GetNVData(), (1 << 17));

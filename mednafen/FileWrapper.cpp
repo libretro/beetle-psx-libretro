@@ -40,12 +40,12 @@
 
 FileWrapper::FileWrapper(const char *path, const int mode, const char *purpose) : OpenedMode(mode)
 {
- if(!(fp = fopen(path, (mode == MODE_WRITE) ? "wb" : "rb")))
- {
-  ErrnoHolder ene(errno);
+   if(!(fp = fopen(path, (mode == MODE_WRITE) ? "wb" : "rb")))
+   {
+      ErrnoHolder ene(errno);
 
-  throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
- }
+      throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
+   }
 }
 
 FileWrapper::~FileWrapper()
@@ -63,7 +63,7 @@ void FileWrapper::close(void)
    fclose(tmp);
 }
 
-uint64 FileWrapper::read(void *data, uint64 count, bool error_on_eof)
+uint64_t FileWrapper::read(void *data, uint64_t count, bool error_on_eof)
 {
    return fread(data, 1, count, fp);
 }
@@ -73,7 +73,7 @@ void FileWrapper::flush(void)
    fflush(fp);
 }
 
-void FileWrapper::write(const void *data, uint64 count)
+void FileWrapper::write(const void *data, uint64_t count)
 {
    fwrite(data, 1, count, fp);
 }
@@ -115,12 +115,12 @@ char *FileWrapper::get_line(char *buf_s, int buf_size)
 }
 
 
-void FileWrapper::seek(int64 offset, int whence)
+void FileWrapper::seek(int64_t offset, int whence)
 {
    fseeko(fp, offset, whence);
 }
 
-int64 FileWrapper::size(void)
+int64_t FileWrapper::size(void)
 {
    struct stat buf;
 
@@ -129,7 +129,7 @@ int64 FileWrapper::size(void)
    return(buf.st_size);
 }
 
-int64 FileWrapper::tell(void)
+int64_t FileWrapper::tell(void)
 {
    return ftello(fp);
 }

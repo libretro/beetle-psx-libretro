@@ -1342,7 +1342,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    {
       std::string biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
-      FileStream BIOSFile(biospath.c_str(), FileStream::MODE_READ);
+      FileStream BIOSFile(biospath.c_str(), MODE_READ);
 
       BIOSFile.read(BIOSROM->data8, 512 * 1024);
    }
@@ -2642,7 +2642,7 @@ static void check_variables(void)
 static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsigned depth = 0)
 {
    std::vector<std::string> ret;
-   FileWrapper m3u_file(path.c_str(), FileWrapper::MODE_READ, _("M3U CD Set"));
+   FileWrapper m3u_file(path.c_str(), MODE_READ, _("M3U CD Set"));
    std::string dir_path;
    char linebuf[2048];
 

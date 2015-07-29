@@ -9,10 +9,10 @@ class AudioReader
       AudioReader();
       virtual ~AudioReader();
 
-      virtual int64 FrameCount(void);
-      INLINE int64 Read(int64 frame_offset, int16 *buffer, int64 frames)
+      virtual int64_t FrameCount(void);
+      INLINE int64_t Read(int64_t frame_offset, int16_t *buffer, int64_t frames)
       {
-         int64 ret;
+         int64_t ret;
 
          if(LastReadPos != frame_offset)
          {
@@ -28,10 +28,10 @@ class AudioReader
       }
 
    private:
-      virtual int64 Read_(int16 *buffer, int64 frames);
-      virtual bool Seek_(int64 frame_offset);
+      virtual int64_t Read_(int16_t *buffer, int64_t frames);
+      virtual bool Seek_(int64_t frame_offset);
 
-      int64 LastReadPos;
+      int64_t LastReadPos;
 };
 
 // AR_Open(), and AudioReader, will NOT take "ownership" of the Stream object(IE it won't ever delete it).  Though it does assume it has exclusive access

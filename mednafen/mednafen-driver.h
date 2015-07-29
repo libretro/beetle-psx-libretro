@@ -26,10 +26,4 @@ void MDFN_DispMessage(const char *format, ...);
 
 uint32 MDFNI_CRC32(uint32 crc, uint8 *buf, uint32 len);
 
-// NES hackish function.  Should abstract in the future.
-int MDFNI_DatachSet(const uint8 *rcode);
-
-void MDFNI_DumpModulesDef(const char *fn);
-
-
 #endif

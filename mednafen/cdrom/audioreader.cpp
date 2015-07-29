@@ -44,22 +44,22 @@ AudioReader::~AudioReader()
 
 }
 
-int64 AudioReader::Read_(int16 *buffer, int64 frames)
+int64_t AudioReader::Read_(int16_t *buffer, int64_t frames)
 {
- abort();
- return(false);
+   abort();
+   return(false);
 }
 
-bool AudioReader::Seek_(int64 frame_offset)
+bool AudioReader::Seek_(int64_t frame_offset)
 {
- abort();
- return(false);
+   abort();
+   return(false);
 }
 
-int64 AudioReader::FrameCount(void)
+int64_t AudioReader::FrameCount(void)
 {
- abort();
- return(0);
+   abort();
+   return(0);
 }
 
 class OggVorbisReader : public AudioReader
@@ -68,9 +68,9 @@ class OggVorbisReader : public AudioReader
       OggVorbisReader(Stream *fp);
       ~OggVorbisReader();
 
-      int64 Read_(int16 *buffer, int64 frames);
-      bool Seek_(int64 frame_offset);
-      int64 FrameCount(void);
+      int64_t Read_(int16_t *buffer, int64_t frames);
+      bool Seek_(int64_t frame_offset);
+      int64_t FrameCount(void);
 
    private:
       OggVorbis_File ovfile;
@@ -108,12 +108,12 @@ static int iov_close_func(void *user_data)
 
 static long iov_tell_func(void *user_data)
 {
- Stream *fw = (Stream*)user_data;
+   Stream *fw = (Stream*)user_data;
 
- if (!fw)
-    return -1;
+   if (!fw)
+      return -1;
 
- return fw->tell();
+   return fw->tell();
 }
 
 OggVorbisReader::OggVorbisReader(Stream *fp) : fw(fp)
@@ -136,11 +136,11 @@ OggVorbisReader::~OggVorbisReader()
    ov_clear(&ovfile);
 }
 
-int64 OggVorbisReader::Read_(int16 *buffer, int64 frames)
+int64_t OggVorbisReader::Read_(int16_t *buffer, int64_t frames)
 {
    uint8 *tw_buf = (uint8 *)buffer;
    int cursection = 0;
-   long toread = frames * sizeof(int16) * 2;
+   long toread = frames * sizeof(int16_t) * 2;
 
    while(toread > 0)
    {
@@ -153,16 +153,16 @@ int64 OggVorbisReader::Read_(int16 *buffer, int64 frames)
       toread -= didread;
    }
 
-   return(frames - toread / sizeof(int16) / 2);
+   return(frames - toread / sizeof(int16_t) / 2);
 }
 
-bool OggVorbisReader::Seek_(int64 frame_offset)
+bool OggVorbisReader::Seek_(int64_t frame_offset)
 {
    ov_pcm_seek(&ovfile, frame_offset);
    return(true);
 }
 
-int64 OggVorbisReader::FrameCount(void)
+int64_t OggVorbisReader::FrameCount(void)
 {
    return(ov_pcm_total(&ovfile, -1));
 }

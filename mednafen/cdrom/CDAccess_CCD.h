@@ -31,7 +31,7 @@ class CDAccess_CCD : public CDAccess
  CDAccess_CCD(const char *path, bool image_memcache);
  virtual ~CDAccess_CCD();
 
- virtual void Read_Raw_Sector(uint8 *buf, int32 lba);
+ virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
  virtual void Read_TOC(TOC *toc);
 

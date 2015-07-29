@@ -36,29 +36,29 @@
 
 FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
- if(!(fp = fopen(path, (mode == FileStream::MODE_WRITE) ? "wb" : "rb")))
- {
-  ErrnoHolder ene(errno);
+   if(!(fp = fopen(path, (mode == MODE_WRITE) ? "wb" : "rb")))
+   {
+      ErrnoHolder ene(errno);
 
-  throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
- }
+      throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
+   }
 }
 
 FileStream::~FileStream()
 {
 }
 
-uint64 FileStream::attributes(void)
+uint64_t FileStream::attributes(void)
 {
-   uint64 ret = ATTRIBUTE_SEEKABLE;
+   uint64_t ret = ATTRIBUTE_SEEKABLE;
 
    switch(OpenedMode)
    {
-      case FileStream::MODE_READ:
+      case MODE_READ:
          ret |= ATTRIBUTE_READABLE;
          break;
-      case FileStream::MODE_WRITE_SAFE:
-      case FileStream::MODE_WRITE:
+      case MODE_WRITE_SAFE:
+      case MODE_WRITE:
          ret |= ATTRIBUTE_WRITEABLE;
          break;
    }
@@ -66,27 +66,28 @@ uint64 FileStream::attributes(void)
    return ret;
 }
 
-uint64 FileStream::read(void *data, uint64 count, bool error_on_eos)
+uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
 {
    return fread(data, 1, count, fp);
 }
 
-void FileStream::write(const void *data, uint64 count)
+void FileStream::write(const void *data, uint64_t count)
 {
    fwrite(data, 1, count, fp);
 }
 
-void FileStream::seek(int64 offset, int whence)
+void FileStream::seek(int64_t offset, int whence)
 {
    fseeko(fp, offset, whence);
 }
 
-int64 FileStream::tell(void)
+int64_t FileStream::tell(void)
 {
    return ftello(fp);
 }
 
-int64 FileStream::size(void) {
+int64_t FileStream::size(void)
+{
    struct stat buf;
 
    fstat(fileno(fp), &buf);

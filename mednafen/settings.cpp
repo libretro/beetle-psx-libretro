@@ -15,10 +15,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "mednafen.h"
 #include <errno.h>
 #include <string.h>
+
 #include <string>
+
+#include "mednafen.h"
 #include "settings.h"
 
 int setting_initial_scanline = 0;
@@ -36,7 +38,7 @@ bool MDFN_SaveSettings(const char *path)
    return(1);
 }
 
-uint64 MDFN_GetSettingUI(const char *name)
+uint64_t MDFN_GetSettingUI(const char *name)
 {
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
       return 4;
@@ -157,7 +159,7 @@ bool MDFNI_SetSettingB(const char *name, bool value)
    return false;
 }
 
-bool MDFNI_SetSettingUI(const char *name, uint64 value)
+bool MDFNI_SetSettingUI(const char *name, uint64_t value)
 {
    return false;
 }
