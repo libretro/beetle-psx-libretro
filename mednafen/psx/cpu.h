@@ -1,43 +1,6 @@
 #ifndef __MDFN_PSX_CPU_H
 #define __MDFN_PSX_CPU_H
 
-/*
- Load delay notes:
-
-	// Takes 1 less
-	".set noreorder\n\t"
-	".set nomacro\n\t"
-	"lw %0, 0(%2)\n\t"
-	"nop\n\t"
-	"nop\n\t"
-	"or %0, %1, %1\n\t"
-
-	// cycle than this:
-	".set noreorder\n\t"
-	".set nomacro\n\t"
-	"lw %0, 0(%2)\n\t"
-	"nop\n\t"
-	"or %0, %1, %1\n\t"
-	"nop\n\t"
-
-
-	// Both of these
-	".set noreorder\n\t"
-	".set nomacro\n\t"
-	"lw %0, 0(%2)\n\t"
-	"nop\n\t"
-	"nop\n\t"
-	"or %1, %0, %0\n\t"
-
-	// take same...(which is kind of odd).
-	".set noreorder\n\t"
-	".set nomacro\n\t"
-	"lw %0, 0(%2)\n\t"
-	"nop\n\t"
-	"or %1, %0, %0\n\t"
-	"nop\n\t"
-*/
-
 #include "gte.h"
 
 #define PS_CPU_EMULATE_ICACHE 1
@@ -110,7 +73,7 @@ class PS_CPU
       union
       {
          __ICache ICache[1024];
-         uint32 ICache_Bulk[2048];
+         uint32_t ICache_Bulk[2048];
       };
 
       enum
@@ -156,34 +119,13 @@ class PS_CPU
          };
       } CP0;
 
-#if 1
-      //uint32_t WrAbsorb;
-      //uint8_t WrAbsorbShift;
-
-      // On read:
-      //WrAbsorb = 0;
-      //WrAbsorbShift = 0;
-
-      // On write:
-      //WrAbsorb >>= (WrAbsorbShift >> 2) & 8;
-      //WrAbsorbShift -= (WrAbsorbShift >> 2) & 8;
-
-      //WrAbsorb |= (timestamp - pre_write_timestamp) << WrAbsorbShift;
-      //WrAbsorbShift += 8;
-#endif
-
       uint8_t ReadAbsorb[0x20 + 1];
       uint8_t ReadAbsorbWhich;
       uint8_t ReadFudge;
 
-      //uint32_t WriteAbsorb;
-      //uint8_t WriteAbsorbCount;
-      //uint8_t WriteAbsorbMonkey;
       uint8 MULT_Tab24[24];
 
       MultiAccessSizeMem<1024, uint32, false> ScratchRAM;
-
-      //PS_GTE GTE;
 
       uint8_t *FastMap[1 << (32 - FAST_MAP_SHIFT)];
       uint8_t DummyPage[FAST_MAP_PSIZE];
@@ -231,7 +173,7 @@ class PS_CPU
          GSREG_HI,
          GSREG_SR,
          GSREG_CAUSE,
-         GSREG_EPC,
+         GSREG_EPC
       };
 
       uint32_t GetRegister(unsigned int which, char *special, const uint32_t special_len);
