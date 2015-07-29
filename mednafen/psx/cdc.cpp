@@ -1131,7 +1131,18 @@ int32_t PS_CDC::Update(const int32_t timestamp)
       }
     else if(DriveStatus == DS_SEEKING)
     {
+       int x;
        CurSector = SeekTarget;
+
+       // CurSector + x for "Tomb Raider"'s sake, as it relies on behavior that we can't emulate very well without a more accurate CD drive
+       // emulation model.
+       for(x = -1; x >= -16; x--)
+       {
+          Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector + x, false);
+          if(DecodeSubQ(pwbuf))
+             break;
+       }
+
        Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
        DecodeSubQ(pwbuf);
 
