@@ -59,6 +59,9 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 	pix = (sum - carry) | (carry - (carry >> 5));
        }
        break;
+     case -1:
+     default:
+     break;
   }
 
   if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
