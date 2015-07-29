@@ -67,13 +67,14 @@ static bool CDUtility_Inited = false;
 
 static void InitScrambleTable(void)
 {
+   unsigned i, b;
    unsigned cv = 1;
 
-   for(unsigned i = 12; i < 2352; i++)
+   for(i = 12; i < 2352; i++)
    {
       unsigned char z = 0;
 
-      for(int b = 0; b < 8; b++)
+      for(b = 0; b < 8; b++)
       {
          z |= (cv & 1) << b;
 
@@ -83,9 +84,6 @@ static void InitScrambleTable(void)
 
       scramble_table[i - 12] = z;
    }
-
-   //for(int i = 0; i < 2352 - 12; i++)
-   // printf("0x%02x, ", scramble_table[i]);
 }
 
 void CDUtility_Init(void)
@@ -153,13 +151,14 @@ bool edc_lec_check_and_correct(uint8_t *sector_data, bool xa)
 
 bool subq_check_checksum(const uint8_t *SubQBuf)
 {
+   unsigned i;
    uint16_t crc = 0;
    uint16_t stored_crc = 0;
 
    stored_crc = SubQBuf[0xA] << 8;
    stored_crc |= SubQBuf[0xB];
 
-   for(int i = 0; i < 0xA; i++)
+   for(i = 0; i < 0xA; i++)
       crc = subq_crctab[(crc >> 8) ^ SubQBuf[i]] ^ (crc << 8);
 
    crc = ~crc;
@@ -169,9 +168,10 @@ bool subq_check_checksum(const uint8_t *SubQBuf)
 
 void subq_generate_checksum(uint8_t *buf)
 {
+   unsigned i;
    uint16_t crc = 0;
 
-   for(int i = 0; i < 0xA; i++)
+   for(i = 0; i < 0xA; i++)
       crc = subq_crctab[(crc >> 8) ^ buf[i]] ^ (crc << 8);
 
    // Checksum
@@ -181,9 +181,11 @@ void subq_generate_checksum(uint8_t *buf)
 
 void subq_deinterleave(const uint8_t *SubPWBuf, uint8_t *qbuf)
 {
+   unsigned i;
+
    memset(qbuf, 0, 0xC);
 
-   for(int i = 0; i < 96; i++)
+   for(i = 0; i < 96; i++)
       qbuf[i >> 3] |= ((SubPWBuf[i] >> 6) & 0x1) << (7 - (i & 0x7));
 }
 
@@ -191,13 +193,14 @@ void subq_deinterleave(const uint8_t *SubPWBuf, uint8_t *qbuf)
 // Deinterleaves 96 bytes of subchannel P-W data from 96 bytes of interleaved subchannel PW data.
 void subpw_deinterleave(const uint8_t *in_buf, uint8_t *out_buf)
 {
+   unsigned ch, i;
    assert(in_buf != out_buf);
 
    memset(out_buf, 0, 96);
 
-   for(unsigned ch = 0; ch < 8; ch++)
+   for(ch = 0; ch < 8; ch++)
    {
-      for(unsigned i = 0; i < 96; i++)
+      for(i = 0; i < 96; i++)
          out_buf[(ch * 12) + (i >> 3)] |= ((in_buf[i] >> (7 - ch)) & 0x1) << (7 - (i & 0x7));
    }
 
@@ -206,18 +209,18 @@ void subpw_deinterleave(const uint8_t *in_buf, uint8_t *out_buf)
 // Interleaves 96 bytes of subchannel P-W data from 96 bytes of uninterleaved subchannel PW data.
 void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf)
 {
+   unsigned d, bitpoodle, ch;
+
    assert(in_buf != out_buf);
 
-   for(unsigned d = 0; d < 12; d++)
+   for(d = 0; d < 12; d++)
    {
-      for(unsigned bitpoodle = 0; bitpoodle < 8; bitpoodle++)
+      for(bitpoodle = 0; bitpoodle < 8; bitpoodle++)
       {
          uint8_t rawb = 0;
 
-         for(unsigned ch = 0; ch < 8; ch++)
-         {
+         for(ch = 0; ch < 8; ch++)
             rawb |= ((in_buf[ch * 12 + d] >> (7 - bitpoodle)) & 1) << (7 - ch);
-         }
          out_buf[(d << 3) + bitpoodle] = rawb;
       }
    }
@@ -231,6 +234,7 @@ void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf)
 //
 void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* SubPWBuf)
 {
+   unsigned i;
    uint8_t buf[0xC];
    uint32_t lba_relative;
    uint32_t ma, sa, fa;
@@ -268,7 +272,7 @@ void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* 
 
    subq_generate_checksum(buf);
 
-   for(int i = 0; i < 96; i++)
+   for(i = 0; i < 96; i++)
       SubPWBuf[i] = (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | 0x80;
 }
 
@@ -299,6 +303,7 @@ void synth_leadout_sector_lba(const uint8_t mode, const struct TOC *toc, const i
 
 void scrambleize_data_sector(uint8_t *sector_data)
 {
-   for(unsigned i = 12; i < 2352; i++)
+   unsigned i;
+   for(i = 12; i < 2352; i++)
       sector_data[i] ^= scramble_table[i - 12];
 }
