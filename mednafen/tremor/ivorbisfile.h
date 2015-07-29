@@ -116,7 +116,6 @@ extern ogg_int64_t ov_pcm_tell(OggVorbis_File *vf);
 extern ogg_int64_t ov_time_tell(OggVorbis_File *vf);
 
 extern vorbis_info *ov_info(OggVorbis_File *vf,int link);
-extern vorbis_comment *ov_comment(OggVorbis_File *vf,int link);
 
 extern long ov_read(OggVorbis_File *vf,char *buffer,int length,
 		    int *bitstream);

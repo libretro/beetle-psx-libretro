@@ -1786,24 +1786,6 @@ vorbis_info *ov_info(OggVorbis_File *vf,int link){
   }
 }
 
-/* grr, strong typing, grr, no templates/inheritence, grr */
-vorbis_comment *ov_comment(OggVorbis_File *vf,int link){
-  if(vf->seekable){
-    if(link<0)
-      if(vf->ready_state>=STREAMSET)
-        return vf->vc+vf->current_link;
-      else
-        return vf->vc;
-    else
-      if(link>=vf->links)
-        return NULL;
-      else
-        return vf->vc+link;
-  }else{
-    return vf->vc;
-  }
-}
-
 /* up to this point, everything could more or less hide the multiple
    logical bitstream nature of chaining from the toplevel application
    if the toplevel application didn't particularly care.  However, at
