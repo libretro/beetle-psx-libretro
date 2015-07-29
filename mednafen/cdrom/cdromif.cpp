@@ -78,8 +78,8 @@ typedef struct
 {
    bool valid;
    bool error;
-   uint32_t lba;
-   uint8_t data[2352 + 96];
+   uint32 lba;
+   uint8 data[2352 + 96];
 } CDIF_Sector_Buffer;
 
 /* TODO: prohibit copy constructor */
@@ -90,9 +90,8 @@ class CDIF_MT : public CDIF
       CDIF_MT(CDAccess *cda);
       virtual ~CDIF_MT();
 
-      virtual void HintReadSector(int32_t lba);
-      virtual bool ReadRawSector(uint8_t *buf, int32_t lba);
-      virtual bool ReadRawSectorPWOnly(uint8_t* pwbuf, int32_t lba, bool hint_fullread);
+      virtual void HintReadSector(uint32 lba);
+      virtual bool ReadRawSector(uint8 *buf, uint32 lba);
 
       // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
       // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
@@ -116,7 +115,7 @@ class CDIF_MT : public CDIF
       enum { SBSize = 256 };
       CDIF_Sector_Buffer SectorBuffers[SBSize];
 
-      uint32_t SBWritePos;
+      uint32 SBWritePos;
 
       slock_t *SBMutex;
       scond_t *SBCond;
@@ -126,9 +125,9 @@ class CDIF_MT : public CDIF
       //
       void RT_EjectDisc(bool eject_status, bool skip_actual_eject = false);
 
-      int32_t ra_lba;
-      int32_t ra_count;
-      int32_t last_read_lba;
+      uint32 ra_lba;
+      int ra_count;
+      uint32 last_read_lba;
 };
 
 /* TODO: prohibit copy constructor */
@@ -139,9 +138,8 @@ class CDIF_ST : public CDIF
       CDIF_ST(CDAccess *cda);
       virtual ~CDIF_ST();
 
-      virtual void HintReadSector(int32_t lba);
-      virtual bool ReadRawSector(uint8_t *buf, int32_t lba);
-      virtual bool ReadRawSectorPWOnly(uint8_t* pwbuf, int32_t lba, bool hint_fullread);
+      virtual void HintReadSector(uint32 lba);
+      virtual bool ReadRawSector(uint8 *buf, uint32 lba);
       virtual bool Eject(bool eject_status);
 
    private:
@@ -262,7 +260,7 @@ void CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
       SBWritePos = 0;
       ra_lba = 0;
       ra_count = 0;
-      last_read_lba = LBA_Read_Maximum + 1;
+      last_read_lba = ~0U;
       memset(SectorBuffers, 0, SBSize * sizeof(CDIF_Sector_Buffer));
    }
 }
@@ -287,7 +285,7 @@ int CDIF_MT::ReadThreadStart()
    SBWritePos = 0;
    ra_lba = 0;
    ra_count = 0;
-   last_read_lba = LBA_Read_Maximum + 1;
+   last_read_lba = ~0U;
 
    try
    {
@@ -332,11 +330,11 @@ int CDIF_MT::ReadThreadStart()
                   static const int       max_ra = 16;
                   static const int   initial_ra = 1;
                   static const int speedmult_ra = 2;
-                  int32_t               new_lba = msg.args[0];
+                  uint32_t              new_lba = msg.args[0];
 
                   assert((unsigned int)max_ra < (SBSize / 4));
 
-                  if(new_lba == (last_read_lba + 1))
+                  if(last_read_lba != ~0U && new_lba == (last_read_lba + 1))
                   {
                      int how_far_ahead = ra_lba - new_lba;
 
@@ -357,11 +355,14 @@ int CDIF_MT::ReadThreadStart()
          }
       }
 
-      // Don't read beyond what the disc (image) readers can handle sanely.
-      if(ra_count && ra_lba == LBA_Read_Maximum)
+      // Don't read >= the "end" of the disc, silly snake.  Slither.
+      if(ra_count && ra_lba == disc_toc.tracks[100].lba)
+      {
          ra_count = 0;
+         //printf("Ephemeral scarabs: %d!\n", ra_lba);
+      }
 
-      if(ra_count && ra_lba == LBA_Read_Maximum)
+      if(ra_count)
       {
          uint8_t tmpbuf[2352 + 96];
          bool error_condition = false;
@@ -488,8 +489,7 @@ bool CDIF::ValidateRawSector(uint8 *buf)
    return(true);
 }
 
-
-bool CDIF_MT::ReadRawSector(uint8_t *buf, int32_t lba)
+bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
 {
    bool found = FALSE;
    bool error_condition = false;
@@ -500,10 +500,11 @@ bool CDIF_MT::ReadRawSector(uint8_t *buf, int32_t lba)
       return(false);
    }
 
-   if (lba < LBA_Read_Minimum || lba > LBA_Read_Maximum)
+   // This shouldn't happen, the emulated-system-specific CDROM emulation code should make sure the emulated program doesn't try
+   // to read past the last "real" sector of the disc.
+   if(lba >= disc_toc.tracks[100].lba)
    {
-      /* Attempt to read sector out of bounds. */
-      memset(buf, 0, 2352 + 96);
+      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       return(FALSE);
    }
 
@@ -533,31 +534,7 @@ bool CDIF_MT::ReadRawSector(uint8_t *buf, int32_t lba)
    return(!error_condition);
 }
 
-bool CDIF_MT::ReadRawSectorPWOnly(uint8_t *pwbuf, int32_t lba, bool hint_fullread)
-{
-   bool ret;
-   uint8_t tmpbuf[2352 + 96];
-
-   if(UnrecoverableError)
-   {
-      memset(pwbuf, 0, 96);
-      return(false);
-   }
-
-   if (lba < LBA_Read_Minimum || lba > LBA_Read_Maximum)
-   {
-      /* Attempt to read sector out of bounds. */
-      memset(pwbuf, 0, 96);
-      return(FALSE);
-   }
-
-   ret = ReadRawSector(tmpbuf, lba);
-   memcpy(pwbuf, tmpbuf + 2352, 96);
-
-   return ret;
-}
-
-void CDIF_MT::HintReadSector(int32_t lba)
+void CDIF_MT::HintReadSector(uint32 lba)
 {
    if(UnrecoverableError)
       return;
@@ -565,14 +542,14 @@ void CDIF_MT::HintReadSector(int32_t lba)
    ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_READ_SECTOR, lba));
 }
 
-int CDIF::ReadSector(uint8_t *buf, int32_t lba, uint32_t sector_count)
+int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 {
    int ret = 0;
 
    if(UnrecoverableError)
       return(false);
 
-   while(sector_count--)
+   while(nSectors--)
    {
       int mode;
       uint8_t tmpbuf[2352 + 96];
@@ -584,7 +561,14 @@ int CDIF::ReadSector(uint8_t *buf, int32_t lba, uint32_t sector_count)
       }
 
       if(!ValidateRawSector(tmpbuf))
+      {
+         if (log_cb)
+         {
+            log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
+            log_cb(RETRO_LOG_ERROR, "Uncorrectable data at sector %d\n", lba);
+         }
          return(false);
+      }
 
       mode = tmpbuf[12 + 3];
 
@@ -594,17 +578,17 @@ int CDIF::ReadSector(uint8_t *buf, int32_t lba, uint32_t sector_count)
       switch (mode)
       {
          case 1:
-            memcpy(buf, &tmpbuf[12 + 4], 2048);
+            memcpy(pBuf, &tmpbuf[12 + 4], 2048);
             break;
          case 2:
-            memcpy(buf, &tmpbuf[12 + 4 + 8], 2048);
+            memcpy(pBuf, &tmpbuf[12 + 4 + 8], 2048);
             break;
          default:
             printf("CDIF_ReadSector() invalid sector type at LBA=%u\n", (unsigned int)lba);
             return(false);
       }
 
-      buf += 2048;
+      pBuf += 2048;
       lba++;
    }
 
@@ -656,22 +640,15 @@ CDIF_ST::~CDIF_ST()
    }
 }
 
-void CDIF_ST::HintReadSector(int32_t lba)
+void CDIF_ST::HintReadSector(uint32 lba)
 {
    /* TODO: disc_cdaccess seek hint? (probably not, would require asynchronousitycamel) */
 }
 
-bool CDIF_ST::ReadRawSector(uint8_t *buf, int32_t lba)
+bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
 {
    if(UnrecoverableError)
    {
-      memset(buf, 0, 2352 + 96);
-      return(false);
-   }
-
-   if(lba < LBA_Read_Minimum || lba > LBA_Read_Maximum)
-   {
-      printf("Attempt to read sector out of bounds; LBA=%d\n", lba);
       memset(buf, 0, 2352 + 96);
       return(false);
    }
@@ -689,30 +666,6 @@ bool CDIF_ST::ReadRawSector(uint8_t *buf, int32_t lba)
    }
 
    return(true);
-}
-
-bool CDIF_ST::ReadRawSectorPWOnly(uint8_t *pwbuf, int32_t lba, bool hint_fullread)
-{
-   uint8_t tmpbuf[2352 + 96];
-   bool ret;
-
-   if(UnrecoverableError)
-   {
-      memset(pwbuf, 0, 96);
-      return(false);
-   }
-
-   if(lba < LBA_Read_Minimum || lba > LBA_Read_Maximum)
-   {
-      printf("Attempt to read sector out of bounds; LBA=%d\n", lba);
-      memset(pwbuf, 0, 96);
-      return(false);
-   }
-
-   ret = ReadRawSector(tmpbuf, lba);
-   memcpy(pwbuf, tmpbuf + 2352, 96);
-
-   return ret;
 }
 
 bool CDIF_ST::Eject(bool eject_status)
@@ -881,7 +834,7 @@ void CDIF_Stream_Thing::close(void)
 }
 
 
-Stream *CDIF::MakeStream(int32_t lba, uint32_t sector_count)
+Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 {
    return new CDIF_Stream_Thing(this, lba, sector_count);
 }
