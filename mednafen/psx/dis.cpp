@@ -268,9 +268,11 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
 
          snprintf(s_a, sizeof(s_a), "%d", shamt);
 
+#if 0
          if(immediate < 0)
             snprintf(s_i, sizeof(s_i), "%d", immediate);
          else
+#endif
             snprintf(s_i, sizeof(s_i), "0x%04x", (uint32)immediate);
 
          snprintf(s_z, sizeof(s_z), "0x%04x", immediate_ze);
