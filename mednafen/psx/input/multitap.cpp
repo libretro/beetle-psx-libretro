@@ -323,20 +323,12 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
       if(byte_counter == 1)
       {
          command = receive_buffer;
+         fm_command_error = false;
 
          //printf("Multitap sub-command: %02x\n", command);
 
-         if(full_mode)
-         {
-            if(command != 0x42)
-               fm_command_error = true;
-            else
-               fm_command_error = fm_deferred_error;
-         }
-         else
-         {
-            fm_command_error = false;
-         }
+         if(full_mode && command != 0x42)
+            fm_command_error = true;
       }
 
       if((!mc_mode || full_mode) && byte_counter == 2)
