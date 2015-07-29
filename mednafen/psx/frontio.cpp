@@ -277,7 +277,7 @@ static INLINE unsigned EP_to_SP(bool emulate_multitap[2], unsigned ep)
 
 InputDevice *FrontIO::GetMemcardDevice(unsigned int which)
 {
-   if (DevicesMC)
+   if (DevicesMC[which])
       return DevicesMC[which];
    return NULL;
 }
