@@ -190,6 +190,7 @@ void PS_CDC::SoftReset(void)
  DriveStatus = DS_STOPPED;
  ClearAIP();
  StatusAfterSeek = DS_STOPPED;
+ SeekRetryCounter = 0;
 
  Forward = false;
  Backward = false;
@@ -317,6 +318,7 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
   SFVAR(AsyncResultsPendingCount),
 
   SFVAR(SeekTarget),
+  SFVAR(SeekRetryCounter),
 
   // FIXME: Save TOC stuff?
 #if 0
@@ -433,7 +435,6 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
  else if(DriveStatus == DS_SEEKING || DriveStatus == DS_SEEKING_LOGICAL)
   ret |= 0x40;
 
- // TODO: shell open and seek error
  if(!Cur_CDIF || DiscChanged)
   ret |= 0x10;
 
@@ -443,7 +444,7 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
  if(cmd_error)
   ret |= 0x01;
 
- DiscChanged = false;
+ DiscChanged = false; // FIXME: Only do it on NOP command execution? 
 
  return(ret);
 }
@@ -866,7 +867,6 @@ void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
 	ab->ReadPos = 0;
 }
 
-// SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
 void PS_CDC::HandlePlayRead(void)
 {
  uint8 read_buf[2352 + 96];
@@ -1156,12 +1156,27 @@ int32_t PS_CDC::Update(const int32_t timestamp)
        Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
        DecodeSubQ(pwbuf);
 
-       DriveStatus = StatusAfterSeek;
-
-       if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+       if(!(Mode & MODE_CDDA) && !(SubQBuf_Safe[0] & 0x40))
        {
-          // TODO: SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);  when !(Mode & MODE_CDDA) and the sector isn't a data sector.
-          PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+          if(!SeekRetryCounter)
+          {
+             DriveStatus = DS_STANDBY;
+             SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
+          }
+          else
+          {
+             SeekRetryCounter--;
+             PSRCounter = 33868800 / 75;
+          }
+       }
+       else
+       {
+          DriveStatus = StatusAfterSeek;
+
+          if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+          {
+             PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+          }
        }
     }
     else if(DriveStatus == DS_READING || DriveStatus == DS_PLAYING)
@@ -1624,6 +1639,7 @@ void PS_CDC::PreSeekHack(uint32 target)
    int max_try = 32;
 
    CurSector = target;	// If removing/changing this, take into account how it will affect ReadN/ReadS/Play/etc command calls that interrupt a seek.
+   SeekRetryCounter = 128;
 
    // If removing this SubQ reading bit, think about how it will interact with a Read command of data(or audio :b) sectors when Mode bit0 is 1.
    do
@@ -1741,6 +1757,15 @@ void PS_CDC::ReadBase(void)
 {
  if(!CommandCheckDiscPresent())
   return;
+
+ if(!IsPSXDisc)
+ {
+  WriteResult(MakeStatus(true));
+  WriteResult(ERRCODE_BAD_COMMAND);
+
+  WriteIRQ(CDCIRQ_DISC_ERROR);
+  return;
+ }
 
  WriteResult(MakeStatus());
  WriteIRQ(CDCIRQ_ACKNOWLEDGE);
