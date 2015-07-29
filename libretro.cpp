@@ -2361,12 +2361,6 @@ void retro_init(void)
       retro_save_directory = retro_base_directory;
    }      
 
-#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
-   enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
-#endif
-
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
@@ -3039,7 +3033,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
 
-#ifdef WANT_32BPP
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
@@ -3047,7 +3040,6 @@ bool retro_load_game(const struct retro_game_info *info)
          log_cb(RETRO_LOG_ERROR, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
       return false;
    }
-#endif
 
    overscan = false;
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);

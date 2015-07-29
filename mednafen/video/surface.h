@@ -1,37 +1,11 @@
 #ifndef __MDFN_SURFACE_H
 #define __MDFN_SURFACE_H
 
-#if defined(WANT_32BPP)
 #define RED_SHIFT 16
 #define GREEN_SHIFT 8
 #define BLUE_SHIFT 0
 #define ALPHA_SHIFT 24
 #define MAKECOLOR(r, g, b, a) ((r << RED_SHIFT) | (g << GREEN_SHIFT) | (b << BLUE_SHIFT) | (a << ALPHA_SHIFT))
-#elif defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
-/* 16bit color - RGB565 */
-#define RED_MASK  0xf800
-#define GREEN_MASK 0x7e0
-#define BLUE_MASK 0x1f
-#define RED_EXPAND 3
-#define GREEN_EXPAND 2
-#define BLUE_EXPAND 3
-#define RED_SHIFT 11
-#define GREEN_SHIFT 5
-#define BLUE_SHIFT 0
-#define MAKECOLOR(r, g, b, a) (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT))
-#elif defined(WANT_16BPP) && !defined(FRONTEND_SUPPORTS_RGB565)
-/* 16bit color - RGB555 */
-#define RED_MASK  0x7c00
-#define GREEN_MASK 0x3e0
-#define BLUE_MASK 0x1f
-#define RED_EXPAND 3
-#define GREEN_EXPAND 3
-#define BLUE_EXPAND 3
-#define RED_SHIFT 10
-#define GREEN_SHIFT 5
-#define BLUE_SHIFT 0
-#define MAKECOLOR(r, g, b, a) (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT))
-#endif
 
 struct MDFN_PaletteEntry
 {
@@ -83,7 +57,6 @@ class MDFN_PixelFormat
  uint8 Ashift;  // [...] alpha component.
 
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
-#if defined(WANT_32BPP)
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
     r = (value >> RED_SHIFT) & 0xFF;
@@ -91,14 +64,6 @@ class MDFN_PixelFormat
     b = (value >> BLUE_SHIFT) & 0xFF;
     a = (value >> ALPHA_SHIFT) & 0xFF;
  }
-#elif defined(WANT_16BPP)
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-    r = (value & BLUE_MASK) << RED_SHIFT;
-    g = (value & GREEN_MASK) << GREEN_SHIFT;
-    b = (value & RED_MASK);
- }
-#endif
 
 }; // MDFN_PixelFormat;
 
@@ -132,7 +97,6 @@ class MDFN_Surface //typedef struct
 
  void SetFormat(const MDFN_PixelFormat &new_format, bool convert);
 
-#if defined(WANT_32BPP)
  // Gets the R/G/B/A values for the passed 32-bit surface pixel value
  INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
  {
@@ -148,23 +112,6 @@ class MDFN_Surface //typedef struct
     g = (value >> GREEN_SHIFT) & 0xFF;
     b = (value >> BLUE_SHIFT) & 0xFF;
  }
-#elif defined(WANT_16BPP)
-
- // Gets the R/G/B/A values for the passed 32-bit surface pixel value
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b, int &a) const
- {
-    r = (value & BLUE_MASK) << RED_SHIFT;
-    g = (value & GREEN_MASK) << GREEN_SHIFT;
-    b = (value & RED_MASK);
- }
-
- INLINE void DecodeColor(uint32 value, int &r, int &g, int &b) const
- {
-  r = (value & BLUE_MASK) << RED_SHIFT;
-  g = (value & GREEN_MASK) << GREEN_SHIFT;
-  b = (value & RED_MASK);
- }
-#endif
  private:
  void Init(void *const p_pixels, const uint32 p_width, const uint32 p_height, const uint32 p_pitchinpix, const MDFN_PixelFormat &nf);
 };
