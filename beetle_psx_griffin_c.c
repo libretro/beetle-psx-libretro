@@ -1,4 +1,3 @@
-#include "mednafen/tremor/tremor_shared.c"
 #include "mednafen/tremor/codebook.c"
 #include "mednafen/tremor/floor0.c"
 #include "mednafen/tremor/floor1.c"

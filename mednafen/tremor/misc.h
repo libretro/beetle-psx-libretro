@@ -19,6 +19,7 @@
 #define _V_RANDOM_H_
 #include "ivorbiscodec.h"
 #include "os.h"
+#include "tremor_shared.h"
 
 #ifdef _LOW_ACCURACY_
 #  define X(n) (((((n)>>22)+1)>>1) - ((((n)>>22)+1)>>9))
