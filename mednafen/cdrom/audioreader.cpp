@@ -74,7 +74,6 @@ class OggVorbisReader : public AudioReader
 
    private:
       OggVorbis_File ovfile;
-      Stream *fw;
 };
 
 
@@ -116,7 +115,7 @@ static long iov_tell_func(void *user_data)
    return fw->tell();
 }
 
-OggVorbisReader::OggVorbisReader(Stream *fp) : fw(fp)
+OggVorbisReader::OggVorbisReader(Stream *fp)
 {
    ov_callbacks cb;
 

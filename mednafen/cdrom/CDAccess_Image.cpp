@@ -711,12 +711,9 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       memcpy(&Tracks[active_track], &TmpTrack, sizeof(TmpTrack));
 
    if(FirstTrack > LastTrack)
-   {
       throw(MDFN_Error(0, _("No tracks found!\n")));
-   }
 
-   FirstTrack = FirstTrack;
-   NumTracks = 1 + LastTrack - FirstTrack;
+   NumTracks  = 1 + LastTrack - FirstTrack;
 
    int32 RunningLBA = 0;
    int32 LastIndex = 0;
