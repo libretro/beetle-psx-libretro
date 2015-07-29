@@ -944,33 +944,30 @@ static int _ov_open2(OggVorbis_File *vf){
 
 /* clear out the OggVorbis_File struct */
 int ov_clear(OggVorbis_File *vf){
-  if(vf){
-    vorbis_block_clear(&vf->vb);
-    vorbis_dsp_clear(&vf->vd);
-    ogg_stream_clear(&vf->os);
+   if(vf){
+      vorbis_block_clear(&vf->vb);
+      vorbis_dsp_clear(&vf->vd);
+      ogg_stream_clear(&vf->os);
 
-    if(vf->vi && vf->links){
-      int i;
-      for(i=0;i<vf->links;i++){
-        vorbis_info_clear(vf->vi+i);
-        vorbis_comment_clear(vf->vc+i);
+      if(vf->vi && vf->links){
+         int i;
+         for(i=0;i<vf->links;i++){
+            vorbis_info_clear(vf->vi+i);
+            vorbis_comment_clear(vf->vc+i);
+         }
+         _ogg_free(vf->vi);
+         _ogg_free(vf->vc);
       }
-      _ogg_free(vf->vi);
-      _ogg_free(vf->vc);
-    }
-    if(vf->dataoffsets)_ogg_free(vf->dataoffsets);
-    if(vf->pcmlengths)_ogg_free(vf->pcmlengths);
-    if(vf->serialnos)_ogg_free(vf->serialnos);
-    if(vf->offsets)_ogg_free(vf->offsets);
-    ogg_sync_clear(&vf->oy);
-    if(vf->datasource && vf->callbacks.close_func)
-      (vf->callbacks.close_func)(vf->datasource);
-    memset(vf,0,sizeof(*vf));
-  }
-#ifdef DEBUG_LEAKS
-  _VDBG_dump();
-#endif
-  return(0);
+      if(vf->dataoffsets)_ogg_free(vf->dataoffsets);
+      if(vf->pcmlengths)_ogg_free(vf->pcmlengths);
+      if(vf->serialnos)_ogg_free(vf->serialnos);
+      if(vf->offsets)_ogg_free(vf->offsets);
+      ogg_sync_clear(&vf->oy);
+      if(vf->datasource && vf->callbacks.close_func)
+         (vf->callbacks.close_func)(vf->datasource);
+      memset(vf,0,sizeof(*vf));
+   }
+   return(0);
 }
 
 /* inspects the OggVorbis file and finds/documents all the logical
