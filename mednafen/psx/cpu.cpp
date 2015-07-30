@@ -242,7 +242,6 @@ static const uint32_t addr_mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFF
 template<typename T>
 INLINE T PS_CPU::PeekMemory(uint32_t address)
 {
-   T ret;
    address &= addr_mask[address >> 29];
 
    if(address >= 0x1F800000 && address <= 0x1F8003FF)
@@ -251,13 +250,10 @@ INLINE T PS_CPU::PeekMemory(uint32_t address)
    //assert(!(CP0.SR & 0x10000));
 
    if(sizeof(T) == 1)
-      ret = PSX_MemPeek8(address);
+      return PSX_MemPeek8(address);
    else if(sizeof(T) == 2)
-      ret = PSX_MemPeek16(address);
-   else
-      ret = PSX_MemPeek32(address);
-
-   return(ret);
+      return PSX_MemPeek16(address);
+   return PSX_MemPeek32(address);
 }
 
 template<typename T>
@@ -280,8 +276,7 @@ INLINE T PS_CPU::ReadMemory(int32_t &timestamp, uint32_t address, bool DS24, boo
 
       if(DS24)
          return ScratchRAM.ReadU24(address & 0x3FF);
-      else
-         return ScratchRAM.Read<T>(address & 0x3FF);
+      return ScratchRAM.Read<T>(address & 0x3FF);
    }
 
    timestamp += (ReadFudge >> 4) & 2;
@@ -446,7 +441,7 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32_t NPM)
 #define GPR_RES(n) { unsigned tn = (n); ReadAbsorb[tn] = 0; }
 #define GPR_DEPRES_END ReadAbsorb[0] = back; }
 
-template<bool DebugMode, bool ILHMode>
+template<bool DebugMode>
 int32_t PS_CPU::RunReal(int32_t timestamp_in)
 {
    register int32_t timestamp = timestamp_in;
@@ -2264,13 +2259,13 @@ SkipNPCStuff:	;
    return(timestamp);
 }
 
-int32_t PS_CPU::Run(int32_t timestamp_in, const bool ILHMode)
+int32_t PS_CPU::Run(int32_t timestamp_in)
 {
 #ifdef HAVE_DEBUG
    if(CPUHook || ADDBT)
-      return(RunReal<true, false>(timestamp_in));
+      return(RunReal<true>(timestamp_in));
 #endif
-   return(RunReal<false, false>(timestamp_in));
+   return(RunReal<false>(timestamp_in));
 }
 
 void PS_CPU::SetCPUHook(void (*cpuh)(const int32_t timestamp, uint32_t pc), void (*addbt)(uint32_t from, uint32_t to, bool exception))
@@ -2281,48 +2276,31 @@ void PS_CPU::SetCPUHook(void (*cpuh)(const int32_t timestamp, uint32_t pc), void
 
 uint32_t PS_CPU::GetRegister(unsigned int which, char *special, const uint32_t special_len)
 {
-   uint32_t ret = 0;
-
    if(which >= GSREG_GPR && which < (GSREG_GPR + 32))
       return GPR[which];
 
    switch(which)
    {
       case GSREG_PC:
-         ret = BACKED_PC;
-         break;
-
+         return BACKED_PC;
       case GSREG_PC_NEXT:
-         ret = BACKED_new_PC;
-         break;
-
+         return BACKED_new_PC;
       case GSREG_IN_BD_SLOT:
-         ret = !(BACKED_new_PC_mask & 3);
-         break;
-
+         return !(BACKED_new_PC_mask & 3);
       case GSREG_LO:
-         ret = LO;
-         break;
-
+         return LO;
       case GSREG_HI:
-         ret = HI;
-         break;
-
+         return HI;
       case GSREG_SR:
-         ret = CP0.SR;
-         break;
-
+         return CP0.SR;
       case GSREG_CAUSE:
-         ret = CP0.CAUSE;
-         break;
-
+         return CP0.CAUSE;
       case GSREG_EPC:
-         ret = CP0.EPC;
-         break;
+         return CP0.EPC;
 
    }
 
-   return ret;
+   return 0;
 }
 
 void PS_CPU::SetRegister(unsigned int which, uint32_t value)

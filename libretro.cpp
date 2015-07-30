@@ -3198,7 +3198,7 @@ void retro_run(void)
    GPU->StartFrame(espec);
 
    Running = -1;
-   timestamp = CPU->Run(timestamp, false);
+   timestamp = CPU->Run(timestamp);
 
    assert(timestamp);
 
