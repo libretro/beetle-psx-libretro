@@ -23,31 +23,21 @@ class InputDevice
 
       void DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock);
 
-      //
-      //
-      //
       virtual void SetAMCT(bool enabled);
       virtual void SetCrosshairsColor(uint32_t color);
 
-      //
-      //
-      //
       virtual void SetDTR(bool new_dtr);
       virtual bool GetDSR(void);	// Currently unused.
 
       virtual bool Clock(bool TxD, int32_t &dsr_pulse_delay);
 
-      //
-      //
       virtual uint8 *GetNVData() { return NULL; }
       virtual uint32_t GetNVSize(void);
       virtual void ReadNV(uint8_t *buffer, uint32_t offset, uint32_t count);
       virtual void WriteNV(const uint8_t *buffer, uint32_t offset, uint32_t count);
 
-      //
       // Dirty count should be incremented on each call to a method this class that causes at least 1 write to occur to the
       // nonvolatile memory(IE Clock() in the correct command phase, and WriteNV()).
-      //
       virtual uint64_t GetNVDirtyCount(void);
       virtual void ResetNVDirtyCount(void);
 
@@ -110,10 +100,6 @@ class FrontIO
 
       InputDevice *DevicesMC[8];
 
-      //
-      //
-      //
-
       int32_t ClockDivider;
 
       bool ReceivePending;
@@ -136,15 +122,11 @@ class FrontIO
 
 
       bool istatus;
-      //
-      //
       int32_t irq10_pulse_ts[2];
 
       int32_t dsr_pulse_delay[4];
       int32_t dsr_active_until_ts[4];
       int32_t lastts;
-      //
-      //
       bool amct_enabled;
       uint32_t chair_colors[8];
 };
