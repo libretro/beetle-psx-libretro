@@ -1824,21 +1824,17 @@ int32 PS_CDC::Command_Stop(const int arg_count, const uint8 *args)
    WriteIRQ(CDCIRQ_ACKNOWLEDGE);
 
    if(DriveStatus == DS_STOPPED)
-   {
       return(5000);
-   }
-   else
-   {
-      ClearAudioBuffers();
-      ClearAIP();
-      SectorPipe_Pos = SectorPipe_In = 0;
-      SectorsRead = 0;
 
-      DriveStatus = DS_STOPPED;
-      HeaderBufValid = false;
+   ClearAudioBuffers();
+   ClearAIP();
+   SectorPipe_Pos = SectorPipe_In = 0;
+   SectorsRead = 0;
 
-      return(33868);	// FIXME, should be much higher.
-   }
+   DriveStatus = DS_STOPPED;
+   HeaderBufValid = false;
+
+   return(33868);	// FIXME, should be much higher.
 }
 
 int32 PS_CDC::Command_Stop_Part2(void)
@@ -1896,23 +1892,19 @@ int32 PS_CDC::Command_Pause(const int arg_count, const uint8 *args)
    WriteIRQ(CDCIRQ_ACKNOWLEDGE);
 
    if(DriveStatus == DS_PAUSED || DriveStatus == DS_STOPPED)
-   {
       return(5000);
-   }
-   else
-   {
-      CurSector -= std::min<uint32>(4, SectorsRead);	// See: Bedlam, Rise 2
-      SectorsRead = 0;
 
-      // "Viewpoint" flips out and crashes if reading isn't stopped (almost?) immediately.
-      //ClearAudioBuffers();
-      SectorPipe_Pos = SectorPipe_In = 0;
-      ClearAIP();
-      DriveStatus = DS_PAUSED;
+   CurSector -= std::min<uint32>(4, SectorsRead);	// See: Bedlam, Rise 2
+   SectorsRead = 0;
 
-      // An approximation.
-      return((1124584 + ((int64)CurSector * 42596 / (75 * 60))) * ((Mode & MODE_SPEED) ? 1 : 2));
-   }
+   // "Viewpoint" flips out and crashes if reading isn't stopped (almost?) immediately.
+   //ClearAudioBuffers();
+   SectorPipe_Pos = SectorPipe_In = 0;
+   ClearAIP();
+   DriveStatus = DS_PAUSED;
+
+   // An approximation.
+   return((1124584 + ((int64)CurSector * 42596 / (75 * 60))) * ((Mode & MODE_SPEED) ? 1 : 2));
 }
 
 int32 PS_CDC::Command_Pause_Part2(void)
