@@ -32,7 +32,13 @@ MDFN_Error::MDFN_Error() throw()
 MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...) throw()
 {
    errno_code = errno_code_new;
-   log_cb(RETRO_LOG_ERROR, error_message);
+
+   va_list ap;
+   va_start(ap, format);
+   error_message = trio_vaprintf(format, ap);
+   va_end(ap);
+
+   log_cb(RETRO_LOG_ERROR, "%s\n", error_message);
 }
 
 

@@ -76,7 +76,12 @@ static unsigned psx_dbg_level = 0;
 void PSX_DBG(unsigned level, const char *format, ...)
 {
    if(psx_dbg_level >= level)
-      log_cb(RETRO_LOG_INFO, format);
+   {
+      va_list ap;
+      va_start(ap, format);
+      trio_vprintf(format, ap);
+      va_end(ap);
+   }
 }
 #else
 static unsigned const psx_dbg_level = 0;
