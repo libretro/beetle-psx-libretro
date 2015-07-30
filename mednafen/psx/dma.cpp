@@ -470,12 +470,18 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
             crmodecache = 0x00000200;
          break;
       case 2:
-         if(MDFN_LIKELY(CRModeCache == 0x00000401))
-            crmodecache = 0x00000401;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000201))
-            crmodecache = 0x00000201;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
-            crmodecache = 0x00000200;
+         switch (CRModeCache)
+         {
+            case 0x00000401:
+               crmodecache = 0x00000401;
+               break;
+            case 0x00000201:
+               crmodecache = 0x00000201;
+               break;
+            case 0x00000200:
+               crmodecache = 0x00000200;
+               break;
+         }
          break;
       case 3:
          if(MDFN_LIKELY(CRModeCache == 0x00000000))
@@ -528,28 +534,6 @@ int32_t DMA_Update(const int32_t timestamp)
 
    return (timestamp + CalcNextEvent(0x10000000));
 }
-
-#if 0
-static void CheckLinkedList(uint32_t addr)
-{
- std::map<uint32, bool> zoom;
-
- do
- {
-  if(zoom[addr])
-  {
-   printf("Bad linked list: 0x%08x\n", addr);
-   break;
-  }
-  zoom[addr] = 1;
-
-  uint32_t header = MainRAM.ReadU32(addr & 0x1FFFFC);
-
-  addr = header & 0xFFFFFF;
-
- } while(addr != 0xFFFFFF && !(addr & 0x800000));
-}
-#endif
 
 void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
