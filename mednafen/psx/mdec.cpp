@@ -505,14 +505,8 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
             IDCT(Coeff, &block_cb[0][0]);
             break;
          case 2:
-            IDCT(Coeff, &block_y[0][0]);
-            break;
          case 3:
-            IDCT(Coeff, &block_y[0][0]);
-            break;
          case 4:
-            IDCT(Coeff, &block_y[0][0]);
-            break;
          case 5:
             IDCT(Coeff, &block_y[0][0]);
             break;
@@ -525,15 +519,11 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
       *eat_cycles += 474;
 
       if(DecodeWB >= 2)
-      {
          EncodeImage((DecodeWB + 4) % 6);
-      }
 
       DecodeWB++;
       if(DecodeWB == (((Command >> 27) & 2) ? 6 : 3))
-      {
          DecodeWB = ((Command >> 27) & 2) ? 0 : 2;
-      }
    }
 }
 
