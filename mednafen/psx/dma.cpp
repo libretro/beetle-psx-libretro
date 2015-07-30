@@ -316,27 +316,29 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
          switch (CRModeCache)
          {
             case 0x00000401:
-               crmodecache = 0x00000401;
-               break;
             case 0x00000201:
-               crmodecache = 0x00000201;
-               break;
             case 0x00000200:
-               crmodecache = 0x00000200;
+               crmodecache = CRModeCache;
                break;
          }
          break;
       case 3:
-         if(MDFN_LIKELY(CRModeCache == 0x00000000))
-            crmodecache = 0x00000000;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000100))
-            crmodecache = 0x00000100;
+         switch (CRModeCache)
+         {
+            case 0x00000000:
+            case 0x00000100:
+               crmodecache = CRModeCache;
+               break;
+         }
          break;
       case 4:
-         if(MDFN_LIKELY(CRModeCache == 0x00000201))
-            crmodecache = 0x00000201;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
-            crmodecache = 0x00000200;
+         switch (CRModeCache)
+         {
+            case 0x00000201:
+            case 0x00000200:
+               crmodecache = CRModeCache;
+               break;
+         }
          break;
       case 6:
          if(MDFN_LIKELY(CRModeCache == 0x00000002))

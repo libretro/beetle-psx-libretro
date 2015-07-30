@@ -2135,7 +2135,13 @@ int32 PS_CDC::Command_Test(const int arg_count, const uint8 *args)
 {
    //PSX_WARNING("[CDC] Test command sub-operation: 0x%02x", args[0]);
 
-   switch(args[0])
+   if ((args[0] >= 0x00 && args[0] <= 0x03) || (args[0] >= 0x10 && args[0] <= 0x1A))
+   {
+      PSX_WARNING("[CDC] Unknown Test command sub-operation: 0x%02x", args[0]);
+      WriteResult(MakeStatus());
+      WriteIRQ(CDCIRQ_ACKNOWLEDGE);
+   }
+   else switch(args[0])
    {
       default:
          PSX_WARNING("[CDC] Unknown Test command sub-operation: 0x%02x", args[0]);
@@ -2143,27 +2149,6 @@ int32 PS_CDC::Command_Test(const int arg_count, const uint8 *args)
          WriteResult(0x10);
          WriteIRQ(CDCIRQ_DISC_ERROR);
          break;
-
-      case 0x00:
-      case 0x01:
-      case 0x02:
-      case 0x03:
-      case 0x10:
-      case 0x11:
-      case 0x12:
-      case 0x13:
-      case 0x14:
-      case 0x15:
-      case 0x16:
-      case 0x17:
-      case 0x18:
-      case 0x19:
-      case 0x1A:
-         PSX_WARNING("[CDC] Unknown Test command sub-operation: 0x%02x", args[0]);
-         WriteResult(MakeStatus());
-         WriteIRQ(CDCIRQ_ACKNOWLEDGE);
-         break;
-
 #if 0
       case 0x50:	// *Need to retest this test command, it takes additional arguments??? Or in any case, it generates a different error code(0x20) than most other Test
          // sub-commands that generate an error code(0x10).
@@ -2204,21 +2189,17 @@ int32 PS_CDC::Command_Test(const int arg_count, const uint8 *args)
          break;
 
       case 0x20:
-         {
-            WriteResult(0x97);
-            WriteResult(0x01);
-            WriteResult(0x10);
-            WriteResult(0xC2);
+         WriteResult(0x97);
+         WriteResult(0x01);
+         WriteResult(0x10);
+         WriteResult(0xC2);
 
-            WriteIRQ(CDCIRQ_ACKNOWLEDGE);
-         }
+         WriteIRQ(CDCIRQ_ACKNOWLEDGE);
          break;
 
       case 0x21:	// *Need to retest this test command.
-         {
-            WriteResult(0x01);
-            WriteIRQ(CDCIRQ_ACKNOWLEDGE);
-         }
+         WriteResult(0x01);
+         WriteIRQ(CDCIRQ_ACKNOWLEDGE);
          break;
 
       case 0x22:
