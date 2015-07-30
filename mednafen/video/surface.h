@@ -78,7 +78,6 @@ class MDFN_Surface //typedef struct
 
  ~MDFN_Surface();
 
- uint16 *pixels16;
  uint32 *pixels;
 
  // w, h, and pitch32 should always be > 0
