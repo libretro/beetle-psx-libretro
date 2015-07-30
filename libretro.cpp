@@ -87,56 +87,9 @@ void PSX_DBG(unsigned level, const char *format, ...)
 static unsigned const psx_dbg_level = 0;
 #endif
 
-
-struct MDFN_PseudoRNG	// Based off(but not the same as) public-domain "JKISS" PRNG.
+/* Based off(but not the same as) public-domain "JKISS" PRNG. */
+struct MDFN_PseudoRNG
 {
-   MDFN_PseudoRNG()
-   {
-      ResetState();
-   }
-
-   uint32_t RandU32(void)
-   {
-      uint64_t t;
-
-      x = 314527869 * x + 1234567;
-      y ^= y << 5; y ^= y >> 7; y ^= y << 22;
-      t = 4294584393ULL * z + c; c = t >> 32; z = t;
-      lcgo = (19073486328125ULL * lcgo) + 1;
-
-      return (x + y + z) ^ (lcgo >> 16);
-   }
-
-   uint32_t RandU32(uint32_t mina, uint32_t maxa)
-   {
-      const uint32_t range_m1 = maxa - mina;
-      uint32_t range_mask;
-      uint32_t tmp;
-
-      range_mask = range_m1;
-      range_mask |= range_mask >> 1;
-      range_mask |= range_mask >> 2;
-      range_mask |= range_mask >> 4;
-      range_mask |= range_mask >> 8;
-      range_mask |= range_mask >> 16;
-
-      do
-      {
-         tmp = RandU32() & range_mask;
-      } while(tmp > range_m1);
-
-      return(mina + tmp);
-   }
-
-   void ResetState(void)	// Must always reset to the same state.
-   {
-      x = 123456789;
-      y = 987654321;
-      z = 43219876;
-      c = 6543217;
-      lcgo = 0xDEADBEEFCAFEBABEULL;
-   }
-
    uint32_t x,y,z,c;
    uint64_t lcgo;
 };
@@ -145,7 +98,31 @@ static MDFN_PseudoRNG PSX_PRNG;
 
 uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
 {
- return PSX_PRNG.RandU32(mina, maxa);
+   uint32_t tmp;
+   const uint32_t range_m1 = maxa - mina;
+   uint32_t range_mask = range_m1;
+
+   range_mask |= range_mask >> 1;
+   range_mask |= range_mask >> 2;
+   range_mask |= range_mask >> 4;
+   range_mask |= range_mask >> 8;
+   range_mask |= range_mask >> 16;
+
+   do
+   {
+      uint64_t t = 4294584393ULL * PSX_PRNG.z + PSX_PRNG.c;
+
+      PSX_PRNG.x = 314527869 * PSX_PRNG.x + 1234567;
+      PSX_PRNG.y ^= PSX_PRNG.y << 5;
+      PSX_PRNG.y ^= PSX_PRNG.y >> 7;
+      PSX_PRNG.y ^= PSX_PRNG.y << 22;
+      PSX_PRNG.c = t >> 32;
+      PSX_PRNG.z = t;
+      PSX_PRNG.lcgo = (19073486328125ULL * PSX_PRNG.lcgo) + 1;
+      tmp = ((PSX_PRNG.x + PSX_PRNG.y + PSX_PRNG.z) ^ (PSX_PRNG.lcgo >> 16)) & range_mask;
+   } while(tmp > range_m1);
+
+   return(mina + tmp);
 }
 
 static std::vector<CDIF*> *cdifs = NULL;
@@ -904,28 +881,12 @@ uint32_t PSX_MemPeek32(uint32_t A)
 static void PSX_Power(void)
 {
    unsigned i;
-   PSX_PRNG.ResetState();	// Should occur first!
 
-#if 0
-   const uint32_t counterer = 262144;
-   uint64_t averageizer = 0;
-   uint32_t maximizer = 0;
-   uint32_t minimizer = ~0U;
-   for(int i = 0; i < counterer; i++)
-   {
-      uint32_t tmp = PSX_GetRandU32(0, 20000);
-      if(tmp < minimizer)
-         minimizer = tmp;
-
-      if(tmp > maximizer)
-         maximizer = tmp;
-
-      averageizer += tmp;
-      printf("%8u\n", tmp);
-   }
-   printf("Average: %f\nMinimum: %u\nMaximum: %u\n", (double)averageizer / counterer, minimizer, maximizer);
-   exit(1);
-#endif
+   PSX_PRNG.x = 123456789;
+   PSX_PRNG.y = 987654321;
+   PSX_PRNG.z = 43219876;
+   PSX_PRNG.c = 6543217;
+   PSX_PRNG.lcgo = 0xDEADBEEFCAFEBABEULL;
 
    memset(MainRAM.data32, 0, 2048 * 1024);
 
