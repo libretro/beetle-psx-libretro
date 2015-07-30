@@ -936,87 +936,87 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	//printf("COP0 thing: %02x\n", sub_op);
 	switch(sub_op)
-	{
-	 default:
-		DO_LDS();
-		break;
+   {
+      default:
+         DO_LDS();
+         break;
 
-	 case 0x00:		// MFC0	- Move from Coprocessor
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
+      case 0x00:		// MFC0	- Move from Coprocessor
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
 
-		 //printf("MFC0: rt=%d <- rd=%d(%08x)\n", rt, rd, CP0.Regs[rd]);
-		 DO_LDS();
+            //printf("MFC0: rt=%d <- rd=%d(%08x)\n", rt, rd, CP0.Regs[rd]);
+            DO_LDS();
 
-		 LDAbsorb = 0;
-		 LDWhich = rt;
-		 LDValue = CP0.Regs[rd];
-		}
-		break;
+            LDAbsorb = 0;
+            LDWhich = rt;
+            LDValue = CP0.Regs[rd];
+         }
+         break;
 
-	 case 0x04:		// MTC0	- Move to Coprocessor
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
-		 uint32 val = GPR[rt];
+      case 0x04:		// MTC0	- Move to Coprocessor
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
+            uint32 val = GPR[rt];
 
-		 if(rd != CP0REG_PRID && rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
-		 {
-	 	  PSX_WARNING("[CPU] Unimplemented MTC0: rt=%d(%08x) -> rd=%d", rt, GPR[rt], rd);
-		 }
+            if(rd != CP0REG_PRID && rd != CP0REG_CAUSE && rd != CP0REG_SR && val)
+            {
+               PSX_WARNING("[CPU] Unimplemented MTC0: rt=%d(%08x) -> rd=%d", rt, GPR[rt], rd);
+            }
 
-		 switch(rd)
-		 {
-		  case CP0REG_BPC:
-			CP0.BPC = val;
-			break;
+            switch(rd)
+            {
+               case CP0REG_BPC:
+                  CP0.BPC = val;
+                  break;
 
-		  case CP0REG_BDA:
-			CP0.BDA = val;
-			break;
+               case CP0REG_BDA:
+                  CP0.BDA = val;
+                  break;
 
-		  case CP0REG_TAR:
-			CP0.TAR = val;
-			break;
+               case CP0REG_TAR:
+                  CP0.TAR = val;
+                  break;
 
-		  case CP0REG_DCIC:
-			CP0.DCIC = val & 0xFF80003F;
-			break;
+               case CP0REG_DCIC:
+                  CP0.DCIC = val & 0xFF80003F;
+                  break;
 
-  		  case CP0REG_BDAM:
-			CP0.BDAM = val;
-			break;
+               case CP0REG_BDAM:
+                  CP0.BDAM = val;
+                  break;
 
-  		  case CP0REG_BPCM:
-			CP0.BPCM = val;
-			break;
+               case CP0REG_BPCM:
+                  CP0.BPCM = val;
+                  break;
 
-		  case CP0REG_CAUSE:
-			CP0.CAUSE &= ~(0x3 << 8);
-			CP0.CAUSE |= val & (0x3 << 8);
-			RecalcIPCache();
-			break;
+               case CP0REG_CAUSE:
+                  CP0.CAUSE &= ~(0x3 << 8);
+                  CP0.CAUSE |= val & (0x3 << 8);
+                  RecalcIPCache();
+                  break;
 
-		  case CP0REG_SR:
-			if((CP0.SR ^ val) & 0x10000)
-			 PSX_DBG(PSX_DBG_SPARSE, "[CPU] IsC %u->%u\n", (bool)(CP0.SR & (1U << 16)), (bool)(val & (1U << 16)));
+               case CP0REG_SR:
+                  if((CP0.SR ^ val) & 0x10000)
+                     PSX_DBG(PSX_DBG_SPARSE, "[CPU] IsC %u->%u\n", (bool)(CP0.SR & (1U << 16)), (bool)(val & (1U << 16)));
 
-			CP0.SR = val & ~( (0x3 << 26) | (0x3 << 23) | (0x3 << 6));
-			RecalcIPCache();
-			break;
-		 }
-		}
-		DO_LDS();
-		break;
+                  CP0.SR = val & ~( (0x3 << 26) | (0x3 << 23) | (0x3 << 6));
+                  RecalcIPCache();
+                  break;
+            }
+         }
+         DO_LDS();
+         break;
 
-	 case (0x10 + 0x10):	// RFE
-		// "Pop"
-		DO_LDS();
-		CP0.SR = (CP0.SR & ~0x0F) | ((CP0.SR >> 2) & 0x0F);
-		RecalcIPCache();
-		break;
-	}
+      case (0x10 + 0x10):	// RFE
+         // "Pop"
+         DO_LDS();
+         CP0.SR = (CP0.SR & ~0x0F) | ((CP0.SR >> 2) & 0x0F);
+         RecalcIPCache();
+         break;
+   }
     END_OPF;
 
     //
@@ -1034,94 +1034,93 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     BEGIN_OPF(COP2, 0x12, 0);
 	uint32 sub_op = (instr >> 21) & 0x1F;
 
-	switch(sub_op)
-	{
-	 default:
-		DO_LDS();
-		break;
+   if (sub_op >= 0x10 && sub_op <= 0x1F)
+   {
+      //printf("%08x\n", PC);
+      if(timestamp < gte_ts_done)
+         timestamp = gte_ts_done;
+      gte_ts_done = timestamp + GTE_Instruction(instr);
+      DO_LDS();
+   }
+   else switch(sub_op)
+   {
+      default:
+         DO_LDS();
+         break;
 
-	 case 0x00:		// MFC2	- Move from Coprocessor
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
+      case 0x00:		// MFC2	- Move from Coprocessor
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
 
- 	 	 DO_LDS();
+            DO_LDS();
 
-	         if(timestamp < gte_ts_done)
-		 {
-		  LDAbsorb = gte_ts_done - timestamp;
-	          timestamp = gte_ts_done;
-		 }
-		 else
-		  LDAbsorb = 0;
+            if(timestamp < gte_ts_done)
+            {
+               LDAbsorb = gte_ts_done - timestamp;
+               timestamp = gte_ts_done;
+            }
+            else
+               LDAbsorb = 0;
 
-		 LDWhich = rt;
-		 LDValue = GTE_ReadDR(rd);
-		}
-		break;
+            LDWhich = rt;
+            LDValue = GTE_ReadDR(rd);
+         }
+         break;
 
-	 case 0x04:		// MTC2	- Move to Coprocessor
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
-		 uint32 val = GPR[rt];
+      case 0x04:		// MTC2	- Move to Coprocessor
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
+            uint32 val = GPR[rt];
 
-	         if(timestamp < gte_ts_done)
-	          timestamp = gte_ts_done;
+            if(timestamp < gte_ts_done)
+               timestamp = gte_ts_done;
 
-		 //printf("GTE WriteDR: %d %d\n", rd, val);
-		 GTE_WriteDR(rd, val);
-	         DO_LDS();
-		}
-		break;
+            //printf("GTE WriteDR: %d %d\n", rd, val);
+            GTE_WriteDR(rd, val);
+            DO_LDS();
+         }
+         break;
 
-	 case 0x02:		// CFC2
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
+      case 0x02:		// CFC2
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
 
-	 	 DO_LDS();
+            DO_LDS();
 
-	         if(timestamp < gte_ts_done)
-		 {
-		  LDAbsorb = gte_ts_done - timestamp;
-	          timestamp = gte_ts_done;
-		 }
-		 else
-		  LDAbsorb = 0;
+            if(timestamp < gte_ts_done)
+            {
+               LDAbsorb = gte_ts_done - timestamp;
+               timestamp = gte_ts_done;
+            }
+            else
+               LDAbsorb = 0;
 
-		 LDWhich = rt;
-		 LDValue = GTE_ReadCR(rd);
+            LDWhich = rt;
+            LDValue = GTE_ReadCR(rd);
 
-		//printf("GTE ReadCR: %d %d\n", rd, GPR[rt]);
-		}		
-		break;
+            //printf("GTE ReadCR: %d %d\n", rd, GPR[rt]);
+         }		
+         break;
 
-	 case 0x06:		// CTC2
-		{
-		 uint32 rt = (instr >> 16) & 0x1F;
-		 uint32 rd = (instr >> 11) & 0x1F;
-		 uint32 val = GPR[rt];
+      case 0x06:		// CTC2
+         {
+            uint32 rt = (instr >> 16) & 0x1F;
+            uint32 rd = (instr >> 11) & 0x1F;
+            uint32 val = GPR[rt];
 
-		//printf("GTE WriteCR: %d %d\n", rd, val);
+            //printf("GTE WriteCR: %d %d\n", rd, val);
 
- 	         if(timestamp < gte_ts_done)
-	          timestamp = gte_ts_done;
+            if(timestamp < gte_ts_done)
+               timestamp = gte_ts_done;
 
-		 GTE_WriteCR(rd, val);		 
-	 	 DO_LDS();
-		}
-		break;
-
-	 case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17:
-	 case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x1F:
-		//printf("%08x\n", PC);
-	        if(timestamp < gte_ts_done)
-	         timestamp = gte_ts_done;
-		gte_ts_done = timestamp + GTE_Instruction(instr);
-		DO_LDS();
-		break;
-	}
+            GTE_WriteCR(rd, val);		 
+            DO_LDS();
+         }
+         break;
+   }
     END_OPF;
 
     //
@@ -2098,20 +2097,21 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	}
 
 	LDWhich = rt;
-	switch(address & 0x3)
-	{
-	 case 0: LDValue = (v & ~(0xFF << 24)) | (ReadMemory<uint8>(timestamp, address & ~3) << 24);
-		 break;
-
-	 case 1: LDValue = (v & ~(0xFFFF << 16)) | (ReadMemory<uint16>(timestamp, address & ~3) << 16);
-	         break;
-
-	 case 2: LDValue = (v & ~(0xFFFFFF << 8)) | (ReadMemory<uint32>(timestamp, address & ~3, true) << 8);
-		 break;
-
-	 case 3: LDValue = (v & ~(0xFFFFFFFF << 0)) | (ReadMemory<uint32>(timestamp, address & ~3) << 0);
-		 break;
-	}
+   switch(address & 0x3)
+   {
+      case 0:
+         LDValue = (v & ~(0xFF << 24)) | (ReadMemory<uint8>(timestamp, address & ~3) << 24);
+         break;
+      case 1:
+         LDValue = (v & ~(0xFFFF << 16)) | (ReadMemory<uint16>(timestamp, address & ~3) << 16);
+         break;
+      case 2:
+         LDValue = (v & ~(0xFFFFFF << 8)) | (ReadMemory<uint32>(timestamp, address & ~3, true) << 8);
+         break;
+      case 3:
+         LDValue = (v & ~(0xFFFFFFFF << 0)) | (ReadMemory<uint32>(timestamp, address & ~3) << 0);
+         break;
+   }
     END_OPF;
 
     //
@@ -2127,20 +2127,21 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         uint32 address = GPR[rs] + immediate;
 
-	switch(address & 0x3)
-	{
-	 case 0: WriteMemory<uint8>(timestamp, address & ~3, GPR[rt] >> 24);
-		 break;
-
-	 case 1: WriteMemory<uint16>(timestamp, address & ~3, GPR[rt] >> 16);
-	         break;
-
-	 case 2: WriteMemory<uint32>(timestamp, address & ~3, GPR[rt] >> 8, true);
-		 break;
-
-	 case 3: WriteMemory<uint32>(timestamp, address & ~3, GPR[rt] >> 0);
-		 break;
-	}
+   switch(address & 0x3)
+   {
+      case 0:
+         WriteMemory<uint8>(timestamp, address & ~3, GPR[rt] >> 24);
+         break;
+      case 1:
+         WriteMemory<uint16>(timestamp, address & ~3, GPR[rt] >> 16);
+         break;
+      case 2:
+         WriteMemory<uint32>(timestamp, address & ~3, GPR[rt] >> 8, true);
+         break;
+      case 3:
+         WriteMemory<uint32>(timestamp, address & ~3, GPR[rt] >> 0);
+         break;
+   }
 	DO_LDS();
 
     END_OPF;
@@ -2170,20 +2171,21 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	}
 
 	LDWhich = rt;
-	switch(address & 0x3)
-	{
-	 case 0: LDValue = (v & ~(0xFFFFFFFF)) | ReadMemory<uint32>(timestamp, address);
-		 break;
-
-	 case 1: LDValue = (v & ~(0xFFFFFF)) | ReadMemory<uint32>(timestamp, address, true);
-		 break;
-
-	 case 2: LDValue = (v & ~(0xFFFF)) | ReadMemory<uint16>(timestamp, address);
-	         break;
-
-	 case 3: LDValue = (v & ~(0xFF)) | ReadMemory<uint8>(timestamp, address);
-		 break;
-	}
+   switch(address & 0x3)
+   {
+      case 0:
+         LDValue = (v & ~(0xFFFFFFFF)) | ReadMemory<uint32>(timestamp, address);
+         break;
+      case 1:
+         LDValue = (v & ~(0xFFFFFF)) | ReadMemory<uint32>(timestamp, address, true);
+         break;
+      case 2:
+         LDValue = (v & ~(0xFFFF)) | ReadMemory<uint16>(timestamp, address);
+         break;
+      case 3:
+         LDValue = (v & ~(0xFF)) | ReadMemory<uint8>(timestamp, address);
+         break;
+   }
     END_OPF;
 
     //
@@ -2200,19 +2202,20 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
         uint32 address = GPR[rs] + immediate;
 
 	switch(address & 0x3)
-	{
-	 case 0: WriteMemory<uint32>(timestamp, address, GPR[rt]);
-		 break;
-
-	 case 1: WriteMemory<uint32>(timestamp, address, GPR[rt], true);
-		 break;
-
-	 case 2: WriteMemory<uint16>(timestamp, address, GPR[rt]);
-	         break;
-
-	 case 3: WriteMemory<uint8>(timestamp, address, GPR[rt]);
-		 break;
-	}
+   {
+      case 0:
+         WriteMemory<uint32>(timestamp, address, GPR[rt]);
+         break;
+      case 1:
+         WriteMemory<uint32>(timestamp, address, GPR[rt], true);
+         break;
+      case 2:
+         WriteMemory<uint16>(timestamp, address, GPR[rt]);
+         break;
+      case 3:
+         WriteMemory<uint8>(timestamp, address, GPR[rt]);
+         break;
+   }
 
 	DO_LDS();
 
@@ -2278,7 +2281,6 @@ uint32_t PS_CPU::GetRegister(unsigned int which, char *special, const uint32_t s
 {
    if(which >= GSREG_GPR && which < (GSREG_GPR + 32))
       return GPR[which];
-
    switch(which)
    {
       case GSREG_PC:
@@ -2297,7 +2299,6 @@ uint32_t PS_CPU::GetRegister(unsigned int which, char *special, const uint32_t s
          return CP0.CAUSE;
       case GSREG_EPC:
          return CP0.EPC;
-
    }
 
    return 0;
