@@ -304,8 +304,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
    if(!strcasecmp(file_ext.c_str(), ".toc"))
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "TOC file detected.\n");
+      log_cb(RETRO_LOG_INFO, "TOC file detected.\n");
       IsTOC = true;
    }
 
@@ -316,9 +315,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
       if(fp.read(bom_tmp, 3, false) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
       {
-         // Print an annoying error message, but don't actually error out.
-         if (log_cb)
-            log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
+         log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
       }
       else
          fp.seek(0, SEEK_SET);
@@ -696,10 +693,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          }
          else if(cmdbuf == "CDTEXTFILE" || cmdbuf == "CATALOG" || cmdbuf == "ISRC" ||
                cmdbuf == "TITLE" || cmdbuf == "PERFORMER" || cmdbuf == "SONGWRITER")
-         {
-            if (log_cb)
-               log_cb(RETRO_LOG_ERROR, "Unsupported CUE sheet directive: \"%s\".\n", cmdbuf.c_str());
-         }
+            log_cb(RETRO_LOG_ERROR, "Unsupported CUE sheet directive: \"%s\".\n", cmdbuf.c_str());
          else
          {
             throw MDFN_Error(0, _("Unknown CUE sheet directive \"%s\".\n"), cmdbuf.c_str());

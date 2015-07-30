@@ -375,8 +375,7 @@ int CDIF_MT::ReadThreadStart()
          }
          catch(std::exception &e)
          {
-            if (log_cb)
-               log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", ra_lba, e.what());
+            log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", ra_lba, e.what());
             memset(tmpbuf, 0, sizeof(tmpbuf));
             error_condition = true;
          }
@@ -457,8 +456,7 @@ CDIF_MT::~CDIF_MT()
    }
    catch(std::exception &e)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "%s.\n", e.what());
+      log_cb(RETRO_LOG_ERROR, "%s.\n", e.what());
       thread_deaded_failed = true;
    }
 
@@ -680,8 +678,7 @@ bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba)
    }
    catch(std::exception &e)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", lba, e.what());
+      log_cb(RETRO_LOG_ERROR, "Sector %u read error: %s\n", lba, e.what());
       memset(buf, 0, 2352 + 96);
       return(false);
    }
@@ -741,8 +738,7 @@ bool CDIF_ST::Eject(bool eject_status)
    }
    catch(std::exception &e)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+      log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
       return(false);
    }
 

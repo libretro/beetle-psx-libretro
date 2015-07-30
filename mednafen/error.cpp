@@ -38,8 +38,7 @@ MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...) throw()
    error_message = trio_vaprintf(format, ap);
    va_end(ap);
 
-   if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "%s\n", error_message);
+   log_cb(RETRO_LOG_ERROR, "%s\n", error_message);
 }
 
 

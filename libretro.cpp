@@ -1636,8 +1636,7 @@ static void CloseGame(void)
       }
       catch(std::exception &e)
       {
-         if (log_cb)
-            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+         log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
       }
    }
 
@@ -1811,9 +1810,6 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
    code |= cheat_string[i] - 'A' + 0xA;  
   else
   {
-   if (!log_cb)
-      return false;
-
    if(cheat_string[i] & 0x80)
       log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code..\n");
    else
@@ -1824,8 +1820,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
 
  if(nybble_count != 12)
  {
-    if (log_cb)
-       log_cb(RETRO_LOG_ERROR, "GameShark code is of an incorrect length.\n");
+    log_cb(RETRO_LOG_ERROR, "GameShark code is of an incorrect length.\n");
     return false;
  }
 
@@ -1838,10 +1833,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
  if(patch->type == 'T')
  {
   if(code_type != 0x80)
-  {
-     if (log_cb)
-        log_cb(RETRO_LOG_ERROR, "Unrecognized GameShark code type for second part to copy bytes code.\n");
-  }
+     log_cb(RETRO_LOG_ERROR, "Unrecognized GameShark code type for second part to copy bytes code.\n");
 
   patch->addr = cl >> 16;
   return(false);
@@ -1850,8 +1842,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
  switch(code_type)
  {
   default:
-   if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "GameShark code type 0x%02X is currently not supported.\n", code_type);
+     log_cb(RETRO_LOG_ERROR, "GameShark code type 0x%02X is currently not supported.\n", code_type);
 
 	return(false);
 
@@ -2188,8 +2179,7 @@ static unsigned disk_get_num_images(void)
 static bool eject_state;
 static bool disk_set_eject_state(bool ejected)
 {
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "[Mednafen]: Ejected: %u.\n", ejected);
+   log_cb(RETRO_LOG_INFO, "[Mednafen]: Ejected: %u.\n", ejected);
    if (ejected == eject_state)
       return false;
 
@@ -2250,8 +2240,7 @@ static void update_md5_checksum(CDIF *iface)
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
    
    std::string md5 = md5_context::asciistr(MDFNGameInfo->MD5, 0);
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
+   log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
 }
 
 // Untested ...
@@ -2308,13 +2297,17 @@ static struct retro_disk_control_callback disk_interface = {
    disk_add_image_index,
 };
 
+static void fallback_log(enum retro_log_level level, const char *fmt, ...)
+{
+}
+
 void retro_init(void)
 {
    struct retro_log_callback log;
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else 
-      log_cb = NULL;
+      log_cb = fallback_log;
 
 #ifdef NEED_CD
    CDUtility_Init();
@@ -2337,8 +2330,7 @@ void retro_init(void)
    else
    {
       /* TODO: Add proper fallback */
-      if (log_cb)
-         log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
+      log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
    }
 
@@ -2356,8 +2348,7 @@ void retro_init(void)
    else
    {
       /* TODO: Add proper fallback */
-      if (log_cb)
-         log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
+      log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
       retro_save_directory = retro_base_directory;
    }      
 
@@ -2656,15 +2647,13 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
       {
          if(efp == path)
          {
-            if (log_cb)
-               log_cb(RETRO_LOG_ERROR, "M3U at \"%s\" references self.\n", efp.c_str());
+            log_cb(RETRO_LOG_ERROR, "M3U at \"%s\" references self.\n", efp.c_str());
             return;
          }
 
          if(depth == 99)
          {
-            if (log_cb)
-               log_cb(RETRO_LOG_ERROR, "M3U load recursion too deep!\n");
+            log_cb(RETRO_LOG_ERROR, "M3U load recursion too deep!\n");
             return;
          }
 
@@ -2684,8 +2673,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
  uint8 LayoutMD5[16];
 
- if (log_cb)
-    log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
+ log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
 
  try
  {
@@ -2707,8 +2695,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  }
  catch(std::exception &e)
  {
-    if (log_cb)
-       log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
+    log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
     return(0);
  }
 
@@ -2721,17 +2708,14 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
     CDInterfaces[i]->ReadTOC(&toc);
 
-    if (log_cb)
-       log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
+    log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
 
     for(int32 track = toc.first_track; track <= toc.last_track; track++)
     {
-       if (log_cb)
-          log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
+       log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
     }
 
-    if (log_cb)
-       log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
+    log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
  }
 
  // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
@@ -2765,13 +2749,9 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  // This if statement will be true if force_module references a system without CDROM support.
  if(!MDFNGameInfo->LoadCD)
  {
-    if (log_cb)
-       log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
+    log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
     return 0;
  }
-
- if (log_cb)
- log_cb(RETRO_LOG_INFO, "Using module: %s(%s)\n", MDFNGameInfo->shortname, MDFNGameInfo->fullname);
 
  // TODO: include module name in hash
  memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
@@ -2806,9 +2786,6 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u")))
 	 return(MDFNI_LoadCD(force_module, name));
 #endif
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "Loading %s...\n", name);
 
    if(MDFNGameInfo->Load(name, GameFile) <= 0)
       goto error;
@@ -3035,11 +3012,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
       return false;
-   }
 
    overscan = false;
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
@@ -3327,8 +3300,7 @@ void retro_run(void)
          Memcard_SaveDelay[i] += timestamp;
          if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
          {
-            if (log_cb)
-               log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
+            log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
 
             if (i == 0 && !use_mednafen_memcard0_method)
             {
@@ -3462,13 +3434,10 @@ void retro_deinit(void)
    delete surf;
    surf = NULL;
 
-   if (log_cb)
-   {
-      log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
-            MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
-      log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
-            MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
-   }
+   log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
+         MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
+   log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
+         MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
 }
 
 unsigned retro_get_region(void)
@@ -3489,28 +3458,23 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
    {
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_PS1PAD:
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
+         log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "gamepad", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALANALOG:
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
+         log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_DUALSHOCK:
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
+         log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "dualshock", &buf.u8[in_port]);    
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
+         log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
          SetInput(in_port, "analogjoy", &buf.u8[in_port]);
          break;
       default:
-         if (log_cb)
-            log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device %u, falling back to gamepad.\n", MEDNAFEN_CORE_NAME,device);
+         log_cb(RETRO_LOG_WARN, "[%s]: Unsupported controller device %u, falling back to gamepad.\n", MEDNAFEN_CORE_NAME,device);
    }
 
    if (rumble.set_rumble_state)
@@ -3598,8 +3562,6 @@ size_t retro_serialize_size(void)
 
    if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_WARN, "[mednafen]: Save states might destroy your memory card data\n");
       return 0;
    }
 
@@ -3704,8 +3666,6 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
          break;
    }
 
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "MDFN_MakeFName: %s\n", ret.c_str());
    return ret;
 }
 
