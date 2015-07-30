@@ -1247,22 +1247,22 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         if(!GPR[rt])
         {
-	 if(GPR[rs] & 0x80000000)
-	  LO = 1;
-	 else
-	  LO = 0xFFFFFFFF;
+           if(GPR[rs] & 0x80000000)
+              LO = 1;
+           else
+              LO = 0xFFFFFFFF;
 
-	 HI = GPR[rs];
+           HI = GPR[rs];
         }
-	else if(GPR[rs] == 0x80000000 && GPR[rt] == 0xFFFFFFFF)
-	{
-	 LO = 0x80000000;
-	 HI = 0;
-	}
+        else if(GPR[rs] == 0x80000000 && GPR[rt] == 0xFFFFFFFF)
+        {
+           LO = 0x80000000;
+           HI = 0;
+        }
         else
         {
-         LO = (int32)GPR[rs] / (int32)GPR[rt];
-         HI = (int32)GPR[rs] % (int32)GPR[rt];
+           LO = (int32)GPR[rs] / (int32)GPR[rt];
+           HI = (int32)GPR[rs] % (int32)GPR[rt];
         }
 	muldiv_ts_done = timestamp + 37;
 
@@ -1270,10 +1270,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
     END_OPF;
 
-
-    //
     // DIVU - Divide Unsigned Word
-    //
     BEGIN_OPF(DIVU, 0, 0x1B);
 	RTYPE;
 
