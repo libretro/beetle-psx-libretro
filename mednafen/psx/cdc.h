@@ -5,42 +5,6 @@
 #include "../cdrom/SimpleFIFO.h"
 #include "../clamp.h"
 
-#define MODE_SPEED      0x80
-#define MODE_STRSND     0x40
-#define MODE_SIZE       0x20
-#define MODE_SIZE2      0x10
-#define MODE_SF         0x08
-#define MODE_REPORT     0x04
-#define MODE_AUTOPAUSE  0x02
-#define MODE_CDDA       0x01
-
-#define CDCIRQ_NONE        0
-#define CDCIRQ_DATA_READY  1
-#define CDCIRQ_COMPLETE    2
-#define CDCIRQ_ACKNOWLEDGE 3
-#define CDCIRQ_DATA_END    4
-#define CDCIRQ_DISC_ERROR  5
-
-/* Names are just guessed 
- * for these based on what 
- * conditions cause them: */
-#define ERRCODE_BAD_ARGVAL    0x10
-#define ERRCODE_BAD_NUMARGS   0x20
-#define ERRCODE_BAD_COMMAND   0x40
-#define ERRCODE_NOT_READY     0x80
-
-#define DS_STANDBY         -2
-#define DS_PAUSED          -1
-#define DS_STOPPED         0
-#define DS_SEEKING         1
-#define DS_SEEKING_LOGICAL 2
-#define DS_PLAY_SEEKING    3
-#define DS_PLAYING         4
-#define DS_READING         5
-#define DS_RESETTING       6
-
-#define SECTORPIPE_COUNT   2
-
 struct CD_Audio_Buffer
 {
    int16 Samples[2][0x1000];	// [0][...] = l, [1][...] = r
@@ -111,7 +75,8 @@ class PS_CDC
       uint8 SB[2340];
       uint32 SB_In;
 
-      uint8 SectorPipe[SECTORPIPE_COUNT][2352];
+      enum { SectorPipe_Count = 2 };
+      uint8 SectorPipe[SectorPipe_Count][2352];
       uint8 SectorPipe_Pos;
       uint8 SectorPipe_In;
 
@@ -123,7 +88,25 @@ class PS_CDC
       uint8 HeaderBuf[12];
 
       void RecalcIRQ(void);
+      enum
+      {
+         CDCIRQ_NONE = 0,
+         CDCIRQ_DATA_READY = 1,
+         CDCIRQ_COMPLETE = 2,
+         CDCIRQ_ACKNOWLEDGE = 3,
+         CDCIRQ_DATA_END = 4,
+         CDCIRQ_DISC_ERROR = 5
+      };
 
+      // Names are just guessed for these based on what conditions cause them:
+      enum
+      {
+         ERRCODE_BAD_ARGVAL  = 0x10,
+         ERRCODE_BAD_NUMARGS = 0x20,
+         ERRCODE_BAD_COMMAND = 0x40,
+         ERRCODE_NOT_READY   = 0x80	// 0x80 (happens with getlocl when drive isn't reading, pause when tray is open, and MAYBE when trying to run an async
+         //	 command while another async command is currently in its asynch phase being executed[pause when in readtoc, todo test more])
+      };
 
       uint8 IRQBuffer;
       uint8 IRQOutTestMask;
@@ -147,8 +130,28 @@ class PS_CDC
 
       int32 SPUCounter;
 
+      enum { MODE_SPEED = 0x80 };
+      enum { MODE_STRSND = 0x40 };
+      enum { MODE_SIZE = 0x20 };
+      enum { MODE_SIZE2 = 0x10 };
+      enum { MODE_SF = 0x08 };
+      enum { MODE_REPORT = 0x04 };
+      enum { MODE_AUTOPAUSE = 0x02 };
+      enum { MODE_CDDA = 0x01 };
       uint8 Mode;
 
+      enum
+      {
+         DS_STANDBY = -2,
+         DS_PAUSED = -1,
+         DS_STOPPED = 0,
+         DS_SEEKING,
+         DS_SEEKING_LOGICAL,
+         DS_PLAY_SEEKING,
+         DS_PLAYING,
+         DS_READING,
+         DS_RESETTING
+      };
       int DriveStatus;
       int StatusAfterSeek;
       bool Forward;
