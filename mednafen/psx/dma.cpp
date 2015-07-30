@@ -292,32 +292,134 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t 
    DMACH[ch].ClockCounter -= std::max<int>(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
 }
 
-//
-// Remember to handle an end condition on the same iteration of the while(DMACH[ch].ClockCounter > 0) loop that caused it,
-// otherwise RecalcHalt() might take the CPU out of a halted state before the end-of-DMA is signaled(especially a problem considering our largeish
-// DMA update timing granularity).
-//
 static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, int32_t clocks)
 {
-   //const uint32_t dc = (DMAControl >> (ch * 4)) & 0xF;
+}
 
-   DMACH[ch].ClockCounter += clocks;
+static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
+{
+   // Mask out the bits that the DMA controller will modify during the course of operation.
+   uint32_t CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
+   uint32_t crmodecache = CRModeCache;
 
-   while(MDFN_LIKELY(DMACH[ch].ClockCounter > 0))
+   switch(ch)
    {
-      if(DMACH[ch].WordCounter == 0)	// Begin WordCounter reload.
-      {
-         if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
-            break;
-
-         if(!ChCan(ch, CRModeCache))
-            break;
-
-         DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
-
-         if(CRModeCache & (1U << 10))
+      case 0:
+         if(MDFN_LIKELY(CRModeCache == 0x00000201))
+            crmodecache = 0x00000201;
+         break;
+      case 1:
+         if(MDFN_LIKELY(CRModeCache == 0x00000200))
+            crmodecache = 0x00000200;
+         break;
+      case 2:
+         switch (CRModeCache)
          {
-            uint32_t header;
+            case 0x00000401:
+               crmodecache = 0x00000401;
+               break;
+            case 0x00000201:
+               crmodecache = 0x00000201;
+               break;
+            case 0x00000200:
+               crmodecache = 0x00000200;
+               break;
+         }
+         break;
+      case 3:
+         if(MDFN_LIKELY(CRModeCache == 0x00000000))
+            crmodecache = 0x00000000;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000100))
+            crmodecache = 0x00000100;
+         break;
+      case 4:
+         if(MDFN_LIKELY(CRModeCache == 0x00000201))
+            crmodecache = 0x00000201;
+         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
+            crmodecache = 0x00000200;
+         break;
+      case 6:
+         if(MDFN_LIKELY(CRModeCache == 0x00000002))
+            crmodecache = 0x00000002;
+         break;
+   }
+
+   //
+   // Remember to handle an end condition on the same iteration of the while(DMACH[ch].ClockCounter > 0) loop that caused it,
+   // otherwise RecalcHalt() might take the CPU out of a halted state before the end-of-DMA is signaled(especially a problem considering our largeish
+   // DMA update timing granularity).
+   if (ch >= 0 && ch <= 6)
+   {
+      CRModeCache = crmodecache;
+      DMACH[ch].ClockCounter += clocks;
+
+      while(MDFN_LIKELY(DMACH[ch].ClockCounter > 0))
+      {
+         if(DMACH[ch].WordCounter == 0)	// Begin WordCounter reload.
+         {
+            if(!(DMACH[ch].ChanControl & (1 << 24)))	// Needed for the forced-DMA-stop kludge(see DMA_Write()).
+               break;
+
+            if(!ChCan(ch, CRModeCache))
+               break;
+
+            DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
+
+            if(CRModeCache & (1U << 10))
+            {
+               uint32_t header;
+
+               if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
+               {
+                  DMACH[ch].ChanControl &= ~(0x11 << 24);
+                  DMAIntControl |= 0x8000;
+                  RecalcIRQOut();
+                  break;
+               }
+
+               header = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+               DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
+
+               DMACH[ch].WordCounter = header >> 24;
+               DMACH[ch].BaseAddr = header & 0xFFFFFF;
+
+               // printf to debug Soul Reaver ;)
+               //if(DMACH[ch].WordCounter > 0x10) 
+               // printf("What the lala?  0x%02x @ 0x%08x\n", DMACH[ch].WordCounter, DMACH[ch].CurAddr - 4);
+
+               if(DMACH[ch].WordCounter)
+                  DMACH[ch].ClockCounter -= 15;
+               else
+                  DMACH[ch].ClockCounter -= 10;
+
+               goto SkipPayloadStuff;	// 3 cheers for gluten-free spaghetticode(necessary because the newly-loaded WordCounter might be 0, and we actually
+               // want 0 to mean 0 and not 65536 in this context)!
+            }
+            else
+            {
+               DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
+
+               if(CRModeCache & (1U << 9))
+               {
+                  if(ch == 2)	// Technically should apply to all channels, but since we don't implement CPU read penalties for channels other than 2 yet, it's like this to avoid making DMA longer than what games can handle.
+                     DMACH[ch].ClockCounter -= 7;
+
+                  DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF) | ((DMACH[ch].BlockControl - (1U << 16)) & 0xFFFF0000);
+               }
+            }
+         }	// End WordCounter reload.
+         else if(CRModeCache & 0x100) // BLARGH BLARGH FISHWHALE
+         {
+            //printf("LoadWC: %u(oldWC=%u)\n", DMACH[ch].BlockControl & 0xFFFF, DMACH[ch].WordCounter);
+            //MDFN_DispMessage("SPOOOON\n");
+            DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
+            DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
+         }
+
+         // Do the payload read/write
+         {
+            uint32_t vtmp;
+            uint32_t voffs = 0;
 
             if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
             {
@@ -327,76 +429,22 @@ static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, in
                break;
             }
 
-            header = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+            if(CRModeCache & 0x1)
+               vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+
+            ChRW(ch, CRModeCache, &vtmp, &voffs);
+
+            if(!(CRModeCache & 0x1))
+               MainRAM.WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
+         }
+
+         if(CRModeCache & 0x2)
+            DMACH[ch].CurAddr = (DMACH[ch].CurAddr - 4) & 0xFFFFFF;
+         else
             DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
 
-            DMACH[ch].WordCounter = header >> 24;
-            DMACH[ch].BaseAddr = header & 0xFFFFFF;
-
-            // printf to debug Soul Reaver ;)
-            //if(DMACH[ch].WordCounter > 0x10) 
-            // printf("What the lala?  0x%02x @ 0x%08x\n", DMACH[ch].WordCounter, DMACH[ch].CurAddr - 4);
-
-            if(DMACH[ch].WordCounter)
-               DMACH[ch].ClockCounter -= 15;
-            else
-               DMACH[ch].ClockCounter -= 10;
-
-            goto SkipPayloadStuff;	// 3 cheers for gluten-free spaghetticode(necessary because the newly-loaded WordCounter might be 0, and we actually
-            // want 0 to mean 0 and not 65536 in this context)!
-         }
-         else
-         {
-            DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
-
-            if(CRModeCache & (1U << 9))
-            {
-               if(ch == 2)	// Technically should apply to all channels, but since we don't implement CPU read penalties for channels other than 2 yet, it's like this to avoid making DMA longer than what games can handle.
-                  DMACH[ch].ClockCounter -= 7;
-
-               DMACH[ch].BlockControl = (DMACH[ch].BlockControl & 0xFFFF) | ((DMACH[ch].BlockControl - (1U << 16)) & 0xFFFF0000);
-            }
-         }
-      }	// End WordCounter reload.
-      else if(CRModeCache & 0x100) // BLARGH BLARGH FISHWHALE
-      {
-         //printf("LoadWC: %u(oldWC=%u)\n", DMACH[ch].BlockControl & 0xFFFF, DMACH[ch].WordCounter);
-         //MDFN_DispMessage("SPOOOON\n");
-         DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
-         DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
-      }
-
-      //
-      // Do the payload read/write
-      //
-      {
-         uint32_t vtmp;
-         uint32_t voffs = 0;
-
-         if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
-         {
-            DMACH[ch].ChanControl &= ~(0x11 << 24);
-            DMAIntControl |= 0x8000;
-            RecalcIRQOut();
-            break;
-         }
-
-         if(CRModeCache & 0x1)
-            vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
-
-         ChRW(ch, CRModeCache, &vtmp, &voffs);
-
-         if(!(CRModeCache & 0x1))
-            MainRAM.WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
-      }
-
-      if(CRModeCache & 0x2)
-         DMACH[ch].CurAddr = (DMACH[ch].CurAddr - 4) & 0xFFFFFF;
-      else
-         DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
-
-      DMACH[ch].WordCounter--;
-      DMACH[ch].ClockCounter--;
+         DMACH[ch].WordCounter--;
+         DMACH[ch].ClockCounter--;
 
 SkipPayloadStuff: ;
 
@@ -447,62 +495,11 @@ SkipPayloadStuff: ;
                         break;
                      }
                   }
+      }
+
+      if(DMACH[ch].ClockCounter > 0)
+         DMACH[ch].ClockCounter = 0;
    }
-
-   if(DMACH[ch].ClockCounter > 0)
-      DMACH[ch].ClockCounter = 0;
-}
-
-static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
-{
-   // Mask out the bits that the DMA controller will modify during the course of operation.
-   const uint32_t CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
-   uint32_t crmodecache = CRModeCache;
-
-   switch(ch)
-   {
-      case 0:
-         if(MDFN_LIKELY(CRModeCache == 0x00000201))
-            crmodecache = 0x00000201;
-         break;
-      case 1:
-         if(MDFN_LIKELY(CRModeCache == 0x00000200))
-            crmodecache = 0x00000200;
-         break;
-      case 2:
-         switch (CRModeCache)
-         {
-            case 0x00000401:
-               crmodecache = 0x00000401;
-               break;
-            case 0x00000201:
-               crmodecache = 0x00000201;
-               break;
-            case 0x00000200:
-               crmodecache = 0x00000200;
-               break;
-         }
-         break;
-      case 3:
-         if(MDFN_LIKELY(CRModeCache == 0x00000000))
-            crmodecache = 0x00000000;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000100))
-            crmodecache = 0x00000100;
-         break;
-      case 4:
-         if(MDFN_LIKELY(CRModeCache == 0x00000201))
-            crmodecache = 0x00000201;
-         else if(MDFN_LIKELY(CRModeCache == 0x00000200))
-            crmodecache = 0x00000200;
-         break;
-      case 6:
-         if(MDFN_LIKELY(CRModeCache == 0x00000002))
-            crmodecache = 0x00000002;
-         break;
-   }
-
-   if (ch >= 0 && ch <= 6)
-      RunChannelI(ch, crmodecache, clocks);
 }
 
 static INLINE int32_t CalcNextEvent(int32_t next_event)
