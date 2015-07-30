@@ -479,7 +479,7 @@ static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
    g->InvalidateTexCache();
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
-      g->InCmd = g->INCMD_FBWRITE;
+      g->InCmd = INCMD_FBWRITE;
 }
 
 /* FBRead: PS1 GPU in SCPH-5501 gives odd, inconsistent results when
@@ -508,7 +508,7 @@ static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
    g->InvalidateTexCache();
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
-      g->InCmd = g->INCMD_FBREAD;
+      g->InCmd = INCMD_FBREAD;
 }
 
 static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)

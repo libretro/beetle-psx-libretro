@@ -8,6 +8,12 @@
 
 class PS_GPU;
 
+#define INCMD_NONE     0
+#define INCMD_PLINE    1
+#define INCMD_QUAD     2
+#define INCMD_FBWRITE  4
+#define INCMD_FBREAD   8
+
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);
@@ -158,18 +164,7 @@ class PS_GPU
 
       bool IRQPending;
 
-      //
-      //
-      //
       // Powers of 2 for faster multiple equality testing(just for multi-testing; InCmd itself will only contain 0, or a power of 2).
-      enum
-      {
-         INCMD_NONE = 0,
-         INCMD_PLINE = (1 << 0),
-         INCMD_QUAD = (1 << 1),
-         INCMD_FBWRITE = (1 << 2),
-         INCMD_FBREAD = (1 << 3)
-      };
       uint8 InCmd;
       uint8 InCmd_CC;
 
@@ -228,13 +223,7 @@ class PS_GPU
 
       int32_t lastts;
 
-      //
-      //
-      //
-
       bool sl_zero_reached;
-      //
-      //
 
       EmulateSpecStruct *espec;
       MDFN_Surface *surface;
