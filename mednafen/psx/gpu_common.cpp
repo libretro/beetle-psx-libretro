@@ -1,77 +1,77 @@
 template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
- y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
+   y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
- if(BlendMode >= 0 && (fore_pix & 0x8000))
- {
-  uint16 bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-  uint16 pix; // = fore_pix & 0x8000;
+   if(BlendMode >= 0 && (fore_pix & 0x8000))
+   {
+      uint16 bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+      uint16 pix; // = fore_pix & 0x8000;
 
-/*
- static const int32_t tab[4][2] =
- {
-  { 2,  2 },
-  { 4,  4 },
-  { 4, -4 },
-  { 4,  1 }
- };
-*/
-  // Efficient 15bpp pixel math algorithms from blargg
-  switch(BlendMode)
-  {
-   case 0:
-	bg_pix |= 0x8000;
-	pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
-	break;
-	  
-   case 1:
-       {
-	bg_pix &= ~0x8000;
+      /*
+         static const int32_t tab[4][2] =
+         {
+         { 2,  2 },
+         { 4,  4 },
+         { 4, -4 },
+         { 4,  1 }
+         };
+         */
+      // Efficient 15bpp pixel math algorithms from blargg
+      switch(BlendMode)
+      {
+         case 0:
+            bg_pix |= 0x8000;
+            pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
+            break;
 
-	uint32_t sum = fore_pix + bg_pix;
-	uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+         case 1:
+            {
+               bg_pix &= ~0x8000;
 
-	pix = (sum - carry) | (carry - (carry >> 5));
-       }
-       break;
+               uint32_t sum = fore_pix + bg_pix;
+               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-   case 2:
-       {
-	bg_pix |= 0x8000;
-        fore_pix &= ~0x8000;
+               pix = (sum - carry) | (carry - (carry >> 5));
+            }
+            break;
 
-	uint32_t diff = bg_pix - fore_pix + 0x108420;
-	uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
+         case 2:
+            {
+               bg_pix |= 0x8000;
+               fore_pix &= ~0x8000;
 
-	pix = (diff - borrow) & (borrow - (borrow >> 5));
-       }
-       break;
+               uint32_t diff = bg_pix - fore_pix + 0x108420;
+               uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
-   case 3:
-       {
-	bg_pix &= ~0x8000;
-	fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
+               pix = (diff - borrow) & (borrow - (borrow >> 5));
+            }
+            break;
 
-	uint32_t sum = fore_pix + bg_pix;
-	uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+         case 3:
+            {
+               bg_pix &= ~0x8000;
+               fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
 
-	pix = (sum - carry) | (carry - (carry >> 5));
-       }
-       break;
-     case -1:
-     default:
-     break;
-  }
+               uint32_t sum = fore_pix + bg_pix;
+               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-  if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-   GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
- }
- else
- {
-  if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-   GPURAM[y][x] = (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR;
- }
+               pix = (sum - carry) | (carry - (carry >> 5));
+            }
+            break;
+         case -1:
+         default:
+            break;
+      }
+
+      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
+         GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
+   }
+   else
+   {
+      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
+         GPURAM[y][x] = (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR;
+   }
 }
 
 INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32_t r, int32_t g, int32_t b, const int32_t dither_x, const int32_t dither_y)
@@ -88,26 +88,26 @@ INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32_t r, int32_t g, int32_t b
 template<uint32_t TexMode_TA>
 INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 {
- if(TexMode_TA < 2)
- {
-  const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
-
-  if(CLUT_Cache_VB != new_ccvb)
-  {
-   uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
-   const uint32_t cxo = (raw_clut & 0x3F) << 4;
-  const uint32_t count = (TexMode_TA ? 256 : 16);
-
-   DrawTimeAvail -= count;
-
-   for(unsigned i = 0; i < count; i++)
+   if(TexMode_TA < 2)
    {
-    CLUT_Cache[i] = gpulp[(cxo + i) & 0x3FF];
-   }
+      const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
 
-   CLUT_Cache_VB = new_ccvb;
-  }
- }
+      if(CLUT_Cache_VB != new_ccvb)
+      {
+         uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
+         const uint32_t cxo = (raw_clut & 0x3F) << 4;
+         const uint32_t count = (TexMode_TA ? 256 : 16);
+
+         DrawTimeAvail -= count;
+
+         for(unsigned i = 0; i < count; i++)
+         {
+            CLUT_Cache[i] = gpulp[(cxo + i) & 0x3FF];
+         }
+
+         CLUT_Cache_VB = new_ccvb;
+      }
+   }
 }
 
 #if 0
@@ -141,8 +141,7 @@ INLINE void PS_GPU::RecalcTexWindowStuff(void)
    const unsigned TexWindowX_OR = (twx & tww) << 3;
    const unsigned TexWindowY_AND = ~(twh << 3);
    const unsigned TexWindowY_OR = (twy & twh) << 3;
-   // printf("TWX: 0x%02x, TWW: 0x%02x\n", twx, tww);
-   // printf("TWY: 0x%02x, TWH: 0x%02x\n", twy, twh);
+
    for(x = 0; x < 256; x++)
       TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
    for(y = 0; y < 256; y++)
@@ -220,8 +219,10 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int3
 
 static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 {
-   //DisplayFB_XStart >= OffsX && DisplayFB_YStart >= OffsY &&
-   // ((y & 1) == (DisplayFB_CurLineYReadout & 1))
+#if 0
+   DisplayFB_XStart >= OffsX && DisplayFB_YStart >= OffsY &&
+   ((y & 1) == (DisplayFB_CurLineYReadout & 1))
+#endif
 
    if((g->DisplayMode & 0x24) != 0x24)
       return false;
@@ -232,9 +233,7 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
    return false;
 }
 
-//
 // Command table generation macros follow:
-//
 
 //#define BM_HELPER(fg) { fg(0), fg(1), fg(2), fg(3) }
 
@@ -261,9 +260,6 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  	 false															\
 	}
 
-//
-//
-
 #define SPR_HELPER_SUB(bm, cv, tm, mam) G_Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
 
 #define SPR_HELPER_FG(bm, cv)						\
@@ -287,9 +283,6 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 	 false													\
 	}
 
-//
-//
-
 #define LINE_HELPER_SUB(bm, cv, mam) G_Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1, mam>
 
 #define LINE_HELPER_FG(bm, cv)											\
@@ -311,9 +304,6 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 	 1,													\
 	 false													\
 	}
-
-//
-//
 
 #define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr }
 #define OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr) { { OTHER_HELPER_FG(0, arg_ptr), OTHER_HELPER_FG(1, arg_ptr), OTHER_HELPER_FG(2, arg_ptr), OTHER_HELPER_FG(3, arg_ptr) }, arg_cs, arg_fbcs, arg_ss }

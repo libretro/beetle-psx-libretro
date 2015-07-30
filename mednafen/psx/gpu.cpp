@@ -323,7 +323,7 @@ void PS_GPU::ResetTS(void)
    lastts = 0;
 }
 
-#include "gpu_common.inc"
+#include "gpu_common.cpp"
 #include "gpu_polygon.cpp"
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
