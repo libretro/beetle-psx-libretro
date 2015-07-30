@@ -1241,15 +1241,13 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    GPU->FillVideoParams(&EmulatedPSX);
 
+   CD_TrayOpen        = true;
+   CD_SelectedDisc    = -1;
+
    if(cdifs)
    {
-      CD_TrayOpen = false;
+      CD_TrayOpen     = false;
       CD_SelectedDisc = 0;
-   }
-   else
-   {
-      CD_TrayOpen = true;
-      CD_SelectedDisc = -1;
    }
 
    CDC->SetDisc(true, NULL, NULL);
@@ -1258,11 +1256,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
 
    BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
+   PIOMem  = NULL;
 
    if(WantPIOMem)
       PIOMem = new MultiAccessSizeMem<65536, uint32, false>();
-   else
-      PIOMem = NULL;
 
    for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
    {
@@ -1285,11 +1282,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    MDFNMP_Init(1024, ((uint64)1 << 29) / 1024);
    MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM.data8);
-   //MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
+#if 0
+   MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
+#endif
 
-   //
-   //
-   //
    const char *biospath_sname;
 
    if(region == REGION_JP)
@@ -1333,24 +1329,15 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 #ifdef WANT_DEBUGGER
    DBG_Init();
 #endif
-
    PSX_Power();
 }
 
 static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp = false)
 {
-   uint32 PC;
-   uint32 SP;
-   uint32 TextStart;
-   uint32 TextSize;
-
-   if(size < 0x800)
-      throw(MDFN_Error(0, "PS-EXE is too small."));
-
-   PC = MDFN_de32lsb(&data[0x10]);
-   SP = MDFN_de32lsb(&data[0x30]);
-   TextStart = MDFN_de32lsb(&data[0x18]);
-   TextSize = MDFN_de32lsb(&data[0x1C]);
+   uint32 PC        = MDFN_de32lsb(&data[0x10]);
+   uint32 SP        = MDFN_de32lsb(&data[0x30]);
+   uint32 TextStart = MDFN_de32lsb(&data[0x18]);
+   uint32 TextSize  = MDFN_de32lsb(&data[0x1C]);
 
    if(ignore_pcsp)
       log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
@@ -1360,9 +1347,7 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    TextStart &= 0x1FFFFF;
 
    if(TextSize > 2048 * 1024)
-   {
       throw(MDFN_Error(0, "Text section too large"));
-   }
 
    if(TextSize > (size - 0x800))
       throw(MDFN_Error(0, "Text section recorded size is larger than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800));
@@ -1393,17 +1378,12 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    memcpy(&TextMem[TextStart - TextMem_Start], data + 0x800, TextSize);
 
-
-   //
-   //
-   //
-
    // BIOS patch
    BIOSROM->WriteU32(0x6990, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
-   // BIOSROM->WriteU32(0x691C, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
+#if 0
+   BIOSROM->WriteU32(0x691C, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
+#endif
 
-   // printf("INSN: 0x%08x\n", BIOSROM->ReadU32(0x6990));
-   // exit(1);
    uint8 *po;
 
    po = &PIOMem->data8[0x0800];
@@ -1513,20 +1493,19 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 static void Cleanup(void);
 static int Load(const char *name, MDFNFILE *fp)
 {
- {
-  const bool IsPSF = false;
+   const bool IsPSF = false;
 
-  if(!TestMagic(name, fp))
-   throw MDFN_Error(0, _("File format is unknown to module \"%s\"."), MDFNGameInfo->shortname);
+   if(!TestMagic(name, fp))
+      throw MDFN_Error(0, _("File format is unknown to module \"%s\"."), MDFNGameInfo->shortname);
 
-  InitCommon(NULL, !IsPSF, true);
+   InitCommon(NULL, !IsPSF, true);
 
-  TextMem.resize(0);
+   TextMem.resize(0);
 
-   LoadEXE(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp));
- }
+   if(GET_FSIZE_PTR(fp) >= 0x800)
+      LoadEXE(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp));
 
- return(1);
+   return(1);
 }
 
 static int LoadCD(std::vector<CDIF *> *CDInterfaces)
@@ -1807,8 +1786,6 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
 
 	return(false);
 
-  //
-  //
   // TODO:
   case 0x10:	// 16-bit increment
 	patch->length = 2;
@@ -2246,7 +2223,6 @@ static bool disk_add_image_index(void)
    cdifs->push_back(NULL);
    return true;
 }
-///////
 
 static struct retro_disk_control_callback disk_interface = {
    disk_set_eject_state,
