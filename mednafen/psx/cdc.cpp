@@ -344,9 +344,8 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
    if(load)
    {
       DMABuffer.SaveStatePostLoad();
-      SectorPipe_Pos %= SectorPipe_Count;
+      SectorPipe_Pos %= SECTORPIPE_COUNT;
 
-      //
       // Handle pre-0.9.37 state loading, and maliciously-constructed/corrupted save states.
       if(!Cur_CDIF)
          DMForceStop();
@@ -956,7 +955,7 @@ void PS_CDC::HandlePlayRead(void)
       }
    }
 
-   if(SectorPipe_In >= SectorPipe_Count)
+   if(SectorPipe_In >= SECTORPIPE_COUNT)
    {
       uint8* buf = SectorPipe[SectorPipe_Pos];
       SectorPipe_In--;
@@ -1026,7 +1025,7 @@ void PS_CDC::HandlePlayRead(void)
    }
 
    memcpy(SectorPipe[SectorPipe_Pos], read_buf, 2352);
-   SectorPipe_Pos = (SectorPipe_Pos + 1) % SectorPipe_Count;
+   SectorPipe_Pos = (SectorPipe_Pos + 1) % SECTORPIPE_COUNT;
    SectorPipe_In++;
 
    PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
