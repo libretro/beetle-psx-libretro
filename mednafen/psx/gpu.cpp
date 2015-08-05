@@ -811,7 +811,8 @@ void PS_GPU::ProcessFIFO(void)
    else switch (cc)
    {
       case 0x01:
-         this->InvalidateCache();
+         CLUT_Cache_VB = ~0U;
+         InvalidateTexCache();
          break;
       case 0x02:
          G_Command_FBFill(this, CB);
