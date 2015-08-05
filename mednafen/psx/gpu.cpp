@@ -802,8 +802,51 @@ void PS_GPU::ProcessFIFO(void)
          SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
    }
 
-   if(command->func[abr][TexMode])
-      command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
+   if ((cc >= 0x80) && (cc <= 0x9F))
+      G_Command_FBCopy(this, CB);
+   else if ((cc >= 0xA0) && (cc <= 0xBF))
+      G_Command_FBWrite(this, CB);
+   else if ((cc >= 0xC0) && (cc <= 0xDF))
+      G_Command_FBRead(this, CB);
+   else switch (cc)
+   {
+      case 0x01:
+         this->InvalidateCache();
+         break;
+      case 0x02:
+         G_Command_FBFill(this, CB);
+         break;
+      case 0x1F:
+         this->IRQPending = true;
+         IRQ_Assert(IRQ_GPU, this->IRQPending);
+         break;
+      case 0xe1:
+         G_Command_DrawMode(this, CB);
+         break;
+      case 0xe2:
+         G_Command_TexWindow(this, CB);
+         break;
+      case 0xe3: /* Clip 0 */
+         this->ClipX0 = *CB & 1023;
+         this->ClipY0 = (*CB >> 10) & 1023;
+         break;
+      case 0xe4: /* Clip 1 */
+         this->ClipX1 = *CB & 1023;
+         this->ClipY1 = (*CB >> 10) & 1023;
+         break;
+      case 0xe5: /* Drawing Offset */
+         this->OffsX = sign_x_to_s32(11, (*CB & 2047));
+         this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
+         break;
+      case 0xe6: /* Mask Setting */
+         this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
+         this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
+         break;
+      default:
+         if(command->func[abr][TexMode])
+            command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
+         break;
+   }
 }
 
 INLINE void PS_GPU::WriteCB(uint32_t InData)
