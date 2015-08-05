@@ -791,18 +791,17 @@ void PS_GPU::ProcessFIFO(void)
    for(i = 0; i < command_len; i++)
       CB[i] = BlitterFIFO.Read();
 
-   if (read_fifo)
-      goto end;
+   if (!read_fifo)
+   {
+      if(!command->ss_cmd)
+         DrawTimeAvail -= 2;
 
-   if(!command->ss_cmd)
-      DrawTimeAvail -= 2;
+      // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
+      /* Don't alter SpriteFlip here. */
+      if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
+         SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
+   }
 
-   // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
-   /* Don't alter SpriteFlip here. */
-   if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
-      SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
-
-end:
    if(command->func[abr][TexMode])
       command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
 }
