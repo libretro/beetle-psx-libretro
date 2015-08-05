@@ -429,11 +429,12 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
          /* Probably will want to be careful with this HeaderBufValid 
           * versus seek/read bit business in the future as it is a bit fragile;
           * "Gran Turismo 1"'s music is a good test case. */
-         if(!HeaderBufValid)
-            ret |= 0x40;
-         else
+         if(HeaderBufValid)
+         {
             ret |= 0x20;
-         break;
+            break;
+         }
+         /* fall-through */
       case DS_SEEKING:
       case DS_SEEKING_LOGICAL:
          ret |= 0x40;
