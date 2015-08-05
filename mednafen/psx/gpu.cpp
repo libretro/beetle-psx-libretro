@@ -709,145 +709,102 @@ CTEntry PS_GPU::Commands[256] =
 
 void PS_GPU::ProcessFIFO(void)
 {
+   uint32_t CB[0x10], InData;
+   unsigned i;
+   uint32_t cc = InCmd_CC;
+   unsigned command_len;
+   const CTEntry *command = &Commands[cc];
+   bool read_fifo = false;
+
    if(!BlitterFIFO.CanRead())
       return;
 
    switch(InCmd)
    {
       default:
-         abort();
-         break;
-
       case INCMD_NONE:
          break;
 
       case INCMD_FBREAD:
-         puts("[GPU] Command FIFO not empty while in FB Read?");
          return;
 
       case INCMD_FBWRITE:
+         InData = BlitterFIFO.Read();
+
+         for(i = 0; i < 2; i++)
          {
-            uint32_t InData = BlitterFIFO.Read();
+            if(!(GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] & MaskEvalAND))
+               GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] = InData | MaskSetOR;
 
-            for(int i = 0; i < 2; i++)
+            FBRW_CurX++;
+            if(FBRW_CurX == (FBRW_X + FBRW_W))
             {
-               if(!(GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] & MaskEvalAND))
-                  GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] = InData | MaskSetOR;
-
-               FBRW_CurX++;
-               if(FBRW_CurX == (FBRW_X + FBRW_W))
+               FBRW_CurX = FBRW_X;
+               FBRW_CurY++;
+               if(FBRW_CurY == (FBRW_Y + FBRW_H))
                {
-                  FBRW_CurX = FBRW_X;
-                  FBRW_CurY++;
-                  if(FBRW_CurY == (FBRW_Y + FBRW_H))
-                  {
-                     InCmd = INCMD_NONE;
-                     break;	// Break out of the for() loop.
-                  }
+                  InCmd = INCMD_NONE;
+                  break;	// Break out of the for() loop.
                }
-               InData >>= 16;
             }
-            return;
+            InData >>= 16;
          }
-         break;
+         return;
 
       case INCMD_QUAD:
-         {
-            if(DrawTimeAvail < 0)
-               return;
-
-            const uint32_t cc = InCmd_CC;
-            const CTEntry *command = &Commands[cc];
-            unsigned vl = 1 + (bool)(cc & 0x4) + (bool)(cc & 0x10);
-            uint32_t CB[3];
-
-            if(BlitterFIFO.CanRead() >= vl)
-            {
-               for(unsigned i = 0; i < vl; i++)
-               {
-                  CB[i] = BlitterFIFO.Read();
-               }
-
-               command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-            }
+         if(DrawTimeAvail < 0)
             return;
-         }
+
+         command_len      = 1 + (bool)(cc & 0x4) + (bool)(cc & 0x10);
+         read_fifo = true;
          break;
-
       case INCMD_PLINE:
+         if(DrawTimeAvail < 0)
+            return;
+
+         command_len        = 1 + (bool)(InCmd_CC & 0x10);
+
+         if((BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
          {
-            if(DrawTimeAvail < 0)
-               return;
-
-            const uint32_t cc = InCmd_CC;
-            const CTEntry *command = &Commands[cc];
-            unsigned vl = 1 + (bool)(InCmd_CC & 0x10);
-            uint32_t CB[2];
-
-            if((BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
-            {
-               BlitterFIFO.Read();
-               InCmd = INCMD_NONE;
-               return;
-            }
-
-            if(BlitterFIFO.CanRead() >= vl)
-            {
-               for(unsigned i = 0; i < vl; i++)
-               {
-                  CB[i] = BlitterFIFO.Read();
-               }
-
-               command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-            }
+            BlitterFIFO.Read();
+            InCmd = INCMD_NONE;
             return;
          }
+
+         read_fifo = true;
          break;
    }
 
-   const uint32_t cc = BlitterFIFO.Peek() >> 24;
-   const CTEntry *command = &Commands[cc];
+   if (!read_fifo)
+   {
+      cc          = BlitterFIFO.Peek() >> 24;
+      command     = &Commands[cc];
+      command_len = command->len;
 
-   if(DrawTimeAvail < 0 && !command->ss_cmd)
+      if(DrawTimeAvail < 0 && !command->ss_cmd)
+         return;
+   }
+
+   if(BlitterFIFO.CanRead() < command_len)
       return;
 
-   if(BlitterFIFO.CanRead() >= command->len)
-   {
-      uint32_t CB[0x10];
+   for(i = 0; i < command_len; i++)
+      CB[i] = BlitterFIFO.Read();
 
-      for(unsigned i = 0; i < command->len; i++)
-         CB[i] = BlitterFIFO.Read();
+   if (read_fifo)
+      goto end;
 
-      if(!command->ss_cmd)
-         DrawTimeAvail -= 2;
+   if(!command->ss_cmd)
+      DrawTimeAvail -= 2;
 
-#if 0
-      PSX_WARNING("[GPU] Command: %08x %s %d %d %d", CB[0], command->name, command->len, scanline, DrawTimeAvail);
-      if(1)
-      {
-         printf("[GPU]    ");
-         for(unsigned i = 0; i < command->len; i++)
-            printf("0x%08x ", CB[i]);
-         printf("\n");
-      }
-#endif
-      // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
-      if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
-      {
-         /* Don't alter SpriteFlip here. */
-         SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
-      }
+   // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
+   /* Don't alter SpriteFlip here. */
+   if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
+      SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
 
-      if(!command->func[abr][TexMode])
-      {
-         if(CB[0])
-            PSX_WARNING("[GPU] Unknown command: %08x, %d", CB[0], scanline);
-      }
-      else
-      {
-         command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-      }
-   }
+end:
+   if(command->func[abr][TexMode])
+      command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
 }
 
 INLINE void PS_GPU::WriteCB(uint32_t InData)
