@@ -121,11 +121,11 @@ SOURCES_CXX += \
 	$(MEDNAFEN_DIR)/mempatcher.cpp \
 	$(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
 	$(MEDNAFEN_DIR)/video/surface.cpp \
-	$(MEDNAFEN_DIR)/md5.cpp \
 	$(CORE_DIR)/libretro.cpp
 
 SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
+	$(MEDNAFEN_DIR)/md5.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
 endif
 

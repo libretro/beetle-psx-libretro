@@ -1,41 +1,29 @@
 #ifndef _MD5_H
 #define _MD5_H
 
-#include <string>
+#include <stdint.h>
 
-class md5_context
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct md5_context
 {
- public:
- md5_context(void);
- ~md5_context(void);
-
- static std::string asciistr(const uint8 digest[16], bool borked_order);
- std::string asciistr(void);
- void starts(void);
- void update(const uint8 *input, uint32 length);
- inline void update_u32_as_lsb(const uint32 input)
- {
-  uint8 buf[4];
-
-  buf[0] = input >> 0;
-  buf[1] = input >> 8;
-  buf[2] = input >> 16;
-  buf[3] = input >> 24;
-
-  update(buf, 4);
- }
-
- inline void update_string(const char *string)
- {
-  update((const uint8 *)string, strlen(string));
- }
- void finish(uint8 digest[16]); 
-
- private:
- void process(const uint8 data[64]);
- uint32 total[2];
- uint32 state[4];
- uint8 buffer[64];
+	uint32_t total[2];
+	uint32_t state[4];
+	uint8_t buffer[64];
 };
 
-#endif /* md5.h */
+void md5_starts(struct md5_context *ctx);
+void md5_update_u32_as_lsb(struct md5_context *ctx, uint32_t input);
+void md5_update(struct md5_context *ctx, uint8_t *input, uint32_t length);
+void md5_finish(struct md5_context *ctx, uint8_t digest[16]);
+
+/* Uses a static buffer, so beware of how it's used. */
+char *md5_asciistr(uint8_t digest[16]);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* md5.h */

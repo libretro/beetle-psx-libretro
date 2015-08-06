@@ -2158,27 +2158,27 @@ static void update_md5_checksum(CDIF *iface)
    md5_context layout_md5;
    CD_TOC toc;
 
-   layout_md5.starts();
+   md5_starts(&layout_md5);
 
    TOC_Clear(&toc);
 
    iface->ReadTOC(&toc);
 
-   layout_md5.update_u32_as_lsb(toc.first_track);
-   layout_md5.update_u32_as_lsb(toc.last_track);
-   layout_md5.update_u32_as_lsb(toc.tracks[100].lba);
+   md5_update_u32_as_lsb(&layout_md5, toc.first_track);
+   md5_update_u32_as_lsb(&layout_md5, toc.last_track);
+   md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
 
    for (uint32 track = toc.first_track; track <= toc.last_track; track++)
    {
-      layout_md5.update_u32_as_lsb(toc.tracks[track].lba);
-      layout_md5.update_u32_as_lsb(toc.tracks[track].control & 0x4);
+      md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
+      md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
    }
 
-   layout_md5.finish(LayoutMD5);
+   md5_finish(&layout_md5, LayoutMD5);
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
    
-   std::string md5 = md5_context::asciistr(MDFNGameInfo->MD5, 0);
-   log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5.c_str());
+   char *md5 = md5_asciistr(MDFNGameInfo->MD5);
+   log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
 }
 
 // Untested ...
@@ -2660,7 +2660,7 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
  {
   md5_context layout_md5;
 
-  layout_md5.starts();
+  md5_starts(&layout_md5);
 
   for(unsigned i = 0; i < CDInterfaces.size(); i++)
   {
@@ -2669,18 +2669,18 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
    TOC_Clear(&toc);
    CDInterfaces[i]->ReadTOC(&toc);
 
-   layout_md5.update_u32_as_lsb(toc.first_track);
-   layout_md5.update_u32_as_lsb(toc.last_track);
-   layout_md5.update_u32_as_lsb(toc.tracks[100].lba);
+   md5_update_u32_as_lsb(&layout_md5, toc.first_track);
+   md5_update_u32_as_lsb(&layout_md5, toc.last_track);
+   md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
 
    for(uint32 track = toc.first_track; track <= toc.last_track; track++)
    {
-    layout_md5.update_u32_as_lsb(toc.tracks[track].lba);
-    layout_md5.update_u32_as_lsb(toc.tracks[track].control & 0x4);
+    md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
+    md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
    }
   }
 
-  layout_md5.finish(LayoutMD5);
+  md5_finish(&layout_md5, LayoutMD5);
  }
 
  // This if statement will be true if force_module references a system without CDROM support.
@@ -3589,7 +3589,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
          ret = retro_save_directory + slash + (!shared_memorycards ? retro_base_name : "mednafen_psx_libretro_shared") +
          std::string(".") +
 #ifndef _XBOX
-          (!shared_memorycards ? md5_context::asciistr(MDFNGameInfo->MD5, 0) : "") + (!shared_memorycards ? std::string(".") : "") +
+          (!shared_memorycards ? md5_asciistr(MDFNGameInfo->MD5) : "") + (!shared_memorycards ? std::string(".") : "") +
 #endif
           std::string(cd1);         
          break;
