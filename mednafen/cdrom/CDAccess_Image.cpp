@@ -284,6 +284,51 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
    track->sectors = sectors;
 }
 
+void CDAccess_Image::LoadSBI(const char* sbi_path)
+{
+   /* Loading SBI file */
+
+   {
+      FileStream sbis(sbi_path, MODE_READ);
+      uint8 header[4];
+      uint8 ed[4 + 10];
+      uint8 tmpq[12];
+
+      sbis.read(header, 4);
+
+      if(memcmp(header, "SBI\0", 4))
+         throw MDFN_Error(0, _("Not recognized a valid SBI file."));
+
+      while(sbis.read(ed, sizeof(ed), false) == sizeof(ed))
+      {
+         if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
+            throw MDFN_Error(0, _("Bad BCD MSF offset in SBI file: %02x:%02x:%02x"), ed[0], ed[1], ed[2]);
+
+         if(ed[3] != 0x01)
+            throw MDFN_Error(0, _("Unrecognized boogly oogly in SBI file: %02x"), ed[3]);
+
+         memcpy(tmpq, &ed[4], 10);
+
+         //
+         subq_generate_checksum(tmpq);
+         tmpq[10] ^= 0xFF;
+         tmpq[11] ^= 0xFF;
+         //
+
+         //printf("%02x:%02x:%02x --- ", ed[0], ed[1], ed[2]);
+         //for(unsigned i = 0; i < 12; i++)
+         // printf("%02x ", tmpq[i]);
+         //printf("\n");
+
+         uint32 aba = AMSF_to_ABA(BCD_to_U8(ed[0]), BCD_to_U8(ed[1]), BCD_to_U8(ed[2]));
+
+         memcpy(SubQReplaceMap[aba].data, tmpq, 12);
+      }
+
+      //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+   }
+}
+
 void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 {
    MemoryStream fp(new FileStream(path, MODE_READ));
@@ -791,6 +836,25 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    } // end to track loop
 
    total_sectors = RunningLBA;
+
+   //
+   // Load SBI file, if present
+   //
+   if(!IsTOC)
+   {
+      char sbi_ext[4] = { 's', 'b', 'i', 0 };
+
+      if(file_ext.length() == 4 && file_ext[0] == '.')
+      {
+         for(unsigned i = 0; i < 3; i++)
+         {
+            if(file_ext[1 + i] >= 'A' && file_ext[1 + i] <= 'Z')
+               sbi_ext[i] += 'A' - 'a';
+         }
+      }
+
+      LoadSBI(MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str());
+   }
 }
 
 void CDAccess_Image::Cleanup(void)
@@ -1057,6 +1121,18 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
    buf[9] = U8_to_BCD(fa);
 
    subq_generate_checksum(buf);
+
+   if(!SubQReplaceMap.empty())
+   {
+      //printf("%d\n", lba);
+      std::map<uint32, cpp11_array_doodad>::const_iterator it = SubQReplaceMap.find(LBA_to_ABA(lba));
+
+      if(it != SubQReplaceMap.end())
+      {
+         //printf("Replace: %d\n", lba);
+         memcpy(buf, it->second.data, 12);
+      }
+   }
 
    for (i = 0; i < 96; i++)
       SubPWBuf[i] |= (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | pause_or;
