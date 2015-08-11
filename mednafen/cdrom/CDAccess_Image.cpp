@@ -853,7 +853,14 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          }
       }
 
-      LoadSBI(MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str());
+      const char *sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str();
+      FILE *dummy = fopen(sbi_path, "rb");
+
+      if (dummy)
+      {
+         fclose(dummy);
+         LoadSBI(sbi_path);
+      }
    }
 }
 
