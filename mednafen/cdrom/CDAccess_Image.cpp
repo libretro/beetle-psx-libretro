@@ -284,49 +284,44 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
    track->sectors = sectors;
 }
 
-void CDAccess_Image::LoadSBI(const char* sbi_path)
+int CDAccess_Image::LoadSBI(const char* sbi_path)
 {
    /* Loading SBI file */
 
+   FileStream sbis(sbi_path, MODE_READ);
+   uint8 header[4];
+   uint8 ed[4 + 10];
+   uint8 tmpq[12];
+
+   sbis.read(header, 4);
+
+   if(memcmp(header, "SBI\0", 4))
+      return -1;
+
+   while(sbis.read(ed, sizeof(ed), false) == sizeof(ed))
    {
-      FileStream sbis(sbi_path, MODE_READ);
-      uint8 header[4];
-      uint8 ed[4 + 10];
-      uint8 tmpq[12];
+      /* Bad BCD MSF offset in SBI file. */
+      if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
+         return -1;
 
-      sbis.read(header, 4);
+      /* Unrecognized boogly oogly in SBI file */
+      if(ed[3] != 0x01)
+         return -1;
 
-      if(memcmp(header, "SBI\0", 4))
-         throw MDFN_Error(0, _("Not recognized a valid SBI file."));
+      memcpy(tmpq, &ed[4], 10);
 
-      while(sbis.read(ed, sizeof(ed), false) == sizeof(ed))
-      {
-         if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
-            throw MDFN_Error(0, _("Bad BCD MSF offset in SBI file: %02x:%02x:%02x"), ed[0], ed[1], ed[2]);
+      subq_generate_checksum(tmpq);
+      tmpq[10] ^= 0xFF;
+      tmpq[11] ^= 0xFF;
 
-         if(ed[3] != 0x01)
-            throw MDFN_Error(0, _("Unrecognized boogly oogly in SBI file: %02x"), ed[3]);
+      uint32 aba = AMSF_to_ABA(BCD_to_U8(ed[0]), BCD_to_U8(ed[1]), BCD_to_U8(ed[2]));
 
-         memcpy(tmpq, &ed[4], 10);
-
-         //
-         subq_generate_checksum(tmpq);
-         tmpq[10] ^= 0xFF;
-         tmpq[11] ^= 0xFF;
-         //
-
-         //printf("%02x:%02x:%02x --- ", ed[0], ed[1], ed[2]);
-         //for(unsigned i = 0; i < 12; i++)
-         // printf("%02x ", tmpq[i]);
-         //printf("\n");
-
-         uint32 aba = AMSF_to_ABA(BCD_to_U8(ed[0]), BCD_to_U8(ed[1]), BCD_to_U8(ed[2]));
-
-         memcpy(SubQReplaceMap[aba].data, tmpq, 12);
-      }
-
-      //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+      memcpy(SubQReplaceMap[aba].data, tmpq, 12);
    }
+
+   //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+
+   return 0;
 }
 
 void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)

@@ -63,7 +63,7 @@ class CDAccess_Image : public CDAccess
       std::string base_dir;
 
       void ImageOpen(const char *path, bool image_memcache);
-      void LoadSBI(const char* sbi_path);
+      int LoadSBI(const char* sbi_path);
       void Cleanup(void);
 
       // MakeSubPQ will OR the simulated P and Q subchannel data into SubPWBuf.

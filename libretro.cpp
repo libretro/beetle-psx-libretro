@@ -26,6 +26,8 @@ unsigned char widescreen_hack;
 unsigned char widescreen_auto_ar;
 unsigned char widescreen_auto_ar_old;
 
+static bool is_pal;
+
 /* start of Mednafen psx.cpp */
 
 /* Mednafen - Multi-system Emulator
@@ -1098,13 +1100,10 @@ static unsigned CalcDiscSCEx(void)
    if(cdifs)
       for(unsigned i = 0; i < cdifs->size(); i++)
       {
-         const char *id = NULL;
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
          unsigned ipos, opos;
-
-
-         id = CalcDiscSCEx_BySYSTEMCNF((*cdifs)[i], (i == 0) ? &ret_region : NULL);
+         const char *id = CalcDiscSCEx_BySYSTEMCNF((*cdifs)[i], (i == 0) ? &ret_region : NULL);
 
          memset(fbuf, 0, sizeof(fbuf));
 
@@ -2973,7 +2972,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    
-   surf = new MDFN_Surface(NULL, MEDNAFEN_CORE_GEOMETRY_MAX_W, (CalcDiscSCEx() == REGION_EU) ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480, MEDNAFEN_CORE_GEOMETRY_MAX_W, pix_fmt);
+   is_pal = (CalcDiscSCEx() == REGION_EU);
+   surf = new MDFN_Surface(NULL, MEDNAFEN_CORE_GEOMETRY_MAX_W, is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480, MEDNAFEN_CORE_GEOMETRY_MAX_W, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
@@ -3326,8 +3326,8 @@ void retro_run(void)
             // This shouldn't happen.
             break;
       }
-      
-      if ((CalcDiscSCEx() == REGION_EU))
+
+      if (is_pal)
       {
          // Attempt to remove black bars.
          // These numbers are arbitrary since the bars differ some by game.
@@ -3357,7 +3357,7 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->timing.fps            = (CalcDiscSCEx() == REGION_EU) ? 49.842 : 59.941;
+   info->timing.fps            = is_pal ? 49.842 : 59.941;
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
@@ -3379,7 +3379,7 @@ void retro_deinit(void)
 
 unsigned retro_get_region(void)
 {
-   if (CalcDiscSCEx() == REGION_EU)
+   if (is_pal)
       return RETRO_REGION_PAL;
    return RETRO_REGION_NTSC;
 }
