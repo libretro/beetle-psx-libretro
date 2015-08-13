@@ -391,7 +391,6 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
    //printf("[GPU] FB Fill %d:%d w=%d, h=%d\n", destX, destY, width, height);
    gpu->DrawTimeAvail -= 46;	// Approximate
-   gpu->DrawTimeAvail -= ((width * height) >> 3) + (height * 9);
 
    for(y = 0; y < height; y++)
    {
@@ -399,6 +398,8 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
       if(LineSkipTest(gpu, d_y))
          continue;
+
+      gpu->DrawTimeAvail -= (width >> 3) + 9;
 
       for(x = 0; x < width; x++)
       {
