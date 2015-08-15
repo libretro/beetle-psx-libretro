@@ -2315,25 +2315,11 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 
 static bool old_cdimagecache = false;
 
-// experimental save state support
 static bool boot = true;
-
-static bool experimental_savestates = false;
-static bool experimental_savestates_toggle = false;
 
 // shared memory cards support
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
-
-
-const char *msgs[] = {"SHARED MEMCARDS: restart required",
-                          "SHARED MEMCARDS DISABLED: memory card method mednafen required",
-                          "SAVESTATES: restart required",
-                          "SAVESTATES DISABLED: non-shared memcards required",
-                          "SAVE STATES ENABLED: experimental, might result in loss of memory card data"};
-
-static bool print_messages[] = {false,false,false,false,false};
-static bool pending_messages = false;
 
 static void check_variables(void)
 {
@@ -2483,17 +2469,11 @@ static void check_variables(void)
          {
             if(use_mednafen_memcard0_method)
                shared_memorycards_toggle = true;
-            else
-               print_messages[1] = true;
          }
          else
          {
-            if(!shared_memorycards)
-               print_messages[0] = true;
             if(use_mednafen_memcard0_method)
                shared_memorycards_toggle = true;
-            else
-               print_messages[1] = true;
          }
      }
      else if (strcmp(var.value, "disabled") == 0)
@@ -2502,61 +2482,10 @@ static void check_variables(void)
             shared_memorycards_toggle = false;
          else
          {
-            if(shared_memorycards)
-               print_messages[0] = true;
             shared_memorycards = false;
          }
      }
    }
-   
-   //this option depends on  beetle_psx_shared_memory_cards being disabled so it should be evaluated that
-   var.key = "beetle_psx_experimental_save_states";
-   
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-     if (strcmp(var.value, "enabled") == 0)
-     {   
-        if(boot)
-        {
-          if(!shared_memorycards_toggle)
-          {
-            print_messages[4] = true;
-            experimental_savestates_toggle = true;
-          }
-          else
-             print_messages[3] = true;
-        }
-        else
-        {
-          if(!shared_memorycards_toggle)
-          {
-            if(!experimental_savestates)
-               print_messages[2] = true;
-            else
-               print_messages[4] = true;
-
-            experimental_savestates_toggle = true;
-          }
-          else
-          {
-            if(!experimental_savestates)
-              print_messages[2] = true;
-            print_messages[3] = true;
-          }
-        }
-      }
-      else if (strcmp(var.value, "disabled") == 0)
-      {
-        if(experimental_savestates)
-          print_messages[2] = true;
-        experimental_savestates_toggle = false;
-      }
-   }
-   
-   if(print_messages[0] || print_messages[1] || print_messages[2] || print_messages[3] || print_messages[4])
-      pending_messages = true;
-   else
-      pending_messages = false;
 }
 
 #ifdef NEED_CD
@@ -2958,8 +2887,6 @@ bool retro_load_game(const struct retro_game_info *info)
    check_variables();
    //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
-   experimental_savestates = experimental_savestates_toggle;
-
    
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
@@ -3137,25 +3064,6 @@ void retro_run(void)
       }
    }
 
-   if(pending_messages)
-   {
-      if(video_frames%120 == 0 && video_frames > 0)
-      {
-         for(int i=0;i<5;i++)
-         {
-            if(print_messages[i])
-            {
-               MDFN_DispMessage(msgs[i]);
-               print_messages[i] = false;
-               break;
-            }
-            if(!print_messages[0] && !print_messages[1] && !print_messages[2] && !print_messages[3] && !print_messages[4])
-               pending_messages = false;
-         }
-      }  
-   }   
-   
-  
    if (setting_apply_analog_toggle)
    {
       FIO->SetAMCT(setting_psx_analog_toggle);
@@ -3432,7 +3340,6 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
-      { "beetle_psx_experimental_save_states", "Savestates (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
@@ -3497,7 +3404,7 @@ size_t retro_serialize_size(void)
    StateMem st;
    memset(&st, 0, sizeof(st));
 
-   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL) || !experimental_savestates)
+   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
    {
       return 0;
    }

@@ -200,11 +200,6 @@ int InputDevice_Memcard::StateAction(StateMem* sm, int load, int data_only, cons
       {
          if(data_used)
             dirty_count++;
-         else
-         {
-            //printf("Format: %s\n", section_name);
-            Format();
-         }
       }
    }
    else
