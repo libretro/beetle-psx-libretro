@@ -3495,9 +3495,6 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
       case MDFNMKF_SAV:
          ret = retro_save_directory + slash + (!shared_memorycards ? retro_base_name : "mednafen_psx_libretro_shared") +
          std::string(".") +
-#ifndef _XBOX
-          (!shared_memorycards ? md5_asciistr(MDFNGameInfo->MD5) : "") + (!shared_memorycards ? std::string(".") : "") +
-#endif
           std::string(cd1);         
          break;
       case MDFNMKF_FIRMWARE:
