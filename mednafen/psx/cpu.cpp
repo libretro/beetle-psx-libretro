@@ -209,13 +209,14 @@ void PS_CPU::AssertIRQ(unsigned which, bool asserted)
 
 void PS_CPU::SetBIU(uint32_t val)
 {
-   unsigned i;
    const uint32_t old_BIU = BIU;
 
    BIU = val & ~(0x440);
 
    if((BIU ^ old_BIU) & 0x800)
    {
+      unsigned i;
+
       if(BIU & 0x800)	// ICache enabled
       {
          for(i = 0; i < 1024; i++)

@@ -1102,13 +1102,13 @@ static unsigned CalcDiscSCEx(void)
       {
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
-         unsigned ipos, opos;
          const char *id = CalcDiscSCEx_BySYSTEMCNF((*cdifs)[i], (i == 0) ? &ret_region : NULL);
 
          memset(fbuf, 0, sizeof(fbuf));
 
          if(id == NULL && (*cdifs)[i]->ReadSector(buf, 4, 1) == 0x2)
          {
+            unsigned ipos, opos;
             for(ipos = 0, opos = 0; ipos < 0x48; ipos++)
             {
                if(buf[ipos] > 0x20 && buf[ipos] < 0x80)

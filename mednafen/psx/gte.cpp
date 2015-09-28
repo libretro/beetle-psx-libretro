@@ -977,9 +977,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
 #define DECODE_FIELDS							\
  const uint32_t sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
- const uint32_t mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
  const uint32_t v_i = (instr >> 15) & 0x3;				\
- const int32* cv MDFN_NOWARN_UNUSED = CRVectors.All[(instr >> 13) & 0x3];	\
  const int lm MDFN_NOWARN_UNUSED = (instr >> 10) & 1;			\
  int16_t v[3] MDFN_NOWARN_UNUSED;					\
  if(v_i == 3)							\
@@ -1013,6 +1011,8 @@ static int32_t SQR(uint32_t instr)
 static int32_t MVMVA(uint32_t instr)
 {
    DECODE_FIELDS;
+   const uint32_t mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;
+   const int32* cv MDFN_NOWARN_UNUSED = CRVectors.All[(instr >> 13) & 0x3];
 
    MultiplyMatrixByVector(&Matrices.All[mx], v, cv, sf, lm);
 
