@@ -1169,30 +1169,6 @@ TRIO_ARGS3((string, max, substring),
 #endif
 
 /**
-   Tokenize string.
-
-   @param string String to be tokenized.
-   @param delimiters String containing list of delimiting characters.
-   @return Start of new token.
-
-   @warning @p string will be destroyed.
-*/
-#if defined(TRIO_FUNC_TOKENIZE)
-
-TRIO_PUBLIC_STRING char *
-trio_tokenize
-TRIO_ARGS2((string, delimiters),
-	   char *string,
-	   TRIO_CONST char *delimiters)
-{
-  assert(delimiters);
-  
-  return strtok(string, delimiters);
-}
-
-#endif
-
-/**
    Convert string to floating-point number.
 
    @param source String to be converted.
