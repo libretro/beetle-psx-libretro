@@ -202,24 +202,6 @@ void Endian_V_NE_to_LE(void *src, uint32_t bytesize)
 #endif
 }
 
-int write16le(uint16_t b, FILE *fp)
-{
-   uint8_t s[2];
-   s[0]=b;
-   s[1]=b>>8;
-   return((fwrite(s,1,2,fp)<2)?0:2);
-}
-
-int write32le(uint32_t b, FILE *fp)
-{
-   uint8_t s[4];
-   s[0]=b;
-   s[1]=b>>8;
-   s[2]=b>>16;
-   s[3]=b>>24;
-   return((fwrite(s,1,4,fp)<4)?0:4);
-}
-
 int read32le(uint32_t *Bufo, FILE *fp)
 {
    uint32_t buf;

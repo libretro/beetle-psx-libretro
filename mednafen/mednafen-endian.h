@@ -33,8 +33,6 @@
 extern "C" {
 #endif
 
-int write16le(uint16_t b, FILE *fp);
-int write32le(uint32_t b, FILE *fp);
 int read32le(uint32_t *Bufo, FILE *fp);
 
 void Endian_A16_Swap(void *src, uint32_t nelements);
