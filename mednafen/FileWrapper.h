@@ -15,11 +15,6 @@ class FileWrapper
 
       void write(const void *data, uint64_t count);
 
-      void put_char(int c);
-
-      void put_string(const char *str);
-      void put_string(const std::string &str);
-
       char *get_line(char *s, int size);	// Same semantics as fgets(), for now
 
       void seek(int64_t offset, int whence);

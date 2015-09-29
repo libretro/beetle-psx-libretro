@@ -125,30 +125,6 @@ int file_seek(struct MDFNFILE *file, int64_t offset, int whence)
    return 0;
 }
 
-int file_read16le(struct MDFNFILE *file, uint16_t *val)
-{
-   if ((file->location + 2) > file->size)
-      return 0;
-
-   *val = MDFN_de16lsb(file->data + file->location);
-
-   file->location += 2;
-
-   return 1;
-}
-
-int file_read32le(struct MDFNFILE *file, uint32_t *val)
-{
-   if ((file->location + 4) > file->size)
-      return 0;
-
-   *val = MDFN_de32lsb(file->data + file->location);
-
-   file->location += 4;
-
-   return 1;
-}
-
 char *file_fgets(struct MDFNFILE *file, char *s, int len)
 {
    int pos = 0;

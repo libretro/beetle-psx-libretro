@@ -3099,31 +3099,6 @@ TRIO_VARGS3((buffer, format, va_alist),
    @return Number of printed characters.
  */
 TRIO_PUBLIC int
-trio_vsprintf
-TRIO_ARGS3((buffer, format, args),
-	   char *buffer,
-	   TRIO_CONST char *format,
-	   va_list args)
-{
-  int status;
-
-  assert(VALID(buffer));
-  assert(VALID(format));
-
-  status = TrioFormat(&buffer, 0, TrioOutStreamString, format, args, NULL);
-  *buffer = NIL;
-  return status;
-}
-
-/**
-   Print to string.
-
-   @param buffer Output string.
-   @param format Formatting string.
-   @param args Arguments.
-   @return Number of printed characters.
- */
-TRIO_PUBLIC int
 trio_sprintfv
 TRIO_ARGS3((buffer, format, args),
 	   char *buffer,
@@ -4536,30 +4511,6 @@ TRIO_VARGS3((buffer, format, va_alist),
 		    format, args, NULL);
   TRIO_VA_END(args);
   return status;
-}
-
-/**
-   Scan characters from string.
-
-   @param buffer Input string.
-   @param format Formatting string.
-   @param args Arguments.
-   @return Number of scanned characters.
- */
-TRIO_PUBLIC int
-trio_vsscanf
-TRIO_ARGS3((buffer, format, args),
-	   TRIO_CONST char *buffer,
-	   TRIO_CONST char *format,
-	   va_list args)
-{
-  assert(VALID(buffer));
-  assert(VALID(format));
-  
-  return TrioScan((trio_pointer_t)&buffer, 0,
-		  TrioInStreamString,
-		  NULL,
-		  format, args, NULL);
 }
 
 /**

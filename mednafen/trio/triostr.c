@@ -1320,58 +1320,6 @@ TRIO_ARGS2((source, endp),
 #endif
 
 /**
-   Convert string to floating-point number.
-
-   @param source String to be converted.
-   @param endp Pointer to end of the converted string.
-   @return A floating-point number.
-
-   See @ref trio_to_long_double.
-*/
-#if defined(TRIO_FUNC_TO_DOUBLE)
-
-TRIO_PUBLIC_STRING double
-trio_to_double
-TRIO_ARGS2((source, endp),
-	   TRIO_CONST char *source,
-	   char **endp)
-{
-#if defined(USE_STRTOD)
-  return strtod(source, endp);
-#else
-  return (double)trio_to_long_double(source, endp);
-#endif
-}
-
-#endif
-
-/**
-   Convert string to floating-point number.
-
-   @param source String to be converted.
-   @param endp Pointer to end of the converted string.
-   @return A floating-point number.
-
-   See @ref trio_to_long_double.
-*/
-#if defined(TRIO_FUNC_TO_FLOAT)
-
-TRIO_PUBLIC_STRING float
-trio_to_float
-TRIO_ARGS2((source, endp),
-	   TRIO_CONST char *source,
-	   char **endp)
-{
-#  if defined(USE_STRTOF)
-  return strtof(source, endp);
-#  else
-  return (float)trio_to_long_double(source, endp);
-#  endif
-}
-
-#endif
-
-/**
    Convert string to signed integer.
 
    @param string String to be converted.
@@ -1420,30 +1368,6 @@ TRIO_ARGS1((source),
     : source;
   
 # endif
-}
-
-#endif
-
-/**
-   Convert string to unsigned integer.
-
-   @param string String to be converted.
-   @param endp Pointer to end of converted string.
-   @param base Radix number of number.
-*/
-#if defined(TRIO_FUNC_TO_UNSIGNED_LONG)
-
-TRIO_PUBLIC_STRING unsigned long
-trio_to_unsigned_long
-TRIO_ARGS3((string, endp, base),
-	   TRIO_CONST char *string,
-	   char **endp,
-	   int base)
-{
-  assert(string);
-  assert((base >= 2) && (base <= 36));
-  
-  return strtoul(string, endp, base);
 }
 
 #endif
@@ -1559,60 +1483,6 @@ TRIO_ARGS1((self),
 #endif
 
 /**
-   Get a pointer to the content.
-   
-   @param self Dynamic string.
-   @param offset Offset into content.
-   @return Pointer to the content.
-   
-   @p Offset can be zero, positive, or negative. If @p offset is zero,
-   then the start of the content will be returned. If @p offset is positive,
-   then a pointer to @p offset number of characters from the beginning of the
-   content is returned. If @p offset is negative, then a pointer to @p offset
-   number of characters from the ending of the string, starting at the
-   terminating zero, is returned.
-*/
-#if defined(TRIO_FUNC_STRING_GET)
-
-TRIO_PUBLIC_STRING char *
-trio_string_get
-TRIO_ARGS2((self, offset),
-	   trio_string_t *self,
-	   int offset)
-{
-  char *result = NULL;
-  
-  assert(self);
-
-  if (self->content != NULL)
-    {
-      if (self->length == 0)
-	{
-	  (void)trio_string_length(self);
-	}
-      if (offset >= 0)
-	{
-	  if (offset > (int)self->length)
-	    {
-	      offset = self->length;
-	    }
-	}
-      else
-	{
-	  offset += self->length + 1;
-	  if (offset < 0)
-	    {
-	      offset = 0;
-	    }
-	}
-      result = &(self->content[offset]);
-    }
-  return result;
-}
-
-#endif
-
-/**
    Extract the content.
    
    @param self Dynamic String
@@ -1637,35 +1507,6 @@ TRIO_ARGS1((self),
   self->content = NULL;
   self->length = self->allocated = 0;
   return result;
-}
-
-#endif
-
-/**
-   Set the content of the dynamic string.
-   
-   @param self Dynamic String
-   @param buffer The new content.
-   
-   Sets the content of the dynamic string to a copy @p buffer.
-   An existing content will be deallocated first, if necessary.
-   
-   @remark
-   This function will make a copy of @p buffer.
-   You are responsible for deallocating @p buffer yourself.
-*/
-#if defined(TRIO_FUNC_XSTRING_SET)
-
-TRIO_PUBLIC_STRING void
-trio_xstring_set
-TRIO_ARGS2((self, buffer),
-	   trio_string_t *self,
-	   char *buffer)
-{
-  assert(self);
-
-  trio_destroy(self->content);
-  self->content = trio_duplicate(buffer);
 }
 
 #endif
@@ -1735,36 +1576,6 @@ TRIO_ARGS2((self, other),
 
 #endif
 
-
-/*
- * trio_xstring_append
- */
-#if defined(TRIO_FUNC_XSTRING_APPEND)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_append
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  size_t length;
-  
-  assert(self);
-  assert(other);
-
-  length = self->length + trio_length(other);
-  if (!internal_string_grow_to(self, length))
-    goto error;
-  trio_copy(&self->content[self->length], other);
-  self->length = length;
-  return TRUE;
-  
- error:
-  return FALSE;
-}
-
-#endif
-
 /*
  * trio_xstring_append_char
  */
@@ -1789,157 +1600,6 @@ TRIO_ARGS2((self, character),
   
  error:
   return FALSE;
-}
-
-#endif
-
-/*
- * trio_xstring_append_max
- */
-#if defined(TRIO_FUNC_XSTRING_APPEND_MAX)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_append_max
-TRIO_ARGS3((self, other, max),
-	   trio_string_t *self,
-	   TRIO_CONST char *other,
-           size_t max)
-{
-  size_t length;
-  
-  assert(self);
-  assert(other);
-
-  length = self->length + trio_length_max(other, max);
-  if (!internal_string_grow_to(self, length))
-    goto error;
-
-  /*
-   * Pass max + 1 since trio_copy_max copies one character less than
-   * this from the source to make room for a terminating zero.
-   */
-  trio_copy_max(&self->content[self->length], max + 1, other);
-  self->length = length;
-  return TRUE;
-  
- error:
-  return FALSE;
-}
-
-#endif
-
-/**
-   Search for the first occurrence of second parameter in the first.
-   
-   @param self Dynamic string to be modified.
-   @param other Dynamic string to copy from.
-   @return Boolean value indicating success or failure.
-*/
-#if defined(TRIO_FUNC_STRING_CONTAINS)
-
-TRIO_PUBLIC_STRING int
-trio_string_contains
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   trio_string_t *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_contains(self->content, other->content);
-}
-
-#endif
-
-/*
- * trio_xstring_contains
- */
-#if defined(TRIO_FUNC_XSTRING_CONTAINS)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_contains
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_contains(self->content, other);
-}
-
-#endif
-
-/*
- * trio_string_copy
- */
-#if defined(TRIO_FUNC_STRING_COPY)
-
-TRIO_PUBLIC_STRING int
-trio_string_copy
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   trio_string_t *other)
-{
-  assert(self);
-  assert(other);
-
-  self->length = 0;
-  return trio_string_append(self, other);
-}
-
-#endif
-
-
-/*
- * trio_xstring_copy
- */
-#if defined(TRIO_FUNC_XSTRING_COPY)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_copy
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  self->length = 0;
-  return trio_xstring_append(self, other);
-}
-
-#endif
-
-/*
- * trio_string_duplicate
- */
-#if defined(TRIO_FUNC_STRING_DUPLICATE)
-
-TRIO_PUBLIC_STRING trio_string_t *
-trio_string_duplicate
-TRIO_ARGS1((other),
-	   trio_string_t *other)
-{
-  trio_string_t *self;
-  
-  assert(other);
-
-  self = internal_string_alloc();
-  if (self)
-    {
-      self->content = internal_duplicate_max(other->content, other->length);
-      if (self->content)
-	{
-	  self->length = other->length;
-	  self->allocated = self->length + 1;
-	}
-      else
-	{
-	  self->length = self->allocated = 0;
-	}
-    }
-  return self;
 }
 
 #endif
@@ -1998,25 +1658,6 @@ TRIO_ARGS2((self, other),
 
 
 /*
- * trio_xstring_equal
- */
-#if defined(TRIO_FUNC_XSTRING_EQUAL)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_equal
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_equal(self->content, other);
-}
-
-#endif
-
-/*
  * trio_string_equal_max
  */
 #if defined(TRIO_FUNC_STRING_EQUAL_MAX)
@@ -2033,26 +1674,6 @@ TRIO_ARGS3((self, max, other),
 
   return trio_equal_max(self->content, max, other->content);
 }
-#endif
-
-/*
- * trio_xstring_equal_max
- */
-#if defined(TRIO_FUNC_XSTRING_EQUAL_MAX)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_equal_max
-TRIO_ARGS3((self, max, other),
-	   trio_string_t *self,
-	   size_t max,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_equal_max(self->content, max, other);
-}
-
 #endif
 
 /*
@@ -2075,25 +1696,6 @@ TRIO_ARGS2((self, other),
 #endif
 
 /*
- * trio_xstring_equal_case
- */
-#if defined(TRIO_FUNC_XSTRING_EQUAL_CASE)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_equal_case
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_equal_case(self->content, other);
-}
-
-#endif
-
-/*
  * trio_string_equal_case_max
  */
 #if defined(TRIO_FUNC_STRING_EQUAL_CASE_MAX)
@@ -2109,26 +1711,6 @@ TRIO_ARGS3((self, max, other),
   assert(other);
 
   return trio_equal_case_max(self->content, max, other->content);
-}
-
-#endif
-
-/*
- * trio_xstring_equal_case_max
- */
-#if defined(TRIO_FUNC_XSTRING_EQUAL_CASE_MAX)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_equal_case_max
-TRIO_ARGS3((self, max, other),
-	   trio_string_t *self,
-	   size_t max,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_equal_case_max(self->content, max, other);
 }
 
 #endif
@@ -2209,153 +1791,3 @@ TRIO_ARGS1((self),
 }
 
 #endif
-
-/*
- * trio_string_lower
- */
-#if defined(TRIO_FUNC_STRING_LOWER)
-
-TRIO_PUBLIC_STRING int
-trio_string_lower
-TRIO_ARGS1((self),
-	   trio_string_t *self)
-{
-  assert(self);
-
-  return trio_lower(self->content);
-}
-
-#endif
-
-/*
- * trio_string_match
- */
-#if defined(TRIO_FUNC_STRING_MATCH)
-
-TRIO_PUBLIC_STRING int
-trio_string_match
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   trio_string_t *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_match(self->content, other->content);
-}
-
-#endif
-
-/*
- * trio_xstring_match
- */
-#if defined(TRIO_FUNC_XSTRING_MATCH)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_match
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_match(self->content, other);
-}
-
-#endif
-
-/*
- * trio_string_match_case
- */
-#if defined(TRIO_FUNC_STRING_MATCH_CASE)
-
-TRIO_PUBLIC_STRING int
-trio_string_match_case
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   trio_string_t *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_match_case(self->content, other->content);
-}
-
-#endif
-
-/*
- * trio_xstring_match_case
- */
-#if defined(TRIO_FUNC_XSTRING_MATCH_CASE)
-
-TRIO_PUBLIC_STRING int
-trio_xstring_match_case
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_match_case(self->content, other);
-}
-
-#endif
-
-/*
- * trio_string_substring
- */
-#if defined(TRIO_FUNC_STRING_SUBSTRING)
-
-TRIO_PUBLIC_STRING char *
-trio_string_substring
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   trio_string_t *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_substring(self->content, other->content);
-}
-
-#endif
-
-/*
- * trio_xstring_substring
- */
-#if defined(TRIO_FUNC_XSTRING_SUBSTRING)
-
-TRIO_PUBLIC_STRING char *
-trio_xstring_substring
-TRIO_ARGS2((self, other),
-	   trio_string_t *self,
-	   TRIO_CONST char *other)
-{
-  assert(self);
-  assert(other);
-
-  return trio_substring(self->content, other);
-}
-
-#endif
-
-/*
- * trio_string_upper
- */
-#if defined(TRIO_FUNC_STRING_UPPER)
-
-TRIO_PUBLIC_STRING int
-trio_string_upper
-TRIO_ARGS1((self),
-	   trio_string_t *self)
-{
-  assert(self);
-
-  return trio_upper(self->content);
-}
-
-#endif
-
-/** @} End of DynamicStrings */

@@ -1101,7 +1101,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
       if(PSRCounter > 0)
       {
-         uint8 pwbuf[96];
 
          PSRCounter -= chunk_clocks;
 
@@ -1135,6 +1134,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                      // emulation model.
                      for(x = -1; x >= -16; x--)
                      {
+                        uint8 pwbuf[96];
                         Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector + x, false);
                         if(DecodeSubQ(pwbuf))
                            break;
@@ -1147,29 +1147,32 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                   }
                   break;
                case DS_SEEKING_LOGICAL:
-                  CurSector = SeekTarget;
-                  Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
-                  DecodeSubQ(pwbuf);
-
-                  if(!(Mode & MODE_CDDA) && !(SubQBuf_Safe[0] & 0x40))
                   {
-                     if(!SeekRetryCounter)
+                     uint8 pwbuf[96];
+                     CurSector = SeekTarget;
+                     Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
+                     DecodeSubQ(pwbuf);
+
+                     if(!(Mode & MODE_CDDA) && !(SubQBuf_Safe[0] & 0x40))
                      {
-                        DriveStatus = DS_STANDBY;
-                        SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
+                        if(!SeekRetryCounter)
+                        {
+                           DriveStatus = DS_STANDBY;
+                           SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
+                        }
+                        else
+                        {
+                           SeekRetryCounter--;
+                           PSRCounter = 33868800 / 75;
+                        }
                      }
                      else
                      {
-                        SeekRetryCounter--;
-                        PSRCounter = 33868800 / 75;
-                     }
-                  }
-                  else
-                  {
-                     DriveStatus = StatusAfterSeek;
+                        DriveStatus = StatusAfterSeek;
 
-                     if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
-                        PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+                        if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+                           PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+                     }
                   }
                   break;
                case DS_READING:

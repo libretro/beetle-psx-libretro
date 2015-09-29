@@ -78,23 +78,6 @@ void FileWrapper::write(const void *data, uint64_t count)
    fwrite(data, 1, count, fp);
 }
 
-void FileWrapper::put_char(int c)
-{
-   fputc(c, fp);
-}
-
-void FileWrapper::put_string(const char *str)
-{
-   write(str, strlen(str));
-}
-
-// We need to decide whether to prohibit NULL characters in output and input strings via std::string.
-// Yes for correctness, no for potential security issues(though unlikely in context all things considered).
-void FileWrapper::put_string(const std::string &str)
-{
-   write(str.data(), str.size());
-}
-
 char *FileWrapper::get_line(char *buf_s, int buf_size)
 {
    return ::fgets(buf_s, buf_size, fp);
