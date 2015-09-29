@@ -78,20 +78,6 @@ void FileWrapper::write(const void *data, uint64_t count)
    fwrite(data, 1, count, fp);
 }
 
-int FileWrapper::scanf(const char *format, ...)
-{
-   va_list ap;
-   int ret;
-
-   va_start(ap, format);
-
-   ret = trio_vfscanf(fp, format, ap);
-
-   va_end(ap);
-
-   return ret;
-}
-
 void FileWrapper::put_char(int c)
 {
    fputc(c, fp);

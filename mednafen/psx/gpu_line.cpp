@@ -136,11 +136,11 @@ void PS_GPU::DrawLine(line_point *points)
       // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
       const int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
       const int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047;
-      uint16_t pix = 0x8000;
 
       if(!LineSkipTest(this, y))
       {
          uint8_t r, g, b;
+         uint16_t pix = 0x8000;
 
          if(goraud)
          {
