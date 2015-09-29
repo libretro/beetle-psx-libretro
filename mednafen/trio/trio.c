@@ -56,13 +56,6 @@
 
 #if defined(TRIO_EMBED_NAN)
 # define TRIO_PUBLIC_NAN static
-# if TRIO_FEATURE_FLOAT
-#  define TRIO_FUNC_NAN
-#  define TRIO_FUNC_NINF
-#  define TRIO_FUNC_PINF
-#  define TRIO_FUNC_FPCLASSIFY_AND_SIGNBIT
-#  define TRIO_FUNC_ISINF
-# endif
 #endif
 #include "../include/trio/trionan.h"
 
@@ -76,9 +69,6 @@
 # endif
 # if TRIO_FEATURE_ERRNO
 #  define TRIO_FUNC_ERROR
-# endif
-# if TRIO_FEATURE_FLOAT && TRIO_FEATURE_SCANF
-#  define TRIO_FUNC_TO_DOUBLE
 # endif
 # if TRIO_FEATURE_DYNAMICSTRING
 #  define TRIO_FUNC_STRING_EXTRACT
@@ -95,7 +85,7 @@
 # if TRIO_FEATURE_USER_DEFINED
 #  define TRIO_FUNC_DESTROY
 # endif
-# if TRIO_FEATURE_USER_DEFINED || (TRIO_FEATURE_FLOAT && TRIO_FEATURE_SCANF)
+# if TRIO_FEATURE_USER_DEFINED
 #  define TRIO_FUNC_EQUAL
 # endif
 # if TRIO_FEATURE_USER_DEFINED || TRIO_FEATURE_SCANF
@@ -117,10 +107,6 @@
  *************************************************************************/
 
 #include <limits.h>
-#if TRIO_FEATURE_FLOAT
-# include <math.h>
-# include <float.h>
-#endif
 
 #if defined(__STDC_ISO_10646__) || defined(MB_LEN_MAX) || defined(USE_MULTIBYTE) || TRIO_FEATURE_WIDECHAR
 # if !defined(TRIO_PLATFORM_WINCE) && !defined(ANDROID)
@@ -133,44 +119,6 @@
 
 #if (TRIO_COMPILER_VISUALC - 0 >= 1100) || defined(TRIO_COMPILER_BORLAND)
 # define TRIO_COMPILER_SUPPORTS_VISUALC_INT
-#endif
-
-#if TRIO_FEATURE_FLOAT
-# if defined(PREDEF_STANDARD_C99) \
-  || defined(PREDEF_STANDARD_UNIX03)
-#  if !defined(HAVE_FLOORL) && !defined(TRIO_NO_FLOORL)
-#   define HAVE_FLOORL
-#  endif
-#  if !defined(HAVE_CEILL) && !defined(TRIO_NO_CEILL)
-#   define HAVE_CEILL
-#  endif
-#  if !defined(HAVE_POWL) && !defined(TRIO_NO_POWL)
-#   define HAVE_POWL
-#  endif
-#  if !defined(HAVE_FMODL) && !defined(TRIO_NO_FMODL)
-#   define HAVE_FMODL
-#  endif
-#  if !defined(HAVE_LOG10L) && !defined(TRIO_NO_LOG10L)
-#   define HAVE_LOG10L
-#  endif
-# endif
-# if defined(TRIO_COMPILER_VISUALC)
-#  if defined(floorl)
-#   define HAVE_FLOORL
-#  endif
-#  if defined(ceill)
-#   define HAVE_CEILL
-#  endif
-#  if defined(powl)
-#   define HAVE_POWL
-#  endif
-#  if defined(fmodl)
-#   define HAVE_FMODL
-#  endif
-#  if defined(log10l)
-#   define HAVE_LOG10L
-#  endif
-# endif
 #endif
 
 /*************************************************************************
@@ -386,56 +334,15 @@ typedef trio_longlong_t trio_int64_t;
 # define trio_log10(x) log10((double)(x))
 #endif
 
-#if TRIO_FEATURE_FLOAT
-# define TRIO_FABS(x) (((x) < 0.0) ? -(x) : (x))
-#endif
 
 /*************************************************************************
  * Internal Definitions
  */
 
-#if TRIO_FEATURE_FLOAT
-
-# if !defined(DECIMAL_DIG)
-#  define DECIMAL_DIG DBL_DIG
-# endif
-
-/* Long double sizes */
-# ifdef LDBL_DIG
-#  define MAX_MANTISSA_DIGITS LDBL_DIG
-#  define MAX_EXPONENT_DIGITS 4
-#  define MAX_DOUBLE_DIGITS LDBL_MAX_10_EXP
-# else
-#  define MAX_MANTISSA_DIGITS DECIMAL_DIG
-#  define MAX_EXPONENT_DIGITS 3
-#  define MAX_DOUBLE_DIGITS DBL_MAX_10_EXP
-# endif
-
-# if defined(TRIO_COMPILER_ANCIENT) || !defined(LDBL_DIG)
-#  undef LDBL_DIG
-#  undef LDBL_MANT_DIG
-#  undef LDBL_EPSILON
-#  define LDBL_DIG DBL_DIG
-#  define LDBL_MANT_DIG DBL_MANT_DIG
-#  define LDBL_EPSILON DBL_EPSILON
-# endif
-
-#endif /* TRIO_FEATURE_FLOAT */
-
 /* The maximal number of digits is for base 2 */
 #define MAX_CHARS_IN(x) (sizeof(x) * CHAR_BIT)
 /* The width of a pointer. The number of bits in a hex digit is 4 */
 #define POINTER_WIDTH ((sizeof("0x") - 1) + sizeof(trio_pointer_t) * CHAR_BIT / 4)
-
-#if TRIO_FEATURE_FLOAT
-/* Infinite and Not-A-Number for floating-point */
-# define INFINITE_LOWER "inf"
-# define INFINITE_UPPER "INF"
-# define LONG_INFINITE_LOWER "infinite"
-# define LONG_INFINITE_UPPER "INFINITE"
-# define NAN_LOWER "nan"
-# define NAN_UPPER "NAN"
-#endif
 
 /* Various constants */
 enum {
@@ -580,14 +487,6 @@ enum {
 #define SPECIFIER_OCTAL 'o'
 #define SPECIFIER_HEX 'x'
 #define SPECIFIER_HEX_UPPER 'X'
-#if TRIO_FEATURE_FLOAT
-# define SPECIFIER_FLOAT_E 'e'
-# define SPECIFIER_FLOAT_E_UPPER 'E'
-# define SPECIFIER_FLOAT_F 'f'
-# define SPECIFIER_FLOAT_F_UPPER 'F'
-# define SPECIFIER_FLOAT_G 'g'
-# define SPECIFIER_FLOAT_G_UPPER 'G'
-#endif
 #define SPECIFIER_POINTER 'p'
 #if TRIO_FEATURE_SCANF
 # define SPECIFIER_GROUP '['
@@ -760,12 +659,6 @@ typedef struct {
       trio_intmax_t as_signed;
       trio_uintmax_t as_unsigned;
     } number;
-#if TRIO_FEATURE_FLOAT
-    double doubleNumber;
-    double *doublePointer;
-    trio_long_double_t longdoubleNumber;
-    trio_long_double_t *longdoublePointer;
-#endif
     int errorNumber;
   } data;
 } trio_parameter_t;
@@ -841,17 +734,6 @@ typedef struct _trio_reference_t {
 
 //static TRIO_CONST char rcsid[] = "@(#)$Id: trio.c,v 1.129 2009/09/20 11:37:15 breese Exp $";
 
-#if TRIO_FEATURE_FLOAT
-/*
- * Need this to workaround a parser bug in HP C/iX compiler that fails
- * to resolves macro definitions that includes type 'long double',
- * e.g: va_arg(arg_ptr, long double)
- */
-# if defined(TRIO_PLATFORM_MPEIX)
-static TRIO_CONST trio_long_double_t ___dummy_long_double = 0;
-# endif
-#endif
-
 static TRIO_CONST char internalNullString[] = "(nil)";
 
 #if defined(USE_LOCALE)
@@ -862,11 +744,6 @@ static struct lconv *internalLocaleValues = NULL;
  * UNIX98 says "in a locale where the radix character is not defined,
  * the radix character defaults to a period (.)"
  */
-#if TRIO_FEATURE_FLOAT || defined(USE_LOCALE)
-static int internalDecimalPointLength = 1;
-static char internalDecimalPoint = '.';
-static char internalDecimalPointString[MAX_LOCALE_SEPARATOR_LENGTH + 1] = ".";
-#endif
 #if TRIO_FEATURE_QUOTE
 static int internalThousandSeparatorLength = 1;
 static char internalThousandSeparator[MAX_LOCALE_SEPARATOR_LENGTH + 1] = ",";
@@ -1023,44 +900,6 @@ TrioSetLocale(TRIO_NOARGS)
 }
 #endif /* defined(USE_LOCALE) */
 
-#if TRIO_FEATURE_FLOAT && TRIO_FEATURE_QUOTE
-TRIO_PRIVATE int
-TrioCalcThousandSeparatorLength
-TRIO_ARGS1((digits),
-	   int digits)
-{
-  int count = 0;
-  int step = NO_GROUPING;
-  char *groupingPointer = internalGrouping;
-
-  while (digits > 0)
-    {
-      if (*groupingPointer == CHAR_MAX)
-	{
-	  /* Disable grouping */
-	  break; /* while */
-	}
-      else if (*groupingPointer == 0)
-	{
-	  /* Repeat last group */
-	  if (step == NO_GROUPING)
-	    {
-	      /* Error in locale */
-	      break; /* while */
-	    }
-	}
-      else
-	{
-	  step = *groupingPointer++;
-	}
-      if (digits > step)
-	count += internalThousandSeparatorLength;
-      digits -= step;
-    }
-  return count;
-}
-#endif /* TRIO_FEATURE_FLOAT && TRIO_FEATURE_QUOTE */
-
 #if TRIO_FEATURE_QUOTE
 TRIO_PRIVATE BOOLEAN_T
 TrioFollowedBySeparator
@@ -1122,71 +961,6 @@ TRIO_ARGS2((format, offsetPointer),
 #endif
   return NO_POSITION;
 }
-
-/*************************************************************************
- * TrioPower
- *
- * Description:
- *  Calculate pow(base, exponent), where number and exponent are integers.
- */
-#if TRIO_FEATURE_FLOAT
-TRIO_PRIVATE trio_long_double_t
-TrioPower
-TRIO_ARGS2((number, exponent),
-	   int number,
-	   int exponent)
-{
-  trio_long_double_t result;
-
-  if (number == 10)
-    {
-      switch (exponent)
-	{
-	  /* Speed up calculation of common cases */
-	case 0:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E-1);
-	  break;
-	case 1:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+0);
-	  break;
-	case 2:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+1);
-	  break;
-	case 3:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+2);
-	  break;
-	case 4:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+3);
-	  break;
-	case 5:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+4);
-	  break;
-	case 6:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+5);
-	  break;
-	case 7:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+6);
-	  break;
-	case 8:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+7);
-	  break;
-	case 9:
-	  result = (trio_long_double_t)number * TRIO_SUFFIX_LONG(1E+8);
-	  break;
-	default:
-	  result = trio_pow((trio_long_double_t)number,
-			    (trio_long_double_t)exponent);
-	  break;
-	}
-    }
-  else
-    {
-      return trio_pow((trio_long_double_t)number,
-		      (trio_long_double_t)exponent);
-    }
-  return result;
-}
-#endif /* TRIO_FEATURE_FLOAT */
 
 /*************************************************************************
  * TrioParseQualifiers
@@ -2118,53 +1892,6 @@ TRIO_ARGS5((type, format, parameters, arglist, argarray),
 	      ? (trio_uintmax_t)va_arg(arglist, int)
 	      : (trio_uintmax_t)(*((int *)argarray[num]));
 	  break;
-
-#if TRIO_FEATURE_FLOAT
-	case FORMAT_DOUBLE:
-# if TRIO_FEATURE_SCANF
-	  if (TYPE_SCAN == type)
-	    {
-	      if (parameters[i].flags & FLAGS_LONGDOUBLE)
-		parameters[i].data.longdoublePointer = (argarray == NULL)
-		  ? va_arg(arglist, trio_long_double_t *)
-		  : (trio_long_double_t *)argarray[num];
-	      else
-                {
-		  if (parameters[i].flags & FLAGS_LONG)
-		    parameters[i].data.doublePointer = (argarray == NULL)
-		      ? va_arg(arglist, double *)
-		      : (double *)argarray[num];
-		  else
-		    parameters[i].data.doublePointer = (argarray == NULL)
-		      ? (double *)va_arg(arglist, float *)
-		      : (double *)((float *)argarray[num]);
-                }
-	    }
-	  else
-# endif /* TRIO_FEATURE_SCANF */
-	    {
-	      if (parameters[i].flags & FLAGS_LONGDOUBLE)
-		parameters[i].data.longdoubleNumber = (argarray == NULL)
-		  ? va_arg(arglist, trio_long_double_t)
-		  : (trio_long_double_t)(*((trio_long_double_t *)argarray[num]));
-	      else
-		{
-		  if (argarray == NULL)
-		    parameters[i].data.longdoubleNumber =
-		      (trio_long_double_t)va_arg(arglist, double);
-		  else
-		    {
-		      if (parameters[i].flags & FLAGS_SHORT)
-			parameters[i].data.longdoubleNumber =
-			  (trio_long_double_t)(*((float *)argarray[num]));
-		      else
-			parameters[i].data.longdoubleNumber =
-			  (trio_long_double_t)(*((double *)argarray[num]));
-		    }
-		}
-	    }
-	  break;
-#endif /* TRIO_FEATURE_FLOAT */
 
 #if TRIO_FEATURE_ERRNO
 	case FORMAT_ERRNO:
