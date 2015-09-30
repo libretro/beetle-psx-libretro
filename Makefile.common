@@ -1,10 +1,11 @@
 SOURCES_CXX :=
 SOURCES_C   :=
 
+LIBRETRO_DIR := $(CORE_DIR)/libretro-common
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 
-INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc
+INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include
 
 ifeq ($(HAVE_GRIFFIN),1)
    SOURCES_CXX += beetle_psx_griffin.cpp \
@@ -134,4 +135,9 @@ SOURCES_C += $(MEDNAFEN_DIR)/trio/trio.c \
 
 ifeq ($(HAVE_GRIFFIN), 1)
 SOURCES_C += beetle_psx_griffin_c.c
+endif
+
+ifneq ($(STATIC_LINKING), 1)
+SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
+				 $(LIBRETRO_DIR)/file/retro_stat.c
 endif
