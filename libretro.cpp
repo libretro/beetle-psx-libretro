@@ -9,6 +9,7 @@
 #endif
 #include "libretro.h"
 #include <rthreads/rthreads.h>
+#include <retro_stat.h>
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -27,6 +28,51 @@ unsigned char widescreen_auto_ar;
 unsigned char widescreen_auto_ar_old;
 
 static bool is_pal;
+
+char retro_save_directory[4096];
+char retro_base_directory[4096];
+static char retro_cd_base_directory[4096];
+static char retro_cd_path[4096];
+char retro_cd_base_name[4096];
+#ifdef _WIN32
+   static char retro_slash = '\\';
+#else
+   static char retro_slash = '/';
+#endif
+
+static void extract_basename(char *buf, const char *path, size_t size)
+{
+   const char *base = strrchr(path, '/');
+   if (!base)
+      base = strrchr(path, '\\');
+   if (!base)
+      base = path;
+
+   if (*base == '\\' || *base == '/')
+      base++;
+
+   strncpy(buf, base, size - 1);
+   buf[size - 1] = '\0';
+
+   char *ext = strrchr(buf, '.');
+   if (ext)
+      *ext = '\0';
+}
+
+static void extract_directory(char *buf, const char *path, size_t size)
+{
+   strncpy(buf, path, size - 1);
+   buf[size - 1] = '\0';
+
+   char *base = strrchr(buf, '/');
+   if (!base)
+      base = strrchr(buf, '\\');
+
+   if (base)
+      *base = '\0';
+   else
+      buf[0] = '\0';
+}
 
 /* start of Mednafen psx.cpp */
 
@@ -2068,23 +2114,7 @@ char *psx_analog_type;
 #define RETRO_DEVICE_DUALSHOCK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
 #define RETRO_DEVICE_FLIGHTSTICK  RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 
-std::string retro_base_directory;
-std::string retro_base_name;
-std::string retro_save_directory;
-
-static void set_basename(const char *path)
-{
-   const char *base = strrchr(path, '/');
-   if (!base)
-      base = strrchr(path, '\\');
-
-   if (base)
-      retro_base_name = base + 1;
-   else
-      retro_base_name = path;
-
-   retro_base_name = retro_base_name.substr(0, retro_base_name.find_last_of('.'));
-}
+;
 
 #ifdef NEED_DEINTERLACER
 static bool PrevInterlaced;
@@ -2203,12 +2233,15 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    try
    {
-      CDIF *iface = CDIF_Open(info->path, false, false);
+      CDIF *iface = CDIF_Open(retro_cd_path, false, false);
       delete cdifs->at(index);
       cdifs->at(index) = iface;
       CalcDiscSCEx();
-      set_basename(info->path); // If we replace, we want the "swap disk manually effect".
-      update_md5_checksum(iface); // Ugly, but needed to get proper disk swapping effect.
+
+      /* If we replace, we want the "swap disk manually effect". */
+      extract_basename(retro_cd_base_name, retro_cd_path, sizeof(retro_cd_base_name));
+      /* Ugly, but needed to get proper disk swapping effect. */
+      update_md5_checksum(iface);
       return true;
    }
    catch (const std::exception &e)
@@ -2237,6 +2270,7 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 {
 }
 
+
 void retro_init(void)
 {
    struct retro_log_callback log;
@@ -2255,13 +2289,7 @@ void retro_init(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
-      retro_base_directory = dir;
-      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      size_t last = retro_base_directory.find_last_not_of("/\\");
-      if (last != std::string::npos)
-         last++;
-
-      retro_base_directory = retro_base_directory.substr(0, last);
+      snprintf(retro_base_directory, sizeof(retro_base_directory), "%s", dir);
    }
    else
    {
@@ -2273,19 +2301,16 @@ void retro_init(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir)
    {
       // If save directory is defined use it, otherwise use system directory
-      retro_save_directory = *dir ? dir : retro_base_directory;
-      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      size_t last = retro_save_directory.find_last_not_of("/\\");
-      if (last != std::string::npos)
-         last++;
-
-      retro_save_directory = retro_save_directory.substr(0, last);      
+      if (dir)
+         snprintf(retro_save_directory, sizeof(retro_save_directory), "%s", dir);
+      else
+         snprintf(retro_save_directory, sizeof(retro_save_directory), "%s", retro_base_directory);
    }
    else
    {
       /* TODO: Add proper fallback */
       log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
-      retro_save_directory = retro_base_directory;
+      snprintf(retro_save_directory, sizeof(retro_save_directory), "%s", retro_base_directory);
    }      
 
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
@@ -2695,8 +2720,10 @@ union
 
 static uint16_t input_buf[MAX_PLAYERS] = {0};
 
+
 bool retro_load_game(const struct retro_game_info *info)
 {
+   char tocbasepath[4096];
    if (failed_init)
       return false;
 
@@ -2882,7 +2909,17 @@ bool retro_load_game(const struct retro_game_info *info)
    overscan = false;
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
 
-   set_basename(info->path);
+   extract_basename(retro_cd_base_name,       info->path, sizeof(retro_cd_base_name));
+   extract_directory(retro_cd_base_directory, info->path, sizeof(retro_cd_base_directory));
+
+   snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
+
+   if (path_is_valid(tocbasepath))
+      snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", tocbasepath);
+   else
+      snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
+
+   log_cb(RETRO_LOG_INFO, "PATH IS NOW!!!!! %s\n", retro_cd_path);
 
    check_variables();
    //make sure shared memory cards and save states are enabled only at startup
@@ -2891,7 +2928,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
-   if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, info->path))
+   if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, retro_cd_path))
       return false;
 
 	MDFN_LoadGameCheats(NULL);
@@ -2940,6 +2977,10 @@ void retro_unload_game(void)
       delete CDInterfaces[i];
    CDInterfaces.clear();
 #endif
+
+   retro_cd_base_directory[0] = '\0';
+   retro_cd_path[0]           = '\0';
+   retro_cd_base_name[0]      = '\0';
 }
 
 
@@ -3483,31 +3524,25 @@ static void sanitize_path(std::string &path)
 // Use a simpler approach to make sure that things go right for libretro.
 std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
-   char slash;
-#ifdef _WIN32
-   slash = '\\';
-#else
-   slash = '/';
-#endif
-   std::string ret;
+   char fullpath[4096];
+
    switch (type)
    {
       case MDFNMKF_SAV:
-         ret = retro_save_directory + slash + (!shared_memorycards ? retro_base_name : "mednafen_psx_libretro_shared") +
-         std::string(".") +
-          std::string(cd1);         
+         snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
+               retro_save_directory,
+               retro_slash,
+               (!shared_memorycards) ? retro_cd_base_name : "mednafen_psx_libretro_shared",
+               cd1);
          break;
       case MDFNMKF_FIRMWARE:
-         ret = retro_base_directory + slash + std::string(cd1);
-#ifdef _WIN32
-   sanitize_path(ret); // Because Windows path handling is mongoloid.
-#endif
+         snprintf(fullpath, sizeof(fullpath), "%s%c%s", retro_base_directory, retro_slash, cd1);
          break;
       default:	  
          break;
    }
 
-   return ret;
+   return std::string(fullpath);
 }
 
 void MDFND_DispMessage(unsigned char *str)

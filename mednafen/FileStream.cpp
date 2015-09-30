@@ -40,6 +40,8 @@ FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
    {
       ErrnoHolder ene(errno);
 
+      printf("%s\n", path);
+
       throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
    }
 }

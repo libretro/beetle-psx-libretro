@@ -33,6 +33,10 @@ uint32_t setting_psx_multitap_port_2 = 0;
 uint32_t setting_psx_analog_toggle = 0;
 uint32_t setting_psx_fastboot = 1;
 
+extern char retro_cd_base_name[4096];
+extern char retro_save_directory[4096];
+extern char retro_base_directory[4096];
+
 bool MDFN_SaveSettings(const char *path)
 {
    return(1);
@@ -117,9 +121,6 @@ bool MDFN_GetSettingB(const char *name)
    return 0;
 }
 
-extern std::string retro_base_directory;
-extern std::string retro_base_name;
-
 std::string MDFN_GetSettingS(const char *name)
 {
    if (!strcmp("psx.bios_eu", name))
@@ -132,19 +133,23 @@ std::string MDFN_GetSettingS(const char *name)
       return "na";
    /* FILESYS */
    if (!strcmp("filesys.path_firmware", name))
-      return retro_base_directory;
-   if (!strcmp("filesys.path_palette", name))
-      return retro_base_directory;
+      return std::string(retro_base_directory);
    if (!strcmp("filesys.path_sav", name))
-      return retro_base_directory;
+      return std::string(retro_save_directory);
    if (!strcmp("filesys.path_state", name))
-      return retro_base_directory;
-   if (!strcmp("filesys.path_cheat", name))
-      return retro_base_directory;
+      return std::string(retro_save_directory);
    if (!strcmp("filesys.fname_state", name))
-      return retro_base_name + std::string(".sav");
+   {
+      char fullpath[4096];
+      snprintf(fullpath, sizeof(fullpath), "%s.sav", retro_cd_base_name);
+      return std::string(fullpath);
+   }
    if (!strcmp("filesys.fname_sav", name))
-      return retro_base_name + std::string(".bsv");
+   {
+      char fullpath[4096];
+      snprintf(fullpath, sizeof(fullpath), "%s.bsv", retro_cd_base_name);
+      return std::string(fullpath);
+   }
    fprintf(stderr, "unhandled setting S: %s\n", name);
    return 0;
 }
