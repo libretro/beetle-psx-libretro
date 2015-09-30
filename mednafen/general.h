@@ -35,7 +35,7 @@ typedef enum
  MDFNMKF_FIRMWARE
 } MakeFName_Type;
 
-std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1);
+const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1);
 
 const char * GetFNComponent(const char *str);
 

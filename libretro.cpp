@@ -1343,8 +1343,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       abort();
 
    {
-      std::string biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
-      FileStream BIOSFile(biospath.c_str(), MODE_READ);
+      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
+      FileStream BIOSFile(biospath, MODE_READ);
 
       BIOSFile.read(BIOSROM->data8, 512 * 1024);
    }
@@ -1360,8 +1360,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    for(; i < 8; i++)
    {
       char ext[64];
+      const char *memcard = NULL;
       snprintf(ext, sizeof(ext), "%d.mcr", i);
-      FIO->LoadMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+      memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+      FIO->LoadMemcard(i, memcard);
    }
 
    for(i = 0; i < 8; i++)
@@ -1615,9 +1617,10 @@ static void CloseGame(void)
       try
       {
          char ext[64];
+         const char *memcard = NULL;
          snprintf(ext, sizeof(ext), "%d.mcr", i);
-
-         FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+         memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+         FIO->SaveMemcard(i, memcard);
       }
       catch(std::exception &e)
       {
@@ -3186,6 +3189,9 @@ void retro_run(void)
          Memcard_SaveDelay[i] += timestamp;
          if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
          {
+            char ext[64];
+            const char *memcard = NULL;
+
             log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
 
             if (i == 0 && !use_mednafen_memcard0_method)
@@ -3196,9 +3202,9 @@ void retro_run(void)
                continue;
             }
 
-            char ext[64];
             snprintf(ext, sizeof(ext), "%d.mcr", i);
-            FIO->SaveMemcard(i, MDFN_MakeFName(MDFNMKF_SAV, 0, ext).c_str());
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            FIO->SaveMemcard(i, memcard);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }
@@ -3522,9 +3528,11 @@ static void sanitize_path(std::string &path)
 #endif
 
 // Use a simpler approach to make sure that things go right for libretro.
-std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
+const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
-   char fullpath[4096];
+   static char fullpath[4096];
+
+   fullpath[0] = '\0';
 
    switch (type)
    {
@@ -3542,7 +3550,7 @@ std::string MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
          break;
    }
 
-   return std::string(fullpath);
+   return fullpath;
 }
 
 void MDFND_DispMessage(unsigned char *str)
