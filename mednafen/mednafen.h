@@ -18,11 +18,6 @@
 #define GET_FDATA_PTR(fp) (fp->data)
 #define GET_FSIZE_PTR(fp) (fp->size)
 #define GET_FEXTS_PTR(fp) (fp->ext)
-#define gzopen(a, b) fopen(a, b)
-#define gzread(a, b, c) fread(b, c, 1, a)
-#define gzclose(a) fclose(a)
-#define gzgetc(a) fgetc(a)
-#define gzseek(a,b,c) fseek(a,b,c)
 
 extern MDFNGI *MDFNGameInfo;
 

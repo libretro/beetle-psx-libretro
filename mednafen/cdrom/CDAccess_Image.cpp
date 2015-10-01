@@ -30,6 +30,8 @@
 	Trying to read sectors at an LBA of less than 0 is not supported.  TODO: support it(at least up to -150).
 */
 
+#include <retro_stat.h>
+
 #include "../mednafen.h"
 
 #include <sys/types.h>
@@ -287,11 +289,10 @@ void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 int CDAccess_Image::LoadSBI(const char* sbi_path)
 {
    /* Loading SBI file */
-
-   FileStream sbis(sbi_path, MODE_READ);
    uint8 header[4];
    uint8 ed[4 + 10];
    uint8 tmpq[12];
+   FileStream sbis(sbi_path, MODE_READ);
 
    sbis.read(header, 4);
 
@@ -837,25 +838,23 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    //
    if(!IsTOC)
    {
+      const char *sbi_path = NULL;
       char sbi_ext[4] = { 's', 'b', 'i', 0 };
 
       if(file_ext.length() == 4 && file_ext[0] == '.')
       {
-         for(unsigned i = 0; i < 3; i++)
+         unsigned i;
+         for(i = 0; i < 3; i++)
          {
             if(file_ext[1 + i] >= 'A' && file_ext[1 + i] <= 'Z')
                sbi_ext[i] += 'A' - 'a';
          }
       }
 
-      const char *sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str();
-      FILE *dummy = fopen(sbi_path, "rb");
+      sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str();
 
-      if (dummy)
-      {
-         fclose(dummy);
+      if (path_is_valid(sbi_path))
          LoadSBI(sbi_path);
-      }
    }
 }
 
