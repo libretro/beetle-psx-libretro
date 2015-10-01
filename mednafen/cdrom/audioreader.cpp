@@ -21,7 +21,6 @@
 // Don't allow exceptions to propagate into the vorbis/musepack/etc. libraries, as it could easily leave the state of the library's decoder "object" in an
 // inconsistent state, which would cause all sorts of unfun when we try to destroy it while handling the exception farther up.
 
-#include <sys/stat.h>
 #include "../mednafen.h"
 #include "audioreader.h"
 
