@@ -20,6 +20,9 @@
 #ifndef __MDFN_FILESTREAM_H
 #define __MDFN_FILESTREAM_H
 
+#include <retro_file.h>
+#include <retro_stat.h>
+
 #include "Stream.h"
 #include "FileWrapper.h"
 
@@ -39,7 +42,8 @@ class FileStream : public Stream
       virtual void close(void);
 
    private:
-      FILE *fp;
+      RFILE *fp;
+      char *original_path;
       const int OpenedMode;
 };
 

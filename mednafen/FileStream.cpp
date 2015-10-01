@@ -17,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <sys/stat.h>
+
 #include "mednafen.h"
 #include "Stream.h"
 #include "FileStream.h"
@@ -25,29 +25,25 @@
 #include <stdarg.h>
 #include <string.h>
 
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-
-#define fseeko fseek
-#define ftello ftell
-
 FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
-   if(!(fp = fopen(path, (mode == MODE_WRITE) ? "wb" : "rb")))
+   fp = retro_fopen(path, (mode == MODE_WRITE) ? RFILE_MODE_WRITE : RFILE_MODE_READ, -1);
+
+   if (!fp)
    {
       ErrnoHolder ene(errno);
 
-      printf("%s\n", path);
-
-      throw(MDFN_Error(ene.Errno(), _("Error opening file %s"), ene.StrError()));
+      throw(MDFN_Error(ene.Errno(), "Error opening file %s", ene.StrError()));
    }
+
+   original_path = strdup(path);
 }
 
 FileStream::~FileStream()
 {
+   if (original_path)
+      free(original_path);
+   original_path = NULL;
 }
 
 uint64_t FileStream::attributes(void)
@@ -70,39 +66,43 @@ uint64_t FileStream::attributes(void)
 
 uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
 {
-   return fread(data, 1, count, fp);
+   if (!fp)
+      return 0;
+   return retro_fread(fp, data, count);
 }
 
 void FileStream::write(const void *data, uint64_t count)
 {
-   fwrite(data, 1, count, fp);
+   if (!fp)
+      return;
+   retro_fwrite(fp, data, count);
 }
 
 void FileStream::seek(int64_t offset, int whence)
 {
-   fseeko(fp, offset, whence);
+   if (!fp)
+      return;
+   retro_fseek(fp, offset, whence);
 }
 
 int64_t FileStream::tell(void)
 {
-   return ftello(fp);
+   if (!fp)
+      return -1;
+   return retro_ftell(fp);
 }
 
 int64_t FileStream::size(void)
 {
-   struct stat buf;
+   if (!original_path)
+      return -1;
 
-   fstat(fileno(fp), &buf);
-
-   return(buf.st_size);
+   return path_get_size(original_path);
 }
 
 void FileStream::close(void)
 {
-   if(!fp)
+   if (!fp)
       return;
-
-   FILE *tmp = fp;
-   fp = NULL;
-   fclose(tmp);
+   retro_fclose(fp);
 }
