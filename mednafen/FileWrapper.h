@@ -23,8 +23,6 @@ class FileWrapper
 
       int64_t size(void);
 
-      void flush(void);
-
       void close(void);	// Flushes and closes the underlying OS/C lib file.  Calling any other method of this class after a call to
       // this method is illegal(except for the implicit call to the destructor).
       //

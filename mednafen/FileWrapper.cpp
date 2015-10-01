@@ -70,11 +70,6 @@ uint64_t FileWrapper::read(void *data, uint64_t count, bool error_on_eof)
    return fread(data, 1, count, fp);
 }
 
-void FileWrapper::flush(void)
-{
-   fflush(fp);
-}
-
 void FileWrapper::write(const void *data, uint64_t count)
 {
    fwrite(data, 1, count, fp);
