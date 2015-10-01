@@ -24,7 +24,6 @@
 #include <retro_stat.h>
 
 #include "Stream.h"
-#include "FileWrapper.h"
 
 class FileStream : public Stream
 {
