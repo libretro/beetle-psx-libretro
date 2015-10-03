@@ -41,7 +41,6 @@ endif
 
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING
-	SOURCES_C += $(CORE_DIR)/threads.c
 endif
 
 ifeq ($(NEED_CRC32), 1)
@@ -139,4 +138,8 @@ endif
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
 				 $(LIBRETRO_DIR)/file/retro_stat.c
+
+ifeq ($(NEED_THREADING), 1)
+SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
+endif
 endif
