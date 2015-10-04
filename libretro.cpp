@@ -292,7 +292,6 @@ static void RebaseTS(const int32_t timestamp)
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 {
-   assert(type > PSX_EVENT__SYNFIRST && type < PSX_EVENT__SYNLAST);
    event_list_entry *e = &events[type];
 
    if(next_timestamp < e->event_time)
