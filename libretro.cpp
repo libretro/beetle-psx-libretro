@@ -213,7 +213,7 @@ static struct
    uint32_t Unknown0;	// 0x1f801004	// BIOS Init: 0x1f802000, Writeable bits: 0x00ffffff, FixedOR = 0x1f000000
    uint32_t Unknown1;	// 0x1f801008	// BIOS Init: 0x0013243f, ????
    uint32_t Unknown2;	// 0x1f80100c	// BIOS Init: 0x00003022, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
-   
+
    uint32_t BIOS_Mapping;	// 0x1f801010	// BIOS Init: 0x0013243f, ????
    uint32_t SPU_Delay;	// 0x1f801014	// BIOS Init: 0x200931e1, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000 - Affects bus timing on access to SPU
    uint32_t CDC_Delay;	// 0x1f801018	// BIOS Init: 0x00020843, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
@@ -528,7 +528,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       // CDC: TODO - 8-bit access.
       if(A >= 0x1f801800 && A <= 0x1f80180F)
       {
-         if(!IsWrite) 
+         if(!IsWrite)
          {
             timestamp += 6 * sizeof(T); //24;
          }
@@ -1086,7 +1086,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
             bootpos++;
             while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
             if(!strncasecmp(bootpos, "cdrom:\\", 7))
-            { 
+            {
                bootpos += 7;
                char *tmp;
 
@@ -1684,7 +1684,7 @@ static int StateAction(StateMem *sm, int load, int data_only)
    ret &= SPU->StateAction(sm, load, data_only);
 
    ret &= FIO->StateAction(sm, load, data_only);
-   
+
    ret &= IRQ_StateAction(sm, load, data_only);	// Do it last.
 
    if(load)
@@ -1794,7 +1794,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
   else if(cheat_string[i] >= 'a' && cheat_string[i] <= 'f')
    code |= cheat_string[i] - 'a' + 0xA;
   else if(cheat_string[i] >= 'A' && cheat_string[i] <= 'F')
-   code |= cheat_string[i] - 'A' + 0xA;  
+   code |= cheat_string[i] - 'A' + 0xA;
   else
   {
    if(cheat_string[i] & 0x80)
@@ -2207,7 +2207,7 @@ static void update_md5_checksum(CDIF *iface)
 
    md5_finish(&layout_md5, LayoutMD5);
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
-   
+
    char *md5 = md5_asciistr(MDFNGameInfo->MD5);
    log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
 }
@@ -2227,7 +2227,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       cdifs->erase(cdifs->begin() + index);
       if (index < CD_SelectedDisc)
          CD_SelectedDisc--;
-      
+
       // Poke into psx.cpp
       CalcDiscSCEx();
       return true;
@@ -2278,7 +2278,7 @@ void retro_init(void)
    struct retro_log_callback log;
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
-   else 
+   else
       log_cb = fallback_log;
 
 #ifdef NEED_CD
@@ -2313,7 +2313,7 @@ void retro_init(void)
       /* TODO: Add proper fallback */
       log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
       snprintf(retro_save_directory, sizeof(retro_save_directory), "%s", retro_base_directory);
-   }      
+   }
 
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &disk_interface);
 
@@ -2409,17 +2409,17 @@ static void check_variables(void)
          setting_psx_analog_toggle = 0;
          setting_apply_analog_toggle = true;
       }
-   }  
-   
+   }
+
    var.key = "beetle_psx_enable_multitap_port1";
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
          setting_psx_multitap_port_1 = true;
       else if (strcmp(var.value, "disabled") == 0)
          setting_psx_multitap_port_1 = false;
-   }   
+   }
 
    var.key = "beetle_psx_enable_multitap_port2";
 
@@ -2458,7 +2458,7 @@ static void check_variables(void)
    {
       setting_last_scanline_pal = atoi(var.value);
    }
-   
+
    if(setting_psx_multitap_port_1)
    {
       if(setting_psx_multitap_port_2)
@@ -2471,9 +2471,9 @@ static void check_variables(void)
       if(setting_psx_multitap_port_2)
          players = 4;
       else
-         players = 2;      
+         players = 2;
    }
-   
+
    var.key = "beetle_psx_use_mednafen_memcard0_method";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2483,13 +2483,13 @@ static void check_variables(void)
       else if (strcmp(var.value, "mednafen") == 0)
          use_mednafen_memcard0_method = true;
    }
-   
+
    //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
-   var.key = "beetle_psx_shared_memory_cards";   
-   
+   var.key = "beetle_psx_shared_memory_cards";
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      
+
      if (strcmp(var.value, "enabled") == 0)
      {
          if(boot)
@@ -2856,7 +2856,7 @@ bool retro_load_game(const struct retro_game_info *info)
       { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
       { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
       { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" }, 
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
       { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
       { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
@@ -2877,7 +2877,7 @@ bool retro_load_game(const struct retro_game_info *info)
       { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
       { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
       { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" }, 
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
       { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
       { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
@@ -2898,7 +2898,7 @@ bool retro_load_game(const struct retro_game_info *info)
       { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
       { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
       { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" }, 
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
       { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
       { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
@@ -2931,7 +2931,7 @@ bool retro_load_game(const struct retro_game_info *info)
    check_variables();
    //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
@@ -2942,7 +2942,7 @@ bool retro_load_game(const struct retro_game_info *info)
 	MDFNMP_InstallReadPatches();
 
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-   
+
    is_pal = (CalcDiscSCEx() == REGION_EU);
    surf = new MDFN_Surface(NULL, MEDNAFEN_CORE_GEOMETRY_MAX_W, is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480, MEDNAFEN_CORE_GEOMETRY_MAX_W, pix_fmt);
 
@@ -2953,7 +2953,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    //SetInput(0, "gamepad", &input_buf[0]);
    //SetInput(1, "gamepad", &input_buf[1]);
-   
+
    for (unsigned i = 0; i < players; i++)
    {
        SetInput(i, "gamepad", &input_buf[i]);
@@ -2997,12 +2997,12 @@ static void update_input(void)
 {
    //input_buf[0] = 0;
    //input_buf[1] = 0;
-   
+
    for (unsigned j = 0; j < players; j++)
    {
        input_buf[j] = 0;
    }
-   	
+
    static unsigned map[] = {
       RETRO_DEVICE_ID_JOYPAD_SELECT,
       RETRO_DEVICE_ID_JOYPAD_L3,
@@ -3033,7 +3033,7 @@ static void update_input(void)
    //buf.u8[0][1] = (input_buf[0] >> 8) & 0xff;
    //buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
    //buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
-   
+
    for (unsigned j = 0; j < players; j++)
    {
         buf.u8[j][0] = (input_buf[j] >> 0) & 0xff;
@@ -3084,7 +3084,7 @@ static void update_input(void)
       //rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
       //rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
       //rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
-      
+
       for (unsigned j = 0; j < players; j++)
       {
           rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, buf.u8[j][9 * 4] * 0x101);
@@ -3141,7 +3141,7 @@ void retro_run(void)
    /* start of Emulate */
    int32_t timestamp = 0;
 
-   espec->skip = false;	
+   espec->skip = false;
    MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 
    MDFNMP_ApplyPeriodicCheats();
@@ -3237,7 +3237,7 @@ void retro_run(void)
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
 
    // PSX is rather special, and needs specific handling ...
-   
+
    unsigned width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
    unsigned height = spec.DisplayRect.h;
    //fprintf(stderr, "(%u x %u)\n", width, height);
@@ -3355,15 +3355,15 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
       case RETRO_DEVICE_JOYPAD:
       case RETRO_DEVICE_PS1PAD:
          log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type standard gamepad.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "gamepad", &buf.u8[in_port]);    
+         SetInput(in_port, "gamepad", &buf.u8[in_port]);
          break;
       case RETRO_DEVICE_DUALANALOG:
          log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type Dual Analog.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualanalog", &buf.u8[in_port]);    
+         SetInput(in_port, "dualanalog", &buf.u8[in_port]);
          break;
       case RETRO_DEVICE_DUALSHOCK:
          log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type DualShock.\n", MEDNAFEN_CORE_NAME);
-         SetInput(in_port, "dualshock", &buf.u8[in_port]);    
+         SetInput(in_port, "dualshock", &buf.u8[in_port]);
          break;
       case RETRO_DEVICE_FLIGHTSTICK:
          log_cb(RETRO_LOG_INFO, "[%s]: Selected controller type FlightStick.\n", MEDNAFEN_CORE_NAME);
@@ -3466,21 +3466,31 @@ size_t retro_serialize_size(void)
 
 bool retro_serialize(void *data, size_t size)
 {
+   /* it seems that mednafen can realloc pointers sent to it?
+      since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
    StateMem st;
    memset(&st, 0, sizeof(st));
-   st.data     = (uint8_t*)data;
+   st.data     = (uint8_t*)malloc(size);
    st.malloced = size;
 
-   return MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-}
+   bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
 
+   /* there are still some errors with the save states, the size seems to change on some games for now just log when this happens */
+   if (st.len != size)
+      log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
+
+   memcpy(data,st.data,size);
+   free(st.data);
+return ret;
+
+}
 bool retro_unserialize(const void *data, size_t size)
 {
    StateMem st;
    memset(&st, 0, sizeof(st));
    st.data = (uint8_t*)data;
    st.len  = size;
-   
+
    return MDFNSS_LoadSM(&st, 0, 0);
 }
 
@@ -3497,7 +3507,7 @@ void *retro_get_memory_data(unsigned type)
       default:
          break;
    }
-   return NULL; 
+   return NULL;
 }
 
 size_t retro_get_memory_size(unsigned type)
@@ -3550,7 +3560,7 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
       case MDFNMKF_FIRMWARE:
          snprintf(fullpath, sizeof(fullpath), "%s%c%s", retro_base_directory, retro_slash, cd1);
          break;
-      default:	  
+      default:
          break;
    }
 
