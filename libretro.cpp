@@ -2235,13 +2235,13 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    try
    {
-      CDIF *iface = CDIF_Open(retro_cd_path, false, false);
+      CDIF *iface = CDIF_Open(info->path, false, false);
       delete cdifs->at(index);
       cdifs->at(index) = iface;
       CalcDiscSCEx();
 
       /* If we replace, we want the "swap disk manually effect". */
-      extract_basename(retro_cd_base_name, retro_cd_path, sizeof(retro_cd_base_name));
+      extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
       /* Ugly, but needed to get proper disk swapping effect. */
       update_md5_checksum(iface);
       return true;
