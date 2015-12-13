@@ -23,6 +23,10 @@ static retro_input_state_t input_state_cb;
 static retro_rumble_interface rumble;
 static unsigned players = 2;
 
+static int psx_skipbios;
+
+
+
 unsigned char widescreen_hack;
 unsigned char widescreen_auto_ar;
 unsigned char widescreen_auto_ar_old;
@@ -1557,6 +1561,10 @@ static int Load(const char *name, MDFNFILE *fp)
 static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 {
    InitCommon(CDInterfaces);
+   
+   if (psx_skipbios == 1)
+   BIOSROM->WriteU32(0x6990, 0);
+   
    MDFNGameInfo->GameType = GMT_CDROM;
 
    return(1);
@@ -2368,6 +2376,18 @@ static void check_variables(void)
          old_cdimagecache = cdimage_cache;
       }
    }
+   
+   var.key = "beetle_psx_skipbios";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         psx_skipbios = 1;
+      else
+         psx_skipbios = 0;
+   }   
+   
+   
 
    var.key = "beetle_psx_widescreen_hack";
 
@@ -3387,6 +3407,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
+      { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
