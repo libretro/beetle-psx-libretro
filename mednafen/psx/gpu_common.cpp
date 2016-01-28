@@ -5,7 +5,7 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
-      uint16 bg_pix = GPURAM[y][x];	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+      uint16 bg_pix = vram_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
       uint16 pix; // = fore_pix & 0x8000;
 
       /*
@@ -64,13 +64,13 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
             break;
       }
 
-      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-         GPURAM[y][x] = (textured ? pix : (pix & 0x7FFF)) | MaskSetOR;
+      if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
+         vram_put(x, y, (textured ? pix : (pix & 0x7FFF)) | MaskSetOR);
    }
    else
    {
-      if(!MaskEval_TA || !(GPURAM[y][x] & 0x8000))
-         GPURAM[y][x] = (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR;
+      if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
+         vram_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
    }
 }
 
@@ -94,7 +94,7 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 
       if(CLUT_Cache_VB != new_ccvb)
       {
-         uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
+         uint32 y = (raw_clut >> 6) & 0x1FF;
          const uint32_t cxo = (raw_clut & 0x3F) << 4;
          const uint32_t count = (TexMode_TA ? 256 : 16);
 
@@ -102,7 +102,7 @@ INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
 
          for(unsigned i = 0; i < count; i++)
          {
-            CLUT_Cache[i] = gpulp[(cxo + i) & 0x3FF];
+            CLUT_Cache[i] = texel_fetch((cxo + i) & 0x3FF, y);
          }
 
          CLUT_Cache_VB = new_ccvb;
@@ -198,7 +198,7 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int3
    uint32_t v = TexWindowYLUT[v_arg];
    uint32_t fbtex_x = TexPageX + (u_ext >> (2 - TexMode_TA));
    uint32_t fbtex_y = TexPageY + v;
-   uint16_t fbw = GPURAM[fbtex_y][fbtex_x & 1023];
+   uint16_t fbw = texel_fetch(fbtex_x & 1023, fbtex_y);
 #endif
    if(TexMode_TA != 2)
    {
@@ -210,7 +210,7 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int3
 #if 0
       fbw = CLUT_Cache[fbw];
 #else
-      fbw = GPURAM[(clut_offset >> 10) & 511][(clut_offset + fbw) & 1023];
+      fbw = texel_fetch((clut_offset + fbw) & 1023, (clut_offset >> 10) & 511);
 #endif
    }
 

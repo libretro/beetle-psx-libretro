@@ -14,6 +14,14 @@ class PS_GPU;
 #define INCMD_FBWRITE  4
 #define INCMD_FBREAD   8
 
+#define UPSCALE_SHIFT 0U
+#define UPSCALE (1U << UPSCALE_SHIFT)
+
+#define VRAM_WIDTH (1024U << UPSCALE_SHIFT)
+#define VRAM_HEIGHT (512U << UPSCALE_SHIFT)
+
+#define VRAM_NPIXELS (VRAM_WIDTH * VRAM_HEIGHT)
+
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);
@@ -93,16 +101,45 @@ class PS_GPU
 
       INLINE uint16 PeekRAM(uint32 A)
       {
-         return(GPURAM[(A >> 10) & 0x1FF][A & 0x3FF]);
+         return texel_fetch(A & 0x3FF, (A >> 10) & 0x1FF);
       }
 
       INLINE void PokeRAM(uint32 A, uint16 V)
       {
-         GPURAM[(A >> 10) & 0x1FF][A & 0x3FF] = V;
+         texel_put(A & 0x3FF, (A >> 10) & 0x1FF, V);
+      }
+
+      // Return a pixel from VRAM, ignoring the internal upscaling
+      INLINE uint16 texel_fetch(uint32 x, uint32 y) {
+         return GPU_RAM[y << UPSCALE_SHIFT][x << UPSCALE_SHIFT];
+      }
+
+      // Set a pixel in VRAM, upscaling it if necessary
+      INLINE void texel_put(uint32 x, uint32 y, uint16 v) {
+         x <<= UPSCALE_SHIFT;
+         y <<= UPSCALE_SHIFT;
+
+         // Duplicate the pixel as many times as necessary (nearest
+         // neighbour upscaling)
+         for (uint32 dy = 0; dy < UPSCALE; dy++) {
+            for (uint32 dx = 0; dx < UPSCALE; dx++) {
+               GPU_RAM[y + dy][x + dx] = v;
+            }
+         }
+      }
+
+      // Return a pixel from VRAM
+      INLINE uint16 vram_fetch(uint32 x, uint32 y) {
+         return GPU_RAM[y][x];
+      }
+
+      // Set a pixel in VRAM
+      INLINE void vram_put(uint32 x, uint32 y, uint16 v) {
+         GPU_RAM[y][x] = v;
       }
 
       // Y, X
-      uint16 GPURAM[512][1024];
+      uint16 GPU_RAM[VRAM_HEIGHT][VRAM_WIDTH];
 
       uint32 DMAControl;
 

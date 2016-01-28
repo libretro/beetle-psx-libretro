@@ -132,29 +132,31 @@ template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMo
 INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl)
 {
    int32_t xs = x_start, xb = x_bound;
+   int32 clipx0 = ClipX0 << UPSCALE_SHIFT;
+   int32 clipx1 = ClipX1 << UPSCALE_SHIFT;
 
    if(LineSkipTest(this, y))
       return;
 
    if(xs < xb)	// (xs != xb)
    {
-      if(xs < ClipX0)
-         xs = ClipX0;
+      if(xs < clipx0)
+         xs = clipx0;
 
-      if(xb > (ClipX1 + 1))
-         xb = ClipX1 + 1;
+      if(xb > (clipx1 + 1))
+         xb = clipx1 + 1;
 
       if(xs < xb)
       {
-         DrawTimeAvail -= (xb - xs);
+         DrawTimeAvail -= (xb - xs) >> UPSCALE_SHIFT;
 
          if(goraud || textured)
          {
-            DrawTimeAvail -= (xb - xs);
+            DrawTimeAvail -= (xb - xs) >> UPSCALE_SHIFT;
          }
          else if((BlendMode >= 0) || MaskEval_TA)
          {
-            DrawTimeAvail -= (((xb + 1) & ~1) - (xs & ~1)) >> 1;
+            DrawTimeAvail -= ((((xb + 1) & ~1) - (xs & ~1)) >> 1) >> UPSCALE_SHIFT;
          }
       }
 
@@ -271,6 +273,15 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
       return;
    }
 
+    // Upscale
+   for (int i = 0; i < 3; i++) {
+      vertices[i].x <<= UPSCALE_SHIFT;
+      vertices[i].y <<= UPSCALE_SHIFT;
+   }
+
+   int32 clipy0 = ClipY0 << UPSCALE_SHIFT;
+   int32 clipy1 = ClipY1 << UPSCALE_SHIFT;
+
    if(!CalcIDeltas(idl, vertices[0], vertices[1], vertices[2]))
       return;
 
@@ -346,26 +357,26 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    else
       bound_coord_ls = MakePolyXFPStep((vertices[2].x - vertices[1].x), (vertices[2].y - vertices[1].y));
 
-   if(y_start < ClipY0)
+   if(y_start < clipy0)
    {
-      int32_t count = ClipY0 - y_start;
+      int32_t count = clipy0 - y_start;
 
-      y_start = ClipY0;
+      y_start = clipy0;
       base_coord += base_step * count;
       bound_coord_ul += bound_coord_us * count;
 
-      if(y_middle < ClipY0)
+      if(y_middle < clipy0)
       {
-         int32_t count_ls = ClipY0 - y_middle;
+         int32_t count_ls = clipy0 - y_middle;
 
-         y_middle = ClipY0;
+         y_middle = clipy0;
          bound_coord_ll += bound_coord_ls * count_ls;
       }
    }
 
-   if(y_bound > (ClipY1 + 1))
+   if(y_bound > (clipy1 + 1))
    {
-      y_bound = ClipY1 + 1;
+      y_bound = clipy1 + 1;
 
       if(y_middle > y_bound)
          y_middle = y_bound;

@@ -219,7 +219,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
 
 void PS_GPU::Power(void)
 {
-   memset(GPURAM, 0, sizeof(GPURAM));
+   memset(GPU_RAM, 0, VRAM_NPIXELS * sizeof(uint16));
 
    memset(CLUT_Cache, 0, sizeof(CLUT_Cache));
    CLUT_Cache_VB = ~0U;
@@ -405,7 +405,7 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
       {
          const int32 d_x = (x + destX) & 1023;
 
-         gpu->GPURAM[d_y][d_x] = fill_value;
+         gpu->texel_put(d_x, d_y, fill_value);
       }
    }
 }
@@ -443,7 +443,8 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
             int32 s_y = (y + sourceY) & 511;
             int32 s_x = (x + chunk_x + sourceX) & 1023;
 
-            tmpbuf[chunk_x] = g->GPURAM[s_y][s_x];
+            // XXX make upscaling-friendly, as it is we copy at 1x
+            tmpbuf[chunk_x] = g->texel_fetch(s_x, s_y);
          }
 
          for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
@@ -451,8 +452,8 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
             int32 d_y = (y + destY) & 511;
             int32 d_x = (x + chunk_x + destX) & 1023;
 
-            if(!(g->GPURAM[d_y][d_x] & g->MaskEvalAND))
-               g->GPURAM[d_y][d_x] = tmpbuf[chunk_x] | g->MaskSetOR;
+            if(!(g->texel_fetch(d_x, d_y) & g->MaskEvalAND))
+               g->texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
          }
       }
    }
@@ -734,8 +735,8 @@ void PS_GPU::ProcessFIFO(void)
 
          for(i = 0; i < 2; i++)
          {
-            if(!(GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] & MaskEvalAND))
-               GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] = InData | MaskSetOR;
+            if(!(texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) & MaskEvalAND))
+               texel_put(FBRW_CurX & 1023, FBRW_CurY & 511, InData | MaskSetOR);
 
             FBRW_CurX++;
             if(FBRW_CurX == (FBRW_X + FBRW_W))
@@ -1027,7 +1028,7 @@ INLINE uint32_t PS_GPU::ReadData(void)
       DataReadBufferEx = 0;
       for(int i = 0; i < 2; i++)
       {
-         DataReadBufferEx |= GPURAM[FBRW_CurY & 511][FBRW_CurX & 1023] << (i * 16);
+         DataReadBufferEx |= texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) << (i * 16);
 
          FBRW_CurX++;
          if(FBRW_CurX == (FBRW_X + FBRW_W))
@@ -1117,7 +1118,7 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 
 INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
-   if(bpp24)	// 24bpp
+   if(bpp24)	// 24bpp XXX fixme for upscaling
    {
       for(int32 x = dx_start; x < dx_end; x++)
       {
@@ -1392,7 +1393,6 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                int32 dx_start = HorizStart, dx_end = HorizEnd;
 
                dest_line = ((scanline - FirstVisibleLine) << espec->InterlaceOn) + espec->InterlaceField;
-               dest = surface->pixels + dest_line * surface->pitch32;
 
                if(dx_end < dx_start)
                   dx_end = dx_start;
@@ -1418,17 +1418,39 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                LineWidths[dest_line] = dmw;
 
+               //printf("dx_start base: %d, dmw: %d\n", dx_start, dmw);
+
                {
+                  // Convert the necessary variables to the upscaled version
                   uint32_t x;
-                  const uint16_t *src = GPURAM[DisplayFB_CurLineYReadout];
+                  uint32_t y      = DisplayFB_CurLineYReadout << UPSCALE_SHIFT;
+                  uint32_t udmw   = dmw      << UPSCALE_SHIFT;
+                  int32 udx_start = dx_start << UPSCALE_SHIFT;
+                  int32 udx_end   = dx_end   << UPSCALE_SHIFT;
+                  int32 ufb_x     = fb_x     << UPSCALE_SHIFT;
 
-                  memset(dest, 0, dx_start * sizeof(int32));
+                  //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
 
-                  //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                  ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & 0x10, src, dest, dx_start, dx_end, fb_x);
+                  for (uint32_t i = 0; i < UPSCALE; i++)
+                  {
+                     const uint16_t *src = GPU_RAM[y + i];
 
-                  for(x = dx_end; x < dmw; x++)
-                     dest[x] = 0;
+                     // printf("surface: %dx%d (%d) %u %u + %u\n",
+                     // 	   surface->w, surface->h, surface->pitchinpix,
+                     // 	   dest_line, y, i);
+
+                     dest = surface->pixels + ((dest_line << UPSCALE_SHIFT) + i) * surface->pitch32;
+
+                     memset(dest, 0, udx_start * sizeof(int32));
+
+                     //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
+                     ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & 0x10, src, dest, udx_start, udx_end, ufb_x);
+
+                     //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
+                     //
+                     for(x = udx_end; x < udmw; x++)
+                        dest[x] = 0;
+                  }
                }
 
                //if(scanline == 64)
@@ -1496,7 +1518,8 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    }
    SFORMAT StateRegs[] =
    {
-      SFARRAY16(&GPURAM[0][0], sizeof(GPURAM) / sizeof(GPURAM[0][0])),
+      // XXX fixme
+      SFARRAY16(&GPU_RAM[0][0], sizeof(GPU_RAM) / sizeof(GPU_RAM[0][0])),
 
       SFVAR(DMAControl),
 

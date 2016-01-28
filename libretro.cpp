@@ -2964,7 +2964,14 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
 
    is_pal = (CalcDiscSCEx() == REGION_EU);
-   surf = new MDFN_Surface(NULL, MEDNAFEN_CORE_GEOMETRY_MAX_W, is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480, MEDNAFEN_CORE_GEOMETRY_MAX_W, pix_fmt);
+
+   uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+   uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+
+   width  <<= UPSCALE_SHIFT;
+   height <<= UPSCALE_SHIFT;
+
+   surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
@@ -3315,7 +3322,11 @@ void retro_run(void)
          pix += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
       }
    }
-   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
+
+   width  <<= UPSCALE_SHIFT;
+   height <<= UPSCALE_SHIFT;
+
+   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
