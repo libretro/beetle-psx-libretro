@@ -134,8 +134,8 @@ void PS_GPU::DrawLine(line_point *points)
    for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
    {
       // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
-      const int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
-      const int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047;
+      int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
+      int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047;
 
       if(!LineSkipTest(this, y))
       {
@@ -170,7 +170,7 @@ void PS_GPU::DrawLine(line_point *points)
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
          if(x >= ClipX0 && x <= ClipX1 && y >= ClipY0 && y <= ClipY1)
-            PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+            PlotLinePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
       }
 
       AddLineStep<goraud>(cur_point, step);

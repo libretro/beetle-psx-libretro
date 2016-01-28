@@ -309,6 +309,9 @@ class PS_GPU
       template<int BlendMode, bool MaskEval_TA, bool textured>
          void PlotPixel(int32 x, int32 y, uint16 pix);
 
+      template<int BlendMode, bool MaskEval_TA, bool textured>
+         void PlotLinePixel(int32 x, int32 y, uint16 pix);
+
       template<uint32 TexMode_TA>
          uint16 GetTexel(uint32 clut_offset, int32 u, int32 v);
 
