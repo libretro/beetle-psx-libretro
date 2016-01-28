@@ -1118,19 +1118,25 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 
 INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
-   if(bpp24)	// 24bpp XXX fixme for upscaling
+   int32_t fb_mask = ((0x7FF << UPSCALE_SHIFT) + UPSCALE - 1);
+
+   if(bpp24)	// 24bpp
    {
-      for(int32 x = dx_start; x < dx_end; x++)
+      for(int32 x = dx_start; x < dx_end; x+= UPSCALE)
       {
          uint32_t srcpix;
 
-         srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + 1) & 0x7FF] << 16);
-         srcpix >>= (fb_x & 1) * 8;
+         srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + (1 << UPSCALE_SHIFT)) & fb_mask] << 16);
+         srcpix >>= ((fb_x >> UPSCALE_SHIFT) & 1) * 8;
 
-         dest[x] = (((srcpix >> 0) << RED_SHIFT) & (0xFF << RED_SHIFT)) | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) |
+         uint32_t color = (((srcpix >> 0) << RED_SHIFT) & (0xFF << RED_SHIFT)) | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) |
             (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
-         fb_x = (fb_x + 3) & 0x7FF;
+         for (int i = 0; i < UPSCALE; i++) {
+            dest[x + i] = color;
+         }
+
+         fb_x = (fb_x + (3 << UPSCALE_SHIFT)) & fb_mask;
       }
    }				// 15bpp
    else
@@ -1140,7 +1146,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
          uint32_t srcpix = src[(fb_x >> 1)];
          dest[x] = MAKECOLOR((((srcpix >> 0) & 0x1F) << 3), (((srcpix >> 5) & 0x1F) << 3), (((srcpix >> 10) & 0x1F) << 3), 0);
 
-         fb_x = (fb_x + 2) & ((0x7FF << UPSCALE_SHIFT) + UPSCALE - 1);
+         fb_x = (fb_x + 2) & fb_mask;
       }
    }
 
