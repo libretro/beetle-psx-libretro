@@ -3271,6 +3271,8 @@ void retro_run(void)
    // PSX core inserts padding on left and right (overscan). Optionally crop this.
 
    const uint32_t *pix = surf->pixels;
+   unsigned pix_offset = 0;
+
    if (!overscan)
    {
       // 320 width -> 350 width.
@@ -3283,29 +3285,29 @@ void retro_run(void)
       {
          // The shifts are not simply (padded_width - real_width) / 2.
          case 280:
-            pix += 10;
+            pix_offset += 10;
             width = 256;
             break;
 
          case 350:
-            pix += 14;
+            pix_offset += 14;
             width = 320;
             break;
 
          case 400:
-            pix += 15;
+            pix_offset += 15;
             width = 364;
             break;
 
 
          case 560:
-            pix += 26;
-            width = 512;
+            pix_offset += 26;
+            width       = 512;
             break;
 
          case 700:
-            pix += 33;
-            width = 640;
+            pix_offset += 33;
+            width       = 640;
             break;
 
          default:
@@ -3319,12 +3321,13 @@ void retro_run(void)
          // These numbers are arbitrary since the bars differ some by game.
          // Changes aspect ratio in the process.
          height -= 36;
-         pix += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
+         pix_offset += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
       }
    }
 
    width  <<= UPSCALE_SHIFT;
    height <<= UPSCALE_SHIFT;
+   pix     += pix_offset << UPSCALE_SHIFT;
 
    video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
 
