@@ -224,11 +224,9 @@ WARNINGS := -Wall \
 
 EXTRA_GCC_FLAGS := -funroll-loops
 
+EXTRA_GCC_FLAGS :=
 ifeq ($(NO_GCC),1)
-	EXTRA_GCC_FLAGS :=
 	WARNINGS :=
-else
-	EXTRA_GCC_FLAGS := -g
 endif
 
 OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
@@ -238,7 +236,7 @@ all: $(TARGET)
 ifeq ($(DEBUG),0)
    FLAGS += -O2 $(EXTRA_GCC_FLAGS)
 else
-   FLAGS += -O0
+   FLAGS += -O0 -g
 endif
 
 LDFLAGS += $(fpic) $(SHARED)
