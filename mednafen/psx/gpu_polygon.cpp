@@ -135,7 +135,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
    int32 clipx0 = ClipX0 << UPSCALE_SHIFT;
    int32 clipx1 = ClipX1 << UPSCALE_SHIFT;
 
-   if(LineSkipTest(this, y))
+   if(LineSkipTest(this, y >> UPSCALE_SHIFT))
       return;
 
    if(xs < xb)	// (xs != xb)
@@ -146,7 +146,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
       if(xb > (clipx1 + 1))
          xb = clipx1 + 1;
 
-      if(xs < xb)
+      if(xs < xb && ((y & (UPSCALE - 1)) == 0))
       {
          DrawTimeAvail -= (xb - xs) >> UPSCALE_SHIFT;
 
@@ -156,7 +156,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
          }
          else if((BlendMode >= 0) || MaskEval_TA)
          {
-            DrawTimeAvail -= ((((xb + 1) & ~1) - (xs & ~1)) >> 1) >> UPSCALE_SHIFT;
+            DrawTimeAvail -= (((((xb  >> UPSCALE_SHIFT) + 1) & ~1) - ((xs  >> UPSCALE_SHIFT) & ~1)) >> 1);
          }
       }
 

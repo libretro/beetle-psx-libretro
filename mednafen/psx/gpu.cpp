@@ -1140,7 +1140,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
          uint32_t srcpix = src[fb_x >> 1];
          dest[x] = MAKECOLOR((((srcpix >> 0) & 0x1F) << 3), (((srcpix >> 5) & 0x1F) << 3), (((srcpix >> 10) & 0x1F) << 3), 0);
 
-         fb_x = (fb_x + 2) & 0x7FF;
+         fb_x = (fb_x + 2) & ((0x7FF << UPSCALE_SHIFT) + UPSCALE - 1);
       }
    }
 
@@ -1428,8 +1428,6 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                   int32 udx_start = dx_start << UPSCALE_SHIFT;
                   int32 udx_end   = dx_end   << UPSCALE_SHIFT;
                   int32 ufb_x     = fb_x     << UPSCALE_SHIFT;
-
-                  //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
 
                   for (uint32_t i = 0; i < UPSCALE; i++)
                   {
