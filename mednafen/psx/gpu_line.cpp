@@ -170,7 +170,7 @@ void PS_GPU::DrawLine(line_point *points)
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
          if(x >= ClipX0 && x <= ClipX1 && y >= ClipY0 && y <= ClipY1)
-            PlotLinePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+	   PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
       }
 
       AddLineStep<goraud>(cur_point, step);
