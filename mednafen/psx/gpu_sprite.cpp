@@ -9,7 +9,7 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
 
    int32_t x_start, x_bound;
    int32_t y_start, y_bound;
-   uint8_t u, v;
+   uint16_t u, v;
    int v_inc = 1, u_inc = 1;
 
    //printf("[GPU] Sprite: x=%d, y=%d, w=%d, h=%d\n", x_arg, y_arg, w, h);
@@ -66,6 +66,13 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
    if(y_bound > (ClipY1 + 1))
       y_bound = ClipY1 + 1;
 
+   // Upscale
+   y_start <<= UPSCALE_SHIFT;
+   y_bound <<= UPSCALE_SHIFT;
+   x_start <<= UPSCALE_SHIFT;
+   x_bound <<= UPSCALE_SHIFT;
+   u = (u & 0xff) << UPSCALE_SHIFT;
+   v = (v & 0xff) << UPSCALE_SHIFT;
 
 
    //HeightMode && !dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1)) && !DisplayOff
@@ -73,12 +80,12 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
 
    for(int32_t y = y_start; MDFN_LIKELY(y < y_bound); y++)
    {
-      uint8_t u_r;
+      uint16_t u_r;
 
       if(textured)
          u_r = u;
 
-      if(!LineSkipTest(this, y))
+      if(!LineSkipTest(this, y >> UPSCALE_SHIFT))
       {
          if(y_bound > y_start && x_bound > x_start)
          {
@@ -88,14 +95,16 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
             if((BlendMode >= 0) || MaskEval_TA)
                suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
 
-            DrawTimeAvail -= suck_time;
+            DrawTimeAvail -= suck_time >> UPSCALE_SHIFT;
          }
 
          for(int32_t x = x_start; MDFN_LIKELY(x < x_bound); x++)
          {
             if(textured)
             {
-               uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
+               uint16_t fbw = GetTexel<TexMode_TA>(clut_offset,
+                     u_r >> UPSCALE_SHIFT,
+                     v   >> UPSCALE_SHIFT);
 
                if(fbw)
                {
