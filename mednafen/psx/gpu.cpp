@@ -1137,7 +1137,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uin
    {
       for(int32 x = dx_start; x < dx_end; x++)
       {
-         uint32_t srcpix = src[fb_x >> 1];
+         uint32_t srcpix = src[(fb_x >> 1)];
          dest[x] = MAKECOLOR((((srcpix >> 0) & 0x1F) << 3), (((srcpix >> 5) & 0x1F) << 3), (((srcpix >> 10) & 0x1F) << 3), 0);
 
          fb_x = (fb_x + 2) & ((0x7FF << UPSCALE_SHIFT) + UPSCALE - 1);
