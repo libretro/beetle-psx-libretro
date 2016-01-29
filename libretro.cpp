@@ -31,6 +31,7 @@ unsigned char widescreen_hack;
 unsigned char widescreen_auto_ar;
 unsigned char widescreen_auto_ar_old;
 
+bool psx_cpu_overclock;
 static bool is_pal;
 
 char retro_save_directory[4096];
@@ -435,7 +436,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       }
       else
       {
-         timestamp += 3;
+         // Overclock: get rid of memory access latency
+         if (!psx_cpu_overclock)
+            timestamp += 3;
       }
 
       if(Access24)
@@ -2376,6 +2379,18 @@ static void check_variables(void)
          old_cdimagecache = cdimage_cache;
       }
    }
+
+   var.key = "beetle_psx_cpu_overclock";
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         psx_cpu_overclock = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         psx_cpu_overclock = false;
+   }
+   else
+      psx_cpu_overclock = false;
    
    var.key = "beetle_psx_skipbios";
 
@@ -3421,6 +3436,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
+      { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },

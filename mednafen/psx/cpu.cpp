@@ -18,6 +18,9 @@
 #include "psx.h"
 #include "cpu.h"
 
+
+extern bool psx_cpu_overclock;
+
 /* TODO
 	Make sure load delays are correct.
 
@@ -515,7 +518,15 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
             if(PC >= 0xA0000000 || !(BIU & 0x800))
             {
                instr = LoadU32_LE((uint32_t *)&FastMap[PC >> FAST_MAP_SHIFT][PC]);
-               timestamp += 4;	// Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
+
+               if (!psx_cpu_overclock)
+               {
+                  // Approximate best-case cache-disabled time, per PS1 tests
+                  // (executing out of 0xA0000000+); it can be 5 in 
+                  // *some* sequences of code(like a lot of sequential "nop"s, 
+                  // probably other simple instructions too).
+                  timestamp += 4;	
+               }
             }
             else
             {
@@ -528,24 +539,30 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
                ICI[0x02].TV = (PC &~ 0xF) | 0x08 | 0x2;
                ICI[0x03].TV = (PC &~ 0xF) | 0x0C | 0x2;
 
-               timestamp += 3;
+               // When overclock is enabled, remove code cache fetch latency
+               if (!psx_cpu_overclock)
+                  timestamp += 3;
 
                switch(PC & 0xC)
                {
                   case 0x0:
-                     timestamp++;
+                     if (!psx_cpu_overclock)
+                        timestamp++;
                      ICI[0x00].TV &= ~0x2;
                      ICI[0x00].Data = LoadU32_LE(&FMP[0]);
                   case 0x4:
-                     timestamp++;
+                     if (!psx_cpu_overclock)
+                        timestamp++;
                      ICI[0x01].TV &= ~0x2;
                      ICI[0x01].Data = LoadU32_LE(&FMP[1]);
                   case 0x8:
-                     timestamp++;
+                     if (!psx_cpu_overclock)
+                        timestamp++;
                      ICI[0x02].TV &= ~0x2;
                      ICI[0x02].Data = LoadU32_LE(&FMP[2]);
                   case 0xC:
-                     timestamp++;
+                     if (!psx_cpu_overclock)
+                        timestamp++;
                      ICI[0x03].TV &= ~0x2;
                      ICI[0x03].Data = LoadU32_LE(&FMP[3]);
                      break;

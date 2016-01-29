@@ -18,6 +18,8 @@
 #include "psx.h"
 #include "gte.h"
 
+extern bool psx_cpu_overclock;
+
 #include "../clamp.h"
 
 /* Notes:
@@ -1676,6 +1678,10 @@ int32_t GTE_Instruction(uint32_t instr)
          ret = NCCT(instr);
          break;
    }
+
+   // Overclock: force all GTE instruction to have 1 cycle latency
+   if (psx_cpu_overclock)
+      ret = 1;
 
    if(FLAGS & 0x7f87e000)
       FLAGS |= 1 << 31;
