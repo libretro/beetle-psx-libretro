@@ -3344,7 +3344,7 @@ void retro_run(void)
    height <<= UPSCALE_SHIFT;
    pix     += pix_offset << UPSCALE_SHIFT;
 
-   video_cb(GPU->InVBlank ? pix : NULL, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
+   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
