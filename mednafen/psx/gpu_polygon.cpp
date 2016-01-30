@@ -132,10 +132,10 @@ template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMo
 INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl)
 {
    int32_t xs = x_start, xb = x_bound;
-   int32 clipx0 = ClipX0 << UPSCALE_SHIFT;
-   int32 clipx1 = ClipX1 << UPSCALE_SHIFT;
+   int32 clipx0 = ClipX0 << upscale_shift;
+   int32 clipx1 = ClipX1 << upscale_shift;
 
-   if(LineSkipTest(this, y >> UPSCALE_SHIFT))
+   if(LineSkipTest(this, y >> upscale_shift))
       return;
 
    if(xs < xb)	// (xs != xb)
@@ -146,17 +146,17 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
       if(xb > (clipx1 + 1))
          xb = clipx1 + 1;
 
-      if(xs < xb && ((y & (UPSCALE - 1)) == 0))
+      if(xs < xb && ((y & (upscale() - 1)) == 0))
       {
-         DrawTimeAvail -= (xb - xs) >> UPSCALE_SHIFT;
+         DrawTimeAvail -= (xb - xs) >> upscale_shift;
 
          if(goraud || textured)
          {
-            DrawTimeAvail -= (xb - xs) >> UPSCALE_SHIFT;
+            DrawTimeAvail -= (xb - xs) >> upscale_shift;
          }
          else if((BlendMode >= 0) || MaskEval_TA)
          {
-            DrawTimeAvail -= (((((xb  >> UPSCALE_SHIFT) + 1) & ~1) - ((xs  >> UPSCALE_SHIFT) & ~1)) >> 1);
+            DrawTimeAvail -= (((((xb  >> upscale_shift) + 1) & ~1) - ((xs  >> upscale_shift) & ~1)) >> 1);
          }
       }
 
@@ -275,12 +275,12 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 
     // Upscale
    for (int i = 0; i < 3; i++) {
-      vertices[i].x <<= UPSCALE_SHIFT;
-      vertices[i].y <<= UPSCALE_SHIFT;
+      vertices[i].x <<= upscale_shift;
+      vertices[i].y <<= upscale_shift;
    }
 
-   int32 clipy0 = ClipY0 << UPSCALE_SHIFT;
-   int32 clipy1 = ClipY1 << UPSCALE_SHIFT;
+   int32 clipy0 = ClipY0 << upscale_shift;
+   int32 clipy1 = ClipY1 << upscale_shift;
 
    if(!CalcIDeltas(idl, vertices[0], vertices[1], vertices[2]))
       return;

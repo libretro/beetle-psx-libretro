@@ -14,14 +14,6 @@ class PS_GPU;
 #define INCMD_FBWRITE  4
 #define INCMD_FBREAD   8
 
-#define UPSCALE_SHIFT 0U
-#define UPSCALE (1U << UPSCALE_SHIFT)
-
-#define VRAM_WIDTH (1024U << UPSCALE_SHIFT)
-#define VRAM_HEIGHT (512U << UPSCALE_SHIFT)
-
-#define VRAM_NPIXELS (VRAM_WIDTH * VRAM_HEIGHT)
-
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);
@@ -50,8 +42,10 @@ class PS_GPU
 {
    public:
 
-      PS_GPU(bool pal_clock_and_tv, int sls, int sle) MDFN_COLD;
+      PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       ~PS_GPU() MDFN_COLD;
+
+      void AllocVRam(uint8_t upscale_shift) MDFN_COLD;
 
       void FillVideoParams(MDFNGI* gi) MDFN_COLD;
 
@@ -111,35 +105,45 @@ class PS_GPU
 
       // Return a pixel from VRAM, ignoring the internal upscaling
       INLINE uint16 texel_fetch(uint32 x, uint32 y) {
-         return GPU_RAM[y << UPSCALE_SHIFT][x << UPSCALE_SHIFT];
+	return vram_fetch(x << upscale_shift,
+			  y << upscale_shift);
       }
 
       // Set a pixel in VRAM, upscaling it if necessary
       INLINE void texel_put(uint32 x, uint32 y, uint16 v) {
-         x <<= UPSCALE_SHIFT;
-         y <<= UPSCALE_SHIFT;
+
+	x <<= upscale_shift;
+	y <<= upscale_shift;
 
          // Duplicate the pixel as many times as necessary (nearest
          // neighbour upscaling)
-         for (uint32 dy = 0; dy < UPSCALE; dy++) {
-            for (uint32 dx = 0; dx < UPSCALE; dx++) {
-               GPU_RAM[y + dy][x + dx] = v;
-            }
+         for (uint32 dy = 0; dy < upscale(); dy++) {
+	   for (uint32 dx = 0; dx < upscale(); dx++) {
+	     vram_put(x + dx, y + dy, v);
+	   }
          }
       }
 
       // Return a pixel from VRAM
       INLINE uint16 vram_fetch(uint32 x, uint32 y) {
-         return GPU_RAM[y][x];
+	return vram[(y << (10 + upscale_shift)) | x];
       }
 
       // Set a pixel in VRAM
       INLINE void vram_put(uint32 x, uint32 y, uint16 v) {
-         GPU_RAM[y][x] = v;
+	vram[(y << (10 + upscale_shift)) | x] = v;
       }
 
-      // Y, X
-      uint16 GPU_RAM[VRAM_HEIGHT][VRAM_WIDTH];
+      INLINE uint32 upscale() {
+	return 1U << upscale_shift;
+      }
+
+      INLINE unsigned vram_npixels() {
+	return 512 * 1024 * upscale() * upscale();
+      }
+
+      uint8 upscale_shift;
+      uint16 *vram;
 
       uint32 DMAControl;
 

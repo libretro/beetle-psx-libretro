@@ -1275,9 +1275,11 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       sle = tmp;
    }
 
+   uint8_t upscale_shift = 0;
+
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = new PS_GPU(region == REGION_EU, sls, sle);
+   GPU = new PS_GPU(region == REGION_EU, sls, sle, upscale_shift);
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -2983,8 +2985,8 @@ bool retro_load_game(const struct retro_game_info *info)
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
    uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
 
-   width  <<= UPSCALE_SHIFT;
-   height <<= UPSCALE_SHIFT;
+   width  <<= GPU->upscale_shift;
+   height <<= GPU->upscale_shift;
 
    surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
 
@@ -3340,11 +3342,13 @@ void retro_run(void)
       }
    }
 
-   width  <<= UPSCALE_SHIFT;
-   height <<= UPSCALE_SHIFT;
-   pix     += pix_offset << UPSCALE_SHIFT;
+   uint8_t upscale_shift = GPU->upscale_shift;
 
-   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
+   width  <<= upscale_shift;
+   height <<= upscale_shift;
+   pix     += pix_offset << upscale_shift;
+
+   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
@@ -3364,13 +3368,17 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
+  assert(GPU != NULL);
+
+  uint8_t upscale_shift = GPU->upscale_shift;
+
    memset(info, 0, sizeof(*info));
    info->timing.fps            = is_pal ? 49.842 : 59.941;
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << UPSCALE_SHIFT;
-   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << UPSCALE_SHIFT;
-   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << UPSCALE_SHIFT;
-   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << UPSCALE_SHIFT;
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << upscale_shift;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << upscale_shift;
+   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << upscale_shift;
+   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << upscale_shift;
    info->geometry.aspect_ratio = !widescreen_auto_ar ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 }
 

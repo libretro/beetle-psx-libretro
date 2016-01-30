@@ -63,7 +63,7 @@ static const int8 dither_table[4][4] =
 };
 
 
-PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle)
+PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
    int x, y, v;
    HardwarePALType = pal_clock_and_tv;
@@ -99,11 +99,37 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle)
 
    LineVisFirst = sls;
    LineVisLast = sle;
+
+   vram = NULL;
+
+   AllocVRam(upscale_shift);
 }
 
 PS_GPU::~PS_GPU()
 {
+  if (vram != NULL) {
+    delete [] vram;
+    vram = NULL;
+  }
+}
 
+void PS_GPU::AllocVRam(uint8_t ushift) {
+  uint16_t *vram_new;
+
+  unsigned npixels = (512 * 1024) << (ushift * 2);
+
+  vram_new = new uint16_t[npixels];
+
+  memset(vram_new, 0, npixels * sizeof(*vram_new));
+
+  if (vram != NULL) {
+      // XXX rescale
+    delete [] vram;
+    vram = NULL;
+  }
+
+  vram = vram_new;
+  this->upscale_shift = ushift;
 }
 
 void PS_GPU::FillVideoParams(MDFNGI* gi)
@@ -219,7 +245,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
 
 void PS_GPU::Power(void)
 {
-   memset(GPU_RAM, 0, VRAM_NPIXELS * sizeof(uint16));
+   memset(vram, 0, vram_npixels() * sizeof(*vram));
 
    memset(CLUT_Cache, 0, sizeof(CLUT_Cache));
    CLUT_Cache_VB = ~0U;
@@ -1118,25 +1144,25 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 
 INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
-   int32_t fb_mask = ((0x7FF << UPSCALE_SHIFT) + UPSCALE - 1);
+  int32_t fb_mask = ((0x7FF << upscale_shift) + upscale() - 1);
 
    if(bpp24)	// 24bpp
    {
-      for(int32 x = dx_start; x < dx_end; x+= UPSCALE)
+     for(int32 x = dx_start; x < dx_end; x+= upscale())
       {
          uint32_t srcpix;
 
-         srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + (1 << UPSCALE_SHIFT)) & fb_mask] << 16);
-         srcpix >>= ((fb_x >> UPSCALE_SHIFT) & 1) * 8;
+         srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
+         srcpix >>= ((fb_x >> upscale_shift) & 1) * 8;
 
          uint32_t color = (((srcpix >> 0) << RED_SHIFT) & (0xFF << RED_SHIFT)) | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) |
             (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
-         for (int i = 0; i < UPSCALE; i++) {
+         for (int i = 0; i < upscale(); i++) {
             dest[x + i] = color;
          }
 
-         fb_x = (fb_x + (3 << UPSCALE_SHIFT)) & fb_mask;
+         fb_x = (fb_x + (3 << upscale_shift)) & fb_mask;
       }
    }				// 15bpp
    else
@@ -1429,21 +1455,21 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                {
                   // Convert the necessary variables to the upscaled version
                   uint32_t x;
-                  uint32_t y      = DisplayFB_CurLineYReadout << UPSCALE_SHIFT;
-                  uint32_t udmw   = dmw      << UPSCALE_SHIFT;
-                  int32 udx_start = dx_start << UPSCALE_SHIFT;
-                  int32 udx_end   = dx_end   << UPSCALE_SHIFT;
-                  int32 ufb_x     = fb_x     << UPSCALE_SHIFT;
+                  uint32_t y      = DisplayFB_CurLineYReadout << upscale_shift;
+                  uint32_t udmw   = dmw      << upscale_shift;
+                  int32 udx_start = dx_start << upscale_shift;
+                  int32 udx_end   = dx_end   << upscale_shift;
+                  int32 ufb_x     = fb_x     << upscale_shift;
 
-                  for (uint32_t i = 0; i < UPSCALE; i++)
+                  for (uint32_t i = 0; i < upscale(); i++)
                   {
-                     const uint16_t *src = GPU_RAM[y + i];
+		    const uint16_t *src = vram + ((y + i) << (10 + upscale_shift));
 
                      // printf("surface: %dx%d (%d) %u %u + %u\n",
                      // 	   surface->w, surface->h, surface->pitchinpix,
                      // 	   dest_line, y, i);
 
-                     dest = surface->pixels + ((dest_line << UPSCALE_SHIFT) + i) * surface->pitch32;
+                     dest = surface->pixels + ((dest_line << upscale_shift) + i) * surface->pitch32;
 
                      memset(dest, 0, udx_start * sizeof(int32));
 
@@ -1465,6 +1491,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                pix_clock = (HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
                pix_clock_div = DotClockRatios[dmc];
             }
+	    // XXX fixme when upscaling is active
             PSX_GPULineHook(sys_timestamp, sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0, dest, &surface->format, dmw_width, pix_clock_offset, pix_clock, pix_clock_div);
 
             if(!InVBlank)
@@ -1512,6 +1539,26 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    uint32 TexCache_Tag[256];
    uint16 TexCache_Data[256][4];
 
+   uint16 *vram_save = NULL;
+
+   if (upscale_shift == 0) {
+     // No upscaling, we can dump the VRAM contents directly
+     vram_save = vram;
+   } else {
+     // We have increased internal resolution, savestates are always
+     // made at 1x for compatibility
+     vram_save = new uint16[1024 * 512];
+
+     if (!load) {
+       // We must downscale the current VRAM contents back to 1x
+       for (unsigned y = 0; y < 512; y++) {
+	 for (unsigned x = 0; x < 1024; x++) {
+	   vram_save[y * 1024 + x] = texel_fetch(x, y);
+	 }
+       }
+     }
+   }
+
    for(unsigned i = 0; i < 256; i++)
    {
       TexCache_Tag[i] = TexCache[i].Tag;
@@ -1522,8 +1569,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    }
    SFORMAT StateRegs[] =
    {
-      // XXX fixme
-      SFARRAY16(&GPU_RAM[0][0], sizeof(GPU_RAM) / sizeof(GPU_RAM[0][0])),
+      SFARRAY16(vram_save, 1024 * 512),
 
       SFVAR(DMAControl),
 
@@ -1622,6 +1668,20 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       SFEND
    };
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+
+   if (upscale_shift > 0) {
+     if (load) {
+       // Restore upscaled VRAM from savestate
+       for (unsigned y = 0; y < 512; y++) {
+	 for (unsigned x = 0; x < 1024; x++) {
+	   texel_put(x, y, vram_save[y * 1024 + x]);
+	 }
+       }
+     }
+
+     delete [] vram_save;
+     vram_save = NULL;
+   }
 
    if(load)
    {
