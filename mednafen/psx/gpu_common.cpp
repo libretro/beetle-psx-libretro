@@ -1,7 +1,8 @@
 template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
-   y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
+   // More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
+   y &= (512 << UPSCALE_SHIFT) - 1;
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
