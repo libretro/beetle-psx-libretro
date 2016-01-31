@@ -3172,7 +3172,7 @@ void retro_run(void)
          {
 	         // We successfully changed the frontend's resolution, we can
 	         // apply the change immediately
-            GPU->upscale_shift = psx_gpu_upscale_shift;
+            GPU->upscale_shift_set(psx_gpu_upscale_shift);
             alloc_surface();
          }
          else 

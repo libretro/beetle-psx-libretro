@@ -107,6 +107,32 @@ PS_GPU::~PS_GPU()
 {
 }
 
+void PS_GPU::upscale_shift_set(uint8_t ushift) {
+   uint16_t *vram_new;
+   unsigned width = 1024 << ushift;
+   unsigned height = 512 << ushift;
+
+   vram_new = new uint16_t[width * height];
+
+   memset(vram_new, 0, width * height * sizeof(*vram_new));
+
+   // We already have a VRAM buffer, we can copy its content into the
+   // new one. For simplicity we do the transfer at 1x internal
+   // resolution.
+
+   for (unsigned y = 0; y < height; y++) {
+      for (unsigned x = 0; x < width; x++) {
+         vram_new[y * width + x] = texel_fetch(x >> ushift, y >> ushift);
+      }
+   }
+
+   memcpy(vram, vram_new, width * height * sizeof(uint16_t));
+
+   this->upscale_shift = ushift;
+
+   delete [] vram_new;
+}
+
 void PS_GPU::FillVideoParams(MDFNGI* gi)
 {
    if(HardwarePALType)
