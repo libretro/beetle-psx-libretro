@@ -2457,7 +2457,13 @@ static void check_variables(void)
      // Upscale must be a power of two
      assert((val & (val - 1)) == 0);
 
-     psx_gpu_upscale_shift = ffs(val) - 1;
+     // Crappy "ffs" implementation since the standard function is not
+     // widely supported by libc in the wild
+     psx_gpu_upscale_shift = 0;
+     while ((val & 1) == 0) {
+       psx_gpu_upscale_shift++;
+       val >>= 1;
+     }
    }
    else
      psx_gpu_upscale_shift = 0;
