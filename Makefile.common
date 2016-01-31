@@ -8,35 +8,15 @@ CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include
 
 ifeq ($(HAVE_GRIFFIN),1)
-   SOURCES_CXX += beetle_psx_griffin.cpp \
+SOURCES_CXX += beetle_psx_griffin.cpp \
 	$(CORE_EMU_DIR)/dma.cpp \
 	$(CORE_EMU_DIR)/sio.cpp
-else
-   SOURCES_CXX += $(CORE_EMU_DIR)/irq.cpp \
-	$(CORE_EMU_DIR)/timer.cpp \
-	$(CORE_EMU_DIR)/dma.cpp \
-	$(CORE_EMU_DIR)/frontio.cpp \
-	$(CORE_EMU_DIR)/sio.cpp \
-	$(CORE_EMU_DIR)/cpu.cpp \
-	$(CORE_EMU_DIR)/gte.cpp \
-	$(CORE_EMU_DIR)/cdc.cpp \
-	$(CORE_EMU_DIR)/spu.cpp \
-	$(CORE_EMU_DIR)/gpu.cpp \
-	$(CORE_EMU_DIR)/mdec.cpp \
-	$(CORE_EMU_DIR)/input/gamepad.cpp \
-	$(CORE_EMU_DIR)/input/dualanalog.cpp \
-	$(CORE_EMU_DIR)/input/dualshock.cpp \
-	$(CORE_EMU_DIR)/input/justifier.cpp \
-	$(CORE_EMU_DIR)/input/guncon.cpp \
-	$(CORE_EMU_DIR)/input/negcon.cpp \
-	$(CORE_EMU_DIR)/input/memcard.cpp \
-	$(CORE_EMU_DIR)/input/multitap.cpp \
-	$(CORE_EMU_DIR)/input/mouse.cpp
+
+SOURCES_C += beetle_psx_griffin_c.c
 endif
 
 ifeq ($(DEBUG), 1)
-	SOURCES_CXX += \
-	$(CORE_EMU_DIR)/dis.cpp
+	SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
 endif
 
 ifeq ($(NEED_THREADING), 1)
@@ -80,25 +60,7 @@ ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
 FLAGS += -DFRONTEND_SUPPORTS_RGB565
 endif
 
-
 ifeq ($(NEED_CD), 1)
-ifneq ($(HAVE_GRIFFIN),1)
-SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
-	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
-	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
-	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
-	$(MEDNAFEN_DIR)/cdrom/misc.cpp \
-	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
-
-SOURCES_C += \
-	$(MEDNAFEN_DIR)/cdrom/CDUtility.c \
-	$(MEDNAFEN_DIR)/cdrom/galois.c \
-	$(MEDNAFEN_DIR)/cdrom/l-ec.c \
-	$(MEDNAFEN_DIR)/cdrom/lec.c \
-	$(MEDNAFEN_DIR)/cdrom/recover-raw.c \
-	$(MEDNAFEN_DIR)/cdrom/edc_crc32.c
-endif
    FLAGS += -DNEED_CD
 endif
 
@@ -107,9 +69,49 @@ ifeq ($(NEED_TREMOR), 1)
 endif
 
 ifneq ($(HAVE_GRIFFIN), 1)
+   SOURCES_CXX += \
+	$(CORE_EMU_DIR)/irq.cpp \
+	$(CORE_EMU_DIR)/timer.cpp \
+	$(CORE_EMU_DIR)/dma.cpp \
+	$(CORE_EMU_DIR)/frontio.cpp \
+	$(CORE_EMU_DIR)/sio.cpp \
+	$(CORE_EMU_DIR)/cpu.cpp \
+	$(CORE_EMU_DIR)/gte.cpp \
+	$(CORE_EMU_DIR)/cdc.cpp \
+	$(CORE_EMU_DIR)/spu.cpp \
+	$(CORE_EMU_DIR)/gpu.cpp \
+	$(CORE_EMU_DIR)/mdec.cpp \
+	$(CORE_EMU_DIR)/input/gamepad.cpp \
+	$(CORE_EMU_DIR)/input/dualanalog.cpp \
+	$(CORE_EMU_DIR)/input/dualshock.cpp \
+	$(CORE_EMU_DIR)/input/justifier.cpp \
+	$(CORE_EMU_DIR)/input/guncon.cpp \
+	$(CORE_EMU_DIR)/input/negcon.cpp \
+	$(CORE_EMU_DIR)/input/memcard.cpp \
+	$(CORE_EMU_DIR)/input/multitap.cpp \
+	$(CORE_EMU_DIR)/input/mouse.cpp
+
 ifeq ($(NEED_TREMOR), 1)
    SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 endif
+
+ifeq ($(NEED_CD), 1)
+SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
+	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
+	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
+	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
+	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
+	$(MEDNAFEN_DIR)/cdrom/misc.cpp \
+	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp
+endif
+
+SOURCES_C += \
+	$(MEDNAFEN_DIR)/cdrom/CDUtility.c \
+	$(MEDNAFEN_DIR)/cdrom/galois.c \
+	$(MEDNAFEN_DIR)/cdrom/l-ec.c \
+	$(MEDNAFEN_DIR)/cdrom/lec.c \
+	$(MEDNAFEN_DIR)/cdrom/recover-raw.c \
+	$(MEDNAFEN_DIR)/cdrom/edc_crc32.c
 
 SOURCES_CXX += \
 	$(MEDNAFEN_DIR)/error.cpp \
@@ -128,14 +130,7 @@ SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
 	$(MEDNAFEN_DIR)/md5.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
-endif
 
-
-SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
-
-ifeq ($(HAVE_GRIFFIN), 1)
-SOURCES_C += beetle_psx_griffin_c.c
-else
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
 				 $(MEDNAFEN_DIR)/trio/trio.c \
@@ -144,6 +139,8 @@ SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
 ifeq ($(NEED_THREADING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
 endif
+
 endif
 endif
 
+SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
