@@ -107,30 +107,60 @@ PS_GPU::~PS_GPU()
 {
 }
 
-void PS_GPU::upscale_shift_set(uint8_t ushift) {
-   uint16_t *vram_new;
-   unsigned width = 1024 << ushift;
-   unsigned height = 512 << ushift;
+// Allocate enough room for the PS_GPU class and VRAM
+void *PS_GPU::Alloc(uint8 upscale_shift) {
+  unsigned width = 1024 << upscale_shift;
+  unsigned height = 512 << upscale_shift;
 
-   vram_new = new uint16_t[width * height];
+  unsigned size = sizeof(PS_GPU) + width * height * sizeof(uint16_t);
 
-   memset(vram_new, 0, width * height * sizeof(*vram_new));
+  char *buffer = new char[size];
 
-   // We already have a VRAM buffer, we can copy its content into the
-   // new one. For simplicity we do the transfer at 1x internal
-   // resolution.
+  memset(buffer, 0, size);
 
-   for (unsigned y = 0; y < height; y++) {
-      for (unsigned x = 0; x < width; x++) {
-         vram_new[y * width + x] = texel_fetch(x >> ushift, y >> ushift);
-      }
-   }
+  return (void*)buffer;
+}
 
-   memcpy(vram, vram_new, width * height * sizeof(uint16_t));
+PS_GPU *PS_GPU::Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift)
+{
+  void *buffer = PS_GPU::Alloc(upscale_shift);
 
-   this->upscale_shift = ushift;
+  // Place the new GPU inside the buffer
+  return new (buffer) PS_GPU(pal_clock_and_tv, sls, sle, upscale_shift);
+}
 
-   delete [] vram_new;
+void PS_GPU::Destroy(PS_GPU *gpu) {
+  gpu->~PS_GPU();
+  delete [] (char*)gpu;
+}
+
+// Build a new GPU with a different upscale_shift
+PS_GPU *PS_GPU::Rescale(uint8 ushift) {
+  // This is all very unsafe but it should work since PS_GPU doesn't
+  // contain anything that can't be copied using memcpy. If this ever
+  // changes a copy constructor should be created and called from here
+  // instead.
+  void *buffer = PS_GPU::Alloc(ushift);
+
+  // Recopy the GPU state in the new buffer
+  memcpy(buffer, (void*)this, sizeof(*this));
+
+  PS_GPU *gpu = (PS_GPU *)buffer;
+
+  // Override the upscaling factor
+  gpu->upscale_shift = ushift;
+
+  // Rescale the VRAM for the new upscaling ratio
+  uint16_t *vram_new = gpu->vram;
+
+  //For simplicity we do the transfer at 1x internal resolution.
+  for (unsigned y = 0; y < 512; y++) {
+    for (unsigned x = 0; x < 1024; x++) {
+      gpu->texel_put(x, y, texel_fetch(x, y));
+    }
+  }
+
+  return gpu;
 }
 
 void PS_GPU::FillVideoParams(MDFNGI* gi)

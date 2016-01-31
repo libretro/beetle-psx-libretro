@@ -40,12 +40,20 @@ struct line_point
 
 class PS_GPU
 {
+  private:
+      // Private constructors and destructors since we need to use
+      // custom allocators to allocate the flexible vram
+      PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
+     ~PS_GPU() MDFN_COLD;
+
+      static void *Alloc(uint8 upscale_shift) MDFN_COLD;
+
    public:
 
-      PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
-      ~PS_GPU() MDFN_COLD;
+      static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
+      static void Destroy(PS_GPU *gpu) MDFN_COLD;
 
-      void upscale_shift_set(uint8_t upscale_shift) MDFN_COLD;
+      PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
 
       void FillVideoParams(MDFNGI* gi) MDFN_COLD;
 
@@ -143,7 +151,6 @@ class PS_GPU
       }
 
       uint8 upscale_shift;
-      uint16 vram[(1024*512) << 4]; // 16MB
 
       uint32 DMAControl;
 
@@ -366,6 +373,12 @@ class PS_GPU
 
       template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
          void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
+
+      // "Flexible" array at the end of the struct. This lets us
+      // having a dynamically sized vram (depending on the internal
+      // upscaling ratio) without having an additional level of
+      // indirection since it'll be allocated right after the struct
+      uint16 vram[0];
 };
 
 #endif
