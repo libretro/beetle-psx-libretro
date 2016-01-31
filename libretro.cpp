@@ -5,7 +5,7 @@
 #include "mednafen/md5.h"
 #include "mednafen/msvc_compat.h"
 #ifdef NEED_DEINTERLACER
-#include	"mednafen/video/Deinterlacer.h"
+#include "mednafen/video/Deinterlacer.h"
 #endif
 #include "libretro.h"
 #include <rthreads/rthreads.h>
@@ -25,12 +25,7 @@ static unsigned players = 2;
 
 static int psx_skipbios;
 
-
-
 unsigned char widescreen_hack;
-unsigned char widescreen_auto_ar;
-unsigned char widescreen_auto_ar_old;
-
 bool psx_cpu_overclock;
 uint8_t psx_gpu_upscale_shift;
 static bool is_pal;
@@ -2126,8 +2121,6 @@ char *psx_analog_type;
 #define RETRO_DEVICE_DUALSHOCK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
 #define RETRO_DEVICE_FLIGHTSTICK  RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 
-;
-
 #ifdef NEED_DEINTERLACER
 static bool PrevInterlaced;
 static Deinterlacer deint;
@@ -2418,8 +2411,6 @@ static void check_variables(void)
          psx_skipbios = 0;
    }   
    
-   
-
    var.key = "beetle_psx_widescreen_hack";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2428,10 +2419,6 @@ static void check_variables(void)
          widescreen_hack = true;
       else if (strcmp(var.value, "disabled") == 0)
          widescreen_hack = false;
-
-      struct retro_system_av_info new_av_info;
-      retro_get_system_av_info(&new_av_info);
-      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
    }
    else
       widescreen_hack = false;
@@ -2452,7 +2439,8 @@ static void check_variables(void)
      // Crappy "ffs" implementation since the standard function is not
      // widely supported by libc in the wild
      psx_gpu_upscale_shift = 0;
-     while ((val & 1) == 0) {
+     while ((val & 1) == 0)
+     {
        psx_gpu_upscale_shift++;
        val >>= 1;
      }
@@ -3170,6 +3158,9 @@ void retro_run(void)
 
 
       check_variables();
+      struct retro_system_av_info new_av_info;
+      retro_get_system_av_info(&new_av_info);
+      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
 
       if (GPU->upscale_shift != psx_gpu_upscale_shift) 
       {
@@ -3181,14 +3172,14 @@ void retro_run(void)
          {
 	         // We successfully changed the frontend's resolution, we can
 	         // apply the change immediately
-	         GPU->AllocVRam(psx_gpu_upscale_shift);
-	         alloc_surface();
-	      } 
+            GPU->AllocVRam(psx_gpu_upscale_shift);
+            alloc_surface();
+         }
          else 
          {
-	         // Failed, we have to postpone the upscaling change
-	         psx_gpu_upscale_shift = GPU->upscale_shift;
-	      }
+            // Failed, we have to postpone the upscaling change
+            psx_gpu_upscale_shift = GPU->upscale_shift;
+         }
       }
    }
 
@@ -3271,7 +3262,7 @@ void retro_run(void)
       if(Memcard_SaveDelay[i] >= 0)
       {
          Memcard_SaveDelay[i] += timestamp;
-         if(Memcard_SaveDelay[i] >= (33868800 * 2))	// Wait until about 2 seconds of no new writes.
+         if(Memcard_SaveDelay[i] >= (33868800 * 2))   // Wait until about 2 seconds of no new writes.
          {
             char ext[64];
             const char *memcard = NULL;
@@ -3411,7 +3402,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
-   info->geometry.aspect_ratio = !widescreen_auto_ar ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
+   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 }
 
 void retro_deinit(void)
