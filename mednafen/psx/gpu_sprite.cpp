@@ -66,15 +66,6 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
    if(y_bound > (ClipY1 + 1))
       y_bound = ClipY1 + 1;
 
-   // Upscale
-   y_start <<= UPSCALE_SHIFT;
-   y_bound <<= UPSCALE_SHIFT;
-   x_start <<= UPSCALE_SHIFT;
-   x_bound <<= UPSCALE_SHIFT;
-   u = (u & 0xff) << UPSCALE_SHIFT;
-   v = (v & 0xff) << UPSCALE_SHIFT;
-
-
    //HeightMode && !dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1)) && !DisplayOff
    //printf("%d:%d, %d, %d ---- heightmode=%d displayfb_ystart=%d field_atvs=%d displayoff=%d\n", w, h, scanline, dfe, HeightMode, DisplayFB_YStart, field_atvs, DisplayOff);
 
@@ -85,15 +76,15 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
       if(textured)
          u_r = u;
 
-      if(!LineSkipTest(this, y >> UPSCALE_SHIFT))
+      if(!LineSkipTest(this, y))
       {
-         if(y_bound > y_start && x_bound > x_start && ((y & (UPSCALE - 1)) == 0))
+	if(y_bound > y_start && x_bound > x_start)
          {
             // Note(TODO): From tests on a PS1, even a 0-width sprite takes up time to "draw" proportional to its height.
-            int32_t suck_time = /* 8 + */ (x_bound - x_start) >> UPSCALE_SHIFT;
+	   int32_t suck_time = /* 8 + */ (x_bound - x_start);
 
             if((BlendMode >= 0) || MaskEval_TA)
-               suck_time += ((((x_bound >> UPSCALE_SHIFT) + 1) & ~1) - ((x_start >> UPSCALE_SHIFT) & ~1)) >> 1;
+	      suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
 
             DrawTimeAvail -= suck_time;
          }
@@ -102,9 +93,7 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
          {
             if(textured)
             {
-               uint16_t fbw = GetTexel<TexMode_TA>(clut_offset,
-                     u_r >> UPSCALE_SHIFT,
-                     v   >> UPSCALE_SHIFT);
+	      uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
 
                if(fbw)
                {
@@ -112,11 +101,11 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
                   {
                      fbw = ModTexel(fbw, r, g, b, 3, 2);
                   }
-                  PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+                  PlotNativePixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
                }
             }
             else
-               PlotPixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
+               PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
 
             if(textured)
                u_r += u_inc;

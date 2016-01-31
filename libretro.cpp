@@ -32,6 +32,7 @@ unsigned char widescreen_auto_ar;
 unsigned char widescreen_auto_ar_old;
 
 bool psx_cpu_overclock;
+uint8_t psx_gpu_upscale_shift;
 static bool is_pal;
 
 char retro_save_directory[4096];
@@ -1277,7 +1278,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = new PS_GPU(region == REGION_EU, sls, sle);
+   GPU = new PS_GPU(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -2116,8 +2117,6 @@ extern void SetInput(int port, const char *type, void *ptr);
 static bool overscan;
 static double last_sound_rate;
 
-static MDFN_Surface *surf;
-
 static bool failed_init;
 
 char *psx_analog_type;
@@ -2143,6 +2142,23 @@ static Deinterlacer deint;
 #define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
 #define MEDNAFEN_CORE_GEOMETRY_MAX_H 576
 #define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
+
+static MDFN_Surface *surf = NULL;
+
+static void alloc_surface() {
+  MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
+  uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+  uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+
+  width  <<= GPU->upscale_shift;
+  height <<= GPU->upscale_shift;
+
+  if (surf != NULL) {
+    delete surf;
+  }
+
+  surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
+}
 
 static void check_system_specs(void)
 {
@@ -2427,6 +2443,24 @@ static void check_variables(void)
    }
    else
       widescreen_auto_ar = false;
+
+   var.key = "beetle_psx_internal_resolution";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+     // We only support one digit upscaling ratios for now... fix me
+     // if we even want 16x.
+     uint8_t val = var.value[0] - '0';
+
+     assert(var.value[1] == 'x');
+
+     // Upscale must be a power of two
+     assert((val & (val - 1)) == 0);
+
+     psx_gpu_upscale_shift = ffs(val) - 1;
+   }
+   else
+     psx_gpu_upscale_shift = 0;
 
    var.key = "beetle_psx_analog_toggle";
 
@@ -2976,17 +3010,9 @@ bool retro_load_game(const struct retro_game_info *info)
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
 
-   MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-
    is_pal = (CalcDiscSCEx() == REGION_EU);
 
-   uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-   uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
-
-   width  <<= UPSCALE_SHIFT;
-   height <<= UPSCALE_SHIFT;
-
-   surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
+   alloc_surface();
 
 #ifdef NEED_DEINTERLACER
 	PrevInterlaced = false;
@@ -3144,14 +3170,32 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
       widescreen_auto_ar_old = widescreen_auto_ar;
+
       check_variables();
+
+      if (GPU->upscale_shift != psx_gpu_upscale_shift) {
+	struct retro_system_av_info new_av_info;
+	retro_get_system_av_info(&new_av_info);
+
+	if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
+		       &new_av_info)) {
+	  // We successfully changed the frontend's resolution, we can
+	  // apply the change immediately
+	  GPU->AllocVRam(psx_gpu_upscale_shift);
+	  alloc_surface();
+	} else {
+	  // Failed, we have to postpone the upscaling change
+	  psx_gpu_upscale_shift = GPU->upscale_shift;
+	}
+      }
 
       if (widescreen_auto_ar != widescreen_auto_ar_old)
       {
-         struct retro_system_av_info new_av_info;
-         retro_get_system_av_info(&new_av_info);
-         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+	struct retro_system_av_info new_av_info;
+	retro_get_system_av_info(&new_av_info);
+	environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
       }
+
    }
 
    if (setting_apply_analog_toggle)
@@ -3340,11 +3384,13 @@ void retro_run(void)
       }
    }
 
-   width  <<= UPSCALE_SHIFT;
-   height <<= UPSCALE_SHIFT;
-   pix     += pix_offset << UPSCALE_SHIFT;
+   uint8_t upscale_shift = GPU->upscale_shift;
 
-   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + UPSCALE_SHIFT));
+   width  <<= upscale_shift;
+   height <<= upscale_shift;
+   pix     += pix_offset << upscale_shift;
+
+   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
@@ -3367,10 +3413,10 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->timing.fps            = is_pal ? 49.842 : 59.941;
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << UPSCALE_SHIFT;
-   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << UPSCALE_SHIFT;
-   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << UPSCALE_SHIFT;
-   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << UPSCALE_SHIFT;
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
+   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
+   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
    info->geometry.aspect_ratio = !widescreen_auto_ar ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 }
 
@@ -3440,6 +3486,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },
+      { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },

@@ -2,7 +2,7 @@ template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
    // More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
-   y &= (512 << UPSCALE_SHIFT) - 1;
+   y &= (512 << upscale_shift) - 1;
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
@@ -75,9 +75,9 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
    }
 }
 
-/// Copy of PlotPixel without internal upscaling, used to draw lines
+/// Copy of PlotPixel without internal upscaling, used to draw lines and sprites
 template<int BlendMode, bool MaskEval_TA, bool textured>
-INLINE void PS_GPU::PlotLinePixel(int32_t x, int32_t y, uint16_t fore_pix)
+INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
    y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
