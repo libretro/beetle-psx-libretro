@@ -103,12 +103,14 @@ endif
 endif
 
 ifeq ($(NEED_TREMOR), 1)
-   SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
    FLAGS += -DNEED_TREMOR
 endif
 
-
 ifneq ($(HAVE_GRIFFIN), 1)
+ifeq ($(NEED_TREMOR), 1)
+   SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+endif
+
 SOURCES_CXX += \
 	$(MEDNAFEN_DIR)/error.cpp \
 	$(MEDNAFEN_DIR)/settings.cpp \
@@ -128,18 +130,20 @@ SOURCES_C += \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
 endif
 
-SOURCES_C += $(MEDNAFEN_DIR)/trio/trio.c \
-				 $(MEDNAFEN_DIR)/trio/triostr.c 
+
+SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
 
 ifeq ($(HAVE_GRIFFIN), 1)
 SOURCES_C += beetle_psx_griffin_c.c
-endif
-
+else
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
-				 $(LIBRETRO_DIR)/file/retro_stat.c
+				 $(MEDNAFEN_DIR)/trio/trio.c \
+				 $(MEDNAFEN_DIR)/trio/triostr.c 
 
 ifeq ($(NEED_THREADING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
 endif
 endif
+endif
+

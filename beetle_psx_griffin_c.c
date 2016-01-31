@@ -15,11 +15,13 @@
 #include "mednafen/tremor/window.c"
 
 #include "mednafen/file.c"
+#include "mednafen/md5.c"
 #include "mednafen/mednafen-endian.c"
 #include "mednafen/trio/trio.c"
 #include "mednafen/trio/triostr.c"
 
-#include "threads.c"
+#include "libretro-common/file/retro_file.c"
+#include "libretro-common/rthreads/rthreads.c"
 #include "scrc32.c"
 
 #ifdef NEED_CD

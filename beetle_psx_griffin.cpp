@@ -20,7 +20,6 @@
 #include "mednafen/psx/input/mouse.cpp"
 
 #include "mednafen/error.cpp"
-#include "mednafen/math_ops.cpp"
 #include "mednafen/settings.cpp"
 #include "mednafen/general.cpp"
 #include "mednafen/FileStream.cpp"
@@ -41,6 +40,5 @@
 #include "mednafen/mempatcher.cpp"
 #include "mednafen/video/Deinterlacer.cpp"
 #include "mednafen/video/surface.cpp"
-#include "mednafen/md5.cpp"
 
 #include "libretro.cpp"

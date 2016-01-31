@@ -61,7 +61,7 @@ static uint16_t subq_crctab[256] =
 };
 
 
-static uint8_t scramble_table[2352 - 12];
+static uint8_t cdutil_scramble_table[2352 - 12];
 
 static bool CDUtility_Inited = false;
 
@@ -82,7 +82,7 @@ static void InitScrambleTable(void)
          cv = (cv >> 1) | (feedback << 14);
       }
 
-      scramble_table[i - 12] = z;
+      cdutil_scramble_table[i - 12] = z;
    }
 }
 
@@ -305,5 +305,5 @@ void scrambleize_data_sector(uint8_t *sector_data)
 {
    unsigned i;
    for(i = 12; i < 2352; i++)
-      sector_data[i] ^= scramble_table[i - 12];
+      sector_data[i] ^= cdutil_scramble_table[i - 12];
 }
