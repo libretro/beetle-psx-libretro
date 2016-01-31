@@ -1548,21 +1548,21 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    uint32 TexCache_Tag[256];
    uint16 TexCache_Data[256][4];
 
-   uint16 *vram_save = NULL;
+   uint16 *GPURAM = NULL;
 
    if (upscale_shift == 0) {
      // No upscaling, we can dump the VRAM contents directly
-     vram_save = vram;
+     GPURAM = vram;
    } else {
      // We have increased internal resolution, savestates are always
      // made at 1x for compatibility
-     vram_save = new uint16[1024 * 512];
+     GPURAM = new uint16[1024 * 512];
 
      if (!load) {
        // We must downscale the current VRAM contents back to 1x
        for (unsigned y = 0; y < 512; y++) {
 	 for (unsigned x = 0; x < 1024; x++) {
-	   vram_save[y * 1024 + x] = texel_fetch(x, y);
+	   GPURAM[y * 1024 + x] = texel_fetch(x, y);
 	 }
        }
      }
@@ -1578,7 +1578,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    }
    SFORMAT StateRegs[] =
    {
-      SFARRAY16(vram_save, 1024 * 512),
+      SFARRAY16(GPURAM, 1024 * 512),
 
       SFVAR(DMAControl),
 
@@ -1683,13 +1683,13 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
        // Restore upscaled VRAM from savestate
        for (unsigned y = 0; y < 512; y++) {
 	 for (unsigned x = 0; x < 1024; x++) {
-	   texel_put(x, y, vram_save[y * 1024 + x]);
+	   texel_put(x, y, GPURAM[y * 1024 + x]);
 	 }
        }
      }
 
-     delete [] vram_save;
-     vram_save = NULL;
+     delete [] GPURAM;
+     GPURAM = NULL;
    }
 
    if(load)
