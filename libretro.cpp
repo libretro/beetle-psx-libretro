@@ -2428,21 +2428,13 @@ static void check_variables(void)
          widescreen_hack = true;
       else if (strcmp(var.value, "disabled") == 0)
          widescreen_hack = false;
+
+      struct retro_system_av_info new_av_info;
+      retro_get_system_av_info(&new_av_info);
+      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
    }
    else
       widescreen_hack = false;
-
-   var.key = "beetle_psx_widescreen_auto_ar";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "enabled") == 0 && widescreen_hack)
-         widescreen_auto_ar = true;
-      else if (strcmp(var.value, "disabled") == 0)
-         widescreen_auto_ar = false;
-   }
-   else
-      widescreen_auto_ar = false;
 
    var.key = "beetle_psx_internal_resolution";
 
@@ -3175,33 +3167,29 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
-      widescreen_auto_ar_old = widescreen_auto_ar;
+
 
       check_variables();
 
-      if (GPU->upscale_shift != psx_gpu_upscale_shift) {
-	struct retro_system_av_info new_av_info;
-	retro_get_system_av_info(&new_av_info);
-
-	if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
-		       &new_av_info)) {
-	  // We successfully changed the frontend's resolution, we can
-	  // apply the change immediately
-	  GPU->AllocVRam(psx_gpu_upscale_shift);
-	  alloc_surface();
-	} else {
-	  // Failed, we have to postpone the upscaling change
-	  psx_gpu_upscale_shift = GPU->upscale_shift;
-	}
-      }
-
-      if (widescreen_auto_ar != widescreen_auto_ar_old)
+      if (GPU->upscale_shift != psx_gpu_upscale_shift) 
       {
-	struct retro_system_av_info new_av_info;
-	retro_get_system_av_info(&new_av_info);
-	environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
-      }
+	      struct retro_system_av_info new_av_info;
+	      retro_get_system_av_info(&new_av_info);
 
+	      if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
+		       &new_av_info)) 
+         {
+	         // We successfully changed the frontend's resolution, we can
+	         // apply the change immediately
+	         GPU->AllocVRam(psx_gpu_upscale_shift);
+	         alloc_surface();
+	      } 
+         else 
+         {
+	         // Failed, we have to postpone the upscaling change
+	         psx_gpu_upscale_shift = GPU->upscale_shift;
+	      }
+      }
    }
 
    if (setting_apply_analog_toggle)
@@ -3491,7 +3479,6 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
-      { "beetle_psx_widescreen_auto_ar", "Widescreen hack auto aspect ratio; disabled|enabled" },
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
