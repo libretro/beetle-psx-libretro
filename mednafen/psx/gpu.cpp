@@ -115,15 +115,24 @@ PS_GPU::~PS_GPU()
 
 void PS_GPU::AllocVRam(uint8_t ushift) {
   uint16_t *vram_new;
+  unsigned width = 1024 << ushift;
+  unsigned height = 512 << ushift;
 
-  unsigned npixels = (512 * 1024) << (ushift * 2);
+  vram_new = new uint16_t[width * height];
 
-  vram_new = new uint16_t[npixels];
-
-  memset(vram_new, 0, npixels * sizeof(*vram_new));
+  memset(vram_new, 0, width * height * sizeof(*vram_new));
 
   if (vram != NULL) {
-      // XXX rescale
+    // We already have a VRAM buffer, we can copy its content into the
+    // new one. For simplicity we do the transfer at 1x internal
+    // resolution.
+
+    for (unsigned y = 0; y < height; y++) {
+      for (unsigned x = 0; x < width; x++) {
+	vram_new[y * width + x] = texel_fetch(x >> ushift, y >> ushift);
+      }
+    }
+
     delete [] vram;
     vram = NULL;
   }
