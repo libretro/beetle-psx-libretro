@@ -3172,7 +3172,7 @@ void retro_run(void)
          {
 	         // We successfully changed the frontend's resolution, we can
 	         // apply the change immediately
-            GPU->AllocVRam(psx_gpu_upscale_shift);
+            GPU->upscale_shift = psx_gpu_upscale_shift;
             alloc_surface();
          }
          else 
@@ -3470,7 +3470,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
-      { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+      { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },

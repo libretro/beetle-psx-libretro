@@ -100,45 +100,11 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
    LineVisFirst = sls;
    LineVisLast = sle;
 
-   vram = NULL;
-
-   AllocVRam(upscale_shift);
+   this->upscale_shift = upscale_shift;
 }
 
 PS_GPU::~PS_GPU()
 {
-  if (vram != NULL) {
-    delete [] vram;
-    vram = NULL;
-  }
-}
-
-void PS_GPU::AllocVRam(uint8_t ushift) {
-  uint16_t *vram_new;
-  unsigned width = 1024 << ushift;
-  unsigned height = 512 << ushift;
-
-  vram_new = new uint16_t[width * height];
-
-  memset(vram_new, 0, width * height * sizeof(*vram_new));
-
-  if (vram != NULL) {
-    // We already have a VRAM buffer, we can copy its content into the
-    // new one. For simplicity we do the transfer at 1x internal
-    // resolution.
-
-    for (unsigned y = 0; y < height; y++) {
-      for (unsigned x = 0; x < width; x++) {
-	vram_new[y * width + x] = texel_fetch(x >> ushift, y >> ushift);
-      }
-    }
-
-    delete [] vram;
-    vram = NULL;
-  }
-
-  vram = vram_new;
-  this->upscale_shift = ushift;
 }
 
 void PS_GPU::FillVideoParams(MDFNGI* gi)

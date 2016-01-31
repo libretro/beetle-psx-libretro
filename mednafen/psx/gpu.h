@@ -45,8 +45,6 @@ class PS_GPU
       PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       ~PS_GPU() MDFN_COLD;
 
-      void AllocVRam(uint8_t upscale_shift) MDFN_COLD;
-
       void FillVideoParams(MDFNGI* gi) MDFN_COLD;
 
       void Power(void) MDFN_COLD;
@@ -143,7 +141,7 @@ class PS_GPU
       }
 
       uint8 upscale_shift;
-      uint16 *vram;
+      uint16 vram[(1024*512) << 4]; // 16MB
 
       uint32 DMAControl;
 
