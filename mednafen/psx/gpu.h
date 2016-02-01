@@ -47,6 +47,13 @@ struct line_point
    uint8 r, g, b;
 };
 
+#define vertex_swap(_type, _a, _b) \
+{                           \
+   _type tmp = _a;          \
+   _a = _b;                 \
+   _b = tmp;                \
+}                           \
+
 class PS_GPU
 {
   private:

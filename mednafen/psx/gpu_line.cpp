@@ -119,12 +119,7 @@ void PS_GPU::DrawLine(line_point *points)
       return;
 
    if(points[0].x > points[1].x && k)
-   {
-      line_point tmp = points[1];
-
-      points[1] = points[0];
-      points[0] = tmp;  
-   }
+      vertex_swap(line_point, points[1], points[0]);
 
    DrawTimeAvail -= k * 2;
 

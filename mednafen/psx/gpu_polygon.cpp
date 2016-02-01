@@ -236,25 +236,13 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    // Sort vertices by y.
    //
    if(vertices[2].y < vertices[1].y)
-   {
-      tri_vertex tmp = vertices[1];
-      vertices[1] = vertices[2];
-      vertices[2] = tmp;
-   }
+      vertex_swap(tri_vertex, vertices[1], vertices[2]);
 
    if(vertices[1].y < vertices[0].y)
-   {
-      tri_vertex tmp = vertices[0];
-      vertices[0] = vertices[1];
-      vertices[1] = tmp;
-   }
+      vertex_swap(tri_vertex, vertices[0], vertices[1]);
 
    if(vertices[2].y < vertices[1].y)
-   {
-      tri_vertex tmp = vertices[1];
-      vertices[1] = vertices[2];
-      vertices[2] = tmp;
-   }
+      vertex_swap(tri_vertex, vertices[1], vertices[2]);
 
    if(vertices[0].y == vertices[2].y)
       return;
