@@ -1277,7 +1277,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
             TIMER_SetHRetrace(false);
 
-            if(DisplayMode & 0x08)
+            if(DisplayMode & DISP_PAL)
                LineClockCounter = 3405 - 200;
             else
                LineClockCounter = 3412 + PhaseChange - 200;
@@ -1309,7 +1309,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                   PSX_RequestMLExit();
                }
 
-               if(DisplayMode & 0x20)
+               if(DisplayMode & DISP_INTERLACED)
                   field = !field;
                else
                   field = 0;
@@ -1320,9 +1320,9 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                assert(sl_zero_reached == false);
                sl_zero_reached = true;
 
-               if(DisplayMode & 0x20)
+               if(DisplayMode & DISP_INTERLACED)
                {
-                  if(DisplayMode & 0x08) // PAL
+                  if(DisplayMode & DISP_PAL)
                      LinesPerField = 313 - field;
                   else                   // NTSC
                      LinesPerField = 263 - field;
@@ -1331,7 +1331,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                {
                   field = 0;  // May not be the correct place for this?
 
-                  if(DisplayMode & 0x08)	// PAL
+                  if(DisplayMode & DISP_PAL)
                      LinesPerField = 314;
                   else			// NTSC
                      LinesPerField = 263;
@@ -1340,7 +1340,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                if(espec)
                {
-                  if((bool)(DisplayMode & 0x08) != HardwarePALType)
+                  if((bool)(DisplayMode & DISP_PAL) != HardwarePALType)
                   {
                      DisplayRect->x = 0;
                      DisplayRect->y = 0;
@@ -1363,13 +1363,13 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                   }
                   else
                   {
-                     espec->InterlaceOn = (bool)(DisplayMode & 0x20);
-                     espec->InterlaceField = (bool)(DisplayMode & 0x20) && field;
+                     espec->InterlaceOn = (bool)(DisplayMode & DISP_INTERLACED);
+                     espec->InterlaceField = (bool)(DisplayMode & DISP_INTERLACED) && field;
 
                      DisplayRect->x = 0;
                      DisplayRect->y = 0;
                      DisplayRect->w = 0;
-                     DisplayRect->h = VisibleLineCount << (bool)(DisplayMode & 0x20);
+                     DisplayRect->h = VisibleLineCount << (bool)(DisplayMode & DISP_INTERLACED);
 
                      // Clear ~0 state.
                      LineWidths[0] = 0;
@@ -1449,7 +1449,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             unsigned pix_clock = 0;
             unsigned pix_clock_div = 0;
             uint32_t *dest = NULL;
-            if((bool)(DisplayMode & 0x08) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount))
+            if((bool)(DisplayMode & DISP_PAL) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32 dest_line;
                int32 fb_x = DisplayFB_XStart * 2;
@@ -1468,7 +1468,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                if(dx_start < 0)
                {
-                  fb_x -= dx_start * ((DisplayMode & 0x10) ? 3 : 2);
+                  fb_x -= dx_start * ((DisplayMode & DISP_RGB24) ? 3 : 2);
                   fb_x &= 0x7FF; //0x3FF;
                   dx_start = 0;
                }
@@ -1505,7 +1505,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                      memset(dest, 0, udx_start * sizeof(int32));
 
                      //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                     ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & 0x10, src, dest, udx_start, udx_end, ufb_x);
+                     ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & DISP_RGB24, src, dest, udx_start, udx_end, ufb_x);
 
                      //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
                      //
