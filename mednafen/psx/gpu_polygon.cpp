@@ -320,8 +320,8 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
       if(vertices[2].x <= vertices[iggvi].x)
          iggvi = 2;
 
-      ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1));
-      ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1));
+      ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1 - upscale_shift));
+      ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1 - upscale_shift));
       ig.r = COORD_MF_INT(vertices[iggvi].r);
       ig.g = COORD_MF_INT(vertices[iggvi].g);
       ig.b = COORD_MF_INT(vertices[iggvi].b);
