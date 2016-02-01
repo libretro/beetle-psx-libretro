@@ -18,6 +18,11 @@ class PS_GPU;
 #define DISP_RGB24      0x10
 #define DISP_INTERLACED 0x20
 
+#define BLEND_MODE_AVERAGE    0
+#define BLEND_MODE_ADD        1
+#define BLEND_MODE_SUBTRACT   2
+#define BLEND_MODE_ADD_FOURTH 3
+
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);

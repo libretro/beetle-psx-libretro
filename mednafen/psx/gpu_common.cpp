@@ -21,12 +21,12 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
       // Efficient 15bpp pixel math algorithms from blargg
       switch(BlendMode)
       {
-         case 0:
+         case BLEND_MODE_AVERAGE:
             bg_pix |= 0x8000;
             pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
             break;
 
-         case 1:
+         case BLEND_MODE_ADD:
             {
                bg_pix &= ~0x8000;
 
@@ -37,7 +37,7 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
             }
             break;
 
-         case 2:
+         case BLEND_MODE_SUBTRACT:
             {
                bg_pix |= 0x8000;
                fore_pix &= ~0x8000;
@@ -49,7 +49,7 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
             }
             break;
 
-         case 3:
+         case BLEND_MODE_ADD_FOURTH:
             {
                bg_pix &= ~0x8000;
                fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
@@ -59,9 +59,6 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 
                pix = (sum - carry) | (carry - (carry >> 5));
             }
-            break;
-         case -1:
-         default:
             break;
       }
 
@@ -98,12 +95,12 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
       // Efficient 15bpp pixel math algorithms from blargg
       switch(BlendMode)
       {
-         case 0:
+         case BLEND_MODE_AVERAGE:
             bg_pix |= 0x8000;
             pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
             break;
 
-         case 1:
+         case BLEND_MODE_ADD:
             {
                bg_pix &= ~0x8000;
 
@@ -114,7 +111,7 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
             }
             break;
 
-         case 2:
+         case BLEND_MODE_SUBTRACT:
             {
                bg_pix |= 0x8000;
                fore_pix &= ~0x8000;
@@ -126,7 +123,7 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
             }
             break;
 
-         case 3:
+         case BLEND_MODE_ADD_FOURTH:
             {
                bg_pix &= ~0x8000;
                fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
@@ -136,9 +133,6 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
 
                pix = (sum - carry) | (carry - (carry >> 5));
             }
-            break;
-         case -1:
-         default:
             break;
       }
 
