@@ -102,20 +102,20 @@ static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step)
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
-   int32_t i_dx;
-   int32_t i_dy;
+   int32_t delta_x;
+   int32_t delta_y;
    int32_t k;
    line_fxp_coord cur_point;
    line_fxp_step step;
 
-   i_dx = abs(points[1].x - points[0].x);
-   i_dy = abs(points[1].y - points[0].y);
-   k = (i_dx > i_dy) ? i_dx : i_dy;
+   delta_x = abs(points[1].x - points[0].x);
+   delta_y = abs(points[1].y - points[0].y);
+   k = (delta_x > delta_y) ? delta_x : delta_y;
 
-   if(i_dx >= 1024)
+   if(delta_x >= 1024)
       return;
 
-   if(i_dy >= 512)
+   if(delta_y >= 512)
       return;
 
    if(points[0].x > points[1].x && k)
@@ -170,7 +170,7 @@ void PS_GPU::DrawLine(line_point *points)
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
          if(x >= ClipX0 && x <= ClipX1 && y >= ClipY0 && y <= ClipY1)
-	   PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+            PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
       }
 
       AddLineStep<goraud>(cur_point, step);
