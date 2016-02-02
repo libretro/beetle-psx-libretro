@@ -134,8 +134,8 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 
    if(textured)
    {
-      u = *cb & 0xFF;
-      v = (*cb >> 8) & 0xFF;
+      u    = *cb & 0xFF;
+      v    = (*cb >> 8) & 0xFF;
       clut = ((*cb >> 16) & 0xFFFF) << 4;
       Update_CLUT_Cache<TexMode_TA>((*cb >> 16) & 0xFFFF);
       cb++;

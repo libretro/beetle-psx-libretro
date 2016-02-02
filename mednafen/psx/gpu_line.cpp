@@ -104,15 +104,11 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
-   int32_t delta_x;
-   int32_t delta_y;
-   int32_t k;
    line_fxp_coord cur_point;
    line_fxp_step step;
-
-   delta_x = abs(points[1].x - points[0].x);
-   delta_y = abs(points[1].y - points[0].y);
-   k = (delta_x > delta_y) ? delta_x : delta_y;
+   int32_t delta_x = abs(points[1].x - points[0].x);
+   int32_t delta_y = abs(points[1].y - points[0].y);
+   int32_t k       = (delta_x > delta_y) ? delta_x : delta_y;
 
    if(delta_x >= 1024)
       return;
@@ -177,10 +173,10 @@ void PS_GPU::DrawLine(line_point *points)
 template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
 INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
 {
-   const uint8_t cc = cb[0] >> 24; // For pline handling later.
    line_point points[2];
+   const uint8_t cc = cb[0] >> 24; // For pline handling later.
 
-   DrawTimeAvail -= 16;	// FIXME, correct time.
+   DrawTimeAvail   -= 16;	// FIXME, correct time.
 
    if(polyline && InCmd == INCMD_PLINE)
    {
