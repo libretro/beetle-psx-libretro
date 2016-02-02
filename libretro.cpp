@@ -2981,8 +2981,6 @@ bool retro_load_game(const struct retro_game_info *info)
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
 
-   log_cb(RETRO_LOG_INFO, "PATH IS NOW!!!!! %s\n", retro_cd_path);
-
    check_variables();
    //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
