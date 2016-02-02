@@ -7,23 +7,13 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
       uint16 bg_pix = vram_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      uint16 pix; // = fore_pix & 0x8000;
 
-      /*
-         static const int32_t tab[4][2] =
-         {
-         { 2,  2 },
-         { 4,  4 },
-         { 4, -4 },
-         { 4,  1 }
-         };
-         */
       // Efficient 15bpp pixel math algorithms from blargg
       switch(BlendMode)
       {
          case BLEND_MODE_AVERAGE:
             bg_pix |= 0x8000;
-            pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
+            fore_pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
             break;
 
          case BLEND_MODE_ADD:
@@ -33,7 +23,7 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
                uint32_t sum = fore_pix + bg_pix;
                uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-               pix = (sum - carry) | (carry - (carry >> 5));
+               fore_pix = (sum - carry) | (carry - (carry >> 5));
             }
             break;
 
@@ -45,7 +35,7 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
                uint32_t diff = bg_pix - fore_pix + 0x108420;
                uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
-               pix = (diff - borrow) & (borrow - (borrow >> 5));
+               fore_pix = (diff - borrow) & (borrow - (borrow >> 5));
             }
             break;
 
@@ -57,47 +47,33 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
                uint32_t sum = fore_pix + bg_pix;
                uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-               pix = (sum - carry) | (carry - (carry >> 5));
+               fore_pix = (sum - carry) | (carry - (carry >> 5));
             }
             break;
       }
+   }
 
-      if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
-         vram_put(x, y, (textured ? pix : (pix & 0x7FFF)) | MaskSetOR);
-   }
-   else
-   {
-      if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
-         vram_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
-   }
+   if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
+      vram_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
 }
 
 /// Copy of PlotPixel without internal upscaling, used to draw lines and sprites
 template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
+   uint16_t output;
    y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
-     uint16 bg_pix = texel_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      uint16 pix; // = fore_pix & 0x8000;
+      uint16 bg_pix = texel_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
 
-      /*
-         static const int32_t tab[4][2] =
-         {
-         { 2,  2 },
-         { 4,  4 },
-         { 4, -4 },
-         { 4,  1 }
-         };
-         */
       // Efficient 15bpp pixel math algorithms from blargg
       switch(BlendMode)
       {
          case BLEND_MODE_AVERAGE:
             bg_pix |= 0x8000;
-            pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
+            fore_pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
             break;
 
          case BLEND_MODE_ADD:
@@ -107,19 +83,19 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
                uint32_t sum = fore_pix + bg_pix;
                uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-               pix = (sum - carry) | (carry - (carry >> 5));
+               fore_pix = (sum - carry) | (carry - (carry >> 5));
             }
             break;
 
          case BLEND_MODE_SUBTRACT:
             {
-               bg_pix |= 0x8000;
+               bg_pix   |=  0x8000;
                fore_pix &= ~0x8000;
 
                uint32_t diff = bg_pix - fore_pix + 0x108420;
                uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
 
-               pix = (diff - borrow) & (borrow - (borrow >> 5));
+               fore_pix = (diff - borrow) & (borrow - (borrow >> 5));
             }
             break;
 
@@ -131,19 +107,14 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
                uint32_t sum = fore_pix + bg_pix;
                uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
 
-               pix = (sum - carry) | (carry - (carry >> 5));
+               fore_pix = (sum - carry) | (carry - (carry >> 5));
             }
             break;
       }
+   }
 
-      if(!MaskEval_TA || !(texel_fetch(x, y) & 0x8000))
-	texel_put(x, y, (textured ? pix : (pix & 0x7FFF)) | MaskSetOR);
-   }
-   else
-   {
-     if(!MaskEval_TA || !(texel_fetch(x, y) & 0x8000))
-       texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
-   }
+   if(!MaskEval_TA || !(texel_fetch(x, y) & 0x8000))
+      texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
 }
 
 INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32_t r, int32_t g, int32_t b, const int32_t dither_x, const int32_t dither_y)
