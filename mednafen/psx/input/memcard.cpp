@@ -219,7 +219,7 @@ void InputDevice_Memcard::SetDTR(bool new_dtr)
    else if(dtr && !new_dtr)
    {
       if(command_phase > 0)
-         PSX_WARNING("[MCR] Communication aborted???");
+         PSX_WARNING("[MCR] Communication aborted on phase %d", command_phase);
    }
    dtr = new_dtr;
 }
