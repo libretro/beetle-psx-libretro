@@ -78,13 +78,15 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
 
       if(!LineSkipTest(this, y))
       {
-	if(y_bound > y_start && x_bound > x_start)
+         if(y_bound > y_start && x_bound > x_start)
          {
-            // Note(TODO): From tests on a PS1, even a 0-width sprite takes up time to "draw" proportional to its height.
-	   int32_t suck_time = /* 8 + */ (x_bound - x_start);
+            /* Note(TODO): From tests on a PS1, 
+             * even a 0-width sprite takes up time 
+             * to "draw" proportional to its height. */
+            int32_t suck_time = /* 8 + */ (x_bound - x_start);
 
             if((BlendMode >= 0) || MaskEval_TA)
-	      suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
+               suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
 
             DrawTimeAvail -= suck_time;
          }
@@ -93,7 +95,7 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, uint
          {
             if(textured)
             {
-	      uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
+               uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
 
                if(fbw)
                {
