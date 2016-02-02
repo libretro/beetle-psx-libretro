@@ -36,6 +36,8 @@ static void PSX_WARNING(const char* format, ...) { }
 static void PSX_DBGINFO(const char* format, ...) { }
 #endif
 
+typedef int32_t pscpu_timestamp_t;
+
 bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp);
 
 void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V);
@@ -53,11 +55,9 @@ uint16_t PSX_MemPeek16(uint32_t A);
 uint32_t PSX_MemPeek32(uint32_t A);
 
 // Should write to WO-locations if possible
-#if 0
 void PSX_MemPoke8(uint32_t A, uint8_t V);
 void PSX_MemPoke16(uint32_t A, uint16_t V);
 void PSX_MemPoke32(uint32_t A, uint32_t V);
-#endif
 
 void PSX_RequestMLExit(void);
 void ForceEventUpdates(const int32_t timestamp);

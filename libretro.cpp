@@ -408,7 +408,7 @@ void PSX_RequestMLExit(void)
 //
 
 
-// Remember to update MemPeek<>() when we change address decoding in MemRW()
+/* Remember to update MemPeek<>() and MemPoke<>() when we change address decoding in MemRW() */
 template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32_t &timestamp, uint32_t A, uint32_t &V)
 {
 #if 0
@@ -963,6 +963,59 @@ static void PSX_Power(void)
    ForceEventUpdates(0);
 }
 
+template<typename T, bool Access24> static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32 A, T V)
+{
+   if(A < 0x00800000)
+   {
+      if(Access24)
+         MainRAM.WriteU24(A & 0x1FFFFF, V);
+      else
+         MainRAM.Write<T>(A & 0x1FFFFF, V);
+
+      return;
+   }
+
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+   {
+      if(Access24)
+         BIOSROM->WriteU24(A & 0x7FFFF, V);
+      else
+         BIOSROM->Write<T>(A & 0x7FFFF, V);
+
+      return;
+   }
+
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801000 && A <= 0x1F801023)
+      {
+         unsigned index = (A & 0x1F) >> 2;
+         SysControl.Regs[index] = (V << ((A & 3) * 8)) & SysControl_Mask[index];
+         return;
+      }
+   }
+
+   if(A == 0xFFFE0130)
+   {
+      CPU->SetBIU(V);
+      return;
+   }
+}
+
+void PSX_MemPoke8(uint32 A, uint8 V)
+{
+   MemPoke<uint8, false>(0, A, V);
+}
+
+void PSX_MemPoke16(uint32 A, uint16 V)
+{
+   MemPoke<uint16, false>(0, A, V);
+}
+
+void PSX_MemPoke32(uint32 A, uint32 V)
+{
+   MemPoke<uint32, false>(0, A, V);
+}
 
 void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
