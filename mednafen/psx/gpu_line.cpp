@@ -27,25 +27,26 @@ struct line_fxp_step
 #define LINE_RGB_FRACTBITS 12
 
 template<bool goraud>
-static INLINE void LinePointToFXPCoord(const line_point &point, const line_fxp_step &step, line_fxp_coord &coord)
+static INLINE void line_point_to_fixed_point_coord(const line_point *point,
+      const line_fxp_step *step, line_fxp_coord *coord)
 {
-   coord.x = ((uint64_t)point.x << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
-   coord.y = ((uint64_t)point.y << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
+   coord->x  = ((uint64_t)point->x << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
+   coord->y  = ((uint64_t)point->y << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
 
-   coord.x -= 1024;
+   coord->x -= 1024;
 
-   if(step.dy_dk < 0)
-      coord.y -= 1024;
+   if(step->dy_dk < 0)
+      coord->y -= 1024;
 
    if(goraud)
    {
-      coord.r = (point.r << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
-      coord.g = (point.g << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
-      coord.b = (point.b << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->r = (point->r << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->g = (point->g << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->b = (point->b << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
    }
 }
 
-static INLINE int64_t LineDivide(int64_t delta, int32_t dk)
+static INLINE int64_t line_divide(int64_t delta, int32_t dk)
 {
    delta = (uint64_t)delta << LINE_XY_FRACTBITS;
 
@@ -58,44 +59,45 @@ static INLINE int64_t LineDivide(int64_t delta, int32_t dk)
 }
 
 template<bool goraud>
-static INLINE void LinePointsToFXPStep(const line_point &point0, const line_point &point1, const int32_t dk, line_fxp_step &step)
+static INLINE void line_points_to_fixed_point_step(const line_point *point0,
+      const line_point *point1, const int32_t dk, line_fxp_step *step)
 {
    if(!dk)
    {
-      step.dx_dk = 0;
-      step.dy_dk = 0;
+      step->dx_dk = 0;
+      step->dy_dk = 0;
 
       if(goraud)
       {
-         step.dr_dk = 0;
-         step.dg_dk = 0;
-         step.db_dk = 0;
+         step->dr_dk = 0;
+         step->dg_dk = 0;
+         step->db_dk = 0;
       }
       return;
    }
 
-   step.dx_dk = LineDivide(point1.x - point0.x, dk);
-   step.dy_dk = LineDivide(point1.y - point0.y, dk);
+   step->dx_dk = line_divide(point1->x - point0->x, dk);
+   step->dy_dk = line_divide(point1->y - point0->y, dk);
 
    if(goraud)
    {
-      step.dr_dk = (int32_t)((uint32_t)(point1.r - point0.r) << LINE_RGB_FRACTBITS) / dk;
-      step.dg_dk = (int32_t)((uint32_t)(point1.g - point0.g) << LINE_RGB_FRACTBITS) / dk;
-      step.db_dk = (int32_t)((uint32_t)(point1.b - point0.b) << LINE_RGB_FRACTBITS) / dk;
+      step->dr_dk = (int32_t)((uint32_t)(point1->r - point0->r) << LINE_RGB_FRACTBITS) / dk;
+      step->dg_dk = (int32_t)((uint32_t)(point1->g - point0->g) << LINE_RGB_FRACTBITS) / dk;
+      step->db_dk = (int32_t)((uint32_t)(point1->b - point0->b) << LINE_RGB_FRACTBITS) / dk;
    }
 }
 
 template<bool goraud>
-static INLINE void AddLineStep(line_fxp_coord &point, const line_fxp_step &step)
+static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 {
-   point.x += step.dx_dk;
-   point.y += step.dy_dk;
+   point->x += step->dx_dk;
+   point->y += step->dy_dk;
 
    if(goraud)
    {
-      point.r += step.dr_dk;
-      point.g += step.dg_dk;
-      point.b += step.db_dk;
+      point->r += step->dr_dk;
+      point->g += step->dg_dk;
+      point->b += step->db_dk;
    }
 }
 
@@ -123,8 +125,8 @@ void PS_GPU::DrawLine(line_point *points)
 
    DrawTimeAvail -= k * 2;
 
-   LinePointsToFXPStep<goraud>(points[0], points[1], k, step);
-   LinePointToFXPCoord<goraud>(points[0], step, cur_point);
+   line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
+   line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
 
    for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
    {
@@ -168,7 +170,7 @@ void PS_GPU::DrawLine(line_point *points)
             PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
       }
 
-      AddLineStep<goraud>(cur_point, step);
+      AddLineStep<goraud>(&cur_point, &step);
    }
 }
 
