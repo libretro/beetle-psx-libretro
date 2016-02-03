@@ -129,7 +129,7 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t coun
 }
 
 template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl)
+INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl, unsigned upscale_shift)
 {
    int32_t xs = x_start, xb = x_bound;
    int32 clipx0 = ClipX0 << upscale_shift;
@@ -374,14 +374,16 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    {
       for(int32_t y = y_start; y < y_middle; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), ig, idl,
+               upscale_shift);
          base_coord += base_step;
          bound_coord_ul += bound_coord_us;
       }
 
       for(int32_t y = y_middle; y < y_bound; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), ig, idl,
+               upscale_shift);
          base_coord += base_step;
          bound_coord_ll += bound_coord_ls;
       }
@@ -390,14 +392,16 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    {
       for(int32_t y = y_start; y < y_middle; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), ig, idl,
+               upscale_shift);
          base_coord += base_step;
          bound_coord_ul += bound_coord_us;
       }
 
       for(int32_t y = y_middle; y < y_bound; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), ig, idl,
+               upscale_shift);
          base_coord += base_step;
          bound_coord_ll += bound_coord_ls;
       }
