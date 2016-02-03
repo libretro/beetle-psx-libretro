@@ -1437,14 +1437,16 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             //
             //
             //
+            //
+            unsigned displayfb_yoffset = DisplayFB_CurYOffset;
 
             // Needs to occur even in vblank.
             // Not particularly confident about the timing of this in regards to vblank and the upper bit(ODE) of the GPU status port, though the test that
             // showed an oddity was pathological in that VertEnd < VertStart in it.
             if((DisplayMode & 0x24) == 0x24)
-               DisplayFB_CurLineYReadout = (DisplayFB_YStart + (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : field_ram_readout)) & 0x1FF;
-            else
-               DisplayFB_CurLineYReadout = (DisplayFB_YStart + DisplayFB_CurYOffset) & 0x1FF;
+               displayfb_yoffset = (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : field_ram_readout);
+
+            DisplayFB_CurLineYReadout = (DisplayFB_YStart + displayfb_yoffset) & 0x1FF;
 
             unsigned dmw_width = 0;
             unsigned pix_clock_offset = 0;
