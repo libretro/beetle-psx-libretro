@@ -308,8 +308,23 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
       if(vertices[2].x <= vertices[iggvi].x)
          iggvi = 2;
 
-      ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1 - upscale_shift));
-      ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1 - upscale_shift));
+      ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1));
+      ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1));
+
+      if (upscale_shift > 0) {
+	// Bias the texture coordinates so that it rounds to the
+	// correct value when the game is mapping a 2D sprite using
+	// triangles. Otherwise this could cause a small "shift" in
+	// the texture coordinates when upscaling
+
+	if (idl.du_dy == 0 && (int32_t)idl.du_dx > 0) {
+	  ig.u -= (1 << (COORD_FBS - 1 - upscale_shift));
+	}
+	if (idl.dv_dx == 0 && (int32_t)idl.dv_dy > 0) {
+	  ig.v -= (1 << (COORD_FBS - 1 - upscale_shift));
+	}
+      }
+
       ig.r = COORD_MF_INT(vertices[iggvi].r);
       ig.g = COORD_MF_INT(vertices[iggvi].g);
       ig.b = COORD_MF_INT(vertices[iggvi].b);
