@@ -434,20 +434,18 @@ static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
 //
 static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
-   int32_t x, y, r, g, b, destX, destY, width, height;
-   r = cb[0] & 0xFF;
-   g = (cb[0] >> 8) & 0xFF;
-   b = (cb[0] >> 16) & 0xFF;
+   int32_t x, y;
+   int32_t r                 = cb[0] & 0xFF;
+   int32_t g                 = (cb[0] >> 8) & 0xFF;
+   int32_t b                 = (cb[0] >> 16) & 0xFF;
    const uint16_t fill_value = ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
-
-   destX = (cb[1] >>  0) & 0x3F0;
-   destY = (cb[1] >> 16) & 0x3FF;
-
-   width =  (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
-   height = (cb[2] >> 16) & 0x1FF;
+   int32_t destX             = (cb[1] >>  0) & 0x3F0;
+   int32_t destY             = (cb[1] >> 16) & 0x3FF;
+   int32_t width             = (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
+   int32_t height            = (cb[2] >> 16) & 0x1FF;
 
    //printf("[GPU] FB Fill %d:%d w=%d, h=%d\n", destX, destY, width, height);
-   gpu->DrawTimeAvail -= 46;	// Approximate
+   gpu->DrawTimeAvail       -= 46; // Approximate
 
    for(y = 0; y < height; y++)
    {
@@ -469,13 +467,12 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
 {
-   int32 sourceX = (cb[1] >> 0) & 0x3FF;
-   int32 sourceY = (cb[1] >> 16) & 0x3FF;
-   int32 destX = (cb[2] >> 0) & 0x3FF;
-   int32 destY = (cb[2] >> 16) & 0x3FF;
-
-   int32 width = (cb[3] >> 0) & 0x3FF;
-   int32 height = (cb[3] >> 16) & 0x1FF;
+   int32_t sourceX = (cb[1] >> 0) & 0x3FF;
+   int32_t sourceY = (cb[1] >> 16) & 0x3FF;
+   int32_t destX   = (cb[2] >> 0) & 0x3FF;
+   int32_t destY   = (cb[2] >> 16) & 0x3FF;
+   int32_t width   = (cb[3] >> 0) & 0x3FF;
+   int32_t height  = (cb[3] >> 16) & 0x1FF;
 
    if(!width)
       width = 0x400;
@@ -770,10 +767,10 @@ void PS_GPU::ProcessFIFO(void)
 {
    uint32_t CB[0x10], InData;
    unsigned i;
-   uint32_t cc = InCmd_CC;
    unsigned command_len;
+   uint32_t cc            = InCmd_CC;
    const CTEntry *command = &Commands[cc];
-   bool read_fifo = false;
+   bool read_fifo         = false;
 
    if(!BlitterFIFO.CanRead())
       return;
@@ -855,7 +852,9 @@ void PS_GPU::ProcessFIFO(void)
       if(!command->ss_cmd)
          DrawTimeAvail -= 2;
 
-      // A very very ugly kludge to support texture mode specialization. fixme/cleanup/SOMETHING in the future.
+      // A very very ugly kludge to support 
+      // texture mode specialization. 
+      // fixme/cleanup/SOMETHING in the future.
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
       {
          /* Don't alter SpriteFlip here. */
@@ -913,7 +912,8 @@ void PS_GPU::ProcessFIFO(void)
 
 INLINE void PS_GPU::WriteCB(uint32_t InData)
 {
-   if(BlitterFIFO.CanRead() >= 0x10 && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
+   if(BlitterFIFO.CanRead() >= 0x10 
+         && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
@@ -1175,7 +1175,10 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
    return(ret >> ((A & 3) * 8));
 }
 
-INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift, uint32_t out_Gshift, uint32_t out_Bshift, bool bpp24, const uint16_t *src, uint32_t *dest, const int32 dx_start, const int32 dx_end, int32 fb_x)
+INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
+      uint32_t out_Gshift, uint32_t out_Bshift,
+      bool bpp24, const uint16_t *src, uint32_t *dest,
+      const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
   int32_t fb_mask = ((0x7FF << upscale_shift) + upscale() - 1);
 
@@ -1262,7 +1265,9 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
       if(!LineClockCounter)
       {
-         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  // We could just call this at the top of GPU_Update(), but do it here for slightly less CPU usage(presumably).
+         // We could just call this at the top of GPU_Update(), but 
+         // do it here for slightly less CPU usage(presumably).
+         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  
 
          LinePhase = (LinePhase + 1) & 1;
 
