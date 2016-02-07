@@ -3269,9 +3269,15 @@ void retro_run(void)
      frame_count++;
 
      if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0) {
+       char msg_buffer[64];
+
        float fps = (internal_frame_count * video_output_framerate()) / INTERNAL_FPS_SAMPLE_PERIOD;
 
-       MDFN_DispMessage("Internal FPS: %.2f", fps);
+       // trio_vasprintf has floating point support disabled so we
+       // need to bake our own formatter with libc's snprintf
+       snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), fps);
+
+       MDFN_DispMessage(msg_buffer);
 
        internal_frame_count = 0;
      }
@@ -3779,7 +3785,7 @@ void MDFN_DispMessage(const char *format, ...)
    char *str = NULL;
    const char *strc = NULL;
 
-   vasprintf(&str, format,ap);
+   trio_vasprintf(&str, format,ap);
    va_end(ap);
    strc = str;
 
