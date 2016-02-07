@@ -100,6 +100,8 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
    LineVisFirst = sls;
    LineVisLast = sle;
 
+   display_change_count = 0;
+
    this->upscale_shift = upscale_shift;
 }
 
@@ -602,6 +604,8 @@ static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
    g->ClipY1 = (*cb >> 10) & 1023;
 }
 
+// XXX this command (and probably those around it) doesn't appear to
+// be called at all, the code is inlined in ProcessFIFO
 static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 {
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
@@ -896,9 +900,11 @@ void PS_GPU::ProcessFIFO(void)
          this->ClipY1 = (*CB >> 10) & 1023;
          break;
       case 0xe5: /* Drawing Offset */
-         this->OffsX = sign_x_to_s32(11, (*CB & 2047));
-         this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
-         break;
+	{
+	  this->OffsX = sign_x_to_s32(11, (*CB & 2047));
+	  this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
+	  break;
+	}
       case 0xe6: /* Mask Setting */
          this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
          this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
@@ -1000,6 +1006,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x05:	// Start of display area in framebuffer
             DisplayFB_XStart = V & 0x3FE; // Lower bit is apparently ignored.
             DisplayFB_YStart = (V >> 10) & 0x1FF;
+	    this->display_change_count++;
             break;
 
          case 0x06:	// Horizontal display range

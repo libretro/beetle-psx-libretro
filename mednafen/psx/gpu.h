@@ -253,6 +253,8 @@ class PS_GPU
       uint32 DisplayFB_XStart;
       uint32 DisplayFB_YStart;
 
+      unsigned display_change_count;
+
       uint32 HorizStart;
       uint32 HorizEnd;
 
