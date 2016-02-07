@@ -22,6 +22,14 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 static retro_rumble_interface rumble;
 static unsigned players = 2;
+static unsigned frame_count = 0;
+static unsigned internal_frame_count = 0;
+static bool display_internal_framerate = false;
+
+// Sets how often (in number of output frames/retro_run invocations)
+// the internal framerace counter should be updated if
+// display_internal_framerate is true.
+#define INTERNAL_FPS_SAMPLE_PERIOD 32
 
 static int psx_skipbios;
 
@@ -40,6 +48,10 @@ char retro_cd_base_name[4096];
 #else
    static char retro_slash = '/';
 #endif
+
+static float video_output_framerate() {
+  return is_pal ? 49.842 : 59.941;
+}
 
 static void extract_basename(char *buf, const char *path, size_t size)
 {
@@ -2621,6 +2633,19 @@ static void check_variables(void)
          }
      }
    }
+
+   var.key = "beetle_psx_display_internal_framerate";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+     {
+       if (strcmp(var.value, "enabled") == 0)
+         display_internal_framerate = true;
+       else if (strcmp(var.value, "disabled") == 0)
+         display_internal_framerate = false;
+     }
+   else
+     display_internal_framerate = false;
+
 }
 
 #ifdef NEED_CD
@@ -3064,6 +3089,10 @@ bool retro_load_game(const struct retro_game_info *info)
        SetInput(i, "gamepad", &input_buf[i]);
    }
    boot = false;
+
+   frame_count = 0;
+   internal_frame_count = 0;
+
    return true;
 }
 
@@ -3234,6 +3263,23 @@ void retro_run(void)
 		  psx_gpu_upscale_shift = GPU->upscale_shift;
 		}
       }
+   }
+
+   if (display_internal_framerate) {
+     frame_count++;
+
+     if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0) {
+       float fps = (internal_frame_count * video_output_framerate()) / INTERNAL_FPS_SAMPLE_PERIOD;
+
+       MDFN_DispMessage("Internal FPS: %.2f", fps);
+
+       internal_frame_count = 0;
+     }
+   } else {
+     // Keep the counters at 0 so that they don't display a bogus
+     // value if this option is enabled later on
+     frame_count = 0;
+     internal_frame_count = 0;
    }
 
    if (setting_apply_analog_toggle)
@@ -3434,6 +3480,16 @@ void retro_run(void)
    audio_frames += spec.SoundBufSize;
 
    audio_batch_cb(interbuf, spec.SoundBufSize);
+
+   if (GPU->display_change_count != 0) {
+     // For simplicity I assume that the game is using double
+     // buffering and it swaps buffers once per frame. That's
+     // obviously an oversimplification, if the game uses simple
+     // buffering it will report 0 fps.
+     internal_frame_count++;
+
+     GPU->display_change_count = 0;
+   }
 }
 
 void retro_get_system_info(struct retro_system_info *info)
@@ -3449,7 +3505,7 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->timing.fps            = is_pal ? 49.842 : 59.941;
+   info->timing.fps            = video_output_framerate();
    info->timing.sample_rate    = 44100;
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
@@ -3533,6 +3589,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_analog_toggle", "Dualshock analog toggle; disabled|enabled" },
       { "beetle_psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
+      { "beetle_psx_display_internal_framerate", "Display internal FPS; disabled|enabled" },
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {
@@ -3722,7 +3779,7 @@ void MDFN_DispMessage(const char *format, ...)
    char *str = NULL;
    const char *strc = NULL;
 
-   trio_vasprintf(&str, format,ap);
+   vasprintf(&str, format,ap);
    va_end(ap);
    strc = str;
 
