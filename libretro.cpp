@@ -25,6 +25,7 @@ static unsigned players = 2;
 static unsigned frame_count = 0;
 static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
+static bool allow_frame_duping = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2634,6 +2635,23 @@ static void check_variables(void)
      }
    }
 
+   var.key = "beetle_psx_frame_duping_enable";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+      {
+         bool can_dupe = false;
+
+         if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &can_dupe))
+            allow_frame_duping = true;
+      }
+      else if (!strcmp(var.value, "disabled"))
+         allow_frame_duping = false;
+   }
+   else
+      allow_frame_duping = false;
+
    var.key = "beetle_psx_display_internal_framerate";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3480,7 +3498,13 @@ void retro_run(void)
    height <<= upscale_shift;
    pix     += pix_offset << upscale_shift;
 
-   video_cb(pix, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+   const void *fb = (GPU->display_change_count == 0) ? NULL : pix;
+
+   if (!allow_frame_duping)
+      fb = pix;
+
+   video_cb(fb, width, height,
+         MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
@@ -3595,6 +3619,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_analog_toggle", "Dualshock analog toggle; disabled|enabled" },
       { "beetle_psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
       { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
+      { "beetle_psx_frame_duping_enable", "Frame duping (speedup); disabled|enabled" },
       { "beetle_psx_display_internal_framerate", "Display internal FPS; disabled|enabled" },
       { NULL, NULL },
    };
