@@ -1004,6 +1004,9 @@ static int32_t MVMVA(uint32_t instr)
 
 static INLINE unsigned CountLeadingZeroU16(uint16_t val)
 {
+#ifdef __GNUC__
+   return __builtin_clz(val << 16 | 0x8000);
+#else
    unsigned ret = 0;
 
    while(!(val & 0x8000) && ret < 16)
@@ -1013,6 +1016,7 @@ static INLINE unsigned CountLeadingZeroU16(uint16_t val)
    }
 
    return ret;
+#endif
 }
 
 static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
