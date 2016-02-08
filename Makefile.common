@@ -137,7 +137,9 @@ SOURCES_C += $(LIBRETRO_DIR)/file/retro_file.c \
 				 $(MEDNAFEN_DIR)/trio/triostr.c 
 
 ifeq ($(NEED_THREADING), 1)
-SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
+SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c \
+				 $(LIBRETRO_DIR)/rthreads/async_job.c \
+				 $(LIBRETRO_DIR)/rthreads/rsemaphore.c
 endif
 
 endif
