@@ -39,6 +39,14 @@ bool psx_cpu_overclock;
 uint8_t psx_gpu_upscale_shift;
 static bool is_pal;
 
+enum dither_mode {
+  DITHER_NATIVE,
+  DITHER_UPSCALED,
+  DITHER_OFF,
+};
+
+enum dither_mode psx_gpu_dither_mode;
+
 char retro_save_directory[4096];
 char retro_base_directory[4096];
 static char retro_cd_base_directory[4096];
@@ -1354,6 +1362,18 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    GPU->FillVideoParams(&EmulatedPSX);
 
+   switch (psx_gpu_dither_mode) {
+     case DITHER_NATIVE:
+       GPU->dither_upscale_shift = psx_gpu_upscale_shift;
+       break;
+     case DITHER_UPSCALED:
+       GPU->dither_upscale_shift = 0;
+       break;
+     case DITHER_OFF:
+       GPU->BuildDitherTable(false);
+       break;
+   }
+
    CD_TrayOpen        = true;
    CD_SelectedDisc    = -1;
 
@@ -2514,6 +2534,20 @@ static void check_variables(void)
    else
      psx_gpu_upscale_shift = 0;
 
+   var.key = "beetle_psx_dither_mode";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+     if (strcmp(var.value, "1x(native)") == 0)
+         psx_gpu_dither_mode = DITHER_NATIVE;
+     else if (strcmp(var.value, "internal resolution") == 0)
+         psx_gpu_dither_mode = DITHER_UPSCALED;
+     else if (strcmp(var.value, "disabled") == 0)
+       psx_gpu_dither_mode = DITHER_OFF;
+   }
+   else
+      psx_gpu_dither_mode = DITHER_NATIVE;
+
    var.key = "beetle_psx_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3253,14 +3287,12 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
-
-
       check_variables();
       struct retro_system_av_info new_av_info;
       retro_get_system_av_info(&new_av_info);
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
 
-      if (GPU->upscale_shift != psx_gpu_upscale_shift) 
+      if (GPU->upscale_shift != psx_gpu_upscale_shift)
       {
 	      struct retro_system_av_info new_av_info;
 	      retro_get_system_av_info(&new_av_info);
@@ -3281,6 +3313,20 @@ void retro_run(void)
 		  psx_gpu_upscale_shift = GPU->upscale_shift;
 		}
       }
+
+      switch (psx_gpu_dither_mode) {
+        case DITHER_NATIVE:
+          GPU->dither_upscale_shift = psx_gpu_upscale_shift;
+          GPU->BuildDitherTable(true);
+          break;
+        case DITHER_UPSCALED:
+          GPU->dither_upscale_shift = 0;
+          GPU->BuildDitherTable(true);
+          break;
+        case DITHER_OFF:
+          GPU->BuildDitherTable(false);
+          break;
+        }
    }
 
    if (display_internal_framerate) {
@@ -3610,6 +3656,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+      { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
