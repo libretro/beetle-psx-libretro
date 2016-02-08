@@ -65,25 +65,9 @@ static const int8 dither_table[4][4] =
 
 PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
-   int x, y, v;
    HardwarePALType = pal_clock_and_tv;
 
-   for(y = 0; y < 4; y++)
-      for(x = 0; x < 4; x++)
-         for(v = 0; v < 512; v++)
-         {
-            int value = v + dither_table[y][x];
-
-            value >>= 3;
-
-            if(value < 0)
-               value = 0;
-
-            if(value > 0x1F)
-               value = 0x1F;
-
-            DitherLUT[y][x][v] = value;
-         }
+   BuildDitherTable(true);
 
    if(HardwarePALType == false)	// NTSC clock
       GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
@@ -103,10 +87,39 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
    display_change_count = 0;
 
    this->upscale_shift = upscale_shift;
+   this->dither_upscale_shift = 0;
 }
 
 PS_GPU::~PS_GPU()
 {
+}
+
+void PS_GPU::BuildDitherTable(bool enabled)
+{
+  int x, y, v;
+
+  for(y = 0; y < 4; y++)
+    for(x = 0; x < 4; x++)
+      for(v = 0; v < 512; v++)
+	{
+	  int value = v;
+
+	  // If dither is disabled we simply put the same value for
+	  // all x and y
+	  if (enabled) {
+	    value += dither_table[y][x];
+	  }
+
+	  value >>= 3;
+
+	  if(value < 0)
+	    value = 0;
+
+	  if(value > 0x1F)
+	    value = 0x1F;
+
+	  DitherLUT[y][x][v] = value;
+	}
 }
 
 // Allocate enough room for the PS_GPU class and VRAM

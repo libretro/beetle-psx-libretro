@@ -66,6 +66,8 @@ class PS_GPU
 
    public:
 
+      void BuildDitherTable(bool enabled);
+
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       static void Destroy(PS_GPU *gpu) MDFN_COLD;
 
@@ -167,6 +169,7 @@ class PS_GPU
       }
 
       uint8 upscale_shift;
+      uint8 dither_upscale_shift;
 
       uint32 DMAControl;
 
