@@ -67,7 +67,7 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
    HardwarePALType = pal_clock_and_tv;
 
-   BuildDitherTable(true);
+   BuildDitherTable();
 
    if(HardwarePALType == false)	// NTSC clock
       GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
@@ -94,7 +94,7 @@ PS_GPU::~PS_GPU()
 {
 }
 
-void PS_GPU::BuildDitherTable(bool enabled)
+void PS_GPU::BuildDitherTable()
 {
   int x, y, v;
 
@@ -104,11 +104,7 @@ void PS_GPU::BuildDitherTable(bool enabled)
 	{
 	  int value = v;
 
-	  // If dither is disabled we simply put the same value for
-	  // all x and y
-	  if (enabled) {
-	    value += dither_table[y][x];
-	  }
+	  value += dither_table[y][x];
 
 	  value >>= 3;
 

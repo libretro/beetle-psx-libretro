@@ -190,6 +190,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
             b = COORD_GET_INT(ig.b);
          }
 
+	 bool dither = DitherEnabled();
          int32_t dither_x = x >> dither_upscale_shift;
          int32_t dither_y = y >> dither_upscale_shift;
 
@@ -200,7 +201,8 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
             if(fbw)
             {
 	      if(TexMult) {
-                  fbw = ModTexel(fbw, r, g, b, (dtd) ? (dither_x & 3) : 3, (dtd) ? (dither_y & 3) : 2);
+
+                  fbw = ModTexel(fbw, r, g, b, (dither) ? (dither_x & 3) : 3, (dither) ? (dither_y & 3) : 2);
 	      }
 	      PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
             }
@@ -209,7 +211,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
          {
             uint16_t pix = 0x8000;
 
-            if(goraud && dtd)
+            if(goraud && dither)
             {
                pix |= DitherLUT[dither_y & 3][dither_x & 3][r] << 0;
                pix |= DitherLUT[dither_y & 3][dither_x & 3][g] << 5;

@@ -4,6 +4,7 @@
 #include "mednafen/general.h"
 #include "mednafen/md5.h"
 #include "mednafen/msvc_compat.h"
+#include "mednafen/psx/gpu.h"
 #ifdef NEED_DEINTERLACER
 #include "mednafen/video/Deinterlacer.h"
 #endif
@@ -39,12 +40,6 @@ unsigned char widescreen_hack;
 bool psx_cpu_overclock;
 uint8_t psx_gpu_upscale_shift;
 static bool is_pal;
-
-enum dither_mode {
-  DITHER_NATIVE,
-  DITHER_UPSCALED,
-  DITHER_OFF,
-};
 
 enum dither_mode psx_gpu_dither_mode;
 
@@ -1372,7 +1367,6 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
        GPU->dither_upscale_shift = 0;
        break;
      case DITHER_OFF:
-       GPU->BuildDitherTable(false);
        break;
    }
 
@@ -3329,14 +3323,11 @@ void retro_run(void)
       switch (psx_gpu_dither_mode) {
         case DITHER_NATIVE:
           GPU->dither_upscale_shift = psx_gpu_upscale_shift;
-          GPU->BuildDitherTable(true);
           break;
         case DITHER_UPSCALED:
           GPU->dither_upscale_shift = 0;
-          GPU->BuildDitherTable(true);
           break;
         case DITHER_OFF:
-          GPU->BuildDitherTable(false);
           break;
         }
    }

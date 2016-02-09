@@ -23,6 +23,14 @@ class PS_GPU;
 #define BLEND_MODE_SUBTRACT   2
 #define BLEND_MODE_ADD_FOURTH 3
 
+enum dither_mode {
+  DITHER_NATIVE,
+  DITHER_UPSCALED,
+  DITHER_OFF,
+};
+
+extern enum dither_mode psx_gpu_dither_mode;
+
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);
@@ -66,7 +74,7 @@ class PS_GPU
 
    public:
 
-      void BuildDitherTable(bool enabled);
+      void BuildDitherTable();
 
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       static void Destroy(PS_GPU *gpu) MDFN_COLD;
@@ -107,6 +115,11 @@ class PS_GPU
       INLINE bool DMACanWrite(void)
       {
          return CalcFIFOReadyBit();
+      }
+
+      INLINE bool DitherEnabled(void)
+      {
+	return psx_gpu_dither_mode != DITHER_OFF && dtd;
       }
 
       void WriteDMA(uint32 V);

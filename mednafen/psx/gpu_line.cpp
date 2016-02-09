@@ -148,7 +148,7 @@ void PS_GPU::DrawLine(line_point *points)
             b = points[0].b;
          }
 
-         if(dtd)
+         if(DitherEnabled())
          {
             pix |= DitherLUT[y & 3][x & 3][r] << 0;
             pix |= DitherLUT[y & 3][x & 3][g] << 5;
