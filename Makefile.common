@@ -20,7 +20,7 @@ ifeq ($(DEBUG), 1)
 endif
 
 ifeq ($(NEED_THREADING), 1)
-   FLAGS += -DWANT_THREADING
+   FLAGS += -DWANT_THREADING -DHAVE_THREADS
 endif
 
 ifeq ($(NEED_CRC32), 1)
