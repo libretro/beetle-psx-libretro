@@ -10,6 +10,7 @@
 #include "libretro.h"
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
+#include <queues/task_queue.h>
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
