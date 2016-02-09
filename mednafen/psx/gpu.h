@@ -338,6 +338,9 @@ class PS_GPU
       uint32 ReadData(void);
       void SoftReset(void);
 
+      template<int BlendMode>
+         void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix);
+
       template<int BlendMode, bool MaskEval_TA, bool textured>
          void PlotPixel(int32 x, int32 y, uint16 pix);
 

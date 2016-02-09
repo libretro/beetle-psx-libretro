@@ -1,3 +1,41 @@
+template<int BlendMode>
+INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
+{
+   uint32_t sum, carry, diff, borrow;
+
+   // Efficient 15bpp pixel math algorithms from blargg
+   switch(BlendMode)
+   {
+      case BLEND_MODE_AVERAGE:
+         bg_pix   |= 0x8000;
+         *fore_pix = ((*fore_pix + bg_pix) - ((*fore_pix ^ bg_pix) & 0x0421)) >> 1;
+         break;
+
+      case BLEND_MODE_ADD:
+         bg_pix   &= ~0x8000;
+         sum       = *fore_pix + bg_pix;
+         carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+         *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         break;
+
+      case BLEND_MODE_SUBTRACT:
+         bg_pix    |= 0x8000;
+         *fore_pix &= ~0x8000;
+         diff       = bg_pix - *fore_pix + 0x108420;
+         borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420;
+         *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5));
+         break;
+
+      case BLEND_MODE_ADD_FOURTH:
+         bg_pix   &= ~0x8000;
+         *fore_pix = ((*fore_pix >> 2) & 0x1CE7) | 0x8000;
+         sum       = *fore_pix + bg_pix;
+         carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+         *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         break;
+   }
+}
+
 template<int BlendMode, bool MaskEval_TA, bool textured>
 INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 {
@@ -6,51 +44,9 @@ INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
-      uint16 bg_pix = vram_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-
-      // Efficient 15bpp pixel math algorithms from blargg
-      switch(BlendMode)
-      {
-         case BLEND_MODE_AVERAGE:
-            bg_pix |= 0x8000;
-            fore_pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
-            break;
-
-         case BLEND_MODE_ADD:
-            {
-               bg_pix &= ~0x8000;
-
-               uint32_t sum = fore_pix + bg_pix;
-               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-
-               fore_pix = (sum - carry) | (carry - (carry >> 5));
-            }
-            break;
-
-         case BLEND_MODE_SUBTRACT:
-            {
-               bg_pix |= 0x8000;
-               fore_pix &= ~0x8000;
-
-               uint32_t diff = bg_pix - fore_pix + 0x108420;
-               uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
-
-               fore_pix = (diff - borrow) & (borrow - (borrow >> 5));
-            }
-            break;
-
-         case BLEND_MODE_ADD_FOURTH:
-            {
-               bg_pix &= ~0x8000;
-               fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
-
-               uint32_t sum = fore_pix + bg_pix;
-               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-
-               fore_pix = (sum - carry) | (carry - (carry >> 5));
-            }
-            break;
-      }
+      // Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+      uint16_t bg_pix = vram_fetch(x, y);
+      PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
    if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
@@ -66,51 +62,8 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
-      uint16 bg_pix = texel_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-
-      // Efficient 15bpp pixel math algorithms from blargg
-      switch(BlendMode)
-      {
-         case BLEND_MODE_AVERAGE:
-            bg_pix |= 0x8000;
-            fore_pix = ((fore_pix + bg_pix) - ((fore_pix ^ bg_pix) & 0x0421)) >> 1;
-            break;
-
-         case BLEND_MODE_ADD:
-            {
-               bg_pix &= ~0x8000;
-
-               uint32_t sum = fore_pix + bg_pix;
-               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-
-               fore_pix = (sum - carry) | (carry - (carry >> 5));
-            }
-            break;
-
-         case BLEND_MODE_SUBTRACT:
-            {
-               bg_pix   |=  0x8000;
-               fore_pix &= ~0x8000;
-
-               uint32_t diff = bg_pix - fore_pix + 0x108420;
-               uint32_t borrow = (diff - ((bg_pix ^ fore_pix) & 0x108420)) & 0x108420;
-
-               fore_pix = (diff - borrow) & (borrow - (borrow >> 5));
-            }
-            break;
-
-         case BLEND_MODE_ADD_FOURTH:
-            {
-               bg_pix &= ~0x8000;
-               fore_pix = ((fore_pix >> 2) & 0x1CE7) | 0x8000;
-
-               uint32_t sum = fore_pix + bg_pix;
-               uint32_t carry = (sum - ((fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-
-               fore_pix = (sum - carry) | (carry - (carry >> 5));
-            }
-            break;
-      }
+      uint16_t bg_pix = texel_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+      PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
    if(!MaskEval_TA || !(texel_fetch(x, y) & 0x8000))
