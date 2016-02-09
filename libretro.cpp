@@ -59,8 +59,9 @@ char retro_cd_base_name[4096];
    static char retro_slash = '/';
 #endif
 
-static float video_output_framerate() {
-  return is_pal ? 49.842 : 59.941;
+static float video_output_framerate(void)
+{
+   return is_pal ? 49.842 : 59.941;
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
@@ -2383,6 +2384,13 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 void retro_init(void)
 {
    struct retro_log_callback log;
+   bool thread_enable = false;
+#ifdef HAVE_THREADS
+   thread_enable = true;
+#endif
+
+   task_queue_ctl(TASK_QUEUE_CTL_INIT, &thread_enable);
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else
@@ -3286,6 +3294,9 @@ static uint64_t video_frames, audio_frames;
 void retro_run(void)
 {
    bool updated = false;
+
+   task_queue_ctl(TASK_QUEUE_CTL_CHECK, NULL);
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
       check_variables();
@@ -3595,6 +3606,8 @@ void retro_deinit(void)
 {
    delete surf;
    surf = NULL;
+
+   task_queue_ctl(TASK_QUEUE_CTL_DEINIT, NULL);
 
    log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
