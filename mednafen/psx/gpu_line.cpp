@@ -150,15 +150,13 @@ void PS_GPU::DrawLine(line_point *points)
 
          if(DitherEnabled())
          {
-            pix |= DitherLUT[y & 3][x & 3][r] << 0;
-            pix |= DitherLUT[y & 3][x & 3][g] << 5;
-            pix |= DitherLUT[y & 3][x & 3][b] << 10;
+            uint8_t *dither_offset = DitherLUT[y & 3][x & 3];
+            pix = 0x8000 | (dither_offset[r] << 0) | (dither_offset[g] << 5) | 
+               (dither_offset[b] << 10);
          }
          else
          {
-            pix |= (r >> 3) << 0;
-            pix |= (g >> 3) << 5;
-            pix |= (b >> 3) << 10;
+            pix = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
          }
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.

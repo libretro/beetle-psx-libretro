@@ -72,13 +72,12 @@ INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
 
 INLINE uint16_t PS_GPU::ModTexel(uint16_t texel, int32_t r, int32_t g, int32_t b, const int32_t dither_x, const int32_t dither_y)
 {
-   uint16_t ret = texel & 0x8000;
+   uint8_t *dither_offset = DitherLUT[dither_y][dither_x];
 
-   ret |= DitherLUT[dither_y][dither_x][(((texel & 0x1F) * r) >> (5 - 1))] << 0;
-   ret |= DitherLUT[dither_y][dither_x][(((texel & 0x3E0) * g) >> (10 - 1))] << 5;
-   ret |= DitherLUT[dither_y][dither_x][(((texel & 0x7C00) * b) >> (15 - 1))] << 10;
-
-   return(ret);
+   return (texel & 0x8000)
+      | (dither_offset[(((texel & 0x1F) * r)   >> (5 - 1))] << 0)
+      | (dither_offset[(((texel & 0x3E0) * g)  >> (10 - 1))] << 5)
+      | (dither_offset[(((texel & 0x7C00) * b) >> (15 - 1))] << 10);
 }
 
 template<uint32_t TexMode_TA>

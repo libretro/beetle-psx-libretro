@@ -209,20 +209,16 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
          }
          else
          {
-            uint16_t pix = 0x8000;
+            uint16_t pix = 0;
 
             if(goraud && dither)
             {
-               pix |= DitherLUT[dither_y & 3][dither_x & 3][r] << 0;
-               pix |= DitherLUT[dither_y & 3][dither_x & 3][g] << 5;
-               pix |= DitherLUT[dither_y & 3][dither_x & 3][b] << 10;
+               uint8_t *dither_offset = DitherLUT[dither_y & 3][dither_x & 3];
+               pix = 0x8000 | (dither_offset[r] << 0) | (dither_offset[g] << 5) | 
+                  (dither_offset[b] << 10);
             }
             else
-            {
-               pix |= (r >> 3) << 0;
-               pix |= (g >> 3) << 5;
-               pix |= (b >> 3) << 10;
-            }
+               pix = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
 
             PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
          }
