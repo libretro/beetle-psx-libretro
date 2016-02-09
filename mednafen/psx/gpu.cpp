@@ -136,7 +136,8 @@ void *PS_GPU::Alloc(uint8 upscale_shift) {
   return (void*)buffer;
 }
 
-PS_GPU *PS_GPU::Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift)
+PS_GPU *PS_GPU::Build(bool pal_clock_and_tv,
+      int sls, int sle, uint8 upscale_shift)
 {
   void *buffer = PS_GPU::Alloc(upscale_shift);
 
@@ -150,32 +151,33 @@ void PS_GPU::Destroy(PS_GPU *gpu) {
 }
 
 // Build a new GPU with a different upscale_shift
-PS_GPU *PS_GPU::Rescale(uint8 ushift) {
-  // This is all very unsafe but it should work since PS_GPU doesn't
-  // contain anything that can't be copied using memcpy. If this ever
-  // changes a copy constructor should be created and called from here
-  // instead.
-  void *buffer = PS_GPU::Alloc(ushift);
+PS_GPU *PS_GPU::Rescale(uint8 ushift)
+{
+   // This is all very unsafe but it should work since PS_GPU doesn't
+   // contain anything that can't be copied using memcpy. If this ever
+   // changes a copy constructor should be created and called from here
+   // instead.
+   void *buffer = PS_GPU::Alloc(ushift);
 
-  // Recopy the GPU state in the new buffer
-  memcpy(buffer, (void*)this, sizeof(*this));
+   // Recopy the GPU state in the new buffer
+   memcpy(buffer, (void*)this, sizeof(*this));
 
-  PS_GPU *gpu = (PS_GPU *)buffer;
+   PS_GPU *gpu = (PS_GPU *)buffer;
 
-  // Override the upscaling factor
-  gpu->upscale_shift = ushift;
+   // Override the upscaling factor
+   gpu->upscale_shift = ushift;
 
-  // Rescale the VRAM for the new upscaling ratio
-  uint16_t *vram_new = gpu->vram;
+   // Rescale the VRAM for the new upscaling ratio
+   uint16_t *vram_new = gpu->vram;
 
-  //For simplicity we do the transfer at 1x internal resolution.
-  for (unsigned y = 0; y < 512; y++) {
-    for (unsigned x = 0; x < 1024; x++) {
-      gpu->texel_put(x, y, texel_fetch(x, y));
-    }
-  }
+   //For simplicity we do the transfer at 1x internal resolution.
+   for (unsigned y = 0; y < 512; y++)
+   {
+      for (unsigned x = 0; x < 1024; x++)
+         gpu->texel_put(x, y, texel_fetch(x, y));
+   }
 
-  return gpu;
+   return gpu;
 }
 
 void PS_GPU::FillVideoParams(MDFNGI* gi)
@@ -403,16 +405,20 @@ void PS_GPU::ResetTS(void)
 //
 // C-style function wrappers so our command table isn't so ginormous(in memory usage).
 //
-   template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+   template<int numvertices, bool shaded, bool textured,
+   int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_DrawPolygon<numvertices, shaded, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
+   g->Command_DrawPolygon<numvertices, shaded, textured,
+      BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
 }
 
-   template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+   template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
+   uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
+   g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult,
+      TexMode_TA, MaskEval_TA>(cb);
 }
 
    template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
@@ -445,8 +451,8 @@ static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
    IRQ_Assert(IRQ_GPU, g->IRQPending);
 }
 
-// Special RAM write mode(16 pixels at a time), does *not* appear to use mask drawing environment settings.
-//
+// Special RAM write mode(16 pixels at a time), 
+// does *not* appear to use mask drawing environment settings.
 static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
    int32_t x, y;
@@ -806,7 +812,9 @@ void PS_GPU::ProcessFIFO(void)
 
          for(i = 0; i < 2; i++)
          {
-            if(!(texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) & MaskEvalAND))
+            bool fetch = texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) & MaskEvalAND;
+
+            if (!fetch)
                texel_put(FBRW_CurX & 1023, FBRW_CurY & 511, InData | MaskSetOR);
 
             FBRW_CurX++;
@@ -913,11 +921,9 @@ void PS_GPU::ProcessFIFO(void)
          this->ClipY1 = (*CB >> 10) & 1023;
          break;
       case 0xe5: /* Drawing Offset */
-	{
-	  this->OffsX = sign_x_to_s32(11, (*CB & 2047));
-	  this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
-	  break;
-	}
+         this->OffsX = sign_x_to_s32(11, (*CB & 2047));
+         this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
+         break;
       case 0xe6: /* Mask Setting */
          this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
          this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
@@ -946,7 +952,7 @@ void PS_GPU::SetTPage(const uint32_t cmdw)
 {
    const unsigned NewTexPageX = (cmdw & 0xF) * 64;
    const unsigned NewTexPageY = (cmdw & 0x10) * 16;
-   const unsigned NewTexMode = (cmdw >> 7) & 0x3;
+   const unsigned NewTexMode  = (cmdw >> 7) & 0x3;
 
    abr = (cmdw >> 5) & 0x3;
 
@@ -1045,41 +1051,40 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
             switch(V & 0xF)
             {
                // DataReadBuffer must remain unchanged for any unhandled GPU info index.
-               default:  break;
-
+               default:
+                  break;
                case 0x2: 
-                         DataReadBufferEx &= 0xFFF00000;
-                         DataReadBufferEx |= (tww << 0) | (twh << 5) | (twx << 10) | (twy << 15);
-                         DataReadBuffer    = DataReadBufferEx;
-                         break;
-
+                  DataReadBufferEx &= 0xFFF00000;
+                  DataReadBufferEx |= (tww << 0) | (twh << 5) | (twx << 10) | (twy << 15);
+                  DataReadBuffer    = DataReadBufferEx;
+                  break;
                case 0x3:
-                         DataReadBufferEx &= 0xFFF00000;
-                         DataReadBufferEx |= (ClipY0 << 10) | ClipX0;
-                         DataReadBuffer = DataReadBufferEx;
-                         break;
+                  DataReadBufferEx &= 0xFFF00000;
+                  DataReadBufferEx |= (ClipY0 << 10) | ClipX0;
+                  DataReadBuffer = DataReadBufferEx;
+                  break;
 
                case 0x4:
-                         DataReadBufferEx &= 0xFFF00000;
-                         DataReadBufferEx |= (ClipY1 << 10) | ClipX1;
-                         DataReadBuffer = DataReadBufferEx;
-                         break;
+                  DataReadBufferEx &= 0xFFF00000;
+                  DataReadBufferEx |= (ClipY1 << 10) | ClipX1;
+                  DataReadBuffer = DataReadBufferEx;
+                  break;
 
                case 0x5: 
-                         DataReadBufferEx &= 0xFFC00000;
-                         DataReadBufferEx |= (OffsX & 2047) | ((OffsY & 2047) << 11);
-                         DataReadBuffer = DataReadBufferEx;
-                         break;
+                  DataReadBufferEx &= 0xFFC00000;
+                  DataReadBufferEx |= (OffsX & 2047) | ((OffsY & 2047) << 11);
+                  DataReadBuffer = DataReadBufferEx;
+                  break;
 
                case 0x7: 
-                         DataReadBufferEx = 2;
-                         DataReadBuffer = DataReadBufferEx;
-                         break;
+                  DataReadBufferEx = 2;
+                  DataReadBuffer = DataReadBufferEx;
+                  break;
 
                case 0x8:
-                         DataReadBufferEx = 0;
-                         DataReadBuffer = DataReadBufferEx;
-                         break;
+                  DataReadBufferEx = 0;
+                  DataReadBuffer = DataReadBufferEx;
+                  break;
             }
             break;
 
@@ -1107,15 +1112,14 @@ INLINE uint32_t PS_GPU::ReadData(void)
       DataReadBufferEx = 0;
       for(int i = 0; i < 2; i++)
       {
-         DataReadBufferEx |= texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) << (i * 16);
+         DataReadBufferEx |= 
+            texel_fetch(FBRW_CurX & 1023,FBRW_CurY & 511) << (i * 16);
 
          FBRW_CurX++;
          if(FBRW_CurX == (FBRW_X + FBRW_W))
          {
             if((FBRW_CurY + 1) == (FBRW_Y + FBRW_H))
-            {
                InCmd = INCMD_NONE;
-            }
             else
             {
                FBRW_CurY++;
@@ -1158,7 +1162,9 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 
       ret |= DisplayOff << 23;
 
-      if(InCmd == INCMD_NONE && DrawTimeAvail >= 0 && BlitterFIFO.CanRead() == 0x00)	// GPU idle bit.
+      /* GPU idle bit */
+      if(InCmd == INCMD_NONE && DrawTimeAvail >= 0 
+            && BlitterFIFO.CanRead() == 0x00)
          ret |= 1 << 26;
 
       if(InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
@@ -1204,19 +1210,20 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
 
    if(bpp24)	// 24bpp
    {
-     for(int32 x = dx_start; x < dx_end; x+= upscale())
+      for(int32 x = dx_start; x < dx_end; x+= upscale())
       {
-         uint32_t srcpix;
-
-         srcpix = src[(fb_x >> 1) + 0] | (src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
+         int i;
+         uint32_t color;
+         uint32_t srcpix = src[(fb_x >> 1) + 0] 
+            | (src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
          srcpix >>= ((fb_x >> upscale_shift) & 1) * 8;
 
-         uint32_t color = (((srcpix >> 0) << RED_SHIFT) & (0xFF << RED_SHIFT)) | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) |
-            (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
+         color =   (((srcpix >> 0) << RED_SHIFT)   & (0xFF << RED_SHIFT)) 
+            | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) 
+            | (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
-         for (int i = 0; i < upscale(); i++) {
+         for (i = 0; i < upscale(); i++)
             dest[x + i] = color;
-         }
 
          fb_x = (fb_x + (3 << upscale_shift)) & fb_mask;
       }
@@ -1226,7 +1233,11 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
       for(int32 x = dx_start; x < dx_end; x++)
       {
          uint32_t srcpix = src[(fb_x >> 1)];
-         dest[x] = MAKECOLOR((((srcpix >> 0) & 0x1F) << 3), (((srcpix >> 5) & 0x1F) << 3), (((srcpix >> 10) & 0x1F) << 3), 0);
+         dest[x] = MAKECOLOR(
+               (((srcpix >> 0) & 0x1F) << 3),
+               (((srcpix >> 5) & 0x1F) << 3),
+               (((srcpix >> 10) & 0x1F) << 3),
+               0);
 
          fb_x = (fb_x + 2) & fb_mask;
       }
@@ -1236,12 +1247,12 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
 
 int32_t PS_GPU::Update(const int32_t sys_timestamp)
 {
+   int32 gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
    const uint32_t dmc = (DisplayMode & 0x40) ? 4 : (DisplayMode & 0x3);
    const uint32_t dmw = 2800 / DotClockRatios[dmc];	// Must be <= 768
 
    int32 sys_clocks = sys_timestamp - lastts;
-   int32 gpu_clocks;
 
    //printf("GPUISH: %d\n", sys_timestamp - lastts);
 
@@ -1259,7 +1270,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
    GPUClockCounter += (uint64)sys_clocks * GPUClockRatio;
 
-   gpu_clocks = GPUClockCounter >> 16;
+   gpu_clocks       = GPUClockCounter >> 16;
    GPUClockCounter -= gpu_clocks << 16;
 
    while(gpu_clocks > 0)
@@ -1299,8 +1310,10 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
          }
          else
          {
-            const unsigned int FirstVisibleLine = LineVisFirst + (HardwarePALType ? 20 : 16);
-            const unsigned int VisibleLineCount = LineVisLast + 1 - LineVisFirst; //HardwarePALType ? 288 : 240;
+            const unsigned int FirstVisibleLine = 
+               LineVisFirst + (HardwarePALType ? 20 : 16);
+            const unsigned int VisibleLineCount = 
+               LineVisLast + 1 - LineVisFirst; //HardwarePALType ? 288 : 240;
 
             TIMER_SetHRetrace(false);
 
@@ -1412,9 +1425,11 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             }
 
             //
-            // Don't mess with the order of evaluation of these scanline == VertXXX && (InVblankwhatever) if statements and the following IRQ/timer vblank stuff
-            // unless you know what you're doing!!! (IE you've run further tests to refine the behavior)
-            //
+            // Don't mess with the order of evaluation of 
+            // these scanline == VertXXX && (InVblankwhatever) if statements 
+            // and the following IRQ/timer vblank stuff
+            // unless you know what you're doing!!! 
+            // (IE you've run further tests to refine the behavior)
             if(scanline == VertEnd && !InVBlank)
             {
                if(sl_zero_reached)
@@ -1452,22 +1467,24 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             {
                InVBlank = false;
 
-               // Note to self: X-Men Mutant Academy relies on this being set on the proper scanline in 480i mode(otherwise it locks up on startup).
+               // Note to self: X-Men Mutant Academy 
+               // relies on this being set on the proper 
+               // scanline in 480i mode(otherwise it locks up on startup).
                //if(HeightMode)
                // DisplayFB_CurYOffset = field;
             }
 
             IRQ_Assert(IRQ_VBLANK, InVBlank);
             TIMER_SetVBlank(InVBlank);
-            //
-            //
-            //
-            //
+
             unsigned displayfb_yoffset = DisplayFB_CurYOffset;
 
             // Needs to occur even in vblank.
-            // Not particularly confident about the timing of this in regards to vblank and the upper bit(ODE) of the GPU status port, though the test that
-            // showed an oddity was pathological in that VertEnd < VertStart in it.
+            // Not particularly confident about the timing 
+            // of this in regards to vblank and the 
+            // upper bit(ODE) of the GPU status port, though the 
+            // test that showed an oddity was pathological in 
+            // that VertEnd < VertStart in it.
             if((DisplayMode & 0x24) == 0x24)
                displayfb_yoffset = (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : field_ram_readout);
 
@@ -1478,13 +1495,16 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             unsigned pix_clock = 0;
             unsigned pix_clock_div = 0;
             uint32_t *dest = NULL;
-            if((bool)(DisplayMode & DISP_PAL) == HardwarePALType && scanline >= FirstVisibleLine && scanline < (FirstVisibleLine + VisibleLineCount))
-            {
-               int32 dest_line;
-               int32 fb_x = DisplayFB_XStart * 2;
-               int32 dx_start = HorizStart, dx_end = HorizEnd;
 
-               dest_line = ((scanline - FirstVisibleLine) << espec->InterlaceOn) + espec->InterlaceField;
+            if(      (bool)(DisplayMode & DISP_PAL) == HardwarePALType 
+                  && scanline >= FirstVisibleLine 
+                  && scanline < (FirstVisibleLine + VisibleLineCount))
+            {
+               int32 fb_x      = DisplayFB_XStart * 2;
+               int32 dx_start  = HorizStart, dx_end = HorizEnd;
+               int32 dest_line = 
+                  ((scanline - FirstVisibleLine) << espec->InterlaceOn) 
+                  + espec->InterlaceField;
 
                if(dx_end < dx_start)
                   dx_end = dx_start;
@@ -1523,18 +1543,29 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                   for (uint32_t i = 0; i < upscale(); i++)
                   {
-		    const uint16_t *src = vram + ((y + i) << (10 + upscale_shift));
+                     const uint16_t *src = vram + 
+                        ((y + i) << (10 + upscale_shift));
 
                      // printf("surface: %dx%d (%d) %u %u + %u\n",
                      // 	   surface->w, surface->h, surface->pitchinpix,
                      // 	   dest_line, y, i);
 
-                     dest = surface->pixels + ((dest_line << upscale_shift) + i) * surface->pitch32;
+                     dest = surface->pixels + 
+                        ((dest_line << upscale_shift) + i) * surface->pitch32;
 
                      memset(dest, 0, udx_start * sizeof(int32));
 
                      //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                     ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, DisplayMode & DISP_RGB24, src, dest, udx_start, udx_end, ufb_x);
+                     ReorderRGB_Var(
+                           RED_SHIFT,
+                           GREEN_SHIFT,
+                           BLUE_SHIFT,
+                           DisplayMode & DISP_RGB24,
+                           src,
+                           dest,
+                           udx_start,
+                           udx_end,
+                           ufb_x);
 
                      //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
                      //
@@ -1551,15 +1582,24 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                pix_clock = (HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
                pix_clock_div = DotClockRatios[dmc];
             }
-	    // XXX fixme when upscaling is active
-            PSX_GPULineHook(sys_timestamp, sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0, dest, &surface->format, dmw_width, pix_clock_offset, pix_clock, pix_clock_div);
+            // XXX fixme when upscaling is active
+            PSX_GPULineHook(sys_timestamp,
+                  sys_timestamp - ((uint64)gpu_clocks * 65536) / GPUClockRatio, scanline == 0,
+                  dest,
+                  &surface->format,
+                  dmw_width,
+                  pix_clock_offset,
+                  pix_clock,
+                  pix_clock_div);
 
             if(!InVBlank)
-            {
                DisplayFB_CurYOffset = (DisplayFB_CurYOffset + 1) & 0x1FF;
-            }
          }
-         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  // Mostly so the next event time gets recalculated properly in regards to our calls
+
+         // Mostly so the next event time gets 
+         // recalculated properly in regards to our calls
+         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  
+
          // to TIMER_SetVBlank() and TIMER_SetHRetrace().
       }	// end if(!LineClockCounter)
    }	// end while(gpu_clocks > 0)
@@ -1569,18 +1609,16 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 TheEnd:
    lastts = sys_timestamp;
 
-   {
-      int32 next_dt = LineClockCounter;
+   int32 next_dt = LineClockCounter;
 
-      next_dt = (((int64)next_dt << 16) - GPUClockCounter + GPUClockRatio - 1) / GPUClockRatio;
+   next_dt = (((int64)next_dt << 16) - GPUClockCounter + GPUClockRatio - 1) / GPUClockRatio;
 
-      next_dt = std::max<int32>(1, next_dt);
-      next_dt = std::min<int32>(128, next_dt);
+   next_dt = std::max<int32>(1, next_dt);
+   next_dt = std::min<int32>(128, next_dt);
 
-      //printf("%d\n", next_dt);
+   //printf("%d\n", next_dt);
 
-      return(sys_timestamp + next_dt);
-   }
+   return(sys_timestamp + next_dt);
 }
 
 void PS_GPU::StartFrame(EmulateSpecStruct *espec_arg)
@@ -1601,22 +1639,26 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
    uint16 *vram_new = NULL;
 
-   if (upscale_shift == 0) {
-     // No upscaling, we can dump the VRAM contents directly
-     vram_new = vram;
-   } else {
-     // We have increased internal resolution, savestates are always
-     // made at 1x for compatibility
-     vram_new = new uint16[1024 * 512];
+   if (upscale_shift == 0)
+   {
+      // No upscaling, we can dump the VRAM contents directly
+      vram_new = vram;
+   }
+   else
+   {
+      // We have increased internal resolution, savestates are always
+      // made at 1x for compatibility
+      vram_new = new uint16[1024 * 512];
 
-     if (!load) {
-       // We must downscale the current VRAM contents back to 1x
-       for (unsigned y = 0; y < 512; y++) {
-	 for (unsigned x = 0; x < 1024; x++) {
-	   vram_new[y * 1024 + x] = texel_fetch(x, y);
-	 }
-       }
-     }
+      if (!load)
+      {
+         // We must downscale the current VRAM contents back to 1x
+         for (unsigned y = 0; y < 512; y++)
+         {
+            for (unsigned x = 0; x < 1024; x++)
+               vram_new[y * 1024 + x] = texel_fetch(x, y);
+         }
+      }
    }
 
    for(unsigned i = 0; i < 256; i++)
@@ -1729,20 +1771,23 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
       SFEND
    };
+
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
 
-   if (upscale_shift > 0) {
-     if (load) {
-       // Restore upscaled VRAM from savestate
-       for (unsigned y = 0; y < 512; y++) {
-	 for (unsigned x = 0; x < 1024; x++) {
-	   texel_put(x, y, vram_new[y * 1024 + x]);
-	 }
-       }
-     }
+   if (upscale_shift > 0)
+   {
+      if (load)
+      {
+         // Restore upscaled VRAM from savestate
+         for (unsigned y = 0; y < 512; y++)
+         {
+            for (unsigned x = 0; x < 1024; x++)
+               texel_put(x, y, vram_new[y * 1024 + x]);
+         }
+      }
 
-     delete [] vram_new;
-     vram_new = NULL;
+      delete [] vram_new;
+      vram_new = NULL;
    }
 
    if(load)
