@@ -88,6 +88,33 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 
    this->upscale_shift = upscale_shift;
    this->dither_upscale_shift = 0;
+   this->SubpixelVertexCache = NULL;
+}
+
+PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
+{
+   // Recopy the GPU state in the new buffer
+   *this = g;
+
+   // Be careful not to copy the dynamically allocated vertex cache
+   this->SubpixelVertexCache = NULL;
+
+   // Override the upscaling factor
+   upscale_shift = ushift;
+
+   //For simplicity we do the transfer at 1x internal resolution.
+   for (unsigned y = 0; y < 512; y++)
+   {
+      for (unsigned x = 0; x < 1024; x++)
+         texel_put(x, y, g.texel_fetch(x, y));
+   }
+
+   if (g.SubpixelVertexCache) {
+     // Subpixel vertex cache is enabled, transfer the data
+     EnableSubpixelVertexCache(true);
+     memcpy(SubpixelVertexCache, g.SubpixelVertexCache,
+	    0x1000 * 0x1000 * sizeof(*SubpixelVertexCache));
+   }
 }
 
 PS_GPU::~PS_GPU()
@@ -116,6 +143,33 @@ void PS_GPU::BuildDitherTable()
 
 	  DitherLUT[y][x][v] = value;
 	}
+}
+
+void PS_GPU::EnableSubpixelVertexCache(bool enable) {
+  // The cache is useless at 1x
+  if (enable && upscale_shift > 0) {
+    if (SubpixelVertexCache == NULL) {
+      SubpixelVertexCache = new subpixel_vertex[0x1000 * 0x1000];
+      ResetSubpixelVertexCache();
+    }
+  } else {
+    if (SubpixelVertexCache) {
+      delete [] SubpixelVertexCache;
+      SubpixelVertexCache = NULL;
+    }
+  }
+}
+
+void PS_GPU::ResetSubpixelVertexCache() {
+  if (SubpixelVertexCache == NULL) {
+    return;
+  }
+
+  for (int16 x = -0x800; x < 0x800; x++) {
+      for (int16 y = -0x800; y < 0x800; y++) {
+	AddSubpixelVertex(x, y, (float)x, (float)y, 0);
+      }
+  }
 }
 
 // Allocate enough room for the PS_GPU class and VRAM
@@ -149,31 +203,9 @@ void PS_GPU::Destroy(PS_GPU *gpu) {
 // Build a new GPU with a different upscale_shift
 PS_GPU *PS_GPU::Rescale(uint8 ushift)
 {
-   // This is all very unsafe but it should work since PS_GPU doesn't
-   // contain anything that can't be copied using memcpy. If this ever
-   // changes a copy constructor should be created and called from here
-   // instead.
    void *buffer = PS_GPU::Alloc(ushift);
 
-   // Recopy the GPU state in the new buffer
-   memcpy(buffer, (void*)this, sizeof(*this));
-
-   PS_GPU *gpu = (PS_GPU *)buffer;
-
-   // Override the upscaling factor
-   gpu->upscale_shift = ushift;
-
-   // Rescale the VRAM for the new upscaling ratio
-   uint16_t *vram_new = gpu->vram;
-
-   //For simplicity we do the transfer at 1x internal resolution.
-   for (unsigned y = 0; y < 512; y++)
-   {
-      for (unsigned x = 0; x < 1024; x++)
-         gpu->texel_put(x, y, texel_fetch(x, y));
-   }
-
-   return gpu;
+   return new (buffer) PS_GPU(*this, ushift);
 }
 
 void PS_GPU::FillVideoParams(MDFNGI* gi)
@@ -1788,6 +1820,9 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
    if(load)
    {
+      // Invalidate vertex cache
+      ResetSubpixelVertexCache();
+
       for(unsigned i = 0; i < 256; i++)
       {
          TexCache[i].Tag = TexCache_Tag[i];
