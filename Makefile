@@ -1,5 +1,6 @@
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
+HAVE_GL=0
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
@@ -43,6 +44,16 @@ ifeq ($(platform), unix)
    endif
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+
+ifeq ($(HAVE_GL),1)
+	ifneq (,$(findstring gles,$(platform)))
+		GLES = 1
+		GL_LIB := -lGLESv2
+	else
+		GL_LIB := -lGL
+	endif
+endif
+
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
@@ -60,6 +71,10 @@ ifeq ($(OSX_LT_MAVERICKS),"YES")
    fpic += -mmacosx-version-min=10.5
 endif
 
+ifeq ($(HAVE_GL),1)
+	GL_LIB := -framework OpenGL
+endif
+
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
 
@@ -71,6 +86,10 @@ else ifneq (,$(findstring ios,$(platform)))
 
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+endif
+
+ifeq ($(HAVE_GL),1)
+	GL_LIB := -framework OpenGLES
 endif
 
    CC = cc -arch armv7 -isysroot $(IOSSDK)
@@ -85,6 +104,10 @@ endif
    FLAGS += $(IPHONEMINVER)
    CC += $(IPHONEMINVER)
    CXX += $(IPHONEMINVER)
+ifeq ($(HAVE_GL),1)
+	GL_LIB := -framework OpenGLES
+endif
+
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
@@ -96,6 +119,11 @@ else ifeq ($(platform), qnx)
    CXX = QCC -Vgcc_ntoarmv7le_cpp
    AR = QCC -Vgcc_ntoarmv7le
    FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
+
+ifeq ($(HAVE_GL),1)
+	GL_LIB := -lGLESv2
+endif
+
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -210,6 +238,11 @@ else
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    FLAGS += -DHAVE__MKDIR
+
+ifeq ($(HAVE_GL),1)
+	GL_LIB := -lopengl32
+endif
+
 endif
 
 include Makefile.common
@@ -252,7 +285,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o $@ $^ $(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS) $(GL_LIB)
 endif
 
 %.o: %.cpp

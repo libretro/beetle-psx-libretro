@@ -5,6 +5,24 @@ LIBRETRO_DIR := $(CORE_DIR)/libretro-common
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 
+ifeq ($(HAVE_GL), 1)
+ifeq ($(GLES), 1)
+GLFLAGS  := -DHAVE_OPENGLES -DHAVE_OPENGLES2
+CFLAGS   += $(GLFLAGS)
+CXXFLAGS += $(GLFLAGS)
+
+SOURCES_C += $(LIBRETRO_DIR)/glsym/glsym_es2.c
+else
+GLFLAGS   := -DHAVE_OPENGL
+CFLAGS    += $(GLFLAGS)
+CXXFLAGS  += $(GLFLAGS)
+SOURCES_C += $(LIBRETRO_DIR)/glsym/glsym_gl.c
+endif
+
+SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
+				 $(LIBRETRO_DIR)/glsym/rglgen.c
+endif
+
 INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include
 
 ifeq ($(HAVE_GRIFFIN),1)
