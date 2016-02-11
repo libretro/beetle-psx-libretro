@@ -12,6 +12,9 @@
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
 #include <queues/task_queue.h>
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#include <glsm/glsm.h>
+#endif
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -2915,10 +2918,38 @@ union
 
 static uint16_t input_buf[MAX_PLAYERS] = {0};
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+static bool fb_ready = false;
+
+static void context_reset(void)
+{
+   printf("context_reset.\n");
+   glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+
+   if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
+      return;
+
+   fb_ready = true;
+}
+
+static void context_destroy(void)
+{
+}
+
+static bool context_framebuffer_lock(void *data)
+{
+   if (fb_ready)
+      return false;
+   return true;
+}
+#endif
 
 bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   glsm_ctx_params_t params = {0};
+#endif
    if (failed_init)
       return false;
 
@@ -3100,6 +3131,19 @@ bool retro_load_game(const struct retro_game_info *info)
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
       return false;
+
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   params.context_reset         = context_reset;
+   params.context_destroy       = context_destroy;
+   params.environ_cb            = environ_cb;
+   params.stencil               = true;
+   params.imm_vbo_draw          = NULL;
+   params.imm_vbo_disable       = NULL;
+   params.framebuffer_lock      = context_framebuffer_lock;
+
+   if (!glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
+      return false;   
+#endif
 
    overscan = false;
    environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
@@ -3290,6 +3334,9 @@ void retro_run(void)
    bool updated = false;
 
    task_queue_ctl(TASK_QUEUE_CTL_CHECK, NULL);
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
+#endif
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
@@ -3552,8 +3599,14 @@ void retro_run(void)
    if (!allow_frame_duping)
       fb = pix;
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   video_cb(RETRO_HW_FRAME_BUFFER_VALID,
+         width, height,
+         MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+#else
    video_cb(fb, width, height,
          MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+#endif
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
@@ -3569,6 +3622,10 @@ void retro_run(void)
 
      GPU->display_change_count = 0;
    }
+
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
+#endif
 }
 
 void retro_get_system_info(struct retro_system_info *info)
