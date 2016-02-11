@@ -6,6 +6,10 @@
 
 #include "FastFIFO.h"
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#include <glsm/glsmsym.h>
+#endif
+
 class PS_GPU;
 
 #define INCMD_NONE     0
