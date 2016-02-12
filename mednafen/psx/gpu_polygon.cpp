@@ -1,3 +1,5 @@
+#include <math.h>
+
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
 #define COORD_POST_PADDING	12
@@ -249,24 +251,18 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    if(vertices[0].y == vertices[2].y)
       return;
 
-   if((vertices[2].y - vertices[0].y) >= 512)
+   if((vertices[2].y - vertices[0].y) >= (512 << upscale_shift))
    {
       //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
       return;
    }
 
-   if(abs(vertices[2].x - vertices[0].x) >= 1024 ||
-         abs(vertices[2].x - vertices[1].x) >= 1024 ||
-         abs(vertices[1].x - vertices[0].x) >= 1024)
+   if(abs(vertices[2].x - vertices[0].x) >= (1024 << upscale_shift) ||
+      abs(vertices[2].x - vertices[1].x) >= (1024 << upscale_shift) ||
+      abs(vertices[1].x - vertices[0].x) >= (1024 << upscale_shift))
    {
       //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
       return;
-   }
-
-    // Upscale
-   for (int i = 0; i < 3; i++) {
-      vertices[i].x <<= upscale_shift;
-      vertices[i].y <<= upscale_shift;
    }
 
    int32 clipy0 = ClipY0 << upscale_shift;
@@ -483,8 +479,20 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          vertices[v].b = vertices[0].b;
       }
 
-      vertices[v].x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF))) + OffsX;
-      vertices[v].y = sign_x_to_s32(11, ((int16_t)(*cb >> 16))) + OffsY;
+      int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
+      int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
+
+      // Attempt to retreive subpixel coordinates if available
+      const subpixel_vertex *pv = GetSubpixelVertex(x, y);
+
+      if (pv != NULL) {
+	vertices[v].x = (int32)roundf((pv->x + (float)OffsX) * upscale());
+	vertices[v].y = (int32)roundf((pv->y + (float)OffsY) * upscale());
+      } else {
+	vertices[v].x = (x + OffsX) << upscale_shift;
+	vertices[v].y = (y + OffsY) << upscale_shift;
+      }
+
       cb++;
 
       if(textured)

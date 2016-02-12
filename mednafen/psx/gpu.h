@@ -4,6 +4,9 @@
 #ifndef __MDFN_PSX_GPU_H
 #define __MDFN_PSX_GPU_H
 
+#include <map>
+#include <queue>
+#include <cmath>
 #include "FastFIFO.h"
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -66,19 +69,79 @@ struct line_point
    _b = tmp;                \
 }                           \
 
+struct subpixel_vertex {
+  float x;
+  float y;
+
+  subpixel_vertex(float x = 0., float y = 0., int16 z = 0)
+  :x(x), y(y)
+  {
+    // In order to save some RAM we don't store `z` since we don't do
+    // anything with it at this point.
+  }
+};
+
 class PS_GPU
 {
   private:
       // Private constructors and destructors since we need to use
       // custom allocators to allocate the flexible vram
       PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
+      PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
      ~PS_GPU() MDFN_COLD;
 
       static void *Alloc(uint8 upscale_shift) MDFN_COLD;
 
+      // Cache for subpixel precision vertices (when enabled)
+      subpixel_vertex *SubpixelVertexCache;
+
    public:
 
       void BuildDitherTable();
+
+      INLINE void AddSubpixelVertex(int32 x, int32 y, float fx, float fy, uint16 z)
+      {
+	if (SubpixelVertexCache) {
+
+	  // The cache is a 0x1000 * 0x1000 array
+	  if (x < -0x800 || x >= 0x800 || y < -0x800 || y >= 0x800) {
+	    // Out of range
+	    return;
+	  }
+
+	  if (fabs(float(x) - fx) >= 1.0 || fabs(float(y) - fy) > 0) {
+	    // The values don't make sense, there's probably an
+	    // overflow along the way
+	    return;
+	  }
+
+	  unsigned cx = x + 0x800;
+	  unsigned cy = y + 0x800;
+
+	  SubpixelVertexCache[cy * 0x1000 + cx] = subpixel_vertex(fx, fy, z);
+	}
+      }
+
+      INLINE const subpixel_vertex *GetSubpixelVertex(int32 x, int32 y) const
+      {
+	if (SubpixelVertexCache == NULL) {
+	  // Cache disabled
+	  return NULL;
+	}
+
+	if (x < -0x800 || x >= 0x800 || y < -0x800 || y >= 0x800) {
+	  // Out of range
+	  return NULL;
+	}
+
+	unsigned cx = x + 0x800;
+	unsigned cy = y + 0x800;
+
+	return &SubpixelVertexCache[cy * 0x1000 + cx];
+      }
+
+      void EnableSubpixelVertexCache(bool enable);
+      void ResetSubpixelVertexCache();
 
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       static void Destroy(PS_GPU *gpu) MDFN_COLD;
@@ -136,7 +199,7 @@ class PS_GPU
          return(scanline);
       } 
 
-      INLINE uint16 PeekRAM(uint32 A)
+      INLINE uint16 PeekRAM(uint32 A) const
       {
          return texel_fetch(A & 0x3FF, (A >> 10) & 0x1FF);
       }
@@ -147,7 +210,7 @@ class PS_GPU
       }
 
       // Return a pixel from VRAM, ignoring the internal upscaling
-      INLINE uint16 texel_fetch(uint32 x, uint32 y) {
+      INLINE uint16 texel_fetch(uint32 x, uint32 y) const {
 	return vram_fetch(x << upscale_shift,
 			  y << upscale_shift);
       }
@@ -168,7 +231,7 @@ class PS_GPU
       }
 
       // Return a pixel from VRAM
-      INLINE uint16 vram_fetch(uint32 x, uint32 y) {
+      INLINE uint16 vram_fetch(uint32 x, uint32 y) const {
 	return vram[(y << (10 + upscale_shift)) | x];
       }
 
@@ -177,11 +240,11 @@ class PS_GPU
 	vram[(y << (10 + upscale_shift)) | x] = v;
       }
 
-      INLINE uint32 upscale() {
+      INLINE uint32 upscale() const {
 	return 1U << upscale_shift;
       }
 
-      INLINE unsigned vram_npixels() {
+      INLINE unsigned vram_npixels() const {
 	return 512 * 1024 * upscale() * upscale();
       }
 
