@@ -877,15 +877,37 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 {
    unsigned i;
 
-   for(i = 0; i < 3; i++)
+   if(MDFN_LIKELY(matrix != &Matrices.AbbyNormal))
    {
-      int64_t tmp;
-      int32_t mulr[3];
-
-      tmp = (uint64_t)(int64_t)crv[i] << 12;
-
-      if(matrix == &Matrices.AbbyNormal)
+      for(i = 0; i < 3; i++)
       {
+         int32_t mulr[3];
+         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+
+         mulr[0] = matrix->MX[i][0] * v[0];
+         mulr[1] = matrix->MX[i][1] * v[1];
+         mulr[2] = matrix->MX[i][2] * v[2];
+
+         tmp = A_MV(i, tmp + mulr[0]);
+         if(crv == CRVectors.FC)
+         {
+            Lm_B(i, tmp >> sf, FALSE);
+            tmp = 0;
+         }
+
+         tmp = A_MV(i, tmp + mulr[1]);
+         tmp = A_MV(i, tmp + mulr[2]);
+
+         MAC[1 + i] = tmp >> sf;
+      }
+   }
+   else
+   {
+      for(i = 0; i < 3; i++)
+      {
+         int32_t mulr[3];
+         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+
          if(i == 0)
          {
             mulr[0] = -(RGB.R << 4);
@@ -898,30 +920,23 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
             mulr[1] = (int16_t)CR[i];
             mulr[2] = (int16_t)CR[i];
          }
-      }
-      else
-      {
-         mulr[0] = matrix->MX[i][0];
-         mulr[1] = matrix->MX[i][1];
-         mulr[2] = matrix->MX[i][2];
-      }
-      mulr[0] *= v[0];
-      mulr[1] *= v[1];
-      mulr[2] *= v[2];
+         mulr[0] *= v[0];
+         mulr[1] *= v[1];
+         mulr[2] *= v[2];
 
-      tmp = A_MV(i, tmp + mulr[0]);
-      if(crv == CRVectors.FC)
-      {
-         Lm_B(i, tmp >> sf, FALSE);
-         tmp = 0;
+         tmp = A_MV(i, tmp + mulr[0]);
+         if(crv == CRVectors.FC)
+         {
+            Lm_B(i, tmp >> sf, FALSE);
+            tmp = 0;
+         }
+
+         tmp = A_MV(i, tmp + mulr[1]);
+         tmp = A_MV(i, tmp + mulr[2]);
+
+         MAC[1 + i] = tmp >> sf;
       }
-
-      tmp = A_MV(i, tmp + mulr[1]);
-      tmp = A_MV(i, tmp + mulr[2]);
-
-      MAC[1 + i] = tmp >> sf;
    }
-
 
    MAC_to_IR(lm);
 }
