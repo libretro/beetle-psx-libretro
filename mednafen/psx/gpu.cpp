@@ -112,8 +112,10 @@ PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
    if (g.SubpixelVertexCache) {
      // Subpixel vertex cache is enabled, transfer the data
      EnableSubpixelVertexCache(true);
-     memcpy(SubpixelVertexCache, g.SubpixelVertexCache,
-	    0x1000 * 0x1000 * sizeof(*SubpixelVertexCache));
+     if (SubpixelVertexCache) {
+       memcpy(SubpixelVertexCache, g.SubpixelVertexCache,
+	      0x1000 * 0x1000 * sizeof(*SubpixelVertexCache));
+     }
    }
 }
 
