@@ -7,6 +7,7 @@
 #include <map>
 #include <queue>
 #include <cmath>
+#include <math.h>
 #include "FastFIFO.h"
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
