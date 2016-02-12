@@ -134,10 +134,9 @@ static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
 
 static void RecalcHalt(void)
 {
-   bool Halt = false;
-   unsigned ch, tmp;
-   ch = 0;
-   tmp = 0;
+   bool Halt    = false;
+   unsigned ch  = 0;
+   unsigned tmp = 0;
 
    for(ch = 0; ch < 7; ch++)
    {
@@ -179,11 +178,9 @@ static void RecalcHalt(void)
 
       if(tmp > 0)
          tmp--;
-
-      PSX_SetDMACycleSteal(tmp);
    }
-   else
-      PSX_SetDMACycleSteal(0);
+
+   PSX_SetDMACycleSteal(tmp);
 
    CPU->SetHalt(Halt);
 }
