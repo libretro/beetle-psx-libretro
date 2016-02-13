@@ -31,6 +31,7 @@ static unsigned frame_count = 0;
 static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool allow_frame_duping = false;
+static bool failed_init = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -1626,7 +1627,6 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    po += 4;
 }
 
-static void Cleanup(void);
 static int Load(const char *name, MDFNFILE *fp)
 {
    const bool IsPSF = false;
@@ -1697,27 +1697,31 @@ static void Cleanup(void)
 static void CloseGame(void)
 {
    int i;
-   for(i = 0; i < 8; i++)
-   {
-      if (i == 0 && !use_mednafen_memcard0_method)
-      {
-         FIO->SaveMemcard(i);
-         continue;
-      }
 
-      // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
-      // we can reduce potential data loss!
-      try
+   if (!failed_init)
+   {
+      for(i = 0; i < 8; i++)
       {
-         char ext[64];
-         const char *memcard = NULL;
-         snprintf(ext, sizeof(ext), "%d.mcr", i);
-         memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
-         FIO->SaveMemcard(i, memcard);
-      }
-      catch(std::exception &e)
-      {
-         log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+         if (i == 0 && !use_mednafen_memcard0_method)
+         {
+            FIO->SaveMemcard(i);
+            continue;
+         }
+
+         // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
+         // we can reduce potential data loss!
+         try
+         {
+            char ext[64];
+            const char *memcard = NULL;
+            snprintf(ext, sizeof(ext), "%d.mcr", i);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            FIO->SaveMemcard(i, memcard);
+         }
+         catch(std::exception &e)
+         {
+            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+         }
       }
    }
 
@@ -2199,7 +2203,6 @@ extern void SetInput(int port, const char *type, void *ptr);
 static bool overscan;
 static double last_sound_rate;
 
-static bool failed_init;
 
 char *psx_analog_type;
 
@@ -3180,7 +3183,10 @@ bool retro_load_game(const struct retro_game_info *info)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
    if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, retro_cd_path))
+   {
+      failed_init = true;
       return false;
+   }
 
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
