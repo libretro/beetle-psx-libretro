@@ -965,7 +965,7 @@ void PS_GPU::ProcessFIFO(void)
    }
 }
 
-INLINE void PS_GPU::WriteCB(uint32_t InData)
+void PS_GPU::WriteCB(uint32_t InData)
 {
    if(BlitterFIFO.CanRead() >= 0x10 
          && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
@@ -1135,7 +1135,7 @@ void PS_GPU::WriteDMA(uint32_t V)
    WriteCB(V);
 }
 
-INLINE uint32_t PS_GPU::ReadData(void)
+uint32_t PS_GPU::ReadData(void)
 {
    if(InCmd == INCMD_FBREAD)
    {
@@ -1231,7 +1231,7 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
    return(ret >> ((A & 3) * 8));
 }
 
-INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
+void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
       uint32_t out_Gshift, uint32_t out_Bshift,
       bool bpp24, const uint16_t *src, uint32_t *dest,
       const int32 dx_start, const int32 dx_end, int32 fb_x)

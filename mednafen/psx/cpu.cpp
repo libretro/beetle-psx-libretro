@@ -29,10 +29,11 @@ extern bool psx_cpu_overclock;
 */
 
 #define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
-#define BIU_ENABLE_DCACHE	0x00000080	// Enable D-cache
-#define BIU_TAG_TEST_MODE	0x00000004	// Enable TAG test mode(IsC must be set to 1 as well presumably?)
+#define BIU_ENABLE_DCACHE	   0x00000080	// Enable D-cache
+#define BIU_TAG_TEST_MODE	   0x00000004	// Enable TAG test mode(IsC must be set to 1 as well presumably?)
 #define BIU_INVALIDATE_MODE	0x00000002	// Enable Invalidate mode(IsC must be set to 1 as well presumably?)
-#define BIU_LOCK		0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
+#define BIU_LOCK		         0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
+
 						// Does lock mode prevent the actual data payload from being modified, while allowing tags to be modified/updated???
 
 PS_CPU::PS_CPU()
@@ -84,13 +85,13 @@ void PS_CPU::SetFastMap(void *region_mem, uint32_t region_address, uint32_t regi
 
 INLINE void PS_CPU::RecalcIPCache(void)
 {
- IPCache = 0;
+   IPCache = 0;
 
- if(((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)) || Halted)
-  IPCache = 0x80;
+   if(((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)) || Halted)
+      IPCache = 0x80;
 
- if(Halted)
-  IPCache = 0x80;
+   if(Halted)
+      IPCache = 0x80;
 }
 
 void PS_CPU::SetHalt(bool status)
@@ -401,16 +402,17 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
    }
 }
 
-uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32_t NPM)
+uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const uint32_t NPM, const uint32_t instr)
 {
-   const bool InBDSlot = !(NPM & 0x3);
+   const bool AfterBranchInstr = !(NPM & 0x1);
+   const bool BranchTaken = !(NPM & 0x3);
    uint32_t handler = 0x80000080;
 
    assert(code < 16);
 
    if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
    {
-      PSX_DBG(PSX_DBG_WARNING, "Exception: %08x @ PC=0x%08x(IBDS=%d) -- IPCache=0x%02x -- IPEND=0x%02x -- SR=0x%08x ; IRQC_Status=0x%04x -- IRQC_Mask=0x%04x\n", code, PC, InBDSlot, IPCache, (CP0.CAUSE >> 8) & 0xFF, CP0.SR,
+      PSX_DBG(PSX_DBG_WARNING, "Exception: %08x @ PC=0x%08x(IBDS=%d) -- IPCache=0x%02x -- IPEND=0x%02x -- SR=0x%08x ; IRQC_Status=0x%04x -- IRQC_Mask=0x%04x\n", code, PC, BranchTaken, IPCache, (CP0.CAUSE >> 8) & 0xFF, CP0.SR,
             ::IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), ::IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
    }
 
@@ -418,8 +420,11 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32_t NPM)
       handler = 0xBFC00180;
 
    CP0.EPC = PC;
-   if(InBDSlot)
+   if(AfterBranchInstr)
+   {
       CP0.EPC -= 4;
+      CP0.TAR = (PC & (NPM | 3)) + NP;
+   }
 
 #ifdef HAVE_DEBUG
    if(ADDBT)
@@ -433,9 +438,10 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32_t NPM)
    CP0.CAUSE &= 0x0000FF00;
    CP0.CAUSE |= code << 2;
 
-   // If EPC was adjusted -= 4 because we were in a branch delay slot, set the bit.
-   if(InBDSlot)
-      CP0.CAUSE |= 0x80000000;
+   // If EPC was adjusted -= 4 because we are after a branch instructon, set bit 31.
+   CP0.CAUSE |= AfterBranchInstr << 31;
+   CP0.CAUSE |= BranchTaken << 31;
+   CP0.CAUSE |= (instr << 2) & (0x3 << 28); // CE
 
    RecalcIPCache();
 
@@ -515,7 +521,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          {
             // This will block interrupt processing, but since we're going more for keeping broken homebrew/hacks from working
             // than super-duper-accurate pipeline emulation, it shouldn't be a problem.
-            new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+            new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, 0);
             new_PC_mask = 0;
             goto OpDone;
          }
@@ -699,7 +705,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     BEGIN_OPF(ILL, 0, 0);
 	     PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
 	     DO_LDS();
-	     new_PC = Exception(EXCEPTION_RI, PC, new_PC_mask);
+	     new_PC = Exception(EXCEPTION_RI, PC, new_PC, new_PC_mask, instr);
 	     new_PC_mask = 0;
     END_OPF;
 
@@ -722,7 +728,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(ep))
 	{
-	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_OV, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -748,7 +754,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         if(MDFN_UNLIKELY(ep))
 	{
-	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_OV, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
         else
@@ -955,7 +961,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	PSX_WARNING("[CPU] BREAK BREAK BREAK BREAK DAAANCE -- PC=0x%08x", PC);
 
 	DO_LDS();
-	new_PC = Exception(EXCEPTION_BP, PC, new_PC_mask);
+	new_PC = Exception(EXCEPTION_BP, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1058,7 +1064,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(COP1, 0x11, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1162,7 +1168,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(COP3, 0x13, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1171,7 +1177,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(LWC0, 0x30, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1180,7 +1186,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(LWC1, 0x31, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1195,7 +1201,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         if(MDFN_UNLIKELY(address & 3))
 	{
-         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
         else
@@ -1213,7 +1219,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(LWC3, 0x33, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1223,7 +1229,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(SWC0, 0x38, 0);
 	DO_LDS();
-	new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+	new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1232,7 +1238,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     BEGIN_OPF(SWC1, 0x39, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_COPU, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1245,7 +1251,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(address & 0x3))
 	{
-	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -1263,7 +1269,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     ///
     BEGIN_OPF(SWC3, 0x3B, 0);
 	DO_LDS();
-        new_PC = Exception(EXCEPTION_RI, PC, new_PC_mask);
+        new_PC = Exception(EXCEPTION_RI, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1837,7 +1843,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(ep))
 	{
-	 new_PC = Exception(EXCEPTION_OV, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_OV, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -1873,7 +1879,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     BEGIN_OPF(SYSCALL, 0, 0x0C);
 	DO_LDS();
 
-	new_PC = Exception(EXCEPTION_SYSCALL, PC, new_PC_mask);
+	new_PC = Exception(EXCEPTION_SYSCALL, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
     END_OPF;
 
@@ -1972,7 +1978,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(address & 1))
 	{
-	 new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -1998,7 +2004,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         if(MDFN_UNLIKELY(address & 1))
 	{
-         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -2025,7 +2031,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         if(MDFN_UNLIKELY(address & 3))
 	{
-         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC_mask);
+         new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
         else
@@ -2068,7 +2074,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(address & 0x1))
 	{
-	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -2092,7 +2098,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	if(MDFN_UNLIKELY(address & 0x3))
 	{
-	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_ADES, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
@@ -2264,7 +2270,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	{
  	 DO_LDS();
 
-	 new_PC = Exception(EXCEPTION_INT, PC, new_PC_mask);
+	 new_PC = Exception(EXCEPTION_INT, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
     END_OPF;
