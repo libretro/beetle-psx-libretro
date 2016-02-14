@@ -630,7 +630,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 #endif
 
    #define DO_LDS() { GPR[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x20; }
-   #define BEGIN_OPF(name, arg_op, arg_funct) { op_##name: /*assert( ((arg_op) ? (0x40 | (arg_op)) : (arg_funct)) == opf); */
+   #define BEGIN_OPF(name) { op_##name:
    #define END_OPF goto OpDone; }
 
    #define DO_BRANCH(offset, mask)			\
@@ -702,7 +702,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
    CGEND
 
    {
-    BEGIN_OPF(ILL, 0, 0);
+    BEGIN_OPF(ILL);
 	     PSX_WARNING("[CPU] Unknown instruction @%08x = %08x, op=%02x, funct=%02x", PC, instr, instr >> 26, (instr & 0x3F));
 	     DO_LDS();
 	     new_PC = Exception(EXCEPTION_RI, PC, new_PC, new_PC_mask, instr);
@@ -712,7 +712,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ADD - Add Word
     //
-    BEGIN_OPF(ADD, 0, 0x20);
+    BEGIN_OPF(ADD);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -739,7 +739,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ADDI - Add Immediate Word
     //
-    BEGIN_OPF(ADDI, 0x08, 0);
+    BEGIN_OPF(ADDI);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -765,7 +765,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ADDIU - Add Immediate Unsigned Word
     //
-    BEGIN_OPF(ADDIU, 0x09, 0);
+    BEGIN_OPF(ADDIU);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -784,7 +784,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ADDU - Add Unsigned Word
     //
-    BEGIN_OPF(ADDU, 0, 0x21);
+    BEGIN_OPF(ADDU);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -804,7 +804,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // AND - And
     //
-    BEGIN_OPF(AND, 0, 0x24);
+    BEGIN_OPF(AND);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -824,7 +824,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ANDI - And Immediate
     //
-    BEGIN_OPF(ANDI, 0x0C, 0);
+    BEGIN_OPF(ANDI);
 	ITYPE_ZE;
 
 	GPR_DEPRES_BEGIN
@@ -843,7 +843,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // BEQ - Branch on Equal
     //
-    BEGIN_OPF(BEQ, 0x04, 0);
+    BEGIN_OPF(BEQ);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -863,7 +863,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
     // Bah, why does MIPS encoding have to be funky like this. :(
     // Handles BGEZ, BGEZAL, BLTZ, BLTZAL
-    BEGIN_OPF(BCOND, 0x01, 0);
+    BEGIN_OPF(BCOND);
 	const uint32 tv = GPR[(instr >> 21) & 0x1F];
 	uint32 riv = (instr >> 16) & 0x1F;
 	uint32 immediate = (int32)(int16)(instr & 0xFFFF);
@@ -894,7 +894,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // BGTZ - Branch on Greater than Zero
     //
-    BEGIN_OPF(BGTZ, 0x07, 0);
+    BEGIN_OPF(BGTZ);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -914,7 +914,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // BLEZ - Branch on Less Than or Equal to Zero
     //
-    BEGIN_OPF(BLEZ, 0x06, 0);
+    BEGIN_OPF(BLEZ);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -935,7 +935,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // BNE - Branch on Not Equal
     //
-    BEGIN_OPF(BNE, 0x05, 0);
+    BEGIN_OPF(BNE);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -957,7 +957,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // BREAK - Breakpoint
     //
-    BEGIN_OPF(BREAK, 0, 0x0D);
+    BEGIN_OPF(BREAK);
 	PSX_WARNING("[CPU] BREAK BREAK BREAK BREAK DAAANCE -- PC=0x%08x", PC);
 
 	DO_LDS();
@@ -968,7 +968,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     // Cop "instructions":	CFCz(no CP0), COPz, CTCz(no CP0), LWCz(no CP0), MFCz, MTCz, SWCz(no CP0)
     //
     // COP0 instructions
-    BEGIN_OPF(COP0, 0x10, 0);
+    BEGIN_OPF(COP0);
 	uint32 sub_op = (instr >> 21) & 0x1F;
 
 	if(sub_op & 0x10)
@@ -1062,7 +1062,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // COP1
     //
-    BEGIN_OPF(COP1, 0x11, 0);
+    BEGIN_OPF(COP1);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1071,7 +1071,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // COP2
     //
-    BEGIN_OPF(COP2, 0x12, 0);
+    BEGIN_OPF(COP2);
 	uint32 sub_op = (instr >> 21) & 0x1F;
 
    if (sub_op >= 0x10 && sub_op <= 0x1F)
@@ -1166,7 +1166,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // COP3
     //
-    BEGIN_OPF(COP3, 0x13, 0);
+    BEGIN_OPF(COP3);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1175,7 +1175,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWC0
     //
-    BEGIN_OPF(LWC0, 0x30, 0);
+    BEGIN_OPF(LWC0);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1184,7 +1184,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWC1
     //
-    BEGIN_OPF(LWC1, 0x31, 0);
+    BEGIN_OPF(LWC1);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1193,7 +1193,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWC2
     //
-    BEGIN_OPF(LWC2, 0x32, 0);
+    BEGIN_OPF(LWC2);
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
@@ -1217,7 +1217,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWC3
     //
-    BEGIN_OPF(LWC3, 0x33, 0);
+    BEGIN_OPF(LWC3);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1227,7 +1227,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWC0
     //
-    BEGIN_OPF(SWC0, 0x38, 0);
+    BEGIN_OPF(SWC0);
 	DO_LDS();
 	new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1236,7 +1236,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWC1
     //
-    BEGIN_OPF(SWC1, 0x39, 0);
+    BEGIN_OPF(SWC1);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_COPU, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1245,7 +1245,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWC2
     //
-    BEGIN_OPF(SWC2, 0x3A, 0);
+    BEGIN_OPF(SWC2);
         ITYPE;
         uint32 address = GPR[rs] + immediate;
 
@@ -1267,7 +1267,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWC3
     ///
-    BEGIN_OPF(SWC3, 0x3B, 0);
+    BEGIN_OPF(SWC3);
 	DO_LDS();
         new_PC = Exception(EXCEPTION_RI, PC, new_PC, new_PC_mask, instr);
         new_PC_mask = 0;
@@ -1277,7 +1277,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // DIV - Divide Word
     //
-    BEGIN_OPF(DIV, 0, 0x1A);
+    BEGIN_OPF(DIV);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1311,7 +1311,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     END_OPF;
 
     // DIVU - Divide Unsigned Word
-    BEGIN_OPF(DIVU, 0, 0x1B);
+    BEGIN_OPF(DIVU);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1337,7 +1337,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // J - Jump
     //
-    BEGIN_OPF(J, 0x02, 0);
+    BEGIN_OPF(J);
 	JTYPE;
 
 	DO_LDS();
@@ -1348,7 +1348,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // JAL - Jump and Link
     //
-    BEGIN_OPF(JAL, 0x03, 0);
+    BEGIN_OPF(JAL);
 	JTYPE;
 
 	//GPR_DEPRES_BEGIN
@@ -1365,7 +1365,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // JALR - Jump and Link Register
     //
-    BEGIN_OPF(JALR, 0, 0x09);
+    BEGIN_OPF(JALR);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1386,7 +1386,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // JR - Jump Register
     //
-    BEGIN_OPF(JR, 0, 0x08);
+    BEGIN_OPF(JR);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1405,7 +1405,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LUI - Load Upper Immediate
     //
-    BEGIN_OPF(LUI, 0x0F, 0);
+    BEGIN_OPF(LUI);
 	ITYPE_ZE;		// Actually, probably would be sign-extending...if we were emulating a 64-bit MIPS chip :b
 
 	GPR_DEPRES_BEGIN
@@ -1421,7 +1421,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MFHI - Move from HI
     //
-    BEGIN_OPF(MFHI, 0, 0x10);
+    BEGIN_OPF(MFHI);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1453,7 +1453,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MFLO - Move from LO
     //
-    BEGIN_OPF(MFLO, 0, 0x12);
+    BEGIN_OPF(MFLO);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1485,7 +1485,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MTHI - Move to HI
     //
-    BEGIN_OPF(MTHI, 0, 0x11);
+    BEGIN_OPF(MTHI);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1501,7 +1501,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MTLO - Move to LO
     //
-    BEGIN_OPF(MTLO, 0, 0x13);
+    BEGIN_OPF(MTLO);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1518,7 +1518,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MULT - Multiply Word
     //
-    BEGIN_OPF(MULT, 0, 0x18);
+    BEGIN_OPF(MULT);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1540,7 +1540,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // MULTU - Multiply Unsigned Word
     //
-    BEGIN_OPF(MULTU, 0, 0x19);
+    BEGIN_OPF(MULTU);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1563,7 +1563,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // NOR - NOR
     //
-    BEGIN_OPF(NOR, 0, 0x27);
+    BEGIN_OPF(NOR);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1583,7 +1583,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // OR - OR
     //
-    BEGIN_OPF(OR, 0, 0x25);
+    BEGIN_OPF(OR);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1604,7 +1604,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // ORI - OR Immediate
     //
-    BEGIN_OPF(ORI, 0x0D, 0);
+    BEGIN_OPF(ORI);
 	ITYPE_ZE;
 
 	GPR_DEPRES_BEGIN
@@ -1624,7 +1624,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLL - Shift Word Left Logical
     //
-    BEGIN_OPF(SLL, 0, 0x00);	// SLL
+    BEGIN_OPF(SLL);	// SLL
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1644,7 +1644,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLLV - Shift Word Left Logical Variable
     //
-    BEGIN_OPF(SLLV, 0, 0x04);
+    BEGIN_OPF(SLLV);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1664,7 +1664,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLT - Set on Less Than
     //
-    BEGIN_OPF(SLT, 0, 0x2A);
+    BEGIN_OPF(SLT);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1685,7 +1685,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLTI - Set on Less Than Immediate
     //
-    BEGIN_OPF(SLTI, 0x0A, 0);
+    BEGIN_OPF(SLTI);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1705,7 +1705,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLTIU - Set on Less Than Immediate, Unsigned
     //
-    BEGIN_OPF(SLTIU, 0x0B, 0);
+    BEGIN_OPF(SLTIU);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1725,7 +1725,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SLTU - Set on Less Than, Unsigned
     //
-    BEGIN_OPF(SLTU, 0, 0x2B);
+    BEGIN_OPF(SLTU);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1746,7 +1746,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SRA - Shift Word Right Arithmetic
     //
-    BEGIN_OPF(SRA, 0, 0x03);
+    BEGIN_OPF(SRA);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1766,7 +1766,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SRAV - Shift Word Right Arithmetic Variable
     //
-    BEGIN_OPF(SRAV, 0, 0x07);
+    BEGIN_OPF(SRAV);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1787,7 +1787,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SRL - Shift Word Right Logical
     //
-    BEGIN_OPF(SRL, 0, 0x02);
+    BEGIN_OPF(SRL);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1806,7 +1806,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SRLV - Shift Word Right Logical Variable
     //
-    BEGIN_OPF(SRLV, 0, 0x06);
+    BEGIN_OPF(SRLV);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1827,7 +1827,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SUB - Subtract Word
     //
-    BEGIN_OPF(SUB, 0, 0x22);
+    BEGIN_OPF(SUB);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1855,7 +1855,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SUBU - Subtract Unsigned Word
     //
-    BEGIN_OPF(SUBU, 0, 0x23); // SUBU
+    BEGIN_OPF(SUBU); // SUBU
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1876,7 +1876,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SYSCALL
     //
-    BEGIN_OPF(SYSCALL, 0, 0x0C);
+    BEGIN_OPF(SYSCALL);
 	DO_LDS();
 
 	new_PC = Exception(EXCEPTION_SYSCALL, PC, new_PC, new_PC_mask, instr);
@@ -1887,7 +1887,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // XOR
     //
-    BEGIN_OPF(XOR, 0, 0x26);
+    BEGIN_OPF(XOR);
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1907,7 +1907,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // XORI - Exclusive OR Immediate
     //
-    BEGIN_OPF(XORI, 0x0E, 0);
+    BEGIN_OPF(XORI);
 	ITYPE_ZE;
 
 	GPR_DEPRES_BEGIN
@@ -1929,7 +1929,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LB - Load Byte
     //
-    BEGIN_OPF(LB, 0x20, 0);
+    BEGIN_OPF(LB);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1947,7 +1947,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LBU - Load Byte Unsigned
     //
-    BEGIN_OPF(LBU, 0x24, 0);
+    BEGIN_OPF(LBU);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1965,7 +1965,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LH - Load Halfword
     //
-    BEGIN_OPF(LH, 0x21, 0);
+    BEGIN_OPF(LH);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1991,7 +1991,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LHU - Load Halfword Unsigned
     //
-    BEGIN_OPF(LHU, 0x25, 0);
+    BEGIN_OPF(LHU);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2018,7 +2018,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LW - Load Word
     //
-    BEGIN_OPF(LW, 0x23, 0);
+    BEGIN_OPF(LW);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2044,7 +2044,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SB - Store Byte
     //
-    BEGIN_OPF(SB, 0x28, 0);
+    BEGIN_OPF(SB);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2062,7 +2062,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     // 
     // SH - Store Halfword
     //
-    BEGIN_OPF(SH, 0x29, 0);
+    BEGIN_OPF(SH);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2086,7 +2086,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     // 
     // SW - Store Word
     //
-    BEGIN_OPF(SW, 0x2B, 0);
+    BEGIN_OPF(SW);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2112,7 +2112,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWL - Load Word Left
     //
-    BEGIN_OPF(LWL, 0x22, 0);
+    BEGIN_OPF(LWL);
 	ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2154,7 +2154,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWL - Store Word Left
     //
-    BEGIN_OPF(SWL, 0x2A, 0);
+    BEGIN_OPF(SWL);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2186,7 +2186,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // LWR - Load Word Right
     //
-    BEGIN_OPF(LWR, 0x26, 0);
+    BEGIN_OPF(LWR);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2228,7 +2228,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // SWR - Store Word Right
     //
-    BEGIN_OPF(SWR, 0x2E, 0);
+    BEGIN_OPF(SWR);
         ITYPE;
 
 	GPR_DEPRES_BEGIN
@@ -2261,7 +2261,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
     //
     // Mednafen special instruction
     //
-    BEGIN_OPF(INTERRUPT, 0x3F, 0);
+    BEGIN_OPF(INTERRUPT);
 	if(Halted)
 	{
 	 goto SkipNPCStuff;
