@@ -11,7 +11,6 @@
 #include "libretro.h"
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
-#include <queues/task_queue.h>
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsm/glsm.h>
 #endif
@@ -2391,8 +2390,6 @@ void retro_init(void)
    thread_enable = true;
 #endif
 
-   task_queue_ctl(TASK_QUEUE_CTL_INIT, &thread_enable);
-
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else
@@ -3353,7 +3350,6 @@ void retro_run(void)
 {
    bool updated = false;
 
-   task_queue_ctl(TASK_QUEUE_CTL_CHECK, NULL);
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #endif
@@ -3676,8 +3672,6 @@ void retro_deinit(void)
 {
    delete surf;
    surf = NULL;
-
-   task_queue_ctl(TASK_QUEUE_CTL_DEINIT, NULL);
 
    log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
