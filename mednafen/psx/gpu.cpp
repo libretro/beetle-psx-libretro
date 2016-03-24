@@ -855,6 +855,10 @@ void PS_GPU::ProcessFIFO(void)
                FBRW_CurY++;
                if(FBRW_CurY == (FBRW_Y + FBRW_H))
                {
+                  /* Upload complete, send over to RSX */
+                  rsx_load_image(FBRW_X, FBRW_Y,
+                        FBRW_W, FBRW_H,
+                        this->vram);
                   InCmd = INCMD_NONE;
                   break;	// Break out of the for() loop.
                }
