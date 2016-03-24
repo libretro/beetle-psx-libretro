@@ -17,7 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include "mednafen.h"
 #include "Stream.h"
 #include "FileStream.h"
@@ -27,7 +26,7 @@
 
 FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
-   fp = retro_fopen(path, (mode == MODE_WRITE) ? RFILE_MODE_WRITE : RFILE_MODE_READ, -1);
+   fp = filestream_open(path, (mode == MODE_WRITE) ? RFILE_MODE_WRITE : RFILE_MODE_READ, -1);
 
    if (!fp)
    {
@@ -68,28 +67,28 @@ uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
 {
    if (!fp)
       return 0;
-   return retro_fread(fp, data, count);
+   return filestream_read(fp, data, count);
 }
 
 void FileStream::write(const void *data, uint64_t count)
 {
    if (!fp)
       return;
-   retro_fwrite(fp, data, count);
+   filestream_write(fp, data, count);
 }
 
 void FileStream::seek(int64_t offset, int whence)
 {
    if (!fp)
       return;
-   retro_fseek(fp, offset, whence);
+   filestream_seek(fp, offset, whence);
 }
 
 int64_t FileStream::tell(void)
 {
    if (!fp)
       return -1;
-   return retro_ftell(fp);
+   return filestream_tell(fp);
 }
 
 int64_t FileStream::size(void)
@@ -104,5 +103,5 @@ void FileStream::close(void)
 {
    if (!fp)
       return;
-   retro_fclose(fp);
+   filestream_close(fp);
 }

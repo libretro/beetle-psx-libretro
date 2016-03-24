@@ -20,7 +20,7 @@
 #ifndef __MDFN_FILESTREAM_H
 #define __MDFN_FILESTREAM_H
 
-#include <retro_file.h>
+#include <streams/file_stream.h>
 #include <retro_stat.h>
 
 #include "Stream.h"
