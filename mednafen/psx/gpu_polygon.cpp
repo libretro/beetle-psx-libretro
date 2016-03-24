@@ -524,6 +524,37 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       }
    }
 
+   uint16_t clut_x = (clut & (0x3f << 4));
+   uint16_t clut_y = (clut >> 10) & 0x1ff;
+
+   uint8_t blend_mode;
+
+   if (textured) {
+     if (TexMult) {
+       blend_mode = 2;
+     } else {
+       blend_mode = 1;
+     }
+   } else {
+     blend_mode = 0;
+   }
+
+   rsx_push_triangle(vertices[0].x, vertices[0].y,
+		     vertices[1].x, vertices[1].y,
+		     vertices[2].x, vertices[2].y,
+		     ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16),
+		     ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16),
+		     ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16),
+		     vertices[0].u, vertices[0].v,
+		     vertices[1].u, vertices[1].v,
+		     vertices[2].u, vertices[2].v,
+		     this->TexPageX, this->TexPageY,
+		     clut_x, clut_y,
+		     blend_mode,
+		     2 - TexMode_TA,
+		     DitherEnabled());
+
+
    DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
 }
 

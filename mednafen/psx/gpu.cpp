@@ -17,6 +17,7 @@
 
 #include "psx.h"
 #include "timer.h"
+#include "rsx.h"
 
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
@@ -923,45 +924,60 @@ void PS_GPU::ProcessFIFO(void)
       G_Command_FBWrite(this, CB);
    else if ((cc >= 0xC0) && (cc <= 0xDF))
       G_Command_FBRead(this, CB);
-   else switch (cc)
+   else
    {
-      case 0x01:
-         CLUT_Cache_VB = ~0U;
-         InvalidateTexCache();
-         break;
-      case 0x02:
-         G_Command_FBFill(this, CB);
-         break;
-      case 0x1F:
-         this->IRQPending = true;
-         IRQ_Assert(IRQ_GPU, this->IRQPending);
-         break;
-      case 0xe1:
-         G_Command_DrawMode(this, CB);
-         break;
-      case 0xe2:
-         G_Command_TexWindow(this, CB);
-         break;
-      case 0xe3: /* Clip 0 */
-         this->ClipX0 = *CB & 1023;
-         this->ClipY0 = (*CB >> 10) & 1023;
-         break;
-      case 0xe4: /* Clip 1 */
-         this->ClipX1 = *CB & 1023;
-         this->ClipY1 = (*CB >> 10) & 1023;
-         break;
-      case 0xe5: /* Drawing Offset */
-         this->OffsX = sign_x_to_s32(11, (*CB & 2047));
-         this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
-         break;
-      case 0xe6: /* Mask Setting */
-         this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
-         this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
-         break;
-      default:
-         if(command->func[abr][TexMode])
-            command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-         break;
+      switch (cc)
+      {
+         case 0x01:
+            CLUT_Cache_VB = ~0U;
+            InvalidateTexCache();
+            break;
+         case 0x02:
+            G_Command_FBFill(this, CB);
+            break;
+         case 0x1F:
+            this->IRQPending = true;
+            IRQ_Assert(IRQ_GPU, this->IRQPending);
+            break;
+         case 0xe1:
+            G_Command_DrawMode(this, CB);
+            break;
+         case 0xe2:
+            G_Command_TexWindow(this, CB);
+            break;
+         case 0xe3: /* Clip 0 */
+            this->ClipX0 = *CB & 1023;
+            this->ClipY0 = (*CB >> 10) & 1023;
+            break;
+         case 0xe4: /* Clip 1 */
+            this->ClipX1 = *CB & 1023;
+            this->ClipY1 = (*CB >> 10) & 1023;
+            break;
+         case 0xe5: /* Drawing Offset */
+            this->OffsX = sign_x_to_s32(11, (*CB & 2047));
+            this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
+            rsx_set_draw_offset(this->OffsX, this->OffsY);
+            break;
+         case 0xe6: /* Mask Setting */
+            this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
+            this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
+            break;
+         default:
+            if(command->func[abr][TexMode])
+               command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
+            break;
+      }
+
+      switch (cc)
+      {
+         case 0xe3: /* Clip 0 */
+         case 0xe4: /* Clip 1 */
+            rsx_set_draw_area(this->ClipX0, this->ClipY0,
+                  this->ClipX1, this->ClipY1);
+            break;
+         default:
+            break;
+      }
    }
 }
 
@@ -1030,6 +1046,10 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x00:	// Reset GPU
             //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             SoftReset();
+             rsx_set_draw_area(this->ClipX0, this->ClipY0,
+                   this->ClipX1, this->ClipY1);
+             rsx_set_draw_offset(this->OffsX, this->OffsY);
+             UpdateDisplayMode();
             break;
 
          case 0x01:	// Reset command buffer
@@ -1071,6 +1091,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x08:
             //printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
             DisplayMode = V & 0xFF;
+            UpdateDisplayMode();
             break;
 
          case 0x09:
@@ -1842,4 +1863,35 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
    }
 
    return(ret);
+}
+
+void PS_GPU::UpdateDisplayMode()
+{
+  bool depth_24bpp = !!(DisplayMode & 0x10);
+
+  uint16_t yres = (DisplayMode & 0x4) ? 480 : 240;
+  uint16_t xres;
+
+  if ((DisplayMode >> 6) & 1) {
+    xres = 368;
+  } else {
+    switch (DisplayMode & 3) {
+    case 0:
+      xres = 256;
+      break;
+    case 1:
+      xres = 320;
+      break;
+    case 2:
+      xres = 512;
+      break;
+    default:
+      xres = 640;
+      break;
+    }
+  }
+
+  rsx_set_display_mode(DisplayFB_XStart, DisplayFB_YStart,
+		       xres, yres,
+		       depth_24bpp);
 }

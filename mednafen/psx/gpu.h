@@ -484,6 +484,8 @@ class PS_GPU
       // upscaling ratio) without having an additional level of
       // indirection since it'll be allocated right after the struct
       uint16 vram[0];
+
+      void UpdateDisplayMode();
 };
 
 #endif
