@@ -222,5 +222,11 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
       }
    }
 
+    rsx_push_line(points[0].x, points[0].y,
+		 points[1].x, points[1].y,
+		 ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
+		 ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
+		 DitherEnabled());
+
    DrawLine<goraud, BlendMode, MaskEval_TA>(points);
 }
