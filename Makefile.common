@@ -5,7 +5,7 @@ LIBRETRO_DIR := $(CORE_DIR)/libretro-common
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 
-ifeq ($(HAVE_GL), 1)
+ifeq ($(HAVE_OPENGL), 1)
 ifeq ($(GLES), 1)
 GLFLAGS  := -DHAVE_OPENGLES -DHAVE_OPENGLES2
 CFLAGS   += $(GLFLAGS)
