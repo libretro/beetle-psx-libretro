@@ -14,6 +14,7 @@
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsm/glsm.h>
 #endif
+#include "rsx.h"
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -2442,6 +2443,8 @@ void retro_init(void)
    setting_last_scanline_pal = 287;
 
    check_system_specs();
+
+   rsx_init();
 }
 
 void retro_reset(void)
@@ -2516,6 +2519,8 @@ static void check_variables(void)
    }
    else
       widescreen_hack = false;
+
+   rsx_refresh_variables();
 
    var.key = "beetle_psx_internal_resolution";
 
@@ -3209,13 +3214,15 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   return true;
+   return rsx_open(is_pal);
 }
 
 void retro_unload_game(void)
 {
    if(!MDFNGameInfo)
       return;
+
+   rsx_close();
 
    MDFN_FlushGameCheats(0);
 
@@ -3353,6 +3360,8 @@ void retro_run(void)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #endif
+
+   rsx_prepare_frame();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
@@ -3617,6 +3626,8 @@ void retro_run(void)
    if (!allow_frame_duping)
       fb = pix;
 
+   rsx_finalize_frame();
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    video_cb(RETRO_HW_FRAME_BUFFER_VALID,
          width, height,
@@ -3658,6 +3669,8 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
+   rsx_get_system_av_info(info);
+
    memset(info, 0, sizeof(*info));
    info->timing.fps            = video_output_framerate();
    info->timing.sample_rate    = 44100;
@@ -3770,6 +3783,8 @@ void retro_set_environment(retro_environment_t cb)
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
    environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+
+   rsx_set_environment(cb);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -3795,6 +3810,8 @@ void retro_set_input_state(retro_input_state_t cb)
 void retro_set_video_refresh(retro_video_refresh_t cb)
 {
    video_cb = cb;
+
+   rsx_set_video_refresh(cb);
 }
 
 static size_t serialize_size;
