@@ -568,9 +568,9 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
       }
    }
 
-   rsx_load_image(destX, destY,
-		  width, height,
-		  g->vram);
+    rsx_copy_rect(sourceX, sourceY,
+		 destX, destY,
+		 width, height);
 }
 
 static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
