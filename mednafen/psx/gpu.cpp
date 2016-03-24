@@ -960,7 +960,6 @@ void PS_GPU::ProcessFIFO(void)
          case 0xe5: /* Drawing Offset */
             this->OffsX = sign_x_to_s32(11, (*CB & 2047));
             this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
-            rsx_set_draw_offset(this->OffsX, this->OffsY);
             break;
          case 0xe6: /* Mask Setting */
             this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
@@ -1052,7 +1051,6 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
             SoftReset();
              rsx_set_draw_area(this->ClipX0, this->ClipY0,
                    this->ClipX1, this->ClipY1);
-             rsx_set_draw_offset(this->OffsX, this->OffsY);
              UpdateDisplayMode();
             break;
 
@@ -1868,7 +1866,6 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
    rsx_set_draw_area(this->ClipX0, this->ClipY0,
          this->ClipX1, this->ClipY1);
-   rsx_set_draw_offset(this->OffsX, this->OffsY);
 
    rsx_load_image(0, 0,
          1024, 512,
