@@ -1871,6 +1871,8 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
          1024, 512,
          this->vram);
 
+   UpdateDisplayMode();
+
    return(ret);
 }
 
