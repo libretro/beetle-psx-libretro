@@ -515,6 +515,13 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
          gpu->texel_put(d_x, d_y, fill_value);
       }
    }
+
+   
+   /* Crappy implementation, should use hardware accelerated code
+    * instead. */
+   rsx_load_image(destX, destY,
+		  width, height,
+		  gpu->vram);
 }
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
@@ -563,6 +570,10 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
          }
       }
    }
+
+   rsx_load_image(destX, destY,
+		  width, height,
+		  g->vram);
 }
 
 static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)

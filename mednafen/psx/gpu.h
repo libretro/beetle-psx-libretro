@@ -471,6 +471,7 @@ class PS_GPU
       void Command_DrawingOffset(const uint32 *cb);
       void Command_MaskSetting(const uint32 *cb);
 
+
    private:
 
 
@@ -479,13 +480,16 @@ class PS_GPU
       template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
          void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
 
+      void UpdateDisplayMode();
+
+   public:
+
       // "Flexible" array at the end of the struct. This lets us
       // having a dynamically sized vram (depending on the internal
       // upscaling ratio) without having an additional level of
       // indirection since it'll be allocated right after the struct
       uint16 vram[0];
 
-      void UpdateDisplayMode();
 };
 
 #endif
