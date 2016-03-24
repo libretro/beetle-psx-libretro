@@ -516,12 +516,9 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
       }
    }
 
-   
-   /* Crappy implementation, should use hardware accelerated code
-    * instead. */
-   rsx_load_image(destX, destY,
-		  width, height,
-		  gpu->vram);
+   rsx_fill_rect(cb[0],
+         destX, destY,
+		 width, height);
 }
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
