@@ -169,6 +169,51 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
    x = sign_x_to_s32(11, x + OffsX);
    y = sign_x_to_s32(11, y + OffsY);
 
+   uint16_t clut_x = (clut & (0x3f << 4));
+   uint16_t clut_y = (clut >> 10) & 0x1ff;
+
+   uint8_t blend_mode;
+
+   if (textured) {
+     if (TexMult) {
+       blend_mode = 2;
+     } else {
+       blend_mode = 1;
+     }
+   } else {
+     blend_mode = 0;
+   }
+
+   rsx_push_triangle(x, y,
+		     x + w, y,
+		     x, y + h,
+		     color,
+		     color,
+		     color,
+		     u, v,
+		     u + w, v,
+		     u, v + h,
+		     this->TexPageX, this->TexPageY,
+		     clut_x, clut_y,
+		     blend_mode,
+		     2 - TexMode_TA,
+		     DitherEnabled());
+
+   rsx_push_triangle(x + w, y,
+		     x, y + h,
+		     x + w, y + h,
+		     color,
+		     color,
+		     color,
+		     u + w, v,
+		     u, v + h,
+		     u + w, v + h,
+		     this->TexPageX, this->TexPageY,
+		     clut_x, clut_y,
+		     blend_mode,
+		     2 - TexMode_TA,
+		     DitherEnabled());   
+
 #if 0
    printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);
 #endif
