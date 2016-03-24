@@ -1866,6 +1866,14 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       IRQ_Assert(IRQ_GPU, IRQPending);
    }
 
+   rsx_set_draw_area(this->ClipX0, this->ClipY0,
+         this->ClipX1, this->ClipY1);
+   rsx_set_draw_offset(this->OffsX, this->OffsY);
+
+   rsx_load_image(0, 0,
+         1024, 512,
+         this->vram);
+
    return(ret);
 }
 

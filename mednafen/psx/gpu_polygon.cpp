@@ -430,7 +430,7 @@ template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMul
 INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 {
    const unsigned cb0 = cb[0];
-   tri_vertex vertices[3];
+   tri_vertex vertices[3] = {{0}};
    uint32_t clut = 0;
    unsigned sv = 0;
    //uint32_t tpage = 0;
