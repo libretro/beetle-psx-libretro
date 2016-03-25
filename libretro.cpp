@@ -2386,10 +2386,6 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 void retro_init(void)
 {
    struct retro_log_callback log;
-   bool thread_enable = false;
-#ifdef HAVE_THREADS
-   thread_enable = true;
-#endif
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
@@ -3669,8 +3665,6 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   rsx_get_system_av_info(info);
-
    memset(info, 0, sizeof(*info));
    info->timing.fps            = video_output_framerate();
    info->timing.sample_rate    = 44100;
@@ -3679,6 +3673,8 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
+
+   rsx_get_system_av_info(info);
 }
 
 void retro_deinit(void)
