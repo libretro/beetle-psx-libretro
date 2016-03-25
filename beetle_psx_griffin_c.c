@@ -20,9 +20,11 @@
 #include "mednafen/trio/trio.c"
 #include "mednafen/trio/triostr.c"
 
-#include "libretro-common/file/retro_file.c"
+#include "libretro-common/streams/file_stream.c"
 #include "libretro-common/rthreads/rthreads.c"
 #include "scrc32.c"
+
+#include "rsx/rsx.c"
 
 #ifdef NEED_CD
 #include "mednafen/cdrom/CDUtility.c"

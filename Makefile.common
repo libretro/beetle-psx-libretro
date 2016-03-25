@@ -146,7 +146,7 @@ SOURCES_CXX += \
 
 SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
-	$(CORE_DIR)/rsx.c \
+	$(CORE_DIR)/rsx/rsx.c \
 	$(MEDNAFEN_DIR)/md5.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
 
