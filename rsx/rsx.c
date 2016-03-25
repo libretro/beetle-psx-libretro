@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdint.h>
 
 #include <boolean.h>
@@ -70,7 +71,7 @@ bool rsx_open(bool is_pal)
 
    params.context_reset         = context_reset;
    params.context_destroy       = context_destroy;
-   params.environ_cb            = environ_cb;
+   params.environ_cb            = rsx_environ_cb;
    params.stencil               = true;
    params.imm_vbo_draw          = NULL;
    params.imm_vbo_disable       = NULL;
