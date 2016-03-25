@@ -4,12 +4,18 @@
 
 #include "rsx.h"
 
+static bool retro_is_pal = false;
+static retro_video_refresh_t retro_video_cb;
+static retro_environment_t retro_environ_cb;
+
 void rsx_set_environment(retro_environment_t cb)
 {
+   retro_environ_cb = cb;
 }
 
 void rsx_set_video_refresh(retro_video_refresh_t cb)
 {
+   retro_video_cb   = cb;
 }
 
 void rsx_get_system_av_info(struct retro_system_av_info *info)
@@ -22,6 +28,8 @@ void rsx_init(void)
 
 bool rsx_open(bool is_pal)
 {
+   retro_is_pal = is_pal;
+
    return true;
 }
 
