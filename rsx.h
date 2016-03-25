@@ -16,7 +16,8 @@ extern "C" {
   void rsx_close(void);
   void rsx_refresh_variables(void);
   void rsx_prepare_frame(void);
-  void rsx_finalize_frame(void);
+  void rsx_finalize_frame(const void *data, unsigned width,
+        unsigned height, unsigned pitch);
 
   void rsx_set_draw_offset(int16_t x, int16_t y);
   void rsx_set_draw_area(uint16_t x, uint16_t y,
