@@ -8,6 +8,13 @@
 
 #include "rsx.h"
 
+enum rsx_renderer_type
+{
+   RSX_SOFTWARE = 0,
+   RSX_OPENGL
+};
+
+static enum rsx_renderer_type rsx_type = RSX_SOFTWARE;
 static bool rsx_is_pal = false;
 static retro_video_refresh_t rsx_video_cb;
 static retro_environment_t rsx_environ_cb;
@@ -60,10 +67,7 @@ bool rsx_open(bool is_pal)
 {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    glsm_ctx_params_t params = {0};
-#endif
-   rsx_is_pal = is_pal;
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    params.context_reset         = context_reset;
    params.context_destroy       = context_destroy;
    params.environ_cb            = environ_cb;
@@ -72,9 +76,11 @@ bool rsx_open(bool is_pal)
    params.imm_vbo_disable       = NULL;
    params.framebuffer_lock      = context_framebuffer_lock;
 
-   if (!glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
-      return false;   
+   if (glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
+      rsx_type = RSX_OPENGL;
 #endif
+
+   rsx_is_pal = is_pal;
 
    return true;
 }
@@ -89,22 +95,35 @@ void rsx_refresh_variables(void)
 
 void rsx_prepare_frame(void)
 {
+   switch (rsx_type)
+   {
+      case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
+         glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #endif
+         break;
+      default:
+         break;
+   }
 }
 
 void rsx_finalize_frame(const void *fb, unsigned width, 
       unsigned height, unsigned pitch)
 {
+   switch (rsx_type)
+   {
+      case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   rsx_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
-         width, height, pitch);
+         rsx_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
+               width, height, pitch);
 
-   glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
-#else
-   rsx_video_cb(fb, width, height, pitch);
+         glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
 #endif
+         break;
+      default:
+         rsx_video_cb(fb, width, height, pitch);
+         break;
+   }
 }
 
 void rsx_set_draw_offset(int16_t x, int16_t y)
