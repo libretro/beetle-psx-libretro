@@ -11,12 +11,17 @@
 #include "rsx_intf.h"
 #ifdef HAVE_RUST
 #include "rsx.h"
-#else
+#endif
 uint8_t psx_gpu_upscale_shift;
 uint8_t widescreen_hack;
-#endif
 
-static enum rsx_renderer_type rsx_type = RSX_SOFTWARE;
+static enum rsx_renderer_type rsx_type = 
+#ifdef HAVE_RUST
+RSX_EXTERNAL_RUST
+#else
+RSX_SOFTWARE
+#endif
+;
 static bool rsx_is_pal = false;
 static retro_video_refresh_t rsx_video_cb;
 static retro_environment_t rsx_environ_cb;
