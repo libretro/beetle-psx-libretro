@@ -31,22 +31,34 @@ extern "C"  {
 
 /* Pre-MSVC 2015 compilers don't implement snprintf in a cross-platform manner. */
 #if _MSC_VER < 1900
-   #include <stdlib.h>
-   #ifndef snprintf
-      #define snprintf c99_snprintf_retro__
-   #endif
-   
-   int c99_snprintf_retro__(char *outBuf, size_t size, const char *format, ...);
-#endif
-
-/* Pre-MSVC 2010 compilers don't implement vsnprintf in a cross-platform manner? Not sure about this one. */
-#if _MSC_VER < 1600 
+   #include <stdio.h>
    #include <stdarg.h>
-   #include <stdlib.h>
-   #ifndef vsnprintf
-      #define vsnprintf c99_vsnprintf_retro__
-   #endif
-   int c99_vsnprintf_retro__(char *outBuf, size_t size, const char *format, va_list ap);
+   #define snprintf c99_snprintf
+   #define vsnprintf c99_vsnprintf
+
+   _inline int c99_vsnprintf(char *outBuf, size_t size, const char *format, va_list ap)
+   {
+      int count = -1;
+
+      if (size != 0)
+         count = _vsnprintf_s(outBuf, size, _TRUNCATE, format, ap);
+      if (count == -1)
+         count = _vscprintf(format, ap);
+
+      return count;
+   }
+
+   _inline int c99_snprintf(char *outBuf, size_t size, const char *format, ...)
+   {
+      int count;
+      va_list ap;
+
+      va_start(ap, format);
+      count = c99_vsnprintf(outBuf, size, format, ap);
+      va_end(ap);
+
+      return count;
+}
 #endif
 
 #ifdef __cplusplus

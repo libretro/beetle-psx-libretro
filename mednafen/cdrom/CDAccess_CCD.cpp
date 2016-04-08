@@ -17,7 +17,7 @@
 
 #include "../mednafen.h"
 #include "../general.h"
-#include "../msvc_compat.h"
+#include <compat/msvc.h>
 #include "CDAccess_CCD.h"
 #include "CDUtility.h"
 

@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include "MemoryStream.h"
-#include "msvc_compat.h"
+#include <compat/msvc.h>
 
 /*
  TODO:

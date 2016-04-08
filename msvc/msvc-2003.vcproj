@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="libretro-psx"
+	Name="mednafen_psx_libretro"
 	ProjectGUID="{A9C675CC-DDF4-4BC5-A212-25AE2465D253}"
-	RootNamespace="libretro-psx"
+	RootNamespace="mednafen_psx_libretro"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -20,7 +20,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003&quot;"
+				AdditionalIncludeDirectories="$(SolutionDir)\..;$(SolutionDir)\..\libretro-common\include;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -33,13 +33,13 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/libretro-psx.dll"
+				OutputFile="$(OutDir)/mednafen_psx_libretro.dll"
 				LinkIncremental="2"
 				ModuleDefinitionFile="libretro.def"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/libretro-psx.pdb"
+				ProgramDatabaseFile="$(OutDir)/mednafen_psx_libretro.pdb"
 				SubSystem="2"
-				ImportLibrary="$(OutDir)/libretro-psx.lib"
+				ImportLibrary="$(OutDir)/mednafen_psx_libretro.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -70,7 +70,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003&quot;"
+				AdditionalIncludeDirectories="$(SolutionDir)\..;$(SolutionDir)\..\libretro-common\include;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -81,14 +81,14 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/libretro-psx.dll"
+				OutputFile="$(OutDir)/mednafen_psx_libretro.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libretro.def"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				ImportLibrary="$(OutDir)/libretro-psx.lib"
+				ImportLibrary="$(OutDir)/mednafen_psx_libretro.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -120,130 +120,176 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath="..\..\libretro.cpp">
+				RelativePath="..\libretro.cpp">
 			</File>
 			<File
-				RelativePath="..\..\scrc32.c">
+				RelativePath="..\scrc32.c">
 			</File>
-			<File
-				RelativePath="..\..\threads.c">
-				<FileConfiguration
-					Name="Debug|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						CompileAs="2"/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32">
-					<Tool
-						Name="VCCLCompilerTool"
-						CompileAs="2"/>
-				</FileConfiguration>
-			</File>
+			<Filter
+				Name="libretro-common"
+				Filter="">
+				<Filter
+					Name="file"
+					Filter="">					
+					<File
+						RelativePath="..\libretro-common\file\retro_stat.c">
+					</File>
+				</Filter>
+				<Filter
+					Name="rthreads"
+					Filter="">					
+					<File
+						RelativePath="..\libretro-common\rthreads\rthreads.c">
+						<FileConfiguration
+						Name="Debug|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
+					</File>
+				</Filter>
+				<Filter
+					Name="streams"
+					Filter="">					
+					<File
+						RelativePath="..\libretro-common\streams\file_stream.c">
+					</File>
+				</Filter>
+			</Filter>
 			<Filter
 				Name="mednafen"
 				Filter="">
 				<File
-					RelativePath="..\..\mednafen\endian.cpp">
+					RelativePath="..\mednafen\error.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\error.cpp">
+					RelativePath="..\mednafen\file.c">
+					<FileConfiguration
+						Name="Debug|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\mednafen\file.cpp">
+					RelativePath="..\mednafen\FileStream.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\FileStream.cpp">
+					RelativePath="..\mednafen\general.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\FileWrapper.cpp">
+					RelativePath="..\mednafen\md5.c">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\general.cpp">
+					RelativePath="..\mednafen\mednafen-endian.c">
+					<FileConfiguration
+						Name="Debug|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							CompileAs="2"/>
+					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\mednafen\md5.cpp">
+					RelativePath="..\mednafen\MemoryStream.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\MemoryStream.cpp">
+					RelativePath="..\mednafen\mempatcher.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\mempatcher.cpp">
+					RelativePath="..\mednafen\settings.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\settings.cpp">
+					RelativePath="..\mednafen\state.cpp">
 				</File>
 				<File
-					RelativePath="..\..\mednafen\state.cpp">
-				</File>
-				<File
-					RelativePath="..\..\mednafen\Stream.cpp">
+					RelativePath="..\mednafen\Stream.cpp">
 				</File>
 				<Filter
 					Name="psx"
 					Filter="">
 					<File
-						RelativePath="..\..\mednafen\psx\cdc.cpp">
+						RelativePath="..\mednafen\psx\cdc.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\cpu.cpp">
+						RelativePath="..\mednafen\psx\cpu.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\dma.cpp">
+						RelativePath="..\mednafen\psx\dis.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\frontio.cpp">
+						RelativePath="..\mednafen\psx\dma.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\gpu.cpp">
+						RelativePath="..\mednafen\psx\frontio.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\gte.cpp">
+						RelativePath="..\mednafen\psx\gpu.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\irq.cpp">
+						RelativePath="..\mednafen\psx\gte.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\mdec.cpp">
+						RelativePath="..\mednafen\psx\irq.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\sio.cpp">
+						RelativePath="..\mednafen\psx\mdec.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\spu.cpp">
+						RelativePath="..\mednafen\psx\sio.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\psx\timer.cpp">
+						RelativePath="..\mednafen\psx\spu.cpp">
+					</File>
+					<File
+						RelativePath="..\mednafen\psx\timer.cpp">
 					</File>
 					<Filter
 						Name="input"
 						Filter="">
 						<File
-							RelativePath="..\..\mednafen\psx\input\dualanalog.cpp">
+							RelativePath="..\mednafen\psx\input\dualanalog.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\dualshock.cpp">
+							RelativePath="..\mednafen\psx\input\dualshock.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\gamepad.cpp">
+							RelativePath="..\mednafen\psx\input\gamepad.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\guncon.cpp">
+							RelativePath="..\mednafen\psx\input\guncon.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\justifier.cpp">
+							RelativePath="..\mednafen\psx\input\justifier.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\memcard.cpp">
+							RelativePath="..\mednafen\psx\input\memcard.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\mouse.cpp">
+							RelativePath="..\mednafen\psx\input\mouse.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\multitap.cpp">
+							RelativePath="..\mednafen\psx\input\multitap.cpp">
 						</File>
 						<File
-							RelativePath="..\..\mednafen\psx\input\negcon.cpp">
+							RelativePath="..\mednafen\psx\input\negcon.cpp">
 						</File>
 					</Filter>
 				</Filter>
@@ -251,17 +297,17 @@
 					Name="video"
 					Filter="">
 					<File
-						RelativePath="..\..\mednafen\video\Deinterlacer.cpp">
+						RelativePath="..\mednafen\video\Deinterlacer.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\video\surface.cpp">
+						RelativePath="..\mednafen\video\surface.cpp">
 					</File>
 				</Filter>
 				<Filter
 					Name="trio"
 					Filter="">
 					<File
-						RelativePath="..\..\mednafen\trio\trio.c">
+						RelativePath="..\mednafen\trio\trio.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -276,66 +322,69 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\trio\triostr.c">
-						<FileConfiguration
-							Name="Debug|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="2"/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Release|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="2"/>
-						</FileConfiguration>
+						RelativePath="..\mednafen\trio\triostr.c">
 					</File>
 				</Filter>
 				<Filter
 					Name="cdrom"
 					Filter="">
 					<File
-						RelativePath="..\..\mednafen\cdrom\audioreader.cpp">
+						RelativePath="..\mednafen\cdrom\audioreader.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\CDAccess.cpp">
+						RelativePath="..\mednafen\cdrom\CDAccess.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\CDAccess_CCD.cpp">
+						RelativePath="..\mednafen\cdrom\CDAccess_CCD.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\CDAccess_Image.cpp">
+						RelativePath="..\mednafen\cdrom\CDAccess_Image.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\cdromif.cpp">
+						RelativePath="..\mednafen\cdrom\cdromif.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\CDUtility.cpp">
+						RelativePath="..\mednafen\cdrom\CDUtility.c">
+						<FileConfiguration
+							Name="Debug|Win32">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Win32">
+							<Tool
+								Name="VCCLCompilerTool"
+								CompileAs="2"/>
+						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\crc32.cpp">
+						RelativePath="..\mednafen\cdrom\edc_crc32.c">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\galois.cpp">
+						RelativePath="..\mednafen\cdrom\galois.c">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\l-ec.cpp">
+						RelativePath="..\mednafen\cdrom\l-ec.c">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\lec.cpp">
+						RelativePath="..\mednafen\cdrom\lec.c">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\recover-raw.cpp">
+						RelativePath="..\mednafen\cdrom\misc.cpp">
 					</File>
 					<File
-						RelativePath="..\..\mednafen\cdrom\SimpleFIFO.cpp">
+						RelativePath="..\mednafen\cdrom\recover-raw.c">
+					</File>
+					<File
+						RelativePath="..\mednafen\cdrom\SimpleFIFO.cpp">
 					</File>
 				</Filter>
 				<Filter
 					Name="tremor"
 					Filter="">
 					<File
-						RelativePath="..\..\mednafen\tremor\bitwise.c">
+						RelativePath="..\mednafen\tremor\bitwise.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -350,7 +399,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\block.c">
+						RelativePath="..\mednafen\tremor\block.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -365,7 +414,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\codebook.c">
+						RelativePath="..\mednafen\tremor\codebook.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -380,7 +429,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\floor0.c">
+						RelativePath="..\mednafen\tremor\floor0.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -395,7 +444,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\floor1.c">
+						RelativePath="..\mednafen\tremor\floor1.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -410,7 +459,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\framing.c">
+						RelativePath="..\mednafen\tremor\framing.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -425,7 +474,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\info.c">
+						RelativePath="..\mednafen\tremor\info.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -440,7 +489,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\ivorbisfile_example.c">
+						RelativePath="..\mednafen\tremor\mapping0.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -455,7 +504,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\mapping0.c">
+						RelativePath="..\mednafen\tremor\mdct.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -470,7 +519,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\mdct.c">
+						RelativePath="..\mednafen\tremor\registry.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -485,7 +534,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\registry.c">
+						RelativePath="..\mednafen\tremor\res012.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -500,7 +549,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\res012.c">
+						RelativePath="..\mednafen\tremor\sharedbook.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -515,7 +564,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\sharedbook.c">
+						RelativePath="..\mednafen\tremor\synthesis.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -530,7 +579,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\synthesis.c">
+						RelativePath="..\mednafen\tremor\vorbisfile.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -545,22 +594,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\mednafen\tremor\vorbisfile.c">
-						<FileConfiguration
-							Name="Debug|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="1"/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Release|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="1"/>
-						</FileConfiguration>
-					</File>
-					<File
-						RelativePath="..\..\mednafen\tremor\window.c">
+						RelativePath="..\mednafen\tremor\window.c">
 						<FileConfiguration
 							Name="Debug|Win32">
 							<Tool
@@ -575,6 +609,13 @@
 						</FileConfiguration>
 					</File>
 				</Filter>
+			</Filter>
+			<Filter
+				Name="rsx"
+				Filter="">					
+				<File
+					RelativePath="..\rsx\rsx_intf.c">
+				</File>
 			</Filter>
 		</Filter>
 		<Filter

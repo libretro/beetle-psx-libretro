@@ -341,7 +341,7 @@ int CDIF_MT::ReadThreadStart()
                      int how_far_ahead = ra_lba - new_lba;
 
                      if(how_far_ahead <= max_ra)
-                        ra_count = std::min(speedmult_ra, 1 + max_ra - how_far_ahead);
+                        ra_count = min(speedmult_ra, 1 + max_ra - how_far_ahead);
                      else
                         ra_count++;
                   }

@@ -17,7 +17,7 @@
 
 #include "psx.h"
 #include "frontio.h"
-#include "../msvc_compat.h"
+#include <compat/msvc.h>
 
 #include "../video/surface.h"
 #include "input/gamepad.h"

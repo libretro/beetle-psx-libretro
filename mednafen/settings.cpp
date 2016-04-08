@@ -22,6 +22,7 @@
 
 #include "mednafen.h"
 #include "settings.h"
+#include <compat/msvc.h>
 
 int setting_initial_scanline = 0;
 int setting_initial_scanline_pal = 0;
