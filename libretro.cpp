@@ -2437,7 +2437,11 @@ void retro_init(void)
 
    check_system_specs();
 
+#ifdef HAVE_RUST
+   rsx_intf_init(RSX_EXTERNAL_RUST);
+#else
    rsx_intf_init(RSX_SOFTWARE);
+#endif
 }
 
 void retro_reset(void)
