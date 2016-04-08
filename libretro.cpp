@@ -2511,30 +2511,41 @@ static void check_variables(void)
 
    rsx_intf_refresh_variables();
 
-   var.key = "beetle_psx_internal_resolution";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   switch (rsx_intf_is_type())
    {
-     // We only support one digit upscaling ratios for now... fix me
-     // if we even want 16x.
-     uint8_t val = var.value[0] - '0';
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         var.key = "beetle_psx_internal_resolution";
 
-     assert(var.value[1] == 'x');
+         if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         {
+            // We only support one digit upscaling ratios for now... fix me
+            // if we even want 16x.
+            uint8_t val = var.value[0] - '0';
 
-     // Upscale must be a power of two
-     assert((val & (val - 1)) == 0);
+            assert(var.value[1] == 'x');
 
-     // Crappy "ffs" implementation since the standard function is not
-     // widely supported by libc in the wild
-     psx_gpu_upscale_shift = 0;
-     while ((val & 1) == 0)
-     {
-       psx_gpu_upscale_shift++;
-       val >>= 1;
-     }
+            // Upscale must be a power of two
+            assert((val & (val - 1)) == 0);
+
+            // Crappy "ffs" implementation since the standard function is not
+            // widely supported by libc in the wild
+            psx_gpu_upscale_shift = 0;
+            while ((val & 1) == 0)
+            {
+               psx_gpu_upscale_shift++;
+               val >>= 1;
+            }
+         }
+         else
+            psx_gpu_upscale_shift = 0;
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         psx_gpu_upscale_shift = 0;
+#endif
+         break;
    }
-   else
-     psx_gpu_upscale_shift = 0;
 
    var.key = "beetle_psx_dither_mode";
 
