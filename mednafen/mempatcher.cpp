@@ -28,7 +28,7 @@
 #include "mempatcher.h"
 
 #ifdef _WIN32
-#include "msvc_compat.h"
+#include <compat/msvc.h>
 #endif
 
 #include "../libretro.h"

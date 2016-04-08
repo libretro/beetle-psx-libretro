@@ -1529,7 +1529,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	uint64 result;
 
 	result = (int64)(int32)GPR[rs] * (int32)GPR[rt];
-	muldiv_ts_done = timestamp + MULT_Tab24[__builtin_clz((GPR[rs] ^ ((int32)GPR[rs] >> 31)) | 0x400)];
+	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32((GPR[rs] ^ ((int32)GPR[rs] >> 31)) | 0x400)];
 	DO_LDS();
 
 	LO = result;
@@ -1551,7 +1551,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	uint64 result;
 
 	result = (uint64)GPR[rs] * GPR[rt];
-	muldiv_ts_done = timestamp + MULT_Tab24[__builtin_clz(GPR[rs] | 0x400)];
+	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32(GPR[rs] | 0x400)];
 	DO_LDS();
 
 	LO = result;
