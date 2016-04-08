@@ -21,6 +21,7 @@ static bool rsx_is_pal = false;
 static retro_video_refresh_t rsx_video_cb;
 static retro_environment_t rsx_environ_cb;
 
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 static bool fb_ready = false;
 
@@ -121,6 +122,11 @@ void rsx_intf_init(enum rsx_renderer_type type)
       default:
          break;
    }
+}
+
+enum rsx_renderer_type rsx_intf_is_type(void)
+{
+   return rsx_type;
 }
 
 bool rsx_intf_open(bool is_pal)

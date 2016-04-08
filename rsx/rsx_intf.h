@@ -76,6 +76,8 @@ extern "C" {
 		     uint16_t dst_x, uint16_t dst_y,
 		     uint16_t w, uint16_t h);
 
+  enum rsx_renderer_type rsx_intf_is_type(void);
+
 
 #ifdef __cplusplus
 }
