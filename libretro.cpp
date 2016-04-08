@@ -37,9 +37,9 @@ static bool failed_init = false;
 
 static int psx_skipbios;
 
-unsigned char widescreen_hack;
 bool psx_cpu_overclock;
-uint8_t psx_gpu_upscale_shift;
+extern "C" uint8_t widescreen_hack;
+extern "C" uint8_t psx_gpu_upscale_shift;
 bool psx_gte_subpixel_precision;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
@@ -2213,16 +2213,6 @@ static bool PrevInterlaced;
 static Deinterlacer deint;
 #endif
 
-#define MEDNAFEN_CORE_NAME_MODULE "psx"
-#define MEDNAFEN_CORE_NAME "Mednafen PSX"
-#define MEDNAFEN_CORE_VERSION "v0.9.38.6"
-#define MEDNAFEN_CORE_EXTENSIONS "cue|toc|ccd|m3u"
-#define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
-#define MEDNAFEN_CORE_GEOMETRY_BASE_H 240
-#define MEDNAFEN_CORE_GEOMETRY_MAX_W 700
-#define MEDNAFEN_CORE_GEOMETRY_MAX_H 576
-#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (4.0 / 3.0)
-
 static MDFN_Surface *surf = NULL;
 
 static void alloc_surface() {
@@ -3360,10 +3350,12 @@ void retro_run(void)
       GPU->EnableSubpixelVertexCache(psx_gte_subpixel_precision);
    }
 
-   if (display_internal_framerate) {
+   if (display_internal_framerate)
+   {
      frame_count++;
 
-     if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0) {
+     if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
+     {
        char msg_buffer[64];
 
        float fps = (internal_frame_count * video_output_framerate()) / INTERNAL_FPS_SAMPLE_PERIOD;
@@ -3376,7 +3368,9 @@ void retro_run(void)
 
        internal_frame_count = 0;
      }
-   } else {
+   }
+   else
+   {
      // Keep the counters at 0 so that they don't display a bogus
      // value if this option is enabled later on
      frame_count = 0;
@@ -3611,15 +3605,6 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   memset(info, 0, sizeof(*info));
-   info->timing.fps            = video_output_framerate();
-   info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
-   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
-   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
-   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
-   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
-
    rsx_intf_get_system_av_info(info);
 }
 

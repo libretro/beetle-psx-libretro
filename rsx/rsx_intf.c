@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <boolean.h>
 
@@ -10,6 +11,9 @@
 #include "rsx_intf.h"
 #ifdef HAVE_RUST
 #include "rsx.h"
+#else
+uint8_t psx_gpu_upscale_shift;
+uint8_t widescreen_hack;
 #endif
 
 static enum rsx_renderer_type rsx_type = RSX_SOFTWARE;
@@ -75,12 +79,25 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
    }
 }
 
+static float video_output_framerate(void)
+{
+   return rsx_is_pal ? 49.842 : 59.941;
+}
+
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
 {
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
       case RSX_OPENGL:
+         memset(info, 0, sizeof(*info));
+         info->timing.fps            = video_output_framerate();
+         info->timing.sample_rate    = 44100;
+         info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
+         info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
+         info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
+         info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
+         info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
