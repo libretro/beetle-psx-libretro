@@ -101,6 +101,8 @@ void rsx_intf_init(enum rsx_renderer_type type)
          rsx_init();
 #endif
          break;
+      default:
+         break;
    }
 }
 
@@ -359,7 +361,7 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
-         rsx_copy_rect(src_X, src_y, dst_x, dst_y,
+         rsx_copy_rect(src_x, src_y, dst_x, dst_y,
                w, h);
 #endif
          break;
