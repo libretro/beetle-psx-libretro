@@ -28,7 +28,7 @@
 #include <retro_inline.h>
 #include <retro_miscellaneous.h>
 
-#if defined(__cplusplus) && !defined(_MSC_VER)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -73,6 +73,19 @@ int sthread_detach(sthread_t *thread);
  * Returns: 0 on success, otherwise it returns a non-zero error number.
  */
 void sthread_join(sthread_t *thread);
+
+/**
+ * sthread_isself:
+ * @thread                  : pointer to thread object 
+ *
+ * Join with a terminated thread. Waits for the thread specified by
+ * @thread to terminate. If that thread has already terminated, then
+ * it will return immediately. The thread specified by @thread must
+ * be joinable.
+ * 
+ * Returns: true (1) if calling thread is the specified thread
+ */
+bool sthread_isself(sthread_t *thread);
 
 /**
  * slock_new:
@@ -170,7 +183,7 @@ int scond_broadcast(scond_t *cond);
  **/
 void scond_signal(scond_t *cond);
 
-#if defined(__cplusplus) && !defined(_MSC_VER)
+#if defined(__cplusplus)
 }
 #endif
 
