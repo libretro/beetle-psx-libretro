@@ -7,13 +7,7 @@
 #include <glsm/glsm.h>
 #endif
 
-#include "rsx.h"
-
-enum rsx_renderer_type
-{
-   RSX_SOFTWARE = 0,
-   RSX_OPENGL
-};
+#include "rsx_intf.h"
 
 static enum rsx_renderer_type rsx_type = RSX_SOFTWARE;
 static bool rsx_is_pal = false;
@@ -46,25 +40,26 @@ static bool context_framebuffer_lock(void *data)
 }
 #endif
 
-void rsx_set_environment(retro_environment_t cb)
+void rsx_intf_set_environment(retro_environment_t cb)
 {
    rsx_environ_cb = cb;
 }
 
-void rsx_set_video_refresh(retro_video_refresh_t cb)
+void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
 {
    rsx_video_cb   = cb;
 }
 
-void rsx_get_system_av_info(struct retro_system_av_info *info)
+void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
 {
 }
 
-void rsx_init(void)
+void rsx_intf_init(enum rsx_renderer_type type)
 {
+   rsx_type = type;
 }
 
-bool rsx_open(bool is_pal)
+bool rsx_intf_open(bool is_pal)
 {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    glsm_ctx_params_t params = {0};
@@ -86,15 +81,15 @@ bool rsx_open(bool is_pal)
    return true;
 }
 
-void rsx_close(void)
+void rsx_intf_close(void)
 {
 }
 
-void rsx_refresh_variables(void)
+void rsx_intf_refresh_variables(void)
 {
 }
 
-void rsx_prepare_frame(void)
+void rsx_intf_prepare_frame(void)
 {
    switch (rsx_type)
    {
@@ -108,7 +103,7 @@ void rsx_prepare_frame(void)
    }
 }
 
-void rsx_finalize_frame(const void *fb, unsigned width, 
+void rsx_intf_finalize_frame(const void *fb, unsigned width, 
       unsigned height, unsigned pitch)
 {
    switch (rsx_type)
@@ -127,22 +122,22 @@ void rsx_finalize_frame(const void *fb, unsigned width,
    }
 }
 
-void rsx_set_draw_offset(int16_t x, int16_t y)
+void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 {
 }
 
-void rsx_set_draw_area(uint16_t x, uint16_t y,
+void rsx_intf_set_draw_area(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
 }
 
-void rsx_set_display_mode(uint16_t x, uint16_t y,
+void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       bool depth_24bpp)
 {
 }
 
-void rsx_push_triangle(int16_t p0x, int16_t p0y,
+void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       int16_t p2x, int16_t p2y,
       uint32_t c0,
@@ -159,7 +154,7 @@ void rsx_push_triangle(int16_t p0x, int16_t p0y,
 {
 }
 
-void rsx_push_line(int16_t p0x, int16_t p0y,
+void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       uint32_t c0,
       uint32_t c1,
@@ -167,19 +162,19 @@ void rsx_push_line(int16_t p0x, int16_t p0y,
 {
 }
 
-void rsx_load_image(uint16_t x, uint16_t y,
+void rsx_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram)
 {
 }
 
-void rsx_fill_rect(uint32_t color,
+void rsx_intf_fill_rect(uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
 }
 
-void rsx_copy_rect(uint16_t src_x, uint16_t src_y,
+void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h)
 {

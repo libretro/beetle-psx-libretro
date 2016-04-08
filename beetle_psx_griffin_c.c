@@ -24,7 +24,7 @@
 #include "libretro-common/rthreads/rthreads.c"
 #include "scrc32.c"
 
-#include "rsx/rsx.c"
+#include "rsx/rsx_intf.c"
 
 #ifdef NEED_CD
 #include "mednafen/cdrom/CDUtility.c"

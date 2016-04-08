@@ -17,7 +17,7 @@
 
 #include "psx.h"
 #include "timer.h"
-#include "rsx.h"
+#include "../../rsx/rsx_intf.h"
 
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
@@ -516,9 +516,7 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
       }
    }
 
-   rsx_fill_rect(cb[0],
-         destX, destY,
-		 width, height);
+   rsx_intf_fill_rect(cb[0], destX, destY, width, height);
 }
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
@@ -568,9 +566,7 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
       }
    }
 
-    rsx_copy_rect(sourceX, sourceY,
-		 destX, destY,
-		 width, height);
+   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height);
 }
 
 static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
@@ -864,7 +860,7 @@ void PS_GPU::ProcessFIFO(void)
                if(FBRW_CurY == (FBRW_Y + FBRW_H))
                {
                   /* Upload complete, send over to RSX */
-                  rsx_load_image(FBRW_X, FBRW_Y,
+                  rsx_intf_load_image(FBRW_X, FBRW_Y,
                         FBRW_W, FBRW_H,
                         this->vram);
                   InCmd = INCMD_NONE;
@@ -983,7 +979,7 @@ void PS_GPU::ProcessFIFO(void)
       {
          case 0xe3: /* Clip 0 */
          case 0xe4: /* Clip 1 */
-            rsx_set_draw_area(this->ClipX0, this->ClipY0,
+            rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
                   this->ClipX1, this->ClipY1);
             break;
          default:
@@ -1057,7 +1053,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x00:	// Reset GPU
             //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             SoftReset();
-             rsx_set_draw_area(this->ClipX0, this->ClipY0,
+             rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
                    this->ClipX1, this->ClipY1);
              UpdateDisplayMode();
             break;
@@ -1872,10 +1868,10 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       IRQ_Assert(IRQ_GPU, IRQPending);
    }
 
-   rsx_set_draw_area(this->ClipX0, this->ClipY0,
+   rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
          this->ClipX1, this->ClipY1);
 
-   rsx_load_image(0, 0,
+   rsx_intf_load_image(0, 0,
          1024, 512,
          this->vram);
 
@@ -1910,7 +1906,7 @@ void PS_GPU::UpdateDisplayMode()
     }
   }
 
-  rsx_set_display_mode(DisplayFB_XStart, DisplayFB_YStart,
+  rsx_intf_set_display_mode(DisplayFB_XStart, DisplayFB_YStart,
 		       xres, yres,
 		       depth_24bpp);
 }

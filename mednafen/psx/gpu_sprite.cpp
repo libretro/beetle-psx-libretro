@@ -184,7 +184,7 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
      blend_mode = 0;
    }
 
-   rsx_push_triangle(x, y,
+   rsx_intf_push_triangle(x, y,
 		     x + w, y,
 		     x, y + h,
 		     color,
@@ -199,7 +199,7 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 		     2 - TexMode_TA,
 		     DitherEnabled());
 
-   rsx_push_triangle(x + w, y,
+   rsx_intf_push_triangle(x + w, y,
 		     x, y + h,
 		     x + w, y + h,
 		     color,

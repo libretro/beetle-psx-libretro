@@ -11,7 +11,7 @@
 #include "libretro.h"
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
-#include "rsx.h"
+#include "rsx/rsx_intf.h"
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -2437,7 +2437,7 @@ void retro_init(void)
 
    check_system_specs();
 
-   rsx_init();
+   rsx_intf_init(RSX_SOFTWARE);
 }
 
 void retro_reset(void)
@@ -2513,7 +2513,7 @@ static void check_variables(void)
    else
       widescreen_hack = false;
 
-   rsx_refresh_variables();
+   rsx_intf_refresh_variables();
 
    var.key = "beetle_psx_internal_resolution";
 
@@ -3166,7 +3166,7 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   return rsx_open(is_pal);
+   return rsx_intf_open(is_pal);
 }
 
 void retro_unload_game(void)
@@ -3174,7 +3174,7 @@ void retro_unload_game(void)
    if(!MDFNGameInfo)
       return;
 
-   rsx_close();
+   rsx_intf_close();
 
    MDFN_FlushGameCheats(0);
 
@@ -3309,7 +3309,7 @@ void retro_run(void)
 {
    bool updated = false;
 
-   rsx_prepare_frame();
+   rsx_intf_prepare_frame();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
@@ -3574,7 +3574,7 @@ void retro_run(void)
    if (!allow_frame_duping)
       fb = pix;
 
-   rsx_finalize_frame(fb, width, height,
+   rsx_intf_finalize_frame(fb, width, height,
          MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    video_frames++;
@@ -3614,7 +3614,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 
-   rsx_get_system_av_info(info);
+   rsx_intf_get_system_av_info(info);
 }
 
 void retro_deinit(void)
@@ -3720,7 +3720,7 @@ void retro_set_environment(retro_environment_t cb)
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
    environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 
-   rsx_set_environment(cb);
+   rsx_intf_set_environment(cb);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -3747,7 +3747,7 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 {
    video_cb = cb;
 
-   rsx_set_video_refresh(cb);
+   rsx_intf_set_video_refresh(cb);
 }
 
 static size_t serialize_size;
