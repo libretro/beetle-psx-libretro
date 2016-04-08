@@ -2439,6 +2439,8 @@ void retro_init(void)
 
 #ifdef HAVE_RUST
    rsx_intf_init(RSX_EXTERNAL_RUST);
+#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   rsx_intf_init(RSX_OPENGL);
 #else
    rsx_intf_init(RSX_SOFTWARE);
 #endif
