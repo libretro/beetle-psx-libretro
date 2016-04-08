@@ -8,6 +8,9 @@
 #endif
 
 #include "rsx_intf.h"
+#ifdef HAVE_RUST
+#include "rsx.h"
+#endif
 
 static enum rsx_renderer_type rsx_type = RSX_SOFTWARE;
 static bool rsx_is_pal = false;
@@ -42,63 +45,147 @@ static bool context_framebuffer_lock(void *data)
 
 void rsx_intf_set_environment(retro_environment_t cb)
 {
-   rsx_environ_cb = cb;
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         rsx_environ_cb = cb;
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_set_environment(cb);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
 {
-   rsx_video_cb   = cb;
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         rsx_video_cb   = cb;
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_set_video_refresh(cb);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_get_system_av_info(info);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_init(enum rsx_renderer_type type)
 {
    rsx_type = type;
+
+   switch (rsx_type)
+   {
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_init();
+#endif
+         break;
+   }
 }
 
 bool rsx_intf_open(bool is_pal)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         rsx_is_pal = is_pal;
+         break;
+      case RSX_OPENGL:
+         {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   glsm_ctx_params_t params = {0};
+            glsm_ctx_params_t params = {0};
 
-   params.context_reset         = context_reset;
-   params.context_destroy       = context_destroy;
-   params.environ_cb            = rsx_environ_cb;
-   params.stencil               = true;
-   params.imm_vbo_draw          = NULL;
-   params.imm_vbo_disable       = NULL;
-   params.framebuffer_lock      = context_framebuffer_lock;
+            params.context_reset         = context_reset;
+            params.context_destroy       = context_destroy;
+            params.environ_cb            = rsx_environ_cb;
+            params.stencil               = true;
+            params.imm_vbo_draw          = NULL;
+            params.imm_vbo_disable       = NULL;
+            params.framebuffer_lock      = context_framebuffer_lock;
 
-   if (glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
-      rsx_type = RSX_OPENGL;
+            if (glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
+               rsx_type = RSX_OPENGL;
 #endif
+         }
+         rsx_is_pal = is_pal;
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_open(is_pal);
+#endif
+         break;
+   }
 
-   rsx_is_pal = is_pal;
 
    return true;
 }
 
 void rsx_intf_close(void)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_close();
+#endif
+         break;
+   }
 }
 
 void rsx_intf_refresh_variables(void)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_refresh_variables();
+#endif
+         break;
+   }
 }
 
 void rsx_intf_prepare_frame(void)
 {
    switch (rsx_type)
    {
+      case RSX_SOFTWARE:
+         break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #endif
          break;
-      default:
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_prepare_frame();
+#endif
          break;
    }
 }
@@ -108,6 +195,9 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
 {
    switch (rsx_type)
    {
+      case RSX_SOFTWARE:
+         rsx_video_cb(fb, width, height, pitch);
+         break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
@@ -116,25 +206,60 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
          glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
 #endif
          break;
-      default:
-         rsx_video_cb(fb, width, height, pitch);
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_finalize_frame();
+#endif
          break;
    }
 }
 
 void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_set_draw_offset(x, y);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_set_draw_area(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_set_draw_area(x, y, w, h);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       bool depth_24bpp)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_set_display_mode(x, y, w, h, depth_24bpp);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
@@ -152,6 +277,22 @@ void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
       uint8_t depth_shift,
       bool dither)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_push_triangle(p0x, p0y, p1x, p1y, p2x, p2y,
+               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
+               texpage_x, texpage_y, clut_x, clut_y,
+               texture_blend_mode,
+               depth_shift,
+               dither);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_push_line(int16_t p0x, int16_t p0y,
@@ -160,22 +301,67 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       uint32_t c1,
       bool dither)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_push_line(p0x, p0y, p1x, p1y, c0, c1, dither);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_load_image(x, y, w, h, vram);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_fill_rect(uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_fill_rect(color, x, y, w, h);
+#endif
+         break;
+   }
 }
 
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h)
 {
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+      case RSX_OPENGL:
+         break;
+      case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+         rsx_copy_rect(src_X, src_y, dst_x, dst_y,
+               w, h);
+#endif
+         break;
+   }
 }
