@@ -421,6 +421,15 @@ void rglLinkProgram(GLuint program)
    glLinkProgram(program);
 }
 
+void rglFramebufferTexture(GLenum target, GLenum attachment,
+  	GLuint texture, GLint level)
+{
+#if defined(HAVE_OPENGLES) && !defined(HAVE_OPENGLES32)
+#else
+   glFramebufferTexture(target, attachment, texture, level);
+#endif
+}
+
 void rglFramebufferTexture2D(GLenum target, GLenum attachment,
       GLenum textarget, GLuint texture, GLint level)
 {
@@ -446,7 +455,7 @@ void rglFramebufferRenderbuffer(GLenum target, GLenum attachment,
    glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);
 }
 
-void rglDeleteFramebuffers(GLsizei n, GLuint *framebuffers)
+void rglDeleteFramebuffers(GLsizei n, const GLuint *framebuffers)
 {
    glDeleteFramebuffers(n, framebuffers);
 }
@@ -716,6 +725,14 @@ void rglPolygonOffset(GLfloat factor, GLfloat units)
    gl_state.polygonoffset.used   = true;
    gl_state.polygonoffset.factor = factor;
    gl_state.polygonoffset.units  = units;
+}
+
+void rglDrawBuffers(GLsizei n, const GLenum *bufs)
+{
+#if defined(HAVE_OPENGLES) && !defined(HAVE_OPENGLES3) && !defined(HAVE_OPENGLES31)
+#else
+   glDrawBuffers(n, bufs);
+#endif
 }
 
 /* GLSM-side */
