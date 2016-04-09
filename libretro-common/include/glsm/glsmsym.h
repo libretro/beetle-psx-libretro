@@ -115,7 +115,10 @@ extern "C" {
 #define glGetAttribLocation         rglGetAttribLocation
 #define glTexStorage2D              rglTexStorage2D
 #define glDrawBuffers               rglDrawBuffers
+#define glGenVertexArrays           rglGenVertexArrays
+#define glBindVertexArray           rglBindVertexArray
 
+void rglGenVertexArrays(GLsizei n, GLuint *arrays);
 void rglReadBuffer(GLenum mode);
 void rglPixelStorei(GLenum pname, GLint param);
 void rglTexCoord2f(GLfloat s, GLfloat t);
@@ -222,6 +225,7 @@ void rglUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose,
       const GLfloat *value);
 GLint rglGetAttribLocation(GLuint program, const GLchar *name);
 void rglDrawBuffers(GLsizei n, const GLenum *bufs);
+void rglBindVertexArray(GLuint array);
 
 #ifdef __cplusplus
 }

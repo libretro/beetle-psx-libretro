@@ -735,6 +735,22 @@ void rglDrawBuffers(GLsizei n, const GLenum *bufs)
 #endif
 }
 
+void rglBindVertexArray(GLuint array)
+{
+#if defined(HAVE_OPENGLES) && !defined(HAVE_OPENGLES3) && !defined(HAVE_OPENGLES31)
+#else
+   glBindVertexArray(array);
+#endif
+}
+
+void rglGenVertexArrays(GLsizei n, GLuint *arrays)
+{
+#if defined(HAVE_OPENGLES) && !defined(HAVE_OPENGLES3) && !defined(HAVE_OPENGLES31)
+#else
+   glGenVertexArrays(n, arrays);
+#endif
+}
+
 /* GLSM-side */
 
 static void glsm_state_setup(void)
