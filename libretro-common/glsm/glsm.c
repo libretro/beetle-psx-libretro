@@ -703,6 +703,12 @@ void rglUniform4fv(GLint location, GLsizei count, const GLfloat *value)
    glUniform4fv(location, count, value);
 }
 
+void rglTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat,
+      GLsizei width, GLsizei height)
+{
+   glTexStorage2D(target, levels, internalFormat, width, height);
+}
+
 void rglPolygonOffset(GLfloat factor, GLfloat units)
 {
    glsm_ctl(GLSM_CTL_IMM_VBO_DRAW, NULL);

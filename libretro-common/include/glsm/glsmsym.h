@@ -112,12 +112,15 @@ extern "C" {
 #define glReadBuffer                rglReadBuffer
 #define glUniformMatrix4fv          rglUniformMatrix4fv
 #define glGetAttribLocation         rglGetAttribLocation
+#define glTexStorage2D              rglTexStorage2D
 
 void rglReadBuffer(GLenum mode);
 void rglPixelStorei(GLenum pname, GLint param);
 void rglTexCoord2f(GLfloat s, GLfloat t);
 void rglDrawElements(GLenum mode, GLsizei count, GLenum type,
                            const GLvoid * indices);
+void rglTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat,
+      GLsizei width, GLsizei height);
 void rglCompressedTexImage2D(GLenum target, GLint level,
       GLenum internalformat, GLsizei width, GLsizei height,
       GLint border, GLsizei imageSize, const GLvoid *data);
