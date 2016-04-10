@@ -1,7 +1,15 @@
+#include <stdio.h>
 #include <stdint.h>
 #include <boolean.h>
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#include <glsm/glsm.h>
+#endif
+
 #include "rsx.h"
+
+static retro_video_refresh_t rsx_gl_video_cb;
+static retro_environment_t   rsx_gl_environ_cb;
 
 #if 0
 static mut static_renderer: *mut retrogl::RetroGl = 0 as *mut _;
@@ -13,6 +21,8 @@ static const uint16_t VRAM_WIDTH_PIXELS = 1024;
 /* Height of the VRAM in lines */
 static const uint16_t VRAM_HEIGHT = 512;
 
+static bool rsx_gl_is_pal = false;
+
 /* The are a few hardware differences between PAL and NTSC consoles,
  * in particular the pixelclock runs slightly slower on PAL consoles. */
 enum VideoClock
@@ -20,6 +30,30 @@ enum VideoClock
    Ntsc,
    Pal,
 };
+
+static bool fb_ready = false;
+
+static void context_reset(void)
+{
+   printf("context_reset.\n");
+   glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+
+   if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
+      return;
+
+   fb_ready = true;
+}
+
+static void context_destroy(void)
+{
+}
+
+static bool context_framebuffer_lock(void *data)
+{
+   if (fb_ready)
+      return false;
+   return true;
+}
 
 void renderer_gl_free(void)
 {
@@ -78,12 +112,22 @@ void rsx_gl_init(void)
 
 bool rsx_gl_open(bool is_pal)
 {
-#if 0
-   let clock = match is_pal {
-      true => VideoClock::Pal,
-           false => VideoClock::Ntsc,
-   };
+   glsm_ctx_params_t params = {0};
 
+   params.context_reset         = context_reset;
+   params.context_destroy       = context_destroy;
+   params.environ_cb            = rsx_gl_environ_cb;
+   params.stencil               = true;
+   params.imm_vbo_draw          = NULL;
+   params.imm_vbo_disable       = NULL;
+   params.framebuffer_lock      = context_framebuffer_lock;
+
+   if (!glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
+      return false;
+
+   rsx_gl_is_pal = is_pal;
+
+#if 0
    match RetroGl::new(clock) {
       Ok(r) => {
          set_renderer(r);
@@ -113,20 +157,27 @@ void rsx_gl_refresh_variables(void)
 
 void rsx_gl_prepare_frame(void)
 {
+   glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #if 0
    renderer().prepare_render();
 #endif
 }
 
-void rsx_gl_finalize_frame(void)
+void rsx_gl_finalize_frame(const void *fb, unsigned width,
+      unsigned height, unsigned pitch)
 {
+   rsx_gl_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
+         width, height, pitch);
+
+   glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
 #if 0
    renderer().finalize_frame();
 #endif
 }
 
-void rsx_gl_set_environment(retro_environment_t fn)
+void rsx_gl_set_environment(retro_environment_t callback)
 {
+   rsx_gl_environ_cb = callback;
 #if 0
     libretro::set_environment(callback);
 #endif
@@ -134,6 +185,7 @@ void rsx_gl_set_environment(retro_environment_t fn)
 
 void rsx_gl_set_video_refresh(retro_video_refresh_t callback)
 {
+   rsx_gl_video_cb = callback;
 #if 0
    libretro::set_video_refresh(callback);
 #endif

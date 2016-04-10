@@ -4,10 +4,6 @@
 
 #include <boolean.h>
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#include <glsm/glsm.h>
-#endif
-
 #include "rsx_intf.h"
 #ifdef HAVE_RUST
 #include "rsx.h"
@@ -28,33 +24,6 @@ RSX_SOFTWARE
 static bool rsx_is_pal = false;
 static retro_video_refresh_t rsx_video_cb;
 static retro_environment_t rsx_environ_cb;
-
-
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-static bool fb_ready = false;
-
-static void context_reset(void)
-{
-   printf("context_reset.\n");
-   glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
-
-   if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
-      return;
-
-   fb_ready = true;
-}
-
-static void context_destroy(void)
-{
-}
-
-static bool context_framebuffer_lock(void *data)
-{
-   if (fb_ready)
-      return false;
-   return true;
-}
-#endif
 
 void rsx_intf_set_environment(retro_environment_t cb)
 {
@@ -162,23 +131,12 @@ bool rsx_intf_open(bool is_pal)
          rsx_is_pal = is_pal;
          break;
       case RSX_OPENGL:
-         {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-            glsm_ctx_params_t params = {0};
-
-            params.context_reset         = context_reset;
-            params.context_destroy       = context_destroy;
-            params.environ_cb            = rsx_environ_cb;
-            params.stencil               = true;
-            params.imm_vbo_draw          = NULL;
-            params.imm_vbo_disable       = NULL;
-            params.framebuffer_lock      = context_framebuffer_lock;
-
-            if (glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
-               rsx_type = RSX_OPENGL;
-#endif
-         }
+         if (!rsx_gl_open(is_pal))
+            return false;
+         rsx_type   = RSX_OPENGL;
          rsx_is_pal = is_pal;
+#endif
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
@@ -238,7 +196,6 @@ void rsx_intf_prepare_frame(void)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_prepare_frame();
-         glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -259,11 +216,7 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_finalize_frame();
-         rsx_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
-               width, height, pitch);
-
-         glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
+         rsx_gl_finalize_frame(fb, width, height, pitch);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
