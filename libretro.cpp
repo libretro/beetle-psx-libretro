@@ -3493,97 +3493,104 @@ void retro_run(void)
 
    /* end of Emulate */
 
-#ifdef NEED_DEINTERLACER
-   if (spec.InterlaceOn)
-   {
-      if (!PrevInterlaced)
-         deint.ClearState();
-
-      deint.Process(spec.surface, spec.DisplayRect, spec.LineWidths, spec.InterlaceField);
-
-      PrevInterlaced = true;
-
-      spec.InterlaceOn = false;
-      spec.InterlaceField = 0;
-   }
-   else
-      PrevInterlaced = false;
-#endif
-
-   int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-
-   // PSX is rather special, and needs specific handling ...
-
-   unsigned width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
-   unsigned height = spec.DisplayRect.h;
-   //fprintf(stderr, "(%u x %u)\n", width, height);
-   // PSX core inserts padding on left and right (overscan). Optionally crop this.
-
-   const uint32_t *pix = surf->pixels;
-   unsigned pix_offset = 0;
-
-   if (!overscan)
-   {
-      // 320 width -> 350 width.
-      // 364 width -> 400 width.
-      // 256 width -> 280 width.
-      // 560 width -> 512 width.
-      // 640 width -> 700 width.
-      // Rectify this.
-      switch (width)
-      {
-         // The shifts are not simply (padded_width - real_width) / 2.
-         case 280:
-            pix_offset += 10;
-            width = 256;
-            break;
-
-         case 350:
-            pix_offset += 14;
-            width = 320;
-            break;
-
-         case 400:
-            pix_offset += 15;
-            width = 364;
-            break;
-
-
-         case 560:
-            pix_offset += 26;
-            width       = 512;
-            break;
-
-         case 700:
-            pix_offset += 33;
-            width       = 640;
-            break;
-
-         default:
-            // This shouldn't happen.
-            break;
-      }
-
-      if (is_pal)
-      {
-         // Attempt to remove black bars.
-         // These numbers are arbitrary since the bars differ some by game.
-         // Changes aspect ratio in the process.
-         height -= 36;
-         pix_offset += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
-      }
-   }
-
+   const void *fb        = NULL;
+   unsigned width        = rects[0];
+   unsigned height       = spec.DisplayRect.h;
    uint8_t upscale_shift = GPU->upscale_shift;
 
-   width  <<= upscale_shift;
-   height <<= upscale_shift;
-   pix     += pix_offset << upscale_shift;
+   if (rsx_intf_is_type() == RSX_SOFTWARE)
+   {
+#ifdef NEED_DEINTERLACER
+      if (spec.InterlaceOn)
+      {
+         if (!PrevInterlaced)
+            deint.ClearState();
 
-   const void *fb = (GPU->display_change_count == 0) ? NULL : pix;
+         deint.Process(spec.surface, spec.DisplayRect, spec.LineWidths, spec.InterlaceField);
 
-   if (!allow_frame_duping)
-      fb = pix;
+         PrevInterlaced = true;
+
+         spec.InterlaceOn = false;
+         spec.InterlaceField = 0;
+      }
+      else
+         PrevInterlaced = false;
+#endif
+      // PSX is rather special, and needs specific handling ...
+
+      width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
+      height = spec.DisplayRect.h;
+      //fprintf(stderr, "(%u x %u)\n", width, height);
+      // PSX core inserts padding on left and right (overscan). Optionally crop this.
+
+      const uint32_t *pix = surf->pixels;
+      unsigned pix_offset = 0;
+
+      if (!overscan)
+      {
+         // 320 width -> 350 width.
+         // 364 width -> 400 width.
+         // 256 width -> 280 width.
+         // 560 width -> 512 width.
+         // 640 width -> 700 width.
+         // Rectify this.
+         switch (width)
+         {
+            // The shifts are not simply (padded_width - real_width) / 2.
+            case 280:
+               pix_offset += 10;
+               width = 256;
+               break;
+
+            case 350:
+               pix_offset += 14;
+               width = 320;
+               break;
+
+            case 400:
+               pix_offset += 15;
+               width = 364;
+               break;
+
+
+            case 560:
+               pix_offset += 26;
+               width       = 512;
+               break;
+
+            case 700:
+               pix_offset += 33;
+               width       = 640;
+               break;
+
+            default:
+               // This shouldn't happen.
+               break;
+         }
+
+         if (is_pal)
+         {
+            // Attempt to remove black bars.
+            // These numbers are arbitrary since the bars differ some by game.
+            // Changes aspect ratio in the process.
+            height -= 36;
+            pix_offset += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
+         }
+      }
+
+
+      width  <<= upscale_shift;
+      height <<= upscale_shift;
+      pix     += pix_offset << upscale_shift;
+
+      if (GPU->display_change_count != 0)
+         fb = pix;
+
+      if (!allow_frame_duping)
+         fb = pix;
+   }
+
+   int16_t *interbuf = (int16_t*)&IntermediateBuffer;
 
    rsx_intf_finalize_frame(fb, width, height,
          MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
