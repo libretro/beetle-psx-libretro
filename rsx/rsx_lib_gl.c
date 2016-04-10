@@ -463,3 +463,32 @@ fn get_av_info(std: VideoClock, upscaling: u32) -> libretro::SystemAvInfo {
     }
 }
 #endif
+
+void rsx_gl_set_blend_mode(enum blending_modes mode)
+{
+   switch (mode)
+   {
+      /* 0.5xB + 0.5 x F */
+      case BLEND_MODE_AVERAGE:
+         glBlendEquation(GL_FUNC_ADD);
+         glBlendColor(1.0, 1.0, 1.0, 0.5);
+         glBlendFunc(GL_CONSTANT_ALPHA, GL_CONSTANT_ALPHA);
+         break;
+      case BLEND_MODE_ADD:
+         /* 1.0xB + 1.0 x F */
+         glBlendEquation(GL_FUNC_ADD);
+         glBlendFunc(GL_ONE, GL_ONE);
+         break;
+      case BLEND_MODE_SUBTRACT:
+         /* 1.0xB - 1.0 x F */
+         glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+         glBlendFunc(GL_ONE, GL_ONE);
+         break;
+      case BLEND_MODE_ADD_FOURTH:
+         /* 1.0xB + 0.25 x F */
+         glBlendEquation(GL_FUNC_ADD);
+         glBlendColor(1.0, 1.0, 1.0, 0.25);
+         glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
+         break;
+   }
+}
