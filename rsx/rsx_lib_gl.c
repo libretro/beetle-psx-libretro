@@ -122,7 +122,7 @@ bool rsx_gl_open(bool is_pal)
    params.context_reset         = context_reset;
    params.context_destroy       = context_destroy;
    params.environ_cb            = rsx_gl_environ_cb;
-   params.stencil               = true;
+   params.stencil               = false;
    params.imm_vbo_draw          = NULL;
    params.imm_vbo_disable       = NULL;
    params.framebuffer_lock      = context_framebuffer_lock;
