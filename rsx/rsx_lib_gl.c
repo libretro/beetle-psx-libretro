@@ -157,6 +157,9 @@ void rsx_gl_refresh_variables(void)
 
 void rsx_gl_prepare_frame(void)
 {
+   if (!fb_ready)
+      return;
+
    glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 #if 0
    renderer().prepare_render();
@@ -166,6 +169,9 @@ void rsx_gl_prepare_frame(void)
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
       unsigned height, unsigned pitch)
 {
+   if (!fb_ready)
+      return;
+  
    rsx_gl_video_cb(RETRO_HW_FRAME_BUFFER_VALID,
          width, height, pitch);
 
@@ -466,6 +472,9 @@ fn get_av_info(std: VideoClock, upscaling: u32) -> libretro::SystemAvInfo {
 
 void rsx_gl_set_blend_mode(enum blending_modes mode)
 {
+   if (!fb_ready)
+      return;
+
    switch (mode)
    {
       /* 0.5xB + 0.5 x F */
