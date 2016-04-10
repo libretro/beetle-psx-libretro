@@ -5,14 +5,11 @@
 #include <boolean.h>
 
 #include "rsx_intf.h"
-#ifdef HAVE_RUST
 #include "rsx.h"
-#endif
 #ifdef HAVE_OPENGL
 #include "rsx_lib_gl.h"
 #endif
-uint8_t psx_gpu_upscale_shift;
-uint8_t widescreen_hack;
+#include "rsx_lib_soft.h"
 
 static enum rsx_renderer_type rsx_type = 
 #ifdef HAVE_RUST
@@ -21,16 +18,13 @@ RSX_EXTERNAL_RUST
 RSX_SOFTWARE
 #endif
 ;
-static bool rsx_is_pal = false;
-static retro_video_refresh_t rsx_video_cb;
-static retro_environment_t rsx_environ_cb;
 
 void rsx_intf_set_environment(retro_environment_t cb)
 {
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_environ_cb = cb;
+         rsx_soft_set_environment(cb);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -50,7 +44,7 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_video_cb   = cb;
+         rsx_soft_set_video_refresh(cb);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -65,24 +59,12 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
    }
 }
 
-static float video_output_framerate(void)
-{
-   return rsx_is_pal ? 49.842 : 59.941;
-}
-
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
 {
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         memset(info, 0, sizeof(*info));
-         info->timing.fps            = video_output_framerate();
-         info->timing.sample_rate    = 44100;
-         info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
-         info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
-         info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
-         info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
-         info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
+         rsx_soft_get_system_av_info(info);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -128,19 +110,19 @@ bool rsx_intf_open(bool is_pal)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_is_pal = is_pal;
+         if (!rsx_soft_open(is_pal))
+            return false;
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          if (!rsx_gl_open(is_pal))
             return false;
-         rsx_type   = RSX_OPENGL;
-         rsx_is_pal = is_pal;
 #endif
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
-         rsx_open(is_pal);
+         if (!rsx_open(is_pal))
+            return false;
 #endif
          break;
    }
@@ -212,7 +194,7 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_video_cb(fb, width, height, pitch);
+         rsx_soft_finalize_frame(fb, width, height, pitch);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
