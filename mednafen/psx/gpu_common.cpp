@@ -6,17 +6,21 @@ INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
    // Efficient 15bpp pixel math algorithms from blargg
    switch(BlendMode)
    {
+      /* 0.5 x B + 0.5 x F */
       case BLEND_MODE_AVERAGE:
          bg_pix   |= 0x8000;
          *fore_pix = ((*fore_pix + bg_pix) - ((*fore_pix ^ bg_pix) & 0x0421)) >> 1;
          break;
 
+         /* 1.0 x B + 1.0 x F */
       case BLEND_MODE_ADD:
          bg_pix   &= ~0x8000;
          sum       = *fore_pix + bg_pix;
          carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
          *fore_pix = (sum - carry) | (carry - (carry >> 5));
          break;
+
+         /* 1.0 x B - 1.0 x F */
 
       case BLEND_MODE_SUBTRACT:
          bg_pix    |= 0x8000;
@@ -25,6 +29,8 @@ INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
          borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420;
          *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5));
          break;
+
+         /* 1.0 x B + 0.25 * F */
 
       case BLEND_MODE_ADD_FOURTH:
          bg_pix   &= ~0x8000;
