@@ -136,7 +136,7 @@ static uint32_t LZCR;
 static uint32_t Reg23;
 // end DR
 
-extern unsigned char widescreen_hack;
+extern "C" unsigned char widescreen_hack;
 
 static INLINE uint8_t Sat5(int16_t cc)
 {

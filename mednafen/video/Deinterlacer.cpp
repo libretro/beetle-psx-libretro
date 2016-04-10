@@ -4,7 +4,7 @@
 #include "../state.h"
 #include "../driver.h"
 
-extern uint8_t psx_gpu_upscale_shift;
+extern "C" uint8_t psx_gpu_upscale_shift;
 
 #include "Deinterlacer.h"
 Deinterlacer::Deinterlacer() : FieldBuffer(NULL), StateValid(false), DeintType(DEINT_WEAVE)
