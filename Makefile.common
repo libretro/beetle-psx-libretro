@@ -23,6 +23,7 @@ SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
 				 $(LIBRETRO_DIR)/glsym/rglgen.c
 
 SOURCES_C += \
+				 $(CORE_DIR)/rsx/rsx_lib_gl.c \
 				 $(CORE_DIR)/rsx/gl/framebuffer.c \
 				 $(CORE_DIR)/rsx/gl/texture.c \
 				 $(CORE_DIR)/rsx/gl/vertex.c
