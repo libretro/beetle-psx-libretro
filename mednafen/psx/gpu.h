@@ -14,6 +14,8 @@
 #include <glsm/glsmsym.h>
 #endif
 
+#include "../../rsx/rsx.h"
+
 class PS_GPU;
 
 #define INCMD_NONE     0
@@ -25,11 +27,6 @@ class PS_GPU;
 #define DISP_PAL        0x08
 #define DISP_RGB24      0x10
 #define DISP_INTERLACED 0x20
-
-#define BLEND_MODE_AVERAGE    0
-#define BLEND_MODE_ADD        1
-#define BLEND_MODE_SUBTRACT   2
-#define BLEND_MODE_ADD_FOURTH 3
 
 enum dither_mode {
   DITHER_NATIVE,

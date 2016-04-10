@@ -175,6 +175,7 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
          ig.b += (xs * idl.db_dx) + (y * idl.db_dy);
       }
 
+
       for(int32_t x = xs; MDFN_LIKELY(x < xb); x++)
       {
          uint32_t r, g, b;
@@ -482,7 +483,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
       int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
 
-      // Attempt to retreive subpixel coordinates if available
+      // Attempt to retrieve subpixel coordinates if available
       const subpixel_vertex *pv = GetSubpixelVertex(x, y);
 
       if (pv != NULL) {
@@ -527,17 +528,17 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;
 
-   uint8_t blend_mode;
+   enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
 
-   if (textured) {
-     if (TexMult) {
-       blend_mode = 2;
-     } else {
-       blend_mode = 1;
-     }
-   } else {
-     blend_mode = 0;
+   if (textured)
+   {
+      if (TexMult)
+         blend_mode = BLEND_MODE_SUBTRACT;
+      else
+         blend_mode = BLEND_MODE_ADD;
    }
+
+   rsx_intf_set_blend_mode(blend_mode);
 
    rsx_intf_push_triangle(vertices[0].x, vertices[0].y,
          vertices[1].x, vertices[1].y,

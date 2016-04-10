@@ -1,9 +1,14 @@
 template<int BlendMode>
 INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 {
-   uint32_t sum, carry, diff, borrow;
+   /*
+    * fore_pix - foreground -  the screen
+    * bg_pix   - background  - the texture 
+    */
 
-   // Efficient 15bpp pixel math algorithms from blargg
+   uint32_t sum, carry;
+
+   /* Efficient 15bpp pixel math algorithms from blargg */
    switch(BlendMode)
    {
       /* 0.5 x B + 0.5 x F */
@@ -23,11 +28,16 @@ INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
          /* 1.0 x B - 1.0 x F */
 
       case BLEND_MODE_SUBTRACT:
-         bg_pix    |= 0x8000;
-         *fore_pix &= ~0x8000;
-         diff       = bg_pix - *fore_pix + 0x108420;
-         borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420;
-         *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5));
+         {
+            uint32_t diff;
+            uint32_t borrow;
+
+            bg_pix    |= 0x8000;
+            *fore_pix &= ~0x8000;
+            diff       = bg_pix - *fore_pix + 0x108420;
+            borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420;
+            *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5));
+         }
          break;
 
          /* 1.0 x B + 0.25 * F */
@@ -40,6 +50,7 @@ INLINE void PS_GPU::PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
          *fore_pix = (sum - carry) | (carry - (carry >> 5));
          break;
    }
+
 }
 
 template<int BlendMode, bool MaskEval_TA, bool textured>

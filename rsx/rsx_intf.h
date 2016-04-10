@@ -3,6 +3,8 @@
 
 #include "libretro.h"
 
+#include "rsx.h"
+
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.38.6"
@@ -23,6 +25,8 @@ enum rsx_renderer_type
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+  void rsx_intf_set_blend_mode(enum blending_modes mode);
 
   void rsx_intf_set_environment(retro_environment_t cb);
   void rsx_intf_set_video_refresh(retro_video_refresh_t cb);

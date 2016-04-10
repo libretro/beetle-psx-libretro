@@ -19,6 +19,15 @@ RSX_SOFTWARE
 #endif
 ;
 
+void rsx_intf_set_blend_mode(enum blending_modes mode)
+{
+   switch (rsx_type)
+   {
+      default:
+         break;
+   }
+}
+
 void rsx_intf_set_environment(retro_environment_t cb)
 {
    switch (rsx_type)
