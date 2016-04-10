@@ -1,15 +1,20 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+
 #include <boolean.h>
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsm/glsm.h>
 #endif
 
+#include "rsx_intf.h"
 #include "rsx.h"
 
 static retro_video_refresh_t rsx_gl_video_cb;
 static retro_environment_t   rsx_gl_environ_cb;
+extern uint8_t widescreen_hack;
+extern uint8_t psx_gpu_upscale_shift;
 
 #if 0
 static mut static_renderer: *mut retrogl::RetroGl = 0 as *mut _;
@@ -197,8 +202,29 @@ void rsx_gl_set_video_refresh(retro_video_refresh_t callback)
 #endif
 }
 
+/* Precise FPS values for the video output for the given
+ * VideoClock. It's actually possible to configure the PlayStation GPU
+ * to output with NTSC timings with the PAL clock (and vice-versa)
+ * which would make this code invalid but it wouldn't make a lot of
+ * sense for a game to do that.
+ */
+static float video_output_framerate(void)
+{
+   /* NTSC - 53.690MHz GPU clock frequency, 263 lines per field,
+    * 3413 cycles per line */
+   return rsx_gl_is_pal ? 49.76 : 59.81;
+}
+
 void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 {
+   memset(info, 0, sizeof(*info));
+   info->timing.fps            = video_output_framerate();
+   info->timing.sample_rate    = 44100;
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
+   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W << psx_gpu_upscale_shift;
+   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H << psx_gpu_upscale_shift;
+   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
 #if 0
     let info = ptr_as_mut_ref(info).unwrap();
 
@@ -421,27 +447,6 @@ fn parse_bool(opt: &str) -> Result<bool, ()> {
 }
 #endif
 
-// Precise FPS values for the video output for the given
-// VideoClock. It's actually possible to configure the PlayStation GPU
-// to output with NTSC timings with the PAL clock (and vice-versa)
-// which would make this code invalid but it wouldn't make a lot of
-// sense for a game to do that.
-float video_output_framerate(enum VideoClock std)
-{
-   switch (std)
-   {
-      /* 53.690MHz GPU clock frequency, 263 lines per field,
-       * 3413 cycles per line */
-      case Ntsc:
-         return 59.81;
-         /* 53.222MHz GPU clock frequency, 314 lines per field,
-          * 3406 cycles per line */
-      case Pal:
-         return 49.76;
-   }
-
-   return 0.0;
-}
 
 #if 0
 fn get_av_info(std: VideoClock, upscaling: u32) -> libretro::SystemAvInfo {
