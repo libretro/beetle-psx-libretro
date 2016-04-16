@@ -296,7 +296,8 @@ void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
       uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
-      bool dither)
+      bool dither,
+      int blend_mode)
 {
    switch (rsx_type)
    {
@@ -309,7 +310,8 @@ void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               dither);
+               dither,
+               blend_mode);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -319,7 +321,8 @@ void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               dither);
+               dither,
+               blend_mode);
 #endif
          break;
    }
@@ -329,7 +332,8 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       uint32_t c0,
       uint32_t c1,
-      bool dither)
+      bool dither,
+      int blend_mode)
 {
    switch (rsx_type)
    {
@@ -337,12 +341,12 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither);
+         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
-         rsx_push_line(p0x, p0y, p1x, p1y, c0, c1, dither);
+         rsx_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode);
 #endif
          break;
    }

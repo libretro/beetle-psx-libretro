@@ -7,26 +7,16 @@
 extern "C" {
 #endif
 
-   enum blending_modes
-   {
-      BLEND_MODE_AVERAGE = 0,
-      BLEND_MODE_ADD,
-      BLEND_MODE_SUBTRACT,
-      BLEND_MODE_ADD_FOURTH
-   };
-
   void rsx_set_environment(retro_environment_t);
   void rsx_set_video_refresh(retro_video_refresh_t);
   void rsx_get_system_av_info(struct retro_system_av_info *);
 
   void rsx_init(void);
   bool rsx_open(bool is_pal);
-  void rsx_close(void);
-  void rsx_refresh_variables(void);
-  void rsx_prepare_frame(void);
-  void rsx_finalize_frame(void);
-
-  void rsx_set_blend_mode(enum blending_modes mode);
+  void rsx_close();
+  void rsx_refresh_variables();
+  void rsx_prepare_frame();
+  void rsx_finalize_frame();
 
   void rsx_set_draw_offset(int16_t x, int16_t y);
   void rsx_set_draw_area(uint16_t x, uint16_t y,
@@ -48,13 +38,15 @@ extern "C" {
 			 uint16_t clut_x, uint16_t clut_y,
 			 uint8_t texture_blend_mode,
 			 uint8_t depth_shift,
-			 bool dither);
+			 bool dither,
+                         int blend_mode);
 
   void rsx_push_line(int16_t p0x, int16_t p0y,
 		     int16_t p1x, int16_t p1y,
 		     uint32_t c0,
 		     uint32_t c1,
-		     bool dither);
+		     bool dither,
+		     int blend_mode);
 
   void rsx_load_image(uint16_t x, uint16_t y,
 		      uint16_t w, uint16_t h,

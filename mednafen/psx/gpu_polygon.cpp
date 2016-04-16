@@ -545,7 +545,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          vertices[2].x, vertices[2].y,
          ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16),
          ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16),
-         ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16),
+			  ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16),
          vertices[0].u, vertices[0].v,
          vertices[1].u, vertices[1].v,
          vertices[2].u, vertices[2].v,
@@ -553,7 +553,8 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          clut_x, clut_y,
          blend_mode,
          2 - TexMode_TA,
-         DitherEnabled());
+         DitherEnabled(),
+         BlendMode);
 
 
    DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
