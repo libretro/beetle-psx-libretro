@@ -2,6 +2,7 @@ DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_RUST=0
 HAVE_OPENGL=0
+HAVE_ZLIB=1
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
@@ -53,6 +54,10 @@ ifeq ($(HAVE_OPENGL),1)
 	else
 		GL_LIB := -lGL
 	endif
+endif
+
+ifeq ($(HAVE_ZLIB),1)
+	ZLIB_LIB := -lz
 endif
 
 else ifeq ($(platform), osx)
@@ -307,7 +312,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o $@ $^ $(LDFLAGS) $(GL_LIB)
+	$(CXX) -o $@ $^ $(LDFLAGS) $(GL_LIB) $(ZLIB_LIB)
 endif
 
 %.o: %.cpp
