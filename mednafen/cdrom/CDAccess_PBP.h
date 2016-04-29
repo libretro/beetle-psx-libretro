@@ -41,7 +41,7 @@ class CDAccess_PBP : public CDAccess
 
       int32_t disc_count;
       int32_t current_disc;
-      uint32_t discs_start_offset[5];
+      uint32_t discs_start_offset[6];
       uint32_t psar_offset, psisoimg_offset;
 
       void ImageOpen(const char *path, bool image_memcache);

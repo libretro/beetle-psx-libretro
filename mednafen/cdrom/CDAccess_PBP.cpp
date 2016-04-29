@@ -69,13 +69,12 @@ static const char *DI_CUE_Strings[7] =
 
 void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 {
-log_cb(RETRO_LOG_DEBUG, "[PBP] ACCESSING %s (%s)\n", path, (image_memcache ? "cached" : "non-cached"));
+log_cb(RETRO_LOG_DEBUG, "[PBP] Opening %s...\n", path);
    if(image_memcache)
       fp = new MemoryStream(new FileStream(path, MODE_READ));
    else
       fp = new FileStream(path, MODE_READ);
 
-   unsigned int i;
    uint8 magic[4];
    char psar_sig[12];
 
@@ -95,16 +94,18 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] ACCESSING %s (%s)\n", path, (image_memcache ? "ca
       // check for multidisk image
       fp->seek(psar_offset + 0x200, SEEK_SET);
 
-      for(i = 0; i < 5; i++)
+      for(int i = 0; i < 6; i++)
       {
          discs_start_offset[i] = fp->get_LE<uint32>();
          if(discs_start_offset[i] == 0)
+         {
+            disc_count = i;
             break;
+         }
 log_cb(RETRO_LOG_DEBUG, "[PBP] DISC[%i] offset = %#x\n", i, psar_offset+discs_start_offset[i]);
       }
-      disc_count = i;
 
-      if(i == 0)
+      if(disc_count == 0)
          throw(MDFN_Error(0, _("Multidisk eboot has 0 images?: %s"), path));
 
       // TODO: figure out a way to integrate multi-discs with retroarch (just a matter of storing the currently selected disc and seeking to the according offset on Read_TOC)
@@ -125,8 +126,6 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] DISC[%i] offset = %#x\n", i, psar_offset+discs_st
    fp->read(magic, 4);
    if(magic[0] == 0 && magic[1] == 'P' && magic[2] == 'G' && magic[3] == 'D')
       throw(MDFN_Error(0, _("%s seems to contain an encrypted TOC (unsupported atm), bailing out"), path));
-
-log_cb(RETRO_LOG_DEBUG, "[PBP] Done with ImageOpen()\n");
 }
 
 void CDAccess_PBP::Cleanup(void)
@@ -420,12 +419,14 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] psisoimg_offset = %#x, Numtracks = %d, total_sect
          Tracks[i-1].sectors = Tracks[i].LBA - Tracks[i-1].LBA;
 #if 0
       Tracks[i].pregap = Tracks[i].index[0];
-      Tracks[i].pregap_dv = Tracks[i].index[1] - Tracks[i].index[0];
       if(i > 1)
          Tracks[i-1].postgap = Tracks[i].index[0] - Tracks[i-1].index[1];
 #else
-      Tracks[i].pregap = Tracks[i].pregap_dv = Tracks[i].postgap = 0;
+      Tracks[i].pregap = Tracks[i].postgap = 0;
 #endif
+      Tracks[i].pregap_dv = Tracks[i].index[1]-Tracks[i].index[0];
+      if(Tracks[i].pregap_dv < 0)
+         Tracks[i].pregap_dv = 0;
 
       if(i == NumTracks)
       {
@@ -438,11 +439,12 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] psisoimg_offset = %#x, Numtracks = %d, total_sect
       toc->tracks[i].adr = ADR_CURPOS;
       toc->tracks[i].lba = Tracks[i].LBA;
 
-log_cb(RETRO_LOG_DEBUG, "[PBP] track[%i]: %s, lba = %i, adr = %i, control = %i\n", BCD_to_U8(toc_entry.track), DI_CUE_Strings[Tracks[i].DIFormat], toc->tracks[i].lba, toc->tracks[i].adr, toc->tracks[i].control);
+      log_cb(RETRO_LOG_DEBUG, "[PBP] track[%i]: %s, lba = %i, adr = %i, control = %i, index[0] = %i, index[1] = %i\n", BCD_to_U8(toc_entry.track), DI_CUE_Strings[Tracks[i].DIFormat], toc->tracks[i].lba, toc->tracks[i].adr, toc->tracks[i].control, Tracks[i].index[0], Tracks[i].index[1]);
 
       if(BCD_to_U8(toc_entry.track) < i || BCD_to_U8(toc_entry.track) > i)
          throw(MDFN_Error(0, _("Tracks out of order")));   // can this happen?
    }
+
    toc->first_track = FirstTrack;
    toc->last_track = LastTrack;
    toc->disc_type = DISC_TYPE_CD_XA;   // always?
