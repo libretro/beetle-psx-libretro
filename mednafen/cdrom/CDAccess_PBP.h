@@ -25,12 +25,12 @@ class CDAccess_PBP : public CDAccess
       Stream* fp;
 
       ////////////////
-      unsigned char buff_raw[16][CD_FRAMESIZE_RAW];
-      unsigned char buff_compressed[CD_FRAMESIZE_RAW * 16 + 100];
-      unsigned int *index_table;
-      unsigned int index_len;
-      unsigned int current_block;
-      unsigned int sector_in_blk;
+      uint8_t buff_raw[16][CD_FRAMESIZE_RAW];
+      uint8_t buff_compressed[CD_FRAMESIZE_RAW * 16 + 100];
+      uint32_t *index_table;
+      uint32_t index_len;
+      uint32_t current_block;
+      uint32_t sector_in_blk;
       ////////////////
 
       int32_t NumTracks;
@@ -39,14 +39,24 @@ class CDAccess_PBP : public CDAccess
       int32_t total_sectors;
       uint8_t disc_type;
 
-      uint32 discs_start_offset[5];
-      uint32 psar_offset, psisoimg_offset;
+      int32_t disc_count;
+      int32_t current_disc;
+      uint32_t discs_start_offset[5];
+      uint32_t psar_offset, psisoimg_offset;
 
       void ImageOpen(const char *path, bool image_memcache);
       int LoadSBI(const char* sbi_path);
       void Cleanup(void);
 
-      int uncompress2(void *out, unsigned long *out_size, void *in, unsigned long in_size);
+      CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
+      struct cpp11_array_doodad
+      {
+         uint8 data[12];
+      };
+      std::map<uint32, cpp11_array_doodad> SubQReplaceMap;
+      void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
+
+      int uncompress2(void *out, uint32_t *out_size, void *in, uint32_t in_size);
 };
 
 
