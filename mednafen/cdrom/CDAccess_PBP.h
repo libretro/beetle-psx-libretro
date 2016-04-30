@@ -5,9 +5,6 @@
 #include "CDAccess_Image.h"
 
 class Stream;
-class AudioReader;
-
-#define CD_FRAMESIZE_RAW		2352
 
 class CDAccess_PBP : public CDAccess
 {
@@ -21,12 +18,13 @@ class CDAccess_PBP : public CDAccess
       virtual void Read_TOC(TOC *toc);
 
       virtual void Eject(bool eject_status);
+
    private:
       Stream* fp;
 
       ////////////////
-      uint8_t buff_raw[16][CD_FRAMESIZE_RAW];
-      uint8_t buff_compressed[CD_FRAMESIZE_RAW * 16 + 100];
+      uint8_t buff_raw[16][2352];
+      uint8_t buff_compressed[2352 * 16 + 100];
       uint32_t *index_table;
       uint32_t index_len;
       uint32_t current_block;

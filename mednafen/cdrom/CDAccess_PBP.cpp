@@ -69,14 +69,18 @@ static const char *DI_CUE_Strings[7] =
 
 void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 {
+   uint8 magic[4];
+   char psar_sig[12];
+   std::string base_dir, file_base, file_ext, sbi_path;
+   char sbi_ext[4] = { 's', 'b', 'i', 0 };
+
+   MDFN_GetFilePathComponents(path, &base_dir, &file_base, &file_ext);
+
 log_cb(RETRO_LOG_DEBUG, "[PBP] Opening %s...\n", path);
    if(image_memcache)
       fp = new MemoryStream(new FileStream(path, MODE_READ));
    else
       fp = new FileStream(path, MODE_READ);
-
-   uint8 magic[4];
-   char psar_sig[12];
 
    // check for valid pbp
    if(fp->read(magic, 4, false) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
@@ -126,6 +130,21 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] DISC[%i] offset = %#x\n", i, psar_offset+discs_st
    fp->read(magic, 4);
    if(magic[0] == 0 && magic[1] == 'P' && magic[2] == 'G' && magic[3] == 'D')
       throw(MDFN_Error(0, _("%s seems to contain an encrypted TOC (unsupported atm), bailing out"), path));
+
+   // check for sbi file
+   if(file_ext.length() == 4 && file_ext[0] == '.')
+   {
+      for(int i = 0; i < 3; i++)
+      {
+         if(file_ext[1 + i] >= 'A' && file_ext[1 + i] <= 'Z')
+            sbi_ext[i] += 'A' - 'a';
+      }
+   }
+
+   sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
+
+   if (path_is_valid(sbi_path.c_str()))
+      LoadSBI(sbi_path.c_str());
 }
 
 void CDAccess_PBP::Cleanup(void)
@@ -144,7 +163,6 @@ CDAccess_PBP::CDAccess_PBP(const char *path, bool image_memcache) : NumTracks(0)
    index_table = NULL;
    fp = NULL;
    ImageOpen(path, image_memcache);
-   // TODO: check for .sbi files in same directory and load them with LoadSBI()
 }
 
 CDAccess_PBP::~CDAccess_PBP()
@@ -292,12 +310,12 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
    uint8_t SimuQ[0xC];
 
+   int32_t block = lba >> 4;
+   sector_in_blk = lba & 0xf;
+
    memset(buf + 2352, 0, 96);
    MakeSubPQ(lba, buf + 2352);
    subq_deinterleave(buf + 2352, SimuQ);
-
-   int32_t block = lba >> 4;
-   sector_in_blk = lba & 0xf;
 
 //log_cb(RETRO_LOG_DEBUG, "[PBP] lba = %d, sector_in_blk = %u, block = %d, current_block = %u\n", lba, sector_in_blk, block, current_block);
 
@@ -346,7 +364,7 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
       }
       current_block = block;
    }
-   memcpy(buf, buff_raw[sector_in_blk], CD_FRAMESIZE_RAW);
+   memcpy(buf, buff_raw[sector_in_blk], 2352);
 }
 
 void CDAccess_PBP::Read_TOC(TOC *toc)
@@ -369,7 +387,10 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
    } index_entry;
 
    int i;
+   uint32_t cdimg_base = psisoimg_offset + 0x100000;
+
    TOC_Clear(toc);
+   memset(Tracks, 0, sizeof(Tracks));
 
    // initialize opposites
    FirstTrack = 99;
@@ -415,26 +436,18 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] psisoimg_offset = %#x, Numtracks = %d, total_sect
 
       // are these correct?
       Tracks[i].LBA = ABA_to_LBA(Tracks[i].index[1]);
-      if(i > 1)
-         Tracks[i-1].sectors = Tracks[i].LBA - Tracks[i-1].LBA;
-#if 0
-      Tracks[i].pregap = Tracks[i].index[0];
-      if(i > 1)
-         Tracks[i-1].postgap = Tracks[i].index[0] - Tracks[i-1].index[1];
-#else
+
       Tracks[i].pregap = Tracks[i].postgap = 0;
-#endif
       Tracks[i].pregap_dv = Tracks[i].index[1]-Tracks[i].index[0];
       if(Tracks[i].pregap_dv < 0)
          Tracks[i].pregap_dv = 0;
 
+      if(i > 1)
+         Tracks[i-1].sectors = Tracks[i].index[0] - Tracks[i-1].index[1];
+
       if(i == NumTracks)
-      {
-            Tracks[i].sectors = total_sectors - Tracks[i-1].LBA;
-#if 0
-            Tracks[i].postgap = total_sectors - Tracks[i-1].index[1];
-#endif
-      }
+         Tracks[i].sectors = total_sectors - Tracks[i-1].index[1];
+
       toc->tracks[i].control = Tracks[i].subq_control;
       toc->tracks[i].adr = ADR_CURPOS;
       toc->tracks[i].lba = Tracks[i].LBA;
@@ -463,7 +476,6 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] psisoimg_offset = %#x, Numtracks = %d, total_sect
    if (index_table == NULL)
       throw(MDFN_Error(0, _("Unable to allocate memory")));
 
-   uint32_t cdimg_base = psisoimg_offset + 0x100000;
    for (i = 0; i < index_len; i++)
    {
       // TOCHECK: does struct reading (with entries that could be affected by endianness) work reliably between different platforms?
@@ -522,7 +534,7 @@ int CDAccess_PBP::LoadSBI(const char* sbi_path)
    }
 
    //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
-
+log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 
