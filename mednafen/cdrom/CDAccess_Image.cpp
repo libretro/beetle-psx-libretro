@@ -838,7 +838,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    //
    if(!IsTOC)
    {
-      const char *sbi_path = NULL;
+      std::string sbi_path;
       char sbi_ext[4] = { 's', 'b', 'i', 0 };
 
       if(file_ext.length() == 4 && file_ext[0] == '.')
@@ -851,10 +851,10 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          }
       }
 
-      sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true).c_str();
+      sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
 
-      if (path_is_valid(sbi_path))
-         LoadSBI(sbi_path);
+      if (path_is_valid(sbi_path.c_str()))
+         LoadSBI(sbi_path.c_str());
    }
 }
 
