@@ -23,7 +23,7 @@ endif
 
 ifneq ($(platform), osx)
 ifeq ($(findstring Haiku,$(shell uname -a)),)
-   PTHREAD_FLAGS = -pthread
+   PTHREAD_FLAGS = -lpthread
 endif
 endif
 
