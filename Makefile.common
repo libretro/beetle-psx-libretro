@@ -1,6 +1,7 @@
 SOURCES_CXX :=
 SOURCES_C   :=
 
+DEPS_DIR     := $(CORE_DIR)/deps
 LIBRETRO_DIR := $(CORE_DIR)/libretro-common
 LIBKIRK_DIR  := $(CORE_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
@@ -31,7 +32,7 @@ SOURCES_C += \
 endif
 
 
-INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include
+INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include -I$(DEPS_DIR)/zlib
 
 SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/amctrl.c \
@@ -40,6 +41,21 @@ SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/ec.c \
 				 $(LIBKIRK_DIR)/kirk_engine.c \
 				 $(LIBKIRK_DIR)/sha1.c
+
+SOURCES_C += $(DEPS_DIR)/zlib/adler32.c \
+				 $(DEPS_DIR)/zlib/compress.c \
+				 $(DEPS_DIR)/zlib/crc32.c \
+				 $(DEPS_DIR)/zlib/deflate.c \
+				 $(DEPS_DIR)/zlib/gzclose.c \
+				 $(DEPS_DIR)/zlib/gzlib.c \
+				 $(DEPS_DIR)/zlib/gzread.c \
+				 $(DEPS_DIR)/zlib/gzwrite.c \
+				 $(DEPS_DIR)/zlib/inffast.c \
+				 $(DEPS_DIR)/zlib/inflate.c \
+				 $(DEPS_DIR)/zlib/inftrees.c \
+				 $(DEPS_DIR)/zlib/trees.c \
+				 $(DEPS_DIR)/zlib/uncompr.c \
+				 $(DEPS_DIR)/zlib/zutil.c
 
 ifeq ($(HAVE_GRIFFIN),1)
 SOURCES_CXX += beetle_psx_griffin.cpp \

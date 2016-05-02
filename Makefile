@@ -2,7 +2,6 @@ DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_RUST=0
 HAVE_OPENGL=0
-HAVE_ZLIB=1
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
@@ -56,14 +55,10 @@ ifeq ($(HAVE_OPENGL),1)
 	endif
 endif
 
-ifeq ($(HAVE_ZLIB),1)
-	ZLIB_LIB := -lz
-endif
-
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
-   SHARED := -dynamiclib -lz
+   SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 ifeq ($(arch),ppc)
@@ -86,7 +81,7 @@ else ifneq (,$(findstring ios,$(platform)))
 
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
-   SHARED := -dynamiclib -lz
+   SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS)
 
@@ -117,7 +112,7 @@ endif
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
-   SHARED := -lcpp -lm -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
    #LDFLAGS += $(PTHREAD_FLAGS)
    #FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -DHAVE_MKDIR
@@ -212,7 +207,7 @@ else ifeq ($(platform), wii)
 else ifneq (,$(findstring armv,$(platform)))
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
-   SHARED := -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    CC = gcc
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
@@ -244,7 +239,7 @@ else ifeq ($(platform), gcw0)
    CXX = /opt/gcw0-toolchain/usr/bin/mipsel-linux-g++
    AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
    fpic := -fPIC
-   SHARED := -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
@@ -312,7 +307,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o $@ $^ $(LDFLAGS) $(GL_LIB) $(ZLIB_LIB)
+	$(CXX) -o $@ $^ $(LDFLAGS) $(GL_LIB)
 endif
 
 %.o: %.cpp
