@@ -63,7 +63,7 @@ endif
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
-   SHARED := -dynamiclib
+   SHARED := -dynamiclib -lz
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 ifeq ($(arch),ppc)
@@ -86,7 +86,7 @@ else ifneq (,$(findstring ios,$(platform)))
 
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
-   SHARED := -dynamiclib
+   SHARED := -dynamiclib -lz
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS)
 
@@ -117,7 +117,7 @@ endif
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
-   SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -lcpp -lm -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
    #LDFLAGS += $(PTHREAD_FLAGS)
    #FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -DHAVE_MKDIR
@@ -212,7 +212,7 @@ else ifeq ($(platform), wii)
 else ifneq (,$(findstring armv,$(platform)))
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
-   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
    CC = gcc
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
@@ -244,7 +244,7 @@ else ifeq ($(platform), gcw0)
    CXX = /opt/gcw0-toolchain/usr/bin/mipsel-linux-g++
    AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
    fpic := -fPIC
-   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   SHARED := -lz -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
