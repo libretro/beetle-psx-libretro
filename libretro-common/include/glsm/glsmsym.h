@@ -25,9 +25,9 @@
 
 #include <glsm/glsm.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <retro_common_api.h>
+
+RETRO_BEGIN_DECLS
 
 /* deprecated old FF-style GL symbols */
 #define glTexCoord2f                rglTexCoord2f
@@ -117,7 +117,11 @@ extern "C" {
 #define glDrawBuffers               rglDrawBuffers
 #define glGenVertexArrays           rglGenVertexArrays
 #define glBindVertexArray           rglBindVertexArray
+#define glBlendEquation             rglBlendEquation
+#define glBlendColor                rglBlendColor
 
+void rglBlendColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+void rglBlendEquation(GLenum mode);
 void rglGenVertexArrays(GLsizei n, GLuint *arrays);
 void rglReadBuffer(GLenum mode);
 void rglPixelStorei(GLenum pname, GLint param);
@@ -227,8 +231,6 @@ GLint rglGetAttribLocation(GLuint program, const GLchar *name);
 void rglDrawBuffers(GLsizei n, const GLenum *bufs);
 void rglBindVertexArray(GLuint array);
 
-#ifdef __cplusplus
-}
-#endif
+RETRO_END_DECLS
 
 #endif
