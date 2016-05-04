@@ -3,7 +3,7 @@ SOURCES_C   :=
 
 DEPS_DIR     := $(CORE_DIR)/deps
 LIBRETRO_DIR := $(CORE_DIR)/libretro-common
-LIBKIRK_DIR  := $(CORE_DIR)/libkirk
+LIBKIRK_DIR  := $(DEPS_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 
