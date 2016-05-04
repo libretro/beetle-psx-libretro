@@ -6,7 +6,7 @@
 #include "rsx.h"
 
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
-#define MEDNAFEN_CORE_NAME "Mednafen PSX (PBP test)"
+#define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #define MEDNAFEN_CORE_VERSION "v0.9.38.6"
 #define MEDNAFEN_CORE_EXTENSIONS "cue|toc|ccd|m3u|pbp"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
