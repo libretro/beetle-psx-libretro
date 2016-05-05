@@ -99,6 +99,7 @@ extern "C" {
 
   enum rsx_renderer_type rsx_intf_is_type(void);
 
+extern retro_environment_t environ_cb;
 
 #ifdef __cplusplus
 }
