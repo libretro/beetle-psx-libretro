@@ -848,6 +848,30 @@ void rglEnableVertexAttribArray(GLuint index)
    glEnableVertexAttribArray(index);
 }
 
+void rglVertexAttribIPointer(
+      GLuint index,
+      GLint size,
+      GLenum type,
+      GLsizei stride,
+      const GLvoid * pointer)
+{
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES3)
+   glVertexAttribIPointer(index, size, type, stride, pointer);
+#endif
+}
+
+void rglVertexAttribLPointer(
+      GLuint index,
+      GLint size,
+      GLenum type,
+      GLsizei stride,
+      const GLvoid * pointer)
+{
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES3)
+   glVertexAttribLPointer(index, size, type, stride, pointer);
+#endif
+}
+
 /*
  * Category: Generic vertex attributes
  *
