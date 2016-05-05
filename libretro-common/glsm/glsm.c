@@ -1484,6 +1484,11 @@ static bool glsm_state_ctx_init(void *data)
    return true;
 }
 
+GLuint glsm_get_current_framebuffer(void)
+{
+   return hw_render.get_current_framebuffer();
+}
+
 bool glsm_ctl(enum glsm_state_ctl state, void *data)
 {
    static bool imm_vbo_enable        = false;
