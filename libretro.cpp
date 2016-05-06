@@ -2884,15 +2884,17 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 
 static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 {
-   MDFNFILE *GameFile = file_open(name);
-
-   if(!GameFile)
-      goto error;
+   MDFNFILE *GameFile;
 
 #ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
 	 return(MDFNI_LoadCD(force_module, name));
 #endif
+
+   GameFile = file_open(name);
+
+   if(!GameFile)
+      goto error;
 
    if(MDFNGameInfo->Load(name, GameFile) <= 0)
       goto error;
