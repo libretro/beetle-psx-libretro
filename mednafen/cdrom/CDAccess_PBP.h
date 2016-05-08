@@ -22,9 +22,23 @@ class CDAccess_PBP : public CDAccess
    private:
       Stream* fp;
 
+      enum PBP_FILES{
+         PARAM_SFO,
+         ICON0_PNG,
+         ICON1_PMF,
+         PIC0_PNG,
+         PIC1_PNG,
+         SND0_AT3,
+         DATA_PSP,
+         DATA_PSAR,
+
+         PBP_NUM_FILES
+      };
+      uint32_t pbp_file_offsets[PBP_NUM_FILES];
+
       ////////////////
       uint8_t buff_raw[16][2352];
-      uint8_t buff_compressed[2352 * 16 + 100];
+      uint8_t buff_compressed[2352 * 16];
       uint32_t *index_table;
       uint32_t index_len;
       uint32_t current_block;
@@ -40,7 +54,10 @@ class CDAccess_PBP : public CDAccess
       int32_t disc_count;
       int32_t current_disc;
       uint32_t discs_start_offset[6];
-      uint32_t psar_offset, psisoimg_offset;
+      uint32_t psisoimg_offset;
+
+      uint16_t fixed_sectors;
+      bool is_official;    // TODO: find more consistent ways to check for used compression algorithm, compressed (and/or encrypted?) audio tracks and messed up sectors
 
       void ImageOpen(const char *path, bool image_memcache);
       int LoadSBI(const char* sbi_path);
@@ -54,7 +71,16 @@ class CDAccess_PBP : public CDAccess
       std::map<uint32, cpp11_array_doodad> SubQReplaceMap;
       void MakeSubPQ(int32 lba, uint8 *SubPWBuf);
 
-      int uncompress2(void *out, uint32_t *out_size, void *in, uint32_t in_size);
+      int decompress2(void *out, uint32_t *out_size, void *in, uint32_t in_size);
+
+      int decode_range(unsigned int *range, unsigned int *code, unsigned char **src);
+      int decode_bit(unsigned int *range, unsigned int *code, int *index, unsigned char **src, unsigned char *c);
+      int decode_word(unsigned char *ptr, int index, int *bit_flag, unsigned int *range, unsigned int *code, unsigned char **src);
+      int decode_number(unsigned char *ptr, int index, int *bit_flag, unsigned int *range, unsigned int *code, unsigned char **src);
+      int decompress(unsigned char *out, unsigned char *in, unsigned int size);
+
+      int decrypt_pgd(unsigned char* pgd_data, int pgd_size);
+      int fix_sector(uint8_t* sector, int32_t lba);
 };
 
 
