@@ -104,7 +104,7 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 {
    uint8 magic[4];
    char psar_sig[12];
-   std::string base_dir, file_base, file_ext, sbi_path;
+   std::string base_dir, file_base, file_ext;
    char sbi_ext[4] = { 's', 'b', 'i', 0 };
 
    MDFN_GetFilePathComponents(path, &base_dir, &file_base, &file_ext);
@@ -175,7 +175,7 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
       throw(MDFN_Error(0, _("Unexpected psar_sig: %s"), psar_sig));
 
-   // check for sbi file
+   // prepare sbi file path
    if(file_ext.length() == 4 && file_ext[0] == '.')
    {
       for(int i = 0; i < 3; i++)
@@ -184,11 +184,14 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
             sbi_ext[i] += 'A' - 'a';
       }
    }
-
    sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
 
-   if (path_is_valid(sbi_path.c_str()))
-      LoadSBI(sbi_path.c_str());
+   // for multi-disc images change the sbi file syntax to [filename]_[disc_number].sbi instead of [filename].sbi
+   if(PBP_DiscCount > 1)
+   {
+      // use a substitute char here, set the proper one in Read_TOC()
+      sbi_path.insert(sbi_path.length()-4, "_x");
+   }
 }
 
 void CDAccess_PBP::Cleanup(void)
@@ -596,7 +599,18 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       toc->tracks[toc->last_track + 1] = toc->tracks[100];
 
    free(iso_header);
-//log_cb(RETRO_LOG_DEBUG, "[PBP] tracks: first = %i, last = %i, disc_type = %i, total_sectors = %i, index_count = %i\n", toc->first_track, toc->last_track, toc->disc_type, total_sectors, i);
+
+   // sbi stuff
+   if(PBP_DiscCount > 1 && PBP_DiscCount < 10)
+      sbi_path[sbi_path.length()-5] = (CD_SelectedDisc+1) + '0';
+
+   if(!SubQReplaceMap.empty())
+      SubQReplaceMap.clear();
+
+   // Load SBI file, if present
+   log_cb(RETRO_LOG_DEBUG, "[PBP] checking for %s\n", sbi_path.c_str());
+   if (path_is_valid(sbi_path.c_str()))
+      LoadSBI(sbi_path.c_str());
 }
 
 int CDAccess_PBP::LoadSBI(const char* sbi_path)
