@@ -179,7 +179,7 @@ int PS_CPU::StateAction(StateMem *sm, int load, int data_only)
       SFARRAY32(CP0.Regs, 32),
 
       SFARRAY(ReadAbsorb, 0x20),
-      SFVARN(ReadAbsorb[0x2], "ReadAbsorbDummy"),
+      SFVARN(ReadAbsorb[0x20], "ReadAbsorbDummy"),
       SFVAR(ReadAbsorbWhich),
       SFVAR(ReadFudge),
 
@@ -438,9 +438,9 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const ui
    CP0.CAUSE &= 0x0000FF00;
    CP0.CAUSE |= code << 2;
 
-   // If EPC was adjusted -= 4 because we are after a branch instructon, set bit 31.
+   // If EPC was adjusted -= 4 because we are after a branch instruction, set bit 31.
    CP0.CAUSE |= AfterBranchInstr << 31;
-   CP0.CAUSE |= BranchTaken << 31;
+   CP0.CAUSE |= BranchTaken << 30;
    CP0.CAUSE |= (instr << 2) & (0x3 << 28); // CE
 
    RecalcIPCache();

@@ -336,6 +336,7 @@ int CDAccess_PBP::decompress2(void *out, uint32_t *out_size, void *in, uint32_t 
    }
    else
       ret = inflateReset(&z);
+
    if (ret != Z_OK)
       return ret;
 
@@ -344,8 +345,7 @@ int CDAccess_PBP::decompress2(void *out, uint32_t *out_size, void *in, uint32_t 
    z.next_out = (Bytef*)out;
    z.avail_out = *out_size;
 
-   ret = inflate(&z, Z_NO_FLUSH);
-   //inflateEnd(&z);
+   ret = inflate(&z, Z_FINISH);
 
    *out_size -= z.avail_out;
    return ret == 1 ? 0 : ret;
@@ -487,8 +487,8 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
 
    // number of tracks
    memcpy(&toc_entry, iso_header+read_offset, sizeof(toc_entry));
-   NumTracks = BCD_to_U8(toc_entry.index1[0]);
    read_offset += sizeof(toc_entry);
+   NumTracks = BCD_to_U8(toc_entry.index1[0]);
 
    // total length
    memcpy(&toc_entry, iso_header+read_offset, sizeof(toc_entry));
