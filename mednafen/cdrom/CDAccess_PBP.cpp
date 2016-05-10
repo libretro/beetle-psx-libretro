@@ -40,12 +40,16 @@
 #include "zlib.h"
 
 extern "C" {
-	#include "deps/libkirk/kirk_engine.h"
-	#include "deps/libkirk/amctrl.h"
-	#include "deps/libkirk/des.h"
+   #include "deps/libkirk/kirk_engine.h"
+   #include "deps/libkirk/amctrl.h"
+   #include "deps/libkirk/des.h"
 }
 
 extern retro_log_printf_t log_cb;
+
+// very hacky but currently the only way to update the disc start offset class variable from libretro.cpp
+extern int CD_SelectedDisc;
+int PBP_DiscCount;
 
 // Disk-image(rip) track/sector formats
 enum
@@ -78,22 +82,22 @@ static unsigned char dnas_key1A90[] = {0xED, 0xE2, 0x5D, 0x2D, 0xBB, 0xF8, 0x12,
 
 // Structure to describe the header of a PGD file.
 typedef struct {
-	unsigned char vkey[16];
+   unsigned char vkey[16];
 
-	int open_flag;
-	int key_index;
-	int drm_type;
-	int mac_type;
-	int cipher_type;
+   int open_flag;
+   int key_index;
+   int drm_type;
+   int mac_type;
+   int cipher_type;
 
-	int data_size;
-	int align_size;
-	int block_size;
-	int block_nr;
-	int data_offset;
-	int table_offset;
+   int data_size;
+   int align_size;
+   int block_size;
+   int block_nr;
+   int data_offset;
+   int table_offset;
 
-	unsigned char *buf;
+   unsigned char *buf;
 } PGD_HEADER;
 
 void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
@@ -151,20 +155,17 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
          memcpy(&discs_start_offset[i], iso_map+read_offset, sizeof(int32_t));
          if(discs_start_offset[i] == 0)
          {
-            disc_count = i;
+            PBP_DiscCount = i;
             break;
          }
          read_offset += sizeof(int32_t);
          log_cb(RETRO_LOG_DEBUG, "[PBP] DISC[%i] offset = %#x\n", i, pbp_file_offsets[DATA_PSAR]+discs_start_offset[i]);
       }
 
-      if(disc_count == 0)
+      if(PBP_DiscCount == 0)
          throw(MDFN_Error(0, _("Multidisk eboot has 0 images?: %s"), path));
 
-      // TODO: figure out a way to integrate multi-discs with retroarch (just a matter of storing the currently selected disc and seeking to the according offset on Read_TOC)
-
       // default to first disc on loading
-      current_disc = 0;
       psisoimg_offset += discs_start_offset[0];
       fp->seek(psisoimg_offset, SEEK_SET);
 
@@ -172,9 +173,7 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    }
 
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
-      throw(MDFN_Error(0, _("Unexpected psar_sig: %s"), path));
-
-   fp->seek(psisoimg_offset+0x400, SEEK_SET);
+      throw(MDFN_Error(0, _("Unexpected psar_sig: %s"), psar_sig));
 
    // check for sbi file
    if(file_ext.length() == 4 && file_ext[0] == '.')
@@ -562,6 +561,7 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
    read_offset = index_table_offset;
 
    // set class variables
+   fixed_sectors = 0;
    current_block = (uint32_t)-1;
    index_len = 0xAFC80 / sizeof(index_entry);   // disc map table has a fixed size of 0xAFC80 (22500 entries)?
 
@@ -596,7 +596,7 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       toc->tracks[toc->last_track + 1] = toc->tracks[100];
 
    free(iso_header);
-log_cb(RETRO_LOG_DEBUG, "[PBP] tracks: first = %i, last = %i, disc_type = %i, total_sectors = %i, index_count = %i\n", toc->first_track, toc->last_track, toc->disc_type, total_sectors, i);
+//log_cb(RETRO_LOG_DEBUG, "[PBP] tracks: first = %i, last = %i, disc_type = %i, total_sectors = %i, index_count = %i\n", toc->first_track, toc->last_track, toc->disc_type, total_sectors, i);
 }
 
 int CDAccess_PBP::LoadSBI(const char* sbi_path)
@@ -640,7 +640,11 @@ log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
 
 void CDAccess_PBP::Eject(bool eject_status)
 {
-
+   if(!eject_status && CD_SelectedDisc >= 0 && CD_SelectedDisc < PBP_DiscCount)
+   {
+      log_cb(RETRO_LOG_DEBUG, "[PBP] changing offset: old = %#x, new = %#x (%i of %i)\n", psisoimg_offset, pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc], CD_SelectedDisc, PBP_DiscCount);
+      psisoimg_offset = pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc];
+   }
 }
 
 

@@ -196,7 +196,10 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
 static std::vector<CDIF*> *cdifs = NULL;
 static std::vector<const char *> cdifs_scex_ids;
 static bool CD_TrayOpen;
-static int CD_SelectedDisc;     // -1 for no disc
+int CD_SelectedDisc;     // -1 for no disc
+
+static bool CD_IsPBP = false;
+extern int PBP_DiscCount;
 
 static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
@@ -1808,8 +1811,17 @@ static void CDInsertEject(void)
    else
       MDFN_DispMessage(_("Virtual CD Drive Tray Closed"));
 
-   CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-         (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
+   if(CD_IsPBP)
+   {
+      // only allow one pbp file to be loaded (at index 0)
+      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[0] : NULL,
+            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[0] : NULL);
+   }
+   else
+   {
+      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
+            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
+   }
 }
 
 static void CDEject(void)
@@ -1822,15 +1834,17 @@ static void CDSelect(void)
 {
  if(cdifs && CD_TrayOpen)
  {
-  CD_SelectedDisc = (CD_SelectedDisc + 1) % (cdifs->size() + 1);
+  int disc_count = (CD_IsPBP ? PBP_DiscCount : (int)cdifs->size());
 
-  if((unsigned)CD_SelectedDisc == cdifs->size())
+  CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
+
+  if(CD_SelectedDisc == disc_count)
    CD_SelectedDisc = -1;
 
   if(CD_SelectedDisc == -1)
    MDFN_DispMessage(_("Disc absence selected."));
   else
-   MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, (int)cdifs->size());
+   MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, disc_count);
  }
 }
 
@@ -2239,7 +2253,10 @@ static void check_system_specs(void)
 
 static unsigned disk_get_num_images(void)
 {
-   return cdifs ? cdifs->size() : 0;
+   if(cdifs)
+      return CD_IsPBP ? PBP_DiscCount : cdifs->size();
+   else
+      return 0;
 }
 
 static bool eject_state;
@@ -2312,10 +2329,7 @@ static void update_md5_checksum(CDIF *iface)
 // Untested ...
 static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
 {
-   if (index >= disk_get_num_images())
-      return false;
-
-   if (!eject_state)
+   if (index >= disk_get_num_images() || !eject_state || CD_IsPBP)
       return false;
 
    if (!info)
@@ -2351,6 +2365,9 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
 static bool disk_add_image_index(void)
 {
+   if(CD_IsPBP)
+      return false;
+
    cdifs->push_back(NULL);
    return true;
 }
@@ -2794,6 +2811,11 @@ MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
    {
     CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false, old_cdimagecache));
    }
+  }
+  else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
+  {
+     CD_IsPBP = true;
+     CDInterfaces.push_back(CDIF_Open(devicename, false, old_cdimagecache));
   }
   else
   {
