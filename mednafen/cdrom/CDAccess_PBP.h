@@ -52,7 +52,7 @@ class CDAccess_PBP : public CDAccess
       uint8_t disc_type;
 
       std::string sbi_path;
-      uint32_t discs_start_offset[6];
+      uint32_t discs_start_offset[5];
       uint32_t psisoimg_offset;
 
       uint16_t fixed_sectors;

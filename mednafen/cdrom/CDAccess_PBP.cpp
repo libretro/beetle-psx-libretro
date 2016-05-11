@@ -150,14 +150,13 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
          read_offset += 0x90;
       }
 
-      for(int i = 0; i < 6; i++)
+      for(int i = 0; i < 5; i++)
       {
          memcpy(&discs_start_offset[i], iso_map+read_offset, sizeof(int32_t));
          if(discs_start_offset[i] == 0)
-         {
-            PBP_DiscCount = i;
             break;
-         }
+
+         PBP_DiscCount = i+1;
          read_offset += sizeof(int32_t);
          log_cb(RETRO_LOG_DEBUG, "[PBP] DISC[%i] offset = %#x\n", i, pbp_file_offsets[DATA_PSAR]+discs_start_offset[i]);
       }
@@ -608,7 +607,6 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       SubQReplaceMap.clear();
 
    // Load SBI file, if present
-   log_cb(RETRO_LOG_DEBUG, "[PBP] checking for %s\n", sbi_path.c_str());
    if (path_is_valid(sbi_path.c_str()))
       LoadSBI(sbi_path.c_str());
 }
