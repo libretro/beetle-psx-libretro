@@ -364,8 +364,6 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
    MakeSubPQ(lba, buf + 2352);
    subq_deinterleave(buf + 2352, SimuQ);
 
-//log_cb(RETRO_LOG_DEBUG, "[PBP] lba = %d, sector_in_blk = %u, block = %d, current_block = %u\n", lba, sector_in_blk, block, current_block);
-
    if (block != current_block)
    {
       uint32_t start_byte = index_table[block];
@@ -389,7 +387,7 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
       fp->seek(start_byte, SEEK_SET);
       fp->read(is_compressed ? buff_compressed : buff_raw[0], size);
 
-//log_cb(RETRO_LOG_DEBUG, "block = %u, start_byte = %#x, index_table[%i] = %#x\n", block, start_byte, block, index_table[block]);
+//log_cb(RETRO_LOG_DEBUG, "lba = %d, block = %u, start_byte = %#x, index_table[%i] = %#x\n", lba, block, start_byte, block, index_table[block]);
 
       if (is_compressed)
       {
@@ -525,9 +523,9 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       Tracks[i].index[1] = (BCD_to_U8(toc_entry.index1[0])*60 + BCD_to_U8(toc_entry.index1[1])) * 75 + BCD_to_U8(toc_entry.index1[2]);
 
       // are these correct?
-      Tracks[i].LBA = ABA_to_LBA(Tracks[i].index[1]);
-
-      Tracks[i].pregap = Tracks[i].postgap = 0;
+      Tracks[i].LBA = Tracks[i].index[1];
+      Tracks[i].pregap = Tracks[i].index[0];
+      Tracks[i].postgap = 0;
       Tracks[i].pregap_dv = Tracks[i].index[1]-Tracks[i].index[0];
       if(Tracks[i].pregap_dv < 0)
          Tracks[i].pregap_dv = 0;
@@ -536,7 +534,7 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
          Tracks[i-1].sectors = Tracks[i].index[0] - Tracks[i-1].index[1];
 
       if(i == NumTracks)
-         Tracks[i].sectors = total_sectors - Tracks[i-1].index[1];
+         Tracks[i].sectors = total_sectors - Tracks[i-1].sectors;
 
       toc->tracks[i].control = Tracks[i].subq_control;
       toc->tracks[i].adr = ADR_CURPOS;
@@ -646,7 +644,7 @@ int CDAccess_PBP::LoadSBI(const char* sbi_path)
    }
 
    //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
-log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
+   log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 
@@ -654,11 +652,10 @@ void CDAccess_PBP::Eject(bool eject_status)
 {
    if(!eject_status && CD_SelectedDisc >= 0 && CD_SelectedDisc < PBP_DiscCount)
    {
-      log_cb(RETRO_LOG_DEBUG, "[PBP] changing offset: old = %#x, new = %#x (%i of %i)\n", psisoimg_offset, pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc], CD_SelectedDisc, PBP_DiscCount);
+      log_cb(RETRO_LOG_DEBUG, "[PBP] changing offset: old = %#x, new = %#x (%i of %i)\n", psisoimg_offset, pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc], CD_SelectedDisc+1, PBP_DiscCount);
       psisoimg_offset = pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc];
    }
 }
-
 
 int CDAccess_PBP::decrypt_pgd(unsigned char* pgd_data, int pgd_size)
 {
