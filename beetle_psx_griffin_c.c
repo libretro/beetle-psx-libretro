@@ -24,7 +24,6 @@
 #include "libretro-common/rthreads/rthreads.c"
 #include "scrc32.c"
 
-#include "rsx/rsx_intf.c"
 #include "rsx/rsx_lib_soft.c"
 
 #ifdef NEED_CD

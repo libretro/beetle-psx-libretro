@@ -42,3 +42,4 @@
 #include "mednafen/video/surface.cpp"
 
 #include "libretro.cpp"
+#include "rsx/rsx_intf.cpp"

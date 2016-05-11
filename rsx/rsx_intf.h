@@ -31,10 +31,6 @@ enum blending_modes
   BLEND_MODE_ADD_FOURTH = 3,
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
   void rsx_intf_set_blend_mode(enum blending_modes mode);
 
   void rsx_intf_set_environment(retro_environment_t cb);
@@ -100,10 +96,5 @@ extern "C" {
   enum rsx_renderer_type rsx_intf_is_type(void);
 
 extern retro_environment_t environ_cb;
-
-#ifdef __cplusplus
-}
-#endif
-
 
 #endif /*__RSX_H__ */

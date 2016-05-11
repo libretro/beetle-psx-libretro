@@ -179,10 +179,11 @@ SOURCES_CXX += \
 
 SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
-	$(CORE_DIR)/rsx/rsx_intf.c \
 	$(CORE_DIR)/rsx/rsx_lib_soft.c \
 	$(MEDNAFEN_DIR)/md5.c \
 	$(MEDNAFEN_DIR)/mednafen-endian.c
+
+SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
 
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
