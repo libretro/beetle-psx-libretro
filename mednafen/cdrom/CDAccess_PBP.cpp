@@ -451,6 +451,8 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
    } index_entry;
 
    int i;
+   int32_t sector_count = 0;
+
    uint32_t read_offset;
    uint32_t toc_offset = 0x400;
    uint32_t index_table_offset = 0x3C00;
@@ -532,9 +534,13 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
 
       if(i > 1)
          Tracks[i-1].sectors = Tracks[i].index[0] - Tracks[i-1].index[1];
+      sector_count += Tracks[i-1].sectors;
 
       if(i == NumTracks)
-         Tracks[i].sectors = total_sectors - Tracks[i-1].sectors;
+      {
+         Tracks[i].sectors = total_sectors - sector_count;
+         sector_count += Tracks[i].sectors;
+      }
 
       toc->tracks[i].control = Tracks[i].subq_control;
       toc->tracks[i].adr = ADR_CURPOS;
@@ -545,6 +551,9 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       if(BCD_to_U8(toc_entry.track) < i || BCD_to_U8(toc_entry.track) > i)
          throw(MDFN_Error(0, _("Tracks out of order")));   // can this happen?
    }
+
+   if(total_sectors != sector_count)
+      log_cb(RETRO_LOG_WARN, "[PBP] sector counts dont match (%i != %i)\n", total_sectors, sector_count);
 
    // HACK: disable audio tracks for official pbp files for now until more is known about them
    if(is_official)
