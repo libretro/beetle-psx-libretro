@@ -36,13 +36,6 @@ NEED_THREADING = 1
 CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx_libretro
 
-ifneq (,$(findstring gles,$(platform)))
-	GLES = 1
-	GL_LIB := -lGLESv2
-else
-	GL_LIB := -lGL
-endif
-
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
@@ -50,16 +43,23 @@ ifeq ($(platform), unix)
    ifneq ($(shell uname -p | grep -E '((i.|x)86|amd64)'),)
       IS_X86 = 1
    endif
-   LDFLAGS += $(PTHREAD_FLAGS) $(GL_LIB)
+   LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+
+ifeq ($(HAVE_OPENGL),1)
+	ifneq (,$(findstring gles,$(platform)))
+		GLES = 1
+		GL_LIB := -lGLESv2
+	else
+		GL_LIB := -lGL
+	endif
+endif
+
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB = -framework OpenGL
-endif
-   LDFLAGS += $(PTHREAD_FLAGS) $(GL_LIB)
+   LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
 ifeq ($(arch),ppc)
    ENDIANNESS_DEFINES := -DMSB_FIRST
@@ -72,6 +72,9 @@ ifeq ($(OSX_LT_MAVERICKS),"YES")
    fpic += -mmacosx-version-min=10.5
 endif
 
+ifeq ($(HAVE_OPENGL),1)
+	GL_LIB := -framework OpenGL
+endif
 
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
@@ -79,7 +82,7 @@ else ifneq (,$(findstring ios,$(platform)))
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   LDFLAGS += $(PTHREAD_FLAGS) $(GL_LIB)
+   LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS)
 
 ifeq ($(IOSSDK),)
@@ -98,23 +101,19 @@ ifeq ($(platform),ios9)
 else
 	IPHONEMINVER = -miphoneos-version-min=5.0
 endif
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -framework OpenGLES
-endif
-   LDFLAGS += $(IPHONEMINVER) $(GL_LIB)
+   LDFLAGS += $(IPHONEMINVER)
    FLAGS += $(IPHONEMINVER)
    CC += $(IPHONEMINVER)
    CXX += $(IPHONEMINVER)
+ifeq ($(HAVE_OPENGL),1)
+	GL_LIB := -framework OpenGLES
+endif
 
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -lGLESv2
-endif
    SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   LDFLAGS += $(PTHREAD_FLAGS)
-	LDFLAGS += $(GL_LIB)
+   #LDFLAGS += $(PTHREAD_FLAGS)
    #FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -DHAVE_MKDIR
    CC = qcc -Vgcc_ntoarmv7le
@@ -122,6 +121,9 @@ endif
    AR = QCC -Vgcc_ntoarmv7le
    FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 
+ifeq ($(HAVE_OPENGL),1)
+	GL_LIB := -lGLESv2
+endif
 
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
@@ -318,3 +320,4 @@ clean:
 	rm -f $(TARGET) $(OBJECTS)
 
 .PHONY: clean
+
