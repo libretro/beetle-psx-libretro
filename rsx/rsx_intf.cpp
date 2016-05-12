@@ -19,20 +19,6 @@ RSX_SOFTWARE
 #endif
 ;
 
-void rsx_intf_set_blend_mode(enum blending_modes mode)
-{
-   switch (rsx_type)
-   {
-      case RSX_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_blend_mode(mode);
-#endif
-         break;
-      default:
-         break;
-   }
-}
-
 void rsx_intf_set_environment(retro_environment_t cb)
 {
    switch (rsx_type)

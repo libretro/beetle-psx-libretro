@@ -538,8 +538,6 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          blend_mode = BLEND_MODE_ADD;
    }
 
-   rsx_intf_set_blend_mode(blend_mode);
-
    rsx_intf_push_triangle(vertices[0].x, vertices[0].y,
          vertices[1].x, vertices[1].y,
          vertices[2].x, vertices[2].y,

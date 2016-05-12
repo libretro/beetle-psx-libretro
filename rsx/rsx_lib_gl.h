@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-  void rsx_gl_set_blend_mode(enum blending_modes mode);
   void rsx_gl_set_environment(retro_environment_t);
   void rsx_gl_set_video_refresh(retro_video_refresh_t);
   void rsx_gl_get_system_av_info(struct retro_system_av_info *);

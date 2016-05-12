@@ -182,8 +182,6 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
        blend_mode = BLEND_MODE_ADD;
    }
 
-   rsx_intf_set_blend_mode(blend_mode);
-
    rsx_intf_push_triangle(x, y,
 		     x + w, y,
 		     x, y + h,
