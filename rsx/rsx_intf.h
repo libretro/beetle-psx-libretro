@@ -31,8 +31,6 @@ enum blending_modes
   BLEND_MODE_ADD_FOURTH = 3,
 };
 
-  void rsx_intf_set_blend_mode(enum blending_modes mode);
-
   void rsx_intf_set_environment(retro_environment_t cb);
   void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
   void rsx_intf_get_system_av_info(struct retro_system_av_info *info);

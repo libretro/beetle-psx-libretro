@@ -14,6 +14,8 @@
 static enum rsx_renderer_type rsx_type = 
 #ifdef HAVE_RUST
 RSX_EXTERNAL_RUST
+#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+RSX_OPENGL
 #else
 RSX_SOFTWARE
 #endif
