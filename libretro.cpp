@@ -16,7 +16,7 @@
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
-static retro_video_refresh_t video_cb;
+retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
 retro_environment_t environ_cb;
@@ -2254,9 +2254,8 @@ static void check_system_specs(void)
 static unsigned disk_get_num_images(void)
 {
    if(cdifs)
-      return CD_IsPBP ? PBP_DiscCount : cdifs->size();
-   else
-      return 0;
+       return CD_IsPBP ? PBP_DiscCount : cdifs->size();
+   return 0;
 }
 
 static bool eject_state;
@@ -2531,7 +2530,6 @@ static void check_variables(void)
    switch (rsx_intf_is_type())
    {
       case RSX_SOFTWARE:
-      case RSX_OPENGL:
          var.key = "beetle_psx_internal_resolution";
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2557,10 +2555,9 @@ static void check_variables(void)
          else
             psx_gpu_upscale_shift = 0;
          break;
+      case RSX_OPENGL:
       case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
          psx_gpu_upscale_shift = 0;
-#endif
          break;
    }
 
