@@ -3718,11 +3718,23 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
    }
 }
 
+#if defined(HAVE_OPENGL)
+#define FIRST_RENDERER "opengl"
+#define EXT_RENDERER "|software"
+#elif defined(HAVE_RUST)
+#define FIRST_RENDERER "opengl-rust"
+#define EXT_RENDERER "|software"
+#else
+#define FIRST_RENDERER "software"
+#define EXT_RENDERER ""
+#endif
+
 void retro_set_environment(retro_environment_t cb)
 {
    environ_cb = cb;
 
    static const struct retro_variable vars[] = {
+      { "beetle_psx_renderer", "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
