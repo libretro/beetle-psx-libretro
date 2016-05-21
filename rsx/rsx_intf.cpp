@@ -107,6 +107,11 @@ enum rsx_renderer_type rsx_intf_is_type(void)
    return rsx_type;
 }
 
+void rsx_intf_set_type(enum rsx_renderer_type type)
+{
+   rsx_type = type;
+}
+
 bool rsx_intf_open(bool is_pal)
 {
    switch (rsx_type)

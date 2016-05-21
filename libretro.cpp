@@ -2470,11 +2470,26 @@ static bool boot = true;
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
-static void check_variables(void)
+static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
 
    extern void PSXDitherApply(bool);
+
+   if (startup)
+   {
+      var.key = "beetle_psx_renderer";
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "software"))
+            rsx_intf_set_type(RSX_SOFTWARE);
+         else if (!strcmp(var.value, "opengl"))
+            rsx_intf_set_type(RSX_OPENGL);
+         else if (!strcmp(var.value, "opengl-rust"))
+            rsx_intf_set_type(RSX_EXTERNAL_RUST);
+      }
+   }
 
    var.key = "beetle_psx_cdimagecache";
 
@@ -3157,7 +3172,7 @@ bool retro_load_game(const struct retro_game_info *info)
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
 
-   check_variables();
+   check_variables(true);
    //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
 
@@ -3341,7 +3356,7 @@ void retro_run(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
-      check_variables();
+      check_variables(false);
       struct retro_system_av_info new_av_info;
       retro_get_system_av_info(&new_av_info);
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
