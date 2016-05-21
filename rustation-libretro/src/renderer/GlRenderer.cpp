@@ -52,6 +52,13 @@ GlRenderer::GlRenderer(DrawConfig* config)
             VERTEX_BUFFER_LEN,
             true);
 
+    DrawBuffer<CommandVertex>* opaque_command_buffer_3point = 
+       GlRenderer::build_buffer<CommandVertex>(
+             command_vertex,
+             command_3point_fragment,
+             VERTEX_BUFFER_LEN,
+             true);
+
     DrawBuffer<OutputVertex>* output_buffer = 
         GlRenderer::build_buffer<OutputVertex>(
             output_vertex,
@@ -109,6 +116,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     // let mut state = GlRenderer {
     this->command_buffer = opaque_command_buffer;
+    this->command_buffer_3point = opaque_command_buffer_3point;
     this->command_draw_mode = GL_TRIANGLES;
     this->semi_transparent_vertices.reserve((size_t) VERTEX_BUFFER_LEN);
     this->semi_transparency_mode =  SemiTransparencyMode::Average;
@@ -134,11 +142,21 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->upload_textures(top_left, dimensions, this->config->vram);
 }
 
+void GlRenderer::change_command_buffer(unsigned id)
+{
+   current_cmd_buffer = id;
+}
+
 GlRenderer::~GlRenderer()
 {
     if (this->command_buffer) {     
         delete this->command_buffer;
         this->command_buffer = NULL;
+    }
+
+    if (this->command_buffer_3point) {     
+        delete this->command_buffer_3point;
+        this->command_buffer_3point = NULL;
     }
 
     if (this->output_buffer)
@@ -191,7 +209,7 @@ static DrawBuffer<T>* GlRenderer::build_buffer( const char** vertex_shader,
 void GlRenderer::draw() 
 {
     if (this->command_buffer->empty() && this->semi_transparent_vertices.empty())
-        return; // Nothing to be done
+       return; // Nothing to be done
 
     int16_t x = this->config->draw_offset[0];
     int16_t y = this->config->draw_offset[1];
@@ -446,6 +464,23 @@ void GlRenderer::prepare_render()
 bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};
+
+    var.key = "beetle_psx_filtering";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+       static unsigned last_id = 0;
+       unsigned current_id     = 0;
+       if (!strcmp(var.value, "nearest"))
+          current_id = 0;
+       else if (!strcmp(var.value, "3point"))
+          current_id = 1;
+
+       if (current_id != last_id)
+       {
+          change_command_buffer(current_id);
+          last_id = current_id;
+       }
+    }
     
     var.key = "beetle_psx_internal_resolution";
     uint8_t upscaling = 1;

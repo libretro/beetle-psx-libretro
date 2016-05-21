@@ -90,6 +90,9 @@ class GlRenderer {
 public:
     /// Buffer used to handle PlayStation GPU draw commands
     DrawBuffer<CommandVertex>* command_buffer;
+    DrawBuffer<CommandVertex>* command_buffer_3point;
+
+    unsigned current_cmd_buffer;
     /// Primitive type for the vertices in the command buffers
     /// (TRIANGLES or LINES)
     GLenum command_draw_mode;
@@ -155,6 +158,7 @@ public:
     void prepare_render();
     bool refresh_variables();
     void finalize_frame();
+    void change_command_buffer(unsigned id);
     void maybe_force_draw(  size_t nvertices, GLenum draw_mode, 
                             bool semi_transparent, 
                             SemiTransparencyMode semi_transparency_mode);
@@ -179,7 +183,6 @@ public:
     void copy_rect( uint16_t source_top_left[2], 
                     uint16_t target_top_left[2],
                     uint16_t dimensions[2]);
-
 };
 
 std::vector<Attribute> attributes(CommandVertex* v);
