@@ -136,40 +136,40 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
 GlRenderer::~GlRenderer()
 {
-    if (this->command_buffer != nullptr) {     
+    if (this->command_buffer) {     
         delete this->command_buffer;
-        this->command_buffer = nullptr;
+        this->command_buffer = NULL;
     }
 
-    if (this->output_buffer != nullptr)
+    if (this->output_buffer)
     {
         delete this->output_buffer;
-        this->output_buffer = nullptr;
+        this->output_buffer = NULL;
     }      
        
-    if (this->image_load_buffer != nullptr) {   
+    if (this->image_load_buffer) {   
         delete this->image_load_buffer;
-        this->image_load_buffer = nullptr;
+        this->image_load_buffer = NULL;
     }
 
-    if (this->config != nullptr) {              
+    if (this->config) {              
         delete this->config;
-        this->config = nullptr;
+        this->config = NULL;
     }
 
-    if (this->fb_texture != nullptr) {          
+    if (this->fb_texture) {          
         delete this->fb_texture;
-        this->fb_texture = nullptr;
+        this->fb_texture = NULL;
     }
 
-    if (this->fb_out != nullptr) {              
+    if (this->fb_out) {              
         delete this->fb_out;
-        this->fb_out = nullptr;
+        this->fb_out = NULL;
     }
 
-    if (this->fb_out_depth != nullptr) {        
+    if (this->fb_out_depth) {        
         delete this->fb_out_depth;
-        this->fb_out_depth = nullptr;        
+        this->fb_out_depth = NULL;        
     }
 }
 
@@ -504,9 +504,9 @@ bool GlRenderer::refresh_variables()
 
         Texture* fb_out = new Texture(w, h, texture_storage);
 
-        if (this->fb_out != nullptr) { 
+        if (this->fb_out) { 
             delete this->fb_out;
-            this->fb_out = nullptr;
+            this->fb_out = NULL;
         }
         
         this->fb_out = fb_out;
@@ -520,9 +520,9 @@ bool GlRenderer::refresh_variables()
         this->upload_textures(top_left, dimensions, this->config->vram);
 
         
-        if (this->fb_out_depth != nullptr) { 
+        if (this->fb_out_depth) { 
             delete this->fb_out_depth;
-            this->fb_out_depth = nullptr;
+            this->fb_out_depth = NULL;
         }
 
         this->fb_out_depth = new Texture(w, h, GL_DEPTH_COMPONENT32F);

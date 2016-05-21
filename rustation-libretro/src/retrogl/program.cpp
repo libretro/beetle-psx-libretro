@@ -21,14 +21,14 @@ Program::Program(Shader* vertex_shader, Shader* fragment_shader)
     fragment_shader->detach_from(id);
 
     /* Program owns the two pointers, so we clean them up now */
-    if (vertex_shader != nullptr) {
+    if (vertex_shader) {
         delete vertex_shader;
-        vertex_shader = nullptr;
+        vertex_shader = NULL;
     }
 
-    if (fragment_shader != nullptr) {
+    if (fragment_shader) {
         delete fragment_shader;
-        fragment_shader = nullptr;
+        fragment_shader = NULL;
     }
 
     // Check if the program linking was successful

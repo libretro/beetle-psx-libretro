@@ -7,7 +7,7 @@
 
 #include <boolean.h>
 
-static RetroGl* static_renderer = nullptr; 
+static RetroGl* static_renderer = NULL; 
 
 static bool rsx_gl_is_pal = false;
 
@@ -25,12 +25,11 @@ void renderer_gl_free(void)
 RetroGl* renderer(void)
 {
   RetroGl* r = static_renderer;
-  if (r != nullptr) {
+  if (r)
     return r;
-  } else {
-    printf("Attempted to use a NULL renderer\n");
-    exit(EXIT_FAILURE);
-  }
+
+  printf("Attempted to use a NULL renderer\n");
+  exit(EXIT_FAILURE);
 }
 
 static void set_renderer(RetroGl* renderer)
@@ -40,7 +39,7 @@ static void set_renderer(RetroGl* renderer)
 
 static void drop_renderer()
 {
-  static_renderer = nullptr;  
+  static_renderer = NULL;  
 }
 
 void rsx_gl_init(void)
@@ -74,9 +73,8 @@ void rsx_gl_close(void)
 
 void rsx_gl_refresh_variables(void)
 {
-    if (static_renderer != nullptr) {
+   if (static_renderer)
       static_renderer->refresh_variables();
-    }
 }
 
 void rsx_gl_prepare_frame(void)

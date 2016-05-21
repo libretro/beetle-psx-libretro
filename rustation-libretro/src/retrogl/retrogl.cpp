@@ -15,8 +15,8 @@ bool RetroGl::isCreated = false;
 
 RetroGl* RetroGl::getInstance(VideoClock video_clock)
 {
-    static RetroGl *single = nullptr;
-    if (single != nullptr && isCreated)
+    static RetroGl *single = NULL;
+    if (single && isCreated)
     {
         return single;
     } else {
@@ -75,16 +75,16 @@ RetroGl::RetroGl(VideoClock video_clock)
     // No context until `context_reset` is called
     this->state = GlState::Invalid;
     this->state_data.c = config;
-    this->state_data.r = nullptr;
+    this->state_data.r = NULL;
 
     this->video_clock = video_clock;
 
 }
 
 RetroGl::~RetroGl() {
-    if (this->state_data.r != nullptr) {
+    if (this->state_data.r) {
         delete this->state_data.r;
-        this->state_data.r = nullptr;
+        this->state_data.r = NULL;
     }
 }
 
@@ -119,9 +119,9 @@ void RetroGl::context_reset() {
         break;
     }
 
-    if (this->state_data.r != nullptr) {
+    if (this->state_data.r) {
         delete this->state_data.r;
-        this->state_data.r = nullptr;
+        this->state_data.r = NULL;
     }
     
     /* GlRenderer will own this copy and delete it in its dtor */
@@ -165,7 +165,7 @@ void RetroGl::context_destroy()
 
 void RetroGl::prepare_render() 
 {
-    GlRenderer* renderer = nullptr;
+    GlRenderer* renderer = NULL;
     switch (this->state)
     {
     case GlState::Valid:
@@ -181,7 +181,7 @@ void RetroGl::prepare_render()
 
 void RetroGl::finalize_frame()
 {
-    GlRenderer* renderer = nullptr;
+    GlRenderer* renderer = NULL;
     switch (this->state)
     {
     case GlState::Valid:
@@ -197,7 +197,7 @@ void RetroGl::finalize_frame()
 
 void RetroGl::refresh_variables()
 {
-    GlRenderer* renderer = nullptr;
+    GlRenderer* renderer = NULL;
     switch (this->state)
     {
     case GlState::Valid:

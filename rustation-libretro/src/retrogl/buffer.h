@@ -61,14 +61,14 @@ public:
 
     ~DrawBuffer()
     {
-        if (this->vao != nullptr) {
+        if (this->vao) {
             delete this->vao;
-            this->vao = nullptr;
+            this->vao = NULL;
         }
 
-        if (this->program != nullptr) {
+        if (this->program) {
             delete program;
-            this->program = nullptr;
+            this->program = NULL;
         }
 
         this->drop();
