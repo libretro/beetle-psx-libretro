@@ -3735,7 +3735,6 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
       { "beetle_psx_renderer", "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
-      { "beetle_psx_filtering", "Filtering; nearest|3point" },
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
