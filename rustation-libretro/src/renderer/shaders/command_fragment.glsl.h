@@ -64,25 +64,17 @@ static const char *command_fragment = {
 "          -3,  1, -4,  0,"
 "           3, -1,  2, -2);" "\n"
 
-"void main() {\n"
-
-"  vec4 color;\n"
-
-"  if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE) {\n"
-"    color = vec4(frag_shading_color, 0.);\n"
-"  } else {\n"
-    // Look up texture
-
+"vec4 sample_texel(vec2 coords) {"
     // Number of texel per VRAM 16bit "pixel" for the current depth
 "    uint pix_per_hw = 1U << frag_depth_shift;\n"
 
     // 8 and 4bpp textures contain several texels per 16bit VRAM
     // "pixel"\n"
-"    float tex_x_float = frag_texture_coord.x / float(pix_per_hw);\n"
+"    float tex_x_float = coords.x / float(pix_per_hw);\n"
 
     // Texture pages are limited to 256x256 pixels\n"
 "    int tex_x = int(tex_x_float) & 0xff;\n"
-"    int tex_y = int(frag_texture_coord.y) & 0xff;\n"
+"    int tex_y = int(coords.y) & 0xff;\n"
 
 "    tex_x += int(frag_texture_page.x);\n"
 "    tex_y += int(frag_texture_page.y);\n"
@@ -121,6 +113,20 @@ static const char *command_fragment = {
       // Look up the real color for the texel in the CLUT\n"
 "      texel = vram_get_pixel(clut_x, clut_y);\n"
 "    }\n"
+"return texel;\n"
+"}\n"
+
+
+"void main() {\n"
+
+"  vec4 color;\n"
+
+"  if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE) {\n"
+"    color = vec4(frag_shading_color, 0.);\n"
+"  } else {\n"
+    // Look up texture
+    //
+    "vec4 texel = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
 
     // texel color 0x0000 is always fully transparent (even for opaque
     // draw commands)
