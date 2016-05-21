@@ -1,10 +1,12 @@
-static const char *command_vertex = {
+static const char *command_fragment = {
 "#version 330 core\n"
 
 "uniform sampler2D fb_texture;\n"
 
 // Scaling to apply to the dither pattern
 "uniform uint dither_scaling;\n"
+// 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
+"uniform uint draw_semi_transparent;\n"
 
 "in vec3 frag_shading_color;\n"
 // Texture page: base offset for texture lookup.
@@ -19,6 +21,8 @@ static const char *command_vertex = {
 "flat in uint frag_depth_shift;\n"
 // 0: No dithering, 1: dithering enabled
 "flat in uint frag_dither;\n"
+// 0: Opaque primitive, 1: semi-transparent primitive
+"flat in uint frag_semi_transparent;\n"
 
 "out vec4 frag_color;\n"
 
@@ -140,27 +144,39 @@ static const char *command_vertex = {
 
     // texel color 0x0000 is always fully transparent (even for opaque
     // draw commands)
-    //    if (is_transparent(texel_00)) {
+        "if (is_transparent(texel_00)) {"
       // Fully transparent texel, discard
-      //discard;
-    //}
+      "discard;\n"
+    "}\n"
 
     // 3-point filtering
     "vec4 texel_10 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 0));\n"
     "vec4 texel_01 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 1));\n"
 
-    //if (is_transparent(texel_10)) {
-      //texel_10 = texel_00;
-      //}
+    "if (is_transparent(texel_10)) {\n"
+      "texel_10 = texel_00;\n"
+      "}\n"
 
-    //if (is_transparent(texel_01)) {
-      //texel_01 = texel_00;
-      //}
+    "if (is_transparent(texel_01)) {\n"
+      "texel_01 = texel_00;\n"
+      "}\n"
 
     "vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);\n"
 
     // vec4 texel = (texel_00 * (1 - u_frac) + texel_10 * u_frac) * (1 - v_frac)
     //   + (texel_01 * (1 - u_frac) + texel_11 * u_frac) * v_frac;
+    //
+    // Bit 15 (stored in the alpha) is used as a flag for
+    // semi-transparency, but only if this is a semi-transparent draw
+    // command
+"    uint transparency_flag = uint(floor(texel.a + 0.5));\n"
+
+"    uint is_texel_semi_transparent = transparency_flag & frag_semi_transparent;\n"
+
+"    if (is_texel_semi_transparent != draw_semi_transparent) {\n"
+      // We're not drawing those texels in this pass, discard\n"
+"      discard;\n"
+"    }\n"
 
     "if (frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE) {\n"
       "color = texel;\n"
