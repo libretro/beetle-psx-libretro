@@ -44,16 +44,6 @@ static void drop_renderer()
 
 void rsx_gl_init(void)
 {
-#if 0
-   static mut first_init: bool = true;
-
-   unsafe {
-      if first_init {
-         retrolog::init();
-         first_init = false;
-      }
-   }
-#endif
 }
 
 bool rsx_gl_open(bool is_pal)
