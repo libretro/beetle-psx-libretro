@@ -1263,6 +1263,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
       bool bpp24, const uint16_t *src, uint32_t *dest,
       const int32 dx_start, const int32 dx_end, int32 fb_x)
 {
+
   int32_t fb_mask = ((0x7FF << upscale_shift) + upscale() - 1);
 
    if(bpp24)	// 24bpp
@@ -1299,7 +1300,6 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
          fb_x = (fb_x + 2) & fb_mask;
       }
    }
-
 }
 
 int32_t PS_GPU::Update(const int32_t sys_timestamp)
@@ -1612,17 +1612,18 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                      memset(dest, 0, udx_start * sizeof(int32));
 
-                     //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                     ReorderRGB_Var(
-                           RED_SHIFT,
-                           GREEN_SHIFT,
-                           BLUE_SHIFT,
-                           DisplayMode & DISP_RGB24,
-                           src,
-                           dest,
-                           udx_start,
-                           udx_end,
-                           ufb_x);
+                     if (rsx_intf_is_type() == RSX_SOFTWARE)
+                        //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
+                        ReorderRGB_Var(
+                              RED_SHIFT,
+                              GREEN_SHIFT,
+                              BLUE_SHIFT,
+                              DisplayMode & DISP_RGB24,
+                              src,
+                              dest,
+                              udx_start,
+                              udx_end,
+                              ufb_x);
 
                      //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
                      //
