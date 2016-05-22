@@ -50,7 +50,7 @@ bool rsx_gl_open(bool is_pal)
 {
    rsx_gl_is_pal = is_pal;
 
-   VideoClock clock = is_pal ? VideoClock::Pal : VideoClock::Ntsc;
+   VideoClock clock = is_pal ? Pal : Ntsc;
    set_renderer( RetroGl::getInstance(clock) );
 
    return true;
@@ -166,28 +166,28 @@ void rsx_gl_push_triangle(
       bool dither,
       int blend_mode)
 {
-   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode::Add;
+   SemiTransparencyMode semi_transparency_mode = Add;
    bool semi_transparent = false;
    switch (blend_mode) {
    case -1:
       semi_transparent = false;
-      semi_transparency_mode = SemiTransparencyMode::Add;
+      semi_transparency_mode = Add;
       break;
    case 0:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::Average;
+      semi_transparency_mode = Average;
       break;
    case 1:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::Add;
+      semi_transparency_mode = Add;
       break;
    case 2:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::SubtractSource;
+      semi_transparency_mode = SubtractSource;
       break;
    case 3:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::AddQuarterSource;
+      semi_transparency_mode = AddQuarterSource;
       break;
    default:
       exit(EXIT_FAILURE);
@@ -266,28 +266,28 @@ void rsx_gl_push_line(int16_t p0x,
       bool dither,
       int blend_mode)
 {
-   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode::Add;
+   SemiTransparencyMode semi_transparency_mode = Add;
    bool semi_transparent = false;
    switch (blend_mode) {
    case -1:
       semi_transparent = false;
-      semi_transparency_mode = SemiTransparencyMode::Add;
+      semi_transparency_mode = Add;
       break;
    case 0:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::Average;
+      semi_transparency_mode = Average;
       break;
    case 1:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::Add;
+      semi_transparency_mode = Add;
       break;
    case 2:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::SubtractSource;
+      semi_transparency_mode = SubtractSource;
       break;
    case 3:
       semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode::AddQuarterSource;
+      semi_transparency_mode = AddQuarterSource;
       break;
    default:
       exit(EXIT_FAILURE);
