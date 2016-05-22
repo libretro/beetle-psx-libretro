@@ -78,13 +78,13 @@ struct ImageLoadVertex {
 
 enum SemiTransparencyMode {
     /// Source / 2 + destination / 2
-    Average = 0,
+    SemiTransparencyMode_Average = 0,
     /// Source + destination
-    Add = 1,
+    SemiTransparencyMode_Add = 1,
     /// Destination - source
-    SubtractSource = 2,
+    SemiTransparencyMode_SubtractSource = 2,
     /// Destination + source / 4
-    AddQuarterSource = 3,
+    SemiTransparencyMode_AddQuarterSource = 3,
 };
 
 class GlRenderer {

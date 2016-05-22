@@ -8,17 +8,17 @@
 #include "../renderer/GlRenderer.h"
 
 enum VideoClock {
-    Ntsc,
-    Pal
+    VideoClock_Ntsc,
+    VideoClock_Pal
 };
 
 /// State machine dealing with OpenGL context
 /// destruction/reconstruction
 enum GlState {
     // OpenGL context is ready
-    Valid,
+    GlState_Valid,
     /// OpenGL context has been destroyed (or is not created yet)
-    Invalid
+    GlState_Invalid
 };
 
 struct GlStateData {

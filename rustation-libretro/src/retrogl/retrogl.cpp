@@ -28,7 +28,7 @@ RetroGl* RetroGl::getInstance(VideoClock video_clock)
 
 RetroGl* RetroGl::getInstance()
 {
-    return RetroGl::getInstance(Ntsc);
+    return RetroGl::getInstance(VideoClocl_Ntsc);
 }
 
 RetroGl::RetroGl(VideoClock video_clock)
@@ -111,10 +111,10 @@ void RetroGl::context_reset() {
 
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         config = *this->state_data.r->draw_config();
         break;
-    case Invalid:
+    case GlState_Invalid:
         config = this->state_data.c;
         break;
     }
@@ -128,16 +128,16 @@ void RetroGl::context_reset() {
     DrawConfig* copy_of_config  = new DrawConfig;
     memcpy(copy_of_config, &config, sizeof(config));
     this->state_data.r = new GlRenderer(copy_of_config);
-    this->state = Valid;
+    this->state = GlState_Valid;
 }
 
 GlRenderer* RetroGl::gl_renderer() 
 {
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         return this->state_data.r;
-    case Invalid:
+    case GlState_Invalid:
         puts("Attempted to get GL state without GL context!\n");
         exit(EXIT_FAILURE);
     }
@@ -151,10 +151,10 @@ void RetroGl::context_destroy()
 
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         config = *this->state_data.r->draw_config();
         break;
-    case Invalid:
+    case GlState_Invalid:
         // Looks like we didn't have an OpenGL context anyway...
         return;
     }
@@ -168,10 +168,10 @@ void RetroGl::prepare_render()
     GlRenderer* renderer = NULL;
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         renderer = this->state_data.r;
         break;
-    case Invalid:
+    case GlState_Invalid:
         puts("Attempted to render a frame without GL context\n");
         exit(EXIT_FAILURE);
     }
@@ -184,10 +184,10 @@ void RetroGl::finalize_frame()
     GlRenderer* renderer = NULL;
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         renderer = this->state_data.r;
         break;
-    case Invalid:
+    case GlState_Invalid:
         puts("Attempted to render a frame without GL context\n");
         exit(EXIT_FAILURE);
     }
@@ -200,10 +200,10 @@ void RetroGl::refresh_variables()
     GlRenderer* renderer = NULL;
     switch (this->state)
     {
-    case Valid:
+    case GlState_Valid:
         renderer = this->state_data.r;
         break;
-    case Invalid:
+    case GlState_Invalid:
         // Nothing to be done if we don't have a GL context
         return;
     }
@@ -256,9 +256,9 @@ bool RetroGl::context_framebuffer_lock(void *data)
 {
     /* If the state is invalid, lock the framebuffer (return true) */
     switch (this->state) {
-    case Valid:
+    case GlState_Valid:
         return false;
-    case Invalid:
+    case GlState_Invalid:
         return true;
     }
 }
@@ -302,10 +302,10 @@ struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
     // which would make this code invalid but it wouldn't make a lot of
     // sense for a game to do that.
     switch (std) {
-    case Ntsc:
+    case VideoClock_Ntsc:
         info.timing.fps = 59.81;
         break;
-    case Pal:
+    case VideoClock_Pal:
         info.timing.fps = 49.76;
         break;
     }    
