@@ -117,6 +117,23 @@ static const char *command_fragment = {
   "return texel;\n"
 "}\n"
 
+    // 3-point filtering
+"vec4 get_texel(vec4 texel_00, float u_frac, float v_frac) {"
+"vec4 texel_10 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 0));\n"
+"vec4 texel_01 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 1));\n"
+
+"if (is_transparent(texel_10)) {\n"
+"texel_10 = texel_00;\n"
+"}\n"
+
+"if (is_transparent(texel_01)) {\n"
+"texel_01 = texel_00;\n"
+"}\n"
+
+"vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);\n"
+"return texel;\n"
+"}\n"
+
 "void main() {\n"
 
   "vec4 color;\n"
@@ -149,19 +166,7 @@ static const char *command_fragment = {
       "discard;\n"
     "}\n"
 
-    // 3-point filtering
-    "vec4 texel_10 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 0));\n"
-    "vec4 texel_01 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 1));\n"
-
-    "if (is_transparent(texel_10)) {\n"
-      "texel_10 = texel_00;\n"
-      "}\n"
-
-    "if (is_transparent(texel_01)) {\n"
-      "texel_01 = texel_00;\n"
-      "}\n"
-
-    "vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);\n"
+    "vec4 texel = get_texel(texel_00, u_frac, v_frac);\n"
 
     // Bit 15 (stored in the alpha) is used as a flag for
     // semi-transparency, but only if this is a semi-transparent draw
