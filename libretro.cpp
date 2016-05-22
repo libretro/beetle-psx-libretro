@@ -29,6 +29,7 @@ static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool allow_frame_duping = false;
 static bool failed_init = false;
+static unsigned image_offset = 0;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2752,6 +2753,30 @@ static void check_variables(bool startup)
    else
      display_internal_framerate = false;
 
+   var.key = "beetle_psx_image_offset";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         image_offset = 0;
+      else if (strcmp(var.value, "1 px") == 0)
+         image_offset = -1;
+      else if (strcmp(var.value, "-1 px") == 0)
+         image_offset = 1;
+      else if (strcmp(var.value, "2 px") == 0)
+         image_offset = -2;
+      else if (strcmp(var.value, "-2 px") == 0)
+         image_offset = 2;
+      else if (strcmp(var.value, "3 px") == 0)
+         image_offset = -3;
+      else if (strcmp(var.value, "-3 px") == 0)
+         image_offset = 3;
+      else if (strcmp(var.value, "4 px") == 0)
+         image_offset = -4;
+      else if (strcmp(var.value, "-4 px") == 0)
+         image_offset = 4;
+   }
+
 }
 
 #ifdef NEED_CD
@@ -3560,7 +3585,7 @@ void retro_run(void)
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
 
       const uint32_t *pix = surf->pixels;
-      unsigned pix_offset = 0;
+      unsigned pix_offset = 0 + image_offset;
 
       if (!overscan)
       {
@@ -3757,6 +3782,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
       { "beetle_psx_frame_duping_enable", "Frame duping (speedup); disabled|enabled" },
       { "beetle_psx_display_internal_framerate", "Display internal FPS; disabled|enabled" },
+      { "beetle_psx_image_offset", "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {
