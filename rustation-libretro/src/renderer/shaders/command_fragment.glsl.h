@@ -135,10 +135,6 @@ static const char *command_fragment = {
 "return texel;\n"
 "}\n"
 
-"vec4 get_texel(vec4 texel_00, float u_frac, float v_frac) {"
-"return texel_00;\n"
-"}\n"
-
 "void main() {\n"
 
 "  vec4 color;\n"
@@ -153,8 +149,8 @@ static const char *command_fragment = {
     "vec4 texel_00;\n"
 
     "if (texture_flt == FILTER_MODE_3POINT) {\n"
-      "float u_frac = fract(frag_texture_coord.x);\n"
-      "float v_frac = fract(frag_texture_coord.y);\n"
+      "u_frac = fract(frag_texture_coord.x);\n"
+      "v_frac = fract(frag_texture_coord.y);\n"
       "if (u_frac + v_frac < 1.0) {\n"
       // Use bottom-left
       "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
@@ -180,8 +176,7 @@ static const char *command_fragment = {
     "if (texture_flt == FILTER_MODE_3POINT) {\n"
       "texel = get_texel_3point(texel_00, u_frac, v_frac);\n"
     "} else {\n"
-      "texel = get_texel(texel_00, u_frac, v_frac);\n"
-      "texel += vec4(1.0, 0.0, 1.0, 1.0);\n"
+      "texel = texel_00;\n"
     "}\n"
 
     // Bit 15 (stored in the alpha) is used as a flag for

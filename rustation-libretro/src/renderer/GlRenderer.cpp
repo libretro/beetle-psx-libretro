@@ -84,7 +84,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
     opaque_command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
-    opaque_command_buffer->program->uniform1ui("texture_flt", 1);
+    opaque_command_buffer->program->uniform1ui("texture_flt", 0);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -201,7 +201,7 @@ void GlRenderer::draw()
 
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
-    this->command_buffer->program->uniform1ui("texture_flt", (GLuint)1);
+    this->command_buffer->program->uniform1ui("texture_flt", (GLuint)0);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
@@ -532,7 +532,7 @@ bool GlRenderer::refresh_variables()
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     this->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
-    this->command_buffer->program->uniform1ui("texture_flt", (GLuint)1);
+    this->command_buffer->program->uniform1ui("texture_flt", (GLuint)0);
 
     this->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
