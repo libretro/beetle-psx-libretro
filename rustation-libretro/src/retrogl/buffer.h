@@ -7,6 +7,7 @@
 
 #include <glsm/glsmsym.h>
 
+#include <cstdio>
 #include <stdlib.h> // size_t
 #include <stdint.h>
 
