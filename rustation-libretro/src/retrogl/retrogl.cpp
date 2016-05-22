@@ -28,7 +28,7 @@ RetroGl* RetroGl::getInstance(VideoClock video_clock)
 
 RetroGl* RetroGl::getInstance()
 {
-    return RetroGl::getInstance(VideoClocl_Ntsc);
+    return RetroGl::getInstance(VideoClock_Ntsc);
 }
 
 RetroGl::RetroGl(VideoClock video_clock)
@@ -73,7 +73,7 @@ RetroGl::RetroGl(VideoClock video_clock)
     }
 
     // No context until `context_reset` is called
-    this->state = Invalid;
+    this->state = GlState_Invalid;
     this->state_data.c = config;
     this->state_data.r = NULL;
 
@@ -159,7 +159,7 @@ void RetroGl::context_destroy()
         return;
     }
 
-    this->state = Invalid;
+    this->state = GlState_Invalid;
     this->state_data.c = config;
 }
 
