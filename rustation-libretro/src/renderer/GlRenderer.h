@@ -123,6 +123,8 @@ public:
     /// since we draw semi-transparent primitives out-of-order.
     int16_t primitive_ordering;
 
+    uint8_t filter_type;
+
     /* pub fn from_config(config: DrawConfig) -> Result<GlRenderer, Error> */
     GlRenderer(DrawConfig* config);
 

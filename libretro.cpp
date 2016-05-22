@@ -3740,6 +3740,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+      { "beetle_psx_filter", "Texture filtering; nearest|3point N64" },
       { "beetle_psx_internal_color_depth", "Internal color depth; dithered 16bpp (native)|32bpp" },
       { "beetle_psx_scale_dither", "Scale dithering pattern with internal resolution; enabled|disabled" },
       { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
