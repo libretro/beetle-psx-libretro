@@ -8,6 +8,8 @@ static const char *command_fragment = {
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 "uniform uint draw_semi_transparent;\n"
 
+"uniform uint texture_flt;\n"
+
 "in vec3 frag_shading_color;\n"
 // Texture page: base offset for texture lookup.
 "flat in uvec2 frag_texture_page;\n"
@@ -29,6 +31,9 @@ static const char *command_fragment = {
 "const uint BLEND_MODE_NO_TEXTURE    = 0U;\n"
 "const uint BLEND_MODE_RAW_TEXTURE   = 1U;\n"
 "const uint BLEND_MODE_TEXTURE_BLEND = 2U;\n"
+
+"const uint FILTER_MODE_NEAREST      = 0U;\n"
+"const uint FILTER_MODE_3POINT       = 1U;\n"
 
 // Read a pixel in VRAM
 "vec4 vram_get_pixel(int x, int y) {"
@@ -116,6 +121,20 @@ static const char *command_fragment = {
 "return texel;\n"
 "}\n"
 
+    // 3-point filtering
+"vec4 get_texel_3point(vec4 texel_00, float u_frac, float v_frac) {"
+"vec4 texel_10 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 0));\n"
+"vec4 texel_01 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 1));\n"
+"if (is_transparent(texel_10)) {\n"
+"texel_10 = texel_00;\n"
+"}\n"
+"if (is_transparent(texel_01)) {\n"
+"texel_01 = texel_00;\n"
+"}\n"
+"vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);\n"
+"return texel;\n"
+"}\n"
+
 "vec4 get_texel(vec4 texel_00, float u_frac, float v_frac) {"
 "return texel_00;\n"
 "}\n"
@@ -132,8 +151,23 @@ static const char *command_fragment = {
     "float u_frac = 0.0;\n"
     "float v_frac = 0.0;\n"
     "vec4 texel_00;\n"
-    
-    "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
+
+    "if (texture_flt == FILTER_MODE_3POINT) {\n"
+      "float u_frac = fract(frag_texture_coord.x);\n"
+      "float v_frac = fract(frag_texture_coord.y);\n"
+      "if (u_frac + v_frac < 1.0) {\n"
+      // Use bottom-left
+      "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
+      "} else {\n"
+      // Use top-right
+      "texel_00 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 1));\n"
+      "float tmp = 1 - v_frac;\n"
+      "v_frac = 1 - u_frac;\n"
+      "u_frac = tmp;\n"
+    "}\n"
+    "} else {\n"
+      "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
+    "}\n"
 
     // texel color 0x0000 is always fully transparent (even for opaque
     // draw commands)
@@ -142,7 +176,13 @@ static const char *command_fragment = {
 "      discard;\n"
 "    }\n"
 
-    "vec4 texel = get_texel(texel_00, u_frac, v_frac);\n"
+    "vec4 texel;\n"
+    "if (texture_flt == FILTER_MODE_3POINT) {\n"
+      "texel = get_texel_3point(texel_00, u_frac, v_frac);\n"
+    "} else {\n"
+      "texel = get_texel(texel_00, u_frac, v_frac);\n"
+      "texel += vec4(1.0, 0.0, 1.0, 1.0);\n"
+    "}\n"
 
     // Bit 15 (stored in the alpha) is used as a flag for
     // semi-transparency, but only if this is a semi-transparent draw

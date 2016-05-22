@@ -204,7 +204,7 @@ void rsx_gl_push_triangle(
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
-          semi_transparent
+          semi_transparent,
       },
       {
           {p1x, p1y}, /* position */
@@ -215,7 +215,7 @@ void rsx_gl_push_triangle(
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
-          semi_transparent
+          semi_transparent,
       },
       {
           {p2x, p2y}, /* position */
@@ -226,7 +226,7 @@ void rsx_gl_push_triangle(
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
-          semi_transparent
+          semi_transparent,
       }
    };
 
@@ -303,7 +303,7 @@ void rsx_gl_push_line(int16_t p0x,
           0,      /* texture_blend_mode */
           0,      /* depth_shift */
           (uint8_t) dither,
-          semi_transparent
+          semi_transparent,
       },
       {
           {p1x, p1y}, /* position */
@@ -314,7 +314,7 @@ void rsx_gl_push_line(int16_t p0x,
           0,      /* texture_blend_mode */
           0,      /* depth_shift */
           (uint8_t) dither,
-          semi_transparent
+          semi_transparent,
       }
    };
 
