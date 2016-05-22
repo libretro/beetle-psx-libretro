@@ -36,6 +36,10 @@ NEED_THREADING = 1
 CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx_libretro
 
+ifeq ($(HAVE_OPENGL),1)
+TARGET_NAME := mednafen_psx_hw_libretro
+endif
+
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
