@@ -116,7 +116,7 @@ static const char *command_fragment = {
 "return texel;\n"
 "}\n"
 
-"vec4 get_texel(vec4 texel_00) {"
+"vec4 get_texel(vec4 texel_00, float u_frac, float v_frac) {"
 "return texel_00;\n"
 "}\n"
 
@@ -129,6 +129,8 @@ static const char *command_fragment = {
 "  } else {\n"
     // Look up texture
     //
+    "float u_frac = 0.0;\n"
+    "float v_frac = 0.0;\n"
     "vec4 texel_00;\n"
     
     "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
@@ -140,7 +142,7 @@ static const char *command_fragment = {
 "      discard;\n"
 "    }\n"
 
-    "vec4 texel = get_texel(texel_00);\n"
+    "vec4 texel = get_texel(texel_00, u_frac, v_frac);\n"
 
     // Bit 15 (stored in the alpha) is used as a flag for
     // semi-transparency, but only if this is a semi-transparent draw
