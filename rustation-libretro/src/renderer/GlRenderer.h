@@ -13,6 +13,7 @@
 #include <glsm/glsmsym.h>
 
 #include <vector>
+#include <cstdio>
 #include <stdint.h>
 
 extern retro_environment_t environ_cb;
