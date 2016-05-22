@@ -111,7 +111,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->command_buffer = opaque_command_buffer;
     this->command_draw_mode = GL_TRIANGLES;
     this->semi_transparent_vertices.reserve((size_t) VERTEX_BUFFER_LEN);
-    this->semi_transparency_mode =  SemiTransparencyMode::Average;
+    this->semi_transparency_mode =  Average;
     this->command_polygon_mode = command_draw_mode;
     this->output_buffer = output_buffer;
     this->image_load_buffer = image_load_buffer;
@@ -228,25 +228,25 @@ void GlRenderer::draw()
 
         switch (this->semi_transparency_mode) {
         /* 0.5xB + 0.5 x F */
-        case SemiTransparencyMode::Average:
+        case Average:
             blend_func = GL_FUNC_ADD;
             // Set to 0.5 with glBlendColor
             blend_src = GL_CONSTANT_ALPHA;
             blend_dst = GL_CONSTANT_ALPHA;
             break;
         /* 1.0xB + 1.0 x F */
-        case SemiTransparencyMode::Add:
+        case Add:
             blend_func = GL_FUNC_ADD;
             blend_src = GL_ONE;
             blend_dst = GL_ONE;
             break;
         /* 1.0xB - 1.0 x F */
-        case SemiTransparencyMode::SubtractSource:
+        case SubtractSource:
             blend_func = GL_FUNC_REVERSE_SUBTRACT;
             blend_src = GL_ONE;
             blend_dst = GL_ONE;
             break;
-        case SemiTransparencyMode::AddQuarterSource:
+        case AddQuarterSource:
             blend_func = GL_FUNC_ADD;
             blend_src = GL_CONSTANT_COLOR;
             blend_dst = GL_ONE;

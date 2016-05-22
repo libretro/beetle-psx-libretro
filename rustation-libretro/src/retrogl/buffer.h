@@ -214,7 +214,7 @@ public:
     void push_slice(T slice[], size_t n)
     {
         if (n > this->remaining_capacity() ) {
-            puts("DrawBuffer::push_slice() - Out of memory\n");
+            printf("DrawBuffer::push_slice() - Out of memory\n");
             return;
         }
 
