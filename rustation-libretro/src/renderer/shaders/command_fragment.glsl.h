@@ -116,6 +116,9 @@ static const char *command_fragment = {
 "return texel;\n"
 "}\n"
 
+"vec4 get_texel(vec4 texel_00) {"
+"return texel_00;\n"
+"}\n"
 
 "void main() {\n"
 
@@ -126,14 +129,18 @@ static const char *command_fragment = {
 "  } else {\n"
     // Look up texture
     //
-    "vec4 texel = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
+    "vec4 texel_00;\n"
+    
+    "texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));\n"
 
     // texel color 0x0000 is always fully transparent (even for opaque
     // draw commands)
-"    if (is_transparent(texel)) {\n"
+"    if (is_transparent(texel_00)) {\n"
       // Fully transparent texel, discard
 "      discard;\n"
 "    }\n"
+
+    "vec4 texel = get_texel(texel_00);\n"
 
     // Bit 15 (stored in the alpha) is used as a flag for
     // semi-transparency, but only if this is a semi-transparent draw

@@ -163,9 +163,6 @@ static const char *command_fragment = {
 
     "vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);\n"
 
-    // vec4 texel = (texel_00 * (1 - u_frac) + texel_10 * u_frac) * (1 - v_frac)
-    //   + (texel_01 * (1 - u_frac) + texel_11 * u_frac) * v_frac;
-    //
     // Bit 15 (stored in the alpha) is used as a flag for
     // semi-transparency, but only if this is a semi-transparent draw
     // command
