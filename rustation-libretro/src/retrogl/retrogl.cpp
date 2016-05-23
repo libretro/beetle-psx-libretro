@@ -276,9 +276,9 @@ struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
     var.key = "beetle_psx_widescreen_hack";
 
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        if (strcmp(var.value, "enabled") == 0)
+        if (!strcmp(var.value, "enabled"))
             widescreen_hack = true;
-        else if (strcmp(var.value, "disabled") == 0)
+        else if (!strcmp(var.value, "disabled"))
             widescreen_hack = false;
     }
     
