@@ -11,17 +11,6 @@ static RetroGl* static_renderer = NULL;
 
 static bool rsx_gl_is_pal = false;
 
-void renderer_gl_free(void)
-{
-#if 0
-   if !static_renderer.is_null()
-   {
-      let _ = Box::from_raw(static_renderer);
-      static_renderer = ptr::null_mut();
-   }
-#endif
-}
-
 RetroGl* renderer(void)
 {
   RetroGl* r = static_renderer;
