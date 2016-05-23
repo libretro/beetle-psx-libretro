@@ -117,7 +117,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -142,7 +142,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -166,7 +166,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -191,7 +191,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2015|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -214,7 +214,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -237,7 +237,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -258,10 +258,33 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\deps\libkirk\aes.c" />
+    <ClCompile Include="..\deps\libkirk\amctrl.c" />
+    <ClCompile Include="..\deps\libkirk\bn.c" />
+    <ClCompile Include="..\deps\libkirk\des.c" />
+    <ClCompile Include="..\deps\libkirk\ec.c" />
+    <ClCompile Include="..\deps\libkirk\kirk_engine.c" />
+    <ClCompile Include="..\deps\libkirk\sha1.c" />
+    <ClCompile Include="..\deps\zlib\adler32.c" />
+    <ClCompile Include="..\deps\zlib\compress.c" />
+    <ClCompile Include="..\deps\zlib\crc32.c" />
+    <ClCompile Include="..\deps\zlib\deflate.c" />
+    <ClCompile Include="..\deps\zlib\gzclose.c" />
+    <ClCompile Include="..\deps\zlib\gzlib.c" />
+    <ClCompile Include="..\deps\zlib\gzread.c" />
+    <ClCompile Include="..\deps\zlib\gzwrite.c" />
+    <ClCompile Include="..\deps\zlib\infback.c" />
+    <ClCompile Include="..\deps\zlib\inffast.c" />
+    <ClCompile Include="..\deps\zlib\inflate.c" />
+    <ClCompile Include="..\deps\zlib\inftrees.c" />
+    <ClCompile Include="..\deps\zlib\trees.c" />
+    <ClCompile Include="..\deps\zlib\uncompr.c" />
+    <ClCompile Include="..\deps\zlib\zutil.c" />
     <ClCompile Include="..\libretro-common\glsm\glsm.c" />
     <ClCompile Include="..\libretro-common\glsym\glsym_gl.c" />
     <ClCompile Include="..\libretro-common\glsym\rglgen.c" />
     <ClCompile Include="..\libretro.cpp" />
+    <ClCompile Include="..\mednafen\cdrom\CDAccess_PBP.cpp" />
     <ClCompile Include="..\rsx\rsx_intf.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_gl.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_soft.c" />
@@ -483,6 +506,24 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\deps\libkirk\aes.h" />
+    <ClInclude Include="..\deps\libkirk\amctrl.h" />
+    <ClInclude Include="..\deps\libkirk\des.h" />
+    <ClInclude Include="..\deps\libkirk\key_vault.h" />
+    <ClInclude Include="..\deps\libkirk\kirk_engine.h" />
+    <ClInclude Include="..\deps\libkirk\psp_headers.h" />
+    <ClInclude Include="..\deps\libkirk\sha1.h" />
+    <ClInclude Include="..\deps\zlib\crc32.h" />
+    <ClInclude Include="..\deps\zlib\deflate.h" />
+    <ClInclude Include="..\deps\zlib\gzguts.h" />
+    <ClInclude Include="..\deps\zlib\inffast.h" />
+    <ClInclude Include="..\deps\zlib\inffixed.h" />
+    <ClInclude Include="..\deps\zlib\inflate.h" />
+    <ClInclude Include="..\deps\zlib\inftrees.h" />
+    <ClInclude Include="..\deps\zlib\trees.h" />
+    <ClInclude Include="..\deps\zlib\zconf.h" />
+    <ClInclude Include="..\deps\zlib\zlib.h" />
+    <ClInclude Include="..\deps\zlib\zutil.h" />
     <ClInclude Include="..\rsx\rsx.h" />
     <ClInclude Include="..\rsx\rsx_intf.h" />
     <ClInclude Include="..\rsx\rsx_lib_gl.h" />
@@ -502,6 +543,9 @@
     <ClInclude Include="..\rustation-libretro\src\retrogl\shader.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\texture.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\vertex.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\deps\zlib\zconf.h.in" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
