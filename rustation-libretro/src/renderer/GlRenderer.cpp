@@ -37,20 +37,29 @@ GlRenderer::GlRenderer(DrawConfig* config)
     var.key = "beetle_psx_internal_color_depth";
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        depth = strcmp(var.value, "32bpp") == 1 ? 32 : 16;
+       if (!strcmp(var.value, "32bpp"))
+          depth = 32;
+       else
+          depth = 16;
     }
     
     
     var.key = "beetle_psx_scale_dither";
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        scale_dither = strcmp(var.value, "enabled") == 1 ? true : false;
+       if (!strcmp(var.value, "enabled"))
+          scale_dither = true;
+       else
+          scale_dither = false;
     }
 
     var.key = "beetle_psx_wireframe";
     bool wireframe = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        wireframe = strcmp(var.value, "enabled") == 1 ? true : false;
+       if (!strcmp(var.value, "enabled"))
+          wireframe = true;
+       else
+          wireframe = false;
     }
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
@@ -480,20 +489,26 @@ bool GlRenderer::refresh_variables()
     var.key = "beetle_psx_internal_color_depth";
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        depth = strcmp(var.value, "32bpp") == 1 ? 32 : 16;
+        depth = !strcmp(var.value, "32bpp") ? 32 : 16;
     }
     
     
     var.key = "beetle_psx_scale_dither";
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        scale_dither = strcmp(var.value, "enabled") == 1 ? true : false;
+       if (!strcmp(var.value, "enabled"))
+          scale_dither = true;
+       else
+          scale_dither = false;
     }
 
     var.key = "beetle_psx_wireframe";
     bool wireframe = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        wireframe = strcmp(var.value, "enabled") == 1 ? true : false;
+       if (!strcmp(var.value, "enabled"))
+          wireframe = true;
+       else
+          wireframe = false;
     }
 
     bool rebuild_fb_out =   upscaling != this->internal_upscaling ||
