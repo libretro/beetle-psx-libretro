@@ -7,3 +7,5 @@
 /msvc/Debug
 /msvc/*.suo
 /msvc/*.user
+/msvc/x64
+/msvc/.vs/msvc-2010/v14/*.suo
