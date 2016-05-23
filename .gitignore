@@ -4,3 +4,6 @@
 *.dylib
 /old
 
+/msvc/Debug
+/msvc/*.suo
+/msvc/*.user
