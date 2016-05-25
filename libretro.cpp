@@ -53,11 +53,6 @@ char retro_cd_base_name[4096];
    static char retro_slash = '/';
 #endif
 
-static float video_output_framerate(void)
-{
-   return is_pal ? 49.842 : 59.941;
-}
-
 static void extract_basename(char *buf, const char *path, size_t size)
 {
    const char *base = strrchr(path, '/');

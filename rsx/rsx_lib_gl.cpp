@@ -9,8 +9,6 @@
 
 static RetroGl* static_renderer = NULL; 
 
-static bool rsx_gl_is_pal = false;
-
 RetroGl* renderer(void)
 {
   RetroGl* r = static_renderer;
@@ -37,8 +35,6 @@ void rsx_gl_init(void)
 
 bool rsx_gl_open(bool is_pal)
 {
-   rsx_gl_is_pal = is_pal;
-
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
    set_renderer( RetroGl::getInstance(clock) );
 

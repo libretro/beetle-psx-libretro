@@ -8,17 +8,8 @@
 #include "rsx_intf.h"
 #include "../libretro_cbs.h"
 
-static bool rsx_is_pal = false;
-
-static float video_output_framerate(void)
-{
-   return rsx_is_pal ? 49.842 : 59.941;
-}
-
 bool rsx_soft_open(bool is_pal)
 {
-   rsx_is_pal = is_pal;
-
    return true;
 }
 
