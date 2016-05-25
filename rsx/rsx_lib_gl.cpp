@@ -70,25 +70,10 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
 void rsx_gl_set_environment(retro_environment_t callback)
 {
-   /* TODO/FIXME - might not be necessary */
 }
 
 void rsx_gl_set_video_refresh(retro_video_refresh_t callback)
 {
-   /* TODO/FIXME - might not be necessary */
-}
-
-/* Precise FPS values for the video output for the given
- * VideoClock. It's actually possible to configure the PlayStation GPU
- * to output with NTSC timings with the PAL clock (and vice-versa)
- * which would make this code invalid but it wouldn't make a lot of
- * sense for a game to do that.
- */
-static float video_output_framerate(void)
-{
-   /* NTSC - 53.690MHz GPU clock frequency, 263 lines per field,
-    * 3413 cycles per line */
-   return rsx_gl_is_pal ? 49.76 : 59.81;
 }
 
 void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
