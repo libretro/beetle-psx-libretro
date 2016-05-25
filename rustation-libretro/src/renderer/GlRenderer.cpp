@@ -651,10 +651,10 @@ void GlRenderer::maybe_force_draw(  size_t nvertices,
 
         // Update the state machine for the next primitive
         this->command_draw_mode = draw_mode;
+    }
 
-        if (semi_transparent) {
-            this->semi_transparency_mode = semi_transparency_mode;
-        }
+    if (semi_transparent) {
+      this->semi_transparency_mode = semi_transparency_mode;
     }
 }
 
