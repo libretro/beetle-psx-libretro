@@ -20,6 +20,7 @@
 #include "mednafen/trio/trio.c"
 #include "mednafen/trio/triostr.c"
 
+#include "libretro_cbs.c"
 #include "libretro-common/streams/file_stream.c"
 #include "libretro-common/rthreads/rthreads.c"
 #include "scrc32.c"

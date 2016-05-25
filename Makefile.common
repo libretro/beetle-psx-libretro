@@ -148,6 +148,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
 	$(CORE_EMU_DIR)/input/multitap.cpp \
 	$(CORE_EMU_DIR)/input/mouse.cpp
 
+SOURCES_C += $(CORE_DIR)/libretro_cbs.c
+
 ifeq ($(NEED_TREMOR), 1)
    SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
 endif

@@ -12,14 +12,13 @@
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
 #include "rsx/rsx_intf.h"
+#include "libretro_cbs.h"
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
-retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
-retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 static retro_rumble_interface rumble;
@@ -39,8 +38,6 @@ static unsigned image_offset = 0;
 static int psx_skipbios;
 
 bool psx_cpu_overclock;
-extern "C" uint8_t widescreen_hack;
-extern "C" uint8_t psx_gpu_upscale_shift;
 bool psx_gte_subpixel_precision;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;

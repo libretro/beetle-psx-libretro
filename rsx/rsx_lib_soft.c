@@ -6,13 +6,9 @@
 
 #include "rsx.h"
 #include "rsx_intf.h"
+#include "../libretro_cbs.h"
 
 static bool rsx_is_pal = false;
-uint8_t widescreen_hack;
-uint8_t psx_gpu_upscale_shift;
-
-static retro_environment_t rsx_environ_cb;
-static retro_video_refresh_t rsx_video_cb;
 
 static float video_output_framerate(void)
 {
@@ -40,16 +36,14 @@ void rsx_soft_get_system_av_info(struct retro_system_av_info *info)
 
 void rsx_soft_set_environment(retro_environment_t callback)
 {
-   rsx_environ_cb = callback;
 }
 
 void rsx_soft_set_video_refresh(retro_video_refresh_t callback)
 {
-   rsx_video_cb   = callback;
 }
 
 void rsx_soft_finalize_frame(const void *fb, unsigned width,
       unsigned height, unsigned pitch)
 {
-   rsx_video_cb(fb, width, height, pitch);
+   video_cb(fb, width, height, pitch);
 }
