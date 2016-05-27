@@ -303,7 +303,7 @@ struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
     // sense for a game to do that.
     switch (std) {
     case VideoClock_Ntsc:
-        info.timing.fps = 59.81;
+        info.timing.fps = 59.941;
         break;
     case VideoClock_Pal:
         info.timing.fps = 49.76;
