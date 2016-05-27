@@ -26,6 +26,24 @@ After that, you can load the <tt>foo.cue</tt> file as a ROM.
 Note that this is a dirty hack and will not work on all games.
 Ideally, make sure to use rips that have cue-sheets.
 
+If foo is a multiple-disk game, you should have .cue files for each one, e.g. <tt>foo (Disc 1).cue</tt>, <tt>foo (Disc 2).cue</tt>, <tt>foo (Disc 3).cue</tt>.To take advantage of Beetle's Disk Control feature for disk swapping, an index file should be made.
+
+Open a text file and enter your game's .cue files on it, like this:
+
+    foo (Disc 1).cue
+    foo (Disc 2).cue
+    foo (Disc 3).cue
+
+Save as foo.m3u and use this file in place of each disk's individual cue sheet.
+
+## Condensing Games
+
+Alternatively to using cue sheets with .bin/.iso files, you can convert your games to .pbp (Playstation Portable update file) to reduce file sizes and neaten up your game folder. If converting a multiple-disk game, all disks should be added to the same .bpb file, rather than making a .m3u file for them.
+
+Most conversion tools will want a single .bin/.iso file for each disk. If your game uses multiple .bin files (tracks) per disk, you will have to mount the cue sheet to a virtual drive and re-burn the images onto a single track before conversion.
+
+Note that RetroArch does not currently have .pbp database due to variability in users' conversion methods. All .pbp games will have to be added to playlists manually.
+
 ## Suggested Firmware
 
 - scph5500.bin (8dd7d5296a650fac7319bce665a6a53c)
