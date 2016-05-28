@@ -609,6 +609,7 @@ void GlRenderer::finalize_frame()
 
     /* If the display is off, just clear the screen */
     if (this->display_off) {
+        glDisable(GL_SCISSOR_TEST);
         glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
     } 

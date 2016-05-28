@@ -41,7 +41,7 @@ const uint FILTER_MODE_3POINT       = 1U;
 
 // Read a pixel in VRAM
 vec4 vram_get_pixel(int x, int y) {
-  return texelFetch(fb_texture, ivec2(x, y), 0);
+  return texelFetch(fb_texture, ivec2(x & 0x3ff, y & 0x1ff), 0);
 }
 
 // Take a normalized color and convert it into a 16bit 1555 ABGR
@@ -77,26 +77,29 @@ vec4 sample_texel(vec2 coords) {
    // Number of texel per VRAM 16bit "pixel" for the current depth
    uint pix_per_hw = 1U << frag_depth_shift;
 
-   // 8 and 4bpp textures contain several texels per 16bit VRAM
-   // "pixel"
-   float tex_x_float = coords.x / float(pix_per_hw);
-
    // Texture pages are limited to 256x256 pixels
-   uint tex_x = uint(tex_x_float) & 0xffU;
+   uint tex_x = uint(coords.x) & 0xffU;
    uint tex_y = uint(coords.y) & 0xffU;
 
    // Texture window adjustments
    tex_x = (tex_x & (~(tww << 3))) | ((twx & tww) << 3);
    tex_y = (tex_y & (~(twh << 3))) | ((twy & twh) << 3);
 
-   tex_x += frag_texture_page.x;
+   // Adjust x coordinate based on the texel color depth.
+   uint tex_x_pix = tex_x / pix_per_hw;
+
+   tex_x_pix += frag_texture_page.x;
    tex_y += frag_texture_page.y;
 
-   vec4 texel = vram_get_pixel(int(tex_x), int(tex_y));
+   vec4 texel = vram_get_pixel(int(tex_x_pix), int(tex_y));
 
    if (frag_depth_shift > 0U) {
       // 8 and 4bpp textures are paletted so we need to lookup the
       // real color in the CLUT
+
+      // 8 and 4bpp textures contain several texels per 16bit VRAM
+      // "pixel"
+      float tex_x_float = coords.x / float(pix_per_hw);
 
       uint icolor = rebuild_psx_color(texel);
 
@@ -111,8 +114,8 @@ vec4 sample_texel(vec2 coords) {
       // 0xf for 4bpp, 0xff for 8bpp
       uint mask = ((1U << bpp) - 1U);
 
-      // 0...3 for 4bpp, 1...2 for 8bpp
-      uint align = uint(fract(tex_x_float) * pix_per_hw);
+      // 0...3 for 4bpp, 0...1 for 8bpp
+      uint align = tex_x & ((1U << frag_depth_shift) - 1U);
 
       // 0, 4, 8 or 12 for 4bpp, 0 or 8 for 8bpp
       uint shift = (align * bpp);
