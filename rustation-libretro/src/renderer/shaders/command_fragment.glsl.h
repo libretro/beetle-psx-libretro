@@ -10,6 +10,11 @@ static const char *command_fragment = {
 
 "uniform uint texture_flt;\n"
 
+"uniform uint tww;\n"
+"uniform uint twh;\n"
+"uniform uint twx;\n"
+"uniform uint twy;\n"
+
 "in vec3 frag_shading_color;\n"
 // Texture page: base offset for texture lookup.
 "flat in uvec2 frag_texture_page;\n"
@@ -25,6 +30,10 @@ static const char *command_fragment = {
 "flat in uint frag_dither;\n"
 // 0: Opaque primitive, 1: semi-transparent primitive
 "flat in uint frag_semi_transparent;\n"
+"flat in uint frag_tww;\n"
+"flat in uint frag_twh;\n"
+"flat in uint frag_twx;\n"
+"flat in uint frag_twy;\n"
 
 "out vec4 frag_color;\n"
 
