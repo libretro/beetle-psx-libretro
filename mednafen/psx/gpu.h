@@ -269,7 +269,7 @@ class PS_GPU
       bool TexDisable;
       bool TexDisableAllowChange;
 
-      uint8 tww, twh, twx, twy;
+      uint8_t tww, twh, twx, twy;
       struct
       {
          uint8 TexWindowXLUT_Pre[16];

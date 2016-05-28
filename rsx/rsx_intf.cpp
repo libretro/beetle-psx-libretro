@@ -217,6 +217,21 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
    }
 }
 
+void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
+      uint8_t twx, uint8_t twy)
+{
+   switch (rsx_type)
+   {
+      case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         rsx_gl_set_tex_window(tww, twh, twx, twy);
+#endif
+         break;
+      default:
+         break;
+   }
+}
+
 void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 {
    switch (rsx_type)

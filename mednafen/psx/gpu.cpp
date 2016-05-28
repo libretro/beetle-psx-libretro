@@ -301,6 +301,7 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    twy = 0;
 
    RecalcTexWindowStuff();
+   rsx_intf_set_tex_window(0, 0, 0, 0);
 
    //
    ClipX0 = 0;
@@ -356,6 +357,7 @@ void PS_GPU::Power(void)
    twy = 0;
 
    RecalcTexWindowStuff();
+   rsx_intf_set_tex_window(0, 0, 0, 0);
 
    TexPageX = 0;
    TexPageY = 0;
@@ -644,6 +646,7 @@ static void G_Command_TexWindow(PS_GPU* g, const uint32 *cb)
    g->twy = ((*cb >> 15) & 0x1F);
 
    g->RecalcTexWindowStuff();
+   rsx_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
 static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
@@ -1861,6 +1864,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
             TexCache[i].Data[j] = TexCache_Data[i][j];
       }
       RecalcTexWindowStuff();
+      rsx_intf_set_tex_window(this->tww, this->twh, this->twx, this->twy);
       BlitterFIFO.SaveStatePostLoad();
 
       HorizStart &= 0xFFF;
