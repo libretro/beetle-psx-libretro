@@ -147,7 +147,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->primitive_ordering = 0;
     // }
 
-    this->display_off = false;
+    this->display_off = true;
 
     //// NOTE: r5 - I have no idea what a borrow checker is.
     // Yet an other copy of this 1MB array to make the borrow

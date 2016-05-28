@@ -1873,7 +1873,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
       IRQ_Assert(IRQ_GPU, IRQPending);
    }
-
+   rsx_intf_toggle_display(DisplayOff);
    rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
          this->ClipX1, this->ClipY1);
 
