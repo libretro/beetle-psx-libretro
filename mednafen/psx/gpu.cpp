@@ -1075,6 +1075,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
          case 0x03:	// Display enable
             DisplayOff = V & 1;
+            rsx_intf_toggle_display(DisplayOff);
             break;
 
          case 0x04:	// DMA Setup

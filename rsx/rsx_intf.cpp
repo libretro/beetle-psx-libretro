@@ -425,3 +425,22 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
          break;
    }
 }
+
+void rsx_intf_toggle_display(bool status)
+{
+    switch (rsx_type)
+    {
+    case RSX_SOFTWARE:
+        break;
+    case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+        rsx_gl_toggle_display(status);
+#endif
+        break;
+    case RSX_EXTERNAL_RUST:
+#ifdef HAVE_RUST
+        puts("rsx_toggle_display: NOT IMPLEMENTED!");
+#endif
+        break;
+    }
+}

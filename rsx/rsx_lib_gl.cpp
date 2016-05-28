@@ -310,3 +310,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
   uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
    renderer()->gl_renderer()->upload_vram_window(top_left, dimensions, vram);
 }
+
+void rsx_gl_toggle_display(bool status)
+{
+    renderer()->gl_renderer()->display_off = status;
+}

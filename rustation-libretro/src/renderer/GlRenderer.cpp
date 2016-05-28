@@ -147,6 +147,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->primitive_ordering = 0;
     // }
 
+    this->display_off = false;
+
     //// NOTE: r5 - I have no idea what a borrow checker is.
     // Yet an other copy of this 1MB array to make the borrow
     // checker happy...
@@ -595,42 +597,50 @@ void GlRenderer::finalize_frame()
     // We can now render to teh frontend's buffer
     this->bind_libretro_framebuffer();
 
-    // Bind 'fb_out' to texture unit 1
-    this->fb_out->bind(GL_TEXTURE1);
+    /* If the display is off, just clear the screen */
+    if (this->display_off) {
+        glClearColor(0.0, 0.0, 0.0, 0.0);
+        glClear(GL_COLOR_BUFFER_BIT);
+    } 
+    
+    else {
+        // Bind 'fb_out' to texture unit 1
+        this->fb_out->bind(GL_TEXTURE1);
 
-    // First we draw the visible part of fb_out
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        // First we draw the visible part of fb_out
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    uint16_t fb_x_start = this->config->display_top_left[0];
-    uint16_t fb_y_start = this->config->display_top_left[1];
-    uint16_t fb_width = this->config->display_resolution[0];
-    uint16_t fb_height = this->config->display_resolution[1];
+        uint16_t fb_x_start = this->config->display_top_left[0];
+        uint16_t fb_y_start = this->config->display_top_left[1];
+        uint16_t fb_width = this->config->display_resolution[0];
+        uint16_t fb_height = this->config->display_resolution[1];
 
-    uint16_t fb_x_end = fb_x_start + fb_width;
-    uint16_t fb_y_end = fb_y_start + fb_height;
+        uint16_t fb_x_end = fb_x_start + fb_width;
+        uint16_t fb_y_end = fb_y_start + fb_height;
 
-    this->output_buffer->clear();
+        this->output_buffer->clear();
 
-    const size_t slice_len = 4;
-    OutputVertex slice[slice_len] =
-    {
-        { {-1.0, -1.0}, {fb_x_start,    fb_y_end}   },
-        { { 1.0, -1.0}, {fb_x_end,      fb_y_end}   },
-        { {-1.0,  1.0}, {fb_x_start,    fb_y_start} },
-        { { 1.0,  1.0}, {fb_x_end,      fb_y_start} }
-    };
-    this->output_buffer->push_slice(slice, slice_len);
+        const size_t slice_len = 4;
+        OutputVertex slice[slice_len] =
+        {
+            { {-1.0, -1.0}, {fb_x_start,    fb_y_end}   },
+            { { 1.0, -1.0}, {fb_x_end,      fb_y_end}   },
+            { {-1.0,  1.0}, {fb_x_start,    fb_y_start} },
+            { { 1.0,  1.0}, {fb_x_end,      fb_y_start} }
+        };
+        this->output_buffer->push_slice(slice, slice_len);
 
-    GLint depth_24bpp = (GLint) this->config->display_24bpp;
+        GLint depth_24bpp = (GLint) this->config->display_24bpp;
 
-    this->output_buffer->program->uniform1i("fb", 1);
-    this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
-    this->output_buffer->program->uniform1ui( "internal_upscaling",
-                                                this->internal_upscaling);
-    this->output_buffer->draw(GL_TRIANGLE_STRIP);
+        this->output_buffer->program->uniform1i("fb", 1);
+        this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
+        this->output_buffer->program->uniform1ui( "internal_upscaling",
+                                                    this->internal_upscaling);
+        this->output_buffer->draw(GL_TRIANGLE_STRIP);
+    }
 
     // Cleanup OpenGL context before returning to the frontend
     /* All of these GL calls are also done in glsm_ctl(UNBIND) */

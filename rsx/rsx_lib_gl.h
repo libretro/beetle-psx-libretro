@@ -62,6 +62,8 @@
 		     uint16_t dst_x, uint16_t dst_y,
 		     uint16_t w, uint16_t h);
 
+  void rsx_gl_toggle_display(bool status);
+
   /* Functions from simias's rustation-libretro/lib.rs */
   RetroGl* renderer();
 

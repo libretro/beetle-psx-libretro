@@ -127,6 +127,9 @@ public:
 
     uint8_t filter_type;
 
+    /* Flag for finalize_frame(). If true, we'll glClear() the libretro fb */
+    bool display_off;
+
     /* pub fn from_config(config: DrawConfig) -> Result<GlRenderer, Error> */
     GlRenderer(DrawConfig* config);
 
