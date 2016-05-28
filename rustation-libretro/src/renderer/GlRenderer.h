@@ -57,8 +57,6 @@ struct CommandVertex {
     /// 0: primitive is opaque, 1: primitive is semi-transparent
     uint8_t semi_transparent;
 
-    uint8_t tww, twh, twx, twy;
-
     static std::vector<Attribute> attributes();
 };
 
@@ -124,8 +122,11 @@ public:
     /// Counter for preserving primitive draw order in the z-buffer
     /// since we draw semi-transparent primitives out-of-order.
     int16_t primitive_ordering;
+    /// Texture window masks
+    uint8_t tww, twh, twx, twy;
 
     uint8_t filter_type;
+
 
     /* Flag for finalize_frame(). If true, we'll glClear() the libretro fb */
     bool display_off;

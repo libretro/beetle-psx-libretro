@@ -30,10 +30,6 @@ static const char *command_fragment = {
 "flat in uint frag_dither;\n"
 // 0: Opaque primitive, 1: semi-transparent primitive
 "flat in uint frag_semi_transparent;\n"
-"flat in uint frag_tww;\n"
-"flat in uint frag_twh;\n"
-"flat in uint frag_twx;\n"
-"flat in uint frag_twy;\n"
 
 "out vec4 frag_color;\n"
 
@@ -87,13 +83,17 @@ static const char *command_fragment = {
 "    float tex_x_float = coords.x / float(pix_per_hw);\n"
 
     // Texture pages are limited to 256x256 pixels\n"
-"    int tex_x = int(tex_x_float) & 0xff;\n"
-"    int tex_y = int(coords.y) & 0xff;\n"
+"    uint tex_x = uint(tex_x_float) & 0xffU;\n"
+"    uint tex_y = uint(coords.y) & 0xffU;\n"
 
-"    tex_x += int(frag_texture_page.x);\n"
-"    tex_y += int(frag_texture_page.y);\n"
+    // Texture window adjustments
+"    tex_x = (tex_x & (~(tww << 3))) | ((twx & tww) << 3);\n"
+"    tex_y = (tex_y & (~(twh << 3))) | ((twy & twh) << 3);\n"
 
-"    vec4 texel = vram_get_pixel(tex_x, tex_y);\n"
+"    tex_x += frag_texture_page.x;\n"
+"    tex_y += frag_texture_page.y;\n"
+
+"    vec4 texel = vram_get_pixel(int(tex_x), int(tex_y));\n"
 
 "    if (frag_depth_shift > 0U) {\n"
       // 8 and 4bpp textures are paletted so we need to lookup the

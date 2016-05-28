@@ -93,9 +93,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
       uint8_t twx, uint8_t twy)
 {
-#if 0
    renderer()->gl_renderer()->set_tex_window(tww, twh, twx, twy);
-#endif
 }
 
 void  rsx_gl_set_draw_area(uint16_t x,

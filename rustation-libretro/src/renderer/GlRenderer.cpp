@@ -145,6 +145,10 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->internal_upscaling = upscaling;
     this->internal_color_depth = depth;
     this->primitive_ordering = 0;
+    this->tww = 0;
+    this->twh = 0;
+    this->twx = 0;
+    this->twy = 0;
     // }
 
     this->display_off = true;
@@ -224,6 +228,12 @@ void GlRenderer::draw()
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+
+    // Set the texture window parameters
+    this->command_buffer->program->uniform1ui("tww", tww);
+    this->command_buffer->program->uniform1ui("twh", twh);
+    this->command_buffer->program->uniform1ui("twx", twx);
+    this->command_buffer->program->uniform1ui("twy", twy);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
@@ -718,13 +728,13 @@ void GlRenderer::set_draw_offset(int16_t x, int16_t y)
 void GlRenderer::set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
       uint8_t twy)
 {
-    // Finish drawing anything in the current area
+    // Finish drawing anything with the current texture window
     this->draw();
 
-    this->command_buffer->program->uniform1ui("tww", tww);
-    this->command_buffer->program->uniform1ui("twh", twh);
-    this->command_buffer->program->uniform1ui("twx", twx);
-    this->command_buffer->program->uniform1ui("twy", twy);
+    this->tww = tww;
+    this->twh = twh;
+    this->twx = twx;
+    this->twy = twy;
 }
 
 void GlRenderer::set_draw_area(uint16_t top_left[2], uint16_t dimensions[2])
@@ -905,10 +915,6 @@ std::vector<Attribute> CommandVertex::attributes()
     result.push_back( Attribute("depth_shift",          offsetof(CommandVertex, depth_shift),           GL_UNSIGNED_BYTE,   1) );
     result.push_back( Attribute("dither",               offsetof(CommandVertex, dither),                GL_UNSIGNED_BYTE,   1) );
     result.push_back( Attribute("semi_transparent",     offsetof(CommandVertex, semi_transparent),      GL_UNSIGNED_BYTE,   1) );
-    result.push_back( Attribute("tww",                  offsetof(CommandVertex, tww),                   GL_UNSIGNED_BYTE,   1) );
-    result.push_back( Attribute("twh",                  offsetof(CommandVertex, twh),                   GL_UNSIGNED_BYTE,   1) );
-    result.push_back( Attribute("twx",                  offsetof(CommandVertex, twx),                   GL_UNSIGNED_BYTE,   1) );
-    result.push_back( Attribute("twy",                  offsetof(CommandVertex, twy),                   GL_UNSIGNED_BYTE,   1) );
 
     return result;
 }

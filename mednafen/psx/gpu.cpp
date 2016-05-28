@@ -52,7 +52,7 @@
    Pixel clock can be changed mid-frame with effect(the effect is either instantaneous, or cached at some point in the scanline, not tested to see which);
    interestingly, alignment is off on a PS1 when going 5MHz->10MHz>5MHz with a grid image.
 
-   Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything 
+   Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything
    different from vs0->ve0.
    */
 static const int8 dither_table[4][4] =
@@ -295,13 +295,12 @@ void PS_GPU::SoftReset(void) // Control command 0x00
    dfe = 0;
 
    //
-   tww = 0; 
-   twh = 0; 
+   tww = 0;
+   twh = 0;
    twx = 0;
    twy = 0;
 
    RecalcTexWindowStuff();
-   rsx_intf_set_tex_window(0, 0, 0, 0);
 
    //
    ClipX0 = 0;
@@ -357,7 +356,6 @@ void PS_GPU::Power(void)
    twy = 0;
 
    RecalcTexWindowStuff();
-   rsx_intf_set_tex_window(0, 0, 0, 0);
 
    TexPageX = 0;
    TexPageY = 0;
@@ -484,7 +482,7 @@ static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
    IRQ_Assert(IRQ_GPU, g->IRQPending);
 }
 
-// Special RAM write mode(16 pixels at a time), 
+// Special RAM write mode(16 pixels at a time),
 // does *not* appear to use mask drawing environment settings.
 static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
@@ -919,8 +917,8 @@ void PS_GPU::ProcessFIFO(void)
       if(!command->ss_cmd)
          DrawTimeAvail -= 2;
 
-      // A very very ugly kludge to support 
-      // texture mode specialization. 
+      // A very very ugly kludge to support
+      // texture mode specialization.
       // fixme/cleanup/SOMETHING in the future.
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
       {
@@ -993,7 +991,7 @@ void PS_GPU::ProcessFIFO(void)
 
 INLINE void PS_GPU::WriteCB(uint32_t InData)
 {
-   if(BlitterFIFO.CanRead() >= 0x10 
+   if(BlitterFIFO.CanRead() >= 0x10
          && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
@@ -1070,7 +1068,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
          case 0x02: 	// Acknowledge IRQ
             IRQPending = false;
-            IRQ_Assert(IRQ_GPU, IRQPending);            
+            IRQ_Assert(IRQ_GPU, IRQPending);
             break;
 
          case 0x03:	// Display enable
@@ -1114,7 +1112,7 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
                // DataReadBuffer must remain unchanged for any unhandled GPU info index.
                default:
                   break;
-               case 0x2: 
+               case 0x2:
                   DataReadBufferEx &= 0xFFF00000;
                   DataReadBufferEx |= (tww << 0) | (twh << 5) | (twx << 10) | (twy << 15);
                   DataReadBuffer    = DataReadBufferEx;
@@ -1131,13 +1129,13 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
                   DataReadBuffer = DataReadBufferEx;
                   break;
 
-               case 0x5: 
+               case 0x5:
                   DataReadBufferEx &= 0xFFC00000;
                   DataReadBufferEx |= (OffsX & 2047) | ((OffsY & 2047) << 11);
                   DataReadBuffer = DataReadBufferEx;
                   break;
 
-               case 0x7: 
+               case 0x7:
                   DataReadBufferEx = 2;
                   DataReadBuffer = DataReadBufferEx;
                   break;
@@ -1173,7 +1171,7 @@ INLINE uint32_t PS_GPU::ReadData(void)
       DataReadBufferEx = 0;
       for(int i = 0; i < 2; i++)
       {
-         DataReadBufferEx |= 
+         DataReadBufferEx |=
             texel_fetch(FBRW_CurX & 1023,FBRW_CurY & 511) << (i * 16);
 
          FBRW_CurX++;
@@ -1224,7 +1222,7 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
       ret |= DisplayOff << 23;
 
       /* GPU idle bit */
-      if(InCmd == INCMD_NONE && DrawTimeAvail >= 0 
+      if(InCmd == INCMD_NONE && DrawTimeAvail >= 0
             && BlitterFIFO.CanRead() == 0x00)
          ret |= 1 << 26;
 
@@ -1276,12 +1274,12 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
       {
          int i;
          uint32_t color;
-         uint32_t srcpix = src[(fb_x >> 1) + 0] 
+         uint32_t srcpix = src[(fb_x >> 1) + 0]
             | (src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
          srcpix >>= ((fb_x >> upscale_shift) & 1) * 8;
 
-         color =   (((srcpix >> 0) << RED_SHIFT)   & (0xFF << RED_SHIFT)) 
-            | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT)) 
+         color =   (((srcpix >> 0) << RED_SHIFT)   & (0xFF << RED_SHIFT))
+            | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT))
             | (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
          for (i = 0; i < upscale(); i++)
@@ -1357,9 +1355,9 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
       if(!LineClockCounter)
       {
-         // We could just call this at the top of GPU_Update(), but 
+         // We could just call this at the top of GPU_Update(), but
          // do it here for slightly less CPU usage(presumably).
-         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  
+         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));
 
          LinePhase = (LinePhase + 1) & 1;
 
@@ -1371,9 +1369,9 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
          }
          else
          {
-            const unsigned int FirstVisibleLine = 
+            const unsigned int FirstVisibleLine =
                LineVisFirst + (HardwarePALType ? 20 : 16);
-            const unsigned int VisibleLineCount = 
+            const unsigned int VisibleLineCount =
                LineVisLast + 1 - LineVisFirst; //HardwarePALType ? 288 : 240;
 
             TIMER_SetHRetrace(false);
@@ -1486,17 +1484,17 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             }
 
             //
-            // Don't mess with the order of evaluation of 
-            // these scanline == VertXXX && (InVblankwhatever) if statements 
+            // Don't mess with the order of evaluation of
+            // these scanline == VertXXX && (InVblankwhatever) if statements
             // and the following IRQ/timer vblank stuff
-            // unless you know what you're doing!!! 
+            // unless you know what you're doing!!!
             // (IE you've run further tests to refine the behavior)
             if(scanline == VertEnd && !InVBlank)
             {
                if(sl_zero_reached)
                {
                   // Gameplay in Descent(NTSC) has vblank at scanline 236
-                  // 
+                  //
                   // Mikagura Shoujo Tanteidan has vblank at scanline 192 during intro
                   //  FMV(which we don't handle here because low-latency in that case is not so important).
                   //
@@ -1528,8 +1526,8 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             {
                InVBlank = false;
 
-               // Note to self: X-Men Mutant Academy 
-               // relies on this being set on the proper 
+               // Note to self: X-Men Mutant Academy
+               // relies on this being set on the proper
                // scanline in 480i mode(otherwise it locks up on startup).
                //if(HeightMode)
                // DisplayFB_CurYOffset = field;
@@ -1541,10 +1539,10 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             unsigned displayfb_yoffset = DisplayFB_CurYOffset;
 
             // Needs to occur even in vblank.
-            // Not particularly confident about the timing 
-            // of this in regards to vblank and the 
-            // upper bit(ODE) of the GPU status port, though the 
-            // test that showed an oddity was pathological in 
+            // Not particularly confident about the timing
+            // of this in regards to vblank and the
+            // upper bit(ODE) of the GPU status port, though the
+            // test that showed an oddity was pathological in
             // that VertEnd < VertStart in it.
             if((DisplayMode & 0x24) == 0x24)
                displayfb_yoffset = (DisplayFB_CurYOffset << 1) + (InVBlank ? 0 : field_ram_readout);
@@ -1557,14 +1555,14 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
             unsigned pix_clock_div = 0;
             uint32_t *dest = NULL;
 
-            if(      (bool)(DisplayMode & DISP_PAL) == HardwarePALType 
-                  && scanline >= FirstVisibleLine 
+            if(      (bool)(DisplayMode & DISP_PAL) == HardwarePALType
+                  && scanline >= FirstVisibleLine
                   && scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32 fb_x      = DisplayFB_XStart * 2;
                int32 dx_start  = HorizStart, dx_end = HorizEnd;
-               int32 dest_line = 
-                  ((scanline - FirstVisibleLine) << espec->InterlaceOn) 
+               int32 dest_line =
+                  ((scanline - FirstVisibleLine) << espec->InterlaceOn)
                   + espec->InterlaceField;
 
                if(dx_end < dx_start)
@@ -1604,14 +1602,14 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                   for (uint32_t i = 0; i < upscale(); i++)
                   {
-                     const uint16_t *src = vram + 
+                     const uint16_t *src = vram +
                         ((y + i) << (10 + upscale_shift));
 
                      // printf("surface: %dx%d (%d) %u %u + %u\n",
                      // 	   surface->w, surface->h, surface->pitchinpix,
                      // 	   dest_line, y, i);
 
-                     dest = surface->pixels + 
+                     dest = surface->pixels +
                         ((dest_line << upscale_shift) + i) * surface->pitch32;
 
                      memset(dest, 0, udx_start * sizeof(int32));
@@ -1658,9 +1656,9 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                DisplayFB_CurYOffset = (DisplayFB_CurYOffset + 1) & 0x1FF;
          }
 
-         // Mostly so the next event time gets 
+         // Mostly so the next event time gets
          // recalculated properly in regards to our calls
-         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));  
+         PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));
 
          // to TIMER_SetVBlank() and TIMER_SetHRetrace().
       }	// end if(!LineClockCounter)
@@ -1866,6 +1864,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       }
       RecalcTexWindowStuff();
       rsx_intf_set_tex_window(this->tww, this->twh, this->twx, this->twy);
+
       BlitterFIFO.SaveStatePostLoad();
 
       HorizStart &= 0xFFF;
