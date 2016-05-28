@@ -1,3 +1,5 @@
+#include "shaders_common.h"
+
 static const char *output_fragment = GLSL(
    // We're sampling from the internal framebuffer texture
    uniform sampler2D fb;
