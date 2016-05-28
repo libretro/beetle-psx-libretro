@@ -3577,7 +3577,7 @@ void retro_run(void)
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
 
       const uint32_t *pix = surf->pixels;
-      unsigned pix_offset = 0 + image_offset;
+      unsigned pix_offset = 0;
 
       if (!overscan)
       {
@@ -3591,28 +3591,28 @@ void retro_run(void)
          {
             // The shifts are not simply (padded_width - real_width) / 2.
             case 280:
-               pix_offset += 10;
+               pix_offset += 10 + image_offset;
                width = 256;
                break;
 
             case 350:
-               pix_offset += 14;
+               pix_offset += 14 + image_offset;
                width = 320;
                break;
 
             case 400:
-               pix_offset += 15;
+               pix_offset += 15 + image_offset;
                width = 364;
                break;
 
 
             case 560:
-               pix_offset += 26;
+               pix_offset += 26 + image_offset;
                width       = 512;
                break;
 
             case 700:
-               pix_offset += 33;
+               pix_offset += 33 + image_offset;
                width       = 640;
                break;
 
