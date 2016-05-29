@@ -36,6 +36,7 @@ const uint BLEND_MODE_TEXTURE_BLEND = 2U;
 
 const uint FILTER_MODE_NEAREST      = 0U;
 const uint FILTER_MODE_3POINT       = 1U;
+const uint FILTER_MODE_BILINEAR     = 2U;
 
 // Read a pixel in VRAM
 vec4 vram_get_pixel(int x, int y) {
@@ -130,20 +131,88 @@ vec4 sample_texel(vec2 coords) {
    return texel;
 }
 
-    // 3-point filtering
-vec4 get_texel_3point(vec4 texel_00, float u_frac, float v_frac)
+// 3-point filtering
+vec4 get_texel_3point()
 {
-   vec4 texel_10 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 0));
-   vec4 texel_01 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 1));
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
+
+  float u_frac = fract(x);
+  float v_frac = fract(y);
+
+  vec4 texel_00;
+
+  if (u_frac + v_frac < 1.0) {
+    // Use bottom-left
+    texel_00 = sample_texel(vec2(x + 0, y + 0));
+  } else {
+    // Use top-right
+    texel_00 = sample_texel(vec2(x + 1, y + 1));
+
+    float tmp = 1 - v_frac;
+    v_frac = 1 - u_frac;
+    u_frac = tmp;
+  }
+
+  if (is_transparent(texel_00)) {
+    return texel_00;
+  }
+
+   vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
+   vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+
    if (is_transparent(texel_10)) {
       texel_10 = texel_00;
    }
+
    if (is_transparent(texel_01)) {
       texel_01 = texel_00;
    }
-   vec4 texel = texel_00 + u_frac * (texel_10 - texel_00) + v_frac * (texel_01 - texel_00);
+   vec4 texel = texel_00
+     + u_frac * (texel_10 - texel_00)
+     + v_frac * (texel_01 - texel_00);
+
    return texel;
 }
+
+// Bilinear filtering
+vec4 get_texel_bilinear()
+{
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
+
+  float u_frac = fract(x);
+  float v_frac = fract(y);
+
+  vec4 texel_00 = sample_texel(vec2(x + 0, y + 0));
+  vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
+  vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+  vec4 texel_11 = sample_texel(vec2(x + 1, y + 1));
+
+   if (is_transparent(texel_00)) {
+     return texel_00;
+   }
+
+   if (is_transparent(texel_10)) {
+      texel_10 = texel_00;
+   }
+
+   if (is_transparent(texel_01)) {
+      texel_01 = texel_10;
+   }
+
+   if (is_transparent(texel_11)) {
+      texel_11 = texel_01;
+   }
+
+   vec4 texel = texel_00 * (1. - u_frac) * (1. - v_frac)
+     + texel_10 * u_frac * (1. - v_frac)
+     + texel_01 * (1. - u_frac) * v_frac
+     + texel_11 * u_frac * v_frac;
+
+   return texel;
+}
+
 
 void main() {
    vec4 color;
@@ -151,40 +220,22 @@ void main() {
       if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE) {
          color = vec4(frag_shading_color, 0.);
       } else {
-         // Look up texture
-         float u_frac = 0.0;
-         float v_frac = 0.0;
-         vec4 texel_00;
-
-         if (texture_flt == FILTER_MODE_3POINT) {
-            u_frac = fract(frag_texture_coord.x);
-            v_frac = fract(frag_texture_coord.y);
-            if (u_frac + v_frac < 1.0) {
-               // Use bottom-left
-               texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));
-            } else {
-               // Use top-right
-               texel_00 = sample_texel(vec2(frag_texture_coord.x + 1, frag_texture_coord.y + 1));
-               float tmp = 1 - v_frac;
-               v_frac = 1 - u_frac;
-               u_frac = tmp;
-            }
-         } else {
-            texel_00 = sample_texel(vec2(frag_texture_coord.x + 0, frag_texture_coord.y + 0));
-         }
-
-         // texel color 0x0000 is always fully transparent (even for opaque
-         // draw commands)
-         if (is_transparent(texel_00)) {
-            // Fully transparent texel, discard
-            discard;
-         }
-
          vec4 texel;
+
          if (texture_flt == FILTER_MODE_3POINT) {
-            texel = get_texel_3point(texel_00, u_frac, v_frac);
-         } else {
-            texel = texel_00;
+	   texel = get_texel_3point();
+         } else if (texture_flt == FILTER_MODE_BILINEAR) {
+	   texel = get_texel_bilinear();
+	 } else {
+	   texel = sample_texel(vec2(frag_texture_coord.x,
+				     frag_texture_coord.y));
+         }
+
+	 // texel color 0x0000 is always fully transparent (even for opaque
+         // draw commands)
+         if (is_transparent(texel)) {
+	   // Fully transparent texel, discard
+	   discard;
          }
 
          // Bit 15 (stored in the alpha) is used as a flag for
