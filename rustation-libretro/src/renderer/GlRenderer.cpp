@@ -147,8 +147,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->primitive_ordering = 0;
     this->tex_x_mask = 0;
     this->tex_x_or = 0;
-    this->tex_x_mask = 0;
-    this->tex_x_or = 0;
+    this->tex_y_mask = 0;
+    this->tex_y_or = 0;
     // }
 
     this->display_off = true;
