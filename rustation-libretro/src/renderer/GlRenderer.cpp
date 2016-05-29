@@ -145,10 +145,10 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->internal_upscaling = upscaling;
     this->internal_color_depth = depth;
     this->primitive_ordering = 0;
-    this->tww = 0;
-    this->twh = 0;
-    this->twx = 0;
-    this->twy = 0;
+    this->tex_x_mask = 0;
+    this->tex_x_or = 0;
+    this->tex_x_mask = 0;
+    this->tex_x_or = 0;
     // }
 
     this->display_off = true;
@@ -230,10 +230,10 @@ void GlRenderer::draw()
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
 
     // Set the texture window parameters
-    this->command_buffer->program->uniform1ui("tww", tww);
-    this->command_buffer->program->uniform1ui("twh", twh);
-    this->command_buffer->program->uniform1ui("twx", twx);
-    this->command_buffer->program->uniform1ui("twy", twy);
+    this->command_buffer->program->uniform1ui("tex_x_mask", tex_x_mask);
+    this->command_buffer->program->uniform1ui("tex_x_or", tex_x_or);
+    this->command_buffer->program->uniform1ui("tex_y_mask", tex_y_mask);
+    this->command_buffer->program->uniform1ui("tex_y_or", tex_y_or);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
@@ -732,10 +732,10 @@ void GlRenderer::set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
     // Finish drawing anything with the current texture window
     this->draw();
 
-    this->tww = tww;
-    this->twh = twh;
-    this->twx = twx;
-    this->twy = twy;
+    this->tex_x_mask = ~(tww << 3);
+    this->tex_x_or = (twx & tww) << 3;
+    this->tex_y_mask = ~(twh << 3);
+    this->tex_y_or = (twy & twh) << 3;
 }
 
 void GlRenderer::set_draw_area(uint16_t top_left[2], uint16_t dimensions[2])
