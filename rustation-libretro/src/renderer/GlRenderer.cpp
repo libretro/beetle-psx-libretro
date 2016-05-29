@@ -682,12 +682,6 @@ void GlRenderer::maybe_force_draw(  size_t nvertices,
                                     SemiTransparencyMode semi_transparency_mode)
 {
     
-    /*
-    let semi_transparent_remaining_capacity =
-        self.semi_transparent_vertices.capacity()
-        - self.semi_transparent_vertices.len(); 
-    */
-
     /* std::vector grows as much as we want. 'semi_transparent_vertices' is meant
     to have a capacity of VERTEX_BUFFER_LEN. We'll use that constant in the
     subtraction below. */
