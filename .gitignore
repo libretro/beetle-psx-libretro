@@ -5,7 +5,10 @@
 /old
 
 /msvc/Debug
+/msvc/Release
 /msvc/*.suo
 /msvc/*.user
+/msvc/*.sdf
+/msvc/*.db
 /msvc/x64
 /msvc/.vs/msvc-2010/v14/*.suo
