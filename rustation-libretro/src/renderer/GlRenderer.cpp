@@ -229,12 +229,6 @@ void GlRenderer::draw()
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
 
-    // Set the texture window parameters
-    this->command_buffer->program->uniform1ui("tex_x_mask", tex_x_mask);
-    this->command_buffer->program->uniform1ui("tex_x_or", tex_x_or);
-    this->command_buffer->program->uniform1ui("tex_y_mask", tex_y_mask);
-    this->command_buffer->program->uniform1ui("tex_y_or", tex_y_or);
-
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
 
@@ -723,9 +717,6 @@ void GlRenderer::set_draw_offset(int16_t x, int16_t y)
 void GlRenderer::set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
       uint8_t twy)
 {
-    // Finish drawing anything with the current texture window
-    this->draw();
-
     this->tex_x_mask = ~(tww << 3);
     this->tex_x_or = (twx & tww) << 3;
     this->tex_y_mask = ~(twh << 3);
@@ -769,8 +760,13 @@ void GlRenderer::push_triangle( CommandVertex v[3],
 
     size_t slice_len = 3;
     size_t i;
+
     for (i = 0; i < slice_len; ++i) {
         v[i].position[2] = z;
+	v[i].texture_window[0] = tex_x_mask;
+	v[i].texture_window[1] = tex_x_or;
+	v[i].texture_window[2] = tex_y_mask;
+	v[i].texture_window[3] = tex_y_or;
     }
 
     bool needs_opaque_draw =
@@ -910,6 +906,7 @@ std::vector<Attribute> CommandVertex::attributes()
     result.push_back( Attribute("depth_shift",          offsetof(CommandVertex, depth_shift),           GL_UNSIGNED_BYTE,   1) );
     result.push_back( Attribute("dither",               offsetof(CommandVertex, dither),                GL_UNSIGNED_BYTE,   1) );
     result.push_back( Attribute("semi_transparent",     offsetof(CommandVertex, semi_transparent),      GL_UNSIGNED_BYTE,   1) );
+    result.push_back( Attribute("texture_window",       offsetof(CommandVertex, texture_window),        GL_UNSIGNED_BYTE,   4) );
 
     return result;
 }

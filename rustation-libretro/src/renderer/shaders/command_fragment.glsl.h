@@ -9,10 +9,6 @@ uniform uint dither_scaling;
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
 uniform uint texture_flt;
-uniform uint tex_x_mask;
-uniform uint tex_x_or;
-uniform uint tex_y_mask;
-uniform uint tex_y_or;
 
 in vec3 frag_shading_color;
 // Texture page: base offset for texture lookup.
@@ -29,6 +25,8 @@ flat in uint frag_depth_shift;
 flat in uint frag_dither;
 // 0: Opaque primitive, 1: semi-transparent primitive
 flat in uint frag_semi_transparent;
+// Texture window: [ X mask, X or, Y mask, Y or ]
+flat in uvec4 frag_texture_window;
 
 out vec4 frag_color;
 
@@ -82,8 +80,8 @@ vec4 sample_texel(vec2 coords) {
    uint tex_y = uint(coords.y) & 0xffU;
 
    // Texture window adjustments
-   tex_x = (tex_x & tex_x_mask) | tex_x_or;
-   tex_y = (tex_y & tex_y_mask) | tex_y_or;
+   tex_x = (tex_x & frag_texture_window[0]) | frag_texture_window[1];
+   tex_y = (tex_y & frag_texture_window[2]) | frag_texture_window[3];
 
    // Adjust x coordinate based on the texel color depth.
    uint tex_x_pix = tex_x / pix_per_hw;

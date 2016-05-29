@@ -56,6 +56,8 @@ struct CommandVertex {
     uint8_t dither;
     /// 0: primitive is opaque, 1: primitive is semi-transparent
     uint8_t semi_transparent;
+    /// Texture window mask/OR values
+    uint8_t texture_window[4];
 
     static std::vector<Attribute> attributes();
 };
@@ -122,7 +124,7 @@ public:
     /// Counter for preserving primitive draw order in the z-buffer
     /// since we draw semi-transparent primitives out-of-order.
     int16_t primitive_ordering;
-    /// Texture window masks
+    /// Texture window mask/OR values
     uint8_t tex_x_mask;
     uint8_t tex_x_or;
     uint8_t tex_y_mask;
