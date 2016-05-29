@@ -123,7 +123,10 @@ public:
     /// since we draw semi-transparent primitives out-of-order.
     int16_t primitive_ordering;
     /// Texture window masks
-    uint8_t tww, twh, twx, twy;
+    uint8_t tex_x_mask;
+    uint8_t tex_x_or;
+    uint8_t tex_y_mask;
+    uint8_t tex_y_or;
 
     uint8_t filter_type;
 
