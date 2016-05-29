@@ -16,7 +16,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
 {
 
     struct retro_variable var = {0};
-    
+
     var.key = "beetle_psx_internal_resolution";
     uint8_t upscaling = 1;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -33,7 +33,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
           filter = 1;
        this->filter_type = filter;
     }
-    
+
     var.key = "beetle_psx_internal_color_depth";
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -42,8 +42,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
        else
           depth = 16;
     }
-    
-    
+
+
     var.key = "beetle_psx_scale_dither";
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -64,21 +64,21 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
-    DrawBuffer<CommandVertex>* opaque_command_buffer = 
+    DrawBuffer<CommandVertex>* opaque_command_buffer =
         GlRenderer::build_buffer<CommandVertex>(
             command_vertex,
             command_fragment,
             VERTEX_BUFFER_LEN,
             true);
 
-    DrawBuffer<OutputVertex>* output_buffer = 
+    DrawBuffer<OutputVertex>* output_buffer =
         GlRenderer::build_buffer<OutputVertex>(
             output_vertex,
             output_fragment,
             4,
             false);
 
-    DrawBuffer<ImageLoadVertex>* image_load_buffer = 
+    DrawBuffer<ImageLoadVertex>* image_load_buffer =
         GlRenderer::build_buffer<ImageLoadVertex>(
             image_load_vertex,
             image_load_fragment,
@@ -163,7 +163,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
 GlRenderer::~GlRenderer()
 {
-    if (this->command_buffer) {     
+    if (this->command_buffer) {
         delete this->command_buffer;
         this->command_buffer = NULL;
     }
@@ -172,31 +172,31 @@ GlRenderer::~GlRenderer()
     {
         delete this->output_buffer;
         this->output_buffer = NULL;
-    }      
-       
-    if (this->image_load_buffer) {   
+    }
+
+    if (this->image_load_buffer) {
         delete this->image_load_buffer;
         this->image_load_buffer = NULL;
     }
 
-    if (this->config) {              
+    if (this->config) {
         delete this->config;
         this->config = NULL;
     }
 
-    if (this->fb_texture) {          
+    if (this->fb_texture) {
         delete this->fb_texture;
         this->fb_texture = NULL;
     }
 
-    if (this->fb_out) {              
+    if (this->fb_out) {
         delete this->fb_out;
         this->fb_out = NULL;
     }
 
-    if (this->fb_out_depth) {        
+    if (this->fb_out_depth) {
         delete this->fb_out_depth;
-        this->fb_out_depth = NULL;        
+        this->fb_out_depth = NULL;
     }
 }
 
@@ -215,7 +215,7 @@ static DrawBuffer<T>* GlRenderer::build_buffer( const char** vertex_shader,
 }
 */
 
-void GlRenderer::draw() 
+void GlRenderer::draw()
 {
     if (this->command_buffer->empty() && this->semi_transparent_vertices.empty())
         return; // Nothing to be done
@@ -286,14 +286,14 @@ void GlRenderer::draw()
         glEnable(GL_BLEND);
 
         this->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
-        
+
         this->command_buffer->push_slice(&this->semi_transparent_vertices[0], this->semi_transparent_vertices.size());
 
         this->command_buffer->draw(this->command_draw_mode);
-        
+
         this->command_buffer->clear();
-        
-        this->semi_transparent_vertices.clear();     
+
+        this->semi_transparent_vertices.clear();
     }
 
     this->primitive_ordering = 0;
@@ -343,7 +343,7 @@ void GlRenderer::bind_libretro_framebuffer()
         geometry.max_height = 0;
         // Is this accurate?
         geometry.aspect_ratio = 4.0/3.0;
-    
+
 
         printf("Target framebuffer size: %dx%d\n", w, h);
 
@@ -360,7 +360,7 @@ void GlRenderer::bind_libretro_framebuffer()
     glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
-void GlRenderer::upload_textures(   uint16_t top_left[2], 
+void GlRenderer::upload_textures(   uint16_t top_left[2],
                                     uint16_t dimensions[2],
                                     uint16_t pixel_buffer[VRAM_PIXELS])
 {
@@ -377,9 +377,9 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
     uint16_t y_end      = y_start + dimensions[1];
 
     const size_t slice_len = 4;
-    ImageLoadVertex slice[slice_len] =  
-    {   
-        {   {x_start,   y_start }   }, 
+    ImageLoadVertex slice[slice_len] =
+    {
+        {   {x_start,   y_start }   },
         {   {x_end,     y_start }   },
         {   {x_start,   y_end   }   },
         {   {x_end,     y_end   }   }
@@ -404,7 +404,7 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
     get_error();
 }
 
-void GlRenderer::upload_vram_window(uint16_t top_left[2], 
+void GlRenderer::upload_vram_window(uint16_t top_left[2],
                                     uint16_t dimensions[2],
                                     uint16_t pixel_buffer[VRAM_PIXELS])
 {
@@ -424,8 +424,8 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
 
     const size_t slice_len = 4;
     ImageLoadVertex slice[slice_len] =
-        {   
-            {   {x_start,   y_start }   }, 
+        {
+            {   {x_start,   y_start }   },
             {   {x_end,     y_start }   },
             {   {x_start,   y_end   }   },
             {   {x_end,     y_end   }   }
@@ -474,7 +474,7 @@ void GlRenderer::prepare_render()
 bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};
-    
+
     var.key = "beetle_psx_internal_resolution";
     uint8_t upscaling = 1;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -491,14 +491,14 @@ bool GlRenderer::refresh_variables()
           filter = 1;
        this->filter_type = filter;
     }
-    
+
     var.key = "beetle_psx_internal_color_depth";
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         depth = !strcmp(var.value, "32bpp") ? 32 : 16;
     }
-    
-    
+
+
     var.key = "beetle_psx_scale_dither";
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
@@ -548,23 +548,23 @@ bool GlRenderer::refresh_variables()
 
         Texture* fb_out = new Texture(w, h, texture_storage);
 
-        if (this->fb_out) { 
+        if (this->fb_out) {
             delete this->fb_out;
             this->fb_out = NULL;
         }
-        
+
         this->fb_out = fb_out;
 
         // This is a bit wasteful since it'll re-upload the data
         // to `fb_texture` even though we haven't touched it but
         // this code is not very performance-critical anyway.
-        
+
         uint16_t top_left[2] = {0, 0};
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
         this->upload_textures(top_left, dimensions, this->config->vram);
 
-        
-        if (this->fb_out_depth) { 
+
+        if (this->fb_out_depth) {
             delete this->fb_out_depth;
             this->fb_out_depth = NULL;
         }
@@ -601,23 +601,22 @@ void GlRenderer::finalize_frame()
     // We can now render to teh frontend's buffer
     this->bind_libretro_framebuffer();
 
+    glDisable(GL_SCISSOR_TEST);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+
     /* If the display is off, just clear the screen */
     if (this->display_off) {
-        glDisable(GL_SCISSOR_TEST);
         glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
-    } 
-    
+    }
+
     else {
         // Bind 'fb_out' to texture unit 1
         this->fb_out->bind(GL_TEXTURE1);
 
         // First we draw the visible part of fb_out
-        glDisable(GL_SCISSOR_TEST);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_BLEND);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
         uint16_t fb_x_start = this->config->display_top_left[0];
         uint16_t fb_y_start = this->config->display_top_left[1];
         uint16_t fb_width = this->config->display_resolution[0];
@@ -670,12 +669,11 @@ void GlRenderer::finalize_frame()
 /// Check if a new primitive's attributes are somehow incompatible
 /// with the ones currently buffered, in which case we must force
 /// a draw to flush the buffers.
-void GlRenderer::maybe_force_draw(  size_t nvertices, 
-                                    GLenum draw_mode, 
-                                    bool semi_transparent, 
+void GlRenderer::maybe_force_draw(  size_t nvertices,
+                                    GLenum draw_mode,
+                                    bool semi_transparent,
                                     SemiTransparencyMode semi_transparency_mode)
 {
-    
     /* std::vector grows as much as we want. 'semi_transparent_vertices' is meant
     to have a capacity of VERTEX_BUFFER_LEN. We'll use that constant in the
     subtraction below. */
@@ -736,8 +734,8 @@ void GlRenderer::set_draw_area(uint16_t top_left[2], uint16_t dimensions[2])
     this->apply_scissor();
 }
 
-void GlRenderer::set_display_mode(  uint16_t top_left[2], 
-                                    uint16_t resolution[2], 
+void GlRenderer::set_display_mode(  uint16_t top_left[2],
+                                    uint16_t resolution[2],
                                     bool depth_24bpp)
 {
     this->config->display_top_left[0] = top_left[0];
@@ -748,7 +746,7 @@ void GlRenderer::set_display_mode(  uint16_t top_left[2],
     this->config->display_24bpp = depth_24bpp;
 }
 
-void GlRenderer::push_triangle( CommandVertex v[3], 
+void GlRenderer::push_triangle( CommandVertex v[3],
                                 SemiTransparencyMode semi_transparency_mode)
 {
     this->maybe_force_draw( 3, GL_TRIANGLES,
@@ -786,7 +784,7 @@ void GlRenderer::push_triangle( CommandVertex v[3],
         size_t i;
         for (i = 0; i < slice_len; ++i) {
             this->semi_transparent_vertices.push_back(v[i]);
-        }   
+        }
     }
 }
 
@@ -810,13 +808,13 @@ void GlRenderer::push_line( CommandVertex v[2],
         size_t i;
         for (i = 0; i < slice_len; ++i) {
             this->semi_transparent_vertices.push_back(v[i]);
-        }   
+        }
     } else {
         this->command_buffer->push_slice(v, slice_len);
     }
 }
 
-void GlRenderer::fill_rect( uint8_t color[3], 
+void GlRenderer::fill_rect( uint8_t color[3],
                             uint16_t top_left[2],
                             uint16_t dimensions[2])
 {
@@ -827,13 +825,13 @@ void GlRenderer::fill_rect( uint8_t color[3],
     // and reconfigure the scissor box to the fill rectangle
     // instead.
     uint16_t draw_area_top_left[2] = {
-        this->config->draw_area_top_left[0], 
-        this->config->draw_area_top_left[1] 
+        this->config->draw_area_top_left[0],
+        this->config->draw_area_top_left[1]
     };
     uint16_t draw_area_dimensions[2] = {
         this->config->draw_area_dimensions[0],
         this->config->draw_area_dimensions[1]
-    }; 
+    };
 
     this->config->draw_area_top_left[0] = top_left[0];
     this->config->draw_area_top_left[1] = top_left[1];
@@ -865,8 +863,8 @@ void GlRenderer::fill_rect( uint8_t color[3],
     this->apply_scissor();
 }
 
-void GlRenderer::copy_rect( uint16_t source_top_left[2], 
-                            uint16_t target_top_left[2],  
+void GlRenderer::copy_rect( uint16_t source_top_left[2],
+                            uint16_t target_top_left[2],
                             uint16_t dimensions[2])
 {
     // Draw pending commands
