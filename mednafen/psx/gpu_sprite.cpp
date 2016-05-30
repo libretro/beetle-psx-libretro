@@ -195,8 +195,8 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 		     clut_x, clut_y,
 		     blend_mode,
 		     2 - TexMode_TA,
-			  DitherEnabled(),
-			  BlendMode > 0);
+		     DitherEnabled(),
+		     BlendMode);
 
    rsx_intf_push_triangle(x + w, y,
 		     x, y + h,
@@ -211,8 +211,8 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 		     clut_x, clut_y,
 		     blend_mode,
 		     2 - TexMode_TA,
-			  DitherEnabled(),
-			  BlendMode > 0);   
+		     DitherEnabled(),
+		     BlendMode);
 
 #if 0
    printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);
