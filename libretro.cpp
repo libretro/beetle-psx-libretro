@@ -29,6 +29,8 @@ static bool display_internal_framerate = false;
 static bool allow_frame_duping = false;
 static bool failed_init = false;
 static unsigned image_offset = 0;
+static unsigned image_crop = 0;
+static bool crop_overscan = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2745,6 +2747,16 @@ static void check_variables(bool startup)
    else
      display_internal_framerate = false;
 
+   var.key = "beetle_psx_crop_overscan";
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+     {
+       if (strcmp(var.value, "enabled") == 0)
+         crop_overscan = true;
+       else if (strcmp(var.value, "disabled") == 0)
+         crop_overscan = false;
+     }
+
    var.key = "beetle_psx_image_offset";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2767,6 +2779,30 @@ static void check_variables(bool startup)
          image_offset = -4;
       else if (strcmp(var.value, "-4 px") == 0)
          image_offset = 4;
+   }
+
+   var.key = "beetle_psx_image_crop";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         image_crop = 0;
+      else if (strcmp(var.value, "1 px") == 0)
+         image_crop = 1;
+      else if (strcmp(var.value, "2 px") == 0)
+         image_crop = 2;
+      else if (strcmp(var.value, "3 px") == 0)
+         image_crop = 3;
+      else if (strcmp(var.value, "4 px") == 0)
+         image_crop = 4;
+      else if (strcmp(var.value, "5 px") == 0)
+         image_crop = 5;
+      else if (strcmp(var.value, "6 px") == 0)
+         image_crop = 6;
+      else if (strcmp(var.value, "7 px") == 0)
+         image_crop = 7;
+      else if (strcmp(var.value, "8 px") == 0)
+         image_crop = 8;
    }
 
 }
@@ -3175,10 +3211,6 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
       return false;
 
-
-   overscan = false;
-   environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
-
    extract_basename(retro_cd_base_name,       info->path, sizeof(retro_cd_base_name));
    extract_directory(retro_cd_base_directory, info->path, sizeof(retro_cd_base_directory));
 
@@ -3579,7 +3611,7 @@ void retro_run(void)
       const uint32_t *pix = surf->pixels;
       unsigned pix_offset = 0;
 
-      if (!overscan)
+      if (crop_overscan)
       {
          // 320 width -> 350 width.
          // 364 width -> 400 width.
@@ -3591,29 +3623,29 @@ void retro_run(void)
          {
             // The shifts are not simply (padded_width - real_width) / 2.
             case 280:
-               pix_offset += 10 + image_offset;
-               width = 256;
+               pix_offset += 10 + (image_offset + floor(0.5 * image_crop));
+               width = 256 - image_crop;
                break;
 
             case 350:
-               pix_offset += 14 + image_offset;
-               width = 320;
+               pix_offset += 14 + (image_offset + floor(0.5 * image_crop));
+               width = 320 - image_crop;
                break;
 
             case 400:
-               pix_offset += 15 + image_offset;
-               width = 364;
+               pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
+               width = 364 - image_crop;
                break;
 
 
             case 560:
-               pix_offset += 26 + image_offset;
-               width       = 512;
+               pix_offset += 26 + (image_offset + floor(0.5 * image_crop));
+               width = 512 - image_crop;
                break;
 
             case 700:
-               pix_offset += 33 + image_offset;
-               width       = 640;
+               pix_offset += 33 + (image_offset + floor(0.5 * image_crop));
+               width = 640 - image_crop;
                break;
 
             default:
@@ -3774,7 +3806,9 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
       { "beetle_psx_frame_duping_enable", "Frame duping (speedup); disabled|enabled" },
       { "beetle_psx_display_internal_framerate", "Display internal FPS; disabled|enabled" },
+      { "beetle_psx_crop_overscan", "Crop Overscan; enabled|disabled" },
       { "beetle_psx_image_offset", "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
+      { "beetle_psx_image_crop", "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {
