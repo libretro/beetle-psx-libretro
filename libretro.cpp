@@ -2747,6 +2747,8 @@ static void check_variables(bool startup)
    else
      display_internal_framerate = false;
 
+   var.key = "beetle_psx_crop_overscan";
+   
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
        if (strcmp(var.value, "enabled") == 0)
