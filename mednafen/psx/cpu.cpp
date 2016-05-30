@@ -87,7 +87,7 @@ INLINE void PS_CPU::RecalcIPCache(void)
 {
    IPCache = 0;
 
-   if(((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)) || Halted)
+   if(((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)))
       IPCache = 0x80;
 
    if(Halted)
@@ -868,20 +868,17 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	uint32 riv = (instr >> 16) & 0x1F;
 	uint32 immediate = (int32)(int16)(instr & 0xFFFF);
 	bool result = (int32)(tv ^ (riv << 31)) < 0;
+	const uint32 link = ((riv & 0x1E) == 0x10) ? 31 : 0;
 
 	GPR_DEPRES_BEGIN
 	GPR_DEP((instr >> 21) & 0x1F);
-
-	if(riv & 0x10)
- 	 GPR_RES(31);
-
+ 	GPR_RES(link);
 	GPR_DEPRES_END
-
 
 	DO_LDS();
 
-	if(riv & 0x10)	// Unconditional link reg setting.
-	 GPR[31] = PC + 8;
+	if(link)	// Unconditional link reg setting.
+	 GPR[link] = PC + 8;
 
         if(result)
 	{
@@ -1938,6 +1935,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 address = GPR[rs] + immediate;
 
+	if(MDFN_UNLIKELY(LDWhich == rt))
+	 LDWhich = 0;
+
 	DO_LDS();
 
 	LDWhich = rt;
@@ -1955,6 +1955,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
         uint32 address = GPR[rs] + immediate;
+
+	if(MDFN_UNLIKELY(LDWhich == rt))
+	 LDWhich = 0;
 
 	DO_LDS();
 
@@ -1974,15 +1977,20 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         uint32 address = GPR[rs] + immediate;
 
-	DO_LDS();
-
 	if(MDFN_UNLIKELY(address & 1))
 	{
+	 DO_LDS();
+
 	 new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
 	{
+	 if(MDFN_UNLIKELY(LDWhich == rt))
+	  LDWhich = 0;
+
+	 DO_LDS();
+
 	 LDWhich = rt;
          LDValue = (int32)ReadMemory<int16>(timestamp, address);
 	}
@@ -2000,15 +2008,20 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         uint32 address = GPR[rs] + immediate;
 
-	DO_LDS();
-
         if(MDFN_UNLIKELY(address & 1))
 	{
+	 DO_LDS();
+
          new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
 	else
 	{
+	 if(MDFN_UNLIKELY(LDWhich == rt))
+	  LDWhich = 0;
+
+	 DO_LDS();
+
 	 LDWhich = rt;
          LDValue = ReadMemory<uint16>(timestamp, address);
 	}
@@ -2027,15 +2040,20 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         uint32 address = GPR[rs] + immediate;
 
-	DO_LDS();
-
         if(MDFN_UNLIKELY(address & 3))
 	{
+	 DO_LDS();
+
          new_PC = Exception(EXCEPTION_ADEL, PC, new_PC, new_PC_mask, instr);
          new_PC_mask = 0;
 	}
         else
 	{
+	 if(MDFN_UNLIKELY(LDWhich == rt))
+	  LDWhich = 0;
+
+	 DO_LDS();
+
 	 LDWhich = rt;
          LDValue = ReadMemory<uint32>(timestamp, address);
 	}

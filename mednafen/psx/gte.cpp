@@ -1044,7 +1044,7 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
       dividend <<= shift_bias;
       divisor <<= shift_bias;
 
-      return ((int64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16;
+      return std::min<uint32>(0x1FFFF, ((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
    }
 
    FLAGS |= 1 << 17;
