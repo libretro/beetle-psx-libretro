@@ -651,12 +651,16 @@ static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
 {
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
+   rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
+         g->ClipX1, g->ClipY1);
 }
 
 static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
 {
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
+   rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
+         g->ClipX1, g->ClipY1);
 }
 
 // XXX this command (and probably those around it) doesn't appear to
@@ -955,12 +959,10 @@ void PS_GPU::ProcessFIFO(void)
             G_Command_TexWindow(this, CB);
             break;
          case 0xe3: /* Clip 0 */
-            this->ClipX0 = *CB & 1023;
-            this->ClipY0 = (*CB >> 10) & 1023;
+            G_Command_Clip0(this, CB);
             break;
          case 0xe4: /* Clip 1 */
-            this->ClipX1 = *CB & 1023;
-            this->ClipY1 = (*CB >> 10) & 1023;
+            G_Command_Clip1(this, CB);
             break;
          case 0xe5: /* Drawing Offset */
             this->OffsX = sign_x_to_s32(11, (*CB & 2047));
@@ -973,17 +975,6 @@ void PS_GPU::ProcessFIFO(void)
          default:
             if(command->func[abr][TexMode])
                command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-            break;
-      }
-
-      switch (cc)
-      {
-         case 0xe3: /* Clip 0 */
-         case 0xe4: /* Clip 1 */
-            rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
-                  this->ClipX1, this->ClipY1);
-            break;
-         default:
             break;
       }
    }
