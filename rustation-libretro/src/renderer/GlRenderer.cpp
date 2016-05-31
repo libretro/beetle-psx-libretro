@@ -317,7 +317,7 @@ void GlRenderer::apply_scissor()
     uint16_t _x = this->config->draw_area_top_left[0];
     uint16_t _y = this->config->draw_area_top_left[1];
     uint16_t _w = this->config->draw_area_bot_right[0] - _x;
-    uint16_t _h = this->config->draw_area_bot_right[1] - _h;
+    uint16_t _h = this->config->draw_area_bot_right[1] - _y;
 
     GLsizei upscale = (GLsizei) this->internal_upscaling;
 
