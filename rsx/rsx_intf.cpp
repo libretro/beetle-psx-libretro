@@ -251,8 +251,8 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
    }
 }
 
-void rsx_intf_set_draw_area(uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h)
+void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
+			    uint16_t x1, uint16_t y1)
 {
    switch (rsx_type)
    {
@@ -260,12 +260,12 @@ void rsx_intf_set_draw_area(uint16_t x, uint16_t y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_draw_area(x, y, w, h);
+         rsx_gl_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
-         rsx_set_draw_area(x, y, w, h);
+         rsx_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
    }

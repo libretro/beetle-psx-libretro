@@ -32,7 +32,7 @@ struct DrawConfig {
     bool     display_24bpp;
     int16_t  draw_offset[2];
     uint16_t draw_area_top_left[2];
-    uint16_t draw_area_dimensions[2];
+    uint16_t draw_area_bot_right[2];
     uint16_t vram[VRAM_PIXELS];
 };
 
@@ -177,7 +177,7 @@ public:
                             SemiTransparencyMode semi_transparency_mode);
 
     void set_draw_offset(int16_t x, int16_t y);
-    void set_draw_area(uint16_t top_left[2], uint16_t dimensions[2]);
+    void set_draw_area(uint16_t top_left[2], uint16_t bot_right[2]);
     void set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
           uint8_t twy);
 

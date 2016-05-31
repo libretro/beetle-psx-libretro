@@ -316,8 +316,8 @@ void GlRenderer::apply_scissor()
 {
     uint16_t _x = this->config->draw_area_top_left[0];
     uint16_t _y = this->config->draw_area_top_left[1];
-    uint16_t _w = this->config->draw_area_dimensions[0];
-    uint16_t _h = this->config->draw_area_dimensions[1];
+    uint16_t _w = this->config->draw_area_bot_right[0] - _x;
+    uint16_t _h = this->config->draw_area_bot_right[1] - _h;
 
     GLsizei upscale = (GLsizei) this->internal_upscaling;
 
@@ -770,15 +770,16 @@ void GlRenderer::set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
     this->tex_y_or = (twy & twh) << 3;
 }
 
-void GlRenderer::set_draw_area(uint16_t top_left[2], uint16_t dimensions[2])
+void GlRenderer::set_draw_area(uint16_t top_left[2],
+			       uint16_t bot_right[2])
 {
     // Finish drawing anything in the current area
     this->draw();
 
     this->config->draw_area_top_left[0] = top_left[0];
     this->config->draw_area_top_left[1] = top_left[1];
-    this->config->draw_area_dimensions[0] = dimensions[0];
-    this->config->draw_area_dimensions[1] = dimensions[1];
+    this->config->draw_area_bot_right[0] = bot_right[0];
+    this->config->draw_area_bot_right[1] = bot_right[1];
 
     this->apply_scissor();
 }
@@ -919,15 +920,15 @@ void GlRenderer::fill_rect( uint8_t color[3],
         this->config->draw_area_top_left[0],
         this->config->draw_area_top_left[1]
     };
-    uint16_t draw_area_dimensions[2] = {
-        this->config->draw_area_dimensions[0],
-        this->config->draw_area_dimensions[1]
+    uint16_t draw_area_bot_right[2] = {
+        this->config->draw_area_bot_right[0],
+        this->config->draw_area_bot_right[1]
     };
 
     this->config->draw_area_top_left[0] = top_left[0];
     this->config->draw_area_top_left[1] = top_left[1];
-    this->config->draw_area_dimensions[0] = dimensions[0];
-    this->config->draw_area_dimensions[1] = dimensions[1];
+    this->config->draw_area_bot_right[0] = top_left[0] + dimensions[0];
+    this->config->draw_area_bot_right[1] = top_left[1] + dimensions[1];
 
     this->apply_scissor();
 
@@ -946,10 +947,10 @@ void GlRenderer::fill_rect( uint8_t color[3],
     }
 
     // Reconfigure the draw area
-    this->config->draw_area_top_left[0]     = draw_area_top_left[0];
-    this->config->draw_area_top_left[1]     = draw_area_top_left[1];
-    this->config->draw_area_dimensions[0]   = draw_area_dimensions[0];
-    this->config->draw_area_dimensions[1]   = draw_area_dimensions[1];
+    this->config->draw_area_top_left[0]    = draw_area_top_left[0];
+    this->config->draw_area_top_left[1]    = draw_area_top_left[1];
+    this->config->draw_area_bot_right[0]   = draw_area_bot_right[0];
+    this->config->draw_area_bot_right[1]   = draw_area_bot_right[1];
 
     this->apply_scissor();
 }

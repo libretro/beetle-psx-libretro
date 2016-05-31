@@ -47,8 +47,8 @@ enum blending_modes
         uint8_t twx, uint8_t twy);
 
   void rsx_intf_set_draw_offset(int16_t x, int16_t y);
-  void rsx_intf_set_draw_area(uint16_t x, uint16_t y,
-                         uint16_t w, uint16_t h);
+  void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
+                              uint16_t x1, uint16_t y1);
   void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                             uint16_t w, uint16_t h,
                             bool depth_24bpp);

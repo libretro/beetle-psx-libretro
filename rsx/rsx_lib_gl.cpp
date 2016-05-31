@@ -96,14 +96,14 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
    renderer()->gl_renderer()->set_tex_window(tww, twh, twx, twy);
 }
 
-void  rsx_gl_set_draw_area(uint16_t x,
-      uint16_t y,
-      uint16_t w,
-      uint16_t h)
+void  rsx_gl_set_draw_area(uint16_t x0,
+			   uint16_t y0,
+			   uint16_t x1,
+			   uint16_t y1)
 {
-   uint16_t top_left[2]   = {x, y};
-   uint16_t dimensions[2] = {w, h};
-   renderer()->gl_renderer()->set_draw_area(top_left, dimensions);
+   uint16_t top_left[2]   = {x0, y0};
+   uint16_t bot_right[2] = {x1, y1};
+   renderer()->gl_renderer()->set_draw_area(top_left, bot_right);
 }
 
 void rsx_gl_set_display_mode(uint16_t x,

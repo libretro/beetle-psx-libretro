@@ -652,7 +652,7 @@ static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
    rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
-         g->ClipX1, g->ClipY1);
+			  g->ClipX1, g->ClipY1);
 }
 
 static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
