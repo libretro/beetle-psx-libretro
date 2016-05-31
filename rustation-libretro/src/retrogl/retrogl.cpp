@@ -62,15 +62,7 @@ RetroGl::RetroGl(VideoClock video_clock)
         {0, 0},         // draw_area_top_left
         {0, 0},         // draw_area_dimensions
         {0, 0},         // draw_offset
-        {}              // vram
     };
-
-    // The VRAM's bootup contents are undefined
-    size_t i;
-    for (i = 0; i < VRAM_PIXELS; ++i)
-    {
-        config.vram[i] = 0xdead;
-    }
 
     // No context until `context_reset` is called
     this->state = GlState_Invalid;
@@ -241,6 +233,7 @@ bool RetroGl::context_framebuffer_lock(void *data)
     case GlState_Valid:
         return false;
     case GlState_Invalid:
+    default:
         return true;
     }
 }

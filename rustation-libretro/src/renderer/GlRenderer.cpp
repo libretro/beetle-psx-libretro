@@ -1,5 +1,8 @@
 #include "GlRenderer.h"
 
+#include "mednafen/mednafen.h"
+#include "mednafen/psx/gpu.h"
+
 #include "shaders/command_vertex.glsl.h"
 #include "shaders/command_fragment.glsl.h"
 #include "shaders/output_vertex.glsl.h"
@@ -11,6 +14,9 @@
 #include <stdlib.h> // size_t, EXIT_FAILURE
 #include <stddef.h> // offsetof()
 #include <string.h>
+
+// Main GPU instance, used to access the VRAM
+extern PS_GPU *GPU;
 
 GlRenderer::GlRenderer(DrawConfig* config)
 {
@@ -171,7 +177,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     // checker happy...
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-    this->upload_textures(top_left, dimensions, this->config->vram);
+    this->upload_textures(top_left, dimensions, GPU->vram);
 }
 
 GlRenderer::~GlRenderer()
@@ -598,7 +604,9 @@ bool GlRenderer::refresh_variables()
 
         uint16_t top_left[2] = {0, 0};
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-        this->upload_textures(top_left, dimensions, this->config->vram);
+
+        this->upload_textures(top_left, dimensions,
+			      GPU->vram);
 
 
         if (this->fb_out_depth) {

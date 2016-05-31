@@ -33,7 +33,6 @@ struct DrawConfig {
     int16_t  draw_offset[2];
     uint16_t draw_area_top_left[2];
     uint16_t draw_area_bot_right[2];
-    uint16_t vram[VRAM_PIXELS];
 };
 
 struct CommandVertex {
