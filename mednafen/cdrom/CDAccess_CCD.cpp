@@ -287,6 +287,9 @@ void CDAccess_CCD::CheckSubQSanity(void)
    int                 prev_lba = INT_MAX;
    uint8_t           prev_track = 0;
 
+   // Silence GCC warning
+   (void)prev_lba;
+
    for(s = 0; s < img_numsectors; s++)
    {
       uint8_t adr;

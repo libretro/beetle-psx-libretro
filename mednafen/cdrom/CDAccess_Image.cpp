@@ -754,6 +754,9 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    int32 LastIndex = 0;
    long FileOffset = 0;
 
+   // Silence GCC warning
+   (void)LastIndex;
+
    for(int x = FirstTrack; x < (FirstTrack + NumTracks); x++)
    {
       if(Tracks[x].DIFormat == DI_FORMAT_AUDIO)

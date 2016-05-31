@@ -186,6 +186,9 @@ int ValidateRawSector(unsigned char *frame, bool xaMode)
 {
    int lec_did_sth = false;
 
+   // Silence GCC warning
+   (void)lec_did_sth;
+
    /* Do simple L-EC.
       It seems that drives stop their internal L-EC as soon as the
       EDC is okay, so we may see uncorrected errors in the parity bytes.
