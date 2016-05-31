@@ -58,7 +58,7 @@ public:
 };
 
 /* This was originally in rustation-libretro/lib.rs */
-retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling);
+retro_system_av_info get_av_info(VideoClock std);
 
 /* TODO - Get rid of these shims */
 static void shim_context_reset();

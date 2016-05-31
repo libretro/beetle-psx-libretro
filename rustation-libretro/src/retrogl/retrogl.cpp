@@ -49,7 +49,7 @@ RetroGl::RetroGl(VideoClock video_clock)
     params.stencil               = false;
     params.imm_vbo_draw          = NULL;
     params.imm_vbo_disable       = NULL;
-   
+
     if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
         puts("Failed to init hardware context\n");
         exit(EXIT_FAILURE);
@@ -95,7 +95,7 @@ void RetroGl::context_reset() {
     if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
         return;
 
-   
+
     /* TODO: I don't know how to translate this into C++ */
 
     /*
@@ -123,7 +123,7 @@ void RetroGl::context_reset() {
         delete this->state_data.r;
         this->state_data.r = NULL;
     }
-    
+
     /* GlRenderer will own this copy and delete it in its dtor */
     DrawConfig* copy_of_config  = new DrawConfig;
     memcpy(copy_of_config, &config, sizeof(config));
@@ -131,13 +131,13 @@ void RetroGl::context_reset() {
     this->state = GlState_Valid;
 }
 
-GlRenderer* RetroGl::gl_renderer() 
+GlRenderer* RetroGl::gl_renderer()
 {
     switch (this->state)
     {
     case GlState_Valid:
         return this->state_data.r;
-    case GlState_Invalid:
+    default:
         puts("Attempted to get GL state without GL context!\n");
         exit(EXIT_FAILURE);
     }
@@ -163,7 +163,7 @@ void RetroGl::context_destroy()
     this->state_data.c = config;
 }
 
-void RetroGl::prepare_render() 
+void RetroGl::prepare_render()
 {
     GlRenderer* renderer = NULL;
     switch (this->state)
@@ -213,15 +213,8 @@ void RetroGl::refresh_variables()
         // The resolution has changed, we must tell the frontend
         // to change its format
         struct retro_variable var = {0};
-    
-        var.key = "beetle_psx_internal_resolution";
-        uint8_t upscaling = 1;
-        if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-            /* Same limitations as libretro.cpp */
-            upscaling = var.value[0] -'0';
-        }
 
-        struct retro_system_av_info av_info = get_av_info(this->video_clock, upscaling);
+        struct retro_system_av_info av_info = get_av_info(this->video_clock);
 
         // This call can potentially (but not necessarily) call
         // `context_destroy` and `context_reset` to reinitialize
@@ -238,18 +231,7 @@ void RetroGl::refresh_variables()
 
 struct retro_system_av_info RetroGl::get_system_av_info()
 {
-    struct retro_variable var = {0};
-    
-    var.key = "beetle_psx_internal_resolution";
-    uint8_t upscaling = 1;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        /* Same limitations as libretro.cpp */
-        upscaling = var.value[0] -'0';
-    }
-
-    struct retro_system_av_info av_info = get_av_info(this->video_clock, upscaling);
-
-    return av_info;
+    return get_av_info(this->video_clock);
 }
 
 bool RetroGl::context_framebuffer_lock(void *data)
@@ -264,27 +246,54 @@ bool RetroGl::context_framebuffer_lock(void *data)
 }
 
 
-struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
+struct retro_system_av_info get_av_info(VideoClock std)
 {
-    // Maximum resolution supported by the PlayStation video
-    // output is 640x480
-    unsigned int max_width  = (unsigned int) (640 * upscaling);
-    unsigned int max_height = (unsigned int) (480 * upscaling);
-    bool widescreen_hack = false;
-
     struct retro_variable var = {0};
-    var.key = "beetle_psx_widescreen_hack";
 
+    var.key = "beetle_psx_internal_resolution";
+    uint8_t upscaling = 1;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      /* Same limitations as libretro.cpp */
+      upscaling = var.value[0] -'0';
+    }
+
+    var.key = "beetle_psx_display_vram";
+    bool display_vram = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+	display_vram = true;
+      else
+	display_vram = false;
+    }
+
+    var.key = "beetle_psx_widescreen_hack";
+    bool widescreen_hack = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         if (!strcmp(var.value, "enabled"))
             widescreen_hack = true;
         else if (!strcmp(var.value, "disabled"))
             widescreen_hack = false;
     }
-    
+
+    unsigned int max_width = 0;
+    unsigned int max_height = 0;
+
+    if (display_vram) {
+      max_width = 1024;
+      max_height = 512;
+    } else {
+      // Maximum resolution supported by the PlayStation video
+      // output is 640x480
+      max_width = 640;
+      max_height = 480;
+    }
+
+    max_width *= upscaling;
+    max_height *= upscaling;
+
     struct retro_system_av_info info;
     memset(&info, 0, sizeof(info));
-    
+
     // The base resolution will be overriden using
     // ENVIRONMENT_SET_GEOMETRY before rendering a frame so
     // this base value is not really important
@@ -292,8 +301,12 @@ struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
     info.geometry.base_height   = max_height;
     info.geometry.max_width     = max_width;
     info.geometry.max_height    = max_height;
-    /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
-    info.geometry.aspect_ratio  = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
+    if (display_vram) {
+      info.geometry.aspect_ratio = 2./1.;
+    } else {
+      /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
+      info.geometry.aspect_ratio  = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
+    }
     info.timing.sample_rate     = 44100;
 
     // Precise FPS values for the video output for the given
@@ -308,7 +321,7 @@ struct retro_system_av_info get_av_info(VideoClock std, uint32_t upscaling)
     case VideoClock_Pal:
         info.timing.fps = 49.76;
         break;
-    }    
+    }
 
     return info;
 }

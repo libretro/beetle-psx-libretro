@@ -132,6 +132,9 @@ public:
 
     uint8_t filter_type;
 
+    /// When true we display the entire VRAM buffer instead of just
+    /// the visible area
+    bool display_vram;
 
     /* Flag for finalize_frame(). If true, we'll glClear() the libretro fb */
     bool display_off;

@@ -3793,6 +3793,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_internal_color_depth", "Internal color depth; dithered 16bpp (native)|32bpp" },
       { "beetle_psx_scale_dither", "Scale dithering pattern with internal resolution; enabled|disabled" },
       { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
+      { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { "beetle_psx_gte_subpixel", "GTE pixel accuracy; 1x(native)|subpixel" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },

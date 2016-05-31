@@ -65,6 +65,15 @@ GlRenderer::GlRenderer(DrawConfig* config)
           wireframe = false;
     }
 
+    var.key = "beetle_psx_display_vram";
+    bool display_vram = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+	display_vram = true;
+      else
+	display_vram = false;
+    }
+
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
     DrawBuffer<CommandVertex>* opaque_command_buffer =
@@ -152,6 +161,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->tex_x_or = 0;
     this->tex_y_mask = 0;
     this->tex_y_or = 0;
+    this->display_vram = display_vram;
     // }
 
     this->display_off = true;
@@ -326,8 +336,20 @@ void GlRenderer::bind_libretro_framebuffer()
 {
     uint32_t f_w = this->frontend_resolution[0];
     uint32_t f_h = this->frontend_resolution[1];
-    uint16_t _w = this->config->display_resolution[0];
-    uint16_t _h = this->config->display_resolution[1];
+    uint16_t _w;
+    uint16_t _h;
+    float    aspect_ratio;
+
+    if (this->display_vram) {
+      _w = VRAM_WIDTH_PIXELS;
+      _h = VRAM_HEIGHT;
+      // Is this accurate?
+      aspect_ratio = 2.0 / 1.0;
+    } else {
+      _w = this->config->display_resolution[0];
+      _h = this->config->display_resolution[1];
+      aspect_ratio = 4.0 / 3.0;
+    }
 
     uint32_t upscale = this->internal_upscaling;
 
@@ -344,9 +366,8 @@ void GlRenderer::bind_libretro_framebuffer()
         // Max parameters are ignored by this call
         geometry.max_width  = 0;
         geometry.max_height = 0;
-        // Is this accurate?
-        geometry.aspect_ratio = 4.0/3.0;
 
+        geometry.aspect_ratio = aspect_ratio;
 
         printf("Target framebuffer size: %dx%d\n", w, h);
 
@@ -523,8 +544,18 @@ bool GlRenderer::refresh_variables()
           wireframe = false;
     }
 
-    bool rebuild_fb_out =   upscaling != this->internal_upscaling ||
-                            depth != this->internal_color_depth;
+    var.key = "beetle_psx_display_vram";
+    bool display_vram = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled")) {
+	display_vram = true;
+      } else
+	display_vram = false;
+    }
+
+    bool rebuild_fb_out =
+      upscaling != this->internal_upscaling ||
+      depth != this->internal_color_depth;
 
     if (rebuild_fb_out) {
         if (depth > 16) {
@@ -590,9 +621,12 @@ bool GlRenderer::refresh_variables()
     // reconfigured. We can't do that here because it could
     // destroy the OpenGL context which would destroy `self`
     //// r5 - replace 'self' by 'this'
-    bool reconfigure_frontend = this->internal_upscaling != upscaling;
+    bool reconfigure_frontend =
+      this->internal_upscaling != upscaling ||
+      this->display_vram != display_vram;
 
     this->internal_upscaling = upscaling;
+    this->display_vram = display_vram;
     this->internal_color_depth = depth;
 
     return reconfigure_frontend;
@@ -628,22 +662,31 @@ void GlRenderer::finalize_frame()
         uint16_t fb_width = this->config->display_resolution[0];
         uint16_t fb_height = this->config->display_resolution[1];
 
+	GLint depth_24bpp = (GLint) this->config->display_24bpp;
+
+	if (this->display_vram) {
+	  // Display the entire VRAM as a 16bpp buffer
+	  fb_x_start = 0;
+	  fb_y_start = 0;
+	  fb_width = VRAM_WIDTH_PIXELS;
+	  fb_height = VRAM_HEIGHT;
+
+	  depth_24bpp = 0;
+	}
+
         uint16_t fb_x_end = fb_x_start + fb_width;
         uint16_t fb_y_end = fb_y_start + fb_height;
 
         this->output_buffer->clear();
 
-        const size_t slice_len = 4;
-        OutputVertex slice[slice_len] =
+        OutputVertex slice[4] =
         {
             { {-1.0, -1.0}, {fb_x_start,    fb_y_end}   },
             { { 1.0, -1.0}, {fb_x_end,      fb_y_end}   },
             { {-1.0,  1.0}, {fb_x_start,    fb_y_start} },
             { { 1.0,  1.0}, {fb_x_end,      fb_y_start} }
         };
-        this->output_buffer->push_slice(slice, slice_len);
-
-        GLint depth_24bpp = (GLint) this->config->display_24bpp;
+        this->output_buffer->push_slice(slice, 4);
 
         this->output_buffer->program->uniform1i("fb", 1);
         this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
