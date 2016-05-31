@@ -112,6 +112,48 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
    }
 }
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+void rsx_gl_push_sprite(
+      int16_t p0x,
+      int16_t p0y,
+      int16_t p1x,
+      int16_t p1y,
+      int16_t p2x,
+      int16_t p2y,
+      int16_t p3x,
+      int16_t p3y,
+      int16_t p4x,
+      int16_t p4y,
+      int16_t p5x,
+      int16_t p5y,
+      uint32_t c0,
+      uint32_t c1,
+      uint32_t c2,
+      uint32_t c3,
+      uint32_t c4,
+      uint32_t c5,
+      uint16_t t0x,
+      uint16_t t0y,
+      uint16_t t1x,
+      uint16_t t1y,
+      uint16_t t2x,
+      uint16_t t2y,
+      uint16_t t3x,
+      uint16_t t3y,
+      uint16_t t4x,
+      uint16_t t4y,
+      uint16_t t5x,
+      uint16_t t5y,
+      uint16_t texpage_x,
+      uint16_t texpage_y,
+      uint16_t clut_x,
+      uint16_t clut_y,
+      uint8_t texture_blend_mode,
+      uint8_t depth_shift,
+      bool dither,
+      int blend_mode);
+#endif
+
 template<uint8_t raw_size, bool textured, int BlendMode,
    bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
 INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
@@ -182,37 +224,84 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
        blend_mode = BLEND_MODE_ADD;
    }
 
-   rsx_intf_push_triangle(x, y,
-		     x + w, y,
-		     x, y + h,
-		     color,
-		     color,
-		     color,
-		     u, v,
-		     u + w, v,
-		     u, v + h,
-		     this->TexPageX, this->TexPageY,
-		     clut_x, clut_y,
-		     blend_mode,
-		     2 - TexMode_TA,
-		     DitherEnabled(),
-		     BlendMode);
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   if (rsx_intf_is_type() == RSX_OPENGL)
+   {
+      rsx_gl_push_sprite(
+            x,                /* p0x */
+            y,                /* p0y */
+            x + w,            /* p1x */
+            y,                /* p1y */
+            x,                /* p2x */
+            y + h,            /* p2y */
+            x + w,            /* p3x */
+            y,                /* p3y */
+            x,                /* p4x */
+            y + h,            /* p4y */
+            x + w,            /* p5x */
+            y + h,            /* p5y */
+            color,            /* c0 */
+            color,            /* c1 */
+            color,            /* c2 */
+            color,            /* c3 */
+            color,            /* c4 */
+            color,            /* c5 */
+            u,                /* t0x */
+            v,                /* t0y */
+            u + w,            /* t1x */
+            v,                /* t1y */
+            u,                /* t2x */
+            v + h,            /* t2y */
+            u + w,            /* t3x */
+            v,                /* t3y */
+            u,                /* t4x */
+            v + h,            /* t4y */
+            u + w,            /* t5x */
+            v + h,            /* t5y */
+            this->TexPageX,
+            this->TexPageY,
+            clut_x,
+            clut_y,
+            blend_mode,
+            2 - TexMode_TA,
+            DitherEnabled(),
+            BlendMode);
+   }
+   else
+#endif
+   {
+      rsx_intf_push_triangle(x, y,
+            x + w, y,
+            x, y + h,
+            color,
+            color,
+            color,
+            u, v,
+            u + w, v,
+            u, v + h,
+            this->TexPageX, this->TexPageY,
+            clut_x, clut_y,
+            blend_mode,
+            2 - TexMode_TA,
+            DitherEnabled(),
+            BlendMode);
 
-   rsx_intf_push_triangle(x + w, y,
-		     x, y + h,
-		     x + w, y + h,
-		     color,
-		     color,
-		     color,
-		     u + w, v,
-		     u, v + h,
-		     u + w, v + h,
-		     this->TexPageX, this->TexPageY,
-		     clut_x, clut_y,
-		     blend_mode,
-		     2 - TexMode_TA,
-		     DitherEnabled(),
-		     BlendMode);
+      rsx_intf_push_triangle(x + w, y,
+            x, y + h,
+            x + w, y + h,
+            color,
+            color,
+            color,
+            u + w, v,
+            u, v + h,
+            u + w, v + h,
+            this->TexPageX, this->TexPageY,
+            clut_x, clut_y,
+            blend_mode,
+            2 - TexMode_TA,
+            DitherEnabled(),
+            BlendMode);
+   }
 
 #if 0
    printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);

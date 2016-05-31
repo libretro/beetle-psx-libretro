@@ -292,7 +292,8 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
    }
 }
 
-void rsx_intf_push_triangle(int16_t p0x, int16_t p0y,
+void rsx_intf_push_triangle(
+      int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       int16_t p2x, int16_t p2y,
       uint32_t c0,

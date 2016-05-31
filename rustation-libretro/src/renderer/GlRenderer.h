@@ -185,6 +185,9 @@ public:
     void push_triangle( CommandVertex v[3],
                         SemiTransparencyMode semi_transparency_mode);
 
+    void push_sprite( CommandVertex v[6],
+                        SemiTransparencyMode semi_transparency_mode);
+
     void push_line( CommandVertex v[2],
                     SemiTransparencyMode semi_transparency_mode);
 

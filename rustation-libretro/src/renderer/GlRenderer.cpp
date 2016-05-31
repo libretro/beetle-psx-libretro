@@ -794,6 +794,48 @@ void GlRenderer::push_triangle( CommandVertex v[3],
     }
 }
 
+void GlRenderer::push_sprite( CommandVertex v[6],
+                                SemiTransparencyMode semi_transparency_mode)
+{
+    this->maybe_force_draw( 6, GL_TRIANGLES,
+                            v[0].semi_transparent == 1,
+                            semi_transparency_mode);
+
+    int16_t z = this->primitive_ordering;
+    this->primitive_ordering += 1;
+
+    size_t slice_len = 6;
+    size_t i;
+
+    for (i = 0; i < slice_len; ++i) {
+        v[i].position[2] = z;
+	v[i].texture_window[0] = tex_x_mask;
+	v[i].texture_window[1] = tex_x_or;
+	v[i].texture_window[2] = tex_y_mask;
+	v[i].texture_window[3] = tex_y_or;
+    }
+
+    bool needs_opaque_draw =
+        !(v[0].semi_transparent == 1) ||
+        // Textured semi-transparent polys can contain opaque
+        // texels (when bit 15 of the color is set to
+        // 0). Therefore they're drawn twice, once for the opaque
+        // texels and once for the semi-transparent ones
+        v[0].texture_blend_mode != 0;
+
+    if (needs_opaque_draw) {
+        this->command_buffer->push_slice(v, slice_len);
+    }
+
+    if (v[0].semi_transparent == 1) {
+        /*  self.semi_transparent_vertices.extend_from_slice(&v); */
+        size_t i;
+        for (i = 0; i < slice_len; ++i) {
+            this->semi_transparent_vertices.push_back(v[i]);
+        }
+    }
+}
+
 void GlRenderer::push_line( CommandVertex v[2],
                             SemiTransparencyMode semi_transparency_mode)
 {

@@ -117,6 +117,146 @@ void rsx_gl_set_display_mode(uint16_t x,
    renderer()->gl_renderer()->set_display_mode(top_left, dimensions, depth_24bpp);
 }
 
+void rsx_gl_push_sprite(
+      int16_t p0x,
+      int16_t p0y,
+      int16_t p1x,
+      int16_t p1y,
+      int16_t p2x,
+      int16_t p2y,
+      int16_t p3x,
+      int16_t p3y,
+      int16_t p4x,
+      int16_t p4y,
+      int16_t p5x,
+      int16_t p5y,
+      uint32_t c0,
+      uint32_t c1,
+      uint32_t c2,
+      uint32_t c3,
+      uint32_t c4,
+      uint32_t c5,
+      uint16_t t0x,
+      uint16_t t0y,
+      uint16_t t1x,
+      uint16_t t1y,
+      uint16_t t2x,
+      uint16_t t2y,
+      uint16_t t3x,
+      uint16_t t3y,
+      uint16_t t4x,
+      uint16_t t4y,
+      uint16_t t5x,
+      uint16_t t5y,
+      uint16_t texpage_x,
+      uint16_t texpage_y,
+      uint16_t clut_x,
+      uint16_t clut_y,
+      uint8_t texture_blend_mode,
+      uint8_t depth_shift,
+      bool dither,
+      int blend_mode)
+{
+   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
+   bool semi_transparent = false;
+   switch (blend_mode) {
+   case -1:
+      semi_transparent = false;
+      semi_transparency_mode = SemiTransparencyMode_Add;
+      break;
+   case 0:
+      semi_transparent = true;
+      semi_transparency_mode = SemiTransparencyMode_Average;
+      break;
+   case 1:
+      semi_transparent = true;
+      semi_transparency_mode = SemiTransparencyMode_Add;
+      break;
+   case 2:
+      semi_transparent = true;
+      semi_transparency_mode = SemiTransparencyMode_SubtractSource;
+      break;
+   case 3:
+      semi_transparent = true;
+      semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
+      break;
+   default:
+      exit(EXIT_FAILURE);
+   }
+
+   CommandVertex v[6] = 
+   {
+      {
+          {p0x, p0y},   /* position */
+          {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+          {t0x, t0y},   /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},         
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      },
+      {
+          {p1x, p1y}, /* position */
+          {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+          {t1x, t1y}, /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},   
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      },
+      {
+          {p2x, p2y}, /* position */
+          {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
+          {t2x, t2y}, /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},   
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      },
+      {
+          {p3x, p3y}, /* position */
+          {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
+          {t3x, t3y}, /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},   
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      },
+      {
+          {p4x, p4y}, /* position */
+          {(uint8_t) c4, (uint8_t) (c4 >> 8), (uint8_t) (c4 >> 16)}, /* color */
+          {t4x, t4y}, /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},   
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      },
+      {
+          {p5x, p5y}, /* position */
+          {(uint8_t) c5, (uint8_t) (c5 >> 8), (uint8_t) (c5 >> 16)}, /* color */
+          {t5x, t5y}, /* texture_coord */
+          {texpage_x, texpage_y}, 
+          {clut_x, clut_y},   
+          texture_blend_mode,
+          depth_shift,
+          (uint8_t) dither,
+          semi_transparent,
+      }
+   };
+
+   renderer()->gl_renderer()->push_sprite(v, semi_transparency_mode);
+}
+
 void rsx_gl_push_triangle(
       int16_t p0x,
       int16_t p0y,
