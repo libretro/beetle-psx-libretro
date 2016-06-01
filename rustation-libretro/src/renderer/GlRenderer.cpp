@@ -501,6 +501,18 @@ void GlRenderer::prepare_render()
     this->fb_texture->bind(GL_TEXTURE0);
 }
 
+bool GlRenderer::has_software_renderer()
+{
+    struct retro_variable var = {0};
+
+    var.key = "beetle_psx_internal_resolution";
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value &&
+          !strcmp(var.value, "enabled"))
+       return true;
+    return false;
+}
+
 bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};

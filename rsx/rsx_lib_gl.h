@@ -64,6 +64,8 @@
 
   void rsx_gl_toggle_display(bool status);
 
+  bool rsx_gl_has_software_renderer(void);
+
   /* Functions from simias's rustation-libretro/lib.rs */
   RetroGl* renderer();
 

@@ -187,6 +187,21 @@ void RetroGl::finalize_frame()
     renderer->finalize_frame();
 }
 
+bool RetroGl::has_software_renderer()
+{
+    GlRenderer* renderer = NULL;
+    switch (this->state)
+    {
+    case GlState_Valid:
+        renderer = this->state_data.r;
+        break;
+    case GlState_Invalid:
+        return false;
+    }
+
+    return renderer->has_software_renderer();
+}
+
 void RetroGl::refresh_variables()
 {
     GlRenderer* renderer = NULL;

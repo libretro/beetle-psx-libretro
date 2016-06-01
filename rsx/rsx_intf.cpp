@@ -427,6 +427,25 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
    }
 }
 
+bool rsx_intf_has_software_renderer(void)
+{
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         return true;
+      case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         return rsx_gl_has_software_renderer();
+#else
+         break;
+#endif
+      case RSX_EXTERNAL_RUST:
+         return true;
+   }
+
+   return false;
+}
+
 void rsx_intf_toggle_display(bool status)
 {
     switch (rsx_type)

@@ -100,6 +100,8 @@ enum blending_modes
 
   void rsx_intf_toggle_display(bool status);
 
+  bool rsx_intf_has_software_renderer(void);
+
 extern retro_environment_t environ_cb;
 
 #endif /*__RSX_H__ */

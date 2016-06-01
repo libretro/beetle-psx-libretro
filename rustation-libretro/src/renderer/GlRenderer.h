@@ -201,6 +201,7 @@ public:
                     uint16_t target_top_left[2],
                     uint16_t dimensions[2]);
 
+    bool has_software_renderer();
 };
 
 std::vector<Attribute> attributes(CommandVertex* v);

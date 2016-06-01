@@ -52,6 +52,7 @@ public:
     void finalize_frame();
     void refresh_variables();
     retro_system_av_info get_system_av_info();
+    bool has_software_renderer();
 
     /* This was stolen from rsx_lib_gl */
     bool context_framebuffer_lock(void *data);
