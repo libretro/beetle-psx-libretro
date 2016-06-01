@@ -17,6 +17,7 @@
 
 // Main GPU instance, used to access the VRAM
 extern PS_GPU *GPU;
+static bool has_software_fb = false;
 
 GlRenderer::GlRenderer(DrawConfig* config)
 {
@@ -503,19 +504,22 @@ void GlRenderer::prepare_render()
 
 bool GlRenderer::has_software_renderer()
 {
-    struct retro_variable var = {0};
-
-    var.key = "beetle_psx_internal_resolution";
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value &&
-          !strcmp(var.value, "enabled"))
-       return true;
-    return false;
+   return has_software_fb;
 }
 
 bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};
+
+    var.key = "beetle_psx_renderer_software_fb";
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+       if (!strcmp(var.value, "enabled"))
+          has_software_fb = true;
+       else
+          has_software_fb = false;
+    }
 
     var.key = "beetle_psx_internal_resolution";
     uint8_t upscaling = 1;

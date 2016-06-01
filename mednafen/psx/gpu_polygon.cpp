@@ -554,7 +554,8 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          DitherEnabled(),
          BlendMode);
 
-   DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
+   if (rsx_intf_has_software_renderer())
+      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
 }
 
 #undef COORD_POST_PADDING

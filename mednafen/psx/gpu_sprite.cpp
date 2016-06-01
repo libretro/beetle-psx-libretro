@@ -307,6 +307,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
    printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);
 #endif
 
+   if (!rsx_intf_has_software_renderer())
+      return;
+
    switch(SpriteFlip & 0x3000)
    {
       case 0x0000:

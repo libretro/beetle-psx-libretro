@@ -229,5 +229,6 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
 		      DitherEnabled(),
 		      BlendMode);
 
-   DrawLine<goraud, BlendMode, MaskEval_TA>(points);
+   if (rsx_intf_has_software_renderer())
+      DrawLine<goraud, BlendMode, MaskEval_TA>(points);
 }
