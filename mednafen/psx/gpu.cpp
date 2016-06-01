@@ -1880,27 +1880,46 @@ void PS_GPU::UpdateDisplayMode()
 {
   bool depth_24bpp = !!(DisplayMode & 0x10);
 
-  uint16_t yres = (DisplayMode & 0x4) ? 480 : 240;
-  uint16_t xres;
+  uint16_t yres = VertEnd - VertStart;
+
+  if(DisplayMode & DISP_INTERLACED) {
+    yres *= 2;
+  }
+
+  unsigned pixelclock_divider;
 
   if ((DisplayMode >> 6) & 1) {
-    xres = 368;
+    // HRes ~ 368pixels
+    pixelclock_divider = 7;
   } else {
     switch (DisplayMode & 3) {
     case 0:
-      xres = 256;
+      // Hres ~ 256pixels
+      pixelclock_divider = 10;
       break;
     case 1:
-      xres = 320;
+      // Hres ~ 320pixels
+      pixelclock_divider = 8;
       break;
     case 2:
-      xres = 512;
+      // Hres ~ 512pixels
+      pixelclock_divider = 5;
       break;
     default:
-      xres = 640;
+      // Hres ~ 640pixels
+      pixelclock_divider = 4;
       break;
     }
   }
+
+  // First we get the horizontal range in number of pixel clock period
+  uint16_t xres = (HorizEnd - HorizStart);
+
+  // Then we apply the divider
+  xres /= pixelclock_divider;
+
+  // Then the rounding formula straight outta No$
+  xres = (xres + 2) & ~3;
 
   rsx_intf_set_display_mode(DisplayFB_XStart, DisplayFB_YStart,
 		       xres, yres,
