@@ -940,40 +940,8 @@ void PS_GPU::ProcessFIFO(void)
       G_Command_FBRead(this, CB);
    else
    {
-      switch (cc)
-      {
-         case 0x01:
-            InvalidateCache();
-            break;
-         case 0x02:
-            G_Command_FBFill(this, CB);
-            break;
-         case 0x1F:
-            G_Command_IRQ(this, CB);
-            break;
-         case 0xe1:
-            G_Command_DrawMode(this, CB);
-            break;
-         case 0xe2:
-            G_Command_TexWindow(this, CB);
-            break;
-         case 0xe3: /* Clip 0 */
-            G_Command_Clip0(this, CB);
-            break;
-         case 0xe4: /* Clip 1 */
-            G_Command_Clip1(this, CB);
-            break;
-         case 0xe5: /* Drawing Offset */
-            G_Command_DrawingOffset(this, CB);
-            break;
-         case 0xe6: /* Mask Setting */
-            G_Command_MaskSetting(this, CB);
-            break;
-         default:
-            if(command->func[abr][TexMode])
-               command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
-            break;
-      }
+      if(command->func[abr][TexMode])
+         command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
    }
 }
 
