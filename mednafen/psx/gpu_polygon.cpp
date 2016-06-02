@@ -237,35 +237,6 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 {
    i_deltas idl;
 
-   //
-   // Sort vertices by y.
-   //
-   if(vertices[2].y < vertices[1].y)
-      vertex_swap(tri_vertex, vertices[1], vertices[2]);
-
-   if(vertices[1].y < vertices[0].y)
-      vertex_swap(tri_vertex, vertices[0], vertices[1]);
-
-   if(vertices[2].y < vertices[1].y)
-      vertex_swap(tri_vertex, vertices[1], vertices[2]);
-
-   if(vertices[0].y == vertices[2].y)
-      return;
-
-   if((vertices[2].y - vertices[0].y) >= (512 << upscale_shift))
-   {
-      //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
-      return;
-   }
-
-   if(abs(vertices[2].x - vertices[0].x) >= (1024 << upscale_shift) ||
-      abs(vertices[2].x - vertices[1].x) >= (1024 << upscale_shift) ||
-      abs(vertices[1].x - vertices[0].x) >= (1024 << upscale_shift))
-   {
-      //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
-      return;
-   }
-
    int32 clipy0 = ClipY0 << upscale_shift;
    int32 clipy1 = ClipY1 << upscale_shift;
 
@@ -524,6 +495,35 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          InQuad_clut = clut;
       }
    }
+
+   //
+   // Sort vertices by y.
+   //
+   if(vertices[2].y < vertices[1].y)
+     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+
+   if(vertices[1].y < vertices[0].y)
+     vertex_swap(tri_vertex, vertices[0], vertices[1]);
+
+   if(vertices[2].y < vertices[1].y)
+     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+
+   if(vertices[0].y == vertices[2].y)
+     return;
+
+   if((vertices[2].y - vertices[0].y) >= (512 << upscale_shift))
+     {
+       //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
+       return;
+     }
+
+   if(abs(vertices[2].x - vertices[0].x) >= (1024 << upscale_shift) ||
+      abs(vertices[2].x - vertices[1].x) >= (1024 << upscale_shift) ||
+      abs(vertices[1].x - vertices[0].x) >= (1024 << upscale_shift))
+     {
+       //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
+       return;
+     }
 
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;

@@ -110,12 +110,6 @@ void PS_GPU::DrawLine(line_point *points)
    int32_t delta_y = abs(points[1].y - points[0].y);
    int32_t k       = (delta_x > delta_y) ? delta_x : delta_y;
 
-   if(delta_x >= 1024)
-      return;
-
-   if(delta_y >= 512)
-      return;
-
    if(points[0].x > points[1].x && k)
       vertex_swap(line_point, points[1], points[0]);
 
@@ -221,6 +215,15 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
          InCmd_CC = cc;
       }
    }
+
+   int32_t delta_x = abs(points[1].x - points[0].x);
+   int32_t delta_y = abs(points[1].y - points[0].y);
+
+   if(delta_x >= 1024)
+     return;
+
+   if(delta_y >= 512)
+     return;
 
    rsx_intf_push_line(points[0].x, points[0].y,
 		      points[1].x, points[1].y,
