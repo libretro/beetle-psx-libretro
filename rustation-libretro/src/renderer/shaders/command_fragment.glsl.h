@@ -10,6 +10,9 @@ uniform uint dither_scaling;
 uniform uint draw_semi_transparent;
 uniform uint texture_flt;
 
+//uniform uint mask_setor;
+//uniform uint mask_evaland;
+
 in vec3 frag_shading_color;
 // Texture page: base offset for texture lookup.
 flat in uvec2 frag_texture_page;

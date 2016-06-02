@@ -123,6 +123,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     opaque_command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
     opaque_command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    //opaque_command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
+    //opaque_command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -174,6 +176,9 @@ GlRenderer::GlRenderer(DrawConfig* config)
     // }
 
     this->display_off = true;
+
+    //opaque_command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
+    //opaque_command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     //// NOTE: r5 - I have no idea what a borrow checker is.
     // Yet an other copy of this 1MB array to make the borrow
@@ -250,6 +255,8 @@ void GlRenderer::draw()
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    //this->command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
+    //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
@@ -638,6 +645,8 @@ bool GlRenderer::refresh_variables()
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     this->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    //this->command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
+    //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     this->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
