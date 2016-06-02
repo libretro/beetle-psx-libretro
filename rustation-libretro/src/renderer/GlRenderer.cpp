@@ -404,6 +404,8 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
                                     uint16_t dimensions[2],
                                     uint16_t pixel_buffer[VRAM_PIXELS])
 {
+    this->draw();
+
     this->fb_texture->set_sub_image(top_left,
                                     dimensions,
                                     GL_RGBA,
@@ -448,6 +450,8 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
                                     uint16_t dimensions[2],
                                     uint16_t pixel_buffer[VRAM_PIXELS])
 {
+    this->draw();
+
     this->fb_texture->set_sub_image_window( top_left,
                                             dimensions,
                                             (size_t) VRAM_WIDTH_PIXELS,
