@@ -676,10 +676,9 @@ static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 static void G_Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 {
    //printf("Mask setting: %08x\n", *cb);
-   g->MaskSetOR = (*cb & 1) ? 0x8000 : 0x0000;
+   g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
 }
-
 
 CTEntry PS_GPU::Commands[256] =
 {
@@ -969,8 +968,7 @@ void PS_GPU::ProcessFIFO(void)
             this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
             break;
          case 0xe6: /* Mask Setting */
-            this->MaskSetOR = (*CB & 1) ? 0x8000 : 0x0000;
-            this->MaskEvalAND = (*CB & 2) ? 0x8000 : 0x0000;
+            G_Command_MaskSetting(this, CB);
             break;
          default:
             if(command->func[abr][TexMode])
