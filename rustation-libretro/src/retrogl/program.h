@@ -25,6 +25,7 @@ public:
     void uniform1i(const char* name, GLint i);
     void uniform1ui(const char* name, GLuint i);
     void uniform2i(const char* name, GLint a, GLint b);
+    void uniform2ui(const char* name, GLuint a, GLuint b);
     void drop();
 
 private:

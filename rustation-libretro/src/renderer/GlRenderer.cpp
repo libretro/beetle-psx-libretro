@@ -713,21 +713,20 @@ void GlRenderer::finalize_frame()
 	  depth_24bpp = 0;
 	}
 
-        uint16_t fb_x_end = fb_x_start + fb_width;
-        uint16_t fb_y_end = fb_y_start + fb_height;
-
         this->output_buffer->clear();
 
         OutputVertex slice[4] =
         {
-            { {-1.0, -1.0}, {fb_x_start,    fb_y_end}   },
-            { { 1.0, -1.0}, {fb_x_end,      fb_y_end}   },
-            { {-1.0,  1.0}, {fb_x_start,    fb_y_start} },
-            { { 1.0,  1.0}, {fb_x_end,      fb_y_start} }
+            { {-1.0, -1.0}, {0,         fb_height}   },
+            { { 1.0, -1.0}, {fb_width , fb_height}   },
+            { {-1.0,  1.0}, {0,         0} },
+            { { 1.0,  1.0}, {fb_width,  0} }
         };
         this->output_buffer->push_slice(slice, 4);
 
+
         this->output_buffer->program->uniform1i("fb", 1);
+        this->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
         this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
         this->output_buffer->program->uniform1ui( "internal_upscaling",
                                                     this->internal_upscaling);

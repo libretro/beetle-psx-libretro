@@ -117,6 +117,14 @@ void Program::uniform2i(const char* name, GLint a, GLint b)
     glUniform2i(u, a, b); 
 }
 
+void Program::uniform2ui(const char* name, GLuint a, GLuint b)
+{
+    this->bind();
+
+    GLint u = this->uniform(name);
+    glUniform2ui(u, a, b);
+}
+
 void Program::drop()
 {
     glDeleteProgram(this->id);
