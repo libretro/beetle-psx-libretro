@@ -433,10 +433,8 @@ void PS_GPU::ResetTS(void)
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
 
-//
-// C-style function wrappers so our command table isn't so ginormous(in memory usage).
-//
-   template<int numvertices, bool shaded, bool textured,
+/* C-style function wrappers so our command table isn't so ginormous(in memory usage). */
+template<int numvertices, bool shaded, bool textured,
    int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
@@ -444,7 +442,7 @@ static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
       BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
 }
 
-   template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
+template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
    uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
 {
@@ -452,7 +450,7 @@ static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
       TexMode_TA, MaskEval_TA>(cb);
 }
 
-   template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
+template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
 static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
 {
    g->Command_DrawLine<polyline, goraud, BlendMode, MaskEval_TA>(cb);
@@ -486,7 +484,7 @@ static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
 // does *not* appear to use mask drawing environment settings.
 static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
-   int32_t x, y;
+   unsigned y;
    int32_t r                 = cb[0] & 0xFF;
    int32_t g                 = (cb[0] >> 8) & 0xFF;
    int32_t b                 = (cb[0] >> 16) & 0xFF;
@@ -501,6 +499,7 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
    for(y = 0; y < height; y++)
    {
+      unsigned x;
       const int32 d_y = (y + destY) & 511;
 
       if(LineSkipTest(gpu, d_y))
@@ -521,6 +520,7 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
 static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
 {
+   unsigned y;
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
    int32_t sourceY = (cb[1] >> 16) & 0x3FF;
    int32_t destX   = (cb[2] >> 0) & 0x3FF;
@@ -539,9 +539,11 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
 
    g->DrawTimeAvail -= (width * height) * 2;
 
-   for(int32 y = 0; y < height; y++)
+   for(y = 0; y < height; y++)
    {
-      for(int32 x = 0; x < width; x += 128)
+      unsigned x;
+
+      for(x = 0; x < width; x += 128)
       {
          const int32 chunk_x_max = std::min<int32>(width - x, 128);
          uint16 tmpbuf[128]; // TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
@@ -663,8 +665,6 @@ static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
          g->ClipX1, g->ClipY1);
 }
 
-// XXX this command (and probably those around it) doesn't appear to
-// be called at all, the code is inlined in ProcessFIFO
 static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 {
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
@@ -943,15 +943,13 @@ void PS_GPU::ProcessFIFO(void)
       switch (cc)
       {
          case 0x01:
-            CLUT_Cache_VB = ~0U;
-            InvalidateTexCache();
+            InvalidateCache();
             break;
          case 0x02:
             G_Command_FBFill(this, CB);
             break;
          case 0x1F:
-            this->IRQPending = true;
-            IRQ_Assert(IRQ_GPU, this->IRQPending);
+            G_Command_IRQ(this, CB);
             break;
          case 0xe1:
             G_Command_DrawMode(this, CB);
@@ -966,8 +964,7 @@ void PS_GPU::ProcessFIFO(void)
             G_Command_Clip1(this, CB);
             break;
          case 0xe5: /* Drawing Offset */
-            this->OffsX = sign_x_to_s32(11, (*CB & 2047));
-            this->OffsY = sign_x_to_s32(11, ((*CB >> 11) & 2047));
+            G_Command_DrawingOffset(this, CB);
             break;
          case 0xe6: /* Mask Setting */
             G_Command_MaskSetting(this, CB);
