@@ -777,6 +777,16 @@ void GlRenderer::maybe_force_draw(  size_t nvertices,
     }
 }
 
+void GlRenderer::set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
+{
+#if 0
+    // Finish drawing anything with the current offset
+    this->draw();
+    this->mask_set_or   = mask_set_or;
+    this->mask_eval_and = mask_eval_and;
+#endif
+}
+
 void GlRenderer::set_draw_offset(int16_t x, int16_t y)
 {
     // Finish drawing anything with the current offset

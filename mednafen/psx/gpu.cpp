@@ -678,6 +678,8 @@ static void G_Command_MaskSetting(PS_GPU* g, const uint32 *cb)
    //printf("Mask setting: %08x\n", *cb);
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
+
+   rsx_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
 }
 
 CTEntry PS_GPU::Commands[256] =

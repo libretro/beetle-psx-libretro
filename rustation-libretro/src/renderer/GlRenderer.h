@@ -129,6 +129,9 @@ public:
     uint8_t tex_y_mask;
     uint8_t tex_y_or;
 
+    uint32_t mask_set_or;
+    uint32_t mask_eval_and;
+
     uint8_t filter_type;
 
     /// When true we display the entire VRAM buffer instead of just
@@ -175,6 +178,7 @@ public:
                             bool semi_transparent, 
                             SemiTransparencyMode semi_transparency_mode);
 
+    void set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
     void set_draw_offset(int16_t x, int16_t y);
     void set_draw_area(uint16_t top_left[2], uint16_t bot_right[2]);
     void set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,

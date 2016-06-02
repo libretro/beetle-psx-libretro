@@ -232,6 +232,23 @@ void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
    }
 }
 
+void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
+{
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         break;
+      case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
+#endif
+         break;
+      case RSX_EXTERNAL_RUST:
+         /* TODO/FIXME */
+         break;
+   }
+}
+
 void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 {
    switch (rsx_type)

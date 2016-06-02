@@ -91,6 +91,11 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 
 /* Draw commands */
 
+void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
+{
+   renderer()->gl_renderer()->set_mask_setting(mask_set_or, mask_eval_and);
+}
+
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
    renderer()->gl_renderer()->set_draw_offset(x, y);
