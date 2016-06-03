@@ -771,17 +771,14 @@ static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_va
 
 static INLINE uint8_t Lm_C(unsigned int which, int32_t value)
 {
-   if(value & ~0xFF)
-   {
-      // Set flag here
-      FLAGS |= 1 << (21 - which);	// Tested with GPF
+   // Set flag here
+   FLAGS |= 1 << (21 - which);	// Tested with GPF
 
-      if(value < 0)
-         value = 0;
+   if(value < 0)
+      value = 0;
 
-      if(value > 255)
-         value = 255;
-   }
+   if(value > 255)
+      value = 255;
 
    return(value);
 }
@@ -861,9 +858,22 @@ static INLINE void MAC_to_RGB_FIFO(void)
 {
    RGB_FIFO[0] = RGB_FIFO[1];
    RGB_FIFO[1] = RGB_FIFO[2];
-   RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
-   RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
-   RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
+
+   if ((MAC[1] >> 4) & ~0xFF)
+      RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
+   else
+      RGB_FIFO[2].R = MAC[1] >> 4;
+
+   if ((MAC[2] >> 4) & ~0xFF)
+      RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
+   else
+      RGB_FIFO[2].G = MAC[2] >> 4;
+
+   if ((MAC[3] >> 4) & ~0xFF)
+      RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
+   else
+      RGB_FIFO[2].B = MAC[3] >> 4;
+
    RGB_FIFO[2].CD = RGB.CD;
 }
 
@@ -875,9 +885,10 @@ static INLINE void MAC_to_IR(int lm)
    IR3 = Lm_B(2, MAC[3], lm);
 }
 
-static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
+static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t instr, int lm)
 {
    unsigned i;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
 
    if(MDFN_LIKELY(matrix != &Matrices.AbbyNormal))
    {
@@ -944,10 +955,11 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 }
 
 
-static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
+static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t instr, int lm)
 {
-   int64_t tmp[3];
    unsigned i;
+   int64_t tmp[3];
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
 
    for(i = 0; i < 3; i++)
    {
@@ -979,7 +991,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
 static int32_t SQR(uint32_t instr)
 {
-   const int      lm = (instr >> 10) & 1;
+   const int lm = (instr >> 10) & 1;
 
    MAC[1] = IR1 * IR1;
    MAC[2] = IR2 * IR2;
@@ -1001,11 +1013,10 @@ static int32_t SQR(uint32_t instr)
 static int32_t MVMVA(uint32_t instr)
 {
    int16_t v[3];
-   const uint32_t mx = (instr >> 17) & 0x3;
-   const int32*   cv = CRVectors.All[(instr >> 13) & 0x3];
+   const uint32_t mx  = (instr >> 17) & 0x3;
+   const int32*   cv  = CRVectors.All[(instr >> 13) & 0x3];
    const uint32_t v_i = (instr >> 15) & 0x3;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   const int      lm  = (instr >> 10) & 1;
 
    if(v_i == 3)
    {
@@ -1020,7 +1031,7 @@ static int32_t MVMVA(uint32_t instr)
       v[2] = Vectors[v_i][2];
    }
 
-   MultiplyMatrixByVector(&Matrices.All[mx], v, cv, sf, lm);
+   MultiplyMatrixByVector(&Matrices.All[mx], v, cv, instr, lm);
 
    return(8);
 }
@@ -1091,10 +1102,9 @@ static INLINE void TransformDQ(int64_t h_div_sz)
 static int32_t RTPS(uint32_t instr)
 {
    int64_t h_div_sz;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   const int lm = (instr >> 10) & 1;
 
-   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
+   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, instr, lm);
    h_div_sz = Divide(H, Z_FIFO[3]);
 
    float precise_h_div_sz = (float)H / (float)Z_FIFO[3];
@@ -1108,17 +1118,17 @@ static int32_t RTPS(uint32_t instr)
 static int32_t RTPT(uint32_t instr)
 {
    unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
    for(i = 0; i < 3; i++)
    {
       int64_t h_div_sz;
+      float precise_h_div_sz;
 
-      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
+      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, instr, lm);
       h_div_sz = Divide(H, Z_FIFO[3]);
 
-      float precise_h_div_sz = (float)H / (float)Z_FIFO[3];
+      precise_h_div_sz = (float)H / (float)Z_FIFO[3];
 
       TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
 
@@ -1129,24 +1139,23 @@ static int32_t RTPT(uint32_t instr)
    return(23);
 }
 
-static INLINE void NormColor(uint32_t sf, int lm, uint32_t v)
+static INLINE void NormColor(uint32_t instr, int lm, uint32_t v)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, instr, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, instr, lm);
 
    MAC_to_RGB_FIFO();
 }
 
 static int32_t NCS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NormColor(sf, lm, 0);
+   NormColor(instr, lm, 0);
 
    return(14);
 }
@@ -1154,27 +1163,34 @@ static int32_t NCS(uint32_t instr)
 static int32_t NCT(uint32_t instr)
 {
    unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
    for(i = 0; i < 3; i++)
-      NormColor(sf, lm, i);
+      NormColor(instr, lm, i);
 
    return(30);
 }
 
-INLINE void NormColorColor(uint32_t v, uint32_t sf, int lm)
+static INLINE void NormColorColor(uint32_t v, uint32_t instr, int lm)
 {
    int16_t tmp_vector[3];
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, instr, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, instr, lm);
 
-   MAC[1] = ((RGB.R << 4) * IR1) >> sf;
-   MAC[2] = ((RGB.G << 4) * IR2) >> sf;
-   MAC[3] = ((RGB.B << 4) * IR3) >> sf;
+   MAC[1] = ((RGB.R << 4) * IR1);
+   MAC[2] = ((RGB.G << 4) * IR2);
+   MAC[3] = ((RGB.B << 4) * IR3);
+
+   if ((instr & (1 << 19)))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
@@ -1183,10 +1199,9 @@ INLINE void NormColorColor(uint32_t v, uint32_t sf, int lm)
 
 static int32_t NCCS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NormColorColor(0, sf, lm);
+   NormColorColor(0, instr, lm);
    return(17);
 }
 
@@ -1194,22 +1209,21 @@ static int32_t NCCS(uint32_t instr)
 static int32_t NCCT(uint32_t instr)
 {
    unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   const int lm = (instr >> 10) & 1;
 
    for(i = 0; i < 3; i++)
-      NormColorColor(i, sf, lm);
+      NormColorColor(i, instr, lm);
 
    return(39);
 }
 
-static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int lm)
+static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t instr, int lm)
 {
    int i;
    int32_t RGB_temp[3];
    int32_t IR_temp[3] = { IR1, IR2, IR3 };
+   const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
 
-   //assert(sf);
    RGB_temp[0] = RGB.R;
    RGB_temp[1] = RGB.G;
    RGB_temp[2] = RGB.B;
@@ -1249,10 +1263,9 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
 
 static int32_t DCPL(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   DepthCue(TRUE, FALSE, sf, lm);
+   DepthCue(TRUE, FALSE, instr, lm);
 
    return(8);
 }
@@ -1260,10 +1273,9 @@ static int32_t DCPL(uint32_t instr)
 
 static int32_t DPCS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   DepthCue(FALSE, FALSE, sf, lm);
+   DepthCue(FALSE, FALSE, instr, lm);
 
    return(8);
 }
@@ -1271,11 +1283,10 @@ static int32_t DPCS(uint32_t instr)
 static int32_t DPCT(uint32_t instr)
 {
    unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
    for(i = 0; i < 3; i++)
-      DepthCue(FALSE, TRUE, sf, lm);
+      DepthCue(FALSE, TRUE, instr, lm);
 
    return(17);
 }
@@ -1314,26 +1325,25 @@ static int32_t INTPL(uint32_t instr)
 }
 
 
-static INLINE void NormColorDepthCue(uint32_t v, uint32_t sf, int lm)
+static INLINE void NormColorDepthCue(uint32_t v, uint32_t instr, int lm)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, instr, lm);
 
    tmp_vector[0] = IR1;
    tmp_vector[1] = IR2;
    tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, instr, lm);
 
-   DepthCue(TRUE, FALSE, sf, lm);
+   DepthCue(TRUE, FALSE, instr, lm);
 }
 
 static int32_t NCDS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NormColorDepthCue(0, sf, lm);
+   NormColorDepthCue(0, instr, lm);
 
    return(19);
 }
@@ -1341,11 +1351,10 @@ static int32_t NCDS(uint32_t instr)
 static int32_t NCDT(uint32_t instr)
 {
    unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
    for(i = 0; i < 3; i++)
-      NormColorDepthCue(i, sf, lm);
+      NormColorDepthCue(i, instr, lm);
 
    return(44);
 }
@@ -1353,10 +1362,9 @@ static int32_t NCDT(uint32_t instr)
 static int32_t CC(uint32_t instr)
 {
    int16_t tmp_vector[3] = { IR1, IR2, IR3};
-   const uint32_t sf     = (instr & (1 << 19)) ? 12 : 0;
    const int      lm     = (instr >> 10) & 1;
 
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, instr, lm);
 
    MAC[1] = ((RGB.R << 4) * IR1);
    MAC[2] = ((RGB.G << 4) * IR2);
@@ -1379,13 +1387,12 @@ static int32_t CC(uint32_t instr)
 static int32_t CDP(uint32_t instr)
 {
    int16_t tmp_vector[3];
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, instr, lm);
 
-   DepthCue(TRUE, FALSE, sf, lm);
+   DepthCue(TRUE, FALSE, instr, lm);
 
    return(13);
 }
