@@ -1099,17 +1099,26 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
 }
 
-static int32_t RTPS(uint32_t instr)
+static INLINE int64_t RTP_common(uint32_t instr, unsigned i, const int lm)
 {
-   int64_t h_div_sz;
-   const int lm = (instr >> 10) & 1;
+   float precise_h_div_sz;
+   int64_t h_div_sz       = 0;
 
-   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, instr, lm);
+   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, instr, lm);
    h_div_sz = Divide(H, Z_FIFO[3]);
 
-   float precise_h_div_sz = (float)H / (float)Z_FIFO[3];
+   precise_h_div_sz = (float)H / (float)Z_FIFO[3];
 
    TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
+
+   return h_div_sz;
+}
+
+static int32_t RTPS(uint32_t instr)
+{
+   const int lm     = (instr >> 10) & 1;
+   int64_t h_div_sz = RTP_common(instr, 0, lm);
+
    TransformDQ(h_div_sz);
 
    return(15);
@@ -1119,22 +1128,12 @@ static int32_t RTPT(uint32_t instr)
 {
    unsigned i;
    const int      lm = (instr >> 10) & 1;
+   int64_t h_div_sz = RTP_common(instr, 0, lm);
 
-   for(i = 0; i < 3; i++)
-   {
-      int64_t h_div_sz;
-      float precise_h_div_sz;
+   h_div_sz         = RTP_common(instr, 1, lm);
+   h_div_sz         = RTP_common(instr, 2, lm);
 
-      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, instr, lm);
-      h_div_sz = Divide(H, Z_FIFO[3]);
-
-      precise_h_div_sz = (float)H / (float)Z_FIFO[3];
-
-      TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
-
-      if(i == 2)
-         TransformDQ(h_div_sz);
-   }
+   TransformDQ(h_div_sz);
 
    return(23);
 }
@@ -1174,7 +1173,6 @@ static int32_t NCT(uint32_t instr)
 static INLINE void NormColorColor(uint32_t v, uint32_t instr, int lm)
 {
    int16_t tmp_vector[3];
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
 
    MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, instr, lm);
 
