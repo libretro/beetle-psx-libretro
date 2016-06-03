@@ -49,8 +49,7 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
 {
    int64_t one_div;
-   const unsigned sa = 32;
-   int64_t     num   = ((int64_t)fx32_shiftup(1)) << sa;
+   int64_t     num   = ((int64_t)fx32_shiftup(1)) << 32;
    int64_t     denom = CALCIS(x, y);
 
    if(!denom)
@@ -58,20 +57,20 @@ static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_ver
 
    one_div = num / denom;
 
-   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> sa;
-   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> sa;
+   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> 32;
+   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> 32;
 
-   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> sa;
-   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> sa;
+   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> 32;
+   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> 32;
 
-   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> sa;
-   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> sa;
+   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> 32;
+   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> 32;
 
-   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> sa;
-   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> sa;
+   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> 32;
+   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> 32;
 
-   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> sa;
-   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> sa;
+   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> 32;
+   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> 32;
 
    // idl.du_dx = ((int64_t)CALCIS(u, y) << COORD_FBS) / denom;
    // idl.du_dy = ((int64_t)CALCIS(x, u) << COORD_FBS) / denom;

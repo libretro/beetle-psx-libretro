@@ -102,6 +102,7 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
+   unsigned i;
    line_fxp_coord cur_point;
    line_fxp_step step;
    int32_t delta_x = abs(points[1].x - points[0].x);
@@ -116,9 +117,10 @@ void PS_GPU::DrawLine(line_point *points)
    line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
    line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
 
-   for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
+   for(i = 0; i <= k; i++)	// <= is not a typo.
    {
-      // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
+      /* Sign extension is not necessary here for x and y, 
+       * due to the maximum values that ClipX1 and ClipY1 can contain. */
       int32_t x = fx32_shiftdown(cur_point.x) & 2047;
       int32_t y = fx32_shiftdown(cur_point.y) & 2047;
 
