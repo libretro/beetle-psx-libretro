@@ -15,6 +15,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <math/fxp.h>
+
 #include "psx.h"
 #include "gte.h"
 
@@ -882,7 +884,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       for(i = 0; i < 3; i++)
       {
          int32_t mulr[3];
-         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+         int64_t tmp = (uint64_t)fx32_shiftup(crv[i]);
 
          mulr[0] = matrix->MX[i][0] * v[0];
          mulr[1] = matrix->MX[i][1] * v[1];
@@ -906,7 +908,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       for(i = 0; i < 3; i++)
       {
          int32_t mulr[3];
-         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+         int64_t tmp = (uint64_t)fx32_shiftup(crv[i]);
 
          if(i == 0)
          {
@@ -951,7 +953,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    {
       int32_t mulr[3];
 
-      tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
+      tmp[i] = (uint64_t)fx32_shiftup(crv[i]);
 
       mulr[0] = matrix->MX[i][0] * v[0];
       mulr[1] = matrix->MX[i][1] * v[1];
@@ -967,12 +969,12 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    IR1 = Lm_B(0, MAC[1], lm);
    IR2 = Lm_B(1, MAC[2], lm);
    //printf("FTV: %08x %08x\n", crv[2], (uint32)(tmp[2] >> 12));
-   IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
+   IR3 = Lm_B_PTZ(2, MAC[3], fx32_shiftdown(tmp[2]), lm);
 
    Z_FIFO[0] = Z_FIFO[1];
    Z_FIFO[1] = Z_FIFO[2];
    Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
+   Z_FIFO[3] = Lm_D(fx32_shiftdown(tmp[2]), TRUE);
 }
 
 static int32_t SQR(uint32_t instr)
@@ -1220,7 +1222,7 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[i])) - RGB_temp[i] * IR_temp[i])) >> sf;
          MAC[1 + i] = A_MV(i, (RGB_temp[i] * IR_temp[i] + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
@@ -1228,8 +1230,8 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[i])) - (int32)((uint32)fx32_shiftup(RGB_temp[i])))) >> sf;
+         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)fx32_shiftup(RGB_temp[i])) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
 
@@ -1277,13 +1279,13 @@ static int32_t INTPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[0])) - (int32)((uint32)(int32)fx32_shiftup(IR1)))) >> sf;
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[1])) - (int32)((uint32)(int32)fx32_shiftup(IR2)))) >> sf;
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[2])) - (int32)((uint32)(int32)fx32_shiftup(IR3)))) >> sf;
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(IR1)) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(IR2)) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(IR3)) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
 
    MAC_to_IR(lm);
 
@@ -1375,7 +1377,7 @@ static int32_t AVSZ3(uint32_t instr)
 {
    MAC[0] = F(((int64_t)ZSF3 * (Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
 
-   OTZ = Lm_D(MAC[0] >> 12, FALSE);
+   OTZ = Lm_D(fx32_shiftdown(MAC[0]), FALSE);
 
    return(5);
 }
@@ -1384,7 +1386,7 @@ static int32_t AVSZ4(uint32_t instr)
 {
    MAC[0] = F(((int64_t)ZSF4 * (Z_FIFO[0] + Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
 
-   OTZ = Lm_D(MAC[0] >> 12, FALSE);
+   OTZ = Lm_D(fx32_shiftdown(MAC[0]), FALSE);
 
    return(5);
 }
