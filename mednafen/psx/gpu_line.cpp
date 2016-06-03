@@ -48,14 +48,12 @@ static INLINE void line_point_to_fixed_point_coord(const line_point *point,
 
 static INLINE int64_t line_divide(int64_t delta, int32_t dk)
 {
-   delta = (uint64_t)fx32_shiftup(delta);
-
    if(delta < 0)
       delta -= dk - 1;
    if(delta > 0)
       delta += dk - 1;
 
-   return(delta / dk);
+   return (delta / dk);
 }
 
 template<bool goraud>
@@ -76,8 +74,8 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
       return;
    }
 
-   step->dx_dk = line_divide(point1->x - point0->x, dk);
-   step->dy_dk = line_divide(point1->y - point0->y, dk);
+   step->dx_dk = line_divide(fx32_shiftup(point1->x - point0->x), dk);
+   step->dy_dk = line_divide(fx32_shiftup(point1->y - point0->y), dk);
 
    if(goraud)
    {
