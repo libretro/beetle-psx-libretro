@@ -1471,9 +1471,16 @@ static int32_t GPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = A_MV(0, (int64_t)((uint64_t)(int64_t)MAC[1] << sf) + (IR0 * IR1)) >> sf;
-   MAC[2] = A_MV(1, (int64_t)((uint64_t)(int64_t)MAC[2] << sf) + (IR0 * IR2)) >> sf;
-   MAC[3] = A_MV(2, (int64_t)((uint64_t)(int64_t)MAC[3] << sf) + (IR0 * IR3)) >> sf;
+   MAC[1] = A_MV(0, (int64_t)((uint64_t)(int64_t)MAC[1] << sf) + (IR0 * IR1));
+   MAC[2] = A_MV(1, (int64_t)((uint64_t)(int64_t)MAC[2] << sf) + (IR0 * IR2));
+   MAC[3] = A_MV(2, (int64_t)((uint64_t)(int64_t)MAC[3] << sf) + (IR0 * IR3));
+
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
