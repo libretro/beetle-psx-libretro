@@ -979,12 +979,18 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
 static int32_t SQR(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = ((IR1 * IR1) >> sf);
-   MAC[2] = ((IR2 * IR2) >> sf);
-   MAC[3] = ((IR3 * IR3) >> sf);
+   MAC[1] = IR1 * IR1;
+   MAC[2] = IR2 * IR2;
+   MAC[3] = IR3 * IR3;
+
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
@@ -1276,16 +1282,29 @@ static int32_t DPCT(uint32_t instr)
 
 static int32_t INTPL(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[0])) - (int32)((uint32)(int32)fx32_shiftup(IR1)))) >> sf;
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[1])) - (int32)((uint32)(int32)fx32_shiftup(IR2)))) >> sf;
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[2])) - (int32)((uint32)(int32)fx32_shiftup(IR3)))) >> sf;
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[0])) - (int32)((uint32)(int32)fx32_shiftup(IR1))));
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[1])) - (int32)((uint32)(int32)fx32_shiftup(IR2))));
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(CRVectors.FC[2])) - (int32)((uint32)(int32)fx32_shiftup(IR3))));
+   
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(IR1)) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(IR2)) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(IR3)) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = A_MV(0, ((int64_t)((uint64_t)fx32_shiftup(IR1)) + IR0 * Lm_B(0, MAC[1], FALSE)));
+   MAC[2] = A_MV(1, ((int64_t)((uint64_t)fx32_shiftup(IR2)) + IR0 * Lm_B(1, MAC[2], FALSE)));
+   MAC[3] = A_MV(2, ((int64_t)((uint64_t)fx32_shiftup(IR3)) + IR0 * Lm_B(2, MAC[3], FALSE)));
+
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
@@ -1333,16 +1352,22 @@ static int32_t NCDT(uint32_t instr)
 
 static int32_t CC(uint32_t instr)
 {
-   int16_t tmp_vector[3];
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   int16_t tmp_vector[3] = { IR1, IR2, IR3};
+   const uint32_t sf     = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm     = (instr >> 10) & 1;
 
-   tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
-   MAC[1] = ((RGB.R << 4) * IR1) >> sf;
-   MAC[2] = ((RGB.G << 4) * IR2) >> sf;
-   MAC[3] = ((RGB.B << 4) * IR3) >> sf;
+   MAC[1] = ((RGB.R << 4) * IR1);
+   MAC[2] = ((RGB.G << 4) * IR2);
+   MAC[3] = ((RGB.B << 4) * IR3);
+   
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
@@ -1396,12 +1421,18 @@ static int32_t AVSZ4(uint32_t instr)
 // (2 ^ 31) - 1 =		      2147483647
 static int32_t OP(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = ((Matrices.Rot.MX[1][1] * IR3) - (Matrices.Rot.MX[2][2] * IR2)) >> sf;
-   MAC[2] = ((Matrices.Rot.MX[2][2] * IR1) - (Matrices.Rot.MX[0][0] * IR3)) >> sf;
-   MAC[3] = ((Matrices.Rot.MX[0][0] * IR2) - (Matrices.Rot.MX[1][1] * IR1)) >> sf;
+   MAC[1] = ((Matrices.Rot.MX[1][1] * IR3) - (Matrices.Rot.MX[2][2] * IR2));
+   MAC[2] = ((Matrices.Rot.MX[2][2] * IR1) - (Matrices.Rot.MX[0][0] * IR3));
+   MAC[3] = ((Matrices.Rot.MX[0][0] * IR2) - (Matrices.Rot.MX[1][1] * IR1));
+
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
@@ -1410,12 +1441,18 @@ static int32_t OP(uint32_t instr)
 
 static int32_t GPF(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = (IR0 * IR1) >> sf;
-   MAC[2] = (IR0 * IR2) >> sf;
-   MAC[3] = (IR0 * IR3) >> sf;
+   MAC[1] = (IR0 * IR1);
+   MAC[2] = (IR0 * IR2);
+   MAC[3] = (IR0 * IR3);
+
+   if (instr & (1 << 19))
+   {
+      MAC[1] = fx32_shiftdown(MAC[1]);
+      MAC[2] = fx32_shiftdown(MAC[2]);
+      MAC[3] = fx32_shiftdown(MAC[3]);
+   }
 
    MAC_to_IR(lm);
 
