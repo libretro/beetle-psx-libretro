@@ -9,7 +9,6 @@ uniform uint dither_scaling;
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
 uniform uint texture_flt;
-uniform uint internal_upscaling;
 
 //uniform uint mask_setor;
 //uniform uint mask_evaland;
@@ -44,10 +43,8 @@ const uint FILTER_MODE_BILINEAR     = 2U;
 
 // Read a pixel in VRAM
 vec4 vram_get_pixel(uint x, uint y) {
-  // Since we're sampling from fb_out we need to adjust for the
-  // upscaling factor.
-  x = (x & 0x3ffU) * internal_upscaling;
-  y = (y & 0x3ffU) * internal_upscaling;
+  x = (x & 0x3ffU);
+  y = (y & 0x1ffU);
 
   return texelFetch(fb_texture, ivec2(x, y), 0);
 }

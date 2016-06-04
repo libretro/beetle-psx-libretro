@@ -255,8 +255,7 @@ void GlRenderer::draw()
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
-    this->command_buffer->program->uniform1ui("internal_upscaling",
-					      this->internal_upscaling);
+
     //this->command_buffer->program->uniform1ui("mask _rthis->mask_set_or);
     //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
@@ -433,6 +432,9 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
 
     this->image_load_buffer->program->uniform1i("fb_texture", 0);
 
+    // fb_texture is always at 1x
+    this->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -479,6 +481,8 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
     this->image_load_buffer->push_slice(slice, slice_len);
 
     this->image_load_buffer->program->uniform1i("fb_texture", 0);
+    // fb_texture is always at 1x
+    this->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
 
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
@@ -513,11 +517,7 @@ void GlRenderer::prepare_render()
 
     this->apply_scissor();
 
-    // Bind `fb_out` to texture unit 0
-    // This is a hack, it means we're sampling fb_out while we're
-    // rendering into it. We need to add code to make sure we remain
-    // coherent.
-    this->fb_out->bind(GL_TEXTURE0);
+    this->fb_texture->bind(GL_TEXTURE0);
 }
 
 bool GlRenderer::has_software_renderer()
@@ -675,6 +675,7 @@ bool GlRenderer::refresh_variables()
 
     return reconfigure_frontend;
 }
+
 /* Setup 2 triangles that cover the entire framebuffer
 then copy the displayed portion of the screen from fb_out */
 void GlRenderer::finalize_frame()
@@ -736,6 +737,37 @@ void GlRenderer::finalize_frame()
         this->output_buffer->program->uniform1ui( "internal_upscaling",
                                                     this->internal_upscaling);
         this->output_buffer->draw(GL_TRIANGLE_STRIP);
+    }
+
+    // Hack: copy fb_out back into fb_texture at the end of every
+    // frame to make offscreen rendering kinda sorta work. Very messy
+    // and slow.
+    {
+      this->image_load_buffer->clear();
+
+      ImageLoadVertex slice[4] =
+	{
+	  {   {0,    0 }   },
+	  {   {1023, 0 }   },
+	  {   {0,    511   }   },
+	  {   {1023, 511   }   },
+	};
+
+      this->image_load_buffer->push_slice(slice, 4);
+
+      this->image_load_buffer->program->uniform1i("fb_texture", 1);
+
+      glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_BLEND);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+      Framebuffer _fb = Framebuffer(this->fb_texture);
+
+      this->image_load_buffer->program->uniform1ui("internal_upscaling",
+						   this->internal_upscaling);
+
+
+      this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
     }
 
     // Cleanup OpenGL context before returning to the frontend
