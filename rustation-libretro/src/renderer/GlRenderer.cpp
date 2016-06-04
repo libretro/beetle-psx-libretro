@@ -255,7 +255,9 @@ void GlRenderer::draw()
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
-    //this->command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
+    this->command_buffer->program->uniform1ui("internal_upscaling",
+					      this->internal_upscaling);
+    //this->command_buffer->program->uniform1ui("mask _rthis->mask_set_or);
     //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     // Bind the out framebuffer
@@ -511,8 +513,11 @@ void GlRenderer::prepare_render()
 
     this->apply_scissor();
 
-    // Bind `fb_texture` to texture unit 0
-    this->fb_texture->bind(GL_TEXTURE0);
+    // Bind `fb_out` to texture unit 0
+    // This is a hack, it means we're sampling fb_out while we're
+    // rendering into it. We need to add code to make sure we remain
+    // coherent.
+    this->fb_out->bind(GL_TEXTURE0);
 }
 
 bool GlRenderer::has_software_renderer()

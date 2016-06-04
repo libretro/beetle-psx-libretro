@@ -9,6 +9,7 @@ uniform uint dither_scaling;
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
 uniform uint texture_flt;
+uniform uint internal_upscaling;
 
 //uniform uint mask_setor;
 //uniform uint mask_evaland;
@@ -42,8 +43,13 @@ const uint FILTER_MODE_3POINT       = 1U;
 const uint FILTER_MODE_BILINEAR     = 2U;
 
 // Read a pixel in VRAM
-vec4 vram_get_pixel(int x, int y) {
-  return texelFetch(fb_texture, ivec2(x & 0x3ff, y & 0x1ff), 0);
+vec4 vram_get_pixel(uint x, uint y) {
+  // Since we're sampling from fb_out we need to adjust for the
+  // upscaling factor.
+  x = (x & 0x3ffU) * internal_upscaling;
+  y = (y & 0x3ffU) * internal_upscaling;
+
+  return texelFetch(fb_texture, ivec2(x, y), 0);
 }
 
 // Take a normalized color and convert it into a 16bit 1555 ABGR
@@ -93,7 +99,7 @@ vec4 sample_texel(vec2 coords) {
    tex_x_pix += frag_texture_page.x;
    tex_y += frag_texture_page.y;
 
-   vec4 texel = vram_get_pixel(int(tex_x_pix), int(tex_y));
+   vec4 texel = vram_get_pixel(tex_x_pix, tex_y);
 
    if (frag_depth_shift > 0U) {
       // 8 and 4bpp textures are paletted so we need to lookup the
@@ -125,8 +131,8 @@ vec4 sample_texel(vec2 coords) {
       // Finally we have the index in the CLUT
       uint index = (icolor >> shift) & mask;
 
-      int clut_x = int(frag_clut.x + index);
-      int clut_y = int(frag_clut.y);
+      uint clut_x = frag_clut.x + index;
+      uint clut_y = frag_clut.y;
 
       // Look up the real color for the texel in the CLUT
       texel = vram_get_pixel(clut_x, clut_y);
