@@ -304,6 +304,8 @@ FLAGS += -DHAVE_RUST
 LDFLAGS += -ldl -L. -lrsx
 endif
 
+LDFLAGS += -ljit
+
 CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
 
