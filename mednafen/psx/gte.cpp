@@ -992,14 +992,18 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
 }
 
+/* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
+   unsigned i;
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = ((IR1 * IR1) >> sf);
-   MAC[2] = ((IR2 * IR2) >> sf);
-   MAC[3] = ((IR3 * IR3) >> sf);
+   for (i = 0; i < 4; i++)
+   {
+      int32_t ir = IR[i];
+      MAC[i]     = (ir * ir) >> sf;
+   }
 
    MAC_to_IR(lm);
 
@@ -1055,9 +1059,10 @@ static INLINE unsigned CountLeadingZeroU16(uint16_t val)
 
 static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
 {
-   //if((Z_FIFO[3] * 2) > H)
    if((divisor * 2) > dividend)
    {
+      /* GTE-specific division algorithm for dist / z.
+       * Returns a saturated 17bit value. */
       unsigned shift_bias = CountLeadingZeroU16(divisor);
 
       dividend <<= shift_bias;
@@ -1065,6 +1070,9 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
 
       return std::min<uint32>(0x1FFFF, ((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
    }
+
+   /* If the Z coordinate is smaller than or equal to half the 
+    * projection plane distance, we clip it */
 
    FLAGS |= 1 << 17;
    return 0x1FFFF;
@@ -1081,10 +1089,11 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
    XY_FIFO[3].Y = Lm_G(1, MAC[0]);
 
-   // Increased precision calculation (sub-pixel precision)
+   /* Increased precision calculation (sub-pixel precision) */
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
+   /* Push onto the XY FIFO */
    GPU->AddSubpixelVertex(XY_FIFO[3].X, XY_FIFO[3].Y,
 			  precise_x, precise_y, z);
 
@@ -1093,25 +1102,45 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    XY_FIFO[2] = XY_FIFO[3];
 }
 
-static INLINE void TransformDQ(int64_t h_div_sz)
+/* Perform depth queuing calculations using the projection
+ * factor computed by the 'RTP' command */
+static INLINE void depth_queuing(int64_t h_div_sz)
 {
    MAC[0] = F((int64_t)DQB + DQA * h_div_sz);
-   IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
+   IR0    = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
+}
+
+/* Rotate, Translate and Perspective transform a single vector
+ * Returns the projection factor that's also used for depth 
+ * queuing */
+static int64_t RTP(uint32_t instr, uint32_t vector_index)
+{
+   int64_t projection_factor;
+   float precise_h_div_sz;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
+
+   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[vector_index],
+         CRVectors.T, sf, lm);
+
+   /* Step 3: perspective projection against the screen plane
+    *
+    * Compute the projection factor by dividing projection plane
+    * distance by the Z coordinate */
+
+   /* Projection factor: 1.16 unsigned */
+   projection_factor = Divide(H, Z_FIFO[3]);
+   precise_h_div_sz  = (float)H / (float)Z_FIFO[3];
+
+   TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
+
+   return projection_factor;
 }
 
 static int32_t RTPS(uint32_t instr)
 {
-   int64_t h_div_sz;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
-   h_div_sz = Divide(H, Z_FIFO[3]);
-
-   float precise_h_div_sz = (float)H / (float)Z_FIFO[3];
-
-   TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
-   TransformDQ(h_div_sz);
+   int64_t projection_factor = RTP(instr, 0);
+   depth_queuing(projection_factor);
 
    return(15);
 }
@@ -1120,24 +1149,11 @@ static int32_t RTPS(uint32_t instr)
  * Operates on v0, v1 and v2 */
 static int32_t RTPT(uint32_t instr)
 {
-   unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   for(i = 0; i < 3; i++)
-   {
-      int64_t h_div_sz;
-
-      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
-      h_div_sz = Divide(H, Z_FIFO[3]);
-
-      float precise_h_div_sz = (float)H / (float)Z_FIFO[3];
-
-      TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
-
-      if(i == 2)
-         TransformDQ(h_div_sz);
-   }
+   int64_t projection_factor;
+   RTP(instr, 0);
+   RTP(instr, 1);
+   projection_factor = RTP(instr, 2);
+   depth_queuing(projection_factor);
 
    return(23);
 }
@@ -1170,17 +1186,19 @@ static int32_t NCT(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   for(i = 0; i < 3; i++)
-      NormColor(sf, lm, i);
+   NormColor(sf, lm, 0);
+   NormColor(sf, lm, 1);
+   NormColor(sf, lm, 2);
 
    return(30);
 }
 
-INLINE void NormColorColor(uint32_t v, uint32_t sf, int lm)
+/* NCC - Normal Color Color */
+static INLINE void NCC(uint32_t vector_index, uint32_t sf, int lm)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Light, Vectors[vector_index], CRVectors.Null, sf, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
@@ -1190,7 +1208,6 @@ INLINE void NormColorColor(uint32_t v, uint32_t sf, int lm)
    MAC[3] = ((RGB.B << 4) * IR3) >> sf;
 
    MAC_to_IR(lm);
-
    MAC_to_RGB_FIFO();
 }
 
@@ -1199,19 +1216,19 @@ static int32_t NCCS(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NormColorColor(0, sf, lm);
+   NCC(0, sf, lm);
    return(17);
 }
 
 
 static int32_t NCCT(uint32_t instr)
 {
-   unsigned i;
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   for(i = 0; i < 3; i++)
-      NormColorColor(i, sf, lm);
+   NCC(0, sf, lm);
+   NCC(1, sf, lm);
+   NCC(2, sf, lm);
 
    return(39);
 }
