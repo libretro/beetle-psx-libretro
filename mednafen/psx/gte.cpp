@@ -811,23 +811,21 @@ static INLINE int32_t Lm_D(int32_t value, int unchained)
    return(value);
 }
 
-static INLINE int32_t Lm_G(unsigned int which, int32_t value)
+static INLINE int32_t i32_to_i11_saturate(uint8_t flag, int32_t value)
 {
-   if(value < -1024)
+   if(value < -0x400)
    {
-      // Set flag here
-      value = -1024;
-      FLAGS |= 1 << (14 - which);
+      FLAGS |= 1 << (14 - flag);
+      return -0x400;
    }
 
-   if(value > 1023)
+   if(value > 0x3ff)
    {
-      // Set flag here.
-      value = 1023;
-      FLAGS |= 1 << (14 - which);
+      FLAGS |= 1 << (14 - flag);
+      return 0x3ff;
    }
 
-   return(value);
+   return value;
 }
 
 // limit to 4096, not 4095
@@ -848,18 +846,18 @@ static INLINE int32_t Lm_H(int32_t value)
    return(value);
 }
 
-static INLINE uint8_t MAC_to_COLOR(unsigned int which, int32_t mac)
+static INLINE uint8_t MAC_to_COLOR(uint8_t flag, int32_t mac)
 {
    int32_t c = mac >> 4;
 
    if (c < 0)
    {
-      FLAGS |= 1 << (21 - which);	/* Tested with GPF */
+      FLAGS |= 1 << (21 - flag);	/* Tested with GPF */
       return 0;
    }
    if (c > 0xff)
    {
-      FLAGS |= 1 << (21 - which);	/* Tested with GPF */
+      FLAGS |= 1 << (21 - flag);	/* Tested with GPF */
       return 0xff;
    }
    return c;
@@ -1120,10 +1118,10 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    float fofy = ((float)OFY / (float)(1 << 16));
 
    MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
-   XY_FIFO[3].X = Lm_G(0, MAC[0]);
+   XY_FIFO[3].X = i32_to_i11_saturate(0, MAC[0]);
 
    MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
-   XY_FIFO[3].Y = Lm_G(1, MAC[0]);
+   XY_FIFO[3].Y = i32_to_i11_saturate(1, MAC[0]);
 
    /* Increased precision calculation (sub-pixel precision) */
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
