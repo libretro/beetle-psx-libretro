@@ -1,31 +1,33 @@
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
-HAVE_RUST=0
-HAVE_OPENGL=0
-HAVE_JIT=0
+HAVE_RUST = 0
+HAVE_OPENGL = 0
+HAVE_JIT = 0
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
 
 ifeq ($(platform),)
-platform = unix
-ifeq ($(shell uname -a),)
-   platform = win
-else ifneq ($(findstring Darwin,$(shell uname -a)),)
-   platform = osx
-   arch = intel
-ifeq ($(shell uname -p),powerpc)
-   arch = ppc
-endif
-else ifneq ($(findstring MINGW,$(shell uname -a)),)
-   platform = win
-endif
+   platform = unix
+   ifeq ($(shell uname -a),)
+      platform = win
+   else ifneq ($(findstring Darwin,$(shell uname -a)),)
+      platform = osx
+      arch = intel
+      ifeq ($(shell uname -p),powerpc)
+         arch = ppc
+      endif
+   else ifneq ($(findstring MINGW,$(shell uname -a)),)
+      platform = win
+   endif
+else ifneq (,$(findstring armv,$(platform)))
+   override platform += unix
 endif
 
 ifneq ($(platform), osx)
-ifeq ($(findstring Haiku,$(shell uname -a)),)
-   PTHREAD_FLAGS = -lpthread
-endif
+   ifeq ($(findstring Haiku,$(shell uname -a)),)
+      PTHREAD_FLAGS = -lpthread
+   endif
 endif
 
 NEED_CD = 1
@@ -38,10 +40,11 @@ CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx_libretro
 
 ifeq ($(HAVE_OPENGL),1)
-TARGET_NAME := mednafen_psx_hw_libretro
+   TARGET_NAME := mednafen_psx_hw_libretro
 endif
 
-ifeq ($(platform), unix)
+# Unix
+ifneq (,$(findstring unix,$(platform)))
    TARGET := $(TARGET_NAME).so
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
@@ -50,70 +53,62 @@ ifeq ($(platform), unix)
    endif
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
+   ifeq ($(HAVE_OPENGL),1)
+      ifneq (,$(findstring gles,$(platform)))
+         GLES = 1
+         GL_LIB := -lGLESv2
+      else
+         GL_LIB := -lGL
+      endif
+   endif
 
-ifeq ($(HAVE_OPENGL),1)
-	ifneq (,$(findstring gles,$(platform)))
-		GLES = 1
-		GL_LIB := -lGLESv2
-	else
-		GL_LIB := -lGL
-	endif
-endif
-
+# OS X
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME).dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
-ifeq ($(arch),ppc)
-   ENDIANNESS_DEFINES := -DMSB_FIRST
-   OLD_GCC := 1
-else
-endif
+   ifeq ($(arch),ppc)
+      ENDIANNESS_DEFINES := -DMSB_FIRST
+      OLD_GCC := 1
+   endif
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-ifeq ($(OSX_LT_MAVERICKS),"YES")
-   fpic += -mmacosx-version-min=10.5
-endif
-
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -framework OpenGL
-endif
+   ifeq ($(OSX_LT_MAVERICKS),"YES")
+      fpic += -mmacosx-version-min=10.5
+   endif
+   ifeq ($(HAVE_OPENGL),1)
+      GL_LIB := -framework OpenGL
+   endif
 
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
-
    TARGET := $(TARGET_NAME)_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS)
-
-ifeq ($(IOSSDK),)
-   IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
-endif
-
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -framework OpenGLES
-endif
-
+   ifeq ($(IOSSDK),)
+      IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+   endif
+   ifeq ($(HAVE_OPENGL),1)
+      GL_LIB := -framework OpenGLES
+   endif
    CC = cc -arch armv7 -isysroot $(IOSSDK)
    CXX = c++ -arch armv7 -isysroot $(IOSSDK)
-IPHONEMINVER :=
-ifeq ($(platform),ios9)
-	IPHONEMINVER = -miphoneos-version-min=8.0
-else
-	IPHONEMINVER = -miphoneos-version-min=5.0
-endif
+   IPHONEMINVER :=
+   ifeq ($(platform),ios9)
+      IPHONEMINVER = -miphoneos-version-min=8.0
+   else
+      IPHONEMINVER = -miphoneos-version-min=5.0
+   endif
    LDFLAGS += $(IPHONEMINVER)
    FLAGS += $(IPHONEMINVER)
    CC += $(IPHONEMINVER)
    CXX += $(IPHONEMINVER)
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -framework OpenGLES
-endif
 
+# QNX
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_qnx.so
    fpic := -fPIC
@@ -125,11 +120,11 @@ else ifeq ($(platform), qnx)
    CXX = QCC -Vgcc_ntoarmv7le_cpp
    AR = QCC -Vgcc_ntoarmv7le
    FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
+   ifeq ($(HAVE_OPENGL),1)
+      GL_LIB := -lGLESv2
+   endif
 
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -lGLESv2
-endif
-
+# PS3
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
@@ -139,6 +134,8 @@ else ifeq ($(platform), ps3)
    OLD_GCC := 1
    FLAGS += -DHAVE_MKDIR -DARCH_POWERPC_ALTIVEC
    STATIC_LINKING = 1
+
+# sncps3
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
@@ -150,6 +147,8 @@ else ifeq ($(platform), sncps3)
    NO_GCC := 1
    FLAGS += -DHAVE_MKDIR -DARCH_POWERPC_ALTIVEC
    STATIC_LINKING = 1
+
+# Lightweight PS3 Homebrew SDK
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
@@ -173,13 +172,14 @@ else ifeq ($(platform), psp1)
 # Vita
 else ifeq ($(platform), vita)
    TARGET := $(TARGET_NAME)_vita.a
-	CC = arm-vita-eabi-gcc$(EXE_EXT)
-	CXX = arm-vita-eabi-g++$(EXE_EXT)
-	AR = arm-vita-eabi-ar$(EXE_EXT)
+   CC = arm-vita-eabi-gcc$(EXE_EXT)
+   CXX = arm-vita-eabi-g++$(EXE_EXT)
+   AR = arm-vita-eabi-ar$(EXE_EXT)
    FLAGS += -DVITA
    FLAGS += -DHAVE_MKDIR
    STATIC_LINKING = 1
 
+# Xbox 360
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
@@ -189,53 +189,23 @@ else ifeq ($(platform), xenon)
    LIBS := $(PTHREAD_FLAGS)
    FLAGS += -DHAVE_MKDIR
    STATIC_LINKING = 1
-else ifeq ($(platform), ngc)
-   TARGET := $(TARGET_NAME)_ngc.a
+
+# Nintendo Game Cube / Nintendo Wii
+else ifneq (,$(filter $(platform),ngc wii))
+   ifeq ($(platform), ngc)
+      TARGET := $(TARGET_NAME)_ngc.a
+      ENDIANNESS_DEFINES += -DHW_DOL
+   else ifeq ($(platform), wii)
+      TARGET := $(TARGET_NAME)_wii.a
+      ENDIANNESS_DEFINES += -DHW_RVL
+   endif
+   ENDIANNESS_DEFINES += -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
-
    EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
    FLAGS += -DHAVE_MKDIR
    STATIC_LINKING = 1
-else ifeq ($(platform), wii)
-   TARGET := $(TARGET_NAME)_wii.a
-   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
-   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
-   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
-
-   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
-   FLAGS += -DHAVE_MKDIR
-   STATIC_LINKING = 1
-else ifneq (,$(findstring armv,$(platform)))
-   TARGET := $(TARGET_NAME).so
-   fpic := -fPIC
-   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   CC = gcc
-   LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
-   IS_X86 = 0
-ifneq (,$(findstring cortexa8,$(platform)))
-   FLAGS += -marm -mcpu=cortex-a8
-   ASFLAGS += -mcpu=cortex-a8
-else ifneq (,$(findstring cortexa9,$(platform)))
-   FLAGS += -marm -mcpu=cortex-a9
-   ASFLAGS += -mcpu=cortex-a9
-endif
-   FLAGS += -marm
-ifneq (,$(findstring neon,$(platform)))
-   FLAGS += -mfpu=neon
-   ASFLAGS += -mfpu=neon
-   HAVE_NEON = 1
-endif
-ifneq (,$(findstring softfloat,$(platform)))
-   FLAGS += -mfloat-abi=softfp
-else ifneq (,$(findstring hardfloat,$(platform)))
-   FLAGS += -mfloat-abi=hard
-endif
-   FLAGS += -DARM
 
 # GCW0
 else ifeq ($(platform), gcw0)
@@ -248,10 +218,10 @@ else ifeq ($(platform), gcw0)
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS += $(PTHREAD_FLAGS) -DHAVE_MKDIR
    FLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
+   GLES = 1
+   GL_LIB := -lGLESv2
 
-    GLES = 1
-    GL_LIB := -lGLESv2
-
+# Windows
 else
    TARGET := $(TARGET_NAME).dll
    CC = gcc
@@ -260,28 +230,26 @@ else
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    FLAGS += -DHAVE__MKDIR
-
-ifeq ($(HAVE_OPENGL),1)
-	GL_LIB := -lopengl32
-endif
+   ifeq ($(HAVE_OPENGL),1)
+      GL_LIB := -lopengl32
+   endif
 
 endif
 
 include Makefile.common
 
 WARNINGS := -Wall \
-	-Wno-sign-compare \
-	-Wno-unused-variable \
-	-Wno-unused-function \
-	-Wno-uninitialized \
-	$(NEW_GCC_WARNING_FLAGS) \
-	-Wno-strict-aliasing
+   -Wno-sign-compare \
+   -Wno-unused-variable \
+   -Wno-unused-function \
+   -Wno-uninitialized \
+   $(NEW_GCC_WARNING_FLAGS) \
+   -Wno-strict-aliasing
 
-EXTRA_GCC_FLAGS := -funroll-loops
+#EXTRA_GCC_FLAGS := -funroll-loops
 
-EXTRA_GCC_FLAGS :=
 ifeq ($(NO_GCC),1)
-	WARNINGS :=
+   WARNINGS :=
 endif
 
 OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
@@ -298,15 +266,15 @@ LDFLAGS += $(fpic) $(SHARED)
 FLAGS += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS += $(INCFLAGS)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.31\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=931 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -D__STDC_CONSTANT_MACROS
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.38.6\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=9386 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -D__STDC_CONSTANT_MACROS
 
 ifeq ($(HAVE_RUST),1)
-FLAGS += -DHAVE_RUST
-LDFLAGS += -ldl -L. -lrsx
+   FLAGS += -DHAVE_RUST
+   LDFLAGS += -ldl -L. -lrsx
 endif
 
 ifeq ($(HAVE_JIT),1)
-LDFLAGS += -ljit
+   LDFLAGS += -ljit
 endif
 
 CXXFLAGS += $(FLAGS)
