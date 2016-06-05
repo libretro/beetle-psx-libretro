@@ -718,9 +718,9 @@ uint32_t GTE_ReadDR(unsigned int which)
    return(ret);
 }
 
-#define sign_x_to_s64(_bits, _value) (((int64_t)((uint64_t)(_value) << (64 - _bits))) >> (64 - _bits))
-
-static INLINE int64_t A_MV(unsigned which, int64_t value)
+/* Truncate i64 value to only keep the low 43 bits + sign and
+ * update the flags if an overflow occurs */
+static INLINE int64_t i64_to_i44(unsigned which, int64_t value)
 {
    if(value >= 0x7ffffffffff)
       FLAGS |= 1 << (30 - which);
@@ -728,7 +728,7 @@ static INLINE int64_t A_MV(unsigned which, int64_t value)
    if(value < -0x80000000000)
       FLAGS |= 1 << (27 - which);
 
-   return sign_x_to_s64(44, value);
+   return (((int64_t)((uint64_t)(value) << (64 - 44))) >> (64 - 44));
 }
 
 static INLINE int64_t F(int64_t value)
@@ -739,7 +739,6 @@ static INLINE int64_t F(int64_t value)
       FLAGS |= 1 << 16;
    return(value);
 }
-
 
 static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
 {
@@ -894,12 +893,12 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
          for(i = 0; i < 3; i++)
          {
             int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
-            tmp = A_MV(i, tmp + (matrix->MX[i][0] * v[0]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
             Lm_B(i, tmp >> sf, FALSE);
             tmp = 0;
 
-            tmp = A_MV(i, tmp + (matrix->MX[i][1] * v[1]));
-            tmp = A_MV(i, tmp + (matrix->MX[i][2] * v[2]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][1] * v[1]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
 
             /* Store the results in the accumulator */
             MAC[1 + i] = tmp >> sf;
@@ -911,9 +910,9 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
          {
             int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
 
-            tmp = A_MV(i, tmp + (matrix->MX[i][0] * v[0]));
-            tmp = A_MV(i, tmp + (matrix->MX[i][1] * v[1]));
-            tmp = A_MV(i, tmp + (matrix->MX[i][2] * v[2]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][1] * v[1]));
+            tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
 
             /* Store the results in the accumulator */
             MAC[1 + i] = tmp >> sf;
@@ -945,12 +944,12 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
             mulr[1] *= v[1];
             mulr[2] *= v[2];
 
-            tmp = A_MV(i, tmp + mulr[0]);
+            tmp = i64_to_i44(i, tmp + mulr[0]);
             Lm_B(i, tmp >> sf, FALSE);
             tmp = 0;
 
-            tmp = A_MV(i, tmp + mulr[1]);
-            tmp = A_MV(i, tmp + mulr[2]);
+            tmp = i64_to_i44(i, tmp + mulr[1]);
+            tmp = i64_to_i44(i, tmp + mulr[2]);
 
             /* Store the results in the accumulator */
             MAC[1 + i] = tmp >> sf;
@@ -979,9 +978,9 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
             mulr[1] *= v[1];
             mulr[2] *= v[2];
 
-            tmp = A_MV(i, tmp + mulr[0]);
-            tmp = A_MV(i, tmp + mulr[1]);
-            tmp = A_MV(i, tmp + mulr[2]);
+            tmp = i64_to_i44(i, tmp + mulr[0]);
+            tmp = i64_to_i44(i, tmp + mulr[1]);
+            tmp = i64_to_i44(i, tmp + mulr[2]);
 
             /* Store the results in the accumulator */
             MAC[1 + i] = tmp >> sf;
@@ -1002,9 +1001,9 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    {
       tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
 
-      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][0] * v[0]));
-      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][1] * v[1]));
-      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][2] * v[2]));
+      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][0] * v[0]));
+      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][1] * v[1]));
+      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][2] * v[2]));
 
       MAC[1 + i] = tmp[i] >> sf;
    }
@@ -1307,16 +1306,16 @@ static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
-         MAC[1 + i] = A_MV(i, (RGB_temp[i] * IR_temp[i] + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
+         MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
    else
    {
       for(i = 0; i < 3; i++)
       {
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-         MAC[1 + i] = A_MV(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
 
@@ -1362,13 +1361,13 @@ static int32_t INTPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
 
-   MAC[1] = A_MV(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = A_MV(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
 
    MAC_to_IR(lm);
    MAC_to_RGB_FIFO();
@@ -1553,9 +1552,9 @@ static int32_t GPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = A_MV(0, (int64_t)((uint64_t)(int64_t)MAC[1] << sf) + (IR0 * IR1)) >> sf;
-   MAC[2] = A_MV(1, (int64_t)((uint64_t)(int64_t)MAC[2] << sf) + (IR0 * IR2)) >> sf;
-   MAC[3] = A_MV(2, (int64_t)((uint64_t)(int64_t)MAC[3] << sf) + (IR0 * IR3)) >> sf;
+   MAC[1] = i64_to_i44(0, (int64_t)((uint64_t)(int64_t)MAC[1] << sf) + (IR0 * IR1)) >> sf;
+   MAC[2] = i64_to_i44(1, (int64_t)((uint64_t)(int64_t)MAC[2] << sf) + (IR0 * IR2)) >> sf;
+   MAC[3] = i64_to_i44(2, (int64_t)((uint64_t)(int64_t)MAC[3] << sf) + (IR0 * IR3)) >> sf;
 
    MAC_to_IR(lm);
 
