@@ -734,16 +734,9 @@ static INLINE int64_t A_MV(unsigned which, int64_t value)
 static INLINE int64_t F(int64_t value)
 {
    if(value < -2147483648LL)
-   {
-      // flag set here
       FLAGS |= 1 << 15;
-   }
-
    if(value > 2147483647LL)
-   {
-      // flag set here
       FLAGS |= 1 << 16;
-   }
    return(value);
 }
 
@@ -896,62 +889,103 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 
    if(MDFN_LIKELY(matrix != &Matrices.AbbyNormal))
    {
-      for(i = 0; i < 3; i++)
+      if(crv == CRVectors.FC)
       {
-         int32_t mulr[3];
-         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
-
-         mulr[0] = matrix->MX[i][0] * v[0];
-         mulr[1] = matrix->MX[i][1] * v[1];
-         mulr[2] = matrix->MX[i][2] * v[2];
-
-         tmp = A_MV(i, tmp + mulr[0]);
-         if(crv == CRVectors.FC)
+         for(i = 0; i < 3; i++)
          {
+            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+            tmp = A_MV(i, tmp + (matrix->MX[i][0] * v[0]));
             Lm_B(i, tmp >> sf, FALSE);
             tmp = 0;
+
+            tmp = A_MV(i, tmp + (matrix->MX[i][1] * v[1]));
+            tmp = A_MV(i, tmp + (matrix->MX[i][2] * v[2]));
+
+            /* Store the results in the accumulator */
+            MAC[1 + i] = tmp >> sf;
          }
+      }
+      else
+      {
+         for(i = 0; i < 3; i++)
+         {
+            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
 
-         tmp = A_MV(i, tmp + mulr[1]);
-         tmp = A_MV(i, tmp + mulr[2]);
+            tmp = A_MV(i, tmp + (matrix->MX[i][0] * v[0]));
+            tmp = A_MV(i, tmp + (matrix->MX[i][1] * v[1]));
+            tmp = A_MV(i, tmp + (matrix->MX[i][2] * v[2]));
 
-         MAC[1 + i] = tmp >> sf;
+            /* Store the results in the accumulator */
+            MAC[1 + i] = tmp >> sf;
+         }
       }
    }
    else
    {
-      for(i = 0; i < 3; i++)
+      if(crv == CRVectors.FC)
       {
-         int32_t mulr[3];
-         int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
+         for(i = 0; i < 3; i++)
+         {
+            int32_t mulr[3];
+            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
 
-         if(i == 0)
-         {
-            mulr[0] = -(RGB.R << 4);
-            mulr[1] = (RGB.R << 4);
-            mulr[2] = IR0;
-         }
-         else
-         {
-            mulr[0] = (int16_t)CR[i];
-            mulr[1] = (int16_t)CR[i];
-            mulr[2] = (int16_t)CR[i];
-         }
-         mulr[0] *= v[0];
-         mulr[1] *= v[1];
-         mulr[2] *= v[2];
+            if(i == 0)
+            {
+               mulr[0] = -(RGB.R << 4);
+               mulr[1] = (RGB.R << 4);
+               mulr[2] = IR0;
+            }
+            else
+            {
+               mulr[0] = (int16_t)CR[i];
+               mulr[1] = (int16_t)CR[i];
+               mulr[2] = (int16_t)CR[i];
+            }
+            mulr[0] *= v[0];
+            mulr[1] *= v[1];
+            mulr[2] *= v[2];
 
-         tmp = A_MV(i, tmp + mulr[0]);
-         if(crv == CRVectors.FC)
-         {
+            tmp = A_MV(i, tmp + mulr[0]);
             Lm_B(i, tmp >> sf, FALSE);
             tmp = 0;
+
+            tmp = A_MV(i, tmp + mulr[1]);
+            tmp = A_MV(i, tmp + mulr[2]);
+
+            /* Store the results in the accumulator */
+            MAC[1 + i] = tmp >> sf;
          }
+      }
+      else
+      {
+         for(i = 0; i < 3; i++)
+         {
+            int32_t mulr[3];
+            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
 
-         tmp = A_MV(i, tmp + mulr[1]);
-         tmp = A_MV(i, tmp + mulr[2]);
+            if(i == 0)
+            {
+               mulr[0] = -(RGB.R << 4);
+               mulr[1] = (RGB.R << 4);
+               mulr[2] = IR0;
+            }
+            else
+            {
+               mulr[0] = (int16_t)CR[i];
+               mulr[1] = (int16_t)CR[i];
+               mulr[2] = (int16_t)CR[i];
+            }
+            mulr[0] *= v[0];
+            mulr[1] *= v[1];
+            mulr[2] *= v[2];
 
-         MAC[1 + i] = tmp >> sf;
+            tmp = A_MV(i, tmp + mulr[0]);
+            tmp = A_MV(i, tmp + mulr[1]);
+            tmp = A_MV(i, tmp + mulr[2]);
+
+            /* Store the results in the accumulator */
+            MAC[1 + i] = tmp >> sf;
+         }
       }
    }
 
@@ -966,17 +1000,11 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
    for(i = 0; i < 3; i++)
    {
-      int32_t mulr[3];
-
       tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
 
-      mulr[0] = matrix->MX[i][0] * v[0];
-      mulr[1] = matrix->MX[i][1] * v[1];
-      mulr[2] = matrix->MX[i][2] * v[2];
-
-      tmp[i] = A_MV(i, tmp[i] + mulr[0]);
-      tmp[i] = A_MV(i, tmp[i] + mulr[1]);
-      tmp[i] = A_MV(i, tmp[i] + mulr[2]);
+      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][0] * v[0]));
+      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][1] * v[1]));
+      tmp[i] = A_MV(i, tmp[i] + (matrix->MX[i][2] * v[2]));
 
       MAC[1 + i] = tmp[i] >> sf;
    }
@@ -1401,11 +1429,31 @@ static int32_t CDP(uint32_t instr)
    return(13);
 }
 
+static INLINE void check_mac_overflow(int64_t value)
+{
+   if(value < -2147483648LL)
+      FLAGS |= 1 << 15;
+   if(value > 2147483647LL)
+      FLAGS |= 1 << 16;
+}
+
 /* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
 {
-   MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
-         );
+   int16_t x0     = XY_FIFO[0].X;
+   int16_t y0     = XY_FIFO[0].Y;
+   int16_t x1     = XY_FIFO[1].X;
+   int16_t y1     = XY_FIFO[1].Y;
+   int16_t x2     = XY_FIFO[2].X;
+   int16_t y2     = XY_FIFO[2].Y;
+   int64_t a      = x0 * (y1 - y2);
+   int64_t b      = x1 * (y2 - y0);
+   int64_t c      = x2 * (y0 - y1);
+   int32_t sum    = a + b + c;
+
+   check_mac_overflow(sum);
+
+   MAC[0] = sum;
 
    return(8);
 }
