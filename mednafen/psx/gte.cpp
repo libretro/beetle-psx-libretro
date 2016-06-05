@@ -1007,6 +1007,8 @@ static int32_t SQR(uint32_t instr)
 }
 
 
+/* MVMVA - Multiply Vector by Matrix And Vector Add */
+
 static int32_t MVMVA(uint32_t instr)
 {
    int16_t v[3];
@@ -1114,6 +1116,8 @@ static int32_t RTPS(uint32_t instr)
    return(15);
 }
 
+/* RTPT - Rotate, Translate and Perspective Transform Triple.
+ * Operates on v0, v1 and v2 */
 static int32_t RTPT(uint32_t instr)
 {
    unsigned i;
@@ -1212,11 +1216,13 @@ static int32_t NCCT(uint32_t instr)
    return(39);
 }
 
-static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int lm)
+static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
 {
    int i;
    int32_t RGB_temp[3];
    int32_t IR_temp[3] = { IR1, IR2, IR3 };
+   const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm  = (instr >> 10) & 1;
 
    //assert(sf);
    RGB_temp[0] = RGB.R;
@@ -1256,12 +1262,10 @@ static INLINE void DepthCue(int mult_IR123, int RGB_from_FIFO, uint32_t sf, int 
 }
 
 
+/* DCPL - Depth Cue Color Light */
 static int32_t DCPL(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   DepthCue(TRUE, FALSE, sf, lm);
+   DepthCue(instr, TRUE, FALSE);
 
    return(8);
 }
@@ -1269,25 +1273,25 @@ static int32_t DCPL(uint32_t instr)
 
 static int32_t DPCS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   DepthCue(FALSE, FALSE, sf, lm);
+   DepthCue(instr, FALSE, FALSE);
 
    return(8);
 }
 
+/* DPCT - Depth Cue Triple */
 static int32_t DPCT(uint32_t instr)
 {
-   unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   for(i = 0; i < 3; i++)
-      DepthCue(FALSE, TRUE, sf, lm);
+   /* Each call uses the oldest entry in the RGB FIFO
+    * and pushes the result at the top so the three calls
+    * will process and replace the entire contents of the FIFO. */
+   DepthCue(instr, FALSE, TRUE);
+   DepthCue(instr, FALSE, TRUE);
+   DepthCue(instr, FALSE, TRUE);
 
    return(17);
 }
+
+/* INTPL - Interpolate Between a vector and the far color */
 
 static int32_t INTPL(uint32_t instr)
 {
@@ -1303,56 +1307,57 @@ static int32_t INTPL(uint32_t instr)
    MAC[3] = A_MV(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
 
    MAC_to_IR(lm);
-
    MAC_to_RGB_FIFO();
 
    return(8);
 }
 
 
-static INLINE void NormColorDepthCue(uint32_t v, uint32_t sf, int lm)
+static INLINE void NormColorDepthCue(uint32_t instr, uint32_t v)
 {
    int16_t tmp_vector[3];
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
 
    MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
 
+   /* Use the custom 4th vector to store the intermediate
+    * values. This vector does not exist in the real hardware
+    * (at least not in the registers), it's just a hack to make
+    * the code simpler. */
    tmp_vector[0] = IR1;
    tmp_vector[1] = IR2;
    tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
-   DepthCue(TRUE, FALSE, sf, lm);
+   DCPL(instr);
 }
 
+/* NCDS - Normal Color Depth Cue Single vector */
 static int32_t NCDS(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   NormColorDepthCue(0, sf, lm);
+   NormColorDepthCue(instr, 0);
 
    return(19);
 }
 
+/* NDCT - Normal Color Depth Cue Triple */
 static int32_t NCDT(uint32_t instr)
 {
-   unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   for(i = 0; i < 3; i++)
-      NormColorDepthCue(i, sf, lm);
+   NormColorDepthCue(instr, 0);
+   NormColorDepthCue(instr, 1);
+   NormColorDepthCue(instr, 2);
 
    return(44);
 }
 
+/* CC - Color Color */
 static int32_t CC(uint32_t instr)
 {
-   int16_t tmp_vector[3];
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   const uint32_t     sf = (instr & (1 << 19)) ? 12 : 0;
+   const int          lm = (instr >> 10) & 1;
+   int16_t tmp_vector[3] = {IR1, IR2, IR3 };
 
-   tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
    MAC[1] = ((RGB.R << 4) * IR1) >> sf;
@@ -1360,7 +1365,6 @@ static int32_t CC(uint32_t instr)
    MAC[3] = ((RGB.B << 4) * IR3) >> sf;
 
    MAC_to_IR(lm);
-
    MAC_to_RGB_FIFO();
 
    return(11);
@@ -1375,11 +1379,12 @@ static int32_t CDP(uint32_t instr)
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
-   DepthCue(TRUE, FALSE, sf, lm);
+   DepthCue(instr, TRUE, FALSE);
 
    return(13);
 }
 
+/* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
 {
    MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
@@ -1388,6 +1393,7 @@ static int32_t NCLIP(uint32_t instr)
    return(8);
 }
 
+/* Average three Z Values */
 static int32_t AVSZ3(uint32_t instr)
 {
    MAC[0] = F(((int64_t)ZSF3 * (Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
@@ -1397,6 +1403,7 @@ static int32_t AVSZ3(uint32_t instr)
    return(5);
 }
 
+/* Average four Z values */
 static int32_t AVSZ4(uint32_t instr)
 {
    MAC[0] = F(((int64_t)ZSF4 * (Z_FIFO[0] + Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
