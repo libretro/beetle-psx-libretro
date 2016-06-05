@@ -829,21 +829,21 @@ static INLINE int32_t i32_to_i11_saturate(uint8_t flag, int32_t value)
 }
 
 // limit to 4096, not 4095
-static INLINE int32_t Lm_H(int32_t value)
+static INLINE int32_t Lm_H(int32_t depth)
 {
-   if(value < 0)
+   if(depth < 0)
    {
-      value = 0;
       FLAGS |= 1 << 12;
+      return 0;
    }
 
-   if(value > 4096)
+   if(depth > 4096)
    {
-      value = 4096;
       FLAGS |= 1 << 12;
+      return 4096;
    }
 
-   return(value);
+   return depth;
 }
 
 static INLINE uint8_t MAC_to_COLOR(uint8_t flag, int32_t mac)
