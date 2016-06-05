@@ -1461,9 +1461,21 @@ static int32_t NCLIP(uint32_t instr)
 /* Average three Z Values */
 static int32_t AVSZ3(uint32_t instr)
 {
-   MAC[0] = F(((int64_t)ZSF3 * (Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
+   uint32_t z1     = Z_FIFO[1];
+   uint32_t z2     = Z_FIFO[2];
+   uint32_t z3     = Z_FIFO[3];
+   uint64_t sum    = z1 + z2 + z3;
+   /* The average factor should generally be set to 1/3th of 
+    * the ordering table size. So for instance, for a table of
+    * 1024 entries, it should be set at 341 to use the full
+    * table granularity. */
+   int64_t zsf3    = ZSF3;
+   int64_t average = zsf3 * sum;
 
-   OTZ = Lm_D(MAC[0] >> 12, FALSE);
+   check_mac_overflow(average);
+
+   MAC[0] = (int32_t)average;
+   OTZ    = Lm_D(MAC[0] >> 12, FALSE);
 
    return(5);
 }
@@ -1471,9 +1483,22 @@ static int32_t AVSZ3(uint32_t instr)
 /* Average four Z values */
 static int32_t AVSZ4(uint32_t instr)
 {
-   MAC[0] = F(((int64_t)ZSF4 * (Z_FIFO[0] + Z_FIFO[1] + Z_FIFO[2] + Z_FIFO[3])));
+   uint32_t z0     = Z_FIFO[0];
+   uint32_t z1     = Z_FIFO[1];
+   uint32_t z2     = Z_FIFO[2];
+   uint32_t z3     = Z_FIFO[3];
+   uint64_t sum    = z0 + z1 + z2 + z3;
+   /* The average factor should generally be set to 1/4th of 
+    * the ordering table size. So for instance, for a table of
+    * 1024 entries, it should be set at 256 to use the full
+    * table granularity. */
+   int64_t zsf4    = ZSF4;
+   int64_t average = zsf4 * sum;
 
-   OTZ = Lm_D(MAC[0] >> 12, FALSE);
+   check_mac_overflow(average);
+
+   MAC[0] = (int32_t)average;
+   OTZ    = Lm_D(MAC[0] >> 12, FALSE);
 
    return(5);
 }
