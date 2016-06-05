@@ -24,7 +24,7 @@ void VertexArrayObject::bind()
 
 void VertexArrayObject::drop()
 {
-    glDeleteBuffers(1, &this->id);
+    glDeleteVertexArrays(1, &this->id);
 }
 
 Attribute::Attribute(const char* name, size_t offset, GLenum ty, GLint components)
