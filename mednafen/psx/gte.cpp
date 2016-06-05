@@ -158,9 +158,9 @@ extern "C" unsigned char widescreen_hack;
 static INLINE uint8_t Sat5(int16_t cc)
 {
    if(cc < 0)
-      cc = 0;
+      return 0;
    if(cc > 0x1F)
-      cc = 0x1F;
+      return 0x1F;
    return(cc);
 }
 
@@ -776,22 +776,6 @@ static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_va
    return(value);
 }
 
-static INLINE uint8_t Lm_C(unsigned int which, int32_t value)
-{
-   if(value & ~0xFF)
-   {
-      // Set flag here
-      FLAGS |= 1 << (21 - which);	// Tested with GPF
-
-      if(value < 0)
-         value = 0;
-
-      if(value > 255)
-         value = 255;
-   }
-
-   return(value);
-}
 
 static INLINE int32_t Lm_D(int32_t value, int unchained)
 {
@@ -864,13 +848,30 @@ static INLINE int32_t Lm_H(int32_t value)
    return(value);
 }
 
+static INLINE uint8_t MAC_to_COLOR(unsigned int which, int32_t mac)
+{
+   int32_t c = mac >> 4;
+
+   if (c < 0)
+   {
+      FLAGS |= 1 << (21 - which);	/* Tested with GPF */
+      return 0;
+   }
+   if (c > 0xff)
+   {
+      FLAGS |= 1 << (21 - which);	/* Tested with GPF */
+      return 0xff;
+   }
+   return c;
+}
+
 static INLINE void MAC_to_RGB_FIFO(void)
 {
    RGB_FIFO[0] = RGB_FIFO[1];
    RGB_FIFO[1] = RGB_FIFO[2];
-   RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
-   RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
-   RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
+   RGB_FIFO[2].R = MAC_to_COLOR(0, MAC[1]);
+   RGB_FIFO[2].G = MAC_to_COLOR(1, MAC[2]);
+   RGB_FIFO[2].B = MAC_to_COLOR(2, MAC[3]);
    RGB_FIFO[2].CD = RGB.CD;
 }
 
