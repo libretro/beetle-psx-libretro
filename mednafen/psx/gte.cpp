@@ -1106,6 +1106,14 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
    return 0x1FFFF;
 }
 
+static INLINE void check_mac_overflow(int64_t value)
+{
+   if(value < -2147483648LL)
+      FLAGS |= 1 << 15;
+   if(value > 2147483647LL)
+      FLAGS |= 1 << 16;
+}
+
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z)
 {
    float fofx = ((float)OFX / (float)(1 << 16));
@@ -1134,8 +1142,19 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
  * factor computed by the 'RTP' command */
 static INLINE void depth_queuing(int64_t h_div_sz)
 {
-   MAC[0] = F((int64_t)DQB + DQA * h_div_sz);
-   IR0    = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
+   int64_t factor = (int64_t)h_div_sz;
+   int64_t dqa    = (int64_t)DQA;
+   int64_t dqb    = (int64_t)DQB;
+   uint64_t depth = dqb + dqa * factor;
+
+   check_mac_overflow(depth);
+
+   MAC[0] = (int32_t)depth;
+
+   /* compute 16bit IR value */
+   depth = depth >> 12;
+
+   IR0    = Lm_H(((int64_t)depth));
 }
 
 /* Rotate, Translate and Perspective transform a single vector
@@ -1429,13 +1448,6 @@ static int32_t CDP(uint32_t instr)
    return(13);
 }
 
-static INLINE void check_mac_overflow(int64_t value)
-{
-   if(value < -2147483648LL)
-      FLAGS |= 1 << 15;
-   if(value > 2147483647LL)
-      FLAGS |= 1 << 16;
-}
 
 /* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
