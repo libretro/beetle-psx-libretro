@@ -133,7 +133,6 @@ ifneq ($(HAVE_GRIFFIN), 1)
 	$(CORE_EMU_DIR)/frontio.cpp \
 	$(CORE_EMU_DIR)/sio.cpp \
 	$(CORE_EMU_DIR)/cpu.cpp \
-	$(CORE_EMU_DIR)/decomp.cpp \
 	$(CORE_EMU_DIR)/gte.cpp \
 	$(CORE_EMU_DIR)/cdc.cpp \
 	$(CORE_EMU_DIR)/spu.cpp \
@@ -148,6 +147,10 @@ ifneq ($(HAVE_GRIFFIN), 1)
 	$(CORE_EMU_DIR)/input/memcard.cpp \
 	$(CORE_EMU_DIR)/input/multitap.cpp \
 	$(CORE_EMU_DIR)/input/mouse.cpp
+
+ifeq ($(HAVE_JIT), 1)
+	SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
+endif
 
 SOURCES_C += $(CORE_DIR)/libretro_cbs.c
 

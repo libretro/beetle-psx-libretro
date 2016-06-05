@@ -2,6 +2,7 @@ DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_RUST=0
 HAVE_OPENGL=0
+HAVE_JIT=0
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
@@ -304,7 +305,9 @@ FLAGS += -DHAVE_RUST
 LDFLAGS += -ldl -L. -lrsx
 endif
 
+ifeq ($(HAVE_JIT),1)
 LDFLAGS += -ljit
+endif
 
 CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
