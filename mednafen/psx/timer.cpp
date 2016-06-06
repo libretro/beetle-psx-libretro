@@ -82,8 +82,8 @@
 struct Timer
 {
    uint32_t Mode;
-   int32_t Counter;	// Only 16-bit, but 32-bit here for detecting counting past target.
-   int32_t Target;
+   int32_t Counter;	/* Counter value. Only 16-bit, but 32-bit here for detecting counting past target. */
+   int32_t Target;   /* Counter target */
 
    int32_t Div8Counter;
 
