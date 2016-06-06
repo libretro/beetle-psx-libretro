@@ -3998,13 +3998,13 @@ void MDFND_DispMessage(unsigned char *str)
 
 void MDFN_DispMessage(const char *format, ...)
 {
+   char str[4096];
    struct retro_message msg;
    va_list ap;
    va_start(ap,format);
-   char *str = NULL;
    const char *strc = NULL;
 
-   vasprintf(&str, format,ap);
+   vsnprintf(str, 4096, format, ap);
    va_end(ap);
    strc = str;
 
