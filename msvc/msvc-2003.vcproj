@@ -304,28 +304,6 @@
 					</File>
 				</Filter>
 				<Filter
-					Name="trio"
-					Filter="">
-					<File
-						RelativePath="..\mednafen\trio\trio.c">
-						<FileConfiguration
-							Name="Debug|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="2"/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Release|Win32">
-							<Tool
-								Name="VCCLCompilerTool"
-								CompileAs="2"/>
-						</FileConfiguration>
-					</File>
-					<File
-						RelativePath="..\mednafen\trio\triostr.c">
-					</File>
-				</Filter>
-				<Filter
 					Name="cdrom"
 					Filter="">
 					<File

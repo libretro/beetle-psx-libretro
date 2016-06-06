@@ -19,7 +19,6 @@
 
 #include <string.h>
 #include <ctype.h>
-#include "include/trio/trio.h"
 #include <errno.h>
 #include <vector>
 
@@ -272,7 +271,7 @@ static bool TestConditions(const char *string)
  bool passed = 1;
 
  //printf("TR: %s\n", string);
- while(trio_sscanf(string, "%u %c %.63s %.63s %.63s", &bytelen, &endian, address, operation, value) == 5 && passed)
+ while(sscanf(string, "%u %c %63s %63s %63s", &bytelen, &endian, address, operation, value) == 5 && passed)
  {
   uint32 v_address;
   uint64 v_value;
@@ -586,7 +585,7 @@ int MDFNI_DecodePAR(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)
  int boo[4];
  if(strlen(str)!=8) return(0);
 
- trio_sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
+ sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
 
  *c = 0;
 

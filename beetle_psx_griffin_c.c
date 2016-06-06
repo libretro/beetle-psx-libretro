@@ -17,8 +17,6 @@
 #include "mednafen/file.c"
 #include "mednafen/md5.c"
 #include "mednafen/mednafen-endian.c"
-#include "mednafen/trio/trio.c"
-#include "mednafen/trio/triostr.c"
 
 #include "libretro_cbs.c"
 #include "libretro-common/streams/file_stream.c"

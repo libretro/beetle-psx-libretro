@@ -142,7 +142,7 @@ void PSX_DBG(unsigned level, const char *format, ...)
    {
       va_list ap;
       va_start(ap, format);
-      trio_vprintf(format, ap);
+      vprintf(format, ap);
       va_end(ap);
    }
 }
@@ -1873,9 +1873,9 @@ static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, c
   patch->conditions.append(", ");
 
  if(len == 2)
-  trio_snprintf(tmp, 256, "%u L 0x%08x %s 0x%04x", len, addr, cc, val & 0xFFFFU);
+  snprintf(tmp, 256, "%u L 0x%08x %s 0x%04x", len, addr, cc, val & 0xFFFFU);
  else
-  trio_snprintf(tmp, 256, "%u L 0x%08x %s 0x%02x", len, addr, cc, val & 0xFFU);
+  snprintf(tmp, 256, "%u L 0x%08x %s 0x%02x", len, addr, cc, val & 0xFFU);
 
  patch->conditions.append(tmp);
 }
@@ -4004,7 +4004,7 @@ void MDFN_DispMessage(const char *format, ...)
    char *str = NULL;
    const char *strc = NULL;
 
-   trio_vasprintf(&str, format,ap);
+   vasprintf(&str, format,ap);
    va_end(ap);
    strc = str;
 

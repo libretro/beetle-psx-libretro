@@ -355,15 +355,6 @@
     <ClCompile Include="..\mednafen\psx\input\negcon.cpp" />
     <ClCompile Include="..\mednafen\video\Deinterlacer.cpp" />
     <ClCompile Include="..\mednafen\video\surface.cpp" />
-    <ClCompile Include="..\mednafen\trio\trio.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|x64'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsCpp</CompileAs>
-    </ClCompile>
-    <ClCompile Include="..\mednafen\trio\triostr.c" />
     <ClCompile Include="..\mednafen\cdrom\audioreader.cpp" />
     <ClCompile Include="..\mednafen\cdrom\CDAccess.cpp" />
     <ClCompile Include="..\mednafen\cdrom\CDAccess_CCD.cpp" />

@@ -25,9 +25,6 @@
     <Filter Include="mednafen\video">
       <UniqueIdentifier>{1e2dc216-8cd7-4d0b-809c-d86ef961b732}</UniqueIdentifier>
     </Filter>
-    <Filter Include="mednafen\trio">
-      <UniqueIdentifier>{217207a1-7e8e-49c9-a76e-280b4304d893}</UniqueIdentifier>
-    </Filter>
     <Filter Include="mednafen\cdrom">
       <UniqueIdentifier>{dba242e6-9e7c-4dbd-b765-b7bde9be02c9}</UniqueIdentifier>
     </Filter>
@@ -179,12 +176,6 @@
     </ClCompile>
     <ClCompile Include="..\mednafen\video\surface.cpp">
       <Filter>mednafen\video</Filter>
-    </ClCompile>
-    <ClCompile Include="..\mednafen\trio\trio.c">
-      <Filter>mednafen\trio</Filter>
-    </ClCompile>
-    <ClCompile Include="..\mednafen\trio\triostr.c">
-      <Filter>mednafen\trio</Filter>
     </ClCompile>
     <ClCompile Include="..\mednafen\cdrom\audioreader.cpp">
       <Filter>mednafen\cdrom</Filter>

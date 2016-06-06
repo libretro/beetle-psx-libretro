@@ -3,7 +3,6 @@
 
 #include "../mednafen.h"
 #include "../masmem.h"
-#include "../include/trio/trio.h"
 
 #include "../cdrom/cdromif.h"
 #include "../general.h"
