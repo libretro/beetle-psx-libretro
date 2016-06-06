@@ -25,7 +25,7 @@
 #define PSX_DBG_FLOOD		4	// Heavy informational debug messages(GPU commands; TODO).
 
 #if PSX_DBGPRINT_ENABLE
-void PSX_DBG(unsigned level, const char *format, ...) throw() MDFN_COLD MDFN_FORMATSTR(printf, 2, 3);
+void PSX_DBG(unsigned level, const char *format, ...);
 
 #define PSX_WARNING(format, ...) { PSX_DBG(PSX_DBG_WARNING, format "\n", ## __VA_ARGS__); }
 #define PSX_DBGINFO(format, ...) { }
