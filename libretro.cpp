@@ -3998,7 +3998,7 @@ void MDFND_DispMessage(unsigned char *str)
 
 void MDFN_DispMessage(const char *format, ...)
 {
-   char str[4096];
+   char *str = new char[4096];
    struct retro_message msg;
    va_list ap;
    va_start(ap,format);
