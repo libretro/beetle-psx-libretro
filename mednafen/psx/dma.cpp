@@ -46,10 +46,10 @@ enum
 
 static int32_t DMACycleCounter;
 
-static uint32_t DMAControl;
+static uint32_t DMAControl;         /* DMA control register */
 static uint32_t DMAIntControl;
 static uint8_t DMAIntStatus;
-static bool IRQOut;
+static bool IRQOut;                 /* IRQ enable for individual channels */
 
 struct Channel
 {
