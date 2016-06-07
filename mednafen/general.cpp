@@ -14,9 +14,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-#include "mednafen.h"
-
 #include <string.h>
 #include <stdarg.h>
 
@@ -24,6 +21,9 @@
 
 #include <string>
 
+#include <boolean.h>
+
+#include "mednafen.h"
 #include "general.h"
 #include "state.h"
 
@@ -39,17 +39,17 @@ static bool IsAbsolutePath(const char *path)
 #endif
          path[0] == '/'
       )
-         return(TRUE);
+         return true;
 
  #if defined(WIN32) || defined(DOS)
  if((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z'))
  {
     if(path[1] == ':')
-       return(TRUE);
+       return true;
  }
  #endif
 
- return(FALSE);
+ return(false);
 }
 
 bool MDFN_IsFIROPSafe(const std::string &path)
@@ -175,7 +175,7 @@ const char * GetFNComponent(const char *str)
 void MDFN_ltrim(char *string)
 {
  int32 di, si;
- bool InWhitespace = TRUE;
+ bool InWhitespace = true;
 
  di = si = 0;
 
@@ -187,7 +187,7 @@ void MDFN_ltrim(char *string)
     }
     else
     {
-       InWhitespace = FALSE;
+       InWhitespace = false;
        string[di] = string[si];
        di++;
     }
@@ -224,7 +224,7 @@ void MDFN_ltrim(std::string &string)
 {
  size_t len = string.length();
  size_t di, si;
- bool InWhitespace = TRUE;
+ bool InWhitespace = true;
 
  di = si = 0;
 
@@ -236,7 +236,7 @@ void MDFN_ltrim(std::string &string)
   }
   else
   {
-   InWhitespace = FALSE;
+   InWhitespace = false;
    string[di] = string[si];
    di++;
   }

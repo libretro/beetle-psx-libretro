@@ -30,6 +30,7 @@
 	Trying to read sectors at an LBA of less than 0 is not supported.  TODO: support it(at least up to -150).
 */
 
+#include <boolean.h>
 #include <retro_stat.h>
 
 #include "../mednafen.h"
@@ -331,7 +332,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    static const unsigned max_args = 4;
    std::string linebuf;
    std::string cmdbuf, args[max_args];
-   bool IsTOC = FALSE;
+   bool IsTOC = false;
    int32 active_track = -1;
    int32 AutoTrackInc = 1; // For TOC
    CDRFILE_TRACK_INFO TmpTrack;
@@ -442,7 +443,7 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             }
 
             if(TmpTrack.DIFormat == DI_FORMAT_AUDIO)
-               TmpTrack.RawAudioMSBFirst = TRUE; // Silly cdrdao...
+               TmpTrack.RawAudioMSBFirst = true; // Silly cdrdao...
 
             if(!strcasecmp(args[1].c_str(), "RW"))
             {
@@ -902,7 +903,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
    int32_t track;
    uint8_t SimuQ[0xC];
-   bool TrackFound = FALSE;
+   bool TrackFound = false;
 
    memset(buf + 2352, 0, 96);
 
@@ -916,7 +917,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
 
       if(lba >= (ct->LBA - ct->pregap_dv - ct->pregap) && lba < (ct->LBA + ct->sectors + ct->postgap))
       {
-         TrackFound = TRUE;
+         TrackFound = true;
 
          // Handle pregap and postgap reading
          if(lba < (ct->LBA - ct->pregap_dv) || lba >= (ct->LBA + ct->sectors))
@@ -1011,7 +1012,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
    if(qbuf[0] & 0x40)
    {
       uint8 dummy_buf[2352 + 96];
-      bool any_mismatch = FALSE;
+      bool any_mismatch = false;
 
       memcpy(dummy_buf + 16, buf + 16, 2048); 
       memset(dummy_buf + 2352, 0, 96);
@@ -1024,7 +1025,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
          if(dummy_buf[i] != buf[i])
          {
             printf("Mismatch at %d, %d: %02x:%02x; ", lba, i, dummy_buf[i], buf[i]);
-            any_mismatch = TRUE;
+            any_mismatch = true;
          }
       }
       if(any_mismatch)
@@ -1047,13 +1048,13 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
    uint32_t ma, sa, fa;
    uint32_t m, s, f;
    uint8_t pause_or = 0x00;
-   bool track_found = FALSE;
+   bool track_found = false;
 
    for(track = FirstTrack; track < (FirstTrack + NumTracks); track++)
    {
       if(lba >= (Tracks[track].LBA - Tracks[track].pregap_dv - Tracks[track].pregap) && lba < (Tracks[track].LBA + Tracks[track].sectors + Tracks[track].postgap))
       {
-         track_found = TRUE;
+         track_found = true;
          break;
       }
    }

@@ -15,20 +15,22 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "mednafen.h"
-
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
 #include <vector>
 
-#include "general.h"
-#include "md5.h"
-#include "mempatcher.h"
-
 #ifdef _WIN32
 #include <compat/msvc.h>
 #endif
+
+#include <boolean.h>
+
+#include "mednafen.h"
+
+#include "general.h"
+#include "md5.h"
+#include "mempatcher.h"
 
 #include "../libretro.h"
 
@@ -58,7 +60,7 @@ static std::vector<CHEATF> cheats;
 static int savecheats;
 static uint32 resultsbytelen = 1;
 static bool resultsbigendian = 0;
-static bool CheatsActive = TRUE;
+static bool CheatsActive = true;
 
 bool SubCheatsOn = 0;
 std::vector<SUBCHEAT> SubCheats[8];

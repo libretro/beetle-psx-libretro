@@ -24,6 +24,7 @@
 
 #include <algorithm>
 
+#include <boolean.h>
 #include <rthreads/rthreads.h>
 #include <retro_miscellaneous.h>
 
@@ -66,7 +67,7 @@ class CDIF_Queue
       CDIF_Queue();
       ~CDIF_Queue();
 
-      bool Read(CDIF_Message *message, bool blocking = TRUE);
+      bool Read(CDIF_Message *message, bool blocking = true);
 
       void Write(const CDIF_Message &message);
 
@@ -201,7 +202,7 @@ CDIF_Queue::~CDIF_Queue()
    scond_free(ze_cond);
 }
 
-// Returns FALSE if message not read, TRUE if it was read.  Will always return TRUE if "blocking" is set.
+// Returns false if message not read, true if it was read.  Will always return true if "blocking" is set.
 // Will throw MDFN_Error if the read message code is CDIF_MSG_FATAL_ERROR
 bool CDIF_Queue::Read(CDIF_Message *message, bool blocking)
 {
@@ -284,7 +285,7 @@ static int ReadThreadStart_C(void *v_arg)
 
 int CDIF_MT::ReadThreadStart()
 {
-   bool Running = TRUE;
+   bool Running = true;
 
    DiscEjected = true;
    SBWritePos = 0;
@@ -310,12 +311,12 @@ int CDIF_MT::ReadThreadStart()
 
       // Only do a blocking-wait for a message if we don't have any sectors to read-ahead.
       // MDFN_DispMessage("%d %d %d\n", last_read_lba, ra_lba, ra_count);
-      if(ReadThreadQueue.Read(&msg, ra_count ? FALSE : TRUE))
+      if(ReadThreadQueue.Read(&msg, ra_count ? false : true))
       {
          switch(msg.message)
          {
             case CDIF_MSG_DIEDIEDIE:
-               Running = FALSE;
+               Running = false;
                break;
 
             case CDIF_MSG_EJECT:
@@ -387,7 +388,7 @@ int CDIF_MT::ReadThreadStart()
 
          SectorBuffers[SBWritePos].lba = ra_lba;
          memcpy(SectorBuffers[SBWritePos].data, tmpbuf, 2352 + 96);
-         SectorBuffers[SBWritePos].valid = TRUE;
+         SectorBuffers[SBWritePos].valid = true;
          SectorBuffers[SBWritePos].error = error_condition;
          SBWritePos = (SBWritePos + 1) % SBSize;
 
@@ -494,7 +495,7 @@ bool CDIF::ValidateRawSector(uint8 *buf)
 
 bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
 {
-   bool found = FALSE;
+   bool found = false;
    bool error_condition = false;
 
    if(UnrecoverableError)
@@ -508,7 +509,7 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
    if(lba >= disc_toc.tracks[100].lba)
    {
       printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
-      return(FALSE);
+      return(false);
    }
 
    ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_READ_SECTOR, lba));
@@ -524,7 +525,7 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba)
          {
             error_condition = SectorBuffers[i].error;
             memcpy(buf, SectorBuffers[i].data, 2352 + 96);
-            found = TRUE;
+            found = true;
          }
       }
 
@@ -554,7 +555,7 @@ bool CDIF_MT::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
    {
       printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       memset(buf, 0, 96);
-      return(FALSE);
+      return(false);
    }
 
    ret = ReadRawSector(tmpbuf, lba);
@@ -586,7 +587,7 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
       if(!ReadRawSector(tmpbuf, lba))
       {
          puts("CDIF Raw Read error");
-         return(FALSE);
+         return(false);
       }
 
       if(!ValidateRawSector(tmpbuf))
@@ -706,7 +707,7 @@ bool CDIF_ST::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
    {
       printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       memset(buf, 0, 96);
-      return(FALSE);
+      return(false);
    }
 
    ret = ReadRawSector(tmpbuf, lba);

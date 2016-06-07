@@ -2994,7 +2994,7 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
       unsigned int x;
       char *tmp;
 
-      MDFNGameInfo->name = (UTF8 *)strdup(GetFNComponent(name));
+      MDFNGameInfo->name = (uint8_t*)strdup(GetFNComponent(name));
 
       for(x=0;x<strlen((char *)MDFNGameInfo->name);x++)
       {

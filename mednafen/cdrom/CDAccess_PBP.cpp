@@ -15,6 +15,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <boolean.h>
 #include <retro_stat.h>
 
 #include "../mednafen.h"
@@ -228,13 +229,13 @@ void CDAccess_PBP::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
    uint32_t ma, sa, fa;
    uint32_t m, s, f;
    uint8_t pause_or = 0x00;
-   bool track_found = FALSE;
+   bool track_found = false;
 
    for(track = FirstTrack; track < (FirstTrack + NumTracks); track++)
    {
       if(lba >= (Tracks[track].LBA - Tracks[track].pregap_dv - Tracks[track].pregap) && lba < (Tracks[track].LBA + Tracks[track].sectors + Tracks[track].postgap))
       {
-         track_found = TRUE;
+         track_found = true;
          break;
       }
    }

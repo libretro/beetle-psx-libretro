@@ -15,6 +15,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <boolean.h>
 #include <compat/intrinsics.h>
 
 #include "psx.h"
@@ -895,7 +896,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
          {
             int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
             tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
-            i32_to_i16_saturate(i, tmp >> sf, FALSE);
+            i32_to_i16_saturate(i, tmp >> sf, false);
 
             tmp = i64_to_i44(i, (matrix->MX[i][1] * v[1]));
             tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
@@ -936,7 +937,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
             }
 
             tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
-            i32_to_i16_saturate(i, tmp >> sf, FALSE);
+            i32_to_i16_saturate(i, tmp >> sf, false);
 
             tmp = i64_to_i44(i, (mulr[1] * v[1]));
             tmp = i64_to_i44(i, tmp + (mulr[2] * v[2]));
@@ -1157,7 +1158,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    Z_FIFO[0] = Z_FIFO[1];
    Z_FIFO[1] = Z_FIFO[2];
    Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, TRUE);
+   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, true);
 
    /* Step 3: perspective projection against the screen plane
     *
@@ -1285,7 +1286,7 @@ static INLINE void DPC(uint32_t instr)
    for(i = 0; i < 3; i++)
    {
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
    MAC_to_IR(lm);
@@ -1310,7 +1311,7 @@ static int32_t DCPL(uint32_t instr)
    for(i = 0; i < 3; i++)
    {
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
-      MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
    MAC_to_IR(lm);
@@ -1338,7 +1339,7 @@ static int32_t DPCS(uint32_t instr)
    for(i = 0; i < 3; i++)
    {
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
    MAC_to_IR(lm);
@@ -1371,9 +1372,9 @@ static int32_t INTPL(uint32_t instr)
    MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
    MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
 
-   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * i32_to_i16_saturate(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC[1], false)) >> sf);
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC[2], false)) >> sf);
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * i32_to_i16_saturate(2, MAC[3], false)) >> sf);
 
    MAC_to_IR(lm);
    MAC_to_RGB_FIFO();
@@ -1492,7 +1493,7 @@ static int32_t AVSZ3(uint32_t instr)
    check_mac_overflow(average);
 
    MAC[0] = (int32_t)average;
-   OTZ    = i64_to_otz(MAC[0], FALSE);
+   OTZ    = i64_to_otz(MAC[0], false);
 
    return(5);
 }
@@ -1515,7 +1516,7 @@ static int32_t AVSZ4(uint32_t instr)
    check_mac_overflow(average);
 
    MAC[0] = (int32_t)average;
-   OTZ    = i64_to_otz(MAC[0], FALSE);
+   OTZ    = i64_to_otz(MAC[0], false);
 
    return(5);
 }
