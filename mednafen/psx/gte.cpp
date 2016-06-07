@@ -742,7 +742,7 @@ static INLINE int64_t F(int64_t value)
    return(value);
 }
 
-static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
+static INLINE int16_t i32_to_i16_saturate(unsigned int which, int32_t value, int lm)
 {
    int32_t tmp = lm << 15;
 
@@ -750,14 +750,14 @@ static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
    {
       // set flag here
       FLAGS |= 1 << (24 - which);
-      value = -32768 + tmp;
+      return -32768 + tmp;
    }
 
    if(value > 32767)
    {
       // Set flag here
       FLAGS |= 1 << (24 - which);
-      value = 32767;
+      return 32767;
    }
 
    return(value);
@@ -878,9 +878,9 @@ static INLINE void MAC_to_RGB_FIFO(void)
 
 static INLINE void MAC_to_IR(int lm)
 {
-   IR1 = Lm_B(0, MAC[1], lm);
-   IR2 = Lm_B(1, MAC[2], lm);
-   IR3 = Lm_B(2, MAC[3], lm);
+   IR1 = i32_to_i16_saturate(0, MAC[1], lm);
+   IR2 = i32_to_i16_saturate(1, MAC[2], lm);
+   IR3 = i32_to_i16_saturate(2, MAC[3], lm);
 }
 
 static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
@@ -895,7 +895,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
          {
             int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
             tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
-            Lm_B(i, tmp >> sf, FALSE);
+            i32_to_i16_saturate(i, tmp >> sf, FALSE);
 
             tmp = i64_to_i44(i, (matrix->MX[i][1] * v[1]));
             tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
@@ -936,7 +936,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
             }
 
             tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
-            Lm_B(i, tmp >> sf, FALSE);
+            i32_to_i16_saturate(i, tmp >> sf, FALSE);
 
             tmp = i64_to_i44(i, (mulr[1] * v[1]));
             tmp = i64_to_i44(i, tmp + (mulr[2] * v[2]));
@@ -989,9 +989,8 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
       MAC[1 + i] = tmp[i] >> sf;
    }
 
-   IR1 = Lm_B(0, MAC[1], lm);
-   IR2 = Lm_B(1, MAC[2], lm);
-   //printf("FTV: %08x %08x\n", crv[2], (uint32)(tmp[2] >> 12));
+   IR1 = i32_to_i16_saturate(0, MAC[1], lm);
+   IR2 = i32_to_i16_saturate(1, MAC[2], lm);
    IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
 
    Z_FIFO[0] = Z_FIFO[1];
@@ -1271,7 +1270,7 @@ static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
       for(i = 0; i < 3; i++)
       {
          MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
-         MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
    else
@@ -1279,7 +1278,7 @@ static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
       for(i = 0; i < 3; i++)
       {
          MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * Lm_B(i, MAC[1 + i], FALSE))) >> sf;
+         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
       }
    }
 
@@ -1329,9 +1328,9 @@ static int32_t INTPL(uint32_t instr)
    MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
    MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
 
-   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * Lm_B(0, MAC[1], FALSE)) >> sf);
-   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * Lm_B(1, MAC[2], FALSE)) >> sf);
-   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * Lm_B(2, MAC[3], FALSE)) >> sf);
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC[1], FALSE)) >> sf);
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC[2], FALSE)) >> sf);
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * i32_to_i16_saturate(2, MAC[3], FALSE)) >> sf);
 
    MAC_to_IR(lm);
    MAC_to_RGB_FIFO();
