@@ -1478,7 +1478,7 @@ static int32_t AVSZ4(uint32_t instr)
    check_mac_overflow(average);
 
    MAC[0] = (int32_t)average;
-   OTZ    = i64_to_otz(MAC[0] >> 12, FALSE);
+   OTZ    = i64_to_otz(MAC[0], FALSE);
 
    return(5);
 }
