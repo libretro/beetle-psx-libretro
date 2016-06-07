@@ -54,8 +54,9 @@ void rsx_gl_refresh_variables(void)
 
 bool rsx_gl_has_software_renderer(void)
 {
-   if (static_renderer)
-      return static_renderer->has_software_renderer();
+   if (!static_renderer)
+      return false;
+   return static_renderer->has_software_renderer();
 }
 
 void rsx_gl_prepare_frame(void)
