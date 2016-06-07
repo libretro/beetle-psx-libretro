@@ -733,14 +733,6 @@ static INLINE int64_t i64_to_i44(unsigned which, int64_t value)
    return (((int64_t)((uint64_t)(value) << (64 - 44))) >> (64 - 44));
 }
 
-static INLINE int64_t F(int64_t value)
-{
-   if(value < -2147483648LL)
-      FLAGS |= 1 << 15;
-   if(value > 2147483647LL)
-      FLAGS |= 1 << 16;
-   return(value);
-}
 
 static INLINE int16_t i32_to_i16_saturate(unsigned int which, int32_t value, int lm)
 {
@@ -1078,20 +1070,25 @@ static INLINE void check_mac_overflow(int64_t value)
 
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z)
 {
-   float fofx = ((float)OFX / (float)(1 << 16));
-   float fofy = ((float)OFY / (float)(1 << 16));
+   float fofx       = ((float)OFX / (float)(1 << 16));
+   float fofy       = ((float)OFY / (float)(1 << 16));
+   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
+   int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
 
-   MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
-   XY_FIFO[3].X = i32_to_i11_saturate(0, MAC[0]);
+   check_mac_overflow(screen_x);
+   check_mac_overflow(screen_y);
 
-   MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
-   XY_FIFO[3].Y = i32_to_i11_saturate(1, MAC[0]);
+   screen_x = (int32_t)(screen_x >> 16);
+   screen_y = (int32_t)(screen_y >> 16);
+
+   /* Push onto the XY FIFO */
+   XY_FIFO[3].X = i32_to_i11_saturate(0, screen_x);
+   XY_FIFO[3].Y = i32_to_i11_saturate(1, screen_y);
 
    /* Increased precision calculation (sub-pixel precision) */
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
-   /* Push onto the XY FIFO */
    GPU->AddSubpixelVertex(XY_FIFO[3].X, XY_FIFO[3].Y,
 			  precise_x, precise_y, z);
 
