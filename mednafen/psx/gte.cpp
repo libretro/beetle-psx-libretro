@@ -972,12 +972,6 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
    MAC_to_IR(lm);
 }
 
-static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, uint32_t vector_index, const int32_t *crv, uint32_t sf, int lm)
-{
-
-}
-
-
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
