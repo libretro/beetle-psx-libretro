@@ -15,6 +15,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <compat/intrinsics.h>
+
 #include "psx.h"
 #include "gte.h"
 
@@ -1066,30 +1068,13 @@ static int32_t MVMVA(uint32_t instr)
    return(8);
 }
 
-static INLINE unsigned CountLeadingZeroU16(uint16_t val)
-{
-#ifdef __GNUC__
-   return __builtin_clz(val << 16 | 0x8000);
-#else
-   unsigned ret = 0;
-
-   while(!(val & 0x8000) && ret < 16)
-   {
-      val <<= 1;
-      ret++;
-   }
-
-   return ret;
-#endif
-}
-
 static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
 {
    if((divisor * 2) > dividend)
    {
       /* GTE-specific division algorithm for dist / z.
        * Returns a saturated 17bit value. */
-      unsigned shift_bias = CountLeadingZeroU16(divisor);
+      unsigned shift_bias = compat_clz_u16(divisor);
 
       dividend <<= shift_bias;
       divisor <<= shift_bias;
