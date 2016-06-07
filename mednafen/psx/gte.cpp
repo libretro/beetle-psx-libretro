@@ -734,6 +734,10 @@ static INLINE int64_t i64_to_i44(unsigned which, int64_t value)
 }
 
 
+/* Truncate i32 value to an i16, saturating in case of an
+ * overflow and updating the flags if an overflow occurs. If
+ * `flags.clamp_negative` is true negative values will be clamped
+ * to 0. */
 static INLINE int16_t i32_to_i16_saturate(unsigned int which, int32_t value, int lm)
 {
    int32_t tmp = lm << 15;
@@ -771,9 +775,13 @@ static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_va
 }
 
 
-static INLINE int32_t Lm_D(int32_t value, int unchained)
+/* Convert a 64bit signed average value to an unsigned halfword
+ * while updating the overflow flags */
+static INLINE uint16_t i64_to_otz(int64_t average, int unchained)
 {
-   // Not sure if we should have it as int64, or just chain on to and special case when the F flags are set.
+   int32_t value = average >> 12;
+   /* Not sure if we should have it as int64, or just chain 
+    * on to and special case when the F flags are set. */
    if(!unchained)
    {
       if(FLAGS & (1 << 15))
@@ -792,17 +800,17 @@ static INLINE int32_t Lm_D(int32_t value, int unchained)
    if(value < 0)
    {
       // Set flag here
-      value = 0;
       FLAGS |= 1 << 18;	// Tested with AVSZ3
+      return 0;
    }
    else if(value > 65535)
    {
       // Set flag here.
-      value = 65535;
       FLAGS |= 1 << 18;	// Tested with AVSZ3
+      return 65535;
    }
 
-   return(value);
+   return value;
 }
 
 static INLINE int32_t i32_to_i11_saturate(uint8_t flag, int32_t value)
@@ -988,7 +996,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    Z_FIFO[0] = Z_FIFO[1];
    Z_FIFO[1] = Z_FIFO[2];
    Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
+   Z_FIFO[3] = i64_to_otz(tmp[2], TRUE);
 }
 
 /* SQR - Square Vector */
@@ -1447,7 +1455,7 @@ static int32_t AVSZ3(uint32_t instr)
    check_mac_overflow(average);
 
    MAC[0] = (int32_t)average;
-   OTZ    = Lm_D(MAC[0] >> 12, FALSE);
+   OTZ    = i64_to_otz(MAC[0], FALSE);
 
    return(5);
 }
@@ -1470,7 +1478,7 @@ static int32_t AVSZ4(uint32_t instr)
    check_mac_overflow(average);
 
    MAC[0] = (int32_t)average;
-   OTZ    = Lm_D(MAC[0] >> 12, FALSE);
+   OTZ    = i64_to_otz(MAC[0] >> 12, FALSE);
 
    return(5);
 }
