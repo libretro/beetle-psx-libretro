@@ -1072,6 +1072,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
 {
    float fofx       = ((float)OFX / (float)(1 << 16));
    float fofy       = ((float)OFY / (float)(1 << 16));
+   /* Project X and Y onto the plane */
    int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
    int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
 
@@ -1085,16 +1086,16 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    XY_FIFO[3].X = i32_to_i11_saturate(0, screen_x);
    XY_FIFO[3].Y = i32_to_i11_saturate(1, screen_y);
 
+   XY_FIFO[0] = XY_FIFO[1];
+   XY_FIFO[1] = XY_FIFO[2];
+   XY_FIFO[2] = XY_FIFO[3];
+
    /* Increased precision calculation (sub-pixel precision) */
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
    GPU->AddSubpixelVertex(XY_FIFO[3].X, XY_FIFO[3].Y,
 			  precise_x, precise_y, z);
-
-   XY_FIFO[0] = XY_FIFO[1];
-   XY_FIFO[1] = XY_FIFO[2];
-   XY_FIFO[2] = XY_FIFO[3];
 }
 
 /* Perform depth queuing calculations using the projection
