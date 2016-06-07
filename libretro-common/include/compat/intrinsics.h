@@ -30,6 +30,10 @@
 #include <retro_common_api.h>
 #include <retro_inline.h>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 RETRO_BEGIN_DECLS
 
 /* Count Leading Zero, unsigned 16bit input value */
@@ -56,7 +60,7 @@ static INLINE int compat_ctz(unsigned x)
 {
    return __builtin_ctz(x);
 }
-#elif defined(_MSC_VER) && defined(_MSC_VER >= 1400)
+#elif _MSC_VER >= 1400
 static INLINE int compat_ctz(unsigned x)
 {
    int r = 0;
