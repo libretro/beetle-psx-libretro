@@ -1276,44 +1276,22 @@ static int32_t NCCT(uint32_t instr)
    return(39);
 }
 
-static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
+static INLINE void DPC(uint32_t instr)
 {
    int i;
    int32_t RGB_temp[3];
-   int32_t IR_temp[3] = { IR1, IR2, IR3 };
-   const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm  = (instr >> 10) & 1;
+   int32_t IR_temp[3]  = { IR1, IR2, IR3 };
+   const uint32_t sf   = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm   = (instr >> 10) & 1;
 
-   //assert(sf);
-   RGB_temp[0] = RGB.R;
-   RGB_temp[1] = RGB.G;
-   RGB_temp[2] = RGB.B;
+   RGB_temp[0] = RGB_FIFO[0].R << 4;
+   RGB_temp[1] = RGB_FIFO[0].G << 4;
+   RGB_temp[2] = RGB_FIFO[0].B << 4;
 
-   if(RGB_from_FIFO)
+   for(i = 0; i < 3; i++)
    {
-      RGB_temp[0] = RGB_FIFO[0].R;
-      RGB_temp[1] = RGB_FIFO[0].G;
-      RGB_temp[2] = RGB_FIFO[0].B;
-   }
-   RGB_temp[0] <<= 4;
-   RGB_temp[1] <<= 4;
-   RGB_temp[2] <<= 4;
-
-   if(mult_IR123)
-   {
-      for(i = 0; i < 3; i++)
-      {
-         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
-         MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
-      }
-   }
-   else
-   {
-      for(i = 0; i < 3; i++)
-      {
-         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
-         MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
-      }
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
    }
 
    MAC_to_IR(lm);
@@ -1325,7 +1303,26 @@ static INLINE void DepthCue(uint32_t instr, int mult_IR123, int RGB_from_FIFO)
 /* DCPL - Depth Cue Color Light */
 static int32_t DCPL(uint32_t instr)
 {
-   DepthCue(instr, TRUE, FALSE);
+   int i;
+   int32_t RGB_temp[3];
+   int32_t IR_temp[3] = { IR1, IR2, IR3 };
+   const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm  = (instr >> 10) & 1;
+
+   RGB_temp[0] = RGB.R << 4;
+   RGB_temp[1] = RGB.G << 4;
+   RGB_temp[2] = RGB.B << 4;
+
+   for(i = 0; i < 3; i++)
+   {
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
+      MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
+   }
+
+   MAC_to_IR(lm);
+
+   MAC_to_RGB_FIFO();
+
 
    return(8);
 }
@@ -1333,7 +1330,25 @@ static int32_t DCPL(uint32_t instr)
 
 static int32_t DPCS(uint32_t instr)
 {
-   DepthCue(instr, FALSE, FALSE);
+   int i;
+   int32_t RGB_temp[3];
+   int32_t IR_temp[3] = { IR1, IR2, IR3 };
+   const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm  = (instr >> 10) & 1;
+
+   //assert(sf);
+   RGB_temp[0] = RGB.R << 4;
+   RGB_temp[1] = RGB.G << 4;
+   RGB_temp[2] = RGB.B << 4;
+
+   for(i = 0; i < 3; i++)
+   {
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], FALSE))) >> sf;
+   }
+
+   MAC_to_IR(lm);
+   MAC_to_RGB_FIFO();
 
    return(8);
 }
@@ -1344,9 +1359,9 @@ static int32_t DPCT(uint32_t instr)
    /* Each call uses the oldest entry in the RGB FIFO
     * and pushes the result at the top so the three calls
     * will process and replace the entire contents of the FIFO. */
-   DepthCue(instr, FALSE, TRUE);
-   DepthCue(instr, FALSE, TRUE);
-   DepthCue(instr, FALSE, TRUE);
+   DPC(instr);
+   DPC(instr);
+   DPC(instr);
 
    return(17);
 }
@@ -1439,7 +1454,7 @@ static int32_t CDP(uint32_t instr)
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
-   DepthCue(instr, TRUE, FALSE);
+   DCPL(instr);
 
    return(13);
 }
