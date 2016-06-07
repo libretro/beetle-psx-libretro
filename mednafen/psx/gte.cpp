@@ -974,46 +974,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 
 static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, uint32_t vector_index, const int32_t *crv, uint32_t sf, int lm)
 {
-   unsigned i, c;
-   int32_t z_shifted = 0;
-   int32_t z_shifted_no_shift = 0;
 
-   /* Iterate over the matrix rows */
-   for(i = 0; i < 3; i++)
-   {
-      /* Start with the translation. Convert translation vector
-       * component from i32 to i64 with 12 fractional bits. */
-      int64_t res = (uint64_t)(int64_t)crv[i] << 12;
-
-      /* Iterate over the rotation matrix columns */
-      for (c = 0; c < 3; c++)
-      {
-         int32_t v    = Vectors[vector_index][c];
-         int32_t m    = matrix->MX[i][c];
-         int64_t rot  = v * m;
-
-         /* The operation is done using 44bit signed
-          * arithmetics. */
-         res = i64_to_i44(c, res + rot);
-      }
-
-      /* Store the result in the accumulator */
-      MAC[1 + i] = res >> sf;
-
-      /* the last resultwill be Z, we can overwrite it each
-       * time and the last one will be the good one. */
-      z_shifted_no_shift = (int32_t)(res);
-      z_shifted          = (int32_t)(res >> 12);
-   }
-
-   IR1 = i32_to_i16_saturate(0, MAC[1], lm);
-   IR2 = i32_to_i16_saturate(1, MAC[2], lm);
-   IR3 = Lm_B_PTZ(2, MAC[3], z_shifted, lm);
-
-   Z_FIFO[0] = Z_FIFO[1];
-   Z_FIFO[1] = Z_FIFO[2];
-   Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, TRUE);
 }
 
 
@@ -1098,6 +1059,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
 {
    float fofx       = ((float)OFX / (float)(1 << 16));
    float fofy       = ((float)OFY / (float)(1 << 16));
+
    /* Project X and Y onto the plane */
    int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
    int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
@@ -1148,13 +1110,60 @@ static INLINE void depth_queuing(int64_t h_div_sz)
  * queuing */
 static int64_t RTP(uint32_t instr, uint32_t vector_index)
 {
+   unsigned i, c;
    int64_t projection_factor;
    float precise_h_div_sz;
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MultiplyMatrixByVector_PT(&Matrices.Rot, vector_index,
-         CRVectors.T, sf, lm);
+   /* Step 1: we compute "tr + vector * rm" and store
+    * the 32bit result in MAC 0, 1 and 2. */
+   int32_t z_shifted = 0;
+   int32_t z_shifted_no_shift = 0;
+   const gtematrix *matrix = &Matrices.Rot;
+   const int32_t *crv      = CRVectors.T;
+
+   /* Iterate over the matrix rows */
+   for(i = 0; i < 3; i++)
+   {
+      /* Start with the translation. Convert translation vector
+       * component from i32 to i64 with 12 fractional bits. */
+      int64_t res = (uint64_t)(int64_t)crv[i] << 12;
+
+      /* Iterate over the rotation matrix columns */
+      for (c = 0; c < 3; c++)
+      {
+         int32_t v    = Vectors[vector_index][c];
+         int32_t m    = matrix->MX[i][c];
+         int64_t rot  = v * m;
+
+         /* The operation is done using 44bit signed
+          * arithmetics. */
+         res = i64_to_i44(c, res + rot);
+      }
+
+      /* Store the result in the accumulator */
+      MAC[1 + i] = res >> sf;
+
+      /* the last resultwill be Z, we can overwrite it each
+       * time and the last one will be the good one. */
+      z_shifted_no_shift = (int32_t)(res);
+      z_shifted          = (int32_t)(res >> 12);
+   }
+
+   /* Step 2: we take the 32bit camera coordinates in MAC and
+    * convert them to 16bit values in the IR vector, saturating
+    * them in case of an overflow. */
+
+   IR1 = i32_to_i16_saturate(0, MAC[1], lm); /* 16bit clamped x coordinate */
+   IR2 = i32_to_i16_saturate(1, MAC[2], lm); /* 16bit clamped y coordinate */
+   IR3 = Lm_B_PTZ(2, MAC[3], z_shifted, lm); /* 16bit clamped z coordinate */
+
+   /* Push 'z_saturated' onto the Z_FIFO */
+   Z_FIFO[0] = Z_FIFO[1];
+   Z_FIFO[1] = Z_FIFO[2];
+   Z_FIFO[2] = Z_FIFO[3];
+   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, TRUE);
 
    /* Step 3: perspective projection against the screen plane
     *
@@ -1163,6 +1172,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
 
    /* Projection factor: 1.16 unsigned */
    projection_factor = Divide(H, Z_FIFO[3]);
+
    precise_h_div_sz  = (float)H / (float)Z_FIFO[3];
 
    TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
