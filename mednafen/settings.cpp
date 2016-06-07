@@ -38,11 +38,6 @@ extern char retro_cd_base_name[4096];
 extern char retro_save_directory[4096];
 extern char retro_base_directory[4096];
 
-bool MDFN_SaveSettings(const char *path)
-{
-   return(1);
-}
-
 uint64_t MDFN_GetSettingUI(const char *name)
 {
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
@@ -168,9 +163,4 @@ bool MDFNI_SetSettingB(const char *name, bool value)
 bool MDFNI_SetSettingUI(const char *name, uint64_t value)
 {
    return false;
-}
-
-bool MDFNI_DumpSettingsDef(const char *path)
-{
-   return true;
 }
