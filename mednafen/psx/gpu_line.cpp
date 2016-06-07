@@ -79,9 +79,9 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
 
    if(goraud)
    {
-      step->dr_dk = (int32_t)((uint32_t)fx32_shiftup(point1->r - point0->r) / dk);
-      step->dg_dk = (int32_t)((uint32_t)fx32_shiftup(point1->g - point0->g) / dk);
-      step->db_dk = (int32_t)((uint32_t)fx32_shiftup(point1->b - point0->b) / dk);
+      step->dr_dk = (int32_t)((uint32_t)fx32_shiftup(point1->r - point0->r)) / dk;
+      step->dg_dk = (int32_t)((uint32_t)fx32_shiftup(point1->g - point0->g)) / dk;
+      step->db_dk = (int32_t)((uint32_t)fx32_shiftup(point1->b - point0->b)) / dk;
    }
 }
 
