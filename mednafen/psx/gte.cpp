@@ -972,32 +972,50 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
    MAC_to_IR(lm);
 }
 
-
-static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
+static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, uint32_t vector_index, const int32_t *crv, uint32_t sf, int lm)
 {
-   int64_t tmp[3];
-   unsigned i;
+   unsigned i, c;
+   int32_t z_shifted = 0;
+   int32_t z_shifted_no_shift = 0;
 
+   /* Iterate over the matrix rows */
    for(i = 0; i < 3; i++)
    {
-      tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
+      /* Start with the translation. Convert translation vector
+       * component from i32 to i64 with 12 fractional bits. */
+      int64_t res = (uint64_t)(int64_t)crv[i] << 12;
 
-      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][0] * v[0]));
-      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][1] * v[1]));
-      tmp[i] = i64_to_i44(i, tmp[i] + (matrix->MX[i][2] * v[2]));
+      /* Iterate over the rotation matrix columns */
+      for (c = 0; c < 3; c++)
+      {
+         int32_t v    = Vectors[vector_index][c];
+         int32_t m    = matrix->MX[i][c];
+         int64_t rot  = v * m;
 
-      MAC[1 + i] = tmp[i] >> sf;
+         /* The operation is done using 44bit signed
+          * arithmetics. */
+         res = i64_to_i44(c, res + rot);
+      }
+
+      /* Store the result in the accumulator */
+      MAC[1 + i] = res >> sf;
+
+      /* the last resultwill be Z, we can overwrite it each
+       * time and the last one will be the good one. */
+      z_shifted_no_shift = (int32_t)(res);
+      z_shifted          = (int32_t)(res >> 12);
    }
 
    IR1 = i32_to_i16_saturate(0, MAC[1], lm);
    IR2 = i32_to_i16_saturate(1, MAC[2], lm);
-   IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
+   IR3 = Lm_B_PTZ(2, MAC[3], z_shifted, lm);
 
    Z_FIFO[0] = Z_FIFO[1];
    Z_FIFO[1] = Z_FIFO[2];
    Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = i64_to_otz(tmp[2], TRUE);
+   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, TRUE);
 }
+
 
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
@@ -1135,7 +1153,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[vector_index],
+   MultiplyMatrixByVector_PT(&Matrices.Rot, vector_index,
          CRVectors.T, sf, lm);
 
    /* Step 3: perspective projection against the screen plane
