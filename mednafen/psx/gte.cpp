@@ -1528,10 +1528,16 @@ static int32_t OP(uint32_t instr)
 {
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
+   int32_t       ir1 = IR1;
+   int32_t       ir2 = IR2;
+   int32_t       ir3 = IR3;
+   int32_t        r0 = Matrices.Rot.MX[0][0];
+   int32_t        r1 = Matrices.Rot.MX[1][1];
+   int32_t        r2 = Matrices.Rot.MX[2][2];
 
-   MAC[1] = ((Matrices.Rot.MX[1][1] * IR3) - (Matrices.Rot.MX[2][2] * IR2)) >> sf;
-   MAC[2] = ((Matrices.Rot.MX[2][2] * IR1) - (Matrices.Rot.MX[0][0] * IR3)) >> sf;
-   MAC[3] = ((Matrices.Rot.MX[0][0] * IR2) - (Matrices.Rot.MX[1][1] * IR1)) >> sf;
+   MAC[1] = (r1 * ir3 - r2 * ir2) >> sf;
+   MAC[2] = (r2 * ir1 - r0 * ir3) >> sf;
+   MAC[3] = (r0 * ir2 - r1 * ir1) >> sf;
 
    MAC_to_IR(lm);
 
