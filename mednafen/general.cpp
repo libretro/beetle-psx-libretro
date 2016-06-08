@@ -171,44 +171,52 @@ const char * GetFNComponent(const char *str)
       return (str);
 }
 
-// Remove whitespace from beginning of string
+/* Remove whitespace from beginning of string */
 void MDFN_ltrim(char *string)
 {
- int32 di, si;
- bool InWhitespace = true;
+   bool in_whitespace  = true;
+   int32_t si          = 0;;
+   int32_t di          = 0;
 
- di = si = 0;
+   while(string[si])
+   {
+      bool test = in_whitespace && 
+            (string[si] == ' '  || 
+             string[si] == '\r' || 
+             string[si] == '\n' || 
+             string[si] == '\t' || 
+             string[si] == 0x0b);
 
- while(string[si])
- {
-    if(InWhitespace && (string[si] == ' ' || string[si] == '\r' || string[si] == '\n' || string[si] == '\t' || string[si] == 0x0b))
-    {
+      if(!test)
+      {
+         in_whitespace = false;
+         string[di]    = string[si];
+         di++;
+      }
 
-    }
-    else
-    {
-       InWhitespace = false;
-       string[di] = string[si];
-       di++;
-    }
-    si++;
- }
- string[di] = 0;
+      si++;
+   }
+   string[di] = 0;
 }
 
-// Remove whitespace from end of string
+/* Remove whitespace from end of string */
 void MDFN_rtrim(char *string)
 {
-   int32 len = strlen(string);
+   int32_t len = strlen(string);
 
    if(len)
    {
-      for(int32 x = len - 1; x >= 0; x--)
+      int32_t x;
+      for(x = len - 1; x >= 0; x--)
       {
-         if(string[x] == ' ' || string[x] == '\r' || string[x] == '\n' || string[x] == '\t' || string[x] == 0x0b)
-            string[x] = 0;
-         else
+         bool test = string[x] == ' '  || string[x] == '\r' 
+            || string[x] == '\n' || string[x] == '\t' 
+            || string[x] == 0x0b;
+
+         if (!test)
             break;
+
+         string[x] = 0;
       }
    }
 }
