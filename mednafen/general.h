@@ -12,10 +12,6 @@ bool MDFN_IsFIROPSafe(const std::string &path);
 
 std::string MDFN_MakeFName(int type, int id1, const char *cd1);
 
-void MDFN_ltrim(char *string);
-void MDFN_rtrim(char *string);
-void MDFN_trim(char *string);
-
 void MDFN_ltrim(std::string &string);
 void MDFN_rtrim(std::string &string);
 void MDFN_trim(std::string &string);
