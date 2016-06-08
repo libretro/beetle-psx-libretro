@@ -1446,7 +1446,9 @@ static int32_t CDP(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
+   tmp_vector[0] = IR1;
+   tmp_vector[1] = IR2;
+   tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
 
    DCPL(instr);
