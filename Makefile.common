@@ -209,3 +209,4 @@ endif
 endif
 
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
+SOURCES_C += $(LIBRETRO_DIR)/string/stdstring.c

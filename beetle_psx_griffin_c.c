@@ -21,6 +21,7 @@
 #include "libretro_cbs.c"
 #include "libretro-common/streams/file_stream.c"
 #include "libretro-common/rthreads/rthreads.c"
+#include "libretro-common/string/stdstring.c"
 #include "scrc32.c"
 
 #include "rsx/rsx_lib_soft.c"
