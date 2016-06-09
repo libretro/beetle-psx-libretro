@@ -1,5 +1,3 @@
-#include <string/stdstring.h>
-
 #include "mednafen/mednafen.h"
 #include "mednafen/mempatcher.h"
 #include "mednafen/git.h"
@@ -2826,7 +2824,7 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
       std::string efp;
 
       if(linebuf[0] == '#') continue;
-      string_trim_whitespace_right(linebuf);
+      MDFN_rtrim(linebuf);
       if(linebuf[0] == 0) continue;
 
       efp = MDFN_EvalFIP(dir_path, std::string(linebuf));
