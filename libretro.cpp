@@ -32,6 +32,7 @@ static bool failed_init = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool crop_overscan = false;
+static bool enable_memcard1 = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -1318,6 +1319,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       emulate_memcard[i] = EmulateMemcards && MDFN_GetSettingB(buf);
    }
 
+   if (!enable_memcard1) {
+     emulate_memcard[1] = false;
+   }
+
    for(i = 0; i < 2; i++)
    {
       char buf[64];
@@ -2535,6 +2540,18 @@ static void check_variables(bool startup)
    }
    else
       widescreen_hack = false;
+
+   var.key = "beetle_psx_enable_memcard1";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         enable_memcard1 = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         enable_memcard1 = false;
+   }
+   else
+      enable_memcard1 = false;
 
    rsx_intf_refresh_variables();
 
@@ -3799,6 +3816,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { "beetle_psx_gte_subpixel", "GTE pixel accuracy; 1x(native)|subpixel" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
+      { "beetle_psx_enable_memcard1", "Enable memory card 1; enabled|disabled" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
