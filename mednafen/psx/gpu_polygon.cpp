@@ -2,6 +2,8 @@
 #include <math/fxp.h>
 
 #define COORD_FBS 12
+#define COORD_MF_INT(n) ((n) << COORD_FBS)
+#define COORD_POST_PADDING	12
 
 struct i_group
 {
@@ -17,6 +19,15 @@ struct i_deltas
    uint32_t du_dy, dv_dy;
    uint32_t dr_dy, dg_dy, db_dy;
 };
+
+/*
+ Store and do most math with interpolant coordinates and deltas as unsigned to avoid violating strict overflow(due to biasing),
+ but when actually grabbing the coordinates, treat them as signed(with signed right shift) so we can do saturation properly.
+*/
+static INLINE int32_t COORD_GET_INT(int32_t n)
+{
+   return(n >> COORD_FBS);
+}
 
 static INLINE int64_t MakePolyXFP(uint32_t x)
 {
@@ -48,29 +59,30 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
 
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
 {
+   const unsigned sa = 32;
+   int64_t num = ((int64_t)COORD_MF_INT(1)) << sa;
+   int64_t denom = CALCIS(x, y);
    int64_t one_div;
-   int64_t     num   = ((int64_t)fx32_shiftup(1)) << 32;
-   int64_t     denom = CALCIS(x, y);
 
    if(!denom)
       return(false);
 
    one_div = num / denom;
 
-   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> 32;
-   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> 32;
+   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> sa;
+   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> sa;
 
-   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> 32;
-   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> 32;
+   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> sa;
+   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> sa;
 
-   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> 32;
-   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> 32;
+   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> sa;
+   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> sa;
 
-   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> 32;
-   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> 32;
+   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> sa;
+   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> sa;
 
-   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> 32;
-   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> 32;
+   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> sa;
+   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> sa;
 
    // idl.du_dx = ((int64_t)CALCIS(u, y) << COORD_FBS) / denom;
    // idl.du_dy = ((int64_t)CALCIS(x, u) << COORD_FBS) / denom;
@@ -171,30 +183,32 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
 
          if(goraud)
          {
-            r = RGB8SAT[fx32_shiftdown(ig.r)];
-            g = RGB8SAT[fx32_shiftdown(ig.g)];
-            b = RGB8SAT[fx32_shiftdown(ig.b)];
+            r = RGB8SAT[COORD_GET_INT(ig.r)];
+            g = RGB8SAT[COORD_GET_INT(ig.g)];
+            b = RGB8SAT[COORD_GET_INT(ig.b)];
          }
          else
          {
-            r = fx32_shiftdown(ig.r);
-            g = fx32_shiftdown(ig.g);
-            b = fx32_shiftdown(ig.b);
+            r = COORD_GET_INT(ig.r);
+            g = COORD_GET_INT(ig.g);
+            b = COORD_GET_INT(ig.b);
          }
 
-         bool dither = DitherEnabled();
+	 bool dither = DitherEnabled();
          int32_t dither_x = x >> dither_upscale_shift;
          int32_t dither_y = y >> dither_upscale_shift;
 
          if(textured)
          {
-            uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, fx32_shiftdown(ig.u), fx32_shiftdown(ig.v));
+            uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, COORD_GET_INT(ig.u), COORD_GET_INT(ig.v));
 
             if(fbw)
             {
-               if(TexMult)
+	      if(TexMult) {
+
                   fbw = ModTexel(fbw, r, g, b, (dither) ? (dither_x & 3) : 3, (dither) ? (dither_y & 3) : 2);
-               PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+	      }
+	      PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
             }
          }
          else
@@ -265,8 +279,8 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
       if(vertices[2].x <= vertices[iggvi].x)
          iggvi = 2;
 
-      ig.u = fx32_shiftup(vertices[iggvi].u) + (1 << (COORD_FBS - 1));
-      ig.v = fx32_shiftup(vertices[iggvi].v) + (1 << (COORD_FBS - 1));
+      ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1));
+      ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1));
 
       if (upscale_shift > 0) {
 	// Bias the texture coordinates so that it rounds to the
@@ -282,9 +296,9 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 	}
       }
 
-      ig.r = fx32_shiftup(vertices[iggvi].r);
-      ig.g = fx32_shiftup(vertices[iggvi].g);
-      ig.b = fx32_shiftup(vertices[iggvi].b);
+      ig.r = COORD_MF_INT(vertices[iggvi].r);
+      ig.g = COORD_MF_INT(vertices[iggvi].g);
+      ig.b = COORD_MF_INT(vertices[iggvi].b);
 
       AddIDeltas_DX<goraud, textured>(ig, idl, -vertices[iggvi].x);
       AddIDeltas_DY<goraud, textured>(ig, idl, -vertices[iggvi].y);
@@ -545,4 +559,6 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
 }
 
+#undef COORD_POST_PADDING
 #undef COORD_FBS
+#undef COORD_MF_INT
