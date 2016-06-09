@@ -31,6 +31,7 @@
 #include "mednafen/cdrom/CDAccess.cpp"
 #include "mednafen/cdrom/CDAccess_Image.cpp"
 #include "mednafen/cdrom/CDAccess_CCD.cpp"
+#include "mednafen/cdrom/CDAccess_PBP.cpp"
 #include "mednafen/cdrom/SimpleFIFO.cpp"
 #include "mednafen/cdrom/audioreader.cpp"
 #include "mednafen/cdrom/cdromif.cpp"

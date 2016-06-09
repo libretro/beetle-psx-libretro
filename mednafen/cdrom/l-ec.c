@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MIN(a, b)  (((a) < (b)) ? (a) : (b))
+#include <retro_miscellaneous.h>
 
 /***
  *** Mapping between cd frame and parity vectors

@@ -332,7 +332,7 @@ int kirk_CMD1(u8* outbuff, u8* inbuff, int size)
 		KIRK_CMD1_ECDSA_HEADER* eheader = (KIRK_CMD1_ECDSA_HEADER*) inbuff;
 		u8 kirk1_pub[40];
 		u8 header_hash[20];u8 data_hash[20];
-		ecdsa_set_curve(ec_p,ec_a,ec_b1,ec_N1,Gx1,Gy1);
+		ecdsa_set_curve(keyvault_ec_p,keyvault_ec_a,ec_b1,ec_N1,Gx1,Gy1);
 		memcpy(kirk1_pub,Px1,20);
 		memcpy(kirk1_pub+20,Py1,20);
 		ecdsa_set_pub(kirk1_pub);
@@ -470,7 +470,7 @@ int kirk_CMD12(u8 * outbuff, int outsize)
 	KIRK_CMD12_BUFFER * keypair = (KIRK_CMD12_BUFFER *) outbuff;
 
 	if (outsize != 0x3C) return KIRK_INVALID_SIZE;
-	ecdsa_set_curve(ec_p,ec_a,ec_b2,ec_N2,Gx2,Gy2);
+	ecdsa_set_curve(keyvault_ec_p,keyvault_ec_a,ec_b2,ec_N2,Gx2,Gy2);
 	k[0] = 0;
 	
 	kirk_CMD14(k+1,0x14);
@@ -489,7 +489,7 @@ int kirk_CMD13(u8 * outbuff, int outsize,u8 * inbuff, int insize)
 	if (outsize != 0x28) return KIRK_INVALID_SIZE;
 	if (insize != 0x3C) return KIRK_INVALID_SIZE;
 	
-	ecdsa_set_curve(ec_p,ec_a,ec_b2,ec_N2,Gx2,Gy2);
+	ecdsa_set_curve(keyvault_ec_p,keyvault_ec_a,ec_b2,ec_N2,Gx2,Gy2);
 	ecdsa_set_pub((u8*)pointmult->public_key.x);
 	memcpy(k+1,pointmult->multiplier,0x14);
 	ec_pub_mult(k, outbuff);
@@ -560,7 +560,7 @@ int kirk_CMD16(u8 * outbuff, int outsize, u8 * inbuff, int insize)
 	// Clear out the padding for safety
 	memset(&dec_private[0x14], 0, 0xC);
 	
-	ecdsa_set_curve(ec_p,ec_a,ec_b2,ec_N2,Gx2,Gy2);
+	ecdsa_set_curve(keyvault_ec_p,keyvault_ec_a,ec_b2,ec_N2,Gx2,Gy2);
 	ecdsa_set_priv(dec_private);
 	ecdsa_sign(signbuf->message_hash,sig->r, sig->s);
 	
@@ -573,7 +573,7 @@ int kirk_CMD17(u8 * inbuff, int insize)
 	
 	if (insize != 0x64) return KIRK_INVALID_SIZE;
 	
-	ecdsa_set_curve(ec_p,ec_a,ec_b2,ec_N2,Gx2,Gy2);
+	ecdsa_set_curve(keyvault_ec_p,keyvault_ec_a,ec_b2,ec_N2,Gx2,Gy2);
 	ecdsa_set_pub(sig->public_key.x);
 	
 	if (ecdsa_verify(sig->message_hash,sig->signature.r,sig->signature.s)) {

@@ -467,3 +467,7 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    return (ret == 0);
 #endif
 }
+
+#ifdef __unix__
+#undef _POSIX_C_SOURCE
+#endif

@@ -34,3 +34,11 @@
 #include "mednafen/cdrom/recover-raw.c"
 #include "mednafen/cdrom/galois.c"
 #endif
+
+#include "deps/libkirk/aes.c"
+#include "deps/libkirk/amctrl.c"
+#include "deps/libkirk/bn.c"
+#include "deps/libkirk/des.c"
+#include "deps/libkirk/ec.c"
+#include "deps/libkirk/kirk_engine.c"
+#include "deps/libkirk/sha1.c"

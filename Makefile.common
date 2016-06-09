@@ -41,13 +41,6 @@ endif
 
 INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include -I$(DEPS_DIR)/zlib
 
-SOURCES_C += $(LIBKIRK_DIR)/aes.c \
-				 $(LIBKIRK_DIR)/amctrl.c \
-				 $(LIBKIRK_DIR)/bn.c \
-				 $(LIBKIRK_DIR)/des.c \
-				 $(LIBKIRK_DIR)/ec.c \
-				 $(LIBKIRK_DIR)/kirk_engine.c \
-				 $(LIBKIRK_DIR)/sha1.c
 
 SOURCES_C += $(DEPS_DIR)/zlib/adler32.c \
 				 $(DEPS_DIR)/zlib/compress.c \
@@ -199,7 +192,15 @@ SOURCES_C += \
 SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
 
 ifneq ($(STATIC_LINKING), 1)
-SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c
+SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
+				 $(LIBRETRO_DIR)/string/stdstring.c
+SOURCES_C += $(LIBKIRK_DIR)/aes.c \
+				 $(LIBKIRK_DIR)/amctrl.c \
+				 $(LIBKIRK_DIR)/bn.c \
+				 $(LIBKIRK_DIR)/des.c \
+				 $(LIBKIRK_DIR)/ec.c \
+				 $(LIBKIRK_DIR)/kirk_engine.c \
+				 $(LIBKIRK_DIR)/sha1.c
 
 ifeq ($(NEED_THREADING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
@@ -209,4 +210,3 @@ endif
 endif
 
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
-SOURCES_C += $(LIBRETRO_DIR)/string/stdstring.c
