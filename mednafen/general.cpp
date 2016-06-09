@@ -171,54 +171,6 @@ const char * GetFNComponent(const char *str)
       return (str);
 }
 
-/* Remove whitespace from beginning of string */
-void MDFN_ltrim(char *string)
-{
-   bool in_whitespace  = true;
-   int32_t si          = 0;;
-   int32_t di          = 0;
-
-   while(string[si])
-   {
-      bool test = in_whitespace && 
-          isspace(string[si]);
-
-      if(!test)
-      {
-         in_whitespace = false;
-         string[di]    = string[si];
-         di++;
-      }
-
-      si++;
-   }
-   string[di] = '\0';
-}
-
-/* Remove whitespace from end of string */
-void MDFN_rtrim(char *string)
-{
-   int32_t len = strlen(string);
-
-   if(len)
-   {
-      int32_t x;
-      for(x = len - 1; x >= 0; x--)
-      {
-         if (!isspace(string[x]))
-            break;
-
-         string[x] = '\0';
-      }
-   }
-}
-
-void MDFN_trim(char *string)
-{
-   MDFN_rtrim(string);
-   MDFN_ltrim(string);
-}
-
 // Remove whitespace from beginning of string
 void MDFN_ltrim(std::string &string)
 {

@@ -11,6 +11,7 @@
 #include "libretro.h"
 #include <rthreads/rthreads.h>
 #include <retro_stat.h>
+#include <string/stdstring.h>
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 
@@ -2823,9 +2824,11 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
    {
       std::string efp;
 
-      if(linebuf[0] == '#') continue;
-      MDFN_rtrim(linebuf);
-      if(linebuf[0] == 0) continue;
+      if(linebuf[0] == '#')
+         continue;
+      string_trim_whitespace_right(linebuf);
+      if(linebuf[0] == 0)
+         continue;
 
       efp = MDFN_EvalFIP(dir_path, std::string(linebuf));
 
