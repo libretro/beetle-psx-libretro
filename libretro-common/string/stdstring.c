@@ -126,13 +126,10 @@ char *string_replace_substring(const char *in,
 /* Remove leading whitespaces */
 char *string_trim_whitespace_left(char *const s)
 {
-   size_t len;
-   char *cur  = NULL;
-
    if(s && *s)
    {
-      len = strlen(s);
-      cur = s;
+      size_t len = strlen(s);
+      char *cur  = s;
 
       while(*cur && isspace(*cur))
          ++cur, --len;
@@ -148,13 +145,10 @@ char *string_trim_whitespace_left(char *const s)
 /* Remove trailing whitespaces */
 char *string_trim_whitespace_right(char *const s)
 {
-   size_t len;
-   char *cur  = NULL;
-
    if(s && *s)
    {
-      len = strlen(s);
-      cur = s + len - 1;
+      size_t len = strlen(s);
+      char  *cur = s + len - 1;
 
       while(cur != s && isspace(*cur))
          --cur, --len;
