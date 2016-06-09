@@ -20,7 +20,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdint.h>
 #include <ctype.h>
 
 #include <string/stdstring.h>
@@ -123,13 +122,17 @@ char *string_replace_substring(const char *in,
 void string_trim_whitespace_left(char *string)
 {
    bool in_whitespace  = true;
-   int32_t si          = 0;
+   int32_t si          = 0;;
    int32_t di          = 0;
 
    while(string[si])
    {
       bool test = in_whitespace && 
-            isspace(string[si]);
+            (string[si] == ' '  || 
+             string[si] == '\r' || 
+             string[si] == '\n' || 
+             string[si] == '\t' || 
+             string[si] == 0x0b);
 
       if(!test)
       {
@@ -140,7 +143,7 @@ void string_trim_whitespace_left(char *string)
 
       si++;
    }
-   string[di] = '\0';
+   string[di] = 0;
 }
 
 /* Remove whitespace from end of string */
@@ -153,10 +156,14 @@ void string_trim_whitespace_right(char *string)
       int32_t x;
       for(x = len - 1; x >= 0; x--)
       {
-         if (!isspace(string[x]))
+         bool test = string[x] == ' '  || string[x] == '\r' 
+            || string[x] == '\n' || string[x] == '\t' 
+            || string[x] == 0x0b;
+
+         if (!test)
             break;
 
-         string[x] = '\0';
+         string[x] = 0;
       }
    }
 }
