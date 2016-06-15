@@ -1,5 +1,4 @@
 #include <math.h>
-#include <math/fxp.h>
 
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)

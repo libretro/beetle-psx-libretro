@@ -30,8 +30,8 @@ template<bool goraud>
 static INLINE void line_point_to_fixed_point_coord(const line_point *point,
       const line_fxp_step *step, line_fxp_coord *coord)
 {
-   coord->x  = ((uint64_t)fx32_shiftup(point->x)) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
-   coord->y  = ((uint64_t)fx32_shiftup(point->y)) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
+   coord->x  = ((uint64_t)point->x << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
+   coord->y  = ((uint64_t)point->y << LINE_XY_FRACTBITS) | (UINT64_C(1) << (LINE_XY_FRACTBITS - 1));
 
    coord->x -= 1024;
 
@@ -40,20 +40,22 @@ static INLINE void line_point_to_fixed_point_coord(const line_point *point,
 
    if(goraud)
    {
-      coord->r = (fx32_shiftup(point->r)) | (1 << (LINE_RGB_FRACTBITS - 1));
-      coord->g = (fx32_shiftup(point->g)) | (1 << (LINE_RGB_FRACTBITS - 1));
-      coord->b = (fx32_shiftup(point->b)) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->r = (point->r << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->g = (point->g << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
+      coord->b = (point->b << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
    }
 }
 
 static INLINE int64_t line_divide(int64_t delta, int32_t dk)
 {
+   delta = (uint64_t)delta << LINE_XY_FRACTBITS;
+
    if(delta < 0)
       delta -= dk - 1;
    if(delta > 0)
       delta += dk - 1;
 
-   return (delta / dk);
+   return(delta / dk);
 }
 
 template<bool goraud>
@@ -74,14 +76,14 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
       return;
    }
 
-   step->dx_dk = line_divide(fx32_shiftup(point1->x - point0->x), dk);
-   step->dy_dk = line_divide(fx32_shiftup(point1->y - point0->y), dk);
+   step->dx_dk = line_divide(point1->x - point0->x, dk);
+   step->dy_dk = line_divide(point1->y - point0->y, dk);
 
    if(goraud)
    {
-      step->dr_dk = (int32_t)((uint32_t)fx32_shiftup(point1->r - point0->r)) / dk;
-      step->dg_dk = (int32_t)((uint32_t)fx32_shiftup(point1->g - point0->g)) / dk;
-      step->db_dk = (int32_t)((uint32_t)fx32_shiftup(point1->b - point0->b)) / dk;
+      step->dr_dk = (int32_t)((uint32_t)(point1->r - point0->r) << LINE_RGB_FRACTBITS) / dk;
+      step->dg_dk = (int32_t)((uint32_t)(point1->g - point0->g) << LINE_RGB_FRACTBITS) / dk;
+      step->db_dk = (int32_t)((uint32_t)(point1->b - point0->b) << LINE_RGB_FRACTBITS) / dk;
    }
 }
 
@@ -102,7 +104,6 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 template<bool goraud, int BlendMode, bool MaskEval_TA>
 void PS_GPU::DrawLine(line_point *points)
 {
-   unsigned i;
    line_fxp_coord cur_point;
    line_fxp_step step;
    int32_t delta_x = abs(points[1].x - points[0].x);
@@ -117,12 +118,11 @@ void PS_GPU::DrawLine(line_point *points)
    line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
    line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
 
-   for(i = 0; i <= k; i++)	// <= is not a typo.
+   for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
    {
-      /* Sign extension is not necessary here for x and y, 
-       * due to the maximum values that ClipX1 and ClipY1 can contain. */
-      int32_t x = fx32_shiftdown(cur_point.x) & 2047;
-      int32_t y = fx32_shiftdown(cur_point.y) & 2047;
+      // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
+      int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
+      int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047;
 
       if(!LineSkipTest(this, y))
       {
@@ -131,9 +131,9 @@ void PS_GPU::DrawLine(line_point *points)
 
          if(goraud)
          {
-            r = fx32_shiftdown(cur_point.r);
-            g = fx32_shiftdown(cur_point.g);
-            b = fx32_shiftdown(cur_point.b);
+            r = cur_point.r >> LINE_RGB_FRACTBITS;
+            g = cur_point.g >> LINE_RGB_FRACTBITS;
+            b = cur_point.b >> LINE_RGB_FRACTBITS;
          }
          else
          {
