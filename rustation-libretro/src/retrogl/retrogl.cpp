@@ -151,6 +151,8 @@ void RetroGl::context_destroy()
         return;
     }
 
+    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
+
     this->state = GlState_Invalid;
     this->state_data.c = config;
 }
