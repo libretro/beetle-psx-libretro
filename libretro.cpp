@@ -3258,6 +3258,7 @@ bool retro_load_game(const struct retro_game_info *info)
 	MDFNMP_InstallReadPatches();
 
    is_pal = (CalcDiscSCEx() == REGION_EU);
+   content_is_pal = is_pal;
 
    alloc_surface();
 
