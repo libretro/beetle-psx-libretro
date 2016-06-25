@@ -34,6 +34,14 @@ static unsigned image_crop = 0;
 static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 
+enum video_mode_setting {
+  VMODE_AUTO = 0,
+  VMODE_NTSC = 1,
+  VMODE_PAL  = 2,
+};
+
+enum video_mode_setting vmode_setting = VMODE_AUTO;
+
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
 // display_internal_framerate is true.
@@ -1349,7 +1357,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = PS_GPU::Build(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
+   GPU = PS_GPU::Build(is_pal, sls, sle, psx_gpu_upscale_shift);
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -2589,6 +2597,20 @@ static void check_variables(bool startup)
          break;
    }
 
+   var.key = "beetle_psx_video_mode";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "force pal") == 0)
+	vmode_setting = VMODE_PAL;
+      else if (strcmp(var.value, "force ntsc") == 0)
+	vmode_setting = VMODE_NTSC;
+      else
+	vmode_setting = VMODE_AUTO;
+   }
+   else
+     vmode_setting = VMODE_AUTO;
+
    var.key = "beetle_psx_dither_mode";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3257,7 +3279,17 @@ bool retro_load_game(const struct retro_game_info *info)
 	MDFN_LoadGameCheats(NULL);
 	MDFNMP_InstallReadPatches();
 
-   is_pal = (CalcDiscSCEx() == REGION_EU);
+   switch (vmode_setting) {
+   case VMODE_NTSC:
+     is_pal = false;
+     break;
+   case VMODE_PAL:
+     is_pal = true;
+     break;
+   case VMODE_AUTO:
+     is_pal = (CalcDiscSCEx() == REGION_EU);
+   }
+
    content_is_pal = is_pal;
 
    alloc_surface();
@@ -3809,6 +3841,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+      { "beetle_psx_video_mode", "Video mode; auto|force ntsc|force pal" },
       { "beetle_psx_filter", "Texture filtering; nearest|3point N64|bilinear" },
       { "beetle_psx_internal_color_depth", "Internal color depth; dithered 16bpp (native)|32bpp" },
       { "beetle_psx_scale_dither", "Scale dithering pattern with internal resolution; enabled|disabled" },
