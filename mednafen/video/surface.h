@@ -112,7 +112,7 @@ class MDFN_Surface //typedef struct
     b = (value >> BLUE_SHIFT) & 0xFF;
  }
  private:
- void Init(void *const p_pixels, const uint32 p_width, const uint32 p_height, const uint32 p_pitchinpix, const MDFN_PixelFormat &nf);
+ bool Init(void *const p_pixels, const uint32 p_width, const uint32 p_height, const uint32 p_pitchinpix, const MDFN_PixelFormat &nf);
 };
 
 #endif
