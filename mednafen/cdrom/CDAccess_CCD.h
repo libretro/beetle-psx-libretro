@@ -33,16 +33,16 @@ class CDAccess_CCD : public CDAccess
 
  virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
- virtual void Read_TOC(TOC *toc);
+ virtual bool Read_TOC(TOC *toc);
 
  virtual void Eject(bool eject_status);
 
  private:
 
- void Load(const char *path, bool image_memcache);
+ bool Load(const char *path, bool image_memcache);
  void Cleanup(void);
 
- void CheckSubQSanity(void);
+ bool CheckSubQSanity(void);
 
  Stream* img_stream;
  Stream* sub_stream;

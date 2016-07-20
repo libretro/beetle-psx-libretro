@@ -17,7 +17,7 @@ class CDAccess_PBP : public CDAccess
 
       virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
-      virtual void Read_TOC(TOC *toc);
+      virtual bool Read_TOC(TOC *toc);
 
       virtual void Eject(bool eject_status);
 
@@ -60,7 +60,7 @@ class CDAccess_PBP : public CDAccess
       uint16_t fixed_sectors;
       bool is_official;    // TODO: find more consistent ways to check for used compression algorithm, compressed (and/or encrypted?) audio tracks and messed up sectors
 
-      void ImageOpen(const char *path, bool image_memcache);
+      bool ImageOpen(const char *path, bool image_memcache);
       int LoadSBI(const char* sbi_path);
       void Cleanup(void);
 

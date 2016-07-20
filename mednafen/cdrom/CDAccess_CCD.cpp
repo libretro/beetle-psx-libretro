@@ -72,7 +72,7 @@ CDAccess_CCD::CDAccess_CCD(const char *path, bool image_memcache) : img_stream(N
    Load(path, image_memcache);
 }
 
-void CDAccess_CCD::Load(const char *path, bool image_memcache)
+bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 {
    FileStream cf(path, MODE_READ);
    std::map<std::string, CCD_Section> Sections;
@@ -136,7 +136,10 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       if(linebuf[0] == '[')
       {
          if(linebuf.length() < 3 || linebuf[linebuf.length() - 1] != ']')
-            throw MDFN_Error(0, _("Malformed section specifier: %s"), linebuf.c_str());
+         {
+            MDFN_Error(0, _("Malformed section specifier: %s"), linebuf.c_str());
+            return false;
+         }
 
          cur_section_name = linebuf.substr(1, linebuf.length() - 2);
          MDFN_strtoupper(cur_section_name);
@@ -148,7 +151,10 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
          const size_t leqpos = linebuf.rfind('=');
 
          if(feqpos == std::string::npos || feqpos != leqpos)
-            throw MDFN_Error(0, _("Malformed value pair specifier: %s"), linebuf.c_str());
+         {
+            MDFN_Error(0, _("Malformed value pair specifier: %s"), linebuf.c_str());
+            return false;
+         }
 
          k = linebuf.substr(0, feqpos);
          v = linebuf.substr(feqpos + 1);
@@ -170,10 +176,16 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       bool data_tracks_scrambled = CCD_ReadInt<unsigned>(ds, "DATATRACKSSCRAMBLED");
 
       if(num_sessions != 1)
-         throw MDFN_Error(0, _("Unsupported number of sessions: %u"), num_sessions);
+      {
+         MDFN_Error(0, _("Unsupported number of sessions: %u"), num_sessions);
+         return false;
+      }
 
       if(data_tracks_scrambled)
-         throw MDFN_Error(0, _("Scrambled CCD data tracks currently not supported."));
+      {
+         MDFN_Error(0, _("Scrambled CCD data tracks currently not supported."));
+         return false;
+      }
 
       //printf("MOO: %d\n", toc_entries);
 
@@ -192,7 +204,10 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
          signed      plba = CCD_ReadInt<signed>(ts, "PLBA");
 
          if(session != 1)
-            throw MDFN_Error(0, "Unsupported TOC entry Session value: %u", session);
+         {
+            MDFN_Error(0, "Unsupported TOC entry Session value: %u", session);
+            return false;
+         }
 
          // Reference: ECMA-394, page 5-14
          if (point >= 1 && point <= 99)
@@ -205,8 +220,8 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
             switch(point)
             {
                default:
-                  throw MDFN_Error(0, "Unsupported TOC entry Point value: %u", point);
-
+                  MDFN_Error(0, "Unsupported TOC entry Point value: %u", point);
+                  return false;
                case 0xA0:
                   tocd.first_track = pmin;
                   tocd.disc_type = psec;
@@ -242,7 +257,10 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
       int64 ss = img_stream->size();
 
       if(ss % 2352)
-         throw MDFN_Error(0, _("CCD image size is not evenly divisible by 2352."));
+      {
+         MDFN_Error(0, _("CCD image size is not evenly divisible by 2352."));
+         return false;
+      }
 
       img_numsectors = ss / 2352;  
    }
@@ -258,10 +276,15 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
          sub_stream = str;
 
       if(sub_stream->size() != (int64)img_numsectors * 96)
-         throw MDFN_Error(0, _("CCD SUB file size mismatch."));
+      {
+         MDFN_Error(0, _("CCD SUB file size mismatch."));
+         return false;
+      }
    }
 
    CheckSubQSanity();
+
+   return true;
 }
 
 //
@@ -272,7 +295,7 @@ void CDAccess_CCD::Load(const char *path, bool image_memcache)
 // This check is not as aggressive or exhaustive as it could be, and will not detect all potential Q subchannel rip errors; as such, it should definitely NOT be
 // used in an effort to "repair" a broken rip.
 //
-void CDAccess_CCD::CheckSubQSanity(void)
+bool CDAccess_CCD::CheckSubQSanity(void)
 {
    size_t s;
    size_t checksum_pass_counter = 0;
@@ -321,7 +344,10 @@ void CDAccess_CCD::CheckSubQSanity(void)
          if(!BCD_is_valid(track_bcd) || !BCD_is_valid(index_bcd) || !BCD_is_valid(rm_bcd) || !BCD_is_valid(rs_bcd) || !BCD_is_valid(rf_bcd) ||
                !BCD_is_valid(am_bcd) || !BCD_is_valid(as_bcd) || !BCD_is_valid(af_bcd) ||
                rs_bcd > 0x59 || rf_bcd > 0x74 || as_bcd > 0x59 || af_bcd > 0x74)
-            throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x"), rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
+         {
+            MDFN_Error(0, _("Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x"), rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
+            return false;
+         }
 
          lba = ((BCD_to_U8(am_bcd) * 60 + BCD_to_U8(as_bcd)) * 75 + BCD_to_U8(af_bcd)) - 150;
          track = BCD_to_U8(track_bcd);
@@ -329,7 +355,10 @@ void CDAccess_CCD::CheckSubQSanity(void)
          prev_lba = lba;
 
          if(track < prev_track)
-            throw MDFN_Error(0, _("Garbage subchannel Q data detected(bad track number)"));
+         {
+            MDFN_Error(0, _("Garbage subchannel Q data detected(bad track number)"));
+            return false;
+         }
 
          prev_track = track;
          checksum_pass_counter++;
@@ -337,6 +366,8 @@ void CDAccess_CCD::CheckSubQSanity(void)
    }
 
    //printf("%u/%u\n", checksum_pass_counter, img_numsectors);
+   
+   return true;
 }
 
 void CDAccess_CCD::Cleanup(void)
@@ -381,9 +412,10 @@ bool CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
 }
 
 
-void CDAccess_CCD::Read_TOC(TOC *toc)
+bool CDAccess_CCD::Read_TOC(TOC *toc)
 {
    *toc = tocd;
+   return true;
 }
 
 void CDAccess_CCD::Eject(bool eject_status)

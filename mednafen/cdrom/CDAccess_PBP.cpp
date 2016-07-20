@@ -101,7 +101,7 @@ typedef struct {
    unsigned char *buf;
 } PGD_HEADER;
 
-void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
+bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 {
    uint8 magic[4];
    char psar_sig[12];
@@ -117,7 +117,10 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
    // check for valid pbp
    if(fp->read(magic, 4, false) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
-      throw(MDFN_Error(0, _("Invalid PBP header: %s"), path));
+   {
+      MDFN_Error(0, _("Invalid PBP header: %s"), path);
+      return false;
+   }
 
    // offsets of internal files
    fp->seek(0x8, SEEK_SET);
@@ -145,7 +148,10 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
          int pdg_size = decrypt_pgd(iso_map, sizeof(iso_map));
 
          if(pdg_size < 1 || pdg_size > sizeof(iso_map))
-            throw(MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map")));
+         {
+            MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map"));
+            return false;
+         }
 
          is_official = true;
          read_offset += 0x90;
@@ -163,7 +169,10 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
       }
 
       if(PBP_DiscCount == 0)
-         throw(MDFN_Error(0, _("Multidisk eboot has 0 images?: %s"), path));
+      {
+         MDFN_Error(0, _("Multidisk eboot has 0 images?: %s"), path);
+         return false;
+      }
 
       // default to first disc on loading
       psisoimg_offset += discs_start_offset[0];
@@ -173,7 +182,10 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    }
 
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
-      throw(MDFN_Error(0, _("Unexpected psar_sig: %s"), psar_sig));
+   {
+      MDFN_Error(0, _("Unexpected psar_sig: %s"), psar_sig);
+      return false;
+   }
 
    // prepare sbi file path
    if(file_ext.length() == 4 && file_ext[0] == '.')
@@ -192,6 +204,8 @@ void CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
       // use a substitute char here, set the proper one in Read_TOC()
       sbi_path.insert(sbi_path.length()-4, "_x");
    }
+
+   return true;
 }
 
 void CDAccess_PBP::Cleanup(void)
@@ -434,7 +448,7 @@ bool CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
    return true;
 }
 
-void CDAccess_PBP::Read_TOC(TOC *toc)
+bool CDAccess_PBP::Read_TOC(TOC *toc)
 {
    struct {
       uint8_t type;
@@ -462,9 +476,13 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
    uint32_t cdimg_base = psisoimg_offset + 0x100000;
 
    uint8_t* iso_header = (uint8_t*)malloc(0xB6600);
-   if(iso_header == NULL)
-      throw(MDFN_Error(0, _("[PBP] Read_TOC() - unable to allocate memory")));
 
+   if(!iso_header)
+   {
+      MDFN_Error(0, _("[PBP] Read_TOC() - unable to allocate memory"));
+      return false;
+   }
+   
    TOC_Clear(toc);
    memset(Tracks, 0, sizeof(Tracks));
 
@@ -476,13 +494,16 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       int pdg_size = decrypt_pgd(iso_header, 0xB6600);
 
       if(pdg_size < 1 || pdg_size > 0xB6600)
-            throw(MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map")));
+      {
+         MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map"));
+         return false;
+      }
 
       is_official = true;
       toc_offset += 0x90;
       index_table_offset += 0x90;
    }
-
+   
    // initialize opposites
    FirstTrack = 99;
    LastTrack = 0;
@@ -552,9 +573,12 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
       log_cb(RETRO_LOG_DEBUG, "[PBP] track[%i]: %s, lba = %i, adr = %i, control = %i, index[0] = %i, index[1] = %i\n", BCD_to_U8(toc_entry.track), DI_CUE_Strings[Tracks[i].DIFormat], toc->tracks[i].lba, toc->tracks[i].adr, toc->tracks[i].control, Tracks[i].index[0], Tracks[i].index[1]);
 
       if(BCD_to_U8(toc_entry.track) < i || BCD_to_U8(toc_entry.track) > i)
-         throw(MDFN_Error(0, _("Tracks out of order")));   // can this happen?
+      {
+         MDFN_Error(0, _("Tracks out of order"));   // can this happen?
+         return false;
+      }
    }
-
+   
    if(total_sectors != sector_count)
       log_cb(RETRO_LOG_WARN, "[PBP] sector counts dont match (%i != %i)\n", total_sectors, sector_count);
 
@@ -582,7 +606,10 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
 
    index_table = (unsigned int*)malloc((index_len + 1) * sizeof(*index_table));
    if (index_table == NULL)
-      throw(MDFN_Error(0, _("Unable to allocate memory")));
+   {
+      MDFN_Error(0, _("Unable to allocate memory"));
+      return false;
+   }
 
    for (i = 0; i < index_len; i++)
    {
@@ -619,6 +646,8 @@ void CDAccess_PBP::Read_TOC(TOC *toc)
    // Load SBI file, if present
    if (path_is_valid(sbi_path.c_str()))
       LoadSBI(sbi_path.c_str());
+
+   return true;
 }
 
 int CDAccess_PBP::LoadSBI(const char* sbi_path)
@@ -655,16 +684,21 @@ int CDAccess_PBP::LoadSBI(const char* sbi_path)
       memcpy(SubQReplaceMap[aba].data, tmpq, 12);
    }
 
-   //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+#if 0
+   MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+#endif
    log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 
 void CDAccess_PBP::Eject(bool eject_status)
 {
-   if(!eject_status && CD_SelectedDisc >= 0 && CD_SelectedDisc < PBP_DiscCount)
+   if(!eject_status && CD_SelectedDisc >= 0 
+         && CD_SelectedDisc < PBP_DiscCount)
    {
-      log_cb(RETRO_LOG_DEBUG, "[PBP] changing offset: old = %#x, new = %#x (%i of %i)\n", psisoimg_offset, pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc], CD_SelectedDisc+1, PBP_DiscCount);
+      log_cb(RETRO_LOG_DEBUG, "[PBP] changing offset: old = %#x, new = %#x (%i of %i)\n",
+            psisoimg_offset, pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc],
+            CD_SelectedDisc+1, PBP_DiscCount);
       psisoimg_offset = pbp_file_offsets[DATA_PSAR]+discs_start_offset[CD_SelectedDisc];
    }
 }
@@ -770,11 +804,12 @@ int CDAccess_PBP::decode_range(unsigned int *range, unsigned int *code, unsigned
       *code = ((*code) << 8) + (*src)++[5];
       return 1;
    }
-   else
-      return 0;
+
+   return 0;
 }
 
-int CDAccess_PBP::decode_bit(unsigned int *range, unsigned int *code, int *index, unsigned char **src, unsigned char *c)
+int CDAccess_PBP::decode_bit(unsigned int *range, unsigned int *code, 
+      int *index, unsigned char **src, unsigned char *c)
 {
    unsigned int val = *range;
 
@@ -794,15 +829,15 @@ int CDAccess_PBP::decode_bit(unsigned int *range, unsigned int *code, int *index
       if (index) (*index)++;
       return 1;
    }
-   else
-   {
-      *code -= val;
-      *range -= val;
-      return 0;
-   }
+
+   *code -= val;
+   *range -= val;
+   return 0;
 }
 
-int CDAccess_PBP::decode_word(unsigned char *ptr, int index, int *bit_flag, unsigned int *range, unsigned int *code, unsigned char **src)
+int CDAccess_PBP::decode_word(unsigned char *ptr, int index, 
+      int *bit_flag, unsigned int *range, 
+      unsigned int *code, unsigned char **src)
 {
    int i = 1;
    index >>= 3;
@@ -843,7 +878,8 @@ int CDAccess_PBP::decode_word(unsigned char *ptr, int index, int *bit_flag, unsi
    return i;
 }
 
-int CDAccess_PBP::decode_number(unsigned char *ptr, int index, int *bit_flag, unsigned int *range, unsigned int *code, unsigned char **src)
+int CDAccess_PBP::decode_number(unsigned char *ptr, int index, int *bit_flag, 
+      unsigned int *range, unsigned int *code, unsigned char **src)
 {
    int i = 1;
 
@@ -988,7 +1024,7 @@ int CDAccess_PBP::decompress(unsigned char *out, unsigned char *in, unsigned int
             } while (diff < 0);
 
             // If the data offset was found, parse it as a number.
-            if ((diff > 0) || (bit_flag != 0)) 
+            if ((diff > 0) || (bit_flag != 0))
             {
                // Adjust diff if needed.
                if (bit_flag == 0) diff -= 8;
@@ -1135,7 +1171,6 @@ int CDAccess_PBP::fix_sector(uint8_t* sector, int32_t lba)
       {
          // Compute form 2 EDC.
          uint32_t EDC = EDCCrc32(sector+CDROMXA_SUBHEADER_OFFSET, CDROMXA_FORM2_EDC_OFFSET-CDROMXA_SUBHEADER_OFFSET);
-
          // Write EDC.
          memcpy(sector+CDROMXA_FORM2_EDC_OFFSET, &EDC, sizeof(EDC));
       }
@@ -1143,10 +1178,8 @@ int CDAccess_PBP::fix_sector(uint8_t* sector, int32_t lba)
       {
          // Compute form 1 EDC.
          uint32_t EDC = EDCCrc32(sector+CDROMXA_SUBHEADER_OFFSET, CDROMXA_FORM1_EDC_OFFSET-CDROMXA_SUBHEADER_OFFSET);
-
          // Write EDC.
          memcpy(sector+CDROMXA_FORM1_EDC_OFFSET, &EDC, sizeof(EDC));
-
          // clear header
          memset(sector+HEADER_OFFSET, 0, 4);
 
