@@ -128,7 +128,7 @@ class CDIF_MT : public CDIF
       //
       // Read-thread-only:
       //
-      void RT_EjectDisc(bool eject_status, bool skip_actual_eject = false);
+      bool RT_EjectDisc(bool eject_status, bool skip_actual_eject = false);
 
       uint32 ra_lba;
       int ra_count;
@@ -227,7 +227,10 @@ bool CDIF_Queue::Read(CDIF_Message *message, bool blocking)
    slock_unlock((slock_t*)ze_mutex);
 
    if(ret && message->message == CDIF_MSG_FATAL_ERROR)
-      throw MDFN_Error(0, "%s", message->str_message.c_str());
+   {
+      MDFN_Error(0, "%s", message->str_message.c_str());
+      return false;
+   }
 
    return(ret);
 }
@@ -244,7 +247,7 @@ void CDIF_Queue::Write(const CDIF_Message &message)
 }
 
 
-void CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
+bool CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
 {
    int32_t old_de = DiscEjected;
 
@@ -260,7 +263,10 @@ void CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
          disc_cdaccess->Read_TOC(&disc_toc);
 
          if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
-            throw(MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track));
+         {
+            MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track);
+            return false;
+         }
       }
 
       SBWritePos = 0;
@@ -269,6 +275,8 @@ void CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
       last_read_lba = ~0U;
       memset(SectorBuffers, 0, SBSize * sizeof(CDIF_Sector_Buffer));
    }
+
+   return true;
 }
 
 struct RTS_Args
@@ -641,29 +649,24 @@ bool CDIF_ST::Eject(bool eject_status)
    if(UnrecoverableError)
       return(false);
 
-   try
+   int32_t old_de = DiscEjected;
+
+   DiscEjected = eject_status;
+
+   if(old_de != DiscEjected)
    {
-      int32_t old_de = DiscEjected;
+      disc_cdaccess->Eject(eject_status);
 
-      DiscEjected = eject_status;
-
-      if(old_de != DiscEjected)
+      if(!eject_status)     // Re-read the TOC
       {
-         disc_cdaccess->Eject(eject_status);
+         disc_cdaccess->Read_TOC(&disc_toc);
 
-         if(!eject_status)     // Re-read the TOC
+         if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
          {
-            disc_cdaccess->Read_TOC(&disc_toc);
-
-            if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
-               throw(MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track));
+            MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track);
+            return false;
          }
       }
-   }
-   catch(std::exception &e)
-   {
-      log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
-      return(false);
    }
 
    return(true);
