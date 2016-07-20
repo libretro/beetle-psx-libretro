@@ -9,8 +9,6 @@
 
 extern std::vector<MDFNGI *>MDFNSystems;
 
-MDFNGI *MDFNI_LoadCD(const char *sysname, const char *devicename);
-
 // Call this function as early as possible, even before MDFNI_Initialize()
 bool MDFNI_InitializeModule(void);
 

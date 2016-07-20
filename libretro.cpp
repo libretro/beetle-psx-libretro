@@ -2879,7 +2879,7 @@ static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 #endif
 // TODO: LoadCommon()
 
-MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
+static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
    uint8 LayoutMD5[16];
 
@@ -3001,7 +3001,7 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
 
 #ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
-	 return(MDFNI_LoadCD(force_module, name));
+	 return MDFNI_LoadCD(force_module, name);
 #endif
 
    GameFile = file_open(name);
