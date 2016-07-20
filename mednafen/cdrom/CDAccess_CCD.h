@@ -28,7 +28,7 @@ class CDAccess_CCD : public CDAccess
 {
  public:
 
- CDAccess_CCD(const char *path, bool image_memcache);
+ CDAccess_CCD(bool *success, const char *path, bool image_memcache);
  virtual ~CDAccess_CCD();
 
  virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);

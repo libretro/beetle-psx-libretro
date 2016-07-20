@@ -40,14 +40,14 @@ CDAccess::~CDAccess()
 
 }
 
-CDAccess *cdaccess_open_image(const char *path, bool image_memcache)
+CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcache)
 {
    if(strlen(path) >= 4 && !strcasecmp(path + strlen(path) - 4, ".ccd"))
-      return new CDAccess_CCD(path, image_memcache);
+      return new CDAccess_CCD(success, path, image_memcache);
    else if(strlen(path) >= 4 && !strcasecmp(path + strlen(path) - 4, ".pbp"))
-      return new CDAccess_PBP(path, image_memcache);
+      return new CDAccess_PBP(success, path, image_memcache);
    else
-      return new CDAccess_Image(path, image_memcache);
+      return new CDAccess_Image(success, path, image_memcache);
 
    return NULL;
 }

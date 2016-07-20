@@ -66,10 +66,11 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
 }
 
 
-CDAccess_CCD::CDAccess_CCD(const char *path, bool image_memcache) : img_stream(NULL), sub_stream(NULL), img_numsectors(0)
+CDAccess_CCD::CDAccess_CCD(bool *success, const char *path, bool image_memcache) : img_stream(NULL), sub_stream(NULL), img_numsectors(0)
 {
    TOC_Clear(&tocd);
-   Load(path, image_memcache);
+   if (!Load(path, image_memcache))
+      *success = false;
 }
 
 bool CDAccess_CCD::Load(const char *path, bool image_memcache)

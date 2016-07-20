@@ -12,7 +12,7 @@ class CDAccess_PBP : public CDAccess
 {
    public:
 
-      CDAccess_PBP(const char *path, bool image_memcache);
+      CDAccess_PBP(bool *success, const char *path, bool image_memcache);
       virtual ~CDAccess_PBP();
 
       virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);

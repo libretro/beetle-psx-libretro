@@ -2344,23 +2344,21 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       return true;
    }
 
-   try
-   {
-      CDIF *iface = CDIF_Open(info->path, false, false);
-      delete cdifs->at(index);
-      cdifs->at(index) = iface;
-      CalcDiscSCEx();
+   bool success = true;
+   CDIF *iface = CDIF_Open(&success, info->path, false, false);
 
-      /* If we replace, we want the "swap disk manually effect". */
-      extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
-      /* Ugly, but needed to get proper disk swapping effect. */
-      update_md5_checksum(iface);
-      return true;
-   }
-   catch (const std::exception &e)
-   {
+   if (!success)
       return false;
-   }
+
+   delete cdifs->at(index);
+   cdifs->at(index) = iface;
+   CalcDiscSCEx();
+
+   /* If we replace, we want the "swap disk manually effect". */
+   extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
+   /* Ugly, but needed to get proper disk swapping effect. */
+   update_md5_checksum(iface);
+   return true;
 }
 
 static bool disk_add_image_index(void)
@@ -2880,112 +2878,115 @@ static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 
 MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
- uint8 LayoutMD5[16];
+   uint8 LayoutMD5[16];
 
- log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
+   log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
 
- try
- {
-  if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".m3u"))
-  {
-   std::vector<std::string> file_list;
-
-   ReadM3U(file_list, devicename);
-
-   for(unsigned i = 0; i < file_list.size(); i++)
+   try
    {
-    CDInterfaces.push_back(CDIF_Open(file_list[i].c_str(), false, old_cdimagecache));
+      if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".m3u"))
+      {
+         std::vector<std::string> file_list;
+
+         ReadM3U(file_list, devicename);
+
+         for(unsigned i = 0; i < file_list.size(); i++)
+         {
+            bool success = true;
+            CDInterfaces.push_back(CDIF_Open(&success, file_list[i].c_str(), false, old_cdimagecache));
+         }
+      }
+      else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
+      {
+         bool success = true;
+         CD_IsPBP = true;
+         CDInterfaces.push_back(CDIF_Open(&success, devicename, false, old_cdimagecache));
+      }
+      else
+      {
+         bool success = true;
+         CDInterfaces.push_back(CDIF_Open(&success, devicename, false, old_cdimagecache));
+      }
    }
-  }
-  else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
-  {
-     CD_IsPBP = true;
-     CDInterfaces.push_back(CDIF_Open(devicename, false, old_cdimagecache));
-  }
-  else
-  {
-   CDInterfaces.push_back(CDIF_Open(devicename, false, old_cdimagecache));
-  }
- }
- catch(std::exception &e)
- {
-    log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
-    return(0);
- }
-
- //
- // Print out a track list for all discs.  //
- for(unsigned i = 0; i < CDInterfaces.size(); i++)
- {
-    TOC toc;
-    TOC_Clear(&toc);
-
-    CDInterfaces[i]->ReadTOC(&toc);
-
-    log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
-
-    for(int32 track = toc.first_track; track <= toc.last_track; track++)
-    {
-       log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
-    }
-
-    log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
- }
-
- // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
- // its own, or to use it to look up a game in its database.
- {
-  md5_context layout_md5;
-
-  md5_starts(&layout_md5);
-
-  for(unsigned i = 0; i < CDInterfaces.size(); i++)
-  {
-   CD_TOC toc;
-
-   TOC_Clear(&toc);
-   CDInterfaces[i]->ReadTOC(&toc);
-
-   md5_update_u32_as_lsb(&layout_md5, toc.first_track);
-   md5_update_u32_as_lsb(&layout_md5, toc.last_track);
-   md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
-
-   for(uint32 track = toc.first_track; track <= toc.last_track; track++)
+   catch(std::exception &e)
    {
-    md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
-    md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
+      log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
+      return(0);
    }
-  }
 
-  md5_finish(&layout_md5, LayoutMD5);
- }
+   //
+   // Print out a track list for all discs.  //
+   for(unsigned i = 0; i < CDInterfaces.size(); i++)
+   {
+      TOC toc;
+      TOC_Clear(&toc);
 
- // This if statement will be true if force_module references a system without CDROM support.
- if(!MDFNGameInfo->LoadCD)
- {
-    log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
-    return 0;
- }
+      CDInterfaces[i]->ReadTOC(&toc);
 
- // TODO: include module name in hash
- memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
+      log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
 
- if(!(MDFNGameInfo->LoadCD(&CDInterfaces)))
- {
-  for(unsigned i = 0; i < CDInterfaces.size(); i++)
-   delete CDInterfaces[i];
-  CDInterfaces.clear();
+      for(int32 track = toc.first_track; track <= toc.last_track; track++)
+      {
+         log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
+      }
 
-  MDFNGameInfo = NULL;
-  return(0);
- }
+      log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
+   }
 
- //MDFNI_SetLayerEnableMask(~0ULL);
+   // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
+   // its own, or to use it to look up a game in its database.
+   {
+      md5_context layout_md5;
 
- MDFN_LoadGameCheats(NULL);
- MDFNMP_InstallReadPatches();
+      md5_starts(&layout_md5);
 
- return(MDFNGameInfo);
+      for(unsigned i = 0; i < CDInterfaces.size(); i++)
+      {
+         CD_TOC toc;
+
+         TOC_Clear(&toc);
+         CDInterfaces[i]->ReadTOC(&toc);
+
+         md5_update_u32_as_lsb(&layout_md5, toc.first_track);
+         md5_update_u32_as_lsb(&layout_md5, toc.last_track);
+         md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
+
+         for(uint32 track = toc.first_track; track <= toc.last_track; track++)
+         {
+            md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
+            md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
+         }
+      }
+
+      md5_finish(&layout_md5, LayoutMD5);
+   }
+
+   // This if statement will be true if force_module references a system without CDROM support.
+   if(!MDFNGameInfo->LoadCD)
+   {
+      log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
+      return 0;
+   }
+
+   // TODO: include module name in hash
+   memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
+
+   if(!(MDFNGameInfo->LoadCD(&CDInterfaces)))
+   {
+      for(unsigned i = 0; i < CDInterfaces.size(); i++)
+         delete CDInterfaces[i];
+      CDInterfaces.clear();
+
+      MDFNGameInfo = NULL;
+      return(0);
+   }
+
+   //MDFNI_SetLayerEnableMask(~0ULL);
+
+   MDFN_LoadGameCheats(NULL);
+   MDFNMP_InstallReadPatches();
+
+   return(MDFNGameInfo);
 }
 #endif
 

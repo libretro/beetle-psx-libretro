@@ -916,12 +916,13 @@ void CDAccess_Image::Cleanup(void)
    }
 }
 
-CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : 
+CDAccess_Image::CDAccess_Image(bool *success, const char *path, bool image_memcache) : 
    NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    memset(Tracks, 0, sizeof(Tracks));
 
-   ImageOpen(path, image_memcache);
+   if (!ImageOpen(path, image_memcache))
+      *success = false;
 }
 
 CDAccess_Image::~CDAccess_Image()

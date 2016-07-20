@@ -219,13 +219,14 @@ void CDAccess_PBP::Cleanup(void)
       free(index_table);
 }
 
-CDAccess_PBP::CDAccess_PBP(const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
+CDAccess_PBP::CDAccess_PBP(bool *success, const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    is_official = false;
    index_table = NULL;
    fp = NULL;
    kirk_init();
-   ImageOpen(path, image_memcache);
+   if (!ImageOpen(path, image_memcache))
+      *success = false;
 }
 
 CDAccess_PBP::~CDAccess_PBP()
