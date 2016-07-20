@@ -5,25 +5,24 @@
 #include <string.h>
 
 #ifdef __cplusplus
-#include <stdexcept>
 
 class ErrnoHolder;
 class MDFN_Error : public std::exception
 {
  public:
 
- MDFN_Error() throw();
+ MDFN_Error();
 
- MDFN_Error(int errno_code_new, const char *format, ...) throw();
+ MDFN_Error(int errno_code_new, const char *format, ...);
  MDFN_Error(const ErrnoHolder &enh);
 
- ~MDFN_Error() throw();
+ ~MDFN_Error();
 
- MDFN_Error(const MDFN_Error &ze_error) throw();
- MDFN_Error & operator=(const MDFN_Error &ze_error) throw();
+ MDFN_Error(const MDFN_Error &ze_error);
+ MDFN_Error & operator=(const MDFN_Error &ze_error);
 
- virtual const char *what(void) const throw();
- int GetErrno(void) const throw();
+ virtual const char *what(void);
+ int GetErrno(void);
 
  private:
 

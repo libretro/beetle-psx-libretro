@@ -880,22 +880,14 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
 {
  assert(which < 8);
 
- try
+ if(DevicesMC[which]->GetNVSize())
  {
-  if(DevicesMC[which]->GetNVSize())
-  {
-   FileStream mf(path, MODE_READ);
+    FileStream mf(path, MODE_READ);
 
-   mf.read(DevicesMC[which]->GetNVData(), (1 << 17));
+    mf.read(DevicesMC[which]->GetNVData(), (1 << 17));
 
-   DevicesMC[which]->WriteNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
-   DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
-  }
- }
- catch(MDFN_Error &e)
- {
-  if(e.GetErrno() != ENOENT)
-   throw(e);
+    DevicesMC[which]->WriteNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
+    DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
  }
 }
 

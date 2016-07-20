@@ -32,7 +32,7 @@ FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
    {
       ErrnoHolder ene(errno);
 
-      throw(MDFN_Error(ene.Errno(), "Error opening file:\n%s\n%s", path, ene.StrError()));
+      MDFN_Error(ene.Errno(), "Error opening file:\n%s\n%s", path, ene.StrError());
    }
 
    original_path = strdup(path);
