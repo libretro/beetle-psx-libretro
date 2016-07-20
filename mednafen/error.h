@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 
 class ErrnoHolder;
-class MDFN_Error : public std::exception
+class MDFN_Error
 {
  public:
 

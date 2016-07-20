@@ -1470,7 +1470,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    PSX_Power();
 }
 
-static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp = false)
+static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp = false)
 {
    uint32 PC        = MDFN_de32lsb(&data[0x10]);
    uint32 SP        = MDFN_de32lsb(&data[0x30]);
@@ -1485,13 +1485,22 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    TextStart &= 0x1FFFFF;
 
    if(TextSize > 2048 * 1024)
-      throw(MDFN_Error(0, "Text section too large"));
+   {
+      MDFN_Error(0, "Text section too large");
+      return false;
+   }
 
    if(TextSize > (size - 0x800))
-      throw(MDFN_Error(0, "Text section recorded size is larger than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800));
+   {
+      MDFN_Error(0, "Text section recorded size is larger than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800);
+      return false;
+   }
 
    if(TextSize < (size - 0x800))
-      throw(MDFN_Error(0, "Text section recorded size is smaller than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800));
+   {
+      MDFN_Error(0, "Text section recorded size is smaller than data available in file.  Header=0x%08x, Available=0x%08x", TextSize, size - 0x800);
+      return false;
+   }
 
    if(!TextMem.size())
    {
@@ -1626,6 +1635,8 @@ static void LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    po += 4;
    MDFN_en32lsb(po, 0);	// NOP(kinda)
    po += 4;
+
+   return true;
 }
 
 static int Load(const char *name, MDFNFILE *fp)
@@ -1643,7 +1654,10 @@ static int Load(const char *name, MDFNFILE *fp)
    TextMem.resize(0);
 
    if(GET_FSIZE_PTR(fp) >= 0x800)
-      LoadEXE(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp));
+   {
+      if (!LoadEXE(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp)))
+         return -1;
+   }
 
    return(1);
 }
