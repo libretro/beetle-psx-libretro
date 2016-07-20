@@ -39,7 +39,7 @@ class CDAccess_Image : public CDAccess
       CDAccess_Image(const char *path, bool image_memcache);
       virtual ~CDAccess_Image();
 
-      virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba);
+      virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
       virtual void Read_TOC(TOC *toc);
 

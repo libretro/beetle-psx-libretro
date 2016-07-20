@@ -60,8 +60,8 @@ extern retro_log_printf_t log_cb;
 enum
 {
    CDRF_SUBM_NONE = 0,
-   CDRF_SUBM_RW = 1,
-   CDRF_SUBM_RW_RAW = 2
+   CDRF_SUBM_RW,
+   CDRF_SUBM_RW_RAW
 };
 
 // Disk-image(rip) track/sector formats
@@ -114,7 +114,8 @@ static const char *DI_CUE_Strings[7] =
 
 // Should return an offset to the start of the next argument(past any whitespace), or if there isn't a next argument,
 // it'll return the length of the src string.
-static size_t UnQuotify(const std::string &src, size_t source_offset, std::string &dest, bool parse_quotes = true)
+static size_t UnQuotify(const std::string &src, size_t source_offset,
+      std::string &dest, bool parse_quotes = true)
 {
    const size_t source_len = src.length();
    bool in_quote = 0;
@@ -184,7 +185,6 @@ uint32 CDAccess_Image::GetSectorCount(CDRFILE_TRACK_INFO *track)
 
       size = track->fp->size();
 
-      //printf("%d %d %d\n", (int)stat_buf.st_size, (int)track->FileOffset, (int)stat_buf.st_size - (int)track->FileOffset);
       if(track->SubchannelMode)
          return((size - track->FileOffset) / (2352 + 96));
       return((size - track->FileOffset) / 2352);
@@ -195,7 +195,9 @@ uint32 CDAccess_Image::GetSectorCount(CDRFILE_TRACK_INFO *track)
    return((size - track->FileOffset) / DI_Size_Table[track->DIFormat]);
 }
 
-void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum, const std::string &filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache)
+void CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int tracknum,
+      const std::string &filename, const char *binoffset, const char *msfoffset,
+      const char *length, bool image_memcache, std::map<std::string, Stream*> &toc_streamcache)
 {
    long offset = 0; // In bytes!
    long tmp_long;
@@ -769,14 +771,14 @@ void CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
       {
          switch(Tracks[x].DIFormat)
          {
-            default: break;
-
             case DI_FORMAT_MODE2:
             case DI_FORMAT_MODE2_FORM1:
             case DI_FORMAT_MODE2_FORM2:
             case DI_FORMAT_MODE2_RAW:
-                     disc_type = DISC_TYPE_CD_XA;	
-                     break;
+               disc_type = DISC_TYPE_CD_XA;	
+               break;
+            default:
+               break;
          }
       }
 
@@ -887,7 +889,8 @@ void CDAccess_Image::Cleanup(void)
    }
 }
 
-CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
+CDAccess_Image::CDAccess_Image(const char *path, bool image_memcache) : 
+   NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    memset(Tracks, 0, sizeof(Tracks));
 
@@ -899,7 +902,7 @@ CDAccess_Image::~CDAccess_Image()
    Cleanup();
 }
 
-void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
+bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
    int32_t track;
    uint8_t SimuQ[0xC];
@@ -1006,7 +1009,10 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
    } // end track search loop
 
    if(!TrackFound)
-      throw(MDFN_Error(0, _("Could not find track for sector %u!"), lba));
+   {
+      MDFN_Error(0, _("Could not find track for sector %u!"), lba);
+      return false;
+   }
 
 #if 0
    if(qbuf[0] & 0x40)
@@ -1036,6 +1042,7 @@ void CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
    //subq_deinterleave(buf + 2352, qbuf);
    //printf("%02x\n", qbuf[0]);
    //printf("%02x\n", buf[12 + 3]);
+   return true;
 }
 
 // Note: this function makes use of the current contents(as in |=) in SubPWBuf.
@@ -1052,7 +1059,8 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 
    for(track = FirstTrack; track < (FirstTrack + NumTracks); track++)
    {
-      if(lba >= (Tracks[track].LBA - Tracks[track].pregap_dv - Tracks[track].pregap) && lba < (Tracks[track].LBA + Tracks[track].sectors + Tracks[track].postgap))
+      if(lba >= (Tracks[track].LBA - Tracks[track].pregap_dv - Tracks[track].pregap) 
+            && lba < (Tracks[track].LBA + Tracks[track].sectors + Tracks[track].postgap))
       {
          track_found = true;
          break;

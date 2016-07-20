@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <boolean.h>
+
 #include "CDUtility.h"
 #include "misc.h"
 
@@ -14,7 +16,7 @@ class CDAccess
  CDAccess();
  virtual ~CDAccess();
 
- virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
+ virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
 
  virtual void Read_TOC(TOC *toc) = 0;
 

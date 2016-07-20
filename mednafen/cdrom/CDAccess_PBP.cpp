@@ -354,7 +354,7 @@ int CDAccess_PBP::decompress2(void *out, uint32_t *out_size, void *in, uint32_t 
    return ret == 1 ? 0 : ret;
 }
 
-void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
+bool CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
    uint8_t SimuQ[0xC];
 
@@ -374,13 +374,13 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
       if (lba >= index_len * 16)
       {
          log_cb(RETRO_LOG_ERROR, "[PBP] sector %d is past img end\n", lba);
-         return;
+         return false;
       }
 
       if (size > sizeof(buff_compressed))
       {
          log_cb(RETRO_LOG_ERROR, "[PBP] %u: block %d is too large (%u)\n", lba, block, size);
-         return;
+         return false;
       }
       else if(size == sizeof(buff_compressed))
          is_compressed = false;  // should be the case here?
@@ -405,12 +405,12 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
             if (ret != 0)
             {
                log_cb(RETRO_LOG_ERROR, "[PBP] uncompress failed with %d for block %d, sector %d (%u)\n", ret, block, lba, size);
-               return;
+               return false;
             }
             if (cdbuffer_size != cdbuffer_size_expect)
             {
                log_cb(RETRO_LOG_WARN, "[PBP] cdbuffer_size: %lu != %lu, sector %d\n", cdbuffer_size, cdbuffer_size_expect, lba);
-               return;
+               return false;
             }
          }
       }
@@ -430,6 +430,8 @@ void CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
    }
 
    memcpy(buf, buff_raw[sector_in_blk], 2352);
+
+   return true;
 }
 
 void CDAccess_PBP::Read_TOC(TOC *toc)

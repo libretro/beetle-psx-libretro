@@ -68,16 +68,8 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
 
 CDAccess_CCD::CDAccess_CCD(const char *path, bool image_memcache) : img_stream(NULL), sub_stream(NULL), img_numsectors(0)
 {
-   try
-   {
-      TOC_Clear(&tocd);
-      Load(path, image_memcache);
-   }
-   catch(...)
-   {
-      Cleanup();
-      throw;
-   }
+   TOC_Clear(&tocd);
+   Load(path, image_memcache);
 }
 
 void CDAccess_CCD::Load(const char *path, bool image_memcache)
@@ -367,12 +359,15 @@ CDAccess_CCD::~CDAccess_CCD()
    Cleanup();
 }
 
-void CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
+bool CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
 {
    uint8_t sub_buf[96];
 
    if(lba < 0 || (size_t)lba >= img_numsectors)
-      throw(MDFN_Error(0, _("LBA out of range.")));
+   {
+      MDFN_Error(0, _("LBA out of range."));
+      return false;
+   }
 
    img_stream->seek(lba * 2352, SEEK_SET);
    img_stream->read(buf, 2352);
@@ -381,6 +376,8 @@ void CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
    sub_stream->read(sub_buf, 96);
 
    subpw_interleave(sub_buf, buf + 2352);
+
+   return true;
 }
 
 
