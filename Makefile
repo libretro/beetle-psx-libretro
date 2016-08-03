@@ -226,7 +226,7 @@ else ifeq ($(platform), gcw0)
    GL_LIB := -lGLESv2
    
 # Emscripten
-ifeq ifeq ($(platform), emscripten)
+else ifeq ($(platform), emscripten)
    TARGET := $(TARGET_NAME).bc
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
