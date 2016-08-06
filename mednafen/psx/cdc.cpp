@@ -457,11 +457,12 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
 
 bool PS_CDC::DecodeSubQ(uint8 *subpw)
 {
+   unsigned i;
    uint8 tmp_q[0xC];
 
    memset(tmp_q, 0, 0xC);
 
-   for(int i = 0; i < 96; i++)
+   for(i = 0; i < 96; i++)
       tmp_q[i >> 3] |= ((subpw[i] & 0x40) >> 6) << (7 - (i & 7));
 
    if((tmp_q[0] & 0xF) == 1)
@@ -537,17 +538,16 @@ void PS_CDC::GetCDAudio(int32 samples[2])
    }
    else
    {
+      unsigned i, s;
       int32 out_tmp[2] = { 0, 0 };
 
-      for(unsigned i = 0; i < 2; i++)
+      for(i = 0; i < 2; i++)
       {
          const int16* imp = CDADPCMImpulse[ADPCM_ResampCurPhase];
          int16* wf = &ADPCM_ResampBuf[i][(ADPCM_ResampCurPos + 32 - 25) & 0x1F];
 
-         for(unsigned s = 0; s < 25; s++)
-         {
+         for(s = 0; s < 25; s++)
             out_tmp[i] += imp[s] * wf[s];
-         }
 
          out_tmp[i] >>= 15;
          clamp(&out_tmp[i], -32768, 32767);
@@ -563,10 +563,10 @@ void PS_CDC::GetCDAudio(int32 samples[2])
          ADPCM_ResampCurPhase -= 7;
          ReadAudioBuffer(raw);
 
-         for(unsigned i = 0; i < 2; i++)
+         for(i = 0; i < 2; i++)
          {
             ADPCM_ResampBuf[i][ADPCM_ResampCurPos +  0] = 
-               ADPCM_ResampBuf[i][ADPCM_ResampCurPos + 32] = raw[i];
+            ADPCM_ResampBuf[i][ADPCM_ResampCurPos + 32] = raw[i];
          }
          ADPCM_ResampCurPos = (ADPCM_ResampCurPos + 1) & 0x1F;
       }
@@ -597,16 +597,16 @@ struct XA_SoundGroup
    uint8 samples[112];
 };
 
-#define XA_SUBMODE_EOF		0x80
+#define XA_SUBMODE_EOF		   0x80
 #define XA_SUBMODE_REALTIME	0x40
-#define XA_SUBMODE_FORM		0x20
-#define XA_SUBMODE_TRIGGER	0x10
-#define XA_SUBMODE_DATA		0x08
-#define XA_SUBMODE_AUDIO	0x04
-#define XA_SUBMODE_VIDEO	0x02
-#define XA_SUBMODE_EOR		0x01
+#define XA_SUBMODE_FORM		   0x20
+#define XA_SUBMODE_TRIGGER	   0x10
+#define XA_SUBMODE_DATA		   0x08
+#define XA_SUBMODE_AUDIO	   0x04
+#define XA_SUBMODE_VIDEO	   0x02
+#define XA_SUBMODE_EOR		   0x01
 
-#define XA_CODING_EMPHASIS	0x40
+#define XA_CODING_EMPHASIS	   0x40
 
 //#define XA_CODING_BPS_MASK	0x30
 //#define XA_CODING_BPS_4BIT	0x00
@@ -674,6 +674,7 @@ void PS_CDC::ClearAudioBuffers(void)
 // output should be readable at -2 and -1
 static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shift, const unsigned weight)
 {
+   unsigned i;
    // Weights copied over from SPU channel ADPCM playback code, 
    // may not be entirely the same for CD-XA ADPCM, we need to run tests.
    static const int32 Weights[16][2] =
@@ -686,7 +687,7 @@ static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shif
       { 122,  -60 },
    };
 
-   for(int i = 0; i < 28; i++)
+   for(i = 0; i < 28; i++)
    {
       int32 sample = (int16)(input[i] << 8);
       sample >>= shift;
@@ -700,6 +701,7 @@ static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shif
 
 void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
 {
+   unsigned i, group, unit;
    const XA_Subheader *sh = (const XA_Subheader *)&sdata[12 + 4];
    const unsigned unit_index_shift = (sh->coding & XA_CODING_8BIT) ? 0 : 1;
 
@@ -713,12 +715,13 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
 
    //fprintf(stderr, "Coding: %02x %02x\n", sh->coding, sh->coding_dup);
 
-   for(unsigned group = 0; group < 18; group++)
+   for(group = 0; group < 18; group++)
    {
       const XA_SoundGroup *sg = (const XA_SoundGroup *)&sdata[12 + 4 + 8 + group * 128];
 
-      for(unsigned unit = 0; unit < (4U << unit_index_shift); unit++)
+      for(unit = 0; unit < (4U << unit_index_shift); unit++)
       {
+         unsigned s;
          const uint8 param = sg->params[(unit & 3) | ((unit & 4) << 1)];
          const uint8 param_copy = sg->params[4 | (unit & 3) | ((unit & 4) << 1)];
          uint8 ibuffer[28];
@@ -729,7 +732,7 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
             PSX_WARNING("[CDC] CD-XA param != param_copy --- %d %02x %02x\n", unit, param, param_copy);
          }
 
-         for(unsigned i = 0; i < 28; i++)
+         for(i = 0; i < 28; i++)
          {
             uint8 tmp = sg->samples[i * 4 + (unit >> unit_index_shift)];
 
@@ -757,14 +760,12 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
 
          if(sh->coding & XA_CODING_STEREO)
          {
-            for(unsigned s = 0; s < 28; s++)
-            {
+            for(s = 0; s < 28; s++)
                ab->Samples[ocn][group * (2 << unit_index_shift) * 28 + (unit >> 1) * 28 + s] = obuffer[2 + s];
-            }
          }
          else
          {
-            for(unsigned s = 0; s < 28; s++)
+            for(s = 0; s < 28; s++)
             {
                ab->Samples[0][group * (4 << unit_index_shift) * 28 + unit * 28 + s] = obuffer[2 + s];
                ab->Samples[1][group * (4 << unit_index_shift) * 28 + unit * 28 + s] = obuffer[2 + s];
@@ -772,18 +773,6 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
          }
       }
    }
-
-#if 0
-   // Test
-   for(unsigned i = 0; i < ab->Size; i++)
-   {
-      static unsigned counter = 0;
-
-      ab->Samples[0][i] = (counter & 2) ? -0x6000 : 0x6000;
-      ab->Samples[1][i] = rand();
-      counter++;
-   }
-#endif
 }
 
 void PS_CDC::ClearAIP(void)
@@ -796,9 +785,11 @@ void PS_CDC::CheckAIP(void)
 {
    if(AsyncIRQPending && CDCReadyReceiveCounter <= 0)
    {
+      unsigned i;
+
       BeginResults();
 
-      for(unsigned i = 0; i < AsyncResultsPendingCount; i++)
+      for(i = 0; i < AsyncResultsPendingCount; i++)
          WriteResult(AsyncResultsPending[i]);
 
       WriteIRQ(AsyncIRQPending);
@@ -925,14 +916,13 @@ void PS_CDC::HandlePlayRead(void)
       if((Mode & MODE_REPORT) && (((SubQBuf_Safe[0x9] >> 4) != ReportLastF) || Forward || Backward) && SubQChecksumOK)
       {
          uint8 tr[8];
-#if 0
+         unsigned i;
          uint16 abs_lev_max = 0;
          bool abs_lev_chselect = SubQBuf_Safe[0x8] & 0x01;
 
-         for(int i = 0; i < 588; i++)
+         for(i = 0; i < 588; i++)
             abs_lev_max = std::max<uint16>(abs_lev_max, std::min<int>(abs((int16)MDFN_de16lsb(&read_buf[i * 4 + (abs_lev_chselect * 2)])), 32767));
          abs_lev_max |= abs_lev_chselect << 15;
-#endif
 
          ReportLastF = SubQBuf_Safe[0x9] >> 4;
 
@@ -953,8 +943,8 @@ void PS_CDC::HandlePlayRead(void)
             tr[5] = SubQBuf_Safe[0x9];	// A F
          }
 
-         tr[6] = 0; //abs_lev_max >> 0;
-         tr[7] = 0; //abs_lev_max >> 8;
+         tr[6] = abs_lev_max >> 0;
+         tr[7] = abs_lev_max >> 8;
 
          SetAIP(CDCIRQ_DATA_READY, 8, tr);
       }
@@ -1101,7 +1091,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
       if(PSRCounter > 0)
       {
-
          PSRCounter -= chunk_clocks;
 
          if(PSRCounter <= 0) 
@@ -1185,106 +1174,94 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
       if(PendingCommandCounter > 0)
       {
-         PendingCommandCounter -= chunk_clocks;
+         int32 next_time = 0;
 
-         if(PendingCommandCounter <= 0 && CDCReadyReceiveCounter > 0)
+         if(PendingCommandPhase == -1)
          {
-            PendingCommandCounter = CDCReadyReceiveCounter; //256;
+            if(ArgsRP != ArgsWP)
+            {
+               ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
+               ArgsRP = (ArgsRP + 1) & 0x1F;
+               PendingCommandPhase += 1;
+               next_time = 1815;
+            }
+            else
+            {
+               PendingCommandPhase += 2;
+               next_time = 8500;
+            }
          }
-         //else if(PendingCommandCounter <= 0 && PSRCounter > 0 && PSRCounter < 2000)
-         //{
-         // PendingCommandCounter = PSRCounter + 1;
-         //}
-         else if(PendingCommandCounter <= 0)
+         else if(PendingCommandPhase == 0)	// Command phase 0
          {
-            int32 next_time = 0;
+            if(ArgsReceiveIn < 32)
+               ArgsReceiveBuf[ArgsReceiveIn++] = ArgsReceiveLatch;
 
-            if(PendingCommandPhase >= 2)	// Command phase 2+
+            if(ArgsRP != ArgsWP)
+            {
+               ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
+               ArgsRP = (ArgsRP + 1) & 0x1F;
+               next_time = 1815;
+            }
+            else
+            {
+               PendingCommandPhase++;
+               next_time = 8500;
+            }
+         }
+         else if(PendingCommandPhase >= 2)	// Command phase 2+
+         {
+            BeginResults();
+
+            const CDC_CTEntry *command = &Commands[PendingCommand];
+
+            next_time = (this->*(command->func2))();
+         }
+         else	// Command phase 1
+         {
+            if(PendingCommand >= 0x20 || !Commands[PendingCommand].func)
+            {
+               BeginResults();
+
+               PSX_WARNING("[CDC] Unknown command: 0x%02x", PendingCommand);
+
+               WriteResult(MakeStatus(true));
+               WriteResult(ERRCODE_BAD_COMMAND);
+               WriteIRQ(CDCIRQ_DISC_ERROR);
+            }
+            else if(ArgsReceiveIn < Commands[PendingCommand].args_min || ArgsReceiveIn > Commands[PendingCommand].args_max)
+            {
+               BeginResults();
+
+               PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
+               for(unsigned int i = 0; i < ArgsReceiveIn; i++)
+                  PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
+               PSX_DBG(PSX_DBG_WARNING, "\n");
+
+               WriteResult(MakeStatus(true));
+               WriteResult(ERRCODE_BAD_NUMARGS);
+               WriteIRQ(CDCIRQ_DISC_ERROR);
+            }
+            else
             {
                BeginResults();
 
                const CDC_CTEntry *command = &Commands[PendingCommand];
 
-               next_time = (this->*(command->func2))();
+               PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
+               for(unsigned int i = 0; i < ArgsReceiveIn; i++)
+                  PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
+               PSX_DBG(PSX_DBG_SPARSE, "\n");
+
+               next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
+               PendingCommandPhase = 2;
             }
-            else switch (PendingCommandPhase)
-            {
-               case -1:
-                  if(ArgsRP != ArgsWP)
-                  {
-                     ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
-                     ArgsRP = (ArgsRP + 1) & 0x1F;
-                     PendingCommandPhase += 1;
-                     next_time = 1815;
-                  }
-                  else
-                  {
-                     PendingCommandPhase += 2;
-                     next_time = 8500;
-                  }
-                  break;
-               case 0: /* Command phase 0 */
-                  if(ArgsReceiveIn < 32)
-                     ArgsReceiveBuf[ArgsReceiveIn++] = ArgsReceiveLatch;
+            ArgsReceiveIn = 0;
+         } // end command phase 1
 
-                  if(ArgsRP != ArgsWP)
-                  {
-                     ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
-                     ArgsRP = (ArgsRP + 1) & 0x1F;
-                     next_time = 1815;
-                  }
-                  else
-                  {
-                     PendingCommandPhase++;
-                     next_time = 8500;
-                  }
-                  break;
-               default: /* Command phase 1 */
-                  {
-                     BeginResults();
-
-                     if(PendingCommand >= 0x20 || !Commands[PendingCommand].func)
-                     {
-                        PSX_WARNING("[CDC] Unknown command: 0x%02x", PendingCommand);
-
-                        WriteResult(MakeStatus(true));
-                        WriteResult(ERRCODE_BAD_COMMAND);
-                        WriteIRQ(CDCIRQ_DISC_ERROR);
-                     }
-                     else if(ArgsReceiveIn < Commands[PendingCommand].args_min || 
-                           ArgsReceiveIn > Commands[PendingCommand].args_max)
-                     {
-                        PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
-                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                           PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
-                        PSX_DBG(PSX_DBG_WARNING, "\n");
-
-                        WriteResult(MakeStatus(true));
-                        WriteResult(ERRCODE_BAD_NUMARGS);
-                        WriteIRQ(CDCIRQ_DISC_ERROR);
-                     }
-                     else
-                     {
-                        const CDC_CTEntry *command = &Commands[PendingCommand];
-
-                        PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
-                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                           PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
-                        PSX_DBG(PSX_DBG_SPARSE, "\n");
-
-                        next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
-                        PendingCommandPhase = 2;
-                     }
-                     ArgsReceiveIn = 0;
-                  }
-                  break;
-            }
-
-            if(!next_time)
-               PendingCommandCounter = 0;
-            else
-               PendingCommandCounter += next_time;
-         }
+         if(!next_time)
+            PendingCommandCounter = 0;
+         else
+            PendingCommandCounter += next_time;
       }
 
       SPUCounter = SPU->UpdateFromCDC(chunk_clocks);
@@ -1546,7 +1523,7 @@ int32 PS_CDC::Command_Setloc(const int arg_count, const uint8 *args)
 {
    uint8 m, s, f;
 
-   if((args[0] & 0x0F) > 0x09 || args[0] > 0x99 ||
+   if(   (args[0] & 0x0F) > 0x09 || args[0] > 0x99 ||
          (args[1] & 0x0F) > 0x09 || args[1] > 0x59 ||
          (args[2] & 0x0F) > 0x09 || args[2] > 0x74)
    {

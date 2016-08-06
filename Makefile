@@ -7,10 +7,6 @@ HAVE_JIT = 0
 CORE_DIR := .
 HAVE_GRIFFIN = 0
 
-ifneq ($(EMSCRIPTEN),)
-	platform = emscripten
-endif
-
 ifeq ($(platform),)
    platform = unix
    ifeq ($(shell uname -a),)
