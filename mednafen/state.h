@@ -1,6 +1,8 @@
 #ifndef _STATE_H
 #define _STATE_H
 
+#include <retro_inline.h>
+
 typedef struct
 {
    uint8_t *data;
