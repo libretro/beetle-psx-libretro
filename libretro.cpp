@@ -2897,7 +2897,7 @@ static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 {
    uint8 LayoutMD5[16];
 
-   log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename ? devicename : "PHYSICAL CD");
+   log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename);
 
    try
    {
