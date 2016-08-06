@@ -156,13 +156,13 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 
       }
       else if(sf->flags & MDFNSTATE_RLSB64)
-         Endian_A64_NE_to_LE(sf->v, bytesize / sizeof(uint64_t));
+         Endian_A64_Swap(sf->v, bytesize / sizeof(uint64_t));
       else if(sf->flags & MDFNSTATE_RLSB32)
-         Endian_A32_NE_to_LE(sf->v, bytesize / sizeof(uint32_t));
+         Endian_A32_Swap(sf->v, bytesize / sizeof(uint32_t));
       else if(sf->flags & MDFNSTATE_RLSB16)
-         Endian_A16_NE_to_LE(sf->v, bytesize / sizeof(uint16_t));
+         Endian_A16_Swap(sf->v, bytesize / sizeof(uint16_t));
       else if(sf->flags & RLSB)
-         Endian_V_NE_to_LE(sf->v, bytesize);
+         FlipByteOrder(sf->v, bytesize);
 #endif
 
       // Special case for the evil bool type, to convert bool to 1-byte elements.
