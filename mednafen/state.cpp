@@ -17,8 +17,6 @@
 
 #include <string.h>
 
-#include <map>
-
 #include <boolean.h>
 
 #include "mednafen.h"
@@ -67,11 +65,6 @@ int32_t smem_putc(StateMem *st, int value)
    if(smem_write(st, &tmpval, 1) != 1)
       return(-1);
    return(1);
-}
-
-int32_t smem_tell(StateMem *st)
-{
-   return(st->loc);
 }
 
 int32_t smem_seek(StateMem *st, uint32_t offset, int whence)
@@ -224,12 +217,12 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
 
    smem_write32le(st, 0);                // We'll come back and write this later.
 
-   data_start_pos = smem_tell(st);
+   data_start_pos = st->loc;
 
    if(!SubWrite(st, sf))
       return(0);
 
-   end_pos = smem_tell(st);
+   end_pos = st->loc;
 
    smem_seek(st, data_start_pos - 4, SEEK_SET);
    smem_write32le(st, end_pos - data_start_pos);
@@ -238,19 +231,10 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
    return(end_pos - data_start_pos);
 }
 
-struct compare_cstr
+static SFORMAT *FindSF(const char *name, SFORMAT *sf)
 {
-   bool operator()(const char *s1, const char *s2) const
-   {
-      return(strcmp(s1, s2) < 0);
-   }
-};
-
-typedef std::map<const char *, SFORMAT *, compare_cstr> SFMap_t;
-
-static void MakeSFMap(SFORMAT *sf, SFMap_t &sfmap)
-{
-   while(sf->size || sf->name) // Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct.
+   /* Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct. */
+   while(sf->size || sf->name) 
    {
       if(!sf->size || !sf->v)
       {
@@ -258,20 +242,23 @@ static void MakeSFMap(SFORMAT *sf, SFMap_t &sfmap)
          continue;
       }
 
-      if(sf->size == (uint32_t)~0)            /* Link to another SFORMAT structure. */
-         MakeSFMap((SFORMAT *)sf->v, sfmap);
+      if (sf->size == (uint32)~0) /* Link to another SFORMAT structure. */
+      {
+         SFORMAT *temp_sf = FindSF(name, (SFORMAT*)sf->v);
+         if (temp_sf)
+            return temp_sf;
+      }
       else
       {
          assert(sf->name);
-
-         if(sfmap.find(sf->name) != sfmap.end())
-            printf("Duplicate save state variable in internal emulator structures(CLUB THE PROGRAMMERS WITH BREADSTICKS): %s\n", sf->name);
-
-         sfmap[sf->name] = sf;
+         if (!strcmp(sf->name, name))
+            return sf;
       }
 
       sf++;
    }
+
+   return NULL;
 }
 
 // Fast raw chunk reader
@@ -308,101 +295,80 @@ static void DOReadChunk(StateMem *st, SFORMAT *sf)
 
 static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 {
-   int temp;
+   int temp = st->loc;
 
+   while (st->loc < (temp + size))
    {
-      SFMap_t sfmap;
-      SFMap_t sfmap_found;	// Used for identifying variables that are missing in the save state.
+      uint32_t recorded_size;	// In bytes
+      uint8_t toa[1 + 256];	// Don't change to char unless cast toa[0] to unsigned to smem_read() and other places.
 
-      MakeSFMap(sf, sfmap);
-
-      temp = smem_tell(st);
-      while(smem_tell(st) < (temp + size))
+      if(smem_read(st, toa, 1) != 1)
       {
-         uint32_t recorded_size;	// In bytes
-         uint8_t toa[1 + 256];	// Don't change to char unless cast toa[0] to unsigned to smem_read() and other places.
+         puts("Unexpected EOF");
+         return(0);
+      }
 
-         if(smem_read(st, toa, 1) != 1)
+      if(smem_read(st, toa + 1, toa[0]) != toa[0])
+      {
+         puts("Unexpected EOF?");
+         return 0;
+      }
+
+      toa[1 + toa[0]] = 0;
+
+      smem_read32le(st, &recorded_size);
+
+      SFORMAT *tmp = FindSF((char*)toa + 1, sf);
+
+      if(tmp)
+      {
+         uint32_t expected_size = tmp->size;	// In bytes
+
+         if(recorded_size != expected_size)
          {
-            puts("Unexpected EOF");
-            return(0);
-         }
-
-         if(smem_read(st, toa + 1, toa[0]) != toa[0])
-         {
-            puts("Unexpected EOF?");
-            return 0;
-         }
-
-         toa[1 + toa[0]] = 0;
-
-         smem_read32le(st, &recorded_size);
-
-         SFMap_t::iterator sfmit;
-
-         sfmit = sfmap.find((char *)toa + 1);
-
-         if(sfmit != sfmap.end())
-         {
-            SFORMAT *tmp = sfmit->second;
-            uint32_t expected_size = tmp->size;	// In bytes
-
-            if(recorded_size != expected_size)
-            {
-               printf("Variable in save state wrong size: %s.  Need: %d, got: %d\n", toa + 1, expected_size, recorded_size);
-               if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
-               {
-                  puts("Seek error");
-                  return(0);
-               }
-            }
-            else
-            {
-               sfmap_found[tmp->name] = tmp;
-
-               smem_read(st, (uint8_t *)tmp->v, expected_size);
-
-               if(tmp->flags & MDFNSTATE_BOOL)
-               {
-                  // Converting downwards is necessary for the case of sizeof(bool) > 1
-                  for(int32_t bool_monster = expected_size - 1; bool_monster >= 0; bool_monster--)
-                  {
-                     ((bool *)tmp->v)[bool_monster] = ((uint8_t *)tmp->v)[bool_monster];
-                  }
-               }
-#ifdef MSB_FIRST
-               if(tmp->flags & MDFNSTATE_RLSB64)
-                  Endian_A64_LE_to_NE(tmp->v, expected_size / sizeof(uint64_t));
-               else if(tmp->flags & MDFNSTATE_RLSB32)
-                  Endian_A32_LE_to_NE(tmp->v, expected_size / sizeof(uint32_t));
-               else if(tmp->flags & MDFNSTATE_RLSB16)
-                  Endian_A16_LE_to_NE(tmp->v, expected_size / sizeof(uint16_t));
-               else if(tmp->flags & RLSB)
-                  Endian_V_LE_to_NE(tmp->v, expected_size);
-#endif
-            }
-         }
-         else
-         {
-            printf("Unknown variable in save state: %s\n", toa + 1);
+            printf("Variable in save state wrong size: %s.  Need: %d, got: %d\n", toa + 1, expected_size, recorded_size);
             if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
             {
                puts("Seek error");
                return(0);
             }
          }
-      } // while(...)
-
-      for(SFMap_t::const_iterator it = sfmap.begin(); it != sfmap.end(); it++)
-      {
-         if(sfmap_found.find(it->second->name) == sfmap_found.end())
+         else
          {
-            printf("Variable missing from save state: %s\n", it->second->name);
+            smem_read(st, (uint8_t *)tmp->v, expected_size);
+
+            if(tmp->flags & MDFNSTATE_BOOL)
+            {
+               // Converting downwards is necessary for the case of sizeof(bool) > 1
+               for(int32_t bool_monster = expected_size - 1; bool_monster >= 0; bool_monster--)
+               {
+                  ((bool *)tmp->v)[bool_monster] = ((uint8_t *)tmp->v)[bool_monster];
+               }
+            }
+#ifdef MSB_FIRST
+            if(tmp->flags & MDFNSTATE_RLSB64)
+               Endian_A64_LE_to_NE(tmp->v, expected_size / sizeof(uint64_t));
+            else if(tmp->flags & MDFNSTATE_RLSB32)
+               Endian_A32_LE_to_NE(tmp->v, expected_size / sizeof(uint32_t));
+            else if(tmp->flags & MDFNSTATE_RLSB16)
+               Endian_A16_LE_to_NE(tmp->v, expected_size / sizeof(uint16_t));
+            else if(tmp->flags & RLSB)
+               Endian_V_LE_to_NE(tmp->v, expected_size);
+#endif
          }
       }
+      else
+      {
+         printf("Unknown variable in save state: %s\n", toa + 1);
+         if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
+         {
+            puts("Seek error");
+            return(0);
+         }
+      }
+   } // while(...)
 
-      assert(smem_tell(st) == (temp + size));
-   }
+   assert(st->loc == (temp + size));
    return 1;
 }
 
@@ -504,7 +470,7 @@ int MDFNSS_SaveSM(void *st_p, int, int, const void*, const void*, const void*)
    if(!MDFNGameInfo->StateAction(st, 0, 0))
       return(0);
 
-   uint32_t sizy = smem_tell(st);
+   uint32_t sizy = st->loc;
    smem_seek(st, 16 + 4, SEEK_SET);
    smem_write32le(st, sizy);
 
