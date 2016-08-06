@@ -260,7 +260,7 @@ static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
          else
             out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
 #else
-         int32 sum_result = 0;
+         int32 sum = 0;
          unsigned u;
 
          for(u = 0; u < 8; u++)
