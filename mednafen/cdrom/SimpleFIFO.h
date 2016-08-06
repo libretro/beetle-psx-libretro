@@ -1,7 +1,6 @@
 #ifndef __MDFN_SIMPLEFIFO_H
 #define __MDFN_SIMPLEFIFO_H
 
-#include <vector>
 #include <assert.h>
 
 #include "../math_ops.h"
@@ -12,60 +11,31 @@ class SimpleFIFO
  public:
 
  // Constructor
- SimpleFIFO(uint32_t the_size) // Size should be a power of 2!
+ SimpleFIFO(uint32 the_size)
  {
-  data.resize(round_up_pow2(the_size));
-  size = the_size;
-  read_pos = 0;
-  write_pos = 0;
-  in_count = 0;
+    /* Size should be a power of 2! */
+    assert(the_size && !(the_size & (the_size - 1)));
+
+    data = (T*)malloc(the_size * sizeof(T));
+    size = the_size;
+    read_pos = 0;
+    write_pos = 0;
+    in_count = 0;
  }
 
  // Destructor
  INLINE ~SimpleFIFO()
  {
-
+    if (data)
+       free(data);
  }
 
- INLINE void SaveStatePostLoad(void)
- {
-  read_pos %= data.size();
-  write_pos %= data.size();
-  in_count %= (data.size() + 1);
- }
-
-#if 0
- INLINE int StateAction(StateMem *sm, int load, int data_only, const char* sname)
- {
-  SFORMAT StateRegs[] =
-  {
-   std::vector<T> data;
-   uint32_t size;
-
-   SFVAR(read_pos),
-   SFVAR(write_pos),
-   SFVAR(in_count),
-   SFEND;
-  }
-  int ret = MDFNSS_StateAction(sm, load, data_only, sname);
-
-  if(load)
-  {
-   read_pos %= data.size();
-   write_pos %= data.size();
-   in_count %= (data.size() + 1);
-  }
-
-  return(ret);
- }
-#endif
-
- INLINE uint32_t CanRead(void)
+ INLINE uint32 CanRead(void)
  {
   return(in_count);
  }
 
- INLINE uint32_t CanWrite(void)
+ INLINE uint32 CanWrite(void)
  {
   return(size - in_count);
  }
@@ -80,21 +50,21 @@ class SimpleFIFO
 
   if(!peek)
   {
-   read_pos = (read_pos + 1) & (data.size() - 1);
+   read_pos = (read_pos + 1) & (size - 1);
    in_count--;
   }
 
   return(ret);
  }
 
- INLINE uint8_t ReadByte(bool peek = false)
+ INLINE uint8 ReadByte(bool peek = false)
  {
   assert(sizeof(T) == 1);
 
   return(ReadUnit(peek));
  }
 
- INLINE void Write(const T *happy_data, uint32_t happy_count)
+ INLINE void Write(const T *happy_data, uint32 happy_count)
  {
   assert(CanWrite() >= happy_count);
 
@@ -102,7 +72,7 @@ class SimpleFIFO
   {
    data[write_pos] = *happy_data;
 
-   write_pos = (write_pos + 1) & (data.size() - 1);
+   write_pos = (write_pos + 1) & (size - 1);
    in_count++;
    happy_data++;
    happy_count--;
@@ -128,12 +98,18 @@ class SimpleFIFO
   in_count = 0;
  }
 
- //private:
- std::vector<T> data;
- uint32_t size;
- uint32_t read_pos; // Read position
- uint32_t write_pos; // Write position
- uint32_t in_count; // Number of units in the FIFO
+ INLINE void SaveStatePostLoad(void)
+ {
+    read_pos  %= size;
+    write_pos %= size;
+    in_count  %= (size + 1);
+ }
+
+ T* data;
+ uint32 size;
+ uint32 read_pos; // Read position
+ uint32 write_pos; // Write position
+ uint32 in_count; // Number of units in the FIFO
 };
 
 

@@ -262,7 +262,7 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
       //
       //
       //
-      SFARRAY(&DMABuffer.data[0], DMABuffer.data.size()),
+      SFARRAY(&DMABuffer.data[0], DMABuffer.size),
       SFVAR(DMABuffer.read_pos),
       SFVAR(DMABuffer.write_pos),
       SFVAR(DMABuffer.in_count),
