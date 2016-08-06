@@ -504,10 +504,8 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
       }   
 
       // Timing in the actual PS1 MDEC is complex due to (apparent) pipelining, but the average when decoding a large number of blocks is
-      // about 512.  We'll go with a lower value here to be conservative due to timing granularity and other timing deficiencies in Mednafen.  BUT, don't
-      // go lower than 460, or Parasite Eve 2's 3D models will stutter like crazy during FMV-background sequences.
-      //
-      *eat_cycles += 474;
+      // about 512.  
+      *eat_cycles += 512;
 
       if(DecodeWB >= 2)
          EncodeImage((DecodeWB + 4) % 6);
