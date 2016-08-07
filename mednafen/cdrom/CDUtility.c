@@ -26,7 +26,7 @@
 
 #include <assert.h>
 
-// lookup table for crc calculation
+/* lookup table for crc calculation */
 static uint16_t subq_crctab[256] = 
 {
    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7, 0x8108,
@@ -152,10 +152,9 @@ bool edc_lec_check_and_correct(uint8_t *sector_data, bool xa)
 bool subq_check_checksum(const uint8_t *SubQBuf)
 {
    unsigned i;
-   uint16_t crc = 0;
-   uint16_t stored_crc = 0;
+   uint16_t        crc = 0;
+   uint16_t stored_crc = SubQBuf[0xA] << 8;
 
-   stored_crc = SubQBuf[0xA] << 8;
    stored_crc |= SubQBuf[0xB];
 
    for(i = 0; i < 0xA; i++)
@@ -174,7 +173,7 @@ void subq_generate_checksum(uint8_t *buf)
    for(i = 0; i < 0xA; i++)
       crc = subq_crctab[(crc >> 8) ^ buf[i]] ^ (crc << 8);
 
-   // Checksum
+   /* Checksum */
    buf[0xa] = ~(crc >> 8);
    buf[0xb] = ~(crc);
 }
@@ -236,36 +235,35 @@ void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* 
 {
    unsigned i;
    uint8_t buf[0xC];
-   uint32_t lba_relative;
-   uint32_t ma, sa, fa;
-   uint32_t m, s, f;
+   uint32_t lba_relative = lba - toc->tracks[100].lba;
+   uint32_t f  = (lba_relative  % 75);
+   uint32_t s  = ((lba_relative / 75) % 60);
+   uint32_t m  = (lba_relative  / 75 / 60);
+   uint32_t fa = (lba + 150)    % 75;
+   uint32_t sa = ((lba + 150)  / 75) % 60;
+   uint32_t ma = ((lba + 150)  / 75 / 60);
 
-   lba_relative = lba - toc->tracks[100].lba;
+   uint8_t adr     = 0x1; // Q channel data encodes position
+   uint8_t control =  toc->tracks[100].control;
 
-   f = (lba_relative % 75);
-   s = ((lba_relative / 75) % 60);
-   m = (lba_relative / 75 / 60);
-
-   fa = (lba + 150) % 75;
-   sa = ((lba + 150) / 75) % 60;
-   ma = ((lba + 150) / 75 / 60);
-
-   uint8_t adr = 0x1; // Q channel data encodes position
-   uint8_t control = (toc->tracks[toc->last_track].control & 0x4) | toc->tracks[100].control;
+   if (toc->tracks[toc->last_track].valid)
+      control |= toc->tracks[toc->last_track].control & 0x4;
+   else if (toc->disc_type == DISC_TYPE_CD_I)
+      control |= 0x4;
 
    memset(buf, 0, 0xC);
    buf[0] = (adr << 0) | (control << 4);
    buf[1] = 0xAA;
    buf[2] = 0x01;
 
-   // Track relative MSF address
+   /* Track relative MSF address */
    buf[3] = U8_to_BCD(m);
    buf[4] = U8_to_BCD(s);
    buf[5] = U8_to_BCD(f);
 
-   buf[6] = 0; // Zerroooo
+   buf[6] = 0; /* Zerroooo */
 
-   // Absolute MSF address
+   /* Absolute MSF address */
    buf[7] = U8_to_BCD(ma);
    buf[8] = U8_to_BCD(sa);
    buf[9] = U8_to_BCD(fa);
@@ -276,13 +274,21 @@ void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* 
       SubPWBuf[i] = (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | 0x80;
 }
 
-void synth_leadout_sector_lba(const uint8_t mode, const struct TOC *toc, const int32_t lba, uint8_t* out_buf)
+void synth_leadout_sector_lba(uint8_t mode, const struct TOC *toc, const int32_t lba, uint8_t* out_buf)
 {
    memset(out_buf, 0, 2352 + 96);
    subpw_synth_leadout_lba(toc, lba, out_buf + 2352);
 
-   if((toc->tracks[toc->last_track].control | toc->tracks[100].control) & 0x4)
+   if(out_buf[2352 + 1] & 0x40)
    {
+      if(mode == 0xFF) 
+      {
+         if(toc->disc_type == DISC_TYPE_CD_XA || toc->disc_type == DISC_TYPE_CD_I)
+            mode = 0x02;
+         else
+            mode = 0x01;
+      }
+
       switch(mode)
       {
          default:
@@ -294,12 +300,21 @@ void synth_leadout_sector_lba(const uint8_t mode, const struct TOC *toc, const i
             break;
 
          case 0x02:
-            out_buf[18] = 0x20;
+            out_buf[12 +  6] = 0x20;
+            out_buf[12 + 10] = 0x20;
             encode_mode2_form2_sector(LBA_to_ABA(lba), out_buf);
             break;
       }
    }
 }
+
+
+/* ISO/IEC 10149:1995 (E): 20.2 */
+#if 0
+/* TODO/FIXME - missing functions */
+void subpw_synth_udapp_lba(const TOC& toc, const int32 lba, const int32 lba_subq_relative_offs, uint8* SubPWBuf);
+void synth_udapp_sector_lba(uint8 mode, const TOC& toc, const int32 lba, int32 lba_subq_relative_offs, uint8* out_buf);
+#endif
 
 void scrambleize_data_sector(uint8_t *sector_data)
 {
