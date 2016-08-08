@@ -46,8 +46,6 @@ CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcac
       return new CDAccess_CCD(success, path, image_memcache);
    else if(strlen(path) >= 4 && !strcasecmp(path + strlen(path) - 4, ".pbp"))
       return new CDAccess_PBP(success, path, image_memcache);
-   else
-      return new CDAccess_Image(success, path, image_memcache);
-
-   return NULL;
+   
+   return new CDAccess_Image(success, path, image_memcache);
 }
