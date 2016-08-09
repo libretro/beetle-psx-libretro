@@ -10,9 +10,10 @@
 
 #include <stdio.h>	// For SEEK_* defines, which we will use in Stream out of FORCE OF HABIT.
 
-#define MODE_READ       0
-#define MODE_WRITE      1
-#define MODE_WRITE_SAFE 2
+#define MODE_READ          0
+#define MODE_WRITE         1
+#define MODE_WRITE_SAFE    2
+#define MODE_WRITE_INPLACE 3
 
 class Stream
 {

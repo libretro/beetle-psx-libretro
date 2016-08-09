@@ -23,6 +23,7 @@ void MDFNMP_InstallReadPatches(void);
 void MDFNMP_RemoveReadPatches(void);
 
 void MDFNMP_ApplyPeriodicCheats(void);
+void MDFNMP_RegSearchable(uint32 addr, uint32 size);
 
 extern MDFNSetting MDFNMP_Settings[];
 

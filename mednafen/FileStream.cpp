@@ -26,7 +26,7 @@
 
 FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 {
-   fp = filestream_open(path, (mode == MODE_WRITE) ? RFILE_MODE_WRITE : RFILE_MODE_READ, -1);
+   fp = filestream_open(path, (mode == MODE_WRITE || mode == MODE_WRITE_INPLACE) ? RFILE_MODE_WRITE : RFILE_MODE_READ, -1);
 
    if (!fp)
    {
@@ -54,6 +54,7 @@ uint64_t FileStream::attributes(void)
       case MODE_READ:
          ret |= ATTRIBUTE_READABLE;
          break;
+      case MODE_WRITE_INPLACE:
       case MODE_WRITE_SAFE:
       case MODE_WRITE:
          ret |= ATTRIBUTE_WRITEABLE;

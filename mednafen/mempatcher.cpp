@@ -137,6 +137,11 @@ void MDFNMP_AddRAM(uint32 size, uint32 A, uint8 *RAM)
  }
 }
 
+void MDFNMP_RegSearchable(uint32 addr, uint32 size)
+{
+ MDFNMP_AddRAM(size, addr, NULL);
+}
+
 void MDFNMP_InstallReadPatches(void)
 {
  if(!CheatsActive) return;
