@@ -260,70 +260,13 @@ typedef enum
 
 class CDIF;
 
+// Time base for EmulateSpecStruct::MasterCycles
+#define MDFN_MASTERCLOCK_FIXED(n)	((int64_t)((double)(n) * (INT64_C(1) << 32)))
+
 typedef struct
 {
-   /* Private functions to Mednafen.  Do not call directly
-      from the driver code, or else bad things shall happen.  Maybe.  Probably not, but don't
-      do it(yet)!
-      */
-   // Short system name, lowercase a-z, 0-9, and _ are the only allowable characters!
-   const char *shortname;
-
-   // Full system name.  Preferably English letters, but can be UTF8
-   const char *fullname;
-
-   // Pointer to an array of FileExtensionSpecStruct, with the last entry being { NULL, NULL } to terminate the list.
-   // This list is used to make best-guess choices, when calling the TestMagic*() functions would be unreasonable, such
-   // as when scanning a ZIP archive for a file to load.  The list may also be used in the future for GUI file open windows.
-   const FileExtensionSpecStruct *FileExtensions;
-
-   ModPrio ModulePriority;
-
-   void *Debugger;
-   InputInfoStruct *InputInfo;
-
-   // Returns 1 on successful load, 0 on fatal error(deprecated: -1 on unrecognized format)
-   int (*Load)(const char *name, MDFNFILE *fp);
-
-   // Return TRUE if the file is a recognized type, FALSE if not.
-   bool (*TestMagic)(const char *name, MDFNFILE *fp);
-
-   //
-   // (*CDInterfaces).size() is guaranteed to be >= 1.
-   int (*LoadCD)(std::vector<CDIF *> *CDInterfaces);
-   bool (*TestMagicCD)(std::vector<CDIF *> *CDInterfaces);
-
-   void (*CloseGame)(void);
-
-   void (*SetLayerEnableMask)(uint64_t mask);	// Video
-   const char *LayerNames;
-
-   void (*SetChanEnableMask)(uint64_t mask);	// Audio(TODO, placeholder)
-   const char *ChanNames;
-
-   void (*InstallReadPatch)(uint32_t address);
-   void (*RemoveReadPatches)(void);
-   uint8_t (*MemRead)(uint32_t addr);
-
-#ifdef WANT_NEW_API
-   CheatFormatInfoStruct *CheatFormatInfo;
-#endif
-
-   bool SaveStateAltersState;	// true for bsnes and some libco-style emulators, false otherwise.
-   // Main save state routine, called by the save state code in state.cpp.
-   // When saving, load is set to 0.  When loading, load is set to the version field of the save state being loaded.
-   // data_only is true when the save state data is temporary, such as being saved into memory for state rewinding.
-   int (*StateAction)(StateMem *sm, int load, int data_only);
-
-   void (*Emulate)(EmulateSpecStruct *espec);
-   void (*SetInput)(int port, const char *type, void *ptr);
-
-   void (*DoSimpleCommand)(int cmd);
-
    const MDFNSetting *Settings;
 
-   // Time base for EmulateSpecStruct::MasterCycles
-#define MDFN_MASTERCLOCK_FIXED(n)	((int64_t)((double)(n) * (INT64_C(1) << 32)))
    int64_t MasterClock;
 
    uint32_t fps; // frames per second * 65536 * 256, truncated

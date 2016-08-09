@@ -1645,7 +1645,7 @@ static int Load(const char *name, MDFNFILE *fp)
 
    if(!TestMagic(name, fp))
    {
-      MDFN_Error(0, _("File format is unknown to module \"%s\"."), MDFNGameInfo->shortname);
+      MDFN_Error(0, "File format is unknown to module psx..");
       return -1;
    }
 
@@ -1751,7 +1751,7 @@ static void SetInput(int port, const char *type, void *ptr)
    FIO->SetInput(port, type, ptr);
 }
 
-static int StateAction(StateMem *sm, int load, int data_only)
+int StateAction(StateMem *sm, int load, int data_only)
 {
 #if 0
    if(!MDFN_GetSettingB("psx.clobbers_lament"))
@@ -2168,34 +2168,6 @@ static MDFNSetting PSXSettings[] =
 // an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
 MDFNGI EmulatedPSX =
 {
- "psx",
- "Sony PlayStation",
- KnownExtensions,
- MODPRIO_INTERNAL_HIGH,
- #ifdef WANT_DEBUGGER
- &PSX_DBGInfo,
- #else
- NULL,
- #endif
- &FIO_InputInfo,
- Load,
- TestMagic,
- LoadCD,
- TestMagicCD,
- CloseGame,
- NULL,	//ToggleLayer,
- "GPU\0",	//"Background Scroll\0Foreground Scroll\0Sprites\0",
- NULL,
- NULL,
- NULL,
- NULL,
- NULL,
- NULL,
- false,
- StateAction,
- NULL,
- SetInput,
- DoSimpleCommand,
  PSXSettings,
  MDFN_MASTERCLOCK_FIXED(33868800),
  0,
@@ -2888,9 +2860,7 @@ end:
    fclose(fp);
 }
 
-#ifdef NEED_CD
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
-#endif
 // TODO: LoadCommon()
 
 static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
@@ -2980,24 +2950,17 @@ static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
       md5_finish(&layout_md5, LayoutMD5);
    }
 
-   // This if statement will be true if force_module references a system without CDROM support.
-   if(!MDFNGameInfo->LoadCD)
-   {
-      log_cb(RETRO_LOG_ERROR, "Specified system \"%s\" doesn't support CDs!", force_module);
-      return 0;
-   }
-
    // TODO: include module name in hash
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
 
-   if(!(MDFNGameInfo->LoadCD(&CDInterfaces)))
+   if(!(LoadCD(&CDInterfaces)))
    {
       for(unsigned i = 0; i < CDInterfaces.size(); i++)
          delete CDInterfaces[i];
       CDInterfaces.clear();
 
       MDFNGameInfo = NULL;
-      return(0);
+      return NULL;
    }
 
    //MDFNI_SetLayerEnableMask(~0ULL);
@@ -3023,7 +2986,7 @@ static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
    if(!GameFile)
       goto error;
 
-   if(MDFNGameInfo->Load(name, GameFile) <= 0)
+   if(Load(name, GameFile) <= 0)
       goto error;
 
    file_close(GameFile);
@@ -3315,7 +3278,7 @@ void retro_unload_game(void)
 
    MDFN_FlushGameCheats(0);
 
-   MDFNGameInfo->CloseGame();
+   CloseGame();
 
    if(MDFNGameInfo->name)
       free(MDFNGameInfo->name);

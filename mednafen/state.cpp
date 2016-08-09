@@ -443,6 +443,8 @@ int MDFNSS_StateAction(void *st_p, int load, int data_only, std::vector <SSDescr
    return(1);
 }
 
+int StateAction(StateMem *sm, int load, int data_only);
+
 int MDFNSS_StateAction(void *st_p, int load, int data_only, SFORMAT *sf, const char *name, bool optional)
 {
    StateMem *st = (StateMem*)st_p;
@@ -467,7 +469,7 @@ int MDFNSS_SaveSM(void *st_p, int, int, const void*, const void*, const void*)
    MDFN_en32lsb(header + 28, neoheight);
    smem_write(st, header, 32);
 
-   if(!MDFNGameInfo->StateAction(st, 0, 0))
+   if(!StateAction(st, 0, 0))
       return(0);
 
    uint32_t sizy = st->loc;
@@ -490,5 +492,5 @@ int MDFNSS_LoadSM(void *st_p, int, int)
 
    stateversion = MDFN_de32lsb(header + 16);
 
-   return(MDFNGameInfo->StateAction(st, stateversion, 0));
+   return(StateAction(st, stateversion, 0));
 }
