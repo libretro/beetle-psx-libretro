@@ -301,7 +301,6 @@ typedef struct
 
    int rotated;
 
-   uint8_t *name;    /* Game name, UTF8 encoding */
    uint8_t MD5[16];
    uint8_t GameSetMD5[16];	/* A unique ID for the game set this CD belongs to, only used in PC-FX emulation. */
    bool GameSetMD5Valid; /* True if GameSetMD5 is valid. */
