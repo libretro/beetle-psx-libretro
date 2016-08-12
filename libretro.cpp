@@ -2383,9 +2383,7 @@ void retro_init(void)
    else
       log_cb = fallback_log;
 
-#ifdef NEED_CD
    CDUtility_Init();
-#endif
 
    eject_state = false;
 
@@ -2863,7 +2861,7 @@ end:
 static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
 // TODO: LoadCommon()
 
-static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
+static MDFNGI *MDFNI_LoadCD(const char *devicename)
 {
    uint8 LayoutMD5[16];
 
@@ -2972,14 +2970,12 @@ static MDFNGI *MDFNI_LoadCD(const char *force_module, const char *devicename)
 }
 #endif
 
-static MDFNGI *MDFNI_LoadGame(const char *force_module, const char *name)
+static MDFNGI *MDFNI_LoadGame(const char *name)
 {
    MDFNFILE *GameFile;
 
-#ifdef NEED_CD
 	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
-	 return MDFNI_LoadCD(force_module, name);
-#endif
+	 return MDFNI_LoadCD(name);
 
    GameFile = file_open(name);
 
@@ -3217,7 +3213,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 
-   if (!MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, retro_cd_path))
+   if (!MDFNI_LoadGame(retro_cd_path))
    {
       failed_init = true;
       return false;
@@ -3268,11 +3264,9 @@ void retro_unload_game(void)
 
    MDFNGameInfo = NULL;
 
-#ifdef NEED_CD
    for(unsigned i = 0; i < CDInterfaces.size(); i++)
       delete CDInterfaces[i];
    CDInterfaces.clear();
-#endif
 
    retro_cd_base_directory[0] = '\0';
    retro_cd_path[0]           = '\0';
