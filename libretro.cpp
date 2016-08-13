@@ -1753,13 +1753,6 @@ static void SetInput(int port, const char *type, void *ptr)
 
 int StateAction(StateMem *sm, int load, int data_only)
 {
-#if 0
-   if(!MDFN_GetSettingB("psx.clobbers_lament"))
-   {
-      return(0);
-   }
-#endif
-
    SFORMAT StateRegs[] =
    {
       SFVAR(CD_TrayOpen),
@@ -2157,8 +2150,6 @@ static MDFNSetting PSXSettings[] =
 #if PSX_DBGPRINT_ENABLE
  { "psx.dbg_level", MDFNSF_NOFLAGS, "Debug printf verbosity level.", NULL, MDFNST_UINT, "0", "0", "4" },
 #endif
-
- { "psx.clobbers_lament", MDFNSF_NOFLAGS, "Enable experimental save state functionality.", "Save states will destroy your saved game/memory card data if you're careless, and that will make clobber sad.  Poor clobber.", MDFNST_BOOL, "0" },
 
  { NULL },
 };
