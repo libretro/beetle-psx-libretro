@@ -1102,10 +1102,10 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
 
 static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
-   const char *ret = NULL;
-   Stream *fp = NULL;
-
    uint8_t pvd[2048];
+   uint32_t rdel, rdel_len;
+   const char *ret = NULL;
+   Stream *fp      = NULL;
    unsigned pvd_search_count = 0;
 
    fp = c->MakeStream(0, ~0U);
@@ -1114,22 +1114,39 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    do
    {
       if((pvd_search_count++) == 32)
-         throw MDFN_Error(0, "PVD search count limit met.");
+      {
+         log_cb(RETRO_LOG_ERROR, "PVD search count limit met.\n");
+         ret = NULL;
+         goto Breakout;
+      }
 
       fp->read(pvd, 2048);
 
       if(memcmp(&pvd[1], "CD001", 5))
-         throw MDFN_Error(0, "Not ISO-9660");
+      {
+         log_cb(RETRO_LOG_ERROR, "Not ISO-9660\n");
+         ret = NULL;
+         goto Breakout;
+      }
 
       if(pvd[0] == 0xFF)
-         throw MDFN_Error(0, "Missing Primary Volume Descriptor");
+      {
+         log_cb(RETRO_LOG_ERROR, "Missing Primary Volume Descriptor\n");
+         ret = NULL;
+         goto Breakout;
+      }
    } while(pvd[0] != 0x01);
-   //[156 ... 189], 34 bytes
-   uint32_t rdel = MDFN_de32lsb(&pvd[0x9E]);
-   uint32_t rdel_len = MDFN_de32lsb(&pvd[0xA6]);
 
-   if(rdel_len >= (1024 * 1024 * 10))	// Arbitrary sanity check.
-      throw MDFN_Error(0, "Root directory table too large");
+   /*[156 ... 189], 34 bytes */
+   rdel = MDFN_de32lsb(&pvd[0x9E]);
+   rdel_len = MDFN_de32lsb(&pvd[0xA6]);
+
+   if(rdel_len >= (1024 * 1024 * 10))	/* Arbitrary sanity check. */
+   {
+      log_cb(RETRO_LOG_ERROR, "Root directory table too large\n");
+      ret = NULL;
+      goto Breakout;
+   }
 
    fp->seek((int64)rdel * 2048, SEEK_SET);
    //printf("%08x, %08x\n", rdel * 2048, rdel_len);

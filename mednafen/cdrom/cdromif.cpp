@@ -228,7 +228,7 @@ bool CDIF_Queue::Read(CDIF_Message *message, bool blocking)
 
    if(ret && message->message == CDIF_MSG_FATAL_ERROR)
    {
-      MDFN_Error(0, "%s", message->str_message.c_str());
+      log_cb(RETRO_LOG_ERROR, "%s\n", message->str_message.c_str());
       return false;
    }
 
@@ -264,7 +264,7 @@ bool CDIF_MT::RT_EjectDisc(bool eject_status, bool skip_actual_eject)
 
          if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
          {
-            MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track);
+            log_cb(RETRO_LOG_ERROR, "TOC first(%d)/last(%d) track numbers bad.\n", disc_toc.first_track, disc_toc.last_track);
             return false;
          }
       }
@@ -663,7 +663,7 @@ bool CDIF_ST::Eject(bool eject_status)
 
          if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
          {
-            MDFN_Error(0, _("TOC first(%d)/last(%d) track numbers bad."), disc_toc.first_track, disc_toc.last_track);
+            log_cb(RETRO_LOG_ERROR, "TOC first(%d)/last(%d) track numbers bad.\n", disc_toc.first_track, disc_toc.last_track);
             return false;
          }
       }
