@@ -42,34 +42,12 @@ CDAFReader::~CDAFReader()
 
 }
 
-enum
+CDAFReader* CDAFR_Open(Stream* fp)
 {
-   AUDIO_VORBIS = 0,
 #ifdef HAVE_MPC
-   AUDIO_MPC,
+  return CDAFR_MPC_Open(fp);
+#else
+  return CDAFR_Vorbis_Open(fp);
 #endif
-   AUDIO_LAST
-};
-
-CDAFReader *CDAFR_Open(Stream *fp)
-{
-  unsigned i;
-
- for (i = 0; i < AUDIO_LAST; i++)
- {
-    switch (i)
-    {
-       case AUDIO_VORBIS:
-          return CDAFR_Vorbis_Open(fp);
-#ifdef HAVE_MPC
-       case AUDIO_MPC:
-          return CDAFR_MPC_Open(fp);
-#endif
-       default:
-          break;
-    }
- }
-
- return(NULL);
 }
 
