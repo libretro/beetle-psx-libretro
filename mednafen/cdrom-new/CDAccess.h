@@ -18,7 +18,7 @@ class CDAccess
  // or if the read can't be done in a thread-safe re-entrant manner.
  //
  // Writes 96 bytes into pwbuf, and returns 'true' otherwise.
- virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept = 0;
+ virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) = 0;
 
  virtual bool Read_TOC(TOC *toc) = 0;
 

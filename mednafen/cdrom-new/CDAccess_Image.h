@@ -44,7 +44,7 @@ class CDAccess_Image : public CDAccess
 
       virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
-      virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept;
+      virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba);
 
       virtual bool Read_TOC(TOC *toc);
 
