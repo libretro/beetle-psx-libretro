@@ -42,11 +42,11 @@ class CDAccess_Image : public CDAccess
       CDAccess_Image(const std::string& path, bool image_memcache);
       virtual ~CDAccess_Image();
 
-      virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba);
+      virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
       virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept;
 
-      virtual void Read_TOC(TOC *toc);
+      virtual bool Read_TOC(TOC *toc);
 
    private:
 

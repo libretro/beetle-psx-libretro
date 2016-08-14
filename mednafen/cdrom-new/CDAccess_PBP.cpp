@@ -34,8 +34,6 @@
 #include "CDAccess_PBP.h"
 #include "CDUtility.h"
 
-#include "audioreader.h"
-
 #include "../../libretro.h"
 
 #include "zlib.h"
@@ -219,14 +217,15 @@ void CDAccess_PBP::Cleanup(void)
       free(index_table);
 }
 
-CDAccess_PBP::CDAccess_PBP(bool *success, const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
+CDAccess_PBP::CDAccess_PBP(const std::string &path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    is_official = false;
    index_table = NULL;
    fp = NULL;
    kirk_init();
-   if (!ImageOpen(path, image_memcache))
-      *success = false;
+   if (!ImageOpen(path.c_str(), image_memcache))
+   {
+   }
 }
 
 CDAccess_PBP::~CDAccess_PBP()
@@ -369,7 +368,7 @@ int CDAccess_PBP::decompress2(void *out, uint32_t *out_size, void *in, uint32_t 
    return ret == 1 ? 0 : ret;
 }
 
-bool CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
+bool CDAccess_PBP::Read_Raw_Sector(uint8_t *buf, int32_t lba)
 {
    uint8_t SimuQ[0xC];
 
@@ -449,6 +448,11 @@ bool CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
    return true;
 }
 
+bool CDAccess_Image::Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept
+{
+   return false;
+}
+
 bool CDAccess_PBP::Read_TOC(TOC *toc)
 {
    struct {
@@ -484,7 +488,6 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
       return false;
    }
    
-   TOC_Clear(toc);
    memset(Tracks, 0, sizeof(Tracks));
 
    fp->seek(psisoimg_offset + 0x400, SEEK_SET);
@@ -1069,8 +1072,6 @@ int CDAccess_PBP::decompress(unsigned char *out, unsigned char *in, unsigned int
    return result;
 }
 
-#include "edc_crc32.h"
-
 // The following table is used for computing the error correction code (ECC).
 static unsigned short RSPCTable[43][256] =
 {
@@ -1134,6 +1135,8 @@ static unsigned short RSPCTable[43][256] =
 #define EDC_SIZE                       4
 #define CDROMXA_FORM1_USER_DATA_SIZE   2048
 #define CDROMXA_FORM1_PARITY_P_SIZE    (43 * 2 * 2)
+
+uint32_t EDCCrc32(const unsigned char *data, int len);
 
 int CDAccess_PBP::fix_sector(uint8_t* sector, int32_t lba)
 {

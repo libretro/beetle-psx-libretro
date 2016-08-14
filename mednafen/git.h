@@ -7,6 +7,8 @@
 #include "state.h"
 #include "settings-common.h"
 
+#include "../libretro.h"
+
 typedef struct
 {
    const char *extension;
@@ -328,5 +330,7 @@ typedef struct
    float mouse_scale_x, mouse_scale_y;
    float mouse_offs_x, mouse_offs_y;
 } MDFNGI;
+
+extern retro_log_printf_t log_cb;
 
 #endif

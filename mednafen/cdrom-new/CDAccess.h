@@ -12,7 +12,7 @@ class CDAccess
  CDAccess();
  virtual ~CDAccess();
 
- virtual void Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
+ virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
 
  // Returns false if the read wouldn't be "fast"(i.e. reading from a disk),
  // or if the read can't be done in a thread-safe re-entrant manner.
@@ -20,7 +20,7 @@ class CDAccess
  // Writes 96 bytes into pwbuf, and returns 'true' otherwise.
  virtual bool Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept = 0;
 
- virtual void Read_TOC(TOC *toc) = 0;
+ virtual bool Read_TOC(TOC *toc) = 0;
 
  private:
  CDAccess(const CDAccess&);	// No copy constructor.

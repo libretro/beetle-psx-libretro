@@ -688,8 +688,8 @@ class CDIF_Stream_Thing : public Stream
       virtual void write(const void *data, uint64 count);
 
       virtual void seek(int64 offset, int whence);
-      virtual int64 tell(void);
-      virtual int64 size(void);
+      virtual uint64_t tell(void);
+      virtual uint64_t size(void);
       virtual void close(void);
 
    private:
@@ -788,12 +788,12 @@ void CDIF_Stream_Thing::seek(int64 offset, int whence)
    position = new_position;
 }
 
-int64 CDIF_Stream_Thing::tell(void)
+uint64_t CDIF_Stream_Thing::tell(void)
 {
    return position;
 }
 
-int64 CDIF_Stream_Thing::size(void)
+uint64_t CDIF_Stream_Thing::size(void)
 {
    return(sector_count * 2048);
 }

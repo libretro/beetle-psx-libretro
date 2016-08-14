@@ -400,24 +400,26 @@ CDAccess_CCD::~CDAccess_CCD()
       delete[] sub_data;
 }
 
-void CDAccess_CCD::Read_Raw_Sector(uint8_t *buf, int32_t lba)
+bool CDAccess_CCD::Read_Raw_Sector(uint8_t *buf, int32_t lba)
 {
    if(lba < 0)
    {
       synth_udapp_sector_lba(0xFF, tocd, lba, 0, buf);
-      return;
+      return true; /* TODO/FIXME - see if we need to return false here? */
    }
 
    if((size_t)lba >= img_numsectors)
    {
       synth_leadout_sector_lba(0xFF, tocd, lba, buf);
-      return;
+      return true; /* TODO/FIXME - see if we need to return false here? */
    }
 
    img_stream->seek(lba * 2352, SEEK_SET);
    img_stream->read(buf, 2352);
 
    subpw_interleave(&sub_data[lba * 96], buf + 2352);
+
+   return true;
 }
 
 bool CDAccess_CCD::Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noexcept
@@ -439,8 +441,9 @@ bool CDAccess_CCD::Fast_Read_Raw_PW_TSRE(uint8_t* pwbuf, int32_t lba) const noex
    return true;
 }
 
-void CDAccess_CCD::Read_TOC(TOC *toc)
+bool CDAccess_CCD::Read_TOC(TOC *toc)
 {
    *toc = tocd;
+   return true;
 }
 

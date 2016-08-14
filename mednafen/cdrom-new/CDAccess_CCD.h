@@ -31,11 +31,11 @@ class CDAccess_CCD : public CDAccess
  CDAccess_CCD(const std::string& path, bool image_memcache);
  virtual ~CDAccess_CCD();
 
- virtual void Read_Raw_Sector(uint8 *buf, int32 lba);
+ virtual bool Read_Raw_Sector(uint8 *buf, int32 lba);
 
  virtual bool Fast_Read_Raw_PW_TSRE(uint8* pwbuf, int32 lba) const noexcept;
 
- virtual void Read_TOC(TOC *toc);
+ virtual bool Read_TOC(TOC *toc);
 
  private:
 

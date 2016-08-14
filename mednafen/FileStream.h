@@ -36,8 +36,8 @@ class FileStream : public Stream
       virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true);
       virtual void write(const void *data, uint64_t count);
       virtual void seek(int64_t offset, int whence);
-      virtual int64_t tell(void);
-      virtual int64_t size(void);
+      virtual uint64_t tell(void);
+      virtual uint64_t size(void);
       virtual void close(void);
 
    private:

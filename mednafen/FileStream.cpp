@@ -85,14 +85,14 @@ void FileStream::seek(int64_t offset, int whence)
    filestream_seek(fp, offset, whence);
 }
 
-int64_t FileStream::tell(void)
+uint64_t FileStream::tell(void)
 {
    if (!fp)
       return -1;
    return filestream_tell(fp);
 }
 
-int64_t FileStream::size(void)
+uint64_t FileStream::size(void)
 {
    if (!original_path)
       return -1;
