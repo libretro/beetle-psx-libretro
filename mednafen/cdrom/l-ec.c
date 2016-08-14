@@ -228,8 +228,7 @@ int CountC2Errors(unsigned char *frame)
 
 int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
 	     int *erasure_list, int erasure_count)
-{
-   GaloisTables *gt = rt->gfTables;
+{  GaloisTables *gt = rt->gfTables;
    int syndrome[NROOTS];
    int lambda[NROOTS+1];
    int omega[NROOTS+1];
@@ -244,18 +243,18 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
    int corrected = 0;
    int i,j,k;
    int r,el;
-
+  
    /*** Form the syndromes: Evaluate data(x) at roots of g(x) */
 
    for(i=0; i<NROOTS; i++)
-      syndrome[i] = data[0];
+     syndrome[i] = data[0];
 
    for(j=1; j<shortened_size; j++)
-      for(i=0; i<NROOTS; i++)
-         if(syndrome[i] == 0) 
-            syndrome[i] = data[j];
-         else syndrome[i] = data[j] ^ gt->alphaTo[mod_fieldmax(gt->indexOf[syndrome[i]] 
-               + (LEC_FIRST_ROOT+i)*LEC_PRIM_ELEM)];
+     for(i=0; i<NROOTS; i++)
+       if(syndrome[i] == 0) 
+             syndrome[i] = data[j];
+        else syndrome[i] = data[j] ^ gt->alphaTo[mod_fieldmax(gt->indexOf[syndrome[i]] 
+							      + (LEC_FIRST_ROOT+i)*LEC_PRIM_ELEM)];
 
    /*** Convert syndrome to index form, check for nonzero condition. */
 
@@ -268,7 +267,7 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
    /*** If the syndrome is zero, everything is fine. */
 
    if(!syn_error)
-      return 0;
+     return 0;
 
    /*** Initialize lambda to be the erasure locator polynomial */
 
@@ -279,7 +278,7 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
    erasure_list[1] += padding;
 
    if(erasure_count > 2)  /* sanity check */
-      erasure_count = 0;
+     erasure_count = 0;
 
    if(erasure_count > 0)
    {  lambda[1] = gt->alphaTo[mod_fieldmax(LEC_PRIM_ELEM*(GF_FIELDMAX-1-erasure_list[0]))];
@@ -288,17 +287,17 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
       {  int u = mod_fieldmax(LEC_PRIM_ELEM*(GF_FIELDMAX-1-erasure_list[i]));
 
          for(j=i+1; j>0; j--) 
-         {  int tmp = gt->indexOf[lambda[j-1]];
-
+	 {  int tmp = gt->indexOf[lambda[j-1]];
+	  
             if(tmp != GF_ALPHA0)
-               lambda[j] ^= gt->alphaTo[mod_fieldmax(u + tmp)];
-         }
+	      lambda[j] ^= gt->alphaTo[mod_fieldmax(u + tmp)];
+	}
       }
    }	
 
    for(i=0; i<NROOTS+1; i++)
-      b[i] = gt->indexOf[lambda[i]];
-
+     b[i] = gt->indexOf[lambda[i]];
+  
    /*** Berlekamp-Massey algorithm to determine error+erasure locator polynomial */
 
    r = erasure_count;   /* r is the step number */
@@ -310,42 +309,42 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
    {  int discr_r = 0;
 
       for(i=0; i<r; i++)
-         if((lambda[i] != 0) && (syndrome[r-i-1] != GF_ALPHA0))
-            discr_r ^= gt->alphaTo[mod_fieldmax(gt->indexOf[lambda[i]] + syndrome[r-i-1])];
+	if((lambda[i] != 0) && (syndrome[r-i-1] != GF_ALPHA0))
+	      discr_r ^= gt->alphaTo[mod_fieldmax(gt->indexOf[lambda[i]] + syndrome[r-i-1])];
 
       discr_r = gt->indexOf[discr_r];
 
       if(discr_r == GF_ALPHA0) 
       {  /* B(x) = x*B(x) */
-         memmove(b+1, b, NROOTS*sizeof(b[0]));
-         b[0] = GF_ALPHA0;
+	 memmove(b+1, b, NROOTS*sizeof(b[0]));
+	 b[0] = GF_ALPHA0;
       } 
       else 
       {  int t[NROOTS+1];
 
-         /* T(x) = lambda(x) - discr_r*x*b(x) */
-         t[0] = lambda[0];
-         for(i=0; i<NROOTS; i++) 
-         {  if(b[i] != GF_ALPHA0)
-            t[i+1] = lambda[i+1] ^ gt->alphaTo[mod_fieldmax(discr_r + b[i])];
-            else t[i+1] = lambda[i+1];
-         }
+	 /* T(x) = lambda(x) - discr_r*x*b(x) */
+	 t[0] = lambda[0];
+	 for(i=0; i<NROOTS; i++) 
+	 {  if(b[i] != GF_ALPHA0)
+	         t[i+1] = lambda[i+1] ^ gt->alphaTo[mod_fieldmax(discr_r + b[i])];
+	    else t[i+1] = lambda[i+1];
+	 }
 
-         if(2*el <= r+erasure_count-1) 
-         {  el = r + erasure_count - el;
+	 if(2*el <= r+erasure_count-1) 
+	 {  el = r + erasure_count - el;
 
-            /* B(x) <-- inv(discr_r) * lambda(x) */
-            for(i=0; i<=NROOTS; i++)
-               b[i] = (lambda[i] == 0) ? GF_ALPHA0 
-                  : mod_fieldmax(gt->indexOf[lambda[i]] - discr_r + GF_FIELDMAX);
-         } 
-         else 
-         {  /* 2 lines below: B(x) <-- x*B(x) */
-            memmove(b+1, b, NROOTS*sizeof(b[0]));
-            b[0] = GF_ALPHA0;
-         }
+	    /* B(x) <-- inv(discr_r) * lambda(x) */
+	    for(i=0; i<=NROOTS; i++)
+	      b[i] = (lambda[i] == 0) ? GF_ALPHA0 
+		                      : mod_fieldmax(gt->indexOf[lambda[i]] - discr_r + GF_FIELDMAX);
+	 } 
+	 else 
+	 {  /* 2 lines below: B(x) <-- x*B(x) */
+	    memmove(b+1, b, NROOTS*sizeof(b[0]));
+	    b[0] = GF_ALPHA0;
+	 }
 
-         memcpy(lambda, t, (NROOTS+1)*sizeof(t[0]));
+	 memcpy(lambda, t, (NROOTS+1)*sizeof(t[0]));
       }
    }
 
@@ -355,7 +354,7 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
    for(i=0; i<NROOTS+1; i++)
    {  lambda[i] = gt->indexOf[lambda[i]];
       if(lambda[i] != GF_ALPHA0)
-         deg_lambda = i;
+	deg_lambda = i;
    }
 
    /*** Find roots of the error+erasure locator polynomial by Chien search */
@@ -368,9 +367,9 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
 
       for(j=deg_lambda; j>0; j--)
       {  if(reg[j] != GF_ALPHA0) 
-         {  reg[j] = mod_fieldmax(reg[j] + j);
-            q ^= gt->alphaTo[reg[j]];
-         }
+	 {  reg[j] = mod_fieldmax(reg[j] + j);
+	    q ^= gt->alphaTo[reg[j]];
+	 }
       }
 
       if(q != 0) continue; /* Not a root */
@@ -402,7 +401,7 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
 
       for(j=i; j>=0; j--)
       {  if((syndrome[i - j] != GF_ALPHA0) && (lambda[j] != GF_ALPHA0))
-         tmp ^= gt->alphaTo[mod_fieldmax(syndrome[i - j] + lambda[j])];
+	  tmp ^= gt->alphaTo[mod_fieldmax(syndrome[i - j] + lambda[j])];
       }
 
       omega[i] = gt->indexOf[tmp];
@@ -421,54 +420,59 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
 
       for(i=deg_omega; i>=0; i--) 
       {  if(omega[i] != GF_ALPHA0)
-         num1 ^= gt->alphaTo[mod_fieldmax(omega[i] + i * root[j])];
+	 num1 ^= gt->alphaTo[mod_fieldmax(omega[i] + i * root[j])];
       }
 
       num2 = gt->alphaTo[mod_fieldmax(root[j] * (LEC_FIRST_ROOT - 1) + GF_FIELDMAX)];
       den = 0;
-
+    
       /* lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i] */
 
       for(i=MIN(deg_lambda, NROOTS-1) & ~1; i>=0; i-=2) 
       {  if(lambda[i+1] != GF_ALPHA0)
-         den ^= gt->alphaTo[mod_fieldmax(lambda[i+1] + i * root[j])];
+	   den ^= gt->alphaTo[mod_fieldmax(lambda[i+1] + i * root[j])];
       }
 
       /* Apply error to data */
 
       if(num1 != 0 && location >= padding)
       {  
-         corrected++;
-         data[location-padding] ^= gt->alphaTo[mod_fieldmax(gt->indexOf[num1] + gt->indexOf[num2] 
-               + GF_FIELDMAX - gt->indexOf[den])];
+	 corrected++;
+	 data[location-padding] ^= gt->alphaTo[mod_fieldmax(gt->indexOf[num1] + gt->indexOf[num2] 
+							    + GF_FIELDMAX - gt->indexOf[den])];
 
-         /* If no erasures were given, at most one error was corrected.
-            Return its position in erasure_list[0]. */
+	 /* If no erasures were given, at most one error was corrected.
+	    Return its position in erasure_list[0]. */
 
-         if(!erasure_count)
-            erasure_list[0] = location-padding;
+	 if(!erasure_count)
+	    erasure_list[0] = location-padding;
       }
-      else
-         return -3;
+#if 1
+      else return -3;
+#endif
    }
 
    /*** Form the syndromes: Evaluate data(x) at roots of g(x) */
 
    for(i=0; i<NROOTS; i++)
-      syndrome[i] = data[0];
+     syndrome[i] = data[0];
 
    for(j=1; j<shortened_size; j++)
-      for(i=0; i<NROOTS; i++)
-      {  if(syndrome[i] == 0) 
-         syndrome[i] = data[j];
-         else syndrome[i] = data[j] ^ gt->alphaTo[mod_fieldmax(gt->indexOf[syndrome[i]] 
-               + (LEC_FIRST_ROOT+i)*LEC_PRIM_ELEM)];
-      }
+     for(i=0; i<NROOTS; i++)
+     {  if(syndrome[i] == 0) 
+             syndrome[i] = data[j];
+        else syndrome[i] = data[j] ^ gt->alphaTo[mod_fieldmax(gt->indexOf[syndrome[i]] 
+							      + (LEC_FIRST_ROOT+i)*LEC_PRIM_ELEM)];
+    }
 
    /*** Convert syndrome to index form, check for nonzero condition. */
+#if 1
    for(i=0; i<NROOTS; i++)
-      if(syndrome[i])
-         return -2;
+     if(syndrome[i])
+       return -2;
+#endif
 
    return corrected;
 }
+
+
