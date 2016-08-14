@@ -8,6 +8,7 @@ MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 ifeq ($(HAVE_CDROM_NEW), 1)
+FLAGS += -DHAVE_CDROM_NEW
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom-new
 else
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
