@@ -118,7 +118,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    // check for valid pbp
    if(fp->read(magic, 4, false) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
    {
-      MDFN_Error(0, _("Invalid PBP header: %s"), path);
+      log_cb(RETRO_LOG_ERROR, "Invalid PBP header: %s\n", path);
       return false;
    }
 
@@ -149,7 +149,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
          if(pdg_size < 1 || pdg_size > sizeof(iso_map))
          {
-            MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map"));
+            log_cb(RETRO_LOG_ERROR, "[PBP] Failed to decrypt multi-disc iso map\n");
             return false;
          }
 
@@ -170,7 +170,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
       if(PBP_DiscCount == 0)
       {
-         MDFN_Error(0, _("Multidisk eboot has 0 images?: %s"), path);
+         log_cb(RETRO_LOG_ERROR, "Multidisk eboot has 0 images?: %s\n", path);
          return false;
       }
 
@@ -183,7 +183,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
    {
-      MDFN_Error(0, _("Unexpected psar_sig: %s"), psar_sig);
+      log_cb(RETRO_LOG_ERROR, "Unexpected psar_sig: %s\n", psar_sig);
       return false;
    }
 
@@ -219,14 +219,15 @@ void CDAccess_PBP::Cleanup(void)
       free(index_table);
 }
 
-CDAccess_PBP::CDAccess_PBP(bool *success, const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
+CDAccess_PBP::CDAccess_PBP(const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    is_official = false;
    index_table = NULL;
    fp = NULL;
    kirk_init();
    if (!ImageOpen(path, image_memcache))
-      *success = false;
+   {
+   }
 }
 
 CDAccess_PBP::~CDAccess_PBP()
@@ -480,7 +481,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
 
    if(!iso_header)
    {
-      MDFN_Error(0, _("[PBP] Read_TOC() - unable to allocate memory"));
+      log_cb(RETRO_LOG_ERROR, "[PBP] Read_TOC() - unable to allocate memory\n");
       return false;
    }
    
@@ -496,7 +497,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
 
       if(pdg_size < 1 || pdg_size > 0xB6600)
       {
-         MDFN_Error(0, _("[PBP] Failed to decrypt multi-disc iso map"));
+         log_cb(RETRO_LOG_ERROR, "[PBP] Failed to decrypt multi-disc iso map\n");
          return false;
       }
 
@@ -575,7 +576,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
 
       if(BCD_to_U8(toc_entry.track) < i || BCD_to_U8(toc_entry.track) > i)
       {
-         MDFN_Error(0, _("Tracks out of order"));   // can this happen?
+         log_cb(RETRO_LOG_ERROR, "Tracks out of order\n");   // can this happen?
          return false;
       }
    }
@@ -608,7 +609,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
    index_table = (unsigned int*)malloc((index_len + 1) * sizeof(*index_table));
    if (index_table == NULL)
    {
-      MDFN_Error(0, _("Unable to allocate memory"));
+      log_cb(RETRO_LOG_ERROR, "Unable to allocate memory\n");
       return false;
    }
 

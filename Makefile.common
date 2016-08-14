@@ -65,6 +65,8 @@ SOURCES_CXX += beetle_psx_griffin.cpp \
 SOURCES_C += beetle_psx_griffin_c.c
 endif
 
+FLAGS += -DHAVE_PBP
+
 ifeq ($(DEBUG), 1)
 	SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
 endif

@@ -118,7 +118,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -143,7 +143,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -167,7 +167,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -192,7 +192,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;DEBUG=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -215,7 +215,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
@@ -238,7 +238,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)..;$(SolutionDir)..\libretro-common\include;$(SolutionDir)..\deps\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CORE=1;HAVE_OPENGL=1;HAVE_PBP=1;WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBRETROPSX_EXPORTS;WANT_THREADING;WANT_32BPP;__LIBRETRO__;WANT_NEW_API;NEED_TREMOR;NEED_DEINTERLACER;NEED_CD;MEDNAFEN_VERSION_NUMERIC=9361;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
