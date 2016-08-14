@@ -181,7 +181,6 @@ SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
 	$(CDROM_DIR)/audioreader.cpp \
 	$(CDROM_DIR)/misc.cpp \
 	$(CDROM_DIR)/cdromif.cpp
-endif
 
 SOURCES_C += \
 	$(CDROM_DIR)/CDUtility.c \
@@ -190,6 +189,8 @@ SOURCES_C += \
 	$(CDROM_DIR)/lec.c \
 	$(CDROM_DIR)/recover-raw.c \
 	$(CDROM_DIR)/edc_crc32.c
+endif
+
 
 
 SOURCES_CXX += \

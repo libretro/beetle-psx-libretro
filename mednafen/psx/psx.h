@@ -4,7 +4,11 @@
 #include "../mednafen.h"
 #include "../masmem.h"
 
+#ifdef HAVE_CDROM_NEW
+#include "../cdrom-new/cdromif.h"
+#else
 #include "../cdrom/cdromif.h"
+#endif
 #include "../general.h"
 #include "../FileStream.h"
 
