@@ -33,6 +33,9 @@ class Stream
       virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true) = 0;
       virtual void write(const void *data, uint64_t count) = 0;
 
+      virtual void truncate(uint64 length) = 0;	/* Should have ftruncate()-like semantics; but avoid using it to extend files. */
+      virtual void flush(void) = 0;
+
       virtual void seek(int64_t offset, int whence) = 0;
       virtual uint64_t tell(void) = 0;
       virtual uint64_t size(void) = 0;

@@ -100,6 +100,14 @@ uint64_t FileStream::size(void)
    return path_get_size(original_path);
 }
 
+void FileStream::truncate(uint64_t length)
+{
+}
+
+void FileStream::flush(void)
+{
+}
+
 void FileStream::close(void)
 {
    if (!fp)
