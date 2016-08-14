@@ -2,7 +2,6 @@
 #define __MDFN_CDACCESS_IMAGE_H
 
 #include <map>
-#include <array>
 
 #include "CDUtility.h"
 
@@ -35,6 +34,23 @@ struct CDRFILE_TRACK_INFO
    CDAFReader *AReader;
 };
 
+template<typename T, size_t N>
+class stl_array {
+   T m_data[N];
+   public:
+   T* begin()              { return m_data; }
+   T* end()                { return m_data + N; }
+   T& operator[](size_t i) { return m_data[i]; }
+   size_t size()           { return N; }
+   bool empty()            { return N == 0; }
+   T* data()               { return m_data; }
+
+   const T* begin() const  { return m_data; }
+   const T*   end() const  { return m_data + N; }
+   const T& operator[](size_t i) const { return m_data[i]; }
+   const T*  data() const  { return m_data; }
+};
+
 class CDAccess_Image : public CDAccess
 {
    public:
@@ -58,7 +74,7 @@ class CDAccess_Image : public CDAccess
       CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
       TOC toc;
 
-      std::map<uint32_t, std::array<uint8_t, 12>> SubQReplaceMap;
+      std::map<uint32_t, stl_array<uint8_t, 12> > SubQReplaceMap;
 
       std::string base_dir;
 

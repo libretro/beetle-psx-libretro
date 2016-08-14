@@ -28,7 +28,9 @@
 #include <mednafen/mednafen.h>
 #include "CDAFReader.h"
 #include "CDAFReader_Vorbis.h"
+#ifdef HAVE_MPC
 #include "CDAFReader_MPC.h"
+#endif
 
 CDAFReader::CDAFReader() : LastReadPos(0)
 {
@@ -40,19 +42,32 @@ CDAFReader::~CDAFReader()
 
 }
 
+enum
+{
+   AUDIO_VORBIS = 0,
+#ifdef HAVE_MPC
+   AUDIO_MPC,
+#endif
+   AUDIO_LAST
+};
+
 CDAFReader *CDAFR_Open(Stream *fp)
 {
- static CDAFReader* (* const OpenFuncs[])(Stream* fp) =
- {
-#ifdef HAVE_MPC
-  CDAFR_MPC_Open,
-#endif
-  CDAFR_Vorbis_Open
- };
+  unsigned i;
 
- for(auto const& f : OpenFuncs)
+ for (i = 0; i < AUDIO_LAST; i++)
  {
-    return f(fp);
+    switch (i)
+    {
+       case AUDIO_VORBIS:
+          return CDAFR_Vorbis_Open(fp);
+#ifdef HAVE_MPC
+       case AUDIO_MPC:
+          return CDAFR_MPC_Open(fp);
+#endif
+       default:
+          break;
+    }
  }
 
  return(NULL);
