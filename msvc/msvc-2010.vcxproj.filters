@@ -213,9 +213,6 @@
     <ClCompile Include="..\mednafen\cdrom\recover-raw.c">
       <Filter>mednafen\cdrom</Filter>
     </ClCompile>
-    <ClCompile Include="..\mednafen\cdrom\SimpleFIFO.cpp">
-      <Filter>mednafen\cdrom</Filter>
-    </ClCompile>
     <ClCompile Include="..\mednafen\tremor\bitwise.c">
       <Filter>mednafen\tremor</Filter>
     </ClCompile>

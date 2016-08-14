@@ -156,7 +156,6 @@ SOURCES_CXX += $(MEDNAFEN_DIR)/cdrom/CDAccess.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_Image.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_CCD.cpp \
 	$(MEDNAFEN_DIR)/cdrom/CDAccess_PBP.cpp \
-	$(MEDNAFEN_DIR)/cdrom/SimpleFIFO.cpp \
 	$(MEDNAFEN_DIR)/cdrom/audioreader.cpp \
 	$(MEDNAFEN_DIR)/cdrom/misc.cpp \
 	$(MEDNAFEN_DIR)/cdrom/cdromif.cpp

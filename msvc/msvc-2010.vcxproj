@@ -374,7 +374,6 @@
     <ClCompile Include="..\mednafen\cdrom\lec.c" />
     <ClCompile Include="..\mednafen\cdrom\misc.cpp" />
     <ClCompile Include="..\mednafen\cdrom\recover-raw.c" />
-    <ClCompile Include="..\mednafen\cdrom\SimpleFIFO.cpp" />
     <ClCompile Include="..\mednafen\tremor\bitwise.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
