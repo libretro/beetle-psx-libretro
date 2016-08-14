@@ -3838,6 +3838,7 @@ void retro_set_environment(retro_environment_t cb)
       { "DualAnalog", RETRO_DEVICE_DUALANALOG },
       { "DualShock", RETRO_DEVICE_DUALSHOCK },
       { "FlightStick", RETRO_DEVICE_FLIGHTSTICK },
+      { NULL, 0 }
    };
 
    static const struct retro_controller_info ports[] = {
@@ -3853,7 +3854,7 @@ void retro_set_environment(retro_environment_t cb)
    };
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
-   environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+   cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 
    rsx_intf_set_environment(cb);
 }
