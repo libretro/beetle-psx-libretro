@@ -927,7 +927,7 @@ void PS_CDC::HandlePlayRead(void)
       if((Mode & MODE_REPORT) && (((SubQBuf_Safe[0x9] >> 4) != ReportLastF) || Forward || Backward) && SubQChecksumOK)
       {
          uint8 tr[8];
-#if 0
+#if 1
          uint16 abs_lev_max = 0;
          bool abs_lev_chselect = SubQBuf_Safe[0x8] & 0x01;
 
@@ -955,8 +955,8 @@ void PS_CDC::HandlePlayRead(void)
             tr[5] = SubQBuf_Safe[0x9];	// A F
          }
 
-         tr[6] = 0; //abs_lev_max >> 0;
-         tr[7] = 0; //abs_lev_max >> 8;
+         tr[6] = abs_lev_max >> 0;
+         tr[7] = abs_lev_max >> 8;
 
          SetAIP(CDCIRQ_DATA_READY, 8, tr);
       }
