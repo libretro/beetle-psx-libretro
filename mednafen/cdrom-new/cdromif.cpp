@@ -630,17 +630,17 @@ class CDIF_Stream_Thing : public Stream
       CDIF_Stream_Thing(CDIF *cdintf_arg, uint32_t lba_arg, uint32_t sector_count_arg);
       ~CDIF_Stream_Thing();
 
-      virtual uint64_t attributes(void) override;
+      virtual uint64_t attributes(void);
 
-      virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true) override;
-      virtual void write(const void *data, uint64_t count) override;
-      virtual void truncate(uint64_t length) override;
+      virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true);
+      virtual void write(const void *data, uint64_t count);
+      virtual void truncate(uint64_t length);
 
-      virtual void seek(int64_t offset, int whence) override;
-      virtual uint64_t tell(void) override;
-      virtual uint64_t size(void) override;
-      virtual void flush(void) override;
-      virtual void close(void) override;
+      virtual void seek(int64_t offset, int whence);
+      virtual uint64_t tell(void);
+      virtual uint64_t size(void);
+      virtual void flush(void);
+      virtual void close(void);
 
    private:
       CDIF *cdintf;

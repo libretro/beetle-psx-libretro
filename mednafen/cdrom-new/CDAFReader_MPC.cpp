@@ -31,9 +31,9 @@ class CDAFReader_MPC final : public CDAFReader
       CDAFReader_MPC(Stream *fp);
       ~CDAFReader_MPC();
 
-      uint64_t Read_(int16 *buffer, uint64_t frames) override;
-      bool Seek_(uint64_t frame_offset) override;
-      uint64_t FrameCount(void) override;
+      uint64_t Read_(int16 *buffer, uint64_t frames);
+      bool Seek_(uint64_t frame_offset);
+      uint64_t FrameCount(void);
 
    private:
       mpc_reader reader;

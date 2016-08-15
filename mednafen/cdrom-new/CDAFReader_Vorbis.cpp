@@ -31,9 +31,9 @@ class CDAFReader_Vorbis final : public CDAFReader
       CDAFReader_Vorbis(Stream *fp);
       ~CDAFReader_Vorbis();
 
-      uint64_t Read_(int16_t *buffer, uint64_t frames) override;
-      bool Seek_(uint64_t frame_offset) override;
-      uint64_t FrameCount(void) override;
+      uint64_t Read_(int16_t *buffer, uint64_t frames);
+      bool Seek_(uint64_t frame_offset);
+      uint64_t FrameCount(void);
 
    private:
       OggVorbis_File ovfile;
