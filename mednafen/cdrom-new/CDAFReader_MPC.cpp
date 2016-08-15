@@ -25,7 +25,7 @@
 
 #include <mednafen/mpcdec/mpcdec.h>
 
-class CDAFReader_MPC final : public CDAFReader
+class CDAFReader_MPC : public CDAFReader
 {
    public:
       CDAFReader_MPC(Stream *fp);

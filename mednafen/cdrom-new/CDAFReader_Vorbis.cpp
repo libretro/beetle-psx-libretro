@@ -25,7 +25,7 @@
 
 #include <mednafen/tremor/ivorbisfile.h>
 
-class CDAFReader_Vorbis final : public CDAFReader
+class CDAFReader_Vorbis : public CDAFReader
 {
    public:
       CDAFReader_Vorbis(Stream *fp);
