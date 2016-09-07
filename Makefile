@@ -38,15 +38,15 @@ WANT_NEW_API = 1
 NEED_DEINTERLACER = 1
 NEED_THREADING = 1
 CORE_DEFINE := -DWANT_PSX_EMU
-TARGET_NAME := mednafen_psx_libretro
+TARGET_NAME := mednafen_psx
 
 ifeq ($(HAVE_OPENGL),1)
-   TARGET_NAME := mednafen_psx_hw_libretro
+   TARGET_NAME := mednafen_psx_hw
 endif
 
 # Unix
 ifneq (,$(findstring unix,$(platform)))
-   TARGET := $(TARGET_NAME).so
+   TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    ifneq ($(shell uname -p | grep -E '((i.|x)86|amd64)'),)
@@ -65,7 +65,7 @@ ifneq (,$(findstring unix,$(platform)))
 
 # OS X
 else ifeq ($(platform), osx)
-   TARGET := $(TARGET_NAME).dylib
+   TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
@@ -85,7 +85,7 @@ else ifeq ($(platform), osx)
 
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
-   TARGET := $(TARGET_NAME)_ios.dylib
+   TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
@@ -111,7 +111,7 @@ else ifneq (,$(findstring ios,$(platform)))
 
 # QNX
 else ifeq ($(platform), qnx)
-   TARGET := $(TARGET_NAME)_qnx.so
+   TARGET := $(TARGET_NAME)_libretro_$(platform).so
    fpic := -fPIC
    SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
    #LDFLAGS += $(PTHREAD_FLAGS)
@@ -127,7 +127,7 @@ else ifeq ($(platform), qnx)
 
 # PS3
 else ifeq ($(platform), ps3)
-   TARGET := $(TARGET_NAME)_ps3.a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
@@ -138,7 +138,7 @@ else ifeq ($(platform), ps3)
 
 # sncps3
 else ifeq ($(platform), sncps3)
-   TARGET := $(TARGET_NAME)_ps3.a
+   TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    CXX = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
@@ -151,7 +151,7 @@ else ifeq ($(platform), sncps3)
 
 # Lightweight PS3 Homebrew SDK
 else ifeq ($(platform), psl1ght)
-   TARGET := $(TARGET_NAME)_psl1ght.a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    CXX = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
@@ -161,7 +161,7 @@ else ifeq ($(platform), psl1ght)
 
 # PSP
 else ifeq ($(platform), psp1)
-   TARGET := $(TARGET_NAME)_psp1.a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = psp-gcc$(EXE_EXT)
    CXX = psp-g++$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
@@ -172,7 +172,7 @@ else ifeq ($(platform), psp1)
 
 # Vita
 else ifeq ($(platform), vita)
-   TARGET := $(TARGET_NAME)_vita.a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = arm-vita-eabi-gcc$(EXE_EXT)
    CXX = arm-vita-eabi-g++$(EXE_EXT)
    AR = arm-vita-eabi-ar$(EXE_EXT)
@@ -182,7 +182,7 @@ else ifeq ($(platform), vita)
 
 # Xbox 360
 else ifeq ($(platform), xenon)
-   TARGET := $(TARGET_NAME)_xenon360.a
+   TARGET := $(TARGET_NAME)_libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
    CXX = xenon-g++$(EXE_EXT)
    AR = xenon-ar$(EXE_EXT)
@@ -194,10 +194,10 @@ else ifeq ($(platform), xenon)
 # Nintendo Game Cube / Nintendo Wii
 else ifneq (,$(filter $(platform),ngc wii))
    ifeq ($(platform), ngc)
-      TARGET := $(TARGET_NAME)_ngc.a
+      TARGET := $(TARGET_NAME)_libretro_$(platform).a
       ENDIANNESS_DEFINES += -DHW_DOL
    else ifeq ($(platform), wii)
-      TARGET := $(TARGET_NAME)_wii.a
+      TARGET := $(TARGET_NAME)_libretro_$(platform).a
       ENDIANNESS_DEFINES += -DHW_RVL
    endif
    ENDIANNESS_DEFINES += -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
@@ -210,7 +210,7 @@ else ifneq (,$(filter $(platform),ngc wii))
 
 # GCW0
 else ifeq ($(platform), gcw0)
-   TARGET := $(TARGET_NAME).so
+   TARGET := $(TARGET_NAME)_libretro.so
    CC = /opt/gcw0-toolchain/usr/bin/mipsel-linux-gcc
    CXX = /opt/gcw0-toolchain/usr/bin/mipsel-linux-g++
    AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
@@ -224,7 +224,7 @@ else ifeq ($(platform), gcw0)
    
 # Emscripten
 else ifeq ($(platform), emscripten)
-   TARGET := $(TARGET_NAME).bc
+   TARGET := $(TARGET_NAME)_libretro_$(platform).bc
    fpic := -fPIC
    SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += $(PTHREAD_FLAGS)
@@ -309,7 +309,7 @@ endif
 
 # Windows
 else
-   TARGET := $(TARGET_NAME).dll
+   TARGET := $(TARGET_NAME)_libretro.dll
    CC = gcc
    CXX = g++
    IS_X86 = 1
