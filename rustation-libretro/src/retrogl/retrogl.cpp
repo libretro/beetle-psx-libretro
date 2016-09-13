@@ -59,6 +59,7 @@ RetroGl::RetroGl(VideoClock video_clock)
         {0, 0},         // display_top_left
         {1024, 512},    // display_resolution
         false,          // display_24bpp
+        true,           // display_off
         {0, 0},         // draw_area_top_left
         {0, 0},         // draw_area_dimensions
         {0, 0},         // draw_offset
@@ -86,16 +87,6 @@ void RetroGl::context_reset() {
 
     if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
         return;
-
-
-    /* TODO: I don't know how to translate this into C++ */
-
-    /*
-    // Should I call this at every reset? Does it matter?
-    gl::load_with(|s| {
-            libretro::hw_context::get_proc_address(s) as *const _
-    });
-    */
 
     /* Save this on the stack, I'm unsure if saving a ptr would
     would cause trouble because of the 'delete' below  */
@@ -137,7 +128,7 @@ GlRenderer* RetroGl::gl_renderer()
 
 void RetroGl::context_destroy()
 {
-    puts("OpenGL context destroy\n");
+    printf("OpenGL context destroy\n");
 
     DrawConfig config;
 

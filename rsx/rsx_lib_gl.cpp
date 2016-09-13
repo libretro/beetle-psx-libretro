@@ -463,5 +463,5 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
 void rsx_gl_toggle_display(bool status)
 {
-    renderer()->gl_renderer()->display_off = status;
+    renderer()->gl_renderer()->set_display_off(status);
 }

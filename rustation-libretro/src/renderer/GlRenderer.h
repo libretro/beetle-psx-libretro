@@ -30,6 +30,7 @@ struct DrawConfig {
     uint16_t display_top_left[2];
     uint16_t display_resolution[2];
     bool     display_24bpp;
+    bool     display_off;
     int16_t  draw_offset[2];
     uint16_t draw_area_top_left[2];
     uint16_t draw_area_bot_right[2];
@@ -138,9 +139,6 @@ public:
     /// the visible area
     bool display_vram;
 
-    /* Flag for finalize_frame(). If true, we'll glClear() the libretro fb */
-    bool display_off;
-
     /* pub fn from_config(config: DrawConfig) -> Result<GlRenderer, Error> */
     GlRenderer(DrawConfig* config);
 
@@ -187,6 +185,8 @@ public:
     void set_display_mode(  uint16_t top_left[2], 
                             uint16_t resolution[2],
                             bool depth_24bpp);
+    void set_display_off(bool off);
+
 
     void push_triangle( CommandVertex v[3],
                         SemiTransparencyMode semi_transparency_mode);

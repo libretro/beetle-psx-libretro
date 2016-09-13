@@ -123,8 +123,6 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     opaque_command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
     opaque_command_buffer->program->uniform1ui("texture_flt", this->filter_type);
-    //opaque_command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
-    //opaque_command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -175,10 +173,6 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->mask_eval_and = 0;
     // }
 
-    this->display_off = true;
-
-    //opaque_command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
-    //opaque_command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     //// NOTE: r5 - I have no idea what a borrow checker is.
     // Yet an other copy of this 1MB array to make the borrow
@@ -255,9 +249,6 @@ void GlRenderer::draw()
     // We use texture unit 0
     this->command_buffer->program->uniform1i("fb_texture", 0);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
-
-    //this->command_buffer->program->uniform1ui("mask _rthis->mask_set_or);
-    //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
@@ -654,8 +645,6 @@ bool GlRenderer::refresh_variables()
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     this->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
     this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
-    //this->command_buffer->program->uniform1ui("mask_setor", this->mask_set_or);
-    //this->command_buffer->program->uniform1ui("mask_evaland", this->mask_eval_and);
 
     this->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
@@ -692,7 +681,7 @@ void GlRenderer::finalize_frame()
     glDisable(GL_BLEND);
 
     /* If the display is off, just clear the screen */
-    if (this->display_off) {
+    if (config->display_off) {
         glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
     }
@@ -877,6 +866,11 @@ void GlRenderer::set_display_mode(  uint16_t top_left[2],
     this->config->display_resolution[0] = resolution[0];
     this->config->display_resolution[1] = resolution[1];
     this->config->display_24bpp = depth_24bpp;
+}
+
+void GlRenderer::set_display_off(bool off)
+{
+  this->config->display_off = off;
 }
 
 void GlRenderer::push_triangle( CommandVertex v[3],
