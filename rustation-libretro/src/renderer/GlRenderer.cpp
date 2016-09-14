@@ -19,6 +19,8 @@
 extern PS_GPU *GPU;
 static bool has_software_fb = false;
 
+extern "C" unsigned char widescreen_hack;
+
 GlRenderer::GlRenderer(DrawConfig* config)
 {
 
@@ -356,7 +358,7 @@ void GlRenderer::bind_libretro_framebuffer()
     } else {
       _w = this->config->display_resolution[0];
       _h = this->config->display_resolution[1];
-      aspect_ratio = 4.0 / 3.0;
+      aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
     }
 
     uint32_t upscale = this->internal_upscaling;
