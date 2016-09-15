@@ -326,8 +326,16 @@ void GlRenderer::apply_scissor()
 {
     uint16_t _x = this->config->draw_area_top_left[0];
     uint16_t _y = this->config->draw_area_top_left[1];
-    uint16_t _w = this->config->draw_area_bot_right[0] - _x;
-    uint16_t _h = this->config->draw_area_bot_right[1] - _y;
+    int _w = this->config->draw_area_bot_right[0] - _x;
+    int _h = this->config->draw_area_bot_right[1] - _y;
+
+    if (_w < 0) {
+      _w = 0;
+    }
+
+    if (_h < 0) {
+      _h = 0;
+    }
 
     GLsizei upscale = (GLsizei) this->internal_upscaling;
 
@@ -683,7 +691,7 @@ void GlRenderer::finalize_frame()
     glDisable(GL_BLEND);
 
     /* If the display is off, just clear the screen */
-    if (config->display_off) {
+    if (config->display_off && !this->display_vram) {
         glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
     }
