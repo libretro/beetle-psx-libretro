@@ -2,8 +2,9 @@
 #ifndef RETROGL_H
 #define RETROGL_H
 
-#include "libretro.h"
 #include <glsm/glsmsym.h>
+
+#include "libretro.h"
 
 #include "../renderer/GlRenderer.h"
 

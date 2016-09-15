@@ -1,20 +1,56 @@
 #ifndef RETROGL_BUFFER_H
 #define RETROGL_BUFFER_H
 
-#include "vertex.h"
-#include "program.h"
-#include "error.h"
-
 #include <glsm/glsmsym.h>
 
 #include <stdio.h>
 #include <stdlib.h> // size_t
 #include <stdint.h>
+#include <unistd.h>
 
 #include <vector>
+#include <deque>
+
+#include "vertex.h"
+#include "program.h"
+#include "error.h"
 
 template<typename T>
-class DrawBuffer 
+struct Storage {
+  // Fence used to make sure we're not writing to the buffer while
+  // it's being used.
+  GLsync fence;
+  // Offset in the main buffer
+  unsigned offset;
+
+  Storage()
+    :fence(NULL), offset(0)
+  {
+  }
+
+  Storage(unsigned offset)
+    :fence(NULL), offset(offset)
+  {
+  }
+
+  // Wait for the buffer to be ready for reuse
+  void sync() {
+    if (this->fence) {
+      glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
+      get_error();
+      this->fence = NULL;
+    }
+  }
+
+  void create_fence() {
+    void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+    this->fence = reinterpret_cast<GLsync>(fence);
+  }
+};
+
+template<typename T>
+class DrawBuffer
 {
 public:
     /// OpenGL name for this buffer
@@ -25,20 +61,18 @@ public:
     VertexArrayObject* vao;
     /// Program used to draw this buffer
     Program* program;
-    /// Number of elements T that the vertex buffer can hold
+    /// Persistently mapped buffer (using ARB_buffer_storage)
+    T *map;
+    /// Use triple buffering
+    Storage<T> buffers[3];
+    /// Index one-past the last element stored in `active`
+    unsigned active_next_index;
+    /// Index of the first element of the current command in `active`
+    unsigned active_command_index;
+    /// Number of elements T that `active` and `backed` can hold
     size_t capacity;
-    /// Current number of entries in the buffer
-    size_t len;
-    /// If true newer items are added *before* older ones
-    /// (i.e. they'll be drawn first)
-    bool lifo;
 
-    /* 
-    pub fn new(capacity: usize,
-               program: Program,
-               lifo: bool) -> Result<DrawBuffer<T>, Error> {
-    */
-    DrawBuffer(size_t capacity, Program* program, bool lifo)
+    DrawBuffer(size_t capacity, Program* program)
     {
         VertexArrayObject* vao = new VertexArrayObject();
 
@@ -51,17 +85,52 @@ public:
         this->capacity = capacity;
         this->id = id;
 
-        this->lifo = lifo;
+	// Create and map the buffer
+	this->bind();
+	size_t element_size = sizeof(T);
+	// We double buffer so we allocate a storage twise as big
+        GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size * 3);
 
-        this->clear();
+        glBufferStorage(GL_ARRAY_BUFFER,
+			storage_size,
+			NULL,
+			GL_MAP_WRITE_BIT |
+			GL_MAP_PERSISTENT_BIT |
+			GL_MAP_COHERENT_BIT);
+
         this->bind_attributes();
 
-        /* error_or() */
+	void *m = glMapBufferRange(GL_ARRAY_BUFFER,
+				   0,
+				   storage_size,
+				   GL_MAP_WRITE_BIT |
+				   GL_MAP_PERSISTENT_BIT |
+				   GL_MAP_FLUSH_EXPLICIT_BIT |
+				   GL_MAP_COHERENT_BIT);
+
+	this->map = reinterpret_cast<T*>(m);
+
+	this->buffers[0] = Storage<T>(0);
+	this->buffers[1] = Storage<T>(this->capacity);
+	this->buffers[2] = Storage<T>(this->capacity * 2);
+
+	this->active_next_index = 0;
+	this->active_command_index = 0;
+
         get_error();
     }
 
     ~DrawBuffer()
     {
+        this->bind();
+
+	this->buffers[1].sync();
+	this->buffers[2].sync();
+
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	glDeleteBuffers(1, &this->id);
+
         if (this->vao) {
             delete this->vao;
             this->vao = NULL;
@@ -71,8 +140,6 @@ public:
             delete program;
             this->program = NULL;
         }
-
-        this->drop();
     }
 
     /* fn bind_attributes(&self)-> Result<(), Error> { */
@@ -87,7 +154,7 @@ public:
 
         GLint element_size = (GLint) sizeof( T );
 
-        /* 
+        /*
         let index =
                     match self.program.find_attribute(attr.name) {
                         Ok(i) => i,
@@ -158,6 +225,20 @@ public:
         get_error();
     }
 
+    unsigned next_index() {
+      return this->active_next_index;
+    }
+
+    /// Swap the active and backed buffers
+    void swap() {
+      this->buffers[0].create_fence();
+      this->buffers[1].sync();
+      std::swap(this->buffers[0], this->buffers[1]);
+      std::swap(this->buffers[1], this->buffers[2]);
+      this->active_next_index = 0;
+      this->active_command_index = 0;
+    }
+
     void enable_attribute(const char* attr)
     {
         GLuint index = this->program->find_attribute(attr);
@@ -180,30 +261,14 @@ public:
 
     bool empty()
     {
-        return this->len == 0;
+        return this->active_next_index == this->active_command_index;
     }
 
-    /* impl<T> DrawBuffer<T> { */
-
-    /// Orphan the buffer (to avoid synchronization) and allocate a
-    /// new one.
-    ///
-    /// https://www.opengl.org/wiki/Buffer_Object_Streaming
-    void clear()
+    /// Called when the current batch is completed (the draw calls
+    /// have been done and we won't reference that data anymore)
+    void finish()
     {
-        this->bind();
-
-        // Compute the size of the buffer
-        size_t element_size = sizeof( T );
-        GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size);
-        glBufferData(   GL_ARRAY_BUFFER,
-                        storage_size,
-                        NULL,
-                        GL_DYNAMIC_DRAW);
-
-        this->len = 0;
-
-        get_error();
+      this->active_command_index = this->active_next_index;
     }
 
     /// Bind the buffer to the current VAO
@@ -215,56 +280,60 @@ public:
     void push_slice(T slice[], size_t n)
     {
         if (n > this->remaining_capacity() ) {
-            printf("DrawBuffer::push_slice() - Out of memory\n");
+            printf("DrawBuffer::push_slice() - Out of memory \n");
             return;
         }
 
-        size_t element_size = sizeof( T );
+	memcpy(this->map + this->buffers[0].offset + this->active_next_index,
+	       slice,
+	       n * sizeof(T));
 
-        size_t offset;
-        if (this->lifo) {
-            offset = this->capacity - this->len - n;
-        } else {
-            offset = this->len;
-        }
-
-        size_t offset_bytes = offset * element_size;
-        
-        size_t size_bytes = n * element_size;
-
-        this->bind();
-
-        glBufferSubData(GL_ARRAY_BUFFER,
-                        (GLintptr) offset_bytes,
-                        (GLintptr) size_bytes,
-                        slice);
-
-        get_error();
-        
-        this->len += n;
+	this->active_next_index += n;
     }
 
     void draw(GLenum mode)
     {
+        if (this->empty()) {
+	  return;
+	}
+
         this->vao->bind();
         this->program->bind();
 
-        GLint first = this->lifo ? (GLint) this->remaining_capacity() : 0;
+	unsigned start = this->buffers[0].offset + this->active_command_index;
+	unsigned len = this->active_next_index - this->active_command_index;
 
-        glDrawArrays(mode, first, (GLsizei) this->len);
+	// Length in number of vertices
+        glDrawArrays(mode, start, len);
 
         get_error();
     }
-    
-    size_t remaining_capacity()
-    {
-        return this->capacity - this->len;
+
+    void pre_bind() {
+        this->vao->bind();
+	this->program->bind();
     }
 
-    /* impl<T> Drop for DrawBuffer<T> { */
-    void drop()
+    void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-        glDeleteBuffers(1, &this->id);
+        if (this->empty()) {
+	  return;
+	}
+
+	GLint base = this->buffers[0].offset;
+
+        glDrawElementsBaseVertex(mode,
+				 count,
+				 GL_UNSIGNED_SHORT,
+				 indices,
+				 base);
+
+        get_error();
+    }
+
+    size_t remaining_capacity()
+    {
+      return this->capacity - this->active_next_index;
     }
 };
 

@@ -2,19 +2,19 @@
 #ifndef GL_RENDERER_H
 #define GL_RENDERER_H
 
+#include <glsm/glsmsym.h>
+#include <vector>
+#include <cstdio>
+#include <stdint.h>
+
+#include "libretro.h"
+
 #include "../retrogl/buffer.h"
 #include "../retrogl/shader.h"
 #include "../retrogl/program.h"
 #include "../retrogl/texture.h"
 #include "../retrogl/framebuffer.h"
 #include "../retrogl/error.h"
-
-#include "libretro.h"
-#include <glsm/glsmsym.h>
-
-#include <vector>
-#include <cstdio>
-#include <stdint.h>
 
 extern retro_environment_t environ_cb;
 extern retro_video_refresh_t video_cb;
@@ -24,7 +24,9 @@ const uint16_t VRAM_HEIGHT = 512;
 const size_t VRAM_PIXELS = (size_t) VRAM_WIDTH_PIXELS * (size_t) VRAM_HEIGHT;
 
 /// How many vertices we buffer before forcing a draw
-static const unsigned int VERTEX_BUFFER_LEN = 2048;
+static const unsigned int VERTEX_BUFFER_LEN = 0x8000;
+/// Maximum number of indices for a vertex buffer
+static const unsigned int INDEX_BUFFER_LEN = VERTEX_BUFFER_LEN;
 
 struct DrawConfig {
     uint16_t display_top_left[2];
@@ -89,18 +91,37 @@ enum SemiTransparencyMode {
     SemiTransparencyMode_AddQuarterSource = 3,
 };
 
+struct TransparencyIndex {
+    SemiTransparencyMode transparency_mode;
+    unsigned last_index;
+    GLenum draw_mode;
+
+  TransparencyIndex(SemiTransparencyMode transparency_mode,
+		    unsigned last_index,
+		    GLenum draw_mode)
+    :transparency_mode(transparency_mode),
+     last_index(last_index),
+     draw_mode(draw_mode)
+  {
+  }
+};
+
 class GlRenderer {
 public:
     /// Buffer used to handle PlayStation GPU draw commands
     DrawBuffer<CommandVertex>* command_buffer;
+    GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
+    GLushort opaque_line_indices[INDEX_BUFFER_LEN];
+    GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
     /// Primitive type for the vertices in the command buffers
     /// (TRIANGLES or LINES)
     GLenum command_draw_mode;
-    /// Temporary buffer holding vertices for semi-transparent draw
-    /// commands.
-    std::vector<CommandVertex> semi_transparent_vertices;
-    /// Transparency mode for semi-transparent commands
+    unsigned opaque_triangle_index_pos;
+    unsigned opaque_line_index_pos;
+    unsigned semi_transparent_index_pos;
+    /// Current semi-transparency mode
     SemiTransparencyMode semi_transparency_mode;
+    std::vector<TransparencyIndex> transparency_mode_index;
     /// Polygon mode (for wireframe)
     GLenum command_polygon_mode;
     /// Buffer used to draw to the frontend's framebuffer
@@ -147,24 +168,23 @@ public:
     template<typename T>
     static DrawBuffer<T>* build_buffer( const char* vertex_shader,
                                         const char* fragment_shader,
-                                        size_t capacity,
-                                        bool lifo  )
+                                        size_t capacity)
     {
         Shader* vs = new Shader(vertex_shader, GL_VERTEX_SHADER);
         Shader* fs = new Shader(fragment_shader, GL_FRAGMENT_SHADER);
         Program* program = new Program(vs, fs);
 
-        return new DrawBuffer<T>(capacity, program, lifo);
+        return new DrawBuffer<T>(capacity, program);
     }
 
     void draw();
     void apply_scissor();
     void bind_libretro_framebuffer();
-    void upload_textures(   uint16_t top_left[2], 
+    void upload_textures(   uint16_t top_left[2],
                             uint16_t dimensions[2],
                             uint16_t pixel_buffer[VRAM_PIXELS]);
 
-    void upload_vram_window(uint16_t top_left[2], 
+    void upload_vram_window(uint16_t top_left[2],
                             uint16_t dimensions[2],
                             uint16_t pixel_buffer[VRAM_PIXELS]);
 
@@ -172,9 +192,6 @@ public:
     void prepare_render();
     bool refresh_variables();
     void finalize_frame();
-    void maybe_force_draw(  size_t nvertices, GLenum draw_mode, 
-                            bool semi_transparent, 
-                            SemiTransparencyMode semi_transparency_mode);
 
     void set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
     void set_draw_offset(int16_t x, int16_t y);
@@ -182,11 +199,15 @@ public:
     void set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
           uint8_t twy);
 
-    void set_display_mode(  uint16_t top_left[2], 
+    void set_display_mode(  uint16_t top_left[2],
                             uint16_t resolution[2],
                             bool depth_24bpp);
     void set_display_off(bool off);
 
+    void push_primitive(CommandVertex *v,
+			unsigned count,
+			GLenum mode,
+			SemiTransparencyMode semi_transparency_mode);
 
     void push_triangle( CommandVertex v[3],
                         SemiTransparencyMode semi_transparency_mode);
@@ -197,11 +218,11 @@ public:
     void push_line( CommandVertex v[2],
                     SemiTransparencyMode semi_transparency_mode);
 
-    void fill_rect( uint8_t color[3], 
-                    uint16_t top_left[2], 
+    void fill_rect( uint8_t color[3],
+                    uint16_t top_left[2],
                     uint16_t dimensions[2]);
 
-    void copy_rect( uint16_t source_top_left[2], 
+    void copy_rect( uint16_t source_top_left[2],
                     uint16_t target_top_left[2],
                     uint16_t dimensions[2]);
 

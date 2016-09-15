@@ -23,7 +23,6 @@ extern "C" unsigned char widescreen_hack;
 
 GlRenderer::GlRenderer(DrawConfig* config)
 {
-
     struct retro_variable var = {0};
 
     var.key = "beetle_psx_internal_resolution";
@@ -85,26 +84,23 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
-    DrawBuffer<CommandVertex>* opaque_command_buffer =
+    DrawBuffer<CommandVertex>* command_buffer =
         GlRenderer::build_buffer<CommandVertex>(
             command_vertex,
             command_fragment,
-            VERTEX_BUFFER_LEN,
-            true);
+            VERTEX_BUFFER_LEN);
 
     DrawBuffer<OutputVertex>* output_buffer =
         GlRenderer::build_buffer<OutputVertex>(
             output_vertex,
             output_fragment,
-            4,
-            false);
+            4);
 
     DrawBuffer<ImageLoadVertex>* image_load_buffer =
         GlRenderer::build_buffer<ImageLoadVertex>(
             image_load_vertex,
             image_load_fragment,
-            4,
-            false);
+            4);
 
     uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
     uint32_t native_height = (uint32_t) VRAM_HEIGHT;
@@ -117,14 +113,14 @@ GlRenderer::GlRenderer(DrawConfig* config)
     if (depth > 16) {
         // Dithering is superfluous when we increase the internal
         // color depth
-        opaque_command_buffer->disable_attribute("dither");
+        command_buffer->disable_attribute("dither");
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
-    opaque_command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
-    opaque_command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
+    command_buffer->program->uniform1ui("texture_flt", this->filter_type);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -148,11 +144,12 @@ GlRenderer::GlRenderer(DrawConfig* config)
                                          GL_DEPTH_COMPONENT32F);
 
 
-    // let mut state = GlRenderer {
-    this->filter_type    = filter;
-    this->command_buffer = opaque_command_buffer;
+    this->filter_type = filter;
+    this->command_buffer = command_buffer;
+    this->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+    this->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+    this->semi_transparent_index_pos = 0;
     this->command_draw_mode = GL_TRIANGLES;
-    this->semi_transparent_vertices.reserve((size_t) VERTEX_BUFFER_LEN);
     this->semi_transparency_mode =  SemiTransparencyMode_Average;
     this->command_polygon_mode = command_draw_mode;
     this->output_buffer = output_buffer;
@@ -173,12 +170,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->display_vram = display_vram;
     this->mask_set_or  = 0;
     this->mask_eval_and = 0;
-    // }
 
-
-    //// NOTE: r5 - I have no idea what a borrow checker is.
-    // Yet an other copy of this 1MB array to make the borrow
-    // checker happy...
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
     this->upload_textures(top_left, dimensions, GPU->vram);
@@ -223,25 +215,10 @@ GlRenderer::~GlRenderer()
     }
 }
 
-/*
-template<typename T>
-static DrawBuffer<T>* GlRenderer::build_buffer( const char** vertex_shader,
-                                                const char** fragment_shader,
-                                                size_t capacity,
-                                                bool lifo  )
-{
-    Shader* vs = new Shader(vertex_shader, GL_VERTEX_SHADER);
-    Shader* fs = new Shader(fragment_shader, GL_FRAGMENT_SHADER);
-    Program* program = new Program(vs, fs);
-
-    return new DrawBuffer<T>(capacity, program, lifo);
-}
-*/
-
 void GlRenderer::draw()
 {
-    if (this->command_buffer->empty() && this->semi_transparent_vertices.empty())
-        return; // Nothing to be done
+    if (this->command_buffer->empty())
+      return; // Nothing to be done
 
     int16_t x = this->config->draw_offset[0];
     int16_t y = this->config->draw_offset[1];
@@ -258,68 +235,110 @@ void GlRenderer::draw()
     glClear(GL_DEPTH_BUFFER_BIT);
 
     // First we draw the opaque vertices
-    if (!this->command_buffer->empty()) {
-        glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-        glDisable(GL_BLEND);
+    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+    glDisable(GL_BLEND);
 
-        this->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
-        this->command_buffer->draw(this->command_draw_mode);
-        this->command_buffer->clear();
+    this->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
+
+    this->command_buffer->pre_bind();
+
+    GLushort *opaque_triangle_indices =
+      this->opaque_triangle_indices + this->opaque_triangle_index_pos + 1;
+    GLsizei opaque_triangle_len =
+      INDEX_BUFFER_LEN - this->opaque_triangle_index_pos - 1;
+
+    if (opaque_triangle_len) {
+      this->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
+						 opaque_triangle_indices,
+						 opaque_triangle_len);
     }
 
-    // Then the semi-transparent vertices
-    if (!this->semi_transparent_vertices.empty()) {
+    GLushort *opaque_line_indices =
+      this->opaque_line_indices + this->opaque_line_index_pos + 1;
+    GLsizei opaque_line_len =
+      INDEX_BUFFER_LEN - this->opaque_line_index_pos - 1;
 
-        // Emulation of the various PSX blending mode using a
-        // combination of constant alpha/color (to emulate
-        // constant 1/4 and 1/2 factors) and blending equation.
-        GLenum blend_func = GL_FUNC_ADD;
-        GLenum blend_src = GL_CONSTANT_ALPHA;
-        GLenum blend_dst = GL_CONSTANT_ALPHA;
-
-        switch (this->semi_transparency_mode) {
-        /* 0.5xB + 0.5 x F */
-        case SemiTransparencyMode_Average:
-            blend_func = GL_FUNC_ADD;
-            // Set to 0.5 with glBlendColor
-            blend_src = GL_CONSTANT_ALPHA;
-            blend_dst = GL_CONSTANT_ALPHA;
-            break;
-        /* 1.0xB + 1.0 x F */
-        case SemiTransparencyMode_Add:
-            blend_func = GL_FUNC_ADD;
-            blend_src = GL_ONE;
-            blend_dst = GL_ONE;
-            break;
-        /* 1.0xB - 1.0 x F */
-        case SemiTransparencyMode_SubtractSource:
-            blend_func = GL_FUNC_REVERSE_SUBTRACT;
-            blend_src = GL_ONE;
-            blend_dst = GL_ONE;
-            break;
-        case SemiTransparencyMode_AddQuarterSource:
-            blend_func = GL_FUNC_ADD;
-            blend_src = GL_CONSTANT_COLOR;
-            blend_dst = GL_ONE;
-            break;
-        }
-
-        glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-        glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
-        glEnable(GL_BLEND);
-
-        this->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
-
-        this->command_buffer->push_slice(&this->semi_transparent_vertices[0], this->semi_transparent_vertices.size());
-
-        this->command_buffer->draw(this->command_draw_mode);
-
-        this->command_buffer->clear();
-
-        this->semi_transparent_vertices.clear();
+    if (opaque_line_len) {
+      this->command_buffer->draw_indexed_no_bind(GL_LINES,
+						 opaque_line_indices,
+						 opaque_line_len);
     }
+
+    if (this->semi_transparent_index_pos > 0) {
+      // Semi-transparency pass
+
+      // Push the current semi-transparency mode
+      TransparencyIndex ti(this->semi_transparency_mode,
+			   this->semi_transparent_index_pos,
+			   this->command_draw_mode);
+
+      this->transparency_mode_index.push_back(ti);
+
+      glEnable(GL_BLEND);
+      this->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
+
+      unsigned cur_index = 0;
+
+      for (std::vector<TransparencyIndex>::iterator it =
+	     this->transparency_mode_index.begin();
+	   it != this->transparency_mode_index.end();
+	   ++it) {
+
+	if (it->last_index == cur_index)
+	  continue;
+
+	GLenum blend_func = GL_FUNC_ADD;
+	GLenum blend_src = GL_CONSTANT_ALPHA;
+	GLenum blend_dst = GL_CONSTANT_ALPHA;
+
+	switch (it->transparency_mode) {
+	  /* 0.5xB + 0.5 x F */
+	case SemiTransparencyMode_Average:
+	  blend_func = GL_FUNC_ADD;
+	  // Set to 0.5 with glBlendColor
+	  blend_src = GL_CONSTANT_ALPHA;
+	  blend_dst = GL_CONSTANT_ALPHA;
+	  break;
+	  /* 1.0xB + 1.0 x F */
+	case SemiTransparencyMode_Add:
+	  blend_func = GL_FUNC_ADD;
+	  blend_src = GL_ONE;
+	  blend_dst = GL_ONE;
+	  break;
+	  /* 1.0xB - 1.0 x F */
+	case SemiTransparencyMode_SubtractSource:
+	  blend_func = GL_FUNC_REVERSE_SUBTRACT;
+	  blend_src = GL_ONE;
+	  blend_dst = GL_ONE;
+	  break;
+	case SemiTransparencyMode_AddQuarterSource:
+	  blend_func = GL_FUNC_ADD;
+	  blend_src = GL_CONSTANT_COLOR;
+	  blend_dst = GL_ONE;
+	  break;
+	}
+
+	glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+	glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+
+	unsigned len = it->last_index - cur_index;
+	GLushort *indices = this->semi_transparent_indices + cur_index;
+
+	this->command_buffer->draw_indexed_no_bind(it->draw_mode,
+						   indices,
+						   len);
+
+	cur_index = it->last_index;
+      }
+    }
+
+    this->command_buffer->finish();
 
     this->primitive_ordering = 0;
+    this->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+    this->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+    this->semi_transparent_index_pos = 0;
+    this->transparency_mode_index.clear();
 }
 
 void GlRenderer::apply_scissor()
@@ -402,9 +421,9 @@ void GlRenderer::bind_libretro_framebuffer()
     glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
-void GlRenderer::upload_textures(   uint16_t top_left[2],
-                                    uint16_t dimensions[2],
-                                    uint16_t pixel_buffer[VRAM_PIXELS])
+void GlRenderer::upload_textures(uint16_t top_left[2],
+                                 uint16_t dimensions[2],
+                                 uint16_t pixel_buffer[VRAM_PIXELS])
 {
     this->draw();
 
@@ -413,7 +432,6 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
                                     GL_RGBA,
                                     GL_UNSIGNED_SHORT_1_5_5_5_REV,
                                     pixel_buffer);
-    this->image_load_buffer->clear();
 
     uint16_t x_start    = top_left[0];
     uint16_t x_end      = x_start + dimensions[0];
@@ -445,6 +463,7 @@ void GlRenderer::upload_textures(   uint16_t top_left[2],
     Framebuffer _fb = Framebuffer(this->fb_out);
 
     this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    this->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -457,14 +476,12 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
 {
     this->draw();
 
-    this->fb_texture->set_sub_image_window( top_left,
-                                            dimensions,
-                                            (size_t) VRAM_WIDTH_PIXELS,
-                                            GL_RGBA,
-                                            GL_UNSIGNED_SHORT_1_5_5_5_REV,
-                                            pixel_buffer);
-
-    this->image_load_buffer->clear();
+    this->fb_texture->set_sub_image_window(top_left,
+                                           dimensions,
+                                           (size_t) VRAM_WIDTH_PIXELS,
+                                           GL_RGBA,
+                                           GL_UNSIGNED_SHORT_1_5_5_5_REV,
+                                           pixel_buffer);
 
     uint16_t x_start    = top_left[0];
     uint16_t x_end      = x_start + dimensions[0];
@@ -493,6 +510,7 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
     Framebuffer _fb = Framebuffer(this->fb_out);
 
     this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    this->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -694,9 +712,7 @@ void GlRenderer::finalize_frame()
     if (config->display_off && !this->display_vram) {
         glClearColor(0.0, 0.0, 0.0, 0.0);
         glClear(GL_COLOR_BUFFER_BIT);
-    }
-
-    else {
+    } else {
         // Bind 'fb_out' to texture unit 1
         this->fb_out->bind(GL_TEXTURE1);
 
@@ -718,8 +734,6 @@ void GlRenderer::finalize_frame()
 	  depth_24bpp = 0;
 	}
 
-        this->output_buffer->clear();
-
         OutputVertex slice[4] =
         {
             { {-1.0, -1.0}, {0,         fb_height}   },
@@ -729,21 +743,19 @@ void GlRenderer::finalize_frame()
         };
         this->output_buffer->push_slice(slice, 4);
 
-
         this->output_buffer->program->uniform1i("fb", 1);
         this->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
         this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
         this->output_buffer->program->uniform1ui( "internal_upscaling",
                                                     this->internal_upscaling);
         this->output_buffer->draw(GL_TRIANGLE_STRIP);
+	this->output_buffer->swap();
     }
 
     // Hack: copy fb_out back into fb_texture at the end of every
     // frame to make offscreen rendering kinda sorta work. Very messy
     // and slow.
     {
-      this->image_load_buffer->clear();
-
       ImageLoadVertex slice[4] =
 	{
 	  {   {0,    0 }   },
@@ -767,6 +779,7 @@ void GlRenderer::finalize_frame()
 
 
       this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+      this->image_load_buffer->swap();
     }
 
     // Cleanup OpenGL context before returning to the frontend
@@ -788,43 +801,6 @@ void GlRenderer::finalize_frame()
     // in the framebuffer.
     video_cb(   RETRO_HW_FRAME_BUFFER_VALID, this->frontend_resolution[0],
                 this->frontend_resolution[1], 0);
-}
-/// Check if a new primitive's attributes are somehow incompatible
-/// with the ones currently buffered, in which case we must force
-/// a draw to flush the buffers.
-void GlRenderer::maybe_force_draw(  size_t nvertices,
-                                    GLenum draw_mode,
-                                    bool semi_transparent,
-                                    SemiTransparencyMode semi_transparency_mode)
-{
-    /* std::vector grows as much as we want. 'semi_transparent_vertices' is meant
-    to have a capacity of VERTEX_BUFFER_LEN. We'll use that constant in the
-    subtraction below. */
-    size_t semi_transparent_remaining_capacity =
-        (size_t) VERTEX_BUFFER_LEN
-        - this->semi_transparent_vertices.size();
-
-    bool force_draw =
-        // Check if we have enough room left in the buffer
-        this->command_buffer->remaining_capacity() < nvertices ||
-        semi_transparent_remaining_capacity < nvertices ||
-        // Check if we're changing the draw mode (line <=> triangle)
-        this->command_draw_mode != draw_mode ||
-        // Check if we're changing the semi-transparency mode
-        (semi_transparent &&
-        !this->semi_transparent_vertices.empty() &&
-        this->semi_transparency_mode != semi_transparency_mode);
-
-    if (force_draw) {
-        this->draw();
-
-        // Update the state machine for the next primitive
-        this->command_draw_mode = draw_mode;
-    }
-
-    if (semi_transparent) {
-      this->semi_transparency_mode = semi_transparency_mode;
-    }
 }
 
 void GlRenderer::set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
@@ -883,114 +859,91 @@ void GlRenderer::set_display_off(bool off)
   this->config->display_off = off;
 }
 
+void GlRenderer::push_primitive(CommandVertex *v,
+				unsigned count,
+				GLenum mode,
+				SemiTransparencyMode semi_transparency_mode) {
+
+  bool is_textured = v[0].texture_blend_mode != 0;
+  bool is_semi_transparent = v[0].semi_transparent == 1;
+  // Textured semi-transparent polys can contain opaque texels (when
+  // bit 15 of the color is set to 0). Therefore they're drawn twice,
+  // once for the opaque texels and once for the semi-transparent
+  // ones. Only untextured semi-transparent triangles don't need to be
+  // drawn as opaque.
+  bool is_opaque = !is_semi_transparent || is_textured;
+
+  bool buffer_full = this->command_buffer->remaining_capacity() < count;
+
+  if (buffer_full) {
+    this->draw();
+    this->command_buffer->swap();
+  }
+
+  int16_t z = this->primitive_ordering;
+  this->primitive_ordering += 1;
+
+  for (unsigned i = 0; i < count; i++) {
+    v[i].position[2] = z;
+    v[i].texture_window[0] = tex_x_mask;
+    v[i].texture_window[1] = tex_x_or;
+    v[i].texture_window[2] = tex_y_mask;
+    v[i].texture_window[3] = tex_y_or;
+  }
+
+  if (is_semi_transparent &&
+      (semi_transparency_mode != this->semi_transparency_mode ||
+       mode != this->command_draw_mode)) {
+    // We're changing the transparency mode
+    TransparencyIndex ti(this->semi_transparency_mode,
+			 this->semi_transparent_index_pos,
+			 this->command_draw_mode);
+
+    this->transparency_mode_index.push_back(ti);
+    this->semi_transparency_mode = semi_transparency_mode;
+    this->command_draw_mode = mode;
+  }
+
+  unsigned index = this->command_buffer->next_index();
+
+  for (unsigned i = 0; i < count; i++) {
+    if (is_opaque) {
+      if (mode == GL_TRIANGLES) {
+	this->opaque_triangle_indices[this->opaque_triangle_index_pos--] =
+	  index;
+      } else {
+	this->opaque_line_indices[this->opaque_line_index_pos--] =
+	  index;
+      }
+    }
+
+    if (is_semi_transparent) {
+      this->semi_transparent_indices[this->semi_transparent_index_pos++]
+	= index;
+    }
+
+    index++;
+  }
+
+  this->command_buffer->push_slice(v, count);
+}
+
 void GlRenderer::push_triangle( CommandVertex v[3],
                                 SemiTransparencyMode semi_transparency_mode)
 {
-    this->maybe_force_draw( 3, GL_TRIANGLES,
-                            v[0].semi_transparent == 1,
-                            semi_transparency_mode);
-
-    int16_t z = this->primitive_ordering;
-    this->primitive_ordering += 1;
-
-    size_t slice_len = 3;
-    size_t i;
-
-    for (i = 0; i < slice_len; ++i) {
-        v[i].position[2] = z;
-	v[i].texture_window[0] = tex_x_mask;
-	v[i].texture_window[1] = tex_x_or;
-	v[i].texture_window[2] = tex_y_mask;
-	v[i].texture_window[3] = tex_y_or;
-    }
-
-    bool needs_opaque_draw =
-        !(v[0].semi_transparent == 1) ||
-        // Textured semi-transparent polys can contain opaque
-        // texels (when bit 15 of the color is set to
-        // 0). Therefore they're drawn twice, once for the opaque
-        // texels and once for the semi-transparent ones
-        v[0].texture_blend_mode != 0;
-
-    if (needs_opaque_draw) {
-        this->command_buffer->push_slice(v, slice_len);
-    }
-
-    if (v[0].semi_transparent == 1) {
-        /*  self.semi_transparent_vertices.extend_from_slice(&v); */
-        size_t i;
-        for (i = 0; i < slice_len; ++i) {
-            this->semi_transparent_vertices.push_back(v[i]);
-        }
-    }
+    this->push_primitive(v, 3, GL_TRIANGLES, semi_transparency_mode);
 }
 
-void GlRenderer::push_sprite( CommandVertex v[6],
-                                SemiTransparencyMode semi_transparency_mode)
+void GlRenderer::push_sprite(CommandVertex v[6],
+			     SemiTransparencyMode semi_transparency_mode)
 {
-    this->maybe_force_draw( 6, GL_TRIANGLES,
-                            v[0].semi_transparent == 1,
-                            semi_transparency_mode);
-
-    int16_t z = this->primitive_ordering;
-    this->primitive_ordering += 1;
-
-    size_t slice_len = 6;
-    size_t i;
-
-    for (i = 0; i < slice_len; ++i) {
-        v[i].position[2] = z;
-	v[i].texture_window[0] = tex_x_mask;
-	v[i].texture_window[1] = tex_x_or;
-	v[i].texture_window[2] = tex_y_mask;
-	v[i].texture_window[3] = tex_y_or;
-    }
-
-    bool needs_opaque_draw =
-        !(v[0].semi_transparent == 1) ||
-        // Textured semi-transparent polys can contain opaque
-        // texels (when bit 15 of the color is set to
-        // 0). Therefore they're drawn twice, once for the opaque
-        // texels and once for the semi-transparent ones
-        v[0].texture_blend_mode != 0;
-
-    if (needs_opaque_draw) {
-        this->command_buffer->push_slice(v, slice_len);
-    }
-
-    if (v[0].semi_transparent == 1) {
-        /*  self.semi_transparent_vertices.extend_from_slice(&v); */
-        size_t i;
-        for (i = 0; i < slice_len; ++i) {
-            this->semi_transparent_vertices.push_back(v[i]);
-        }
-    }
+    this->push_primitive(v, 6, GL_TRIANGLES, semi_transparency_mode);
 }
 
 void GlRenderer::push_line( CommandVertex v[2],
                             SemiTransparencyMode semi_transparency_mode)
 {
-    this->maybe_force_draw( 2, GL_LINES,
-                            v[0].semi_transparent == 1,
-                            semi_transparency_mode);
-
-    int16_t z = this->primitive_ordering;
-    this->primitive_ordering += 1;
-
-    size_t slice_len = 2;
-    size_t i;
-    for (i = 0; i < slice_len; ++i) {
-        v[i].position[2] = z;
-    }
-
-    if (v[0].semi_transparent == 1) {
-        size_t i;
-        for (i = 0; i < slice_len; ++i) {
-            this->semi_transparent_vertices.push_back(v[i]);
-        }
-    } else {
-        this->command_buffer->push_slice(v, slice_len);
-    }
+    this->push_primitive(v, 2, GL_LINES, semi_transparency_mode);
 }
 
 void GlRenderer::fill_rect( uint8_t color[3],
