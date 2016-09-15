@@ -58,6 +58,6 @@ Note that RetroArch does not currently have .pbp database due to variability in 
 * PSX Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems
 * PSX Last Scanline - Sets the last scanline to be drawn on screen
 * PSX Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems
-* Dualshock analog toggle - Enables/Disables the analog button from Dualshock controllers, if disabled analogs are always on, if enabled you can toggle it's state with START+SELECT+L1+L2+R1+R2
+* DualShock Analog button toggle - Enables/Disables the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2
 * Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1
 * Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2
