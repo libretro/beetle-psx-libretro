@@ -25,8 +25,10 @@ const size_t VRAM_PIXELS = (size_t) VRAM_WIDTH_PIXELS * (size_t) VRAM_HEIGHT;
 
 /// How many vertices we buffer before forcing a draw
 static const unsigned int VERTEX_BUFFER_LEN = 0x8000;
-/// Maximum number of indices for a vertex buffer
-static const unsigned int INDEX_BUFFER_LEN = VERTEX_BUFFER_LEN;
+/// Maximum number of indices for a vertex buffer. Since quads have
+/// two duplicated vertices it can be up to 3/2 the vertex buffer
+/// length
+static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
 struct DrawConfig {
     uint16_t display_top_left[2];
@@ -204,15 +206,20 @@ public:
                             bool depth_24bpp);
     void set_display_off(bool off);
 
+    void vertex_preprocessing(CommandVertex *v,
+			      unsigned count,
+			      GLenum mode,
+			      SemiTransparencyMode stm);
+
+    void push_quad(CommandVertex v[4],
+		   SemiTransparencyMode semi_transparency_mode);
+
     void push_primitive(CommandVertex *v,
 			unsigned count,
 			GLenum mode,
 			SemiTransparencyMode semi_transparency_mode);
 
     void push_triangle( CommandVertex v[3],
-                        SemiTransparencyMode semi_transparency_mode);
-
-    void push_sprite( CommandVertex v[6],
                         SemiTransparencyMode semi_transparency_mode);
 
     void push_line( CommandVertex v[2],

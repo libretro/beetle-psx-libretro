@@ -43,7 +43,27 @@
 			 uint8_t texture_blend_mode,
 			 uint8_t depth_shift,
 			 bool dither,
-          int blend_mode);
+			 int blend_mode);
+
+  void rsx_gl_push_quad(int16_t p0x, int16_t p0y,
+			int16_t p1x, int16_t p1y,
+			int16_t p2x, int16_t p2y,
+			int16_t p3x, int16_t p3y,
+			uint32_t c0,
+			uint32_t c1,
+			uint32_t c2,
+			uint32_t c3,
+			uint16_t t0x, uint16_t t0y,
+			uint16_t t1x, uint16_t t1y,
+			uint16_t t2x, uint16_t t2y,
+			uint16_t t3x, uint16_t t3y,
+			uint16_t texpage_x, uint16_t texpage_y,
+			uint16_t clut_x, uint16_t clut_y,
+			uint8_t texture_blend_mode,
+			uint8_t depth_shift,
+			bool dither,
+			int blend_mode);
+
 
   void rsx_gl_push_line(int16_t p0x, int16_t p0y,
 		     int16_t p1x, int16_t p1y,

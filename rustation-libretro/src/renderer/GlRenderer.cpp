@@ -859,20 +859,11 @@ void GlRenderer::set_display_off(bool off)
   this->config->display_off = off;
 }
 
-void GlRenderer::push_primitive(CommandVertex *v,
-				unsigned count,
-				GLenum mode,
-				SemiTransparencyMode semi_transparency_mode) {
-
-  bool is_textured = v[0].texture_blend_mode != 0;
+void GlRenderer::vertex_preprocessing(CommandVertex *v,
+				      unsigned count,
+				      GLenum mode,
+				      SemiTransparencyMode stm) {
   bool is_semi_transparent = v[0].semi_transparent == 1;
-  // Textured semi-transparent polys can contain opaque texels (when
-  // bit 15 of the color is set to 0). Therefore they're drawn twice,
-  // once for the opaque texels and once for the semi-transparent
-  // ones. Only untextured semi-transparent triangles don't need to be
-  // drawn as opaque.
-  bool is_opaque = !is_semi_transparent || is_textured;
-
   bool buffer_full = this->command_buffer->remaining_capacity() < count;
 
   if (buffer_full) {
@@ -892,7 +883,7 @@ void GlRenderer::push_primitive(CommandVertex *v,
   }
 
   if (is_semi_transparent &&
-      (semi_transparency_mode != this->semi_transparency_mode ||
+      (stm != this->semi_transparency_mode ||
        mode != this->command_draw_mode)) {
     // We're changing the transparency mode
     TransparencyIndex ti(this->semi_transparency_mode,
@@ -900,9 +891,59 @@ void GlRenderer::push_primitive(CommandVertex *v,
 			 this->command_draw_mode);
 
     this->transparency_mode_index.push_back(ti);
-    this->semi_transparency_mode = semi_transparency_mode;
+    this->semi_transparency_mode = stm;
     this->command_draw_mode = mode;
   }
+}
+
+void GlRenderer::push_quad(CommandVertex v[4],
+			   SemiTransparencyMode stm) {
+  bool is_semi_transparent = v[0].semi_transparent == 1;
+  bool is_textured = v[0].texture_blend_mode != 0;
+  // Textured semi-transparent polys can contain opaque texels (when
+  // bit 15 of the color is set to 0). Therefore they're drawn twice,
+  // once for the opaque texels and once for the semi-transparent
+  // ones. Only untextured semi-transparent triangles don't need to be
+  // drawn as opaque.
+  bool is_opaque = !is_semi_transparent || is_textured;
+
+  this->vertex_preprocessing(v, 4, GL_TRIANGLES, stm);
+
+  // The diagonal is duplicated
+  static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
+
+  unsigned index = this->command_buffer->next_index();
+
+  for (unsigned i = 0; i < 6; i++) {
+    if (is_opaque) {
+      this->opaque_triangle_indices[this->opaque_triangle_index_pos--] =
+	index + indices[i];
+    }
+
+    if (is_semi_transparent) {
+      this->semi_transparent_indices[this->semi_transparent_index_pos++]
+	= index + indices[i];
+    }
+  }
+
+  this->command_buffer->push_slice(v, 4);
+}
+
+void GlRenderer::push_primitive(CommandVertex *v,
+				unsigned count,
+				GLenum mode,
+				SemiTransparencyMode stm) {
+
+  bool is_semi_transparent = v[0].semi_transparent == 1;
+  bool is_textured = v[0].texture_blend_mode != 0;
+  // Textured semi-transparent polys can contain opaque texels (when
+  // bit 15 of the color is set to 0). Therefore they're drawn twice,
+  // once for the opaque texels and once for the semi-transparent
+  // ones. Only untextured semi-transparent triangles don't need to be
+  // drawn as opaque.
+  bool is_opaque = !is_semi_transparent || is_textured;
+
+  this->vertex_preprocessing(v, count, mode, stm);
 
   unsigned index = this->command_buffer->next_index();
 
@@ -932,12 +973,6 @@ void GlRenderer::push_triangle( CommandVertex v[3],
                                 SemiTransparencyMode semi_transparency_mode)
 {
     this->push_primitive(v, 3, GL_TRIANGLES, semi_transparency_mode);
-}
-
-void GlRenderer::push_sprite(CommandVertex v[6],
-			     SemiTransparencyMode semi_transparency_mode)
-{
-    this->push_primitive(v, 6, GL_TRIANGLES, semi_transparency_mode);
 }
 
 void GlRenderer::push_line( CommandVertex v[2],

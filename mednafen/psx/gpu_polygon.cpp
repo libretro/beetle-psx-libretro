@@ -240,6 +240,21 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    int32 clipy0 = ClipY0 << upscale_shift;
    int32 clipy1 = ClipY1 << upscale_shift;
 
+   //
+   // Sort vertices by y.
+   //
+   if(vertices[2].y < vertices[1].y)
+     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+
+   if(vertices[1].y < vertices[0].y)
+     vertex_swap(tri_vertex, vertices[0], vertices[1]);
+
+   if(vertices[2].y < vertices[1].y)
+     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+
+   if(vertices[0].y == vertices[2].y)
+     return;
+
    if(!CalcIDeltas(idl, vertices[0], vertices[1], vertices[2]))
       return;
 
@@ -496,22 +511,9 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       }
    }
 
-   //
-   // Sort vertices by y.
-   //
-   if(vertices[2].y < vertices[1].y)
-     vertex_swap(tri_vertex, vertices[1], vertices[2]);
-
-   if(vertices[1].y < vertices[0].y)
-     vertex_swap(tri_vertex, vertices[0], vertices[1]);
-
-   if(vertices[2].y < vertices[1].y)
-     vertex_swap(tri_vertex, vertices[1], vertices[2]);
-
-   if(vertices[0].y == vertices[2].y)
-     return;
-
-   if((vertices[2].y - vertices[0].y) >= (512 << upscale_shift))
+   if(abs(vertices[2].y - vertices[0].y) >= (512 << upscale_shift) ||
+      abs(vertices[2].y - vertices[1].y) >= (512 << upscale_shift) ||
+      abs(vertices[1].y - vertices[0].y) >= (512 << upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
        return;
@@ -538,21 +540,62 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          blend_mode = BLEND_MODE_ADD;
    }
 
-   rsx_intf_push_triangle(vertices[0].x, vertices[0].y,
-         vertices[1].x, vertices[1].y,
-         vertices[2].x, vertices[2].y,
-         ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16),
-         ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16),
-			  ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16),
-         vertices[0].u, vertices[0].v,
-         vertices[1].u, vertices[1].v,
-         vertices[2].u, vertices[2].v,
-         this->TexPageX, this->TexPageY,
-         clut_x, clut_y,
-         blend_mode,
-         2 - TexMode_TA,
-         DitherEnabled(),
-         BlendMode);
+   if (numvertices == 4) {
+     if (InCmd == INCMD_NONE) {
+       // We have 4 quad vertices, we can push that at once
+       tri_vertex *first = &InQuad_F3Vertices[0];
+
+       rsx_intf_push_quad(first->x, first->y,
+			  vertices[0].x, vertices[0].y,
+			  vertices[1].x, vertices[1].y,
+			  vertices[2].x, vertices[2].y,
+			  ((uint32_t)first->r) |
+			  ((uint32_t)first->g << 8) |
+			  ((uint32_t)first->b << 16),
+			  ((uint32_t)vertices[0].r) |
+			  ((uint32_t)vertices[0].g << 8) |
+			  ((uint32_t)vertices[0].b << 16),
+			  ((uint32_t)vertices[1].r) |
+			  ((uint32_t)vertices[1].g << 8) |
+			  ((uint32_t)vertices[1].b << 16),
+			  ((uint32_t)vertices[2].r) |
+			  ((uint32_t)vertices[2].g << 8) |
+			  ((uint32_t)vertices[2].b << 16),
+			  first->u, first->v,
+			  vertices[0].u, vertices[0].v,
+			  vertices[1].u, vertices[1].v,
+			  vertices[2].u, vertices[2].v,
+			  this->TexPageX, this->TexPageY,
+			  clut_x, clut_y,
+			  blend_mode,
+			  2 - TexMode_TA,
+			  DitherEnabled(),
+			  BlendMode);
+     }
+   } else {
+     // Push a single triangle
+     rsx_intf_push_triangle(vertices[0].x, vertices[0].y,
+			    vertices[1].x, vertices[1].y,
+			    vertices[2].x, vertices[2].y,
+			    ((uint32_t)vertices[0].r) |
+			    ((uint32_t)vertices[0].g << 8) |
+			    ((uint32_t)vertices[0].b << 16),
+			    ((uint32_t)vertices[1].r) |
+			    ((uint32_t)vertices[1].g << 8) |
+			    ((uint32_t)vertices[1].b << 16),
+			    ((uint32_t)vertices[2].r) |
+			    ((uint32_t)vertices[2].g << 8) |
+			    ((uint32_t)vertices[2].b << 16),
+			    vertices[0].u, vertices[0].v,
+			    vertices[1].u, vertices[1].v,
+			    vertices[2].u, vertices[2].v,
+			    this->TexPageX, this->TexPageY,
+			    clut_x, clut_y,
+			    blend_mode,
+			    2 - TexMode_TA,
+			    DitherEnabled(),
+			    BlendMode);
+   }
 
    if (rsx_intf_has_software_renderer())
       DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);

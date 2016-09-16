@@ -122,16 +122,10 @@ void rsx_gl_push_sprite(
       int16_t p2y,
       int16_t p3x,
       int16_t p3y,
-      int16_t p4x,
-      int16_t p4y,
-      int16_t p5x,
-      int16_t p5y,
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
       uint32_t c3,
-      uint32_t c4,
-      uint32_t c5,
       uint16_t t0x,
       uint16_t t0y,
       uint16_t t1x,
@@ -140,10 +134,6 @@ void rsx_gl_push_sprite(
       uint16_t t2y,
       uint16_t t3x,
       uint16_t t3y,
-      uint16_t t4x,
-      uint16_t t4y,
-      uint16_t t5x,
-      uint16_t t5y,
       uint16_t texpage_x,
       uint16_t texpage_y,
       uint16_t clut_x,
@@ -227,7 +217,7 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    if (rsx_intf_is_type() == RSX_OPENGL)
    {
-      rsx_gl_push_sprite(
+      rsx_intf_push_quad(
             x,                /* p0x */
             y,                /* p0y */
             x + w,            /* p1x */
@@ -235,27 +225,17 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             x,                /* p2x */
             y + h,            /* p2y */
             x + w,            /* p3x */
-            y,                /* p3y */
-            x,                /* p4x */
-            y + h,            /* p4y */
-            x + w,            /* p5x */
-            y + h,            /* p5y */
+            y + h,            /* p3y */
             color,            /* c0 */
             color,            /* c1 */
             color,            /* c2 */
             color,            /* c3 */
-            color,            /* c4 */
-            color,            /* c5 */
             u,                /* t0x */
             v,                /* t0y */
             u + w,            /* t1x */
             v,                /* t1y */
             u,                /* t2x */
             v + h,            /* t2y */
-            u + w,            /* t3x */
-            v,                /* t3y */
-            u,                /* t4x */
-            v + h,            /* t4y */
             u + w,            /* t5x */
             v + h,            /* t5y */
             this->TexPageX,
