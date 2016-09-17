@@ -241,7 +241,12 @@ public:
 
     void enable_attribute(const char* attr)
     {
-        GLuint index = this->program->find_attribute(attr);
+        GLint index = this->program->find_attribute(attr);
+
+        if (index < 0) {
+          return;
+        }
+
         this->vao->bind();
 
         glEnableVertexAttribArray(index);
@@ -251,7 +256,12 @@ public:
 
     void disable_attribute(const char* attr)
     {
-        GLuint index = this->program->find_attribute(attr);
+        GLint index = this->program->find_attribute(attr);
+
+        if (index < 0) {
+          return;
+        }
+
         this->vao->bind();
 
         glDisableVertexAttribArray(index);
