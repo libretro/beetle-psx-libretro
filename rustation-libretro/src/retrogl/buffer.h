@@ -33,12 +33,19 @@ struct Storage {
   {
   }
 
+  ~Storage() {
+    if (this->fence) {
+      glDeleteSync(this->fence);
+    }
+  }
+
   // Wait for the buffer to be ready for reuse
   void sync() {
     if (this->fence) {
       glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
-      get_error();
+      glDeleteSync(this->fence);
       this->fence = NULL;
+      get_error();
     }
   }
 
