@@ -49,7 +49,7 @@ MDFN_Error::~MDFN_Error()
 {
    if(error_message)
    {
-      free(error_message);
+      delete [] error_message;
       error_message = NULL;
    }
 }
