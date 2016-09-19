@@ -154,7 +154,7 @@ void InputDevice_DualShock::SetAMCT(bool enabled)
    else
       analog_mode = true;
 
-   MDFN_DispMessage(_("%s: Analog toggle is %s, sticks are %s"), gp_name.c_str(), amct_enabled ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
+   MDFN_DispMessage(_("%s: Analog button toggle is %s, sticks are %s"), gp_name.c_str(), amct_enabled ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
 }
 
 //
