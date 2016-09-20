@@ -55,7 +55,7 @@ Note that RetroArch does not currently have .pbp database due to variability in 
 * Renderer (restart) - 'software' or 'opengl'. 'opengl' uses the OpenGL API to accelerate tasks like upscaling.
 * Software framebuffer - If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.
 * CD Image Cache - Loads the complete image in memory at startup.
-* CPU Overclock - Gets rid of memory acces latency and makes all GTE instructions have 1 cycle latency and memory.
+* CPU Overclock - Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
 * Skip BIOS - Self-explanatory. Some games have issues when enabled.
 * Widescreen mode hack - If on, renders in 16:9. Works best on 3D games.
 * Internal GPU resolution - Graphics upscaling.
