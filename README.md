@@ -52,12 +52,32 @@ Note that RetroArch does not currently have .pbp database due to variability in 
 
 ## Options
 
-* CD Image Cache - Loads the complete image in memory at startup
-* PSX Dithering - Enables Dithering
-* PSX Initial Scanline - Sets the first scanline to be drawn on screen
-* PSX Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems
-* PSX Last Scanline - Sets the last scanline to be drawn on screen
-* PSX Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems
-* DualShock Analog button toggle - Enables/Disables the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2
-* Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1
-* Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2
+* Renderer (restart) - 'software' or 'opengl'. 'opengl' uses the OpenGL API to accelerate tasks like upscaling.
+* Software framebuffer - If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.
+* CD Image Cache - Loads the complete image in memory at startup.
+* CPU Overclock - Gets rid of memory acces latency and makes all GTE instructions have 1 cycle latency and memory.
+* Skip BIOS - Self-explanatory. Some games have issues when enabled.
+* Widescreen mode hack - If on, renders in 16:9. Works best on 3D games.
+* Internal GPU resolution - Graphics upscaling.
+* Texture filtering - Self-explanatory.
+* Internal color depth - PSX had 16bpp depth, beetle-psx can go up to 32bpp.
+* Scale dithering pattern with internal resolution - Self-explanatory
+* Wireframe mode - For debug use. Shows only the outlines of polygons. 
+* Display full VRAM - Everything in VRAM is drawn on screen.
+* Dithering pattern - If off, disables the dithering pattern the PSX applies to combat color banding.
+* GTE pixel accuracy - If on, uses floating point coordinates instead of integer ones for vertex positions, to avoid the PSX poly jitter. This option does nothing at the moment.
+* Memcard 0 method - Picks the format (libretro or mednafen) used for storing memcard 0 save data.
+* Enable memory card 1 - Specifically enables memcard slot 1. Needed for game "Codename Tenka".
+* Shared memory cards (restart) - Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
+* Initial Scanline - Sets the first scanline to be drawn on screen.
+* Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems.
+* Last Scanline - Sets the last scanline to be drawn on screen.
+* Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems.
+* DualShock Analog button toggle - Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.
+* Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1.
+* Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2.
+* Frame duping (speedup) - Redraws/reuses the last frame if there was no new data.
+* Display internal FPS - Shows the frame rate at which the emulated PSX is drawing at.
+* Crop Overscan - Self-explanatory.
+* Offset cropped image - Self-explanatory.
+* Additional cropping - Self-explanatory.
