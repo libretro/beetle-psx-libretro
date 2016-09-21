@@ -366,7 +366,6 @@ void GlRenderer::apply_scissor()
     GLsizei h = (GLsizei) _h * upscale;
 
     glScissor(x, y, w, h);
-
 }
 
 void GlRenderer::bind_libretro_framebuffer()
@@ -836,8 +835,9 @@ void GlRenderer::set_draw_area(uint16_t top_left[2],
 
     this->config->draw_area_top_left[0] = top_left[0];
     this->config->draw_area_top_left[1] = top_left[1];
-    this->config->draw_area_bot_right[0] = bot_right[0];
-    this->config->draw_area_bot_right[1] = bot_right[1];
+    // Draw area coordinates are inclusive
+    this->config->draw_area_bot_right[0] = bot_right[0] + 1;
+    this->config->draw_area_bot_right[1] = bot_right[1] + 1;
 
     this->apply_scissor();
 }
