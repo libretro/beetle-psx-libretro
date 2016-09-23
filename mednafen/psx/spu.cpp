@@ -1470,7 +1470,19 @@ int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
       {
          Voices[i].DecodeReadPos &= 0x1F;
          Voices[i].DecodeWritePos &= 0x1F;
+         Voices[i].CurAddr &= 0x3FFFF;
+         Voices[i].StartAddr &= 0x3FFFF;
+         Voices[i].LoopAddr &= 0x3FFFF;
       }
+
+      if(clock_divider <= 0 || clock_divider > 768)
+         clock_divider = 768;
+
+      RWAddr &= 0x3FFFF;
+      CWA &= 0x1FF;
+
+      ReverbWA &= 0x3FFFF;
+      ReverbCur &= 0x3FFFF;
 
       RvbResPos &= 0x3F;
 

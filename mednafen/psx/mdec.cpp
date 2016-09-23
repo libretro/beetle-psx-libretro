@@ -215,6 +215,8 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
    {
       InFIFO.SaveStatePostLoad();
       OutFIFO.SaveStatePostLoad();
+
+      PixelBufferCount32 %= (sizeof(PixelBuffer.pix32) / sizeof(PixelBuffer.pix32[0])) + 1;
    }
 
    return(ret);
@@ -588,7 +590,8 @@ void MDEC_Run(int32 clocks)
                { ClockCounter -= (need_eat); { case 7: if(!(ClockCounter > 0)) { MDRPhase = 8 - MDRPhaseBias - 1; return; } }; };
 
                PixelBufferReadOffset = 0;
-               while(PixelBufferReadOffset != PixelBufferCount32)
+
+               while(PixelBufferReadOffset < PixelBufferCount32)
                {
                   { { case 9: if(!(OutFIFO.CanWrite())) { MDRPhase = 10 - MDRPhaseBias - 1; return; } }; OutFIFO.Write(LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++])); };
                }
