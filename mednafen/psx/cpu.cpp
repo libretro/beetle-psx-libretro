@@ -21,20 +21,13 @@
 
 extern bool psx_cpu_overclock;
 
-/* TODO
-	Make sure load delays are correct.
-
-	Consider preventing IRQs being taken while in a branch delay slot, to prevent potential problems with games that like to be too clever and perform
-	un-restartable sequences of instructions.
-*/
-
 #define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
+#define BIU_ICACHE_FSIZE_MASK	0x00000300  // I-cache fill size mask; 0x000 = 2 words, 0x100 = 4 words, 0x200 = 8 words, 0x300 = 16 words
 #define BIU_ENABLE_DCACHE	   0x00000080	// Enable D-cache
+#define BIU_DCACHE_SCRATCHPAD	0x00000008	// Enable scratchpad RAM mode of D-cache
 #define BIU_TAG_TEST_MODE	   0x00000004	// Enable TAG test mode(IsC must be set to 1 as well presumably?)
 #define BIU_INVALIDATE_MODE	0x00000002	// Enable Invalidate mode(IsC must be set to 1 as well presumably?)
-#define BIU_LOCK		         0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
-
-						// Does lock mode prevent the actual data payload from being modified, while allowing tags to be modified/updated???
+#define BIU_LOCK_MODE		   0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
 
 PS_CPU::PS_CPU()
 {
@@ -124,10 +117,6 @@ void PS_CPU::Power(void)
    memset(ReadAbsorb, 0, sizeof(ReadAbsorb));
    ReadAbsorbWhich = 0;
    ReadFudge = 0;
-
-   //WriteAbsorb = 0;
-   //WriteAbsorbCount = 0;
-   //WriteAbsorbMonkey = 0;
 
    CP0.SR |= (1 << 22);	// BEV
    CP0.SR |= (1 << 21);	// TS
@@ -282,10 +271,6 @@ INLINE T PS_CPU::ReadMemory(int32_t &timestamp, uint32_t address, bool DS24, boo
 {
    T ret;
 
-   //WriteAbsorb >>= WriteAbsorbMonkey * 8;
-   //WriteAbsorbCount -= WriteAbsorbMonkey;
-   //WriteAbsorbMonkey = WriteAbsorbCount;
-
    ReadAbsorb[ReadAbsorbWhich] = 0;
    ReadAbsorbWhich = 0;
 
@@ -345,18 +330,6 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
 
          return;
       }
-
-      //if(WriteAbsorbCount == 4)
-      //{
-      // WriteAbsorb >>= 8;
-      // WriteAbsorbCount--;
-      //
-      // if(WriteAbsorbMonkey)
-      //  WriteAbsorbMonkey--;
-      //}
-      //timestamp += 3;
-      //WriteAbsorb |= (3U << (WriteAbsorbCount * 8));
-      //WriteAbsorbCount++;
 
       if(sizeof(T) == 1)
          PSX_MemWrite8(timestamp, address, value);
@@ -530,9 +503,6 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
          if(ICache[(PC & 0xFFC) >> 2].TV != PC)
          {
-            //WriteAbsorb = 0;
-            //WriteAbsorbCount = 0;
-            //WriteAbsorbMonkey = 0;
             ReadAbsorb[ReadAbsorbWhich] = 0;
             ReadAbsorbWhich = 0;
 
@@ -614,17 +584,6 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 #else
          if(ReadAbsorb[ReadAbsorbWhich])
             ReadAbsorb[ReadAbsorbWhich]--;
-         //else if((uint8)WriteAbsorb)
-         //{
-         // WriteAbsorb--;
-         // if(!WriteAbsorb)
-         // {
-         //  WriteAbsorbCount--;
-         //  if(WriteAbsorbMonkey)
-         //   WriteAbsorbMonkey--;
-         //  WriteAbsorb >>= 8;
-         // }
-         //}
          else
             timestamp++;
 #endif
