@@ -12,6 +12,7 @@
 #define CP0REG_BDA            5   /* Data load/store breakpoint address */
 #define CP0REG_TAR            6   /* Target address */
 #define CP0REG_DCIC           7   /* Cache control */
+#define CP0REG_BADA           8
 #define CP0REG_BDAM           9   /* Data load/store address mask */
 #define CP0REG_BPCM           11  /* PC breakpoint address mask */
 #define CP0REG_SR             12
@@ -125,15 +126,15 @@ class PS_CPU
                uint32_t Unused04;
                uint32_t BDA;		// RW
                uint32_t TAR;
-               uint32_t DCIC;	// RW
-               uint32_t Unused08;	
-               uint32_t BDAM;	// R/W
+               uint32_t DCIC;	   // RW
+               uint32_t BADA;	   // R
+               uint32_t BDAM;	   // R/W
                uint32_t Unused0A;
-               uint32_t BPCM;	// R/W
+               uint32_t BPCM;	   // R/W
                uint32_t SR;		// R/W
                uint32_t CAUSE;	// R/W(partial)
                uint32_t EPC;		// R
-               uint32_t PRID;	// R
+               uint32_t PRID;	   // R
                uint32_t ERREG;	// ?(may not exist, test)
             };
          };
