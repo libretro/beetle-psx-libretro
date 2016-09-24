@@ -345,20 +345,20 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
    }
    else
    {
-      if(BIU & 0x800)	// Instruction cache is enabled/active
+      if(BIU & BIU_ENABLE_ICACHE_S1)	// Instruction cache is enabled/active
       {
-         if(BIU & 0x4)	// TAG test mode.
+         if(BIU & (BIU_TAG_TEST_MODE | BIU_INVALIDATE_MODE | BIU_LOCK_MODE))
          {
-            // TODO: Respect written value.
-            __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
-            const uint8_t valid_bits = 0x00;
+            const uint8 valid_bits = (BIU & BIU_TAG_TEST_MODE) ? ((value << ((address & 0x3) * 8)) & 0x0F) : 0x00;
+            __ICache* const ICI = &ICache[((address & 0xFF0) >> 2)];
 
-            ICI[0].TV = ((valid_bits & 0x01) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
-            ICI[1].TV = ((valid_bits & 0x02) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
-            ICI[2].TV = ((valid_bits & 0x04) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
-            ICI[3].TV = ((valid_bits & 0x08) ? 0x00 : 0x02) | ((BIU & 0x800) ? 0x0 : 0x1);
+            //
+            // Set validity bits and tag.
+            //
+            for(unsigned i = 0; i < 4; i++)
+               ICI[i].TV = ((valid_bits & (1U << i)) ? 0x00 : 0x02) | (address & 0xFFFFFFF0) | (i << 2);
          }
-         else if(!(BIU & 0x1))
+         else
          {
             ICache[(address & 0xFFC) >> 2].Data = value << ((address & 0x3) * 8);
          }
@@ -375,6 +375,75 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
    }
 }
 
+INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address)
+{
+   uint32 instr = ICache[(address & 0xFFC) >> 2].Data;
+
+   if(ICache[(address & 0xFFC) >> 2].TV != address)
+   {
+      ReadAbsorb[ReadAbsorbWhich] = 0;
+      ReadAbsorbWhich = 0;
+
+      // FIXME: Handle executing out of scratchpad.
+      if(address >= 0xA0000000 || !(BIU & 0x800))
+      {
+         instr = LoadU32_LE((uint32_t *)&FastMap[address >> FAST_MAP_SHIFT][address]);
+
+         if (!psx_cpu_overclock)
+         {
+            // Approximate best-case cache-disabled time, per PS1 tests
+            // (executing out of 0xA0000000+); it can be 5 in 
+            // *some* sequences of code(like a lot of sequential "nop"s, 
+            // probably other simple instructions too).
+            timestamp += 4;	
+         }
+      }
+      else
+      {
+         __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
+         const uint32_t *FMP = (uint32_t *)&FastMap[(address &~ 0xF) >> FAST_MAP_SHIFT][address &~ 0xF];
+
+         // | 0x2 to simulate (in)validity bits.
+         ICI[0x00].TV = (address &~ 0xF) | 0x00 | 0x2;
+         ICI[0x01].TV = (address &~ 0xF) | 0x04 | 0x2;
+         ICI[0x02].TV = (address &~ 0xF) | 0x08 | 0x2;
+         ICI[0x03].TV = (address &~ 0xF) | 0x0C | 0x2;
+
+         // When overclock is enabled, remove code cache fetch latency
+         if (!psx_cpu_overclock)
+            timestamp += 3;
+
+         switch(address & 0xC)
+         {
+            case 0x0:
+               if (!psx_cpu_overclock)
+                  timestamp++;
+               ICI[0x00].TV &= ~0x2;
+               ICI[0x00].Data = LoadU32_LE(&FMP[0]);
+            case 0x4:
+               if (!psx_cpu_overclock)
+                  timestamp++;
+               ICI[0x01].TV &= ~0x2;
+               ICI[0x01].Data = LoadU32_LE(&FMP[1]);
+            case 0x8:
+               if (!psx_cpu_overclock)
+                  timestamp++;
+               ICI[0x02].TV &= ~0x2;
+               ICI[0x02].Data = LoadU32_LE(&FMP[2]);
+            case 0xC:
+               if (!psx_cpu_overclock)
+                  timestamp++;
+               ICI[0x03].TV &= ~0x2;
+               ICI[0x03].Data = LoadU32_LE(&FMP[3]);
+               break;
+         }
+         instr = ICache[(address & 0xFFC) >> 2].Data;
+      }
+   }
+
+   return instr;
+}
+
 uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const uint32_t NPM, const uint32_t instr)
 {
    const bool AfterBranchInstr = !(NPM & 0x1);
@@ -382,12 +451,6 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const ui
    uint32_t handler = 0x80000080;
 
    assert(code < 16);
-
-   if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
-   {
-      PSX_DBG(PSX_DBG_WARNING, "Exception: %08x @ PC=0x%08x(IBDS=%d) -- IPCache=0x%02x -- IPEND=0x%02x -- SR=0x%08x ; IRQC_Status=0x%04x -- IRQC_Mask=0x%04x\n", code, PC, BranchTaken, IPCache, (CP0.CAUSE >> 8) & 0xFF, CP0.SR,
-            ::IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), ::IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
-   }
 
    if(CP0.SR & (1 << 22))	// BEV
       handler = 0xBFC00180;
@@ -488,8 +551,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          }
 #endif
 
-         // We can't fold this into the ICache[] != PC handling, since the lower 2 bits of TV
-         // are already used for cache management purposes and it assumes that the lower 2 bits of PC will be 0.
+         //
+         // Instruction fetch
+         //
          if(MDFN_UNLIKELY(PC & 0x3))
          {
             // This will block interrupt processing, but since we're going more for keeping broken homebrew/hacks from working
@@ -499,75 +563,17 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
             goto OpDone;
          }
 
-         instr = ICache[(PC & 0xFFC) >> 2].Data;
+         instr = ReadInstruction(timestamp, PC);
 
-         if(ICache[(PC & 0xFFC) >> 2].TV != PC)
-         {
-            ReadAbsorb[ReadAbsorbWhich] = 0;
-            ReadAbsorbWhich = 0;
-
-            // FIXME: Handle executing out of scratchpad.
-            if(PC >= 0xA0000000 || !(BIU & 0x800))
-            {
-               instr = LoadU32_LE((uint32_t *)&FastMap[PC >> FAST_MAP_SHIFT][PC]);
-
-               if (!psx_cpu_overclock)
-               {
-                  // Approximate best-case cache-disabled time, per PS1 tests
-                  // (executing out of 0xA0000000+); it can be 5 in 
-                  // *some* sequences of code(like a lot of sequential "nop"s, 
-                  // probably other simple instructions too).
-                  timestamp += 4;	
-               }
-            }
-            else
-            {
-               __ICache *ICI = &ICache[((PC & 0xFF0) >> 2)];
-               const uint32_t *FMP = (uint32_t *)&FastMap[(PC &~ 0xF) >> FAST_MAP_SHIFT][PC &~ 0xF];
-
-               // | 0x2 to simulate (in)validity bits.
-               ICI[0x00].TV = (PC &~ 0xF) | 0x00 | 0x2;
-               ICI[0x01].TV = (PC &~ 0xF) | 0x04 | 0x2;
-               ICI[0x02].TV = (PC &~ 0xF) | 0x08 | 0x2;
-               ICI[0x03].TV = (PC &~ 0xF) | 0x0C | 0x2;
-
-               // When overclock is enabled, remove code cache fetch latency
-               if (!psx_cpu_overclock)
-                  timestamp += 3;
-
-               switch(PC & 0xC)
-               {
-                  case 0x0:
-                     if (!psx_cpu_overclock)
-                        timestamp++;
-                     ICI[0x00].TV &= ~0x2;
-                     ICI[0x00].Data = LoadU32_LE(&FMP[0]);
-                  case 0x4:
-                     if (!psx_cpu_overclock)
-                        timestamp++;
-                     ICI[0x01].TV &= ~0x2;
-                     ICI[0x01].Data = LoadU32_LE(&FMP[1]);
-                  case 0x8:
-                     if (!psx_cpu_overclock)
-                        timestamp++;
-                     ICI[0x02].TV &= ~0x2;
-                     ICI[0x02].Data = LoadU32_LE(&FMP[2]);
-                  case 0xC:
-                     if (!psx_cpu_overclock)
-                        timestamp++;
-                     ICI[0x03].TV &= ~0x2;
-                     ICI[0x03].Data = LoadU32_LE(&FMP[3]);
-                     break;
-               }
-               instr = ICache[(PC & 0xFFC) >> 2].Data;
-            }
-         }
 
          //printf("PC=%08x, SP=%08x - op=0x%02x - funct=0x%02x - instr=0x%08x\n", PC, GPR[29], instr >> 26, instr & 0x3F, instr);
          //for(int i = 0; i < 32; i++)
          // printf("%02x : %08x\n", i, GPR[i]);
          //printf("\n");
 
+         //
+         // Instruction decode
+         //
          opf = instr & 0x3F;
 
          if(instr & (0x3F << 26))
@@ -575,18 +581,10 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
          opf |= IPCache;
 
-#if 0
-         {
-            uint32_t tmp = (ReadAbsorb[ReadAbsorbWhich] + 0x7FFFFFFF) >> 31;
-            ReadAbsorb[ReadAbsorbWhich] -= tmp;
-            timestamp = timestamp + 1 - tmp;
-         }
-#else
          if(ReadAbsorb[ReadAbsorbWhich])
             ReadAbsorb[ReadAbsorbWhich]--;
          else
             timestamp++;
-#endif
 
    #define DO_LDS() { GPR[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x20; }
    #define BEGIN_OPF(name) { op_##name:

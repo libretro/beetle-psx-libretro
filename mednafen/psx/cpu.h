@@ -160,6 +160,8 @@ class PS_CPU
       template<typename T> T ReadMemory(int32_t &timestamp, uint32_t address, bool DS24 = false, bool LWC_timing = false);
       template<typename T> void WriteMemory(int32_t &timestamp, uint32_t address, uint32_t value, bool DS24 = false);
 
+      uint32 ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address);
+
       // Mednafen debugger stuff follows:
    public:
       void SetCPUHook(void (*cpuh)(const int32_t timestamp, uint32_t pc), void (*addbt)(uint32_t from, uint32_t to, bool exception));
