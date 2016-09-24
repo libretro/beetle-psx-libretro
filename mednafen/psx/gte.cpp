@@ -569,17 +569,9 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
          break;
 
       case 30:
-         LZCS = value;
-         {
-            uint32_t test = value & 0x80000000;
-            LZCR = 0;
 
-            while((value & 0x80000000) == test && LZCR < 32)
-            {
-               LZCR++;
-               value <<= 1;
-            }
-         }
+         LZCS = value;
+         LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
          break;
 
       case 31:	// Read-only
@@ -1712,10 +1704,6 @@ int32_t GTE_Instruction(uint32_t instr)
             break;
             */
 
-      case 0x1A:	// Alternate for 0x29?
-         ret = DCPL(instr);
-         break;
-
       case 0x1B:
          ret = NCCS(instr);
          break;
@@ -1768,6 +1756,7 @@ int32_t GTE_Instruction(uint32_t instr)
          ret = SQR(instr);
          break;
 
+      case 0x1A:	// Alternate for 0x29?
       case 0x29:
          ret = DCPL(instr);
          break;
