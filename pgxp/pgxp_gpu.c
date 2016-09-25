@@ -24,12 +24,12 @@
 *	Created on: 25 Mar 2016
 *      Author: iCatButler
 ***************************************************************************/
-
 #include "pgxp_gpu.h"
 #include "pgxp_mem.h"
 #include "pgxp_value.h"
 
 #include <math.h>
+#include <string.h>
 #include <assert.h>
 
 /////////////////////////////////

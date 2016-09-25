@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "pgxp_value.h"
 #include "limits.h"
 
