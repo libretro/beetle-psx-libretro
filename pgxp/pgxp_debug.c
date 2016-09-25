@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "pgxp_debug.h"
 #include "pgxp_cpu.h"
 #include "pgxp_gte.h"

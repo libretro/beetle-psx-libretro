@@ -25,6 +25,8 @@
 *      Author: iCatButler
 ***************************************************************************/
 
+#include <string.h>
+
 #include "pgxp_gte.h"
 #include "pgxp_main.h"
 #include "pgxp_value.h"
