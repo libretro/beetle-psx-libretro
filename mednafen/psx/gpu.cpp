@@ -92,16 +92,12 @@ PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 
    this->upscale_shift = upscale_shift;
    this->dither_upscale_shift = 0;
-   this->SubpixelVertexCache = NULL;
 }
 
 PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
 {
    // Recopy the GPU state in the new buffer
    *this = g;
-
-   // Be careful not to copy the dynamically allocated vertex cache
-   this->SubpixelVertexCache = NULL;
 
    // Override the upscaling factor
    upscale_shift = ushift;
@@ -111,15 +107,6 @@ PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
    {
       for (unsigned x = 0; x < 1024; x++)
          texel_put(x, y, g.texel_fetch(x, y));
-   }
-
-   if (g.SubpixelVertexCache) {
-     // Subpixel vertex cache is enabled, transfer the data
-     EnableSubpixelVertexCache(true);
-     if (SubpixelVertexCache) {
-       memcpy(SubpixelVertexCache, g.SubpixelVertexCache,
-	      0x1000 * 0x1000 * sizeof(*SubpixelVertexCache));
-     }
    }
 }
 
@@ -149,33 +136,6 @@ void PS_GPU::BuildDitherTable()
 
 	  DitherLUT[y][x][v] = value;
 	}
-}
-
-void PS_GPU::EnableSubpixelVertexCache(bool enable) {
-  // The cache is useless at 1x
-  if (enable && upscale_shift > 0) {
-    if (SubpixelVertexCache == NULL) {
-      SubpixelVertexCache = new subpixel_vertex[0x1000 * 0x1000];
-      ResetSubpixelVertexCache();
-    }
-  } else {
-    if (SubpixelVertexCache) {
-      delete [] SubpixelVertexCache;
-      SubpixelVertexCache = NULL;
-    }
-  }
-}
-
-void PS_GPU::ResetSubpixelVertexCache() {
-  if (SubpixelVertexCache == NULL) {
-    return;
-  }
-
-  for (int16 x = -0x800; x < 0x800; x++) {
-      for (int16 y = -0x800; y < 0x800; y++) {
-	AddSubpixelVertex(x, y, (float)x, (float)y, 0);
-      }
-  }
 }
 
 // Allocate enough room for the PS_GPU class and VRAM
@@ -1815,9 +1775,6 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
    if(load)
    {
-      // Invalidate vertex cache
-      ResetSubpixelVertexCache();
-
       for(unsigned i = 0; i < 256; i++)
       {
          TexCache[i].Tag = TexCache_Tag[i];

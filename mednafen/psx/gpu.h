@@ -67,18 +67,6 @@ struct line_point
    _b = tmp;                \
 }                           \
 
-struct subpixel_vertex {
-  float x;
-  float y;
-
-  subpixel_vertex(float x = 0., float y = 0., int16 z = 0)
-  :x(x), y(y)
-  {
-    // In order to save some RAM we don't store `z` since we don't do
-    // anything with it at this point.
-  }
-};
-
 class PS_GPU
 {
   private:
@@ -90,56 +78,9 @@ class PS_GPU
 
       static void *Alloc(uint8 upscale_shift) MDFN_COLD;
 
-      // Cache for subpixel precision vertices (when enabled)
-      subpixel_vertex *SubpixelVertexCache;
-
    public:
 
       void BuildDitherTable();
-
-      INLINE void AddSubpixelVertex(int32 x, int32 y, float fx, float fy, uint16 z)
-      {
-	if (SubpixelVertexCache) {
-
-	  // The cache is a 0x1000 * 0x1000 array
-	  if (x < -0x800 || x >= 0x800 || y < -0x800 || y >= 0x800) {
-	    // Out of range
-	    return;
-	  }
-
-	  if (fabs(float(x) - fx) >= 1.0 || fabs(float(y) - fy) > 0) {
-	    // The values don't make sense, there's probably an
-	    // overflow along the way
-	    return;
-	  }
-
-	  unsigned cx = x + 0x800;
-	  unsigned cy = y + 0x800;
-
-	  SubpixelVertexCache[cy * 0x1000 + cx] = subpixel_vertex(fx, fy, z);
-	}
-      }
-
-      INLINE const subpixel_vertex *GetSubpixelVertex(int32 x, int32 y) const
-      {
-	if (SubpixelVertexCache == NULL) {
-	  // Cache disabled
-	  return NULL;
-	}
-
-	if (x < -0x800 || x >= 0x800 || y < -0x800 || y >= 0x800) {
-	  // Out of range
-	  return NULL;
-	}
-
-	unsigned cx = x + 0x800;
-	unsigned cy = y + 0x800;
-
-	return &SubpixelVertexCache[cy * 0x1000 + cx];
-      }
-
-      void EnableSubpixelVertexCache(bool enable);
-      void ResetSubpixelVertexCache();
 
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       static void Destroy(PS_GPU *gpu) MDFN_COLD;

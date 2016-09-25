@@ -472,25 +472,17 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
       int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
 
-	  PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
+      PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
 
-      // Attempt to retrieve subpixel coordinates if available
-      const subpixel_vertex *pv = GetSubpixelVertex(x, y);
+      vertices[v].x = (x + OffsX) << upscale_shift;
+      vertices[v].y = (y + OffsY) << upscale_shift;
 
-      if (pv != NULL) {
-	vertices[v].x = (int32)roundf((pv->x + (float)OffsX) * upscale());
-	vertices[v].y = (int32)roundf((pv->y + (float)OffsY) * upscale());
-      } else {
-	vertices[v].x = (x + OffsX) << upscale_shift;
-	vertices[v].y = (y + OffsY) << upscale_shift;
-      }
+      vertices[v].x = ((vert.x + (float)OffsX) * upscale());
+      vertices[v].y = ((vert.y + (float)OffsY) * upscale());
+      vertices[v].w = vert.w;
 
-	  vertices[v].x = ((vert.x + (float)OffsX) * upscale());
-	  vertices[v].y = ((vert.y + (float)OffsY) * upscale());
-	  vertices[v].w = vert.w;
-
-	  if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
-		  invalidW = true;
+      if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
+	invalidW = true;
 
       cb++;
 

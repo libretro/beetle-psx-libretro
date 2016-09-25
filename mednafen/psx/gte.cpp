@@ -1071,9 +1071,6 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
-   GPU->AddSubpixelVertex(XY_FIFO[3].X, XY_FIFO[3].Y,
-			  precise_x, precise_y, z);
-
    uint32 value = *((uint32*)&XY_FIFO[3]);
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
 }

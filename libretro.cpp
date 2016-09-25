@@ -44,7 +44,6 @@ static bool enable_memcard1 = false;
 static int psx_skipbios;
 
 bool psx_cpu_overclock;
-bool psx_gte_subpixel_precision;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
 
@@ -1406,8 +1405,6 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
        break;
    }
 
-   GPU->EnableSubpixelVertexCache(psx_gte_subpixel_precision);
-
    PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
 
    CD_TrayOpen        = true;
@@ -2621,18 +2618,6 @@ static void check_variables(bool startup)
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
 
-   var.key = "beetle_psx_gte_subpixel";
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-     if (strcmp(var.value, "1x(native)") == 0)
-         psx_gte_subpixel_precision = false;
-     else if (strcmp(var.value, "subpixel") == 0)
-         psx_gte_subpixel_precision = true;
-   }
-   else
-      psx_gte_subpixel_precision = false;
-
    // iCB: PGXP settings
    var.key = "beetle_psx_pgxp_mode";
 
@@ -3514,9 +3499,7 @@ void retro_run(void)
           break;
         }
 
-      GPU->EnableSubpixelVertexCache(psx_gte_subpixel_precision);
-
-	  PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
+      PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
 
    if (display_internal_framerate)
@@ -3867,7 +3850,6 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
       { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
-      { "beetle_psx_gte_subpixel", "GTE pixel accuracy; 1x(native)|subpixel" },
 	  { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
 	  { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
 	  { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },
