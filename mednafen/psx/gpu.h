@@ -386,7 +386,7 @@ class PS_GPU
          void DrawLine(line_point *vertices);
 
    public:
-      template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+      template<int numvertices, bool shaded, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA, bool pgxp>
          void Command_DrawPolygon(const uint32 *cb);
 
       template<uint8 raw_size, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>

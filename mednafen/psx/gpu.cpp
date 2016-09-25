@@ -19,6 +19,7 @@
 #include "timer.h"
 #include "../../rsx/rsx_intf.h"
 
+#include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"
 #include "../pgxp/pgxp_mem.h"
 
@@ -398,15 +399,20 @@ void PS_GPU::ResetTS(void)
 
 /* C-style function wrappers so our command table isn't so ginormous(in memory usage). */
 template<int numvertices, bool shaded, bool textured,
-   int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+	 int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
-   g->Command_DrawPolygon<numvertices, shaded, textured,
-      BlendMode, TexMult, TexMode_TA, MaskEval_TA>(cb);
+  if (PGXP_enabled()) {
+    g->Command_DrawPolygon<numvertices, shaded, textured,
+			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(cb);
+  } else {
+    g->Command_DrawPolygon<numvertices, shaded, textured,
+			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(cb);
+  }
 }
 
 template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
-   uint32 TexMode_TA, bool MaskEval_TA>
+	 uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
 {
    g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult,

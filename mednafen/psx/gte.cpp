@@ -22,6 +22,7 @@
 #include "gte.h"
 
 #include "../pgxp/pgxp_gte.h"
+#include "../pgxp/pgxp_main.h"
 
 extern bool psx_cpu_overclock;
 
@@ -1164,7 +1165,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
 
    precise_h_div_sz  = (float)H / (float)Z_FIFO[3]; 
 
-   TransformXY(projection_factor, precise_h_div_sz, max(H/2.f, Z_FIFO[3]));
+   TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
 
    return projection_factor;
 }
@@ -1465,7 +1466,8 @@ static int32_t NCLIP(uint32_t instr)
    int64_t c      = x2 * (y0 - y1);
    int32_t sum    = a + b + c;
 
-   if (PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2])))
+   if (PGXP_enabled() &&
+       PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2])))
 	   sum = PGXP_NCLIP();
 
    check_mac_overflow(sum);

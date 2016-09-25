@@ -50,6 +50,10 @@ extern "C" {
 	void	PGXP_EnableModes(u32 modes);
 	void	PGXP_DisableModes(u32 modes);
 
+        static inline int PGXP_enabled(void) {
+          return (PGXP_GetModes() & PGXP_MODE_MEMORY) != 0;
+        }
+
 #ifdef __cplusplus
 }//extern "C"
 #endif

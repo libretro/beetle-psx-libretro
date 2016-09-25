@@ -3850,9 +3850,9 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
       { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
-	  { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
-	  { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
-	  { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },
+      { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
+      { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
+      { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_enable_memcard1", "Enable memory card 1; enabled|disabled" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },

@@ -68,20 +68,20 @@ static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_ver
 
    one_div = num / denom;
 
-   idl.dr_dx = ((one_div * (uint16_t)(CALCIS(r, y))) + 0x00000000) >> sa;
-   idl.dr_dy = ((one_div * (uint16_t)(CALCIS(x, r))) + 0x00000000) >> sa;
+   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> sa;
+   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> sa;
 
-   idl.dg_dx = ((one_div * (uint16_t)(CALCIS(g, y))) + 0x00000000) >> sa;
-   idl.dg_dy = ((one_div * (uint16_t)(CALCIS(x, g))) + 0x00000000) >> sa;
+   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> sa;
+   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> sa;
 
-   idl.db_dx = ((one_div * (uint16_t)(CALCIS(b, y))) + 0x00000000) >> sa;
-   idl.db_dy = ((one_div * (uint16_t)(CALCIS(x, b))) + 0x00000000) >> sa;
+   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> sa;
+   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> sa;
 
-   idl.du_dx = ((one_div * (uint16_t)(CALCIS(u, y))) + 0x00000000) >> sa;
-   idl.du_dy = ((one_div * (uint16_t)(CALCIS(x, u))) + 0x00000000) >> sa;
+   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> sa;
+   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> sa;
 
-   idl.dv_dx = ((one_div * (uint16_t)(CALCIS(v, y))) + 0x00000000) >> sa;
-   idl.dv_dy = ((one_div * (uint16_t)(CALCIS(x, v))) + 0x00000000) >> sa;
+   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> sa;
+   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> sa;
 
    // idl.du_dx = ((int64_t)CALCIS(u, y) << COORD_FBS) / denom;
    // idl.du_dy = ((int64_t)CALCIS(x, u) << COORD_FBS) / denom;
@@ -413,7 +413,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 #endif
 }
 
-template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
+template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 {
 	const uint32_t* baseCB = cb;
@@ -474,15 +474,22 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       vertices[v].x = (x + OffsX) << upscale_shift;
       vertices[v].y = (y + OffsY) << upscale_shift;
 
-      OGLVertex vert;
-      PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
+      if (pgxp) {
+	OGLVertex vert;
+	PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
 
-      vertices[v].precise[0] = ((vert.x + (float)OffsX) * upscale());
-      vertices[v].precise[1] = ((vert.y + (float)OffsY) * upscale());
-      vertices[v].precise[2] = vert.w;
+	vertices[v].precise[0] = ((vert.x + (float)OffsX) * upscale());
+	vertices[v].precise[1] = ((vert.y + (float)OffsY) * upscale());
+	vertices[v].precise[2] = vert.w;
 
-      if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
+	if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
+	  invalidW = true;
+      } else {
+	vertices[v].precise[0] = (float)x;
+	vertices[v].precise[1] = (float)y;
+
 	invalidW = true;
+      }
 
       cb++;
 
