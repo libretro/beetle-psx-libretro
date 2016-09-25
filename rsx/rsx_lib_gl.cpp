@@ -361,13 +361,13 @@ void rsx_gl_copy_rect(
 }
 
 void rsx_gl_push_line(int16_t p0x,
-      int16_t p0y,
-      int16_t p1x,
-      int16_t p1y,
-      uint32_t c0,
-      uint32_t c1,
-      bool dither,
-      int blend_mode)
+		      int16_t p0y,
+		      int16_t p1x,
+		      int16_t p1y,
+		      uint32_t c0,
+		      uint32_t c1,
+		      bool dither,
+		      int blend_mode)
 {
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
@@ -398,7 +398,7 @@ void rsx_gl_push_line(int16_t p0x,
 
    CommandVertex v[2] = {
       {
-          {p0x, p0y}, /* position */
+          {(float)p0x, (float)p0y}, /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {0, 0}, /* texture_coord */
           {0, 0}, /* texture_page */
@@ -409,7 +409,7 @@ void rsx_gl_push_line(int16_t p0x,
           semi_transparent,
       },
       {
-          {p1x, p1y}, /* position */
+          {(float)p1x, (float)p1y}, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {0, 0}, /* texture_coord */
           {0, 0}, /* texture_page */

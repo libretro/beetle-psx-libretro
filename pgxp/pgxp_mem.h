@@ -35,6 +35,8 @@ extern "C" {
 
 #include "pgxp_types.h"
 
+        void PGXP_InitMem(void);
+
 	char*	PGXP_GetMem();	// return pointer to precision memory
 	u32		PGXP_ConvertAddress(u32 addr);
 

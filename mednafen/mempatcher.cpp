@@ -288,6 +288,8 @@ static bool TestConditions(const char *string)
   uint64 v_value;
   uint64 value_at_address;
 
+  (void)v_address;
+
   if(address[0] == '0' && address[1] == 'x')
    v_address = strtoul(address + 2, NULL, 16);
   else

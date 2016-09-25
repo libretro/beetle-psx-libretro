@@ -1,4 +1,5 @@
 #include <string.h>
+#include <math.h>
 
 #include "pgxp_cpu.h"
 #include "pgxp_value.h"
