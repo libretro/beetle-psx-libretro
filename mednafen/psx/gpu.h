@@ -46,9 +46,11 @@ struct CTEntry
 
 struct tri_vertex
 {
-   float x, y, w;
+   int32 x, y;
    int32 u, v;
    int32 r, g, b;
+   // Precise x, y, and w coordinates using PGXP (if available)
+   float precise[3];
 };
 
 struct i_group;
