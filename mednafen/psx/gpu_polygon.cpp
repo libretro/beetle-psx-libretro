@@ -485,8 +485,8 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 	if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
 	  invalidW = true;
       } else {
-	vertices[v].precise[0] = (float)x;
-	vertices[v].precise[1] = (float)y;
+	vertices[v].precise[0] = (float)x + OffsX;
+	vertices[v].precise[1] = (float)y + OffsY;
 
 	invalidW = true;
       }
