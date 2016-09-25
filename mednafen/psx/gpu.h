@@ -46,7 +46,7 @@ struct CTEntry
 
 struct tri_vertex
 {
-   int32 x, y;
+   float x, y, w;
    int32 u, v;
    int32 r, g, b;
 };
@@ -187,7 +187,7 @@ class PS_GPU
 	return psx_gpu_dither_mode != DITHER_OFF && dtd;
       }
 
-      void WriteDMA(uint32 V);
+      void WriteDMA(uint32 V, uint32 addr);
       uint32 ReadDMA(void);
 
       uint32 Read(const int32_t timestamp, uint32 A);
@@ -412,7 +412,7 @@ class PS_GPU
 
 
       void ProcessFIFO(void);
-      void WriteCB(uint32 data);
+      void WriteCB(uint32 data, uint32 addr);
       uint32 ReadData(void);
       void SoftReset(void);
 

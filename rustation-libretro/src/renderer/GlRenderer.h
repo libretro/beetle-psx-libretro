@@ -16,8 +16,15 @@
 #include "../retrogl/framebuffer.h"
 #include "../retrogl/error.h"
 
-extern retro_environment_t environ_cb;
-extern retro_video_refresh_t video_cb;
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+	extern retro_environment_t environ_cb;
+	extern retro_video_refresh_t video_cb;
+#ifdef __cplusplus
+}
+#endif
 
 const uint16_t VRAM_WIDTH_PIXELS = 1024;
 const uint16_t VRAM_HEIGHT = 512;
@@ -42,7 +49,7 @@ struct DrawConfig {
 
 struct CommandVertex {
     /// Position in PlayStation VRAM coordinates
-    int16_t position[3];
+	float position[4];
     /// RGB color, 8bits per component
     uint8_t color[3];
     /// Texture coordinates within the page

@@ -64,7 +64,7 @@ static INLINE int compat_ctz(unsigned x)
 static INLINE int compat_ctz(unsigned x)
 {
    int r = 0;
-   _BitScanReverse(&r, x);
+   _BitScanReverse((unsigned long*)&r, x);
    return r;
 }
 #else

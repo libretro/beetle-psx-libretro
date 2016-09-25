@@ -217,27 +217,31 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    if (rsx_intf_is_type() == RSX_OPENGL)
    {
-      rsx_intf_push_quad(
-            x,                /* p0x */
-            y,                /* p0y */
-            x + w,            /* p1x */
-            y,                /* p1y */
-            x,                /* p2x */
-            y + h,            /* p2y */
-            x + w,            /* p3x */
-            y + h,            /* p3y */
-            color,            /* c0 */
-            color,            /* c1 */
-            color,            /* c2 */
-            color,            /* c3 */
-            u,                /* t0x */
-            v,                /* t0y */
-            u + w,            /* t1x */
-            v,                /* t1y */
-            u,                /* t2x */
-            v + h,            /* t2y */
-            u + w,            /* t5x */
-            v + h,            /* t5y */
+	   rsx_intf_push_quad(
+		   x,                /* p0x */
+		   y,                /* p0y */
+		   1,
+		   x + w,            /* p1x */
+		   y,                /* p1y */
+		   1,
+		   x,                /* p2x */
+		   y + h,            /* p2y */
+		   1,
+		   x + w,            /* p3x */
+		   y + h,            /* p3y */
+		   1,
+		   color,            /* c0 */
+		   color,            /* c1 */
+		   color,            /* c2 */
+		   color,            /* c3 */
+		   u,                /* t0x */
+		   v,                /* t0y */
+		   u + w,            /* t1x */
+		   v,                /* t1y */
+		   u,                /* t2x */
+		   v + h,            /* t2y */
+		   u + w,            /* t5x */
+		   v + h,            /* t5y */
             this->TexPageX,
             this->TexPageY,
             clut_x,
@@ -250,9 +254,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
    else
 #endif
    {
-      rsx_intf_push_triangle(x, y,
-            x + w, y,
-            x, y + h,
+      rsx_intf_push_triangle(x, y, 1,
+            x + w, y, 1,
+            x, y + h, 1,
             color,
             color,
             color,
@@ -266,9 +270,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             DitherEnabled(),
             BlendMode);
 
-      rsx_intf_push_triangle(x + w, y,
-            x, y + h,
-            x + w, y + h,
+      rsx_intf_push_triangle(x + w, y, 1,
+            x, y + h, 1,
+            x + w, y + h, 1,
             color,
             color,
             color,

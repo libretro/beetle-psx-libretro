@@ -310,9 +310,9 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
 }
 
 void rsx_intf_push_triangle(
-      int16_t p0x, int16_t p0y,
-      int16_t p1x, int16_t p1y,
-      int16_t p2x, int16_t p2y,
+      float p0x, float p0y, float p0w,
+      float p1x, float p1y, float p1w,
+      float p2x, float p2y, float p2w,
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
@@ -332,7 +332,7 @@ void rsx_intf_push_triangle(
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_triangle(p0x, p0y, p1x, p1y, p2x, p2y,
+         rsx_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
                c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
@@ -356,44 +356,44 @@ void rsx_intf_push_triangle(
 }
 
 void rsx_intf_push_quad(
-      int16_t p0x, int16_t p0y,
-      int16_t p1x, int16_t p1y,
-      int16_t p2x, int16_t p2y,
-      int16_t p3x, int16_t p3y,
-      uint32_t c0,
-      uint32_t c1,
-      uint32_t c2,
-      uint32_t c3,
-      uint16_t t0x, uint16_t t0y,
-      uint16_t t1x, uint16_t t1y,
-      uint16_t t2x, uint16_t t2y,
-      uint16_t t3x, uint16_t t3y,
-      uint16_t texpage_x, uint16_t texpage_y,
-      uint16_t clut_x, uint16_t clut_y,
-      uint8_t texture_blend_mode,
-      uint8_t depth_shift,
-      bool dither,
-      int blend_mode)
+	float p0x, float p0y, float p0w,
+	float p1x, float p1y, float p1w,
+	float p2x, float p2y, float p2w,
+	float p3x, float p3y, float p3w,
+	uint32_t c0,
+	uint32_t c1,
+	uint32_t c2,
+	uint32_t c3,
+	uint16_t t0x, uint16_t t0y,
+	uint16_t t1x, uint16_t t1y,
+	uint16_t t2x, uint16_t t2y,
+	uint16_t t3x, uint16_t t3y,
+	uint16_t texpage_x, uint16_t texpage_y,
+	uint16_t clut_x, uint16_t clut_y,
+	uint8_t texture_blend_mode,
+	uint8_t depth_shift,
+	bool dither,
+	int blend_mode)
 {
-   switch (rsx_type)
-   {
-      case RSX_SOFTWARE:
-         break;
-      case RSX_OPENGL:
+	switch (rsx_type)
+	{
+	case RSX_SOFTWARE:
+		break;
+	case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_quad(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y,
-			  c0, c1, c2, c3,
-			  t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
-			  texpage_x, texpage_y, clut_x, clut_y,
-			  texture_blend_mode,
-			  depth_shift,
-			  dither,
-			  blend_mode);
+		rsx_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
+			c0, c1, c2, c3,
+			t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
+			texpage_x, texpage_y, clut_x, clut_y,
+			texture_blend_mode,
+			depth_shift,
+			dither,
+			blend_mode);
 #endif
-         break;
-      case RSX_EXTERNAL_RUST:
-         break;
-   }
+		break;
+	case RSX_EXTERNAL_RUST:
+		break;
+	}
 }
 
 void rsx_intf_push_line(int16_t p0x, int16_t p0y,

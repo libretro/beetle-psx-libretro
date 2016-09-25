@@ -15,6 +15,8 @@
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 
+#include "../pgxp/pgxp_main.h"
+
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
@@ -45,6 +47,12 @@ bool psx_cpu_overclock;
 bool psx_gte_subpixel_precision;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
+
+//iCB: PGXP options
+unsigned int psx_pgxp_mode;
+unsigned int psx_pgxp_vertex_caching;
+unsigned int psx_pgxp_texture_correction;
+// \iCB
 
 char retro_save_directory[4096];
 char retro_base_directory[4096];
@@ -278,7 +286,7 @@ static void EventReset(void)
       events[i].which = i;
 
       if(i == PSX_EVENT__SYNFIRST)
-         events[i].event_time = (int32_t)0x80000000;
+		  events[i].event_time = (int32_t)0x80000000;
       else if(i == PSX_EVENT__SYNLAST)
          events[i].event_time = 0x7FFFFFFF;
       else
@@ -1399,6 +1407,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    }
 
    GPU->EnableSubpixelVertexCache(psx_gte_subpixel_precision);
+
+   PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
 
    CD_TrayOpen        = true;
    CD_SelectedDisc    = -1;
@@ -2623,6 +2633,46 @@ static void check_variables(bool startup)
    else
       psx_gte_subpixel_precision = false;
 
+   // iCB: PGXP settings
+   var.key = "beetle_psx_pgxp_mode";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	   if (strcmp(var.value, "disabled") == 0)
+		   psx_pgxp_mode = PGXP_MODE_NONE;
+	   else if (strcmp(var.value, "memory only") == 0)
+		   psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE;
+	   else if (strcmp(var.value, "memory + CPU") == 0)
+		   psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE | PGXP_MODE_CPU;
+   }
+   else
+	   psx_pgxp_mode = PGXP_MODE_NONE;
+
+   var.key = "beetle_psx_pgxp_caching";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	   if (strcmp(var.value, "disabled") == 0)
+		   psx_pgxp_vertex_caching = PGXP_MODE_NONE;
+	   else if (strcmp(var.value, "enabled") == 0)
+		   psx_pgxp_vertex_caching = PGXP_VERTEX_CACHE;
+   }
+   else
+	   psx_pgxp_vertex_caching = PGXP_MODE_NONE;
+
+   var.key = "beetle_psx_pgxp_texture";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	   if (strcmp(var.value, "disabled") == 0)
+		   psx_pgxp_texture_correction = PGXP_MODE_NONE;
+	   else if (strcmp(var.value, "enabled") == 0)
+		   psx_pgxp_texture_correction = PGXP_TEXTURE_CORRECTION;
+   }
+   else
+	   psx_pgxp_texture_correction = PGXP_MODE_NONE;
+   // \iCB
+
    var.key = "beetle_psx_analog_toggle";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3465,6 +3515,8 @@ void retro_run(void)
         }
 
       GPU->EnableSubpixelVertexCache(psx_gte_subpixel_precision);
+
+	  PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
 
    if (display_internal_framerate)
@@ -3816,6 +3868,9 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { "beetle_psx_gte_subpixel", "GTE pixel accuracy; 1x(native)|subpixel" },
+	  { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
+	  { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
+	  { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_enable_memcard1", "Enable memory card 1; enabled|disabled" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },

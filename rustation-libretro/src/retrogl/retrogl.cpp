@@ -59,7 +59,7 @@ RetroGl::RetroGl(VideoClock video_clock)
         {0, 0},         // display_top_left
         {1024, 512},    // display_resolution
         false,          // display_24bpp
-        true,           // display_off
+		true,           // display_off
         {0, 0},         // draw_area_top_left
         {0, 0},         // draw_area_dimensions
         {0, 0},         // draw_offset
@@ -128,7 +128,7 @@ GlRenderer* RetroGl::gl_renderer()
 
 void RetroGl::context_destroy()
 {
-    printf("OpenGL context destroy\n");
+	printf("OpenGL context destroy\n");
 
     DrawConfig config;
 

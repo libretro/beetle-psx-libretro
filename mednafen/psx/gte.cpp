@@ -21,6 +21,8 @@
 #include "psx.h"
 #include "gte.h"
 
+#include "../pgxp/pgxp_gte.h"
+
 extern bool psx_cpu_overclock;
 
 #include "../clamp.h"
@@ -571,7 +573,7 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
       case 30:
 
          LZCS = value;
-         LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
+		 LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
          break;
 
       case 31:	// Read-only
@@ -1071,6 +1073,9 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
 
    GPU->AddSubpixelVertex(XY_FIFO[3].X, XY_FIFO[3].Y,
 			  precise_x, precise_y, z);
+
+   uint32 value = *((uint32*)&XY_FIFO[3]);
+   PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
 }
 
 /* Perform depth queuing calculations using the projection
@@ -1160,9 +1165,9 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    /* Projection factor: 1.16 unsigned */
    projection_factor = Divide(H, Z_FIFO[3]);
 
-   precise_h_div_sz  = (float)H / (float)Z_FIFO[3];
+   precise_h_div_sz  = (float)H / (float)Z_FIFO[3]; 
 
-   TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
+   TransformXY(projection_factor, precise_h_div_sz, max(H/2.f, Z_FIFO[3]));
 
    return projection_factor;
 }
@@ -1463,6 +1468,9 @@ static int32_t NCLIP(uint32_t instr)
    int64_t c      = x2 * (y0 - y1);
    int32_t sum    = a + b + c;
 
+   if (PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2])))
+	   sum = PGXP_NCLIP();
+
    check_mac_overflow(sum);
 
    MAC[0] = sum;
@@ -1756,7 +1764,7 @@ int32_t GTE_Instruction(uint32_t instr)
          ret = SQR(instr);
          break;
 
-      case 0x1A:	// Alternate for 0x29?
+	  case 0x1A:	// Alternate for 0x29?
       case 0x29:
          ret = DCPL(instr);
          break;

@@ -68,20 +68,20 @@ static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_ver
 
    one_div = num / denom;
 
-   idl.dr_dx = ((one_div * CALCIS(r, y)) + 0x00000000) >> sa;
-   idl.dr_dy = ((one_div * CALCIS(x, r)) + 0x00000000) >> sa;
+   idl.dr_dx = ((one_div * (uint16_t)(CALCIS(r, y))) + 0x00000000) >> sa;
+   idl.dr_dy = ((one_div * (uint16_t)(CALCIS(x, r))) + 0x00000000) >> sa;
 
-   idl.dg_dx = ((one_div * CALCIS(g, y)) + 0x00000000) >> sa;
-   idl.dg_dy = ((one_div * CALCIS(x, g)) + 0x00000000) >> sa;
+   idl.dg_dx = ((one_div * (uint16_t)(CALCIS(g, y))) + 0x00000000) >> sa;
+   idl.dg_dy = ((one_div * (uint16_t)(CALCIS(x, g))) + 0x00000000) >> sa;
 
-   idl.db_dx = ((one_div * CALCIS(b, y)) + 0x00000000) >> sa;
-   idl.db_dy = ((one_div * CALCIS(x, b)) + 0x00000000) >> sa;
+   idl.db_dx = ((one_div * (uint16_t)(CALCIS(b, y))) + 0x00000000) >> sa;
+   idl.db_dy = ((one_div * (uint16_t)(CALCIS(x, b))) + 0x00000000) >> sa;
 
-   idl.du_dx = ((one_div * CALCIS(u, y)) + 0x00000000) >> sa;
-   idl.du_dy = ((one_div * CALCIS(x, u)) + 0x00000000) >> sa;
+   idl.du_dx = ((one_div * (uint16_t)(CALCIS(u, y))) + 0x00000000) >> sa;
+   idl.du_dy = ((one_div * (uint16_t)(CALCIS(x, u))) + 0x00000000) >> sa;
 
-   idl.dv_dx = ((one_div * CALCIS(v, y)) + 0x00000000) >> sa;
-   idl.dv_dy = ((one_div * CALCIS(x, v)) + 0x00000000) >> sa;
+   idl.dv_dx = ((one_div * (uint16_t)(CALCIS(v, y))) + 0x00000000) >> sa;
+   idl.dv_dy = ((one_div * (uint16_t)(CALCIS(x, v))) + 0x00000000) >> sa;
 
    // idl.du_dx = ((int64_t)CALCIS(u, y) << COORD_FBS) / denom;
    // idl.du_dy = ((int64_t)CALCIS(x, u) << COORD_FBS) / denom;
@@ -244,19 +244,19 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    // Sort vertices by y.
    //
    if(vertices[2].y < vertices[1].y)
-     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+	   vertex_swap(tri_vertex, vertices[1], vertices[2]);
 
    if(vertices[1].y < vertices[0].y)
-     vertex_swap(tri_vertex, vertices[0], vertices[1]);
+	   vertex_swap(tri_vertex, vertices[0], vertices[1]);
 
    if(vertices[2].y < vertices[1].y)
-     vertex_swap(tri_vertex, vertices[1], vertices[2]);
+	   vertex_swap(tri_vertex, vertices[1], vertices[2]);
 
    if(vertices[0].y == vertices[2].y)
-     return;
+	   return;
 
    if(!CalcIDeltas(idl, vertices[0], vertices[1], vertices[2]))
-      return;
+	   return;
 
    // [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex.
    //
@@ -416,10 +416,12 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
 INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 {
+	const uint32_t* baseCB = cb;
    const unsigned cb0 = cb[0];
    tri_vertex vertices[3] = {{0}};
    uint32_t clut = 0;
    unsigned sv = 0;
+   bool invalidW = false;
    //uint32_t tpage = 0;
 
    // Base timing is approximate, and could be improved.
@@ -466,8 +468,11 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          vertices[v].b = vertices[0].b;
       }
 
+	  OGLVertex vert;
       int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
       int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
+
+	  PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
 
       // Attempt to retrieve subpixel coordinates if available
       const subpixel_vertex *pv = GetSubpixelVertex(x, y);
@@ -479,6 +484,13 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 	vertices[v].x = (x + OffsX) << upscale_shift;
 	vertices[v].y = (y + OffsY) << upscale_shift;
       }
+
+	  vertices[v].x = ((vert.x + (float)OffsX) * upscale());
+	  vertices[v].y = ((vert.y + (float)OffsY) * upscale());
+	  vertices[v].w = vert.w;
+
+	  if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
+		  invalidW = true;
 
       cb++;
 
@@ -496,6 +508,12 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       }
    }
 
+   // iCB: If any vertices lack w components then set all to 1
+   if (invalidW)
+	   for (unsigned v = sv; v < 3; v++)
+		   vertices[v].w = 1.f;
+
+
    if(numvertices == 4)
    {
       if(InCmd == INCMD_QUAD)
@@ -512,8 +530,8 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
    }
 
    if(abs(vertices[2].y - vertices[0].y) >= (512 << upscale_shift) ||
-      abs(vertices[2].y - vertices[1].y) >= (512 << upscale_shift) ||
-      abs(vertices[1].y - vertices[0].y) >= (512 << upscale_shift))
+	   abs(vertices[2].y - vertices[1].y) >= (512 << upscale_shift) ||
+	   abs(vertices[1].y - vertices[0].y) >= (512 << upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
        return;
@@ -541,60 +559,60 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
    }
 
    if (numvertices == 4) {
-     if (InCmd == INCMD_NONE) {
-       // We have 4 quad vertices, we can push that at once
-       tri_vertex *first = &InQuad_F3Vertices[0];
+	   if (InCmd == INCMD_NONE) {
+		   // We have 4 quad vertices, we can push that at once
+		   tri_vertex *first = &InQuad_F3Vertices[0];
 
-       rsx_intf_push_quad(first->x, first->y,
-			  vertices[0].x, vertices[0].y,
-			  vertices[1].x, vertices[1].y,
-			  vertices[2].x, vertices[2].y,
-			  ((uint32_t)first->r) |
-			  ((uint32_t)first->g << 8) |
-			  ((uint32_t)first->b << 16),
-			  ((uint32_t)vertices[0].r) |
-			  ((uint32_t)vertices[0].g << 8) |
-			  ((uint32_t)vertices[0].b << 16),
-			  ((uint32_t)vertices[1].r) |
-			  ((uint32_t)vertices[1].g << 8) |
-			  ((uint32_t)vertices[1].b << 16),
-			  ((uint32_t)vertices[2].r) |
-			  ((uint32_t)vertices[2].g << 8) |
-			  ((uint32_t)vertices[2].b << 16),
-			  first->u, first->v,
-			  vertices[0].u, vertices[0].v,
-			  vertices[1].u, vertices[1].v,
-			  vertices[2].u, vertices[2].v,
-			  this->TexPageX, this->TexPageY,
-			  clut_x, clut_y,
-			  blend_mode,
-			  2 - TexMode_TA,
-			  DitherEnabled(),
-			  BlendMode);
-     }
+		   rsx_intf_push_quad(first->x, first->y, first->w,
+			   vertices[0].x, vertices[0].y, vertices[0].w,
+			   vertices[1].x, vertices[1].y, vertices[1].w,
+			   vertices[2].x, vertices[2].y, vertices[2].w,
+			   ((uint32_t)first->r) |
+			   ((uint32_t)first->g << 8) |
+			   ((uint32_t)first->b << 16),
+			   ((uint32_t)vertices[0].r) |
+			   ((uint32_t)vertices[0].g << 8) |
+			   ((uint32_t)vertices[0].b << 16),
+			   ((uint32_t)vertices[1].r) |
+			   ((uint32_t)vertices[1].g << 8) |
+			   ((uint32_t)vertices[1].b << 16),
+			   ((uint32_t)vertices[2].r) |
+			   ((uint32_t)vertices[2].g << 8) |
+			   ((uint32_t)vertices[2].b << 16),
+			   first->u, first->v,
+			   vertices[0].u, vertices[0].v,
+			   vertices[1].u, vertices[1].v,
+			   vertices[2].u, vertices[2].v,
+			   this->TexPageX, this->TexPageY,
+			   clut_x, clut_y,
+			   blend_mode,
+			   2 - TexMode_TA,
+			   DitherEnabled(),
+			   BlendMode);
+	   }
    } else {
-     // Push a single triangle
-     rsx_intf_push_triangle(vertices[0].x, vertices[0].y,
-			    vertices[1].x, vertices[1].y,
-			    vertices[2].x, vertices[2].y,
-			    ((uint32_t)vertices[0].r) |
-			    ((uint32_t)vertices[0].g << 8) |
-			    ((uint32_t)vertices[0].b << 16),
-			    ((uint32_t)vertices[1].r) |
-			    ((uint32_t)vertices[1].g << 8) |
-			    ((uint32_t)vertices[1].b << 16),
-			    ((uint32_t)vertices[2].r) |
-			    ((uint32_t)vertices[2].g << 8) |
-			    ((uint32_t)vertices[2].b << 16),
-			    vertices[0].u, vertices[0].v,
-			    vertices[1].u, vertices[1].v,
-			    vertices[2].u, vertices[2].v,
-			    this->TexPageX, this->TexPageY,
-			    clut_x, clut_y,
-			    blend_mode,
-			    2 - TexMode_TA,
-			    DitherEnabled(),
-			    BlendMode);
+	   // Push a single triangle
+	   rsx_intf_push_triangle(vertices[0].x, vertices[0].y, vertices[0].w,
+		   vertices[1].x, vertices[1].y, vertices[1].w,
+		   vertices[2].x, vertices[2].y, vertices[2].w,
+		   ((uint32_t)vertices[0].r) |
+		   ((uint32_t)vertices[0].g << 8) |
+		   ((uint32_t)vertices[0].b << 16),
+		   ((uint32_t)vertices[1].r) |
+		   ((uint32_t)vertices[1].g << 8) |
+		   ((uint32_t)vertices[1].b << 16),
+		   ((uint32_t)vertices[2].r) |
+		   ((uint32_t)vertices[2].g << 8) |
+		   ((uint32_t)vertices[2].b << 16),
+		   vertices[0].u, vertices[0].v,
+		   vertices[1].u, vertices[1].v,
+		   vertices[2].u, vertices[2].v,
+		   this->TexPageX, this->TexPageY,
+		   clut_x, clut_y,
+		   blend_mode,
+		   2 - TexMode_TA,
+		   DitherEnabled(),
+		   BlendMode);
    }
 
    if (rsx_intf_has_software_renderer())

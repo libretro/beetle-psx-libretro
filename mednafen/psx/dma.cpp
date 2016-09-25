@@ -20,6 +20,8 @@
 #include "cdc.h"
 #include "spu.h"
 
+#include "../pgxp/pgxp_mem.h"
+
 /* Notes:
 
  Channel 4(SPU):
@@ -186,7 +188,7 @@ static void RecalcHalt(void)
 }
 
 
-static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t *V, uint32_t *offset)
+static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uint32_t addr, uint32_t *V, uint32_t *offset)
 {
    unsigned extra_cyc_overhead = 0;
 
@@ -209,7 +211,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, uint32_t 
 
       case CH_GPU:
          if(CRModeCache & 0x1)
-            GPU->WriteDMA(*V);
+            GPU->WriteDMA(*V, addr);
          else
             *V = GPU->ReadDMA();
          break;
@@ -431,7 +433,8 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
             if(CRModeCache & 0x1)
                vtmp = MainRAM.ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
 
-            ChRW(ch, CRModeCache, &vtmp, &voffs);
+			//iCB: Pass address of memory for GPU
+            ChRW(ch, CRModeCache, DMACH[ch].CurAddr, &vtmp, &voffs);
 
             if(!(CRModeCache & 0x1))
                MainRAM.WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);

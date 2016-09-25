@@ -18,6 +18,11 @@
 #include "psx.h"
 #include "cpu.h"
 
+// iCB: PGXP STUFF
+#include "../pgxp/pgxp_cpu.h"
+#include "../pgxp/pgxp_gte.h"
+#include "../pgxp/pgxp_main.h"
+// int pgxpMode = PGXP_GetModes();
 
 extern bool psx_cpu_overclock;
 
@@ -129,6 +134,8 @@ void PS_CPU::Power(void)
    BIU = 0;
 
    memset(ScratchRAM.data8, 0, 1024);
+
+   PGXP_Init();
 
    // Not quite sure about these poweron/reset values:
    for(i = 0; i < 1024; i++)
@@ -345,20 +352,20 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
    }
    else
    {
-      if(BIU & BIU_ENABLE_ICACHE_S1)	// Instruction cache is enabled/active
-      {
-         if(BIU & (BIU_TAG_TEST_MODE | BIU_INVALIDATE_MODE | BIU_LOCK_MODE))
-         {
-            const uint8 valid_bits = (BIU & BIU_TAG_TEST_MODE) ? ((value << ((address & 0x3) * 8)) & 0x0F) : 0x00;
-            __ICache* const ICI = &ICache[((address & 0xFF0) >> 2)];
+	   if(BIU & BIU_ENABLE_ICACHE_S1)	// Instruction cache is enabled/active
+	   {
+		   if(BIU & (BIU_TAG_TEST_MODE | BIU_INVALIDATE_MODE | BIU_LOCK_MODE))
+		   {
+			   const uint8 valid_bits = (BIU & BIU_TAG_TEST_MODE) ? ((value << ((address & 0x3) * 8)) & 0x0F) : 0x00;
+			   __ICache* const ICI = &ICache[((address & 0xFF0) >> 2)];
 
-            //
-            // Set validity bits and tag.
-            //
-            for(unsigned i = 0; i < 4; i++)
-               ICI[i].TV = ((valid_bits & (1U << i)) ? 0x00 : 0x02) | (address & 0xFFFFFFF0) | (i << 2);
-         }
-         else
+			   //
+			   // Set validity bits and tag.
+			   //
+			   for(unsigned i = 0; i < 4; i++)
+				   ICI[i].TV = ((valid_bits & (1U << i)) ? 0x00 : 0x02) | (address & 0xFFFFFFF0) | (i << 2);
+		   }
+		   else
          {
             ICache[(address & 0xFFC) >> 2].Data = value << ((address & 0x3) * 8);
          }
@@ -377,71 +384,71 @@ INLINE void PS_CPU::WriteMemory(int32_t &timestamp, uint32_t address, uint32_t v
 
 INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address)
 {
-   uint32 instr = ICache[(address & 0xFFC) >> 2].Data;
+	uint32 instr = ICache[(address & 0xFFC) >> 2].Data;
 
-   if(ICache[(address & 0xFFC) >> 2].TV != address)
-   {
-      ReadAbsorb[ReadAbsorbWhich] = 0;
-      ReadAbsorbWhich = 0;
+	if(ICache[(address & 0xFFC) >> 2].TV != address)
+	{
+		ReadAbsorb[ReadAbsorbWhich] = 0;
+		ReadAbsorbWhich = 0;
 
-      // FIXME: Handle executing out of scratchpad.
-      if(address >= 0xA0000000 || !(BIU & 0x800))
-      {
-         instr = LoadU32_LE((uint32_t *)&FastMap[address >> FAST_MAP_SHIFT][address]);
+		// FIXME: Handle executing out of scratchpad.
+		if(address >= 0xA0000000 || !(BIU & 0x800))
+		{
+			instr = LoadU32_LE((uint32_t *)&FastMap[address >> FAST_MAP_SHIFT][address]);
 
-         if (!psx_cpu_overclock)
-         {
-            // Approximate best-case cache-disabled time, per PS1 tests
-            // (executing out of 0xA0000000+); it can be 5 in 
-            // *some* sequences of code(like a lot of sequential "nop"s, 
-            // probably other simple instructions too).
-            timestamp += 4;	
-         }
-      }
-      else
-      {
-         __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
-         const uint32_t *FMP = (uint32_t *)&FastMap[(address &~ 0xF) >> FAST_MAP_SHIFT][address &~ 0xF];
+			if (!psx_cpu_overclock)
+			{
+				// Approximate best-case cache-disabled time, per PS1 tests
+				// (executing out of 0xA0000000+); it can be 5 in 
+				// *some* sequences of code(like a lot of sequential "nop"s, 
+				// probably other simple instructions too).
+				timestamp += 4;
+			}
+		}
+		else
+		{
+			__ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
+			const uint32_t *FMP = (uint32_t *)&FastMap[(address &~ 0xF) >> FAST_MAP_SHIFT][address &~ 0xF];
 
-         // | 0x2 to simulate (in)validity bits.
-         ICI[0x00].TV = (address &~ 0xF) | 0x00 | 0x2;
-         ICI[0x01].TV = (address &~ 0xF) | 0x04 | 0x2;
-         ICI[0x02].TV = (address &~ 0xF) | 0x08 | 0x2;
-         ICI[0x03].TV = (address &~ 0xF) | 0x0C | 0x2;
+			// | 0x2 to simulate (in)validity bits.
+			ICI[0x00].TV = (address &~ 0xF) | 0x00 | 0x2;
+			ICI[0x01].TV = (address &~ 0xF) | 0x04 | 0x2;
+			ICI[0x02].TV = (address &~ 0xF) | 0x08 | 0x2;
+			ICI[0x03].TV = (address &~ 0xF) | 0x0C | 0x2;
 
-         // When overclock is enabled, remove code cache fetch latency
-         if (!psx_cpu_overclock)
-            timestamp += 3;
+			// When overclock is enabled, remove code cache fetch latency
+			if (!psx_cpu_overclock)
+				timestamp += 3;
 
-         switch(address & 0xC)
-         {
-            case 0x0:
-               if (!psx_cpu_overclock)
-                  timestamp++;
-               ICI[0x00].TV &= ~0x2;
-               ICI[0x00].Data = LoadU32_LE(&FMP[0]);
-            case 0x4:
-               if (!psx_cpu_overclock)
-                  timestamp++;
-               ICI[0x01].TV &= ~0x2;
-               ICI[0x01].Data = LoadU32_LE(&FMP[1]);
-            case 0x8:
-               if (!psx_cpu_overclock)
-                  timestamp++;
-               ICI[0x02].TV &= ~0x2;
-               ICI[0x02].Data = LoadU32_LE(&FMP[2]);
-            case 0xC:
-               if (!psx_cpu_overclock)
-                  timestamp++;
-               ICI[0x03].TV &= ~0x2;
-               ICI[0x03].Data = LoadU32_LE(&FMP[3]);
-               break;
-         }
-         instr = ICache[(address & 0xFFC) >> 2].Data;
-      }
-   }
+			switch(address & 0xC)
+			{
+			case 0x0:
+				if (!psx_cpu_overclock)
+					timestamp++;
+				ICI[0x00].TV &= ~0x2;
+				ICI[0x00].Data = LoadU32_LE(&FMP[0]);
+			case 0x4:
+				if (!psx_cpu_overclock)
+					timestamp++;
+				ICI[0x01].TV &= ~0x2;
+				ICI[0x01].Data = LoadU32_LE(&FMP[1]);
+			case 0x8:
+				if (!psx_cpu_overclock)
+					timestamp++;
+				ICI[0x02].TV &= ~0x2;
+				ICI[0x02].Data = LoadU32_LE(&FMP[2]);
+			case 0xC:
+				if (!psx_cpu_overclock)
+					timestamp++;
+				ICI[0x03].TV &= ~0x2;
+				ICI[0x03].Data = LoadU32_LE(&FMP[3]);
+				break;
+			}
+			instr = ICache[(address & 0xFFC) >> 2].Data;
+		}
+	}
 
-   return instr;
+	return instr;
 }
 
 uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const uint32_t NPM, const uint32_t instr)
@@ -551,9 +558,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          }
 #endif
 
-         //
-         // Instruction fetch
-         //
+		 //
+		 // Instruction fetch
+		 //
          if(MDFN_UNLIKELY(PC & 0x3))
          {
             // This will block interrupt processing, but since we're going more for keeping broken homebrew/hacks from working
@@ -563,7 +570,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
             goto OpDone;
          }
 
-         instr = ReadInstruction(timestamp, PC);
+		 instr = ReadInstruction(timestamp, PC);
 
 
          //printf("PC=%08x, SP=%08x - op=0x%02x - funct=0x%02x - instr=0x%08x\n", PC, GPR[29], instr >> 26, instr & 0x3F, instr);
@@ -571,9 +578,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          // printf("%02x : %08x\n", i, GPR[i]);
          //printf("\n");
 
-         //
-         // Instruction decode
-         //
+		 //
+		 // Instruction decode
+		 //
          opf = instr & 0x3F;
 
          if(instr & (0x3F << 26))
@@ -583,6 +590,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
          if(ReadAbsorb[ReadAbsorbWhich])
             ReadAbsorb[ReadAbsorbWhich]--;
+
          else
             timestamp++;
 
@@ -681,6 +689,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	uint32 result = GPR[rs] + GPR[rt];
 	bool ep = ((~(GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ADD(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	if(MDFN_UNLIKELY(ep))
@@ -705,7 +716,13 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
         uint32 result = GPR[rs] + immediate;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ADDI(instr, result, GPR[rs]);
+
 	bool ep = ((~(GPR[rs] ^ immediate)) & (GPR[rs] ^ result)) & 0x80000000;
+
+	
 
 	DO_LDS();
 
@@ -732,6 +749,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] + immediate;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ADDIU(instr, result, GPR[rs]);
+
 	DO_LDS();
 
 	GPR[rt] = result;
@@ -751,6 +771,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] + GPR[rt];
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ADDU(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -772,6 +795,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] & GPR[rt];
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_AND(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -790,6 +816,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] & immediate;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ANDI(instr, result, GPR[rs]);
 
 	DO_LDS();
 
@@ -1059,6 +1088,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
             LDWhich = rt;
             LDValue = GTE_ReadDR(rd);
+
+			if (PGXP_GetModes() & PGXP_MODE_GTE)
+				PGXP_GTE_MFC2(instr, LDValue, LDValue);
          }
          break;
 
@@ -1073,6 +1105,10 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
             //printf("GTE WriteDR: %d %d\n", rd, val);
             GTE_WriteDR(rd, val);
+
+			if (PGXP_GetModes() & PGXP_MODE_GTE)
+				PGXP_GTE_MTC2(instr, val, val);
+
             DO_LDS();
          }
          break;
@@ -1095,6 +1131,8 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
             LDWhich = rt;
             LDValue = GTE_ReadCR(rd);
 
+			if (PGXP_GetModes() & PGXP_MODE_GTE)
+				PGXP_GTE_CFC2(instr, LDValue, LDValue);
             //printf("GTE ReadCR: %d %d\n", rd, GPR[rt]);
          }		
          break;
@@ -1110,7 +1148,11 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
             if(timestamp < gte_ts_done)
                timestamp = gte_ts_done;
 
-            GTE_WriteCR(rd, val);		 
+            GTE_WriteCR(rd, val);		
+
+			if (PGXP_GetModes() & PGXP_MODE_GTE)
+				PGXP_GTE_CTC2(instr, val, val);
+
             DO_LDS();
          }
          break;
@@ -1163,8 +1205,13 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          if(timestamp < gte_ts_done)
           timestamp = gte_ts_done;
 
-         GTE_WriteDR(rt, ReadMemory<uint32>(timestamp, address, false, true));
+		 uint32_t value = ReadMemory<uint32>(timestamp, address, false, true);
+         GTE_WriteDR(rt, value);
+
+		 if (PGXP_GetModes() & PGXP_MODE_GTE)
+			 PGXP_GTE_LWC2(instr, value, address);
 	}
+
 	// GTE stuff here
     END_OPF;
 
@@ -1214,7 +1261,11 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
           timestamp = gte_ts_done;
 
 	 WriteMemory<uint32>(timestamp, address, GTE_ReadDR(rt));
+
+	 if (PGXP_GetModes() & PGXP_MODE_GTE)
+		 PGXP_GTE_SWC2(instr, GTE_ReadDR(rt), address);
 	}
+
 	DO_LDS();
     END_OPF;
 
@@ -1260,6 +1311,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
         }
 	muldiv_ts_done = timestamp + 37;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_DIV(instr, HI, LO, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
     END_OPF;
@@ -1284,6 +1338,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	 HI = GPR[rs] % GPR[rt];
 	}
  	muldiv_ts_done = timestamp + 37;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_DIVU(instr, HI, LO, GPR[rs], GPR[rt]);
 
 	DO_LDS();
     END_OPF;
@@ -1368,6 +1425,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	DO_LDS();
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_LUI(instr, GPR[rt]);
+
 	GPR[rt] = immediate << 16;
 
     END_OPF;
@@ -1401,6 +1461,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	GPR[rd] = HI;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MFHI(instr, GPR[rd], HI);
+
     END_OPF;
 
 
@@ -1433,6 +1496,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	GPR[rd] = LO;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MFLO(instr, GPR[rd], LO);
+
     END_OPF;
 
 
@@ -1447,6 +1513,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	HI = GPR[rs];
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MTHI(instr, HI, GPR[rd]);
 
 	DO_LDS();
 
@@ -1463,6 +1532,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	LO = GPR[rs];
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MTLO(instr, LO, GPR[rd]);
 
 	DO_LDS();
 
@@ -1489,6 +1561,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	LO = result;
 	HI = result >> 32;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MULT(instr, HI, LO, GPR[rs], GPR[rt]);
+
     END_OPF;
 
     //
@@ -1511,6 +1586,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	LO = result;
 	HI = result >> 32;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_MULTU(instr, HI, LO, GPR[rs], GPR[rt]);
+
     END_OPF;
 
 
@@ -1527,6 +1605,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = ~(GPR[rs] | GPR[rt]);
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_NOR(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -1548,6 +1629,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] | GPR[rt];
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_OR(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1568,6 +1652,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] | immediate;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_ORI(instr, result, GPR[rs]);
+
 	DO_LDS();
 
 	GPR[rt] = result;
@@ -1587,6 +1674,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rt] << shamt;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLL(instr, result, GPR[rt]);
 
 	DO_LDS();
 
@@ -1609,6 +1699,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rt] << (GPR[rs] & 0x1F);
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLLV(instr, result, GPR[rt], GPR[rs]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1628,6 +1721,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = (bool)((int32)GPR[rs] < (int32)GPR[rt]);
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLT(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -1649,6 +1745,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = (bool)((int32)GPR[rs] < (int32)immediate);
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLTI(instr, result, GPR[rs]);
+
 	DO_LDS();
 
 	GPR[rt] = result;
@@ -1668,6 +1767,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = (bool)(GPR[rs] < (uint32)immediate);
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLTIU(instr, result, GPR[rs]);
 
 	DO_LDS();
 
@@ -1690,6 +1792,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = (bool)(GPR[rs] < GPR[rt]);
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SLTU(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1709,6 +1814,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = ((int32)GPR[rt]) >> shamt;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SRA(instr, result, GPR[rt]);
 
 	DO_LDS();
 
@@ -1731,6 +1839,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = ((int32)GPR[rt]) >> (GPR[rs] & 0x1F);
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SRAV(instr, result, GPR[rt], GPR[rs]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1751,6 +1862,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rt] >> shamt;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SRL(instr, result, GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1770,6 +1884,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rt] >> (GPR[rs] & 0x1F);
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SRLV(instr, result, GPR[rt], GPR[rs]);
 
 	DO_LDS();
 
@@ -1792,6 +1909,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] - GPR[rt];
 	bool ep = (((GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SUB(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -1819,6 +1939,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] - GPR[rt];
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SUBU(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -1852,6 +1975,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	uint32 result = GPR[rs] ^ GPR[rt];
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_XOR(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -1870,6 +1996,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] ^ immediate;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_XORI(instr, result, GPR[rs]);
 
 	DO_LDS();
 
@@ -1899,6 +2028,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	LDWhich = rt;
 	LDValue = (int32)ReadMemory<int8>(timestamp, address);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LB(instr, LDValue, address);
     END_OPF;
 
     //
@@ -1920,6 +2052,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
         LDWhich = rt;
 	LDValue = ReadMemory<uint8>(timestamp, address);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LBU(instr, LDValue, address);
     END_OPF;
 
     //
@@ -1951,6 +2086,8 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	 LDWhich = rt;
          LDValue = (int32)ReadMemory<int16>(timestamp, address);
 	}
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LH(instr, LDValue, address);
     END_OPF;
 
     //
@@ -1982,6 +2119,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	 LDWhich = rt;
          LDValue = ReadMemory<uint16>(timestamp, address);
 	}
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LHU(instr, LDValue, address);
     END_OPF;
 
 
@@ -2014,6 +2154,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	 LDWhich = rt;
          LDValue = ReadMemory<uint32>(timestamp, address);
 	}
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LW(instr, LDValue, address);
     END_OPF;
 
     //
@@ -2030,6 +2173,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	uint32 address = GPR[rs] + immediate;
 
 	WriteMemory<uint8>(timestamp, address, GPR[rt]);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SB(instr, GPR[rt], address);
 
 	DO_LDS();
     END_OPF;
@@ -2055,6 +2201,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	else
 	 WriteMemory<uint16>(timestamp, address, GPR[rt]);
 
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SH(instr, GPR[rt], address);
+
 	DO_LDS();
     END_OPF;
 
@@ -2078,6 +2227,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	}
 	else
 	 WriteMemory<uint32>(timestamp, address, GPR[rt]);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SW(instr, GPR[rt], address);
 
 	DO_LDS();
     END_OPF;
@@ -2124,6 +2276,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          LDValue = (v & ~(0xFFFFFFFF << 0)) | (ReadMemory<uint32>(timestamp, address & ~3) << 0);
          break;
    }
+   if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+	   PGXP_CPU_LWL(instr, LDValue, address);
+
     END_OPF;
 
     //
@@ -2154,7 +2309,10 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          WriteMemory<uint32>(timestamp, address & ~3, GPR[rt] >> 0);
          break;
    }
-	DO_LDS();
+   if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+	   PGXP_CPU_SWL(instr, GPR[rt], address);
+
+   DO_LDS();
 
     END_OPF;
 
@@ -2198,6 +2356,10 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          LDValue = (v & ~(0xFF)) | ReadMemory<uint8>(timestamp, address);
          break;
    }
+
+   if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+	   PGXP_CPU_LWR(instr, LDValue, address);
+
     END_OPF;
 
     //
@@ -2228,6 +2390,9 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
          WriteMemory<uint8>(timestamp, address, GPR[rt]);
          break;
    }
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SWR(instr, GPR[rt], address);
 
 	DO_LDS();
 

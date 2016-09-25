@@ -130,34 +130,38 @@ void rsx_gl_set_display_mode(uint16_t x,
 }
 
 void rsx_gl_push_quad(
-			int16_t p0x,
-			int16_t p0y,
-			int16_t p1x,
-			int16_t p1y,
-			int16_t p2x,
-			int16_t p2y,
-			int16_t p3x,
-			int16_t p3y,
-			uint32_t c0,
-			uint32_t c1,
-			uint32_t c2,
-			uint32_t c3,
-			uint16_t t0x,
-			uint16_t t0y,
-			uint16_t t1x,
-			uint16_t t1y,
-			uint16_t t2x,
-			uint16_t t2y,
-			uint16_t t3x,
-			uint16_t t3y,
-			uint16_t texpage_x,
-			uint16_t texpage_y,
-			uint16_t clut_x,
-			uint16_t clut_y,
-			uint8_t texture_blend_mode,
-			uint8_t depth_shift,
-			bool dither,
-			int blend_mode)
+      float p0x,
+      float p0y,
+	  float p0w,
+      float p1x,
+      float p1y,
+	  float p1w,
+      float p2x,
+      float p2y,
+	  float p2w,
+      float p3x,
+      float p3y,
+	  float p3w,
+      uint32_t c0,
+      uint32_t c1,
+      uint32_t c2,
+      uint32_t c3,
+      uint16_t t0x,
+      uint16_t t0y,
+      uint16_t t1x,
+      uint16_t t1y,
+      uint16_t t2x,
+      uint16_t t2y,
+      uint16_t t3x,
+      uint16_t t3y,
+      uint16_t texpage_x,
+      uint16_t texpage_y,
+      uint16_t clut_x,
+      uint16_t clut_y,
+      uint8_t texture_blend_mode,
+      uint8_t depth_shift,
+      bool dither,
+      int blend_mode)
 {
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
@@ -189,7 +193,7 @@ void rsx_gl_push_quad(
    CommandVertex v[4] = 
    {
       {
-          {p0x, p0y},   /* position */
+          {p0x, p0y, 0.95, p0w},   /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {t0x, t0y},   /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -200,7 +204,7 @@ void rsx_gl_push_quad(
           semi_transparent,
       },
       {
-          {p1x, p1y}, /* position */
+          {p1x, p1y, 0.95, p1w }, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {t1x, t1y}, /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -211,7 +215,7 @@ void rsx_gl_push_quad(
           semi_transparent,
       },
       {
-          {p2x, p2y}, /* position */
+          {p2x, p2y, 0.95, p2w }, /* position */
           {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
           {t2x, t2y}, /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -222,7 +226,7 @@ void rsx_gl_push_quad(
           semi_transparent,
       },
       {
-          {p3x, p3y}, /* position */
+          {p3x, p3y, 0.95, p3w }, /* position */
           {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
           {t3x, t3y}, /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -238,12 +242,15 @@ void rsx_gl_push_quad(
 }
 
 void rsx_gl_push_triangle(
-      int16_t p0x,
-      int16_t p0y,
-      int16_t p1x,
-      int16_t p1y,
-      int16_t p2x,
-      int16_t p2y,
+	  float p0x,
+	  float p0y,
+	  float p0w,
+	  float p1x,
+      float p1y,
+	  float p1w,
+      float p2x,
+      float p2y,
+	  float p2w,
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
@@ -292,7 +299,7 @@ void rsx_gl_push_triangle(
    CommandVertex v[3] = 
    {
       {
-          {p0x, p0y},   /* position */
+          {p0x, p0y, 0.95, p0w},   /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {t0x, t0y},   /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -303,7 +310,7 @@ void rsx_gl_push_triangle(
           semi_transparent,
       },
       {
-          {p1x, p1y}, /* position */
+          {p1x, p1y, 0.95, p1w }, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {t1x, t1y}, /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -314,7 +321,7 @@ void rsx_gl_push_triangle(
           semi_transparent,
       },
       {
-          {p2x, p2y}, /* position */
+          {p2x, p2y, 0.95, p2w }, /* position */
           {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
           {t2x, t2y}, /* texture_coord */
           {texpage_x, texpage_y}, 
@@ -431,5 +438,5 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
 void rsx_gl_toggle_display(bool status)
 {
-    renderer()->gl_renderer()->set_display_off(status);
+	renderer()->gl_renderer()->set_display_off(status);
 }

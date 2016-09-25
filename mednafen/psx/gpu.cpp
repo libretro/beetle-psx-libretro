@@ -19,6 +19,9 @@
 #include "timer.h"
 #include "../../rsx/rsx_intf.h"
 
+#include "../pgxp/pgxp_gpu.h"
+#include "../pgxp/pgxp_mem.h"
+
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
 
@@ -914,8 +917,11 @@ void PS_GPU::ProcessFIFO(void)
    if(BlitterFIFO.CanRead() < command_len)
       return;
 
-   for(i = 0; i < command_len; i++)
-      CB[i] = BlitterFIFO.Read();
+   for (i = 0; i < command_len; i++)
+   {
+	   PGXP_WriteCB(PGXP_ReadFIFO(BlitterFIFO.read_pos), i);
+	   CB[i] = BlitterFIFO.Read();
+   }
 
    if (!read_fifo)
    {
@@ -940,12 +946,12 @@ void PS_GPU::ProcessFIFO(void)
       G_Command_FBRead(this, CB);
    else
    {
-      if(command->func[abr][TexMode])
-         command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
+	   if (command->func[abr][TexMode])
+		   command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
    }
 }
 
-INLINE void PS_GPU::WriteCB(uint32_t InData)
+INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
 {
    if(BlitterFIFO.CanRead() >= 0x10
          && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
@@ -954,6 +960,7 @@ INLINE void PS_GPU::WriteCB(uint32_t InData)
       return;
    }
 
+   PGXP_WriteFIFO(ReadMem(addr), BlitterFIFO.write_pos);
    BlitterFIFO.Write(InData);
    ProcessFIFO();
 }
@@ -1110,14 +1117,14 @@ void PS_GPU::Write(const int32_t timestamp, uint32_t A, uint32_t V)
       //uint32_t command = V >> 24;
       //printf("Meow command: %02x\n", command);
       //assert(!(DMAControl & 2));
-      WriteCB(V);
+      WriteCB(V, A);
    }
 }
 
 
-void PS_GPU::WriteDMA(uint32_t V)
+void PS_GPU::WriteDMA(uint32_t V, uint32 addr)
 {
-   WriteCB(V);
+   WriteCB(V, addr);
 }
 
 INLINE uint32_t PS_GPU::ReadData(void)
@@ -1826,22 +1833,22 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
       HorizStart &= 0xFFF;
       HorizEnd &= 0xFFF;
 
-        DisplayFB_CurYOffset &= 0x1FF;
-        DisplayFB_CurLineYReadout &= 0x1FF;
+	  DisplayFB_CurYOffset &= 0x1FF;
+	  DisplayFB_CurLineYReadout &= 0x1FF;
 
-        TexPageX &= 0xF * 64;
-        TexPageY &= 0x10 * 16;
-        TexMode &= 0x3;
-        abr &= 0x3;
+	  TexPageX &= 0xF * 64;
+	  TexPageY &= 0x10 * 16;
+	  TexMode &= 0x3;
+	  abr &= 0x3;
 
-        ClipX0 &= 1023;
-        ClipY0 &= 1023;
-        ClipX1 &= 1023;
-        ClipY1 &= 1023;
+	  ClipX0 &= 1023;
+	  ClipY0 &= 1023;
+	  ClipX1 &= 1023;
+	  ClipY1 &= 1023;
 
-        OffsX = sign_x_to_s32(11, OffsX);
-        OffsY = sign_x_to_s32(11, OffsY);
- 
+	  OffsX = sign_x_to_s32(11, OffsX);
+	  OffsY = sign_x_to_s32(11, OffsY);
+
 
       IRQ_Assert(IRQ_GPU, IRQPending);
    }

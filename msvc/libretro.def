@@ -1,4 +1,4 @@
-LIBRARY "msvc-2003"
+LIBRARY "mednafen_psx_libretro"
 EXPORTS
 retro_set_environment
 retro_set_video_refresh

@@ -41,7 +41,12 @@ bool string_is_equal_noncase(const char *a, const char *b)
 {
    if (!a || !b)
       return false;
+ 
+#if _MSC_VER
+   return (_stricmp(a, b) == 0);
+#else
    return (strcasecmp(a, b) == 0);
+#endif
 }
 
 char *string_to_upper(char *s)

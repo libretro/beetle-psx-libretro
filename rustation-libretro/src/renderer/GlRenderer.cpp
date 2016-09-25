@@ -1062,7 +1062,7 @@ std::vector<Attribute> CommandVertex::attributes()
 {
     std::vector<Attribute> result;
 
-    result.push_back( Attribute("position",             offsetof(CommandVertex, position),              GL_SHORT,           3) );
+    result.push_back( Attribute("position",             offsetof(CommandVertex, position),              GL_FLOAT,           4) );
     result.push_back( Attribute("color",                offsetof(CommandVertex, color),                 GL_UNSIGNED_BYTE,   3) );
     result.push_back( Attribute("texture_coord",        offsetof(CommandVertex, texture_coord),         GL_UNSIGNED_SHORT,  2) );
     result.push_back( Attribute("texture_page",         offsetof(CommandVertex, texture_page),          GL_UNSIGNED_SHORT,  2) );
