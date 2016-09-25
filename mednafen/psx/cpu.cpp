@@ -1425,10 +1425,10 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 
 	DO_LDS();
 
+	GPR[rt] = immediate << 16;
+
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_LUI(instr, GPR[rt]);
-
-	GPR[rt] = immediate << 16;
 
     END_OPF;
 
@@ -1515,7 +1515,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	HI = GPR[rs];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
-		PGXP_CPU_MTHI(instr, HI, GPR[rd]);
+		PGXP_CPU_MTHI(instr, HI, GPR[rs]);
 
 	DO_LDS();
 
@@ -1534,7 +1534,7 @@ int32_t PS_CPU::RunReal(int32_t timestamp_in)
 	LO = GPR[rs];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
-		PGXP_CPU_MTLO(instr, LO, GPR[rd]);
+		PGXP_CPU_MTLO(instr, LO, GPR[rs]);
 
 	DO_LDS();
 
