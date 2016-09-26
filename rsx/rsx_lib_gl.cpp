@@ -398,7 +398,7 @@ void rsx_gl_push_line(int16_t p0x,
 
    CommandVertex v[2] = {
       {
-          {(float)p0x, (float)p0y}, /* position */
+          {(float)p0x, (float)p0y, 0., 1.0}, /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {0, 0}, /* texture_coord */
           {0, 0}, /* texture_page */
@@ -409,7 +409,7 @@ void rsx_gl_push_line(int16_t p0x,
           semi_transparent,
       },
       {
-          {(float)p1x, (float)p1y}, /* position */
+          {(float)p1x, (float)p1y, 0., 1.0}, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {0, 0}, /* texture_coord */
           {0, 0}, /* texture_page */
