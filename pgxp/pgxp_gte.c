@@ -26,6 +26,7 @@
 ***************************************************************************/
 
 #include <string.h>
+#include <math.h>
 
 #include "pgxp_gte.h"
 #include "pgxp_main.h"

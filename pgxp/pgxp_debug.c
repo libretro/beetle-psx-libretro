@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 
 #include "pgxp_debug.h"
 #include "pgxp_cpu.h"
@@ -421,8 +422,8 @@ void PGXP_CPU_DebugOutput(u32 eOp, u32 instr, u32 numOps, u32 op1, u32 op2, u32 
 	char szInputBuffer[512];
 	PGXP_CPU_OpData opData = GetOpData(instr);
 	u32			test_flags[4] = { VALID_ALL, VALID_ALL, VALID_ALL, VALID_ALL };
-	psx_value	psx_regs[4];
 	u32 inIdx = 0;
+	psx_value	psx_regs[4];
 	psx_regs[0].d = op1;
 	psx_regs[1].d = op2;
 	psx_regs[2].d = op3;
@@ -438,6 +439,8 @@ void PGXP_CPU_DebugOutput(u32 eOp, u32 instr, u32 numOps, u32 op1, u32 op2, u32 
 	// Hack: duplicate psx register data for GTE register movement funcs
 	//if ((op(instr) == 18) && (func(instr) == 0))
 	//	psx_regs[1] = psx_regs[0];
+
+	(void)psx_regs;
 
 	// /iCB Hack
 
