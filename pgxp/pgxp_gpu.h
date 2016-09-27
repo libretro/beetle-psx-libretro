@@ -40,7 +40,7 @@ extern "C" {
 		float	y;
 		float	z;
 		float	w;
-		unsigned int PGXP_flag;
+		unsigned char valid_w;
 	} OGLVertex;
 
 	//struct OGLVertexTag;
