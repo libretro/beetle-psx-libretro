@@ -235,6 +235,8 @@ void PGXP_SetAddress(unsigned int addr)
 // Get parallel vertex values
 int PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOffs)
 {
+   unsigned i;
+
 	PGXP_Mem = (PGXP_value*)PGXP_GetMem();
 
 	unsigned int	primCmd		= ((*addr >> 24) & 0xff);			// primitive command
@@ -255,11 +257,12 @@ int PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOf
 	// if PGXP is enabled
 	if (PGXP_Mem != NULL)
 	{
+
 		// Offset to start of primitive
 		primStart = &PGXP_Mem[currentAddr + 1];
 
 		// Find any invalid vertices
-		for (unsigned i = 0; i < count; ++i)
+		for (i = 0; i < count; ++i)
 		{
 			if (!((primStart[stride * i].flags & VALID_012) == VALID_012))
 				invalidVert++;
@@ -268,7 +271,7 @@ int PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOf
 	else
 		invalidVert = count;
 
-	for (unsigned i = 0; i < count; ++i)
+	for (i = 0; i < count; ++i)
 	{
 		if (primStart && ((primStart[stride * i].flags & VALID_01) == VALID_01) && (primStart[stride * i].value == *(unsigned int*)(&pPrimData[stride * i * 2])))
 		{
@@ -334,7 +337,7 @@ int PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOf
 	// If there are any invalid vertices set all w values to 1
 	// iCB: Could use plane equation to find w for single invalid vertex in a quad
 	if (invalidVert > 0)
-		for (unsigned i = 0; i < count; ++i)
+		for (i = 0; i < count; ++i)
 			pVertex[i].w = 1;
 
 	return 1;

@@ -246,10 +246,11 @@ PGXP_value* GetReg(u32 instr, u32 flag, u32 psxValue)
 
 void ForceValues(u32 instr, u32 flags, psx_value* psx_regs, u32 startIdx)
 {
+   u32 opdIdx;
 	PGXP_value* pReg = NULL;
 	u32			regIdx = startIdx;
 
-	for (u32 opdIdx = 0; opdIdx < 14; opdIdx++)
+	for (opdIdx = 0; opdIdx < 14; opdIdx++)
 	{
 		u32 flag = 1 << opdIdx;
 
@@ -269,10 +270,11 @@ void ForceValues(u32 instr, u32 flags, psx_value* psx_regs, u32 startIdx)
 
 void TestValues(u32 instr, u32 flags, psx_value* psx_regs, u32 *test_flags, u32 startIdx)
 {
+   u32 opdIdx;
 	PGXP_value* pReg = NULL;
 	u32			regIdx = startIdx;
 
-	for (u32 opdIdx = 0; opdIdx < 14; opdIdx++)
+	for (opdIdx = 0; opdIdx < 14; opdIdx++)
 	{
 		u32 flag = 1 << opdIdx;
 
@@ -292,6 +294,7 @@ void TestValues(u32 instr, u32 flags, psx_value* psx_regs, u32 *test_flags, u32 
 
 void PrintOperands(char* szBuffer, u32 instr, u32 flags, const char* szDelim, psx_value* psx_regs, u32 startIdx)
 {
+   u32 opdIdx;
 	char		szTempBuffer[256];
 	PGXP_value* pReg = NULL;
 	psx_value	psx_reg;
@@ -300,7 +303,7 @@ void PrintOperands(char* szBuffer, u32 instr, u32 flags, const char* szDelim, ps
 	const char*	szPre = "";
 
 	memset(szTempBuffer, 0, sizeof(szTempBuffer));
-	for (u32 opdIdx = 0; opdIdx < 14; opdIdx++)
+	for (opdIdx = 0; opdIdx < 14; opdIdx++)
 	{
 		u32 flag = 1 << opdIdx;
 
@@ -418,6 +421,7 @@ void PrintOperands(char* szBuffer, u32 instr, u32 flags, const char* szDelim, ps
 
 void PGXP_CPU_DebugOutput(u32 eOp, u32 instr, u32 numOps, u32 op1, u32 op2, u32 op3, u32 op4)
 {
+   u32 opdIdx;
 	char szOutputBuffer[256];
 	char szInputBuffer[512];
 	PGXP_CPU_OpData opData = GetOpData(instr);
@@ -445,7 +449,7 @@ void PGXP_CPU_DebugOutput(u32 eOp, u32 instr, u32 numOps, u32 op1, u32 op2, u32 
 	// /iCB Hack
 
 	// skip output arguments to find first input
-	for (u32 opdIdx = 0; opdIdx < 12; opdIdx++)
+	for (opdIdx = 0; opdIdx < 12; opdIdx++)
 	{
 		if (opData.OutputFlags & (1 << opdIdx))
 			inIdx++;
