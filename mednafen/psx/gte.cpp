@@ -1069,7 +1069,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    XY_FIFO[2] = XY_FIFO[3];
 
    /* Increased precision calculation (sub-pixel precision) */
-   float precise_x = fofx + ((float)IR1 * precise_h_div_sz);
+   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
    uint32 value = *((uint32*)&XY_FIFO[3]);
