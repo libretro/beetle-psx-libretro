@@ -482,8 +482,9 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 	vertices[v].precise[1] = ((vert.y + (float)OffsY) * upscale());
 	vertices[v].precise[2] = vert.w;
 
-	if ((vert.PGXP_flag != 1) && (vert.PGXP_flag != 3))
+	if (!vert.valid_w)
 	  invalidW = true;
+
       } else {
 	vertices[v].precise[0] = (float)x + OffsX;
 	vertices[v].precise[1] = (float)y + OffsY;

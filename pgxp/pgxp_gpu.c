@@ -203,193 +203,48 @@ void PGXP_SetAddress(unsigned int addr)
 	currentAddr = addr;
 }
 
-//// Wrap glVertex3fv/glVertex4fv
-//void PGXP_glVertexfv(GLfloat* pV)
-//{
-//	// If there are PGXP vertices expected
-//	if (1)//(vertexIdx < numVertices)
-//	{
-//	float temp[4];
-//	memcpy(temp, pV, sizeof(float) * 4);
-//
-//		//pre-multiply each element by w (to negate perspective divide)
-//		for (unsigned int i = 0; i < 3; i++)
-//			temp[i] *= temp[3];
-//
-//		//pass complete vertex to OpenGL
-//		glVertex4fv(temp);
-//		vertexIdx++;
-//
-//		//pV[3] = 1.f;
-//	}
-//	else
-//	{
-//		glVertex3fv(pV);
-//	}
-//}
-
-#ifndef min
-#   define min(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-// Get parallel vertex values
-int PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOffs)
-{
-   unsigned i;
-
-	PGXP_Mem = (PGXP_value*)PGXP_GetMem();
-
-	unsigned int	primCmd		= ((*addr >> 24) & 0xff);			// primitive command
-	unsigned int	primIdx		= min((primCmd - 0x20) >> 2, 8);	// index to primitive lookup
-	OGLVertex*		pVertex		= (OGLVertex*)pOutput;				// pointer to output vertices
-	unsigned int	stride		= primStrideTable[primIdx];			// stride between vertices
-	unsigned int	count		= primCountTable[primIdx];			// number of vertices
-	PGXP_value*	primStart	= NULL;								// pointer to first vertex
-	char			invalidVert	= 0;								// Number of vertices without valid PGXP values
-
-	short*			pPrimData	= ((short*)addr) + 2;				// primitive data for cache lookups
-	PGXP_value*	pCacheVert	= NULL;
-
-	// Reset vertex count
-	numVertices = count;
-	vertexIdx = 0;
-
-	// if PGXP is enabled
-	if (PGXP_Mem != NULL)
-	{
-
-		// Offset to start of primitive
-		primStart = &PGXP_Mem[currentAddr + 1];
-
-		// Find any invalid vertices
-		for (i = 0; i < count; ++i)
-		{
-			if (!((primStart[stride * i].flags & VALID_012) == VALID_012))
-				invalidVert++;
-		}
-	}
-	else
-		invalidVert = count;
-
-	for (i = 0; i < count; ++i)
-	{
-		if (primStart && ((primStart[stride * i].flags & VALID_01) == VALID_01) && (primStart[stride * i].value == *(unsigned int*)(&pPrimData[stride * i * 2])))
-		{
-			pVertex[i].x = (primStart[stride * i].x + xOffs);
-			pVertex[i].y = (primStart[stride * i].y + yOffs);
-			pVertex[i].z = 0.95f;
-			pVertex[i].w = primStart[stride * i].z;
-			pVertex[i].PGXP_flag = 1;
-
-			if ((primStart[stride * i].flags & VALID_2) != VALID_2)
-			{
-				pVertex[i].PGXP_flag = 6;
-		//		__Log("GPPV No W: v:%x (%d, %d) pgxp(%f, %f)|\n", (currentAddr + 1 + (i * stride)) * 4, pPrimData[stride * i * 2], pPrimData[(stride * i * 2) + 1], primStart[stride * i].x, primStart[stride * i].y);
-			}
-
-			// Log incorrect vertices
-			//if (PGXP_tDebug && 
-			//	(fabs((float)pPrimData[stride * i * 2] - primStart[stride * i].x) > debug_tolerance) ||
-			//	(fabs((float)pPrimData[(stride * i * 2) + 1] - primStart[stride * i].y) > debug_tolerance))
-			//	__Log("GPPV: v:%x (%d, %d) pgxp(%f, %f)|\n", (currentAddr + 1 + (i * stride)) * 4, pPrimData[stride * i * 2], pPrimData[(stride * i * 2) + 1], primStart[stride * i].x, primStart[stride * i].y);
-		}
-		else
-		{
-			// Default to low precision vertex data
-			//if (primStart  && ((primStart[stride * i].flags & VALID_01) == VALID_01) && primStart[stride * i].value != *(unsigned int*)(&pPrimData[stride * i * 2]))
-			//	pVertex[i].PGXP_flag = 6;
-			//else
-				pVertex[i].PGXP_flag = 2;
-
-				//pVertex[i].x = (pPrimData[stride * i * 2] + xOffs);
-				//pVertex[i].y = (pPrimData[(stride * i * 2) + 1] + yOffs);
-
-			// Look in cache for valid vertex
-			pCacheVert = PGXP_GetCachedVertex(pPrimData[stride * i * 2], pPrimData[(stride * i * 2) + 1]);
-			if (pCacheVert)
-			{
-				if (IsSessionID(pCacheVert->count))
-				{
-					if (pCacheVert->gFlags == 1)
-					{
-						pVertex[i].x = (pCacheVert->x + xOffs);
-						pVertex[i].y = (pCacheVert->y + yOffs);
-						pVertex[i].z = 0.95f;
-						pVertex[i].w = pCacheVert->z;
-						pVertex[i].PGXP_flag = 3;
-						// reduce number of invalid vertices
-						invalidVert--;
-					}
-					else if(pCacheVert->gFlags > 1)
-						pVertex[i].PGXP_flag = 4;
-				}
-			}
-
-			// Log unprocessed vertices
-			//if(PGXP_tDebug)
-			//	__Log("GPPV: v:%x (%d, %d)|\n", (currentAddr + 1 + (i * stride))*4, pPrimData[stride * i * 2], pPrimData[(stride * i * 2) + 1]);
-		}
-
-		//pVertex[i].x = ((pPrimData[stride * i * 2] + xOffs) << 5) >> 5;
-		//pVertex[i].y = ((pPrimData[(stride * i * 2) + 1] + yOffs) << 5) >> 5;
-	}
-
-	// If there are any invalid vertices set all w values to 1
-	// iCB: Could use plane equation to find w for single invalid vertex in a quad
-	if (invalidVert > 0)
-		for (i = 0; i < count; ++i)
-			pVertex[i].w = 1;
-
-	return 1;
-}
-
 // Get single parallel vertex value
 int PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVertex* pOutput, int xOffs, int yOffs)
 {
 	PGXP_value*		vert = PGXP_ReadCB(offset);			// pointer to vertex
 	short*			psxData = ((short*)addr);			// primitive data for cache lookups
-	PGXP_value*		pCacheVert = NULL;
 
+	if (vert && ((vert->flags & VALID_01) == VALID_01) && (vert->value == *(unsigned int*)(addr)))
+	{
+		// There is a value here with valid X and Y coordinates
+		pOutput->x = (vert->x + xOffs);
+		pOutput->y = (vert->y + yOffs);
+		pOutput->z = 0.95f;
+		pOutput->w = vert->z;
+		pOutput->valid_w = 1;
 
-		if (vert && ((vert->flags & VALID_01) == VALID_01) && (vert->value == *(unsigned int*)(addr)))
+		if ((vert->flags & VALID_2) != VALID_2)
 		{
-			pOutput->x = (vert->x + xOffs);
-			pOutput->y = (vert->y + yOffs);
+			// This value does not have a valid W coordinate
+			pOutput->valid_w = 0;
+		}
+	}
+	else
+	{
+		// Look in cache for valid vertex
+		vert = PGXP_GetCachedVertex(psxData[0], psxData[1]);
+		if ((vert) && /*(IsSessionID(vert->count)) &&*/ (vert->gFlags == 1))
+		{
+			// a value is found, it is from the current session and is unambiguous (there was only one value recorded at that position)
+			pOutput->x = vert->x + xOffs;
+			pOutput->y = vert->y + yOffs;
 			pOutput->z = 0.95f;
 			pOutput->w = vert->z;
-			pOutput->PGXP_flag = 1;
-
-			if ((vert->flags & VALID_2) != VALID_2)
-			{
-				pOutput->PGXP_flag = 6;
-			}
+			pOutput->valid_w = 1;
 		}
 		else
 		{
-			pOutput->PGXP_flag = 2;
-
+			// no valid value can be found anywhere, use the native PSX data	
 			pOutput->x = ((psxData[0] + xOffs) << 5) >> 5;
 			pOutput->y = ((psxData[1] + yOffs) << 5) >> 5;
-
-			// Look in cache for valid vertex
-			pCacheVert = PGXP_GetCachedVertex(psxData[0], psxData[1]);
-			if (pCacheVert)
-			{
-			//	if (IsSessionID(pCacheVert->count))
-				{
-					if (pCacheVert->gFlags == 1)
-					{
-						pOutput->x = (pCacheVert->x + xOffs);
-						pOutput->y = (pCacheVert->y + yOffs);
-						pOutput->z = 0.95f;
-						pOutput->w = pCacheVert->z;
-						pOutput->PGXP_flag = 3;
-					}
-					else if (pCacheVert->gFlags > 1)
-						pOutput->PGXP_flag = 4;
-				}
-			}
+			pOutput->valid_w = 0;
 		}
+	}
 
 	return 1;
 }
