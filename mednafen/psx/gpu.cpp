@@ -1813,17 +1813,18 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 	  OffsY = sign_x_to_s32(11, OffsY);
 
 
-      IRQ_Assert(IRQ_GPU, IRQPending);
+	  IRQ_Assert(IRQ_GPU, IRQPending);
+
+	  rsx_intf_toggle_display(DisplayOff);
+	  rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
+				 this->ClipX1, this->ClipY1);
+
+	  rsx_intf_load_image(0, 0,
+			      1024, 512,
+			      this->vram);
+
+	  UpdateDisplayMode();
    }
-   rsx_intf_toggle_display(DisplayOff);
-   rsx_intf_set_draw_area(this->ClipX0, this->ClipY0,
-         this->ClipX1, this->ClipY1);
-
-   rsx_intf_load_image(0, 0,
-         1024, 512,
-         this->vram);
-
-   UpdateDisplayMode();
 
    return(ret);
 }
