@@ -1073,8 +1073,8 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
    /* Clamp precision values to valid range */
-   precise_x = max(-0x400, min(precise_x, 0x3ff));
-   precise_y = max(-0x400, min(precise_y, 0x3ff));
+   precise_x = max(-0x400, std::min<float>(precise_x, 0x3ff));
+   precise_y = max(-0x400, std::min<float>(precise_y, 0x3ff));
 
    uint32 value = *((uint32*)&XY_FIFO[3]);
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
