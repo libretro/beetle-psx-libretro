@@ -246,5 +246,13 @@ int PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVerte
 		}
 	}
 
+	// clear upper 5 bits in x and y
+	float x = pOutput->x *(1 << 16);
+	float y = pOutput->y *(1 << 16);
+	x = (float)(((int)x << 5) >> 5);
+	y = (float)(((int)y << 5) >> 5);
+	pOutput->x = x / (1 << 16);
+	pOutput->y = y / (1 << 16);
+
 	return 1;
 }
