@@ -443,6 +443,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       {
          memcpy(&vertices[0], &InQuad_F3Vertices[1], 2 * sizeof(tri_vertex));
          clut = InQuad_clut;
+		 invalidW = InQuad_invalidW;
          sv = 2;
       }
    }
@@ -510,7 +511,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 
    // iCB: If any vertices lack w components then set all to 1
    if (invalidW)
-	   for (unsigned v = sv; v < 3; v++)
+	   for (unsigned v = 0; v < 3; v++)
 		   vertices[v].precise[2] = 1.f;
 
 
@@ -519,6 +520,10 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       if(InCmd == INCMD_QUAD)
       {
          InCmd = INCMD_NONE;
+
+		 // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
+		 if (invalidW)
+			 InQuad_F3Vertices[0].precise[2] = 1.f;
       }
       else
       {
@@ -526,6 +531,7 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          InCmd_CC = cb0 >> 24;
          memcpy(&InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex) * 3);
          InQuad_clut = clut;
+		 InQuad_invalidW = invalidW;
       }
    }
 
