@@ -1167,7 +1167,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    /* Projection factor: 1.16 unsigned */
    projection_factor = Divide(H, Z_FIFO[3]);
 
-   precise_h_div_sz  = (float)H / (float)Z_FIFO[3]; 
+   precise_h_div_sz  = (float)H / max(H/2.f, (float)Z_FIFO[3]); 
 
    TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
 
