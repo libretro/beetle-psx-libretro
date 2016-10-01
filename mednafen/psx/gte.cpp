@@ -1045,7 +1045,7 @@ static INLINE void check_mac_overflow(int64_t value)
       FLAGS |= 1 << 16;
 }
 
-static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z)
+static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 z)
 {
    float fofx       = ((float)OFX / (float)(1 << 16));
    float fofy       = ((float)OFY / (float)(1 << 16));
@@ -1071,6 +1071,10 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, int16 z
    /* Increased precision calculation (sub-pixel precision) */
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
+
+   /* Clamp precision values to valid range */
+   precise_x = max(-0x400, min(precise_x, 0x3ff));
+   precise_y = max(-0x400, min(precise_y, 0x3ff));
 
    uint32 value = *((uint32*)&XY_FIFO[3]);
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
