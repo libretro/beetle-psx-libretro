@@ -35,11 +35,16 @@ static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool crop_overscan = false;
 static bool enable_memcard1 = false;
+static bool enable_analog_calibration = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
 // display_internal_framerate is true.
 #define INTERNAL_FPS_SAMPLE_PERIOD 32
+
+#define MAX_PLAYERS 8
+#define MAX_BUTTONS 16
+
 
 static int psx_skipbios;
 
@@ -52,6 +57,13 @@ unsigned int psx_pgxp_mode;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 // \iCB
+
+struct analog_calibration {
+  float left;
+  float right;
+};
+
+static struct analog_calibration analog_calibration[MAX_PLAYERS];
 
 char retro_save_directory[4096];
 char retro_base_directory[4096];
@@ -1494,6 +1506,11 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    }
 
 
+   for (unsigned i = 0; i < MAX_PLAYERS; i++) {
+     analog_calibration[i].left = 0.7;
+     analog_calibration[i].right = 0.7;
+   }
+
 #ifdef WANT_DEBUGGER
    DBG_Init();
 #endif
@@ -2568,6 +2585,18 @@ static void check_variables(bool startup)
    else
       enable_memcard1 = false;
 
+   var.key = "beetle_psx_analog_calibration";
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         enable_analog_calibration = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         enable_analog_calibration = false;
+   }
+   else
+      enable_analog_calibration = false;
+
    rsx_intf_refresh_variables();
 
    switch (rsx_intf_is_type())
@@ -3072,9 +3101,6 @@ error:
    return NULL;
 }
 
-#define MAX_PLAYERS 8
-#define MAX_BUTTONS 16
-
 union
 {
    uint32_t u32[MAX_PLAYERS][1 + 8 + 1]; // Buttons + Axes + Rumble
@@ -3347,6 +3373,22 @@ void retro_unload_game(void)
    retro_cd_base_name[0]      = '\0';
 }
 
+// Return the normalized distance between the origin and the current
+// (x,y) analog stick position
+static float analog_radius(int x, int y) {
+  float fx = ((float)x) / 0x8000;
+  float fy = ((float)y) / 0x8000;
+
+  return sqrtf(fx * fx + fy * fy);
+}
+
+static void analog_scale(uint32_t *v, float s) {
+  *v *= s;
+
+  if (*v > 0x7fff) {
+    *v = 0x7fff;
+  }
+}
 
 // Hardcoded for PSX. No reason to parse lots of structures ...
 // See mednafen/psx/input/gamepad.cpp
@@ -3412,6 +3454,8 @@ static void update_input(void)
       int analog_right_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
             RETRO_DEVICE_ID_ANALOG_Y);
 
+      struct analog_calibration *calibration = &analog_calibration[j];
+
       uint32_t r_right = analog_right_x > 0 ?  analog_right_x : 0;
       uint32_t r_left  = analog_right_x < 0 ? -analog_right_x : 0;
       uint32_t r_down  = analog_right_y > 0 ?  analog_right_y : 0;
@@ -3421,6 +3465,58 @@ static void update_input(void)
       uint32_t l_left  = analog_left_x < 0 ? -analog_left_x : 0;
       uint32_t l_down  = analog_left_y > 0 ?  analog_left_y : 0;
       uint32_t l_up    = analog_left_y < 0 ? -analog_left_y : 0;
+
+      if (enable_analog_calibration) {
+	// Compute the "radius" (distance from 0, 0) of the current
+	// stick position, using the same normalized values
+	float l = analog_radius(analog_left_x, analog_left_y);
+	float r = analog_radius(analog_right_x, analog_right_y);
+
+	// We recalibrate when we find a new max value for the sticks
+	if (l > analog_calibration->left) {
+	  analog_calibration->left = l;
+
+	  log_cb(RETRO_LOG_DEBUG,
+		 "Recalibrating left stick, radius: %f\n",
+		 l);
+	}
+
+	if (r > analog_calibration->right) {
+	  analog_calibration->right = r;
+
+	  log_cb(RETRO_LOG_DEBUG,
+		 "Recalibrating right stick, radius: %f\n",
+		 r);
+	}
+
+	// This represents the maximal value the DualShock sticks can
+	// reach, where 1.0 would be the maximum value along the X or
+	// Y axis. XXX I need to measure this value more precisely,
+	// it's a rough estimate at the moment.
+	static const float dualshock_analog_radius = 1.35;
+
+	// Now compute the scaling factor to apply to convert the
+	// emulator's controller coordinates to a native DualShock's
+	// ones
+	float l_scaling = dualshock_analog_radius / analog_calibration->left;
+	float r_scaling = dualshock_analog_radius / analog_calibration->right;
+
+	analog_scale(&l_left, l_scaling);
+	analog_scale(&l_right, l_scaling);
+	analog_scale(&l_up, l_scaling);
+	analog_scale(&l_down, l_scaling);
+
+	analog_scale(&r_left, r_scaling);
+	analog_scale(&r_right, r_scaling);
+	analog_scale(&r_up, r_scaling);
+	analog_scale(&r_down, r_scaling);
+      } else {
+	// Reset the calibration. Since we only increase the
+	// calibration coordinates we can start with a reasonably
+	// small value.
+	analog_calibration->left = 0.7;
+	analog_calibration->right = 0.7;
+      }
 
       buf.u32[j][1] = r_right;
       buf.u32[j][2] = r_left;
@@ -3856,6 +3952,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
       { "beetle_psx_enable_memcard1", "Enable memory card 1; enabled|disabled" },
       { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
+      { "beetle_psx_analog_calibration", "Analog self-calibration; disabled|enabled" },
       { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { "beetle_psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
