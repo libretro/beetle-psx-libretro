@@ -36,6 +36,7 @@ static unsigned image_crop = 0;
 static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_analog_calibration = false;
+static bool enable_variable_serialization_size = false;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2424,6 +2425,7 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 void retro_init(void)
 {
    struct retro_log_callback log;
+   uint64_t serialization_quirks = RETRO_SERIALIZATION_QUIRK_CORE_VARIABLE_SIZE;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
@@ -2468,6 +2470,10 @@ void retro_init(void)
       perf_get_cpu_features_cb = perf_cb.get_cpu_features;
    else
       perf_get_cpu_features_cb = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &serialization_quirks) &&
+       (serialization_quirks & RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE))
+      enable_variable_serialization_size = true;
 
    setting_initial_scanline = 0;
    setting_last_scanline = 239;
@@ -4032,16 +4038,23 @@ static size_t serialize_size;
 
 size_t retro_serialize_size(void)
 {
-   StateMem st;
-   memset(&st, 0, sizeof(st));
-
-   if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
+   if (enable_variable_serialization_size)
    {
-      return 0;
-   }
+      StateMem st;
+      memset(&st, 0, sizeof(st));
 
-   free(st.data);
-   return serialize_size = st.len;
+      if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
+      {
+         return 0;
+      }
+
+      free(st.data);
+      return serialize_size = st.len;
+   }
+   else
+   {
+      return serialize_size = 16777216; // 16MB
+   }
 }
 
 bool retro_serialize(void *data, size_t size)
