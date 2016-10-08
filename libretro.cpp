@@ -2495,7 +2495,11 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
    return false;
 }
 
+#ifdef EMSCRIPTEN
+static bool old_cdimagecache = true;
+#else
 static bool old_cdimagecache = false;
+#endif
 
 static bool boot = true;
 
@@ -2524,6 +2528,7 @@ static void check_variables(bool startup)
       }
    }
 
+#ifndef EMSCRIPTEN
    var.key = "beetle_psx_cdimagecache";
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2538,6 +2543,7 @@ static void check_variables(bool startup)
          old_cdimagecache = cdimage_cache;
       }
    }
+#endif
 
    var.key = "beetle_psx_cpu_overclock";
    
@@ -3935,7 +3941,9 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "beetle_psx_renderer", "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
       { "beetle_psx_renderer_software_fb", "Software framebuffer; enabled|disabled" }, 
+#ifndef EMSCRIPTEN
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
+#endif
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
