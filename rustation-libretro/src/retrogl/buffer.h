@@ -72,6 +72,8 @@ public:
     T *map;
     /// Use triple buffering
     Storage<T> buffers[3];
+    unsigned active_buffer;
+
     /// Index one-past the last element stored in `active`
     unsigned active_next_index;
     /// Index of the first element of the current command in `active`
@@ -121,6 +123,8 @@ public:
 	this->buffers[1] = Storage<T>(this->capacity);
 	this->buffers[2] = Storage<T>(this->capacity * 2);
 
+	this->active_buffer = 0;
+
 	this->active_next_index = 0;
 	this->active_command_index = 0;
 
@@ -147,6 +151,11 @@ public:
             delete program;
             this->program = NULL;
         }
+    }
+
+    struct Storage<T> *get_active_buffer()
+    {
+        return &this->buffers[this->active_buffer];
     }
 
     /* fn bind_attributes(&self)-> Result<(), Error> { */
@@ -238,10 +247,14 @@ public:
 
     /// Swap the active and backed buffers
     void swap() {
-      this->buffers[0].create_fence();
-      this->buffers[1].sync();
-      std::swap(this->buffers[0], this->buffers[1]);
-      std::swap(this->buffers[1], this->buffers[2]);
+      this->get_active_buffer()->create_fence();
+
+      if (++this->active_buffer > 2) {
+	this->active_buffer = 0;
+      }
+
+      this->get_active_buffer()->sync();
+
       this->active_next_index = 0;
       this->active_command_index = 0;
     }
@@ -301,7 +314,9 @@ public:
             return;
         }
 
-	memcpy(this->map + this->buffers[0].offset + this->active_next_index,
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	memcpy(this->map + buffer->offset + this->active_next_index,
 	       slice,
 	       n * sizeof(T));
 
@@ -317,7 +332,9 @@ public:
         this->vao->bind();
         this->program->bind();
 
-	unsigned start = this->buffers[0].offset + this->active_command_index;
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	unsigned start = buffer->offset + this->active_command_index;
 	unsigned len = this->active_next_index - this->active_command_index;
 
 	// Length in number of vertices
@@ -337,7 +354,9 @@ public:
 	  return;
 	}
 
-	GLint base = this->buffers[0].offset;
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	GLint base = buffer->offset;
 
         glDrawElementsBaseVertex(mode,
 				 count,
