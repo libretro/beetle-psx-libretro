@@ -16,6 +16,7 @@
  */
 
 #include <boolean.h>
+#include <retro_miscellaneous.h>
 #include <compat/intrinsics.h>
 
 #include "psx.h"
