@@ -18,6 +18,7 @@
 #include <boolean.h>
 #include <retro_miscellaneous.h>
 #include <compat/intrinsics.h>
+#include <math/float_minmax.h>
 
 #include "psx.h"
 #include "gte.h"
@@ -169,31 +170,6 @@ static INLINE uint8_t Sat5(int16_t cc)
    if(cc > 0x1F)
       return 0x1F;
    return(cc);
-}
-
-#ifdef __SSE2__
-#include <emmintrin.h>
-#include <mmintrin.h>
-#endif
-
-static INLINE float minss(float a, float b)
-{
-#ifdef __SSE2__
-   _mm_store_ss( &a, _mm_min_ss(_mm_set_ss(a),_mm_set_ss(b)) );
-   return a;
-#else
-   return std::min<float>(a, b);
-#endif
-}
-
-static INLINE float maxss(float a, float b)
-{
-#ifdef __SSE2__
-   _mm_store_ss( &a, _mm_max_ss(_mm_set_ss(a),_mm_set_ss(b)) );
-   return a;
-#else
-   return MAX(a, b);
-#endif
 }
 
 //
@@ -1099,8 +1075,8 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
    /* Clamp precision values to valid range */
-   precise_x = maxss(-0x400, minss(precise_x, 0x3ff));
-   precise_y = maxss(-0x400, minss(precise_y, 0x3ff));
+   precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
+   precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
 
    uint32 value = *((uint32*)&XY_FIFO[3]);
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
@@ -1193,7 +1169,7 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    /* Projection factor: 1.16 unsigned */
    projection_factor = Divide(H, Z_FIFO[3]);
 
-   precise_h_div_sz  = (float)H / maxss(H/2.f, (float)Z_FIFO[3]); 
+   precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]); 
 
    TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
 
