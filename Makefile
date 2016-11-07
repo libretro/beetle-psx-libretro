@@ -209,6 +209,18 @@ else ifneq (,$(filter $(platform),ngc wii))
    FLAGS += -DHAVE_MKDIR
    STATIC_LINKING = 1
 
+# Nintendo WiiU
+else ifeq ($(platform), wiiu)
+	TARGET := $(TARGET_NAME)_libretro_$(platform).a
+	ENDIANNESS_DEFINES += -DHW_RVL -DWIIU
+   ENDIANNESS_DEFINES += -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
+   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
+   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
+   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
+   FLAGS += -DHAVE_MKDIR
+   STATIC_LINKING = 1
+
 # GCW0
 else ifeq ($(platform), gcw0)
    TARGET := $(TARGET_NAME)_libretro.so
