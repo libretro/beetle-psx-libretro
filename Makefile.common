@@ -214,7 +214,7 @@ SOURCES_C += \
 
 SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
 
-ifneq ($(STATIC_LINKING), 1)
+#ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 				 $(LIBRETRO_DIR)/string/stdstring.c
 SOURCES_C += $(LIBKIRK_DIR)/aes.c \
@@ -230,7 +230,7 @@ SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
 endif
 
 endif
-endif
+#endif
 
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
 

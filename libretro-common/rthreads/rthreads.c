@@ -39,6 +39,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
+#elif defined(WIIU)
+#include "wiiu_pthread.h"
 #elif defined(GEKKO)
 #include "gx_pthread.h"
 #elif defined(PSP) || defined(VITA)
@@ -93,6 +95,17 @@ struct scond
 #endif
 };
 
+#ifdef WIIU
+static void *thread_wrap(int argc, void *argv)
+{
+   struct thread_data *data = (struct thread_data*)argv;
+   if (!data)
+	   return 0;
+   data->func(data->userdata);
+   free(data);
+   return 0;
+}
+#else
 #ifdef USE_WIN32_THREADS
 static DWORD CALLBACK thread_wrap(void *data_)
 #else
@@ -106,7 +119,7 @@ static void *thread_wrap(void *data_)
    free(data);
    return 0;
 }
-
+#endif
 /**
  * sthread_create:
  * @start_routine           : thread entry callback function
