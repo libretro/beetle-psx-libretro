@@ -95,17 +95,6 @@ struct scond
 #endif
 };
 
-#ifdef WIIU
-static void *thread_wrap(int argc, void *argv)
-{
-   struct thread_data *data = (struct thread_data*)argv;
-   if (!data)
-	   return 0;
-   data->func(data->userdata);
-   free(data);
-   return 0;
-}
-#else
 #ifdef USE_WIN32_THREADS
 static DWORD CALLBACK thread_wrap(void *data_)
 #else
@@ -114,12 +103,12 @@ static void *thread_wrap(void *data_)
 {
    struct thread_data *data = (struct thread_data*)data_;
    if (!data)
-	   return 0;
+      return 0;
    data->func(data->userdata);
    free(data);
    return 0;
 }
-#endif
+
 /**
  * sthread_create:
  * @start_routine           : thread entry callback function

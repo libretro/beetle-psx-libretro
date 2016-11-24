@@ -24,11 +24,12 @@
 #define _WIIU_PTHREAD_WRAP_WIIU_
 
 #include <retro_inline.h>
+//ppc-eabi-gcc errors on the headers otherwise
 #define static_assert(a,b)
 #include <coreinit/condition.h>
 #include <coreinit/thread.h>
 #include <coreinit/mutex.h>
-
+#include <malloc.h>
 #define STACKSIZE (8 * 1024)
 
 typedef OSThread* pthread_t;
@@ -41,10 +42,10 @@ typedef OSCondition* pthread_condattr_t;
 static INLINE int pthread_create(pthread_t *thread,
       const pthread_attr_t *attr, void *(*start_routine)(void*), void *arg)
 {
-   OSThread *t = malloc(sizeof(OSThread));
-   void *stack = malloc(STACKSIZE);
+   OSThread *t = memalign(8, sizeof(OSThread));
+   void *stack = memalign(32, STACKSIZE);
    bool ret = OSCreateThread(t, (OSThreadEntryPointFn)start_routine, 
-      1, arg, ((uint32_t)stack)+STACKSIZE, STACKSIZE, 8, OS_THREAD_ATTRIB_AFFINITY_ANY);
+      (uint32_t)arg, NULL, (void*)(((uint32_t)stack)+STACKSIZE), STACKSIZE, 8, OS_THREAD_ATTRIB_AFFINITY_ANY);
    if(ret == true)
    {
       OSResumeThread(t);
@@ -52,7 +53,7 @@ static INLINE int pthread_create(pthread_t *thread,
    }
    else
       *thread = NULL;
-   return ret;
+   return (ret == true) ? 0 : -1;
 }
 
 static INLINE pthread_t pthread_self(void)
@@ -71,6 +72,9 @@ static INLINE int pthread_mutex_init(pthread_mutex_t *mutex,
 
 static INLINE int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
+   if(*mutex)
+      free(*mutex);
+   *mutex = NULL;
    return 0;
 }
 
@@ -100,9 +104,14 @@ static INLINE int pthread_detach(pthread_t thread)
 
 static INLINE int pthread_join(pthread_t thread, void **retval)
 {
-   int ret;
-   OSJoinThread(thread, &ret);
-   return ret;
+   (void)retval;
+   bool ret = OSJoinThread(thread, NULL);
+   if(ret == true)
+   {
+      free(thread->stackEnd);
+      free(thread);
+   }
+   return (ret == true) ? 0 : -1;
 }
 
 static INLINE int pthread_mutex_trylock(pthread_mutex_t *mutex)
@@ -149,6 +158,9 @@ static INLINE int pthread_cond_broadcast(pthread_cond_t *cond)
 
 static INLINE int pthread_cond_destroy(pthread_cond_t *cond)
 {
+   if(*cond)
+      free(*cond);
+   *cond = NULL;
    return 0;
 }
 
