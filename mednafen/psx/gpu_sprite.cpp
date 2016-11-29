@@ -214,8 +214,8 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
        blend_mode = BLEND_MODE_ADD;
    }
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   if (rsx_intf_is_type() == RSX_OPENGL)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
    {
 	   rsx_intf_push_quad(
 		   x,                /* p0x */
@@ -249,7 +249,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             blend_mode,
             2 - TexMode_TA,
             DitherEnabled(),
-            BlendMode);
+            BlendMode,
+            MaskEval_TA,
+            MaskSetOR != 0);
    }
    else
 #endif
@@ -268,7 +270,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             blend_mode,
             2 - TexMode_TA,
             DitherEnabled(),
-            BlendMode);
+            BlendMode,
+            MaskEval_TA,
+            MaskSetOR != 0);
 
       rsx_intf_push_triangle(x + w, y, 1,
             x, y + h, 1,
@@ -284,7 +288,9 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             blend_mode,
             2 - TexMode_TA,
             DitherEnabled(),
-            BlendMode);
+            BlendMode,
+            MaskEval_TA,
+            MaskSetOR != 0);
    }
 
 #if 0

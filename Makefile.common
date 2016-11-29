@@ -214,6 +214,30 @@ SOURCES_C += \
 
 SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
 
+ifneq ($(RSX_DUMP),)
+   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp
+   CFLAGS += -DRSX_DUMP
+   CXXFLAGS += -DRSX_DUMP
+endif
+
+ifneq ($(HAVE_VULKAN),)
+	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp)
+	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp)
+	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp)
+	SOURCES_CXX += $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/spirv_cross.cpp
+	SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/renderer
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/khronos/include
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/atlas
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/vulkan
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
+	CXXFLAGS += -std=c++11
+	ifneq ($(VULKAN_DEBUG),)
+		FLAGS += -DVULKAN_DEBUG
+	endif
+endif
+
 #ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 				 $(LIBRETRO_DIR)/string/stdstring.c

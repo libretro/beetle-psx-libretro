@@ -19,6 +19,7 @@ enum rsx_renderer_type
 {
    RSX_SOFTWARE = 0,
    RSX_OPENGL,
+   RSX_VULKAN,
    RSX_EXTERNAL_RUST
 };
 
@@ -71,7 +72,9 @@ enum blending_modes
                          // This is really an `enum blending_modes`
                          // but I don't want to deal with enums in the
                          // FFI
-                         int blend_mode);
+                         int blend_mode,
+                         bool mask_test,
+                         bool set_mask);
 
   void rsx_intf_push_quad(float p0x, float p0y, float p0w,
 	  float p1x, float p1y, float p1w,
@@ -90,7 +93,9 @@ enum blending_modes
 	  uint8_t texture_blend_mode,
 	  uint8_t depth_shift,
 	  bool dither,
-	  int blend_mode);
+	  int blend_mode,
+     bool mask_test,
+     bool set_mask);
 
 
   void rsx_intf_push_line(int16_t p0x, int16_t p0y,
@@ -101,11 +106,15 @@ enum blending_modes
                      // This is really an `enum blending_modes`
                      // but I don't want to deal with enums in the
                      // FFI
-                     int blend_mode);
+                     int blend_mode,
+                     bool mask_test,
+                     bool set_mask);
 
   void rsx_intf_load_image(uint16_t x, uint16_t y,
 		      uint16_t w, uint16_t h,
-		      uint16_t *vram);
+		      uint16_t *vram,
+            bool mask_test,
+            bool set_mask);
 
   void rsx_intf_fill_rect(uint32_t color,
 		     uint16_t x, uint16_t y,
@@ -113,7 +122,7 @@ enum blending_modes
 
   void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
 		     uint16_t dst_x, uint16_t dst_y,
-		     uint16_t w, uint16_t h);
+		     uint16_t w, uint16_t h, bool mask_test, bool set_mask);
 
   void rsx_intf_set_type(enum rsx_renderer_type type);
 

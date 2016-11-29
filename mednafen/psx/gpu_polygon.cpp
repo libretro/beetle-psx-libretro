@@ -603,7 +603,9 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 			   blend_mode,
 			   2 - TexMode_TA,
 			   DitherEnabled(),
-			   BlendMode);
+            BlendMode,
+            MaskEval_TA,
+            MaskSetOR != 0);
 	   }
    } else {
 	   // Push a single triangle
@@ -634,7 +636,9 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 		   blend_mode,
 		   2 - TexMode_TA,
 		   DitherEnabled(),
-		   BlendMode);
+		   BlendMode,
+         MaskEval_TA,
+         MaskSetOR != 0);
    }
 
    if (rsx_intf_has_software_renderer())

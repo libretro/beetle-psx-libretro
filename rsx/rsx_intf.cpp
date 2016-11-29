@@ -10,7 +10,15 @@
 #ifdef HAVE_OPENGL
 #include "rsx_lib_gl.h"
 #endif
+#ifdef HAVE_VULKAN
+#include "rsx_lib_vulkan.h"
+#endif
 #include "rsx_lib_soft.h"
+
+#ifdef RSX_DUMP
+#include "rsx_dump.h"
+#include <stdlib.h>
+#endif
 
 static enum rsx_renderer_type rsx_type = 
 #ifdef HAVE_RUST
@@ -34,6 +42,11 @@ void rsx_intf_set_environment(retro_environment_t cb)
          rsx_gl_set_environment(cb);
 #endif
          break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_environment(cb);
+#endif
+         break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
          rsx_set_environment(cb);
@@ -52,6 +65,11 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_set_video_refresh(cb);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_video_refresh(cb);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -74,6 +92,11 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          rsx_gl_get_system_av_info(info);
 #endif
          break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_get_system_av_info(info);
+#endif
+         break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
          rsx_get_system_av_info(info);
@@ -91,6 +114,11 @@ void rsx_intf_init(enum rsx_renderer_type type)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_init();
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_init();
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -127,6 +155,12 @@ bool rsx_intf_open(bool is_pal)
             return false;
 #endif
          break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         if (!rsx_vulkan_open(is_pal))
+            return false;
+#endif
+         break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
          if (!rsx_open(is_pal))
@@ -135,12 +169,21 @@ bool rsx_intf_open(bool is_pal)
          break;
    }
 
+#if defined(RSX_DUMP)
+   const char *env = getenv("RSX_DUMP");
+   if (env)
+      rsx_dump_init(env);
+#endif
 
    return true;
 }
 
 void rsx_intf_close(void)
 {
+#if defined(RSX_DUMP)
+   rsx_dump_deinit();
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -148,6 +191,11 @@ void rsx_intf_close(void)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_close();
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_close();
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -169,6 +217,11 @@ void rsx_intf_refresh_variables(void)
          rsx_gl_refresh_variables();
 #endif
          break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_refresh_variables();
+#endif
+         break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
          rsx_refresh_variables();
@@ -179,6 +232,10 @@ void rsx_intf_refresh_variables(void)
 
 void rsx_intf_prepare_frame(void)
 {
+#ifdef RSX_DUMP
+   rsx_dump_prepare_frame();
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -186,6 +243,11 @@ void rsx_intf_prepare_frame(void)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_prepare_frame();
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_prepare_frame();
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -199,6 +261,10 @@ void rsx_intf_prepare_frame(void)
 void rsx_intf_finalize_frame(const void *fb, unsigned width, 
       unsigned height, unsigned pitch)
 {
+#ifdef RSX_DUMP
+   rsx_dump_finalize_frame();
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -207,6 +273,11 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_finalize_frame(fb, width, height, pitch);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_finalize_frame(fb, width, height, pitch);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -220,11 +291,20 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
 void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
       uint8_t twx, uint8_t twy)
 {
+#ifdef RSX_DUMP
+   rsx_dump_set_tex_window(tww, twh, twx, twy);
+#endif
+
    switch (rsx_type)
    {
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_set_tex_window(tww, twh, twx, twy);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_tex_window(tww, twh, twx, twy);
 #endif
          break;
       default:
@@ -243,6 +323,9 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
          rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
 #endif
          break;
+      case RSX_VULKAN:
+         /* TODO/FIXME */
+         break;
       case RSX_EXTERNAL_RUST:
          /* TODO/FIXME */
          break;
@@ -251,6 +334,10 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 
 void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 {
+#ifdef RSX_DUMP
+   rsx_dump_set_draw_offset(x, y);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -258,6 +345,11 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_set_draw_offset(x, y);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_draw_offset(x, y);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -271,6 +363,10 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
 			    uint16_t x1, uint16_t y1)
 {
+#ifdef RSX_DUMP
+   rsx_dump_set_draw_area(x0, y0, x1, y1);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -278,6 +374,11 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_set_draw_area(x0, y0, x1, y1);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -292,6 +393,10 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       bool depth_24bpp)
 {
+#ifdef RSX_DUMP
+   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -299,6 +404,11 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_set_display_mode(x, y, w, h, depth_24bpp);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_display_mode(x, y, w, h, depth_24bpp);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -324,8 +434,23 @@ void rsx_intf_push_triangle(
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
       bool dither,
-      int blend_mode)
+      int blend_mode,
+      bool mask_test,
+      bool set_mask)
 {
+#ifdef RSX_DUMP
+   const rsx_dump_vertex vertices[3] = {
+      { p0x, p0y, p0w, c0, t0x, t0y },
+      { p1x, p1y, p1w, c1, t1x, t1y },
+      { p2x, p2y, p2w, c2, t2x, t2y },
+   };
+   const rsx_render_state state = {
+      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
+      mask_test, set_mask,
+   };
+   rsx_dump_triangle(vertices, &state);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -339,6 +464,17 @@ void rsx_intf_push_triangle(
                depth_shift,
                dither,
                blend_mode);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
+               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
+               texpage_x, texpage_y, clut_x, clut_y,
+               texture_blend_mode,
+               depth_shift,
+               dither,
+               blend_mode, mask_test, set_mask);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -373,8 +509,24 @@ void rsx_intf_push_quad(
 	uint8_t texture_blend_mode,
 	uint8_t depth_shift,
 	bool dither,
-	int blend_mode)
+	int blend_mode,
+   bool mask_test,
+   bool set_mask)
 {
+#ifdef RSX_DUMP
+   const rsx_dump_vertex vertices[4] = {
+      { p0x, p0y, p0w, c0, t0x, t0y },
+      { p1x, p1y, p1w, c1, t1x, t1y },
+      { p2x, p2y, p2w, c2, t2x, t2y },
+      { p3x, p3y, p3w, c3, t3x, t3y },
+   };
+   const rsx_render_state state = {
+      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
+      mask_test, set_mask,
+   };
+   rsx_dump_quad(vertices, &state);
+#endif
+
 	switch (rsx_type)
 	{
 	case RSX_SOFTWARE:
@@ -391,6 +543,18 @@ void rsx_intf_push_quad(
 			blend_mode);
 #endif
 		break;
+   case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+		rsx_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
+			c0, c1, c2, c3,
+			t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
+			texpage_x, texpage_y, clut_x, clut_y,
+			texture_blend_mode,
+			depth_shift,
+			dither,
+			blend_mode, mask_test, set_mask);
+#endif
+      break;
 	case RSX_EXTERNAL_RUST:
 		break;
 	}
@@ -401,8 +565,18 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       uint32_t c0,
       uint32_t c1,
       bool dither,
-      int blend_mode)
+      int blend_mode,
+      bool mask_test,
+      bool set_mask)
 {
+#ifdef RSX_DUMP
+   const rsx_dump_line_data line = {
+      p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode,
+      mask_test, set_mask,
+   };
+   rsx_dump_line(&line);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -410,6 +584,11 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -422,8 +601,12 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
 
 void rsx_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
-      uint16_t *vram)
+      uint16_t *vram, bool mask_test, bool set_mask)
 {
+#ifdef RSX_DUMP
+   rsx_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -431,6 +614,11 @@ void rsx_intf_load_image(uint16_t x, uint16_t y,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_load_image(x, y, w, h, vram);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -445,6 +633,10 @@ void rsx_intf_fill_rect(uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
+#ifdef RSX_DUMP
+   rsx_dump_fill_rect(color, x, y, w, h);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -452,6 +644,11 @@ void rsx_intf_fill_rect(uint32_t color,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_fill_rect(color, x, y, w, h);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_fill_rect(color, x, y, w, h);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -464,8 +661,12 @@ void rsx_intf_fill_rect(uint32_t color,
 
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
-      uint16_t w, uint16_t h)
+      uint16_t w, uint16_t h, bool mask_test, bool set_mask)
 {
+#ifdef RSX_DUMP
+   rsx_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
+#endif
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -474,6 +675,12 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_copy_rect(src_x, src_y, dst_x, dst_y,
                w, h);
+#endif
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_copy_rect(src_x, src_y, dst_x, dst_y,
+               w, h, mask_test, set_mask);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -497,6 +704,12 @@ bool rsx_intf_has_software_renderer(void)
 #else
          break;
 #endif
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         return rsx_vulkan_has_software_renderer();
+#else
+         break;
+#endif
       case RSX_EXTERNAL_RUST:
          return true;
    }
@@ -506,6 +719,10 @@ bool rsx_intf_has_software_renderer(void)
 
 void rsx_intf_toggle_display(bool status)
 {
+#ifdef RSX_DUMP
+   rsx_dump_toggle_display(status);
+#endif
+
     switch (rsx_type)
     {
     case RSX_SOFTWARE:
@@ -513,6 +730,11 @@ void rsx_intf_toggle_display(bool status)
     case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
         rsx_gl_toggle_display(status);
+#endif
+        break;
+    case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+        rsx_vulkan_toggle_display(status);
 #endif
         break;
     case RSX_EXTERNAL_RUST:

@@ -2484,6 +2484,8 @@ void retro_init(void)
 
 #ifdef HAVE_RUST
    rsx_intf_init(RSX_EXTERNAL_RUST);
+#elif defined(HAVE_VULKAN)
+   rsx_intf_init(RSX_VULKAN);
 #elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    rsx_intf_init(RSX_OPENGL);
 #else
@@ -2529,6 +2531,8 @@ static void check_variables(bool startup)
             rsx_intf_set_type(RSX_SOFTWARE);
          else if (!strcmp(var.value, "opengl"))
             rsx_intf_set_type(RSX_OPENGL);
+         else if (!strcmp(var.value, "vulkan"))
+            rsx_intf_set_type(RSX_VULKAN);
          else if (!strcmp(var.value, "opengl-rust"))
             rsx_intf_set_type(RSX_EXTERNAL_RUST);
       }
@@ -2640,6 +2644,7 @@ static void check_variables(bool startup)
             psx_gpu_upscale_shift = 0;
          break;
       case RSX_OPENGL:
+      case RSX_VULKAN:
       case RSX_EXTERNAL_RUST:
          psx_gpu_upscale_shift = 0;
          break;
@@ -3948,7 +3953,14 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
    }
 }
 
+#if defined(HAVE_VULKAN)
+#define FIRST_RENDERER "vulkan"
 #if defined(HAVE_OPENGL)
+#define EXT_RENDERER "|opengl|software"
+#else
+#define EXT_RENDERER "|software"
+#endif
+#elif defined(HAVE_OPENGL)
 #define FIRST_RENDERER "opengl"
 #define EXT_RENDERER "|software"
 #elif defined(HAVE_RUST)
@@ -3966,19 +3978,30 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
       { "beetle_psx_renderer", "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
       { "beetle_psx_renderer_software_fb", "Software framebuffer; enabled|disabled" }, 
+#ifdef HAVE_VULKAN
+      { "beetle_psx_adaptive_smoothing", "Adaptive smoothing; enabled|disabled" },
+#endif
 #ifndef EMSCRIPTEN
       { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
 #endif
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+#elif defined(HAVE_VULKAN)
+      // Don't support on-the-fly changing resolution for now.
+      { "beetle_psx_internal_resolution", "Internal GPU resolution (restart); 1x(native)|2x|4x|8x" },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+      // Only used in GL renderer for now.
       { "beetle_psx_filter", "Texture filtering; nearest|3point N64|bilinear" },
       { "beetle_psx_internal_color_depth", "Internal color depth; dithered 16bpp (native)|32bpp" },
       { "beetle_psx_scale_dither", "Scale dithering pattern with internal resolution; enabled|disabled" },
       { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
       { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
       { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
+#endif
       { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
       { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
       { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },

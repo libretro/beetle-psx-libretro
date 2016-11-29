@@ -537,7 +537,7 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
       }
    }
 
-   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height);
+   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
 }
 
 static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
@@ -837,7 +837,7 @@ void PS_GPU::ProcessFIFO(void)
                   /* Upload complete, send over to RSX */
                   rsx_intf_load_image(FBRW_X, FBRW_Y,
                         FBRW_W, FBRW_H,
-                        this->vram);
+                        this->vram, MaskEvalAND != 0, MaskSetOR != 0);
                   InCmd = INCMD_NONE;
                   break;	// Break out of the for() loop.
                }
@@ -1821,7 +1821,7 @@ int PS_GPU::StateAction(StateMem *sm, int load, int data_only)
 
 	  rsx_intf_load_image(0, 0,
 			      1024, 512,
-			      this->vram);
+			      this->vram, false, false);
 
 	  UpdateDisplayMode();
    }

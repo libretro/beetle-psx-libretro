@@ -68,7 +68,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       unsigned height, unsigned pitch)
 {
    renderer()->finalize_frame();
-
 }
 
 void rsx_gl_set_environment(retro_environment_t callback)

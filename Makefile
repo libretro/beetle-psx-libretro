@@ -40,7 +40,9 @@ NEED_THREADING = 1
 CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx
 
-ifeq ($(HAVE_OPENGL),1)
+ifeq ($(HAVE_VULKAN),1)
+   TARGET_NAME := mednafen_psx_vulkan
+else ifeq ($(HAVE_OPENGL),1)
    TARGET_NAME := mednafen_psx_hw
 endif
 
@@ -375,6 +377,10 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=
 ifeq ($(HAVE_RUST),1)
    FLAGS += -DHAVE_RUST
    LDFLAGS += -ldl -L. -lrsx
+endif
+
+ifeq ($(HAVE_VULKAN),1)
+	FLAGS += -DHAVE_VULKAN
 endif
 
 ifeq ($(HAVE_JIT),1)

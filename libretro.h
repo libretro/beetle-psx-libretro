@@ -244,6 +244,7 @@ enum retro_language
    RETRO_LANGUAGE_CHINESE_SIMPLIFIED  = 11,
    RETRO_LANGUAGE_ESPERANTO           = 12,
    RETRO_LANGUAGE_POLISH              = 13,
+   RETRO_LANGUAGE_VIETNAMESE          = 14,
    RETRO_LANGUAGE_LAST,
 
    /* Ensure sizeof(enum) == sizeof(int) */
@@ -1316,6 +1317,7 @@ struct retro_log_callback
 #define RETRO_SIMD_POPCNT   (1 << 18)
 #define RETRO_SIMD_MOVBE    (1 << 19)
 #define RETRO_SIMD_CMOV     (1 << 20)
+#define RETRO_SIMD_ASIMD    (1 << 21)
 
 typedef uint64_t retro_perf_tick_t;
 typedef int64_t retro_time_t;
