@@ -2484,13 +2484,14 @@ void retro_init(void)
 
 #ifdef HAVE_RUST
    rsx_intf_init(RSX_EXTERNAL_RUST);
-#elif defined(HAVE_VULKAN)
-   rsx_intf_init(RSX_VULKAN);
-#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   rsx_intf_init(RSX_OPENGL);
-#else
-   rsx_intf_init(RSX_SOFTWARE);
 #endif
+#ifdef HAVE_VULKAN
+   rsx_intf_init(RSX_VULKAN);
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   rsx_intf_init(RSX_OPENGL);
+#endif
+   rsx_intf_init(RSX_SOFTWARE);
 }
 
 void retro_reset(void)
@@ -2528,13 +2529,25 @@ static void check_variables(bool startup)
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
          if (!strcmp(var.value, "software"))
+         {
             rsx_intf_set_type(RSX_SOFTWARE);
+            rsx_intf_set_fallback_type(RSX_SOFTWARE);
+         }
          else if (!strcmp(var.value, "opengl"))
+         {
             rsx_intf_set_type(RSX_OPENGL);
+            rsx_intf_set_fallback_type(RSX_VULKAN);
+         }
          else if (!strcmp(var.value, "vulkan"))
+         {
             rsx_intf_set_type(RSX_VULKAN);
+            rsx_intf_set_fallback_type(RSX_OPENGL);
+         }
          else if (!strcmp(var.value, "opengl-rust"))
+         {
             rsx_intf_set_type(RSX_EXTERNAL_RUST);
+            rsx_intf_set_type(RSX_VULKAN);
+         }
       }
    }
 
@@ -3955,12 +3968,12 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
 
 #if defined(HAVE_VULKAN)
 #define FIRST_RENDERER "vulkan"
-#if defined(HAVE_OPENGL)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #define EXT_RENDERER "|opengl|software"
 #else
 #define EXT_RENDERER "|software"
 #endif
-#elif defined(HAVE_OPENGL)
+#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #define FIRST_RENDERER "opengl"
 #define EXT_RENDERER "|software"
 #elif defined(HAVE_RUST)

@@ -23,12 +23,16 @@
 static enum rsx_renderer_type rsx_type = 
 #ifdef HAVE_RUST
 RSX_EXTERNAL_RUST
+#elif defined(HAVE_VULKAN)
+RSX_VULKAN
 #elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 RSX_OPENGL
 #else
 RSX_SOFTWARE
 #endif
 ;
+
+static enum rsx_renderer_type rsx_fallback_type = RSX_SOFTWARE;
 
 void rsx_intf_set_environment(retro_environment_t cb)
 {
@@ -141,32 +145,55 @@ void rsx_intf_set_type(enum rsx_renderer_type type)
    rsx_type = type;
 }
 
+void rsx_intf_set_fallback_type(enum rsx_renderer_type type)
+{
+   rsx_fallback_type = type;
+}
+
 bool rsx_intf_open(bool is_pal)
 {
+   bool ret = true;
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
          if (!rsx_soft_open(is_pal))
-            return false;
+            ret = false;
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          if (!rsx_gl_open(is_pal))
-            return false;
+            ret = false;
+#else
+         ret = false;
 #endif
          break;
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          if (!rsx_vulkan_open(is_pal))
-            return false;
+            ret = false;
+#else
+         ret = false;
 #endif
          break;
       case RSX_EXTERNAL_RUST:
 #ifdef HAVE_RUST
          if (!rsx_open(is_pal))
-            return false;
+            ret = false;
+#else
+         ret = false;
 #endif
          break;
+   }
+
+   if (!ret)
+   {
+      if (rsx_fallback_type == rsx_type) // We're screwed.
+         return false;
+
+      // Try the fallback type.
+      rsx_type = rsx_fallback_type;
+      rsx_fallback_type = RSX_SOFTWARE; // This shouldn't ever fail.
+      return rsx_intf_open(rsx_type);
    }
 
 #if defined(RSX_DUMP)

@@ -125,6 +125,7 @@ enum blending_modes
 		     uint16_t w, uint16_t h, bool mask_test, bool set_mask);
 
   void rsx_intf_set_type(enum rsx_renderer_type type);
+  void rsx_intf_set_fallback_type(enum rsx_renderer_type type);
 
   enum rsx_renderer_type rsx_intf_is_type(void);
 

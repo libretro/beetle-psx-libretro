@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> // memcpy()
+#include <stdexcept>
 
 /*
 *
@@ -15,15 +16,19 @@ bool RetroGl::isCreated = false;
 
 RetroGl* RetroGl::getInstance(VideoClock video_clock)
 {
-    static RetroGl *single = NULL;
-    if (single && isCreated)
-    {
-        return single;
-    } else {
-        single = new RetroGl(video_clock);
-        isCreated = true;
-        return single;
-    }
+   static RetroGl *single = NULL;
+   if (single && isCreated)
+   {
+      return single;
+   } else {
+      try {
+         single = new RetroGl(video_clock);
+      } catch (const std::runtime_error &) {
+         return NULL;
+      }
+      isCreated = true;
+      return single;
+   }
 }
 
 RetroGl* RetroGl::getInstance()
@@ -52,7 +57,8 @@ RetroGl::RetroGl(VideoClock video_clock)
 
     if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
         puts("Failed to init hardware context\n");
-        exit(EXIT_FAILURE);
+        // TODO: Move this out to a init function to avoid exceptions?
+        throw std::runtime_error("Failed to init GLSM context.");
     }
 
     static DrawConfig config = {

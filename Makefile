@@ -41,7 +41,7 @@ CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx
 
 ifeq ($(HAVE_VULKAN),1)
-   TARGET_NAME := mednafen_psx_vulkan
+   TARGET_NAME := mednafen_psx_hw
 else ifeq ($(HAVE_OPENGL),1)
    TARGET_NAME := mednafen_psx_hw
 endif
