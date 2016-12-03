@@ -1,0 +1,75 @@
+#version 310 es
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "common.h"
+
+#if defined(SCALED)
+layout(set = 0, binding = 0, rgba8) uniform writeonly mediump image2D uScaled;
+layout(set = 0, binding = 1) uniform mediump usampler2D uUnscaled;
+#elif defined(UNSCALED)
+layout(set = 0, binding = 0, r32ui) uniform writeonly mediump uimage2D uUnscaled;
+layout(set = 0, binding = 1) uniform mediump sampler2D uScaled;
+#endif
+
+layout(set = 1, binding = 0, std140) uniform Rects
+{
+    // Have to pad due to silly std140-ness.
+    uvec4 offsets[1024];
+};
+
+layout(push_constant, std430) uniform PushMe
+{
+    vec2 inv_source_size;
+    uint scale;
+} registers;
+
+void main()
+{
+#if defined(SCALED)
+    uvec2 coord = gl_GlobalInvocationID.xy + offsets[gl_WorkGroupID.z].xy * registers.scale;
+    vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
+    uint value = textureLod(uUnscaled, uv, 0.0).x;
+    vec4 unorm = abgr1555(value);
+    imageStore(uScaled, ivec2(coord), unorm);
+#elif defined(UNSCALED)
+    uvec2 coord = gl_GlobalInvocationID.xy + offsets[gl_WorkGroupID.z].xy;
+    vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
+#if SCALE == 2
+    // Grabs 4 texels and averages them box-style.
+    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+#elif SCALE == 4
+    // Grabs 16 texels and averages them box-style.
+    uv -= vec2(0.25 / 1024.0, 0.25 / 512.0);
+    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 2));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 2));
+    value /= 4.0;
+#elif SCALE == 8
+    // Kinda crazy, grabs 64 texels and averages them.
+    uv -= vec2(0.375 / 1024.0, 0.375 / 512.0);
+    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 0));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 0));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 2));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 2));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 2));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 2));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 4));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 4));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 4));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 4));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 6));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 6));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 6));
+    value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 6));
+    value /= 16.0;
+#endif
+
+    uint packed_color = pack_abgr1555(value);
+    imageStore(uUnscaled, ivec2(coord), uvec4(packed_color));
+#else
+#error "Invalid defines."
+#endif
+}

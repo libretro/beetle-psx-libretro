@@ -1,0 +1,82 @@
+#version 450
+layout(local_size_x = 128) in;
+
+#if defined(SCALED)
+layout(set = 0, binding = 0, rgba8) uniform image2D uFramebuffer;
+#elif defined(UNSCALED)
+layout(set = 0, binding = 0, r32ui) uniform uimage2D uFramebuffer;
+#else
+#error "Invalid defines."
+#endif
+
+layout(std430, push_constant) uniform Registers
+{
+   ivec2 src;
+   ivec2 dst;
+   ivec2 extent;
+   int scaling;
+} registers;
+
+void main()
+{
+   int src_x = registers.src.x;
+   int dst_x = registers.dst.x;
+   ivec2 offset = ivec2(gl_WorkGroupID.xy);
+   ivec2 mask = ivec2(1024, 512) * ivec2(gl_NumWorkGroups.xy) - 1;
+
+   bool read_after_write = registers.src.y == registers.dst.y;
+
+   for (int y = 0; y < registers.extent.y; y++)
+   {
+      for (int x = 0; x < registers.extent.x; x += 128)
+      {
+         int local_x = x + int(gl_LocalInvocationID.x);
+
+         // Make sure we load data into our "cache" before starting the write back.
+#ifdef SCALED
+#define DECL_CACHE vec4 cache
+#define DECL_MASK_CACHE vec4 mask_cache
+#define LOAD_SWIZZLE rgba
+#define STORE_CACHE cache
+#define TEST_CACHE(v) ((v).a < 0.5)
+#else
+#define DECL_CACHE uint cache
+#define DECL_MASK_CACHE uint mask_cache
+#define LOAD_SWIZZLE r
+#define STORE_CACHE uvec4(cache)
+#define TEST_CACHE(v) (((v) & 0x8000u) == 0u)
+#endif
+
+         // This way isn't great for cache, but we can run scaling * scaling independent workgroups as pixels
+         // within macro-blocks are completely independent.
+
+         DECL_CACHE;
+         if (local_x < registers.extent.x)
+         {
+            ivec2 coord = (registers.scaling * ivec2(src_x + local_x, registers.src.y + y) + offset) & mask;
+            cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+         }
+
+         // Write-after-read hazard, just execution barrier here.
+         if (read_after_write)
+            barrier();
+
+         if (local_x < registers.extent.x)
+         {
+            ivec2 coord = (registers.scaling * ivec2(dst_x + local_x, registers.dst.y + y) + offset) & mask;
+#ifdef MASKED
+            DECL_MASK_CACHE;
+            mask_cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+            if (TEST_CACHE(mask_cache))
+               imageStore(uFramebuffer, coord, STORE_CACHE);
+#else
+            imageStore(uFramebuffer, coord, STORE_CACHE);
+#endif
+         }
+
+         memoryBarrierImage();
+         barrier();
+      }
+   }
+}
+

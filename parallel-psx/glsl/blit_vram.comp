@@ -1,0 +1,55 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#if defined(SCALED)
+layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uFramebuffer;
+layout(set = 0, binding = 1) uniform sampler2D uImage;
+#elif defined(UNSCALED)
+layout(set = 0, binding = 0, r32ui) uniform writeonly uimage2D uFramebuffer;
+layout(set = 0, binding = 1) uniform usampler2D uImage;
+#else
+#error "Invalid defines."
+#endif
+
+struct Rect
+{
+    uvec4 offsets;
+    uvec2 extent;
+    uint mask_or;
+    uint padding;
+};
+
+layout(set = 1, binding = 0, std140) uniform Rects
+{
+    Rect rects[512];
+};
+
+void main()
+{
+    if (all(lessThan(gl_GlobalInvocationID.xy, rects[gl_WorkGroupID.z].extent)))
+    {
+        uvec4 offsets = rects[gl_WorkGroupID.z].offsets;
+        uvec2 mask = uvec2(1024u, 512u) * gl_NumWorkGroups.xy - 1u;
+        uvec2 src_coord = (gl_GlobalInvocationID.xy + offsets.xy) & mask;
+        uvec2 dst_coord = (gl_GlobalInvocationID.xy + offsets.zw) & mask;
+#if defined(SCALED)
+        vec4 value = texelFetch(uImage, ivec2(src_coord), 0);
+#ifdef MASKED
+        float fbalpha = texelFetch(uImage, ivec2(dst_coord), 0).a;
+        if (fbalpha < 0.5)
+            imageStore(uFramebuffer, ivec2(dst_coord), value);
+#else
+        imageStore(uFramebuffer, ivec2(dst_coord), value);
+#endif
+#elif defined(UNSCALED)
+        uint value = texelFetch(uImage, ivec2(src_coord), 0).x;
+#ifdef MASKED
+        uint fbvalue = texelFetch(uImage, ivec2(dst_coord), 0).x;
+        if ((fbvalue & 0x8000u) == 0u)
+            imageStore(uFramebuffer, ivec2(dst_coord), uvec4(value | rects[gl_WorkGroupID.z].mask_or));
+#else
+        imageStore(uFramebuffer, ivec2(dst_coord), uvec4(value | rects[gl_WorkGroupID.z].mask_or));
+#endif
+#endif
+    }
+}

@@ -1,0 +1,29 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, r32ui) uniform uimage2D uFramebuffer;
+layout(set = 0, binding = 1) uniform usamplerBuffer uImage;
+
+layout(push_constant, std430) uniform Rect
+{
+    uvec2 offset;
+    uvec2 extent;
+    uint view_offset;
+    uint mask_or;
+} rect;
+
+void main()
+{
+    if (all(lessThan(gl_GlobalInvocationID.xy, rect.extent)))
+    {
+        uint value = texelFetch(uImage,
+             int(rect.view_offset + rect.extent.x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x)).x;
+        uvec2 coord = (gl_GlobalInvocationID.xy + rect.offset) & uvec2(1023u, 511u);
+#ifdef MASKED
+        uint fbvalue = imageLoad(uFramebuffer, ivec2(coord)).x;
+        if ((fbvalue & 0x8000u) == 0u)
+            imageStore(uFramebuffer, ivec2(coord), uvec4(value | rect.mask_or));
+#else
+        imageStore(uFramebuffer, ivec2(coord), uvec4(value | rect.mask_or));
+#endif
+    }
+}
