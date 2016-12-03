@@ -1835,7 +1835,8 @@ void PS_GPU::UpdateDisplayMode()
 
   uint16_t yres = VertEnd - VertStart;
 
-  if(DisplayMode & DISP_INTERLACED) {
+  // Both 2nd bit and 5th bit have to be enabled to use interlacing properly.
+  if((DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480)) {
     yres *= 2;
   }
 

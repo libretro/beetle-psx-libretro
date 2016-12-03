@@ -24,6 +24,7 @@ class PS_GPU;
 #define INCMD_FBWRITE  4
 #define INCMD_FBREAD   8
 
+#define DISP_VERT480    0x04
 #define DISP_PAL        0x08
 #define DISP_RGB24      0x10
 #define DISP_INTERLACED 0x20
