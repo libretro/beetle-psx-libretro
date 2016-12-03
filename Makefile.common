@@ -220,7 +220,7 @@ ifneq ($(RSX_DUMP),)
    CXXFLAGS += -DRSX_DUMP
 endif
 
-ifneq ($(HAVE_VULKAN),)
+ifeq ($(HAVE_VULKAN),1)
 	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp)
 	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp)
 	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp)
