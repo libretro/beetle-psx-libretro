@@ -41,6 +41,11 @@ NEED_THREADING = 1
 CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx
 
+ifeq ($(HAVE_HW),1)
+HAVE_VULKAN=1
+HAVE_OPENGL=1
+endif
+
 ifeq ($(HAVE_VULKAN),1)
    TARGET_NAME := mednafen_psx_hw
 else ifeq ($(HAVE_OPENGL),1)
