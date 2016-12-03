@@ -156,7 +156,7 @@ endif
 SOURCES_C += $(CORE_DIR)/libretro_cbs.c
 
 ifeq ($(NEED_TREMOR), 1)
-   SOURCES_C += $(wildcard $(MEDNAFEN_DIR)/tremor/*.c)
+   SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))
 endif
 
 ifeq ($(HAVE_CDROM_NEW), 1)
