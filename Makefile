@@ -5,7 +5,6 @@ HAVE_OPENGL = 0
 HAVE_JIT = 0
 HAVE_CDROM_NEW = 0
 
-
 CORE_DIR := .
 HAVE_GRIFFIN = 0
 
@@ -355,8 +354,11 @@ ifeq ($(NO_GCC),1)
 endif
 
 OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
+DEPS := $(SOURCES_CXX:.cpp=.d) $(SOURCES_C:.c=.d)
 
 all: $(TARGET)
+
+-include $(DEPS)
 
 ifeq ($(DEBUG),0)
    FLAGS += -O2 $(EXTRA_GCC_FLAGS)
@@ -390,13 +392,15 @@ else
 endif
 
 %.o: %.cpp
-	$(CXX) -c -o $@ $< $(CPPFLAGS) $(CXXFLAGS)
+	$(CXX) $< -MM -MT $@ -MF $(patsubst %.o,%.d,$@) $(CPPFLAGS) $(CXXFLAGS)
+	$(CXX) -c -o $@ $< $(CXXFLAGS)
 
 %.o: %.c
-	$(CC) -c -o $@ $< $(CPPFLAGS) $(CFLAGS)
+	$(CC) $< -MM -MT $@ -MF $(patsubst %.o,%.d,$@) $(CPPFLAGS) $(CFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:
-	rm -f $(TARGET) $(OBJECTS)
+	rm -f $(TARGET) $(OBJECTS) $(DEPS)
 
 .PHONY: clean
 
