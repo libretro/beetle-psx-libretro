@@ -134,6 +134,7 @@ void rsx_vulkan_refresh_variables(void)
           has_software_fb = false;
     }
 
+    unsigned old_scaling = scaling;
     var.key = "beetle_psx_internal_resolution";
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -148,6 +149,18 @@ void rsx_vulkan_refresh_variables(void)
            adaptive_smoothing = true;
         else
            adaptive_smoothing = false;
+    }
+
+    if (old_scaling != scaling && renderer)
+    {
+       retro_system_av_info info;
+       rsx_vulkan_get_system_av_info(&info);
+
+       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
+       {
+          // Failed to change scale, just keep using the old one.
+          scaling = old_scaling;
+       }
     }
 }
 

@@ -3987,12 +3987,7 @@ void retro_set_environment(retro_environment_t cb)
       { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
       { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
       { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
-#elif defined(HAVE_VULKAN)
-      // Don't support on-the-fly changing resolution for now.
-      { "beetle_psx_internal_resolution", "Internal GPU resolution (restart); 1x(native)|2x|4x|8x" },
-#endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
       { "beetle_psx_filter", "Texture filtering; nearest|3point N64|bilinear" },
