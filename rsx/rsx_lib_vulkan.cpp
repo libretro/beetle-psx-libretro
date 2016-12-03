@@ -27,6 +27,7 @@ static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
+static bool widescreen_hack;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -150,6 +151,15 @@ void rsx_vulkan_refresh_variables(void)
         else
            adaptive_smoothing = false;
     }
+    
+    var.key = "beetle_psx_widescreen_hack";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        if (!strcmp(var.value, "enabled"))
+            widescreen_hack = true;
+        else
+            widescreen_hack = false;
+    }
 
     if (old_scaling != scaling && renderer)
     {
@@ -255,7 +265,7 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_height = 480 * scaling;
    info->timing.sample_rate = 44100.0;
 
-   info->geometry.aspect_ratio = 4.0 / 3.0;
+   info->geometry.aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
    if (video_is_pal)
       info->timing.fps = 49.76;
    else
