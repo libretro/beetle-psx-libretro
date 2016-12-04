@@ -402,7 +402,7 @@ ImageHandle Renderer::scanout_to_texture()
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &reuseable_scanout->get_view();
 		rp.num_color_attachments = 1;
-		rp.op_flags = RENDER_PASS_OP_COLOR_OPTIMAL_BIT | RENDER_PASS_OP_CLEAR_COLOR_BIT;
+		rp.op_flags = RENDER_PASS_OP_COLOR_OPTIMAL_BIT | RENDER_PASS_OP_CLEAR_COLOR_BIT | RENDER_PASS_OP_STORE_COLOR_BIT;
 
 		cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
