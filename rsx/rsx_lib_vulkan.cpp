@@ -8,6 +8,7 @@
 #include "renderer.hpp"
 #include "libretro_vulkan.h"
 #include <vector>
+#include <functional>
 
 using namespace Vulkan;
 using namespace PSX;
@@ -28,6 +29,7 @@ static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
 static bool widescreen_hack;
+static vector<function<void ()>> defer;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -76,6 +78,11 @@ static void context_reset(void)
    device->init_virtual_swapchain(num_images);
    swapchain_images.resize(num_images);
    renderer = new Renderer(*device, scaling, save_state.vram.empty() ? nullptr : &save_state);
+
+   for (auto &func : defer)
+      func();
+   defer.clear();
+
    renderer->flush();
 }
 
@@ -276,7 +283,14 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
 
 void rsx_vulkan_set_draw_offset(int16_t x, int16_t y)
 {
-   renderer->set_draw_offset(x, y);
+   if (renderer)
+      renderer->set_draw_offset(x, y);
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_draw_offset(x, y);
+      });
+   }
 }
 
 void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
@@ -287,7 +301,14 @@ void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    auto tex_x_or = (twx & tww) << 3;
    auto tex_y_or = (twy & twh) << 3;
 
-   renderer->set_texture_window({ uint8_t(tex_x_mask), uint8_t(tex_y_mask), uint8_t(tex_x_or), uint8_t(tex_y_or) });
+   if (renderer)
+      renderer->set_texture_window({ uint8_t(tex_x_mask), uint8_t(tex_y_mask), uint8_t(tex_x_or), uint8_t(tex_y_or) });
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_texture_window({ uint8_t(tex_x_mask), uint8_t(tex_y_mask), uint8_t(tex_x_or), uint8_t(tex_y_or) });
+      });
+   }
 }
 
 void rsx_vulkan_set_draw_area(uint16_t x0,
@@ -302,7 +323,15 @@ void rsx_vulkan_set_draw_area(uint16_t x0,
 
    width = min(width, int(FB_WIDTH - x0));
    height = min(height, int(FB_HEIGHT - y0));
-   renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+
+   if (renderer)
+      renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+      });
+   }
 }
 
 void rsx_vulkan_set_display_mode(uint16_t x,
@@ -311,7 +340,14 @@ void rsx_vulkan_set_display_mode(uint16_t x,
       uint16_t h,
       bool depth_24bpp)
 {
-   renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+   if (renderer)
+      renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+      });
+   }
 }
 
 void rsx_vulkan_push_quad(
@@ -348,6 +384,9 @@ void rsx_vulkan_push_quad(
       bool dither,
       int blend_mode, bool mask_test, bool set_mask)
 {
+   if (!renderer)
+      return;
+
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
@@ -431,6 +470,9 @@ void rsx_vulkan_push_triangle(
       bool dither,
       int blend_mode, bool mask_test, bool set_mask)
 {
+   if (!renderer)
+      return;
+
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
@@ -489,7 +531,8 @@ void rsx_vulkan_fill_rect(uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
-   renderer->clear_rect({ x, y, w, h }, color);
+   if (renderer)
+      renderer->clear_rect({ x, y, w, h }, color);
 }
 
 void rsx_vulkan_copy_rect(
@@ -497,6 +540,9 @@ void rsx_vulkan_copy_rect(
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h, bool mask_test, bool set_mask)
 {
+   if (!renderer)
+      return;
+
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->blit_vram({ dst_x, dst_y, w, h }, { src_x, src_y, w, h });
@@ -511,6 +557,9 @@ void rsx_vulkan_push_line(int16_t p0x,
       bool dither,
       int blend_mode, bool mask_test, bool set_mask)
 {
+   if (!renderer)
+      return;
+
    renderer->set_texture_mode(TextureMode::None);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
@@ -547,6 +596,15 @@ void rsx_vulkan_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram, bool mask_test, bool set_mask)
 {
+   if (!renderer)
+   {
+      // Generally happens if someone loads a save state before the Vulkan context is created.
+      defer.push_back([=]() {
+            rsx_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
+      });
+      return;
+   }
+
    bool dual_copy = x + w > FB_WIDTH; // Check if we need to handle wrap-around in X.
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
@@ -579,5 +637,12 @@ void rsx_vulkan_load_image(uint16_t x, uint16_t y,
 
 void rsx_vulkan_toggle_display(bool status)
 {
-   renderer->toggle_display(status == 0);
+   if (renderer)
+      renderer->toggle_display(status == 0);
+   else
+   {
+      defer.push_back([=] {
+            renderer->toggle_display(status == 0);
+      });
+   }
 }
