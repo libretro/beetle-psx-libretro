@@ -434,7 +434,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	ensure_command_buffer();
 
-	if (!render_state.bpp24 && scaling != 1)
+	if (render_state.adaptive_smoothing && (!render_state.bpp24 && scaling != 1))
 		mipmap_framebuffer();
 
 	if (scanout_semaphore)
