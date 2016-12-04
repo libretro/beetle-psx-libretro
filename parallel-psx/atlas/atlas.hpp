@@ -103,18 +103,20 @@ using FBColor = uint32_t;
 
 static inline uint32_t fbcolor_to_rgba8(FBColor color)
 {
-	return color;
+	// 3 LSBs are ignored.
+	return color & 0xfff8f8f8u;
 }
 
 static inline void fbcolor_to_rgba32f(float *v, FBColor color)
 {
-	unsigned r = (color >> 0) & 0xff;
-	unsigned g = (color >> 8) & 0xff;
-	unsigned b = (color >> 16) & 0xff;
+	// 3 LSBs are ignored.
+	unsigned r = (color >> 0) & 0xf8;
+	unsigned g = (color >> 8) & 0xf8;
+	unsigned b = (color >> 16) & 0xf8;
 	v[0] = r * (1.0f / 255.0f);
 	v[1] = g * (1.0f / 255.0f);
 	v[2] = b * (1.0f / 255.0f);
-	// Not sure what happens to mask bit.
+	// Mask bit is always cleared.
 	v[3] = 0.0f;
 }
 
