@@ -386,8 +386,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 		ensure_command_buffer();
 
-		auto info = ImageCreateInfo::render_target(rect.width ? rect.width : 64u, rect.height ? rect.height : 64u,
-		                                           VK_FORMAT_R8G8B8A8_UNORM);
+		auto info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
 		if (!reuseable_scanout || reuseable_scanout->get_create_info().width != info.width ||
 		    reuseable_scanout->get_create_info().height != info.height)
