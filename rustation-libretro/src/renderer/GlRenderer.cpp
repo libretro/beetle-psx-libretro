@@ -2,6 +2,7 @@
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
+#include "libretro_options.h"
 
 #include "shaders/command_vertex.glsl.h"
 #include "shaders/command_fragment.glsl.h"
@@ -25,14 +26,14 @@ GlRenderer::GlRenderer(DrawConfig* config)
 {
     struct retro_variable var = {0};
 
-    var.key = "beetle_psx_internal_resolution";
+    var.key = option_internal_resolution;
     uint8_t upscaling = 1;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         /* Same limitations as libretro.cpp */
         upscaling = var.value[0] -'0';
     }
 
-    var.key = "beetle_psx_filter";
+    var.key = option_filter;
     uint8_t filter = 0;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "nearest"))
@@ -45,7 +46,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
        this->filter_type = filter;
     }
 
-    var.key = "beetle_psx_internal_color_depth";
+    var.key = option_depth;
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "32bpp"))
@@ -55,7 +56,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     }
 
 
-    var.key = "beetle_psx_scale_dither";
+    var.key = option_scale_dither;
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "enabled"))
@@ -64,7 +65,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
           scale_dither = false;
     }
 
-    var.key = "beetle_psx_wireframe";
+    var.key = option_wireframe;
     bool wireframe = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "enabled"))
@@ -73,7 +74,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
           wireframe = false;
     }
 
-    var.key = "beetle_psx_display_vram";
+    var.key = option_display_vram;
     bool display_vram = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       if (!strcmp(var.value, "enabled"))
@@ -547,7 +548,7 @@ bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};
 
-    var.key = "beetle_psx_renderer_software_fb";
+    var.key = option_renderer_software_fb;
 
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -557,14 +558,14 @@ bool GlRenderer::refresh_variables()
           has_software_fb = false;
     }
 
-    var.key = "beetle_psx_internal_resolution";
+    var.key = option_internal_resolution;
     uint8_t upscaling = 1;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         /* Same limitations as libretro.cpp */
         upscaling = var.value[0] -'0';
     }
 
-    var.key = "beetle_psx_filter";
+    var.key = option_filter;
     uint8_t filter = 0;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "nearest"))
@@ -577,14 +578,14 @@ bool GlRenderer::refresh_variables()
        this->filter_type = filter;
     }
 
-    var.key = "beetle_psx_internal_color_depth";
+    var.key = option_depth;
     uint8_t depth = 16;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         depth = !strcmp(var.value, "32bpp") ? 32 : 16;
     }
 
 
-    var.key = "beetle_psx_scale_dither";
+    var.key = option_scale_dither;
     bool scale_dither = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "enabled"))
@@ -593,7 +594,7 @@ bool GlRenderer::refresh_variables()
           scale_dither = false;
     }
 
-    var.key = "beetle_psx_wireframe";
+    var.key = option_wireframe;
     bool wireframe = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "enabled"))
@@ -602,7 +603,7 @@ bool GlRenderer::refresh_variables()
           wireframe = false;
     }
 
-    var.key = "beetle_psx_display_vram";
+    var.key = option_vram;
     bool display_vram = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       if (!strcmp(var.value, "enabled")) {

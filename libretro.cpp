@@ -14,6 +14,7 @@
 #include <string/stdstring.h>
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
+#include "libretro_options.h"
 
 #include "../pgxp/pgxp_main.h"
 
@@ -2524,7 +2525,7 @@ static void check_variables(bool startup)
 
    if (startup)
    {
-      var.key = "beetle_psx_renderer";
+      var.key = option_renderer;
 
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
@@ -2552,7 +2553,7 @@ static void check_variables(bool startup)
    }
 
 #ifndef EMSCRIPTEN
-   var.key = "beetle_psx_cdimagecache";
+   var.key = option_cd_image_cache;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2568,7 +2569,7 @@ static void check_variables(bool startup)
    }
 #endif
 
-   var.key = "beetle_psx_cpu_overclock";
+   var.key = option_cpu_overclock;
    
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2580,7 +2581,7 @@ static void check_variables(bool startup)
    else
       psx_cpu_overclock = false;
    
-   var.key = "beetle_psx_skipbios";
+   var.key = option_skip_bios;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2590,7 +2591,7 @@ static void check_variables(bool startup)
          psx_skipbios = 0;
    }   
    
-   var.key = "beetle_psx_widescreen_hack";
+   var.key = option_widescreen_hack;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2602,7 +2603,7 @@ static void check_variables(bool startup)
    else
       widescreen_hack = false;
 
-   var.key = "beetle_psx_enable_memcard1";
+   var.key = option_memcard1_enable;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2614,7 +2615,7 @@ static void check_variables(bool startup)
    else
       enable_memcard1 = false;
 
-   var.key = "beetle_psx_analog_calibration";
+   var.key = option_analog_calibration;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2631,7 +2632,7 @@ static void check_variables(bool startup)
    switch (rsx_intf_is_type())
    {
       case RSX_SOFTWARE:
-         var.key = "beetle_psx_internal_resolution";
+         var.key = option_internal_resolution;
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
          {
@@ -2663,7 +2664,7 @@ static void check_variables(bool startup)
          break;
    }
 
-   var.key = "beetle_psx_dither_mode";
+   var.key = option_dither_mode;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2678,7 +2679,7 @@ static void check_variables(bool startup)
       psx_gpu_dither_mode = DITHER_NATIVE;
 
    // iCB: PGXP settings
-   var.key = "beetle_psx_pgxp_mode";
+   var.key = option_pgxp_mode;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2692,7 +2693,7 @@ static void check_variables(bool startup)
    else
 	   psx_pgxp_mode = PGXP_MODE_NONE;
 
-   var.key = "beetle_psx_pgxp_caching";
+   var.key = option_pgxp_vertex;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2704,7 +2705,7 @@ static void check_variables(bool startup)
    else
 	   psx_pgxp_vertex_caching = PGXP_MODE_NONE;
 
-   var.key = "beetle_psx_pgxp_texture";
+   var.key = option_pgxp_texture;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2717,7 +2718,7 @@ static void check_variables(bool startup)
 	   psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
 
-   var.key = "beetle_psx_analog_toggle";
+   var.key = option_analog_toggle;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2735,7 +2736,7 @@ static void check_variables(bool startup)
       }
    }
 
-   var.key = "beetle_psx_enable_multitap_port1";
+   var.key = option_multitap1;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2745,7 +2746,7 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_1 = false;
    }
 
-   var.key = "beetle_psx_enable_multitap_port2";
+   var.key = option_multitap2;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2755,28 +2756,28 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_2 = false;
    }
 
-   var.key = "beetle_psx_initial_scanline";
+   var.key = option_initial_scanline;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_initial_scanline = atoi(var.value);
    }
 
-   var.key = "beetle_psx_last_scanline";
+   var.key = option_last_scanline;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_last_scanline = atoi(var.value);
    }
 
-   var.key = "beetle_psx_initial_scanline_pal";
+   var.key = option_initial_scanline_pal;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_initial_scanline_pal = atoi(var.value);
    }
 
-   var.key = "beetle_psx_last_scanline_pal";
+   var.key = option_last_scanline_pal;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2798,7 +2799,7 @@ static void check_variables(bool startup)
          players = 2;
    }
 
-   var.key = "beetle_psx_use_mednafen_memcard0_method";
+   var.key = option_memcard0_method;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2809,7 +2810,7 @@ static void check_variables(bool startup)
    }
 
    //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
-   var.key = "beetle_psx_shared_memory_cards";
+   var.key = option_memcard_shared;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2838,7 +2839,7 @@ static void check_variables(bool startup)
      }
    }
 
-   var.key = "beetle_psx_frame_duping_enable";
+   var.key = option_frame_duping;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2855,7 +2856,7 @@ static void check_variables(bool startup)
    else
       allow_frame_duping = false;
 
-   var.key = "beetle_psx_display_internal_framerate";
+   var.key = option_display_internal_fps;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
@@ -2867,7 +2868,7 @@ static void check_variables(bool startup)
    else
      display_internal_framerate = false;
 
-   var.key = "beetle_psx_crop_overscan";
+   var.key = option_crop_overscan;
    
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
@@ -2877,7 +2878,7 @@ static void check_variables(bool startup)
          crop_overscan = false;
      }
 
-   var.key = "beetle_psx_image_offset";
+   var.key = option_image_offset;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2901,7 +2902,7 @@ static void check_variables(bool startup)
          image_offset = 4;
    }
 
-   var.key = "beetle_psx_image_crop";
+   var.key = option_image_crop;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3989,46 +3990,50 @@ void retro_set_environment(retro_environment_t cb)
    environ_cb = cb;
 
    static const struct retro_variable vars[] = {
-      { "beetle_psx_renderer", "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
-      { "beetle_psx_renderer_software_fb", "Software framebuffer; enabled|disabled" }, 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+      { option_renderer, "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
+      { option_renderer_software_fb, "Software framebuffer; enabled|disabled" }, 
+#endif
 #ifdef HAVE_VULKAN
-      { "beetle_psx_adaptive_smoothing", "Adaptive smoothing; enabled|disabled" },
+      { option_adaptive_smoothing, "Adaptive smoothing; enabled|disabled" },
 #endif
-#ifndef EMSCRIPTEN
-      { "beetle_psx_cdimagecache", "CD Image Cache (restart); disabled|enabled" },
-#endif
-      { "beetle_psx_cpu_overclock", "CPU Overclock; disabled|enabled" },
-      { "beetle_psx_skipbios", "Skip BIOS; disabled|enabled" },
-      { "beetle_psx_widescreen_hack", "Widescreen mode hack; disabled|enabled" },
-      { "beetle_psx_internal_resolution", "Internal GPU resolution; 1x(native)|2x|4x|8x" },
+      { option_internal_resolution, "Internal GPU resolution; 1x(native)|2x|4x|8x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
-      { "beetle_psx_filter", "Texture filtering; nearest|3point N64|bilinear" },
-      { "beetle_psx_internal_color_depth", "Internal color depth; dithered 16bpp (native)|32bpp" },
-      { "beetle_psx_scale_dither", "Scale dithering pattern with internal resolution; enabled|disabled" },
-      { "beetle_psx_wireframe", "Wireframe mode; disabled|enabled" },
-      { "beetle_psx_display_vram", "Display full VRAM; disabled|enabled" },
-      { "beetle_psx_dither_mode", "Dithering pattern; 1x(native)|internal resolution|disabled" },
+      { option_filter, "Texture filtering; nearest|3point N64|bilinear" },
+      { option_depth, "Internal color depth; dithered 16bpp (native)|32bpp" },
+      { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
+      { option_scale_dither, "Scale dithering pattern with internal resolution; enabled|disabled" },
+      { option_wireframe, "Wireframe mode; disabled|enabled" },
+      { option_display_vram, "Display full VRAM; disabled|enabled" },
 #endif
-      { "beetle_psx_pgxp_mode", "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
-      { "beetle_psx_pgxp_caching", "PGXP vertex cache; disabled|enabled" },
-      { "beetle_psx_pgxp_texture", "PGXP perspective correct texturing; disabled|enabled" },
-      { "beetle_psx_use_mednafen_memcard0_method", "Memcard 0 method; libretro|mednafen" },
-      { "beetle_psx_enable_memcard1", "Enable memory card 1; enabled|disabled" },
-      { "beetle_psx_shared_memory_cards", "Shared memcards (restart); disabled|enabled" },
-      { "beetle_psx_analog_calibration", "Analog self-calibration; disabled|enabled" },
-      { "beetle_psx_initial_scanline", "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { "beetle_psx_initial_scanline_pal", "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { "beetle_psx_last_scanline", "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
-      { "beetle_psx_last_scanline_pal", "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
-      { "beetle_psx_analog_toggle", "DualShock Analog button toggle; disabled|enabled" },
-      { "beetle_psx_enable_multitap_port1", "Port 1: Multitap enable; disabled|enabled" },
-      { "beetle_psx_enable_multitap_port2", "Port 2: Multitap enable; disabled|enabled" },
-      { "beetle_psx_frame_duping_enable", "Frame duping (speedup); disabled|enabled" },
-      { "beetle_psx_display_internal_framerate", "Display internal FPS; disabled|enabled" },
-      { "beetle_psx_crop_overscan", "Crop Overscan; enabled|disabled" },
-      { "beetle_psx_image_offset", "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
-      { "beetle_psx_image_crop", "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+      { option_pgxp_mode, "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
+      { option_pgxp_vertex, "PGXP vertex cache; disabled|enabled" },
+      { option_pgxp_texture, "PGXP perspective correct texturing; disabled|enabled" },
+#endif
+      { option_initial_scanline, "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { option_last_scanline, "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
+      { option_initial_scanline_pal, "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { option_last_scanline_pal, "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
+      { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
+      { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
+      { option_crop_overscan, "Crop Overscan; enabled|disabled" },
+      { option_image_crop, "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
+      { option_image_offset, "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
+      { option_display_internal_fps, "Display internal FPS; disabled|enabled" },
+      { option_analog_calibration, "Analog self-calibration; disabled|enabled" },
+      { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
+      { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
+      { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
+      { option_cpu_overclock, "CPU Overclock; disabled|enabled" },
+#ifndef EMSCRIPTEN
+      { option_cd_image_cache, "CD Image Cache (restart); disabled|enabled" },
+#endif
+      { option_skip_bios, "Skip BIOS; disabled|enabled" },
+      { option_memcard0_method, "Memcard 0 method; libretro|mednafen" },
+      { option_memcard1_enable, "Enable memory card 1; enabled|disabled" },
+      { option_memcard_shared, "Shared memcards (restart); disabled|enabled" },
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {

@@ -44,6 +44,7 @@ TARGET_NAME := mednafen_psx
 ifeq ($(HAVE_HW),1)
 HAVE_VULKAN=1
 HAVE_OPENGL=1
+FLAGS += -DHAVE_HW
 endif
 
 ifeq ($(HAVE_VULKAN),1)
