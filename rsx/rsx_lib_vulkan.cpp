@@ -10,6 +10,8 @@
 #include <vector>
 #include <functional>
 
+
+
 using namespace Vulkan;
 using namespace PSX;
 using namespace std;
@@ -132,7 +134,7 @@ void rsx_vulkan_close(void)
 void rsx_vulkan_refresh_variables(void)
 {
     struct retro_variable var = {0};
-    var.key = "beetle_psx_renderer_software_fb";
+    var.key = option_renderer_software_fb;
 
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -143,14 +145,14 @@ void rsx_vulkan_refresh_variables(void)
     }
 
     unsigned old_scaling = scaling;
-    var.key = "beetle_psx_internal_resolution";
+    var.key = option_internal_resolution;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
         /* Same limitations as libretro.cpp */
         scaling = var.value[0] - '0';
     }
 
-    var.key = "beetle_psx_adaptive_smoothing";
+    var.key = option_adaptive_smoothing;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
         if (!strcmp(var.value, "enabled"))
@@ -159,7 +161,7 @@ void rsx_vulkan_refresh_variables(void)
            adaptive_smoothing = false;
     }
     
-    var.key = "beetle_psx_widescreen_hack";
+    var.key = option_widescreen_hack;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
         if (!strcmp(var.value, "enabled"))
