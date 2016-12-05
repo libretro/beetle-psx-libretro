@@ -603,7 +603,7 @@ bool GlRenderer::refresh_variables()
           wireframe = false;
     }
 
-    var.key = option_vram;
+    var.key = option_display_vram;
     bool display_vram = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       if (!strcmp(var.value, "enabled")) {
