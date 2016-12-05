@@ -4,7 +4,7 @@
 #else
 #define MEDNAFEN_CORE_NAME "Mednafen PSX"
 #endif
-#define MEDNAFEN_CORE_VERSION "v0.9.39.2"
+#define MEDNAFEN_CORE_VERSION "0.9.39.2"
 #define MEDNAFEN_CORE_EXTENSIONS "exe|cue|toc|ccd|m3u|pbp"
 #define MEDNAFEN_CORE_GEOMETRY_BASE_W 320
 #define MEDNAFEN_CORE_GEOMETRY_BASE_H 240

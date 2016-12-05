@@ -3900,7 +3900,11 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = MEDNAFEN_CORE_NAME;
+#ifdef GIT_VERSION
+   info->library_version  = MEDNAFEN_CORE_VERSION GIT_VERSION;
+#else
    info->library_version  = MEDNAFEN_CORE_VERSION;
+#endif
    info->need_fullpath    = true;
    info->valid_extensions = MEDNAFEN_CORE_EXTENSIONS;
    info->block_extract    = false;
