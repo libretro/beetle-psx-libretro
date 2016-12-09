@@ -371,9 +371,9 @@ all: $(TARGET)
 -include $(DEPS)
 
 ifeq ($(DEBUG),0)
-   FLAGS += -O2 $(EXTRA_GCC_FLAGS)
+   FLAGS += -O2 -DNDEBUG $(EXTRA_GCC_FLAGS)
 else
-   FLAGS += -O0 -g
+   FLAGS += -O0 -g -DDEBUG
 endif
 
 LDFLAGS += $(fpic) $(SHARED)

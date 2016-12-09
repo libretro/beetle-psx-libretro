@@ -1,10 +1,11 @@
 #include "error.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <cassert>
+
 void get_error()
 {
 #ifdef DEBUG
-    
     GLenum error = glGetError();
     switch (error)
     {
@@ -37,7 +38,6 @@ void get_error()
         break;
     }
 
-    exit(EXIT_FAILURE);
-    
+    assert(error == GL_NO_ERROR);
 #endif
 }
