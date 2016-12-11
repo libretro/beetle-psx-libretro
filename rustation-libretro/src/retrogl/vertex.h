@@ -30,7 +30,7 @@ public:
     const GLvoid* gl_offset();
 };
 
-/* 
+/*
 <simias> in order to create the vertex attrib array I need to know:
 the GL type of the field, the number of components (unary, pair or triple)
 and the offset within the struct

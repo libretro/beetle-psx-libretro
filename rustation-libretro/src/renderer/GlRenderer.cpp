@@ -241,7 +241,7 @@ void GlRenderer::draw()
 
     this->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
 
-    this->command_buffer->pre_bind();
+    this->command_buffer->prepare_draw();
 
     GLushort *opaque_triangle_indices =
       this->opaque_triangle_indices + this->opaque_triangle_index_pos + 1;
@@ -249,9 +249,9 @@ void GlRenderer::draw()
       INDEX_BUFFER_LEN - this->opaque_triangle_index_pos - 1;
 
     if (opaque_triangle_len) {
-      this->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
-						 opaque_triangle_indices,
-						 opaque_triangle_len);
+      this->command_buffer->draw_indexed__raw(GL_TRIANGLES,
+                                              opaque_triangle_indices,
+                                              opaque_triangle_len);
     }
 
     GLushort *opaque_line_indices =
@@ -260,9 +260,9 @@ void GlRenderer::draw()
       INDEX_BUFFER_LEN - this->opaque_line_index_pos - 1;
 
     if (opaque_line_len) {
-      this->command_buffer->draw_indexed_no_bind(GL_LINES,
-						 opaque_line_indices,
-						 opaque_line_len);
+      this->command_buffer->draw_indexed__raw(GL_LINES,
+                                              opaque_line_indices,
+                                              opaque_line_len);
     }
 
     if (this->semi_transparent_index_pos > 0) {
@@ -325,15 +325,16 @@ void GlRenderer::draw()
 	unsigned len = it->last_index - cur_index;
 	GLushort *indices = this->semi_transparent_indices + cur_index;
 
-	this->command_buffer->draw_indexed_no_bind(it->draw_mode,
-						   indices,
-						   len);
+	this->command_buffer->draw_indexed__raw(it->draw_mode,
+                                                indices,
+                                                len);
 
 	cur_index = it->last_index;
       }
+
     }
 
-    this->command_buffer->finish();
+    this->command_buffer->finalize_draw__no_bind();
 
     this->primitive_ordering = 0;
     this->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
@@ -463,7 +464,6 @@ void GlRenderer::upload_textures(uint16_t top_left[2],
     Framebuffer _fb = Framebuffer(this->fb_out);
 
     this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    this->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -510,7 +510,6 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
     Framebuffer _fb = Framebuffer(this->fb_out);
 
     this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    this->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -749,7 +748,6 @@ void GlRenderer::finalize_frame()
         this->output_buffer->program->uniform1ui( "internal_upscaling",
                                                     this->internal_upscaling);
         this->output_buffer->draw(GL_TRIANGLE_STRIP);
-	this->output_buffer->swap();
     }
 
     // Hack: copy fb_out back into fb_texture at the end of every
@@ -779,7 +777,6 @@ void GlRenderer::finalize_frame()
 
 
       this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-      this->image_load_buffer->swap();
     }
 
     // Cleanup OpenGL context before returning to the frontend
@@ -869,7 +866,6 @@ void GlRenderer::vertex_preprocessing(CommandVertex *v,
 
   if (buffer_full) {
     this->draw();
-    this->command_buffer->swap();
   }
 
   int16_t z = this->primitive_ordering;
@@ -910,8 +906,11 @@ void GlRenderer::push_quad(CommandVertex v[4],
 
   this->vertex_preprocessing(v, 4, GL_TRIANGLES, stm);
 
-  // The diagonal is duplicated
-  static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
+  // The diagonal is duplicated. I originally used "1, 2, 1, 2" to
+  // duplicate the diagonal but I believe it was incorrect because of
+  // the OpenGL filling convention. At least it's what TinyTiger told
+  // me...
+  static const GLushort indices[6] = {0, 1, 2, 2, 1, 3};
 
   unsigned index = this->command_buffer->next_index();
 
@@ -1048,13 +1047,26 @@ void GlRenderer::copy_rect( uint16_t source_top_left[2],
     GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
     GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
-    // XXX CopyImageSubData gives undefined results if the source
-    // and target area overlap, this should be handled
-    // explicitely
-    /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-    glCopyImageSubData( this->fb_out->id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
-                        this->fb_out->id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
-                        w, h, 1 );
+    GLuint fb;
+
+    glGenFramebuffers(1, &fb);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
+    glFramebufferTexture(GL_READ_FRAMEBUFFER,
+                         GL_COLOR_ATTACHMENT0,
+                         this->fb_out->id,
+                         0);
+
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+
+    // Can I bind the same texture to the framebuffer and
+    // GL_TEXTURE_2D? Something tells me this is undefined
+    // behaviour. I could use glReadPixels and glWritePixels instead
+    // or something like that.
+    glBindTexture(GL_TEXTURE_2D, this->fb_out->id);
+
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
+
+    glDeleteFramebuffers(1, &fb);
 
     get_error();
 }

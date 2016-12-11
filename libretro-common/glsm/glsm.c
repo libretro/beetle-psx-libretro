@@ -2197,7 +2197,7 @@ static bool glsm_state_ctx_init(void *data)
 #else
    hw_render.context_type       = RETRO_HW_CONTEXT_OPENGLES2;
 #endif
-#else
+#else /* HAVE_OPENGLES */
 #ifdef CORE
    hw_render.context_type       = RETRO_HW_CONTEXT_OPENGL_CORE;
    hw_render.version_major      = 3;
@@ -2205,7 +2205,7 @@ static bool glsm_state_ctx_init(void *data)
 #else
    hw_render.context_type       = RETRO_HW_CONTEXT_OPENGL;
 #endif
-#endif
+#endif /* HAVE_OPENGLES */
    hw_render.context_reset      = params->context_reset;
    hw_render.context_destroy    = params->context_destroy;
    hw_render.stencil            = params->stencil;
