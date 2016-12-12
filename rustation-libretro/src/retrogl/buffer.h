@@ -183,8 +183,6 @@ public:
 
         offset_bytes = this->map_start * element_size;
 
-        printf("Remap %lu %lu\n", this->capacity, this->map_start);
-
         m = glMapBufferRange(GL_ARRAY_BUFFER,
                              offset_bytes,
                              buffer_size,
@@ -300,8 +298,6 @@ public:
 
     void draw(GLenum mode)
     {
-        printf("Draw %lu\n", this->map_index);
-
         if (this->empty()) {
 	  return;
 	}
@@ -322,8 +318,6 @@ public:
     /// draw calls between the prepare/finalize)
     void draw_indexed__raw(GLenum mode, GLushort *indices, GLsizei count)
     {
-        printf("Draw indexed %d/%lu\n", count, this->map_index);
-
         this->bind();
 
         if (this->empty()) {
