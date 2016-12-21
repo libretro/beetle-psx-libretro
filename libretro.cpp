@@ -3940,6 +3940,8 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
+   if (in_port >= MAX_PLAYERS)
+      return;
    switch (device)
    {
       case RETRO_DEVICE_JOYPAD:
