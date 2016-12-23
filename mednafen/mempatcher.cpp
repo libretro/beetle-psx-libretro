@@ -65,6 +65,18 @@ static bool CheatsActive = true;
 bool SubCheatsOn = 0;
 std::vector<SUBCHEAT> SubCheats[8];
 
+MemoryPatch::MemoryPatch() : addr(0), val(0), compare(0), 
+			     mltpl_count(1), mltpl_addr_inc(0), mltpl_val_inc(0), copy_src_addr(0), copy_src_addr_inc(0),
+			     length(0), bigendian(false), status(false), icount(0), type(0)
+{
+
+}
+
+MemoryPatch::~MemoryPatch()
+{
+
+}
+
 static void RebuildSubCheats(void)
 {
  std::vector<CHEATF>::iterator chit;

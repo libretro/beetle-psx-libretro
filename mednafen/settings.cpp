@@ -75,7 +75,7 @@ double MDFN_GetSettingF(const char *name)
 bool MDFN_GetSettingB(const char *name)
 {
    if (!strcmp("cheats", name))
-      return 0;
+      return 1;
    /* LIBRETRO */
    if (!strcmp("libretro.cd_load_into_ram", name))
       return 0;
