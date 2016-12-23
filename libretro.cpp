@@ -4204,13 +4204,11 @@ void retro_cheat_set(unsigned index, bool enabled, const char * code)
 	//Set parameters
 	patch.name=std::string(name);
 	patch.status=enabled;
-	printf("Cheats Enabled: %i\n",MDFN_GetSettingB("cheats"));
 
 	//Add the Cheat
 	try
 	{
 		MDFNI_AddCheat(name,patch.addr,patch.val,patch.compare,patch.type,patch.length,patch.bigendian);
-		MDFNI_SetCheat(0,name,patch.addr,patch.val,patch.compare,enabled,patch.type,patch.length,patch.bigendian);
 
 	}
 	catch(std::exception &e)
