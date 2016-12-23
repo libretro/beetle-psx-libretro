@@ -4180,10 +4180,44 @@ size_t retro_get_memory_size(unsigned type)
 }
 
 void retro_cheat_reset(void)
-{}
+{
+	MDFN_FlushGameCheats(1);
+}
 
-void retro_cheat_set(unsigned, bool, const char *)
-{}
+void retro_cheat_set(unsigned index, bool enabled, const char * code)
+{
+	const CheatFormatStruct* cf = CheatFormats;
+	char name[256];
+	MemoryPatch patch;
+	
+	//Decode the cheat
+	try
+	{
+		cf->DecodeCheat(std::string(code), &patch);
+	}
+	catch(std::exception &e)
+	{
+		return;
+	}
+	
+	//Generate a name
+	sprintf(name,"cheat_%u",index);
+	
+	//Set parameters
+	patch.name=std::string(name);
+	patch.status=enabled;
+
+	//Add the Cheat
+	try
+	{
+		MDFNI_AddCheat(name,patch.addr,patch.val,patch.compare,patch.type,patch.length,patch.bigendian);
+
+	}
+	catch(std::exception &e)
+	{
+		return;
+	}
+}
 
 #ifdef _WIN32
 static void sanitize_path(std::string &path)
