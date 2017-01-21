@@ -51,9 +51,8 @@ class SPU_Sweep
 
    void WriteVolume(int16 value);
 
-   void Clock(void);
+   void Clock();
 
-   private:
    uint16_t Control;
    uint16_t Current;
    uint32_t Divider;
