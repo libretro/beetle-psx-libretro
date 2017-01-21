@@ -838,13 +838,17 @@ void PS_CDC::SetAIP(unsigned irq, unsigned result_count, uint8 *r)
 
 void PS_CDC::SetAIP(unsigned irq, uint8 result0)
 {
-   uint8 tr[1] = { result0 };
+   uint8 tr[1];
+   tr[0] = result0;
+
    SetAIP(irq, 1, tr);
 }
 
 void PS_CDC::SetAIP(unsigned irq, uint8 result0, uint8 result1)
 {
-   uint8 tr[2] = { result0, result1 };
+   uint8 tr[2];
+   tr[0] = result0;
+   tr[1] = result1;
    SetAIP(irq, 2, tr);
 }
 
