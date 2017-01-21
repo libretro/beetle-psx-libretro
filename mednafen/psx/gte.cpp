@@ -923,7 +923,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       {
          for(i = 0; i < 3; i++)
          {
-            int32_t mulr[3] = { (int16_t)CR[i] };
+            int32_t mulr[3];
             int64_t tmp     = (uint64_t)(int64_t)crv[i] << 12;
 
             if(i == 0)
@@ -931,6 +931,12 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
                mulr[0] = -(RGB.R << 4);
                mulr[1] = (RGB.R << 4);
                mulr[2] = IR0;
+            }
+            else
+            {
+               mulr[0] = (int16_t)CR[i];
+               mulr[1] = (int16_t)CR[i];
+               mulr[2] = (int16_t)CR[i];
             }
 
             tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
@@ -947,7 +953,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       {
          for(i = 0; i < 3; i++)
          {
-            int32_t mulr[3] = { (int16_t)CR[i] };
+            int32_t mulr[3];
             int64_t tmp     = (uint64_t)(int64_t)crv[i] << 12;
 
             if(i == 0)
@@ -955,6 +961,12 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
                mulr[0] = -(RGB.R << 4);
                mulr[1] = (RGB.R << 4);
                mulr[2] = IR0;
+            }
+            else
+            {
+               mulr[0] = (int16_t)CR[i];
+               mulr[1] = (int16_t)CR[i];
+               mulr[2] = (int16_t)CR[i];
             }
 
             tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
@@ -1276,7 +1288,6 @@ static INLINE void DPC(uint32_t instr)
 {
    int i;
    int32_t RGB_temp[3];
-   int32_t IR_temp[3]  = { IR1, IR2, IR3 };
    const uint32_t sf   = (instr & (1 << 19)) ? 12 : 0;
    const int      lm   = (instr >> 10) & 1;
 
@@ -1328,7 +1339,6 @@ static int32_t DPCS(uint32_t instr)
 {
    int i;
    int32_t RGB_temp[3];
-   int32_t IR_temp[3] = { IR1, IR2, IR3 };
    const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
    const int      lm  = (instr >> 10) & 1;
 
