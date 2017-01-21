@@ -1752,9 +1752,6 @@ int32 PS_CDC::Command_Backward(const int arg_count, const uint8 *args)
 
 void PS_CDC::ReadBase(void)
 {
-   if(!CommandCheckDiscPresent())
-      return;
-
    if(!IsPSXDisc)
    {
       WriteResult(MakeStatus(true));
@@ -1802,13 +1799,15 @@ void PS_CDC::ReadBase(void)
 
 int32 PS_CDC::Command_ReadN(const int arg_count, const uint8 *args)
 {
-   ReadBase();
+   if(CommandCheckDiscPresent())
+      ReadBase();
    return 0;
 }
 
 int32 PS_CDC::Command_ReadS(const int arg_count, const uint8 *args)
 {
-   ReadBase();
+   if(CommandCheckDiscPresent())
+      ReadBase();
    return 0;
 }
 
