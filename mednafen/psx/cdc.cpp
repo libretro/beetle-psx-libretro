@@ -534,16 +534,8 @@ INLINE void PS_CDC::ApplyVolume(int32 samples[2])
 
 // This function must always set samples[0] and samples[1], even if just to 0; 
 // range of samples[n] shall be restricted to -32768 through 32767.
-void PS_CDC::GetCDAudio(int32 samples[2])
+void PS_CDC::GetCDAudio(int32 samples[2], const unsigned freq)
 {
-   const unsigned freq = (AudioBuffer.ReadPos < AudioBuffer.Size) ? AudioBuffer.Freq : 0;
-
-   samples[0] = 0;
-   samples[1] = 0;
-
-   if(!freq)
-      return;
-
    if(freq == 7 || freq == 14)
    {
       ReadAudioBuffer(samples);
@@ -552,7 +544,9 @@ void PS_CDC::GetCDAudio(int32 samples[2])
    }
    else
    {
-      int32 out_tmp[2] = { 0, 0 };
+      int32 out_tmp[2];
+
+      out_tmp[0] = out_tmp[1] = 0;
 
       for(unsigned i = 0; i < 2; i++)
       {
@@ -573,7 +567,9 @@ void PS_CDC::GetCDAudio(int32 samples[2])
 
       if(ADPCM_ResampCurPhase >= 7)
       {
-         int32 raw[2] = { 0, 0 };
+         int32 raw[2];
+
+         raw[0] = raw[1] = 0;
 
          ADPCM_ResampCurPhase -= 7;
          ReadAudioBuffer(raw);

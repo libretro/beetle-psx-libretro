@@ -662,9 +662,12 @@ static int32 IIASM(const int16 IIR_ALPHA, const int16 insamp)
 //
 void PS_SPU::RunReverb(const int32* in, int32* out)
 {
- int32 upsampled[2] = { 0, 0 };
+   unsigned lr;
+ int32 upsampled[2];
 
- for(unsigned lr = 0; lr < 2; lr++)
+ upsampled[0] = upsampled[1] = 0;
+
+ for(lr = 0; lr < 2; lr++)
  {
   RDSB[lr][RvbResPos | 0x00] = in[lr];
   RDSB[lr][RvbResPos | 0x40] = in[lr];	// So we don't have to &/bounds check in our MAC loop
@@ -797,16 +800,21 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
       // xxx[0] = left, xxx[1] = right
 
       // Accumulated sound output.
-      int32 accum[2] = { 0, 0 };
+      int32 accum[2];
 
       // Accumulated sound output for reverb input
-      int32 accum_fv[2] = { 0, 0 };
+      int32 accum_fv[2];
 
       // Output of reverb processing.
-      int32 reverb[2] = { 0, 0 };
+      int32 reverb[2];
 
       // Final output.
-      int32 output[2] = { 0, 0 };
+      int32 output[2];
+
+      accum[0]    = accum[1]    = 0;
+      accum_fv[0] = accum_fv[1] = 0;
+      reverb[0]   = reverb[1]   = 0;
+      output[0]   = output[1]   = 0;
 
       const uint32 PhaseModCache = FM_Mode & ~ 1;
       /*
@@ -990,8 +998,12 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
       {
          int32 cda_raw[2];
          int32 cdav[2];
+         const unsigned freq = (CDC->AudioBuffer.ReadPos < CDC->AudioBuffer.Size) ? CDC->AudioBuffer.Freq : 0;
 
-         CDC->GetCDAudio(cda_raw);	// PS_CDC::GetCDAudio() guarantees the variables passed by reference will be set to 0,
+         cda_raw[0] = cda_raw[1] = 0;
+
+         if (freq)
+            CDC->GetCDAudio(cda_raw, freq);	// PS_CDC::GetCDAudio() guarantees the variables passed by reference will be set to 0,
          // and that their range shall be -32768 through 32767.
 
          WriteSPURAM(CWA | 0x000, cda_raw[0]);

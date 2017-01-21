@@ -37,14 +37,14 @@ class PS_CDC
       uint32 DMARead(void);
       void SoftReset(void);
 
-      void GetCDAudio(int32 samples[2]);
+      void GetCDAudio(int32 samples[2], const unsigned freq);
+
+      CD_Audio_Buffer AudioBuffer;
 
    private:
       CDIF *Cur_CDIF;
       bool DiscChanged;
       int32 DiscStartupDelay;
-
-      CD_Audio_Buffer AudioBuffer;
 
       uint8 Pending_DecodeVolume[2][2], DecodeVolume[2][2];		// [data_source][output_port]
 
