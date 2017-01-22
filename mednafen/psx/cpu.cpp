@@ -513,13 +513,12 @@ uint32_t PS_CPU::Exception(uint32_t code, uint32_t PC, const uint32 NP, const ui
 template<bool DebugMode>
 int32_t PS_CPU::RunReal(int32_t timestamp_in)
 {
-   register int32_t timestamp = timestamp_in;
-
-   register uint32_t PC;
-   register uint32_t new_PC;
-   register uint32_t new_PC_mask;
-   register uint32_t LDWhich;
-   register uint32_t LDValue;
+   uint32_t PC;
+   uint32_t new_PC;
+   uint32_t new_PC_mask;
+   uint32_t LDWhich;
+   uint32_t LDValue;
+   int32_t timestamp = timestamp_in;
 
    //printf("%d %d\n", gte_ts_done, muldiv_ts_done);
 
