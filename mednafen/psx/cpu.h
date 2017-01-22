@@ -3,8 +3,6 @@
 
 #include "gte.h"
 
-#define PS_CPU_EMULATE_ICACHE 1
-
 #define FAST_MAP_SHIFT        16
 #define FAST_MAP_PSIZE        (1 << FAST_MAP_SHIFT)
 
