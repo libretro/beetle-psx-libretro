@@ -39,7 +39,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
-#elif defined(WIIU)
+#elif defined(HW_WUP)
 #include "wiiu_pthread.h"
 #elif defined(GEKKO)
 #include "gx_pthread.h"

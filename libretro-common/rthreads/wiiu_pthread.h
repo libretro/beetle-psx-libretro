@@ -24,11 +24,9 @@
 #define _WIIU_PTHREAD_WRAP_WIIU_
 
 #include <retro_inline.h>
-//ppc-eabi-gcc errors on the headers otherwise
-#define static_assert(a,b)
-#include <coreinit/condition.h>
-#include <coreinit/thread.h>
-#include <coreinit/mutex.h>
+#include <wiiu/os/condition.h>
+#include <wiiu/os/thread.h>
+#include <wiiu/os/mutex.h>
 #include <malloc.h>
 #define STACKSIZE (8 * 1024)
 

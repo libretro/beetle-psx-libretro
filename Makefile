@@ -221,16 +221,13 @@ else ifneq (,$(filter $(platform),ngc wii))
 # Nintendo WiiU
 else ifeq ($(platform), wiiu)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   ENDIANNESS_DEFINES += -DHW_RVL -DWIIU
-   ENDIANNESS_DEFINES += -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST 
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   ifeq ($(strip $(WUT_ROOT)),)
-   $(error "Please set WUT_ROOT in your environment. export WUT_ROOT=<path to>WUT")
-   endif
-   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include -I$(WUT_ROOT)/include
-   FLAGS += -DHAVE_MKDIR
+   FLAGS += -DGEKKO -mwup -mcpu=750 -meabi -mhard-float -DHAVE_MKDIR
+   FLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
+   ENDIANNESS_DEFINES += -DMSB_FIRST
+   EXTRA_INCLUDES := -Ideps
    STATIC_LINKING = 1
 
 # GCW0
