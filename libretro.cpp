@@ -3142,10 +3142,10 @@ static uint16_t input_buf[MAX_PLAYERS] = {0};
 
 bool retro_load_game(const struct retro_game_info *info)
 {
+   char tocbasepath[4096];
    bool ret = false;
 
-   char tocbasepath[4096];
-   if (failed_init)
+   if (!info || failed_init)
       return false;
 
    struct retro_input_descriptor desc[] = {
