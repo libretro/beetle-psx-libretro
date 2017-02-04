@@ -3145,7 +3145,7 @@ bool retro_load_game(const struct retro_game_info *info)
    char tocbasepath[4096];
    bool ret = false;
 
-   if (!info || failed_init)
+   if (failed_init)
       return false;
 
    struct retro_input_descriptor desc[] = {
