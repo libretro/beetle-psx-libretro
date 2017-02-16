@@ -1954,7 +1954,7 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
 
  for(unsigned i = 0; i < cheat_string.size(); i++)
  {
-  if(cheat_string[i] == ' ' || cheat_string[i] == '-' || cheat_string[i] == ':')
+  if(cheat_string[i] == ' ' || cheat_string[i] == '-' || cheat_string[i] == ':' || cheat_string[i] == '+')
    continue;
 
   nybble_count++;
