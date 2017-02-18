@@ -39,7 +39,10 @@ void Endian_A16_Swap(void *src, uint32_t nelements);
 void Endian_A32_Swap(void *src, uint32_t nelements);
 void Endian_A64_Swap(void *src, uint32_t nelements);
 
+void Endian_A16_LE_to_NE(void *src, uint32_t nelements);
 void Endian_A16_BE_to_NE(void *src, uint32_t nelements);
+void Endian_A32_LE_to_NE(void *src, uint32_t nelements);
+void Endian_A64_LE_to_NE(void *src, uint32_t nelements);
 
 void FlipByteOrder(uint8_t *src, uint32_t count);
 

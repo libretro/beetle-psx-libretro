@@ -89,7 +89,9 @@ INLINE uint32_t SF_FORCE_D(double *) { return(0); }
 
 #define SFEND { 0, 0, 0, 0 }
 
-/* State-Section Descriptor */
+#include <vector>
+
+// State-Section Descriptor
 class SSDescriptor
 {
    public:
@@ -109,6 +111,7 @@ class SSDescriptor
       bool optional;
 };
 
+int MDFNSS_StateAction(void *st, int load, int data_only, std::vector <SSDescriptor> &sections);
 int MDFNSS_StateAction(void *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
 
 #endif

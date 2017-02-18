@@ -320,6 +320,8 @@ typedef struct
 
    const char *cspecial;  /* Special cart expansion: DIP switches, barcode reader, etc. */
 
+   std::vector<const char *>DesiredInput; // Desired input device for the input ports, NULL for don't care
+
    // For mouse relative motion.
    double mouse_sensitivity;
 
