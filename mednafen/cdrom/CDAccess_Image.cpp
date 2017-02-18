@@ -112,6 +112,26 @@ static const char *DI_CUE_Strings[7] =
    "MODE2/2352"
 };
 
+static void Endian_A16_Swap(void *src, uint32_t nelements)
+{
+   uint32_t i;
+   uint8_t *nsrc = (uint8_t *)src;
+
+   for(i = 0; i < nelements; i++)
+   {
+      uint8_t tmp = nsrc[i * 2];
+
+      nsrc[i * 2] = nsrc[i * 2 + 1];
+      nsrc[i * 2 + 1] = tmp;
+   }
+}
+
+static inline void MDFN_en16lsb(uint8_t *buf, uint16_t morp)
+{
+   buf[0]=morp;
+   buf[1]=morp>>8;
+}
+
 // Should return an offset to the start of the next argument(past any whitespace), or if there isn't a next argument,
 // it'll return the length of the src string.
 static size_t UnQuotify(const std::string &src, size_t source_offset,

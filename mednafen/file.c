@@ -22,7 +22,6 @@
 #include <string.h>
 
 #include "file.h"
-#include "mednafen-endian.h"
 
 struct MDFNFILE *file_open(const char *path)
 {

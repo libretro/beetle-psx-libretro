@@ -19,12 +19,15 @@
 
 #include <boolean.h>
 
+#include <compat/msvc.h>
+
 #include "mednafen.h"
 #include "driver.h"
 #include "general.h"
 #include "state.h"
 #include "video.h"
-#include <compat/msvc.h>
+
+#include "mednafen-endian.h"
 
 #define RLSB 		MDFNSTATE_RLSB	//0x80000000
 

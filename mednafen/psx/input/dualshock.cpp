@@ -19,6 +19,8 @@
 #include "../frontio.h"
 #include "dualshock.h"
 
+#include "../../mednafen-endian.h"
+
 /*
    TODO:
 	If we ever call Update() more than once per video frame(IE 50/60Hz), we'll need to add debounce logic to the analog mode button evaluation code.

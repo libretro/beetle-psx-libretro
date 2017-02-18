@@ -19,6 +19,8 @@
 #include "../frontio.h"
 #include "justifier.h"
 
+#include "../../mednafen-endian.h"
+
 class InputDevice_Justifier : public InputDevice
 {
    public:

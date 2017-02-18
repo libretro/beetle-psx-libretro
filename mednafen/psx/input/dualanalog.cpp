@@ -2,6 +2,8 @@
 #include "../frontio.h"
 #include "dualanalog.h"
 
+#include "../../mednafen-endian.h"
+
 class InputDevice_DualAnalog : public InputDevice
 {
    public:

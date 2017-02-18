@@ -52,6 +52,8 @@
 #include "cdc.h"
 #include "spu.h"
 
+#include "../mednafen-endian.h"
+
 PS_CDC::PS_CDC() : DMABuffer(4096)
 {
    IsPSXDisc = false;

@@ -19,6 +19,8 @@
 #include "../frontio.h"
 #include "guncon.h"
 
+#include "../../mednafen-endian.h"
+
 class InputDevice_GunCon : public InputDevice
 {
    public:

@@ -16,6 +16,8 @@
 #include "libretro_cbs.h"
 #include "libretro_options.h"
 
+#include "mednafen/mednafen-endian.h"
+
 #include "../pgxp/pgxp_main.h"
 
 struct retro_perf_callback perf_cb;

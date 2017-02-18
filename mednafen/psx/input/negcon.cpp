@@ -19,6 +19,8 @@
 #include "../frontio.h"
 #include "negcon.h"
 
+#include "../../mednafen-endian.h"
+
 class InputDevice_neGcon : public InputDevice
 {
    public:

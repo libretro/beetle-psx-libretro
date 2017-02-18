@@ -2,6 +2,8 @@
 #include "../frontio.h"
 #include "mouse.h"
 
+#include "../../mednafen-endian.h"
+
 class InputDevice_Mouse : public InputDevice
 {
    public:

@@ -209,8 +209,7 @@ SOURCES_CXX += \
 SOURCES_C += \
 	$(MEDNAFEN_DIR)/file.c \
 	$(CORE_DIR)/rsx/rsx_lib_soft.c \
-	$(MEDNAFEN_DIR)/md5.c \
-	$(MEDNAFEN_DIR)/mednafen-endian.c
+	$(MEDNAFEN_DIR)/md5.c
 
 SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
 
@@ -221,17 +220,19 @@ ifneq ($(RSX_DUMP),)
 endif
 
 ifeq ($(HAVE_VULKAN),1)
-	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp)
-	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp)
-	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp)
-	SOURCES_CXX += $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/spirv_cross.cpp
-	SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/renderer
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/khronos/include
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/atlas
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/vulkan
-	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
+	SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
+						$(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
+						$(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp) \
+						$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/spirv_cross.cpp \
+						$(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
+
+	EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross \
+							-I$(CORE_DIR)/parallel-psx/renderer \
+							-I$(CORE_DIR)/parallel-psx/khronos/include \
+							-I$(CORE_DIR)/parallel-psx/atlas \
+							-I$(CORE_DIR)/parallel-psx/vulkan \
+							-I$(CORE_DIR)/parallel-psx/glsl/prebuilt
+
 	CXXFLAGS += -std=c++11
 	ifneq ($(VULKAN_DEBUG),)
 		FLAGS += -DVULKAN_DEBUG
