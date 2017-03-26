@@ -4,16 +4,57 @@
 #include <glsm/glsmsym.h>
 
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h> // size_t
 #include <stdint.h>
+//#include <unistd.h>
 
 #include <vector>
 #include <deque>
-#include <cassert>
 
 #include "vertex.h"
 #include "program.h"
 #include "error.h"
+
+template<typename T>
+struct Storage {
+  // Fence used to make sure we're not writing to the buffer while
+  // it's being used.
+  GLsync fence;
+  // Offset in the main buffer
+  unsigned offset;
+
+  Storage()
+    :fence(NULL), offset(0)
+  {
+  }
+
+  Storage(unsigned offset)
+    :fence(NULL), offset(offset)
+  {
+  }
+
+  ~Storage() {
+    if (this->fence) {
+      glDeleteSync(this->fence);
+    }
+  }
+
+  // Wait for the buffer to be ready for reuse
+  void sync() {
+    if (this->fence) {
+      glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
+      glDeleteSync(this->fence);
+      this->fence = NULL;
+      get_error();
+    }
+  }
+
+  void create_fence() {
+    void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+    this->fence = reinterpret_cast<GLsync>(fence);
+  }
+};
 
 template<typename T>
 class DrawBuffer
@@ -27,19 +68,20 @@ public:
     VertexArrayObject* vao;
     /// Program used to draw this buffer
     Program* program;
-    /// Currently mapped buffer range (write-only)
+    /// Persistently mapped buffer (using ARB_buffer_storage)
     T *map;
-    /// Number of elements T mapped at once in `map`
+    /// Use triple buffering
+    Storage<T> buffers[3];
+    unsigned active_buffer;
+
+    /// Index one-past the last element stored in `active`
+    unsigned active_next_index;
+    /// Index of the first element of the current command in `active`
+    unsigned active_command_index;
+    /// Number of elements T that `active` and `backed` can hold
     size_t capacity;
-    /// Index one-past the last element stored in `map`, relative to
-    /// the first element in `map`
-    size_t map_index;
-    /// Absolute offset of the 1st mapped element in the current
-    /// buffer relative to the beginning of the GL storage.
-    size_t map_start;
 
     DrawBuffer(size_t capacity, Program* program)
-        :map(NULL)
     {
         VertexArrayObject* vao = new VertexArrayObject();
 
@@ -55,22 +97,36 @@ public:
 	// Create and map the buffer
 	this->bind();
 	size_t element_size = sizeof(T);
-	// We allocate enough space for 3 times the buffer space and
-	// we only remap one third of it at a time
-        GLsizeiptr storage_size = this->capacity * element_size * 3;
+	// We double buffer so we allocate a storage twise as big
+        GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size * 3);
 
-        // Since we store indexes in unsigned shorts we want to make
-        // sure the entire buffer is indexable.
-        assert(this->capacity * 3 <= 0xffff);
-
-        glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
+        glBufferStorage(GL_ARRAY_BUFFER,
+			storage_size,
+			NULL,
+			GL_MAP_WRITE_BIT |
+			GL_MAP_PERSISTENT_BIT |
+			GL_MAP_COHERENT_BIT);
 
         this->bind_attributes();
 
-        this->map_index = 0;
-        this->map_start = 0;
+	void *m = glMapBufferRange(GL_ARRAY_BUFFER,
+				   0,
+				   storage_size,
+				   GL_MAP_WRITE_BIT |
+				   GL_MAP_PERSISTENT_BIT |
+				   GL_MAP_FLUSH_EXPLICIT_BIT |
+				   GL_MAP_COHERENT_BIT);
 
-        this->map__no_bind();
+	this->map = reinterpret_cast<T*>(m);
+
+	this->buffers[0] = Storage<T>(0);
+	this->buffers[1] = Storage<T>(this->capacity);
+	this->buffers[2] = Storage<T>(this->capacity * 2);
+
+	this->active_buffer = 0;
+
+	this->active_next_index = 0;
+	this->active_command_index = 0;
 
         get_error();
     }
@@ -79,7 +135,10 @@ public:
     {
         this->bind();
 
-	this->unmap__no_bind();
+	this->buffers[1].sync();
+	this->buffers[2].sync();
+
+	glUnmapBuffer(GL_ARRAY_BUFFER);
 
 	glDeleteBuffers(1, &this->id);
 
@@ -94,6 +153,12 @@ public:
         }
     }
 
+    struct Storage<T> *get_active_buffer()
+    {
+        return &this->buffers[this->active_buffer];
+    }
+
+    /* fn bind_attributes(&self)-> Result<(), Error> { */
     void bind_attributes()
     {
         this->vao->bind();
@@ -104,6 +169,20 @@ public:
         std::vector<Attribute> attrs = T::attributes();
 
         GLint element_size = (GLint) sizeof( T );
+
+        /*
+        let index =
+                    match self.program.find_attribute(attr.name) {
+                        Ok(i) => i,
+                        // Don't error out if the shader doesn't use this
+                        // attribute, it could be caused by shader
+                        // optimization if the attribute is unused for
+                        // some reason.
+                        Err(Error::InvalidValue) => continue,
+                        Err(e) => return Err(e),
+                    };
+
+        */
 
         //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
         //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
@@ -162,60 +241,22 @@ public:
         get_error();
     }
 
-    // Map the buffer for write-only access
-    void map__no_bind()
-    {
-        size_t element_size = sizeof(T);
-        GLsizeiptr buffer_size = this->capacity * element_size;
-        GLintptr offset_bytes;
-        void *m;
-
-        this->bind();
-
-        // If we're already mapped something's wrong
-        assert(this->map == NULL);
-
-        if (this->map_start > 2 * this->capacity) {
-            // We don't have enough room left to remap `capacity`,
-            // start back from the beginning of the buffer.
-            this->map_start = 0;
-        }
-
-        offset_bytes = this->map_start * element_size;
-
-        printf("Remap %lu %lu\n", this->capacity, this->map_start);
-
-        m = glMapBufferRange(GL_ARRAY_BUFFER,
-                             offset_bytes,
-                             buffer_size,
-                             GL_MAP_WRITE_BIT |
-                             GL_MAP_INVALIDATE_RANGE_BIT);
-
-        get_error();
-
-        // Just in case...
-        assert(m != NULL);
-
-        this->map = reinterpret_cast<T *>(m);
+    unsigned next_index() {
+      return this->active_next_index;
     }
 
-    // Unmap the active buffer
-    void unmap__no_bind()
-    {
-        assert(this->map != NULL);
+    /// Swap the active and backed buffers
+    void swap() {
+      this->get_active_buffer()->create_fence();
 
-        this->bind();
+      if (++this->active_buffer > 2) {
+	this->active_buffer = 0;
+      }
 
-        glUnmapBuffer(GL_ARRAY_BUFFER);
+      this->get_active_buffer()->sync();
 
-        this->map = NULL;
-    }
-
-    /// Returns the index of the next item to be inserted in
-    /// `map`. Can be used to build an index buffer for indexed draws.
-    size_t next_index()
-    {
-        return this->map_start + this->map_index;
+      this->active_next_index = 0;
+      this->active_command_index = 0;
     }
 
     void enable_attribute(const char* attr)
@@ -248,10 +289,16 @@ public:
         get_error();
     }
 
-    /// Return true if `map` is empty
     bool empty()
     {
-        return this->map_index == 0;
+        return this->active_next_index == this->active_command_index;
+    }
+
+    /// Called when the current batch is completed (the draw calls
+    /// have been done and we won't reference that data anymore)
+    void finish()
+    {
+      this->active_command_index = this->active_next_index;
     }
 
     /// Bind the buffer to the current VAO
@@ -260,84 +307,69 @@ public:
         glBindBuffer(GL_ARRAY_BUFFER, this->id);
     }
 
-    /// Push new vertices in the storage. If `n` is greater than
-    /// `remaining_capacity` this function crashes, it's up to the
-    /// caller to make sure there's enough room left.
     void push_slice(T slice[], size_t n)
     {
-        assert(n <= this->remaining_capacity());
-        assert(this->map != NULL);
+        if (n > this->remaining_capacity() ) {
+            printf("DrawBuffer::push_slice() - Out of memory \n");
+            return;
+        }
 
-	memcpy(this->map + this->map_index,
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	memcpy(this->map + buffer->offset + this->active_next_index,
 	       slice,
 	       n * sizeof(T));
 
-	this->map_index += n;
-    }
-
-    /// Prepares the buffer for a draw command. We have to bind the
-    /// VAO, the program and unmap the buffer.
-    void prepare_draw()
-    {
-        this->vao->bind();
-        this->program->bind();
-        // I don't need to bind this to draw (it's captured by the
-        // VAO) but I need it to map/unmap the storage.
-        this->bind();
-
-        this->unmap__no_bind();
-    }
-
-    /// Finalize the current buffer data and remap a fresh slice of
-    /// the storage.
-    void finalize_draw__no_bind()
-    {
-        this->map_start += this->map_index;
-        this->map_index = 0;
-
-        this->map__no_bind();
+	this->active_next_index += n;
     }
 
     void draw(GLenum mode)
     {
-        printf("Draw %lu\n", this->map_index);
-
         if (this->empty()) {
 	  return;
 	}
 
-        this->prepare_draw();
+        this->vao->bind();
+        this->program->bind();
+
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	unsigned start = buffer->offset + this->active_command_index;
+	unsigned len = this->active_next_index - this->active_command_index;
 
 	// Length in number of vertices
-        glDrawArrays(mode, this->map_start, this->map_index);
-
-        this->finalize_draw__no_bind();
+        glDrawArrays(mode, start, len);
 
         get_error();
     }
 
-    /// This method doesn't call prepare_draw/finalize_draw itself, it
-    /// must be handled by the caller. This is because this command
-    /// can be called several times on the same buffer (i.e. multiple
-    /// draw calls between the prepare/finalize)
-    void draw_indexed__raw(GLenum mode, GLushort *indices, GLsizei count)
+    void pre_bind() {
+        this->vao->bind();
+	this->program->bind();
+    }
+
+    void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-        printf("Draw indexed %d/%lu\n", count, this->map_index);
-
-        this->bind();
-
         if (this->empty()) {
 	  return;
 	}
 
-        glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices);
+	struct Storage<T> *buffer = this->get_active_buffer();
+
+	GLint base = buffer->offset;
+
+        glDrawElementsBaseVertex(mode,
+				 count,
+				 GL_UNSIGNED_SHORT,
+				 indices,
+				 base);
 
         get_error();
     }
 
     size_t remaining_capacity()
     {
-        return this->capacity - this->map_index;
+      return this->capacity - this->active_next_index;
     }
 };
 

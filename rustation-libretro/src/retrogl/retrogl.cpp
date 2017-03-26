@@ -40,7 +40,7 @@ RetroGl::RetroGl(VideoClock video_clock)
 {
     retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
     if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) ) {
-        puts("Can't set pixel format");
+        puts("Can't set pixel format\n");
         exit(EXIT_FAILURE);
     }
 
@@ -56,7 +56,7 @@ RetroGl::RetroGl(VideoClock video_clock)
     params.imm_vbo_disable       = NULL;
 
     if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
-        puts("Failed to init hardware context");
+        puts("Failed to init hardware context\n");
         // TODO: Move this out to a init function to avoid exceptions?
         throw std::runtime_error("Failed to init GLSM context.");
     }
@@ -88,7 +88,7 @@ RetroGl::~RetroGl() {
 }
 
 void RetroGl::context_reset() {
-    puts("OpenGL context reset");
+    puts("OpenGL context reset\n");
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
     if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
@@ -127,7 +127,7 @@ GlRenderer* RetroGl::gl_renderer()
     case GlState_Valid:
         return this->state_data.r;
     default:
-        puts("Attempted to get GL state without GL context!");
+        puts("Attempted to get GL state without GL context!\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -163,7 +163,7 @@ void RetroGl::prepare_render()
         renderer = this->state_data.r;
         break;
     case GlState_Invalid:
-        puts("Attempted to render a frame without GL context");
+        puts("Attempted to render a frame without GL context\n");
         exit(EXIT_FAILURE);
     }
 
@@ -179,7 +179,7 @@ void RetroGl::finalize_frame()
         renderer = this->state_data.r;
         break;
     case GlState_Invalid:
-        puts("Attempted to render a frame without GL context");
+        puts("Attempted to render a frame without GL context\n");
         exit(EXIT_FAILURE);
     }
 
@@ -229,8 +229,8 @@ void RetroGl::refresh_variables()
 
         if (!ok)
         {
-            puts("Couldn't change frontend resolution");
-            puts("Try resetting to enable the new configuration");
+            puts("Couldn't change frontend resolution\n");
+            puts("Try resetting to enable the new configuration\n");
         }
     }
 }

@@ -30,10 +30,8 @@ const uint16_t VRAM_WIDTH_PIXELS = 1024;
 const uint16_t VRAM_HEIGHT = 512;
 const size_t VRAM_PIXELS = (size_t) VRAM_WIDTH_PIXELS * (size_t) VRAM_HEIGHT;
 
-/// How many vertices we buffer before forcing a draw. Since the
-/// indexes are stored on 16bits we need to make sure that the length
-/// multiplied by 3 (for triple buffering) doesn't overflow 0xffff.
-static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
+/// How many vertices we buffer before forcing a draw
+static const unsigned int VERTEX_BUFFER_LEN = 0x8000;
 /// Maximum number of indices for a vertex buffer. Since quads have
 /// two duplicated vertices it can be up to 3/2 the vertex buffer
 /// length
@@ -51,7 +49,7 @@ struct DrawConfig {
 
 struct CommandVertex {
     /// Position in PlayStation VRAM coordinates
-    float position[4];
+	float position[4];
     /// RGB color, 8bits per component
     uint8_t color[3];
     /// Texture coordinates within the page
