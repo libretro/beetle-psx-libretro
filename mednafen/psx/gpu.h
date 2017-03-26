@@ -106,16 +106,17 @@ class PS_GPU
 
       INLINE bool CalcFIFOReadyBit(void)
       {
+         uint32_t in_count = BlitterFIFO.CanRead();
          if(InCmd & (INCMD_PLINE | INCMD_QUAD))
             return(false);
 
-         if(BlitterFIFO.CanRead() == 0)
+         if(in_count == 0)
             return(true);
 
          if(InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
             return(false);
 
-         if(BlitterFIFO.CanRead() >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
+         if(in_count >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
             return(false);
 
          return(true);
@@ -356,7 +357,7 @@ class PS_GPU
          void Update_CLUT_Cache(uint16 raw_clut);
 
 
-      void ProcessFIFO(void);
+      void ProcessFIFO(uint32_t in_count);
       void WriteCB(uint32 data, uint32 addr);
       uint32 ReadData(void);
       void SoftReset(void);

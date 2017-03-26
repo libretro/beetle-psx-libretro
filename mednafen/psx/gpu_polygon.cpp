@@ -416,13 +416,46 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 {
+   tri_vertex vertices[3];
 	const uint32_t* baseCB = cb;
-   const unsigned cb0 = cb[0];
-   tri_vertex vertices[3] = {{0}};
-   uint32_t clut = 0;
-   unsigned sv = 0;
-   bool invalidW = false;
-   //uint32_t tpage = 0;
+   const unsigned cb0     = cb[0];
+   uint32_t clut          = 0;
+   unsigned sv            = 0;
+   bool invalidW          = false;
+   //uint32_t tpage       = 0;
+
+   vertices[0].x          = 0;
+   vertices[0].y          = 0;
+   vertices[0].u          = 0;
+   vertices[0].v          = 0;
+   vertices[0].r          = 0;
+   vertices[0].g          = 0;
+   vertices[0].b          = 0;
+   vertices[0].precise[0] = 0.0f;
+   vertices[0].precise[1] = 0.0f;
+   vertices[0].precise[2] = 0.0f;
+
+   vertices[1].x          = 0;
+   vertices[1].y          = 0;
+   vertices[1].u          = 0;
+   vertices[1].v          = 0;
+   vertices[1].r          = 0;
+   vertices[1].g          = 0;
+   vertices[1].b          = 0;
+   vertices[1].precise[0] = 0.0f;
+   vertices[1].precise[1] = 0.0f;
+   vertices[1].precise[2] = 0.0f;
+
+   vertices[2].x          = 0;
+   vertices[2].y          = 0;
+   vertices[2].u          = 0;
+   vertices[2].v          = 0;
+   vertices[2].r          = 0;
+   vertices[2].g          = 0;
+   vertices[2].b          = 0;
+   vertices[2].precise[0] = 0.0f;
+   vertices[2].precise[1] = 0.0f;
+   vertices[2].precise[2] = 0.0f;
 
    // Base timing is approximate, and could be improved.
    if(numvertices == 4 && InCmd == INCMD_QUAD)

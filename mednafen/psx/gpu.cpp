@@ -140,7 +140,8 @@ void PS_GPU::BuildDitherTable()
 }
 
 // Allocate enough room for the PS_GPU class and VRAM
-void *PS_GPU::Alloc(uint8 upscale_shift) {
+void *PS_GPU::Alloc(uint8 upscale_shift)
+{
   unsigned width = 1024 << upscale_shift;
   unsigned height = 512 << upscale_shift;
 
@@ -162,7 +163,8 @@ PS_GPU *PS_GPU::Build(bool pal_clock_and_tv,
   return new (buffer) PS_GPU(pal_clock_and_tv, sls, sle, upscale_shift);
 }
 
-void PS_GPU::Destroy(PS_GPU *gpu) {
+void PS_GPU::Destroy(PS_GPU *gpu)
+{
   gpu->~PS_GPU();
   delete [] (char*)gpu;
 }
@@ -402,13 +404,12 @@ template<int numvertices, bool shaded, bool textured,
 	 int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
-  if (PGXP_enabled()) {
+  if (PGXP_enabled())
     g->Command_DrawPolygon<numvertices, shaded, textured,
 			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(cb);
-  } else {
+  else
     g->Command_DrawPolygon<numvertices, shaded, textured,
 			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(cb);
-  }
 }
 
 template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
@@ -796,7 +797,7 @@ CTEntry PS_GPU::Commands[256] =
 };
 
 
-void PS_GPU::ProcessFIFO(void)
+void PS_GPU::ProcessFIFO(uint32_t in_count)
 {
    uint32_t CB[0x10], InData;
    unsigned i;
@@ -804,9 +805,6 @@ void PS_GPU::ProcessFIFO(void)
    uint32_t cc            = InCmd_CC;
    const CTEntry *command = &Commands[cc];
    bool read_fifo         = false;
-
-   if(!BlitterFIFO.CanRead())
-      return;
 
    switch(InCmd)
    {
@@ -880,7 +878,7 @@ void PS_GPU::ProcessFIFO(void)
          return;
    }
 
-   if(BlitterFIFO.CanRead() < command_len)
+   if(in_count < command_len)
       return;
 
    for (i = 0; i < command_len; i++)
@@ -919,8 +917,9 @@ void PS_GPU::ProcessFIFO(void)
 
 INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
 {
-   if(BlitterFIFO.CanRead() >= 0x10
-         && (InCmd != INCMD_NONE || (BlitterFIFO.CanRead() - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
+   uint32_t in_count = BlitterFIFO.CanRead();
+   if(in_count >= 0x10
+         && (InCmd != INCMD_NONE || (in_count - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
@@ -928,7 +927,9 @@ INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
 
    PGXP_WriteFIFO(ReadMem(addr), BlitterFIFO.write_pos);
    BlitterFIFO.Write(InData);
-   ProcessFIFO();
+
+   if(in_count)
+      ProcessFIFO(in_count);
 }
 
 void PS_GPU::SetTPage(const uint32_t cmdw)
@@ -1237,10 +1238,10 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 {
    int32 gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
+   uint32_t in_count  = BlitterFIFO.CanRead();
    const uint32_t dmc = (DisplayMode & 0x40) ? 4 : (DisplayMode & 0x3);
    const uint32_t dmw = 2800 / DotClockRatios[dmc];	// Must be <= 768
-
-   int32 sys_clocks = sys_timestamp - lastts;
+   int32_t sys_clocks = sys_timestamp - lastts;
 
    //printf("GPUISH: %d\n", sys_timestamp - lastts);
 
@@ -1252,7 +1253,8 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
    if(DrawTimeAvail > 256)
       DrawTimeAvail = 256;
 
-   ProcessFIFO();
+   if(in_count)
+      ProcessFIFO(in_count);
 
    //puts("GPU Update Start");
 
