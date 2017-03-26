@@ -522,7 +522,7 @@ void MDEC_Run(int32 clocks)
 {
    static const unsigned MDRPhaseBias = 0 + 1;
 
-   //MDFN_DispMessage("%u", OutFIFO.CanRead());
+   //MDFN_DispMessage("%u", OutFIFO.in_count);
 
    ClockCounter += clocks;
 
@@ -538,7 +538,7 @@ void MDEC_Run(int32 clocks)
       for(;;)
       {
          InCommand = false;
-         { { case 1: if(!(InFIFO.CanRead())) { MDRPhase = 2 - MDRPhaseBias - 1; return; } }; Command = InFIFO.Read(); };
+         { { case 1: if(!(InFIFO.in_count)) { MDRPhase = 2 - MDRPhaseBias - 1; return; } }; Command = InFIFO.Read(); };
          InCommand = true;
          { ClockCounter -= (1); { case 3: if(!(ClockCounter > 0)) { MDRPhase = 4 - MDRPhaseBias - 1; return; } }; };
 
@@ -577,7 +577,7 @@ void MDEC_Run(int32 clocks)
                uint32 tfr;
                int32 need_eat; // = 0;
 
-               { { case 5: if(!(InFIFO.CanRead())) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 5: if(!(InFIFO.in_count)) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                //     printf("KA: %04x %08x\n", InCounter, tfr);
@@ -610,7 +610,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               { { case 11: if(!(InFIFO.CanRead())) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 11: if(!(InFIFO.in_count)) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                //printf("KA: %04x %08x\n", InCounter, tfr);
@@ -636,7 +636,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               { { case 13: if(!(InFIFO.CanRead())) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 13: if(!(InFIFO.in_count)) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
                InCounter--;
 
                for(unsigned i = 0; i < 2; i++)
@@ -671,7 +671,7 @@ uint32 MDEC_DMARead(uint32* offs)
 
    *offs = 0;
 
-   if(MDFN_LIKELY(OutFIFO.CanRead()))
+   if(MDFN_LIKELY(OutFIFO.in_count))
    {
       V = OutFIFO.Read();
 
@@ -702,12 +702,12 @@ bool MDEC_DMACanWrite(void)
 
 bool MDEC_DMACanRead(void)
 {
- return((OutFIFO.CanRead() >= 0x20) && (Control & (1U << 29)));
+ return((OutFIFO.in_count >= 0x20) && (Control & (1U << 29)));
 }
 
 void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
 {
-   //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d  --- %u %u", A, V, timestamp, InFIFO.CanRead(), OutFIFO.CanRead());
+   //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d  --- %u %u", A, V, timestamp, InFIFO.in_count, OutFIFO.in_count);
    if(A & 4)
    {
       if(V & 0x80000000) // Reset?
@@ -757,7 +757,7 @@ uint32 MDEC_Read(const int32_t timestamp, uint32 A)
  {
   ret = 0;
 
-  ret |= (OutFIFO.CanRead() == 0) << 31;
+  ret |= (OutFIFO.in_count == 0) << 31;
   ret |= (InFIFO.CanWrite() == 0) << 30;
   ret |= InCommand << 29;
 
@@ -772,11 +772,11 @@ uint32 MDEC_Read(const int32_t timestamp, uint32 A)
  }
  else
  {
-  if(OutFIFO.CanRead())
+  if(OutFIFO.in_count)
    ret = OutFIFO.Read();
  }
 
- //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.CanRead(), InCounter);
+ //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.in_count, InCounter);
 
  return(ret);
 }

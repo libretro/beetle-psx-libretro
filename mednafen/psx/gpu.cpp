@@ -917,9 +917,10 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
 
 INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
 {
-   uint32_t in_count = BlitterFIFO.CanRead();
-   if(in_count >= 0x10
-         && (InCmd != INCMD_NONE || (in_count - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
+   if(BlitterFIFO.in_count >= 0x10
+         && 
+         ( InCmd != INCMD_NONE || 
+          (BlitterFIFO.in_count - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
@@ -928,8 +929,8 @@ INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
    PGXP_WriteFIFO(ReadMem(addr), BlitterFIFO.write_pos);
    BlitterFIFO.Write(InData);
 
-   if(in_count)
-      ProcessFIFO(in_count);
+   if(BlitterFIFO.in_count)
+      ProcessFIFO(BlitterFIFO.in_count);
 }
 
 void PS_GPU::SetTPage(const uint32_t cmdw)
@@ -1238,7 +1239,6 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 {
    int32 gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
-   uint32_t in_count  = BlitterFIFO.CanRead();
    const uint32_t dmc = (DisplayMode & 0x40) ? 4 : (DisplayMode & 0x3);
    const uint32_t dmw = 2800 / DotClockRatios[dmc];	// Must be <= 768
    int32_t sys_clocks = sys_timestamp - lastts;
@@ -1253,8 +1253,8 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
    if(DrawTimeAvail > 256)
       DrawTimeAvail = 256;
 
-   if(in_count)
-      ProcessFIFO(in_count);
+   if(BlitterFIFO.in_count)
+      ProcessFIFO(BlitterFIFO.in_count);
 
    //puts("GPU Update Start");
 
