@@ -1369,13 +1369,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
      emulate_memcard[1] = false;
    }
 
-   for(i = 0; i < 2; i++)
-   {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "psx.input.pport%u.multitap", i + 1);
-      emulate_multitap[i] = MDFN_GetSettingB(buf);
-   }
-
+   emulate_multitap[0] = setting_psx_multitap_port_1;
+   emulate_multitap[1] = setting_psx_multitap_port_2;
 
    cdifs = CDInterfaces;
    region = CalcDiscSCEx();
@@ -2786,20 +2781,12 @@ static void check_variables(bool startup)
       setting_last_scanline_pal = atoi(var.value);
    }
 
-   if(setting_psx_multitap_port_1)
-   {
-      if(setting_psx_multitap_port_2)
-         players = 8;
-      else
-         players = 4;
-   }
+   if(setting_psx_multitap_port_1 && setting_psx_multitap_port_2)
+      players = 8;
+   else if (setting_psx_multitap_port_1 || setting_psx_multitap_port_2)
+      players = 4;
    else
-   {
-      if(setting_psx_multitap_port_2)
-         players = 4;
-      else
-         players = 2;
-   }
+      players = 2;
 
    var.key = option_memcard0_method;
 
@@ -3942,7 +3929,7 @@ unsigned retro_api_version(void)
 
 void retro_set_controller_port_device(unsigned in_port, unsigned device)
 {
-   if (in_port >= MAX_PLAYERS)
+   if (in_port >= players)
       return;
    switch (device)
    {
@@ -4124,16 +4111,20 @@ bool retro_serialize(void *data, size_t size)
 {
    /* it seems that mednafen can realloc pointers sent to it?
       since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
+   static bool logged;
    StateMem st;
    memset(&st, 0, sizeof(st));
    st.data     = (uint8_t*)malloc(size);
    st.malloced = size;
+   /* there are still some errors with the save states, the size seems to change on some games for now just log when this happens */
+   if (!logged && st.len != size)
+   {
+      log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
+      logged = true;
+   }
+
 
    bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-
-   /* there are still some errors with the save states, the size seems to change on some games for now just log when this happens */
-   if (st.len != size)
-      log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
 
    memcpy(data,st.data,size);
    free(st.data);
