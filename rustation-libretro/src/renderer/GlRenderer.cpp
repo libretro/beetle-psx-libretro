@@ -40,8 +40,12 @@ GlRenderer::GlRenderer(DrawConfig* config)
           filter = 0;
        else if (!strcmp(var.value, "3point N64"))
           filter = 1;
-       else if (!strcmp(var.value, "bilinear"))
+       else if (!strcmp(var.value, "SABR"))
           filter = 2;
+       else if (!strcmp(var.value, "6xBRZ"))
+          filter = 3;
+       else if (!strcmp(var.value, "bilinear"))
+          filter = 4;
 
        this->filter_type = filter;
     }
@@ -572,8 +576,12 @@ bool GlRenderer::refresh_variables()
           filter = 0;
        else if (!strcmp(var.value, "3point N64"))
           filter = 1;
-       else if (!strcmp(var.value, "bilinear"))
+       else if (!strcmp(var.value, "SABR"))
           filter = 2;
+       else if (!strcmp(var.value, "6xBRZ"))
+          filter = 3;
+       else if (!strcmp(var.value, "bilinear"))
+          filter = 4;
 
        this->filter_type = filter;
     }
