@@ -5,6 +5,8 @@
 #include <string.h> // memcpy()
 #include <stdexcept>
 
+#include "libretro_options.h"
+
 /*
 *
 *   THIS CLASS IS A SINGLETON!
@@ -257,14 +259,14 @@ struct retro_system_av_info get_av_info(VideoClock std)
 {
     struct retro_variable var = {0};
 
-    var.key = "beetle_psx_internal_resolution";
+    var.key = option_internal_resolution;
     uint8_t upscaling = 1;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       /* Same limitations as libretro.cpp */
       upscaling = var.value[0] -'0';
     }
 
-    var.key = "beetle_psx_display_vram";
+    var.key = option_display_vram;
     bool display_vram = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       if (!strcmp(var.value, "enabled"))
@@ -273,7 +275,7 @@ struct retro_system_av_info get_av_info(VideoClock std)
 	display_vram = false;
     }
 
-    var.key = "beetle_psx_widescreen_hack";
+    var.key = option_widescreen_hack;
     bool widescreen_hack = false;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         if (!strcmp(var.value, "enabled"))
