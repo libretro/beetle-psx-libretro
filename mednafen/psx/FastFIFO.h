@@ -27,11 +27,6 @@ class FastFIFO
   in_count %= (size + 1);
  }
 
- INLINE uint32 CanRead(void)
- {
-  return(in_count);
- }
-
  INLINE uint32 CanWrite(void)
  {
   return(size - in_count);

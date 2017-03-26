@@ -106,17 +106,16 @@ class PS_GPU
 
       INLINE bool CalcFIFOReadyBit(void)
       {
-         uint32_t in_count = BlitterFIFO.CanRead();
          if(InCmd & (INCMD_PLINE | INCMD_QUAD))
             return(false);
 
-         if(in_count == 0)
+         if(BlitterFIFO.in_count == 0)
             return(true);
 
          if(InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
             return(false);
 
-         if(in_count >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
+         if(BlitterFIFO.in_count >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
             return(false);
 
          return(true);

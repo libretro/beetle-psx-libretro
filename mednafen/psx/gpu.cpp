@@ -1154,7 +1154,7 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
 
       /* GPU idle bit */
       if(InCmd == INCMD_NONE && DrawTimeAvail >= 0
-            && BlitterFIFO.CanRead() == 0x00)
+            && BlitterFIFO.in_count == 0x00)
          ret |= 1 << 26;
 
       if(InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
