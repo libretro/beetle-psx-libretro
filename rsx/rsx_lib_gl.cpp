@@ -223,39 +223,9 @@ public:
     }
 
     void draw();
-    void apply_scissor();
 
     DrawConfig* draw_config();
     bool refresh_variables();
-
-    void vertex_preprocessing(CommandVertex *v,
-			      unsigned count,
-			      GLenum mode,
-			      SemiTransparencyMode stm);
-
-    void push_quad(CommandVertex v[4],
-		   SemiTransparencyMode semi_transparency_mode);
-
-    void push_primitive(CommandVertex *v,
-			unsigned count,
-			GLenum mode,
-			SemiTransparencyMode semi_transparency_mode);
-
-    void push_triangle( CommandVertex v[3],
-                        SemiTransparencyMode semi_transparency_mode);
-
-    void push_line( CommandVertex v[2],
-                    SemiTransparencyMode semi_transparency_mode);
-
-    void fill_rect( uint8_t color[3],
-                    uint16_t top_left[2],
-                    uint16_t dimensions[2]);
-
-    void copy_rect( uint16_t source_top_left[2],
-                    uint16_t target_top_left[2],
-                    uint16_t dimensions[2]);
-
-    bool has_software_renderer();
 };
 
 static void upload_textures(
@@ -580,12 +550,12 @@ void GlRenderer::draw()
     this->transparency_mode_index.clear();
 }
 
-void GlRenderer::apply_scissor()
+static inline void apply_scissor(GlRenderer *renderer)
 {
-    uint16_t _x = this->config->draw_area_top_left[0];
-    uint16_t _y = this->config->draw_area_top_left[1];
-    int _w = this->config->draw_area_bot_right[0] - _x;
-    int _h = this->config->draw_area_bot_right[1] - _y;
+    uint16_t _x = renderer->config->draw_area_top_left[0];
+    uint16_t _y = renderer->config->draw_area_top_left[1];
+    int _w      = renderer->config->draw_area_bot_right[0] - _x;
+    int _h      = renderer->config->draw_area_bot_right[1] - _y;
 
     if (_w < 0)
       _w = 0;
@@ -593,7 +563,7 @@ void GlRenderer::apply_scissor()
     if (_h < 0)
       _h = 0;
 
-    GLsizei upscale = (GLsizei) this->internal_upscaling;
+    GLsizei upscale = (GLsizei)renderer->internal_upscaling;
 
     // We need to scale those to match the internal resolution if
     // upscaling is enabled
@@ -765,11 +735,6 @@ DrawConfig* GlRenderer::draw_config()
     return this->config;
 }
 
-bool GlRenderer::has_software_renderer()
-{
-   return has_software_fb;
-}
-
 bool GlRenderer::refresh_variables()
 {
     struct retro_variable var = {0};
@@ -918,206 +883,95 @@ bool GlRenderer::refresh_variables()
 }
 
 
-void GlRenderer::vertex_preprocessing(CommandVertex *v,
-				      unsigned count,
-				      GLenum mode,
-				      SemiTransparencyMode stm) {
-  bool is_semi_transparent = v[0].semi_transparent == 1;
-  bool buffer_full = this->command_buffer->remaining_capacity() < count;
+static void vertex_preprocessing(
+      GlRenderer *renderer,
+      CommandVertex *v,
+      unsigned count,
+      GLenum mode,
+      SemiTransparencyMode stm)
+{
+   bool is_semi_transparent = v[0].semi_transparent == 1;
+   bool buffer_full         = renderer->command_buffer->remaining_capacity() < count;
 
-  if (buffer_full) {
-     if (!this->command_buffer->empty())
-        this->draw();
-    this->command_buffer->swap();
-  }
+   if (buffer_full)
+   {
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+      renderer->command_buffer->swap();
+   }
 
-  int16_t z = this->primitive_ordering;
-  this->primitive_ordering += 1;
+   int16_t z = renderer->primitive_ordering;
+   renderer->primitive_ordering += 1;
 
-  for (unsigned i = 0; i < count; i++) {
-    v[i].position[2] = z;
-    v[i].texture_window[0] = tex_x_mask;
-    v[i].texture_window[1] = tex_x_or;
-    v[i].texture_window[2] = tex_y_mask;
-    v[i].texture_window[3] = tex_y_or;
-  }
+   for (unsigned i = 0; i < count; i++)
+   {
+      v[i].position[2] = z;
+      v[i].texture_window[0] = renderer->tex_x_mask;
+      v[i].texture_window[1] = renderer->tex_x_or;
+      v[i].texture_window[2] = renderer->tex_y_mask;
+      v[i].texture_window[3] = renderer->tex_y_or;
+   }
 
-  if (is_semi_transparent &&
-      (stm != this->semi_transparency_mode ||
-       mode != this->command_draw_mode)) {
-    // We're changing the transparency mode
-    TransparencyIndex ti(this->semi_transparency_mode,
-			 this->semi_transparent_index_pos,
-			 this->command_draw_mode);
+   if (is_semi_transparent &&
+         (stm != renderer->semi_transparency_mode ||
+          mode != renderer->command_draw_mode)) {
+      // We're changing the transparency mode
+      TransparencyIndex ti(renderer->semi_transparency_mode,
+            renderer->semi_transparent_index_pos,
+            renderer->command_draw_mode);
 
-    this->transparency_mode_index.push_back(ti);
-    this->semi_transparency_mode = stm;
-    this->command_draw_mode = mode;
-  }
+      renderer->transparency_mode_index.push_back(ti);
+      renderer->semi_transparency_mode = stm;
+      renderer->command_draw_mode = mode;
+   }
 }
 
-void GlRenderer::push_quad(CommandVertex v[4],
-			   SemiTransparencyMode stm) {
-  bool is_semi_transparent = v[0].semi_transparent == 1;
-  bool is_textured = v[0].texture_blend_mode != 0;
-  // Textured semi-transparent polys can contain opaque texels (when
-  // bit 15 of the color is set to 0). Therefore they're drawn twice,
-  // once for the opaque texels and once for the semi-transparent
-  // ones. Only untextured semi-transparent triangles don't need to be
-  // drawn as opaque.
-  bool is_opaque = !is_semi_transparent || is_textured;
+static void push_primitive(
+      GlRenderer *renderer,
+      CommandVertex *v,
+      unsigned count,
+      GLenum mode,
+      SemiTransparencyMode stm)
+{
+   bool is_semi_transparent = v[0].semi_transparent == 1;
+   bool is_textured = v[0].texture_blend_mode != 0;
+   // Textured semi-transparent polys can contain opaque texels (when
+   // bit 15 of the color is set to 0). Therefore they're drawn twice,
+   // once for the opaque texels and once for the semi-transparent
+   // ones. Only untextured semi-transparent triangles don't need to be
+   // drawn as opaque.
+   bool is_opaque = !is_semi_transparent || is_textured;
 
-  this->vertex_preprocessing(v, 4, GL_TRIANGLES, stm);
+   vertex_preprocessing(renderer, v, count, mode, stm);
 
-  // The diagonal is duplicated
-  static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
+   unsigned index = renderer->command_buffer->next_index();
 
-  unsigned index = this->command_buffer->next_index();
-
-  for (unsigned i = 0; i < 6; i++) {
-    if (is_opaque) {
-      this->opaque_triangle_indices[this->opaque_triangle_index_pos--] =
-	index + indices[i];
-    }
-
-    if (is_semi_transparent) {
-      this->semi_transparent_indices[this->semi_transparent_index_pos++]
-	= index + indices[i];
-    }
-  }
-
-  this->command_buffer->push_slice(v, 4);
-}
-
-void GlRenderer::push_primitive(CommandVertex *v,
-				unsigned count,
-				GLenum mode,
-				SemiTransparencyMode stm) {
-
-  bool is_semi_transparent = v[0].semi_transparent == 1;
-  bool is_textured = v[0].texture_blend_mode != 0;
-  // Textured semi-transparent polys can contain opaque texels (when
-  // bit 15 of the color is set to 0). Therefore they're drawn twice,
-  // once for the opaque texels and once for the semi-transparent
-  // ones. Only untextured semi-transparent triangles don't need to be
-  // drawn as opaque.
-  bool is_opaque = !is_semi_transparent || is_textured;
-
-  this->vertex_preprocessing(v, count, mode, stm);
-
-  unsigned index = this->command_buffer->next_index();
-
-  for (unsigned i = 0; i < count; i++) {
-    if (is_opaque) {
-      if (mode == GL_TRIANGLES) {
-	this->opaque_triangle_indices[this->opaque_triangle_index_pos--] =
-	  index;
-      } else {
-	this->opaque_line_indices[this->opaque_line_index_pos--] =
-	  index;
+   for (unsigned i = 0; i < count; i++)
+   {
+      if (is_opaque)
+      {
+         if (mode == GL_TRIANGLES)
+         {
+            renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
+               index;
+         }
+         else
+         {
+            renderer->opaque_line_indices[renderer->opaque_line_index_pos--] =
+               index;
+         }
       }
-    }
 
-    if (is_semi_transparent) {
-      this->semi_transparent_indices[this->semi_transparent_index_pos++]
-	= index;
-    }
+      if (is_semi_transparent)
+      {
+         renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
+            = index;
+      }
 
-    index++;
-  }
+      index++;
+   }
 
-  this->command_buffer->push_slice(v, count);
-}
-
-void GlRenderer::push_triangle( CommandVertex v[3],
-                                SemiTransparencyMode semi_transparency_mode)
-{
-    this->push_primitive(v, 3, GL_TRIANGLES, semi_transparency_mode);
-}
-
-void GlRenderer::push_line( CommandVertex v[2],
-                            SemiTransparencyMode semi_transparency_mode)
-{
-    this->push_primitive(v, 2, GL_LINES, semi_transparency_mode);
-}
-
-void GlRenderer::fill_rect( uint8_t color[3],
-                            uint16_t top_left[2],
-                            uint16_t dimensions[2])
-{
-    // Draw pending commands
-   if (!this->command_buffer->empty())
-      this->draw();
-
-    // Fill rect ignores the draw area. Save the previous value
-    // and reconfigure the scissor box to the fill rectangle
-    // instead.
-    uint16_t draw_area_top_left[2] = {
-        this->config->draw_area_top_left[0],
-        this->config->draw_area_top_left[1]
-    };
-    uint16_t draw_area_bot_right[2] = {
-        this->config->draw_area_bot_right[0],
-        this->config->draw_area_bot_right[1]
-    };
-
-    this->config->draw_area_top_left[0] = top_left[0];
-    this->config->draw_area_top_left[1] = top_left[1];
-    this->config->draw_area_bot_right[0] = top_left[0] + dimensions[0];
-    this->config->draw_area_bot_right[1] = top_left[1] + dimensions[1];
-
-    this->apply_scissor();
-
-    /* This scope is intentional, just like in the Rust version */
-    {
-        // Bind the out framebuffer
-        Framebuffer _fb = Framebuffer(this->fb_out);
-
-        glClearColor(   (float) color[0] / 255.0,
-                        (float) color[1] / 255.0,
-                        (float) color[2] / 255.0,
-                        // XXX Not entirely sure what happens to
-                        // the mask bit in fill_rect commands
-                        0.0);
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
-
-    // Reconfigure the draw area
-    this->config->draw_area_top_left[0]    = draw_area_top_left[0];
-    this->config->draw_area_top_left[1]    = draw_area_top_left[1];
-    this->config->draw_area_bot_right[0]   = draw_area_bot_right[0];
-    this->config->draw_area_bot_right[1]   = draw_area_bot_right[1];
-
-    this->apply_scissor();
-}
-
-void GlRenderer::copy_rect( uint16_t source_top_left[2],
-                            uint16_t target_top_left[2],
-                            uint16_t dimensions[2])
-{
-    // Draw pending commands
-   if (!this->command_buffer->empty())
-      this->draw();
-
-    uint32_t upscale = this->internal_upscaling;
-
-    GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
-    GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
-    GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
-    GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
-
-    GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
-    GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
-
-    // XXX CopyImageSubData gives undefined results if the source
-    // and target area overlap, this should be handled
-    // explicitely
-    /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-    glCopyImageSubData( this->fb_out->id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
-                        this->fb_out->id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
-                        w, h, 1 );
-
-    get_error();
+   renderer->command_buffer->push_slice(v, count);
 }
 
 std::vector<Attribute> CommandVertex::attributes()
@@ -1194,7 +1048,6 @@ public:
     void context_destroy();
     void refresh_variables();
     retro_system_av_info get_system_av_info();
-    bool has_software_renderer();
 
     /* This was stolen from rsx_lib_gl */
     bool context_framebuffer_lock(void *data);
@@ -1343,21 +1196,6 @@ void RetroGl::context_destroy()
 
     this->state = GlState_Invalid;
     this->state_data.c = config;
-}
-
-bool RetroGl::has_software_renderer()
-{
-    GlRenderer* renderer = NULL;
-    switch (this->state)
-    {
-    case GlState_Valid:
-        renderer = this->state_data.r;
-        break;
-    case GlState_Invalid:
-        return false;
-    }
-
-    return renderer->has_software_renderer();
 }
 
 void RetroGl::refresh_variables()
@@ -1535,7 +1373,7 @@ bool rsx_gl_has_software_renderer(void)
 {
    if (!static_renderer)
       return false;
-   return static_renderer->has_software_renderer();
+   return has_software_fb;
 }
 
 void rsx_gl_prepare_frame(void)
@@ -1554,7 +1392,7 @@ void rsx_gl_prepare_frame(void)
       // Used for PSX GPU command blending
       glBlendColor(0.25, 0.25, 0.25, 0.5);
 
-      renderer->apply_scissor();
+      apply_scissor(renderer);
       renderer->fb_texture->bind(GL_TEXTURE0);
    }
 }
@@ -1764,7 +1602,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
       renderer->config->draw_area_bot_right[0] = bot_right[0] + 1;
       renderer->config->draw_area_bot_right[1] = bot_right[1] + 1;
 
-      renderer->apply_scissor();
+      apply_scissor(renderer);
    }
 }
 
@@ -1897,7 +1735,39 @@ void rsx_gl_push_quad(
    };
 
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->push_quad(v, semi_transparency_mode);
+   {
+      GlRenderer *renderer     = static_renderer->state_data.r;
+
+      bool is_semi_transparent = v[0].semi_transparent == 1;
+      bool is_textured         = v[0].texture_blend_mode != 0;
+      // Textured semi-transparent polys can contain opaque texels (when
+      // bit 15 of the color is set to 0). Therefore they're drawn twice,
+      // once for the opaque texels and once for the semi-transparent
+      // ones. Only untextured semi-transparent triangles don't need to be
+      // drawn as opaque.
+      bool is_opaque           = !is_semi_transparent || is_textured;
+
+      vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
+
+      // The diagonal is duplicated
+      static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
+
+      unsigned index = renderer->command_buffer->next_index();
+
+      for (unsigned i = 0; i < 6; i++) {
+         if (is_opaque) {
+            renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
+               index + indices[i];
+         }
+
+         if (is_semi_transparent) {
+            renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
+               = index + indices[i];
+         }
+      }
+
+      renderer->command_buffer->push_slice(v, 4);
+   }
 }
 
 void rsx_gl_push_triangle(
@@ -1993,7 +1863,10 @@ void rsx_gl_push_triangle(
    };
 
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->push_triangle(v, semi_transparency_mode);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+      push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode);
+   }
 }
 
 void rsx_gl_fill_rect(uint32_t color,
@@ -2006,7 +1879,54 @@ void rsx_gl_fill_rect(uint32_t color,
    uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};  
 
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->fill_rect(col, top_left, dimensions);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+
+      // Draw pending commands
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+
+      // Fill rect ignores the draw area. Save the previous value
+      // and reconfigure the scissor box to the fill rectangle
+      // instead.
+      uint16_t draw_area_top_left[2] = {
+         renderer->config->draw_area_top_left[0],
+         renderer->config->draw_area_top_left[1]
+      };
+      uint16_t draw_area_bot_right[2] = {
+         renderer->config->draw_area_bot_right[0],
+         renderer->config->draw_area_bot_right[1]
+      };
+
+      renderer->config->draw_area_top_left[0] = top_left[0];
+      renderer->config->draw_area_top_left[1] = top_left[1];
+      renderer->config->draw_area_bot_right[0] = top_left[0] + dimensions[0];
+      renderer->config->draw_area_bot_right[1] = top_left[1] + dimensions[1];
+
+      apply_scissor(renderer);
+
+      /* This scope is intentional, just like in the Rust version */
+      {
+         // Bind the out framebuffer
+         Framebuffer _fb = Framebuffer(renderer->fb_out);
+
+         glClearColor(   (float) col[0] / 255.0,
+               (float) col[1] / 255.0,
+               (float) col[2] / 255.0,
+               // XXX Not entirely sure what happens to
+               // the mask bit in fill_rect commands
+               0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
+      }
+
+      // Reconfigure the draw area
+      renderer->config->draw_area_top_left[0]    = draw_area_top_left[0];
+      renderer->config->draw_area_top_left[1]    = draw_area_top_left[1];
+      renderer->config->draw_area_bot_right[0]   = draw_area_bot_right[0];
+      renderer->config->draw_area_bot_right[1]   = draw_area_bot_right[1];
+
+      apply_scissor(renderer);
+   }
 }
 
 void rsx_gl_copy_rect(
@@ -2014,12 +1934,38 @@ void rsx_gl_copy_rect(
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h)
 {
-    uint16_t src_pos[2] = {src_x, src_y};
-    uint16_t dst_pos[2] = {dst_x, dst_y};
-    uint16_t dimensions[2] = {w, h}; 
 
     if (static_renderer->state == GlState_Valid)
-       static_renderer->state_data.r->copy_rect(src_pos, dst_pos, dimensions);
+    {
+       GlRenderer *renderer        = static_renderer->state_data.r;
+       uint16_t source_top_left[2] = {src_x, src_y};
+       uint16_t target_top_left[2] = {dst_x, dst_y};
+       uint16_t dimensions[2]      = {w, h}; 
+
+       // Draw pending commands
+       if (!renderer->command_buffer->empty())
+          renderer->draw();
+
+       uint32_t upscale = renderer->internal_upscaling;
+
+       GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
+       GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
+       GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
+       GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
+
+       GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
+       GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
+
+       // XXX CopyImageSubData gives undefined results if the source
+       // and target area overlap, this should be handled
+       // explicitely
+       /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
+       glCopyImageSubData( renderer->fb_out->id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
+             renderer->fb_out->id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
+             w, h, 1 );
+
+       get_error();
+    }
 }
 
 void rsx_gl_push_line(int16_t p0x,
@@ -2084,7 +2030,10 @@ void rsx_gl_push_line(int16_t p0x,
    };
 
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->push_line(v, semi_transparency_mode);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+      push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode);
+   }
 }
 
 void rsx_gl_load_image(uint16_t x, uint16_t y,
