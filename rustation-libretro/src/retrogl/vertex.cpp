@@ -29,10 +29,3 @@ Attribute::Attribute(const char* name, size_t offset, GLenum ty, GLint component
     this->ty = ty;
     this->components = components;
 }
-
-const GLvoid* Attribute::gl_offset()
-{
-    /// For some reason VertexAttribXPointer takes the offset as a
-    /// pointer...
-    return (void*)this->offset;
-}

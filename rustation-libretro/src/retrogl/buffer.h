@@ -218,7 +218,7 @@ public:
                                         attr.components,
                                         attr.ty,
                                         element_size,
-                                        attr.gl_offset());
+                                        (GLvoid*)attr.offset);
                 break;
             case GL_FLOAT:
                 glVertexAttribPointer(  index,
@@ -226,14 +226,14 @@ public:
                                         attr.ty,
                                         GL_FALSE,
                                         element_size,
-                                        attr.gl_offset());
+                                        (GLvoid*)attr.offset);
                 break;
             case GL_DOUBLE:
                 glVertexAttribLPointer( index,
                                         attr.components,
                                         attr.ty,
                                         element_size,
-                                        attr.gl_offset());
+                                        (GLvoid*)attr.offset);
                 break;
             }
         }

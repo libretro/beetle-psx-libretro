@@ -26,7 +26,6 @@ public:
     GLint components;
 
     Attribute(const char* name, size_t offset, GLenum ty, GLint components);
-    const GLvoid* gl_offset();
 };
 
 /* 
