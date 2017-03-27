@@ -55,7 +55,6 @@ public:
     ~RetroGl();
 
     void context_reset();
-    GlRenderer* gl_renderer();
     void context_destroy();
     void prepare_render();
     void finalize_frame();
@@ -188,18 +187,6 @@ void RetroGl::context_reset() {
     memcpy(copy_of_config, &config, sizeof(config));
     this->state_data.r = new GlRenderer(copy_of_config);
     this->state = GlState_Valid;
-}
-
-GlRenderer* RetroGl::gl_renderer()
-{
-    switch (this->state)
-    {
-    case GlState_Valid:
-        return this->state_data.r;
-    default:
-        puts("Attempted to get GL state without GL context!\n");
-        exit(EXIT_FAILURE);
-    }
 }
 
 void RetroGl::context_destroy()
@@ -430,16 +417,6 @@ RetroGl* renderer(void)
   exit(EXIT_FAILURE);
 }
 
-static void set_renderer(RetroGl* renderer)
-{
-  static_renderer = renderer;
-}
-
-static void drop_renderer()
-{
-  static_renderer = NULL;  
-}
-
 void rsx_gl_init(void)
 {
 }
@@ -447,13 +424,13 @@ void rsx_gl_init(void)
 bool rsx_gl_open(bool is_pal)
 {
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
-   set_renderer( RetroGl::getInstance(clock) );
+   static_renderer = RetroGl::getInstance(clock);
    return static_renderer != NULL;
 }
 
 void rsx_gl_close(void)
 {
-    drop_renderer();
+   static_renderer = NULL;  
 }
 
 void rsx_gl_refresh_variables(void)
@@ -503,18 +480,21 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 
 void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
-   renderer()->gl_renderer()->set_mask_setting(mask_set_or, mask_eval_and);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_mask_setting(mask_set_or, mask_eval_and);
 }
 
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
-   renderer()->gl_renderer()->set_draw_offset(x, y);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_draw_offset(x, y);
 }
 
 void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
       uint8_t twx, uint8_t twy)
 {
-   renderer()->gl_renderer()->set_tex_window(tww, twh, twx, twy);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_tex_window(tww, twh, twx, twy);
 }
 
 void  rsx_gl_set_draw_area(uint16_t x0,
@@ -524,7 +504,8 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 {
    uint16_t top_left[2]   = {x0, y0};
    uint16_t bot_right[2] = {x1, y1};
-   renderer()->gl_renderer()->set_draw_area(top_left, bot_right);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_draw_area(top_left, bot_right);
 }
 
 void rsx_gl_set_display_mode(uint16_t x,
@@ -535,7 +516,8 @@ void rsx_gl_set_display_mode(uint16_t x,
 {
    uint16_t top_left[2]   = {x, y};
    uint16_t dimensions[2] = {w, h};
-   renderer()->gl_renderer()->set_display_mode(top_left, dimensions, depth_24bpp);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_display_mode(top_left, dimensions, depth_24bpp);
 }
 
 void rsx_gl_push_quad(
@@ -647,7 +629,8 @@ void rsx_gl_push_quad(
       },
    };
 
-   renderer()->gl_renderer()->push_quad(v, semi_transparency_mode);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->push_quad(v, semi_transparency_mode);
 }
 
 void rsx_gl_push_triangle(
@@ -742,7 +725,8 @@ void rsx_gl_push_triangle(
       }
    };
 
-   renderer()->gl_renderer()->push_triangle(v, semi_transparency_mode);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->push_triangle(v, semi_transparency_mode);
 }
 
 void rsx_gl_fill_rect(uint32_t color,
@@ -754,7 +738,8 @@ void rsx_gl_fill_rect(uint32_t color,
    uint16_t dimensions[2] = {w, h};
    uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};  
 
-   renderer()->gl_renderer()->fill_rect(col, top_left, dimensions);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->fill_rect(col, top_left, dimensions);
 }
 
 void rsx_gl_copy_rect(
@@ -766,7 +751,8 @@ void rsx_gl_copy_rect(
     uint16_t dst_pos[2] = {dst_x, dst_y};
     uint16_t dimensions[2] = {w, h}; 
 
-    renderer()->gl_renderer()->copy_rect(src_pos, dst_pos, dimensions);
+    if (static_renderer->state == GlState_Valid)
+       static_renderer->state_data.r->copy_rect(src_pos, dst_pos, dimensions);
 }
 
 void rsx_gl_push_line(int16_t p0x,
@@ -830,7 +816,8 @@ void rsx_gl_push_line(int16_t p0x,
       }
    };
 
-   renderer()->gl_renderer()->push_line(v, semi_transparency_mode);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->push_line(v, semi_transparency_mode);
 }
 
 void rsx_gl_load_image(uint16_t x, uint16_t y,
@@ -842,10 +829,12 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
    /* TODO FIXME - upload_vram_window expects a 
   uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
-   renderer()->gl_renderer()->upload_vram_window(top_left, dimensions, vram);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->upload_vram_window(top_left, dimensions, vram);
 }
 
 void rsx_gl_toggle_display(bool status)
 {
-	renderer()->gl_renderer()->set_display_off(status);
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->set_display_off(status);
 }
