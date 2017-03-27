@@ -88,8 +88,8 @@ Program::Program(Shader* vertex_shader, Shader* fragment_shader)
 
 Program::~Program()
 {
-    this->drop();
-    free(info_log);
+   glDeleteProgram(this->id);
+   free(info_log);
 }
 
 GLint Program::find_attribute(const char* attr)
@@ -134,12 +134,6 @@ void Program::uniform2ui(const char* name, GLuint a, GLuint b)
     GLint u = this->uniform(name);
     glUniform2ui(u, a, b);
 }
-
-void Program::drop()
-{
-    glDeleteProgram(this->id);
-}
-
 
 UniformMap load_program_uniforms(GLuint program)
 {

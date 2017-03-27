@@ -39,7 +39,6 @@ public:
     GLint uniform(const char* name);
     void uniform2i(const char* name, GLint a, GLint b);
     void uniform2ui(const char* name, GLuint a, GLuint b);
-    void drop();
 
     char *info_log;
 };
