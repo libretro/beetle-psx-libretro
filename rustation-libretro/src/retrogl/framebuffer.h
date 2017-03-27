@@ -16,9 +16,6 @@ public:
 
     void bind();
     void drop();
-
-private:
-    void InitializeWithColorTexture(Texture* color_texture);
 };
 
 #endif

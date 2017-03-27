@@ -3,6 +3,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+static void get_program_info_log(Program *pg, GLuint id)
+{
+    GLint log_len = 0;
+
+    glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
+
+    if (log_len <= 0)
+        return;
+
+    pg->info_log = (char*)malloc(log_len);
+    GLsizei len = (GLsizei) log_len;
+    glGetProgramInfoLog(id,
+                        len,
+                        &log_len,
+                        (char*)pg->info_log);
+
+    if (log_len <= 0)
+        return;
+
+    // The length returned by GetShaderInfoLog *excludes*
+    // the ending \0 unlike the call to GetShaderiv above
+    // so we can get rid of it by truncating here.
+    /* log.truncate(log_len as usize); */
+    /* Don't want to spend time thinking about the above, I'll just put a \0
+    in the last index */
+    pg->info_log[log_len - 1] = '\0';
+}
+
 Program::Program(Shader* vertex_shader, Shader* fragment_shader)
     : info_log(NULL)
 {
@@ -34,7 +62,7 @@ Program::Program(Shader* vertex_shader, Shader* fragment_shader)
     // Check if the program linking was successful
     GLint status = (GLint) GL_FALSE;
     glGetProgramiv(id, GL_LINK_STATUS, &status);
-    get_program_info_log(id);
+    get_program_info_log(this, id);
 
     if (status != (GLint) GL_TRUE)
     {
@@ -130,35 +158,6 @@ void Program::drop()
     glDeleteProgram(this->id);
 }
 
-void Program::get_program_info_log(GLuint id)
-{
-    GLint log_len = 0;
-
-    glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
-
-    if (log_len <= 0) {
-        return;
-    }
-
-    info_log = (char*)malloc(log_len);
-    GLsizei len = (GLsizei) log_len;
-    glGetProgramInfoLog(id,
-                        len,
-                        &log_len,
-                        (char*) info_log);
-
-    if (log_len <= 0) {
-        return;
-    }
-
-    // The length returned by GetShaderInfoLog *excludes*
-    // the ending \0 unlike the call to GetShaderiv above
-    // so we can get rid of it by truncating here.
-    /* log.truncate(log_len as usize); */
-    /* Don't want to spend time thinking about the above, I'll just put a \0
-    in the last index */
-    info_log[log_len - 1] = '\0';
-}
 
 UniformMap load_program_uniforms(GLuint program)
 {

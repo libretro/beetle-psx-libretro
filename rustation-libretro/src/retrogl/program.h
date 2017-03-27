@@ -28,8 +28,6 @@ public:
     void uniform2ui(const char* name, GLuint a, GLuint b);
     void drop();
 
-private:
-    void get_program_info_log(GLuint id);
     char *info_log;
 };
 
