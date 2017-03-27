@@ -326,8 +326,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
-    command_buffer->program->uniform1ui("dither_scaling", dither_scaling);
-    command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    program_uniform1ui(command_buffer->program, "dither_scaling", dither_scaling);
+    program_uniform1ui(command_buffer->program, "texture_flt", this->filter_type);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -430,8 +430,8 @@ static void draw(GlRenderer *renderer)
     renderer->command_buffer->program->uniform2i("offset", (GLint)x, (GLint)y);
 
     // We use texture unit 0
-    renderer->command_buffer->program->uniform1i("fb_texture", 0);
-    renderer->command_buffer->program->uniform1ui("texture_flt", renderer->filter_type);
+    program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
+    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
     // Bind the out framebuffer
     Framebuffer _fb = Framebuffer(renderer->fb_out, renderer->fb_out_depth);
@@ -442,7 +442,7 @@ static void draw(GlRenderer *renderer)
     glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
 
-    renderer->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
+    program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
 
     renderer->command_buffer->pre_bind();
 
@@ -479,7 +479,7 @@ static void draw(GlRenderer *renderer)
       renderer->transparency_mode_index.push_back(ti);
 
       glEnable(GL_BLEND);
-      renderer->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
+      program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 1);
 
       unsigned cur_index = 0;
 
@@ -654,10 +654,10 @@ static void upload_textures(
 
     renderer->image_load_buffer->push_slice(slice, slice_len);
 
-    renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
+    program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
 
     // fb_texture is always at 1x
-    renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+    program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
 
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
@@ -802,8 +802,8 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
-    renderer->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
-    renderer->command_buffer->program->uniform1ui("texture_flt", renderer->filter_type);
+    program_uniform1ui(renderer->command_buffer->program, "dither_scaling", (GLuint) dither_scaling);
+    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
     renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
@@ -1403,10 +1403,10 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          };
          renderer->output_buffer->push_slice(slice, 4);
 
-         renderer->output_buffer->program->uniform1i("fb", 1);
+         program_uniform1i(renderer->output_buffer->program, "fb", 1);
          renderer->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
-         renderer->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
-         renderer->output_buffer->program->uniform1ui( "internal_upscaling",
+         program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
+         program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
          renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->output_buffer->swap();
@@ -1426,7 +1426,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          renderer->image_load_buffer->push_slice(slice, 4);
 
-         renderer->image_load_buffer->program->uniform1i("fb_texture", 1);
+         program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 1);
 
          glDisable(GL_SCISSOR_TEST);
          glDisable(GL_BLEND);
@@ -1434,7 +1434,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          Framebuffer _fb = Framebuffer(renderer->fb_texture);
 
-         renderer->image_load_buffer->program->uniform1ui("internal_upscaling",
+         program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
 
 
@@ -2027,9 +2027,9 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       };
       renderer->image_load_buffer->push_slice(slice, slice_len);
 
-      renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
+      program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
       // fb_texture is always at 1x
-      renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+      program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
 
       glDisable(GL_SCISSOR_TEST);
       glDisable(GL_BLEND);

@@ -11,6 +11,20 @@
 
 #define program_bind(x) (glUseProgram((x)->id))
 
+#define program_uniform1i(x, name, i) \
+{ \
+   program_bind(x); \
+   GLint u = (x)->uniform(name); \
+   glUniform1i(u, i); \
+}
+
+#define program_uniform1ui(x, name, i) \
+{ \
+   program_bind(x); \
+   GLint u = (x)->uniform(name); \
+   glUniform1ui(u, i); \
+}
+
 typedef std::map<std::string, GLint> UniformMap;
 
 class Program {
@@ -23,8 +37,6 @@ public:
     ~Program();
     GLint find_attribute(const char* attr);
     GLint uniform(const char* name);
-    void uniform1i(const char* name, GLint i);
-    void uniform1ui(const char* name, GLuint i);
     void uniform2i(const char* name, GLint a, GLint b);
     void uniform2ui(const char* name, GLuint a, GLuint b);
     void drop();

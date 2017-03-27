@@ -119,22 +119,6 @@ GLint Program::uniform(const char* name)
     return this->uniforms[name];
 }
 
-void Program::uniform1i(const char* name, GLint i)
-{
-    program_bind(this);
-
-    GLint u = this->uniform(name);
-    glUniform1i(u, i);
-}
-
-void Program::uniform1ui(const char* name, GLuint i)
-{
-    program_bind(this);
-
-    GLint u = this->uniform(name);
-    glUniform1ui(u, i);
-}
-
 void Program::uniform2i(const char* name, GLint a, GLint b)
 {
     program_bind(this);
