@@ -405,7 +405,7 @@ void GlRenderer::bind_libretro_framebuffer()
 
         geometry.aspect_ratio = aspect_ratio;
 
-        printf("Target framebuffer size: %dx%d\n", w, h);
+        //printf("Target framebuffer size: %dx%d\n", w, h);
 
         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
