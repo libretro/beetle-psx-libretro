@@ -224,30 +224,9 @@ public:
 
     void draw();
     void apply_scissor();
-    void bind_libretro_framebuffer();
-    void upload_textures(   uint16_t top_left[2],
-                            uint16_t dimensions[2],
-                            uint16_t pixel_buffer[VRAM_PIXELS]);
-
-    void upload_vram_window(uint16_t top_left[2],
-                            uint16_t dimensions[2],
-                            uint16_t pixel_buffer[VRAM_PIXELS]);
 
     DrawConfig* draw_config();
-    void prepare_render();
     bool refresh_variables();
-    void finalize_frame();
-
-    void set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
-    void set_draw_offset(int16_t x, int16_t y);
-    void set_draw_area(uint16_t top_left[2], uint16_t bot_right[2]);
-    void set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
-          uint8_t twy);
-
-    void set_display_mode(  uint16_t top_left[2],
-                            uint16_t resolution[2],
-                            bool depth_24bpp);
-    void set_display_off(bool off);
 
     void vertex_preprocessing(CommandVertex *v,
 			      unsigned count,
@@ -278,6 +257,12 @@ public:
 
     bool has_software_renderer();
 };
+
+static void upload_textures(
+      GlRenderer *renderer,
+      uint16_t top_left[2],
+      uint16_t dimensions[2],
+      uint16_t pixel_buffer[VRAM_PIXELS]);
 
 GlRenderer::GlRenderer(DrawConfig* config)
 {
@@ -430,7 +415,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-    this->upload_textures(top_left, dimensions, GPU->vram);
+    upload_textures(this, top_left, dimensions, GPU->vram);
 }
 
 GlRenderer::~GlRenderer()
@@ -620,26 +605,27 @@ void GlRenderer::apply_scissor()
     glScissor(x, y, w, h);
 }
 
-void GlRenderer::bind_libretro_framebuffer()
+static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
-    uint32_t f_w = this->frontend_resolution[0];
-    uint32_t f_h = this->frontend_resolution[1];
+    uint32_t f_w = renderer->frontend_resolution[0];
+    uint32_t f_h = renderer->frontend_resolution[1];
     uint16_t _w;
     uint16_t _h;
     float    aspect_ratio;
 
-    if (this->display_vram) {
+    if (renderer->display_vram)
+    {
       _w = VRAM_WIDTH_PIXELS;
       _h = VRAM_HEIGHT;
       // Is this accurate?
       aspect_ratio = 2.0 / 1.0;
     } else {
-      _w = this->config->display_resolution[0];
-      _h = this->config->display_resolution[1];
+      _w = renderer->config->display_resolution[0];
+      _h = renderer->config->display_resolution[1];
       aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
     }
 
-    uint32_t upscale = this->internal_upscaling;
+    uint32_t upscale = renderer->internal_upscaling;
 
     // XXX scale w and h when implementing increased internal
     // resolution
@@ -661,8 +647,8 @@ void GlRenderer::bind_libretro_framebuffer()
 
         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
-        this->frontend_resolution[0] = w;
-        this->frontend_resolution[1] = h;
+        renderer->frontend_resolution[0] = w;
+        renderer->frontend_resolution[1] = h;
     }
 
     // Bind the output framebuffer provided by the frontend
@@ -672,14 +658,16 @@ void GlRenderer::bind_libretro_framebuffer()
     glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
-void GlRenderer::upload_textures(uint16_t top_left[2],
-                                 uint16_t dimensions[2],
-                                 uint16_t pixel_buffer[VRAM_PIXELS])
+static void upload_textures(
+      GlRenderer *renderer,
+      uint16_t top_left[2],
+      uint16_t dimensions[2],
+      uint16_t pixel_buffer[VRAM_PIXELS])
 {
-   if (!this->command_buffer->empty())
-      this->draw();
+   if (!renderer->command_buffer->empty())
+      renderer->draw();
 
-    this->fb_texture->set_sub_image(top_left,
+    renderer->fb_texture->set_sub_image(top_left,
                                     dimensions,
                                     GL_RGBA,
                                     GL_UNSIGNED_SHORT_1_5_5_5_REV,
@@ -699,12 +687,12 @@ void GlRenderer::upload_textures(uint16_t top_left[2],
         {   {x_end,     y_end   }   }
     };
 
-    this->image_load_buffer->push_slice(slice, slice_len);
+    renderer->image_load_buffer->push_slice(slice, slice_len);
 
-    this->image_load_buffer->program->uniform1i("fb_texture", 0);
+    renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
 
     // fb_texture is always at 1x
-    this->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+    renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
 
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
@@ -712,24 +700,26 @@ void GlRenderer::upload_textures(uint16_t top_left[2],
 
     // Bind the output framebuffer
     // let _fb = Framebuffer::new(&self.fb_out);
-    Framebuffer _fb = Framebuffer(this->fb_out);
+    Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-    this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    this->image_load_buffer->swap();
-    glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
+    renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    renderer->image_load_buffer->swap();
+    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
     get_error();
 }
 
-void GlRenderer::upload_vram_window(uint16_t top_left[2],
-                                    uint16_t dimensions[2],
-                                    uint16_t pixel_buffer[VRAM_PIXELS])
+static void upload_vram_window(
+      GlRenderer *renderer,
+      uint16_t top_left[2],
+      uint16_t dimensions[2],
+      uint16_t pixel_buffer[VRAM_PIXELS])
 {
-   if (!this->command_buffer->empty())
-      this->draw();
+   if (!renderer->command_buffer->empty())
+      renderer->draw();
 
-    this->fb_texture->set_sub_image_window(top_left,
+    renderer->fb_texture->set_sub_image_window(top_left,
                                            dimensions,
                                            (size_t) VRAM_WIDTH_PIXELS,
                                            GL_RGBA,
@@ -749,22 +739,22 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
             {   {x_start,   y_end   }   },
             {   {x_end,     y_end   }   }
         };
-    this->image_load_buffer->push_slice(slice, slice_len);
+    renderer->image_load_buffer->push_slice(slice, slice_len);
 
-    this->image_load_buffer->program->uniform1i("fb_texture", 0);
+    renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
     // fb_texture is always at 1x
-    this->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+    renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
 
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Bind the output framebuffer
-    Framebuffer _fb = Framebuffer(this->fb_out);
+    Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-    this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    this->image_load_buffer->swap();
-    glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
+    renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    renderer->image_load_buffer->swap();
+    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
     get_error();
@@ -773,23 +763,6 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
 DrawConfig* GlRenderer::draw_config()
 {
     return this->config;
-}
-
-void GlRenderer::prepare_render()
-{
-    // In case we're upscaling we need to increase the line width
-    // proportionally
-    glLineWidth((GLfloat)this->internal_upscaling);
-    glPolygonMode(GL_FRONT_AND_BACK, this->command_polygon_mode);
-    glEnable(GL_SCISSOR_TEST);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    // Used for PSX GPU command blending
-    glBlendColor(0.25, 0.25, 0.25, 0.5);
-
-    this->apply_scissor();
-
-    this->fb_texture->bind(GL_TEXTURE0);
 }
 
 bool GlRenderer::has_software_renderer()
@@ -909,7 +882,7 @@ bool GlRenderer::refresh_variables()
         uint16_t top_left[2] = {0, 0};
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-        this->upload_textures(top_left, dimensions,
+        upload_textures(this, top_left, dimensions,
 			      GPU->vram);
 
 
@@ -944,176 +917,6 @@ bool GlRenderer::refresh_variables()
     return reconfigure_frontend;
 }
 
-/* Setup 2 triangles that cover the entire framebuffer
-then copy the displayed portion of the screen from fb_out */
-void GlRenderer::finalize_frame()
-{
-    // Draw pending commands
-   if (!this->command_buffer->empty())
-      this->draw();
-
-    // We can now render to teh frontend's buffer
-    this->bind_libretro_framebuffer();
-
-    glDisable(GL_SCISSOR_TEST);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-
-    /* If the display is off, just clear the screen */
-    if (config->display_off && !this->display_vram) {
-        glClearColor(0.0, 0.0, 0.0, 0.0);
-        glClear(GL_COLOR_BUFFER_BIT);
-    } else {
-        // Bind 'fb_out' to texture unit 1
-        this->fb_out->bind(GL_TEXTURE1);
-
-        // First we draw the visible part of fb_out
-        uint16_t fb_x_start = this->config->display_top_left[0];
-        uint16_t fb_y_start = this->config->display_top_left[1];
-        uint16_t fb_width = this->config->display_resolution[0];
-        uint16_t fb_height = this->config->display_resolution[1];
-
-	GLint depth_24bpp = (GLint) this->config->display_24bpp;
-
-	if (this->display_vram) {
-	  // Display the entire VRAM as a 16bpp buffer
-	  fb_x_start = 0;
-	  fb_y_start = 0;
-	  fb_width = VRAM_WIDTH_PIXELS;
-	  fb_height = VRAM_HEIGHT;
-
-	  depth_24bpp = 0;
-	}
-
-        OutputVertex slice[4] =
-        {
-            { {-1.0, -1.0}, {0,         fb_height}   },
-            { { 1.0, -1.0}, {fb_width , fb_height}   },
-            { {-1.0,  1.0}, {0,         0} },
-            { { 1.0,  1.0}, {fb_width,  0} }
-        };
-        this->output_buffer->push_slice(slice, 4);
-
-        this->output_buffer->program->uniform1i("fb", 1);
-        this->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
-        this->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
-        this->output_buffer->program->uniform1ui( "internal_upscaling",
-                                                    this->internal_upscaling);
-        this->output_buffer->draw(GL_TRIANGLE_STRIP);
-	this->output_buffer->swap();
-    }
-
-    // Hack: copy fb_out back into fb_texture at the end of every
-    // frame to make offscreen rendering kinda sorta work. Very messy
-    // and slow.
-    {
-      ImageLoadVertex slice[4] =
-	{
-	  {   {0,    0 }   },
-	  {   {1023, 0 }   },
-	  {   {0,    511   }   },
-	  {   {1023, 511   }   },
-	};
-
-      this->image_load_buffer->push_slice(slice, 4);
-
-      this->image_load_buffer->program->uniform1i("fb_texture", 1);
-
-      glDisable(GL_SCISSOR_TEST);
-      glDisable(GL_BLEND);
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-      Framebuffer _fb = Framebuffer(this->fb_texture);
-
-      this->image_load_buffer->program->uniform1ui("internal_upscaling",
-						   this->internal_upscaling);
-
-
-      this->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-      this->image_load_buffer->swap();
-    }
-
-    // Cleanup OpenGL context before returning to the frontend
-    /* All of these GL calls are also done in glsm_ctl(UNBIND) */
-    glDisable(GL_BLEND);
-    glBlendColor(0.0, 0.0, 0.0, 0.0);
-    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
-    glBindVertexArray(0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glLineWidth(1.0);
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-
-    // When using a hardware renderer we set the data pointer to
-    // -1 to notify the frontend that the frame has been rendered
-    // in the framebuffer.
-    video_cb(   RETRO_HW_FRAME_BUFFER_VALID, this->frontend_resolution[0],
-                this->frontend_resolution[1], 0);
-}
-
-void GlRenderer::set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
-{
-    // Finish drawing anything with the current offset
-   if (!this->command_buffer->empty())
-      this->draw();
-    this->mask_set_or   = mask_set_or;
-    this->mask_eval_and = mask_eval_and;
-}
-
-void GlRenderer::set_draw_offset(int16_t x, int16_t y)
-{
-    // Finish drawing anything with the current offset
-   if (!this->command_buffer->empty())
-      this->draw();
-    this->config->draw_offset[0] = x;
-    this->config->draw_offset[1] = y;
-}
-
-void GlRenderer::set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx,
-      uint8_t twy)
-{
-    this->tex_x_mask = ~(tww << 3);
-    this->tex_x_or = (twx & tww) << 3;
-    this->tex_y_mask = ~(twh << 3);
-    this->tex_y_or = (twy & twh) << 3;
-}
-
-void GlRenderer::set_draw_area(uint16_t top_left[2],
-			       uint16_t bot_right[2])
-{
-    // Finish drawing anything in the current area
-   if (!this->command_buffer->empty())
-      this->draw();
-
-    this->config->draw_area_top_left[0] = top_left[0];
-    this->config->draw_area_top_left[1] = top_left[1];
-    // Draw area coordinates are inclusive
-    this->config->draw_area_bot_right[0] = bot_right[0] + 1;
-    this->config->draw_area_bot_right[1] = bot_right[1] + 1;
-
-    this->apply_scissor();
-}
-
-void GlRenderer::set_display_mode(  uint16_t top_left[2],
-                                    uint16_t resolution[2],
-                                    bool depth_24bpp)
-{
-    this->config->display_top_left[0] = top_left[0];
-    this->config->display_top_left[1] = top_left[1];
-
-    this->config->display_resolution[0] = resolution[0];
-    this->config->display_resolution[1] = resolution[1];
-    this->config->display_24bpp = depth_24bpp;
-}
-
-void GlRenderer::set_display_off(bool off)
-{
-  this->config->display_off = off;
-}
 
 void GlRenderer::vertex_preprocessing(CommandVertex *v,
 				      unsigned count,
@@ -1738,14 +1541,144 @@ bool rsx_gl_has_software_renderer(void)
 void rsx_gl_prepare_frame(void)
 {
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->prepare_render();
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+
+      // In case we're upscaling we need to increase the line width
+      // proportionally
+      glLineWidth((GLfloat)renderer->internal_upscaling);
+      glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
+      glEnable(GL_SCISSOR_TEST);
+      glEnable(GL_DEPTH_TEST);
+      glDepthFunc(GL_LEQUAL);
+      // Used for PSX GPU command blending
+      glBlendColor(0.25, 0.25, 0.25, 0.5);
+
+      renderer->apply_scissor();
+      renderer->fb_texture->bind(GL_TEXTURE0);
+   }
 }
 
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
       unsigned height, unsigned pitch)
 {
+   /* Setup 2 triangles that cover the entire framebuffer
+      then copy the displayed portion of the screen from fb_out */
+
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->finalize_frame();
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+      // Draw pending commands
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+
+      // We can now render to the frontend's buffer
+      bind_libretro_framebuffer(renderer);
+
+      glDisable(GL_SCISSOR_TEST);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+
+      /* If the display is off, just clear the screen */
+      if (renderer->config->display_off && !renderer->display_vram)
+      {
+         glClearColor(0.0, 0.0, 0.0, 0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
+      }
+      else
+      {
+         // Bind 'fb_out' to texture unit 1
+         renderer->fb_out->bind(GL_TEXTURE1);
+
+         // First we draw the visible part of fb_out
+         uint16_t fb_x_start = renderer->config->display_top_left[0];
+         uint16_t fb_y_start = renderer->config->display_top_left[1];
+         uint16_t fb_width   = renderer->config->display_resolution[0];
+         uint16_t fb_height  = renderer->config->display_resolution[1];
+
+         GLint depth_24bpp   = (GLint) renderer->config->display_24bpp;
+
+         if (renderer->display_vram)
+         {
+            // Display the entire VRAM as a 16bpp buffer
+            fb_x_start = 0;
+            fb_y_start = 0;
+            fb_width = VRAM_WIDTH_PIXELS;
+            fb_height = VRAM_HEIGHT;
+
+            depth_24bpp = 0;
+         }
+
+         OutputVertex slice[4] =
+         {
+            { {-1.0, -1.0}, {0,         fb_height}   },
+            { { 1.0, -1.0}, {fb_width , fb_height}   },
+            { {-1.0,  1.0}, {0,         0} },
+            { { 1.0,  1.0}, {fb_width,  0} }
+         };
+         renderer->output_buffer->push_slice(slice, 4);
+
+         renderer->output_buffer->program->uniform1i("fb", 1);
+         renderer->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
+         renderer->output_buffer->program->uniform1i("depth_24bpp", depth_24bpp);
+         renderer->output_buffer->program->uniform1ui( "internal_upscaling",
+               renderer->internal_upscaling);
+         renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
+         renderer->output_buffer->swap();
+      }
+
+      // Hack: copy fb_out back into fb_texture at the end of every
+      // frame to make offscreen rendering kinda sorta work. Very messy
+      // and slow.
+      {
+         ImageLoadVertex slice[4] =
+         {
+            {   {0,    0 }   },
+            {   {1023, 0 }   },
+            {   {0,    511   }   },
+            {   {1023, 511   }   },
+         };
+
+         renderer->image_load_buffer->push_slice(slice, 4);
+
+         renderer->image_load_buffer->program->uniform1i("fb_texture", 1);
+
+         glDisable(GL_SCISSOR_TEST);
+         glDisable(GL_BLEND);
+         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+         Framebuffer _fb = Framebuffer(renderer->fb_texture);
+
+         renderer->image_load_buffer->program->uniform1ui("internal_upscaling",
+               renderer->internal_upscaling);
+
+
+         renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+         renderer->image_load_buffer->swap();
+      }
+
+      // Cleanup OpenGL context before returning to the frontend
+      /* All of these GL calls are also done in glsm_ctl(UNBIND) */
+      glDisable(GL_BLEND);
+      glBlendColor(0.0, 0.0, 0.0, 0.0);
+      glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+      glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glUseProgram(0);
+      glBindVertexArray(0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      glLineWidth(1.0);
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+
+      // When using a hardware renderer we set the data pointer to
+      // -1 to notify the frontend that the frame has been rendered
+      // in the framebuffer.
+      video_cb(   RETRO_HW_FRAME_BUFFER_VALID,
+            renderer->frontend_resolution[0],
+            renderer->frontend_resolution[1], 0);
+   }
 }
 
 void rsx_gl_set_environment(retro_environment_t callback)
@@ -1772,20 +1705,42 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_mask_setting(mask_set_or, mask_eval_and);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+
+      // Finish drawing anything with the current offset
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+      renderer->mask_set_or   = mask_set_or;
+      renderer->mask_eval_and = mask_eval_and;
+   }
 }
 
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_draw_offset(x, y);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+
+      // Finish drawing anything with the current offset
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+      renderer->config->draw_offset[0] = x;
+      renderer->config->draw_offset[1] = y;
+   }
 }
 
 void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
       uint8_t twx, uint8_t twy)
 {
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_tex_window(tww, twh, twx, twy);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+      renderer->tex_x_mask = ~(tww << 3);
+      renderer->tex_x_or   = (twx & tww) << 3;
+      renderer->tex_y_mask = ~(twh << 3);
+      renderer->tex_y_or   = (twy & twh) << 3;
+   }
 }
 
 void  rsx_gl_set_draw_area(uint16_t x0,
@@ -1796,7 +1751,21 @@ void  rsx_gl_set_draw_area(uint16_t x0,
    uint16_t top_left[2]   = {x0, y0};
    uint16_t bot_right[2] = {x1, y1};
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_draw_area(top_left, bot_right);
+   {
+      GlRenderer *renderer = static_renderer->state_data.r;
+
+      // Finish drawing anything in the current area
+      if (!renderer->command_buffer->empty())
+         renderer->draw();
+
+      renderer->config->draw_area_top_left[0] = top_left[0];
+      renderer->config->draw_area_top_left[1] = top_left[1];
+      // Draw area coordinates are inclusive
+      renderer->config->draw_area_bot_right[0] = bot_right[0] + 1;
+      renderer->config->draw_area_bot_right[1] = bot_right[1] + 1;
+
+      renderer->apply_scissor();
+   }
 }
 
 void rsx_gl_set_display_mode(uint16_t x,
@@ -1805,10 +1774,17 @@ void rsx_gl_set_display_mode(uint16_t x,
       uint16_t h,
       bool depth_24bpp)
 {
-   uint16_t top_left[2]   = {x, y};
-   uint16_t dimensions[2] = {w, h};
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_display_mode(top_left, dimensions, depth_24bpp);
+   {
+      GlRenderer *renderer                    = static_renderer->state_data.r;
+
+      renderer->config->display_top_left[0]   = x;
+      renderer->config->display_top_left[1]   = y;
+
+      renderer->config->display_resolution[0] = w;
+      renderer->config->display_resolution[1] = h;
+      renderer->config->display_24bpp = depth_24bpp;
+   }
 }
 
 void rsx_gl_push_quad(
@@ -2121,11 +2097,14 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
    /* TODO FIXME - upload_vram_window expects a 
   uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->upload_vram_window(top_left, dimensions, vram);
+      upload_vram_window(static_renderer->state_data.r, top_left, dimensions, vram);
 }
 
 void rsx_gl_toggle_display(bool status)
 {
    if (static_renderer->state == GlState_Valid)
-      static_renderer->state_data.r->set_display_off(status);
+   {
+      GlRenderer *renderer          = static_renderer->state_data.r;
+      renderer->config->display_off = status;
+   }
 }
