@@ -96,6 +96,9 @@ GLint Program::find_attribute(const char* attr)
 {
     GLint index = glGetAttribLocation(this->id, attr);
 
+    if (index >= 0)
+       return index;
+
     if (index < 0) {
         printf("Couldn't find attribute \"%s\" in program\n", attr);
         get_error();
@@ -103,11 +106,6 @@ GLint Program::find_attribute(const char* attr)
     }
 
     return index;
-}
-
-void Program::bind()
-{
-    glUseProgram(this->id);
 }
 
 GLint Program::uniform(const char* name)
@@ -123,7 +121,7 @@ GLint Program::uniform(const char* name)
 
 void Program::uniform1i(const char* name, GLint i)
 {
-    this->bind();
+    program_bind(this);
 
     GLint u = this->uniform(name);
     glUniform1i(u, i);
@@ -131,7 +129,7 @@ void Program::uniform1i(const char* name, GLint i)
 
 void Program::uniform1ui(const char* name, GLuint i)
 {
-    this->bind();
+    program_bind(this);
 
     GLint u = this->uniform(name);
     glUniform1ui(u, i);
@@ -139,7 +137,7 @@ void Program::uniform1ui(const char* name, GLuint i)
 
 void Program::uniform2i(const char* name, GLint a, GLint b)
 {
-    this->bind();
+    program_bind(this);
 
     GLint u = this->uniform(name);
     glUniform2i(u, a, b); 
@@ -147,7 +145,7 @@ void Program::uniform2i(const char* name, GLint a, GLint b)
 
 void Program::uniform2ui(const char* name, GLuint a, GLuint b)
 {
-    this->bind();
+    program_bind(this);
 
     GLint u = this->uniform(name);
     glUniform2ui(u, a, b);

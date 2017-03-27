@@ -325,46 +325,45 @@ public:
 
     void draw(GLenum mode)
     {
-        if (this->empty()) {
-	  return;
-	}
+       if (this->empty())
+          return;
 
-        this->vao->bind();
-        this->program->bind();
+       this->vao->bind();
+       program_bind(this->program);
 
-	struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = this->get_active_buffer();
 
-	unsigned start = buffer->offset + this->active_command_index;
-	unsigned len = this->active_next_index - this->active_command_index;
+       unsigned start = buffer->offset + this->active_command_index;
+       unsigned len = this->active_next_index - this->active_command_index;
 
-	// Length in number of vertices
-        glDrawArrays(mode, start, len);
+       // Length in number of vertices
+       glDrawArrays(mode, start, len);
 
-        get_error();
+       get_error();
     }
 
-    void pre_bind() {
-        this->vao->bind();
-	this->program->bind();
+    void pre_bind()
+    {
+       this->vao->bind();
+       program_bind(this->program);
     }
 
     void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-        if (this->empty()) {
-	  return;
-	}
+       if (this->empty())
+          return;
 
-	struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = this->get_active_buffer();
 
-	GLint base = buffer->offset;
+       GLint base = buffer->offset;
 
-        glDrawElementsBaseVertex(mode,
-				 count,
-				 GL_UNSIGNED_SHORT,
-				 indices,
-				 base);
+       glDrawElementsBaseVertex(mode,
+             count,
+             GL_UNSIGNED_SHORT,
+             indices,
+             base);
 
-        get_error();
+       get_error();
     }
 
     size_t remaining_capacity()
