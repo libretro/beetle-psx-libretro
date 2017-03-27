@@ -1144,16 +1144,18 @@ void RetroGl::refresh_variables()
     GlRenderer* renderer = NULL;
     switch (this->state)
     {
-    case GlState_Valid:
-        renderer = this->state_data.r;
-        break;
-    case GlState_Invalid:
-        // Nothing to be done if we don't have a GL context
-        return;
+       case GlState_Valid:
+          renderer = this->state_data.r;
+          break;
+       case GlState_Invalid:
+          // Nothing to be done if we don't have a GL context
+          return;
     }
 
     bool reconfigure_frontend = retro_refresh_variables(renderer);
-    if (reconfigure_frontend) {
+
+    if (reconfigure_frontend)
+    {
         // The resolution has changed, we must tell the frontend
         // to change its format
         struct retro_variable var = {0};
@@ -1180,14 +1182,17 @@ struct retro_system_av_info RetroGl::get_system_av_info()
 
 bool RetroGl::context_framebuffer_lock(void *data)
 {
-    /* If the state is invalid, lock the framebuffer (return true) */
-    switch (this->state) {
-    case GlState_Valid:
-        return false;
-    case GlState_Invalid:
-    default:
-        return true;
-    }
+   /* If the state is invalid, lock the framebuffer (return true) */
+   switch (this->state)
+   {
+      case GlState_Valid:
+         return false;
+      case GlState_Invalid:
+      default:
+         break;
+   }
+
+   return true;
 }
 
 
