@@ -13,8 +13,6 @@ public:
     Framebuffer(Texture* color_texture);
     Framebuffer(Texture* color_texture, Texture* depth_texture);
     ~Framebuffer();
-
-    void bind();
 };
 
 #endif

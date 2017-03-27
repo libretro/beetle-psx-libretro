@@ -11,7 +11,7 @@ static void InitializeWithColorTexture(Framebuffer *fb, Texture* color_texture)
     fb->id = id;
     fb->_color_texture = color_texture;
 
-    fb->bind();
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb->id);
 
     glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
                             GL_COLOR_ATTACHMENT0,
@@ -51,9 +51,4 @@ Framebuffer::Framebuffer(Texture* color_texture, Texture* depth_texture)
 Framebuffer::~Framebuffer()
 {
     glDeleteFramebuffers(1, &this->id);
-}
-
-void Framebuffer::bind()
-{
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->id);
 }
