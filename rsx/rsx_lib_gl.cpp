@@ -56,8 +56,6 @@ public:
 
     void context_reset();
     void context_destroy();
-    void prepare_render();
-    void finalize_frame();
     void refresh_variables();
     retro_system_av_info get_system_av_info();
     bool has_software_renderer();
@@ -209,38 +207,6 @@ void RetroGl::context_destroy()
 
     this->state = GlState_Invalid;
     this->state_data.c = config;
-}
-
-void RetroGl::prepare_render()
-{
-    GlRenderer* renderer = NULL;
-    switch (this->state)
-    {
-    case GlState_Valid:
-        renderer = this->state_data.r;
-        break;
-    case GlState_Invalid:
-        puts("Attempted to render a frame without GL context\n");
-        exit(EXIT_FAILURE);
-    }
-
-    renderer->prepare_render();
-}
-
-void RetroGl::finalize_frame()
-{
-    GlRenderer* renderer = NULL;
-    switch (this->state)
-    {
-    case GlState_Valid:
-        renderer = this->state_data.r;
-        break;
-    case GlState_Invalid:
-        puts("Attempted to render a frame without GL context\n");
-        exit(EXIT_FAILURE);
-    }
-
-    renderer->finalize_frame();
 }
 
 bool RetroGl::has_software_renderer()
@@ -407,16 +373,6 @@ static bool shim_context_framebuffer_lock(void* data)
 
 static RetroGl* static_renderer = NULL; 
 
-RetroGl* renderer(void)
-{
-  RetroGl* r = static_renderer;
-  if (r)
-    return r;
-
-  printf("Attempted to use a NULL renderer\n");
-  exit(EXIT_FAILURE);
-}
-
 void rsx_gl_init(void)
 {
 }
@@ -448,13 +404,15 @@ bool rsx_gl_has_software_renderer(void)
 
 void rsx_gl_prepare_frame(void)
 {
-   renderer()->prepare_render();
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->prepare_render();
 }
 
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
       unsigned height, unsigned pitch)
 {
-   renderer()->finalize_frame();
+   if (static_renderer->state == GlState_Valid)
+      static_renderer->state_data.r->finalize_frame();
 }
 
 void rsx_gl_set_environment(retro_environment_t callback)
@@ -472,7 +430,7 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
    /* This will possibly trigger the frontend to reconfigure itself */
    rsx_gl_refresh_variables();
 
-   struct retro_system_av_info result = renderer()->get_system_av_info();
+   struct retro_system_av_info result = static_renderer->get_system_av_info();
    memcpy(info, &result, sizeof(result));
 }
 
