@@ -42,7 +42,6 @@ public:
                                 GLenum ty,
                                 uint16_t* data);
 
-    void drop();
 };
 
 #endif

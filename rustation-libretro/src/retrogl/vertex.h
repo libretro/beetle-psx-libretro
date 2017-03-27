@@ -15,7 +15,6 @@ public:
     VertexArrayObject();
     ~VertexArrayObject();
     void bind();
-    void drop();
 };
 
 class Attribute {

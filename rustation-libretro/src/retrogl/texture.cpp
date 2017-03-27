@@ -25,7 +25,7 @@ Texture::Texture(uint32_t width, uint32_t height, GLenum internal_format)
 
 Texture::~Texture()
 {
-    this->drop();
+    glDeleteTextures(1, &this->id);
 }
 
 void Texture::bind(GLenum texture_unit)
@@ -80,10 +80,3 @@ void Texture::set_sub_image_window( uint16_t top_left[2],
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
-
-void Texture::drop()
-{
-    glDeleteTextures(1, &this->id);
-}
-
-

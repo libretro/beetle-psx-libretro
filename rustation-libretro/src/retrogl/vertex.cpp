@@ -14,17 +14,12 @@ VertexArrayObject::VertexArrayObject()
 
 VertexArrayObject::~VertexArrayObject()
 {
-    this->drop();
+    glDeleteVertexArrays(1, &this->id);
 }
 
 void VertexArrayObject::bind()
 {
     glBindVertexArray(this->id);
-}
-
-void VertexArrayObject::drop()
-{
-    glDeleteVertexArrays(1, &this->id);
 }
 
 Attribute::Attribute(const char* name, size_t offset, GLenum ty, GLint components)
