@@ -76,13 +76,3 @@ Shader::~Shader()
     glDeleteShader(this->id);
     free(info_log);
 }
-
-void Shader::attach_to(GLuint program)
-{
-    glAttachShader(program, this->id);
-}
-
-void Shader::detach_from(GLuint program)
-{
-    glDetachShader(program, this->id);
-}

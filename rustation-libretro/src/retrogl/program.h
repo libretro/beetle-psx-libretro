@@ -51,8 +51,6 @@ public:
     ~Program();
     GLint find_attribute(const char* attr);
     GLint uniform(const char* name);
-    void uniform2i(const char* name, GLint a, GLint b);
-    void uniform2ui(const char* name, GLuint a, GLuint b);
 
     char *info_log;
 };

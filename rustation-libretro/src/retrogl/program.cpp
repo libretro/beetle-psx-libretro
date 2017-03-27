@@ -40,13 +40,13 @@ Program::Program(Shader* vertex_shader, Shader* fragment_shader)
         exit(EXIT_FAILURE);
     }
 
-    vertex_shader->attach_to(id);
-    fragment_shader->attach_to(id);
+    glAttachShader(id, vertex_shader->id);
+    glAttachShader(id, fragment_shader->id);
 
     glLinkProgram(id);
 
-    vertex_shader->detach_from(id);
-    fragment_shader->detach_from(id);
+    glDetachShader(id, vertex_shader->id);
+    glDetachShader(id, fragment_shader->id);
 
     /* Program owns the two pointers, so we clean them up now */
     if (vertex_shader) {
