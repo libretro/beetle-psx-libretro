@@ -15,7 +15,6 @@ public:
     ~Framebuffer();
 
     void bind();
-    void drop();
 };
 
 #endif

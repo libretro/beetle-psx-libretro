@@ -50,15 +50,10 @@ Framebuffer::Framebuffer(Texture* color_texture, Texture* depth_texture)
 
 Framebuffer::~Framebuffer()
 {
-    this->drop();
+    glDeleteFramebuffers(1, &this->id);
 }
 
 void Framebuffer::bind()
 {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->id);
-}
-
-void Framebuffer::drop()
-{
-    glDeleteFramebuffers(1, &this->id);
 }
