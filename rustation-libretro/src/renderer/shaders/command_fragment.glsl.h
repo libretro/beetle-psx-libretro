@@ -38,8 +38,7 @@ const uint BLEND_MODE_RAW_TEXTURE   = 1U;
 const uint BLEND_MODE_TEXTURE_BLEND = 2U;
 
 const uint FILTER_MODE_NEAREST      = 0U;
-const uint FILTER_MODE_3POINT       = 1U;
-const uint FILTER_MODE_BILINEAR     = 2U;
+const uint FILTER_MODE_SABR         = 1U;
 
 // Read a pixel in VRAM
 vec4 vram_get_pixel(uint x, uint y) {
@@ -137,104 +136,162 @@ vec4 sample_texel(vec2 coords) {
    return texel;
 }
 
-// 3-point filtering
-vec4 get_texel_3point()
+// constants and functions for sabr
+const  vec4 Ai  = vec4( 1.0, -1.0, -1.0,  1.0);
+const  vec4 B45 = vec4( 1.0,  1.0, -1.0, -1.0);
+const  vec4 C45 = vec4( 1.5,  0.5, -0.5,  0.5);
+const  vec4 B30 = vec4( 0.5,  2.0, -0.5, -2.0);
+const  vec4 C30 = vec4( 1.0,  1.0, -0.5,  0.0);
+const  vec4 B60 = vec4( 2.0,  0.5, -2.0, -0.5);
+const  vec4 C60 = vec4( 2.0,  0.0, -1.0,  0.5);
+
+const  vec4 M45 = vec4(0.4, 0.4, 0.4, 0.4);
+const  vec4 M30 = vec4(0.2, 0.4, 0.2, 0.4);
+const  vec4 M60 = M30.yxwz;
+const  vec4 Mshift = vec4(0.2, 0.2, 0.2, 0.2);
+
+const  float coef = 2.0;
+
+const  vec4 threshold = vec4(0.32, 0.32, 0.32, 0.32);
+
+const  vec3 lum = vec3(0.21, 0.72, 0.07);
+
+vec4 lum_to(vec3 v0, vec3 v1, vec3 v2, vec3 v3) {
+	return vec4(dot(lum, v0), dot(lum, v1), dot(lum, v2), dot(lum, v3));
+}
+
+vec4 lum_df(vec4 A, vec4 B) {
+	return abs(A - B);
+}
+
+bvec4 lum_eq(vec4 A, vec4 B) {
+	return lessThan(lum_df(A, B) , vec4(threshold));
+}
+
+vec4 lum_wd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h) {
+	return lum_df(a, b) + lum_df(a, c) + lum_df(d, e) + lum_df(d, f) + 4.0 * lum_df(g, h);
+}
+
+float c_df(vec3 c1, vec3 c2) {
+	vec3 df = abs(c1 - c2);
+	return df.r + df.g + df.b;
+}
+
+//sabr
+vec4 get_texel_sabr()
 {
-  float x = frag_texture_coord.x;
-  float y = frag_texture_coord.y;
+	vec2 tc = vec2(frag_texture_coord.x, frag_texture_coord.y);// * vec2(1.00001);
+	vec4 xyp_1_2_3    = tc.xxxy + vec4(      -1., 0.0,   1., -2.0 * 1.);
+	vec4 xyp_6_7_8    = tc.xxxy + vec4(      -1., 0.0,   1.,       -1.);
+	vec4 xyp_11_12_13 = tc.xxxy + vec4(      -1., 0.0,   1.,      0.0);
+	vec4 xyp_16_17_18 = tc.xxxy + vec4(      -1., 0.0,   1.,        1.);
+	vec4 xyp_21_22_23 = tc.xxxy + vec4(      -1., 0.0,   1.,  2.0 * 1.);
+	vec4 xyp_5_10_15  = tc.xyyy + vec4(-2.0 * 1.,  -1., 0.0,        1.);
+	vec4 xyp_9_14_9   = tc.xyyy + vec4( 2.0 * 1.,  -1., 0.0,        1.);
 
-  float u_frac = fract(x);
-  float v_frac = fract(y);
+	// Store mask values
+	vec3 P1  = sample_texel(xyp_1_2_3.xw   ).rgb;
+	vec3 P2  = sample_texel(xyp_1_2_3.yw   ).rgb;
+	vec3 P3  = sample_texel(xyp_1_2_3.zw   ).rgb;
 
-  vec4 texel_00;
+	vec3 P6  = sample_texel(xyp_6_7_8.xw   ).rgb;
+	vec3 P7  = sample_texel(xyp_6_7_8.yw   ).rgb;
+	vec3 P8  = sample_texel(xyp_6_7_8.zw   ).rgb;
 
-  if (u_frac + v_frac < 1.0) {
-    // Use bottom-left
-    texel_00 = sample_texel(vec2(x + 0, y + 0));
-  } else {
-    // Use top-right
-    texel_00 = sample_texel(vec2(x + 1, y + 1));
+	vec3 P11 = sample_texel(xyp_11_12_13.xw).rgb;
+	vec3 P12 = sample_texel(xyp_11_12_13.yw).rgb;
+	vec3 P13 = sample_texel(xyp_11_12_13.zw).rgb;
 
-    float tmp = 1 - v_frac;
-    v_frac = 1 - u_frac;
-    u_frac = tmp;
-  }
+	vec3 P16 = sample_texel(xyp_16_17_18.xw).rgb;
+	vec3 P17 = sample_texel(xyp_16_17_18.yw).rgb;
+	vec3 P18 = sample_texel(xyp_16_17_18.zw).rgb;
 
-  if (is_transparent(texel_00)) {
-    return texel_00;
-  }
+	vec3 P21 = sample_texel(xyp_21_22_23.xw).rgb;
+	vec3 P22 = sample_texel(xyp_21_22_23.yw).rgb;
+	vec3 P23 = sample_texel(xyp_21_22_23.zw).rgb;
 
-   vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
-   vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+	vec3 P5  = sample_texel(xyp_5_10_15.xy ).rgb;
+	vec3 P10 = sample_texel(xyp_5_10_15.xz ).rgb;
+	vec3 P15 = sample_texel(xyp_5_10_15.xw ).rgb;
 
-   if (is_transparent(texel_10)) {
-      texel_10 = texel_00;
-   }
+	vec3 P9  = sample_texel(xyp_9_14_9.xy  ).rgb;
+	vec3 P14 = sample_texel(xyp_9_14_9.xz  ).rgb;
+	vec3 P19 = sample_texel(xyp_9_14_9.xw  ).rgb;
 
-   if (is_transparent(texel_01)) {
-      texel_01 = texel_00;
-   }
-   vec4 texel = texel_00
-     + u_frac * (texel_10 - texel_00)
-     + v_frac * (texel_01 - texel_00);
+// Store luminance values of each point
+	vec4 p7  = lum_to(P7,  P11, P17, P13);
+	vec4 p8  = lum_to(P8,  P6,  P16, P18);
+	vec4 p11 = p7.yzwx;                      // P11, P17, P13, P7
+	vec4 p12 = lum_to(P12, P12, P12, P12);
+	vec4 p13 = p7.wxyz;                      // P13, P7,  P11, P17
+	vec4 p14 = lum_to(P14, P2,  P10, P22);
+	vec4 p16 = p8.zwxy;                      // P16, P18, P8,  P6
+	vec4 p17 = p7.zwxy;                      // P11, P17, P13, P7
+	vec4 p18 = p8.wxyz;                      // P18, P8,  P6,  P16
+	vec4 p19 = lum_to(P19, P3,  P5,  P21);
+	vec4 p22 = p14.wxyz;                     // P22, P14, P2,  P10
+	vec4 p23 = lum_to(P23, P9,  P1,  P15);
+
+	vec2 fp = fract(tc);
+
+	vec4 ma45 = smoothstep(C45 - M45, C45 + M45, Ai * fp.y + B45 * fp.x);
+	vec4 ma30 = smoothstep(C30 - M30, C30 + M30, Ai * fp.y + B30 * fp.x);
+	vec4 ma60 = smoothstep(C60 - M60, C60 + M60, Ai * fp.y + B60 * fp.x);
+	vec4 marn = smoothstep(C45 - M45 + Mshift, C45 + M45 + Mshift, Ai * fp.y + B45 * fp.x);
+
+	vec4 e45   = lum_wd(p12, p8, p16, p18, p22, p14, p17, p13);
+	vec4 econt = lum_wd(p17, p11, p23, p13, p7, p19, p12, p18);
+	vec4 e30   = lum_df(p13, p16);
+	vec4 e60   = lum_df(p8, p17);
+
+    vec4 final45 = vec4(1.0);
+	vec4 final30 = vec4(0.0);
+	vec4 final60 = vec4(0.0);
+	vec4 final36 = vec4(0.0);
+	vec4 finalrn = vec4(0.0);
+
+	vec4 px = step(lum_df(p12, p17), lum_df(p12, p13));
+
+	vec4 mac = final36 * max(ma30, ma60) + final30 * ma30 + final60 * ma60 + final45 * ma45 + finalrn * marn;
+
+	vec3 res1 = P12;
+	res1 = mix(res1, mix(P13, P17, px.x), mac.x);
+	res1 = mix(res1, mix(P7 , P13, px.y), mac.y);
+	res1 = mix(res1, mix(P11, P7 , px.z), mac.z);
+	res1 = mix(res1, mix(P17, P11, px.w), mac.w);
+
+	vec3 res2 = P12;
+	res2 = mix(res2, mix(P17, P11, px.w), mac.w);
+	res2 = mix(res2, mix(P11, P7 , px.z), mac.z);
+	res2 = mix(res2, mix(P7 , P13, px.y), mac.y);
+	res2 = mix(res2, mix(P13, P17, px.x), mac.x);
+
+	float texel_alpha = sample_texel(vec2(frag_texture_coord.x, frag_texture_coord.y)).w;
+
+   vec4 texel = vec4(mix(res1, res2, step(c_df(P12, res1), c_df(P12, res2))), texel_alpha);
 
    return texel;
 }
-
-// Bilinear filtering
-vec4 get_texel_bilinear()
-{
-  float x = frag_texture_coord.x;
-  float y = frag_texture_coord.y;
-
-  float u_frac = fract(x);
-  float v_frac = fract(y);
-
-  vec4 texel_00 = sample_texel(vec2(x + 0, y + 0));
-  vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
-  vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
-  vec4 texel_11 = sample_texel(vec2(x + 1, y + 1));
-
-   if (is_transparent(texel_00)) {
-     return texel_00;
-   }
-
-   if (is_transparent(texel_10)) {
-      texel_10 = texel_00;
-   }
-
-   if (is_transparent(texel_01)) {
-      texel_01 = texel_10;
-   }
-
-   if (is_transparent(texel_11)) {
-      texel_11 = texel_01;
-   }
-
-   vec4 texel = texel_00 * (1. - u_frac) * (1. - v_frac)
-     + texel_10 * u_frac * (1. - v_frac)
-     + texel_01 * (1. - u_frac) * v_frac
-     + texel_11 * u_frac * v_frac;
-
-   return texel;
-}
-
 
 void main() {
    vec4 color;
 
-      if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE) {
+      if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
+      {
          color = vec4(frag_shading_color, 0.);
-      } else {
+      }
+      else
+      {
          vec4 texel;
 
-         if (texture_flt == FILTER_MODE_3POINT) {
-	   texel = get_texel_3point();
-         } else if (texture_flt == FILTER_MODE_BILINEAR) {
-	   texel = get_texel_bilinear();
-	 } else {
-	   texel = sample_texel(vec2(frag_texture_coord.x,
-				     frag_texture_coord.y));
+         if (texture_flt == FILTER_MODE_SABR)
+         {
+            texel = get_texel_sabr();
+         }
+         else
+         {
+            texel = sample_texel(vec2(frag_texture_coord.x,
+                     frag_texture_coord.y));
          }
 
 	 // texel color 0x0000 is always fully transparent (even for opaque

@@ -35,13 +35,12 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     var.key = option_filter;
     uint8_t filter = 0;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
        if (!strcmp(var.value, "nearest"))
           filter = 0;
-       else if (!strcmp(var.value, "3point N64"))
+       else if (!strcmp(var.value, "SABR"))
           filter = 1;
-       else if (!strcmp(var.value, "bilinear"))
-          filter = 2;
 
        this->filter_type = filter;
     }
@@ -570,10 +569,8 @@ bool GlRenderer::refresh_variables()
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "nearest"))
           filter = 0;
-       else if (!strcmp(var.value, "3point N64"))
+       else if (!strcmp(var.value, "SABR"))
           filter = 1;
-       else if (!strcmp(var.value, "bilinear"))
-          filter = 2;
 
        this->filter_type = filter;
     }
