@@ -73,7 +73,7 @@ Shader::Shader(const char* source, GLenum shader_type)
 
 Shader::~Shader()
 {
-    this->drop();
+    glDeleteShader(this->id);
     free(info_log);
 }
 
@@ -86,9 +86,3 @@ void Shader::detach_from(GLuint program)
 {
     glDetachShader(program, this->id);
 }
-
-void Shader::drop()
-{
-    glDeleteShader(this->id);
-}
-

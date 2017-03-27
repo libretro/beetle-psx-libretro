@@ -13,7 +13,6 @@ public:
     ~Shader();
     void attach_to(GLuint program);
     void detach_from(GLuint program);
-    void drop();
 
     char *info_log;
 };
