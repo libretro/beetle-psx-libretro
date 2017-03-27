@@ -451,10 +451,12 @@ static void draw(GlRenderer *renderer)
     GLsizei opaque_triangle_len =
       INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
 
-    if (opaque_triangle_len) {
-      renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
-						 opaque_triangle_indices,
-						 opaque_triangle_len);
+    if (opaque_triangle_len)
+    {
+       if (!renderer->command_buffer->empty())
+          renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
+                opaque_triangle_indices,
+                opaque_triangle_len);
     }
 
     GLushort *opaque_line_indices =
@@ -462,10 +464,12 @@ static void draw(GlRenderer *renderer)
     GLsizei opaque_line_len =
       INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
 
-    if (opaque_line_len) {
-      renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
-						 opaque_line_indices,
-						 opaque_line_len);
+    if (opaque_line_len)
+    {
+       if (!renderer->command_buffer->empty())
+          renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
+                opaque_line_indices,
+                opaque_line_len);
     }
 
     if (renderer->semi_transparent_index_pos > 0) {
@@ -528,9 +532,10 @@ static void draw(GlRenderer *renderer)
 	unsigned len = it->last_index - cur_index;
 	GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
-	renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
-						   indices,
-						   len);
+   if (!renderer->command_buffer->empty())
+      renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
+            indices,
+            len);
 
 	cur_index = it->last_index;
       }
@@ -667,7 +672,8 @@ static void upload_textures(
     // let _fb = Framebuffer::new(&self.fb_out);
     Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-    renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    if (!renderer->image_load_buffer->empty())
+       renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
     renderer->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
@@ -1408,7 +1414,9 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
          program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
-         renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
+
+         if (!renderer->output_buffer->empty())
+            renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->output_buffer->swap();
       }
 
@@ -1437,8 +1445,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
 
-
-         renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+         if (!renderer->image_load_buffer->empty())
+            renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->image_load_buffer->swap();
       }
 
@@ -2038,7 +2046,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       // Bind the output framebuffer
       Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-      renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+      if (!renderer->image_load_buffer->empty())
+         renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
       renderer->image_load_buffer->swap();
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
       glEnable(GL_SCISSOR_TEST);

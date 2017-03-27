@@ -325,9 +325,6 @@ public:
 
     void draw(GLenum mode)
     {
-       if (this->empty())
-          return;
-
        this->vao->bind();
        program_bind(this->program);
 
