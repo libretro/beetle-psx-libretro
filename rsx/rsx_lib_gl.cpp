@@ -474,9 +474,6 @@ GlRenderer::~GlRenderer()
 
 void GlRenderer::draw()
 {
-    if (this->command_buffer->empty())
-      return; // Nothing to be done
-
     int16_t x = this->config->draw_offset[0];
     int16_t y = this->config->draw_offset[1];
 
@@ -605,13 +602,11 @@ void GlRenderer::apply_scissor()
     int _w = this->config->draw_area_bot_right[0] - _x;
     int _h = this->config->draw_area_bot_right[1] - _y;
 
-    if (_w < 0) {
+    if (_w < 0)
       _w = 0;
-    }
 
-    if (_h < 0) {
+    if (_h < 0)
       _h = 0;
-    }
 
     GLsizei upscale = (GLsizei) this->internal_upscaling;
 
@@ -681,7 +676,8 @@ void GlRenderer::upload_textures(uint16_t top_left[2],
                                  uint16_t dimensions[2],
                                  uint16_t pixel_buffer[VRAM_PIXELS])
 {
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     this->fb_texture->set_sub_image(top_left,
                                     dimensions,
@@ -730,7 +726,8 @@ void GlRenderer::upload_vram_window(uint16_t top_left[2],
                                     uint16_t dimensions[2],
                                     uint16_t pixel_buffer[VRAM_PIXELS])
 {
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     this->fb_texture->set_sub_image_window(top_left,
                                            dimensions,
@@ -952,7 +949,8 @@ then copy the displayed portion of the screen from fb_out */
 void GlRenderer::finalize_frame()
 {
     // Draw pending commands
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     // We can now render to teh frontend's buffer
     this->bind_libretro_framebuffer();
@@ -1060,7 +1058,8 @@ void GlRenderer::finalize_frame()
 void GlRenderer::set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
     // Finish drawing anything with the current offset
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
     this->mask_set_or   = mask_set_or;
     this->mask_eval_and = mask_eval_and;
 }
@@ -1068,7 +1067,8 @@ void GlRenderer::set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 void GlRenderer::set_draw_offset(int16_t x, int16_t y)
 {
     // Finish drawing anything with the current offset
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
     this->config->draw_offset[0] = x;
     this->config->draw_offset[1] = y;
 }
@@ -1086,7 +1086,8 @@ void GlRenderer::set_draw_area(uint16_t top_left[2],
 			       uint16_t bot_right[2])
 {
     // Finish drawing anything in the current area
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     this->config->draw_area_top_left[0] = top_left[0];
     this->config->draw_area_top_left[1] = top_left[1];
@@ -1122,7 +1123,8 @@ void GlRenderer::vertex_preprocessing(CommandVertex *v,
   bool buffer_full = this->command_buffer->remaining_capacity() < count;
 
   if (buffer_full) {
-    this->draw();
+     if (!this->command_buffer->empty())
+        this->draw();
     this->command_buffer->swap();
   }
 
@@ -1241,7 +1243,8 @@ void GlRenderer::fill_rect( uint8_t color[3],
                             uint16_t dimensions[2])
 {
     // Draw pending commands
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     // Fill rect ignores the draw area. Save the previous value
     // and reconfigure the scissor box to the fill rectangle
@@ -1290,7 +1293,8 @@ void GlRenderer::copy_rect( uint16_t source_top_left[2],
                             uint16_t dimensions[2])
 {
     // Draw pending commands
-    this->draw();
+   if (!this->command_buffer->empty())
+      this->draw();
 
     uint32_t upscale = this->internal_upscaling;
 
