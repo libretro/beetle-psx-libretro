@@ -1885,6 +1885,9 @@ void rsx_gl_copy_rect(
     if (static_renderer->state == GlState_Valid)
     {
        GlRenderer *renderer        = static_renderer->state_data.r;
+       uint16_t source_top_left[2] = {src_x, src_y};
+       uint16_t target_top_left[2] = {dst_x, dst_y};
+       uint16_t dimensions[2]      = {w, h};
 
        // Draw pending commands
        if (!renderer->command_buffer->empty())
@@ -1892,13 +1895,13 @@ void rsx_gl_copy_rect(
 
        uint32_t upscale = renderer->internal_upscaling;
 
-       GLint src_x = (GLint) src_x * (GLint) upscale;
-       GLint src_y = (GLint) src_y * (GLint) upscale;
-       GLint dst_x = (GLint) dst_x * (GLint) upscale;
-       GLint dst_y = (GLint) dst_y * (GLint) upscale;
+       GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
+       GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
+       GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
+       GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
 
-       GLsizei w = (GLsizei) w * (GLsizei) upscale;
-       GLsizei h = (GLsizei) h * (GLsizei) upscale;
+       GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
+       GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
        // XXX CopyImageSubData gives undefined results if the source
        // and target area overlap, this should be handled
