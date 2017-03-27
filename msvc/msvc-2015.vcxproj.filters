@@ -278,9 +278,6 @@
     <ClCompile Include="..\rustation-libretro\src\retrogl\program.cpp">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\retrogl\retrogl.cpp">
-      <Filter>rustation-libretro\src\retrogl</Filter>
-    </ClCompile>
     <ClCompile Include="..\rustation-libretro\src\retrogl\shader.cpp">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
@@ -420,9 +417,6 @@
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClInclude>
     <ClInclude Include="..\rustation-libretro\src\retrogl\program.h">
-      <Filter>rustation-libretro\src\retrogl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rustation-libretro\src\retrogl\retrogl.h">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClInclude>
     <ClInclude Include="..\rustation-libretro\src\retrogl\shader.h">

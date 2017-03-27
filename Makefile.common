@@ -41,8 +41,7 @@ SOURCES_CXX += \
 	$(RSXGL_DIR)/retrogl/program.cpp \
 	$(RSXGL_DIR)/retrogl/shader.cpp \
 	$(RSXGL_DIR)/retrogl/texture.cpp \
-	$(RSXGL_DIR)/retrogl/vertex.cpp \
-	$(RSXGL_DIR)/retrogl/retrogl.cpp
+	$(RSXGL_DIR)/retrogl/vertex.cpp
 endif
 
 INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include -I$(DEPS_DIR)/zlib
