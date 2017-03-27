@@ -675,56 +675,6 @@ static void upload_textures(
     get_error();
 }
 
-static void upload_vram_window(
-      GlRenderer *renderer,
-      uint16_t top_left[2],
-      uint16_t dimensions[2],
-      uint16_t pixel_buffer[VRAM_PIXELS])
-{
-   if (!renderer->command_buffer->empty())
-      draw(renderer);
-
-    renderer->fb_texture->set_sub_image_window(top_left,
-                                           dimensions,
-                                           (size_t) VRAM_WIDTH_PIXELS,
-                                           GL_RGBA,
-                                           GL_UNSIGNED_SHORT_1_5_5_5_REV,
-                                           pixel_buffer);
-
-    uint16_t x_start    = top_left[0];
-    uint16_t x_end      = x_start + dimensions[0];
-    uint16_t y_start    = top_left[1];
-    uint16_t y_end      = y_start + dimensions[1];
-
-    const size_t slice_len = 4;
-    ImageLoadVertex slice[slice_len] =
-        {
-            {   {x_start,   y_start }   },
-            {   {x_end,     y_start }   },
-            {   {x_start,   y_end   }   },
-            {   {x_end,     y_end   }   }
-        };
-    renderer->image_load_buffer->push_slice(slice, slice_len);
-
-    renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
-    // fb_texture is always at 1x
-    renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
-
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_BLEND);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    // Bind the output framebuffer
-    Framebuffer _fb = Framebuffer(renderer->fb_out);
-
-    renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    renderer->image_load_buffer->swap();
-    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-    glEnable(GL_SCISSOR_TEST);
-
-    get_error();
-}
-
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
     struct retro_variable var = {0};
@@ -1577,8 +1527,6 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 			   uint16_t x1,
 			   uint16_t y1)
 {
-   uint16_t top_left[2]   = {x0, y0};
-   uint16_t bot_right[2] = {x1, y1};
    if (static_renderer->state == GlState_Valid)
    {
       GlRenderer *renderer = static_renderer->state_data.r;
@@ -1587,11 +1535,11 @@ void  rsx_gl_set_draw_area(uint16_t x0,
       if (!renderer->command_buffer->empty())
          draw(renderer);
 
-      renderer->config->draw_area_top_left[0] = top_left[0];
-      renderer->config->draw_area_top_left[1] = top_left[1];
+      renderer->config->draw_area_top_left[0] = x0;
+      renderer->config->draw_area_top_left[1] = y0;
       // Draw area coordinates are inclusive
-      renderer->config->draw_area_bot_right[0] = bot_right[0] + 1;
-      renderer->config->draw_area_bot_right[1] = bot_right[1] + 1;
+      renderer->config->draw_area_bot_right[0] = x1 + 1;
+      renderer->config->draw_area_bot_right[1] = y1 + 1;
 
       apply_scissor(renderer);
    }
@@ -1615,6 +1563,9 @@ void rsx_gl_set_display_mode(uint16_t x,
       renderer->config->display_24bpp = depth_24bpp;
    }
 }
+
+// The diagonal is duplicated
+static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 
 void rsx_gl_push_quad(
       float p0x,
@@ -1740,18 +1691,18 @@ void rsx_gl_push_quad(
 
       vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
 
-      // The diagonal is duplicated
-      static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
-
       unsigned index = renderer->command_buffer->next_index();
 
-      for (unsigned i = 0; i < 6; i++) {
-         if (is_opaque) {
+      for (unsigned i = 0; i < 6; i++)
+      {
+         if (is_opaque)
+         {
             renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
                index + indices[i];
          }
 
-         if (is_semi_transparent) {
+         if (is_semi_transparent)
+         {
             renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
                = index + indices[i];
          }
@@ -1889,8 +1840,8 @@ void rsx_gl_fill_rect(uint32_t color,
          renderer->config->draw_area_bot_right[1]
       };
 
-      renderer->config->draw_area_top_left[0] = top_left[0];
-      renderer->config->draw_area_top_left[1] = top_left[1];
+      renderer->config->draw_area_top_left[0]  = top_left[0];
+      renderer->config->draw_area_top_left[1]  = top_left[1];
       renderer->config->draw_area_bot_right[0] = top_left[0] + dimensions[0];
       renderer->config->draw_area_bot_right[1] = top_left[1] + dimensions[1];
 
@@ -1929,9 +1880,6 @@ void rsx_gl_copy_rect(
     if (static_renderer->state == GlState_Valid)
     {
        GlRenderer *renderer        = static_renderer->state_data.r;
-       uint16_t source_top_left[2] = {src_x, src_y};
-       uint16_t target_top_left[2] = {dst_x, dst_y};
-       uint16_t dimensions[2]      = {w, h}; 
 
        // Draw pending commands
        if (!renderer->command_buffer->empty())
@@ -1939,13 +1887,13 @@ void rsx_gl_copy_rect(
 
        uint32_t upscale = renderer->internal_upscaling;
 
-       GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
-       GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
-       GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
-       GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
+       GLint src_x = (GLint) src_x * (GLint) upscale;
+       GLint src_y = (GLint) src_y * (GLint) upscale;
+       GLint dst_x = (GLint) dst_x * (GLint) upscale;
+       GLint dst_y = (GLint) dst_y * (GLint) upscale;
 
-       GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
-       GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
+       GLsizei w = (GLsizei) w * (GLsizei) upscale;
+       GLsizei h = (GLsizei) h * (GLsizei) upscale;
 
        // XXX CopyImageSubData gives undefined results if the source
        // and target area overlap, this should be handled
@@ -2031,13 +1979,64 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram)
 {
-   uint16_t top_left[2]   = {x, y};
-   uint16_t dimensions[2] = {w, h};
 
    /* TODO FIXME - upload_vram_window expects a 
   uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
    if (static_renderer->state == GlState_Valid)
-      upload_vram_window(static_renderer->state_data.r, top_left, dimensions, vram);
+   {
+      uint16_t top_left[2];
+      uint16_t dimensions[2];
+      GlRenderer *renderer   = static_renderer->state_data.r;
+
+      top_left[0]            = x;
+      top_left[1]            = y;
+      dimensions[0]          = w;
+      dimensions[1]          = h;
+
+      if (!renderer->command_buffer->empty())
+         draw(renderer);
+
+      renderer->fb_texture->set_sub_image_window(
+            top_left,
+            dimensions,
+            (size_t) VRAM_WIDTH_PIXELS,
+            GL_RGBA,
+            GL_UNSIGNED_SHORT_1_5_5_5_REV,
+            vram);
+
+      uint16_t x_start    = top_left[0];
+      uint16_t x_end      = x_start + dimensions[0];
+      uint16_t y_start    = top_left[1];
+      uint16_t y_end      = y_start + dimensions[1];
+
+      const size_t slice_len = 4;
+      ImageLoadVertex slice[slice_len] =
+      {
+         {   {x_start,   y_start }   },
+         {   {x_end,     y_start }   },
+         {   {x_start,   y_end   }   },
+         {   {x_end,     y_end   }   }
+      };
+      renderer->image_load_buffer->push_slice(slice, slice_len);
+
+      renderer->image_load_buffer->program->uniform1i("fb_texture", 0);
+      // fb_texture is always at 1x
+      renderer->image_load_buffer->program->uniform1ui("internal_upscaling", 1);
+
+      glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_BLEND);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+      // Bind the output framebuffer
+      Framebuffer _fb = Framebuffer(renderer->fb_out);
+
+      renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+      renderer->image_load_buffer->swap();
+      glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
+      glEnable(GL_SCISSOR_TEST);
+
+      get_error();
+   }
 }
 
 void rsx_gl_toggle_display(bool status)
