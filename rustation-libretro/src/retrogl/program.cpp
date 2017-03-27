@@ -119,22 +119,6 @@ GLint Program::uniform(const char* name)
     return this->uniforms[name];
 }
 
-void Program::uniform2i(const char* name, GLint a, GLint b)
-{
-    program_bind(this);
-
-    GLint u = this->uniform(name);
-    glUniform2i(u, a, b); 
-}
-
-void Program::uniform2ui(const char* name, GLuint a, GLuint b)
-{
-    program_bind(this);
-
-    GLint u = this->uniform(name);
-    glUniform2ui(u, a, b);
-}
-
 UniformMap load_program_uniforms(GLuint program)
 {
     GLint n_uniforms = 0;

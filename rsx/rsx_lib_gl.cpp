@@ -427,7 +427,7 @@ static void draw(GlRenderer *renderer)
     int16_t x = renderer->config->draw_offset[0];
     int16_t y = renderer->config->draw_offset[1];
 
-    renderer->command_buffer->program->uniform2i("offset", (GLint)x, (GLint)y);
+    program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
 
     // We use texture unit 0
     program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
@@ -1404,7 +1404,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          renderer->output_buffer->push_slice(slice, 4);
 
          program_uniform1i(renderer->output_buffer->program, "fb", 1);
-         renderer->output_buffer->program->uniform2ui("offset", fb_x_start, fb_y_start);
+         program_uniform2ui(renderer->output_buffer->program, "offset", fb_x_start, fb_y_start);
          program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
          program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);

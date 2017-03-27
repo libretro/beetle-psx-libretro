@@ -25,6 +25,20 @@
    glUniform1ui(u, i); \
 }
 
+#define program_uniform2i(x, name, a, b) \
+{ \
+   program_bind(x); \
+   GLint u = (x)->uniform(name); \
+   glUniform2i(u, a, b); \
+}
+
+#define program_uniform2ui(x, name, a, b) \
+{ \
+   program_bind(x); \
+   GLint u = (x)->uniform(name); \
+   glUniform2ui(u, a, b); \
+}
+
 typedef std::map<std::string, GLint> UniformMap;
 
 class Program {
