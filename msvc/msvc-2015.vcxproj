@@ -301,7 +301,6 @@
     <ClCompile Include="..\rsx\rsx_intf.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_gl.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_soft.c" />
-    <ClCompile Include="..\rustation-libretro\src\renderer\GlRenderer.cpp" />
     <ClCompile Include="..\rustation-libretro\src\retrogl\error.cpp" />
     <ClCompile Include="..\rustation-libretro\src\retrogl\framebuffer.cpp" />
     <ClCompile Include="..\rustation-libretro\src\retrogl\program.cpp" />
@@ -539,7 +538,6 @@
     <ClInclude Include="..\rsx\rsx_intf.h" />
     <ClInclude Include="..\rsx\rsx_lib_gl.h" />
     <ClInclude Include="..\rsx\rsx_lib_soft.h" />
-    <ClInclude Include="..\rustation-libretro\src\renderer\GlRenderer.h" />
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\command_fragment.glsl.h" />
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\command_vertex.glsl.h" />
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\image_load_fragment.glsl.h" />

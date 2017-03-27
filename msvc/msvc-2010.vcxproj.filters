@@ -287,9 +287,6 @@
     <ClCompile Include="..\rustation-libretro\src\retrogl\framebuffer.cpp">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\renderer\GlRenderer.cpp">
-      <Filter>rustation-libretro\src\renderer</Filter>
-    </ClCompile>
     <ClCompile Include="..\libretro-common\glsm\glsm.c">
       <Filter>libretro-common\glsm</Filter>
     </ClCompile>
@@ -405,9 +402,6 @@
     </ClInclude>
     <ClInclude Include="..\rustation-libretro\src\retrogl\error.h">
       <Filter>rustation-libretro\src\retrogl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rustation-libretro\src\renderer\GlRenderer.h">
-      <Filter>rustation-libretro\src\renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\command_vertex.glsl.h">
       <Filter>rustation-libretro\src\renderer\shaders</Filter>

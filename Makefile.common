@@ -35,7 +35,6 @@ SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
 
 ### Rust-to-Cpp translated GL renderer
 SOURCES_CXX += \
-	$(RSXGL_DIR)/renderer/GlRenderer.cpp \
 	$(RSXGL_DIR)/retrogl/error.cpp \
 	$(RSXGL_DIR)/retrogl/framebuffer.cpp \
 	$(RSXGL_DIR)/retrogl/program.cpp \
