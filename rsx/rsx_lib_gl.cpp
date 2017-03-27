@@ -29,12 +29,12 @@
 #include "mednafen/psx/gpu.h"
 #include "libretro_options.h"
 
-#include "../rustation-libretro/src/renderer/shaders/command_vertex.glsl.h"
-#include "../rustation-libretro/src/renderer/shaders/command_fragment.glsl.h"
-#include "../rustation-libretro/src/renderer/shaders/output_vertex.glsl.h"
-#include "../rustation-libretro/src/renderer/shaders/output_fragment.glsl.h"
-#include "../rustation-libretro/src/renderer/shaders/image_load_vertex.glsl.h"
-#include "../rustation-libretro/src/renderer/shaders/image_load_fragment.glsl.h"
+#include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "../rustation-libretro/src/shaders/output_vertex.glsl.h"
+#include "../rustation-libretro/src/shaders/output_fragment.glsl.h"
+#include "../rustation-libretro/src/shaders/image_load_vertex.glsl.h"
+#include "../rustation-libretro/src/shaders/image_load_fragment.glsl.h"
 
 #include "libretro.h"
 #include "libretro_options.h"
