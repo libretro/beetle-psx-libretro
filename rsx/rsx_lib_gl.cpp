@@ -221,11 +221,6 @@ public:
 
         return new DrawBuffer<T>(capacity, program);
     }
-
-    void draw();
-
-    DrawConfig* draw_config();
-    bool refresh_variables();
 };
 
 static void upload_textures(
@@ -427,19 +422,19 @@ GlRenderer::~GlRenderer()
     }
 }
 
-void GlRenderer::draw()
+static void draw(GlRenderer *renderer)
 {
-    int16_t x = this->config->draw_offset[0];
-    int16_t y = this->config->draw_offset[1];
+    int16_t x = renderer->config->draw_offset[0];
+    int16_t y = renderer->config->draw_offset[1];
 
-    this->command_buffer->program->uniform2i("offset", (GLint)x, (GLint)y);
+    renderer->command_buffer->program->uniform2i("offset", (GLint)x, (GLint)y);
 
     // We use texture unit 0
-    this->command_buffer->program->uniform1i("fb_texture", 0);
-    this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    renderer->command_buffer->program->uniform1i("fb_texture", 0);
+    renderer->command_buffer->program->uniform1ui("texture_flt", renderer->filter_type);
 
     // Bind the out framebuffer
-    Framebuffer _fb = Framebuffer(this->fb_out, this->fb_out_depth);
+    Framebuffer _fb = Framebuffer(renderer->fb_out, renderer->fb_out_depth);
 
     glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -447,50 +442,50 @@ void GlRenderer::draw()
     glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
 
-    this->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
+    renderer->command_buffer->program->uniform1ui("draw_semi_transparent", 0);
 
-    this->command_buffer->pre_bind();
+    renderer->command_buffer->pre_bind();
 
     GLushort *opaque_triangle_indices =
-      this->opaque_triangle_indices + this->opaque_triangle_index_pos + 1;
+      renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
     GLsizei opaque_triangle_len =
-      INDEX_BUFFER_LEN - this->opaque_triangle_index_pos - 1;
+      INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
 
     if (opaque_triangle_len) {
-      this->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
+      renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
 						 opaque_triangle_indices,
 						 opaque_triangle_len);
     }
 
     GLushort *opaque_line_indices =
-      this->opaque_line_indices + this->opaque_line_index_pos + 1;
+      renderer->opaque_line_indices + renderer->opaque_line_index_pos + 1;
     GLsizei opaque_line_len =
-      INDEX_BUFFER_LEN - this->opaque_line_index_pos - 1;
+      INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
 
     if (opaque_line_len) {
-      this->command_buffer->draw_indexed_no_bind(GL_LINES,
+      renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
 						 opaque_line_indices,
 						 opaque_line_len);
     }
 
-    if (this->semi_transparent_index_pos > 0) {
+    if (renderer->semi_transparent_index_pos > 0) {
       // Semi-transparency pass
 
       // Push the current semi-transparency mode
-      TransparencyIndex ti(this->semi_transparency_mode,
-			   this->semi_transparent_index_pos,
-			   this->command_draw_mode);
+      TransparencyIndex ti(renderer->semi_transparency_mode,
+			   renderer->semi_transparent_index_pos,
+			   renderer->command_draw_mode);
 
-      this->transparency_mode_index.push_back(ti);
+      renderer->transparency_mode_index.push_back(ti);
 
       glEnable(GL_BLEND);
-      this->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
+      renderer->command_buffer->program->uniform1ui("draw_semi_transparent", 1);
 
       unsigned cur_index = 0;
 
       for (std::vector<TransparencyIndex>::iterator it =
-	     this->transparency_mode_index.begin();
-	   it != this->transparency_mode_index.end();
+	     renderer->transparency_mode_index.begin();
+	   it != renderer->transparency_mode_index.end();
 	   ++it) {
 
 	if (it->last_index == cur_index)
@@ -531,9 +526,9 @@ void GlRenderer::draw()
 	glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
 
 	unsigned len = it->last_index - cur_index;
-	GLushort *indices = this->semi_transparent_indices + cur_index;
+	GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
-	this->command_buffer->draw_indexed_no_bind(it->draw_mode,
+	renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
 						   indices,
 						   len);
 
@@ -541,13 +536,13 @@ void GlRenderer::draw()
       }
     }
 
-    this->command_buffer->finish();
+    renderer->command_buffer->finish();
 
-    this->primitive_ordering = 0;
-    this->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-    this->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-    this->semi_transparent_index_pos = 0;
-    this->transparency_mode_index.clear();
+    renderer->primitive_ordering = 0;
+    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+    renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+    renderer->semi_transparent_index_pos = 0;
+    renderer->transparency_mode_index.clear();
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -635,7 +630,7 @@ static void upload_textures(
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
    if (!renderer->command_buffer->empty())
-      renderer->draw();
+      draw(renderer);
 
     renderer->fb_texture->set_sub_image(top_left,
                                     dimensions,
@@ -687,7 +682,7 @@ static void upload_vram_window(
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
    if (!renderer->command_buffer->empty())
-      renderer->draw();
+      draw(renderer);
 
     renderer->fb_texture->set_sub_image_window(top_left,
                                            dimensions,
@@ -730,12 +725,7 @@ static void upload_vram_window(
     get_error();
 }
 
-DrawConfig* GlRenderer::draw_config()
-{
-    return this->config;
-}
-
-bool GlRenderer::refresh_variables()
+static bool retro_refresh_variables(GlRenderer *renderer)
 {
     struct retro_variable var = {0};
 
@@ -764,7 +754,7 @@ bool GlRenderer::refresh_variables()
        else if (!strcmp(var.value, "SABR"))
           filter = 1;
 
-       this->filter_type = filter;
+       renderer->filter_type = filter;
     }
 
     var.key = option_depth;
@@ -802,15 +792,15 @@ bool GlRenderer::refresh_variables()
     }
 
     bool rebuild_fb_out =
-      upscaling != this->internal_upscaling ||
-      depth != this->internal_color_depth;
+      upscaling != renderer->internal_upscaling ||
+      depth != renderer->internal_color_depth;
 
-    if (rebuild_fb_out) {
-        if (depth > 16) {
-            this->command_buffer->disable_attribute("dither");
-        } else {
-            this->command_buffer->enable_attribute("dither");
-        }
+    if (rebuild_fb_out)
+    {
+        if (depth > 16)
+            renderer->command_buffer->disable_attribute("dither");
+        else
+            renderer->command_buffer->enable_attribute("dither");
 
         uint32_t native_width = (uint32_t) VRAM_WIDTH_PIXELS;
         uint32_t native_height = (uint32_t) VRAM_HEIGHT;
@@ -833,12 +823,13 @@ bool GlRenderer::refresh_variables()
 
         Texture* fb_out = new Texture(w, h, texture_storage);
 
-        if (this->fb_out) {
-            delete this->fb_out;
-            this->fb_out = NULL;
+        if (renderer->fb_out)
+        {
+            delete renderer->fb_out;
+            renderer->fb_out = NULL;
         }
 
-        this->fb_out = fb_out;
+        renderer->fb_out = fb_out;
 
         // This is a bit wasteful since it'll re-upload the data
         // to `fb_texture` even though we haven't touched it but
@@ -847,23 +838,24 @@ bool GlRenderer::refresh_variables()
         uint16_t top_left[2] = {0, 0};
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-        upload_textures(this, top_left, dimensions,
+        upload_textures(renderer, top_left, dimensions,
 			      GPU->vram);
 
 
-        if (this->fb_out_depth) {
-            delete this->fb_out_depth;
-            this->fb_out_depth = NULL;
+        if (renderer->fb_out_depth)
+        {
+           delete renderer->fb_out_depth;
+           renderer->fb_out_depth = NULL;
         }
 
-        this->fb_out_depth = new Texture(w, h, GL_DEPTH_COMPONENT32F);
+        renderer->fb_out_depth = new Texture(w, h, GL_DEPTH_COMPONENT32F);
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
-    this->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
-    this->command_buffer->program->uniform1ui("texture_flt", this->filter_type);
+    renderer->command_buffer->program->uniform1ui("dither_scaling", (GLuint) dither_scaling);
+    renderer->command_buffer->program->uniform1ui("texture_flt", renderer->filter_type);
 
-    this->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
+    renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
     glLineWidth((GLfloat) upscaling);
 
@@ -872,16 +864,15 @@ bool GlRenderer::refresh_variables()
     // destroy the OpenGL context which would destroy `self`
     //// r5 - replace 'self' by 'this'
     bool reconfigure_frontend =
-      this->internal_upscaling != upscaling ||
-      this->display_vram != display_vram;
+      renderer->internal_upscaling != upscaling ||
+      renderer->display_vram != display_vram;
 
-    this->internal_upscaling = upscaling;
-    this->display_vram = display_vram;
-    this->internal_color_depth = depth;
+    renderer->internal_upscaling = upscaling;
+    renderer->display_vram = display_vram;
+    renderer->internal_color_depth = depth;
 
     return reconfigure_frontend;
 }
-
 
 static void vertex_preprocessing(
       GlRenderer *renderer,
@@ -896,7 +887,7 @@ static void vertex_preprocessing(
    if (buffer_full)
    {
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
       renderer->command_buffer->swap();
    }
 
@@ -1157,7 +1148,7 @@ void RetroGl::context_reset() {
     switch (this->state)
     {
     case GlState_Valid:
-        config = *this->state_data.r->draw_config();
+        config = *this->state_data.r->config;
         break;
     case GlState_Invalid:
         config = this->state_data.c;
@@ -1185,7 +1176,7 @@ void RetroGl::context_destroy()
     switch (this->state)
     {
     case GlState_Valid:
-        config = *this->state_data.r->draw_config();
+        config = *this->state_data.r->config;
         break;
     case GlState_Invalid:
         // Looks like we didn't have an OpenGL context anyway...
@@ -1211,7 +1202,7 @@ void RetroGl::refresh_variables()
         return;
     }
 
-    bool reconfigure_frontend = renderer->refresh_variables();
+    bool reconfigure_frontend = retro_refresh_variables(renderer);
     if (reconfigure_frontend) {
         // The resolution has changed, we must tell the frontend
         // to change its format
@@ -1408,7 +1399,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       GlRenderer *renderer = static_renderer->state_data.r;
       // Draw pending commands
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
 
       // We can now render to the frontend's buffer
       bind_libretro_framebuffer(renderer);
@@ -1548,7 +1539,7 @@ void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 
       // Finish drawing anything with the current offset
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
       renderer->mask_set_or   = mask_set_or;
       renderer->mask_eval_and = mask_eval_and;
    }
@@ -1562,7 +1553,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 
       // Finish drawing anything with the current offset
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
       renderer->config->draw_offset[0] = x;
       renderer->config->draw_offset[1] = y;
    }
@@ -1594,7 +1585,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 
       // Finish drawing anything in the current area
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
 
       renderer->config->draw_area_top_left[0] = top_left[0];
       renderer->config->draw_area_top_left[1] = top_left[1];
@@ -1884,7 +1875,7 @@ void rsx_gl_fill_rect(uint32_t color,
 
       // Draw pending commands
       if (!renderer->command_buffer->empty())
-         renderer->draw();
+         draw(renderer);
 
       // Fill rect ignores the draw area. Save the previous value
       // and reconfigure the scissor box to the fill rectangle
@@ -1944,7 +1935,7 @@ void rsx_gl_copy_rect(
 
        // Draw pending commands
        if (!renderer->command_buffer->empty())
-          renderer->draw();
+         draw(renderer);
 
        uint32_t upscale = renderer->internal_upscaling;
 
