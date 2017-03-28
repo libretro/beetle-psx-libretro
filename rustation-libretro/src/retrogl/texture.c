@@ -1,10 +1,10 @@
-#include "texture.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "texture.h"
+
 void Texture_init(
-      Texture *tex,
+      struct Texture *tex,
       uint32_t width,
       uint32_t height,
       GLenum internal_format)
@@ -19,23 +19,19 @@ void Texture_init(
                     (GLsizei) width,
                     (GLsizei) height);
 
-#ifdef DEBUG
-    get_error();
-#endif
-
-    tex->id = id;
-    tex->width = width;
+    tex->id     = id;
+    tex->width  = width;
     tex->height = height;
 }
 
-void Texture_free(Texture *tex)
+void Texture_free(struct Texture *tex)
 {
    if (tex)
       glDeleteTextures(1, &tex->id);
 }
 
 void Texture_set_sub_image(
-      Texture *tex,
+      struct Texture *tex,
       uint16_t top_left[2],
       uint16_t resolution[2],
       GLenum format,
@@ -53,14 +49,10 @@ void Texture_set_sub_image(
                     format,
                     ty,
                     (void*) data);
-
-#ifdef DEBUG
-    get_error();
-#endif
 }
 
 void Texture_set_sub_image_window(
-      Texture *tex,
+      struct Texture *tex,
       uint16_t top_left[2],
       uint16_t resolution[2],
       size_t row_len,
