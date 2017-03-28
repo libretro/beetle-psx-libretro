@@ -1,12 +1,12 @@
 #ifndef RETROGL_VERTEX_H
 #define RETROGL_VERTEX_H
 
-#include "error.h"
-
 #include <glsm/glsmsym.h>
 
 #include <stdlib.h>
 #include <string>
+
+#define VertexArrayObject_bind(x) (glBindVertexArray((x)->id))
 
 class VertexArrayObject {
 public:
@@ -14,7 +14,6 @@ public:
 
     VertexArrayObject();
     ~VertexArrayObject();
-    void bind();
 };
 
 class Attribute {

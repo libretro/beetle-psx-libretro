@@ -67,7 +67,7 @@ struct Storage {
 #define DRAWBUFFER_BIND(x)               (glBindBuffer(GL_ARRAY_BUFFER, (x)->id))
 
 #define DRAWBUFFER_PREBIND(x) \
-   (x)->vao->bind(); \
+   VertexArrayObject_bind((x)->vao); \
    program_bind((x)->program)
 
 /* Called when the current batch is completed (the draw calls
@@ -181,7 +181,7 @@ public:
 
     void bind_attributes()
     {
-       this->vao->bind();
+       VertexArrayObject_bind(this->vao);
 
        // ARRAY_BUFFER is captured by VertexAttribPointer
        DRAWBUFFER_BIND(this);
@@ -288,7 +288,7 @@ public:
        if (index < 0)
           return;
 
-       this->vao->bind();
+       VertexArrayObject_bind(this->vao);
 
        glEnableVertexAttribArray(index);
 
@@ -304,7 +304,7 @@ public:
        if (index < 0)
           return;
 
-       this->vao->bind();
+       VertexArrayObject_bind(this->vao);
 
        glDisableVertexAttribArray(index);
 
@@ -332,7 +332,7 @@ public:
 
     void draw(GLenum mode)
     {
-       this->vao->bind();
+       VertexArrayObject_bind(this->vao);
        program_bind(this->program);
 
        struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);

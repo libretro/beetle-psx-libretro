@@ -7,21 +7,12 @@ VertexArrayObject::VertexArrayObject()
     GLuint id = 0;
     glGenVertexArrays(1, &id);
 
-#ifdef DEBUG
-    get_error();
-#endif
-
     this->id = id;
 }
 
 VertexArrayObject::~VertexArrayObject()
 {
     glDeleteVertexArrays(1, &this->id);
-}
-
-void VertexArrayObject::bind()
-{
-    glBindVertexArray(this->id);
 }
 
 Attribute::Attribute(const char* name, size_t offset, GLenum ty, GLint components)
