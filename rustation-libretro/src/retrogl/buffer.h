@@ -281,7 +281,10 @@ public:
        // VAO) but I need it to map/unmap the storage.
        DRAWBUFFER_BIND(this->id);
 
-       this->unmap__no_bind();
+       /* Unmap the active buffer */
+       glUnmapBuffer(GL_ARRAY_BUFFER);
+
+       this->map = NULL;
     }
 
     /// Finalize the current buffer data and remap a fresh slice of
