@@ -283,6 +283,8 @@ void main() {
       else
       {
          vec4 texel;
+         vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
+                  frag_texture_coord.y));
 
          if (texture_flt == FILTER_MODE_SABR)
          {
@@ -290,13 +292,12 @@ void main() {
          }
          else
          {
-            texel = sample_texel(vec2(frag_texture_coord.x,
-                     frag_texture_coord.y));
+            texel = texel0;
          }
 
 	 // texel color 0x0000 is always fully transparent (even for opaque
          // draw commands)
-         if (is_transparent(texel)) {
+         if (is_transparent(texel0)) {
 	   // Fully transparent texel, discard
 	   discard;
          }
@@ -304,7 +305,7 @@ void main() {
          // Bit 15 (stored in the alpha) is used as a flag for
          // semi-transparency, but only if this is a semi-transparent draw
          // command
-         uint transparency_flag = uint(floor(texel.a + 0.5));
+         uint transparency_flag = uint(floor(texel0.a + 0.5));
 
          uint is_texel_semi_transparent = transparency_flag & frag_semi_transparent;
 
