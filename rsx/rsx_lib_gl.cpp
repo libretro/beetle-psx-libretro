@@ -315,7 +315,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
     // Texture holding the raw VRAM texture contents. We can't
     // meaningfully upscale it since most games use paletted
     // textures.
-    Texture* fb_texture = new Texture(native_width, native_height, GL_RGB5_A1);
+    Texture *fb_texture = (Texture*)calloc(1, sizeof(*fb_texture));
+    Texture_init(fb_texture, native_width, native_height, GL_RGB5_A1);
 
     if (depth > 16) {
         // Dithering is superfluous when we increase the internal
@@ -342,14 +343,20 @@ GlRenderer::GlRenderer(DrawConfig* config)
         exit(EXIT_FAILURE);
     }
 
-    Texture* fb_out = new Texture( native_width * upscaling,
-                                   native_height * upscaling,
-                                   texture_storage);
+    Texture *fb_out       = (Texture*)calloc(1, sizeof(*fb_out));
+    Texture *fb_out_depth = (Texture*)calloc(1, sizeof(*fb_out_depth));
 
-    Texture* fb_out_depth = new Texture( fb_out->width,
-                                         fb_out->height,
-                                         GL_DEPTH_COMPONENT32F);
+    Texture_init(
+          fb_out,
+          native_width * upscaling,
+          native_height * upscaling,
+          texture_storage);
 
+    Texture_init(
+          fb_out_depth,
+          fb_out->width,
+          fb_out->height,
+          GL_DEPTH_COMPONENT32F);
 
     this->filter_type = filter;
     this->command_buffer = command_buffer;
@@ -406,19 +413,25 @@ GlRenderer::~GlRenderer()
         this->config = NULL;
     }
 
-    if (this->fb_texture) {
-        delete this->fb_texture;
-        this->fb_texture = NULL;
+    if (this->fb_texture)
+    {
+       Texture_free(this->fb_texture);
+       free(this->fb_texture);
+       this->fb_texture = NULL;
     }
 
-    if (this->fb_out) {
-        delete this->fb_out;
-        this->fb_out = NULL;
+    if (this->fb_out)
+    {
+       Texture_free(this->fb_out);
+       free(this->fb_out);
+       this->fb_out = NULL;
     }
 
-    if (this->fb_out_depth) {
-        delete this->fb_out_depth;
-        this->fb_out_depth = NULL;
+    if (this->fb_out_depth)
+    {
+       Texture_free(this->fb_out_depth);
+       free(fb_out_depth);
+       this->fb_out_depth = NULL;
     }
 }
 
@@ -785,12 +798,15 @@ static bool retro_refresh_variables(GlRenderer *renderer)
             exit(EXIT_FAILURE);
         }
 
-        Texture* fb_out = new Texture(w, h, texture_storage);
+        Texture *fb_out = (Texture*)calloc(1, sizeof(*fb_out));
+
+        Texture_init(fb_out, w, h, texture_storage);
 
         if (renderer->fb_out)
         {
-            delete renderer->fb_out;
-            renderer->fb_out = NULL;
+           Texture_free(renderer->fb_out);
+           free(renderer->fb_out);
+           renderer->fb_out = NULL;
         }
 
         renderer->fb_out = fb_out;
@@ -808,11 +824,14 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
         if (renderer->fb_out_depth)
         {
-           delete renderer->fb_out_depth;
+           Texture_free(renderer->fb_out_depth);
+           free(renderer->fb_out_depth);
            renderer->fb_out_depth = NULL;
         }
 
-        renderer->fb_out_depth = new Texture(w, h, GL_DEPTH_COMPONENT32F);
+        renderer->fb_out_depth = (Texture*)calloc(1, sizeof(*renderer->fb_out_depth));
+
+        Texture_init(renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;

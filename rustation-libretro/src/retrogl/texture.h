@@ -7,19 +7,23 @@
 
 #include <stdint.h>
 
-class Texture {
-public:
+struct Texture {
     GLuint id;
     uint32_t width;
     uint32_t height;
-
-    Texture(uint32_t width, uint32_t height, GLenum internal_format);
-    ~Texture();
 };
 
 #define  Texture_bind(tex, texture_unit) \
     glActiveTexture(texture_unit); \
     glBindTexture(GL_TEXTURE_2D, tex->id)
+
+void Texture_init(
+      Texture *tex,
+      uint32_t width,
+      uint32_t height,
+      GLenum internal_format);
+
+void Texture_free(Texture *tex);
 
 void Texture_set_sub_image(
       Texture *tex,

@@ -3,7 +3,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-Texture::Texture(uint32_t width, uint32_t height, GLenum internal_format)
+void Texture_init(
+      Texture *tex,
+      uint32_t width,
+      uint32_t height,
+      GLenum internal_format)
 {
     GLuint id = 0;
 
@@ -19,14 +23,15 @@ Texture::Texture(uint32_t width, uint32_t height, GLenum internal_format)
     get_error();
 #endif
 
-    this->id = id;
-    this->width = width;
-    this->height = height;
+    tex->id = id;
+    tex->width = width;
+    tex->height = height;
 }
 
-Texture::~Texture()
+void Texture_free(Texture *tex)
 {
-    glDeleteTextures(1, &this->id);
+   if (tex)
+      glDeleteTextures(1, &tex->id);
 }
 
 void Texture_set_sub_image(
