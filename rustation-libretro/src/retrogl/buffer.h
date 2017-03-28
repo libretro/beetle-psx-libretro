@@ -103,7 +103,9 @@ public:
 
     DrawBuffer(size_t capacity, Program* program)
     {
-       VertexArrayObject* vao = new VertexArrayObject();
+       VertexArrayObject* vao = (VertexArrayObject*)calloc(1, sizeof(*vao));
+       
+       VertexArrayObject_init(vao);
 
        GLuint id = 0;
        // Generate the buffer object
@@ -167,7 +169,8 @@ public:
 
        if (this->vao)
        {
-          delete this->vao;
+          VertexArrayObject_free(this->vao);
+          free(this->vao);
           this->vao = NULL;
        }
 

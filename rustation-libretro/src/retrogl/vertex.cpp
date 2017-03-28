@@ -2,17 +2,18 @@
 
 #include <string.h> // strcpy()
 
-VertexArrayObject::VertexArrayObject()
+void VertexArrayObject_init(VertexArrayObject *vao)
 {
-    GLuint id = 0;
-    glGenVertexArrays(1, &id);
+   GLuint id = 0;
+   glGenVertexArrays(1, &id);
 
-    this->id = id;
+   vao->id = id;
 }
 
-VertexArrayObject::~VertexArrayObject()
+void VertexArrayObject_free(VertexArrayObject *vao)
 {
-    glDeleteVertexArrays(1, &this->id);
+   if (vao)
+      glDeleteVertexArrays(1, &vao->id);
 }
 
 Attribute::Attribute(const char* name, size_t offset, GLenum ty, GLint components)

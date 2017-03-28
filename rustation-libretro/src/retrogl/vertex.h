@@ -8,13 +8,14 @@
 
 #define VertexArrayObject_bind(x) (glBindVertexArray((x)->id))
 
-class VertexArrayObject {
-public:
+struct VertexArrayObject
+{
     GLuint id;
-
-    VertexArrayObject();
-    ~VertexArrayObject();
 };
+
+void VertexArrayObject_init(VertexArrayObject *vao);
+
+void VertexArrayObject_free(VertexArrayObject *vao);
 
 class Attribute {
 public:
