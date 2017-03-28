@@ -18,16 +18,9 @@ struct Storage {
   // Fence used to make sure we're not writing to the buffer while
   // it's being used.
   GLsync fence;
-  // Offset in the main buffer
-  unsigned offset;
 
   Storage()
-    :fence(NULL), offset(0)
-  {
-  }
-
-  Storage(unsigned offset)
-    :fence(NULL), offset(offset)
+    :fence(NULL)
   {
   }
 
@@ -135,7 +128,7 @@ public:
 
        this->map = reinterpret_cast<T*>(m);
 
-       this->buffer = Storage<T>(0);
+       this->buffer = Storage<T>();
 
        this->active_next_index = 0;
        this->active_command_index = 0;
@@ -291,7 +284,7 @@ public:
           return;
        }
 
-       memcpy(this->map + this->buffer.offset + this->active_next_index,
+       memcpy(this->map + this->active_next_index,
              slice,
              n * sizeof(T));
 
@@ -303,7 +296,7 @@ public:
        VertexArrayObject_bind(this->vao);
        program_bind(this->program);
 
-       unsigned start = this->buffer.offset + this->active_command_index;
+       unsigned start = this->active_command_index;
        unsigned len = this->active_next_index - this->active_command_index;
 
        // Length in number of vertices
@@ -312,7 +305,7 @@ public:
 
     void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-       GLint base = this->buffer.offset;
+       GLint base = 0;
 
        glDrawElementsBaseVertex(mode,
              count,
