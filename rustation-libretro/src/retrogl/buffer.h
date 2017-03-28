@@ -56,6 +56,8 @@ struct Storage {
   }
 };
 
+#define DRAWBUFFER_IS_EMPTY(x) ((x)->active_next_index == (x)->active_command_index)
+
 template<typename T>
 class DrawBuffer
 {
@@ -289,10 +291,6 @@ public:
         get_error();
     }
 
-    bool empty()
-    {
-        return this->active_next_index == this->active_command_index;
-    }
 
     /// Called when the current batch is completed (the draw calls
     /// have been done and we won't reference that data anymore)
@@ -347,9 +345,6 @@ public:
 
     void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-       if (this->empty())
-          return;
-
        struct Storage<T> *buffer = this->get_active_buffer();
 
        GLint base = buffer->offset;

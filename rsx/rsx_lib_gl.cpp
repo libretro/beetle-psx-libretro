@@ -453,7 +453,7 @@ static void draw(GlRenderer *renderer)
 
     if (opaque_triangle_len)
     {
-       if (!renderer->command_buffer->empty())
+       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
           renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
                 opaque_triangle_indices,
                 opaque_triangle_len);
@@ -466,7 +466,7 @@ static void draw(GlRenderer *renderer)
 
     if (opaque_line_len)
     {
-       if (!renderer->command_buffer->empty())
+       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
           renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
                 opaque_line_indices,
                 opaque_line_len);
@@ -532,7 +532,7 @@ static void draw(GlRenderer *renderer)
 	unsigned len = it->last_index - cur_index;
 	GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
-   if (!renderer->command_buffer->empty())
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
             indices,
             len);
@@ -634,7 +634,7 @@ static void upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
-   if (!renderer->command_buffer->empty())
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       draw(renderer);
 
     renderer->fb_texture->set_sub_image(top_left,
@@ -672,7 +672,7 @@ static void upload_textures(
     // let _fb = Framebuffer::new(&self.fb_out);
     Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-    if (!renderer->image_load_buffer->empty())
+    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
        renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
     renderer->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
@@ -842,7 +842,7 @@ static void vertex_preprocessing(
 
    if (buffer_full)
    {
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
       renderer->command_buffer->swap();
    }
@@ -1359,7 +1359,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
    {
       GlRenderer *renderer = static_renderer->state_data.r;
       // Draw pending commands
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
       // We can now render to the frontend's buffer
@@ -1415,7 +1415,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
 
-         if (!renderer->output_buffer->empty())
+         if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
             renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->output_buffer->swap();
       }
@@ -1445,7 +1445,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
 
-         if (!renderer->image_load_buffer->empty())
+         if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->image_load_buffer->swap();
       }
@@ -1501,7 +1501,7 @@ void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
       GlRenderer *renderer = static_renderer->state_data.r;
 
       // Finish drawing anything with the current offset
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
       renderer->mask_set_or   = mask_set_or;
       renderer->mask_eval_and = mask_eval_and;
@@ -1515,7 +1515,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
       GlRenderer *renderer = static_renderer->state_data.r;
 
       // Finish drawing anything with the current offset
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
       renderer->config->draw_offset[0] = x;
       renderer->config->draw_offset[1] = y;
@@ -1545,7 +1545,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
       GlRenderer *renderer = static_renderer->state_data.r;
 
       // Finish drawing anything in the current area
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
       renderer->config->draw_area_top_left[0] = x0;
@@ -1838,7 +1838,7 @@ void rsx_gl_fill_rect(uint32_t color,
       GlRenderer *renderer = static_renderer->state_data.r;
 
       // Draw pending commands
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
       // Fill rect ignores the draw area. Save the previous value
@@ -1898,7 +1898,7 @@ void rsx_gl_copy_rect(
        uint16_t dimensions[2]      = {w, h};
 
        // Draw pending commands
-       if (!renderer->command_buffer->empty())
+       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
        uint32_t upscale = renderer->internal_upscaling;
@@ -2009,7 +2009,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       dimensions[0]          = w;
       dimensions[1]          = h;
 
-      if (!renderer->command_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
       renderer->fb_texture->set_sub_image_window(
@@ -2046,7 +2046,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       // Bind the output framebuffer
       Framebuffer _fb = Framebuffer(renderer->fb_out);
 
-      if (!renderer->image_load_buffer->empty())
+      if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
          renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
       renderer->image_load_buffer->swap();
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
