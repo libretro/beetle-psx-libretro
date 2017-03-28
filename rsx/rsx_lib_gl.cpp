@@ -475,7 +475,7 @@ static void draw(GlRenderer *renderer)
    if (opaque_triangle_len)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
+         draw_indexed__raw(GL_TRIANGLES,
                opaque_triangle_indices,
                opaque_triangle_len);
    }
@@ -488,7 +488,7 @@ static void draw(GlRenderer *renderer)
    if (opaque_line_len)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
+         draw_indexed__raw(GL_LINES,
                opaque_line_indices,
                opaque_line_len);
    }
@@ -554,7 +554,7 @@ static void draw(GlRenderer *renderer)
          GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-            renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
+            draw_indexed__raw(it->draw_mode,
                   indices,
                   len);
 

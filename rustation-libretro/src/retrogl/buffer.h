@@ -13,6 +13,8 @@
 #include "program.h"
 #include "error.h"
 
+#define draw_indexed__raw(mode, indices, count) glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices)
+
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->active_next_index == (x)->active_command_index)
 #define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->active_next_index)
 #define DRAWBUFFER_NEXT_INDEX(x)         ((x)->active_next_index)
@@ -27,6 +29,7 @@
 /* Called when the current batch is completed (the draw calls
  * have been done and we won't reference that data anymore) */
 #define DRAWBUFFER_FINISH(x)             ((x)->active_command_index = (x)->active_next_index)
+
 
 template<typename T>
 class DrawBuffer
@@ -264,16 +267,6 @@ public:
        glDrawArrays(mode, start, len);
     }
 
-    void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
-    {
-       GLint base = 0;
-
-       glDrawElementsBaseVertex(mode,
-             count,
-             GL_UNSIGNED_SHORT,
-             indices,
-             base);
-    }
 };
 
 #endif
