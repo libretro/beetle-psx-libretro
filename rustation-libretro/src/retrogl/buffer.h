@@ -29,24 +29,6 @@ struct Storage {
      if (this->fence)
         glDeleteSync(this->fence);
   }
-
-  // Wait for the buffer to be ready for reuse
-  void sync()
-  {
-     if (this->fence)
-     {
-        glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
-        glDeleteSync(this->fence);
-        this->fence = NULL;
-     }
-  }
-
-  void create_fence()
-  {
-     void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-     this->fence = reinterpret_cast<GLsync>(fence);
-  }
 };
 
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->active_next_index == (x)->active_command_index)
@@ -244,9 +226,15 @@ public:
     /// Swap the active and backed buffers
     void swap()
     {
-       this->buffer.create_fence();
+       this->buffer.fence = reinterpret_cast<GLsync>(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
 
-       this->buffer.sync();
+       // Wait for the buffer to be ready for reuse
+       if (this->buffer.fence)
+       {
+          glWaitSync(this->buffer.fence, 0, GL_TIMEOUT_IGNORED);
+          glDeleteSync(this->buffer.fence);
+          this->buffer.fence = NULL;
+       }
 
        this->active_next_index = 0;
        this->active_command_index = 0;
