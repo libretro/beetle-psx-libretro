@@ -1,9 +1,9 @@
 #include "error.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <cassert>
+#include <assert.h>
 
-void get_error()
+void get_error(void)
 {
 #ifdef DEBUG
     GLenum error = glGetError();

@@ -3,6 +3,14 @@
 
 #include <glsm/glsmsym.h>
 
-void get_error();
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void get_error(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
