@@ -17,6 +17,7 @@
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
 #define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->map_index)
 #define DRAWBUFFER_NEXT_INDEX(x)         ((x)->map_start + (x)->map_index)
+#define DRAWBUFFER_BIND(x)               (glBindBuffer(GL_ARRAY_BUFFER, (x)->id))
 
 template<typename T>
 class DrawBuffer
@@ -59,7 +60,7 @@ public:
        this->id = id;
 
        // Create and map the buffer
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        size_t element_size = sizeof(T);
        // We allocate enough space for 3 times the buffer space and
@@ -82,7 +83,7 @@ public:
 
     ~DrawBuffer()
     {
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        this->unmap__no_bind();
 
@@ -109,7 +110,7 @@ public:
        VertexArrayObject_bind(this->vao);
 
        // ARRAY_BUFFER is captured by VertexAttribPointer
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        std::vector<Attribute> attrs = T::attributes();
 
@@ -183,7 +184,7 @@ public:
        GLintptr offset_bytes;
        void *m;
 
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        // If we're already mapped something's wrong
        assert(this->map == NULL);
@@ -219,7 +220,7 @@ public:
     {
        assert(this->map != NULL);
 
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        glUnmapBuffer(GL_ARRAY_BUFFER);
 
@@ -250,11 +251,6 @@ public:
        glDisableVertexAttribArray(index);
     }
 
-    /// Bind the buffer to the current VAO
-    void bind()
-    {
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-    }
 
     void push_slice(T slice[], size_t n)
     {
@@ -275,7 +271,7 @@ public:
 
        // I don't need to bind this to draw (it's captured by the
        // VAO) but I need it to map/unmap the storage.
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        this->unmap__no_bind();
     }
@@ -307,7 +303,7 @@ public:
     /// draw calls between the prepare/finalize)
     void draw_indexed__raw(GLenum mode, GLushort *indices, GLsizei count)
     {
-       this->bind();
+       DRAWBUFFER_BIND(this);
        glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices);
     }
 
