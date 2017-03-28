@@ -14,28 +14,28 @@
 #define program_uniform1i(x, name, i) \
 { \
    program_bind(x); \
-   GLint u = (x)->uniform(name); \
+   GLint u = Program_uniform(x, name); \
    glUniform1i(u, i); \
 }
 
 #define program_uniform1ui(x, name, i) \
 { \
    program_bind(x); \
-   GLint u = (x)->uniform(name); \
+   GLint u = Program_uniform(x, name); \
    glUniform1ui(u, i); \
 }
 
 #define program_uniform2i(x, name, a, b) \
 { \
    program_bind(x); \
-   GLint u = (x)->uniform(name); \
+   GLint u = Program_uniform(x, name); \
    glUniform2i(u, a, b); \
 }
 
 #define program_uniform2ui(x, name, a, b) \
 { \
    program_bind(x); \
-   GLint u = (x)->uniform(name); \
+   GLint u = Program_uniform(x, name); \
    glUniform2ui(u, a, b); \
 }
 

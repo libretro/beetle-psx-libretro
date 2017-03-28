@@ -68,13 +68,13 @@ void Program_init(
    // Check if the program linking was successful
    GLint status = (GLint) GL_FALSE;
    glGetProgramiv(id, GL_LINK_STATUS, &status);
-   get_program_info_log(this, id);
+   get_program_info_log(program, id);
 
    if (status != (GLint) GL_TRUE)
    {
       puts("OpenGL program linking failed\n");
       puts("Program info log:\n");
-      puts( info_log );
+      puts(program->info_log );
 
       exit(EXIT_FAILURE);
       return;
@@ -84,8 +84,8 @@ void Program_init(
       exit(EXIT_FAILURE) ? */
    UniformMap uniforms = load_program_uniforms(id);
 
-   this->id       = id;
-   this->uniforms = uniforms;
+   program->id       = id;
+   program->uniforms = uniforms;
 }
 
 void Program_free(Program *program)
