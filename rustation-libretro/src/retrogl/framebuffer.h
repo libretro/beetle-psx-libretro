@@ -11,7 +11,6 @@ public:
     Texture* _color_texture;
 
     Framebuffer(Texture* color_texture);
-    Framebuffer(Texture* color_texture, Texture* depth_texture);
     ~Framebuffer();
 };
 

@@ -434,7 +434,11 @@ static void draw(GlRenderer *renderer)
    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
    // Bind the out framebuffer
-   Framebuffer _fb = Framebuffer(renderer->fb_out, renderer->fb_out_depth);
+   Framebuffer _fb = Framebuffer(renderer->fb_out);
+   glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
+         GL_DEPTH_ATTACHMENT,
+         renderer->fb_out_depth->id,
+         0);
 
    glClear(GL_DEPTH_BUFFER_BIT);
 

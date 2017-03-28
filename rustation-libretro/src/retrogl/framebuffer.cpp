@@ -35,21 +35,6 @@ Framebuffer::Framebuffer(Texture* color_texture)
     InitializeWithColorTexture(this, color_texture);
 }
 
-Framebuffer::Framebuffer(Texture* color_texture, Texture* depth_texture)
-{
-    InitializeWithColorTexture(this, color_texture);
-
-    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
-                            GL_DEPTH_ATTACHMENT,
-                            depth_texture->id,
-                            0);
-
-#ifdef DEBUG
-    get_error();
-#endif
-}
-
-
 Framebuffer::~Framebuffer()
 {
     glDeleteFramebuffers(1, &this->id);
