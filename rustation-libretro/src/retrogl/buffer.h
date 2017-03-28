@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h> // size_t
 #include <stdint.h>
+#include <assert.h>
 
 #include <vector>
 
@@ -242,11 +243,7 @@ public:
 
     void push_slice(T slice[], size_t n)
     {
-       if (n > DRAWBUFFER_REMAINING_CAPACITY(this) )
-       {
-          printf("DrawBuffer::push_slice() - Out of memory \n");
-          return;
-       }
+       assert(n <= DRAWBUFFER_REMAINING_CAPACITY(this));
 
        memcpy(this->map + this->active_next_index,
              slice,
