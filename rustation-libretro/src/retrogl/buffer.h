@@ -118,7 +118,8 @@ public:
 
        if (this->program)
        {
-          delete program;
+          Program_free(program);
+          free(program);
           this->program = NULL;
        }
     }

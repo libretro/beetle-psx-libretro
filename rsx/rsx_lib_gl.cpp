@@ -215,9 +215,11 @@ public:
                                         const char* fragment_shader,
                                         size_t capacity)
     {
-        Shader* vs = new Shader(vertex_shader, GL_VERTEX_SHADER);
-        Shader* fs = new Shader(fragment_shader, GL_FRAGMENT_SHADER);
-        Program* program = new Program(vs, fs);
+        Shader* vs       = new Shader(vertex_shader, GL_VERTEX_SHADER);
+        Shader* fs       = new Shader(fragment_shader, GL_FRAGMENT_SHADER);
+        Program* program = (Program*)calloc(1, sizeof(*program));
+        
+        Program_init(program, vs, fs);
 
         return new DrawBuffer<T>(capacity, program);
     }

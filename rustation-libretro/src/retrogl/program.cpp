@@ -31,85 +31,75 @@ static void get_program_info_log(Program *pg, GLuint id)
     pg->info_log[log_len - 1] = '\0';
 }
 
-Program::Program(Shader* vertex_shader, Shader* fragment_shader)
-    : info_log(NULL)
+void Program_init(
+      Program *program,
+      Shader* vertex_shader,
+      Shader* fragment_shader)
 {
-    GLuint id = glCreateProgram();
-    if (id == 0) {
-        puts("An error occured creating the program object\n");
-        exit(EXIT_FAILURE);
-    }
+   program->info_log = NULL;
+   GLuint id = glCreateProgram();
+   if (id == 0)
+   {
+      puts("An error occured creating the program object\n");
+      exit(EXIT_FAILURE);
+   }
 
-    glAttachShader(id, vertex_shader->id);
-    glAttachShader(id, fragment_shader->id);
+   glAttachShader(id, vertex_shader->id);
+   glAttachShader(id, fragment_shader->id);
 
-    glLinkProgram(id);
+   glLinkProgram(id);
 
-    glDetachShader(id, vertex_shader->id);
-    glDetachShader(id, fragment_shader->id);
+   glDetachShader(id, vertex_shader->id);
+   glDetachShader(id, fragment_shader->id);
 
-    /* Program owns the two pointers, so we clean them up now */
-    if (vertex_shader) {
-        delete vertex_shader;
-        vertex_shader = NULL;
-    }
+   /* Program owns the two pointers, so we clean them up now */
+   if (vertex_shader)
+   {
+      delete vertex_shader;
+      vertex_shader = NULL;
+   }
 
-    if (fragment_shader) {
-        delete fragment_shader;
-        fragment_shader = NULL;
-    }
+   if (fragment_shader)
+   {
+      delete fragment_shader;
+      fragment_shader = NULL;
+   }
 
-    // Check if the program linking was successful
-    GLint status = (GLint) GL_FALSE;
-    glGetProgramiv(id, GL_LINK_STATUS, &status);
-    get_program_info_log(this, id);
+   // Check if the program linking was successful
+   GLint status = (GLint) GL_FALSE;
+   glGetProgramiv(id, GL_LINK_STATUS, &status);
+   get_program_info_log(this, id);
 
-    if (status != (GLint) GL_TRUE)
-    {
-        puts("OpenGL program linking failed\n");
-        puts("Program info log:\n");
-        puts( info_log );
+   if (status != (GLint) GL_TRUE)
+   {
+      puts("OpenGL program linking failed\n");
+      puts("Program info log:\n");
+      puts( info_log );
 
-        exit(EXIT_FAILURE);
-        return;
-    }
+      exit(EXIT_FAILURE);
+      return;
+   }
 
-    /* Rust code has a try statement here, perhaps we should fail fast with
-       exit(EXIT_FAILURE) ? */
-    UniformMap uniforms = load_program_uniforms(id);
+   /* Rust code has a try statement here, perhaps we should fail fast with
+      exit(EXIT_FAILURE) ? */
+   UniformMap uniforms = load_program_uniforms(id);
 
-#ifdef DEBUG
-    // There shouldn't be anything in glGetError but let's
-    // check to make sure.
-    get_error();
-#endif
-
-    this->id = id;
-    this->uniforms = uniforms;
+   this->id       = id;
+   this->uniforms = uniforms;
 }
 
-Program::~Program()
+void Program_free(Program *program)
 {
-   glDeleteProgram(this->id);
-   free(info_log);
+   if (!program)
+      return;
+
+   glDeleteProgram(program->id);
+   free(program->info_log);
 }
 
 GLint Program_find_attribute(Program *program, const char* attr)
 {
-    GLint index = glGetAttribLocation(program->id, attr);
-
-    if (index >= 0)
-       return index;
-
-    if (index < 0)
-    {
-       printf("Couldn't find attribute \"%s\" in program\n", attr);
-#ifdef DEBUG
-       get_error();
-#endif
-    }
-
-    return index;
+    return glGetAttribLocation(program->id, attr);
 }
 
 GLint Program_uniform(Program *program, const char* name)
@@ -140,10 +130,6 @@ UniformMap load_program_uniforms(GLuint program)
     glGetProgramiv( program,
                     GL_ACTIVE_UNIFORM_MAX_LENGTH,
                     &max_name_len);
-
-#ifdef DEBUG
-    get_error();
-#endif
 
     size_t u;
     for (u = 0; u < n_uniforms; ++u)
@@ -181,10 +167,6 @@ UniformMap load_program_uniforms(GLuint program)
 
        uniforms[name] = location;
     }
-
-#ifdef DEBUG
-    get_error();
-#endif
 
     return uniforms;
 }

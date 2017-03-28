@@ -41,17 +41,20 @@
 
 typedef std::map<std::string, GLint> UniformMap;
 
-class Program {
-public:
+struct Program
+{
     GLuint id;
     /// Hash map of all the active uniforms in this program
     UniformMap uniforms;
-
-    Program(Shader* vertex_shader, Shader* fragment_shader);
-    ~Program();
-
     char *info_log;
 };
+
+void Program_init(
+      Program *program,
+      Shader* vertex_shader,
+      Shader* fragment_shader);
+
+void Program_free(Program *program);
 
 GLint Program_uniform(Program *program, const char* name);
 GLint Program_find_attribute(Program *program, const char* attr);
