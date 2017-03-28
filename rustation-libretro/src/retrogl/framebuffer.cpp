@@ -25,8 +25,9 @@ static void InitializeWithColorTexture(Framebuffer *fb, Texture* color_texture)
                 (GLsizei) color_texture->width,
                 (GLsizei) color_texture->height);
 
-    /* error_or(fb) */
+#ifdef DEBUG
     get_error();
+#endif
 }
 
 Framebuffer::Framebuffer(Texture* color_texture)
@@ -43,8 +44,9 @@ Framebuffer::Framebuffer(Texture* color_texture, Texture* depth_texture)
                             depth_texture->id,
                             0);
 
-    /* error_or(fb) */
+#ifdef DEBUG
     get_error();
+#endif
 }
 
 

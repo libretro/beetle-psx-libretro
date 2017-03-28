@@ -78,9 +78,11 @@ Program::Program(Shader* vertex_shader, Shader* fragment_shader)
        exit(EXIT_FAILURE) ? */
     UniformMap uniforms = load_program_uniforms(id);
 
+#ifdef DEBUG
     // There shouldn't be anything in glGetError but let's
     // check to make sure.
     get_error();
+#endif
 
     this->id = id;
     this->uniforms = uniforms;
@@ -99,10 +101,12 @@ GLint Program::find_attribute(const char* attr)
     if (index >= 0)
        return index;
 
-    if (index < 0) {
-        printf("Couldn't find attribute \"%s\" in program\n", attr);
-        get_error();
-        /* exit(EXIT_FAILURE); */
+    if (index < 0)
+    {
+       printf("Couldn't find attribute \"%s\" in program\n", attr);
+#ifdef DEBUG
+       get_error();
+#endif
     }
 
     return index;
@@ -136,45 +140,50 @@ UniformMap load_program_uniforms(GLuint program)
                     GL_ACTIVE_UNIFORM_MAX_LENGTH,
                     &max_name_len);
 
+#ifdef DEBUG
     get_error();
+#endif
 
     size_t u;
-    for (u = 0; u < n_uniforms; ++u) {
-        // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
-        char name[256];
-        size_t name_len = max_name_len;
-        GLsizei len = 0;
-        // XXX we might want to validate those at some point
-        GLint size = 0;
-        GLenum ty = 0;
+    for (u = 0; u < n_uniforms; ++u)
+    {
+       // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
+       char name[256];
+       size_t name_len = max_name_len;
+       GLsizei len = 0;
+       // XXX we might want to validate those at some point
+       GLint size = 0;
+       GLenum ty = 0;
 
-        glGetActiveUniform( program,
-                            (GLuint) u,
-                            (GLsizei) name_len,
-                            &len,
-                            &size,
-                            &ty,
-                            (char*) name);
-        if (len <= 0) {
-            printf("Ignoring uniform name with size %d\n", len);
-            continue;
-        }
+       glGetActiveUniform( program,
+             (GLuint) u,
+             (GLsizei) name_len,
+             &len,
+             &size,
+             &ty,
+             (char*) name);
+       if (len <= 0) {
+          printf("Ignoring uniform name with size %d\n", len);
+          continue;
+       }
 
-        // Retrieve the location of this uniform
-        GLint location = glGetUniformLocation(program, (const char*) name);
+       // Retrieve the location of this uniform
+       GLint location = glGetUniformLocation(program, (const char*) name);
 
-        /* name.truncate(len as usize); */
-        /* name[len - 1] = '\0'; */
+       /* name.truncate(len as usize); */
+       /* name[len - 1] = '\0'; */
 
-        if (location < 0) {
-            printf("Uniform \"%s\" doesn't have a location", name);
-            continue;
-        }
+       if (location < 0) {
+          printf("Uniform \"%s\" doesn't have a location", name);
+          continue;
+       }
 
-        uniforms[name] = location;
+       uniforms[name] = location;
     }
 
+#ifdef DEBUG
     get_error();
+#endif
 
     return uniforms;
 }

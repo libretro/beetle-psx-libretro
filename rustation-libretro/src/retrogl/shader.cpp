@@ -64,9 +64,12 @@ Shader::Shader(const char* source, GLenum shader_type)
         exit(EXIT_FAILURE);
         return;
     }
+
+#ifdef DEBUG
     // There shouldn't be anything in glGetError but let's
     // check to make sure.
     get_error();
+#endif
 
     this->id = id;
 }

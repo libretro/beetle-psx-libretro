@@ -15,8 +15,9 @@ Texture::Texture(uint32_t width, uint32_t height, GLenum internal_format)
                     (GLsizei) width,
                     (GLsizei) height);
 
+#ifdef DEBUG
     get_error();
-
+#endif
 
     this->id = id;
     this->width = width;
@@ -56,7 +57,9 @@ void Texture::set_sub_image(uint16_t top_left[2],
                     ty,
                     (void*) data);
 
+#ifdef DEBUG
     get_error();
+#endif
 }
 
 void Texture::set_sub_image_window( uint16_t top_left[2],

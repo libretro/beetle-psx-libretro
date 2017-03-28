@@ -678,7 +678,9 @@ static void upload_textures(
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
+#ifdef DEBUG
     get_error();
+#endif
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
@@ -1919,7 +1921,9 @@ void rsx_gl_copy_rect(
              renderer->fb_out->id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
              w, h, 1 );
 
+#ifdef DEBUG
        get_error();
+#endif
     }
 }
 
@@ -1934,29 +1938,31 @@ void rsx_gl_push_line(int16_t p0x,
 {
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
-   switch (blend_mode) {
-   case -1:
-      semi_transparent = false;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 0:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Average;
-      break;
-   case 1:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 2:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-      break;
-   case 3:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-      break;
-   default:
-      exit(EXIT_FAILURE);
+
+   switch (blend_mode)
+   {
+      case -1:
+         semi_transparent = false;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 0:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Average;
+         break;
+      case 1:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 2:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
+         break;
+      case 3:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
+         break;
+      default:
+         exit(EXIT_FAILURE);
    }
 
    CommandVertex v[2] = {
@@ -1997,7 +2003,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 {
 
    /* TODO FIXME - upload_vram_window expects a 
-  uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
+      uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
+
    if (static_renderer->state == GlState_Valid)
    {
       uint16_t top_left[2];
@@ -2052,7 +2059,9 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
       glEnable(GL_SCISSOR_TEST);
 
+#ifdef DEBUG
       get_error();
+#endif
    }
 }
 
