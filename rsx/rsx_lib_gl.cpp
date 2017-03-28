@@ -424,61 +424,61 @@ GlRenderer::~GlRenderer()
 
 static void draw(GlRenderer *renderer)
 {
-    int16_t x = renderer->config->draw_offset[0];
-    int16_t y = renderer->config->draw_offset[1];
+   int16_t x = renderer->config->draw_offset[0];
+   int16_t y = renderer->config->draw_offset[1];
 
-    program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
+   program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
 
-    // We use texture unit 0
-    program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
-    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
+   // We use texture unit 0
+   program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
+   program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
-    // Bind the out framebuffer
-    Framebuffer _fb = Framebuffer(renderer->fb_out, renderer->fb_out_depth);
+   // Bind the out framebuffer
+   Framebuffer _fb = Framebuffer(renderer->fb_out, renderer->fb_out_depth);
 
-    glClear(GL_DEPTH_BUFFER_BIT);
+   glClear(GL_DEPTH_BUFFER_BIT);
 
-    // First we draw the opaque vertices
-    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-    glDisable(GL_BLEND);
+   // First we draw the opaque vertices
+   glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+   glDisable(GL_BLEND);
 
-    program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
+   program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
 
-    renderer->command_buffer->pre_bind();
+   DRAWBUFFER_PREBIND(renderer->command_buffer);
 
-    GLushort *opaque_triangle_indices =
+   GLushort *opaque_triangle_indices =
       renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
-    GLsizei opaque_triangle_len =
+   GLsizei opaque_triangle_len =
       INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
 
-    if (opaque_triangle_len)
-    {
-       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-          renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
-                opaque_triangle_indices,
-                opaque_triangle_len);
-    }
+   if (opaque_triangle_len)
+   {
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+         renderer->command_buffer->draw_indexed_no_bind(GL_TRIANGLES,
+               opaque_triangle_indices,
+               opaque_triangle_len);
+   }
 
-    GLushort *opaque_line_indices =
+   GLushort *opaque_line_indices =
       renderer->opaque_line_indices + renderer->opaque_line_index_pos + 1;
-    GLsizei opaque_line_len =
+   GLsizei opaque_line_len =
       INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
 
-    if (opaque_line_len)
-    {
-       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-          renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
-                opaque_line_indices,
-                opaque_line_len);
-    }
+   if (opaque_line_len)
+   {
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+         renderer->command_buffer->draw_indexed_no_bind(GL_LINES,
+               opaque_line_indices,
+               opaque_line_len);
+   }
 
-    if (renderer->semi_transparent_index_pos > 0) {
+   if (renderer->semi_transparent_index_pos > 0) {
       // Semi-transparency pass
 
       // Push the current semi-transparency mode
       TransparencyIndex ti(renderer->semi_transparency_mode,
-			   renderer->semi_transparent_index_pos,
-			   renderer->command_draw_mode);
+            renderer->semi_transparent_index_pos,
+            renderer->command_draw_mode);
 
       renderer->transparency_mode_index.push_back(ti);
 
@@ -488,66 +488,66 @@ static void draw(GlRenderer *renderer)
       unsigned cur_index = 0;
 
       for (std::vector<TransparencyIndex>::iterator it =
-	     renderer->transparency_mode_index.begin();
-	   it != renderer->transparency_mode_index.end();
-	   ++it) {
+            renderer->transparency_mode_index.begin();
+            it != renderer->transparency_mode_index.end();
+            ++it) {
 
-	if (it->last_index == cur_index)
-	  continue;
+         if (it->last_index == cur_index)
+            continue;
 
-	GLenum blend_func = GL_FUNC_ADD;
-	GLenum blend_src = GL_CONSTANT_ALPHA;
-	GLenum blend_dst = GL_CONSTANT_ALPHA;
+         GLenum blend_func = GL_FUNC_ADD;
+         GLenum blend_src = GL_CONSTANT_ALPHA;
+         GLenum blend_dst = GL_CONSTANT_ALPHA;
 
-	switch (it->transparency_mode) {
-	  /* 0.5xB + 0.5 x F */
-	case SemiTransparencyMode_Average:
-	  blend_func = GL_FUNC_ADD;
-	  // Set to 0.5 with glBlendColor
-	  blend_src = GL_CONSTANT_ALPHA;
-	  blend_dst = GL_CONSTANT_ALPHA;
-	  break;
-	  /* 1.0xB + 1.0 x F */
-	case SemiTransparencyMode_Add:
-	  blend_func = GL_FUNC_ADD;
-	  blend_src = GL_ONE;
-	  blend_dst = GL_ONE;
-	  break;
-	  /* 1.0xB - 1.0 x F */
-	case SemiTransparencyMode_SubtractSource:
-	  blend_func = GL_FUNC_REVERSE_SUBTRACT;
-	  blend_src = GL_ONE;
-	  blend_dst = GL_ONE;
-	  break;
-	case SemiTransparencyMode_AddQuarterSource:
-	  blend_func = GL_FUNC_ADD;
-	  blend_src = GL_CONSTANT_COLOR;
-	  blend_dst = GL_ONE;
-	  break;
-	}
+         switch (it->transparency_mode) {
+            /* 0.5xB + 0.5 x F */
+            case SemiTransparencyMode_Average:
+               blend_func = GL_FUNC_ADD;
+               // Set to 0.5 with glBlendColor
+               blend_src = GL_CONSTANT_ALPHA;
+               blend_dst = GL_CONSTANT_ALPHA;
+               break;
+               /* 1.0xB + 1.0 x F */
+            case SemiTransparencyMode_Add:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+               /* 1.0xB - 1.0 x F */
+            case SemiTransparencyMode_SubtractSource:
+               blend_func = GL_FUNC_REVERSE_SUBTRACT;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+            case SemiTransparencyMode_AddQuarterSource:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_CONSTANT_COLOR;
+               blend_dst = GL_ONE;
+               break;
+         }
 
-	glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-	glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+         glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+         glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
 
-	unsigned len = it->last_index - cur_index;
-	GLushort *indices = renderer->semi_transparent_indices + cur_index;
+         unsigned len = it->last_index - cur_index;
+         GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
-   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
-            indices,
-            len);
+         if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+            renderer->command_buffer->draw_indexed_no_bind(it->draw_mode,
+                  indices,
+                  len);
 
-	cur_index = it->last_index;
+         cur_index = it->last_index;
       }
-    }
+   }
 
-    renderer->command_buffer->finish();
+   DRAWBUFFER_FINISH(renderer->command_buffer);
 
-    renderer->primitive_ordering = 0;
-    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-    renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-    renderer->semi_transparent_index_pos = 0;
-    renderer->transparency_mode_index.clear();
+   renderer->primitive_ordering = 0;
+   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->semi_transparent_index_pos = 0;
+   renderer->transparency_mode_index.clear();
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -838,7 +838,7 @@ static void vertex_preprocessing(
       SemiTransparencyMode stm)
 {
    bool is_semi_transparent = v[0].semi_transparent == 1;
-   bool buffer_full         = renderer->command_buffer->remaining_capacity() < count;
+   bool buffer_full         = DRAWBUFFER_REMAINING_CAPACITY(renderer->command_buffer) < count;
 
    if (buffer_full)
    {
@@ -891,7 +891,7 @@ static void push_primitive(
 
    vertex_preprocessing(renderer, v, count, mode, stm);
 
-   unsigned index = renderer->command_buffer->next_index();
+   unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
 
    for (unsigned i = 0; i < count; i++)
    {
@@ -1704,7 +1704,7 @@ void rsx_gl_push_quad(
 
       vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
 
-      unsigned index = renderer->command_buffer->next_index();
+      unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
 
       for (unsigned i = 0; i < 6; i++)
       {

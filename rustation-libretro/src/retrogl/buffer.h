@@ -33,30 +33,50 @@ struct Storage {
   {
   }
 
-  ~Storage() {
-    if (this->fence) {
-      glDeleteSync(this->fence);
-    }
+  ~Storage()
+  {
+     if (this->fence)
+        glDeleteSync(this->fence);
   }
 
   // Wait for the buffer to be ready for reuse
-  void sync() {
-    if (this->fence) {
-      glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
-      glDeleteSync(this->fence);
-      this->fence = NULL;
-      get_error();
-    }
+  void sync()
+  {
+     if (this->fence)
+     {
+        glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
+        glDeleteSync(this->fence);
+        this->fence = NULL;
+#ifdef DEBUG
+        get_error();
+#endif
+     }
   }
 
-  void create_fence() {
-    void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  void create_fence()
+  {
+     void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 
-    this->fence = reinterpret_cast<GLsync>(fence);
+     this->fence = reinterpret_cast<GLsync>(fence);
   }
 };
 
-#define DRAWBUFFER_IS_EMPTY(x) ((x)->active_next_index == (x)->active_command_index)
+#define DRAWBUFFER_IS_EMPTY(x)           ((x)->active_next_index == (x)->active_command_index)
+#define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->active_next_index)
+#define DRAWBUFFER_NEXT_INDEX(x)         ((x)->active_next_index)
+
+/* Bind the buffer to the current VAO */
+#define DRAWBUFFER_BIND(x)               (glBindBuffer(GL_ARRAY_BUFFER, (x)->id))
+
+#define DRAWBUFFER_PREBIND(x) \
+   (x)->vao->bind(); \
+   program_bind((x)->program)
+
+/* Called when the current batch is completed (the draw calls
+ * have been done and we won't reference that data anymore) */
+#define DRAWBUFFER_FINISH(x)             ((x)->active_command_index = (x)->active_next_index)
+
+#define DRAWBUFFER_GET_ACTIVE_BUFFER(x)  (&(x)->buffers[(x)->active_buffer])
 
 template<typename T>
 class DrawBuffer
@@ -97,7 +117,8 @@ public:
        this->id = id;
 
        // Create and map the buffer
-       this->bind();
+       DRAWBUFFER_BIND(this);
+
        size_t element_size = sizeof(T);
        // We double buffer so we allocate a storage twise as big
        GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size * 3);
@@ -130,12 +151,14 @@ public:
        this->active_next_index = 0;
        this->active_command_index = 0;
 
+#ifdef DEBUG
        get_error();
+#endif
     }
 
     ~DrawBuffer()
     {
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        this->buffers[1].sync();
        this->buffers[2].sync();
@@ -144,29 +167,26 @@ public:
 
        glDeleteBuffers(1, &this->id);
 
-       if (this->vao) {
+       if (this->vao)
+       {
           delete this->vao;
           this->vao = NULL;
        }
 
-       if (this->program) {
+       if (this->program)
+       {
           delete program;
           this->program = NULL;
        }
     }
 
-    struct Storage<T> *get_active_buffer()
-    {
-       return &this->buffers[this->active_buffer];
-    }
 
-    /* fn bind_attributes(&self)-> Result<(), Error> { */
     void bind_attributes()
     {
        this->vao->bind();
 
        // ARRAY_BUFFER is captured by VertexAttribPointer
-       this->bind();
+       DRAWBUFFER_BIND(this);
 
        std::vector<Attribute> attrs = T::attributes();
 
@@ -183,8 +203,7 @@ public:
        Err(Error::InvalidValue) => continue,
        Err(e) => return Err(e),
        };
-
-*/
+       */
 
        //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
        //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
@@ -192,9 +211,12 @@ public:
        //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
        GLint nVertexAttribs;
        glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
-       for (int i = 0; i < nVertexAttribs; i++) glDisableVertexAttribArray(i);
 
-       for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it) {
+       for (int i = 0; i < nVertexAttribs; i++)
+          glDisableVertexAttribArray(i);
+
+       for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
+       {
           Attribute& attr = *it;
           GLint index = this->program->find_attribute(attr.name.c_str());
 
@@ -202,14 +224,15 @@ public:
           // attribute, it could be caused by shader
           // optimization if the attribute is unused for
           // some reason.
-          if (index < 0) {
+          if (index < 0)
              continue;
-          }
+
           glEnableVertexAttribArray((GLuint) index);
 
           // This captures the buffer so that we don't have to bind it
           // when we draw later on, we'll just have to bind the vao
-          switch (attr.ty) {
+          switch (attr.ty)
+          {
              case GL_BYTE:
              case GL_UNSIGNED_BYTE:
              case GL_SHORT:
@@ -240,23 +263,21 @@ public:
           }
        }
 
+#ifdef DEBUG
        get_error();
+#endif
     }
 
-    unsigned next_index()
-    {
-       return this->active_next_index;
-    }
 
     /// Swap the active and backed buffers
     void swap()
     {
-       this->get_active_buffer()->create_fence();
+       DRAWBUFFER_GET_ACTIVE_BUFFER(this)->create_fence();
 
        if (++this->active_buffer > 2)
           this->active_buffer = 0;
 
-       this->get_active_buffer()->sync();
+       DRAWBUFFER_GET_ACTIVE_BUFFER(this)->sync();
 
        this->active_next_index = 0;
        this->active_command_index = 0;
@@ -273,7 +294,9 @@ public:
 
        glEnableVertexAttribArray(index);
 
+#ifdef DEBUG
        get_error();
+#endif
     }
 
     void disable_attribute(const char* attr)
@@ -287,32 +310,20 @@ public:
 
        glDisableVertexAttribArray(index);
 
+#ifdef DEBUG
        get_error();
-    }
-
-
-    /// Called when the current batch is completed (the draw calls
-    /// have been done and we won't reference that data anymore)
-    void finish()
-    {
-       this->active_command_index = this->active_next_index;
-    }
-
-    /// Bind the buffer to the current VAO
-    void bind()
-    {
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+#endif
     }
 
     void push_slice(T slice[], size_t n)
     {
-       if (n > this->remaining_capacity() )
+       if (n > DRAWBUFFER_REMAINING_CAPACITY(this) )
        {
           printf("DrawBuffer::push_slice() - Out of memory \n");
           return;
        }
 
-       struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
 
        memcpy(this->map + buffer->offset + this->active_next_index,
              slice,
@@ -326,7 +337,7 @@ public:
        this->vao->bind();
        program_bind(this->program);
 
-       struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
 
        unsigned start = buffer->offset + this->active_command_index;
        unsigned len = this->active_next_index - this->active_command_index;
@@ -334,18 +345,14 @@ public:
        // Length in number of vertices
        glDrawArrays(mode, start, len);
 
+#ifdef DEBUG
        get_error();
-    }
-
-    void pre_bind()
-    {
-       this->vao->bind();
-       program_bind(this->program);
+#endif
     }
 
     void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-       struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
 
        GLint base = buffer->offset;
 
@@ -355,12 +362,9 @@ public:
              indices,
              base);
 
+#ifdef DEBUG
        get_error();
-    }
-
-    size_t remaining_capacity()
-    {
-       return this->capacity - this->active_next_index;
+#endif
     }
 };
 
