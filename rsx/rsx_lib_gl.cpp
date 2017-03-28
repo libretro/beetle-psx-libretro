@@ -641,11 +641,13 @@ static void upload_textures(
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       draw(renderer);
 
-    renderer->fb_texture->set_sub_image(top_left,
-                                    dimensions,
-                                    GL_RGBA,
-                                    GL_UNSIGNED_SHORT_1_5_5_5_REV,
-                                    pixel_buffer);
+    Texture_set_sub_image(
+          renderer->fb_texture,
+          top_left,
+          dimensions,
+          GL_RGBA,
+          GL_UNSIGNED_SHORT_1_5_5_5_REV,
+          pixel_buffer);
 
     uint16_t x_start    = top_left[0];
     uint16_t x_end      = x_start + dimensions[0];
@@ -1351,7 +1353,8 @@ void rsx_gl_prepare_frame(void)
       glBlendColor(0.25, 0.25, 0.25, 0.5);
 
       apply_scissor(renderer);
-      renderer->fb_texture->bind(GL_TEXTURE0);
+
+      Texture_bind(renderer->fb_texture, GL_TEXTURE0);
    }
 }
 
@@ -1385,7 +1388,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       else
       {
          // Bind 'fb_out' to texture unit 1
-         renderer->fb_out->bind(GL_TEXTURE1);
+         Texture_bind(renderer->fb_out, GL_TEXTURE1);
 
          // First we draw the visible part of fb_out
          uint16_t fb_x_start = renderer->config->display_top_left[0];
@@ -2023,7 +2026,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
-      renderer->fb_texture->set_sub_image_window(
+      Texture_set_sub_image_window(
+            renderer->fb_texture,
             top_left,
             dimensions,
             (size_t) VRAM_WIDTH_PIXELS,

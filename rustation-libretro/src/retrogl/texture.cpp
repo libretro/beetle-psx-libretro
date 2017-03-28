@@ -29,24 +29,16 @@ Texture::~Texture()
     glDeleteTextures(1, &this->id);
 }
 
-void Texture::bind(GLenum texture_unit)
+void Texture_set_sub_image(
+      Texture *tex,
+      uint16_t top_left[2],
+      uint16_t resolution[2],
+      GLenum format,
+      GLenum ty,
+      uint16_t* data)
 {
-    glActiveTexture(texture_unit);
-    glBindTexture(GL_TEXTURE_2D, this->id);
-}
-
-void Texture::set_sub_image(uint16_t top_left[2],
-                            uint16_t resolution[2],
-                            GLenum format,
-                            GLenum ty,
-                            uint16_t* data)
-{
-    // if data.len() != (resolution.0 as usize * resolution.1 as usize) {
-    //     panic!("Invalid texture sub_image size");
-    // }
-
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glBindTexture(GL_TEXTURE_2D, this->id);
+    glBindTexture(GL_TEXTURE_2D, tex->id);
     glTexSubImage2D(GL_TEXTURE_2D,
                     0,
                     (GLint) top_left[0],
@@ -62,12 +54,14 @@ void Texture::set_sub_image(uint16_t top_left[2],
 #endif
 }
 
-void Texture::set_sub_image_window( uint16_t top_left[2],
-                                    uint16_t resolution[2],
-                                    size_t row_len,
-                                    GLenum format,
-                                    GLenum ty,
-                                    uint16_t* data)
+void Texture_set_sub_image_window(
+      Texture *tex,
+      uint16_t top_left[2],
+      uint16_t resolution[2],
+      size_t row_len,
+      GLenum format,
+      GLenum ty,
+      uint16_t* data)
 {
    uint16_t x = top_left[0];
    uint16_t y = top_left[1];
@@ -79,7 +73,7 @@ void Texture::set_sub_image_window( uint16_t top_left[2],
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
 
-   this->set_sub_image(top_left, resolution, format, ty, sub_data);
+   Texture_set_sub_image(tex, top_left, resolution, format, ty, sub_data);
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
