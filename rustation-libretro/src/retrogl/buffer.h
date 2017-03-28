@@ -85,210 +85,209 @@ public:
 
     DrawBuffer(size_t capacity, Program* program)
     {
-        VertexArrayObject* vao = new VertexArrayObject();
+       VertexArrayObject* vao = new VertexArrayObject();
 
-        GLuint id = 0;
-        // Generate the buffer object
-        glGenBuffers(1, &id);
+       GLuint id = 0;
+       // Generate the buffer object
+       glGenBuffers(1, &id);
 
-        this->vao = vao;
-        this->program = program;
-        this->capacity = capacity;
-        this->id = id;
+       this->vao = vao;
+       this->program = program;
+       this->capacity = capacity;
+       this->id = id;
 
-	// Create and map the buffer
-	this->bind();
-	size_t element_size = sizeof(T);
-	// We double buffer so we allocate a storage twise as big
-        GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size * 3);
+       // Create and map the buffer
+       this->bind();
+       size_t element_size = sizeof(T);
+       // We double buffer so we allocate a storage twise as big
+       GLsizeiptr storage_size = (GLsizeiptr) (this->capacity * element_size * 3);
 
-        glBufferStorage(GL_ARRAY_BUFFER,
-			storage_size,
-			NULL,
-			GL_MAP_WRITE_BIT |
-			GL_MAP_PERSISTENT_BIT |
-			GL_MAP_COHERENT_BIT);
+       glBufferStorage(GL_ARRAY_BUFFER,
+             storage_size,
+             NULL,
+             GL_MAP_WRITE_BIT |
+             GL_MAP_PERSISTENT_BIT |
+             GL_MAP_COHERENT_BIT);
 
-        this->bind_attributes();
+       this->bind_attributes();
 
-	void *m = glMapBufferRange(GL_ARRAY_BUFFER,
-				   0,
-				   storage_size,
-				   GL_MAP_WRITE_BIT |
-				   GL_MAP_PERSISTENT_BIT |
-				   GL_MAP_FLUSH_EXPLICIT_BIT |
-				   GL_MAP_COHERENT_BIT);
+       void *m = glMapBufferRange(GL_ARRAY_BUFFER,
+             0,
+             storage_size,
+             GL_MAP_WRITE_BIT |
+             GL_MAP_PERSISTENT_BIT |
+             GL_MAP_FLUSH_EXPLICIT_BIT |
+             GL_MAP_COHERENT_BIT);
 
-	this->map = reinterpret_cast<T*>(m);
+       this->map = reinterpret_cast<T*>(m);
 
-	this->buffers[0] = Storage<T>(0);
-	this->buffers[1] = Storage<T>(this->capacity);
-	this->buffers[2] = Storage<T>(this->capacity * 2);
+       this->buffers[0] = Storage<T>(0);
+       this->buffers[1] = Storage<T>(this->capacity);
+       this->buffers[2] = Storage<T>(this->capacity * 2);
 
-	this->active_buffer = 0;
+       this->active_buffer = 0;
 
-	this->active_next_index = 0;
-	this->active_command_index = 0;
+       this->active_next_index = 0;
+       this->active_command_index = 0;
 
-        get_error();
+       get_error();
     }
 
     ~DrawBuffer()
     {
-        this->bind();
+       this->bind();
 
-	this->buffers[1].sync();
-	this->buffers[2].sync();
+       this->buffers[1].sync();
+       this->buffers[2].sync();
 
-	glUnmapBuffer(GL_ARRAY_BUFFER);
+       glUnmapBuffer(GL_ARRAY_BUFFER);
 
-	glDeleteBuffers(1, &this->id);
+       glDeleteBuffers(1, &this->id);
 
-        if (this->vao) {
-            delete this->vao;
-            this->vao = NULL;
-        }
+       if (this->vao) {
+          delete this->vao;
+          this->vao = NULL;
+       }
 
-        if (this->program) {
-            delete program;
-            this->program = NULL;
-        }
+       if (this->program) {
+          delete program;
+          this->program = NULL;
+       }
     }
 
     struct Storage<T> *get_active_buffer()
     {
-        return &this->buffers[this->active_buffer];
+       return &this->buffers[this->active_buffer];
     }
 
     /* fn bind_attributes(&self)-> Result<(), Error> { */
     void bind_attributes()
     {
-        this->vao->bind();
+       this->vao->bind();
 
-        // ARRAY_BUFFER is captured by VertexAttribPointer
-        this->bind();
+       // ARRAY_BUFFER is captured by VertexAttribPointer
+       this->bind();
 
-        std::vector<Attribute> attrs = T::attributes();
+       std::vector<Attribute> attrs = T::attributes();
 
-        GLint element_size = (GLint) sizeof( T );
+       GLint element_size = (GLint) sizeof( T );
 
-        /*
-        let index =
-                    match self.program.find_attribute(attr.name) {
-                        Ok(i) => i,
-                        // Don't error out if the shader doesn't use this
-                        // attribute, it could be caused by shader
-                        // optimization if the attribute is unused for
-                        // some reason.
-                        Err(Error::InvalidValue) => continue,
-                        Err(e) => return Err(e),
-                    };
+       /*
+          let index =
+          match self.program.find_attribute(attr.name) {
+          Ok(i) => i,
+       // Don't error out if the shader doesn't use this
+       // attribute, it could be caused by shader
+       // optimization if the attribute is unused for
+       // some reason.
+       Err(Error::InvalidValue) => continue,
+       Err(e) => return Err(e),
+       };
 
-        */
+*/
 
-        //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
-        //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
-        //we need to make sure they're all disabled before then re-enabling the attribs we want
-        //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
-        GLint nVertexAttribs;
-        glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
-        for (int i = 0; i < nVertexAttribs; i++) glDisableVertexAttribArray(i);
+       //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
+       //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
+       //we need to make sure they're all disabled before then re-enabling the attribs we want
+       //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
+       GLint nVertexAttribs;
+       glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
+       for (int i = 0; i < nVertexAttribs; i++) glDisableVertexAttribArray(i);
 
-        for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it) {
-            Attribute& attr = *it;
-            GLint index = this->program->find_attribute(attr.name.c_str());
+       for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it) {
+          Attribute& attr = *it;
+          GLint index = this->program->find_attribute(attr.name.c_str());
 
-            // Don't error out if the shader doesn't use this
-            // attribute, it could be caused by shader
-            // optimization if the attribute is unused for
-            // some reason.
-            if (index < 0) {
-                continue;
-            }
-            glEnableVertexAttribArray((GLuint) index);
+          // Don't error out if the shader doesn't use this
+          // attribute, it could be caused by shader
+          // optimization if the attribute is unused for
+          // some reason.
+          if (index < 0) {
+             continue;
+          }
+          glEnableVertexAttribArray((GLuint) index);
 
-            // This captures the buffer so that we don't have to bind it
-            // when we draw later on, we'll just have to bind the vao
-            switch (attr.ty) {
-            case GL_BYTE:
-            case GL_UNSIGNED_BYTE:
-            case GL_SHORT:
-            case GL_UNSIGNED_SHORT:
-            case GL_INT:
-            case GL_UNSIGNED_INT:
+          // This captures the buffer so that we don't have to bind it
+          // when we draw later on, we'll just have to bind the vao
+          switch (attr.ty) {
+             case GL_BYTE:
+             case GL_UNSIGNED_BYTE:
+             case GL_SHORT:
+             case GL_UNSIGNED_SHORT:
+             case GL_INT:
+             case GL_UNSIGNED_INT:
                 glVertexAttribIPointer( index,
-                                        attr.components,
-                                        attr.ty,
-                                        element_size,
-                                        (GLvoid*)attr.offset);
+                      attr.components,
+                      attr.ty,
+                      element_size,
+                      (GLvoid*)attr.offset);
                 break;
-            case GL_FLOAT:
+             case GL_FLOAT:
                 glVertexAttribPointer(  index,
-                                        attr.components,
-                                        attr.ty,
-                                        GL_FALSE,
-                                        element_size,
-                                        (GLvoid*)attr.offset);
+                      attr.components,
+                      attr.ty,
+                      GL_FALSE,
+                      element_size,
+                      (GLvoid*)attr.offset);
                 break;
-            case GL_DOUBLE:
+             case GL_DOUBLE:
                 glVertexAttribLPointer( index,
-                                        attr.components,
-                                        attr.ty,
-                                        element_size,
-                                        (GLvoid*)attr.offset);
+                      attr.components,
+                      attr.ty,
+                      element_size,
+                      (GLvoid*)attr.offset);
                 break;
-            }
-        }
+          }
+       }
 
-        get_error();
+       get_error();
     }
 
-    unsigned next_index() {
-      return this->active_next_index;
+    unsigned next_index()
+    {
+       return this->active_next_index;
     }
 
     /// Swap the active and backed buffers
-    void swap() {
-      this->get_active_buffer()->create_fence();
+    void swap()
+    {
+       this->get_active_buffer()->create_fence();
 
-      if (++this->active_buffer > 2) {
-	this->active_buffer = 0;
-      }
+       if (++this->active_buffer > 2)
+          this->active_buffer = 0;
 
-      this->get_active_buffer()->sync();
+       this->get_active_buffer()->sync();
 
-      this->active_next_index = 0;
-      this->active_command_index = 0;
+       this->active_next_index = 0;
+       this->active_command_index = 0;
     }
 
     void enable_attribute(const char* attr)
     {
-        GLint index = this->program->find_attribute(attr);
+       GLint index = this->program->find_attribute(attr);
 
-        if (index < 0) {
+       if (index < 0)
           return;
-        }
 
-        this->vao->bind();
+       this->vao->bind();
 
-        glEnableVertexAttribArray(index);
+       glEnableVertexAttribArray(index);
 
-        get_error();
+       get_error();
     }
 
     void disable_attribute(const char* attr)
     {
-        GLint index = this->program->find_attribute(attr);
+       GLint index = this->program->find_attribute(attr);
 
-        if (index < 0) {
+       if (index < 0)
           return;
-        }
 
-        this->vao->bind();
+       this->vao->bind();
 
-        glDisableVertexAttribArray(index);
+       glDisableVertexAttribArray(index);
 
-        get_error();
+       get_error();
     }
 
 
@@ -296,29 +295,30 @@ public:
     /// have been done and we won't reference that data anymore)
     void finish()
     {
-      this->active_command_index = this->active_next_index;
+       this->active_command_index = this->active_next_index;
     }
 
     /// Bind the buffer to the current VAO
     void bind()
     {
-        glBindBuffer(GL_ARRAY_BUFFER, this->id);
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
     }
 
     void push_slice(T slice[], size_t n)
     {
-        if (n > this->remaining_capacity() ) {
-            printf("DrawBuffer::push_slice() - Out of memory \n");
-            return;
-        }
+       if (n > this->remaining_capacity() )
+       {
+          printf("DrawBuffer::push_slice() - Out of memory \n");
+          return;
+       }
 
-	struct Storage<T> *buffer = this->get_active_buffer();
+       struct Storage<T> *buffer = this->get_active_buffer();
 
-	memcpy(this->map + buffer->offset + this->active_next_index,
-	       slice,
-	       n * sizeof(T));
+       memcpy(this->map + buffer->offset + this->active_next_index,
+             slice,
+             n * sizeof(T));
 
-	this->active_next_index += n;
+       this->active_next_index += n;
     }
 
     void draw(GLenum mode)
@@ -360,7 +360,7 @@ public:
 
     size_t remaining_capacity()
     {
-      return this->capacity - this->active_next_index;
+       return this->capacity - this->active_next_index;
     }
 };
 
