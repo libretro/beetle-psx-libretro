@@ -15,15 +15,44 @@
 
 template<typename T>
 struct Storage {
+  // Fence used to make sure we're not writing to the buffer while
+  // it's being used.
+  GLsync fence;
   // Offset in the main buffer
   unsigned offset;
 
-  Storage(): offset(0)
+  Storage()
+    :fence(NULL), offset(0)
+  {
+  }
+
+  Storage(unsigned offset)
+    :fence(NULL), offset(offset)
   {
   }
 
   ~Storage()
   {
+     if (this->fence)
+        glDeleteSync(this->fence);
+  }
+
+  // Wait for the buffer to be ready for reuse
+  void sync()
+  {
+     if (this->fence)
+     {
+        glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
+        glDeleteSync(this->fence);
+        this->fence = NULL;
+     }
+  }
+
+  void create_fence()
+  {
+     void *fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+     this->fence = reinterpret_cast<GLsync>(fence);
   }
 };
 
@@ -106,7 +135,7 @@ public:
 
        this->map = reinterpret_cast<T*>(m);
 
-       this->buffer = Storage<T>();
+       this->buffer = Storage<T>(0);
 
        this->active_next_index = 0;
        this->active_command_index = 0;
@@ -222,6 +251,10 @@ public:
     /// Swap the active and backed buffers
     void swap()
     {
+       this->buffer.create_fence();
+
+       this->buffer.sync();
+
        this->active_next_index = 0;
        this->active_command_index = 0;
     }
