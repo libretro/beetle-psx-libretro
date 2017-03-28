@@ -65,8 +65,10 @@ extern "C"
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
 
-/// How many vertices we buffer before forcing a draw
-#define VERTEX_BUFFER_LEN 0x8000
+/// How many vertices we buffer before forcing a draw. Since the
+/// indexes are stored on 16bits we need to make sure that the length
+/// multiplied by 3 (for triple buffering) doesn't overflow 0xffff.
+static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
 
 /// Maximum number of indices for a vertex buffer. Since quads have
 /// two duplicated vertices it can be up to 3/2 the vertex buffer
@@ -465,7 +467,7 @@ static void draw(GlRenderer *renderer)
 
    program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
 
-   DRAWBUFFER_PREBIND(renderer->command_buffer);
+   renderer->command_buffer->prepare_draw();
 
    GLushort *opaque_triangle_indices =
       renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
@@ -475,7 +477,7 @@ static void draw(GlRenderer *renderer)
    if (opaque_triangle_len)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw_indexed__raw(GL_TRIANGLES,
+         renderer->command_buffer->draw_indexed__raw(GL_TRIANGLES,
                opaque_triangle_indices,
                opaque_triangle_len);
    }
@@ -488,7 +490,7 @@ static void draw(GlRenderer *renderer)
    if (opaque_line_len)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw_indexed__raw(GL_LINES,
+         renderer->command_buffer->draw_indexed__raw(GL_LINES,
                opaque_line_indices,
                opaque_line_len);
    }
@@ -554,7 +556,7 @@ static void draw(GlRenderer *renderer)
          GLushort *indices = renderer->semi_transparent_indices + cur_index;
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-            draw_indexed__raw(it->draw_mode,
+            renderer->command_buffer->draw_indexed__raw(it->draw_mode,
                   indices,
                   len);
 
@@ -562,7 +564,7 @@ static void draw(GlRenderer *renderer)
       }
    }
 
-   DRAWBUFFER_FINISH(renderer->command_buffer);
+   renderer->command_buffer->finalize_draw__no_bind();
 
    renderer->primitive_ordering = 0;
    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
@@ -700,7 +702,6 @@ static void upload_textures(
 
     if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
        renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    renderer->image_load_buffer->swap();
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -879,7 +880,6 @@ static void vertex_preprocessing(
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
-      renderer->command_buffer->swap();
    }
 
    int16_t z = renderer->primitive_ordering;
@@ -1531,7 +1531,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
             renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
-         renderer->output_buffer->swap();
       }
 
       // Hack: copy fb_out back into fb_texture at the end of every
@@ -1562,7 +1561,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-         renderer->image_load_buffer->swap();
 
          Framebuffer_free(&_fb);
       }
@@ -2176,7 +2174,6 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
          renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-      renderer->image_load_buffer->swap();
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
       glEnable(GL_SCISSOR_TEST);
 
