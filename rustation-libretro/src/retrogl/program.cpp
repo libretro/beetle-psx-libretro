@@ -94,9 +94,9 @@ Program::~Program()
    free(info_log);
 }
 
-GLint Program::find_attribute(const char* attr)
+GLint Program_find_attribute(Program *program, const char* attr)
 {
-    GLint index = glGetAttribLocation(this->id, attr);
+    GLint index = glGetAttribLocation(program->id, attr);
 
     if (index >= 0)
        return index;
@@ -112,15 +112,16 @@ GLint Program::find_attribute(const char* attr)
     return index;
 }
 
-GLint Program::uniform(const char* name)
+GLint Program_uniform(Program *program, const char* name)
 {
-    bool found = this->uniforms.find(name) != this->uniforms.end();
-    if (!found) {
+    bool found = program->uniforms.find(name) != program->uniforms.end();
+    if (!found)
+    {
         printf("Attempted to access unknown uniform %s\n", name);
         exit(EXIT_FAILURE);
     }
 
-    return this->uniforms[name];
+    return program->uniforms[name];
 }
 
 UniformMap load_program_uniforms(GLuint program)

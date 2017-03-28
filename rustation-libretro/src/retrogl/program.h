@@ -49,11 +49,12 @@ public:
 
     Program(Shader* vertex_shader, Shader* fragment_shader);
     ~Program();
-    GLint find_attribute(const char* attr);
-    GLint uniform(const char* name);
 
     char *info_log;
 };
+
+GLint Program_uniform(Program *program, const char* name);
+GLint Program_find_attribute(Program *program, const char* attr);
 
 
 // Return a hashmap of all uniform names contained in `program` with

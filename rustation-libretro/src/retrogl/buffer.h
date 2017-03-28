@@ -135,19 +135,6 @@ public:
 
        GLint element_size = (GLint) sizeof( T );
 
-       /*
-          let index =
-          match self.program.find_attribute(attr.name) {
-          Ok(i) => i,
-       // Don't error out if the shader doesn't use this
-       // attribute, it could be caused by shader
-       // optimization if the attribute is unused for
-       // some reason.
-       Err(Error::InvalidValue) => continue,
-       Err(e) => return Err(e),
-       };
-       */
-
        //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
        //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
        //we need to make sure they're all disabled before then re-enabling the attribs we want
@@ -161,7 +148,7 @@ public:
        for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
        {
           Attribute& attr = *it;
-          GLint index = this->program->find_attribute(attr.name);
+          GLint index     = Program_find_attribute(this->program, attr.name);
 
           // Don't error out if the shader doesn't use this
           // attribute, it could be caused by shader
@@ -227,7 +214,7 @@ public:
 
     void enable_attribute(const char* attr)
     {
-       GLint index = this->program->find_attribute(attr);
+       GLint index = Program_find_attribute(this->program, attr);
 
        if (index < 0)
           return;
@@ -239,7 +226,7 @@ public:
 
     void disable_attribute(const char* attr)
     {
-       GLint index = this->program->find_attribute(attr);
+       GLint index = Program_find_attribute(this->program, attr);
 
        if (index < 0)
           return;
