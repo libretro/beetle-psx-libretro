@@ -45,9 +45,6 @@ struct Storage {
         glWaitSync(this->fence, 0, GL_TIMEOUT_IGNORED);
         glDeleteSync(this->fence);
         this->fence = NULL;
-#ifdef DEBUG
-        get_error();
-#endif
      }
   }
 
@@ -74,8 +71,6 @@ struct Storage {
  * have been done and we won't reference that data anymore) */
 #define DRAWBUFFER_FINISH(x)             ((x)->active_command_index = (x)->active_next_index)
 
-#define DRAWBUFFER_GET_ACTIVE_BUFFER(x)  (&(x)->buffers[(x)->active_buffer])
-
 template<typename T>
 class DrawBuffer
 {
@@ -90,9 +85,7 @@ public:
     Program* program;
     /// Persistently mapped buffer (using ARB_buffer_storage)
     T *map;
-    /// Use triple buffering
-    Storage<T> buffers[3];
-    unsigned active_buffer;
+    Storage<T> buffer;
 
     /// Index one-past the last element stored in `active`
     unsigned active_next_index;
@@ -142,26 +135,15 @@ public:
 
        this->map = reinterpret_cast<T*>(m);
 
-       this->buffers[0] = Storage<T>(0);
-       this->buffers[1] = Storage<T>(this->capacity);
-       this->buffers[2] = Storage<T>(this->capacity * 2);
-
-       this->active_buffer = 0;
+       this->buffer = Storage<T>(0);
 
        this->active_next_index = 0;
        this->active_command_index = 0;
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 
     ~DrawBuffer()
     {
        DRAWBUFFER_BIND(this);
-
-       this->buffers[1].sync();
-       this->buffers[2].sync();
 
        glUnmapBuffer(GL_ARRAY_BUFFER);
 
@@ -263,22 +245,15 @@ public:
                 break;
           }
        }
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 
 
     /// Swap the active and backed buffers
     void swap()
     {
-       DRAWBUFFER_GET_ACTIVE_BUFFER(this)->create_fence();
+       this->buffer.create_fence();
 
-       if (++this->active_buffer > 2)
-          this->active_buffer = 0;
-
-       DRAWBUFFER_GET_ACTIVE_BUFFER(this)->sync();
+       this->buffer.sync();
 
        this->active_next_index = 0;
        this->active_command_index = 0;
@@ -294,10 +269,6 @@ public:
        VertexArrayObject_bind(this->vao);
 
        glEnableVertexAttribArray(index);
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 
     void disable_attribute(const char* attr)
@@ -310,10 +281,6 @@ public:
        VertexArrayObject_bind(this->vao);
 
        glDisableVertexAttribArray(index);
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 
     void push_slice(T slice[], size_t n)
@@ -324,9 +291,7 @@ public:
           return;
        }
 
-       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
-
-       memcpy(this->map + buffer->offset + this->active_next_index,
+       memcpy(this->map + this->buffer.offset + this->active_next_index,
              slice,
              n * sizeof(T));
 
@@ -338,34 +303,22 @@ public:
        VertexArrayObject_bind(this->vao);
        program_bind(this->program);
 
-       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
-
-       unsigned start = buffer->offset + this->active_command_index;
+       unsigned start = this->buffer.offset + this->active_command_index;
        unsigned len = this->active_next_index - this->active_command_index;
 
        // Length in number of vertices
        glDrawArrays(mode, start, len);
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 
     void draw_indexed_no_bind(GLenum mode, GLushort *indices, GLsizei count)
     {
-       struct Storage<T> *buffer = DRAWBUFFER_GET_ACTIVE_BUFFER(this);
-
-       GLint base = buffer->offset;
+       GLint base = this->buffer.offset;
 
        glDrawElementsBaseVertex(mode,
              count,
              GL_UNSIGNED_SHORT,
              indices,
              base);
-
-#ifdef DEBUG
-       get_error();
-#endif
     }
 };
 
