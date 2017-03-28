@@ -3,13 +3,12 @@
 #include <stdlib.h> // exit()
 #include <stdio.h>
 
-Framebuffer::Framebuffer(Texture* color_texture)
+void Framebuffer_init(struct Framebuffer *fb, struct Texture* color_texture)
 {
-   Framebuffer *fb = this;
    GLuint id = 0;
    glGenFramebuffers(1, &id);
 
-   fb->id = id;
+   fb->id             = id;
    fb->_color_texture = color_texture;
 
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb->id);
@@ -25,13 +24,4 @@ Framebuffer::Framebuffer(Texture* color_texture)
          0,
          (GLsizei) color_texture->width,
          (GLsizei) color_texture->height);
-
-#ifdef DEBUG
-   get_error();
-#endif
-}
-
-Framebuffer::~Framebuffer()
-{
-    glDeleteFramebuffers(1, &this->id);
 }

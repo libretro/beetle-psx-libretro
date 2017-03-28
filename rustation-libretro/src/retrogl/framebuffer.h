@@ -3,15 +3,23 @@
 
 #include <glsm/glsmsym.h>
 #include "texture.h"
-#include "error.h"
 
-class Framebuffer {
-public:
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct Framebuffer
+{
     GLuint id;
-    Texture* _color_texture;
-
-    Framebuffer(Texture* color_texture);
-    ~Framebuffer();
+    struct Texture* _color_texture;
 };
+
+void Framebuffer_init(struct Framebuffer *fb, struct Texture* color_texture);
+
+#define Framebuffer_free(fb) glDeleteFramebuffers(1, fb.id)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

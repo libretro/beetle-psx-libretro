@@ -284,7 +284,7 @@
     <ClCompile Include="..\rustation-libretro\src\retrogl\error.c">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\retrogl\framebuffer.cpp">
+    <ClCompile Include="..\rustation-libretro\src\retrogl\framebuffer.c">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
     <ClCompile Include="..\libretro-common\glsm\glsm.c">

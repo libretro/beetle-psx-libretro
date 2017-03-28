@@ -449,7 +449,9 @@ static void draw(GlRenderer *renderer)
    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
    // Bind the out framebuffer
-   Framebuffer _fb = Framebuffer(renderer->fb_out);
+   Framebuffer _fb;
+   Framebuffer_init(&_fb, renderer->fb_out);
+
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
          GL_DEPTH_ATTACHMENT,
          renderer->fb_out_depth->id,
@@ -567,6 +569,8 @@ static void draw(GlRenderer *renderer)
    renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
    renderer->semi_transparent_index_pos = 0;
    renderer->transparency_mode_index.clear();
+
+   Framebuffer_free(&_fb);
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -691,7 +695,8 @@ static void upload_textures(
 
     // Bind the output framebuffer
     // let _fb = Framebuffer::new(&self.fb_out);
-    Framebuffer _fb = Framebuffer(renderer->fb_out);
+    Framebuffer _fb;
+    Framebuffer_init(&_fb, renderer->fb_out);
 
     if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
        renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
@@ -702,6 +707,7 @@ static void upload_textures(
 #ifdef DEBUG
     get_error();
 #endif
+    Framebuffer_free(&_fb);
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
@@ -1548,7 +1554,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          glDisable(GL_BLEND);
          glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-         Framebuffer _fb = Framebuffer(renderer->fb_texture);
+         Framebuffer _fb;
+         Framebuffer_init(&_fb, renderer->fb_texture);
 
          program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
@@ -1556,6 +1563,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
          renderer->image_load_buffer->swap();
+
+         Framebuffer_free(&_fb);
       }
 
       // Cleanup OpenGL context before returning to the frontend
@@ -1971,7 +1980,8 @@ void rsx_gl_fill_rect(uint32_t color,
       /* This scope is intentional, just like in the Rust version */
       {
          // Bind the out framebuffer
-         Framebuffer _fb = Framebuffer(renderer->fb_out);
+         Framebuffer _fb;
+         Framebuffer_init(&_fb, renderer->fb_out);
 
          glClearColor(   (float) col[0] / 255.0,
                (float) col[1] / 255.0,
@@ -1980,6 +1990,8 @@ void rsx_gl_fill_rect(uint32_t color,
                // the mask bit in fill_rect commands
                0.0);
          glClear(GL_COLOR_BUFFER_BIT);
+
+         Framebuffer_free(&_fb);
       }
 
       // Reconfigure the draw area
@@ -2158,7 +2170,9 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
       // Bind the output framebuffer
-      Framebuffer _fb = Framebuffer(renderer->fb_out);
+      Framebuffer _fb;
+
+      Framebuffer_init(&_fb, renderer->fb_out);
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
          renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
@@ -2169,6 +2183,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 #ifdef DEBUG
       get_error();
 #endif
+
+      Framebuffer_free(&_fb);
    }
 }
 
