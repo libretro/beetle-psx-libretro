@@ -5,14 +5,16 @@
 
 #include <glsm/glsmsym.h>
 
-class Shader {
-public:
+struct Shader
+{
     GLuint id;
-
-    Shader(const char* source, GLenum shader_type);
-    ~Shader();
-
     char *info_log;
 };
+
+void Shader_init(Shader *shader,
+      const char* source,
+      GLenum shader_type);
+
+void Shader_free(Shader *shader);
 
 #endif

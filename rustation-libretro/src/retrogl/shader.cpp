@@ -3,10 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-Shader::Shader(const char* source, GLenum shader_type)
-    : info_log(NULL)
+void Shader_init(Shader *shader,
+      const char* source,
+      GLenum shader_type)
 {
-   Shader *shader = this;
+   shader->info_log = NULL;
+
    GLuint id = glCreateShader(shader_type);
    if (id == 0)
    {
@@ -56,17 +58,20 @@ Shader::Shader(const char* source, GLenum shader_type)
       puts( source );
 
       puts("Shader info log:\n");
-      puts(info_log);
+      puts(shader->info_log);
 
       exit(EXIT_FAILURE);
       return;
    }
 
-   this->id = id;
+   shader->id = id;
 }
 
-Shader::~Shader()
+void Shader_free(Shader *shader)
 {
-   glDeleteShader(this->id);
-   free(info_log);
+   if (shader)
+   {
+      glDeleteShader(shader->id);
+      free(shader->info_log);
+   }
 }

@@ -55,13 +55,15 @@ void Program_init(
    /* Program owns the two pointers, so we clean them up now */
    if (vertex_shader)
    {
-      delete vertex_shader;
+      Shader_free(vertex_shader);
+      free(vertex_shader);
       vertex_shader = NULL;
    }
 
    if (fragment_shader)
    {
-      delete fragment_shader;
+      Shader_free(fragment_shader);
+      free(fragment_shader);
       fragment_shader = NULL;
    }
 
