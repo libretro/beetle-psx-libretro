@@ -278,7 +278,7 @@
     <ClCompile Include="..\rustation-libretro\src\retrogl\texture.c">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\retrogl\vertex.cpp">
+    <ClCompile Include="..\rustation-libretro\src\retrogl\vertex.c">
       <Filter>rustation-libretro\src\retrogl</Filter>
     </ClCompile>
     <ClCompile Include="..\rustation-libretro\src\retrogl\error.cpp">

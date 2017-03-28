@@ -953,70 +953,70 @@ std::vector<Attribute> CommandVertex::attributes()
     std::vector<Attribute> result;
     Attribute attr;
 
-    attr.name       = "position";
+    strcpy(attr.name, "position");
     attr.offset     = offsetof(CommandVertex, position);
     attr.ty         = GL_FLOAT;
     attr.components = 4;
 
     result.push_back(attr);
 
-    attr.name       = "color";
+    strcpy(attr.name, "color");
     attr.offset     = offsetof(CommandVertex, color);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 3;
 
     result.push_back(attr);
 
-    attr.name       = "texture_coord";
+    strcpy(attr.name, "texture_coord");
     attr.offset     = offsetof(CommandVertex, texture_coord);
     attr.ty         = GL_UNSIGNED_SHORT;
     attr.components = 2;
 
     result.push_back(attr);
 
-    attr.name       = "texture_page";
+    strcpy(attr.name, "texture_page");
     attr.offset     = offsetof(CommandVertex, texture_page);
     attr.ty         = GL_UNSIGNED_SHORT;
     attr.components = 2;
 
     result.push_back(attr);
 
-    attr.name       = "clut";
+    strcpy(attr.name, "clut");
     attr.offset     = offsetof(CommandVertex, clut);
     attr.ty         = GL_UNSIGNED_SHORT;
     attr.components = 2;
 
     result.push_back(attr);
 
-    attr.name       = "texture_blend_mode";
+    strcpy(attr.name, "texture_blend_mode");
     attr.offset     = offsetof(CommandVertex, texture_blend_mode);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 1;
 
     result.push_back(attr);
 
-    attr.name       = "depth_shift";
+    strcpy(attr.name, "depth_shift");
     attr.offset     = offsetof(CommandVertex, depth_shift);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 1;
 
     result.push_back(attr);
 
-    attr.name       = "dither";
+    strcpy(attr.name, "dither");
     attr.offset     = offsetof(CommandVertex, dither);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 1;
 
     result.push_back(attr);
 
-    attr.name       = "semi_transparent";
+    strcpy(attr.name, "semi_transparent");
     attr.offset     = offsetof(CommandVertex, semi_transparent);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 1;
 
     result.push_back(attr);
 
-    attr.name       = "texture_window";
+    strcpy(attr.name, "texture_window");
     attr.offset     = offsetof(CommandVertex, texture_window);
     attr.ty         = GL_UNSIGNED_BYTE;
     attr.components = 4;
@@ -1031,14 +1031,14 @@ std::vector<Attribute> OutputVertex::attributes()
     std::vector<Attribute> result;
     Attribute attr;
 
-    attr.name       = "position";
+    strcpy(attr.name, "position");
     attr.offset     = offsetof(OutputVertex, position);
     attr.ty         = GL_FLOAT;
     attr.components = 2;
 
     result.push_back(attr);
 
-    attr.name       = "fb_coord";
+    strcpy(attr.name, "fb_coord");
     attr.offset     = offsetof(OutputVertex, fb_coord);
     attr.ty         = GL_UNSIGNED_SHORT;
     attr.components = 2;
@@ -1053,7 +1053,7 @@ std::vector<Attribute> ImageLoadVertex::attributes()
     std::vector<Attribute> result;
     Attribute attr;
 
-    attr.name       = "position";
+    strcpy(attr.name, "position");
     attr.offset     = offsetof(ImageLoadVertex, position);
     attr.ty         = GL_UNSIGNED_SHORT;
     attr.components = 2;

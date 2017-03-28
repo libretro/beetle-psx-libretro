@@ -219,7 +219,7 @@ public:
        for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
        {
           Attribute& attr = *it;
-          GLint index = this->program->find_attribute(attr.name.c_str());
+          GLint index = this->program->find_attribute(attr.name);
 
           // Don't error out if the shader doesn't use this
           // attribute, it could be caused by shader
