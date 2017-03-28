@@ -13,24 +13,6 @@
 #include "program.h"
 #include "error.h"
 
-template<typename T>
-struct Storage {
-  // Fence used to make sure we're not writing to the buffer while
-  // it's being used.
-  GLsync fence;
-
-  Storage()
-    :fence(NULL)
-  {
-  }
-
-  ~Storage()
-  {
-     if (this->fence)
-        glDeleteSync(this->fence);
-  }
-};
-
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->active_next_index == (x)->active_command_index)
 #define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->active_next_index)
 #define DRAWBUFFER_NEXT_INDEX(x)         ((x)->active_next_index)
@@ -60,7 +42,7 @@ public:
     Program* program;
     /// Persistently mapped buffer (using ARB_buffer_storage)
     T *map;
-    Storage<T> buffer;
+    GLsync buffer_fence;
 
     /// Index one-past the last element stored in `active`
     unsigned active_next_index;
@@ -110,8 +92,6 @@ public:
 
        this->map = reinterpret_cast<T*>(m);
 
-       this->buffer = Storage<T>();
-
        this->active_next_index = 0;
        this->active_command_index = 0;
     }
@@ -123,6 +103,11 @@ public:
        glUnmapBuffer(GL_ARRAY_BUFFER);
 
        glDeleteBuffers(1, &this->id);
+
+       if (this->buffer_fence)
+       {
+          glDeleteSync(this->buffer_fence);
+       }
 
        if (this->vao)
        {
@@ -226,14 +211,14 @@ public:
     /// Swap the active and backed buffers
     void swap()
     {
-       this->buffer.fence = reinterpret_cast<GLsync>(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+       this->buffer_fence = reinterpret_cast<GLsync>(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
 
        // Wait for the buffer to be ready for reuse
-       if (this->buffer.fence)
+       if (this->buffer_fence)
        {
-          glWaitSync(this->buffer.fence, 0, GL_TIMEOUT_IGNORED);
-          glDeleteSync(this->buffer.fence);
-          this->buffer.fence = NULL;
+          glWaitSync(this->buffer_fence, 0, GL_TIMEOUT_IGNORED);
+          glDeleteSync(this->buffer_fence);
+          this->buffer_fence = NULL;
        }
 
        this->active_next_index = 0;
