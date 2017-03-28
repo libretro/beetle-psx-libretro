@@ -26,6 +26,9 @@
        DRAWBUFFER_BIND(id); \
        glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices)
 
+#ifndef GL_MAP_INVALIDATE_RANGE_BIT
+#define GL_MAP_INVALIDATE_RANGE_BIT       0x000
+#endif
 
 template<typename T>
 class DrawBuffer
