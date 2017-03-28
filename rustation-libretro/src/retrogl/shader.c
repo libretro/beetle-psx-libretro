@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-void Shader_init(Shader *shader,
+void Shader_init(
+      struct Shader *shader,
       const char* source,
       GLenum shader_type)
 {
@@ -67,7 +68,7 @@ void Shader_init(Shader *shader,
    shader->id = id;
 }
 
-void Shader_free(Shader *shader)
+void Shader_free(struct Shader *shader)
 {
    if (shader)
    {
