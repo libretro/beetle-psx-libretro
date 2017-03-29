@@ -39,7 +39,7 @@
 #include "libretro.h"
 #include "libretro_options.h"
 
-#if 0
+#if 0 || defined(__APPLE__)
 #define NEW_COPY_RECT
 #endif
 
