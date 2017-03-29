@@ -1191,17 +1191,17 @@ uint32_t PS_GPU::Read(const int32_t timestamp, uint32_t A)
    return(ret >> ((A & 3) * 8));
 }
 
-INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
+static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
       uint32_t out_Gshift, uint32_t out_Bshift,
       bool bpp24, const uint16_t *src, uint32_t *dest,
-      const int32 dx_start, const int32 dx_end, int32 fb_x)
+      const int32 dx_start, const int32 dx_end, int32 fb_x,
+      unsigned upscale_shift, unsigned upscale)
 {
-
-  int32_t fb_mask = ((0x7FF << upscale_shift) + upscale() - 1);
+  int32_t fb_mask = ((0x7FF << upscale_shift) + upscale - 1);
 
    if(bpp24)	// 24bpp
    {
-      for(int32 x = dx_start; x < dx_end; x+= upscale())
+      for(int32 x = dx_start; x < dx_end; x+= upscale)
       {
          int i;
          uint32_t color;
@@ -1213,7 +1213,7 @@ INLINE void PS_GPU::ReorderRGB_Var(uint32_t out_Rshift,
             | (((srcpix >> 8) << GREEN_SHIFT) & (0xFF << GREEN_SHIFT))
             | (((srcpix >> 16) << BLUE_SHIFT) & (0xFF << BLUE_SHIFT));
 
-         for (i = 0; i < upscale(); i++)
+         for (i = 0; i < upscale; i++)
             dest[x + i] = color;
 
          fb_x = (fb_x + (3 << upscale_shift)) & fb_mask;
@@ -1522,16 +1522,18 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                //printf("dx_start base: %d, dmw: %d\n", dx_start, dmw);
 
+               if (rsx_intf_is_type() == RSX_SOFTWARE)
                {
                   // Convert the necessary variables to the upscaled version
                   uint32_t x;
-                  uint32_t y      = DisplayFB_CurLineYReadout << upscale_shift;
-                  uint32_t udmw   = dmw      << upscale_shift;
-                  int32 udx_start = dx_start << upscale_shift;
-                  int32 udx_end   = dx_end   << upscale_shift;
-                  int32 ufb_x     = fb_x     << upscale_shift;
+                  uint32_t y        = DisplayFB_CurLineYReadout << upscale_shift;
+                  uint32_t udmw     = dmw      << upscale_shift;
+                  int32 udx_start   = dx_start << upscale_shift;
+                  int32 udx_end     = dx_end   << upscale_shift;
+                  int32 ufb_x       = fb_x     << upscale_shift;
+                  unsigned _upscale = upscale();
 
-                  for (uint32_t i = 0; i < upscale(); i++)
+                  for (uint32_t i = 0; i < _upscale; i++)
                   {
                      const uint16_t *src = vram +
                         ((y + i) << (10 + upscale_shift));
@@ -1542,21 +1544,21 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
 
                      dest = surface->pixels +
                         ((dest_line << upscale_shift) + i) * surface->pitch32;
-
                      memset(dest, 0, udx_start * sizeof(int32));
 
-                     if (rsx_intf_is_type() == RSX_SOFTWARE)
-                        //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
-                        ReorderRGB_Var(
-                              RED_SHIFT,
-                              GREEN_SHIFT,
-                              BLUE_SHIFT,
-                              DisplayMode & DISP_RGB24,
-                              src,
-                              dest,
-                              udx_start,
-                              udx_end,
-                              ufb_x);
+                     //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
+                     ReorderRGB_Var(
+                           RED_SHIFT,
+                           GREEN_SHIFT,
+                           BLUE_SHIFT,
+                           DisplayMode & DISP_RGB24,
+                           src,
+                           dest,
+                           udx_start,
+                           udx_end,
+                           ufb_x,
+                           upscale_shift,
+                           _upscale);
 
                      //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
                      //
