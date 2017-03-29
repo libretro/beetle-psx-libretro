@@ -286,13 +286,12 @@ void main() {
       }
       else
       {
-         vec4 texel;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
 #ifdef FILTER_SABR
-         texel = get_texel_sabr();
+         vec4 texel = get_texel_sabr();
 #else
-         texel = texel0;
+         vec4 texel = texel0;
 #endif
 
 	 // texel color 0x0000 is always fully transparent (even for opaque
