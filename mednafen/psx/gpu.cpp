@@ -1368,7 +1368,7 @@ int32_t PS_GPU::Update(const int32_t sys_timestamp)
                }
 
 
-               if(espec)
+               if (rsx_intf_is_type() == RSX_SOFTWARE && espec)
                {
                   if((bool)(DisplayMode & DISP_PAL) != HardwarePALType)
                   {
