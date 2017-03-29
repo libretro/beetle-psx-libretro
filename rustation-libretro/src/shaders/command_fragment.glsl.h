@@ -1,6 +1,11 @@
 #include "shaders_common.h"
 
-static const char *command_fragment = GLSL(
+#ifdef FILTER_SABR
+static const char * command_fragment_sabr = GLSL(
+#else
+static const char * command_fragment = GLSL(
+#endif
+
 uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
@@ -8,7 +13,6 @@ uniform uint dither_scaling;
 
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
-uniform uint texture_flt;
 
 //uniform uint mask_setor;
 //uniform uint mask_evaland;
@@ -135,7 +139,7 @@ vec4 sample_texel(vec2 coords) {
    }
    return texel;
 }
-
+#ifdef FILTER_SABR
 // constants and functions for sabr
 const  vec4 Ai  = vec4( 1.0, -1.0, -1.0,  1.0);
 const  vec4 B45 = vec4( 1.0,  1.0, -1.0, -1.0);
@@ -272,7 +276,7 @@ vec4 get_texel_sabr()
 
    return texel;
 }
-
+#endif
 void main() {
    vec4 color;
 
@@ -285,15 +289,11 @@ void main() {
          vec4 texel;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
-
-         if (texture_flt == FILTER_MODE_SABR)
-         {
-            texel = get_texel_sabr();
-         }
-         else
-         {
-            texel = texel0;
-         }
+#ifdef FILTER_SABR
+         texel = get_texel_sabr();
+#else
+         texel = texel0;
+#endif
 
 	 // texel color 0x0000 is always fully transparent (even for opaque
          // draw commands)

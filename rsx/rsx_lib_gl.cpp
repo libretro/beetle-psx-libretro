@@ -31,6 +31,9 @@
 
 #include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#define FILTER_SABR
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#undef FILTER_SABR
 #include "../rustation-libretro/src/shaders/output_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/output_fragment.glsl.h"
 #include "../rustation-libretro/src/shaders/image_load_vertex.glsl.h"
@@ -52,6 +55,11 @@ static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 enum VideoClock {
     VideoClock_Ntsc,
     VideoClock_Pal
+};
+
+enum FilterMode {
+   FILTER_MODE_NEAREST,
+   FILTER_MODE_SABR
 };
 
 // Main GPU instance, used to access the VRAM
@@ -258,13 +266,13 @@ GlRenderer::GlRenderer(DrawConfig* config)
     }
 
     var.key = option_filter;
-    uint8_t filter = 0;
+    uint8_t filter = FILTER_MODE_NEAREST;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
        if (!strcmp(var.value, "nearest"))
-          filter = 0;
+          filter = FILTER_MODE_NEAREST;
        else if (!strcmp(var.value, "SABR"))
-          filter = 1;
+          filter = FILTER_MODE_SABR;
 
        this->filter_type = filter;
     }
@@ -308,11 +316,22 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
-    DrawBuffer<CommandVertex>* command_buffer =
-        GlRenderer::build_buffer<CommandVertex>(
-            command_vertex,
-            command_fragment,
-            VERTEX_BUFFER_LEN);
+    DrawBuffer<CommandVertex>* command_buffer;
+    switch(this->filter_type)
+    {
+    case FILTER_MODE_SABR:
+      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment_sabr,
+                           VERTEX_BUFFER_LEN);
+      break;
+    case FILTER_MODE_NEAREST:
+    default:
+       command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment,
+                           VERTEX_BUFFER_LEN);
+    }
 
     DrawBuffer<OutputVertex>* output_buffer =
         GlRenderer::build_buffer<OutputVertex>(
@@ -345,7 +364,6 @@ GlRenderer::GlRenderer(DrawConfig* config)
     GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
     program_uniform1ui(command_buffer->program, "dither_scaling", dither_scaling);
-    program_uniform1ui(command_buffer->program, "texture_flt", this->filter_type);
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -461,7 +479,6 @@ static void draw(GlRenderer *renderer)
 
    // We use texture unit 0
    program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
-   program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
    // Bind the out framebuffer
    Framebuffer _fb;
@@ -764,8 +781,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
           filter = 0;
        else if (!strcmp(var.value, "SABR"))
           filter = 1;
-
-       renderer->filter_type = filter;
     }
 
     var.key = option_depth;
@@ -870,7 +885,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     program_uniform1ui(renderer->command_buffer->program, "dither_scaling", (GLuint) dither_scaling);
-    program_uniform1ui(renderer->command_buffer->program, "texture_flt", renderer->filter_type);
 
     renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
@@ -882,11 +896,13 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     //// r5 - replace 'self' by 'this'
     bool reconfigure_frontend =
       renderer->internal_upscaling != upscaling ||
-      renderer->display_vram != display_vram;
+      renderer->display_vram != display_vram ||
+      renderer->filter_type != filter;
 
     renderer->internal_upscaling = upscaling;
     renderer->display_vram = display_vram;
     renderer->internal_color_depth = depth;
+    renderer->filter_type = filter;
 
     return reconfigure_frontend;
 }
