@@ -775,12 +775,12 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     }
 
     var.key = option_filter;
-    uint8_t filter = 0;
+    uint8_t filter = FILTER_MODE_NEAREST;
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
        if (!strcmp(var.value, "nearest"))
-          filter = 0;
+          filter = FILTER_MODE_NEAREST;
        else if (!strcmp(var.value, "SABR"))
-          filter = 1;
+          filter = FILTER_MODE_SABR;
     }
 
     var.key = option_depth;
