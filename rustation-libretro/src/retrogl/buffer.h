@@ -65,10 +65,10 @@ public:
        // Generate the buffer object
        glGenBuffers(1, &id);
 
-       this->vao = vao;
-       this->program = program;
+       this->vao      = vao;
+       this->program  = program;
        this->capacity = capacity;
-       this->id = id;
+       this->id       = id;
 
        // Create and map the buffer
        DRAWBUFFER_BIND(id);
@@ -190,7 +190,7 @@ public:
     // Map the buffer for write-only access
     void map__no_bind()
     {
-       size_t element_size = sizeof(T);
+       size_t element_size    = sizeof(T);
        GLsizeiptr buffer_size = this->capacity * element_size;
        GLintptr offset_bytes;
        void *m;
@@ -200,11 +200,10 @@ public:
        // If we're already mapped something's wrong
        assert(this->map == NULL);
 
-       if (this->map_start > 2 * this->capacity) {
-          // We don't have enough room left to remap `capacity`,
-          // start back from the beginning of the buffer.
+       // We don't have enough room left to remap `capacity`,
+       // start back from the beginning of the buffer.
+       if (this->map_start > 2 * this->capacity)
           this->map_start = 0;
-       }
 
        offset_bytes = this->map_start * element_size;
 
@@ -217,8 +216,6 @@ public:
              buffer_size,
              GL_MAP_WRITE_BIT |
              GL_MAP_INVALIDATE_RANGE_BIT);
-
-       get_error();
 
        // Just in case...
        assert(m != NULL);
@@ -295,7 +292,7 @@ public:
     void finalize_draw__no_bind()
     {
        this->map_start += this->map_index;
-       this->map_index = 0;
+       this->map_index  = 0;
 
        this->map__no_bind();
     }
