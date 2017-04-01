@@ -181,18 +181,18 @@ float c_df(vec3 c1, vec3 c2) {
 	return df.r + df.g + df.b;
 }
 
+in vec2 tc;
+in vec4 xyp_1_2_3;
+in vec4 xyp_6_7_8;
+in vec4 xyp_11_12_13;
+in vec4 xyp_16_17_18;
+in vec4 xyp_21_22_23;
+in vec4 xyp_5_10_15;
+in vec4 xyp_9_14_9;
+
 //sabr
 vec4 get_texel_sabr()
 {
-	vec2 tc = vec2(frag_texture_coord.x, frag_texture_coord.y);// * vec2(1.00001);
-	vec4 xyp_1_2_3    = tc.xxxy + vec4(      -1., 0.0,   1., -2.0 * 1.);
-	vec4 xyp_6_7_8    = tc.xxxy + vec4(      -1., 0.0,   1.,       -1.);
-	vec4 xyp_11_12_13 = tc.xxxy + vec4(      -1., 0.0,   1.,      0.0);
-	vec4 xyp_16_17_18 = tc.xxxy + vec4(      -1., 0.0,   1.,        1.);
-	vec4 xyp_21_22_23 = tc.xxxy + vec4(      -1., 0.0,   1.,  2.0 * 1.);
-	vec4 xyp_5_10_15  = tc.xyyy + vec4(-2.0 * 1.,  -1., 0.0,        1.);
-	vec4 xyp_9_14_9   = tc.xyyy + vec4( 2.0 * 1.,  -1., 0.0,        1.);
-
 	// Store mask values
 	vec3 P1  = sample_texel(xyp_1_2_3.xw   ).rgb;
 	vec3 P2  = sample_texel(xyp_1_2_3.yw   ).rgb;
