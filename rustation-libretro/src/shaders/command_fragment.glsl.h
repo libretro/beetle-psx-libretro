@@ -2,6 +2,12 @@
 
 #ifdef FILTER_SABR
 static const char * command_fragment_sabr = GLSL(
+#elif defined(FILTER_XBR)
+static const char * command_fragment_xbr = GLSL(
+#elif defined(FILTER_BILINEAR)
+static const char * command_fragment_bilinear = GLSL(
+#elif defined(FILTER_3POINT)
+static const char * command_fragment_3point = GLSL(
 #else
 static const char * command_fragment = GLSL(
 #endif
@@ -86,8 +92,8 @@ vec4 sample_texel(vec2 coords) {
    uint pix_per_hw = 1U << frag_depth_shift;
 
    // Texture pages are limited to 256x256 pixels
-   uint tex_x = uint(coords.x) & 0xffU;
-   uint tex_y = uint(coords.y) & 0xffU;
+   uint tex_x = clamp(uint(coords.x), 0x0U, 0xffU);
+   uint tex_y = clamp(uint(coords.y), 0x0U, 0xffU);
 
    // Texture window adjustments
    tex_x = (tex_x & frag_texture_window[0]) | frag_texture_window[1];
@@ -139,6 +145,25 @@ vec4 sample_texel(vec2 coords) {
    }
    return texel;
 }
+
+#if defined(FILTER_SABR) || defined(FILTER_XBR)
+in vec2 tc;
+in vec4 xyp_1_2_3;
+in vec4 xyp_6_7_8;
+in vec4 xyp_11_12_13;
+in vec4 xyp_16_17_18;
+in vec4 xyp_21_22_23;
+in vec4 xyp_5_10_15;
+in vec4 xyp_9_14_9;
+
+float c_df(vec3 c1, vec3 c2) {
+	vec3 df = abs(c1 - c2);
+	return df.r + df.g + df.b;
+}
+
+const float coef = 2.0;
+#endif
+
 #ifdef FILTER_SABR
 // constants and functions for sabr
 const  vec4 Ai  = vec4( 1.0, -1.0, -1.0,  1.0);
@@ -153,8 +178,6 @@ const  vec4 M45 = vec4(0.4, 0.4, 0.4, 0.4);
 const  vec4 M30 = vec4(0.2, 0.4, 0.2, 0.4);
 const  vec4 M60 = M30.yxwz;
 const  vec4 Mshift = vec4(0.2, 0.2, 0.2, 0.2);
-
-const  float coef = 2.0;
 
 const  vec4 threshold = vec4(0.32, 0.32, 0.32, 0.32);
 
@@ -176,23 +199,9 @@ vec4 lum_wd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h) {
 	return lum_df(a, b) + lum_df(a, c) + lum_df(d, e) + lum_df(d, f) + 4.0 * lum_df(g, h);
 }
 
-float c_df(vec3 c1, vec3 c2) {
-	vec3 df = abs(c1 - c2);
-	return df.r + df.g + df.b;
-}
-
 //sabr
 vec4 get_texel_sabr()
 {
-	vec2 tc = vec2(frag_texture_coord.x, frag_texture_coord.y);// * vec2(1.00001);
-	vec4 xyp_1_2_3    = tc.xxxy + vec4(      -1., 0.0,   1., -2.0 * 1.);
-	vec4 xyp_6_7_8    = tc.xxxy + vec4(      -1., 0.0,   1.,       -1.);
-	vec4 xyp_11_12_13 = tc.xxxy + vec4(      -1., 0.0,   1.,      0.0);
-	vec4 xyp_16_17_18 = tc.xxxy + vec4(      -1., 0.0,   1.,        1.);
-	vec4 xyp_21_22_23 = tc.xxxy + vec4(      -1., 0.0,   1.,  2.0 * 1.);
-	vec4 xyp_5_10_15  = tc.xyyy + vec4(-2.0 * 1.,  -1., 0.0,        1.);
-	vec4 xyp_9_14_9   = tc.xyyy + vec4( 2.0 * 1.,  -1., 0.0,        1.);
-
 	// Store mask values
 	vec3 P1  = sample_texel(xyp_1_2_3.xw   ).rgb;
 	vec3 P2  = sample_texel(xyp_1_2_3.yw   ).rgb;
@@ -277,6 +286,233 @@ vec4 get_texel_sabr()
    return texel;
 }
 #endif
+
+#ifdef FILTER_XBR
+
+// constants and functions for xbr
+const   vec3  rgbw          = vec3(14.352, 28.176, 5.472);
+const   vec4  eq_threshold  = vec4(15.0, 15.0, 15.0, 15.0);
+
+const vec4 delta   = vec4(1.0/4., 1.0/4., 1.0/4., 1.0/4.);
+const vec4 delta_l = vec4(0.5/4., 1.0/4., 0.5/4., 1.0/4.);
+const vec4 delta_u = delta_l.yxwz;
+
+const  vec4 Ao = vec4( 1.0, -1.0, -1.0, 1.0 );
+const  vec4 Bo = vec4( 1.0,  1.0, -1.0,-1.0 );
+const  vec4 Co = vec4( 1.5,  0.5, -0.5, 0.5 );
+const  vec4 Ax = vec4( 1.0, -1.0, -1.0, 1.0 );
+const  vec4 Bx = vec4( 0.5,  2.0, -0.5,-2.0 );
+const  vec4 Cx = vec4( 1.0,  1.0, -0.5, 0.0 );
+const  vec4 Ay = vec4( 1.0, -1.0, -1.0, 1.0 );
+const  vec4 By = vec4( 2.0,  0.5, -2.0,-0.5 );
+const  vec4 Cy = vec4( 2.0,  0.0, -1.0, 0.5 );
+const  vec4 Ci = vec4(0.25, 0.25, 0.25, 0.25);
+
+// Difference between vector components.
+vec4 df(vec4 A, vec4 B)
+{
+    return vec4(abs(A-B));
+}
+
+// Compare two vectors and return their components are different.
+vec4 diff(vec4 A, vec4 B)
+{
+    return vec4(notEqual(A, B));
+}
+
+// Determine if two vector components are equal based on a threshold.
+vec4 eq(vec4 A, vec4 B)
+{
+    return (step(df(A, B), vec4(15.)));
+}
+
+// Determine if two vector components are NOT equal based on a threshold.
+vec4 neq(vec4 A, vec4 B)
+{
+    return (vec4(1.0, 1.0, 1.0, 1.0) - eq(A, B));
+}
+
+// Weighted distance.
+vec4 wd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h)
+{
+    return (df(a,b) + df(a,c) + df(d,e) + df(d,f) + 4.0*df(g,h));
+}
+
+vec4 get_texel_xbr()
+{
+    vec4 edri;
+    vec4 edr;
+    vec4 edr_l;
+    vec4 edr_u;
+    vec4 px; // px = pixel, edr = edge detection rule
+    vec4 irlv0;
+    vec4 irlv1;
+    vec4 irlv2l;
+    vec4 irlv2u;
+    vec4 block_3d;
+    vec4 fx;
+    vec4 fx_l;
+    vec4 fx_u; // inequations of straight lines.
+
+    vec2 fp  = fract(tc);
+
+    vec3 A1 = sample_texel(xyp_1_2_3.xw    ).xyz;
+    vec3 B1 = sample_texel(xyp_1_2_3.yw    ).xyz;
+    vec3 C1 = sample_texel(xyp_1_2_3.zw    ).xyz;
+    vec3 A  = sample_texel(xyp_6_7_8.xw    ).xyz;
+    vec3 B  = sample_texel(xyp_6_7_8.yw    ).xyz;
+    vec3 C  = sample_texel(xyp_6_7_8.zw    ).xyz;
+    vec3 D  = sample_texel(xyp_11_12_13.xw ).xyz;
+    vec3 E  = sample_texel(xyp_11_12_13.yw ).xyz;
+    vec3 F  = sample_texel(xyp_11_12_13.zw ).xyz;
+    vec3 G  = sample_texel(xyp_16_17_18.xw ).xyz;
+    vec3 H  = sample_texel(xyp_16_17_18.yw ).xyz;
+    vec3 I  = sample_texel(xyp_16_17_18.zw ).xyz;
+    vec3 G5 = sample_texel(xyp_21_22_23.xw ).xyz;
+    vec3 H5 = sample_texel(xyp_21_22_23.yw ).xyz;
+    vec3 I5 = sample_texel(xyp_21_22_23.zw ).xyz;
+    vec3 A0 = sample_texel(xyp_5_10_15.xy  ).xyz;
+    vec3 D0 = sample_texel(xyp_5_10_15.xz  ).xyz;
+    vec3 G0 = sample_texel(xyp_5_10_15.xw  ).xyz;
+    vec3 C4 = sample_texel(xyp_9_14_9.xy   ).xyz;
+    vec3 F4 = sample_texel(xyp_9_14_9.xz   ).xyz;
+    vec3 I4 = sample_texel(xyp_9_14_9.xw   ).xyz;
+
+    vec4 b  = vec4(dot(B ,rgbw), dot(D ,rgbw), dot(H ,rgbw), dot(F ,rgbw));
+    vec4 c  = vec4(dot(C ,rgbw), dot(A ,rgbw), dot(G ,rgbw), dot(I ,rgbw));
+    vec4 d  = b.yzwx;
+    vec4 e  = vec4(dot(E,rgbw));
+    vec4 f  = b.wxyz;
+    vec4 g  = c.zwxy;
+    vec4 h  = b.zwxy;
+    vec4 i  = c.wxyz;
+    vec4 i4 = vec4(dot(I4,rgbw), dot(C1,rgbw), dot(A0,rgbw), dot(G5,rgbw));
+    vec4 i5 = vec4(dot(I5,rgbw), dot(C4,rgbw), dot(A1,rgbw), dot(G0,rgbw));
+    vec4 h5 = vec4(dot(H5,rgbw), dot(F4,rgbw), dot(B1,rgbw), dot(D0,rgbw));
+    vec4 f4 = h5.yzwx;
+
+    // These inequations define the line below which interpolation occurs.
+    fx   = (Ao*fp.y+Bo*fp.x);
+    fx_l = (Ax*fp.y+Bx*fp.x);
+    fx_u = (Ay*fp.y+By*fp.x);
+
+    irlv1 = irlv0 = diff(e,f) * diff(e,h);
+
+//#ifdef CORNER_B
+//    irlv1      = (irlv0 * ( neq(f,b) * neq(h,d) + eq(e,i) * neq(f,i4) * neq(h,i5) + eq(e,g) + eq(e,c) ) );
+//#endif
+//#ifdef CORNER_D
+//    vec4 c1 = i4.yzwx;
+//    vec4 g0 = i5.wxyz;
+//    irlv1     = (irlv0  *  ( neq(f,b) * neq(h,d) + eq(e,i) * neq(f,i4) * neq(h,i5) + eq(e,g) + eq(e,c) ) * (diff(f,f4) * diff(f,i) + diff(h,h5) * diff(h,i) + diff(h,g) + diff(f,c) + eq(b,c1) * eq(d,g0)));
+//#endif
+//#ifdef CORNER_C
+    irlv1     = (irlv0  * ( neq(f,b) * neq(f,c) + neq(h,d) * neq(h,g) + eq(e,i) * (neq(f,f4) * neq(f,i4) + neq(h,h5) * neq(h,i5)) + eq(e,g) + eq(e,c)) );
+//#endif
+
+    irlv2l = diff(e,g) * diff(d,g);
+    irlv2u = diff(e,c) * diff(b,c);
+
+    vec4 fx45i = clamp((fx   + delta   -Co - Ci)/(2.0*delta  ), 0.0, 1.0);
+    vec4 fx45  = clamp((fx   + delta   -Co     )/(2.0*delta  ), 0.0, 1.0);
+    vec4 fx30  = clamp((fx_l + delta_l -Cx     )/(2.0*delta_l), 0.0, 1.0);
+    vec4 fx60  = clamp((fx_u + delta_u -Cy     )/(2.0*delta_u), 0.0, 1.0);
+
+    vec4 wd1 = wd( e, c,  g, i, h5, f4, h, f);
+    vec4 wd2 = wd( h, d, i5, f, i4,  b, e, i);
+
+    edri  = step(wd1, wd2) * irlv0;
+    edr   = step(wd1 + vec4(0.1, 0.1, 0.1, 0.1), wd2) * step(vec4(0.5, 0.5, 0.5, 0.5), irlv1);
+    edr_l = step( 2.*df(f,g), df(h,c) ) * irlv2l * edr;
+    edr_u = step( 2.*df(h,c), df(f,g) ) * irlv2u * edr;
+
+    fx45  = edr   * fx45;
+    fx30  = edr_l * fx30;
+    fx60  = edr_u * fx60;
+    fx45i = edri  * fx45i;
+
+    px = step(df(e,f), df(e,h));
+
+//#ifdef SMOOTH_TIPS
+    vec4 maximos = max(max(fx30, fx60), max(fx45, fx45i));
+//#endif
+//#ifndef SMOOTH_TIPS
+//    vec4 maximos = max(max(fx30, fx60), fx45);
+//#endif
+
+    vec3 res1 = E;
+    res1 = mix(res1, mix(H, F, px.x), maximos.x);
+    res1 = mix(res1, mix(B, D, px.z), maximos.z);
+
+    vec3 res2 = E;
+    res2 = mix(res2, mix(F, B, px.y), maximos.y);
+    res2 = mix(res2, mix(D, H, px.w), maximos.w);
+
+    vec3 res = mix(res1, res2, step(c_df(E, res1), c_df(E, res2)));
+    float texel_alpha = sample_texel(tc).a;
+
+    return vec4(res, texel_alpha);
+}
+#endif
+
+#ifdef FILTER_3POINT
+vec4 get_texel_3point()
+{
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
+
+  float u_frac = fract(x);
+  float v_frac = fract(y);
+
+  vec4 texel_00;
+
+  if (u_frac + v_frac < 1.0) {
+    // Use bottom-left
+    texel_00 = sample_texel(vec2(x + 0, y + 0));
+  } else {
+    // Use top-right
+    texel_00 = sample_texel(vec2(x + 1, y + 1));
+
+    float tmp = 1 - v_frac;
+    v_frac = 1 - u_frac;
+    u_frac = tmp;
+  }
+
+   vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
+   vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+
+   vec4 texel = texel_00
+     + u_frac * (texel_10 - texel_00)
+     + v_frac * (texel_01 - texel_00);
+
+   return texel;
+}
+#endif
+
+#ifdef FILTER_BILINEAR
+// Bilinear filtering
+vec4 get_texel_bilinear()
+{
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
+
+  float u_frac = fract(x);
+  float v_frac = fract(y);
+
+  vec4 texel_00 = sample_texel(vec2(x + 0, y + 0));
+  vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
+  vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+  vec4 texel_11 = sample_texel(vec2(x + 1, y + 1));
+
+   vec4 texel = texel_00 * (1. - u_frac) * (1. - v_frac)
+     + texel_10 * u_frac * (1. - v_frac)
+     + texel_01 * (1. - u_frac) * v_frac
+     + texel_11 * u_frac * v_frac;
+
+   return texel;
+}
+#endif
+
 void main() {
    vec4 color;
 
@@ -288,10 +524,25 @@ void main() {
       {
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
+         vec4 texel = vec4(0.0);
 #ifdef FILTER_SABR
-         vec4 texel = get_texel_sabr();
-#else
-         vec4 texel = texel0;
+         texel = get_texel_sabr();
+#endif
+
+#ifdef FILTER_XBR
+         texel = get_texel_xbr();
+#endif
+
+#ifdef FILTER_BILINEAR
+         texel = get_texel_bilinear();
+#endif
+
+#ifdef FILTER_3POINT
+         texel = get_texel_3point();
+#endif
+
+#if !defined(FILTER_SABR) && !defined(FILTER_XBR) && !defined(FILTER_BILINEAR) && !defined(FILTER_3POINT)
+         texel = texel0; //use nearest if nothing else is chosen
 #endif
 
 	 // texel color 0x0000 is always fully transparent (even for opaque

@@ -1711,10 +1711,10 @@ static int Load(const char *name, MDFNFILE *fp)
 static int LoadCD(std::vector<CDIF *> *CDInterfaces)
 {
    InitCommon(CDInterfaces);
-   
+
    if (psx_skipbios == 1)
    BIOSROM->WriteU32(0x6990, 0);
-   
+
    MDFNGameInfo->GameType = GMT_CDROM;
 
    return(1);
@@ -2567,7 +2567,7 @@ static void check_variables(bool startup)
 #endif
 
    var.key = option_cpu_overclock;
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
@@ -2577,7 +2577,7 @@ static void check_variables(bool startup)
    }
    else
       psx_cpu_overclock = false;
-   
+
    var.key = option_skip_bios;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2586,8 +2586,8 @@ static void check_variables(bool startup)
          psx_skipbios = 1;
       else
          psx_skipbios = 0;
-   }   
-   
+   }
+
    var.key = option_widescreen_hack;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2858,7 +2858,7 @@ static void check_variables(bool startup)
      display_internal_framerate = false;
 
    var.key = option_crop_overscan;
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
        if (strcmp(var.value, "enabled") == 0)
@@ -3987,7 +3987,7 @@ void retro_set_environment(retro_environment_t cb)
    static const struct retro_variable vars[] = {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
       { option_renderer, "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
-      { option_renderer_software_fb, "Software framebuffer; enabled|disabled" }, 
+      { option_renderer_software_fb, "Software framebuffer; enabled|disabled" },
 #endif
 #ifdef HAVE_VULKAN
       { option_adaptive_smoothing, "Adaptive smoothing; enabled|disabled" },
@@ -3995,7 +3995,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_internal_resolution, "Internal GPU resolution; 1x(native)|2x|4x|8x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
-      { option_filter, "Texture filtering; nearest|SABR" },
+      { option_filter, "Texture filtering; nearest|SABR|xBR|bilinear|3-point" },
       { option_depth, "Internal color depth; dithered 16bpp (native)|32bpp" },
       { option_wireframe, "Wireframe mode; disabled|enabled" },
       { option_display_vram, "Display full VRAM; disabled|enabled" },
@@ -4006,7 +4006,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_pgxp_texture, "PGXP perspective correct texturing; disabled|enabled" },
 #endif
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
-      { option_scale_dither, "Scale dithering pattern with internal resolution; enabled|disabled" },	   
+      { option_scale_dither, "Scale dithering pattern with internal resolution; enabled|disabled" },
       { option_initial_scanline, "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { option_last_scanline, "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
       { option_initial_scanline_pal, "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
@@ -4182,7 +4182,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * code)
 	const CheatFormatStruct* cf = CheatFormats;
 	char name[256];
 	MemoryPatch patch;
-	
+
 	//Decode the cheat
 	try
 	{
@@ -4192,10 +4192,10 @@ void retro_cheat_set(unsigned index, bool enabled, const char * code)
 	{
 		return;
 	}
-	
+
 	//Generate a name
 	sprintf(name,"cheat_%u",index);
-	
+
 	//Set parameters
 	patch.name=std::string(name);
 	patch.status=enabled;

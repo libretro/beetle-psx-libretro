@@ -26,6 +26,15 @@ flat out uint frag_dither;
 flat out uint frag_semi_transparent;
 flat out uvec4 frag_texture_window;
 
+out vec2 tc;
+out vec4 xyp_1_2_3;
+out vec4 xyp_6_7_8;
+out vec4 xyp_11_12_13;
+out vec4 xyp_16_17_18;
+out vec4 xyp_21_22_23;
+out vec4 xyp_5_10_15;
+out vec4 xyp_9_14_9;
+
 void main() {
    vec2 pos = position.xy + vec2(offset);
 
@@ -55,4 +64,13 @@ void main() {
    frag_dither = dither;
    frag_semi_transparent = semi_transparent;
    frag_texture_window = texture_window;
+
+	tc = frag_texture_coord.xy;
+	xyp_1_2_3    = tc.xxxy + vec4(-1.,  0., 1., -2.);
+	xyp_6_7_8    = tc.xxxy + vec4(-1.,  0., 1., -1.);
+	xyp_11_12_13 = tc.xxxy + vec4(-1.,  0., 1.,  0.);
+	xyp_16_17_18 = tc.xxxy + vec4(-1.,  0., 1.,  1.);
+	xyp_21_22_23 = tc.xxxy + vec4(-1.,  0., 1.,  2.);
+	xyp_5_10_15  = tc.xyyy + vec4(-2., -1., 0.,  1.);
+	xyp_9_14_9   = tc.xyyy + vec4( 2., -1., 0.,  1.);
 });

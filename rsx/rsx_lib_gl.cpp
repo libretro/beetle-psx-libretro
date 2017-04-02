@@ -34,6 +34,15 @@
 #define FILTER_SABR
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
 #undef FILTER_SABR
+#define FILTER_XBR
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#undef FILTER_XBR
+#define FILTER_BILINEAR
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#undef FILTER_BILINEAR
+#define FILTER_3POINT
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#undef FILTER_3POINT
 #include "../rustation-libretro/src/shaders/output_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/output_fragment.glsl.h"
 #include "../rustation-libretro/src/shaders/image_load_vertex.glsl.h"
@@ -59,7 +68,10 @@ enum VideoClock {
 
 enum FilterMode {
    FILTER_MODE_NEAREST,
-   FILTER_MODE_SABR
+   FILTER_MODE_SABR,
+   FILTER_MODE_XBR,
+   FILTER_MODE_BILINEAR,
+   FILTER_MODE_3POINT
 };
 
 // Main GPU instance, used to access the VRAM
@@ -275,6 +287,12 @@ GlRenderer::GlRenderer(DrawConfig* config)
           filter = FILTER_MODE_NEAREST;
        else if (!strcmp(var.value, "SABR"))
           filter = FILTER_MODE_SABR;
+       else if (!strcmp(var.value, "xBR"))
+          filter = FILTER_MODE_XBR;
+       else if (!strcmp(var.value, "bilinear"))
+          filter = FILTER_MODE_BILINEAR;
+       else if (!strcmp(var.value, "3-point"))
+          filter = FILTER_MODE_3POINT;
 
        this->filter_type = filter;
     }
@@ -325,6 +343,24 @@ GlRenderer::GlRenderer(DrawConfig* config)
       command_buffer = GlRenderer::build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment_sabr,
+                           VERTEX_BUFFER_LEN);
+      break;
+    case FILTER_MODE_XBR:
+      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment_xbr,
+                           VERTEX_BUFFER_LEN);
+      break;
+     case FILTER_MODE_BILINEAR:
+      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment_bilinear,
+                           VERTEX_BUFFER_LEN);
+      break;
+     case FILTER_MODE_3POINT:
+      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment_3point,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_NEAREST:
@@ -1137,9 +1173,9 @@ private:
 public:
     static RetroGl* getInstance(VideoClock video_clock);
     static RetroGl* getInstance();
-    /* 
+    /*
     Rust's enums members can contain data. To emulate that,
-    I'll use a helper struct to save the data.  
+    I'll use a helper struct to save the data.
     */
     GlStateData state_data;
     GlState state;
@@ -1456,7 +1492,7 @@ static bool shim_context_framebuffer_lock(void* data)
     return RetroGl::getInstance()->context_framebuffer_lock(data);
 }
 
-static RetroGl* static_renderer = NULL; 
+static RetroGl* static_renderer = NULL;
 
 void rsx_gl_init(void)
 {
@@ -1471,7 +1507,7 @@ bool rsx_gl_open(bool is_pal)
 
 void rsx_gl_close(void)
 {
-   static_renderer = NULL;  
+   static_renderer = NULL;
 }
 
 void rsx_gl_refresh_variables(void)
@@ -1800,14 +1836,14 @@ void rsx_gl_push_quad(
       exit(EXIT_FAILURE);
    }
 
-   CommandVertex v[4] = 
+   CommandVertex v[4] =
    {
       {
           {p0x, p0y, 0.95, p0w},   /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {t0x, t0y},   /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},         
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1817,8 +1853,8 @@ void rsx_gl_push_quad(
           {p1x, p1y, 0.95, p1w }, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {t1x, t1y}, /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},   
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1828,8 +1864,8 @@ void rsx_gl_push_quad(
           {p2x, p2y, 0.95, p2w }, /* position */
           {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
           {t2x, t2y}, /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},   
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1839,8 +1875,8 @@ void rsx_gl_push_quad(
           {p3x, p3y, 0.95, p3w }, /* position */
           {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
           {t3x, t3y}, /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},   
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1939,14 +1975,14 @@ void rsx_gl_push_triangle(
       exit(EXIT_FAILURE);
    }
 
-   CommandVertex v[3] = 
+   CommandVertex v[3] =
    {
       {
           {p0x, p0y, 0.95, p0w},   /* position */
           {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
           {t0x, t0y},   /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},         
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1956,8 +1992,8 @@ void rsx_gl_push_triangle(
           {p1x, p1y, 0.95, p1w }, /* position */
           {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
           {t1x, t1y}, /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},   
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1967,8 +2003,8 @@ void rsx_gl_push_triangle(
           {p2x, p2y, 0.95, p2w }, /* position */
           {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
           {t2x, t2y}, /* texture_coord */
-          {texpage_x, texpage_y}, 
-          {clut_x, clut_y},   
+          {texpage_x, texpage_y},
+          {clut_x, clut_y},
           texture_blend_mode,
           depth_shift,
           (uint8_t) dither,
@@ -1990,7 +2026,7 @@ void rsx_gl_fill_rect(uint32_t color,
 
    uint16_t top_left[2]   = {x, y};
    uint16_t dimensions[2] = {w, h};
-   uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};  
+   uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};
 
    if (static_renderer->state == GlState_Valid)
    {
@@ -2079,7 +2115,7 @@ void rsx_gl_copy_rect(
        // duplicate the diagonal but I believe it was incorrect because of
        // the OpenGL filling convention. At least it's what TinyTiger told
        // me...
-       
+
        glBindFramebuffer(GL_READ_FRAMEBUFFER, copy_fb);
        glFramebufferTexture(GL_READ_FRAMEBUFFER,
              GL_COLOR_ATTACHMENT0,
@@ -2182,7 +2218,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       uint16_t *vram)
 {
 
-   /* TODO FIXME - upload_vram_window expects a 
+   /* TODO FIXME - upload_vram_window expects a
       uint16_t[VRAM_HEIGHT*VRAM_WIDTH_PIXELS] array arg instead of a ptr */
 
    if (static_renderer->state == GlState_Valid)
