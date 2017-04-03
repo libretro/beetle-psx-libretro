@@ -1,6 +1,10 @@
 #include "shaders_common.h"
 
+#if defined(FILTER_SABR) || defined(FILTER_XBR)
+static const char * command_vertex_xbr = GLSL(
+#else
 static const char *command_vertex = GLSL(
+#endif
 // Vertex shader for rendering GPU draw commands in the framebuffer
 in vec4 position;
 in uvec3 color;
@@ -26,6 +30,7 @@ flat out uint frag_dither;
 flat out uint frag_semi_transparent;
 flat out uvec4 frag_texture_window;
 
+#if defined(FILTER_SABR) || defined(FILTER_XBR)
 out vec2 tc;
 out vec4 xyp_1_2_3;
 out vec4 xyp_6_7_8;
@@ -34,6 +39,7 @@ out vec4 xyp_16_17_18;
 out vec4 xyp_21_22_23;
 out vec4 xyp_5_10_15;
 out vec4 xyp_9_14_9;
+#endif
 
 void main() {
    vec2 pos = position.xy + vec2(offset);
@@ -65,6 +71,7 @@ void main() {
    frag_semi_transparent = semi_transparent;
    frag_texture_window = texture_window;
 
+#if defined(FILTER_SABR) || defined(FILTER_XBR)
 	tc = frag_texture_coord.xy;
 	xyp_1_2_3    = tc.xxxy + vec4(-1.,  0., 1., -2.);
 	xyp_6_7_8    = tc.xxxy + vec4(-1.,  0., 1., -1.);
@@ -73,4 +80,5 @@ void main() {
 	xyp_21_22_23 = tc.xxxy + vec4(-1.,  0., 1.,  2.);
 	xyp_5_10_15  = tc.xyyy + vec4(-2., -1., 0.,  1.);
 	xyp_9_14_9   = tc.xyyy + vec4( 2., -1., 0.,  1.);
+#endif
 });

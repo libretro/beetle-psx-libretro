@@ -458,8 +458,8 @@ vec4 get_texel_xbr()
 #ifdef FILTER_3POINT
 vec4 get_texel_3point()
 {
-  float x = frag_texture_coord.x;
-  float y = frag_texture_coord.y;
+  float x = frag_texture_coord.x - 0.5;
+  float y = frag_texture_coord.y - 0.5;
 
   float u_frac = fract(x);
   float v_frac = fract(y);
@@ -493,8 +493,8 @@ vec4 get_texel_3point()
 // Bilinear filtering
 vec4 get_texel_bilinear()
 {
-  float x = frag_texture_coord.x;
-  float y = frag_texture_coord.y;
+  float x = frag_texture_coord.x - 0.5;
+  float y = frag_texture_coord.y - 0.5;
 
   float u_frac = fract(x);
   float v_frac = fract(y);
@@ -522,26 +522,19 @@ void main() {
       }
       else
       {
+         vec4 texel;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
-         vec4 texel = vec4(0.0);
-#ifdef FILTER_SABR
+
+#if defined(FILTER_SABR)
          texel = get_texel_sabr();
-#endif
-
-#ifdef FILTER_XBR
+#elif defined(FILTER_XBR)
          texel = get_texel_xbr();
-#endif
-
-#ifdef FILTER_BILINEAR
+#elif defined(FILTER_BILINEAR)
          texel = get_texel_bilinear();
-#endif
-
-#ifdef FILTER_3POINT
+#elif defined(FILTER_3POINT)
          texel = get_texel_3point();
-#endif
-
-#if !defined(FILTER_SABR) && !defined(FILTER_XBR) && !defined(FILTER_BILINEAR) && !defined(FILTER_3POINT)
+#else
          texel = texel0; //use nearest if nothing else is chosen
 #endif
 

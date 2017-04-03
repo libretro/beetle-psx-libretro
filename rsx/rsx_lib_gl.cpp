@@ -31,12 +31,13 @@
 
 #include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#define FILTER_XBR
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
+#undef FILTER_XBR
 #define FILTER_SABR
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
 #undef FILTER_SABR
-#define FILTER_XBR
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
-#undef FILTER_XBR
 #define FILTER_BILINEAR
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
 #undef FILTER_BILINEAR
@@ -341,13 +342,13 @@ GlRenderer::GlRenderer(DrawConfig* config)
     {
     case FILTER_MODE_SABR:
       command_buffer = GlRenderer::build_buffer<CommandVertex>(
-                           command_vertex,
+                           command_vertex_xbr,
                            command_fragment_sabr,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_XBR:
       command_buffer = GlRenderer::build_buffer<CommandVertex>(
-                           command_vertex,
+                           command_vertex_xbr,
                            command_fragment_xbr,
                            VERTEX_BUFFER_LEN);
       break;
@@ -819,6 +820,12 @@ static bool retro_refresh_variables(GlRenderer *renderer)
           filter = FILTER_MODE_NEAREST;
        else if (!strcmp(var.value, "SABR"))
           filter = FILTER_MODE_SABR;
+       else if (!strcmp(var.value, "xBR"))
+          filter = FILTER_MODE_XBR;
+       else if (!strcmp(var.value, "bilinear"))
+          filter = FILTER_MODE_BILINEAR;
+       else if (!strcmp(var.value, "3-point"))
+          filter = FILTER_MODE_3POINT;
     }
 
     var.key = option_depth;
