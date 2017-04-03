@@ -52,11 +52,8 @@
 #include "libretro.h"
 #include "libretro_options.h"
 
-#if 1
+#if 0 || defined(__APPLE__)
 #define NEW_COPY_RECT
-#endif
-
-#ifdef NEW_COPY_RECT
 static const GLushort indices[6] = {0, 1, 2, 2, 1, 3};
 #else
 static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
@@ -78,8 +75,6 @@ enum FilterMode {
 // Main GPU instance, used to access the VRAM
 extern PS_GPU *GPU;
 static bool has_software_fb = false;
-
-static GLuint copy_fb;
 
 extern "C" unsigned char widescreen_hack;
 
@@ -1320,8 +1315,6 @@ void RetroGl::context_reset() {
     memcpy(copy_of_config, &config, sizeof(config));
     this->state_data.r = new GlRenderer(copy_of_config);
     this->state = GlState_Valid;
-
-    glGenFramebuffers(1, &copy_fb);
 }
 
 void RetroGl::context_destroy()
@@ -1340,7 +1333,6 @@ void RetroGl::context_destroy()
         return;
     }
 
-    glDeleteFramebuffers(1, &copy_fb);
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
     this->state = GlState_Invalid;
@@ -2118,19 +2110,36 @@ void rsx_gl_copy_rect(
        GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
 #ifdef NEW_COPY_RECT
+       /* TODO/FIXME - buggy code!
+        *
+        * Dead or Alive/Tekken 3 (high-res interlaced game) has screen
+        * flickering issues with this code! */
+
        // The diagonal is duplicated. I originally used "1, 2, 1, 2" to
        // duplicate the diagonal but I believe it was incorrect because of
        // the OpenGL filling convention. At least it's what TinyTiger told
        // me...
+       
+       GLuint fb;
 
-       glBindFramebuffer(GL_READ_FRAMEBUFFER, copy_fb);
+       glGenFramebuffers(1, &fb);
+       glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
        glFramebufferTexture(GL_READ_FRAMEBUFFER,
              GL_COLOR_ATTACHMENT0,
              renderer->fb_out->id,
              0);
 
        glReadBuffer(GL_COLOR_ATTACHMENT0);
+
+       // Can I bind the same texture to the framebuffer and
+       // GL_TEXTURE_2D? Something tells me this is undefined
+       // behaviour. I could use glReadPixels and glWritePixels instead
+       // or something like that.
+       glBindTexture(GL_TEXTURE_2D, renderer->fb_out->id);
+
        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
+
+       glDeleteFramebuffers(1, &fb);
 #else
 
        // The diagonal is duplicated
