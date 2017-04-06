@@ -20,6 +20,9 @@
 
 #include "../pgxp/pgxp_main.h"
 
+#include <vector>
+#define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
+
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
@@ -4174,42 +4177,74 @@ size_t retro_get_memory_size(unsigned type)
 
 void retro_cheat_reset(void)
 {
-	MDFN_FlushGameCheats(1);
+   MDFN_FlushGameCheats(1);
 }
 
-void retro_cheat_set(unsigned index, bool enabled, const char * code)
+void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
 {
-	const CheatFormatStruct* cf = CheatFormats;
-	char name[256];
-	MemoryPatch patch;
+   const CheatFormatStruct* cf = CheatFormats;
+   std::string name;
+   std::vector<std::string> codeParts;
+   int matchLength=0;
+   int cursor;
+   std::string part;
 
-	//Decode the cheat
-	try
-	{
-		cf->DecodeCheat(std::string(code), &patch);
-	}
-	catch(std::exception &e)
-	{
-		return;
-	}
+   if (codeLine==NULL) return;
 
-	//Generate a name
-	sprintf(name,"cheat_%u",index);
+   //Break the code into Parts
+   for (cursor=0;;cursor++)
+   {
+      if (ISHEXDEC)
+      {
+         matchLength++;
+      } else {
+         if (matchLength)
+         {
+            part=codeLine+cursor-matchLength;
+            part.erase(matchLength,std::string::npos);
+            codeParts.push_back(part);
+            matchLength=0;
+         }
+      }
+      if (!codeLine[cursor])
+      {
+         break;
+      }
+   }
 
-	//Set parameters
-	patch.name=std::string(name);
-	patch.status=enabled;
+   MemoryPatch patch;
+   bool trueML=0;
+   for (cursor=0;cursor<codeParts.size();cursor++)
+   {
+      part=codeParts[cursor];
+      if (part.length()==8)
+      {
+         part+=codeParts[++cursor];
+      }
+      if (part.length()==12)
+      {
+         //Decode the cheat
+         try
+         {
+            if(!cf->DecodeCheat(std::string(part), &patch))
+            {
+               //Generate a name
+               name="cheat_"+std::to_string(index)+"_"+std::to_string(cursor);
 
-	//Add the Cheat
-	try
-	{
-		MDFNI_AddCheat(name,patch.addr,patch.val,patch.compare,patch.type,patch.length,patch.bigendian);
+               //Set parameters
+               patch.name=name;
+               patch.status=enabled;
 
-	}
-	catch(std::exception &e)
-	{
-		return;
-	}
+               MDFNI_AddCheat(patch);
+               patch=MemoryPatch();
+            }
+         }
+         catch(std::exception &e)
+         {
+             continue;
+         }
+      }
+   }
 }
 
 #ifdef _WIN32

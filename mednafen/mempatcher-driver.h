@@ -27,7 +27,7 @@ struct MemoryPatch
 
 int MDFNI_DecodePAR(const char *code, uint32 *a, uint8 *v, uint8 *c, char *type);
 int MDFNI_DecodeGG(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type);
-int MDFNI_AddCheat(const char *name, uint32 addr, uint64 val, uint64 compare, char type, unsigned int length, bool bigendian);
+void MDFNI_AddCheat(const MemoryPatch& patch);
 int MDFNI_DelCheat(uint32 which);
 int MDFNI_ToggleCheat(uint32 which);
 
