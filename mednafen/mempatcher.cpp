@@ -33,6 +33,7 @@
 #include "mempatcher.h"
 
 #include "../libretro.h"
+#include "psx/psx.h"
 
 extern retro_log_printf_t log_cb;
 
@@ -40,6 +41,8 @@ static uint8 **RAMPtrs = NULL;
 static uint32 PageSize;
 static uint32 NumPages;
 
+typedef MemoryPatch CHEATF;
+#if 0
 typedef struct __CHEATF
 {
            char *name;
@@ -55,6 +58,7 @@ typedef struct __CHEATF
            char type;   /* 'R' for replace, 'S' for substitute(GG), 'C' for substitute with compare */
            int status;
 } CHEATF;
+#endif
 
 static std::vector<CHEATF> cheats;
 static int savecheats;
@@ -206,44 +210,24 @@ void MDFN_LoadGameCheats(void *override_ptr)
 
 void MDFN_FlushGameCheats(int nosave)
 {
-   std::vector<CHEATF>::iterator chit;
-
-   for(chit = cheats.begin(); chit != cheats.end(); chit++)
-   {
-      free(chit->name);
-      if(chit->conditions)
-         free(chit->conditions);
-   }
    cheats.clear();
 
    RebuildSubCheats();
 }
 
-int MDFNI_AddCheat(const char *name, uint32 addr, uint64 val, uint64 compare, char type, unsigned int length, bool bigendian)
+void MDFNI_AddCheat(const MemoryPatch& patch)
 {
- char *t;
+ cheats.push_back(patch);
 
- if(!(t = strdup(name)))
-  return(0);
-
- if(!AddCheatEntry(t, NULL, addr,val,compare,1,type, length, bigendian))
- {
-  free(t);
-  return(0);
- }
-
- savecheats = 1;
+ savecheats = true;
 
  MDFNMP_RemoveReadPatches();
  RebuildSubCheats();
  MDFNMP_InstallReadPatches();
-
- return(1);
 }
 
 int MDFNI_DelCheat(uint32 which)
 {
- free(cheats[which].name);
  cheats.erase(cheats.begin() + which);
 
  savecheats=1;
@@ -300,8 +284,6 @@ static bool TestConditions(const char *string)
   uint64 v_value;
   uint64 value_at_address;
 
-  (void)v_address;
-
   if(address[0] == '0' && address[1] == 'x')
    v_address = strtoul(address + 2, NULL, 16);
   else
@@ -312,7 +294,6 @@ static bool TestConditions(const char *string)
   else
    v_value = strtoull(value, NULL, 0);
 
-#if 0
   value_at_address = 0;
   for(unsigned int x = 0; x < bytelen; x++)
   {
@@ -322,9 +303,8 @@ static bool TestConditions(const char *string)
     shiftie = (bytelen - 1 - x) * 8;
    else
     shiftie = x * 8;
-   value_at_address |= MDFNGameInfo->MemRead(v_address + x) << shiftie;
+   value_at_address |= PSX_MemPeek8(v_address + x) << shiftie;
   }
-#endif
 
   //printf("A: %08x, V: %08llx, VA: %08llx, OP: %s\n", v_address, v_value, value_at_address, operation);
   if(!strcmp(operation, ">="))
@@ -402,67 +382,72 @@ static bool TestConditions(const char *string)
 
 void MDFNMP_ApplyPeriodicCheats(void)
 {
-   std::vector<CHEATF>::iterator chit;
+ if(!CheatsActive)
+  return;
 
-   if(!CheatsActive)
-      return;
-
-   for(chit = cheats.begin(); chit != cheats.end(); chit++)
+ //TestConditions("2 L 0x1F00F5 == 0xDEAD");
+ //if(TestConditions("1 L 0x1F0058 > 0")) //, 1 L 0xC000 == 0x01"));
+ for(std::vector<CHEATF>::iterator chit = cheats.begin(); chit != cheats.end(); chit++)
+ {
+  if(chit->status && (chit->type == 'R' || chit->type == 'A' || chit->type == 'T'))
+  {
+   if(chit->conditions.size() == 0 || TestConditions(chit->conditions.c_str()))
    {
-      if(chit->status && chit->type == 'R')
+    uint32 mltpl_count = chit->mltpl_count;
+    uint32 mltpl_addr = chit->addr;
+    uint64 mltpl_val = chit->val;
+    uint32 copy_src_addr = chit->copy_src_addr;
+
+    while(mltpl_count--)
+    {
+     uint8 carry = 0;
+
+     for(unsigned int x = 0; x < chit->length; x++)
+     {
+      const uint32 tmpaddr = chit->bigendian ? (mltpl_addr + chit->length - 1 - x) : (mltpl_addr + x);
+      const uint8 tmpval = mltpl_val >> (x * 8);
+
+      if(chit->type == 'A')
       {
-         if(!chit->conditions || TestConditions(chit->conditions))
-            for(unsigned int x = 0; x < chit->length; x++)
-            {
-               uint32 page = ((chit->addr + x) / PageSize) % NumPages;
-               if(RAMPtrs[page])
-               {
-                  uint64 tmpval = chit->val;
+       const unsigned t = PSX_MemPeek8(tmpaddr) + tmpval + carry;
 
-                  if(chit->bigendian)
-                     tmpval >>= (chit->length - 1 - x) * 8;
-                  else
-                     tmpval >>= x * 8;
+       carry = t >> 8;
 
-                  RAMPtrs[page][(chit->addr + x) % PageSize] = tmpval;
-               }
-            }
+       PSX_MemPoke8(tmpaddr, t);
       }
-   }
+      else if(chit->type == 'T')
+      {
+       const uint8 cv = PSX_MemPeek8(chit->bigendian ? (copy_src_addr + chit->length - 1 - x) : (copy_src_addr + x));
+
+       PSX_MemPoke8(tmpaddr, cv);
+      }
+      else
+       PSX_MemPoke8(tmpaddr, tmpval);
+     }
+     mltpl_addr += chit->mltpl_addr_inc;
+     mltpl_val += chit->mltpl_val_inc;
+     copy_src_addr += chit->copy_src_addr_inc;
+    }
+   } // end if(chit->conditions.size() == 0 || TestConditions(chit->conditions.c_str()))
+  }
+ }
 }
 
 
-void MDFNI_ListCheats(int (*callb)(char *name, uint32 a, uint64 v, uint64 compare, int s, char type, unsigned int length, bool bigendian, void *data), void *data)
+void MDFNI_ListCheats(int (*callb)(const MemoryPatch& patch, void *data), void *data)
 {
  std::vector<CHEATF>::iterator chit;
 
  for(chit = cheats.begin(); chit != cheats.end(); chit++)
  {
-  if(!callb(chit->name, chit->addr, chit->val, chit->compare, chit->status, chit->type, chit->length, chit->bigendian, data)) break;
+  if(!callb(*chit, data))
+   break;
  }
 }
 
-int MDFNI_GetCheat(uint32 which, char **name, uint32 *a, uint64 *v, uint64 *compare, int *s, char *type, unsigned int *length, bool *bigendian)
+MemoryPatch MDFNI_GetCheat(uint32 which)
 {
- CHEATF *next = &cheats[which];
-
- if(name)
-  *name=next->name;
- if(a)
-  *a=next->addr; 
- if(v)
-  *v=next->val;
- if(s)
-  *s=next->status;
- if(compare)
-  *compare=next->compare;
- if(type)
-  *type=next->type;
- if(length)
-  *length = next->length;
- if(bigendian)
-  *bigendian = next->bigendian;
- return(1);
+ return cheats[which];
 }
 
 static uint8 CharToNibble(char thechar)
@@ -631,35 +616,15 @@ int MDFNI_DecodePAR(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)
  return(1);
 }
 
-/* name can be NULL if the name isn't going to be changed. */
-int MDFNI_SetCheat(uint32 which, const char *name, uint32 a, uint64 v, uint64 compare, int s, char type, unsigned int length, bool bigendian)
+void MDFNI_SetCheat(uint32 which, const MemoryPatch& patch)
 {
- CHEATF *next = &cheats[which];
+ cheats[which] = patch;
 
- if(name)
- {
-  char *t;
+ savecheats = true;
 
-  if((t=(char *)realloc(next->name,strlen(name+1))))
-  {
-   next->name=t;
-   strcpy(next->name,name);
-  }
-  else
-   return(0);
- }
- next->addr=a;
- next->val=v;
- next->status=s;
- next->compare=compare;
- next->type=type;
- next->length = length;
- next->bigendian = bigendian;
-
+ MDFNMP_RemoveReadPatches();
  RebuildSubCheats();
- savecheats=1;
-
- return(1);
+ MDFNMP_InstallReadPatches();
 }
 
 /* Convenience function. */
