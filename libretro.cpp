@@ -3998,7 +3998,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_internal_resolution, "Internal GPU resolution; 1x(native)|2x|4x|8x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
-      { option_filter, "Texture filtering; nearest|SABR|xBR|bilinear|3-point" },
+      { option_filter, "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
       { option_depth, "Internal color depth; dithered 16bpp (native)|32bpp" },
       { option_wireframe, "Wireframe mode; disabled|enabled" },
       { option_display_vram, "Display full VRAM; disabled|enabled" },

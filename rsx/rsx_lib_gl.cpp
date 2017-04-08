@@ -44,6 +44,9 @@
 #define FILTER_3POINT
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
 #undef FILTER_3POINT
+#define FILTER_JINC2
+#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#undef FILTER_JINC2
 #include "../rustation-libretro/src/shaders/output_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/output_fragment.glsl.h"
 #include "../rustation-libretro/src/shaders/image_load_vertex.glsl.h"
@@ -69,7 +72,8 @@ enum FilterMode {
    FILTER_MODE_SABR,
    FILTER_MODE_XBR,
    FILTER_MODE_BILINEAR,
-   FILTER_MODE_3POINT
+   FILTER_MODE_3POINT,
+   FILTER_MODE_JINC2
 };
 
 // Main GPU instance, used to access the VRAM
@@ -289,6 +293,8 @@ GlRenderer::GlRenderer(DrawConfig* config)
           filter = FILTER_MODE_BILINEAR;
        else if (!strcmp(var.value, "3-point"))
           filter = FILTER_MODE_3POINT;
+       else if (!strcmp(var.value, "JINC2"))
+          filter = FILTER_MODE_JINC2;
 
        this->filter_type = filter;
     }
@@ -357,6 +363,12 @@ GlRenderer::GlRenderer(DrawConfig* config)
       command_buffer = GlRenderer::build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment_3point,
+                           VERTEX_BUFFER_LEN);
+      break;
+     case FILTER_MODE_JINC2:
+      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+                           command_vertex,
+                           command_fragment_jinc2,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_NEAREST:
@@ -821,6 +833,8 @@ static bool retro_refresh_variables(GlRenderer *renderer)
           filter = FILTER_MODE_BILINEAR;
        else if (!strcmp(var.value, "3-point"))
           filter = FILTER_MODE_3POINT;
+       else if (!strcmp(var.value, "JINC2"))
+          filter = FILTER_MODE_JINC2;
     }
 
     var.key = option_depth;
@@ -2119,7 +2133,7 @@ void rsx_gl_copy_rect(
        // duplicate the diagonal but I believe it was incorrect because of
        // the OpenGL filling convention. At least it's what TinyTiger told
        // me...
-       
+
        GLuint fb;
 
        glGenFramebuffers(1, &fb);
