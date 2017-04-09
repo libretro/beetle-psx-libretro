@@ -4183,7 +4183,7 @@ void retro_cheat_reset(void)
 void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
 {
    const CheatFormatStruct* cf = CheatFormats;
-   std::string name;
+   char name[256];
    std::vector<std::string> codeParts;
    int matchLength=0;
    int cursor;
@@ -4229,10 +4229,10 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
             if(!cf->DecodeCheat(std::string(part), &patch))
             {
                //Generate a name
-               name="cheat_"+std::to_string(index)+"_"+std::to_string(cursor);
+               sprintf(name,"cheat_%i_%i",index,cursor);
 
                //Set parameters
-               patch.name=name;
+               patch.name=(std::string)name;
                patch.status=enabled;
 
                MDFNI_AddCheat(patch);
