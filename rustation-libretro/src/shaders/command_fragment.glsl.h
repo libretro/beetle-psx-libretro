@@ -460,8 +460,8 @@ vec4 get_texel_xbr()
 #ifdef FILTER_3POINT
 vec4 get_texel_3point()
 {
-  float x = frag_texture_coord.x - 0.5;
-  float y = frag_texture_coord.y - 0.5;
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
 
   float u_frac = fract(x);
   float v_frac = fract(y);
@@ -495,8 +495,8 @@ vec4 get_texel_3point()
 // Bilinear filtering
 vec4 get_texel_bilinear()
 {
-  float x = frag_texture_coord.x - 0.5;
-  float y = frag_texture_coord.y - 0.5;
+  float x = frag_texture_coord.x;
+  float y = frag_texture_coord.y;
 
   float u_frac = fract(x);
   float v_frac = fract(y);
