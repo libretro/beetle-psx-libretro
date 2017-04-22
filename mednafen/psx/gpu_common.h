@@ -11,6 +11,7 @@ extern enum dither_mode psx_gpu_dither_mode;
 
 #define DitherEnabled(gpu)    (psx_gpu_dither_mode != DITHER_OFF && gpu->dtd)
 
+#define UPSCALE(gpu)          (1U << gpu->upscale_shift)
 
 template<int BlendMode>
 static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)

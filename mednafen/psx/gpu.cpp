@@ -336,7 +336,7 @@ void GPU_Power(void)
 {
    PS_GPU *gpu = (PS_GPU*)GPU;
 
-   memset(gpu->vram, 0, 512 * 1024 * gpu->upscale() * gpu->upscale() * sizeof(*gpu->vram));
+   memset(gpu->vram, 0, 512 * 1024 * UPSCALE(gpu) * UPSCALE(gpu) * sizeof(*gpu->vram));
 
    memset(gpu->CLUT_Cache, 0, sizeof(gpu->CLUT_Cache));
    gpu->CLUT_Cache_VB = ~0U;
@@ -1626,7 +1626,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   int32 udx_start   = dx_start << gpu->upscale_shift;
                   int32 udx_end     = dx_end   << gpu->upscale_shift;
                   int32 ufb_x       = fb_x     << gpu->upscale_shift;
-                  unsigned _upscale = gpu->upscale();
+                  unsigned _upscale = UPSCALE(gpu);
 
                   for (uint32_t i = 0; i < _upscale; i++)
                   {
@@ -2000,9 +2000,9 @@ void texel_put(uint32 x, uint32 y, uint16 v)
 
    /* Duplicate the pixel as many times as necessary (nearest
     * neighbour upscaling) */
-   for (dy = 0; dy < GPU->upscale(); dy++)
+   for (dy = 0; dy < UPSCALE(GPU); dy++)
    {
-      for (dx = 0; dx < GPU->upscale(); dx++)
+      for (dx = 0; dx < UPSCALE(GPU); dx++)
          vram_put(GPU, x + dx, y + dy, v);
    }
 }

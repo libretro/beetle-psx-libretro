@@ -89,11 +89,6 @@ class PS_GPU
          return(scanline);
       } 
 
-      INLINE uint32 upscale() const
-      {
-         return 1U << upscale_shift;
-      }
-
       uint8 upscale_shift;
       uint8 dither_upscale_shift;
 

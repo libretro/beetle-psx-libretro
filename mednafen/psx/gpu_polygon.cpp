@@ -148,7 +148,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
       if(xb > (clipx1 + 1))
          xb = clipx1 + 1;
 
-      if(xs < xb && ((y & (gpu->upscale() - 1)) == 0))
+      if(xs < xb && ((y & (UPSCALE(gpu) - 1)) == 0))
       {
          gpu->DrawTimeAvail -= (xb - xs) >> gpu->upscale_shift;
 
@@ -512,8 +512,8 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 	OGLVertex vert;
 	PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
 
-	vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * gpu->upscale());
-	vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * gpu->upscale());
+	vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * UPSCALE(gpu));
+	vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * UPSCALE(gpu));
 	vertices[v].precise[2] = vert.w;
 
 	if (!vert.valid_w)
