@@ -319,8 +319,6 @@ class PS_GPU
 
       template<uint32 TexMode_TA>
          void Update_CLUT_Cache(uint16 raw_clut);
-      template<int BlendMode>
-         void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix);
 
       template<int BlendMode, bool MaskEval_TA, bool textured>
          void PlotPixel(int32 x, int32 y, uint16 pix);
