@@ -16,8 +16,6 @@
 
 #include "../../rsx/rsx.h"
 
-class PS_GPU;
-
 #define INCMD_NONE     0
 #define INCMD_PLINE    1
 #define INCMD_QUAD     2
@@ -33,15 +31,7 @@ enum dither_mode
 {
    DITHER_NATIVE   = 0,
    DITHER_UPSCALED,
-   DITHER_OFF,
-};
-
-struct CTEntry
-{
-   void (*func[4][8])(PS_GPU* g, const uint32 *cb);
-   uint8 len;
-   uint8 fifo_fb_len;
-   bool ss_cmd;
+   DITHER_OFF
 };
 
 struct tri_vertex
@@ -131,8 +121,6 @@ class PS_GPU
          uint8 RGB8SAT[256];
          uint8 RGB8SAT_Over[256];
       };
-
-      static CTEntry Commands[256];
 
       FastFIFO<uint32, 0x20> BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
 
