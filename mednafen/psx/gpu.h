@@ -92,56 +92,11 @@ class PS_GPU
          return psx_gpu_dither_mode != DITHER_OFF && dtd;
       }
 
-
       inline int32 GetScanlineNum(void)
       {
          return(scanline);
       } 
 
-      INLINE uint16 PeekRAM(uint32 A) const
-      {
-         return texel_fetch(A & 0x3FF, (A >> 10) & 0x1FF);
-      }
-
-      INLINE void PokeRAM(uint32 A, uint16 V)
-      {
-         texel_put(A & 0x3FF, (A >> 10) & 0x1FF, V);
-      }
-
-      // Return a pixel from VRAM, ignoring the internal upscaling
-      INLINE uint16 texel_fetch(uint32 x, uint32 y) const
-      {
-         return vram_fetch(x << upscale_shift,
-               y << upscale_shift);
-      }
-
-      // Set a pixel in VRAM, upscaling it if necessary
-      INLINE void texel_put(uint32 x, uint32 y, uint16 v)
-      {
-
-         x <<= upscale_shift;
-         y <<= upscale_shift;
-
-         // Duplicate the pixel as many times as necessary (nearest
-         // neighbour upscaling)
-         for (uint32 dy = 0; dy < upscale(); dy++) {
-            for (uint32 dx = 0; dx < upscale(); dx++) {
-               vram_put(x + dx, y + dy, v);
-            }
-         }
-      }
-
-      // Return a pixel from VRAM
-      INLINE uint16 vram_fetch(uint32 x, uint32 y) const
-      {
-         return vram[(y << (10 + upscale_shift)) | x];
-      }
-
-      // Set a pixel in VRAM
-      INLINE void vram_put(uint32 x, uint32 y, uint16 v)
-      {
-         vram[(y << (10 + upscale_shift)) | x] = v;
-      }
 
       INLINE uint32 upscale() const
       {
@@ -311,25 +266,9 @@ class PS_GPU
       void InvalidateCache(void);
       void SetTPage(uint32_t data);
 
-      void WriteCB(uint32 data, uint32 addr);
       uint32 ReadData(void);
-      void ProcessFIFO(uint32_t in_count);
 
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-
-      template<uint32 TexMode_TA>
-         void Update_CLUT_Cache(uint16 raw_clut);
-
-      template<int BlendMode, bool MaskEval_TA, bool textured>
-         void PlotPixel(int32 x, int32 y, uint16 pix);
-      template<int BlendMode, bool MaskEval_TA, bool textured>
-         void PlotNativePixel(int32 x, int32 y, uint16 pix);
-
-      template<uint32 TexMode_TA>
-         uint16 GetTexel(uint32 clut_offset, int32 u, int32 v);
-
-      void UpdateDisplayMode();
-
    private:
       template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
          void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
@@ -383,5 +322,11 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
+
+uint16 GPU_PeekRAM(uint32 A);
+
+void GPU_PokeRAM(uint32 A, uint16 V);
+
+void texel_put(uint32 x, uint32 y, uint16 v);
 
 #endif

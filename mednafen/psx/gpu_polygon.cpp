@@ -199,7 +199,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
 
          if(textured)
          {
-            uint16_t fbw = gpu->GetTexel<TexMode_TA>(clut_offset, COORD_GET_INT(ig.u), COORD_GET_INT(ig.v));
+            uint16_t fbw = GetTexel<TexMode_TA>(gpu, clut_offset, COORD_GET_INT(ig.u), COORD_GET_INT(ig.v));
 
             if(fbw)
             {
@@ -208,7 +208,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
                   uint8_t *dither_offset = gpu->DitherLUT[(dither) ? (dither_y & 3) : 2][(dither) ? (dither_x & 3) : 3];
                   fbw = ModTexel(dither_offset, fbw, r, g, b);
                }
-               gpu->PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+               PlotPixel<BlendMode, MaskEval_TA, true>(gpu, x, y, fbw);
             }
          }
          else
@@ -224,7 +224,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
             else
                pix = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
 
-            gpu->PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+            PlotPixel<BlendMode, MaskEval_TA, false>(gpu, x, y, pix);
          }
 
          AddIDeltas_DX<goraud, textured>(ig, idl);

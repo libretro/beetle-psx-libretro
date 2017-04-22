@@ -23,6 +23,8 @@
 #include "../pgxp/pgxp_gpu.h"
 #include "../pgxp/pgxp_mem.h"
 
+#include "gpu_common.h"
+
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
 
@@ -125,7 +127,7 @@ PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
    for (unsigned y = 0; y < 512; y++)
    {
       for (unsigned x = 0; x < 1024; x++)
-         texel_put(x, y, g.texel_fetch(x, y));
+         texel_put(x, y, texel_fetch(GPU, x, y));
    }
 }
 
@@ -163,9 +165,9 @@ void *PS_GPU::Alloc(uint8 upscale_shift)
   unsigned width = 1024 << upscale_shift;
   unsigned height = 512 << upscale_shift;
 
-  unsigned size = sizeof(PS_GPU) + width * height * sizeof(uint16_t);
+  unsigned size   = sizeof(PS_GPU) + width * height * sizeof(uint16_t);
 
-  char *buffer = new char[size];
+  char *buffer    = new char[size];
 
   memset(buffer, 0, size);
 
@@ -438,7 +440,6 @@ void GPU_ResetTS(void)
    gpu->lastts = 0;
 }
 
-#include "gpu_common.h"
 #include "gpu_polygon.cpp"
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
@@ -511,7 +512,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
       {
          const int32 d_x = (x + destX) & 1023;
 
-         gpu->texel_put(d_x, d_y, fill_value);
+         texel_put(d_x, d_y, fill_value);
       }
    }
 
@@ -554,7 +555,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
             int32 s_x = (x + chunk_x + sourceX) & 1023;
 
             // XXX make upscaling-friendly, as it is we copy at 1x
-            tmpbuf[chunk_x] = g->texel_fetch(s_x, s_y);
+            tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
          }
 
          for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
@@ -562,8 +563,8 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
             int32 d_y = (y + destY) & 511;
             int32 d_x = (x + chunk_x + destX) & 1023;
 
-            if(!(g->texel_fetch(d_x, d_y) & g->MaskEvalAND))
-               g->texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
+            if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
+               texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
          }
       }
    }
@@ -826,47 +827,45 @@ CTEntry PS_GPU::Commands[256] =
 
 };
 
-
-void PS_GPU::ProcessFIFO(uint32_t in_count)
+static void ProcessFIFO(uint32_t in_count)
 {
    uint32_t CB[0x10], InData;
    unsigned i;
    unsigned command_len;
-   uint32_t cc            = InCmd_CC;
-   const CTEntry *command = &Commands[cc];
+   uint32_t cc            = GPU->InCmd_CC;
+   const CTEntry *command = &GPU->Commands[cc];
    bool read_fifo         = false;
 
-   switch(InCmd)
+   switch (GPU->InCmd)
    {
       default:
       case INCMD_NONE:
          break;
-
-      case INCMD_FBREAD:
-         return;
-
       case INCMD_FBWRITE:
-         InData = BlitterFIFO.Read();
+         InData = GPU->BlitterFIFO.Read();
 
          for(i = 0; i < 2; i++)
          {
-            bool fetch = texel_fetch(FBRW_CurX & 1023, FBRW_CurY & 511) & MaskEvalAND;
+            bool fetch = texel_fetch(GPU, GPU->FBRW_CurX & 1023, GPU->FBRW_CurY & 511) & GPU->MaskEvalAND;
 
             if (!fetch)
-               texel_put(FBRW_CurX & 1023, FBRW_CurY & 511, InData | MaskSetOR);
+               texel_put(GPU->FBRW_CurX & 1023, GPU->FBRW_CurY & 511, InData | GPU->MaskSetOR);
 
-            FBRW_CurX++;
-            if(FBRW_CurX == (FBRW_X + FBRW_W))
+            GPU->FBRW_CurX++;
+            if(GPU->FBRW_CurX == (GPU->FBRW_X + GPU->FBRW_W))
             {
-               FBRW_CurX = FBRW_X;
-               FBRW_CurY++;
-               if(FBRW_CurY == (FBRW_Y + FBRW_H))
+               GPU->FBRW_CurX = GPU->FBRW_X;
+               GPU->FBRW_CurY++;
+               if(GPU->FBRW_CurY == (GPU->FBRW_Y + GPU->FBRW_H))
                {
                   /* Upload complete, send over to RSX */
-                  rsx_intf_load_image(FBRW_X, FBRW_Y,
-                        FBRW_W, FBRW_H,
-                        this->vram, MaskEvalAND != 0, MaskSetOR != 0);
-                  InCmd = INCMD_NONE;
+                  rsx_intf_load_image(
+                        GPU->FBRW_X, GPU->FBRW_Y,
+                        GPU->FBRW_W, GPU->FBRW_H,
+                        GPU->vram,
+                        GPU->MaskEvalAND != 0,
+                        GPU->MaskSetOR != 0);
+                  GPU->InCmd = INCMD_NONE;
                   break;	// Break out of the for() loop.
                }
             }
@@ -875,22 +874,22 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
          return;
 
       case INCMD_QUAD:
-         if(DrawTimeAvail < 0)
+         if(GPU->DrawTimeAvail < 0)
             return;
 
          command_len      = 1 + (bool)(cc & 0x4) + (bool)(cc & 0x10);
          read_fifo = true;
          break;
       case INCMD_PLINE:
-         if(DrawTimeAvail < 0)
+         if(GPU->DrawTimeAvail < 0)
             return;
 
-         command_len        = 1 + (bool)(InCmd_CC & 0x10);
+         command_len        = 1 + (bool)(GPU->InCmd_CC & 0x10);
 
-         if((BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
+         if((GPU->BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
          {
-            BlitterFIFO.Read();
-            InCmd = INCMD_NONE;
+            GPU->BlitterFIFO.Read();
+            GPU->InCmd = INCMD_NONE;
             return;
          }
 
@@ -900,11 +899,11 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
 
    if (!read_fifo)
    {
-      cc          = BlitterFIFO.Peek() >> 24;
-      command     = &Commands[cc];
+      cc          = GPU->BlitterFIFO.Peek() >> 24;
+      command     = &GPU->Commands[cc];
       command_len = command->len;
 
-      if(DrawTimeAvail < 0 && !command->ss_cmd)
+      if(GPU->DrawTimeAvail < 0 && !command->ss_cmd)
          return;
    }
 
@@ -913,14 +912,14 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
 
    for (i = 0; i < command_len; i++)
    {
-	   PGXP_WriteCB(PGXP_ReadFIFO(BlitterFIFO.read_pos), i);
-	   CB[i] = BlitterFIFO.Read();
+	   PGXP_WriteCB(PGXP_ReadFIFO(GPU->BlitterFIFO.read_pos), i);
+	   CB[i] = GPU->BlitterFIFO.Read();
    }
 
    if (!read_fifo)
    {
       if(!command->ss_cmd)
-         DrawTimeAvail -= 2;
+         GPU->DrawTimeAvail -= 2;
 
       // A very very ugly kludge to support
       // texture mode specialization.
@@ -928,39 +927,39 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
       {
          /* Don't alter SpriteFlip here. */
-         SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
+         GPU->SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
       }
    }
 
    if ((cc >= 0x80) && (cc <= 0x9F))
-      Command_FBCopy(this, CB);
+      Command_FBCopy(GPU, CB);
    else if ((cc >= 0xA0) && (cc <= 0xBF))
-      Command_FBWrite(this, CB);
+      Command_FBWrite(GPU, CB);
    else if ((cc >= 0xC0) && (cc <= 0xDF))
-      Command_FBRead(this, CB);
+      Command_FBRead(GPU, CB);
    else
    {
-	   if (command->func[abr][TexMode])
-		   command->func[abr][TexMode | (MaskEvalAND ? 0x4 : 0x0)](this, CB);
+	   if (command->func[GPU->abr][GPU->TexMode])
+		   command->func[GPU->abr][GPU->TexMode | (GPU->MaskEvalAND ? 0x4 : 0x0)](GPU, CB);
    }
 }
 
-INLINE void PS_GPU::WriteCB(uint32_t InData, uint32_t addr)
+static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 {
-   if(BlitterFIFO.in_count >= 0x10
+   if(GPU->BlitterFIFO.in_count >= 0x10
          && 
-         ( InCmd != INCMD_NONE || 
-          (BlitterFIFO.in_count - 0x10) >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len))
+         ( GPU->InCmd != INCMD_NONE || 
+          (GPU->BlitterFIFO.in_count - 0x10) >= GPU->Commands[GPU->BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
    }
 
-   PGXP_WriteFIFO(ReadMem(addr), BlitterFIFO.write_pos);
-   BlitterFIFO.Write(InData);
+   PGXP_WriteFIFO(ReadMem(addr), GPU->BlitterFIFO.write_pos);
+   GPU->BlitterFIFO.Write(InData);
 
-   if(BlitterFIFO.in_count)
-      ProcessFIFO(BlitterFIFO.in_count);
+   if(GPU->BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
+      ProcessFIFO(GPU->BlitterFIFO.in_count);
 }
 
 void PS_GPU::SetTPage(const uint32_t cmdw)
@@ -969,12 +968,10 @@ void PS_GPU::SetTPage(const uint32_t cmdw)
    const unsigned NewTexPageY = (cmdw & 0x10) * 16;
    const unsigned NewTexMode  = (cmdw >> 7) & 0x3;
 
-   abr = (cmdw >> 5) & 0x3;
+   this->abr = (cmdw >> 5) & 0x3;
 
    if(!NewTexMode != !TexMode || NewTexPageX != TexPageX || NewTexPageY != TexPageY)
-   {
       InvalidateTexCache();
-   }
 
    if(TexDisableAllowChange)
    {
@@ -990,6 +987,62 @@ void PS_GPU::SetTPage(const uint32_t cmdw)
    TexPageX = NewTexPageX;
    TexPageY = NewTexPageY;
    TexMode  = NewTexMode;
+}
+
+static void UpdateDisplayMode(void)
+{
+   bool depth_24bpp = !!(GPU->DisplayMode & 0x10);
+
+   uint16_t yres = GPU->VertEnd - GPU->VertStart;
+
+   // Both 2nd bit and 5th bit have to be enabled to use interlacing properly.
+   if((GPU->DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
+      yres *= 2;
+
+   unsigned pixelclock_divider;
+
+   if ((GPU->DisplayMode >> 6) & 1)
+   {
+      // HRes ~ 368pixels
+      pixelclock_divider = 7;
+   }
+   else
+   {
+      switch (GPU->DisplayMode & 3)
+      {
+         case 0:
+            // Hres ~ 256pixels
+            pixelclock_divider = 10;
+            break;
+         case 1:
+            // Hres ~ 320pixels
+            pixelclock_divider = 8;
+            break;
+         case 2:
+            // Hres ~ 512pixels
+            pixelclock_divider = 5;
+            break;
+         default:
+            // Hres ~ 640pixels
+            pixelclock_divider = 4;
+            break;
+      }
+   }
+
+   // First we get the horizontal range in number of pixel clock period
+   uint16_t xres = (GPU->HorizEnd - GPU->HorizStart);
+
+   // Then we apply the divider
+   xres /= pixelclock_divider;
+
+   // Then the rounding formula straight outta No$
+   xres = (xres + 2) & ~3;
+
+   rsx_intf_set_display_mode(
+         GPU->DisplayFB_XStart,
+         GPU->DisplayFB_YStart,
+         xres, yres,
+         depth_24bpp);
 }
 
 void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
@@ -1019,7 +1072,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU_SoftReset();
              rsx_intf_set_draw_area(gpu->ClipX0, gpu->ClipY0,
                    gpu->ClipX1, gpu->ClipY1);
-             gpu->UpdateDisplayMode();
+             UpdateDisplayMode();
             break;
 
          case 0x01:	// Reset command buffer
@@ -1062,7 +1115,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x08:
             //printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
             gpu->DisplayMode = V & 0xFF;
-            gpu->UpdateDisplayMode();
+            UpdateDisplayMode();
             break;
 
          case 0x09:
@@ -1117,26 +1170,26 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
       //uint32_t command = V >> 24;
       //printf("Meow command: %02x\n", command);
       //assert(!(gpu->DMAControl & 2));
-      gpu->WriteCB(V, A);
+      GPU_WriteCB(V, A);
    }
 }
 
-
 void GPU_WriteDMA(uint32_t V, uint32 addr)
 {
-   PS_GPU *gpu  = (PS_GPU*)GPU;
-   gpu->WriteCB(V, addr);
+   GPU_WriteCB(V, addr);
 }
 
 INLINE uint32_t PS_GPU::ReadData(void)
 {
+   PS_GPU *gpu = (PS_GPU*)GPU;
+
    if(InCmd == INCMD_FBREAD)
    {
       DataReadBufferEx = 0;
       for(int i = 0; i < 2; i++)
       {
          DataReadBufferEx |=
-            texel_fetch(FBRW_CurX & 1023,FBRW_CurY & 511) << (i * 16);
+            texel_fetch(gpu, FBRW_CurX & 1023,FBRW_CurY & 511) << (i * 16);
 
          FBRW_CurX++;
          if(FBRW_CurX == (FBRW_X + FBRW_W))
@@ -1291,8 +1344,8 @@ int32_t GPU_Update(const int32_t sys_timestamp)
    if(gpu->DrawTimeAvail > 256)
       gpu->DrawTimeAvail = 256;
 
-   if(gpu->BlitterFIFO.in_count)
-      gpu->ProcessFIFO(gpu->BlitterFIFO.in_count);
+   if(gpu->BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
+      ProcessFIFO(gpu->BlitterFIFO.in_count);
 
    //puts("GPU Update Start");
 
@@ -1687,7 +1740,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
          for (unsigned y = 0; y < 512; y++)
          {
             for (unsigned x = 0; x < 1024; x++)
-               vram_new[y * 1024 + x] = gpu->texel_fetch(x, y);
+               vram_new[y * 1024 + x] = texel_fetch(gpu, x, y);
          }
       }
    }
@@ -1831,7 +1884,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
          for (unsigned y = 0; y < 512; y++)
          {
             for (unsigned x = 0; x < 1024; x++)
-               gpu->texel_put(x, y, vram_new[y * 1024 + x]);
+               texel_put(x, y, vram_new[y * 1024 + x]);
          }
       }
 
@@ -1882,62 +1935,12 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 			      1024, 512,
 			      gpu->vram, false, false);
 
-	  gpu->UpdateDisplayMode();
+	  UpdateDisplayMode();
    }
 
    return(ret);
 }
 
-void PS_GPU::UpdateDisplayMode()
-{
-  bool depth_24bpp = !!(DisplayMode & 0x10);
-
-  uint16_t yres = VertEnd - VertStart;
-
-  // Both 2nd bit and 5th bit have to be enabled to use interlacing properly.
-  if((DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480)) {
-    yres *= 2;
-  }
-
-  unsigned pixelclock_divider;
-
-  if ((DisplayMode >> 6) & 1) {
-    // HRes ~ 368pixels
-    pixelclock_divider = 7;
-  } else {
-    switch (DisplayMode & 3) {
-    case 0:
-      // Hres ~ 256pixels
-      pixelclock_divider = 10;
-      break;
-    case 1:
-      // Hres ~ 320pixels
-      pixelclock_divider = 8;
-      break;
-    case 2:
-      // Hres ~ 512pixels
-      pixelclock_divider = 5;
-      break;
-    default:
-      // Hres ~ 640pixels
-      pixelclock_divider = 4;
-      break;
-    }
-  }
-
-  // First we get the horizontal range in number of pixel clock period
-  uint16_t xres = (HorizEnd - HorizStart);
-
-  // Then we apply the divider
-  xres /= pixelclock_divider;
-
-  // Then the rounding formula straight outta No$
-  xres = (xres + 2) & ~3;
-
-  rsx_intf_set_display_mode(DisplayFB_XStart, DisplayFB_YStart,
-		       xres, yres,
-		       depth_24bpp);
-}
 
 void GPU_set_dither_upscale_shift(uint8 upscale_shift)
 {
@@ -1972,4 +1975,30 @@ uint16 *GPU_get_vram(void)
 {
    PS_GPU *gpu = (PS_GPU*)GPU;
    return gpu->vram;
+}
+
+uint16 GPU_PeekRAM(uint32 A)
+{
+   return texel_fetch(GPU, A & 0x3FF, (A >> 10) & 0x1FF);
+}
+
+void GPU_PokeRAM(uint32 A, uint16 V)
+{
+   texel_put(A & 0x3FF, (A >> 10) & 0x1FF, V);
+}
+
+/* Set a pixel in VRAM, upscaling it if necessary */
+void texel_put(uint32 x, uint32 y, uint16 v)
+{
+   uint32_t dy, dx;
+   x <<= GPU->upscale_shift;
+   y <<= GPU->upscale_shift;
+
+   /* Duplicate the pixel as many times as necessary (nearest
+    * neighbour upscaling) */
+   for (dy = 0; dy < GPU->upscale(); dy++)
+   {
+      for (dx = 0; dx < GPU->upscale(); dx++)
+         vram_put(GPU, x + dx, y + dy, v);
+   }
 }

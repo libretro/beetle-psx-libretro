@@ -1,3 +1,12 @@
+/* Return a pixel from VRAM */
+#define vram_fetch(gpu, x, y)  (gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)])
+
+/* Return a pixel from VRAM, ignoring the internal upscaling */
+#define texel_fetch(gpu, x, y) vram_fetch(gpu, (x) << gpu->upscale_shift, (y) << gpu->upscale_shift)
+
+/* Set a pixel in VRAM */
+#define vram_put(gpu, x, y, v) gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)] = (v)
+
 template<int BlendMode>
 static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 {
@@ -54,62 +63,66 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 }
 
 template<int BlendMode, bool MaskEval_TA, bool textured>
-INLINE void PS_GPU::PlotPixel(int32_t x, int32_t y, uint16_t fore_pix)
+static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
    // More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
-   y &= (512 << upscale_shift) - 1;
+   y &= (512 << gpu->upscale_shift) - 1;
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
       // Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      uint16_t bg_pix = vram_fetch(x, y);
+      uint16_t bg_pix = vram_fetch(gpu, x, y);
       PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
-   if(!MaskEval_TA || !(vram_fetch(x, y) & 0x8000))
-      vram_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
+   if(!MaskEval_TA || !(vram_fetch(gpu, x, y) & 0x8000))
+   {
+      if (textured)
+         vram_put(gpu, x, y, fore_pix | gpu->MaskSetOR);
+      else
+         vram_put(gpu, x, y, (fore_pix & 0x7FFF) | gpu->MaskSetOR);
+   }
 }
 
 /// Copy of PlotPixel without internal upscaling, used to draw lines and sprites
 template<int BlendMode, bool MaskEval_TA, bool textured>
-INLINE void PS_GPU::PlotNativePixel(int32_t x, int32_t y, uint16_t fore_pix)
+static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
    uint16_t output;
    y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
 
    if(BlendMode >= 0 && (fore_pix & 0x8000))
    {
-      uint16_t bg_pix = texel_fetch(x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
+      uint16_t bg_pix = texel_fetch(gpu, x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
       PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
-   if(!MaskEval_TA || !(texel_fetch(x, y) & 0x8000))
-      texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | MaskSetOR);
+   if(!MaskEval_TA || !(texel_fetch(gpu, x, y) & 0x8000))
+      texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR);
 }
 
 #define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[(((texel & 0x1F)  * (r))   >> (5 - 1))] << 0) | (dither_offset[(((texel & 0x3E0)  * (g))  >> (10 - 1))] << 5) | (dither_offset[(((texel & 0x7C00) * (b)) >> (15 - 1))] << 10))
 
 template<uint32_t TexMode_TA>
-INLINE void PS_GPU::Update_CLUT_Cache(uint16 raw_clut)
+static INLINE void Update_CLUT_Cache(PS_GPU *gpu, uint16 raw_clut)
 {
    if(TexMode_TA < 2)
    {
       const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
 
-      if(CLUT_Cache_VB != new_ccvb)
+      if(gpu->CLUT_Cache_VB != new_ccvb)
       {
+         unsigned i;
          uint32 y = (raw_clut >> 6) & 0x1FF;
          const uint32_t cxo = (raw_clut & 0x3F) << 4;
          const uint32_t count = (TexMode_TA ? 256 : 16);
 
-         DrawTimeAvail -= count;
+         gpu->DrawTimeAvail -= count;
 
-         for(unsigned i = 0; i < count; i++)
-         {
-            CLUT_Cache[i] = texel_fetch((cxo + i) & 0x3FF, y);
-         }
+         for(i = 0; i < count; i++)
+            gpu->CLUT_Cache[i] = texel_fetch(gpu, (cxo + i) & 0x3FF, y);
 
-         CLUT_Cache_VB = new_ccvb;
+         gpu->CLUT_Cache_VB = new_ccvb;
       }
    }
 }
@@ -163,7 +176,7 @@ INLINE void PS_GPU::RecalcTexWindowStuff(void)
 }
 
 template<uint32_t TexMode_TA>
-INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int32_t v_arg)
+static INLINE uint16_t GetTexel(PS_GPU *gpu, const uint32_t clut_offset, int32_t u_arg, int32_t v_arg)
 {
 #if 0
    /* TODO */
@@ -198,11 +211,11 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int3
 
    uint16 fbw = c->Data[gro & 0x3];
 #else
-   uint32_t u_ext = TexWindowXLUT[u_arg];
-   uint32_t v = TexWindowYLUT[v_arg];
-   uint32_t fbtex_x = TexPageX + (u_ext >> (2 - TexMode_TA));
-   uint32_t fbtex_y = TexPageY + v;
-   uint16_t fbw = texel_fetch(fbtex_x & 1023, fbtex_y);
+   uint32_t u_ext   = gpu->TexWindowXLUT[u_arg];
+   uint32_t v       = gpu->TexWindowYLUT[v_arg];
+   uint32_t fbtex_x = gpu->TexPageX + (u_ext >> (2 - TexMode_TA));
+   uint32_t fbtex_y = gpu->TexPageY + v;
+   uint16_t fbw     = texel_fetch(gpu, fbtex_x & 1023, fbtex_y);
 #endif
    if(TexMode_TA != 2)
    {
@@ -214,7 +227,7 @@ INLINE uint16_t PS_GPU::GetTexel(const uint32_t clut_offset, int32_t u_arg, int3
 #if 0
       fbw = CLUT_Cache[fbw];
 #else
-      fbw = texel_fetch((clut_offset + fbw) & 1023, (clut_offset >> 10) & 511);
+      fbw = texel_fetch(gpu, (clut_offset + fbw) & 1023, (clut_offset >> 10) & 511);
 #endif
    }
 

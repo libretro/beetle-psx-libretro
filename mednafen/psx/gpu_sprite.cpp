@@ -91,7 +91,7 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
          {
             if(textured)
             {
-               uint16_t fbw = gpu->GetTexel<TexMode_TA>(clut_offset, u_r, v);
+               uint16_t fbw = GetTexel<TexMode_TA>(gpu, clut_offset, u_r, v);
 
                if(fbw)
                {
@@ -100,11 +100,11 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
                      uint8_t *dither_offset = gpu->DitherLUT[2][3];
                      fbw = ModTexel(dither_offset, fbw, r, g, b);
                   }
-                  gpu->PlotNativePixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+                  PlotNativePixel<BlendMode, MaskEval_TA, true>(gpu, x, y, fbw);
                }
             }
             else
-               gpu->PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
+               PlotNativePixel<BlendMode, MaskEval_TA, false>(gpu, x, y, fill_color);
 
             if(textured)
                u_r += u_inc;
@@ -172,7 +172,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
       u    = *cb & 0xFF;
       v    = (*cb >> 8) & 0xFF;
       clut = ((*cb >> 16) & 0xFFFF) << 4;
-      gpu->Update_CLUT_Cache<TexMode_TA>((*cb >> 16) & 0xFFFF);
+      Update_CLUT_Cache<TexMode_TA>(gpu, (*cb >> 16) & 0xFFFF);
       cb++;
    }
 
