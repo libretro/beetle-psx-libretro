@@ -80,8 +80,6 @@ class PS_GPU
       PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
      ~PS_GPU() MDFN_COLD;
 
-      void BuildDitherTable();
-
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       static void Destroy(PS_GPU *gpu) MDFN_COLD;
 
@@ -266,8 +264,6 @@ class PS_GPU
       void InvalidateCache(void);
       void SetTPage(uint32_t data);
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-   public:
-
       // "Flexible" array at the end of the struct. This lets us
       // having a dynamically sized vram (depending on the internal
       // upscaling ratio) without having an additional level of

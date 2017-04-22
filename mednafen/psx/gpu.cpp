@@ -90,9 +90,32 @@ static INLINE bool CalcFIFOReadyBit(void)
 
 PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
+   int x, y, v;
+
    HardwarePALType = pal_clock_and_tv;
 
-   BuildDitherTable();
+   for(y = 0; y < 4; y++)
+   {
+      for(x = 0; x < 4; x++)
+      {
+         for(v = 0; v < 512; v++)
+         {
+            int value = v;
+
+            value += dither_table[y][x];
+
+            value >>= 3;
+
+            if(value < 0)
+               value = 0;
+
+            if(value > 0x1F)
+               value = 0x1F;
+
+            DitherLUT[y][x][v] = value;
+         }
+      }
+   }
 
    if(HardwarePALType == false)	// NTSC clock
       GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
@@ -135,29 +158,6 @@ PS_GPU::~PS_GPU()
 {
 }
 
-void PS_GPU::BuildDitherTable()
-{
-  int x, y, v;
-
-  for(y = 0; y < 4; y++)
-    for(x = 0; x < 4; x++)
-      for(v = 0; v < 512; v++)
-	{
-	  int value = v;
-
-	  value += dither_table[y][x];
-
-	  value >>= 3;
-
-	  if(value < 0)
-	    value = 0;
-
-	  if(value > 0x1F)
-	    value = 0x1F;
-
-	  DitherLUT[y][x][v] = value;
-	}
-}
 
 // Allocate enough room for the PS_GPU class and VRAM
 void *PS_GPU::Alloc(uint8 upscale_shift)
