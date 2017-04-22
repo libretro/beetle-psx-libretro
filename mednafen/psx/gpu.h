@@ -94,11 +94,6 @@ class PS_GPU
          return 1U << upscale_shift;
       }
 
-      INLINE unsigned vram_npixels() const
-      {
-         return 512 * 1024 * upscale() * upscale();
-      }
-
       uint8 upscale_shift;
       uint8 dither_upscale_shift;
 

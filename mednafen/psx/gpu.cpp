@@ -336,7 +336,7 @@ void GPU_Power(void)
 {
    PS_GPU *gpu = (PS_GPU*)GPU;
 
-   memset(gpu->vram, 0, gpu->vram_npixels() * sizeof(*gpu->vram));
+   memset(gpu->vram, 0, 512 * 1024 * gpu->upscale() * gpu->upscale() * sizeof(*gpu->vram));
 
    memset(gpu->CLUT_Cache, 0, sizeof(gpu->CLUT_Cache));
    gpu->CLUT_Cache_VB = ~0U;
