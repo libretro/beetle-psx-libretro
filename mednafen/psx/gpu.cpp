@@ -73,6 +73,8 @@ static const int8 dither_table[4][4] =
    {  3, -1,  2, -2 },
 };
 
+static FastFIFO<uint32, 0x20> GPU_BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
+
 struct CTEntry
 {
    void (*func[4][8])(PS_GPU* g, const uint32 *cb);
@@ -500,13 +502,13 @@ static INLINE bool CalcFIFOReadyBit(void)
    if(GPU->InCmd & (INCMD_PLINE | INCMD_QUAD))
       return(false);
 
-   if(GPU->BlitterFIFO.in_count == 0)
+   if(GPU_BlitterFIFO.in_count == 0)
       return(true);
 
    if(GPU->InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
       return(false);
 
-   if(GPU->BlitterFIFO.in_count >= Commands[GPU->BlitterFIFO.Peek() >> 24].fifo_fb_len)
+   if(GPU_BlitterFIFO.in_count >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len)
       return(false);
 
    return(true);
@@ -699,7 +701,7 @@ void GPU_SoftReset(void) // Control command 0x00
    if(gpu->DrawTimeAvail < 0)
       gpu->DrawTimeAvail = 0;
 
-   gpu->BlitterFIFO.Flush();
+   GPU_BlitterFIFO.Flush();
    gpu->DataReadBufferEx = 0;
    gpu->InCmd = INCMD_NONE;
 
@@ -799,7 +801,7 @@ void GPU_Power(void)
    gpu->abr = 0;
    gpu->TexMode = 0;
 
-   gpu->BlitterFIFO.Flush();
+   GPU_BlitterFIFO.Flush();
 
    gpu->DataReadBuffer = 0; // Don't reset in SoftReset()
    gpu->DataReadBufferEx = 0;
@@ -880,7 +882,7 @@ static void ProcessFIFO(uint32_t in_count)
       case INCMD_NONE:
          break;
       case INCMD_FBWRITE:
-         InData = GPU->BlitterFIFO.Read();
+         InData = GPU_BlitterFIFO.Read();
 
          for(i = 0; i < 2; i++)
          {
@@ -924,9 +926,9 @@ static void ProcessFIFO(uint32_t in_count)
 
          command_len        = 1 + (bool)(GPU->InCmd_CC & 0x10);
 
-         if((GPU->BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
+         if((GPU_BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
          {
-            GPU->BlitterFIFO.Read();
+            GPU_BlitterFIFO.Read();
             GPU->InCmd = INCMD_NONE;
             return;
          }
@@ -937,7 +939,7 @@ static void ProcessFIFO(uint32_t in_count)
 
    if (!read_fifo)
    {
-      cc          = GPU->BlitterFIFO.Peek() >> 24;
+      cc          = GPU_BlitterFIFO.Peek() >> 24;
       command     = &Commands[cc];
       command_len = command->len;
 
@@ -950,8 +952,8 @@ static void ProcessFIFO(uint32_t in_count)
 
    for (i = 0; i < command_len; i++)
    {
-	   PGXP_WriteCB(PGXP_ReadFIFO(GPU->BlitterFIFO.read_pos), i);
-	   CB[i] = GPU->BlitterFIFO.Read();
+	   PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
+	   CB[i] = GPU_BlitterFIFO.Read();
    }
 
    if (!read_fifo)
@@ -983,20 +985,20 @@ static void ProcessFIFO(uint32_t in_count)
 
 static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 {
-   if(GPU->BlitterFIFO.in_count >= 0x10
+   if(GPU_BlitterFIFO.in_count >= 0x10
          && 
          ( GPU->InCmd != INCMD_NONE || 
-          (GPU->BlitterFIFO.in_count - 0x10) >= Commands[GPU->BlitterFIFO.Peek() >> 24].fifo_fb_len))
+          (GPU_BlitterFIFO.in_count - 0x10) >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len))
    {
       PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
    }
 
-   PGXP_WriteFIFO(ReadMem(addr), GPU->BlitterFIFO.write_pos);
-   GPU->BlitterFIFO.Write(InData);
+   PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
+   GPU_BlitterFIFO.Write(InData);
 
-   if(GPU->BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
-      ProcessFIFO(GPU->BlitterFIFO.in_count);
+   if(GPU_BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
+      ProcessFIFO(GPU_BlitterFIFO.in_count);
 }
 
 
@@ -1089,7 +1091,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x01:	// Reset command buffer
             if(gpu->DrawTimeAvail < 0)
                gpu->DrawTimeAvail = 0;
-            gpu->BlitterFIFO.Flush();
+            GPU_BlitterFIFO.Flush();
             gpu->InCmd = INCMD_NONE;
             break;
 
@@ -1252,7 +1254,7 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
 
       /* GPU idle bit */
       if(gpu->InCmd == INCMD_NONE && gpu->DrawTimeAvail >= 0
-            && gpu->BlitterFIFO.in_count == 0x00)
+            && GPU_BlitterFIFO.in_count == 0x00)
          ret |= 1 << 26;
 
       if(gpu->InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
@@ -1359,8 +1361,8 @@ int32_t GPU_Update(const int32_t sys_timestamp)
    if(gpu->DrawTimeAvail > 256)
       gpu->DrawTimeAvail = 256;
 
-   if(gpu->BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
-      ProcessFIFO(gpu->BlitterFIFO.in_count);
+   if(GPU_BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
+      ProcessFIFO(GPU_BlitterFIFO.in_count);
 
    //puts("GPU Update Start");
 
@@ -1806,10 +1808,10 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(gpu->abr, "abr"),
       SFVARN(gpu->TexMode, "TexMode"),
 
-      SFARRAY32N(&gpu->BlitterFIFO.data[0], sizeof(gpu->BlitterFIFO.data) / sizeof(gpu->BlitterFIFO.data[0]), "&BlitterFIFO.data[0]"),
-      SFVARN(gpu->BlitterFIFO.read_pos, "BlitterFIFO.read_pos"),
-      SFVARN(gpu->BlitterFIFO.write_pos, "BlitterFIFO.write_pos"),
-      SFVARN(gpu->BlitterFIFO.in_count, "BlitterFIFO.in_count"),
+      SFARRAY32N(&GPU_BlitterFIFO.data[0], sizeof(GPU_BlitterFIFO.data) / sizeof(GPU_BlitterFIFO.data[0]), "&BlitterFIFO.data[0]"),
+      SFVARN(GPU_BlitterFIFO.read_pos, "BlitterFIFO.read_pos"),
+      SFVARN(GPU_BlitterFIFO.write_pos, "BlitterFIFO.write_pos"),
+      SFVARN(GPU_BlitterFIFO.in_count, "BlitterFIFO.in_count"),
 
       SFVARN(gpu->DataReadBuffer, "DataReadBuffer"),
       SFVARN(gpu->DataReadBufferEx, "DataReadBufferEx"),
@@ -1919,7 +1921,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       gpu->RecalcTexWindowStuff();
       rsx_intf_set_tex_window(gpu->tww, gpu->twh, gpu->twx, gpu->twy);
 
-      gpu->BlitterFIFO.SaveStatePostLoad();
+      GPU_BlitterFIFO.SaveStatePostLoad();
 
       gpu->HorizStart &= 0xFFF;
       gpu->HorizEnd &= 0xFFF;

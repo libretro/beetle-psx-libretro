@@ -122,8 +122,6 @@ class PS_GPU
          uint8 RGB8SAT_Over[256];
       };
 
-      FastFIFO<uint32, 0x20> BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
-
       uint32 DataReadBuffer;
       uint32 DataReadBufferEx;
 
