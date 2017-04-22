@@ -265,13 +265,7 @@ class PS_GPU
       void InvalidateTexCache(void);
       void InvalidateCache(void);
       void SetTPage(uint32_t data);
-
-      uint32 ReadData(void);
-
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-   private:
-      template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
-         void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
    public:
 
       // "Flexible" array at the end of the struct. This lets us

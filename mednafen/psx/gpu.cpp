@@ -1179,41 +1179,40 @@ void GPU_WriteDMA(uint32_t V, uint32 addr)
    GPU_WriteCB(V, addr);
 }
 
-INLINE uint32_t PS_GPU::ReadData(void)
+static INLINE uint32_t GPU_ReadData(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
+   unsigned i;
 
-   if(InCmd == INCMD_FBREAD)
+   GPU->DataReadBufferEx = 0;
+
+   for(i = 0; i < 2; i++)
    {
-      DataReadBufferEx = 0;
-      for(int i = 0; i < 2; i++)
-      {
-         DataReadBufferEx |=
-            texel_fetch(gpu, FBRW_CurX & 1023,FBRW_CurY & 511) << (i * 16);
+      GPU->DataReadBufferEx |=
+         texel_fetch(GPU,
+               GPU->FBRW_CurX & 1023,
+               GPU->FBRW_CurY & 511) << (i * 16);
 
-         FBRW_CurX++;
-         if(FBRW_CurX == (FBRW_X + FBRW_W))
+      GPU->FBRW_CurX++;
+      if(GPU->FBRW_CurX == (GPU->FBRW_X + GPU->FBRW_W))
+      {
+         if((GPU->FBRW_CurY + 1) == (GPU->FBRW_Y + GPU->FBRW_H))
+            GPU->InCmd = INCMD_NONE;
+         else
          {
-            if((FBRW_CurY + 1) == (FBRW_Y + FBRW_H))
-               InCmd = INCMD_NONE;
-            else
-            {
-               FBRW_CurY++;
-               FBRW_CurX = FBRW_X;
-            }
+            GPU->FBRW_CurY++;
+            GPU->FBRW_CurX = GPU->FBRW_X;
          }
       }
-
-      return DataReadBufferEx;
    }
 
-   return DataReadBuffer;
+   return GPU->DataReadBufferEx;
 }
 
 uint32_t GPU_ReadDMA(void)
 {
-   PS_GPU *gpu  = (PS_GPU*)GPU;
-   return gpu->ReadData();
+   if(GPU->InCmd != INCMD_FBREAD)
+      return GPU->DataReadBuffer;
+   return GPU_ReadData();
 }
 
 uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
@@ -1269,7 +1268,12 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
       ret |= gpu->TexDisable << 15;
    }
    else		// "Data"
-      ret = gpu->ReadData();
+   {
+      if(gpu->InCmd == INCMD_FBREAD)
+         ret = GPU_ReadData();
+      else
+         ret = gpu->DataReadBuffer;
+   }
 
 #if 0
    if(gpu->DMAControl & 2)
