@@ -229,7 +229,6 @@ static int64_t Memcard_SaveDelay[8];
 
 PS_CPU *CPU = NULL;
 PS_SPU *SPU = NULL;
-PS_GPU *GPU = NULL;
 PS_CDC *CDC = NULL;
 FrontIO *FIO = NULL;
 
@@ -389,7 +388,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 // Called from debug.cpp too.
 void ForceEventUpdates(const int32_t timestamp)
 {
-   PSX_SetEventNT(PSX_EVENT_GPU, GPU->Update(timestamp));
+   PSX_SetEventNT(PSX_EVENT_GPU, GPU_Update(timestamp));
    PSX_SetEventNT(PSX_EVENT_CDC, CDC->Update(timestamp));
 
    PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(timestamp));
@@ -415,7 +414,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
          default:
             abort();
          case PSX_EVENT_GPU:
-            nt = GPU->Update(e->event_time);
+            nt = GPU_Update(e->event_time);
             break;
          case PSX_EVENT_CDC:
             nt = CDC->Update(e->event_time);
@@ -595,9 +594,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
             timestamp++;
 
          if(IsWrite)
-            GPU->Write(timestamp, A, V);
+            GPU_Write(timestamp, A, V);
          else
-            V = GPU->Read(timestamp, A);
+            V = GPU_Read(timestamp, A);
 
          return;
       }
@@ -1001,7 +1000,7 @@ static void PSX_Power(void)
 
    MDEC_Power();
    CDC->Power();
-   GPU->Power();
+   GPU_Power();
    //SPU->Power();	// Called from CDC->Power()
    IRQ_Power();
 
@@ -1393,7 +1392,9 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CPU = new PS_CPU();
    SPU = new PS_SPU();
-   GPU = PS_GPU::Build(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
+
+   GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
+
    CDC = new PS_CDC();
    FIO = new FrontIO(emulate_memcard, emulate_multitap);
    FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
@@ -1406,17 +1407,18 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    DMA_Init();
 
-   GPU->FillVideoParams(&EmulatedPSX);
+   GPU_FillVideoParams(&EmulatedPSX);
 
-   switch (psx_gpu_dither_mode) {
-     case DITHER_NATIVE:
-       GPU->dither_upscale_shift = psx_gpu_upscale_shift;
-       break;
-     case DITHER_UPSCALED:
-       GPU->dither_upscale_shift = 0;
-       break;
-     case DITHER_OFF:
-       break;
+   switch (psx_gpu_dither_mode)
+   {
+      case DITHER_NATIVE:
+         GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+         break;
+      case DITHER_UPSCALED:
+         GPU_set_dither_upscale_shift(0);
+         break;
+      case DITHER_OFF:
+         break;
    }
 
    PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
@@ -1736,9 +1738,7 @@ static void Cleanup(void)
       delete SPU;
    SPU = NULL;
 
-   if(GPU)
-     PS_GPU::Destroy(GPU);
-   GPU = NULL;
+   GPU_Destroy();
 
    if(CPU)
       delete CPU;
@@ -1838,7 +1838,7 @@ int StateAction(StateMem *sm, int load, int data_only)
 
    ret &= CDC->StateAction(sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
-   ret &= GPU->StateAction(sm, load, data_only);
+   ret &= GPU_StateAction(sm, load, data_only);
    ret &= SPU->StateAction(sm, load, data_only);
 
    ret &= FIO->StateAction(sm, load, data_only);
@@ -2261,19 +2261,19 @@ static Deinterlacer deint;
 
 static MDFN_Surface *surf = NULL;
 
-static void alloc_surface() {
-  MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
-  uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-  uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+static void alloc_surface(void)
+{
+   MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
+   uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+   uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
 
-  width  <<= GPU->upscale_shift;
-  height <<= GPU->upscale_shift;
+   width  <<= GPU_get_dither_upscale_shift();
+   height <<= GPU_get_dither_upscale_shift();
 
-  if (surf != NULL) {
-    delete surf;
-  }
+   if (surf != NULL)
+      delete surf;
 
-  surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
+   surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
 }
 
 static void check_system_specs(void)
@@ -3604,38 +3604,35 @@ void retro_run(void)
       retro_get_system_av_info(&new_av_info);
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
 
-      if (GPU->upscale_shift != psx_gpu_upscale_shift)
+      if (GPU_get_dither_upscale_shift() != psx_gpu_upscale_shift)
       {
 	      struct retro_system_av_info new_av_info;
 	      retro_get_system_av_info(&new_av_info);
 
 	      if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
 			     &new_av_info))
-		{
-		  // We successfully changed the frontend's resolution, we can
-		  // apply the change immediately
-		  PS_GPU *new_gpu = GPU->Rescale(psx_gpu_upscale_shift);
-		  PS_GPU::Destroy(GPU);
-		  GPU = new_gpu;
-		  alloc_surface();
-		}
+         {
+            GPU_Reinit(psx_gpu_upscale_shift);
+            alloc_surface();
+         }
 	      else
-		{
-		  // Failed, we have to postpone the upscaling change
-		  psx_gpu_upscale_shift = GPU->upscale_shift;
-		}
+         {
+            // Failed, we have to postpone the upscaling change
+            psx_gpu_upscale_shift = GPU_get_dither_upscale_shift();
+         }
       }
 
-      switch (psx_gpu_dither_mode) {
-        case DITHER_NATIVE:
-          GPU->dither_upscale_shift = psx_gpu_upscale_shift;
-          break;
-        case DITHER_UPSCALED:
-          GPU->dither_upscale_shift = 0;
-          break;
-        case DITHER_OFF:
-          break;
-        }
+      switch (psx_gpu_dither_mode)
+      {
+         case DITHER_NATIVE:
+            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+            break;
+         case DITHER_UPSCALED:
+            GPU_set_dither_upscale_shift(0);
+            break;
+         case DITHER_OFF:
+            break;
+      }
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
@@ -3704,7 +3701,7 @@ void retro_run(void)
    espec->SoundBufSize = 0;
 
    FIO->UpdateInput();
-   GPU->StartFrame(espec);
+   GPU_StartFrame(espec);
 
    Running = -1;
    timestamp = CPU->Run(timestamp);
@@ -3712,8 +3709,10 @@ void retro_run(void)
    assert(timestamp);
 
    ForceEventUpdates(timestamp);
+#if 0
    if(GPU->GetScanlineNum() < 100)
       PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
+#endif
 
    //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
 
@@ -3723,7 +3722,7 @@ void retro_run(void)
    CDC->ResetTS();
    TIMER_ResetTS();
    DMA_ResetTS();
-   GPU->ResetTS();
+   GPU_ResetTS();
    FIO->ResetTS();
 
    RebaseTS(timestamp);
@@ -3773,7 +3772,7 @@ void retro_run(void)
    const void *fb        = NULL;
    unsigned width        = rects[0];
    unsigned height       = spec.DisplayRect.h;
-   uint8_t upscale_shift = GPU->upscale_shift;
+   uint8_t upscale_shift = GPU_get_dither_upscale_shift();
 
    if (rsx_intf_is_type() == RSX_SOFTWARE)
    {
@@ -3860,7 +3859,7 @@ void retro_run(void)
       height <<= upscale_shift;
       pix     += pix_offset << upscale_shift;
 
-      if (GPU->display_change_count != 0)
+      if (GPU_get_display_change_count() != 0)
          fb = pix;
 
       if (!allow_frame_duping)
@@ -3877,14 +3876,15 @@ void retro_run(void)
 
    audio_batch_cb(interbuf, spec.SoundBufSize);
 
-   if (GPU->display_change_count != 0) {
-     // For simplicity I assume that the game is using double
-     // buffering and it swaps buffers once per frame. That's
-     // obviously an oversimplification, if the game uses simple
-     // buffering it will report 0 fps.
-     internal_frame_count++;
+   if (GPU_get_display_change_count() != 0)
+   {
+      // For simplicity I assume that the game is using double
+      // buffering and it swaps buffers once per frame. That's
+      // obviously an oversimplification, if the game uses simple
+      // buffering it will report 0 fps.
+      internal_frame_count++;
 
-     GPU->display_change_count = 0;
+      GPU_set_display_change_count(0);
    }
 }
 

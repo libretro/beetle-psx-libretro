@@ -76,8 +76,6 @@ enum FilterMode {
    FILTER_MODE_JINC2
 };
 
-// Main GPU instance, used to access the VRAM
-extern PS_GPU *GPU;
 static bool has_software_fb = false;
 
 extern "C" unsigned char widescreen_hack;
@@ -468,7 +466,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
 
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-    upload_textures(this, top_left, dimensions, GPU->vram);
+    upload_textures(this, top_left, dimensions, GPU_get_vram());
 }
 
 GlRenderer::~GlRenderer()
@@ -922,7 +920,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
         upload_textures(renderer, top_left, dimensions,
-			      GPU->vram);
+			      GPU_get_vram());
 
 
         if (renderer->fb_out_depth)

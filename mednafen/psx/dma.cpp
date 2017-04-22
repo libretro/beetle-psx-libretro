@@ -120,7 +120,7 @@ static INLINE bool ChCan(const unsigned ch, const uint32_t CRModeCache)
          return(MDEC_DMACanRead());
       case CH_GPU: 
          if(CRModeCache & 0x1)
-            return(GPU->DMACanWrite());
+            return(GPU_DMACanWrite());
       case CH_CDC:
       case CH_SPU:
          return(true);
@@ -162,7 +162,7 @@ static void RecalcHalt(void)
    if((DMACH[1].WordCounter || (DMACH[1].ChanControl & (1 << 24))) && (DMACH[1].ChanControl & 0x200) && (DMACH[1].WordCounter || MDEC_DMACanRead()))
       Halt = true;
 
-   if((DMACH[2].WordCounter || (DMACH[2].ChanControl & (1 << 24))) && (DMACH[2].ChanControl & 0x200) && ((DMACH[2].ChanControl & 0x1) && (DMACH[2].WordCounter || GPU->DMACanWrite())))
+   if((DMACH[2].WordCounter || (DMACH[2].ChanControl & (1 << 24))) && (DMACH[2].ChanControl & 0x200) && ((DMACH[2].ChanControl & 0x1) && (DMACH[2].WordCounter || GPU_DMACanWrite())))
       Halt = true;
 
    if((DMACH[3].WordCounter || (DMACH[3].ChanControl & (1 << 24))) && !(DMACH[3].ChanControl & 0x100))
@@ -211,9 +211,9 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
 
       case CH_GPU:
          if(CRModeCache & 0x1)
-            GPU->WriteDMA(*V, addr);
+            GPU_WriteDMA(*V, addr);
          else
-            *V = GPU->ReadDMA();
+            *V = GPU_ReadDMA();
          break;
 
       case CH_CDC:
@@ -519,7 +519,7 @@ int32_t DMA_Update(const int32_t timestamp)
    clocks = timestamp - lastts;
    lastts = timestamp;
 
-   GPU->Update(timestamp);
+   GPU_Update(timestamp);
    MDEC_Run(clocks);
 
    for (i = 0; i < 7; i++)

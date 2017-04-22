@@ -72,16 +72,13 @@ struct line_point
 
 class PS_GPU
 {
-  private:
+   public:
+      static void *Alloc(uint8 upscale_shift) MDFN_COLD;
       // Private constructors and destructors since we need to use
       // custom allocators to allocate the flexible vram
       PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
      ~PS_GPU() MDFN_COLD;
-
-      static void *Alloc(uint8 upscale_shift) MDFN_COLD;
-
-   public:
 
       void BuildDitherTable();
 
@@ -89,20 +86,6 @@ class PS_GPU
       static void Destroy(PS_GPU *gpu) MDFN_COLD;
 
       PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
-
-      void FillVideoParams(MDFNGI* gi) MDFN_COLD;
-
-      void Power(void) MDFN_COLD;
-
-      int StateAction(StateMem *sm, int load, int data_only);
-
-      void ResetTS(void);
-
-      void StartFrame(EmulateSpecStruct *espec);
-
-      int32_t Update(const int32_t timestamp);
-
-      void Write(const int32_t timestamp, uint32 A, uint32 V);
 
       INLINE bool CalcFIFOReadyBit(void)
       {
@@ -121,20 +104,12 @@ class PS_GPU
          return(true);
       }
 
-      INLINE bool DMACanWrite(void)
-      {
-         return CalcFIFOReadyBit();
-      }
 
       INLINE bool DitherEnabled(void)
       {
-	return psx_gpu_dither_mode != DITHER_OFF && dtd;
+         return psx_gpu_dither_mode != DITHER_OFF && dtd;
       }
 
-      void WriteDMA(uint32 V, uint32 addr);
-      uint32 ReadDMA(void);
-
-      uint32 Read(const int32_t timestamp, uint32 A);
 
       inline int32 GetScanlineNum(void)
       {
@@ -152,42 +127,48 @@ class PS_GPU
       }
 
       // Return a pixel from VRAM, ignoring the internal upscaling
-      INLINE uint16 texel_fetch(uint32 x, uint32 y) const {
-	return vram_fetch(x << upscale_shift,
-			  y << upscale_shift);
+      INLINE uint16 texel_fetch(uint32 x, uint32 y) const
+      {
+         return vram_fetch(x << upscale_shift,
+               y << upscale_shift);
       }
 
       // Set a pixel in VRAM, upscaling it if necessary
-      INLINE void texel_put(uint32 x, uint32 y, uint16 v) {
+      INLINE void texel_put(uint32 x, uint32 y, uint16 v)
+      {
 
-	x <<= upscale_shift;
-	y <<= upscale_shift;
+         x <<= upscale_shift;
+         y <<= upscale_shift;
 
          // Duplicate the pixel as many times as necessary (nearest
          // neighbour upscaling)
          for (uint32 dy = 0; dy < upscale(); dy++) {
-	   for (uint32 dx = 0; dx < upscale(); dx++) {
-	     vram_put(x + dx, y + dy, v);
-	   }
+            for (uint32 dx = 0; dx < upscale(); dx++) {
+               vram_put(x + dx, y + dy, v);
+            }
          }
       }
 
       // Return a pixel from VRAM
-      INLINE uint16 vram_fetch(uint32 x, uint32 y) const {
-	return vram[(y << (10 + upscale_shift)) | x];
+      INLINE uint16 vram_fetch(uint32 x, uint32 y) const
+      {
+         return vram[(y << (10 + upscale_shift)) | x];
       }
 
       // Set a pixel in VRAM
-      INLINE void vram_put(uint32 x, uint32 y, uint16 v) {
-	vram[(y << (10 + upscale_shift)) | x] = v;
+      INLINE void vram_put(uint32 x, uint32 y, uint16 v)
+      {
+         vram[(y << (10 + upscale_shift)) | x] = v;
       }
 
-      INLINE uint32 upscale() const {
-	return 1U << upscale_shift;
+      INLINE uint32 upscale() const
+      {
+         return 1U << upscale_shift;
       }
 
-      INLINE unsigned vram_npixels() const {
-	return 512 * 1024 * upscale() * upscale();
+      INLINE unsigned vram_npixels() const
+      {
+         return 512 * 1024 * upscale() * upscale();
       }
 
       uint8 upscale_shift;
@@ -348,6 +329,10 @@ class PS_GPU
       void InvalidateCache(void);
       void SetTPage(uint32_t data);
 
+      void WriteCB(uint32 data, uint32 addr);
+      uint32 ReadData(void);
+      void ProcessFIFO(uint32_t in_count);
+
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
 
    private:
@@ -355,11 +340,6 @@ class PS_GPU
       template<uint32 TexMode_TA>
          void Update_CLUT_Cache(uint16 raw_clut);
 
-
-      void ProcessFIFO(uint32_t in_count);
-      void WriteCB(uint32 data, uint32 addr);
-      uint32 ReadData(void);
-      void SoftReset(void);
 
       template<int BlendMode>
          void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix);
@@ -413,13 +393,11 @@ class PS_GPU
       void Command_DrawingOffset(const uint32 *cb);
       void Command_MaskSetting(const uint32 *cb);
 
+      void UpdateDisplayMode();
 
    private:
       template<uint32 out_Rshift, uint32 out_Gshift, uint32 out_Bshift>
          void ReorderRGB(bool bpp24, const uint16 *src, uint32 *dest, const int32 dx_start, const int32 dx_end, int32 fb_x) NO_INLINE;
-
-      void UpdateDisplayMode();
-
    public:
 
       // "Flexible" array at the end of the struct. This lets us
@@ -429,5 +407,46 @@ class PS_GPU
       uint16 vram[0];
 
 };
+
+uint16 *GPU_get_vram(void);
+
+void GPU_WriteDMA(uint32 V, uint32 addr);
+
+uint32_t GPU_ReadDMA(void);
+
+bool GPU_DMACanWrite(void);
+
+uint8 GPU_get_dither_upscale_shift(void);
+
+void GPU_set_dither_upscale_shift(uint8 upscale_shift);
+
+void GPU_set_display_change_count(unsigned a);
+
+unsigned GPU_get_display_change_count(void);
+
+void GPU_Init(bool pal_clock_and_tv,
+      int sls, int sle, uint8 upscale_shift);
+
+void GPU_SoftReset(void);
+
+void GPU_Destroy(void);
+
+void GPU_Reinit(uint8 ushift);
+
+int32_t GPU_Update(const int32_t sys_timestamp);
+
+void GPU_FillVideoParams(MDFNGI* gi);
+
+void GPU_Power(void);
+
+void GPU_ResetTS(void);
+
+void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V);
+
+uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
+
+void GPU_StartFrame(EmulateSpecStruct *espec_arg);
+
+int GPU_StateAction(StateMem *sm, int load, int data_only);
 
 #endif
