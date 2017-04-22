@@ -193,7 +193,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
             b = COORD_GET_INT(ig.b);
          }
 
-         bool dither = gpu->DitherEnabled();
+         bool dither      = DitherEnabled(gpu);
          int32_t dither_x = x >> gpu->dither_upscale_shift;
          int32_t dither_y = y >> gpu->dither_upscale_shift;
 
@@ -637,7 +637,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
                clut_x, clut_y,
                blend_mode,
                2 - TexMode_TA,
-               gpu->DitherEnabled(),
+               DitherEnabled(gpu),
                BlendMode,
                MaskEval_TA,
                gpu->MaskSetOR != 0);
@@ -670,7 +670,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 		   clut_x, clut_y,
 		   blend_mode,
 		   2 - TexMode_TA,
-		   gpu->DitherEnabled(),
+		   DitherEnabled(gpu),
 		   BlendMode,
          MaskEval_TA,
          gpu->MaskSetOR != 0);

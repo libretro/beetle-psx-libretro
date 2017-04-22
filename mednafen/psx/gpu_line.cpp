@@ -142,7 +142,7 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
             b = points[0].b;
          }
 
-         if(gpu->DitherEnabled())
+         if(DitherEnabled(gpu))
          {
             uint8_t *dither_offset = gpu->DitherLUT[y & 3][x & 3];
             pix = 0x8000 | (dither_offset[r] << 0) | (dither_offset[g] << 5) | 
@@ -229,7 +229,7 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 		      points[1].x, points[1].y,
 		      ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
 		      ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
-		      gpu->DitherEnabled(),
+		      DitherEnabled(gpu),
 		      BlendMode,
             MaskEval_TA,
             gpu->MaskSetOR);

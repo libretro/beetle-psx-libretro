@@ -29,13 +29,12 @@ class PS_GPU;
 #define DISP_RGB24      0x10
 #define DISP_INTERLACED 0x20
 
-enum dither_mode {
-  DITHER_NATIVE,
-  DITHER_UPSCALED,
-  DITHER_OFF,
+enum dither_mode
+{
+   DITHER_NATIVE   = 0,
+   DITHER_UPSCALED,
+   DITHER_OFF,
 };
-
-extern enum dither_mode psx_gpu_dither_mode;
 
 struct CTEntry
 {
@@ -85,16 +84,10 @@ class PS_GPU
 
       PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
 
-      INLINE bool DitherEnabled(void)
-      {
-         return psx_gpu_dither_mode != DITHER_OFF && dtd;
-      }
-
       inline int32 GetScanlineNum(void)
       {
          return(scanline);
       } 
-
 
       INLINE uint32 upscale() const
       {

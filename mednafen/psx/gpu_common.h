@@ -1,3 +1,5 @@
+extern enum dither_mode psx_gpu_dither_mode;
+
 /* Return a pixel from VRAM */
 #define vram_fetch(gpu, x, y)  (gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)])
 
@@ -6,6 +8,9 @@
 
 /* Set a pixel in VRAM */
 #define vram_put(gpu, x, y, v) gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)] = (v)
+
+#define DitherEnabled(gpu)    (psx_gpu_dither_mode != DITHER_OFF && gpu->dtd)
+
 
 template<int BlendMode>
 static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)

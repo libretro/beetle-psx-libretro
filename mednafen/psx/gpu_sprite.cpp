@@ -251,7 +251,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
             clut_y,
             blend_mode,
             2 - TexMode_TA,
-            gpu->DitherEnabled(),
+            DitherEnabled(gpu),
             BlendMode,
             MaskEval_TA,
             gpu->MaskSetOR != 0);
@@ -273,7 +273,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
             clut_x, clut_y,
             blend_mode,
             2 - TexMode_TA,
-            gpu->DitherEnabled(),
+            DitherEnabled(gpu),
             BlendMode,
             MaskEval_TA,
             gpu->MaskSetOR != 0);
@@ -292,7 +292,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
             clut_x, clut_y,
             blend_mode,
             2 - TexMode_TA,
-            gpu->DitherEnabled(),
+            DitherEnabled(gpu),
             BlendMode,
             MaskEval_TA,
             gpu->MaskSetOR != 0);
