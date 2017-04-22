@@ -87,24 +87,6 @@ class PS_GPU
 
       PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
 
-      INLINE bool CalcFIFOReadyBit(void)
-      {
-         if(InCmd & (INCMD_PLINE | INCMD_QUAD))
-            return(false);
-
-         if(BlitterFIFO.in_count == 0)
-            return(true);
-
-         if(InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
-            return(false);
-
-         if(BlitterFIFO.in_count >= Commands[BlitterFIFO.Peek() >> 24].fifo_fb_len)
-            return(false);
-
-         return(true);
-      }
-
-
       INLINE bool DitherEnabled(void)
       {
          return psx_gpu_dither_mode != DITHER_OFF && dtd;

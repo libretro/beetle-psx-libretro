@@ -69,6 +69,23 @@ static const int8 dither_table[4][4] =
 
 PS_GPU *GPU = NULL;
 
+static INLINE bool CalcFIFOReadyBit(void)
+{
+   if(GPU->InCmd & (INCMD_PLINE | INCMD_QUAD))
+      return(false);
+
+   if(GPU->BlitterFIFO.in_count == 0)
+      return(true);
+
+   if(GPU->InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
+      return(false);
+
+   if(GPU->BlitterFIFO.in_count >= GPU->Commands[GPU->BlitterFIFO.Peek() >> 24].fifo_fb_len)
+      return(false);
+
+   return(true);
+}
+
 PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
    HardwarePALType = pal_clock_and_tv;
@@ -1178,7 +1195,7 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
       if(gpu->InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
          ret |= (1 << 27);
 
-      ret |= gpu->CalcFIFOReadyBit() << 28;		// FIFO has room bit? (kinda).
+      ret |= CalcFIFOReadyBit() << 28;		// FIFO has room bit? (kinda).
 
       //
       //
@@ -1948,8 +1965,7 @@ uint8 GPU_get_dither_upscale_shift(void)
 
 bool GPU_DMACanWrite(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   return gpu->CalcFIFOReadyBit();
+   return CalcFIFOReadyBit();
 }
 
 uint16 *GPU_get_vram(void)
