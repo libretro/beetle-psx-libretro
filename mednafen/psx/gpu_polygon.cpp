@@ -204,7 +204,10 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
             if(fbw)
             {
                if(TexMult)
-                  fbw = gpu->ModTexel(fbw, r, g, b, (dither) ? (dither_x & 3) : 3, (dither) ? (dither_y & 3) : 2);
+               {
+                  uint8_t *dither_offset = gpu->DitherLUT[(dither) ? (dither_y & 3) : 2][(dither) ? (dither_x & 3) : 3];
+                  fbw = ModTexel(dither_offset, fbw, r, g, b);
+               }
                gpu->PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
             }
          }
