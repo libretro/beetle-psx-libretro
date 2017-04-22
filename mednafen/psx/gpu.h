@@ -243,9 +243,6 @@ class PS_GPU
          uint32 Tag;
       } TexCache[256];
 
-      void InvalidateTexCache(void);
-      void InvalidateCache(void);
-      void SetTPage(uint32_t data);
       uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
       // "Flexible" array at the end of the struct. This lets us
       // having a dynamically sized vram (depending on the internal

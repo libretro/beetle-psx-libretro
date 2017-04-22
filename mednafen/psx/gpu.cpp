@@ -88,6 +88,45 @@ static INLINE bool CalcFIFOReadyBit(void)
    return(true);
 }
 
+static INLINE void InvalidateTexCache(PS_GPU *gpu)
+{
+   unsigned i;
+   for (i = 0; i < 256; i++)
+      gpu->TexCache[i].Tag = ~0U;
+}
+
+static INLINE void InvalidateCache(PS_GPU *gpu)
+{
+   gpu->CLUT_Cache_VB = ~0U;
+   InvalidateTexCache(gpu);
+}
+
+static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
+{
+   const unsigned NewTexPageX = (cmdw & 0xF) * 64;
+   const unsigned NewTexPageY = (cmdw & 0x10) * 16;
+   const unsigned NewTexMode  = (cmdw >> 7) & 0x3;
+
+   gpu->abr = (cmdw >> 5) & 0x3;
+
+   if(!NewTexMode != !gpu->TexMode || NewTexPageX != gpu->TexPageX || NewTexPageY != gpu->TexPageY)
+      InvalidateTexCache(gpu);
+
+   if(gpu->TexDisableAllowChange)
+   {
+      bool NewTexDisable = (cmdw >> 11) & 1;
+
+      if (NewTexDisable != gpu->TexDisable)
+         InvalidateTexCache(gpu);
+
+      gpu->TexDisable = NewTexDisable;
+   }
+
+   gpu->TexPageX = NewTexPageX;
+   gpu->TexPageY = NewTexPageY;
+   gpu->TexMode  = NewTexMode;
+}
+
 PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
 {
    int x, y, v;
@@ -269,7 +308,7 @@ void GPU_SoftReset(void) // Control command 0x00
    gpu->IRQPending = false;
    IRQ_Assert(IRQ_GPU, gpu->IRQPending);
 
-   gpu->InvalidateCache();
+   InvalidateCache(gpu);
    gpu->DMAControl = 0;
 
    if(gpu->DrawTimeAvail < 0)
@@ -457,22 +496,10 @@ static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
 }
 
-void PS_GPU::InvalidateTexCache()
-{
-   unsigned i;
-   for (i = 0; i < 256; i++)
-      TexCache[i].Tag = ~0U;
-}
-
-void PS_GPU::InvalidateCache()
-{
-   CLUT_Cache_VB = ~0U;
-   InvalidateTexCache();
-}
 
 static void Command_ClearCache(PS_GPU* g, const uint32 *cb)
 {
-   g->InvalidateCache();
+   InvalidateCache(g);
 }
 
 static void Command_IRQ(PS_GPU* g, const uint32 *cb)
@@ -535,7 +562,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
    if(!height)
       height = 0x200;
 
-   g->InvalidateTexCache();
+   InvalidateTexCache(g);
    //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
 
    g->DrawTimeAvail -= (width * height) * 2;
@@ -591,7 +618,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32 *cb)
    g->FBRW_CurX = g->FBRW_X;
    g->FBRW_CurY = g->FBRW_Y;
 
-   g->InvalidateTexCache();
+   InvalidateTexCache(g);
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBWRITE;
@@ -620,7 +647,7 @@ static void Command_FBRead(PS_GPU* g, const uint32 *cb)
    g->FBRW_CurX = g->FBRW_X;
    g->FBRW_CurY = g->FBRW_Y;
 
-   g->InvalidateTexCache();
+   InvalidateTexCache(g);
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBREAD;
@@ -630,7 +657,7 @@ static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
 {
    const uint32 cmdw = *cb;
 
-   g->SetTPage(cmdw);
+   SetTPage(g, cmdw);
 
    g->SpriteFlip = (cmdw & 0x3000);
    g->dtd =        (cmdw >> 9) & 1;
@@ -924,11 +951,10 @@ static void ProcessFIFO(uint32_t in_count)
       // A very very ugly kludge to support
       // texture mode specialization.
       // fixme/cleanup/SOMETHING in the future.
+      
+      /* Don't alter SpriteFlip here. */
       if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
-      {
-         /* Don't alter SpriteFlip here. */
-         GPU->SetTPage(CB[4 + ((cc >> 4) & 0x1)] >> 16);
-      }
+         SetTPage(GPU, CB[4 + ((cc >> 4) & 0x1)] >> 16);
    }
 
    if ((cc >= 0x80) && (cc <= 0x9F))
@@ -962,32 +988,6 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
       ProcessFIFO(GPU->BlitterFIFO.in_count);
 }
 
-void PS_GPU::SetTPage(const uint32_t cmdw)
-{
-   const unsigned NewTexPageX = (cmdw & 0xF) * 64;
-   const unsigned NewTexPageY = (cmdw & 0x10) * 16;
-   const unsigned NewTexMode  = (cmdw >> 7) & 0x3;
-
-   this->abr = (cmdw >> 5) & 0x3;
-
-   if(!NewTexMode != !TexMode || NewTexPageX != TexPageX || NewTexPageY != TexPageY)
-      InvalidateTexCache();
-
-   if(TexDisableAllowChange)
-   {
-      bool NewTexDisable = (cmdw >> 11) & 1;
-
-      if (NewTexDisable != TexDisable)
-         InvalidateTexCache();
-
-      TexDisable = NewTexDisable;
-      //printf("TexDisable: %02x\n", TexDisable);
-   }
-
-   TexPageX = NewTexPageX;
-   TexPageY = NewTexPageY;
-   TexMode  = NewTexMode;
-}
 
 static void UpdateDisplayMode(void)
 {
