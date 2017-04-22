@@ -102,7 +102,7 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 }
 
 template<bool goraud, int BlendMode, bool MaskEval_TA>
-void PS_GPU::DrawLine(line_point *points)
+static void DrawLine(PS_GPU *gpu, line_point *points)
 {
    line_fxp_coord cur_point;
    line_fxp_step step;
@@ -113,7 +113,7 @@ void PS_GPU::DrawLine(line_point *points)
    if(points[0].x > points[1].x && k)
       vertex_swap(line_point, points[1], points[0]);
 
-   DrawTimeAvail -= k * 2;
+   gpu->DrawTimeAvail -= k * 2;
 
    line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
    line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
@@ -124,7 +124,7 @@ void PS_GPU::DrawLine(line_point *points)
       int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
       int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047;
 
-      if(!LineSkipTest(this, y))
+      if(!LineSkipTest(gpu, y))
       {
          uint8_t r, g, b;
          uint16_t pix = 0x8000;
@@ -142,9 +142,9 @@ void PS_GPU::DrawLine(line_point *points)
             b = points[0].b;
          }
 
-         if(DitherEnabled())
+         if(gpu->DitherEnabled())
          {
-            uint8_t *dither_offset = DitherLUT[y & 3][x & 3];
+            uint8_t *dither_offset = gpu->DitherLUT[y & 3][x & 3];
             pix = 0x8000 | (dither_offset[r] << 0) | (dither_offset[g] << 5) | 
                (dither_offset[b] << 10);
          }
@@ -154,8 +154,8 @@ void PS_GPU::DrawLine(line_point *points)
          }
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
-         if(x >= ClipX0 && x <= ClipX1 && y >= ClipY0 && y <= ClipY1)
-            PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+         if(x >= gpu->ClipX0 && x <= gpu->ClipX1 && y >= gpu->ClipY0 && y <= gpu->ClipY1)
+            gpu->PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, pix);
       }
 
       AddLineStep<goraud>(&cur_point, &step);
@@ -163,17 +163,17 @@ void PS_GPU::DrawLine(line_point *points)
 }
 
 template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
-INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
+static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 {
    line_point points[2];
    const uint8_t cc = cb[0] >> 24; // For pline handling later.
 
-   DrawTimeAvail   -= 16;	// FIXME, correct time.
+   gpu->DrawTimeAvail   -= 16;	// FIXME, correct time.
 
-   if(polyline && InCmd == INCMD_PLINE)
+   if(polyline && gpu->InCmd == INCMD_PLINE)
    {
       //printf("PLINE N\n");
-      points[0] = InPLine_PrevPoint;
+      points[0] = gpu->InPLine_PrevPoint;
    }
    else
    {
@@ -182,8 +182,8 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
       points[0].b = (*cb >> 16) & 0xFF;
       cb++;
 
-      points[0].x = sign_x_to_s32(11, ((*cb >> 0) & 0xFFFF)) + OffsX;
-      points[0].y = sign_x_to_s32(11, ((*cb >> 16) & 0xFFFF)) + OffsY;
+      points[0].x = sign_x_to_s32(11, ((*cb >> 0) & 0xFFFF)) + gpu->OffsX;
+      points[0].y = sign_x_to_s32(11, ((*cb >> 16) & 0xFFFF)) + gpu->OffsY;
       cb++;
    }
 
@@ -201,18 +201,18 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
       points[1].b = points[0].b;
    }
 
-   points[1].x = sign_x_to_s32(11, ((*cb >> 0) & 0xFFFF)) + OffsX;
-   points[1].y = sign_x_to_s32(11, ((*cb >> 16) & 0xFFFF)) + OffsY;
+   points[1].x = sign_x_to_s32(11, ((*cb >> 0) & 0xFFFF)) + gpu->OffsX;
+   points[1].y = sign_x_to_s32(11, ((*cb >> 16) & 0xFFFF)) + gpu->OffsY;
    cb++;
 
    if(polyline)
    {
-      InPLine_PrevPoint = points[1];
+      gpu->InPLine_PrevPoint = points[1];
 
-      if(InCmd != INCMD_PLINE)
+      if(gpu->InCmd != INCMD_PLINE)
       {
-         InCmd = INCMD_PLINE;
-         InCmd_CC = cc;
+         gpu->InCmd = INCMD_PLINE;
+         gpu->InCmd_CC = cc;
       }
    }
 
@@ -229,11 +229,11 @@ INLINE void PS_GPU::Command_DrawLine(const uint32_t *cb)
 		      points[1].x, points[1].y,
 		      ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
 		      ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
-		      DitherEnabled(),
+		      gpu->DitherEnabled(),
 		      BlendMode,
             MaskEval_TA,
-            MaskSetOR);
+            gpu->MaskSetOR);
 
    if (rsx_intf_has_software_renderer())
-      DrawLine<goraud, BlendMode, MaskEval_TA>(points);
+      DrawLine<goraud, BlendMode, MaskEval_TA>(gpu, points);
 }

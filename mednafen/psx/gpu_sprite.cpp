@@ -1,7 +1,7 @@
 
 template<bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA,
    bool MaskEval_TA, bool FlipX, bool FlipY>
-void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
+static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
       uint8_t u_arg, uint8_t v_arg, uint32_t color, uint32_t clut_offset)
 {
    uint8_t u, v;
@@ -40,27 +40,27 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
          v_inc = -1;
    }
 
-   if(x_start < ClipX0)
+   if(x_start < gpu->ClipX0)
    {
       if(textured)
-         u += (ClipX0 - x_start) * u_inc;
+         u += (gpu->ClipX0 - x_start) * u_inc;
 
-      x_start = ClipX0;
+      x_start = gpu->ClipX0;
    }
 
-   if(y_start < ClipY0)
+   if(y_start < gpu->ClipY0)
    {
       if(textured)
-         v += (ClipY0 - y_start) * v_inc;
+         v += (gpu->ClipY0 - y_start) * v_inc;
 
-      y_start = ClipY0;
+      y_start = gpu->ClipY0;
    }
 
-   if(x_bound > (ClipX1 + 1))
-      x_bound = ClipX1 + 1;
+   if(x_bound > (gpu->ClipX1 + 1))
+      x_bound = gpu->ClipX1 + 1;
 
-   if(y_bound > (ClipY1 + 1))
-      y_bound = ClipY1 + 1;
+   if(y_bound > (gpu->ClipY1 + 1))
+      y_bound = gpu->ClipY1 + 1;
 
    //HeightMode && !dfe && ((y & 1) == ((DisplayFB_YStart + !field_atvs) & 1)) && !DisplayOff
    //printf("%d:%d, %d, %d ---- heightmode=%d displayfb_ystart=%d field_atvs=%d displayoff=%d\n", w, h, scanline, dfe, HeightMode, DisplayFB_YStart, field_atvs, DisplayOff);
@@ -72,7 +72,7 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
       if(textured)
          u_r = u;
 
-      if(!LineSkipTest(this, y))
+      if(!LineSkipTest(gpu, y))
       {
          if(y_bound > y_start && x_bound > x_start)
          {
@@ -84,24 +84,24 @@ void PS_GPU::DrawSprite(int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
             if((BlendMode >= 0) || MaskEval_TA)
                suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
 
-            DrawTimeAvail -= suck_time;
+            gpu->DrawTimeAvail -= suck_time;
          }
 
          for(int32_t x = x_start; MDFN_LIKELY(x < x_bound); x++)
          {
             if(textured)
             {
-               uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, u_r, v);
+               uint16_t fbw = gpu->GetTexel<TexMode_TA>(clut_offset, u_r, v);
 
                if(fbw)
                {
                   if(TexMult)
-                     fbw = ModTexel(fbw, r, g, b, 3, 2);
-                  PlotNativePixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+                     fbw = gpu->ModTexel(fbw, r, g, b, 3, 2);
+                  gpu->PlotNativePixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
                }
             }
             else
-               PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
+               gpu->PlotNativePixel<BlendMode, MaskEval_TA, false>(x, y, fill_color);
 
             if(textured)
                u_r += u_inc;
@@ -146,7 +146,7 @@ void rsx_gl_push_sprite(
 
 template<uint8_t raw_size, bool textured, int BlendMode,
    bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
+static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
 {
    int32_t x, y;
    int32_t w, h;
@@ -155,7 +155,7 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
    uint32_t color   = 0;
    uint32_t clut    = 0;
 
-   DrawTimeAvail   -= 16;	// FIXME, correct time.
+   gpu->DrawTimeAvail   -= 16;	// FIXME, correct time.
 
    color            = *cb & 0x00FFFFFF;
    cb++;
@@ -169,7 +169,7 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
       u    = *cb & 0xFF;
       v    = (*cb >> 8) & 0xFF;
       clut = ((*cb >> 16) & 0xFFFF) << 4;
-      Update_CLUT_Cache<TexMode_TA>((*cb >> 16) & 0xFFFF);
+      gpu->Update_CLUT_Cache<TexMode_TA>((*cb >> 16) & 0xFFFF);
       cb++;
    }
 
@@ -198,8 +198,8 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
          break;
    }
 
-   x = sign_x_to_s32(11, x + OffsX);
-   y = sign_x_to_s32(11, y + OffsY);
+   x = sign_x_to_s32(11, x + gpu->OffsX);
+   y = sign_x_to_s32(11, y + gpu->OffsY);
 
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;
@@ -242,16 +242,16 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
 		   v + h,            /* t2y */
 		   u + w,            /* t5x */
 		   v + h,            /* t5y */
-            this->TexPageX,
-            this->TexPageY,
+            gpu->TexPageX,
+            gpu->TexPageY,
             clut_x,
             clut_y,
             blend_mode,
             2 - TexMode_TA,
-            DitherEnabled(),
+            gpu->DitherEnabled(),
             BlendMode,
             MaskEval_TA,
-            MaskSetOR != 0);
+            gpu->MaskSetOR != 0);
    }
    else
 #endif
@@ -265,14 +265,15 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             u, v,
             u + w, v,
             u, v + h,
-            this->TexPageX, this->TexPageY,
+            gpu->TexPageX,
+            gpu->TexPageY,
             clut_x, clut_y,
             blend_mode,
             2 - TexMode_TA,
-            DitherEnabled(),
+            gpu->DitherEnabled(),
             BlendMode,
             MaskEval_TA,
-            MaskSetOR != 0);
+            gpu->MaskSetOR != 0);
 
       rsx_intf_push_triangle(x + w, y, 1,
             x, y + h, 1,
@@ -283,14 +284,15 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
             u + w, v,
             u, v + h,
             u + w, v + h,
-            this->TexPageX, this->TexPageY,
+            gpu->TexPageX,
+            gpu->TexPageY,
             clut_x, clut_y,
             blend_mode,
             2 - TexMode_TA,
-            DitherEnabled(),
+            gpu->DitherEnabled(),
             BlendMode,
             MaskEval_TA,
-            MaskSetOR != 0);
+            gpu->MaskSetOR != 0);
    }
 
 #if 0
@@ -300,34 +302,34 @@ INLINE void PS_GPU::Command_DrawSprite(const uint32_t *cb)
    if (!rsx_intf_has_software_renderer())
       return;
 
-   switch(SpriteFlip & 0x3000)
+   switch(gpu->SpriteFlip & 0x3000)
    {
       case 0x0000:
          if(!TexMult || color == 0x808080)
-            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, false>(gpu, x, y, w, h, u, v, color, clut);
          else
-            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, false>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, false>(gpu, x, y, w, h, u, v, color, clut);
          break;
 
       case 0x1000:
          if(!TexMult || color == 0x808080)
-            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, false>(gpu, x, y, w, h, u, v, color, clut);
          else
-            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, false>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, false>(gpu, x, y, w, h, u, v, color, clut);
          break;
 
       case 0x2000:
          if(!TexMult || color == 0x808080)
-            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, false, true>(gpu, x, y, w, h, u, v, color, clut);
          else
-            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, true>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, false, true>(gpu, x, y, w, h, u, v, color, clut);
          break;
 
       case 0x3000:
          if(!TexMult || color == 0x808080)
-            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, false, TexMode_TA, MaskEval_TA, true, true>(gpu, x, y, w, h, u, v, color, clut);
          else
-            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, true>(x, y, w, h, u, v, color, clut);
+            DrawSprite<textured, BlendMode, true, TexMode_TA, MaskEval_TA, true, true>(gpu, x, y, w, h, u, v, color, clut);
          break;
    }
 }

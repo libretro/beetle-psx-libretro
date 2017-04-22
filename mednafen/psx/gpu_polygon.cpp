@@ -131,13 +131,13 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t coun
 }
 
 template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl)
+static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas &idl)
 {
    int32_t xs = x_start, xb = x_bound;
-   int32 clipx0 = ClipX0 << upscale_shift;
-   int32 clipx1 = ClipX1 << upscale_shift;
+   int32 clipx0 = gpu->ClipX0 << gpu->upscale_shift;
+   int32 clipx1 = gpu->ClipX1 << gpu->upscale_shift;
 
-   if(LineSkipTest(this, y >> upscale_shift))
+   if(LineSkipTest(gpu, y >> gpu->upscale_shift))
       return;
 
    if(xs < xb)	// (xs != xb)
@@ -148,17 +148,17 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
       if(xb > (clipx1 + 1))
          xb = clipx1 + 1;
 
-      if(xs < xb && ((y & (upscale() - 1)) == 0))
+      if(xs < xb && ((y & (gpu->upscale() - 1)) == 0))
       {
-         DrawTimeAvail -= (xb - xs) >> upscale_shift;
+         gpu->DrawTimeAvail -= (xb - xs) >> gpu->upscale_shift;
 
          if(goraud || textured)
          {
-            DrawTimeAvail -= (xb - xs) >> upscale_shift;
+            gpu->DrawTimeAvail -= (xb - xs) >> gpu->upscale_shift;
          }
          else if((BlendMode >= 0) || MaskEval_TA)
          {
-            DrawTimeAvail -= (((((xb  >> upscale_shift) + 1) & ~1) - ((xs  >> upscale_shift) & ~1)) >> 1);
+            gpu->DrawTimeAvail -= (((((xb  >> gpu->upscale_shift) + 1) & ~1) - ((xs  >> gpu->upscale_shift) & ~1)) >> 1);
          }
       }
 
@@ -182,9 +182,9 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
 
          if(goraud)
          {
-            r = RGB8SAT[COORD_GET_INT(ig.r)];
-            g = RGB8SAT[COORD_GET_INT(ig.g)];
-            b = RGB8SAT[COORD_GET_INT(ig.b)];
+            r = gpu->RGB8SAT[COORD_GET_INT(ig.r)];
+            g = gpu->RGB8SAT[COORD_GET_INT(ig.g)];
+            b = gpu->RGB8SAT[COORD_GET_INT(ig.b)];
          }
          else
          {
@@ -193,21 +193,19 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
             b = COORD_GET_INT(ig.b);
          }
 
-	 bool dither = DitherEnabled();
-         int32_t dither_x = x >> dither_upscale_shift;
-         int32_t dither_y = y >> dither_upscale_shift;
+         bool dither = gpu->DitherEnabled();
+         int32_t dither_x = x >> gpu->dither_upscale_shift;
+         int32_t dither_y = y >> gpu->dither_upscale_shift;
 
          if(textured)
          {
-            uint16_t fbw = GetTexel<TexMode_TA>(clut_offset, COORD_GET_INT(ig.u), COORD_GET_INT(ig.v));
+            uint16_t fbw = gpu->GetTexel<TexMode_TA>(clut_offset, COORD_GET_INT(ig.u), COORD_GET_INT(ig.v));
 
             if(fbw)
             {
-	      if(TexMult) {
-
-                  fbw = ModTexel(fbw, r, g, b, (dither) ? (dither_x & 3) : 3, (dither) ? (dither_y & 3) : 2);
-	      }
-	      PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
+               if(TexMult)
+                  fbw = gpu->ModTexel(fbw, r, g, b, (dither) ? (dither_x & 3) : 3, (dither) ? (dither_y & 3) : 2);
+               gpu->PlotPixel<BlendMode, MaskEval_TA, true>(x, y, fbw);
             }
          }
          else
@@ -216,14 +214,14 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
 
             if(goraud && dither)
             {
-               uint8_t *dither_offset = DitherLUT[dither_y & 3][dither_x & 3];
+               uint8_t *dither_offset = gpu->DitherLUT[dither_y & 3][dither_x & 3];
                pix = 0x8000 | (dither_offset[r] << 0) | (dither_offset[g] << 5) | 
                   (dither_offset[b] << 10);
             }
             else
                pix = 0x8000 | ((r >> 3) << 0) | ((g >> 3) << 5) | ((b >> 3) << 10);
 
-            PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
+            gpu->PlotPixel<BlendMode, MaskEval_TA, false>(x, y, pix);
          }
 
          AddIDeltas_DX<goraud, textured>(ig, idl);
@@ -233,12 +231,12 @@ INLINE void PS_GPU::DrawSpan(int y, uint32_t clut_offset, const int32_t x_start,
 }
 
 template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
+static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices, uint32_t clut)
 {
    i_deltas idl;
 
-   int32 clipy0 = ClipY0 << upscale_shift;
-   int32 clipy1 = ClipY1 << upscale_shift;
+   int32 clipy0 = gpu->ClipY0 << gpu->upscale_shift;
+   int32 clipy1 = gpu->ClipY1 << gpu->upscale_shift;
 
    //
    // Sort vertices by y.
@@ -296,18 +294,17 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
       ig.u = COORD_MF_INT(vertices[iggvi].u) + (1 << (COORD_FBS - 1));
       ig.v = COORD_MF_INT(vertices[iggvi].v) + (1 << (COORD_FBS - 1));
 
-      if (upscale_shift > 0) {
-	// Bias the texture coordinates so that it rounds to the
-	// correct value when the game is mapping a 2D sprite using
-	// triangles. Otherwise this could cause a small "shift" in
-	// the texture coordinates when upscaling
+      if (gpu->upscale_shift > 0)
+      {
+         // Bias the texture coordinates so that it rounds to the
+         // correct value when the game is mapping a 2D sprite using
+         // triangles. Otherwise this could cause a small "shift" in
+         // the texture coordinates when upscaling
 
-	if (idl.du_dy == 0 && (int32_t)idl.du_dx > 0) {
-	  ig.u -= (1 << (COORD_FBS - 1 - upscale_shift));
-	}
-	if (idl.dv_dx == 0 && (int32_t)idl.dv_dy > 0) {
-	  ig.v -= (1 << (COORD_FBS - 1 - upscale_shift));
-	}
+         if (idl.du_dy == 0 && (int32_t)idl.du_dx > 0)
+            ig.u -= (1 << (COORD_FBS - 1 - gpu->upscale_shift));
+         if (idl.dv_dx == 0 && (int32_t)idl.dv_dy > 0)
+            ig.v -= (1 << (COORD_FBS - 1 - gpu->upscale_shift));
       }
 
       ig.r = COORD_MF_INT(vertices[iggvi].r);
@@ -374,14 +371,14 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    {
       for(int32_t y = y_start; y < y_middle; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ul), ig, idl);
          base_coord += base_step;
          bound_coord_ul += bound_coord_us;
       }
 
       for(int32_t y = y_middle; y < y_bound; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, y, clut, GetPolyXFP_Int(base_coord), GetPolyXFP_Int(bound_coord_ll), ig, idl);
          base_coord += base_step;
          bound_coord_ll += bound_coord_ls;
       }
@@ -390,14 +387,14 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
    {
       for(int32_t y = y_start; y < y_middle; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, y, clut, GetPolyXFP_Int(bound_coord_ul), GetPolyXFP_Int(base_coord), ig, idl);
          base_coord += base_step;
          bound_coord_ul += bound_coord_us;
       }
 
       for(int32_t y = y_middle; y < y_bound; y++)
       {
-         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), ig, idl);
+         DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, y, clut, GetPolyXFP_Int(bound_coord_ll), GetPolyXFP_Int(base_coord), ig, idl);
          base_coord += base_step;
          bound_coord_ll += bound_coord_ls;
       }
@@ -414,7 +411,7 @@ void PS_GPU::DrawTriangle(tri_vertex *vertices, uint32_t clut)
 }
 
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
-INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
+static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 {
    tri_vertex vertices[3];
 	const uint32_t* baseCB = cb;
@@ -458,25 +455,25 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
    vertices[2].precise[2] = 0.0f;
 
    // Base timing is approximate, and could be improved.
-   if(numvertices == 4 && InCmd == INCMD_QUAD)
-      DrawTimeAvail -= (28 + 18);
+   if(numvertices == 4 && gpu->InCmd == INCMD_QUAD)
+      gpu->DrawTimeAvail -= (28 + 18);
    else
-      DrawTimeAvail -= (64 + 18);
+      gpu->DrawTimeAvail -= (64 + 18);
 
    if(goraud && textured)
-      DrawTimeAvail -= 150 * 3;
+      gpu->DrawTimeAvail -= 150 * 3;
    else if(goraud)
-      DrawTimeAvail -= 96 * 3;
+      gpu->DrawTimeAvail -= 96 * 3;
    else if(textured)
-      DrawTimeAvail -= 60 * 3;
+      gpu->DrawTimeAvail -= 60 * 3;
 
    if(numvertices == 4)
    {
-      if(InCmd == INCMD_QUAD)
+      if(gpu->InCmd == INCMD_QUAD)
       {
-         memcpy(&vertices[0], &InQuad_F3Vertices[1], 2 * sizeof(tri_vertex));
-         clut = InQuad_clut;
-		 invalidW = InQuad_invalidW;
+         memcpy(&vertices[0], &gpu->InQuad_F3Vertices[1], 2 * sizeof(tri_vertex));
+         clut = gpu->InQuad_clut;
+		 invalidW = gpu->InQuad_invalidW;
          sv = 2;
       }
    }
@@ -505,23 +502,23 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
       int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
       int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
 
-      vertices[v].x = (x + OffsX) << upscale_shift;
-      vertices[v].y = (y + OffsY) << upscale_shift;
+      vertices[v].x = (x + gpu->OffsX) << gpu->upscale_shift;
+      vertices[v].y = (y + gpu->OffsY) << gpu->upscale_shift;
 
       if (pgxp) {
 	OGLVertex vert;
 	PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
 
-	vertices[v].precise[0] = ((vert.x + (float)OffsX) * upscale());
-	vertices[v].precise[1] = ((vert.y + (float)OffsY) * upscale());
+	vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * gpu->upscale());
+	vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * gpu->upscale());
 	vertices[v].precise[2] = vert.w;
 
 	if (!vert.valid_w)
 	  invalidW = true;
 
       } else {
-	vertices[v].precise[0] = (float)x + OffsX;
-	vertices[v].precise[1] = (float)y + OffsY;
+	vertices[v].precise[0] = (float)x + gpu->OffsX;
+	vertices[v].precise[1] = (float)y + gpu->OffsY;
 
 	invalidW = true;
       }
@@ -550,35 +547,35 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 
    if(numvertices == 4)
    {
-      if(InCmd == INCMD_QUAD)
+      if(gpu->InCmd == INCMD_QUAD)
       {
-         InCmd = INCMD_NONE;
+         gpu->InCmd = INCMD_NONE;
 
-		 // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
-		 if (invalidW)
-			 InQuad_F3Vertices[0].precise[2] = 1.f;
+         // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
+         if (invalidW)
+            gpu->InQuad_F3Vertices[0].precise[2] = 1.f;
       }
       else
       {
-         InCmd = INCMD_QUAD;
-         InCmd_CC = cb0 >> 24;
-         memcpy(&InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex) * 3);
-         InQuad_clut = clut;
-		 InQuad_invalidW = invalidW;
+         gpu->InCmd = INCMD_QUAD;
+         gpu->InCmd_CC = cb0 >> 24;
+         memcpy(&gpu->InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex) * 3);
+         gpu->InQuad_clut = clut;
+         gpu->InQuad_invalidW = invalidW;
       }
    }
 
-   if(abs(vertices[2].y - vertices[0].y) >= (512 << upscale_shift) ||
-	   abs(vertices[2].y - vertices[1].y) >= (512 << upscale_shift) ||
-	   abs(vertices[1].y - vertices[0].y) >= (512 << upscale_shift))
+   if(abs(vertices[2].y - vertices[0].y) >= (512 << gpu->upscale_shift) ||
+	   abs(vertices[2].y - vertices[1].y) >= (512 << gpu->upscale_shift) ||
+	   abs(vertices[1].y - vertices[0].y) >= (512 << gpu->upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
        return;
      }
 
-   if(abs(vertices[2].x - vertices[0].x) >= (1024 << upscale_shift) ||
-      abs(vertices[2].x - vertices[1].x) >= (1024 << upscale_shift) ||
-      abs(vertices[1].x - vertices[0].x) >= (1024 << upscale_shift))
+   if(abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) ||
+      abs(vertices[2].x - vertices[1].x) >= (1024 << gpu->upscale_shift) ||
+      abs(vertices[1].x - vertices[0].x) >= (1024 << gpu->upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
        return;
@@ -597,49 +594,51 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
          blend_mode = BLEND_MODE_ADD;
    }
 
-   if (numvertices == 4) {
-	   if (InCmd == INCMD_NONE) {
-		   // We have 4 quad vertices, we can push that at once
-		   tri_vertex *first = &InQuad_F3Vertices[0];
+   if (numvertices == 4)
+   {
+	   if (gpu->InCmd == INCMD_NONE)
+      {
+         // We have 4 quad vertices, we can push that at once
+         tri_vertex *first = &gpu->InQuad_F3Vertices[0];
 
-		   rsx_intf_push_quad(
-                           first->precise[0],
-		           first->precise[1],
-		           first->precise[2],
-			   vertices[0].precise[0],
-			   vertices[0].precise[1],
-			   vertices[0].precise[2],
-			   vertices[1].precise[0],
-			   vertices[1].precise[1],
-			   vertices[1].precise[2],
-			   vertices[2].precise[0],
-			   vertices[2].precise[1],
-			   vertices[2].precise[2],
-			   ((uint32_t)first->r) |
-			   ((uint32_t)first->g << 8) |
-			   ((uint32_t)first->b << 16),
-			   ((uint32_t)vertices[0].r) |
-			   ((uint32_t)vertices[0].g << 8) |
-			   ((uint32_t)vertices[0].b << 16),
-			   ((uint32_t)vertices[1].r) |
-			   ((uint32_t)vertices[1].g << 8) |
-			   ((uint32_t)vertices[1].b << 16),
-			   ((uint32_t)vertices[2].r) |
-			   ((uint32_t)vertices[2].g << 8) |
-			   ((uint32_t)vertices[2].b << 16),
-			   first->u, first->v,
-			   vertices[0].u, vertices[0].v,
-			   vertices[1].u, vertices[1].v,
-			   vertices[2].u, vertices[2].v,
-			   this->TexPageX, this->TexPageY,
-			   clut_x, clut_y,
-			   blend_mode,
-			   2 - TexMode_TA,
-			   DitherEnabled(),
-            BlendMode,
-            MaskEval_TA,
-            MaskSetOR != 0);
-	   }
+         rsx_intf_push_quad(
+               first->precise[0],
+               first->precise[1],
+               first->precise[2],
+               vertices[0].precise[0],
+               vertices[0].precise[1],
+               vertices[0].precise[2],
+               vertices[1].precise[0],
+               vertices[1].precise[1],
+               vertices[1].precise[2],
+               vertices[2].precise[0],
+               vertices[2].precise[1],
+               vertices[2].precise[2],
+               ((uint32_t)first->r) |
+               ((uint32_t)first->g << 8) |
+               ((uint32_t)first->b << 16),
+               ((uint32_t)vertices[0].r) |
+               ((uint32_t)vertices[0].g << 8) |
+               ((uint32_t)vertices[0].b << 16),
+               ((uint32_t)vertices[1].r) |
+               ((uint32_t)vertices[1].g << 8) |
+               ((uint32_t)vertices[1].b << 16),
+               ((uint32_t)vertices[2].r) |
+                  ((uint32_t)vertices[2].g << 8) |
+                  ((uint32_t)vertices[2].b << 16),
+               first->u, first->v,
+               vertices[0].u, vertices[0].v,
+               vertices[1].u, vertices[1].v,
+               vertices[2].u, vertices[2].v,
+               gpu->TexPageX, gpu->TexPageY,
+               clut_x, clut_y,
+               blend_mode,
+               2 - TexMode_TA,
+               gpu->DitherEnabled(),
+               BlendMode,
+               MaskEval_TA,
+               gpu->MaskSetOR != 0);
+      }
    } else {
 	   // Push a single triangle
 	   rsx_intf_push_triangle(
@@ -664,18 +663,18 @@ INLINE void PS_GPU::Command_DrawPolygon(const uint32_t *cb)
 		   vertices[0].u, vertices[0].v,
 		   vertices[1].u, vertices[1].v,
 		   vertices[2].u, vertices[2].v,
-		   this->TexPageX, this->TexPageY,
+		   gpu->TexPageX, gpu->TexPageY,
 		   clut_x, clut_y,
 		   blend_mode,
 		   2 - TexMode_TA,
-		   DitherEnabled(),
+		   gpu->DitherEnabled(),
 		   BlendMode,
          MaskEval_TA,
-         MaskSetOR != 0);
+         gpu->MaskSetOR != 0);
    }
 
    if (rsx_intf_has_software_renderer())
-      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(vertices, clut);
+      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices, clut);
 }
 
 #undef COORD_POST_PADDING

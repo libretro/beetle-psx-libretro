@@ -421,7 +421,7 @@ void GPU_ResetTS(void)
    gpu->lastts = 0;
 }
 
-#include "gpu_common.cpp"
+#include "gpu_common.h"
 #include "gpu_polygon.cpp"
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
@@ -432,25 +432,11 @@ template<int numvertices, bool shaded, bool textured,
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
   if (PGXP_enabled())
-    g->Command_DrawPolygon<numvertices, shaded, textured,
-			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(cb);
+    Command_DrawPolygon<numvertices, shaded, textured,
+			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb);
   else
-    g->Command_DrawPolygon<numvertices, shaded, textured,
-			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(cb);
-}
-
-template<uint8 raw_size, bool textured, int BlendMode, bool TexMult,
-	 uint32 TexMode_TA, bool MaskEval_TA>
-static void G_Command_DrawSprite(PS_GPU* g, const uint32 *cb)
-{
-   g->Command_DrawSprite<raw_size, textured, BlendMode, TexMult,
-      TexMode_TA, MaskEval_TA>(cb);
-}
-
-template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
-static void G_Command_DrawLine(PS_GPU* g, const uint32 *cb)
-{
-   g->Command_DrawLine<polyline, goraud, BlendMode, MaskEval_TA>(cb);
+    Command_DrawPolygon<numvertices, shaded, textured,
+			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
 }
 
 void PS_GPU::InvalidateTexCache()
@@ -466,12 +452,12 @@ void PS_GPU::InvalidateCache()
    InvalidateTexCache();
 }
 
-static void G_Command_ClearCache(PS_GPU* g, const uint32 *cb)
+static void Command_ClearCache(PS_GPU* g, const uint32 *cb)
 {
    g->InvalidateCache();
 }
 
-static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
+static void Command_IRQ(PS_GPU* g, const uint32 *cb)
 {
    g->IRQPending = true;
    IRQ_Assert(IRQ_GPU, g->IRQPending);
@@ -479,7 +465,7 @@ static void G_Command_IRQ(PS_GPU* g, const uint32 *cb)
 
 // Special RAM write mode(16 pixels at a time),
 // does *not* appear to use mask drawing environment settings.
-static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
+static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 {
    unsigned y;
    int32_t r                 = cb[0] & 0xFF;
@@ -515,7 +501,7 @@ static void G_Command_FBFill(PS_GPU* gpu, const uint32 *cb)
    rsx_intf_fill_rect(cb[0], destX, destY, width, height);
 }
 
-static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
+static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
 {
    unsigned y;
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
@@ -568,7 +554,7 @@ static void G_Command_FBCopy(PS_GPU* g, const uint32 *cb)
    rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
 }
 
-static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
+static void Command_FBWrite(PS_GPU* g, const uint32 *cb)
 {
    //assert(InCmd == INCMD_NONE);
 
@@ -597,7 +583,7 @@ static void G_Command_FBWrite(PS_GPU* g, const uint32 *cb)
  * raw_height == 0, or raw_height != 0x200 && (raw_height & 0x1FF) == 0
  */
 
-static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
+static void Command_FBRead(PS_GPU* g, const uint32 *cb)
 {
    //assert(g->InCmd == INCMD_NONE);
 
@@ -622,7 +608,7 @@ static void G_Command_FBRead(PS_GPU* g, const uint32 *cb)
       g->InCmd = INCMD_FBREAD;
 }
 
-static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
+static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
 {
    const uint32 cmdw = *cb;
 
@@ -635,7 +621,7 @@ static void G_Command_DrawMode(PS_GPU* g, const uint32 *cb)
    //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
-static void G_Command_TexWindow(PS_GPU* g, const uint32 *cb)
+static void Command_TexWindow(PS_GPU* g, const uint32 *cb)
 {
    g->tww = (*cb & 0x1F);
    g->twh = ((*cb >> 5) & 0x1F);
@@ -646,7 +632,7 @@ static void G_Command_TexWindow(PS_GPU* g, const uint32 *cb)
    rsx_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
-static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
+static void Command_Clip0(PS_GPU* g, const uint32 *cb)
 {
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
@@ -654,7 +640,7 @@ static void G_Command_Clip0(PS_GPU* g, const uint32 *cb)
 			  g->ClipX1, g->ClipY1);
 }
 
-static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
+static void Command_Clip1(PS_GPU* g, const uint32 *cb)
 {
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
@@ -662,7 +648,7 @@ static void G_Command_Clip1(PS_GPU* g, const uint32 *cb)
          g->ClipX1, g->ClipY1);
 }
 
-static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
+static void Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 {
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
    g->OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
@@ -670,7 +656,7 @@ static void G_Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
    //fprintf(stderr, "[GPU] Drawing offset: %d(raw=%d) %d(raw=%d) -- %d\n", OffsX, *cb, OffsY, *cb >> 11, scanline);
 }
 
-static void G_Command_MaskSetting(PS_GPU* g, const uint32 *cb)
+static void Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 {
    //printf("Mask setting: %08x\n", *cb);
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
@@ -683,8 +669,8 @@ CTEntry PS_GPU::Commands[256] =
 {
    /* 0x00 */
    NULLCMD(),
-   OTHER_HELPER(1, 2, false, G_Command_ClearCache),
-   OTHER_HELPER(3, 3, false, G_Command_FBFill),
+   OTHER_HELPER(1, 2, false, Command_ClearCache),
+   OTHER_HELPER(3, 3, false, Command_FBFill),
 
    NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
    NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
@@ -693,7 +679,7 @@ CTEntry PS_GPU::Commands[256] =
    NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
    NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
 
-   OTHER_HELPER(1, 1, false,  G_Command_IRQ),
+   OTHER_HELPER(1, 1, false,  Command_IRQ),
 
    /* 0x20 */
    POLY_HELPER(0x20),
@@ -796,23 +782,23 @@ CTEntry PS_GPU::Commands[256] =
    SPR_HELPER(0x7f),
 
    /* 0x80 ... 0x9F */
-   OTHER_HELPER_X32(4, 2, false, G_Command_FBCopy),
+   OTHER_HELPER_X32(4, 2, false, Command_FBCopy),
 
    /* 0xA0 ... 0xBF */
-   OTHER_HELPER_X32(3, 2, false, G_Command_FBWrite),
+   OTHER_HELPER_X32(3, 2, false, Command_FBWrite),
 
    /* 0xC0 ... 0xDF */
-   OTHER_HELPER_X32(3, 2, false, G_Command_FBRead),
+   OTHER_HELPER_X32(3, 2, false, Command_FBRead),
 
    /* 0xE0 */
 
    NULLCMD(),
-   OTHER_HELPER(1, 2, false, G_Command_DrawMode),
-   OTHER_HELPER(1, 2, false, G_Command_TexWindow),
-   OTHER_HELPER(1, 1, true,  G_Command_Clip0),
-   OTHER_HELPER(1, 1, true,  G_Command_Clip1),
-   OTHER_HELPER(1, 1, true,  G_Command_DrawingOffset),
-   OTHER_HELPER(1, 2, false, G_Command_MaskSetting),
+   OTHER_HELPER(1, 2, false, Command_DrawMode),
+   OTHER_HELPER(1, 2, false, Command_TexWindow),
+   OTHER_HELPER(1, 1, true,  Command_Clip0),
+   OTHER_HELPER(1, 1, true,  Command_Clip1),
+   OTHER_HELPER(1, 1, true,  Command_DrawingOffset),
+   OTHER_HELPER(1, 2, false, Command_MaskSetting),
 
    NULLCMD(),
    NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(), NULLCMD(),
@@ -930,11 +916,11 @@ void PS_GPU::ProcessFIFO(uint32_t in_count)
    }
 
    if ((cc >= 0x80) && (cc <= 0x9F))
-      G_Command_FBCopy(this, CB);
+      Command_FBCopy(this, CB);
    else if ((cc >= 0xA0) && (cc <= 0xBF))
-      G_Command_FBWrite(this, CB);
+      Command_FBWrite(this, CB);
    else if ((cc >= 0xC0) && (cc <= 0xDF))
-      G_Command_FBRead(this, CB);
+      Command_FBRead(this, CB);
    else
    {
 	   if (command->func[abr][TexMode])
