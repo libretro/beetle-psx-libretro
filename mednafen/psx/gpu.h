@@ -78,8 +78,6 @@ class PS_GPU
       PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
      ~PS_GPU() MDFN_COLD;
 
-      static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
-
       PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
 
       inline int32 GetScanlineNum(void)

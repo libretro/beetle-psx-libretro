@@ -214,7 +214,7 @@ static void *GPU_Alloc(uint8 upscale_shift)
 }
 
 
-PS_GPU *PS_GPU::Build(bool pal_clock_and_tv,
+static PS_GPU *GPU_Build(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift)
 {
   void *buffer = GPU_Alloc(upscale_shift);
@@ -226,7 +226,7 @@ PS_GPU *PS_GPU::Build(bool pal_clock_and_tv,
 void GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift)
 {
-   GPU = PS_GPU::Build(pal_clock_and_tv, sls, sle, upscale_shift);
+   GPU = GPU_Build(pal_clock_and_tv, sls, sle, upscale_shift);
 }
 
 void GPU_Destroy(void)
