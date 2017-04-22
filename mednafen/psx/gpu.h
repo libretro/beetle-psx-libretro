@@ -72,7 +72,6 @@ struct line_point
 class PS_GPU
 {
    public:
-      static void *Alloc(uint8 upscale_shift) MDFN_COLD;
       // Private constructors and destructors since we need to use
       // custom allocators to allocate the flexible vram
       PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
@@ -80,7 +79,6 @@ class PS_GPU
      ~PS_GPU() MDFN_COLD;
 
       static PS_GPU *Build(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
-      static void Destroy(PS_GPU *gpu) MDFN_COLD;
 
       PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
 

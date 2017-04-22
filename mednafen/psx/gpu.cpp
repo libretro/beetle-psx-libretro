@@ -198,8 +198,8 @@ PS_GPU::~PS_GPU()
 }
 
 
-// Allocate enough room for the PS_GPU class and VRAM
-void *PS_GPU::Alloc(uint8 upscale_shift)
+/* Allocate enough room for the PS_GPU class and VRAM */
+static void *GPU_Alloc(uint8 upscale_shift)
 {
   unsigned width = 1024 << upscale_shift;
   unsigned height = 512 << upscale_shift;
@@ -217,7 +217,7 @@ void *PS_GPU::Alloc(uint8 upscale_shift)
 PS_GPU *PS_GPU::Build(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift)
 {
-  void *buffer = PS_GPU::Alloc(upscale_shift);
+  void *buffer = GPU_Alloc(upscale_shift);
 
   // Place the new GPU inside the buffer
   return new (buffer) PS_GPU(pal_clock_and_tv, sls, sle, upscale_shift);
@@ -242,7 +242,7 @@ void GPU_Destroy(void)
 // Build a new GPU with a different upscale_shift
 PS_GPU *PS_GPU::Rescale(uint8 ushift)
 {
-   void *buffer = PS_GPU::Alloc(ushift);
+   void *buffer = GPU_Alloc(ushift);
 
    return new (buffer) PS_GPU(*this, ushift);
 }
