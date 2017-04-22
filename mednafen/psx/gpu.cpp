@@ -240,18 +240,18 @@ void GPU_Destroy(void)
 }
 
 // Build a new GPU with a different upscale_shift
-PS_GPU *PS_GPU::Rescale(uint8 ushift)
+static PS_GPU *GPU_Rescale(PS_GPU *gpu, uint8 ushift)
 {
    void *buffer = GPU_Alloc(ushift);
 
-   return new (buffer) PS_GPU(*this, ushift);
+   return new (buffer) PS_GPU(*gpu, ushift);
 }
 
 void GPU_Reinit(uint8 ushift)
 {
    // We successfully changed the frontend's resolution, we can
    // apply the change immediately
-   PS_GPU *new_gpu = GPU->Rescale(ushift);
+   PS_GPU *new_gpu = GPU_Rescale(GPU, ushift);
    GPU_Destroy();
    GPU = new_gpu;
 }
@@ -2005,4 +2005,9 @@ void texel_put(uint32 x, uint32 y, uint16 v)
       for (dx = 0; dx < UPSCALE(GPU); dx++)
          vram_put(GPU, x + dx, y + dy, v);
    }
+}
+
+int32_t GPU_GetScanlineNum(void)
+{
+   return GPU->scanline;
 }

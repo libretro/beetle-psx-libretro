@@ -76,14 +76,7 @@ class PS_GPU
       // custom allocators to allocate the flexible vram
       PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
       PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
-     ~PS_GPU() MDFN_COLD;
-
-      PS_GPU *Rescale(uint8 upscale_shift) MDFN_COLD;
-
-      inline int32 GetScanlineNum(void)
-      {
-         return(scanline);
-      } 
+      ~PS_GPU() MDFN_COLD;
 
       uint8 upscale_shift;
       uint8 dither_upscale_shift;
@@ -154,7 +147,7 @@ class PS_GPU
 
       tri_vertex InQuad_F3Vertices[3];
       uint32 InQuad_clut;
-	  bool InQuad_invalidW;
+      bool InQuad_invalidW;
 
       line_point InPLine_PrevPoint;
 
@@ -245,7 +238,6 @@ class PS_GPU
       // upscaling ratio) without having an additional level of
       // indirection since it'll be allocated right after the struct
       uint16 vram[0];
-
 };
 
 uint16 *GPU_get_vram(void);
@@ -292,6 +284,8 @@ int GPU_StateAction(StateMem *sm, int load, int data_only);
 uint16 GPU_PeekRAM(uint32 A);
 
 void GPU_PokeRAM(uint32 A, uint16 V);
+
+int32_t GPU_GetScanlineNum(void);
 
 void texel_put(uint32 x, uint32 y, uint16 v);
 

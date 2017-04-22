@@ -597,9 +597,9 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                DMACH[ch].ClockCounter = (1 << 30);
                RunChannel(timestamp, 1, ch);
                DMACH[ch].ClockCounter = 0;
-#endif
-               PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU->GetScanlineNum());
+               PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU_GetScanlineNum());
                //MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
+#endif
             }
 
             if(ch == 6)
@@ -610,7 +610,7 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
             {
                //if(ch == 0 || ch == 1)
-               // PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU->GetScanlineNum());
+               // PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU_GetScanlineNum());
 
                DMACH[ch].WordCounter = 0;
                DMACH[ch].ClockCounter = 0;

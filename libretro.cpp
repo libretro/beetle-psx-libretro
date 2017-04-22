@@ -3710,11 +3710,11 @@ void retro_run(void)
 
    ForceEventUpdates(timestamp);
 #if 0
-   if(GPU->GetScanlineNum() < 100)
-      PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
+   if(GPU_GetScanlineNum() < 100)
+      PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
 #endif
 
-   //printf("scanline=%u, st=%u\n", GPU->GetScanlineNum(), timestamp);
+   //printf("scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
 
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
