@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2016 The RetroArch team
+/* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (file_stream.h).
@@ -28,18 +28,17 @@
 
 #include <sys/types.h>
 
-#include <retro_common.h>
+#include <retro_common_api.h>
 #include <boolean.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 typedef struct RFILE RFILE;
 
 enum
 {
    RFILE_MODE_READ = 0,
+   RFILE_MODE_READ_TEXT,
    RFILE_MODE_WRITE,
    RFILE_MODE_READ_WRITE,
 
@@ -47,6 +46,12 @@ enum
    RFILE_HINT_UNBUFFERED = 1<<8,
    RFILE_HINT_MMAP       = 1<<9  /* requires RFILE_MODE_READ */
 };
+
+long long int filestream_get_size(RFILE *stream);
+
+void filestream_set_size(RFILE *stream);
+
+const char *filestream_get_ext(RFILE *stream);
 
 RFILE *filestream_open(const char *path, unsigned mode, ssize_t len);
 
@@ -64,12 +69,22 @@ int filestream_close(RFILE *stream);
 
 int filestream_read_file(const char *path, void **buf, ssize_t *len);
 
+char *filestream_gets(RFILE *stream, char *s, size_t len);
+
+char *filestream_getline(RFILE *stream);
+
+int filestream_getc(RFILE *stream);
+
+int filestream_eof(RFILE *stream);
+
 bool filestream_write_file(const char *path, const void *data, ssize_t size);
+
+int filestream_putc(RFILE *stream, int c);
 
 int filestream_get_fd(RFILE *stream);
 
-#ifdef __cplusplus
-}
-#endif
+int filestream_flush(RFILE *stream);
+
+RETRO_END_DECLS
 
 #endif
