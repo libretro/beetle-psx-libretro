@@ -297,6 +297,7 @@ else ifeq ($(platform), emscripten)
                  -Dfilestream_write=gg_filestream_write\
                  -Dfilestream_rewind=gg_filestream_rewind\
                  -Dfilestream_putc=gg_filestream_putc\
+					  -Dfilestream_getline=gg_filestream_getline\
                  -Dpath_is_character_special=gg_path_is_character_special\
                  -Dpath_is_valid=gg_path_is_valid\
                  -Dpath_is_compressed=gg_path_is_compressed\
