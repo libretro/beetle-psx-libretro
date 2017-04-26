@@ -239,9 +239,17 @@ ifeq ($(HAVE_VULKAN),1)
 	endif
 endif
 
-#ifneq ($(STATIC_LINKING), 1)
+ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 				 $(LIBRETRO_DIR)/string/stdstring.c
+
+ifeq ($(NEED_THREADING), 1)
+SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
+endif
+
+endif
+endif
+
 SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/amctrl.c \
 				 $(LIBKIRK_DIR)/bn.c \
@@ -249,13 +257,6 @@ SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/ec.c \
 				 $(LIBKIRK_DIR)/kirk_engine.c \
 				 $(LIBKIRK_DIR)/sha1.c
-
-ifeq ($(NEED_THREADING), 1)
-SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
-endif
-
-endif
-#endif
 
 SOURCES_C += $(LIBRETRO_DIR)/file/retro_stat.c
 
