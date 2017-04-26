@@ -239,6 +239,7 @@ ifeq ($(HAVE_VULKAN),1)
 	endif
 endif
 
+ifneq ($(platform), wiiu)
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 				 $(LIBRETRO_DIR)/string/stdstring.c
@@ -247,6 +248,7 @@ ifeq ($(NEED_THREADING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
 endif
 
+endif
 endif
 endif
 
