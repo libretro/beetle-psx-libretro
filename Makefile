@@ -289,6 +289,7 @@ else ifeq ($(platform), emscripten)
                  -Dfilestream_seek=gg_filestream_seek\
                  -Dfilestream_close=gg_filestream_close\
                  -Dfilestream_tell=gg_filestream_tell\
+                 -Dfilestream_get_ext=gg_filestream_get_ext\
                  -Dfilestream_read_file=gg_filestream_read_file\
                  -Dfilestream_write_file=gg_filestream_write_file\
                  -Dfilestream_write=gg_filestream_write\
