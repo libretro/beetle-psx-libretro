@@ -300,6 +300,7 @@ else ifeq ($(platform), emscripten)
 					  -Dfilestream_getline=gg_filestream_getline\
 					  -Dfilestream_getc=gg_filestream_getc\
 					  -Dfilestream_gets=gg_filestream_gets\
+					  -Dfilestream_eof=gg_filestream_eof\
                  -Dpath_is_character_special=gg_path_is_character_special\
                  -Dpath_is_valid=gg_path_is_valid\
                  -Dpath_is_compressed=gg_path_is_compressed\
