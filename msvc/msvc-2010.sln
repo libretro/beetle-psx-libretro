@@ -16,16 +16,16 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|Win32.ActiveCfg = Debug|Win32
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|Win32.Build.0 = Debug|Win32
-		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|x64.ActiveCfg = Debug|Win32
-		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|x64.Build.0 = Debug|Win32
+		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|x64.ActiveCfg = Debug|x64
+		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug|x64.Build.0 = Debug|x64
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug-2015|Win32.ActiveCfg = Debug-2015|Win32
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug-2015|Win32.Build.0 = Debug-2015|Win32
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug-2015|x64.ActiveCfg = Debug-2015|x64
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Debug-2015|x64.Build.0 = Debug-2015|x64
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|Win32.ActiveCfg = Release|Win32
 		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|Win32.Build.0 = Release|Win32
-		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|x64.ActiveCfg = Release|Win32
-		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|x64.Build.0 = Release|Win32
+		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|x64.ActiveCfg = Release|x64
+		{A9C675CC-DDF4-4BC5-A212-25AE2465D253}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
