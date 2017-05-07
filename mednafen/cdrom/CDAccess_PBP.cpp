@@ -550,10 +550,19 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
       Tracks[i].index[0] = (BCD_to_U8(toc_entry.index0[0])*60 + BCD_to_U8(toc_entry.index0[1])) * 75 + BCD_to_U8(toc_entry.index0[2]);
       Tracks[i].index[1] = (BCD_to_U8(toc_entry.index1[0])*60 + BCD_to_U8(toc_entry.index1[1])) * 75 + BCD_to_U8(toc_entry.index1[2]);
 
-      // are these correct?
+      // HACK: force these values for converted files since conversion tools like PSX2PSP seem to specify an offset for data tracks at 00:02:00 which is not the actual location in the converted image data (but rather 00:00:00)
+      if (!is_official && Tracks[i].DIFormat == DI_FORMAT_MODE2_RAW)
+      {
+         Tracks[i].index[0] = 0;
+         Tracks[i].index[1] = 0;
+      }
+
       Tracks[i].LBA = Tracks[i].index[1];
-      Tracks[i].pregap = Tracks[i].index[0];
+
+      // pre/postgaps shouldn't be required, dont know if the pbp format even supports it
+      Tracks[i].pregap = 0;
       Tracks[i].postgap = 0;
+
       Tracks[i].pregap_dv = Tracks[i].index[1]-Tracks[i].index[0];
       if(Tracks[i].pregap_dv < 0)
          Tracks[i].pregap_dv = 0;
