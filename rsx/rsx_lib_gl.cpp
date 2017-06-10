@@ -514,6 +514,8 @@ GlRenderer::~GlRenderer()
     }
 }
 
+extern bool doCleanFrame;
+
 static void draw(GlRenderer *renderer)
 {
    int16_t x = renderer->config->draw_offset[0];
@@ -1580,8 +1582,12 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       /* If the display is off, just clear the screen */
       if (renderer->config->display_off && !renderer->display_vram)
       {
-         glClearColor(0.0, 0.0, 0.0, 0.0);
-         glClear(GL_COLOR_BUFFER_BIT);
+         if (doCleanFrame)
+         {
+            glClearColor(0.0, 0.0, 0.0, 0.0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            doCleanFrame = false;
+         }
       }
       else
       {
@@ -2072,13 +2078,17 @@ void rsx_gl_fill_rect(uint32_t color,
          Framebuffer _fb;
          Framebuffer_init(&_fb, renderer->fb_out);
 
-         glClearColor(   (float) col[0] / 255.0,
-               (float) col[1] / 255.0,
-               (float) col[2] / 255.0,
-               // XXX Not entirely sure what happens to
-               // the mask bit in fill_rect commands
-               0.0);
-         glClear(GL_COLOR_BUFFER_BIT);
+         if (doCleanFrame)
+         {
+            glClearColor(   (float) col[0] / 255.0,
+                  (float) col[1] / 255.0,
+                  (float) col[2] / 255.0,
+                  // XXX Not entirely sure what happens to
+                  // the mask bit in fill_rect commands
+                  0.0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            doCleanFrame = false;
+         }
 
          Framebuffer_free(&_fb);
       }
