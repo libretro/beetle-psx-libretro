@@ -95,6 +95,6 @@ LOCAL_C_INCLUDES = $(CORE_DIR)/parallel-psx $(CORE_DIR)/parallel-psx/atlas $(COR
 
 LOCAL_CFLAGS =  $(FLAGS) 
 LOCAL_CXXFLAGS = $(FLAGS) -fexceptions
-LOCAL_LDLIBS += -lz
+LOCAL_LDLIBS += -lz -latomic
 
 include $(BUILD_SHARED_LIBRARY)
