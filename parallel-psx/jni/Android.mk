@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 FAST = 1
-HAVE_VULKAN=1
+HAVE_VULKAN = 0
 
 GIT_VERSION ?= " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
@@ -16,13 +16,39 @@ ANDROID_FLAGS := -DANDROID_ARM
 LOCAL_ARM_MODE := arm
 endif
 
+ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
+ANDROID_FLAGS := -DANDROID_ARM
+LOCAL_CXXFLAGS += -std=c++11
+HAVE_VULKAN = 1
+endif
+
+ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
+ANDROID_FLAGS := -DANDROID_ARM
+LOCAL_CXXFLAGS += -std=c++11
+HAVE_VULKAN = 1
+endif
+
 ifeq ($(TARGET_ARCH),x86)
 ANDROID_FLAGS := -DANDROID_X86
 IS_X86 = 1
+LOCAL_CXXFLAGS += -std=c++11
+HAVE_VULKAN = 1
+endif
+
+ifeq ($(TARGET_ARCH),x86_64)
+ANDROID_FLAGS := -DANDROID_X86
+LOCAL_CXXFLAGS += -std=c++11
+HAVE_VULKAN = 1
 endif
 
 ifeq ($(TARGET_ARCH),mips)
 ANDROID_FLAGS := -DANDROID_MIPS -D__mips__ -D__MIPSEL__
+endif
+
+ifeq ($(TARGET_ARCH),mips64)
+ANDROID_FLAGS := -DANDROID_MIPS -D__mips__ -D__MIPSEL__
+LOCAL_CXXFLAGS += -std=c++11
+HAVE_VULKAN = 1
 endif
 
 LOCAL_CXXFLAGS += $(ANDROID_FLAGS)
@@ -62,7 +88,7 @@ FLAGS += -DHAVE_VULKAN -DHAVE_HW
 LOCAL_C_INCLUDES = $(CORE_DIR)/parallel-psx $(CORE_DIR)/parallel-psx/atlas $(CORE_DIR)/parallel-psx/vulkan $(CORE_DIR)/parallel-psx/renderer $(CORE_DIR)/parallel-psx/khronos/include $(CORE_DIR)/parallel-psx/glsl/prebuilt $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/include
 
 LOCAL_CFLAGS =  $(FLAGS) 
-LOCAL_CXXFLAGS = $(FLAGS) -fexceptions -std=c++11
+LOCAL_CXXFLAGS = $(FLAGS) -fexceptions
 LOCAL_LDLIBS += -lz
 
 include $(BUILD_SHARED_LIBRARY)
