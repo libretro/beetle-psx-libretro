@@ -70,9 +70,22 @@ inline std::string merge(const std::vector<std::string> &list)
 }
 
 template <typename T>
+std::string to_string_internal(T value)
+{
+   //create an output string stream
+   std::ostringstream os ;
+
+   //throw the value into the string stream
+   os << value ;
+
+   //convert the string stream into a string and return
+   return os.str() ;
+}
+
+template <typename T>
 inline std::string convert_to_string(T &&t)
 {
-	return std::to_string(std::forward<T>(t));
+	return to_string_internal(std::forward<T>(t));
 }
 
 // Allow implementations to set a convenient standard precision

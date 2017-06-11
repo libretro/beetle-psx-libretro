@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2016 The RetroArch team
+/* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (retro_miscellaneous.h).
@@ -24,7 +24,6 @@
 #define __RARCH_MISCELLANEOUS_H
 
 #include <stdint.h>
-#include <math.h>
 
 #if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
 #include <sys/timer.h>
@@ -32,8 +31,10 @@
 #include <time/time.h>
 #elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
 #include <unistd.h>
+#elif defined(WIIU)
+#include <wiiu/os/thread.h>
 #elif defined(PSP)
-#include <pspthreadman.h> 
+#include <pspthreadman.h>
 #elif defined(VITA)
 #include <psp2/kernel/threadmgr.h>
 #elif defined(_3DS)
@@ -57,7 +58,7 @@
 #include <retro_inline.h>
 
 #ifndef PATH_MAX_LENGTH
-#if defined(_XBOX1) || defined(_3DS) || defined(PSP) || defined(GEKKO)
+#if defined(_XBOX1) || defined(_3DS) || defined(PSP) || defined(GEKKO)|| defined(WIIU)
 #define PATH_MAX_LENGTH 512
 #else
 #define PATH_MAX_LENGTH 4096
@@ -65,7 +66,9 @@
 #endif
 
 #ifndef M_PI
+#if !defined(_MSC_VER) && !defined(USE_MATH_DEFINES)
 #define M_PI 3.14159265358979323846264338327
+#endif
 #endif
 
 #ifndef MAX
@@ -78,6 +81,26 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define RARCH_SCALE_BASE 256
+
+#ifdef DJGPP
+#define timespec timeval
+#define tv_nsec tv_usec
+#include <unistd.h>
+
+extern int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
+
+static int nanosleepDOS(const struct timespec *rqtp, struct timespec *rmtp)
+{
+   usleep(1000000 * rqtp->tv_sec + rqtp->tv_nsec / 1000);
+
+   if (rmtp)
+      rmtp->tv_sec = rmtp->tv_nsec=0;
+
+   return 0;
+}
+
+#define nanosleep nanosleepDOS
+#endif
 
 /**
  * retro_sleep:
@@ -99,6 +122,8 @@ static INLINE void retro_sleep(unsigned msec)
    udelay(1000 * msec);
 #elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
    usleep(1000 * msec);
+#elif defined(WIIU)
+   OSSleepTicks(ms_to_ticks(msec));
 #else
    struct timespec tv = {0};
    tv.tv_sec = msec / 1000;
@@ -145,17 +170,16 @@ static INLINE uint32_t prev_pow2(uint32_t v)
    return v - (v >> 1);
 }
 
-/**
- * db_to_gain:
- * @db          : Decibels.
- *
- * Converts decibels to voltage gain.
- *
- * Returns: voltage gain value.
- **/
-static INLINE float db_to_gain(float db)
+static INLINE uint32_t read_le(const uint8_t *data, unsigned size)
 {
-   return powf(10.0f, db / 20.0f);
+   unsigned i;
+   uint32_t val = 0;
+
+   size *= 8;
+   for (i = 0; i < size; i += 8)
+      val |= (uint32_t)*data++ << i;
+
+   return val;
 }
 
 /* Helper macros and struct to keep track of many booleans.
@@ -185,7 +209,7 @@ typedef struct
 #define BIT64_GET(a, bit) (!!((a) &   (UINT64_C(1) << ((bit) & 63))))
 #define BIT64_CLEAR_ALL(a)   ((a) = 0)
 
-#define BIT128_SET(a, bit)   ((a).data[(bit) >> 5] |=  (1 << ((bit) & 31))
+#define BIT128_SET(a, bit)   ((a).data[(bit) >> 5] |=  (1 << ((bit) & 31)))
 #define BIT128_CLEAR(a, bit) ((a).data[(bit) >> 5] &= ~(1 << ((bit) & 31)))
 #define BIT128_GET(a, bit)   ((a).data[(bit) >> 5] &   (1 << ((bit) & 31)))
 #define BIT128_CLEAR_ALL(a)  memset(&(a), 0, sizeof(a));

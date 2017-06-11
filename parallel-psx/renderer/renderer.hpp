@@ -1,8 +1,8 @@
 #pragma once
 
-#include "atlas.hpp"
-#include "device.hpp"
-#include "vulkan.hpp"
+#include "../atlas/atlas.hpp"
+#include "../vulkan/device.hpp"
+#include "../vulkan/vulkan.hpp"
 
 #ifdef VULKAN_WSI
 #include "wsi.hpp"

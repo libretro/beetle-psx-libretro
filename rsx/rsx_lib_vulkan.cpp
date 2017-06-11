@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h> /* exit() */
 #include <boolean.h>
-#include "renderer.hpp"
+#include "../parallel-psx/renderer/renderer.hpp"
 #include "libretro_vulkan.h"
 #include <vector>
 #include <functional>
