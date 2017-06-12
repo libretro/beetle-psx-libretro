@@ -90,6 +90,6 @@ FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=
 LOCAL_CFLAGS =  $(FLAGS) 
 LOCAL_C_INCLUDES = $(CORE_DIR)/libretro-common/include $(CORE_DIR)/parallel-psx/khronos/include $(CORE_DIR)/parallel-psx/glsl $(CORE_DIR)/parallel-psx/glsl/prebuilt $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross
 LOCAL_CXXFLAGS += $(FLAGS) -fexceptions
-LOCAL_LDLIBS += -lz
+LOCAL_LDLIBS += -lz -latomic
 
 include $(BUILD_SHARED_LIBRARY)
