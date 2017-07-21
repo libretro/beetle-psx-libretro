@@ -150,6 +150,11 @@ void rsx_vulkan_refresh_variables(void)
     {
         /* Same limitations as libretro.cpp */
         scaling = var.value[0] - '0';
+	if (var.value[1] != 'x')
+	{
+           scaling  = (var.value[0] - '0') * 10;
+	   scaling += var.value[1] - '0';
+	}
     }
 
     var.key = option_adaptive_smoothing;

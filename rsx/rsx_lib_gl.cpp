@@ -275,6 +275,11 @@ GlRenderer::GlRenderer(DrawConfig* config)
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         /* Same limitations as libretro.cpp */
         upscaling = var.value[0] -'0';
+	if (var.value[1] != 'x')
+	{
+	   upscaling  = (var.value[0] - '0') * 10;
+	   upscaling += var.value[1] - '0';
+	}
     }
 
     var.key = option_filter;
