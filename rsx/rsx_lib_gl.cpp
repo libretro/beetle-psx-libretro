@@ -823,6 +823,11 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         /* Same limitations as libretro.cpp */
         upscaling = var.value[0] -'0';
+	if (var.value[1] != 'x')
+	{
+           upscaling  = (var.value[0] -'0') * 10;
+           upscaling += (var.value[1] -'0');
+	}
     }
 
     var.key = option_filter;
@@ -1424,6 +1429,11 @@ struct retro_system_av_info get_av_info(VideoClock std)
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       /* Same limitations as libretro.cpp */
       upscaling = var.value[0] -'0';
+      if (var.value[1] != 'x')
+      {
+         upscaling  = (var.value[0] -'0') * 10;
+         upscaling += (var.value[1] -'0');
+      }
     }
 
     var.key = option_display_vram;
