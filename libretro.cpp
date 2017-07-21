@@ -2638,11 +2638,13 @@ static void check_variables(bool startup)
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
          {
-            // We only support one digit upscaling ratios for now... fix me
-            // if we even want 16x.
             uint8_t val = var.value[0] - '0';
 
-            assert(var.value[1] == 'x');
+	    if (var.value[1] != 'x')
+	    {
+	       val  = (var.value[0] - '0') * 10;
+               val += var.value[1] - '0';
+	    }
 
             // Upscale must be a power of two
             assert((val & (val - 1)) == 0);
