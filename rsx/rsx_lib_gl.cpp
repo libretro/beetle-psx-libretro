@@ -209,11 +209,11 @@ public:
     /// Texture used to store the VRAM for texture mapping
     DrawConfig config;
     /// Framebuffer used as a shader input for texturing draw commands
-    Texture* fb_texture;
+    Texture fb_texture;
     /// Framebuffer used as an output when running draw commands
-    Texture* fb_out;
+    Texture fb_out;
     /// Depth buffer for fb_out
-    Texture* fb_out_depth;
+    Texture fb_out_depth;
     /// Current resolution of the frontend's framebuffer
     uint32_t frontend_resolution[2];
     /// Current internal resolution upscaling factor
@@ -239,27 +239,26 @@ public:
     bool display_vram;
 
     /* pub fn from_config(config: DrawConfig) -> Result<GlRenderer, Error> */
-    GlRenderer(DrawConfig* config);
-
+    GlRenderer(DrawConfig config);
     ~GlRenderer();
-
-    template<typename T>
-    static DrawBuffer<T>* build_buffer( const char* vertex_shader,
-                                        const char* fragment_shader,
-                                        size_t capacity)
-    {
-       Shader *vs = (Shader*)calloc(1, sizeof(*vs));
-       Shader *fs = (Shader*)calloc(1, sizeof(*fs));
-
-       Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
-       Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
-       Program* program = (Program*)calloc(1, sizeof(*program));
-
-       Program_init(program, vs, fs);
-
-       return new DrawBuffer<T>(capacity, program);
-    }
 };
+
+template<typename T>
+static DrawBuffer<T>* build_buffer( const char* vertex_shader,
+		const char* fragment_shader,
+		size_t capacity)
+{
+   Shader *vs = (Shader*)calloc(1, sizeof(*vs));
+   Shader *fs = (Shader*)calloc(1, sizeof(*fs));
+
+   Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
+   Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
+   Program* program = (Program*)calloc(1, sizeof(*program));
+
+   Program_init(program, vs, fs);
+
+   return new DrawBuffer<T>(capacity, program);
+}
 
 static void upload_textures(
       GlRenderer *renderer,
@@ -267,7 +266,7 @@ static void upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS]);
 
-GlRenderer::GlRenderer(DrawConfig* config)
+GlRenderer::GlRenderer(DrawConfig config)
 {
     struct retro_variable var = {0};
 
@@ -349,51 +348,51 @@ GlRenderer::GlRenderer(DrawConfig* config)
     switch(this->filter_type)
     {
     case FILTER_MODE_SABR:
-      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+      command_buffer = build_buffer<CommandVertex>(
                            command_vertex_xbr,
                            command_fragment_sabr,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_XBR:
-      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+      command_buffer = build_buffer<CommandVertex>(
                            command_vertex_xbr,
                            command_fragment_xbr,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_BILINEAR:
-      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+      command_buffer = build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment_bilinear,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_3POINT:
-      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+      command_buffer = build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment_3point,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_JINC2:
-      command_buffer = GlRenderer::build_buffer<CommandVertex>(
+      command_buffer = build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment_jinc2,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_NEAREST:
     default:
-       command_buffer = GlRenderer::build_buffer<CommandVertex>(
+       command_buffer = build_buffer<CommandVertex>(
                            command_vertex,
                            command_fragment,
                            VERTEX_BUFFER_LEN);
     }
 
     DrawBuffer<OutputVertex>* output_buffer =
-        GlRenderer::build_buffer<OutputVertex>(
+        build_buffer<OutputVertex>(
             output_vertex,
             output_fragment,
             4);
 
     DrawBuffer<ImageLoadVertex>* image_load_buffer =
-        GlRenderer::build_buffer<ImageLoadVertex>(
+        build_buffer<ImageLoadVertex>(
             image_load_vertex,
             image_load_fragment,
             4);
@@ -404,8 +403,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     // Texture holding the raw VRAM texture contents. We can't
     // meaningfully upscale it since most games use paletted
     // textures.
-    Texture *fb_texture = (Texture*)calloc(1, sizeof(*fb_texture));
-    Texture_init(fb_texture, native_width, native_height, GL_RGB5_A1);
+    Texture_init(&this->fb_texture, native_width, native_height, GL_RGB5_A1);
 
     if (depth > 16) {
         // Dithering is superfluous when we increase the internal
@@ -431,19 +429,16 @@ GlRenderer::GlRenderer(DrawConfig* config)
         exit(EXIT_FAILURE);
     }
 
-    Texture *fb_out       = (Texture*)calloc(1, sizeof(*fb_out));
-    Texture *fb_out_depth = (Texture*)calloc(1, sizeof(*fb_out_depth));
-
     Texture_init(
-          fb_out,
+          &this->fb_out,
           native_width * upscaling,
           native_height * upscaling,
           texture_storage);
 
     Texture_init(
-          fb_out_depth,
-          fb_out->width,
-          fb_out->height,
+          &this->fb_out_depth,
+          this->fb_out.width,
+          this->fb_out.height,
           GL_DEPTH_COMPONENT32F);
 
     this->filter_type = filter;
@@ -456,10 +451,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->command_polygon_mode = command_draw_mode;
     this->output_buffer = output_buffer;
     this->image_load_buffer = image_load_buffer;
-    this->config = *config;
-    this->fb_texture = fb_texture;
-    this->fb_out = fb_out;
-    this->fb_out_depth = fb_out_depth;
+    this->config = config;
     this->frontend_resolution[0] = 0;
     this->frontend_resolution[1] = 0;
     this->internal_upscaling = upscaling;
@@ -496,26 +488,20 @@ GlRenderer::~GlRenderer()
         this->image_load_buffer = NULL;
     }
 
-    if (this->fb_texture)
-    {
-       Texture_free(this->fb_texture);
-       free(this->fb_texture);
-       this->fb_texture = NULL;
-    }
+    Texture_free(&this->fb_texture);
+    this->fb_texture.id     = 0;
+    this->fb_texture.width  = 0;
+    this->fb_texture.height = 0;
 
-    if (this->fb_out)
-    {
-       Texture_free(this->fb_out);
-       free(this->fb_out);
-       this->fb_out = NULL;
-    }
+    Texture_free(&this->fb_out);
+    this->fb_out.id     = 0;
+    this->fb_out.width  = 0;
+    this->fb_out.height = 0;
 
-    if (this->fb_out_depth)
-    {
-       Texture_free(this->fb_out_depth);
-       free(fb_out_depth);
-       this->fb_out_depth = NULL;
-    }
+    Texture_free(&this->fb_out_depth);
+    this->fb_out_depth.id     = 0;
+    this->fb_out_depth.width  = 0;
+    this->fb_out_depth.height = 0;
 }
 
 extern bool doCleanFrame;
@@ -532,11 +518,11 @@ static void draw(GlRenderer *renderer)
 
    // Bind the out framebuffer
    Framebuffer _fb;
-   Framebuffer_init(&_fb, renderer->fb_out);
+   Framebuffer_init(&_fb, &renderer->fb_out);
 
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
          GL_DEPTH_ATTACHMENT,
-         renderer->fb_out_depth->id,
+         renderer->fb_out_depth.id,
          0);
 
    glClear(GL_DEPTH_BUFFER_BIT);
@@ -755,7 +741,7 @@ static void upload_textures(
       draw(renderer);
 
     Texture_set_sub_image(
-          renderer->fb_texture,
+          &renderer->fb_texture,
           top_left,
           dimensions,
           GL_RGBA,
@@ -790,7 +776,7 @@ static void upload_textures(
     // Bind the output framebuffer
     // let _fb = Framebuffer::new(&self.fb_out);
     Framebuffer _fb;
-    Framebuffer_init(&_fb, renderer->fb_out);
+    Framebuffer_init(&_fb, &renderer->fb_out);
 
     if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
        renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
@@ -913,18 +899,11 @@ static bool retro_refresh_variables(GlRenderer *renderer)
             exit(EXIT_FAILURE);
         }
 
-        Texture *fb_out = (Texture*)calloc(1, sizeof(*fb_out));
-
-        Texture_init(fb_out, w, h, texture_storage);
-
-        if (renderer->fb_out)
-        {
-           Texture_free(renderer->fb_out);
-           free(renderer->fb_out);
-           renderer->fb_out = NULL;
-        }
-
-        renderer->fb_out = fb_out;
+	Texture_free(&renderer->fb_out);
+	renderer->fb_out.id     = 0;
+	renderer->fb_out.width  = 0;
+	renderer->fb_out.height = 0;
+        Texture_init(&renderer->fb_out, w, h, texture_storage);
 
         // This is a bit wasteful since it'll re-upload the data
         // to `fb_texture` even though we haven't touched it but
@@ -937,16 +916,11 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 			      GPU_get_vram());
 
 
-        if (renderer->fb_out_depth)
-        {
-           Texture_free(renderer->fb_out_depth);
-           free(renderer->fb_out_depth);
-           renderer->fb_out_depth = NULL;
-        }
-
-        renderer->fb_out_depth = (Texture*)calloc(1, sizeof(*renderer->fb_out_depth));
-
-        Texture_init(renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
+	Texture_free(&renderer->fb_out_depth);
+	renderer->fb_out_depth.id     = 0;
+	renderer->fb_out_depth.width  = 0;
+	renderer->fb_out_depth.height = 0;
+        Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
@@ -1310,7 +1284,8 @@ RetroGl::~RetroGl() {
     }
 }
 
-void RetroGl::context_reset() {
+void RetroGl::context_reset()
+{
     puts("OpenGL context reset\n");
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
@@ -1336,10 +1311,7 @@ void RetroGl::context_reset() {
         this->state_data.r = NULL;
     }
 
-    /* GlRenderer will own this copy and delete it in its dtor */
-    DrawConfig* copy_of_config  = new DrawConfig;
-    memcpy(copy_of_config, &config, sizeof(config));
-    this->state_data.r = new GlRenderer(copy_of_config);
+    this->state_data.r = new GlRenderer(config);
     this->state = GlState_Valid;
 }
 
@@ -1571,7 +1543,8 @@ void rsx_gl_prepare_frame(void)
 
       apply_scissor(renderer);
 
-      Texture_bind(renderer->fb_texture, GL_TEXTURE0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
    }
 }
 
@@ -1609,7 +1582,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       else
       {
          // Bind 'fb_out' to texture unit 1
-         Texture_bind(renderer->fb_out, GL_TEXTURE1);
+	 glActiveTexture(GL_TEXTURE1);
+	 glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
          // First we draw the visible part of fb_out
          uint16_t fb_x_start = renderer->config.display_top_left[0];
@@ -1670,7 +1644,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
          Framebuffer _fb;
-         Framebuffer_init(&_fb, renderer->fb_texture);
+         Framebuffer_init(&_fb, &renderer->fb_texture);
 
          program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
                renderer->internal_upscaling);
@@ -2093,7 +2067,7 @@ void rsx_gl_fill_rect(uint32_t color,
       {
          // Bind the out framebuffer
          Framebuffer _fb;
-         Framebuffer_init(&_fb, renderer->fb_out);
+         Framebuffer_init(&_fb, &renderer->fb_out);
 
          if (doCleanFrame)
          {
@@ -2187,8 +2161,8 @@ void rsx_gl_copy_rect(
        // and target area overlap, this should be handled
        // explicitely
        /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-       glCopyImageSubData( renderer->fb_out->id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
-             renderer->fb_out->id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
+       glCopyImageSubData( renderer->fb_out.id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
+             renderer->fb_out.id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
              w, h, 1 );
 #endif
 
@@ -2291,7 +2265,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
          draw(renderer);
 
       Texture_set_sub_image_window(
-            renderer->fb_texture,
+            &renderer->fb_texture,
             top_left,
             dimensions,
             (size_t) VRAM_WIDTH_PIXELS,
@@ -2325,7 +2299,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       // Bind the output framebuffer
       Framebuffer _fb;
 
-      Framebuffer_init(&_fb, renderer->fb_out);
+      Framebuffer_init(&_fb, &renderer->fb_out);
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
          renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
