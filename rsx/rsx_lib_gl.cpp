@@ -473,6 +473,8 @@ GlRenderer::GlRenderer(DrawConfig config)
 GlRenderer::~GlRenderer()
 {
     if (this->command_buffer) {
+	Program_free(this->command_buffer->program);
+	free(this->command_buffer->program);
         delete this->command_buffer;
         this->command_buffer = NULL;
     }
