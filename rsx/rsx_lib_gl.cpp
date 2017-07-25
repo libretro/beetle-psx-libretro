@@ -1172,6 +1172,8 @@ class RetroGl {
 public:
      // new(video_clock: VideoClock)
     RetroGl(VideoClock video_clock);
+    ~RetroGl();
+
     /*
     Rust's enums members can contain data. To emulate that,
     I'll use a helper struct to save the data.
@@ -1180,8 +1182,6 @@ public:
     GlState state;
     VideoClock video_clock;
 
-    ~RetroGl();
-    void refresh_variables();
 };
 
 /* This was originally in rustation-libretro/lib.rs */
@@ -1254,15 +1254,16 @@ static bool gl_context_framebuffer_lock(void* data)
 
 RetroGl::RetroGl(VideoClock video_clock)
 {
+    glsm_ctx_params_t params = {0};
     retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
-    if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) ) {
+
+    if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) )
+    {
         puts("Can't set pixel format\n");
         exit(EXIT_FAILURE);
     }
 
     /* glsm related setup */
-    glsm_ctx_params_t params = {0};
-
     params.context_reset         = gl_context_reset;
     params.context_destroy       = gl_context_destroy;
     params.framebuffer_lock      = gl_context_framebuffer_lock;
@@ -1281,18 +1282,18 @@ RetroGl::RetroGl(VideoClock video_clock)
         {0, 0},         // display_top_left
         {1024, 512},    // display_resolution
         false,          // display_24bpp
-		true,           // display_off
+	true,           // display_off
         {0, 0},         // draw_area_top_left
         {0, 0},         // draw_area_dimensions
         {0, 0},         // draw_offset
     };
 
     // No context until `context_reset` is called
-    this->state = GlState_Invalid;
+    this->state        = GlState_Invalid;
     this->state_data.c = config;
     this->state_data.r = NULL;
 
-    this->video_clock = video_clock;
+    this->video_clock  = video_clock;
 
 }
 
@@ -1301,10 +1302,6 @@ RetroGl::~RetroGl() {
         delete this->state_data.r;
         this->state_data.r = NULL;
     }
-}
-
-void RetroGl::refresh_variables()
-{
 }
 
 struct retro_system_av_info get_av_info(VideoClock std)
