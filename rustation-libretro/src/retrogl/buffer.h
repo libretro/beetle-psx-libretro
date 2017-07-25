@@ -57,7 +57,7 @@ public:
     DrawBuffer(size_t capacity, Program* program)
        :map(NULL)
     {
-       VertexArrayObject* vao = (VertexArrayObject*)calloc(1, sizeof(*vao));
+       VertexArrayObject* vao = new VertexArrayObject();
        
        VertexArrayObject_init(vao);
 
@@ -103,14 +103,13 @@ public:
        if (this->vao)
        {
           VertexArrayObject_free(this->vao);
-          free(this->vao);
+          delete this->vao;
           this->vao = NULL;
        }
 
        if (this->program)
        {
           Program_free(program);
-          free(program);
           this->program = NULL;
        }
     }
