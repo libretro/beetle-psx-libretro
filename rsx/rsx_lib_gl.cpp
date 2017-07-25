@@ -1169,14 +1169,9 @@ struct GlStateData {
 };
 
 class RetroGl {
-/* Everything private is the singleton requirements... */
-private:
+public:
      // new(video_clock: VideoClock)
     RetroGl(VideoClock video_clock);
-    static bool isCreated;
-public:
-    static RetroGl* getInstance(VideoClock video_clock);
-    static RetroGl* getInstance();
     /*
     Rust's enums members can contain data. To emulate that,
     I'll use a helper struct to save the data.
@@ -1187,52 +1182,76 @@ public:
 
     ~RetroGl();
 
-    void context_reset();
-    void context_destroy();
     void refresh_variables();
     retro_system_av_info get_system_av_info();
-
-    /* This was stolen from rsx_lib_gl */
-    bool context_framebuffer_lock(void *data);
 };
 
 /* This was originally in rustation-libretro/lib.rs */
 retro_system_av_info get_av_info(VideoClock std);
 
-/* TODO - Get rid of these shims */
-static void shim_context_reset();
-static void shim_context_destroy();
-static bool shim_context_framebuffer_lock(void* data);
+static RetroGl* static_renderer = NULL;
 
-/*
-*
-*   THIS CLASS IS A SINGLETON!
-*   TODO: Fix the above.
-*
-*/
-
-bool RetroGl::isCreated = false;
-
-RetroGl* RetroGl::getInstance(VideoClock video_clock)
+static void gl_context_reset(void)
 {
-   static RetroGl *single = NULL;
-   if (single && isCreated)
-   {
-      return single;
-   } else {
-      try {
-         single = new RetroGl(video_clock);
-      } catch (const std::runtime_error &) {
-         return NULL;
-      }
-      isCreated = true;
-      return single;
-   }
+    static DrawConfig config;
+    puts("OpenGL context reset\n");
+    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+
+    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
+        return;
+
+    /* Save this on the stack, I'm unsure if saving a ptr would
+    would cause trouble because of the 'delete' below  */
+
+    if (!static_renderer)
+       return;
+
+    switch (static_renderer->state)
+    {
+    case GlState_Valid:
+        config = static_renderer->state_data.r->config;
+        break;
+    case GlState_Invalid:
+        config = static_renderer->state_data.c;
+        break;
+    }
+
+    if (static_renderer->state_data.r)
+    {
+        delete static_renderer->state_data.r;
+        static_renderer->state_data.r = NULL;
+    }
+
+    static_renderer->state_data.r = new GlRenderer(config);
+    static_renderer->state = GlState_Valid;
 }
 
-RetroGl* RetroGl::getInstance()
+static void gl_context_destroy(void)
 {
-    return RetroGl::getInstance(VideoClock_Ntsc);
+    if (static_renderer)
+    {
+	    switch (static_renderer->state)
+	    {
+		    case GlState_Valid:
+			    break;
+		    case GlState_Invalid:
+			    // Looks like we didn't have an OpenGL context anyway...
+			    return;
+	    }
+    }
+
+    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
+
+    if (static_renderer)
+    {
+    static_renderer->state        = GlState_Invalid;
+    static_renderer->state_data.c = static_renderer->state_data.r->config;
+    }
+}
+
+static bool gl_context_framebuffer_lock(void* data)
+{
+    return false;
 }
 
 RetroGl::RetroGl(VideoClock video_clock)
@@ -1246,9 +1265,9 @@ RetroGl::RetroGl(VideoClock video_clock)
     /* glsm related setup */
     glsm_ctx_params_t params = {0};
 
-    params.context_reset         = shim_context_reset;
-    params.context_destroy       = shim_context_destroy;
-    params.framebuffer_lock      = shim_context_framebuffer_lock;
+    params.context_reset         = gl_context_reset;
+    params.context_destroy       = gl_context_destroy;
+    params.framebuffer_lock      = gl_context_framebuffer_lock;
     params.environ_cb            = environ_cb;
     params.stencil               = false;
     params.imm_vbo_draw          = NULL;
@@ -1284,54 +1303,6 @@ RetroGl::~RetroGl() {
         delete this->state_data.r;
         this->state_data.r = NULL;
     }
-}
-
-void RetroGl::context_reset()
-{
-    puts("OpenGL context reset\n");
-    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
-
-    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
-        return;
-
-    /* Save this on the stack, I'm unsure if saving a ptr would
-    would cause trouble because of the 'delete' below  */
-    static DrawConfig config;
-
-    switch (this->state)
-    {
-    case GlState_Valid:
-        config = this->state_data.r->config;
-        break;
-    case GlState_Invalid:
-        config = this->state_data.c;
-        break;
-    }
-
-    if (this->state_data.r) {
-        delete this->state_data.r;
-        this->state_data.r = NULL;
-    }
-
-    this->state_data.r = new GlRenderer(config);
-    this->state = GlState_Valid;
-}
-
-void RetroGl::context_destroy()
-{
-    switch (this->state)
-    {
-    case GlState_Valid:
-        break;
-    case GlState_Invalid:
-        // Looks like we didn't have an OpenGL context anyway...
-        return;
-    }
-
-    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
-
-    this->state = GlState_Invalid;
-    this->state_data.c = this->state_data.r->config;
 }
 
 void RetroGl::refresh_variables()
@@ -1375,21 +1346,6 @@ void RetroGl::refresh_variables()
 struct retro_system_av_info RetroGl::get_system_av_info()
 {
     return get_av_info(this->video_clock);
-}
-
-bool RetroGl::context_framebuffer_lock(void *data)
-{
-   /* If the state is invalid, lock the framebuffer (return true) */
-   switch (this->state)
-   {
-      case GlState_Valid:
-         return false;
-      case GlState_Invalid:
-      default:
-         break;
-   }
-
-   return true;
 }
 
 
@@ -1481,23 +1437,6 @@ struct retro_system_av_info get_av_info(VideoClock std)
     return info;
 }
 
-static void shim_context_reset()
-{
-    RetroGl::getInstance()->context_reset();
-}
-
-static void shim_context_destroy()
-{
-    RetroGl::getInstance()->context_destroy();
-}
-
-static bool shim_context_framebuffer_lock(void* data)
-{
-    return RetroGl::getInstance()->context_framebuffer_lock(data);
-}
-
-static RetroGl* static_renderer = NULL;
-
 void rsx_gl_init(void)
 {
 }
@@ -1505,12 +1444,13 @@ void rsx_gl_init(void)
 bool rsx_gl_open(bool is_pal)
 {
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
-   static_renderer = RetroGl::getInstance(clock);
+   static_renderer = new RetroGl(clock);
    return static_renderer != NULL;
 }
 
 void rsx_gl_close(void)
 {
+   delete[] static_renderer;
    static_renderer = NULL;
 }
 
