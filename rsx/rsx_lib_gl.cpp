@@ -2134,34 +2134,35 @@ void rsx_gl_push_line(int16_t p0x,
          exit(EXIT_FAILURE);
    }
 
-   CommandVertex v[2] = {
-      {
-          {(float)p0x, (float)p0y, 0., 1.0}, /* position */
-          {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
-          {0, 0}, /* texture_coord */
-          {0, 0}, /* texture_page */
-          {0, 0}, /* clut */
-          0,      /* texture_blend_mode */
-          0,      /* depth_shift */
-          (uint8_t) dither,
-          semi_transparent,
-      },
-      {
-          {(float)p1x, (float)p1y, 0., 1.0}, /* position */
-          {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
-          {0, 0}, /* texture_coord */
-          {0, 0}, /* texture_page */
-          {0, 0}, /* clut */
-          0,      /* texture_blend_mode */
-          0,      /* depth_shift */
-          (uint8_t) dither,
-          semi_transparent,
-      }
-   };
 
    if (static_renderer.state == GlState_Valid)
    {
       GlRenderer *renderer = static_renderer.state_data.r;
+
+      CommandVertex v[2] = {
+	      {
+		      {(float)p0x, (float)p0y, 0., 1.0}, /* position */
+		      {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+		      {0, 0}, /* texture_coord */
+		      {0, 0}, /* texture_page */
+		      {0, 0}, /* clut */
+		      0,      /* texture_blend_mode */
+		      0,      /* depth_shift */
+		      (uint8_t) dither,
+		      semi_transparent,
+	      },
+	      {
+		      {(float)p1x, (float)p1y, 0., 1.0}, /* position */
+		      {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+		      {0, 0}, /* texture_coord */
+		      {0, 0}, /* texture_page */
+		      {0, 0}, /* clut */
+		      0,      /* texture_blend_mode */
+		      0,      /* depth_shift */
+		      (uint8_t) dither,
+		      semi_transparent,
+	      }
+      };
       push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode);
    }
 }
