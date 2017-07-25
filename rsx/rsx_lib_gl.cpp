@@ -279,6 +279,9 @@ GlRenderer::GlRenderer(DrawConfig* config)
 	{
 	   upscaling  = (var.value[0] - '0') * 10;
 	   upscaling += var.value[1] - '0';
+
+	   if (upscaling == 32) /* Too high for GL */
+              upscaling = 16;
 	}
     }
 
@@ -827,6 +830,9 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 	{
            upscaling  = (var.value[0] -'0') * 10;
            upscaling += (var.value[1] -'0');
+
+	   if (upscaling == 32) /* Too high for GL */
+	      upscaling = 16;
 	}
     }
 
@@ -1378,6 +1384,7 @@ void RetroGl::refresh_variables()
 
     bool reconfigure_frontend = retro_refresh_variables(renderer);
 
+#if 0
     if (reconfigure_frontend)
     {
         // The resolution has changed, we must tell the frontend
@@ -1397,6 +1404,7 @@ void RetroGl::refresh_variables()
             puts("Try resetting to enable the new configuration\n");
         }
     }
+#endif
 }
 
 struct retro_system_av_info RetroGl::get_system_av_info()
@@ -1433,6 +1441,9 @@ struct retro_system_av_info get_av_info(VideoClock std)
       {
          upscaling  = (var.value[0] -'0') * 10;
          upscaling += (var.value[1] -'0');
+
+	 if (upscaling == 32) /* Too high for GL */
+            upscaling = 16;
       }
     }
 
