@@ -173,15 +173,6 @@ struct TransparencyIndex {
     SemiTransparencyMode transparency_mode;
     unsigned last_index;
     GLenum draw_mode;
-
-  TransparencyIndex(SemiTransparencyMode transparency_mode,
-		    unsigned last_index,
-		    GLenum draw_mode)
-    :transparency_mode(transparency_mode),
-     last_index(last_index),
-     draw_mode(draw_mode)
-  {
-  }
 };
 
 class GlRenderer {
@@ -575,9 +566,10 @@ static void draw(GlRenderer *renderer)
       // Semi-transparency pass
 
       // Push the current semi-transparency mode
-      TransparencyIndex ti(renderer->semi_transparency_mode,
-            renderer->semi_transparent_index_pos,
-            renderer->command_draw_mode);
+      TransparencyIndex ti;
+      ti.transparency_mode = renderer->semi_transparency_mode;
+      ti.last_index        = renderer->semi_transparent_index_pos;
+      ti.draw_mode         = renderer->command_draw_mode;
 
       renderer->transparency_mode_index.push_back(ti);
 
@@ -981,9 +973,10 @@ static void vertex_preprocessing(
          (stm != renderer->semi_transparency_mode ||
           mode != renderer->command_draw_mode)) {
       // We're changing the transparency mode
-      TransparencyIndex ti(renderer->semi_transparency_mode,
-            renderer->semi_transparent_index_pos,
-            renderer->command_draw_mode);
+      TransparencyIndex ti;
+      ti.transparency_mode = renderer->semi_transparency_mode;
+      ti.last_index        = renderer->semi_transparent_index_pos;
+      ti.draw_mode         = renderer->command_draw_mode;
 
       renderer->transparency_mode_index.push_back(ti);
       renderer->semi_transparency_mode = stm;
