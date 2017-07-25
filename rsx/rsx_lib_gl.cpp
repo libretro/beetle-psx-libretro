@@ -105,7 +105,8 @@ static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
 /// length
 static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
-struct DrawConfig {
+struct DrawConfig
+{
     uint16_t display_top_left[2];
     uint16_t display_resolution[2];
     bool     display_24bpp;
@@ -206,7 +207,7 @@ public:
     /// Buffer used to copy textures from `fb_texture` to `fb_out`
     DrawBuffer<ImageLoadVertex>* image_load_buffer;
     /// Texture used to store the VRAM for texture mapping
-    DrawConfig* config;
+    DrawConfig config;
     /// Framebuffer used as a shader input for texturing draw commands
     Texture* fb_texture;
     /// Framebuffer used as an output when running draw commands
@@ -455,7 +456,7 @@ GlRenderer::GlRenderer(DrawConfig* config)
     this->command_polygon_mode = command_draw_mode;
     this->output_buffer = output_buffer;
     this->image_load_buffer = image_load_buffer;
-    this->config = config;
+    this->config = *config;
     this->fb_texture = fb_texture;
     this->fb_out = fb_out;
     this->fb_out_depth = fb_out_depth;
@@ -495,11 +496,6 @@ GlRenderer::~GlRenderer()
         this->image_load_buffer = NULL;
     }
 
-    if (this->config) {
-        delete this->config;
-        this->config = NULL;
-    }
-
     if (this->fb_texture)
     {
        Texture_free(this->fb_texture);
@@ -526,8 +522,8 @@ extern bool doCleanFrame;
 
 static void draw(GlRenderer *renderer)
 {
-   int16_t x = renderer->config->draw_offset[0];
-   int16_t y = renderer->config->draw_offset[1];
+   int16_t x = renderer->config.draw_offset[0];
+   int16_t y = renderer->config.draw_offset[1];
 
    program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
 
@@ -673,10 +669,10 @@ static void draw(GlRenderer *renderer)
 
 static inline void apply_scissor(GlRenderer *renderer)
 {
-    uint16_t _x = renderer->config->draw_area_top_left[0];
-    uint16_t _y = renderer->config->draw_area_top_left[1];
-    int _w      = renderer->config->draw_area_bot_right[0] - _x;
-    int _h      = renderer->config->draw_area_bot_right[1] - _y;
+    uint16_t _x = renderer->config.draw_area_top_left[0];
+    uint16_t _y = renderer->config.draw_area_top_left[1];
+    int _w      = renderer->config.draw_area_bot_right[0] - _x;
+    int _h      = renderer->config.draw_area_bot_right[1] - _y;
 
     if (_w < 0)
       _w = 0;
@@ -711,8 +707,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       // Is this accurate?
       aspect_ratio = 2.0 / 1.0;
     } else {
-      _w = renderer->config->display_resolution[0];
-      _h = renderer->config->display_resolution[1];
+      _w = renderer->config.display_resolution[0];
+      _h = renderer->config.display_resolution[1];
       aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
     }
 
@@ -1328,7 +1324,7 @@ void RetroGl::context_reset() {
     switch (this->state)
     {
     case GlState_Valid:
-        config = *this->state_data.r->config;
+        config = this->state_data.r->config;
         break;
     case GlState_Invalid:
         config = this->state_data.c;
@@ -1349,14 +1345,9 @@ void RetroGl::context_reset() {
 
 void RetroGl::context_destroy()
 {
-	printf("OpenGL context destroy\n");
-
-    DrawConfig config;
-
     switch (this->state)
     {
     case GlState_Valid:
-        config = *this->state_data.r->config;
         break;
     case GlState_Invalid:
         // Looks like we didn't have an OpenGL context anyway...
@@ -1366,7 +1357,7 @@ void RetroGl::context_destroy()
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
     this->state = GlState_Invalid;
-    this->state_data.c = config;
+    this->state_data.c = this->state_data.r->config;
 }
 
 void RetroGl::refresh_variables()
@@ -1606,7 +1597,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       glDisable(GL_BLEND);
 
       /* If the display is off, just clear the screen */
-      if (renderer->config->display_off && !renderer->display_vram)
+      if (renderer->config.display_off && !renderer->display_vram)
       {
          if (doCleanFrame)
          {
@@ -1621,12 +1612,12 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          Texture_bind(renderer->fb_out, GL_TEXTURE1);
 
          // First we draw the visible part of fb_out
-         uint16_t fb_x_start = renderer->config->display_top_left[0];
-         uint16_t fb_y_start = renderer->config->display_top_left[1];
-         uint16_t fb_width   = renderer->config->display_resolution[0];
-         uint16_t fb_height  = renderer->config->display_resolution[1];
+         uint16_t fb_x_start = renderer->config.display_top_left[0];
+         uint16_t fb_y_start = renderer->config.display_top_left[1];
+         uint16_t fb_width   = renderer->config.display_resolution[0];
+         uint16_t fb_height  = renderer->config.display_resolution[1];
 
-         GLint depth_24bpp   = (GLint) renderer->config->display_24bpp;
+         GLint depth_24bpp   = (GLint) renderer->config.display_24bpp;
 
          if (renderer->display_vram)
          {
@@ -1757,8 +1748,8 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
       // Finish drawing anything with the current offset
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
-      renderer->config->draw_offset[0] = x;
-      renderer->config->draw_offset[1] = y;
+      renderer->config.draw_offset[0] = x;
+      renderer->config.draw_offset[1] = y;
    }
 }
 
@@ -1788,11 +1779,11 @@ void  rsx_gl_set_draw_area(uint16_t x0,
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          draw(renderer);
 
-      renderer->config->draw_area_top_left[0] = x0;
-      renderer->config->draw_area_top_left[1] = y0;
+      renderer->config.draw_area_top_left[0] = x0;
+      renderer->config.draw_area_top_left[1] = y0;
       // Draw area coordinates are inclusive
-      renderer->config->draw_area_bot_right[0] = x1 + 1;
-      renderer->config->draw_area_bot_right[1] = y1 + 1;
+      renderer->config.draw_area_bot_right[0] = x1 + 1;
+      renderer->config.draw_area_bot_right[1] = y1 + 1;
 
       apply_scissor(renderer);
    }
@@ -1808,12 +1799,12 @@ void rsx_gl_set_display_mode(uint16_t x,
    {
       GlRenderer *renderer                    = static_renderer->state_data.r;
 
-      renderer->config->display_top_left[0]   = x;
-      renderer->config->display_top_left[1]   = y;
+      renderer->config.display_top_left[0]   = x;
+      renderer->config.display_top_left[1]   = y;
 
-      renderer->config->display_resolution[0] = w;
-      renderer->config->display_resolution[1] = h;
-      renderer->config->display_24bpp = depth_24bpp;
+      renderer->config.display_resolution[0] = w;
+      renderer->config.display_resolution[1] = h;
+      renderer->config.display_24bpp = depth_24bpp;
    }
 }
 
@@ -2083,18 +2074,18 @@ void rsx_gl_fill_rect(uint32_t color,
       // and reconfigure the scissor box to the fill rectangle
       // instead.
       uint16_t draw_area_top_left[2] = {
-         renderer->config->draw_area_top_left[0],
-         renderer->config->draw_area_top_left[1]
+         renderer->config.draw_area_top_left[0],
+         renderer->config.draw_area_top_left[1]
       };
       uint16_t draw_area_bot_right[2] = {
-         renderer->config->draw_area_bot_right[0],
-         renderer->config->draw_area_bot_right[1]
+         renderer->config.draw_area_bot_right[0],
+         renderer->config.draw_area_bot_right[1]
       };
 
-      renderer->config->draw_area_top_left[0]  = top_left[0];
-      renderer->config->draw_area_top_left[1]  = top_left[1];
-      renderer->config->draw_area_bot_right[0] = top_left[0] + dimensions[0];
-      renderer->config->draw_area_bot_right[1] = top_left[1] + dimensions[1];
+      renderer->config.draw_area_top_left[0]  = top_left[0];
+      renderer->config.draw_area_top_left[1]  = top_left[1];
+      renderer->config.draw_area_bot_right[0] = top_left[0] + dimensions[0];
+      renderer->config.draw_area_bot_right[1] = top_left[1] + dimensions[1];
 
       apply_scissor(renderer);
 
@@ -2120,10 +2111,10 @@ void rsx_gl_fill_rect(uint32_t color,
       }
 
       // Reconfigure the draw area
-      renderer->config->draw_area_top_left[0]    = draw_area_top_left[0];
-      renderer->config->draw_area_top_left[1]    = draw_area_top_left[1];
-      renderer->config->draw_area_bot_right[0]   = draw_area_bot_right[0];
-      renderer->config->draw_area_bot_right[1]   = draw_area_bot_right[1];
+      renderer->config.draw_area_top_left[0]    = draw_area_top_left[0];
+      renderer->config.draw_area_top_left[1]    = draw_area_top_left[1];
+      renderer->config.draw_area_bot_right[0]   = draw_area_bot_right[0];
+      renderer->config.draw_area_bot_right[1]   = draw_area_bot_right[1];
 
       apply_scissor(renderer);
    }
@@ -2354,6 +2345,6 @@ void rsx_gl_toggle_display(bool status)
    if (static_renderer->state == GlState_Valid)
    {
       GlRenderer *renderer          = static_renderer->state_data.r;
-      renderer->config->display_off = status;
+      renderer->config.display_off = status;
    }
 }
