@@ -1181,9 +1181,7 @@ public:
     VideoClock video_clock;
 
     ~RetroGl();
-
     void refresh_variables();
-    retro_system_av_info get_system_av_info();
 };
 
 /* This was originally in rustation-libretro/lib.rs */
@@ -1307,47 +1305,7 @@ RetroGl::~RetroGl() {
 
 void RetroGl::refresh_variables()
 {
-    GlRenderer* renderer = NULL;
-    switch (this->state)
-    {
-       case GlState_Valid:
-          renderer = this->state_data.r;
-          break;
-       case GlState_Invalid:
-          // Nothing to be done if we don't have a GL context
-          return;
-    }
-
-    bool reconfigure_frontend = retro_refresh_variables(renderer);
-
-#if 0
-    if (reconfigure_frontend)
-    {
-        // The resolution has changed, we must tell the frontend
-        // to change its format
-        struct retro_variable var = {0};
-
-        struct retro_system_av_info av_info = get_av_info(this->video_clock);
-
-        // This call can potentially (but not necessarily) call
-        // `context_destroy` and `context_reset` to reinitialize
-        // the entire OpenGL context, so beware.
-        bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
-
-        if (!ok)
-        {
-            puts("Couldn't change frontend resolution\n");
-            puts("Try resetting to enable the new configuration\n");
-        }
-    }
-#endif
 }
-
-struct retro_system_av_info RetroGl::get_system_av_info()
-{
-    return get_av_info(this->video_clock);
-}
-
 
 struct retro_system_av_info get_av_info(VideoClock std)
 {
@@ -1456,8 +1414,42 @@ void rsx_gl_close(void)
 
 void rsx_gl_refresh_variables(void)
 {
-   if (static_renderer)
-      static_renderer->refresh_variables();
+    GlRenderer* renderer = NULL;
+    if (!static_renderer)
+	    return;
+
+    switch (static_renderer->state)
+    {
+       case GlState_Valid:
+          renderer = static_renderer->state_data.r;
+          break;
+       case GlState_Invalid:
+          // Nothing to be done if we don't have a GL context
+          return;
+    }
+
+    bool reconfigure_frontend = retro_refresh_variables(renderer);
+
+#if 0
+    if (reconfigure_frontend)
+    {
+        // The resolution has changed, we must tell the frontend
+        // to change its format
+        struct retro_variable var = {0};
+
+        struct retro_system_av_info av_info = get_av_info(static_renderer->video_clock);
+
+        // This call can potentially (but not necessarily) call
+        // `context_destroy` and `context_reset` to reinitialize
+        bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
+
+        if (!ok)
+        {
+            puts("Couldn't change frontend resolution\n");
+            puts("Try resetting to enable the new configuration\n");
+        }
+    }
+#endif
 }
 
 bool rsx_gl_has_software_renderer(void)
@@ -1635,7 +1627,7 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
    /* This will possibly trigger the frontend to reconfigure itself */
    rsx_gl_refresh_variables();
 
-   struct retro_system_av_info result = static_renderer->get_system_av_info();
+   struct retro_system_av_info result = get_av_info(static_renderer->video_clock);
    memcpy(info, &result, sizeof(result));
 }
 
