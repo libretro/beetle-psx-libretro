@@ -467,19 +467,16 @@ GlRenderer::~GlRenderer()
 	Program_free(this->command_buffer->program);
 	free(this->command_buffer->program);
         delete this->command_buffer;
-        this->command_buffer = NULL;
     }
+    this->command_buffer = NULL;
 
     if (this->output_buffer)
-    {
         delete this->output_buffer;
-        this->output_buffer = NULL;
-    }
+    this->output_buffer = NULL;
 
-    if (this->image_load_buffer) {
+    if (this->image_load_buffer)
         delete this->image_load_buffer;
-        this->image_load_buffer = NULL;
-    }
+    this->image_load_buffer = NULL;
 
     Texture_free(&this->fb_texture);
     this->fb_texture.id     = 0;
@@ -1528,23 +1525,26 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
             depth_24bpp = 0;
          }
 
-         OutputVertex slice[4] =
-         {
-            { {-1.0, -1.0}, {0,         fb_height}   },
-            { { 1.0, -1.0}, {fb_width , fb_height}   },
-            { {-1.0,  1.0}, {0,         0} },
-            { { 1.0,  1.0}, {fb_width,  0} }
-         };
-         renderer->output_buffer->push_slice(slice, 4);
+	 if (renderer->output_buffer)
+	 {
+		 OutputVertex slice[4] =
+		 {
+			 { {-1.0, -1.0}, {0,         fb_height}   },
+			 { { 1.0, -1.0}, {fb_width , fb_height}   },
+			 { {-1.0,  1.0}, {0,         0} },
+			 { { 1.0,  1.0}, {fb_width,  0} }
+		 };
+		 renderer->output_buffer->push_slice(slice, 4);
 
-         program_uniform1i(renderer->output_buffer->program, "fb", 1);
-         program_uniform2ui(renderer->output_buffer->program, "offset", fb_x_start, fb_y_start);
-         program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
-         program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
-               renderer->internal_upscaling);
+		 program_uniform1i(renderer->output_buffer->program, "fb", 1);
+		 program_uniform2ui(renderer->output_buffer->program, "offset", fb_x_start, fb_y_start);
+		 program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
+		 program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
+				 renderer->internal_upscaling);
 
-         if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
-            renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
+		 if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
+			 renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
+	 }
       }
 
       // Hack: copy fb_out back into fb_texture at the end of every
