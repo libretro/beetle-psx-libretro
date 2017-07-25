@@ -5,6 +5,7 @@
 
 static void get_program_info_log(Program *pg, GLuint id)
 {
+   GLsizei len;
    GLint log_len = 0;
 
    glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
@@ -13,7 +14,8 @@ static void get_program_info_log(Program *pg, GLuint id)
       return;
 
    pg->info_log = (char*)malloc(log_len);
-   GLsizei len = (GLsizei) log_len;
+   len          = (GLsizei) log_len;
+
    glGetProgramInfoLog(id,
          len,
          &log_len,
@@ -36,8 +38,13 @@ void Program_init(
       Shader* vertex_shader,
       Shader* fragment_shader)
 {
+   GLint status;
+   GLuint id;
+
    program->info_log = NULL;
-   GLuint id = glCreateProgram();
+
+   id                = glCreateProgram();
+
    if (id == 0)
    {
       puts("An error occured creating the program object\n");
@@ -68,7 +75,7 @@ void Program_init(
    }
 
    // Check if the program linking was successful
-   GLint status = (GLint) GL_FALSE;
+   status = (GLint) GL_FALSE;
    glGetProgramiv(id, GL_LINK_STATUS, &status);
    get_program_info_log(program, id);
 
@@ -118,31 +125,29 @@ GLint Program_uniform(Program *program, const char* name)
 
 UniformMap load_program_uniforms(GLuint program)
 {
-   GLint n_uniforms = 0;
+   size_t u;
+   UniformMap uniforms;
+   // Figure out how long a uniform name can be
+   GLint max_name_len = 0;
+   GLint n_uniforms   = 0;
 
    glGetProgramiv( program,
          GL_ACTIVE_UNIFORMS,
          &n_uniforms );
 
-   UniformMap uniforms;
-
-   // Figure out how long a uniform name can be
-   GLint max_name_len = 0;
-
    glGetProgramiv( program,
          GL_ACTIVE_UNIFORM_MAX_LENGTH,
          &max_name_len);
 
-   size_t u;
    for (u = 0; u < n_uniforms; ++u)
    {
       // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
       char name[256];
       size_t name_len = max_name_len;
-      GLsizei len = 0;
-      // XXX we might want to validate those at some point
-      GLint size = 0;
-      GLenum ty = 0;
+      GLsizei len     = 0;
+      /* XXX we might want to validate those at some point */
+      GLint size      = 0;
+      GLenum ty       = 0;
 
       glGetActiveUniform( program,
             (GLuint) u,
@@ -151,7 +156,9 @@ UniformMap load_program_uniforms(GLuint program)
             &size,
             &ty,
             (char*) name);
-      if (len <= 0) {
+
+      if (len <= 0)
+      {
          printf("Ignoring uniform name with size %d\n", len);
          continue;
       }
@@ -162,7 +169,8 @@ UniformMap load_program_uniforms(GLuint program)
       /* name.truncate(len as usize); */
       /* name[len - 1] = '\0'; */
 
-      if (location < 0) {
+      if (location < 0)
+      {
          printf("Uniform \"%s\" doesn't have a location", name);
          continue;
       }

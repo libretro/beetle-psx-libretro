@@ -8,9 +8,13 @@ void Shader_init(
       const char* source,
       GLenum shader_type)
 {
-   shader->info_log = NULL;
+   GLint status;
+   GLint log_len = 0;
+   GLuint id;
 
-   GLuint id = glCreateShader(shader_type);
+   shader->info_log = NULL;
+   id               = glCreateShader(shader_type);
+
    if (id == 0)
    {
       puts("An error occured creating the shader object\n");
@@ -23,17 +27,17 @@ void Shader_init(
          NULL);
    glCompileShader(id);
 
-   GLint status = (GLint) GL_FALSE;
+   status = (GLint) GL_FALSE;
    glGetShaderiv(id, GL_COMPILE_STATUS, &status);
-
-   GLint log_len = 0;
-
    glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_len);
 
    if (log_len > 0)
    {
+      GLsizei len;
+
       shader->info_log = (char*)malloc(log_len);
-      GLsizei len = (GLsizei) log_len;
+      len              = (GLsizei) log_len;
+
       glGetShaderInfoLog(id,
             len,
             &log_len,

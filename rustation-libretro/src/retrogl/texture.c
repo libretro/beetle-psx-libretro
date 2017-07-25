@@ -60,10 +60,10 @@ void Texture_set_sub_image_window(
       GLenum ty,
       uint16_t* data)
 {
-   uint16_t x = top_left[0];
-   uint16_t y = top_left[1];
+   uint16_t x         = top_left[0];
+   uint16_t y         = top_left[1];
 
-   size_t index = ((size_t) y) * row_len + ((size_t) x);
+   size_t index       = ((size_t) y) * row_len + ((size_t) x);
 
    /* TODO - Am I indexing data out of bounds? */
    uint16_t* sub_data = &( data[index] );
