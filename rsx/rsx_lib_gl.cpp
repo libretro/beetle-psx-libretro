@@ -292,15 +292,7 @@ public:
 
        glDeleteBuffers(1, &this->id);
        glDeleteVertexArrays(1, &this->vao);
-
-       if (this->program)
-       {
-          Program_free(program);
-	  delete this->program;
-          this->program = NULL;
-       }
     }
-
 
     void bind_attributes()
     {
@@ -807,14 +799,14 @@ static void Program_init(
    if (vertex_shader)
    {
       Shader_free(vertex_shader);
-      free(vertex_shader);
+      delete vertex_shader;
       vertex_shader = NULL;
    }
 
    if (fragment_shader)
    {
       Shader_free(fragment_shader);
-      free(fragment_shader);
+      delete fragment_shader;
       fragment_shader = NULL;
    }
 
@@ -1228,8 +1220,8 @@ GlRenderer::GlRenderer(DrawConfig config)
 GlRenderer::~GlRenderer()
 {
     if (this->command_buffer) {
-	Program_free(this->command_buffer->program);
-	delete this->command_buffer->program;
+        Program_free(this->command_buffer->program);
+        delete this->command_buffer->program;
         delete this->command_buffer;
     }
     this->command_buffer = NULL;
@@ -1993,13 +1985,16 @@ static void gl_context_destroy(void)
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
     if (static_renderer.state_data.r)
+    {
         delete static_renderer.state_data.r;
+        static_renderer.inited = false;
+    }
     static_renderer.state_data.r = NULL;
 
     if (static_renderer.inited)
     {
-    static_renderer.state        = GlState_Invalid;
-    static_renderer.state_data.c = static_renderer.state_data.r->config;
+        static_renderer.state        = GlState_Invalid;
+        static_renderer.state_data.c = static_renderer.state_data.r->config;
     }
 }
 

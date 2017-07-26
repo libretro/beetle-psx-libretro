@@ -400,6 +400,12 @@ endif
 CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
 
+ifneq ($(SANITIZER),)
+    CFLAGS   := -fsanitize=$(SANITIZER) $(CFLAGS)
+    CXXFLAGS := -fsanitize=$(SANITIZER) $(CXXFLAGS)
+    LDFLAGS  := -fsanitize=$(SANITIZER) $(LDFLAGS)
+endif
+
 $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
