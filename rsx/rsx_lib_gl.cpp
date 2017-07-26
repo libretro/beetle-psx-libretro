@@ -27,19 +27,10 @@
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
 #define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->map_index)
 #define DRAWBUFFER_NEXT_INDEX(x)         ((x)->map_start + (x)->map_index)
-    /// This method doesn't call prepare_draw/finalize_draw itself, it
-    /// must be handled by the caller. This is because this command
-    /// can be called several times on the same buffer (i.e. multiple
-    /// draw calls between the prepare/finalize)
-#define DRAW_INDEXED_RAW(id, mode, indices, count) \
-       glBindBuffer(GL_ARRAY_BUFFER, id); \
-       glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices)
 
 #ifndef GL_MAP_INVALIDATE_RANGE_BIT
 #define GL_MAP_INVALIDATE_RANGE_BIT       0x000
 #endif
-
-
 
 #include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
@@ -1867,8 +1858,12 @@ static void draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	 glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
+	      glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	      glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
       }
    }
 
@@ -1881,6 +1876,10 @@ static void draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
 	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
 	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
       }
@@ -1949,6 +1948,10 @@ static void draw(GlRenderer *renderer)
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          {
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
 	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
 	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
          }
