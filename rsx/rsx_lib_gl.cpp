@@ -308,6 +308,7 @@ public:
        if (this->program)
        {
           Program_free(program);
+	  delete this->program;
           this->program = NULL;
        }
     }
@@ -872,7 +873,8 @@ static void Program_free(Program *program)
       return;
 
    glDeleteProgram(program->id);
-   free(program->info_log);
+   if (program->info_log)
+      free(program->info_log);
 }
 
 static GLint Program_find_attribute(Program *program, const char* attr)
@@ -1027,12 +1029,12 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
 		const char* fragment_shader,
 		size_t capacity)
 {
-   Shader *vs = (Shader*)calloc(1, sizeof(*vs));
-   Shader *fs = (Shader*)calloc(1, sizeof(*fs));
+   Shader *vs = new Shader;
+   Shader *fs = new Shader;
 
    Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
    Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
-   Program* program = (Program*)calloc(1, sizeof(*program));
+   Program* program = new Program;
 
    Program_init(program, vs, fs);
 
@@ -1253,7 +1255,7 @@ GlRenderer::~GlRenderer()
 {
     if (this->command_buffer) {
 	Program_free(this->command_buffer->program);
-	free(this->command_buffer->program);
+	delete this->command_buffer->program;
         delete this->command_buffer;
     }
     this->command_buffer = NULL;
