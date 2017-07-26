@@ -130,11 +130,6 @@ struct Program
     char *info_log;
 };
 
-struct VertexArrayObject
-{
-    GLuint id;
-};
-
 struct Shader
 {
     GLuint id;
@@ -235,7 +230,7 @@ public:
     /// Vertex Array Object containing the bindings for this
     /// buffer. I'm assuming that each VAO will only use a single
     /// buffer for simplicity.
-    VertexArrayObject* vao;
+    GLuint vao;
     /// Program used to draw this buffer
     Program* program;
     /// Currently mapped buffer range (write-only)
@@ -254,15 +249,15 @@ public:
        :map(NULL)
     {
        GLuint id = 0;
-       VertexArrayObject* vao = new VertexArrayObject();
        glGenVertexArrays(1, &id);
-       vao->id = id;
 
-       id = 0;
+       this->vao      = id;
+
+       id             = 0;
+
        // Generate the buffer object
        glGenBuffers(1, &id);
 
-       this->vao      = vao;
        this->program  = program;
        this->capacity = capacity;
        this->id       = id;
@@ -296,14 +291,7 @@ public:
        this->unmap__no_bind();
 
        glDeleteBuffers(1, &this->id);
-
-       if (this->vao)
-       {
-	  if (this->vao)
-             glDeleteVertexArrays(1, &this->vao->id);
-          delete this->vao;
-          this->vao = NULL;
-       }
+       glDeleteVertexArrays(1, &this->vao);
 
        if (this->program)
        {
@@ -316,7 +304,7 @@ public:
 
     void bind_attributes()
     {
-       glBindVertexArray(this->vao->id);
+       glBindVertexArray(this->vao);
 
        // ARRAY_BUFFER is captured by VertexAttribPointer
        glBindBuffer(GL_ARRAY_BUFFER, this->id);
@@ -440,7 +428,7 @@ public:
        if (index < 0)
           return;
 
-       glBindVertexArray(this->vao->id);
+       glBindVertexArray(this->vao);
 
        glEnableVertexAttribArray(index);
     }
@@ -452,7 +440,7 @@ public:
        if (index < 0)
           return;
 
-       glBindVertexArray(this->vao->id);
+       glBindVertexArray(this->vao);
 
        glDisableVertexAttribArray(index);
     }
@@ -472,7 +460,7 @@ public:
 
     void prepare_draw()
     {
-       glBindVertexArray(this->vao->id);
+       glBindVertexArray(this->vao);
        glUseProgram(this->program->id);
 
        // I don't need to bind this to draw (it's captured by the
@@ -605,20 +593,6 @@ static void get_error(void)
 
    assert(error == GL_NO_ERROR);
 #endif
-}
-
-static void VertexArrayObject_init(struct VertexArrayObject *vao)
-{
-   GLuint id = 0;
-   glGenVertexArrays(1, &id);
-
-   vao->id = id;
-}
-
-static void VertexArrayObject_free(struct VertexArrayObject *vao)
-{
-   if (vao)
-      glDeleteVertexArrays(1, &vao->id);
 }
 
 static void Framebuffer_init(struct Framebuffer *fb,
