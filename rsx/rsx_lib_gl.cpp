@@ -21,8 +21,6 @@
 #include "../rustation-libretro/src/retrogl/buffer.h"
 #include "../rustation-libretro/src/retrogl/shader.h"
 #include "../rustation-libretro/src/retrogl/program.h"
-#include "../rustation-libretro/src/retrogl/texture.h"
-#include "../rustation-libretro/src/retrogl/framebuffer.h"
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
@@ -139,6 +137,19 @@ struct CommandVertex {
     uint8_t texture_window[4];
 
     static std::vector<Attribute> attributes();
+};
+
+struct Texture
+{
+    GLuint id;
+    uint32_t width;
+    uint32_t height;
+};
+
+struct Framebuffer
+{
+    GLuint id;
+    struct Texture* _color_texture;
 };
 
 struct OutputVertex {
@@ -287,6 +298,102 @@ static void get_error(void)
 
    assert(error == GL_NO_ERROR);
 #endif
+}
+
+static void Framebuffer_init(struct Framebuffer *fb,
+		struct Texture* color_texture)
+{
+   GLuint id = 0;
+   glGenFramebuffers(1, &id);
+
+   fb->id             = id;
+   fb->_color_texture = color_texture;
+
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb->id);
+
+   glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
+         GL_COLOR_ATTACHMENT0,
+         color_texture->id,
+         0);
+
+   GLenum col_attach_0 = GL_COLOR_ATTACHMENT0;
+   glDrawBuffers(1, &col_attach_0);
+   glViewport( 0,
+         0,
+         (GLsizei) color_texture->width,
+         (GLsizei) color_texture->height);
+}
+
+static void Texture_init(
+      struct Texture *tex,
+      uint32_t width,
+      uint32_t height,
+      GLenum internal_format)
+{
+    GLuint id = 0;
+
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexStorage2D(GL_TEXTURE_2D,
+                    1,
+                    internal_format,
+                    (GLsizei) width,
+                    (GLsizei) height);
+
+    tex->id     = id;
+    tex->width  = width;
+    tex->height = height;
+}
+
+void Texture_free(struct Texture *tex)
+{
+   if (tex)
+      glDeleteTextures(1, &tex->id);
+}
+
+static void Texture_set_sub_image(
+      struct Texture *tex,
+      uint16_t top_left[2],
+      uint16_t resolution[2],
+      GLenum format,
+      GLenum ty,
+      uint16_t* data)
+{
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glBindTexture(GL_TEXTURE_2D, tex->id);
+    glTexSubImage2D(GL_TEXTURE_2D,
+                    0,
+                    (GLint) top_left[0],
+                    (GLint) top_left[1],
+                    (GLsizei) resolution[0],
+                    (GLsizei) resolution[1],
+                    format,
+                    ty,
+                    (void*) data);
+}
+
+static void Texture_set_sub_image_window(
+      struct Texture *tex,
+      uint16_t top_left[2],
+      uint16_t resolution[2],
+      size_t row_len,
+      GLenum format,
+      GLenum ty,
+      uint16_t* data)
+{
+   uint16_t x         = top_left[0];
+   uint16_t y         = top_left[1];
+
+   size_t index       = ((size_t) y) * row_len + ((size_t) x);
+
+   /* TODO - Am I indexing data out of bounds? */
+   uint16_t* sub_data = &( data[index] );
+
+   glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
+
+   Texture_set_sub_image(tex, top_left, resolution, format, ty, sub_data);
+
+   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
 static void upload_textures(
@@ -670,7 +777,7 @@ static void upload_textures(
 #ifdef DEBUG
     get_error();
 #endif
-    Framebuffer_free(&_fb);
+    glDeleteFramebuffers(1, &_fb.id);
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
@@ -1215,7 +1322,7 @@ static void draw(GlRenderer *renderer)
    renderer->semi_transparent_index_pos = 0;
    renderer->transparency_mode_index.clear();
 
-   Framebuffer_free(&_fb);
+   glDeleteFramebuffers(1, &_fb.id);
 }
 
 static void gl_context_reset(void)
@@ -1618,7 +1725,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
 
-         Framebuffer_free(&_fb);
+	 glDeleteFramebuffers(1, &_fb.id);
       }
 
       // Cleanup OpenGL context before returning to the frontend
@@ -2047,7 +2154,7 @@ void rsx_gl_fill_rect(uint32_t color,
             doCleanFrame = false;
          }
 
-         Framebuffer_free(&_fb);
+	 glDeleteFramebuffers(1, &_fb.id);
       }
 
       // Reconfigure the draw area
@@ -2277,7 +2384,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       get_error();
 #endif
 
-      Framebuffer_free(&_fb);
+      glDeleteFramebuffers(1, &_fb.id);
    }
 }
 

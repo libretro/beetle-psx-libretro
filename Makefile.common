@@ -37,9 +37,7 @@ SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
 SOURCES_CXX += $(RSXGL_DIR)/retrogl/program.cpp 
 
 SOURCES_C += \
-	     $(RSXGL_DIR)/retrogl/framebuffer.c \
 	     $(RSXGL_DIR)/retrogl/shader.c \
-	     $(RSXGL_DIR)/retrogl/texture.c \
 	     $(RSXGL_DIR)/retrogl/vertex.c
 endif
 

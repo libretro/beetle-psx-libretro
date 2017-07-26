@@ -301,32 +301,8 @@
     <ClCompile Include="..\rsx\rsx_intf.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_gl.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_soft.c" />
-    <ClCompile Include="..\rustation-libretro\src\retrogl\error.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
-    </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\retrogl\framebuffer.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
-    </ClCompile>
     <ClCompile Include="..\rustation-libretro\src\retrogl\program.cpp" />
     <ClCompile Include="..\rustation-libretro\src\retrogl\shader.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
-    </ClCompile>
-    <ClCompile Include="..\rustation-libretro\src\retrogl\texture.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug-2015|Win32'">CompileAsC</CompileAs>
@@ -580,11 +556,8 @@
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\output_fragment.glsl.h" />
     <ClInclude Include="..\rustation-libretro\src\renderer\shaders\output_vertex.glsl.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\buffer.h" />
-    <ClInclude Include="..\rustation-libretro\src\retrogl\error.h" />
-    <ClInclude Include="..\rustation-libretro\src\retrogl\framebuffer.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\program.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\shader.h" />
-    <ClInclude Include="..\rustation-libretro\src\retrogl\texture.h" />
     <ClInclude Include="..\rustation-libretro\src\retrogl\vertex.h" />
   </ItemGroup>
   <ItemGroup>
