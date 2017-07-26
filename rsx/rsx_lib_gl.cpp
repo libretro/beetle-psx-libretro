@@ -17,14 +17,29 @@
 #include <cstdio>
 #include <stdint.h>
 
-
-#include "../rustation-libretro/src/retrogl/buffer.h"
-#include "../rustation-libretro/src/retrogl/shader.h"
-#include "../rustation-libretro/src/retrogl/program.h"
+#include <map>
+#include <string>
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
 #include "libretro_options.h"
+
+#define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
+#define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->map_index)
+#define DRAWBUFFER_NEXT_INDEX(x)         ((x)->map_start + (x)->map_index)
+    /// This method doesn't call prepare_draw/finalize_draw itself, it
+    /// must be handled by the caller. This is because this command
+    /// can be called several times on the same buffer (i.e. multiple
+    /// draw calls between the prepare/finalize)
+#define DRAW_INDEXED_RAW(id, mode, indices, count) \
+       glBindBuffer(GL_ARRAY_BUFFER, id); \
+       glDrawElements(mode, count, GL_UNSIGNED_SHORT, indices)
+
+#ifndef GL_MAP_INVALIDATE_RANGE_BIT
+#define GL_MAP_INVALIDATE_RANGE_BIT       0x000
+#endif
+
+
 
 #include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
 #include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
@@ -113,9 +128,40 @@ struct DrawConfig
     uint16_t draw_area_bot_right[2];
 };
 
+
+typedef std::map<std::string, GLint> UniformMap;
+
+struct Program
+{
+    GLuint id;
+    /// Hash map of all the active uniforms in this program
+    UniformMap uniforms;
+    char *info_log;
+};
+
+struct VertexArrayObject
+{
+    GLuint id;
+};
+
+struct Shader
+{
+    GLuint id;
+    char *info_log;
+};
+
+struct Attribute
+{
+   char name[32];
+   size_t offset;
+   /// Attribute type (BYTE, UNSIGNED_SHORT, FLOAT etc...)
+   GLenum ty;
+   GLint components;
+};
+
 struct CommandVertex {
     /// Position in PlayStation VRAM coordinates
-	float position[4];
+    float position[4];
     /// RGB color, 8bits per component
     uint8_t color[3];
     /// Texture coordinates within the page
@@ -185,6 +231,291 @@ struct TransparencyIndex {
     GLenum draw_mode;
 };
 
+/* forward decls */
+static void Program_free(Program *program);
+static GLint Program_find_attribute(Program *program, const char* attr);
+
+template<typename T>
+class DrawBuffer
+{
+public:
+    /// OpenGL name for this buffer
+    GLuint id;
+    /// Vertex Array Object containing the bindings for this
+    /// buffer. I'm assuming that each VAO will only use a single
+    /// buffer for simplicity.
+    VertexArrayObject* vao;
+    /// Program used to draw this buffer
+    Program* program;
+    /// Currently mapped buffer range (write-only)
+    T *map;
+
+    /// Number of elements T mapped at once in 'map'
+    size_t capacity;
+    /// Index one-past the last element stored in `map`, relative to
+    /// the first element in `map`
+    size_t map_index;
+    /// Absolute offset of the 1st mapped element in the current
+    /// buffer relative to the beginning of the GL storage.
+    size_t map_start;
+
+    DrawBuffer(size_t capacity, Program* program)
+       :map(NULL)
+    {
+       GLuint id = 0;
+       VertexArrayObject* vao = new VertexArrayObject();
+       glGenVertexArrays(1, &id);
+       vao->id = id;
+
+       id = 0;
+       // Generate the buffer object
+       glGenBuffers(1, &id);
+
+       this->vao      = vao;
+       this->program  = program;
+       this->capacity = capacity;
+       this->id       = id;
+
+       // Create and map the buffer
+       glBindBuffer(GL_ARRAY_BUFFER, id);
+
+       size_t element_size = sizeof(T);
+       // We allocate enough space for 3 times the buffer space and
+       // we only remap one third of it at a time
+       GLsizeiptr storage_size = this->capacity * element_size * 3;
+
+       // Since we store indexes in unsigned shorts we want to make
+       // sure the entire buffer is indexable.
+       assert(this->capacity * 3 <= 0xffff);
+
+       glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
+
+       this->bind_attributes();
+
+       this->map_index = 0;
+       this->map_start = 0;
+
+       this->map__no_bind();
+    }
+
+    ~DrawBuffer()
+    {
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+
+       this->unmap__no_bind();
+
+       glDeleteBuffers(1, &this->id);
+
+       if (this->vao)
+       {
+	  if (this->vao)
+             glDeleteVertexArrays(1, &this->vao->id);
+          delete this->vao;
+          this->vao = NULL;
+       }
+
+       if (this->program)
+       {
+          Program_free(program);
+          this->program = NULL;
+       }
+    }
+
+
+    void bind_attributes()
+    {
+       glBindVertexArray(this->vao->id);
+
+       // ARRAY_BUFFER is captured by VertexAttribPointer
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+
+       std::vector<Attribute> attrs = T::attributes();
+
+       GLint element_size = (GLint) sizeof( T );
+
+       //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
+       //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
+       //we need to make sure they're all disabled before then re-enabling the attribs we want
+       //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
+       GLint nVertexAttribs;
+       glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
+
+       for (int i = 0; i < nVertexAttribs; i++)
+          glDisableVertexAttribArray(i);
+
+       for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
+       {
+          Attribute& attr = *it;
+          GLint index     = Program_find_attribute(this->program, attr.name);
+
+          // Don't error out if the shader doesn't use this
+          // attribute, it could be caused by shader
+          // optimization if the attribute is unused for
+          // some reason.
+          if (index < 0)
+             continue;
+
+          glEnableVertexAttribArray((GLuint) index);
+
+          // This captures the buffer so that we don't have to bind it
+          // when we draw later on, we'll just have to bind the vao
+          switch (attr.ty)
+          {
+             case GL_BYTE:
+             case GL_UNSIGNED_BYTE:
+             case GL_SHORT:
+             case GL_UNSIGNED_SHORT:
+             case GL_INT:
+             case GL_UNSIGNED_INT:
+                glVertexAttribIPointer( index,
+                      attr.components,
+                      attr.ty,
+                      element_size,
+                      (GLvoid*)attr.offset);
+                break;
+             case GL_FLOAT:
+                glVertexAttribPointer(  index,
+                      attr.components,
+                      attr.ty,
+                      GL_FALSE,
+                      element_size,
+                      (GLvoid*)attr.offset);
+                break;
+             case GL_DOUBLE:
+                glVertexAttribLPointer( index,
+                      attr.components,
+                      attr.ty,
+                      element_size,
+                      (GLvoid*)attr.offset);
+                break;
+          }
+       }
+    }
+
+
+    // Map the buffer for write-only access
+    void map__no_bind()
+    {
+       size_t element_size    = sizeof(T);
+       GLsizeiptr buffer_size = this->capacity * element_size;
+       GLintptr offset_bytes;
+       void *m;
+
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+
+       // If we're already mapped something's wrong
+       assert(this->map == NULL);
+
+       // We don't have enough room left to remap `capacity`,
+       // start back from the beginning of the buffer.
+       if (this->map_start > 2 * this->capacity)
+          this->map_start = 0;
+
+       offset_bytes = this->map_start * element_size;
+
+#if 0
+       printf("Remap %lu %lu\n", this->capacity, this->map_start);
+#endif
+
+       m = glMapBufferRange(GL_ARRAY_BUFFER,
+             offset_bytes,
+             buffer_size,
+             GL_MAP_WRITE_BIT |
+             GL_MAP_INVALIDATE_RANGE_BIT);
+
+       // Just in case...
+       assert(m != NULL);
+
+       this->map = reinterpret_cast<T *>(m);
+    }
+
+    // Unmap the active buffer
+    void unmap__no_bind()
+    {
+       assert(this->map != NULL);
+
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+
+       glUnmapBuffer(GL_ARRAY_BUFFER);
+
+       this->map = NULL;
+    }
+
+    void enable_attribute(const char* attr)
+    {
+       GLint index = Program_find_attribute(this->program, attr);
+
+       if (index < 0)
+          return;
+
+       glBindVertexArray(this->vao->id);
+
+       glEnableVertexAttribArray(index);
+    }
+
+    void disable_attribute(const char* attr)
+    {
+       GLint index = Program_find_attribute(this->program, attr);
+
+       if (index < 0)
+          return;
+
+       glBindVertexArray(this->vao->id);
+
+       glDisableVertexAttribArray(index);
+    }
+
+
+    void push_slice(T slice[], size_t n)
+    {
+       assert(n <= DRAWBUFFER_REMAINING_CAPACITY(this));
+       assert(this->map != NULL);
+
+       memcpy(this->map + this->map_index,
+             slice,
+             n * sizeof(T));
+
+       this->map_index += n;
+    }
+
+    void prepare_draw()
+    {
+       glBindVertexArray(this->vao->id);
+       glUseProgram(this->program->id);
+
+       // I don't need to bind this to draw (it's captured by the
+       // VAO) but I need it to map/unmap the storage.
+       glBindBuffer(GL_ARRAY_BUFFER, this->id);
+
+       /* Unmap the active buffer */
+       glUnmapBuffer(GL_ARRAY_BUFFER);
+
+       this->map = NULL;
+    }
+
+    /// Finalize the current buffer data and remap a fresh slice of
+    /// the storage.
+    void finalize_draw__no_bind()
+    {
+       this->map_start += this->map_index;
+       this->map_index  = 0;
+
+       this->map__no_bind();
+    }
+
+    void draw(GLenum mode)
+    {
+
+       this->prepare_draw();
+
+       // Length in number of vertices
+       glDrawArrays(mode, this->map_start, this->map_index);
+
+       this->finalize_draw__no_bind();
+    }
+
+};
+
 class GlRenderer {
 public:
     /// Buffer used to handle PlayStation GPU draw commands
@@ -244,22 +575,6 @@ public:
     ~GlRenderer();
 };
 
-template<typename T>
-static DrawBuffer<T>* build_buffer( const char* vertex_shader,
-		const char* fragment_shader,
-		size_t capacity)
-{
-   Shader *vs = (Shader*)calloc(1, sizeof(*vs));
-   Shader *fs = (Shader*)calloc(1, sizeof(*fs));
-
-   Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
-   Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
-   Program* program = (Program*)calloc(1, sizeof(*program));
-
-   Program_init(program, vs, fs);
-
-   return new DrawBuffer<T>(capacity, program);
-}
 
 static void get_error(void)
 {
@@ -300,6 +615,20 @@ static void get_error(void)
 #endif
 }
 
+static void VertexArrayObject_init(struct VertexArrayObject *vao)
+{
+   GLuint id = 0;
+   glGenVertexArrays(1, &id);
+
+   vao->id = id;
+}
+
+static void VertexArrayObject_free(struct VertexArrayObject *vao)
+{
+   if (vao)
+      glDeleteVertexArrays(1, &vao->id);
+}
+
 static void Framebuffer_init(struct Framebuffer *fb,
 		struct Texture* color_texture)
 {
@@ -322,6 +651,312 @@ static void Framebuffer_init(struct Framebuffer *fb,
          0,
          (GLsizei) color_texture->width,
          (GLsizei) color_texture->height);
+}
+
+/* forward decls */
+static GLint Program_uniform(Program *program, const char* name);
+
+static void program_uniform1i(Program *prog, const char *name, GLint i)
+{
+   GLint u;
+   if (!prog)
+      return;
+
+   glUseProgram(prog->id);
+   u = Program_uniform(prog, name);
+   glUniform1i(u, i);
+}
+
+static void program_uniform1ui(Program *prog, const char *name, GLuint i)
+{
+   GLint u;
+   if (!prog)
+      return;
+
+   glUseProgram(prog->id);
+   u = Program_uniform(prog, name);
+   glUniform1ui(u, i);
+}
+
+static void program_uniform2i(Program *prog, const char *name, GLint a, GLint b)
+{
+   GLint u;
+   if (!prog)
+      return;
+
+   glUseProgram(prog->id);
+   u = Program_uniform(prog, name);
+   glUniform2i(u, a, b);
+}
+
+static void program_uniform2ui(Program *prog, const char *name, GLuint a, GLuint b)
+{
+   GLint u;
+   if (!prog)
+      return;
+
+   glUseProgram(prog->id);
+   u = Program_uniform(prog, name);
+   glUniform2ui(u, a, b);
+}
+
+static void Shader_init(
+      struct Shader *shader,
+      const char* source,
+      GLenum shader_type)
+{
+   GLint status;
+   GLint log_len = 0;
+   GLuint id;
+
+   shader->info_log = NULL;
+   id               = glCreateShader(shader_type);
+
+   if (id == 0)
+   {
+      puts("An error occured creating the shader object\n");
+      exit(EXIT_FAILURE);
+   }
+
+   glShaderSource( id,
+         1,
+         &source,
+         NULL);
+   glCompileShader(id);
+
+   status = (GLint) GL_FALSE;
+   glGetShaderiv(id, GL_COMPILE_STATUS, &status);
+   glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_len);
+
+   if (log_len > 0)
+   {
+      GLsizei len;
+
+      shader->info_log = (char*)malloc(log_len);
+      len              = (GLsizei) log_len;
+
+      glGetShaderInfoLog(id,
+            len,
+            &log_len,
+            (char*)shader->info_log);
+
+      if (log_len > 0)
+      {
+         // The length returned by GetShaderInfoLog *excludes*
+         // the ending \0 unlike the call to GetShaderiv above
+         // so we can get rid of it by truncating here.
+         /* log.truncate(log_len as usize); */
+         /* Don't want to spend time thinking about the above, I'll just put a \0
+            in the last index */
+         shader->info_log[log_len - 1] = '\0';
+      }
+   }
+
+   if (status != (GLint) GL_TRUE)
+   {
+      puts("Shader compilation failed:\n");
+
+      /* print shader source */
+      puts( source );
+
+      puts("Shader info log:\n");
+      puts(shader->info_log);
+
+      exit(EXIT_FAILURE);
+      return;
+   }
+
+   shader->id = id;
+}
+
+static void Shader_free(struct Shader *shader)
+{
+   if (shader)
+   {
+      glDeleteShader(shader->id);
+      if (shader->info_log)
+         free(shader->info_log);
+   }
+}
+
+static UniformMap load_program_uniforms(GLuint program);
+
+static void get_program_info_log(Program *pg, GLuint id)
+{
+   GLsizei len;
+   GLint log_len = 0;
+
+   glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
+
+   if (log_len <= 0)
+      return;
+
+   pg->info_log = (char*)malloc(log_len);
+   len          = (GLsizei) log_len;
+
+   glGetProgramInfoLog(id,
+         len,
+         &log_len,
+         (char*)pg->info_log);
+
+   if (log_len <= 0)
+      return;
+
+   // The length returned by GetShaderInfoLog *excludes*
+   // the ending \0 unlike the call to GetShaderiv above
+   // so we can get rid of it by truncating here.
+   /* log.truncate(log_len as usize); */
+   /* Don't want to spend time thinking about the above, I'll just put a \0
+      in the last index */
+   pg->info_log[log_len - 1] = '\0';
+}
+
+static void Program_init(
+      Program *program,
+      Shader* vertex_shader,
+      Shader* fragment_shader)
+{
+   GLint status;
+   GLuint id;
+
+   program->info_log = NULL;
+
+   id                = glCreateProgram();
+
+   if (id == 0)
+   {
+      puts("An error occured creating the program object\n");
+      exit(EXIT_FAILURE);
+   }
+
+   glAttachShader(id, vertex_shader->id);
+   glAttachShader(id, fragment_shader->id);
+
+   glLinkProgram(id);
+
+   glDetachShader(id, vertex_shader->id);
+   glDetachShader(id, fragment_shader->id);
+
+   /* Program owns the two pointers, so we clean them up now */
+   if (vertex_shader)
+   {
+      Shader_free(vertex_shader);
+      free(vertex_shader);
+      vertex_shader = NULL;
+   }
+
+   if (fragment_shader)
+   {
+      Shader_free(fragment_shader);
+      free(fragment_shader);
+      fragment_shader = NULL;
+   }
+
+   // Check if the program linking was successful
+   status = (GLint) GL_FALSE;
+   glGetProgramiv(id, GL_LINK_STATUS, &status);
+   get_program_info_log(program, id);
+
+   if (status != (GLint) GL_TRUE)
+   {
+      puts("OpenGL program linking failed\n");
+      puts("Program info log:\n");
+      puts(program->info_log );
+
+      exit(EXIT_FAILURE);
+      return;
+   }
+
+   /* Rust code has a try statement here, perhaps we should fail fast with
+      exit(EXIT_FAILURE) ? */
+   UniformMap uniforms = load_program_uniforms(id);
+
+   program->id       = id;
+   program->uniforms = uniforms;
+}
+
+static void Program_free(Program *program)
+{
+   if (!program)
+      return;
+
+   glDeleteProgram(program->id);
+   free(program->info_log);
+}
+
+static GLint Program_find_attribute(Program *program, const char* attr)
+{
+   return glGetAttribLocation(program->id, attr);
+}
+
+static GLint Program_uniform(Program *program, const char* name)
+{
+   bool found = program->uniforms.find(name) != program->uniforms.end();
+   if (!found)
+   {
+      printf("Attempted to access unknown uniform %s\n", name);
+      exit(EXIT_FAILURE);
+   }
+
+   return program->uniforms[name];
+}
+
+static UniformMap load_program_uniforms(GLuint program)
+{
+   size_t u;
+   UniformMap uniforms;
+   // Figure out how long a uniform name can be
+   GLint max_name_len = 0;
+   GLint n_uniforms   = 0;
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORMS,
+         &n_uniforms );
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORM_MAX_LENGTH,
+         &max_name_len);
+
+   for (u = 0; u < n_uniforms; ++u)
+   {
+      // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
+      char name[256];
+      size_t name_len = max_name_len;
+      GLsizei len     = 0;
+      /* XXX we might want to validate those at some point */
+      GLint size      = 0;
+      GLenum ty       = 0;
+
+      glGetActiveUniform( program,
+            (GLuint) u,
+            (GLsizei) name_len,
+            &len,
+            &size,
+            &ty,
+            (char*) name);
+
+      if (len <= 0)
+      {
+         printf("Ignoring uniform name with size %d\n", len);
+         continue;
+      }
+
+      // Retrieve the location of this uniform
+      GLint location = glGetUniformLocation(program, (const char*) name);
+
+      /* name.truncate(len as usize); */
+      /* name[len - 1] = '\0'; */
+
+      if (location < 0)
+      {
+         printf("Uniform \"%s\" doesn't have a location", name);
+         continue;
+      }
+
+      uniforms[name] = location;
+   }
+
+   return uniforms;
 }
 
 static void Texture_init(
@@ -394,6 +1029,23 @@ static void Texture_set_sub_image_window(
    Texture_set_sub_image(tex, top_left, resolution, format, ty, sub_data);
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+}
+
+template<typename T>
+static DrawBuffer<T>* build_buffer( const char* vertex_shader,
+		const char* fragment_shader,
+		size_t capacity)
+{
+   Shader *vs = (Shader*)calloc(1, sizeof(*vs));
+   Shader *fs = (Shader*)calloc(1, sizeof(*fs));
+
+   Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
+   Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
+   Program* program = (Program*)calloc(1, sizeof(*program));
+
+   Program_init(program, vs, fs);
+
+   return new DrawBuffer<T>(capacity, program);
 }
 
 static void upload_textures(
@@ -1215,11 +1867,8 @@ static void draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-         DRAW_INDEXED_RAW(
-               renderer->command_buffer->id,
-               GL_TRIANGLES,
-               opaque_triangle_indices,
-               opaque_triangle_len);
+	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	 glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
       }
    }
 
@@ -1232,11 +1881,8 @@ static void draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-         DRAW_INDEXED_RAW(
-               renderer->command_buffer->id,
-               GL_LINES,
-               opaque_line_indices,
-               opaque_line_len);
+	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
       }
    }
 
@@ -1303,11 +1949,8 @@ static void draw(GlRenderer *renderer)
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          {
-            DRAW_INDEXED_RAW(
-                  renderer->command_buffer->id,
-                  it->draw_mode,
-                  indices,
-                  len);
+	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
          }
 
          cur_index = it->last_index;

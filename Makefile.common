@@ -32,13 +32,6 @@ SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
 				 $(LIBRETRO_DIR)/glsym/rglgen.c
 
 SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
-
-### Rust-to-Cpp translated GL renderer
-SOURCES_CXX += $(RSXGL_DIR)/retrogl/program.cpp 
-
-SOURCES_C += \
-	     $(RSXGL_DIR)/retrogl/shader.c \
-	     $(RSXGL_DIR)/retrogl/vertex.c
 endif
 
 INCFLAGS := -I$(CORE_DIR) -I$(MEDNAFEN_DIR) -I$(MEDNAFEN_DIR)/include -I$(MEDNAFEN_DIR)/intl -I$(MEDNAFEN_DIR)/hw_sound -I$(MEDNAFEN_DIR)/hw_cpu -I$(MEDNAFEN_DIR)/hw_misc -I$(LIBRETRO_DIR)/include -I$(DEPS_DIR)/zlib
