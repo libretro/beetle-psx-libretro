@@ -36,7 +36,7 @@
 
 #include "audioreader.h"
 
-#include "../../libretro.h"
+#include <libretro.h>
 
 #include "zlib.h"
 

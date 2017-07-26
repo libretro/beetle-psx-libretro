@@ -32,7 +32,7 @@
 #include "md5.h"
 #include "mempatcher.h"
 
-#include "../libretro.h"
+#include <libretro.h>
 #include "psx/psx.h"
 
 extern retro_log_printf_t log_cb;

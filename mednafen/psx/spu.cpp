@@ -69,7 +69,7 @@
 #include "psx.h"
 #include "cdc.h"
 #include "spu.h"
-#include "../../libretro.h"
+#include <libretro.h>
 
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
