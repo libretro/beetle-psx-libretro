@@ -437,11 +437,11 @@ void scond_free(scond_t *cond)
 #ifdef USE_WIN32_THREADS
 static bool _scond_wait_win32(scond_t *cond, slock_t *lock, DWORD dwMilliseconds)
 {
-   static bool beginPeriod = false;
+   static LARGE_INTEGER performanceCounterFrequency = { .QuadPart = 0 };
 
    struct QueueEntry myentry;
    struct QueueEntry **ptr;
-   DWORD tsBegin;
+   LARGE_INTEGER tsBegin;
    DWORD waitResult;
    DWORD dwFinalTimeout = dwMilliseconds; /* Careful! in case we begin in the head, 
                                              we don't do the hot potato stuff, 
@@ -453,16 +453,15 @@ static bool _scond_wait_win32(scond_t *cond, slock_t *lock, DWORD dwMilliseconds
 
    /* since this library is meant for realtime game software 
     * I have no problem setting this to 1 and forgetting about it. */
-   if (!beginPeriod)
+   if (performanceCounterFrequency.QuadPart == 0)
    {
-      beginPeriod = true;
-      timeBeginPeriod(1);
+      QueryPerformanceFrequency(&performanceCounterFrequency);
    }
 
    /* Now we can take a good timestamp for use in faking the timeout ourselves. */
    /* But don't bother unless we need to (to save a little time) */
    if (dwMilliseconds != INFINITE)
-      tsBegin = timeGetTime();
+      QueryPerformanceCounter(&tsBegin);
 
    /* add ourselves to a queue of waiting threads */
    ptr = &cond->head;
@@ -504,8 +503,11 @@ static bool _scond_wait_win32(scond_t *cond, slock_t *lock, DWORD dwMilliseconds
       /* Assess the remaining timeout time */
       if (dwMilliseconds != INFINITE)
       {
-         DWORD now     = timeGetTime();
-         DWORD elapsed = now - tsBegin;
+         LARGE_INTEGER now;
+         QueryPerformanceCounter(&now);
+         LONGLONG elapsed = now.QuadPart - tsBegin.QuadPart;
+         elapsed *= 1000;
+         elapsed /= performanceCounterFrequency.QuadPart;
 
          /* Try one last time with a zero timeout (keeps the code simpler) */
          if (elapsed > dwMilliseconds)
