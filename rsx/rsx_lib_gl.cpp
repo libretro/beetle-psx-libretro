@@ -1229,6 +1229,7 @@ GlRenderer::~GlRenderer()
 {
     if (this->command_buffer) {
 	Program_free(this->command_buffer->program);
+	delete this->command_buffer->program;
         delete this->command_buffer;
     }
     this->command_buffer = NULL;
@@ -1994,7 +1995,12 @@ static void gl_context_destroy(void)
     if (static_renderer.state_data.r)
         delete static_renderer.state_data.r;
     static_renderer.state_data.r = NULL;
+
+    if (static_renderer.inited)
+    {
     static_renderer.state        = GlState_Invalid;
+    static_renderer.state_data.c = static_renderer.state_data.r->config;
+    }
 }
 
 static bool gl_context_framebuffer_lock(void* data)
