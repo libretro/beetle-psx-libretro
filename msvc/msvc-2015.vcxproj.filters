@@ -72,7 +72,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\libretro-common\file\retro_stat.c">
+    <ClCompile Include="..\libretro-common\file\file_path.c">
+      <Filter>libretro-common\file</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro-common\file\retro_dirent.c">
       <Filter>libretro-common\file</Filter>
     </ClCompile>
     <ClCompile Include="..\libretro-common\rthreads\rthreads.c">
