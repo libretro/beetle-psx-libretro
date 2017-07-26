@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (posix_string.h).
+ * The following license statement only applies to this file (compat_strcasestr.c).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,42 +20,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __LIBRETRO_SDK_COMPAT_POSIX_STRING_H
-#define __LIBRETRO_SDK_COMPAT_POSIX_STRING_H
+#include <ctype.h>
 
-#include <retro_common_api.h>
+#include <compat/strcasestr.h>
 
-#ifdef _MSC_VER
-#include <compat/msvc.h>
-#endif
+/* Pretty much strncasecmp. */
+static int casencmp(const char *a, const char *b, size_t n)
+{
+   size_t i;
 
-RETRO_BEGIN_DECLS
+   for (i = 0; i < n; i++)
+   {
+      int a_lower = tolower(a[i]);
+      int b_lower = tolower(b[i]);
+      if (a_lower != b_lower)
+         return a_lower - b_lower;
+   }
 
-#ifdef _WIN32
-#undef strtok_r
-#define strtok_r(str, delim, saveptr) retro_strtok_r__(str, delim, saveptr)
+   return 0;
+}
 
-char *strtok_r(char *str, const char *delim, char **saveptr);
-#endif
+char *strcasestr_retro__(const char *haystack, const char *needle)
+{
+   size_t i, search_off;
+   size_t hay_len    = strlen(haystack);
+   size_t needle_len = strlen(needle);
 
-#ifdef _MSC_VER
-#undef strcasecmp
-#undef strdup
-#define strcasecmp(a, b) retro_strcasecmp__(a, b)
-#define strdup(orig)     retro_strdup__(orig)
-int strcasecmp(const char *a, const char *b);
-char *strdup(const char *orig);
+   if (needle_len > hay_len)
+      return NULL;
 
-/* isblank is available since MSVC 2013 */
-#if _MSC_VER < 1800
-#undef isblank
-#define isblank(c)       retro_isblank__(c)
-int isblank(int c);
-#endif
+   search_off = hay_len - needle_len;
+   for (i = 0; i <= search_off; i++)
+      if (!casencmp(haystack + i, needle, needle_len))
+         return (char*)haystack + i;
 
-#endif
-
-
-RETRO_END_DECLS
-
-#endif
+   return NULL;
+}

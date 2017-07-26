@@ -1,7 +1,7 @@
-/* Copyright  (C) 2010-2015 The RetroArch team
+/* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (retro_stat.h).
+ * The following license statement only applies to this file (compat_strl.c).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,46 +20,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __RETRO_STAT_H
-#define __RETRO_STAT_H
+#include <ctype.h>
 
-#include <stdint.h>
-#include <stddef.h>
+#include <compat/strl.h>
+#include <compat/posix_string.h>
 
-#include <boolean.h>
+/* Implementation of strlcpy()/strlcat() based on OpenBSD. */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef __MACH__
 
-/**
- * path_is_directory:
- * @path               : path
- *
- * Checks if path is a directory.
- *
- * Returns: true (1) if path is a directory, otherwise false (0).
- */
-bool path_is_directory(const char *path);
+size_t strlcpy(char *dest, const char *source, size_t size)
+{
+   size_t src_size = 0;
+   size_t        n = size;
 
-bool path_is_character_special(const char *path);
+   if (n)
+      while (--n && (*dest++ = *source++)) src_size++;
 
-bool path_is_valid(const char *path);
+   if (!n)
+   {
+      if (size) *dest = '\0';
+      while (*source++) src_size++;
+   }
 
-int32_t path_get_size(const char *path);
-
-/**
- * path_mkdir_norecurse:
- * @dir                : directory
- *
- * Create directory on filesystem.
- *
- * Returns: true (1) if directory could be created, otherwise false (0).
- **/
-bool mkdir_norecurse(const char *dir);
-
-#ifdef __cplusplus
+   return src_size;
 }
-#endif
 
+size_t strlcat(char *dest, const char *source, size_t size)
+{
+   size_t len = strlen(dest);
+
+   dest += len;
+
+   if (len > size)
+      size = 0;
+   else
+      size -= len;
+
+   return len + strlcpy(dest, source, size);
+}
 #endif

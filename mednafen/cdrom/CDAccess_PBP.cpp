@@ -16,7 +16,7 @@
  */
 
 #include <boolean.h>
-#include <retro_stat.h>
+#include <file/file_path.h>
 
 #include "../mednafen.h"
 

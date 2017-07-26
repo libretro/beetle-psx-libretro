@@ -10,7 +10,7 @@
 #endif
 #include "libretro.h"
 #include <rthreads/rthreads.h>
-#include <retro_stat.h>
+#include <file/file_path.h>
 #include <string/stdstring.h>
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"

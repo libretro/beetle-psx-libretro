@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (posix_string.h).
+ * The following license statement only applies to this file (compat_snprintf.c).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,42 +20,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __LIBRETRO_SDK_COMPAT_POSIX_STRING_H
-#define __LIBRETRO_SDK_COMPAT_POSIX_STRING_H
-
-#include <retro_common_api.h>
-
+/* THIS FILE HAS NOT BEEN VALIDATED ON PLATFORMS BESIDES MSVC */
 #ifdef _MSC_VER
-#include <compat/msvc.h>
+
+#include <retro_common.h>
+
+#include <stdio.h>
+#include <stdarg.h>
+
+/* http://stackoverflow.com/questions/2915672/snprintf-and-visual-studio-2010 */
+
+int c99_vsnprintf_retro__(char *outBuf, size_t size, const char *format, va_list ap)
+{
+   int count = -1;
+
+   if (size != 0)
+#if (_MSC_VER <= 1310)
+       count = _vsnprintf(outBuf, size, format, ap);
+#else
+       count = _vsnprintf_s(outBuf, size, _TRUNCATE, format, ap);
 #endif
+   if (count == -1)
+       count = _vscprintf(format, ap);
 
-RETRO_BEGIN_DECLS
+   return count;
+}
 
-#ifdef _WIN32
-#undef strtok_r
-#define strtok_r(str, delim, saveptr) retro_strtok_r__(str, delim, saveptr)
+int c99_snprintf_retro__(char *outBuf, size_t size, const char *format, ...)
+{
+   int count;
+   va_list ap;
 
-char *strtok_r(char *str, const char *delim, char **saveptr);
-#endif
+   va_start(ap, format);
+   count = c99_vsnprintf_retro__(outBuf, size, format, ap);
+   va_end(ap);
 
-#ifdef _MSC_VER
-#undef strcasecmp
-#undef strdup
-#define strcasecmp(a, b) retro_strcasecmp__(a, b)
-#define strdup(orig)     retro_strdup__(orig)
-int strcasecmp(const char *a, const char *b);
-char *strdup(const char *orig);
-
-/* isblank is available since MSVC 2013 */
-#if _MSC_VER < 1800
-#undef isblank
-#define isblank(c)       retro_isblank__(c)
-int isblank(int c);
-#endif
-
-#endif
-
-
-RETRO_END_DECLS
-
+   return count;
+}
 #endif

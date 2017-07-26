@@ -343,7 +343,7 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
     </ClCompile>
     <ClCompile Include="..\scrc32.c" />
-    <ClCompile Include="..\libretro-common\file\retro_stat.c" />
+    <ClCompile Include="..\libretro-common\file\file_path.c" />
     <ClCompile Include="..\libretro-common\rthreads\rthreads.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
