@@ -154,7 +154,7 @@ bool setting_apply_analog_toggle  = false;
 bool use_mednafen_memcard0_method = false;
 
 extern MDFNGI EmulatedPSX;
-MDFNGI *MDFNGameInfo = &EmulatedPSX;
+MDFNGI *MDFNGameInfo = NULL;
 
 enum
 {
@@ -3076,6 +3076,11 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
       }
 
       md5_finish(&layout_md5, LayoutMD5);
+   }
+
+   if (MDFNGameInfo == NULL)
+   {
+      MDFNGameInfo = &EmulatedPSX;
    }
 
    // TODO: include module name in hash
