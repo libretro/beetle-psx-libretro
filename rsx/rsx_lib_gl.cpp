@@ -23,7 +23,6 @@
 #include "../rustation-libretro/src/retrogl/program.h"
 #include "../rustation-libretro/src/retrogl/texture.h"
 #include "../rustation-libretro/src/retrogl/framebuffer.h"
-#include "../rustation-libretro/src/retrogl/error.h"
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
@@ -249,6 +248,45 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
    Program_init(program, vs, fs);
 
    return new DrawBuffer<T>(capacity, program);
+}
+
+static void get_error(void)
+{
+#ifdef DEBUG
+   GLenum error = glGetError();
+   switch (error)
+   {
+      case GL_NO_ERROR:
+         //puts("GL error flag: GL_NO_ERROR\n");
+         return;
+      case GL_INVALID_ENUM:
+         puts("GL error flag: GL_INVALID_ENUM\n");
+         break;
+      case GL_INVALID_VALUE:
+         puts("GL error flag: GL_INVALID_VALUE\n");
+         break;
+      case GL_INVALID_FRAMEBUFFER_OPERATION:
+         puts("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION\n");
+         break;
+      case GL_OUT_OF_MEMORY:
+         puts("GL error flag: GL_OUT_OF_MEMORY\n");
+         break;
+      case GL_STACK_UNDERFLOW:
+         puts("GL error flag: GL_STACK_UNDERFLOW\n");
+         break;
+      case GL_STACK_OVERFLOW:
+         puts("GL error flag: GL_STACK_OVERFLOW\n");
+         break;
+      case GL_INVALID_OPERATION:
+         puts("GL error flag: GL_INVALID_OPERATION\n");
+         break;
+      default:
+         printf("GL error flag: %d\n", (int) error);
+         break;
+   }
+
+   assert(error == GL_NO_ERROR);
+#endif
 }
 
 static void upload_textures(
