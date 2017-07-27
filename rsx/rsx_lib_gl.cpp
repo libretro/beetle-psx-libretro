@@ -1218,8 +1218,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     return true;
 }
 
-void GlRenderer_free(GlRenderer *renderer)
+static void GlRenderer_free(GlRenderer *renderer)
 {
+   if (!renderer)
+      return;
+
     if (renderer->command_buffer) {
         Program_free(renderer->command_buffer->program);
         delete renderer->command_buffer->program;
