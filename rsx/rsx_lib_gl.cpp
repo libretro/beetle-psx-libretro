@@ -22,6 +22,7 @@
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
+#include <libretro.h>
 #include "libretro_options.h"
 
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
@@ -68,6 +69,8 @@ static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 #define VRAM_WIDTH_PIXELS 1024
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
+
+extern retro_log_printf_t log_cb;
 
 /* How many vertices we buffer before forcing a draw. Since the
  * indexes are stored on 16bits we need to make sure that the length
@@ -343,28 +346,28 @@ static void get_error(const char *msg)
 #endif
          return;
       case GL_INVALID_ENUM:
-         printf("GL error flag: GL_INVALID_ENUM [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_ENUM [%s]\n", msg);
          break;
       case GL_INVALID_VALUE:
-         printf("GL error flag: GL_INVALID_VALUE [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_VALUE [%s]\n", msg);
          break;
       case GL_INVALID_FRAMEBUFFER_OPERATION:
-         printf("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION [%s]\n", msg);
          break;
       case GL_OUT_OF_MEMORY:
-         printf("GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
          break;
       case GL_STACK_UNDERFLOW:
-         printf("GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
          break;
       case GL_STACK_OVERFLOW:
-         printf("GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
          break;
       case GL_INVALID_OPERATION:
-         printf("GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
          break;
       default:
-         printf("GL error flag: %d\n", (int) error);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: %d\n", (int) error);
          break;
    }
 
@@ -501,7 +504,7 @@ static UniformMap load_program_uniforms(GLuint program)
 
       if (len <= 0)
       {
-         printf("Ignoring uniform name with size %d\n", len);
+         log_cb(RETRO_LOG_WARN, "Ignoring uniform name with size %d\n", len);
          continue;
       }
 
@@ -510,7 +513,7 @@ static UniformMap load_program_uniforms(GLuint program)
 
       if (location < 0)
       {
-         printf("Uniform \"%s\" doesn't have a location", name);
+         log_cb(RETRO_LOG_WARN, "Uniform \"%s\" doesn't have a location", name);
          continue;
       }
 
@@ -1274,8 +1277,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          wireframe = false;
    }
 
-   printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
-
+   log_cb(RETRO_LOG_INFO, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
    switch(renderer->filter_type)
    {
@@ -1362,7 +1364,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          texture_storage = GL_RGBA8;
          break;
       default:
-         printf("Unsupported depth %d\n", depth);
+         log_cb(RETRO_LOG_ERROR, "Unsupported depth %d\n", depth);
          exit(EXIT_FAILURE);
    }
 
@@ -1618,7 +1620,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
             texture_storage = GL_RGBA8;
             break;
          default:
-            printf("Unsupported depth %d\n", depth);
+            log_cb(RETRO_LOG_ERROR, "Unsupported depth %d\n", depth);
             exit(EXIT_FAILURE);
       }
 
