@@ -265,6 +265,9 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
 template<typename T>
 static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n)
 {
+   if (!drawbuffer)
+      return;
+
    assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer));
    assert(drawbuffer->map != NULL);
 
@@ -932,7 +935,7 @@ static void Texture_set_sub_image_window(
 }
 
 template<typename T>
-static DrawBuffer<T>* build_buffer( const char* vertex_shader,
+static DrawBuffer<T>* DrawBuffer_build( const char* vertex_shader,
 		const char* fragment_shader,
 		size_t capacity)
 {
@@ -1207,13 +1210,17 @@ static void GlRenderer_upload_textures(
 
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
+    uint8_t upscaling = 1;
+    DrawBuffer<CommandVertex>* command_buffer;
     struct retro_variable var = {0};
+    uint16_t top_left[2] = {0, 0};
+    uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
     if (!renderer)
        return false;
 
     var.key = option_internal_resolution;
-    uint8_t upscaling = 1;
+
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
         /* Same limitations as libretro.cpp */
         upscaling = var.value[0] -'0';
@@ -1286,56 +1293,55 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
-    DrawBuffer<CommandVertex>* command_buffer;
 
     switch(renderer->filter_type)
     {
     case FILTER_MODE_SABR:
-      command_buffer = build_buffer<CommandVertex>(
+      command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex_xbr,
                            command_fragment_sabr,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_XBR:
-      command_buffer = build_buffer<CommandVertex>(
+      command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex_xbr,
                            command_fragment_xbr,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_BILINEAR:
-      command_buffer = build_buffer<CommandVertex>(
+      command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex,
                            command_fragment_bilinear,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_3POINT:
-      command_buffer = build_buffer<CommandVertex>(
+      command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex,
                            command_fragment_3point,
                            VERTEX_BUFFER_LEN);
       break;
      case FILTER_MODE_JINC2:
-      command_buffer = build_buffer<CommandVertex>(
+      command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex,
                            command_fragment_jinc2,
                            VERTEX_BUFFER_LEN);
       break;
     case FILTER_MODE_NEAREST:
     default:
-       command_buffer = build_buffer<CommandVertex>(
+       command_buffer = DrawBuffer_build<CommandVertex>(
                            command_vertex,
                            command_fragment,
                            VERTEX_BUFFER_LEN);
     }
 
     DrawBuffer<OutputVertex>* output_buffer =
-        build_buffer<OutputVertex>(
+        DrawBuffer_build<OutputVertex>(
             output_vertex,
             output_fragment,
             4);
 
     DrawBuffer<ImageLoadVertex>* image_load_buffer =
-        build_buffer<ImageLoadVertex>(
+        DrawBuffer_build<ImageLoadVertex>(
             image_load_vertex,
             image_load_fragment,
             4);
@@ -1412,9 +1418,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     renderer->display_vram = display_vram;
     renderer->mask_set_or  = 0;
     renderer->mask_eval_and = 0;
-
-    uint16_t top_left[2] = {0, 0};
-    uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
     GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
@@ -1927,16 +1930,13 @@ static void gl_context_reset(void)
     if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
         return;
 
-    /* Save this on the stack, I'm unsure if saving a ptr would
-    would cause trouble because of the 'delete' below  */
-
-    if (!static_renderer.inited)
-       return;
-
     static_renderer.state_data = new GlRenderer();
 
     if (GlRenderer_new(static_renderer.state_data, persistent_config))
-       static_renderer.state = GlState_Valid;
+    {
+       static_renderer.inited = true;
+       static_renderer.state  = GlState_Valid;
+    }
 }
 
 static void gl_context_destroy(void)
@@ -2103,15 +2103,12 @@ void rsx_gl_init(void)
 bool rsx_gl_open(bool is_pal)
 {
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
-   bool ret         = RetroGl_alloc(clock);
-   static_renderer.inited = ret ? true : false; 
-   return ret;
+   return RetroGl_alloc(clock);
 }
 
 void rsx_gl_close(void)
 {
    RetroGl_free();
-   static_renderer.inited = false;
 }
 
 void rsx_gl_refresh_variables(void)
