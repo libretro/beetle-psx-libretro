@@ -1733,11 +1733,12 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg)
    gpu->LineWidths      = gpu->espec->LineWidths;
 }
 
-int GPU_StateAction(StateMem *sm, int load, int data_only)
+uint32 TexCache_Tag[256];
+uint16 TexCache_Data[256][4];
+uint16 *vram_new = NULL;
+
+void GPU_RestoreStateP1(bool load)
 {
-   uint32 TexCache_Tag[256];
-   uint16 TexCache_Data[256][4];
-   uint16 *vram_new = NULL;
    PS_GPU *gpu      = (PS_GPU*)GPU;
 
    if (gpu->upscale_shift == 0)
@@ -1770,6 +1771,82 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
          TexCache_Data[i][j] = gpu->TexCache[i].Data[j];
 
    }
+}
+
+void GPU_RestoreStateP2(bool load)
+{
+   PS_GPU *gpu      = (PS_GPU*)GPU;
+
+   if (gpu->upscale_shift > 0)
+   {
+      if (load)
+      {
+         // Restore upscaled VRAM from savestate
+         for (unsigned y = 0; y < 512; y++)
+         {
+            for (unsigned x = 0; x < 1024; x++)
+               texel_put(x, y, vram_new[y * 1024 + x]);
+         }
+      }
+
+      delete [] vram_new;
+      vram_new = NULL;
+   }
+}
+
+void GPU_RestoreStateP3(void)
+{
+   PS_GPU *gpu      = (PS_GPU*)GPU;
+   for(unsigned i = 0; i < 256; i++)
+   {
+      gpu->TexCache[i].Tag = TexCache_Tag[i];
+
+      for(unsigned j = 0; j < 4; j++)
+         gpu->TexCache[i].Data[j] = TexCache_Data[i][j];
+   }
+   gpu->RecalcTexWindowStuff();
+   rsx_intf_set_tex_window(gpu->tww, gpu->twh, gpu->twx, gpu->twy);
+
+   GPU_BlitterFIFO.SaveStatePostLoad();
+
+   gpu->HorizStart &= 0xFFF;
+   gpu->HorizEnd &= 0xFFF;
+
+   gpu->DisplayFB_CurYOffset &= 0x1FF;
+   gpu->DisplayFB_CurLineYReadout &= 0x1FF;
+
+   gpu->TexPageX &= 0xF * 64;
+   gpu->TexPageY &= 0x10 * 16;
+   gpu->TexMode &= 0x3;
+   gpu->abr &= 0x3;
+
+   gpu->ClipX0 &= 1023;
+   gpu->ClipY0 &= 1023;
+   gpu->ClipX1 &= 1023;
+   gpu->ClipY1 &= 1023;
+
+   gpu->OffsX = sign_x_to_s32(11, gpu->OffsX);
+   gpu->OffsY = sign_x_to_s32(11, gpu->OffsY);
+
+   IRQ_Assert(IRQ_GPU, gpu->IRQPending);
+
+   rsx_intf_toggle_display(gpu->DisplayOff);
+   rsx_intf_set_draw_area(gpu->ClipX0, gpu->ClipY0,
+         gpu->ClipX1, gpu->ClipY1);
+
+   rsx_intf_load_image(0, 0,
+         1024, 512,
+         gpu->vram, false, false);
+
+   UpdateDisplayMode();
+}
+
+int GPU_StateAction(StateMem *sm, int load, int data_only)
+{
+   PS_GPU *gpu      = (PS_GPU*)GPU;
+
+   GPU_RestoreStateP1(load);
+
    SFORMAT StateRegs[] =
    {
       // Hardcode entry name to remain backward compatible with the
@@ -1893,67 +1970,10 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
 
-   if (gpu->upscale_shift > 0)
-   {
-      if (load)
-      {
-         // Restore upscaled VRAM from savestate
-         for (unsigned y = 0; y < 512; y++)
-         {
-            for (unsigned x = 0; x < 1024; x++)
-               texel_put(x, y, vram_new[y * 1024 + x]);
-         }
-      }
-
-      delete [] vram_new;
-      vram_new = NULL;
-   }
+   GPU_RestoreStateP2(load);
 
    if(load)
-   {
-      for(unsigned i = 0; i < 256; i++)
-      {
-         gpu->TexCache[i].Tag = TexCache_Tag[i];
-
-         for(unsigned j = 0; j < 4; j++)
-            gpu->TexCache[i].Data[j] = TexCache_Data[i][j];
-      }
-      gpu->RecalcTexWindowStuff();
-      rsx_intf_set_tex_window(gpu->tww, gpu->twh, gpu->twx, gpu->twy);
-
-      GPU_BlitterFIFO.SaveStatePostLoad();
-
-      gpu->HorizStart &= 0xFFF;
-      gpu->HorizEnd &= 0xFFF;
-
-	  gpu->DisplayFB_CurYOffset &= 0x1FF;
-	  gpu->DisplayFB_CurLineYReadout &= 0x1FF;
-
-	  gpu->TexPageX &= 0xF * 64;
-	  gpu->TexPageY &= 0x10 * 16;
-	  gpu->TexMode &= 0x3;
-	  gpu->abr &= 0x3;
-
-	  gpu->ClipX0 &= 1023;
-	  gpu->ClipY0 &= 1023;
-	  gpu->ClipX1 &= 1023;
-	  gpu->ClipY1 &= 1023;
-
-	  gpu->OffsX = sign_x_to_s32(11, gpu->OffsX);
-	  gpu->OffsY = sign_x_to_s32(11, gpu->OffsY);
-
-	  IRQ_Assert(IRQ_GPU, gpu->IRQPending);
-
-	  rsx_intf_toggle_display(gpu->DisplayOff);
-	  rsx_intf_set_draw_area(gpu->ClipX0, gpu->ClipY0,
-				 gpu->ClipX1, gpu->ClipY1);
-
-	  rsx_intf_load_image(0, 0,
-			      1024, 512,
-			      gpu->vram, false, false);
-
-	  UpdateDisplayMode();
-   }
+      GPU_RestoreStateP3();
 
    return(ret);
 }
