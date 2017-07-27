@@ -642,7 +642,18 @@ static void Framebuffer_init(struct Framebuffer *fb,
 }
 
 /* forward decls */
-static GLint Program_uniform(Program *program, const char* name);
+static GLint Program_uniform(Program *program, const char* name)
+{
+   bool found = program->uniforms.find(name) != program->uniforms.end();
+   if (!found)
+   {
+      printf("Attempted to access unknown uniform %s\n", name);
+      exit(EXIT_FAILURE);
+   }
+
+   return program->uniforms[name];
+}
+
 
 static void program_uniform1i(Program *prog, const char *name, GLint i)
 {
@@ -873,18 +884,6 @@ static void Program_free(Program *program)
       free(program->info_log);
 }
 
-
-static GLint Program_uniform(Program *program, const char* name)
-{
-   bool found = program->uniforms.find(name) != program->uniforms.end();
-   if (!found)
-   {
-      printf("Attempted to access unknown uniform %s\n", name);
-      exit(EXIT_FAILURE);
-   }
-
-   return program->uniforms[name];
-}
 
 static UniformMap load_program_uniforms(GLuint program)
 {
