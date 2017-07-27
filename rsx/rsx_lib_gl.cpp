@@ -972,12 +972,8 @@ static void GlRenderer_draw(GlRenderer *renderer)
    {
       glUseProgram(renderer->command_buffer->program->id);
       glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
-   }
 
-   // We use texture unit 0
-   if (renderer->command_buffer->program)
-   {
-      glUseProgram(renderer->command_buffer->program->id);
+      /* We use texture unit 0 */
       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
    }
 
@@ -1168,12 +1164,12 @@ static void GlRenderer_upload_textures(
       glUseProgram(renderer->image_load_buffer->program->id);
       glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
 
-       glUseProgram(renderer->command_buffer->program->id);
-       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
 
-       /* fb_texture is always at 1x */
-       glUseProgram(renderer->image_load_buffer->program->id);
-       glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      /* fb_texture is always at 1x */
+      glUseProgram(renderer->image_load_buffer->program->id);
+      glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
     }
 
     glDisable(GL_SCISSOR_TEST);
@@ -2258,13 +2254,10 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 		 {
                     glUseProgram(renderer->output_buffer->program->id);
 		    glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
-	            glUseProgram(renderer->output_buffer->program->id);
 		    glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
 
-                    glUseProgram(renderer->output_buffer->program->id);
 		    glUniform1i(renderer->output_buffer->program->uniforms["depth"], depth_24bpp);
 
-                    glUseProgram(renderer->output_buffer->program->id);
 		    glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
 		 }
 
@@ -2952,7 +2945,6 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 	 glUseProgram(renderer->image_load_buffer->program->id);
 	 glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
          /* fb_texture is always at 1x */
-	 glUseProgram(renderer->image_load_buffer->program->id);
 	 glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
       }
 
