@@ -1952,8 +1952,12 @@ static bool gl_context_framebuffer_lock(void* data)
 
 struct retro_system_av_info get_av_info(VideoClock std)
 {
-    uint8_t upscaling = 1;
-    bool display_vram = false;
+    struct retro_system_av_info info;
+    unsigned int max_width    = 0;
+    unsigned int max_height   = 0;
+    uint8_t upscaling         = 1;
+    bool widescreen_hack      = false;
+    bool display_vram         = false;
     struct retro_variable var = {0};
 
     var.key = option_internal_resolution;
@@ -1961,60 +1965,61 @@ struct retro_system_av_info get_av_info(VideoClock std)
     get_variables(&upscaling, &display_vram);
 
     var.key = option_widescreen_hack;
-    bool widescreen_hack = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
         if (!strcmp(var.value, "enabled"))
             widescreen_hack = true;
         else if (!strcmp(var.value, "disabled"))
             widescreen_hack = false;
     }
 
-    unsigned int max_width = 0;
-    unsigned int max_height = 0;
-
-    if (display_vram) {
-      max_width = 1024;
+    if (display_vram)
+    {
+      max_width  = 1024;
       max_height = 512;
-    } else {
-      // Maximum resolution supported by the PlayStation video
-      // output is 640x480
-      max_width = 640;
+    }
+    else
+    {
+      /* Maximum resolution supported by the PlayStation video
+       * output is 640x480 */
+      max_width  = 640;
       max_height = 480;
     }
 
     max_width *= upscaling;
     max_height *= upscaling;
 
-    struct retro_system_av_info info;
     memset(&info, 0, sizeof(info));
 
-    // The base resolution will be overriden using
-    // ENVIRONMENT_SET_GEOMETRY before rendering a frame so
-    // this base value is not really important
-    info.geometry.base_width    = max_width;
-    info.geometry.base_height   = max_height;
-    info.geometry.max_width     = max_width;
-    info.geometry.max_height    = max_height;
-    if (display_vram) {
+    /* The base resolution will be overriden using
+     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
+     * this base value is not really important */
+    info.geometry.base_width     = max_width;
+    info.geometry.base_height    = max_height;
+    info.geometry.max_width      = max_width;
+    info.geometry.max_height     = max_height;
+    /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
+    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
+
+    if (display_vram)
       info.geometry.aspect_ratio = 2./1.;
-    } else {
-      /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
-      info.geometry.aspect_ratio  = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
-    }
+
     info.timing.sample_rate     = 44100;
 
-    // Precise FPS values for the video output for the given
-    // VideoClock. It's actually possible to configure the PlayStation GPU
-    // to output with NTSC timings with the PAL clock (and vice-versa)
-    // which would make this code invalid but it wouldn't make a lot of
-    // sense for a game to do that.
-    switch (std) {
-    case VideoClock_Ntsc:
-        info.timing.fps = 59.941;
-        break;
-    case VideoClock_Pal:
-        info.timing.fps = 49.76;
-        break;
+    /* Precise FPS values for the video output for the given
+     * VideoClock. It's actually possible to configure the PlayStation GPU
+     * to output with NTSC timings with the PAL clock (and vice-versa)
+     * which would make this code invalid but it wouldn't make a lot of
+     * sense for a game to do that. */
+    switch (std)
+    {
+       case VideoClock_Ntsc:
+          info.timing.fps = 59.941;
+	  break;
+       case VideoClock_Pal:
+	  info.timing.fps = 49.76;
+	  break;
     }
 
     return info;
