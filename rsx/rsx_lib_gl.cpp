@@ -532,19 +532,12 @@ struct GlRenderer {
     bool display_vram;
 };
 
-
-
-struct GlStateData
-{
-    GlRenderer* r;
-};
-
 struct RetroGl {
     /*
     Rust's enums members can contain data. To emulate that,
     I'll use a helper struct to save the data.
     */
-    GlStateData state_data;
+    GlRenderer* state_data;
     GlState state;
     VideoClock video_clock;
     bool inited;
@@ -1918,9 +1911,9 @@ static void gl_context_reset(void)
     if (!static_renderer.inited)
        return;
 
-    static_renderer.state_data.r = new GlRenderer();
+    static_renderer.state_data = new GlRenderer();
 
-    if (GlRenderer_new(static_renderer.state_data.r, persistent_config))
+    if (GlRenderer_new(static_renderer.state_data, persistent_config))
        static_renderer.state = GlState_Valid;
 }
 
@@ -1928,11 +1921,12 @@ static void gl_context_destroy(void)
 {
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
-    GlRenderer_free(static_renderer.state_data.r);
-
-    if (static_renderer.state_data.r)
-        delete static_renderer.state_data.r;
-    static_renderer.state_data.r = NULL;
+    if (static_renderer.state_data)
+    {
+       GlRenderer_free(static_renderer.state_data);
+       delete static_renderer.state_data;
+    }
+    static_renderer.state_data = NULL;
 
     if (static_renderer.inited)
        static_renderer.state        = GlState_Invalid;
@@ -1970,21 +1964,23 @@ static bool RetroGl_alloc(VideoClock video_clock)
 	return false;
     }
 
-
     // No context until `context_reset` is called
     static_renderer.state        = GlState_Invalid;
-    static_renderer.state_data.r = NULL;
+    static_renderer.state_data   = NULL;
 
     static_renderer.video_clock  = video_clock;
 
     return true;
 }
 
-void RetroGl_free()
+static void RetroGl_free(void)
 {
-    if (static_renderer.state_data.r)
-        delete static_renderer.state_data.r;
-    static_renderer.state_data.r = NULL;
+    if (static_renderer.state_data)
+    {
+	GlRenderer_free(static_renderer.state_data);
+        delete static_renderer.state_data;
+    }
+    static_renderer.state_data = NULL;
 
     static_renderer.state       = GlState_Invalid;
     static_renderer.video_clock = VideoClock_Ntsc;
@@ -2105,7 +2101,7 @@ void rsx_gl_refresh_variables(void)
     switch (static_renderer.state)
     {
        case GlState_Valid:
-          renderer = static_renderer.state_data.r;
+          renderer = static_renderer.state_data;
           break;
        case GlState_Invalid:
           // Nothing to be done if we don't have a GL context
@@ -2147,7 +2143,7 @@ void rsx_gl_prepare_frame(void)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       // In case we're upscaling we need to increase the line width
       // proportionally
@@ -2174,7 +2170,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
       // Draw pending commands
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          GlRenderer_draw(renderer);
@@ -2337,7 +2333,7 @@ void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       // Finish drawing anything with the current offset
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2351,7 +2347,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       // Finish drawing anything with the current offset
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2366,7 +2362,7 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
       renderer->tex_x_mask = ~(tww << 3);
       renderer->tex_x_or   = (twx & tww) << 3;
       renderer->tex_y_mask = ~(twh << 3);
@@ -2381,7 +2377,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       // Finish drawing anything in the current area
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2405,7 +2401,7 @@ void rsx_gl_set_display_mode(uint16_t x,
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer                    = static_renderer.state_data.r;
+      GlRenderer *renderer                    = static_renderer.state_data;
 
       renderer->config.display_top_left[0]   = x;
       renderer->config.display_top_left[1]   = y;
@@ -2528,7 +2524,7 @@ void rsx_gl_push_quad(
 
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer     = static_renderer.state_data.r;
+      GlRenderer *renderer     = static_renderer.state_data;
 
       bool is_semi_transparent = v[0].semi_transparent == 1;
       bool is_textured         = v[0].texture_blend_mode != 0;
@@ -2656,7 +2652,7 @@ void rsx_gl_push_triangle(
 
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
       push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode);
    }
 }
@@ -2672,7 +2668,7 @@ void rsx_gl_fill_rect(uint32_t color,
 
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       // Draw pending commands
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2737,7 +2733,7 @@ void rsx_gl_copy_rect(
 
     if (static_renderer.state == GlState_Valid)
     {
-       GlRenderer *renderer        = static_renderer.state_data.r;
+       GlRenderer *renderer        = static_renderer.state_data;
        uint16_t source_top_left[2] = {src_x, src_y};
        uint16_t target_top_left[2] = {dst_x, dst_y};
        uint16_t dimensions[2]      = {w, h};
@@ -2847,7 +2843,7 @@ void rsx_gl_push_line(int16_t p0x,
 
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer = static_renderer.state_data.r;
+      GlRenderer *renderer = static_renderer.state_data;
 
       CommandVertex v[2] = {
 	      {
@@ -2890,7 +2886,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       Framebuffer _fb;
       uint16_t top_left[2];
       uint16_t dimensions[2];
-      GlRenderer *renderer   = static_renderer.state_data.r;
+      GlRenderer *renderer   = static_renderer.state_data;
 
       top_left[0]            = x;
       top_left[1]            = y;
@@ -2957,7 +2953,7 @@ void rsx_gl_toggle_display(bool status)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer          = static_renderer.state_data.r;
+      GlRenderer *renderer          = static_renderer.state_data;
       renderer->config.display_off = status;
    }
 }
