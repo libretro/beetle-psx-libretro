@@ -537,7 +537,6 @@ struct GlRenderer {
 struct GlStateData
 {
     GlRenderer* r;
-    DrawConfig c;
 };
 
 struct RetroGl {
@@ -549,6 +548,16 @@ struct RetroGl {
     GlState state;
     VideoClock video_clock;
     bool inited;
+};
+
+static DrawConfig persistent_config = {
+	{0, 0},         // display_top_left
+	{1024, 512},    // display_resolution
+	false,          // display_24bpp
+	true,           // display_off
+	{0, 0},         // draw_area_top_left
+	{0, 0},         // draw_area_dimensions
+	{0, 0},         // draw_offset
 };
 
 /* This was originally in rustation-libretro/lib.rs */
@@ -1897,7 +1906,6 @@ std::vector<Attribute> ImageLoadVertex::attributes()
 
 static void gl_context_reset(void)
 {
-    static DrawConfig config;
     puts("OpenGL context reset\n");
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
@@ -1910,19 +1918,9 @@ static void gl_context_reset(void)
     if (!static_renderer.inited)
        return;
 
-    switch (static_renderer.state)
-    {
-    case GlState_Valid:
-        config = static_renderer.state_data.r->config;
-        break;
-    case GlState_Invalid:
-        config = static_renderer.state_data.c;
-        break;
-    }
-
     static_renderer.state_data.r = new GlRenderer();
 
-    if (GlRenderer_new(static_renderer.state_data.r, config))
+    if (GlRenderer_new(static_renderer.state_data.r, persistent_config))
        static_renderer.state = GlState_Valid;
 }
 
@@ -1937,10 +1935,7 @@ static void gl_context_destroy(void)
     static_renderer.state_data.r = NULL;
 
     if (static_renderer.inited)
-    {
-        static_renderer.state        = GlState_Invalid;
-        static_renderer.state_data.c = static_renderer.state_data.r->config;
-    }
+       static_renderer.state        = GlState_Invalid;
 
     static_renderer.inited       = false;
 }
@@ -1975,19 +1970,9 @@ static bool RetroGl_alloc(VideoClock video_clock)
 	return false;
     }
 
-    static DrawConfig config = {
-        {0, 0},         // display_top_left
-        {1024, 512},    // display_resolution
-        false,          // display_24bpp
-	true,           // display_off
-        {0, 0},         // draw_area_top_left
-        {0, 0},         // draw_area_dimensions
-        {0, 0},         // draw_offset
-    };
 
     // No context until `context_reset` is called
     static_renderer.state        = GlState_Invalid;
-    static_renderer.state_data.c = config;
     static_renderer.state_data.r = NULL;
 
     static_renderer.video_clock  = video_clock;
@@ -2001,7 +1986,6 @@ void RetroGl_free()
         delete static_renderer.state_data.r;
     static_renderer.state_data.r = NULL;
 
-    memset(&static_renderer.state_data.c, 0, sizeof(DrawConfig));
     static_renderer.state       = GlState_Invalid;
     static_renderer.video_clock = VideoClock_Ntsc;
 }
