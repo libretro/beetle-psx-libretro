@@ -165,6 +165,22 @@ struct CommandVertex {
     static std::vector<Attribute> attributes();
 };
 
+struct OutputVertex {
+    /// Vertex position on the screen
+    float position[2];
+    /// Corresponding coordinate in the framebuffer
+    uint16_t fb_coord[2];
+
+    static std::vector<Attribute> attributes();
+};
+
+struct ImageLoadVertex {
+    // Vertex position in VRAM
+    uint16_t position[2];
+
+    static std::vector<Attribute> attributes();
+};
+
 struct DrawConfig
 {
     uint16_t display_top_left[2];
@@ -189,21 +205,6 @@ struct Framebuffer
     struct Texture _color_texture;
 };
 
-struct OutputVertex {
-    /// Vertex position on the screen
-    float position[2];
-    /// Corresponding coordinate in the framebuffer
-    uint16_t fb_coord[2];
-
-    static std::vector<Attribute> attributes();
-};
-
-struct ImageLoadVertex {
-    // Vertex position in VRAM
-    uint16_t position[2];
-
-    static std::vector<Attribute> attributes();
-};
 
 struct TransparencyIndex {
     SemiTransparencyMode transparency_mode;
