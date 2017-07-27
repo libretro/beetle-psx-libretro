@@ -1411,6 +1411,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
 static void GlRenderer_free(GlRenderer *renderer)
 {
+   unsigned i;
    if (!renderer)
       return;
 
@@ -1449,6 +1450,13 @@ static void GlRenderer_free(GlRenderer *renderer)
    renderer->fb_out_depth.id     = 0;
    renderer->fb_out_depth.width  = 0;
    renderer->fb_out_depth.height = 0;
+
+   for (i = 0; i < INDEX_BUFFER_LEN; i++)
+   {
+      renderer->opaque_triangle_indices[i]   = 0;
+      renderer->opaque_line_indices[i]       = 0;
+      renderer->semi_transparent_indices[i]  = 0;
+   }
 }
 
 extern bool doCleanFrame;
