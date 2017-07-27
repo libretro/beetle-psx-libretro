@@ -181,7 +181,7 @@ struct Texture
 struct Framebuffer
 {
     GLuint id;
-    struct Texture* _color_texture;
+    struct Texture _color_texture;
 };
 
 struct OutputVertex {
@@ -584,8 +584,11 @@ static void Framebuffer_init(struct Framebuffer *fb,
    GLuint id = 0;
    glGenFramebuffers(1, &id);
 
-   fb->id             = id;
-   fb->_color_texture = color_texture;
+   fb->id                    = id;
+
+   fb->_color_texture.id     = color_texture->id;
+   fb->_color_texture.width  = color_texture->width;
+   fb->_color_texture.height = color_texture->height;
 
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb->id);
 
@@ -926,12 +929,6 @@ static void Texture_init(
     tex->height = height;
 }
 
-static void Texture_free(struct Texture *tex)
-{
-   if (tex)
-      glDeleteTextures(1, &tex->id);
-}
-
 static void Texture_set_sub_image(
       struct Texture *tex,
       uint16_t top_left[2],
@@ -1230,17 +1227,17 @@ static void GlRenderer_free(GlRenderer *renderer)
         delete renderer->image_load_buffer;
     renderer->image_load_buffer = NULL;
 
-    Texture_free(&renderer->fb_texture);
+    glDeleteTextures(1, &renderer->fb_texture.id);
     renderer->fb_texture.id     = 0;
     renderer->fb_texture.width  = 0;
     renderer->fb_texture.height = 0;
 
-    Texture_free(&renderer->fb_out);
+    glDeleteTextures(1, &renderer->fb_out.id);
     renderer->fb_out.id     = 0;
     renderer->fb_out.width  = 0;
     renderer->fb_out.height = 0;
 
-    Texture_free(&renderer->fb_out_depth);
+    glDeleteTextures(1, &renderer->fb_out_depth.id);
     renderer->fb_out_depth.id     = 0;
     renderer->fb_out_depth.width  = 0;
     renderer->fb_out_depth.height = 0;
@@ -1497,7 +1494,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
             exit(EXIT_FAILURE);
         }
 
-	Texture_free(&renderer->fb_out);
+	glDeleteTextures(1, &renderer->fb_out.id);
 	renderer->fb_out.id     = 0;
 	renderer->fb_out.width  = 0;
 	renderer->fb_out.height = 0;
@@ -1514,7 +1511,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 			      GPU_get_vram());
 
 
-	Texture_free(&renderer->fb_out_depth);
+	glDeleteTextures(1, &renderer->fb_out_depth.id);
 	renderer->fb_out_depth.id     = 0;
 	renderer->fb_out_depth.width  = 0;
 	renderer->fb_out_depth.height = 0;
