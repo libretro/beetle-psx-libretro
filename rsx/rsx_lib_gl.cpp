@@ -1335,7 +1335,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
     glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
-static void draw(GlRenderer *renderer);
+static void GlRenderer_draw(GlRenderer *renderer);
 
 static void upload_textures(
       GlRenderer *renderer,
@@ -1344,7 +1344,7 @@ static void upload_textures(
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      draw(renderer);
+      GlRenderer_draw(renderer);
 
     Texture_set_sub_image(
           &renderer->fb_texture,
@@ -1566,7 +1566,7 @@ static void vertex_preprocessing(
    if (buffer_full)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
    }
 
    int16_t z = renderer->primitive_ordering;
@@ -1789,13 +1789,15 @@ retro_system_av_info get_av_info(VideoClock std);
 
 static RetroGl static_renderer;
 
-static void draw(GlRenderer *renderer)
+static void GlRenderer_draw(GlRenderer *renderer)
 {
-   int16_t x = renderer->config.draw_offset[0];
-   int16_t y = renderer->config.draw_offset[1];
+   int16_t x, y;
 
-   if (static_renderer.state == GlState_Invalid)
+   if (!renderer || static_renderer.state == GlState_Invalid)
 	   return;
+
+   x = renderer->config.draw_offset[0];
+   y = renderer->config.draw_offset[1];
 
    program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
 
@@ -2241,7 +2243,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       GlRenderer *renderer = static_renderer.state_data.r;
       // Draw pending commands
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
 
       // We can now render to the frontend's buffer
       bind_libretro_framebuffer(renderer);
@@ -2392,7 +2394,7 @@ void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 
       // Finish drawing anything with the current offset
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
       renderer->mask_set_or   = mask_set_or;
       renderer->mask_eval_and = mask_eval_and;
    }
@@ -2406,7 +2408,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 
       // Finish drawing anything with the current offset
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
       renderer->config.draw_offset[0] = x;
       renderer->config.draw_offset[1] = y;
    }
@@ -2436,7 +2438,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 
       // Finish drawing anything in the current area
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
 
       renderer->config.draw_area_top_left[0] = x0;
       renderer->config.draw_area_top_left[1] = y0;
@@ -2727,7 +2729,7 @@ void rsx_gl_fill_rect(uint32_t color,
 
       // Draw pending commands
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
 
       // Fill rect ignores the draw area. Save the previous value
       // and reconfigure the scissor box to the fill rectangle
@@ -2795,7 +2797,7 @@ void rsx_gl_copy_rect(
 
        // Draw pending commands
        if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
 
        uint32_t upscale = renderer->internal_upscaling;
 
@@ -2948,7 +2950,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       dimensions[1]          = h;
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         draw(renderer);
+         GlRenderer_draw(renderer);
 
       Texture_set_sub_image_window(
             &renderer->fb_texture,
