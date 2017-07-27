@@ -82,8 +82,8 @@ static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 typedef std::map<std::string, GLint> UniformMap;
 
 enum VideoClock {
-    VideoClock_Ntsc,
-    VideoClock_Pal
+   VideoClock_Ntsc,
+   VideoClock_Pal
 };
 
 enum FilterMode {
@@ -99,35 +99,35 @@ enum FilterMode {
  * destruction/reconstruction */
 enum GlState
 {
-    /* OpenGL context is ready */
-    GlState_Valid,
-    /* OpenGL context has been destroyed (or is not created yet) */
-    GlState_Invalid
+   /* OpenGL context is ready */
+   GlState_Valid,
+   /* OpenGL context has been destroyed (or is not created yet) */
+   GlState_Invalid
 };
 
 enum SemiTransparencyMode {
-    /* Source / 2 + destination / 2 */
-    SemiTransparencyMode_Average = 0,
-    /* Source + destination */
-    SemiTransparencyMode_Add = 1,
-    /* Destination - source */
-    SemiTransparencyMode_SubtractSource = 2,
-    /* Destination + source / 4 */
-    SemiTransparencyMode_AddQuarterSource = 3,
+   /* Source / 2 + destination / 2 */
+   SemiTransparencyMode_Average = 0,
+   /* Source + destination */
+   SemiTransparencyMode_Add = 1,
+   /* Destination - source */
+   SemiTransparencyMode_SubtractSource = 2,
+   /* Destination + source / 4 */
+   SemiTransparencyMode_AddQuarterSource = 3,
 };
 
 struct Program
 {
-    GLuint id;
-    /* Hash map of all the active uniforms in this program */
-    UniformMap uniforms;
-    char *info_log;
+   GLuint id;
+   /* Hash map of all the active uniforms in this program */
+   UniformMap uniforms;
+   char *info_log;
 };
 
 struct Shader
 {
-    GLuint id;
-    char *info_log;
+   GLuint id;
+   char *info_log;
 };
 
 struct Attribute
@@ -140,103 +140,103 @@ struct Attribute
 };
 
 struct CommandVertex {
-    /* Position in PlayStation VRAM coordinates */
-    float position[4];
-    /// RGB color, 8bits per component
-    uint8_t color[3];
-    /// Texture coordinates within the page
-    uint16_t texture_coord[2];
-    /// Texture page (base offset in VRAM used for texture lookup)
-    uint16_t texture_page[2];
-    /// Color Look-Up Table (palette) coordinates in VRAM
-    uint16_t clut[2];
-    /// Blending mode: 0: no texture, 1: raw-texture, 2: texture-blended
-    uint8_t texture_blend_mode;
-    /// Right shift from 16bits: 0 for 16bpp textures, 1 for 8bpp, 2
-    /// for 4bpp
-    uint8_t depth_shift;
-    /// True if dithering is enabled for this primitive
-    uint8_t dither;
-    /// 0: primitive is opaque, 1: primitive is semi-transparent
-    uint8_t semi_transparent;
-    /// Texture window mask/OR values
-    uint8_t texture_window[4];
+   /* Position in PlayStation VRAM coordinates */
+   float position[4];
+   /// RGB color, 8bits per component
+   uint8_t color[3];
+   /// Texture coordinates within the page
+   uint16_t texture_coord[2];
+   /// Texture page (base offset in VRAM used for texture lookup)
+   uint16_t texture_page[2];
+   /// Color Look-Up Table (palette) coordinates in VRAM
+   uint16_t clut[2];
+   /// Blending mode: 0: no texture, 1: raw-texture, 2: texture-blended
+   uint8_t texture_blend_mode;
+   /// Right shift from 16bits: 0 for 16bpp textures, 1 for 8bpp, 2
+   /// for 4bpp
+   uint8_t depth_shift;
+   /// True if dithering is enabled for this primitive
+   uint8_t dither;
+   /// 0: primitive is opaque, 1: primitive is semi-transparent
+   uint8_t semi_transparent;
+   /// Texture window mask/OR values
+   uint8_t texture_window[4];
 
-    static std::vector<Attribute> attributes();
+   static std::vector<Attribute> attributes();
 };
 
 struct OutputVertex {
-    /// Vertex position on the screen
-    float position[2];
-    /// Corresponding coordinate in the framebuffer
-    uint16_t fb_coord[2];
+   /// Vertex position on the screen
+   float position[2];
+   /// Corresponding coordinate in the framebuffer
+   uint16_t fb_coord[2];
 
-    static std::vector<Attribute> attributes();
+   static std::vector<Attribute> attributes();
 };
 
 struct ImageLoadVertex {
-    // Vertex position in VRAM
-    uint16_t position[2];
+   // Vertex position in VRAM
+   uint16_t position[2];
 
-    static std::vector<Attribute> attributes();
+   static std::vector<Attribute> attributes();
 };
 
 struct DrawConfig
 {
-    uint16_t display_top_left[2];
-    uint16_t display_resolution[2];
-    bool     display_24bpp;
-    bool     display_off;
-    int16_t  draw_offset[2];
-    uint16_t draw_area_top_left[2];
-    uint16_t draw_area_bot_right[2];
+   uint16_t display_top_left[2];
+   uint16_t display_resolution[2];
+   bool     display_24bpp;
+   bool     display_off;
+   int16_t  draw_offset[2];
+   uint16_t draw_area_top_left[2];
+   uint16_t draw_area_bot_right[2];
 };
 
 struct Texture
 {
-    GLuint id;
-    uint32_t width;
-    uint32_t height;
+   GLuint id;
+   uint32_t width;
+   uint32_t height;
 };
 
 struct Framebuffer
 {
-    GLuint id;
-    struct Texture _color_texture;
+   GLuint id;
+   struct Texture _color_texture;
 };
 
 
 struct TransparencyIndex {
-    SemiTransparencyMode transparency_mode;
-    unsigned last_index;
-    GLenum draw_mode;
+   SemiTransparencyMode transparency_mode;
+   unsigned last_index;
+   GLenum draw_mode;
 };
 
 template<typename T>
 struct DrawBuffer
 {
-    /// OpenGL name for this buffer
-    GLuint id;
-    /// Vertex Array Object containing the bindings for this
-    /// buffer. I'm assuming that each VAO will only use a single
-    /// buffer for simplicity.
-    GLuint vao;
-    /// Program used to draw this buffer
-    Program* program;
-    /// Currently mapped buffer range (write-only)
-    T *map;
+   /// OpenGL name for this buffer
+   GLuint id;
+   /// Vertex Array Object containing the bindings for this
+   /// buffer. I'm assuming that each VAO will only use a single
+   /// buffer for simplicity.
+   GLuint vao;
+   /// Program used to draw this buffer
+   Program* program;
+   /// Currently mapped buffer range (write-only)
+   T *map;
 
-    /// Number of elements T mapped at once in 'map'
-    size_t capacity;
-    /// Index one-past the last element stored in `map`, relative to
-    /// the first element in `map`
-    size_t map_index;
-    /// Absolute offset of the 1st mapped element in the current
-    /// buffer relative to the beginning of the GL storage.
-    size_t map_start;
+   /// Number of elements T mapped at once in 'map'
+   size_t capacity;
+   /// Index one-past the last element stored in `map`, relative to
+   /// the first element in `map`
+   size_t map_index;
+   /// Absolute offset of the 1st mapped element in the current
+   /// buffer relative to the beginning of the GL storage.
+   size_t map_start;
 };
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
 {
    GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
@@ -249,7 +249,7 @@ static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* a
    glEnableVertexAttribArray(index);
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
 {
    GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
@@ -262,7 +262,7 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
    glDisableVertexAttribArray(index);
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n)
 {
    if (!drawbuffer)
@@ -272,13 +272,13 @@ static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n
    assert(drawbuffer->map != NULL);
 
    memcpy(drawbuffer->map + drawbuffer->map_index,
-		   slice,
-		   n * sizeof(T));
+         slice,
+         n * sizeof(T));
 
    drawbuffer->map_index += n;
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
 {
    glBindVertexArray(drawbuffer->vao);
@@ -303,7 +303,7 @@ static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
 }
 
 /* Unmap the active buffer */
-template<typename T>
+   template<typename T>
 static void DrawBuffer_unmap__no_bind(DrawBuffer<T> *drawbuffer)
 {
    assert(drawbuffer->map != NULL);
@@ -316,7 +316,7 @@ static void DrawBuffer_unmap__no_bind(DrawBuffer<T> *drawbuffer)
 }
 
 /* Map the buffer for write-only access */
-template<typename T>
+   template<typename T>
 static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 {
    GLintptr offset_bytes;
@@ -332,7 +332,7 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
    /* We don't have enough room left to remap `capacity`,
     * start back from the beginning of the buffer. */
    if (drawbuffer->map_start > 2 * drawbuffer->capacity)
-	   drawbuffer->map_start = 0;
+      drawbuffer->map_start = 0;
 
    offset_bytes = drawbuffer->map_start * element_size;
 
@@ -341,17 +341,17 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 #endif
 
    m = glMapBufferRange(GL_ARRAY_BUFFER,
-		   offset_bytes,
-		   buffer_size,
-		   GL_MAP_WRITE_BIT |
-		   GL_MAP_INVALIDATE_RANGE_BIT);
+         offset_bytes,
+         buffer_size,
+         GL_MAP_WRITE_BIT |
+         GL_MAP_INVALIDATE_RANGE_BIT);
 
    assert(m != NULL);
 
    drawbuffer->map = reinterpret_cast<T *>(m);
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
 {
    if (!drawbuffer)
@@ -365,7 +365,7 @@ static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
    glDeleteVertexArrays(1, &drawbuffer->vao);
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 {
    unsigned i;
@@ -407,37 +407,37 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
       switch (attr.ty)
       {
          case GL_BYTE:
-	 case GL_UNSIGNED_BYTE:
-	 case GL_SHORT:
-	 case GL_UNSIGNED_SHORT:
-	 case GL_INT:
-	 case GL_UNSIGNED_INT:
+         case GL_UNSIGNED_BYTE:
+         case GL_SHORT:
+         case GL_UNSIGNED_SHORT:
+         case GL_INT:
+         case GL_UNSIGNED_INT:
             glVertexAttribIPointer( index,
-			    attr.components,
-			    attr.ty,
-			    element_size,
-			    (GLvoid*)attr.offset);
-	    break;
-	 case GL_FLOAT:
-	    glVertexAttribPointer(  index,
-			    attr.components,
-			    attr.ty,
-			    GL_FALSE,
-			    element_size,
-			    (GLvoid*)attr.offset);
-	    break;
-	 case GL_DOUBLE:
-	    glVertexAttribLPointer( index,
-			    attr.components,
-			    attr.ty,
-			    element_size,
-			    (GLvoid*)attr.offset);
-	    break;
+                  attr.components,
+                  attr.ty,
+                  element_size,
+                  (GLvoid*)attr.offset);
+            break;
+         case GL_FLOAT:
+            glVertexAttribPointer(  index,
+                  attr.components,
+                  attr.ty,
+                  GL_FALSE,
+                  element_size,
+                  (GLvoid*)attr.offset);
+            break;
+         case GL_DOUBLE:
+            glVertexAttribLPointer( index,
+                  attr.components,
+                  attr.ty,
+                  element_size,
+                  (GLvoid*)attr.offset);
+            break;
       }
    }
 }
 
-template<typename T>
+   template<typename T>
 static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* program)
 {
    GLuint id = 0;
@@ -479,76 +479,76 @@ static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* 
 }
 
 struct GlRenderer {
-    /* Buffer used to handle PlayStation GPU draw commands */
-    DrawBuffer<CommandVertex>* command_buffer;
-    /* Buffer used to draw to the frontend's framebuffer */
-    DrawBuffer<OutputVertex>* output_buffer;
-    /* Buffer used to copy textures from `fb_texture` to `fb_out` */
-    DrawBuffer<ImageLoadVertex>* image_load_buffer;
+   /* Buffer used to handle PlayStation GPU draw commands */
+   DrawBuffer<CommandVertex>* command_buffer;
+   /* Buffer used to draw to the frontend's framebuffer */
+   DrawBuffer<OutputVertex>* output_buffer;
+   /* Buffer used to copy textures from `fb_texture` to `fb_out` */
+   DrawBuffer<ImageLoadVertex>* image_load_buffer;
 
-    GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
-    GLushort opaque_line_indices[INDEX_BUFFER_LEN];
-    GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
-    /* Primitive type for the vertices in the command buffers
-     * (TRIANGLES or LINES) */
-    GLenum command_draw_mode;
-    unsigned opaque_triangle_index_pos;
-    unsigned opaque_line_index_pos;
-    unsigned semi_transparent_index_pos;
-    /* Current semi-transparency mode */
-    SemiTransparencyMode semi_transparency_mode;
-    std::vector<TransparencyIndex> transparency_mode_index;
-    /* Polygon mode (for wireframe) */
-    GLenum command_polygon_mode;
-    /* Texture used to store the VRAM for texture mapping */
-    DrawConfig config;
-    /* Framebuffer used as a shader input for texturing draw commands */
-    Texture fb_texture;
-    /* Framebuffer used as an output when running draw commands */
-    Texture fb_out;
-    /* Depth buffer for fb_out */
-    Texture fb_out_depth;
-    /* Current resolution of the frontend's framebuffer */
-    uint32_t frontend_resolution[2];
-    /* Current internal resolution upscaling factor */
-    uint32_t internal_upscaling;
-    /* Current internal color depth */
-    uint8_t internal_color_depth;
-    /* Counter for preserving primitive draw order in the z-buffer
-     * since we draw semi-transparent primitives out-of-order. */
-    int16_t primitive_ordering;
-    /* Texture window mask/OR values */
-    uint8_t tex_x_mask;
-    uint8_t tex_x_or;
-    uint8_t tex_y_mask;
-    uint8_t tex_y_or;
+   GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
+   GLushort opaque_line_indices[INDEX_BUFFER_LEN];
+   GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
+   /* Primitive type for the vertices in the command buffers
+    * (TRIANGLES or LINES) */
+   GLenum command_draw_mode;
+   unsigned opaque_triangle_index_pos;
+   unsigned opaque_line_index_pos;
+   unsigned semi_transparent_index_pos;
+   /* Current semi-transparency mode */
+   SemiTransparencyMode semi_transparency_mode;
+   std::vector<TransparencyIndex> transparency_mode_index;
+   /* Polygon mode (for wireframe) */
+   GLenum command_polygon_mode;
+   /* Texture used to store the VRAM for texture mapping */
+   DrawConfig config;
+   /* Framebuffer used as a shader input for texturing draw commands */
+   Texture fb_texture;
+   /* Framebuffer used as an output when running draw commands */
+   Texture fb_out;
+   /* Depth buffer for fb_out */
+   Texture fb_out_depth;
+   /* Current resolution of the frontend's framebuffer */
+   uint32_t frontend_resolution[2];
+   /* Current internal resolution upscaling factor */
+   uint32_t internal_upscaling;
+   /* Current internal color depth */
+   uint8_t internal_color_depth;
+   /* Counter for preserving primitive draw order in the z-buffer
+    * since we draw semi-transparent primitives out-of-order. */
+   int16_t primitive_ordering;
+   /* Texture window mask/OR values */
+   uint8_t tex_x_mask;
+   uint8_t tex_x_or;
+   uint8_t tex_y_mask;
+   uint8_t tex_y_or;
 
-    uint32_t mask_set_or;
-    uint32_t mask_eval_and;
+   uint32_t mask_set_or;
+   uint32_t mask_eval_and;
 
-    uint8_t filter_type;
+   uint8_t filter_type;
 
-    /* When true we display the entire VRAM buffer instead of just
-     * the visible area */
-    bool display_vram;
+   /* When true we display the entire VRAM buffer instead of just
+    * the visible area */
+   bool display_vram;
 };
 
 struct RetroGl
 {
-    GlRenderer *state_data;
-    GlState state;
-    VideoClock video_clock;
-    bool inited;
+   GlRenderer *state_data;
+   GlState state;
+   VideoClock video_clock;
+   bool inited;
 };
 
 static DrawConfig persistent_config = {
-	{0, 0},         /* display_top_left */
-	{1024, 512},    /* display_resolution */
-	false,          /* display_24bpp */
-	true,           /* display_off */
-	{0, 0},         /* draw_area_top_left */
-	{0, 0},         /* draw_area_dimensions */
-	{0, 0},         /* draw_offset */
+   {0, 0},         /* display_top_left */
+   {1024, 512},    /* display_resolution */
+   false,          /* display_24bpp */
+   true,           /* display_off */
+   {0, 0},         /* draw_area_top_left */
+   {0, 0},         /* draw_area_dimensions */
+   {0, 0},         /* draw_offset */
 };
 
 /* This was originally in rustation-libretro/lib.rs */
@@ -566,8 +566,8 @@ extern "C" unsigned char widescreen_hack;
 extern "C"
 {
 #endif
-	extern retro_environment_t environ_cb;
-	extern retro_video_refresh_t video_cb;
+   extern retro_environment_t environ_cb;
+   extern retro_video_refresh_t video_cb;
 #ifdef __cplusplus
 }
 #endif
@@ -613,7 +613,7 @@ static void get_error(const char *msg)
 }
 
 static void Framebuffer_init(struct Framebuffer *fb,
-		struct Texture* color_texture)
+      struct Texture* color_texture)
 {
    GLuint id = 0;
    glGenFramebuffers(1, &id);
@@ -855,19 +855,19 @@ static void Texture_init(
       uint32_t height,
       GLenum internal_format)
 {
-    GLuint id = 0;
+   GLuint id = 0;
 
-    glGenTextures(1, &id);
-    glBindTexture(GL_TEXTURE_2D, id);
-    glTexStorage2D(GL_TEXTURE_2D,
-                    1,
-                    internal_format,
-                    (GLsizei) width,
-                    (GLsizei) height);
+   glGenTextures(1, &id);
+   glBindTexture(GL_TEXTURE_2D, id);
+   glTexStorage2D(GL_TEXTURE_2D,
+         1,
+         internal_format,
+         (GLsizei) width,
+         (GLsizei) height);
 
-    tex->id     = id;
-    tex->width  = width;
-    tex->height = height;
+   tex->id     = id;
+   tex->width  = width;
+   tex->height = height;
 }
 
 static void Texture_set_sub_image(
@@ -878,17 +878,17 @@ static void Texture_set_sub_image(
       GLenum ty,
       uint16_t* data)
 {
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glBindTexture(GL_TEXTURE_2D, tex->id);
-    glTexSubImage2D(GL_TEXTURE_2D,
-                    0,
-                    (GLint) top_left[0],
-                    (GLint) top_left[1],
-                    (GLsizei) resolution[0],
-                    (GLsizei) resolution[1],
-                    format,
-                    ty,
-                    (void*) data);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glBindTexture(GL_TEXTURE_2D, tex->id);
+   glTexSubImage2D(GL_TEXTURE_2D,
+         0,
+         (GLint) top_left[0],
+         (GLint) top_left[1],
+         (GLsizei) resolution[0],
+         (GLsizei) resolution[1],
+         format,
+         ty,
+         (void*) data);
 }
 
 static void Texture_set_sub_image_window(
@@ -915,10 +915,10 @@ static void Texture_set_sub_image_window(
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
-template<typename T>
+   template<typename T>
 static DrawBuffer<T>* DrawBuffer_build( const char* vertex_shader,
-		const char* fragment_shader,
-		size_t capacity)
+      const char* fragment_shader,
+      size_t capacity)
 {
    DrawBuffer<T> *t = new DrawBuffer<T>;
    Shader       *vs = new Shader;
@@ -948,7 +948,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
    int16_t x, y;
 
    if (!renderer || static_renderer.state == GlState_Invalid)
-	   return;
+      return;
 
    x = renderer->config.draw_offset[0];
    y = renderer->config.draw_offset[1];
@@ -1003,12 +1003,12 @@ static void GlRenderer_draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-	      /* This method doesn't call prepare_draw/finalize_draw itself, it
-	       * must be handled by the caller. This is because this command
-	       * can be called several times on the same buffer (i.e. multiple
-	       * draw calls between the prepare/finalize) */
-	      glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	      glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
+         /* This method doesn't call prepare_draw/finalize_draw itself, it
+          * must be handled by the caller. This is because this command
+          * can be called several times on the same buffer (i.e. multiple
+          * draw calls between the prepare/finalize) */
+         glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+         glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
       }
    }
 
@@ -1021,12 +1021,12 @@ static void GlRenderer_draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-	      /* This method doesn't call prepare_draw/finalize_draw itself, it
-	       * must be handled by the caller. This is because this command
-	       * can be called several times on the same buffer (i.e. multiple
-	       * draw calls between the prepare/finalize) */
-	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
+         /* This method doesn't call prepare_draw/finalize_draw itself, it
+          * must be handled by the caller. This is because this command
+          * can be called several times on the same buffer (i.e. multiple
+          * draw calls between the prepare/finalize) */
+         glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+         glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
       }
    }
 
@@ -1047,7 +1047,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
       if (renderer->command_buffer->program)
       {
          glUseProgram(renderer->command_buffer->program->id);
-	 glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 1);
+         glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 1);
       }
 
       unsigned cur_index = 0;
@@ -1099,12 +1099,12 @@ static void GlRenderer_draw(GlRenderer *renderer)
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          {
-	      /* This method doesn't call prepare_draw/finalize_draw itself, it
-	       * must be handled by the caller. This is because this command
-	       * can be called several times on the same buffer (i.e. multiple
-	       * draw calls between the prepare/finalize) */
-	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
+            /* This method doesn't call prepare_draw/finalize_draw itself, it
+             * must be handled by the caller. This is because this command
+             * can be called several times on the same buffer (i.e. multiple
+             * draw calls between the prepare/finalize) */
+            glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+            glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
          }
 
          cur_index = it->last_index;
@@ -1133,32 +1133,32 @@ static void GlRenderer_upload_textures(
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
 
-    Texture_set_sub_image(
-          &renderer->fb_texture,
-          top_left,
-          dimensions,
-          GL_RGBA,
-          GL_UNSIGNED_SHORT_1_5_5_5_REV,
-          pixel_buffer);
+   Texture_set_sub_image(
+         &renderer->fb_texture,
+         top_left,
+         dimensions,
+         GL_RGBA,
+         GL_UNSIGNED_SHORT_1_5_5_5_REV,
+         pixel_buffer);
 
-    uint16_t x_start    = top_left[0];
-    uint16_t x_end      = x_start + dimensions[0];
-    uint16_t y_start    = top_left[1];
-    uint16_t y_end      = y_start + dimensions[1];
+   uint16_t x_start    = top_left[0];
+   uint16_t x_end      = x_start + dimensions[0];
+   uint16_t y_start    = top_left[1];
+   uint16_t y_end      = y_start + dimensions[1];
 
-    const size_t slice_len = 4;
-    ImageLoadVertex slice[slice_len] =
-    {
-        {   {x_start,   y_start }   },
-        {   {x_end,     y_start }   },
-        {   {x_start,   y_end   }   },
-        {   {x_end,     y_end   }   }
-    };
+   const size_t slice_len = 4;
+   ImageLoadVertex slice[slice_len] =
+   {
+      {   {x_start,   y_start }   },
+      {   {x_end,     y_start }   },
+      {   {x_start,   y_end   }   },
+      {   {x_end,     y_end   }   }
+   };
 
-    DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
+   DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
 
-    if (renderer->image_load_buffer->program)
-    {
+   if (renderer->image_load_buffer->program)
+   {
       glUseProgram(renderer->image_load_buffer->program->id);
       glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
 
@@ -1168,254 +1168,254 @@ static void GlRenderer_upload_textures(
       /* fb_texture is always at 1x */
       glUseProgram(renderer->image_load_buffer->program->id);
       glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
-    }
+   }
 
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_BLEND);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+   glDisable(GL_SCISSOR_TEST);
+   glDisable(GL_BLEND);
+   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    // Bind the output framebuffer
-    // let _fb = Framebuffer::new(&self.fb_out);
-    Framebuffer _fb;
-    Framebuffer_init(&_fb, &renderer->fb_out);
+   // Bind the output framebuffer
+   // let _fb = Framebuffer::new(&self.fb_out);
+   Framebuffer _fb;
+   Framebuffer_init(&_fb, &renderer->fb_out);
 
-    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
-    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-    glEnable(GL_SCISSOR_TEST);
+   if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
+      DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
+   glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
+   glEnable(GL_SCISSOR_TEST);
 
-    get_error("GlRenderer_upload_textures");
-    glDeleteFramebuffers(1, &_fb.id);
+   get_error("GlRenderer_upload_textures");
+   glDeleteFramebuffers(1, &_fb.id);
 }
 
 static void get_variables(uint8_t *upscaling, bool *display_vram)
 {
-    struct retro_variable var = {0};
+   struct retro_variable var = {0};
 
-    var.key = option_internal_resolution;
+   var.key = option_internal_resolution;
 
-    if (upscaling)
-    {
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        /* Same limitations as libretro.cpp */
-        *upscaling = var.value[0] -'0';
-	if (var.value[1] != 'x')
-	{
-	   *upscaling  = (var.value[0] - '0') * 10;
-	   *upscaling += var.value[1] - '0';
+   if (upscaling)
+   {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         /* Same limitations as libretro.cpp */
+         *upscaling = var.value[0] -'0';
+         if (var.value[1] != 'x')
+         {
+            *upscaling  = (var.value[0] - '0') * 10;
+            *upscaling += var.value[1] - '0';
 
-	   if (*upscaling == 32) /* Too high for GL */
-              *upscaling = 16;
-	}
-    }
-    }
+            if (*upscaling == 32) /* Too high for GL */
+               *upscaling = 16;
+         }
+      }
+   }
 
-    if (*display_vram)
-    {
-    var.key = option_display_vram;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      if (!strcmp(var.value, "enabled"))
-	*display_vram = true;
-      else
-	*display_vram = false;
-    }
-    }
+   if (*display_vram)
+   {
+      var.key = option_display_vram;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+         if (!strcmp(var.value, "enabled"))
+            *display_vram = true;
+         else
+            *display_vram = false;
+      }
+   }
 }
 
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
-    DrawBuffer<CommandVertex>* command_buffer;
-    uint8_t upscaling = 1;
-    bool display_vram = false;
-    struct retro_variable var = {0};
-    uint16_t top_left[2] = {0, 0};
-    uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
+   DrawBuffer<CommandVertex>* command_buffer;
+   uint8_t upscaling = 1;
+   bool display_vram = false;
+   struct retro_variable var = {0};
+   uint16_t top_left[2] = {0, 0};
+   uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-    if (!renderer)
-       return false;
+   if (!renderer)
+      return false;
 
-    get_variables(&upscaling, &display_vram);
+   get_variables(&upscaling, &display_vram);
 
-    var.key = option_filter;
-    uint8_t filter = FILTER_MODE_NEAREST;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-       if (!strcmp(var.value, "nearest"))
-          filter = FILTER_MODE_NEAREST;
-       else if (!strcmp(var.value, "SABR"))
-          filter = FILTER_MODE_SABR;
-       else if (!strcmp(var.value, "xBR"))
-          filter = FILTER_MODE_XBR;
-       else if (!strcmp(var.value, "bilinear"))
-          filter = FILTER_MODE_BILINEAR;
-       else if (!strcmp(var.value, "3-point"))
-          filter = FILTER_MODE_3POINT;
-       else if (!strcmp(var.value, "JINC2"))
-          filter = FILTER_MODE_JINC2;
+   var.key = option_filter;
+   uint8_t filter = FILTER_MODE_NEAREST;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "nearest"))
+         filter = FILTER_MODE_NEAREST;
+      else if (!strcmp(var.value, "SABR"))
+         filter = FILTER_MODE_SABR;
+      else if (!strcmp(var.value, "xBR"))
+         filter = FILTER_MODE_XBR;
+      else if (!strcmp(var.value, "bilinear"))
+         filter = FILTER_MODE_BILINEAR;
+      else if (!strcmp(var.value, "3-point"))
+         filter = FILTER_MODE_3POINT;
+      else if (!strcmp(var.value, "JINC2"))
+         filter = FILTER_MODE_JINC2;
 
-       renderer->filter_type = filter;
-    }
+      renderer->filter_type = filter;
+   }
 
-    var.key = option_depth;
-    uint8_t depth = 16;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "32bpp"))
-          depth = 32;
-       else
-          depth = 16;
-    }
-
-
-    var.key = option_scale_dither;
-    bool scale_dither = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "enabled"))
-          scale_dither = true;
-       else
-          scale_dither = false;
-    }
-
-    var.key = option_wireframe;
-    bool wireframe = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "enabled"))
-          wireframe = true;
-       else
-          wireframe = false;
-    }
-
-    printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
+   var.key = option_depth;
+   uint8_t depth = 16;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "32bpp"))
+         depth = 32;
+      else
+         depth = 16;
+   }
 
 
-    switch(renderer->filter_type)
-    {
-    case FILTER_MODE_SABR:
-      command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex_xbr,
-                           command_fragment_sabr,
-                           VERTEX_BUFFER_LEN);
-      break;
-    case FILTER_MODE_XBR:
-      command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex_xbr,
-                           command_fragment_xbr,
-                           VERTEX_BUFFER_LEN);
-      break;
-     case FILTER_MODE_BILINEAR:
-      command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex,
-                           command_fragment_bilinear,
-                           VERTEX_BUFFER_LEN);
-      break;
-     case FILTER_MODE_3POINT:
-      command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex,
-                           command_fragment_3point,
-                           VERTEX_BUFFER_LEN);
-      break;
-     case FILTER_MODE_JINC2:
-      command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex,
-                           command_fragment_jinc2,
-                           VERTEX_BUFFER_LEN);
-      break;
-    case FILTER_MODE_NEAREST:
-    default:
-       command_buffer = DrawBuffer_build<CommandVertex>(
-                           command_vertex,
-                           command_fragment,
-                           VERTEX_BUFFER_LEN);
-    }
+   var.key = option_scale_dither;
+   bool scale_dither = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+         scale_dither = true;
+      else
+         scale_dither = false;
+   }
 
-    DrawBuffer<OutputVertex>* output_buffer =
-        DrawBuffer_build<OutputVertex>(
+   var.key = option_wireframe;
+   bool wireframe = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+         wireframe = true;
+      else
+         wireframe = false;
+   }
+
+   printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
+
+
+   switch(renderer->filter_type)
+   {
+      case FILTER_MODE_SABR:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex_xbr,
+               command_fragment_sabr,
+               VERTEX_BUFFER_LEN);
+         break;
+      case FILTER_MODE_XBR:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex_xbr,
+               command_fragment_xbr,
+               VERTEX_BUFFER_LEN);
+         break;
+      case FILTER_MODE_BILINEAR:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex,
+               command_fragment_bilinear,
+               VERTEX_BUFFER_LEN);
+         break;
+      case FILTER_MODE_3POINT:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex,
+               command_fragment_3point,
+               VERTEX_BUFFER_LEN);
+         break;
+      case FILTER_MODE_JINC2:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex,
+               command_fragment_jinc2,
+               VERTEX_BUFFER_LEN);
+         break;
+      case FILTER_MODE_NEAREST:
+      default:
+         command_buffer = DrawBuffer_build<CommandVertex>(
+               command_vertex,
+               command_fragment,
+               VERTEX_BUFFER_LEN);
+   }
+
+   DrawBuffer<OutputVertex>* output_buffer =
+      DrawBuffer_build<OutputVertex>(
             output_vertex,
             output_fragment,
             4);
 
-    DrawBuffer<ImageLoadVertex>* image_load_buffer =
-        DrawBuffer_build<ImageLoadVertex>(
+   DrawBuffer<ImageLoadVertex>* image_load_buffer =
+      DrawBuffer_build<ImageLoadVertex>(
             image_load_vertex,
             image_load_fragment,
             4);
 
-    uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
-    uint32_t native_height = (uint32_t) VRAM_HEIGHT;
+   uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
+   uint32_t native_height = (uint32_t) VRAM_HEIGHT;
 
-    // Texture holding the raw VRAM texture contents. We can't
-    // meaningfully upscale it since most games use paletted
-    // textures.
-    Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
+   // Texture holding the raw VRAM texture contents. We can't
+   // meaningfully upscale it since most games use paletted
+   // textures.
+   Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
-    if (depth > 16)
-    {
-        /* Dithering is superfluous when we increase the internal
-         * color depth */
-        DrawBuffer_disable_attribute(command_buffer, "dither");
-    }
+   if (depth > 16)
+   {
+      /* Dithering is superfluous when we increase the internal
+       * color depth */
+      DrawBuffer_disable_attribute(command_buffer, "dither");
+   }
 
-    uint32_t dither_scaling = scale_dither ? upscaling : 1;
-    GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
+   uint32_t dither_scaling = scale_dither ? upscaling : 1;
+   GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
-    if (command_buffer->program)
-    {
-       glUseProgram(command_buffer->program->id);
-       glUniform1ui(command_buffer->program->uniforms["dither_scaling"], dither_scaling);
-    }
+   if (command_buffer->program)
+   {
+      glUseProgram(command_buffer->program->id);
+      glUniform1ui(command_buffer->program->uniforms["dither_scaling"], dither_scaling);
+   }
 
-    GLenum texture_storage = GL_RGB5_A1;
-    switch (depth) {
-    case 16:
-        texture_storage = GL_RGB5_A1;
-        break;
-    case 32:
-        texture_storage = GL_RGBA8;
-        break;
-    default:
-        printf("Unsupported depth %d\n", depth);
-        exit(EXIT_FAILURE);
-    }
+   GLenum texture_storage = GL_RGB5_A1;
+   switch (depth) {
+      case 16:
+         texture_storage = GL_RGB5_A1;
+         break;
+      case 32:
+         texture_storage = GL_RGBA8;
+         break;
+      default:
+         printf("Unsupported depth %d\n", depth);
+         exit(EXIT_FAILURE);
+   }
 
-    Texture_init(
-          &renderer->fb_out,
-          native_width * upscaling,
-          native_height * upscaling,
-          texture_storage);
+   Texture_init(
+         &renderer->fb_out,
+         native_width * upscaling,
+         native_height * upscaling,
+         texture_storage);
 
-    Texture_init(
-          &renderer->fb_out_depth,
-          renderer->fb_out.width,
-          renderer->fb_out.height,
-          GL_DEPTH_COMPONENT32F);
+   Texture_init(
+         &renderer->fb_out_depth,
+         renderer->fb_out.width,
+         renderer->fb_out.height,
+         GL_DEPTH_COMPONENT32F);
 
-    renderer->filter_type = filter;
-    renderer->command_buffer = command_buffer;
-    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-    renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-    renderer->semi_transparent_index_pos = 0;
-    renderer->command_draw_mode = GL_TRIANGLES;
-    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
-    renderer->command_polygon_mode = command_draw_mode;
-    renderer->output_buffer = output_buffer;
-    renderer->image_load_buffer = image_load_buffer;
-    renderer->config = config;
-    renderer->frontend_resolution[0] = 0;
-    renderer->frontend_resolution[1] = 0;
-    renderer->internal_upscaling = upscaling;
-    renderer->internal_color_depth = depth;
-    renderer->primitive_ordering = 0;
-    renderer->tex_x_mask = 0;
-    renderer->tex_x_or = 0;
-    renderer->tex_y_mask = 0;
-    renderer->tex_y_or = 0;
-    renderer->display_vram = display_vram;
-    renderer->mask_set_or  = 0;
-    renderer->mask_eval_and = 0;
+   renderer->filter_type = filter;
+   renderer->command_buffer = command_buffer;
+   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->semi_transparent_index_pos = 0;
+   renderer->command_draw_mode = GL_TRIANGLES;
+   renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
+   renderer->command_polygon_mode = command_draw_mode;
+   renderer->output_buffer = output_buffer;
+   renderer->image_load_buffer = image_load_buffer;
+   renderer->config = config;
+   renderer->frontend_resolution[0] = 0;
+   renderer->frontend_resolution[1] = 0;
+   renderer->internal_upscaling = upscaling;
+   renderer->internal_color_depth = depth;
+   renderer->primitive_ordering = 0;
+   renderer->tex_x_mask = 0;
+   renderer->tex_x_or = 0;
+   renderer->tex_y_mask = 0;
+   renderer->tex_y_or = 0;
+   renderer->display_vram = display_vram;
+   renderer->mask_set_or  = 0;
+   renderer->mask_eval_and = 0;
 
-    GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+   GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
-    return true;
+   return true;
 }
 
 static void GlRenderer_free(GlRenderer *renderer)
@@ -1423,45 +1423,45 @@ static void GlRenderer_free(GlRenderer *renderer)
    if (!renderer)
       return;
 
-    if (renderer->command_buffer)
-    {
-        Program_free(renderer->command_buffer->program);
-	DrawBuffer_free(renderer->command_buffer);
-        delete renderer->command_buffer->program;
-        delete renderer->command_buffer;
-    }
-    renderer->command_buffer = NULL;
+   if (renderer->command_buffer)
+   {
+      Program_free(renderer->command_buffer->program);
+      DrawBuffer_free(renderer->command_buffer);
+      delete renderer->command_buffer->program;
+      delete renderer->command_buffer;
+   }
+   renderer->command_buffer = NULL;
 
-    if (renderer->output_buffer)
-    {
-        Program_free(renderer->output_buffer->program);
-	DrawBuffer_free(renderer->output_buffer);
-        delete renderer->output_buffer;
-    }
-    renderer->output_buffer = NULL;
+   if (renderer->output_buffer)
+   {
+      Program_free(renderer->output_buffer->program);
+      DrawBuffer_free(renderer->output_buffer);
+      delete renderer->output_buffer;
+   }
+   renderer->output_buffer = NULL;
 
-    if (renderer->image_load_buffer)
-    {
-        Program_free(renderer->image_load_buffer->program);
-	DrawBuffer_free(renderer->image_load_buffer);
-        delete renderer->image_load_buffer;
-    }
-    renderer->image_load_buffer = NULL;
+   if (renderer->image_load_buffer)
+   {
+      Program_free(renderer->image_load_buffer->program);
+      DrawBuffer_free(renderer->image_load_buffer);
+      delete renderer->image_load_buffer;
+   }
+   renderer->image_load_buffer = NULL;
 
-    glDeleteTextures(1, &renderer->fb_texture.id);
-    renderer->fb_texture.id     = 0;
-    renderer->fb_texture.width  = 0;
-    renderer->fb_texture.height = 0;
+   glDeleteTextures(1, &renderer->fb_texture.id);
+   renderer->fb_texture.id     = 0;
+   renderer->fb_texture.width  = 0;
+   renderer->fb_texture.height = 0;
 
-    glDeleteTextures(1, &renderer->fb_out.id);
-    renderer->fb_out.id     = 0;
-    renderer->fb_out.width  = 0;
-    renderer->fb_out.height = 0;
+   glDeleteTextures(1, &renderer->fb_out.id);
+   renderer->fb_out.id     = 0;
+   renderer->fb_out.width  = 0;
+   renderer->fb_out.height = 0;
 
-    glDeleteTextures(1, &renderer->fb_out_depth.id);
-    renderer->fb_out_depth.id     = 0;
-    renderer->fb_out_depth.width  = 0;
-    renderer->fb_out_depth.height = 0;
+   glDeleteTextures(1, &renderer->fb_out_depth.id);
+   renderer->fb_out_depth.id     = 0;
+   renderer->fb_out_depth.width  = 0;
+   renderer->fb_out_depth.height = 0;
 }
 
 extern bool doCleanFrame;
@@ -1469,224 +1469,224 @@ extern bool doCleanFrame;
 
 static inline void apply_scissor(GlRenderer *renderer)
 {
-    uint16_t _x = renderer->config.draw_area_top_left[0];
-    uint16_t _y = renderer->config.draw_area_top_left[1];
-    int _w      = renderer->config.draw_area_bot_right[0] - _x;
-    int _h      = renderer->config.draw_area_bot_right[1] - _y;
+   uint16_t _x = renderer->config.draw_area_top_left[0];
+   uint16_t _y = renderer->config.draw_area_top_left[1];
+   int _w      = renderer->config.draw_area_bot_right[0] - _x;
+   int _h      = renderer->config.draw_area_bot_right[1] - _y;
 
-    if (_w < 0)
+   if (_w < 0)
       _w = 0;
 
-    if (_h < 0)
+   if (_h < 0)
       _h = 0;
 
-    GLsizei upscale = (GLsizei)renderer->internal_upscaling;
+   GLsizei upscale = (GLsizei)renderer->internal_upscaling;
 
-    // We need to scale those to match the internal resolution if
-    // upscaling is enabled
-    GLsizei x = (GLsizei) _x * upscale;
-    GLsizei y = (GLsizei) _y * upscale;
-    GLsizei w = (GLsizei) _w * upscale;
-    GLsizei h = (GLsizei) _h * upscale;
+   // We need to scale those to match the internal resolution if
+   // upscaling is enabled
+   GLsizei x = (GLsizei) _x * upscale;
+   GLsizei y = (GLsizei) _y * upscale;
+   GLsizei w = (GLsizei) _w * upscale;
+   GLsizei h = (GLsizei) _h * upscale;
 
-    glScissor(x, y, w, h);
+   glScissor(x, y, w, h);
 }
 
 static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
-    GLuint fbo;
-    uint32_t f_w = renderer->frontend_resolution[0];
-    uint32_t f_h = renderer->frontend_resolution[1];
-    uint16_t _w;
-    uint16_t _h;
-    uint32_t w, h, upscale;
-    float    aspect_ratio;
+   GLuint fbo;
+   uint32_t f_w = renderer->frontend_resolution[0];
+   uint32_t f_h = renderer->frontend_resolution[1];
+   uint16_t _w;
+   uint16_t _h;
+   uint32_t w, h, upscale;
+   float    aspect_ratio;
 
-    if (renderer->display_vram)
-    {
+   if (renderer->display_vram)
+   {
       _w = VRAM_WIDTH_PIXELS;
       _h = VRAM_HEIGHT;
       // Is this accurate?
       aspect_ratio = 2.0 / 1.0;
-    } else {
+   } else {
       _w = renderer->config.display_resolution[0];
       _h = renderer->config.display_resolution[1];
       aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
-    }
+   }
 
-    upscale = renderer->internal_upscaling;
-    w       = (uint32_t) _w * upscale;
-    h       = (uint32_t) _h * upscale;
+   upscale = renderer->internal_upscaling;
+   w       = (uint32_t) _w * upscale;
+   h       = (uint32_t) _h * upscale;
 
-    if (w != f_w || h != f_h)
-    {
-        /* We need to change the frontend's resolution */
-        struct retro_game_geometry geometry;
-        geometry.base_width  = w;
-        geometry.base_height = h;
+   if (w != f_w || h != f_h)
+   {
+      /* We need to change the frontend's resolution */
+      struct retro_game_geometry geometry;
+      geometry.base_width  = w;
+      geometry.base_height = h;
 
-        /* Max parameters are ignored by this call */
-        geometry.max_width  = 0;
-        geometry.max_height = 0;
+      /* Max parameters are ignored by this call */
+      geometry.max_width  = 0;
+      geometry.max_height = 0;
 
-        geometry.aspect_ratio = aspect_ratio;
+      geometry.aspect_ratio = aspect_ratio;
 
-        //printf("Target framebuffer size: %dx%d\n", w, h);
+      //printf("Target framebuffer size: %dx%d\n", w, h);
 
-        environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
+      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
-        renderer->frontend_resolution[0] = w;
-        renderer->frontend_resolution[1] = h;
-    }
+      renderer->frontend_resolution[0] = w;
+      renderer->frontend_resolution[1] = h;
+   }
 
-    // Bind the output framebuffer provided by the frontend
-    /* TODO/FIXME - I think glsm_ctl(BIND) is the way to go here. Check with the libretro devs */
-    fbo = glsm_get_current_framebuffer();
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+   // Bind the output framebuffer provided by the frontend
+   /* TODO/FIXME - I think glsm_ctl(BIND) is the way to go here. Check with the libretro devs */
+   fbo = glsm_get_current_framebuffer();
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+   glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
 
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
-    uint8_t upscaling = 1;
-    bool display_vram = false;
-    struct retro_variable var = {0};
+   uint8_t upscaling = 1;
+   bool display_vram = false;
+   struct retro_variable var = {0};
 
-    var.key = option_renderer_software_fb;
+   var.key = option_renderer_software_fb;
 
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-       if (!strcmp(var.value, "enabled"))
-          has_software_fb = true;
-       else
-          has_software_fb = false;
-    }
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         has_software_fb = true;
+      else
+         has_software_fb = false;
+   }
 
-    get_variables(&upscaling, &display_vram);
+   get_variables(&upscaling, &display_vram);
 
-    var.key = option_filter;
-    uint8_t filter = FILTER_MODE_NEAREST;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "nearest"))
-          filter = FILTER_MODE_NEAREST;
-       else if (!strcmp(var.value, "SABR"))
-          filter = FILTER_MODE_SABR;
-       else if (!strcmp(var.value, "xBR"))
-          filter = FILTER_MODE_XBR;
-       else if (!strcmp(var.value, "bilinear"))
-          filter = FILTER_MODE_BILINEAR;
-       else if (!strcmp(var.value, "3-point"))
-          filter = FILTER_MODE_3POINT;
-       else if (!strcmp(var.value, "JINC2"))
-          filter = FILTER_MODE_JINC2;
-    }
+   var.key = option_filter;
+   uint8_t filter = FILTER_MODE_NEAREST;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "nearest"))
+         filter = FILTER_MODE_NEAREST;
+      else if (!strcmp(var.value, "SABR"))
+         filter = FILTER_MODE_SABR;
+      else if (!strcmp(var.value, "xBR"))
+         filter = FILTER_MODE_XBR;
+      else if (!strcmp(var.value, "bilinear"))
+         filter = FILTER_MODE_BILINEAR;
+      else if (!strcmp(var.value, "3-point"))
+         filter = FILTER_MODE_3POINT;
+      else if (!strcmp(var.value, "JINC2"))
+         filter = FILTER_MODE_JINC2;
+   }
 
-    var.key = option_depth;
-    uint8_t depth = 16;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        depth = !strcmp(var.value, "32bpp") ? 32 : 16;
-    }
+   var.key = option_depth;
+   uint8_t depth = 16;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      depth = !strcmp(var.value, "32bpp") ? 32 : 16;
+   }
 
 
-    var.key = option_scale_dither;
-    bool scale_dither = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "enabled"))
-          scale_dither = true;
-       else
-          scale_dither = false;
-    }
+   var.key = option_scale_dither;
+   bool scale_dither = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+         scale_dither = true;
+      else
+         scale_dither = false;
+   }
 
-    var.key = option_wireframe;
-    bool wireframe = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (!strcmp(var.value, "enabled"))
-          wireframe = true;
-       else
-          wireframe = false;
-    }
+   var.key = option_wireframe;
+   bool wireframe = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+         wireframe = true;
+      else
+         wireframe = false;
+   }
 
-    bool rebuild_fb_out =
+   bool rebuild_fb_out =
       upscaling != renderer->internal_upscaling ||
       depth != renderer->internal_color_depth;
 
-    if (rebuild_fb_out)
-    {
-        if (depth > 16)
-            DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
-        else
-            DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+   if (rebuild_fb_out)
+   {
+      if (depth > 16)
+         DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
+      else
+         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
 
-        uint32_t native_width = (uint32_t) VRAM_WIDTH_PIXELS;
-        uint32_t native_height = (uint32_t) VRAM_HEIGHT;
+      uint32_t native_width = (uint32_t) VRAM_WIDTH_PIXELS;
+      uint32_t native_height = (uint32_t) VRAM_HEIGHT;
 
-        uint32_t w = native_width * upscaling;
-        uint32_t h = native_height * upscaling;
+      uint32_t w = native_width * upscaling;
+      uint32_t h = native_height * upscaling;
 
-        GLenum texture_storage = GL_RGB5_A1;
-        switch (depth) {
-        case 16:
+      GLenum texture_storage = GL_RGB5_A1;
+      switch (depth) {
+         case 16:
             texture_storage = GL_RGB5_A1;
             break;
-        case 32:
+         case 32:
             texture_storage = GL_RGBA8;
             break;
-        default:
+         default:
             printf("Unsupported depth %d\n", depth);
             exit(EXIT_FAILURE);
-        }
+      }
 
-	glDeleteTextures(1, &renderer->fb_out.id);
-	renderer->fb_out.id     = 0;
-	renderer->fb_out.width  = 0;
-	renderer->fb_out.height = 0;
-        Texture_init(&renderer->fb_out, w, h, texture_storage);
+      glDeleteTextures(1, &renderer->fb_out.id);
+      renderer->fb_out.id     = 0;
+      renderer->fb_out.width  = 0;
+      renderer->fb_out.height = 0;
+      Texture_init(&renderer->fb_out, w, h, texture_storage);
 
-        // This is a bit wasteful since it'll re-upload the data
-        // to `fb_texture` even though we haven't touched it but
-        // this code is not very performance-critical anyway.
+      // This is a bit wasteful since it'll re-upload the data
+      // to `fb_texture` even though we haven't touched it but
+      // this code is not very performance-critical anyway.
 
-        uint16_t top_left[2] = {0, 0};
-        uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
+      uint16_t top_left[2] = {0, 0};
+      uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-        GlRenderer_upload_textures(renderer, top_left, dimensions,
-			      GPU_get_vram());
+      GlRenderer_upload_textures(renderer, top_left, dimensions,
+            GPU_get_vram());
 
-	glDeleteTextures(1, &renderer->fb_out_depth.id);
-	renderer->fb_out_depth.id     = 0;
-	renderer->fb_out_depth.width  = 0;
-	renderer->fb_out_depth.height = 0;
-        Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
-    }
+      glDeleteTextures(1, &renderer->fb_out_depth.id);
+      renderer->fb_out_depth.id     = 0;
+      renderer->fb_out_depth.width  = 0;
+      renderer->fb_out_depth.height = 0;
+      Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
+   }
 
-    uint32_t dither_scaling = scale_dither ? upscaling : 1;
+   uint32_t dither_scaling = scale_dither ? upscaling : 1;
 
-    if (renderer->command_buffer->program)
-    {
-       glUseProgram(renderer->command_buffer->program->id);
-       glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], (GLuint)dither_scaling);
-    }
+   if (renderer->command_buffer->program)
+   {
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], (GLuint)dither_scaling);
+   }
 
-    renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
+   renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
-    glLineWidth((GLfloat) upscaling);
+   glLineWidth((GLfloat) upscaling);
 
-    // If the scaling factor has changed the frontend should be
-    // reconfigured. We can't do that here because it could
-    // destroy the OpenGL context which would destroy `self`
-    //// r5 - replace 'self' by 'this'
-    bool reconfigure_frontend =
+   // If the scaling factor has changed the frontend should be
+   // reconfigured. We can't do that here because it could
+   // destroy the OpenGL context which would destroy `self`
+   //// r5 - replace 'self' by 'this'
+   bool reconfigure_frontend =
       renderer->internal_upscaling != upscaling ||
       renderer->display_vram != display_vram ||
       renderer->filter_type != filter;
 
-    renderer->internal_upscaling = upscaling;
-    renderer->display_vram = display_vram;
-    renderer->internal_color_depth = depth;
-    renderer->filter_type = filter;
+   renderer->internal_upscaling = upscaling;
+   renderer->display_vram = display_vram;
+   renderer->internal_color_depth = depth;
+   renderer->filter_type = filter;
 
-    return reconfigure_frontend;
+   return reconfigure_frontend;
 }
 
 static void vertex_preprocessing(
@@ -1782,247 +1782,247 @@ static void push_primitive(
 
 std::vector<Attribute> CommandVertex::attributes()
 {
-    std::vector<Attribute> result;
-    Attribute attr;
+   std::vector<Attribute> result;
+   Attribute attr;
 
-    strcpy(attr.name, "position");
-    attr.offset     = offsetof(CommandVertex, position);
-    attr.ty         = GL_FLOAT;
-    attr.components = 4;
+   strcpy(attr.name, "position");
+   attr.offset     = offsetof(CommandVertex, position);
+   attr.ty         = GL_FLOAT;
+   attr.components = 4;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "color");
-    attr.offset     = offsetof(CommandVertex, color);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 3;
+   strcpy(attr.name, "color");
+   attr.offset     = offsetof(CommandVertex, color);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 3;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "texture_coord");
-    attr.offset     = offsetof(CommandVertex, texture_coord);
-    attr.ty         = GL_UNSIGNED_SHORT;
-    attr.components = 2;
+   strcpy(attr.name, "texture_coord");
+   attr.offset     = offsetof(CommandVertex, texture_coord);
+   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "texture_page");
-    attr.offset     = offsetof(CommandVertex, texture_page);
-    attr.ty         = GL_UNSIGNED_SHORT;
-    attr.components = 2;
+   strcpy(attr.name, "texture_page");
+   attr.offset     = offsetof(CommandVertex, texture_page);
+   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "clut");
-    attr.offset     = offsetof(CommandVertex, clut);
-    attr.ty         = GL_UNSIGNED_SHORT;
-    attr.components = 2;
+   strcpy(attr.name, "clut");
+   attr.offset     = offsetof(CommandVertex, clut);
+   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "texture_blend_mode");
-    attr.offset     = offsetof(CommandVertex, texture_blend_mode);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 1;
+   strcpy(attr.name, "texture_blend_mode");
+   attr.offset     = offsetof(CommandVertex, texture_blend_mode);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 1;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "depth_shift");
-    attr.offset     = offsetof(CommandVertex, depth_shift);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 1;
+   strcpy(attr.name, "depth_shift");
+   attr.offset     = offsetof(CommandVertex, depth_shift);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 1;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "dither");
-    attr.offset     = offsetof(CommandVertex, dither);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 1;
+   strcpy(attr.name, "dither");
+   attr.offset     = offsetof(CommandVertex, dither);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 1;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "semi_transparent");
-    attr.offset     = offsetof(CommandVertex, semi_transparent);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 1;
+   strcpy(attr.name, "semi_transparent");
+   attr.offset     = offsetof(CommandVertex, semi_transparent);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 1;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "texture_window");
-    attr.offset     = offsetof(CommandVertex, texture_window);
-    attr.ty         = GL_UNSIGNED_BYTE;
-    attr.components = 4;
+   strcpy(attr.name, "texture_window");
+   attr.offset     = offsetof(CommandVertex, texture_window);
+   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.components = 4;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    return result;
+   return result;
 }
 
 std::vector<Attribute> OutputVertex::attributes()
 {
-    std::vector<Attribute> result;
-    Attribute attr;
+   std::vector<Attribute> result;
+   Attribute attr;
 
-    strcpy(attr.name, "position");
-    attr.offset     = offsetof(OutputVertex, position);
-    attr.ty         = GL_FLOAT;
-    attr.components = 2;
+   strcpy(attr.name, "position");
+   attr.offset     = offsetof(OutputVertex, position);
+   attr.ty         = GL_FLOAT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    strcpy(attr.name, "fb_coord");
-    attr.offset     = offsetof(OutputVertex, fb_coord);
-    attr.ty         = GL_UNSIGNED_SHORT;
-    attr.components = 2;
+   strcpy(attr.name, "fb_coord");
+   attr.offset     = offsetof(OutputVertex, fb_coord);
+   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    return result;
+   return result;
 }
 
 std::vector<Attribute> ImageLoadVertex::attributes()
 {
-    std::vector<Attribute> result;
-    Attribute attr;
+   std::vector<Attribute> result;
+   Attribute attr;
 
-    strcpy(attr.name, "position");
-    attr.offset     = offsetof(ImageLoadVertex, position);
-    attr.ty         = GL_UNSIGNED_SHORT;
-    attr.components = 2;
+   strcpy(attr.name, "position");
+   attr.offset     = offsetof(ImageLoadVertex, position);
+   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.components = 2;
 
-    result.push_back(attr);
+   result.push_back(attr);
 
-    return result;
+   return result;
 }
 
 static void cleanup_gl_state(void)
 {
-      /* Cleanup OpenGL context before returning to the frontend */
-      /* All of these GL calls are also done in glsm_ctl(UNBIND) */
-      glDisable(GL_BLEND);
-      glBlendColor(0.0, 0.0, 0.0, 0.0);
-      glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-      glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, 0);
-      glUseProgram(0);
-      glBindVertexArray(0);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      glLineWidth(1.0);
-      glClearColor(0.0, 0.0, 0.0, 0.0);
+   /* Cleanup OpenGL context before returning to the frontend */
+   /* All of these GL calls are also done in glsm_ctl(UNBIND) */
+   glDisable(GL_BLEND);
+   glBlendColor(0.0, 0.0, 0.0, 0.0);
+   glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+   glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   glUseProgram(0);
+   glBindVertexArray(0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   glLineWidth(1.0);
+   glClearColor(0.0, 0.0, 0.0, 0.0);
 }
 
 
 static void gl_context_reset(void)
 {
-    puts("OpenGL context reset\n");
-    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+   puts("OpenGL context reset\n");
+   glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
-    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
-        return;
+   if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
+      return;
 
-    static_renderer.state_data = new GlRenderer();
+   static_renderer.state_data = new GlRenderer();
 
-    if (GlRenderer_new(static_renderer.state_data, persistent_config))
-    {
-       static_renderer.inited = true;
-       static_renderer.state  = GlState_Valid;
-    }
+   if (GlRenderer_new(static_renderer.state_data, persistent_config))
+   {
+      static_renderer.inited = true;
+      static_renderer.state  = GlState_Valid;
+   }
 }
 
 static void gl_context_destroy(void)
 {
-    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
+   glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
-    if (static_renderer.state_data)
-    {
-       GlRenderer_free(static_renderer.state_data);
-       delete static_renderer.state_data;
-    }
+   if (static_renderer.state_data)
+   {
+      GlRenderer_free(static_renderer.state_data);
+      delete static_renderer.state_data;
+   }
 
-    static_renderer.state_data = NULL;
-    static_renderer.state      = GlState_Invalid;
-    static_renderer.inited       = false;
+   static_renderer.state_data = NULL;
+   static_renderer.state      = GlState_Invalid;
+   static_renderer.inited       = false;
 }
 
 static bool gl_context_framebuffer_lock(void* data)
 {
-    return false;
+   return false;
 }
 
 struct retro_system_av_info get_av_info(VideoClock std)
 {
-    struct retro_system_av_info info;
-    unsigned int max_width    = 0;
-    unsigned int max_height   = 0;
-    uint8_t upscaling         = 1;
-    bool widescreen_hack      = false;
-    bool display_vram         = false;
-    struct retro_variable var = {0};
+   struct retro_system_av_info info;
+   unsigned int max_width    = 0;
+   unsigned int max_height   = 0;
+   uint8_t upscaling         = 1;
+   bool widescreen_hack      = false;
+   bool display_vram         = false;
+   struct retro_variable var = {0};
 
-    var.key = option_internal_resolution;
+   var.key = option_internal_resolution;
 
-    get_variables(&upscaling, &display_vram);
+   get_variables(&upscaling, &display_vram);
 
-    var.key = option_widescreen_hack;
+   var.key = option_widescreen_hack;
 
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        if (!strcmp(var.value, "enabled"))
-            widescreen_hack = true;
-        else if (!strcmp(var.value, "disabled"))
-            widescreen_hack = false;
-    }
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         widescreen_hack = true;
+      else if (!strcmp(var.value, "disabled"))
+         widescreen_hack = false;
+   }
 
-    if (display_vram)
-    {
+   if (display_vram)
+   {
       max_width  = 1024;
       max_height = 512;
-    }
-    else
-    {
+   }
+   else
+   {
       /* Maximum resolution supported by the PlayStation video
        * output is 640x480 */
       max_width  = 640;
       max_height = 480;
-    }
+   }
 
-    max_width *= upscaling;
-    max_height *= upscaling;
+   max_width *= upscaling;
+   max_height *= upscaling;
 
-    memset(&info, 0, sizeof(info));
+   memset(&info, 0, sizeof(info));
 
-    /* The base resolution will be overriden using
-     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
-     * this base value is not really important */
-    info.geometry.base_width     = max_width;
-    info.geometry.base_height    = max_height;
-    info.geometry.max_width      = max_width;
-    info.geometry.max_height     = max_height;
-    /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
-    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
+   /* The base resolution will be overriden using
+    * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
+    * this base value is not really important */
+   info.geometry.base_width     = max_width;
+   info.geometry.base_height    = max_height;
+   info.geometry.max_width      = max_width;
+   info.geometry.max_height     = max_height;
+   /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
+   info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
 
-    if (display_vram)
+   if (display_vram)
       info.geometry.aspect_ratio = 2./1.;
 
-    info.timing.sample_rate     = 44100;
+   info.timing.sample_rate     = 44100;
 
-    /* Precise FPS values for the video output for the given
-     * VideoClock. It's actually possible to configure the PlayStation GPU
-     * to output with NTSC timings with the PAL clock (and vice-versa)
-     * which would make this code invalid but it wouldn't make a lot of
-     * sense for a game to do that. */
-    switch (std)
-    {
-       case VideoClock_Ntsc:
-          info.timing.fps = 59.941;
-	  break;
-       case VideoClock_Pal:
-	  info.timing.fps = 49.76;
-	  break;
-    }
+   /* Precise FPS values for the video output for the given
+    * VideoClock. It's actually possible to configure the PlayStation GPU
+    * to output with NTSC timings with the PAL clock (and vice-versa)
+    * which would make this code invalid but it wouldn't make a lot of
+    * sense for a game to do that. */
+   switch (std)
+   {
+      case VideoClock_Ntsc:
+         info.timing.fps = 59.941;
+         break;
+      case VideoClock_Pal:
+         info.timing.fps = 49.76;
+         break;
+   }
 
-    return info;
+   return info;
 }
 
 void rsx_gl_init(void)
@@ -2038,22 +2038,22 @@ bool rsx_gl_open(bool is_pal)
    if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) )
       return false;
 
-    /* glsm related setup */
-    params.context_reset         = gl_context_reset;
-    params.context_destroy       = gl_context_destroy;
-    params.framebuffer_lock      = gl_context_framebuffer_lock;
-    params.environ_cb            = environ_cb;
-    params.stencil               = false;
-    params.imm_vbo_draw          = NULL;
-    params.imm_vbo_disable       = NULL;
+   /* glsm related setup */
+   params.context_reset         = gl_context_reset;
+   params.context_destroy       = gl_context_destroy;
+   params.framebuffer_lock      = gl_context_framebuffer_lock;
+   params.environ_cb            = environ_cb;
+   params.stencil               = false;
+   params.imm_vbo_draw          = NULL;
+   params.imm_vbo_disable       = NULL;
 
-    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) )
-	return false;
+   if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) )
+      return false;
 
-    /* No context until `context_reset` is called */
-    static_renderer.video_clock  = clock;
+   /* No context until `context_reset` is called */
+   static_renderer.video_clock  = clock;
 
-    return true;
+   return true;
 }
 
 void rsx_gl_close(void)
@@ -2064,41 +2064,41 @@ void rsx_gl_close(void)
 
 void rsx_gl_refresh_variables(void)
 {
-    GlRenderer* renderer = NULL;
-    if (!static_renderer.inited)
-	    return;
+   GlRenderer* renderer = NULL;
+   if (!static_renderer.inited)
+      return;
 
-    switch (static_renderer.state)
-    {
-       case GlState_Valid:
-          renderer = static_renderer.state_data;
-          break;
-       case GlState_Invalid:
-          // Nothing to be done if we don't have a GL context
-          return;
-    }
+   switch (static_renderer.state)
+   {
+      case GlState_Valid:
+         renderer = static_renderer.state_data;
+         break;
+      case GlState_Invalid:
+         // Nothing to be done if we don't have a GL context
+         return;
+   }
 
-    bool reconfigure_frontend = retro_refresh_variables(renderer);
+   bool reconfigure_frontend = retro_refresh_variables(renderer);
 
 #if 1
-    if (reconfigure_frontend)
-    {
-        // The resolution has changed, we must tell the frontend
-        // to change its format
-        struct retro_variable var = {0};
+   if (reconfigure_frontend)
+   {
+      // The resolution has changed, we must tell the frontend
+      // to change its format
+      struct retro_variable var = {0};
 
-        struct retro_system_av_info av_info = get_av_info(static_renderer.video_clock);
+      struct retro_system_av_info av_info = get_av_info(static_renderer.video_clock);
 
-        // This call can potentially (but not necessarily) call
-        // `context_destroy` and `context_reset` to reinitialize
-        bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
+      // This call can potentially (but not necessarily) call
+      // `context_destroy` and `context_reset` to reinitialize
+      bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 
-        if (!ok)
-        {
-            puts("Couldn't change frontend resolution\n");
-            puts("Try resetting to enable the new configuration\n");
-        }
-    }
+      if (!ok)
+      {
+         puts("Couldn't change frontend resolution\n");
+         puts("Try resetting to enable the new configuration\n");
+      }
+   }
 #endif
 }
 
@@ -2166,8 +2166,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       else
       {
          // Bind 'fb_out' to texture unit 1
-	 glActiveTexture(GL_TEXTURE1);
-	 glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
          /* First we draw the visible part of fb_out */
          uint16_t fb_x_start = renderer->config.display_top_left[0];
@@ -2188,39 +2188,39 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
             depth_24bpp = 0;
          }
 
-	 if (renderer->output_buffer)
-	 {
-		 OutputVertex slice[4] =
-		 {
-			 { {-1.0, -1.0}, {0,         fb_height}   },
-			 { { 1.0, -1.0}, {fb_width , fb_height}   },
-			 { {-1.0,  1.0}, {0,         0} },
-			 { { 1.0,  1.0}, {fb_width,  0} }
-		 };
+         if (renderer->output_buffer)
+         {
+            OutputVertex slice[4] =
+            {
+               { {-1.0, -1.0}, {0,         fb_height}   },
+               { { 1.0, -1.0}, {fb_width , fb_height}   },
+               { {-1.0,  1.0}, {0,         0} },
+               { { 1.0,  1.0}, {fb_width,  0} }
+            };
 
-		 DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
+            DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
 
-		 if (renderer->output_buffer->program)
-		 {
-                    glUseProgram(renderer->output_buffer->program->id);
-		    glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
-		    glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
+            if (renderer->output_buffer->program)
+            {
+               glUseProgram(renderer->output_buffer->program->id);
+               glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
+               glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
 
-		    glUniform1i(renderer->output_buffer->program->uniforms["depth"], depth_24bpp);
+               glUniform1i(renderer->output_buffer->program->uniforms["depth"], depth_24bpp);
 
-		    glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
-		 }
+               glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+            }
 
-		 if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
-			 DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
-	 }
+            if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
+               DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
+         }
       }
 
       // Hack: copy fb_out back into fb_texture at the end of every
       // frame to make offscreen rendering kinda sorta work. Very messy
       // and slow.
       {
-	 Framebuffer _fb;
+         Framebuffer _fb;
          ImageLoadVertex slice[4] =
          {
             {   {0,    0 }   },
@@ -2231,11 +2231,11 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4);
 
-	 if (renderer->image_load_buffer->program)
-	 {
-	    glUseProgram(renderer->image_load_buffer->program->id);
-	    glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
-	 }
+         if (renderer->image_load_buffer->program)
+         {
+            glUseProgram(renderer->image_load_buffer->program->id);
+            glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+         }
 
          glDisable(GL_SCISSOR_TEST);
          glDisable(GL_BLEND);
@@ -2243,16 +2243,16 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          Framebuffer_init(&_fb, &renderer->fb_texture);
 
-	 if (renderer->image_load_buffer->program)
-	 {
-	    glUseProgram(renderer->image_load_buffer->program->id);
-	    glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
-	 }
+         if (renderer->image_load_buffer->program)
+         {
+            glUseProgram(renderer->image_load_buffer->program->id);
+            glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+         }
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
-	 glDeleteFramebuffers(1, &_fb.id);
+         glDeleteFramebuffers(1, &_fb.id);
       }
 
       cleanup_gl_state();
@@ -2329,9 +2329,9 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
 }
 
 void  rsx_gl_set_draw_area(uint16_t x0,
-			   uint16_t y0,
-			   uint16_t x1,
-			   uint16_t y1)
+      uint16_t y0,
+      uint16_t x1,
+      uint16_t y1)
 {
    if (static_renderer.state == GlState_Valid)
    {
@@ -2374,16 +2374,16 @@ void rsx_gl_set_display_mode(uint16_t x,
 void rsx_gl_push_quad(
       float p0x,
       float p0y,
-	  float p0w,
+      float p0w,
       float p1x,
       float p1y,
-	  float p1w,
+      float p1w,
       float p2x,
       float p2y,
-	  float p2w,
+      float p2w,
       float p3x,
       float p3y,
-	  float p3w,
+      float p3w,
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
@@ -2408,75 +2408,75 @@ void rsx_gl_push_quad(
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
    switch (blend_mode) {
-   case -1:
-      semi_transparent = false;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 0:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Average;
-      break;
-   case 1:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 2:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-      break;
-   case 3:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-      break;
-   default:
-      exit(EXIT_FAILURE);
+      case -1:
+         semi_transparent = false;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 0:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Average;
+         break;
+      case 1:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 2:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
+         break;
+      case 3:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
+         break;
+      default:
+         exit(EXIT_FAILURE);
    }
 
    CommandVertex v[4] =
    {
       {
-          {p0x, p0y, 0.95, p0w},   /* position */
-          {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
-          {t0x, t0y},   /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p0x, p0y, 0.95, p0w},   /* position */
+         {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+         {t0x, t0y},   /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
       {
-          {p1x, p1y, 0.95, p1w }, /* position */
-          {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
-          {t1x, t1y}, /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p1x, p1y, 0.95, p1w }, /* position */
+         {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+         {t1x, t1y}, /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
       {
-          {p2x, p2y, 0.95, p2w }, /* position */
-          {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
-          {t2x, t2y}, /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p2x, p2y, 0.95, p2w }, /* position */
+         {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
+         {t2x, t2y}, /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
       {
-          {p3x, p3y, 0.95, p3w }, /* position */
-          {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
-          {t3x, t3y}, /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p3x, p3y, 0.95, p3w }, /* position */
+         {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
+         {t3x, t3y}, /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
    };
 
@@ -2517,15 +2517,15 @@ void rsx_gl_push_quad(
 }
 
 void rsx_gl_push_triangle(
-	  float p0x,
-	  float p0y,
-	  float p0w,
-	  float p1x,
+      float p0x,
+      float p0y,
+      float p0w,
+      float p1x,
       float p1y,
-	  float p1w,
+      float p1w,
       float p2x,
       float p2y,
-	  float p2w,
+      float p2w,
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
@@ -2547,64 +2547,64 @@ void rsx_gl_push_triangle(
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
    switch (blend_mode) {
-   case -1:
-      semi_transparent = false;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 0:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Average;
-      break;
-   case 1:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_Add;
-      break;
-   case 2:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-      break;
-   case 3:
-      semi_transparent = true;
-      semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-      break;
-   default:
-      exit(EXIT_FAILURE);
+      case -1:
+         semi_transparent = false;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 0:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Average;
+         break;
+      case 1:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_Add;
+         break;
+      case 2:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
+         break;
+      case 3:
+         semi_transparent = true;
+         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
+         break;
+      default:
+         exit(EXIT_FAILURE);
    }
 
    CommandVertex v[3] =
    {
       {
-          {p0x, p0y, 0.95, p0w},   /* position */
-          {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
-          {t0x, t0y},   /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p0x, p0y, 0.95, p0w},   /* position */
+         {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+         {t0x, t0y},   /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
       {
-          {p1x, p1y, 0.95, p1w }, /* position */
-          {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
-          {t1x, t1y}, /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p1x, p1y, 0.95, p1w }, /* position */
+         {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+         {t1x, t1y}, /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       },
       {
-          {p2x, p2y, 0.95, p2w }, /* position */
-          {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
-          {t2x, t2y}, /* texture_coord */
-          {texpage_x, texpage_y},
-          {clut_x, clut_y},
-          texture_blend_mode,
-          depth_shift,
-          (uint8_t) dither,
-          semi_transparent,
+         {p2x, p2y, 0.95, p2w }, /* position */
+         {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
+         {t2x, t2y}, /* texture_coord */
+         {texpage_x, texpage_y},
+         {clut_x, clut_y},
+         texture_blend_mode,
+         depth_shift,
+         (uint8_t) dither,
+         semi_transparent,
       }
    };
 
@@ -2669,7 +2669,7 @@ void rsx_gl_fill_rect(uint32_t color,
             doCleanFrame = false;
          }
 
-	 glDeleteFramebuffers(1, &_fb.id);
+         glDeleteFramebuffers(1, &_fb.id);
       }
 
       // Reconfigure the draw area
@@ -2689,83 +2689,83 @@ void rsx_gl_copy_rect(
       uint16_t w, uint16_t h)
 {
 
-    if (static_renderer.state == GlState_Valid)
-    {
-       GlRenderer *renderer        = static_renderer.state_data;
-       uint16_t source_top_left[2] = {src_x, src_y};
-       uint16_t target_top_left[2] = {dst_x, dst_y};
-       uint16_t dimensions[2]      = {w, h};
+   if (static_renderer.state == GlState_Valid)
+   {
+      GlRenderer *renderer        = static_renderer.state_data;
+      uint16_t source_top_left[2] = {src_x, src_y};
+      uint16_t target_top_left[2] = {dst_x, dst_y};
+      uint16_t dimensions[2]      = {w, h};
 
-       /* Draw pending commands */
-       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      /* Draw pending commands */
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          GlRenderer_draw(renderer);
 
-       uint32_t upscale = renderer->internal_upscaling;
+      uint32_t upscale = renderer->internal_upscaling;
 
-       GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
-       GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
-       GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
-       GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
+      GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
+      GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
+      GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
+      GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
 
-       GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
-       GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
+      GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
+      GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
 #ifdef NEW_COPY_RECT
-       /* TODO/FIXME - buggy code!
-        *
-        * Dead or Alive/Tekken 3 (high-res interlaced game) has screen
-        * flickering issues with this code! */
+      /* TODO/FIXME - buggy code!
+       *
+       * Dead or Alive/Tekken 3 (high-res interlaced game) has screen
+       * flickering issues with this code! */
 
-       // The diagonal is duplicated. I originally used "1, 2, 1, 2" to
-       // duplicate the diagonal but I believe it was incorrect because of
-       // the OpenGL filling convention. At least it's what TinyTiger told
-       // me...
+      // The diagonal is duplicated. I originally used "1, 2, 1, 2" to
+      // duplicate the diagonal but I believe it was incorrect because of
+      // the OpenGL filling convention. At least it's what TinyTiger told
+      // me...
 
-       GLuint fb;
+      GLuint fb;
 
-       glGenFramebuffers(1, &fb);
-       glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
-       glFramebufferTexture(GL_READ_FRAMEBUFFER,
-             GL_COLOR_ATTACHMENT0,
-             renderer->fb_out.id,
-             0);
+      glGenFramebuffers(1, &fb);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
+      glFramebufferTexture(GL_READ_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            renderer->fb_out.id,
+            0);
 
-       glReadBuffer(GL_COLOR_ATTACHMENT0);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
 
-       // Can I bind the same texture to the framebuffer and
-       // GL_TEXTURE_2D? Something tells me this is undefined
-       // behaviour. I could use glReadPixels and glWritePixels instead
-       // or something like that.
-       glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+      // Can I bind the same texture to the framebuffer and
+      // GL_TEXTURE_2D? Something tells me this is undefined
+      // behaviour. I could use glReadPixels and glWritePixels instead
+      // or something like that.
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
-       glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
+      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
 
-       glDeleteFramebuffers(1, &fb);
+      glDeleteFramebuffers(1, &fb);
 #else
 
-       // The diagonal is duplicated
+      // The diagonal is duplicated
 
-       // XXX CopyImageSubData gives undefined results if the source
-       // and target area overlap, this should be handled
-       // explicitely
-       /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-       glCopyImageSubData( renderer->fb_out.id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
-             renderer->fb_out.id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
-             w, h, 1 );
+      // XXX CopyImageSubData gives undefined results if the source
+      // and target area overlap, this should be handled
+      // explicitely
+      /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
+      glCopyImageSubData( renderer->fb_out.id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
+            renderer->fb_out.id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
+            w, h, 1 );
 #endif
 
-       get_error("rsx_gl_copy_rect");
-    }
+      get_error("rsx_gl_copy_rect");
+   }
 }
 
 void rsx_gl_push_line(int16_t p0x,
-		      int16_t p0y,
-		      int16_t p1x,
-		      int16_t p1y,
-		      uint32_t c0,
-		      uint32_t c1,
-		      bool dither,
-		      int blend_mode)
+      int16_t p0y,
+      int16_t p1x,
+      int16_t p1y,
+      uint32_t c0,
+      uint32_t c1,
+      bool dither,
+      int blend_mode)
 {
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
@@ -2802,28 +2802,28 @@ void rsx_gl_push_line(int16_t p0x,
       GlRenderer *renderer = static_renderer.state_data;
 
       CommandVertex v[2] = {
-	      {
-		      {(float)p0x, (float)p0y, 0., 1.0}, /* position */
-		      {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
-		      {0, 0}, /* texture_coord */
-		      {0, 0}, /* texture_page */
-		      {0, 0}, /* clut */
-		      0,      /* texture_blend_mode */
-		      0,      /* depth_shift */
-		      (uint8_t) dither,
-		      semi_transparent,
-	      },
-	      {
-		      {(float)p1x, (float)p1y, 0., 1.0}, /* position */
-		      {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
-		      {0, 0}, /* texture_coord */
-		      {0, 0}, /* texture_page */
-		      {0, 0}, /* clut */
-		      0,      /* texture_blend_mode */
-		      0,      /* depth_shift */
-		      (uint8_t) dither,
-		      semi_transparent,
-	      }
+         {
+            {(float)p0x, (float)p0y, 0., 1.0}, /* position */
+            {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+            {0, 0}, /* texture_coord */
+            {0, 0}, /* texture_page */
+            {0, 0}, /* clut */
+            0,      /* texture_blend_mode */
+            0,      /* depth_shift */
+            (uint8_t) dither,
+            semi_transparent,
+         },
+         {
+            {(float)p1x, (float)p1y, 0., 1.0}, /* position */
+            {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+            {0, 0}, /* texture_coord */
+            {0, 0}, /* texture_page */
+            {0, 0}, /* clut */
+            0,      /* texture_blend_mode */
+            0,      /* depth_shift */
+            (uint8_t) dither,
+            semi_transparent,
+         }
       };
       push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode);
    }
@@ -2879,10 +2879,10 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
       if (renderer->image_load_buffer->program)
       {
-	 glUseProgram(renderer->image_load_buffer->program->id);
-	 glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
+         glUseProgram(renderer->image_load_buffer->program->id);
+         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
          /* fb_texture is always at 1x */
-	 glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
       }
 
 
