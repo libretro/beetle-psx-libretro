@@ -236,7 +236,351 @@ struct DrawBuffer
    size_t map_start;
 };
 
-   template<typename T>
+
+struct GlRenderer {
+   /* Buffer used to handle PlayStation GPU draw commands */
+   DrawBuffer<CommandVertex>* command_buffer;
+   /* Buffer used to draw to the frontend's framebuffer */
+   DrawBuffer<OutputVertex>* output_buffer;
+   /* Buffer used to copy textures from `fb_texture` to `fb_out` */
+   DrawBuffer<ImageLoadVertex>* image_load_buffer;
+
+   GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
+   GLushort opaque_line_indices[INDEX_BUFFER_LEN];
+   GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
+   /* Primitive type for the vertices in the command buffers
+    * (TRIANGLES or LINES) */
+   GLenum command_draw_mode;
+   unsigned opaque_triangle_index_pos;
+   unsigned opaque_line_index_pos;
+   unsigned semi_transparent_index_pos;
+   /* Current semi-transparency mode */
+   SemiTransparencyMode semi_transparency_mode;
+   std::vector<TransparencyIndex> transparency_mode_index;
+   /* Polygon mode (for wireframe) */
+   GLenum command_polygon_mode;
+   /* Texture used to store the VRAM for texture mapping */
+   DrawConfig config;
+   /* Framebuffer used as a shader input for texturing draw commands */
+   Texture fb_texture;
+   /* Framebuffer used as an output when running draw commands */
+   Texture fb_out;
+   /* Depth buffer for fb_out */
+   Texture fb_out_depth;
+   /* Current resolution of the frontend's framebuffer */
+   uint32_t frontend_resolution[2];
+   /* Current internal resolution upscaling factor */
+   uint32_t internal_upscaling;
+   /* Current internal color depth */
+   uint8_t internal_color_depth;
+   /* Counter for preserving primitive draw order in the z-buffer
+    * since we draw semi-transparent primitives out-of-order. */
+   int16_t primitive_ordering;
+   /* Texture window mask/OR values */
+   uint8_t tex_x_mask;
+   uint8_t tex_x_or;
+   uint8_t tex_y_mask;
+   uint8_t tex_y_or;
+
+   uint32_t mask_set_or;
+   uint32_t mask_eval_and;
+
+   uint8_t filter_type;
+
+   /* When true we display the entire VRAM buffer instead of just
+    * the visible area */
+   bool display_vram;
+};
+
+struct RetroGl
+{
+   GlRenderer *state_data;
+   GlState state;
+   VideoClock video_clock;
+   bool inited;
+};
+
+static DrawConfig persistent_config = {
+   {0, 0},         /* display_top_left */
+   {1024, 512},    /* display_resolution */
+   false,          /* display_24bpp */
+   true,           /* display_off */
+   {0, 0},         /* draw_area_top_left */
+   {0, 0},         /* draw_area_dimensions */
+   {0, 0},         /* draw_offset */
+};
+
+/* This was originally in rustation-libretro/lib.rs */
+retro_system_av_info get_av_info(VideoClock std);
+
+static RetroGl static_renderer;
+
+
+static bool has_software_fb = false;
+
+extern "C" unsigned char widescreen_hack;
+
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+   extern retro_environment_t environ_cb;
+   extern retro_video_refresh_t video_cb;
+#ifdef __cplusplus
+}
+#endif
+
+
+static void get_error(const char *msg)
+{
+   GLenum error = glGetError();
+   switch (error)
+   {
+      case GL_NO_ERROR:
+#if 0
+         puts("GL error flag: GL_NO_ERROR\n");
+#endif
+         return;
+      case GL_INVALID_ENUM:
+         printf("GL error flag: GL_INVALID_ENUM [%s]\n", msg);
+         break;
+      case GL_INVALID_VALUE:
+         printf("GL error flag: GL_INVALID_VALUE [%s]\n", msg);
+         break;
+      case GL_INVALID_FRAMEBUFFER_OPERATION:
+         printf("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION [%s]\n", msg);
+         break;
+      case GL_OUT_OF_MEMORY:
+         printf("GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
+         break;
+      case GL_STACK_UNDERFLOW:
+         printf("GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
+         break;
+      case GL_STACK_OVERFLOW:
+         printf("GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
+         break;
+      case GL_INVALID_OPERATION:
+         printf("GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
+         break;
+      default:
+         printf("GL error flag: %d\n", (int) error);
+         break;
+   }
+
+   assert(error == GL_NO_ERROR);
+}
+
+static bool Shader_init(
+      struct Shader *shader,
+      const char* source,
+      GLenum shader_type)
+{
+   GLint status;
+   GLint log_len = 0;
+   GLuint id;
+
+   shader->info_log = NULL;
+   id               = glCreateShader(shader_type);
+
+   if (id == 0)
+   {
+      puts("An error occured creating the shader object\n");
+      return false;
+   }
+
+   glShaderSource( id,
+         1,
+         &source,
+         NULL);
+   glCompileShader(id);
+
+   status = (GLint) GL_FALSE;
+   glGetShaderiv(id, GL_COMPILE_STATUS, &status);
+   glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_len);
+
+   if (log_len > 0)
+   {
+      GLsizei len;
+
+      shader->info_log = (char*)malloc(log_len);
+      len              = (GLsizei) log_len;
+
+      glGetShaderInfoLog(id,
+            len,
+            &log_len,
+            (char*)shader->info_log);
+
+      if (log_len > 0)
+         shader->info_log[log_len - 1] = '\0';
+   }
+
+   if (status != (GLint) GL_TRUE)
+   {
+      puts("Shader compilation failed:\n");
+
+      /* print shader source */
+      puts( source );
+
+      puts("Shader info log:\n");
+      puts(shader->info_log);
+
+      return false;
+   }
+
+   shader->id = id;
+
+   return true;
+}
+
+static void Shader_free(struct Shader *shader)
+{
+   if (shader)
+   {
+      glDeleteShader(shader->id);
+      if (shader->info_log)
+         free(shader->info_log);
+   }
+}
+
+static void get_program_info_log(Program *pg, GLuint id)
+{
+   GLsizei len;
+   GLint log_len = 0;
+
+   glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
+
+   if (log_len <= 0)
+      return;
+
+   pg->info_log = (char*)malloc(log_len);
+   len          = (GLsizei) log_len;
+
+   glGetProgramInfoLog(id,
+         len,
+         &log_len,
+         (char*)pg->info_log);
+
+   if (log_len <= 0)
+      return;
+
+   pg->info_log[log_len - 1] = '\0';
+}
+
+static UniformMap load_program_uniforms(GLuint program)
+{
+   size_t u;
+   UniformMap uniforms;
+   /* Figure out how long a uniform name can be */
+   GLint max_name_len = 0;
+   GLint n_uniforms   = 0;
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORMS,
+         &n_uniforms );
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORM_MAX_LENGTH,
+         &max_name_len);
+
+   for (u = 0; u < n_uniforms; ++u)
+   {
+      char name[256];
+      size_t name_len = max_name_len;
+      GLsizei len     = 0;
+      GLint size      = 0;
+      GLenum ty       = 0;
+
+      glGetActiveUniform( program,
+            (GLuint) u,
+            (GLsizei) name_len,
+            &len,
+            &size,
+            &ty,
+            (char*) name);
+
+      if (len <= 0)
+      {
+         printf("Ignoring uniform name with size %d\n", len);
+         continue;
+      }
+
+      /* Retrieve the location of this uniform */
+      GLint location = glGetUniformLocation(program, (const char*) name);
+
+      if (location < 0)
+      {
+         printf("Uniform \"%s\" doesn't have a location", name);
+         continue;
+      }
+
+      uniforms[name] = location;
+   }
+
+   return uniforms;
+}
+
+
+static bool Program_init(
+      Program *program,
+      Shader* vertex_shader,
+      Shader* fragment_shader)
+{
+   GLint status;
+   GLuint id;
+
+   program->info_log = NULL;
+
+   id                = glCreateProgram();
+
+   if (id == 0)
+   {
+      puts("An error occured creating the program object\n");
+      return false;
+   }
+
+   glAttachShader(id, vertex_shader->id);
+   glAttachShader(id, fragment_shader->id);
+
+   glLinkProgram(id);
+
+   glDetachShader(id, vertex_shader->id);
+   glDetachShader(id, fragment_shader->id);
+
+   /* Check if the program linking was successful */
+   status = (GLint) GL_FALSE;
+   glGetProgramiv(id, GL_LINK_STATUS, &status);
+   get_program_info_log(program, id);
+
+   if (status != (GLint) GL_TRUE)
+   {
+      puts("OpenGL program linking failed\n");
+      puts("Program info log:\n");
+      puts(program->info_log );
+
+      return false;
+   }
+
+   UniformMap uniforms = load_program_uniforms(id);
+
+   program->id       = id;
+   program->uniforms = uniforms;
+
+   return true;
+}
+
+static void Program_free(Program *program)
+{
+   if (!program)
+      return;
+
+   if (glIsProgram(program->id))
+      glDeleteProgram(program->id);
+   if (program->info_log)
+      free(program->info_log);
+}
+
+template<typename T>
 static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
 {
    GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
@@ -435,10 +779,23 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 }
 
    template<typename T>
-static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* program)
+static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, 
+      const char *vertex_shader, const char *fragment_shader, size_t capacity)
 {
    GLuint id = 0;
    size_t element_size = sizeof(T);
+   Shader vs, fs;
+   Program* program    = new Program;
+
+   Shader_init(&vs, vertex_shader, GL_VERTEX_SHADER);
+   Shader_init(&fs, fragment_shader, GL_FRAGMENT_SHADER);
+
+   if (!Program_init(program, &vs, &fs))
+      return;
+
+   /* Program owns the two pointers, so we clean them up now */
+   Shader_free(&fs);
+   Shader_free(&vs);
 
    glGenVertexArrays(1, &id);
 
@@ -475,140 +832,6 @@ static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* 
    DrawBuffer_map__no_bind(drawbuffer);
 }
 
-struct GlRenderer {
-   /* Buffer used to handle PlayStation GPU draw commands */
-   DrawBuffer<CommandVertex>* command_buffer;
-   /* Buffer used to draw to the frontend's framebuffer */
-   DrawBuffer<OutputVertex>* output_buffer;
-   /* Buffer used to copy textures from `fb_texture` to `fb_out` */
-   DrawBuffer<ImageLoadVertex>* image_load_buffer;
-
-   GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
-   GLushort opaque_line_indices[INDEX_BUFFER_LEN];
-   GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
-   /* Primitive type for the vertices in the command buffers
-    * (TRIANGLES or LINES) */
-   GLenum command_draw_mode;
-   unsigned opaque_triangle_index_pos;
-   unsigned opaque_line_index_pos;
-   unsigned semi_transparent_index_pos;
-   /* Current semi-transparency mode */
-   SemiTransparencyMode semi_transparency_mode;
-   std::vector<TransparencyIndex> transparency_mode_index;
-   /* Polygon mode (for wireframe) */
-   GLenum command_polygon_mode;
-   /* Texture used to store the VRAM for texture mapping */
-   DrawConfig config;
-   /* Framebuffer used as a shader input for texturing draw commands */
-   Texture fb_texture;
-   /* Framebuffer used as an output when running draw commands */
-   Texture fb_out;
-   /* Depth buffer for fb_out */
-   Texture fb_out_depth;
-   /* Current resolution of the frontend's framebuffer */
-   uint32_t frontend_resolution[2];
-   /* Current internal resolution upscaling factor */
-   uint32_t internal_upscaling;
-   /* Current internal color depth */
-   uint8_t internal_color_depth;
-   /* Counter for preserving primitive draw order in the z-buffer
-    * since we draw semi-transparent primitives out-of-order. */
-   int16_t primitive_ordering;
-   /* Texture window mask/OR values */
-   uint8_t tex_x_mask;
-   uint8_t tex_x_or;
-   uint8_t tex_y_mask;
-   uint8_t tex_y_or;
-
-   uint32_t mask_set_or;
-   uint32_t mask_eval_and;
-
-   uint8_t filter_type;
-
-   /* When true we display the entire VRAM buffer instead of just
-    * the visible area */
-   bool display_vram;
-};
-
-struct RetroGl
-{
-   GlRenderer *state_data;
-   GlState state;
-   VideoClock video_clock;
-   bool inited;
-};
-
-static DrawConfig persistent_config = {
-   {0, 0},         /* display_top_left */
-   {1024, 512},    /* display_resolution */
-   false,          /* display_24bpp */
-   true,           /* display_off */
-   {0, 0},         /* draw_area_top_left */
-   {0, 0},         /* draw_area_dimensions */
-   {0, 0},         /* draw_offset */
-};
-
-/* This was originally in rustation-libretro/lib.rs */
-retro_system_av_info get_av_info(VideoClock std);
-
-static RetroGl static_renderer;
-
-
-static bool has_software_fb = false;
-
-extern "C" unsigned char widescreen_hack;
-
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-   extern retro_environment_t environ_cb;
-   extern retro_video_refresh_t video_cb;
-#ifdef __cplusplus
-}
-#endif
-
-
-static void get_error(const char *msg)
-{
-   GLenum error = glGetError();
-   switch (error)
-   {
-      case GL_NO_ERROR:
-#if 0
-         puts("GL error flag: GL_NO_ERROR\n");
-#endif
-         return;
-      case GL_INVALID_ENUM:
-         printf("GL error flag: GL_INVALID_ENUM [%s]\n", msg);
-         break;
-      case GL_INVALID_VALUE:
-         printf("GL error flag: GL_INVALID_VALUE [%s]\n", msg);
-         break;
-      case GL_INVALID_FRAMEBUFFER_OPERATION:
-         printf("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION [%s]\n", msg);
-         break;
-      case GL_OUT_OF_MEMORY:
-         printf("GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
-         break;
-      case GL_STACK_UNDERFLOW:
-         printf("GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
-         break;
-      case GL_STACK_OVERFLOW:
-         printf("GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
-         break;
-      case GL_INVALID_OPERATION:
-         printf("GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
-         break;
-      default:
-         printf("GL error flag: %d\n", (int) error);
-         break;
-   }
-
-   assert(error == GL_NO_ERROR);
-}
-
 static void Framebuffer_init(struct Framebuffer *fb,
       struct Texture* color_texture)
 {
@@ -635,215 +858,6 @@ static void Framebuffer_init(struct Framebuffer *fb,
          (GLsizei) color_texture->width,
          (GLsizei) color_texture->height);
 }
-
-static bool Shader_init(
-      struct Shader *shader,
-      const char* source,
-      GLenum shader_type)
-{
-   GLint status;
-   GLint log_len = 0;
-   GLuint id;
-
-   shader->info_log = NULL;
-   id               = glCreateShader(shader_type);
-
-   if (id == 0)
-   {
-      puts("An error occured creating the shader object\n");
-      return false;
-   }
-
-   glShaderSource( id,
-         1,
-         &source,
-         NULL);
-   glCompileShader(id);
-
-   status = (GLint) GL_FALSE;
-   glGetShaderiv(id, GL_COMPILE_STATUS, &status);
-   glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_len);
-
-   if (log_len > 0)
-   {
-      GLsizei len;
-
-      shader->info_log = (char*)malloc(log_len);
-      len              = (GLsizei) log_len;
-
-      glGetShaderInfoLog(id,
-            len,
-            &log_len,
-            (char*)shader->info_log);
-
-      if (log_len > 0)
-         shader->info_log[log_len - 1] = '\0';
-   }
-
-   if (status != (GLint) GL_TRUE)
-   {
-      puts("Shader compilation failed:\n");
-
-      /* print shader source */
-      puts( source );
-
-      puts("Shader info log:\n");
-      puts(shader->info_log);
-
-      return false;
-   }
-
-   shader->id = id;
-
-   return true;
-}
-
-static void Shader_free(struct Shader *shader)
-{
-   if (shader)
-   {
-      glDeleteShader(shader->id);
-      if (shader->info_log)
-         free(shader->info_log);
-   }
-}
-
-static UniformMap load_program_uniforms(GLuint program)
-{
-   size_t u;
-   UniformMap uniforms;
-   /* Figure out how long a uniform name can be */
-   GLint max_name_len = 0;
-   GLint n_uniforms   = 0;
-
-   glGetProgramiv( program,
-         GL_ACTIVE_UNIFORMS,
-         &n_uniforms );
-
-   glGetProgramiv( program,
-         GL_ACTIVE_UNIFORM_MAX_LENGTH,
-         &max_name_len);
-
-   for (u = 0; u < n_uniforms; ++u)
-   {
-      char name[256];
-      size_t name_len = max_name_len;
-      GLsizei len     = 0;
-      GLint size      = 0;
-      GLenum ty       = 0;
-
-      glGetActiveUniform( program,
-            (GLuint) u,
-            (GLsizei) name_len,
-            &len,
-            &size,
-            &ty,
-            (char*) name);
-
-      if (len <= 0)
-      {
-         printf("Ignoring uniform name with size %d\n", len);
-         continue;
-      }
-
-      /* Retrieve the location of this uniform */
-      GLint location = glGetUniformLocation(program, (const char*) name);
-
-      if (location < 0)
-      {
-         printf("Uniform \"%s\" doesn't have a location", name);
-         continue;
-      }
-
-      uniforms[name] = location;
-   }
-
-   return uniforms;
-}
-
-static void get_program_info_log(Program *pg, GLuint id)
-{
-   GLsizei len;
-   GLint log_len = 0;
-
-   glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_len);
-
-   if (log_len <= 0)
-      return;
-
-   pg->info_log = (char*)malloc(log_len);
-   len          = (GLsizei) log_len;
-
-   glGetProgramInfoLog(id,
-         len,
-         &log_len,
-         (char*)pg->info_log);
-
-   if (log_len <= 0)
-      return;
-
-   pg->info_log[log_len - 1] = '\0';
-}
-
-static bool Program_init(
-      Program *program,
-      Shader* vertex_shader,
-      Shader* fragment_shader)
-{
-   GLint status;
-   GLuint id;
-
-   program->info_log = NULL;
-
-   id                = glCreateProgram();
-
-   if (id == 0)
-   {
-      puts("An error occured creating the program object\n");
-      return false;
-   }
-
-   glAttachShader(id, vertex_shader->id);
-   glAttachShader(id, fragment_shader->id);
-
-   glLinkProgram(id);
-
-   glDetachShader(id, vertex_shader->id);
-   glDetachShader(id, fragment_shader->id);
-
-   /* Check if the program linking was successful */
-   status = (GLint) GL_FALSE;
-   glGetProgramiv(id, GL_LINK_STATUS, &status);
-   get_program_info_log(program, id);
-
-   if (status != (GLint) GL_TRUE)
-   {
-      puts("OpenGL program linking failed\n");
-      puts("Program info log:\n");
-      puts(program->info_log );
-
-      return false;
-   }
-
-   UniformMap uniforms = load_program_uniforms(id);
-
-   program->id       = id;
-   program->uniforms = uniforms;
-
-   return true;
-}
-
-static void Program_free(Program *program)
-{
-   if (!program)
-      return;
-
-   if (glIsProgram(program->id))
-      glDeleteProgram(program->id);
-   if (program->info_log)
-      free(program->info_log);
-}
-
 
 
 static void Texture_init(
@@ -918,23 +932,7 @@ static DrawBuffer<T>* DrawBuffer_build( const char* vertex_shader,
       size_t capacity)
 {
    DrawBuffer<T> *t = new DrawBuffer<T>;
-   Shader       *vs = new Shader;
-   Shader       *fs = new Shader;
-
-   Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
-   Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
-   Program* program = new Program;
-
-   if (!Program_init(program, vs, fs))
-      return NULL;
-
-   /* Program owns the two pointers, so we clean them up now */
-   Shader_free(fs);
-   Shader_free(vs);
-   delete vs;
-   delete fs;
-
-   DrawBuffer_new<T>(t, capacity, program);
+   DrawBuffer_new<T>(t, vertex_shader, fragment_shader, capacity);
 
    return t;
 }
