@@ -388,7 +388,7 @@ static bool Shader_init(
 
    if (id == 0)
    {
-      puts("An error occured creating the shader object\n");
+      log_cb(RETRO_LOG_ERROR, "An error occured creating the shader object\n");
       return false;
    }
 
@@ -420,7 +420,7 @@ static bool Shader_init(
 
    if (status != (GLint) GL_TRUE)
    {
-      puts("Shader compilation failed:\n");
+      log_cb(RETRO_LOG_ERROR, "Shader compilation failed:\n");
 
       /* print shader source */
       puts( source );
@@ -1918,7 +1918,7 @@ static void cleanup_gl_state(void)
 
 static void gl_context_reset(void)
 {
-   puts("OpenGL context reset\n");
+   log_cb(RETRO_LOG_INFO, "gl_context_reset called.\n");
    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
@@ -1936,6 +1936,8 @@ static void gl_context_reset(void)
 static void gl_context_destroy(void)
 {
    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
+
+   log_cb(RETRO_LOG_INFO, "gl_context_destroy called.\n");
 
    if (static_renderer.state_data)
    {
