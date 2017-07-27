@@ -2085,7 +2085,6 @@ void rsx_gl_refresh_variables(void)
 
    bool reconfigure_frontend = retro_refresh_variables(renderer);
 
-#if 1
    if (reconfigure_frontend)
    {
       // The resolution has changed, we must tell the frontend
@@ -2104,7 +2103,6 @@ void rsx_gl_refresh_variables(void)
          puts("Try resetting to enable the new configuration\n");
       }
    }
-#endif
 }
 
 bool rsx_gl_has_software_renderer(void)
