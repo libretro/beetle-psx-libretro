@@ -32,28 +32,28 @@
 #define GL_MAP_INVALIDATE_RANGE_BIT       0x000
 #endif
 
-#include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "shaders_gl/command_vertex.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
 #define FILTER_XBR
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
-#include "../rustation-libretro/src/shaders/command_vertex.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
+#include "shaders_gl/command_vertex.glsl.h"
 #undef FILTER_XBR
 #define FILTER_SABR
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
 #undef FILTER_SABR
 #define FILTER_BILINEAR
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
 #undef FILTER_BILINEAR
 #define FILTER_3POINT
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
 #undef FILTER_3POINT
 #define FILTER_JINC2
-#include "../rustation-libretro/src/shaders/command_fragment.glsl.h"
+#include "shaders_gl/command_fragment.glsl.h"
 #undef FILTER_JINC2
-#include "../rustation-libretro/src/shaders/output_vertex.glsl.h"
-#include "../rustation-libretro/src/shaders/output_fragment.glsl.h"
-#include "../rustation-libretro/src/shaders/image_load_vertex.glsl.h"
-#include "../rustation-libretro/src/shaders/image_load_fragment.glsl.h"
+#include "shaders_gl/output_vertex.glsl.h"
+#include "shaders_gl/output_fragment.glsl.h"
+#include "shaders_gl/image_load_vertex.glsl.h"
+#include "shaders_gl/image_load_fragment.glsl.h"
 
 #include "libretro.h"
 #include "libretro_options.h"
@@ -1669,7 +1669,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
         GlRenderer_upload_textures(renderer, top_left, dimensions,
 			      GPU_get_vram());
-
 
 	glDeleteTextures(1, &renderer->fb_out_depth.id);
 	renderer->fb_out_depth.id     = 0;
