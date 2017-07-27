@@ -718,7 +718,63 @@ static void Shader_free(struct Shader *shader)
    }
 }
 
-static UniformMap load_program_uniforms(GLuint program);
+static UniformMap load_program_uniforms(GLuint program)
+{
+   size_t u;
+   UniformMap uniforms;
+   // Figure out how long a uniform name can be
+   GLint max_name_len = 0;
+   GLint n_uniforms   = 0;
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORMS,
+         &n_uniforms );
+
+   glGetProgramiv( program,
+         GL_ACTIVE_UNIFORM_MAX_LENGTH,
+         &max_name_len);
+
+   for (u = 0; u < n_uniforms; ++u)
+   {
+      // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
+      char name[256];
+      size_t name_len = max_name_len;
+      GLsizei len     = 0;
+      /* XXX we might want to validate those at some point */
+      GLint size      = 0;
+      GLenum ty       = 0;
+
+      glGetActiveUniform( program,
+            (GLuint) u,
+            (GLsizei) name_len,
+            &len,
+            &size,
+            &ty,
+            (char*) name);
+
+      if (len <= 0)
+      {
+         printf("Ignoring uniform name with size %d\n", len);
+         continue;
+      }
+
+      // Retrieve the location of this uniform
+      GLint location = glGetUniformLocation(program, (const char*) name);
+
+      /* name.truncate(len as usize); */
+      /* name[len - 1] = '\0'; */
+
+      if (location < 0)
+      {
+         printf("Uniform \"%s\" doesn't have a location", name);
+         continue;
+      }
+
+      uniforms[name] = location;
+   }
+
+   return uniforms;
+}
 
 static void get_program_info_log(Program *pg, GLuint id)
 {
@@ -811,63 +867,6 @@ static void Program_free(Program *program)
 }
 
 
-static UniformMap load_program_uniforms(GLuint program)
-{
-   size_t u;
-   UniformMap uniforms;
-   // Figure out how long a uniform name can be
-   GLint max_name_len = 0;
-   GLint n_uniforms   = 0;
-
-   glGetProgramiv( program,
-         GL_ACTIVE_UNIFORMS,
-         &n_uniforms );
-
-   glGetProgramiv( program,
-         GL_ACTIVE_UNIFORM_MAX_LENGTH,
-         &max_name_len);
-
-   for (u = 0; u < n_uniforms; ++u)
-   {
-      // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
-      char name[256];
-      size_t name_len = max_name_len;
-      GLsizei len     = 0;
-      /* XXX we might want to validate those at some point */
-      GLint size      = 0;
-      GLenum ty       = 0;
-
-      glGetActiveUniform( program,
-            (GLuint) u,
-            (GLsizei) name_len,
-            &len,
-            &size,
-            &ty,
-            (char*) name);
-
-      if (len <= 0)
-      {
-         printf("Ignoring uniform name with size %d\n", len);
-         continue;
-      }
-
-      // Retrieve the location of this uniform
-      GLint location = glGetUniformLocation(program, (const char*) name);
-
-      /* name.truncate(len as usize); */
-      /* name[len - 1] = '\0'; */
-
-      if (location < 0)
-      {
-         printf("Uniform \"%s\" doesn't have a location", name);
-         continue;
-      }
-
-      uniforms[name] = location;
-   }
-
-   return uniforms;
-}
 
 static void Texture_init(
       struct Texture *tex,
