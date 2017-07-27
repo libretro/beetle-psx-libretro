@@ -2031,10 +2031,7 @@ bool rsx_gl_open(bool is_pal)
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
 
    if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) )
-   {
-      puts("Can't set pixel format\n");
       return false;
-   }
 
     /* glsm related setup */
     params.context_reset         = gl_context_reset;
@@ -2045,15 +2042,10 @@ bool rsx_gl_open(bool is_pal)
     params.imm_vbo_draw          = NULL;
     params.imm_vbo_disable       = NULL;
 
-    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
-        puts("Failed to init hardware context\n");
+    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) )
 	return false;
-    }
 
-    // No context until `context_reset` is called
-    static_renderer.state        = GlState_Invalid;
-    static_renderer.state_data   = NULL;
-
+    /* No context until `context_reset` is called */
     static_renderer.video_clock  = clock;
 
     return true;
@@ -2061,13 +2053,6 @@ bool rsx_gl_open(bool is_pal)
 
 void rsx_gl_close(void)
 {
-   if (static_renderer.state_data)
-   {
-      GlRenderer_free(static_renderer.state_data);
-      delete static_renderer.state_data;
-   }
-   static_renderer.state_data = NULL;
-
    static_renderer.state       = GlState_Invalid;
    static_renderer.video_clock = VideoClock_Ntsc;
 }
