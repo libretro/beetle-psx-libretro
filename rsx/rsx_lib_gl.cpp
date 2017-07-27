@@ -531,12 +531,9 @@ struct GlRenderer {
     bool display_vram;
 };
 
-struct RetroGl {
-    /*
-    Rust's enums members can contain data. To emulate that,
-    I'll use a helper struct to save the data.
-    */
-    GlRenderer* state_data;
+struct RetroGl
+{
+    GlRenderer *state_data;
     GlState state;
     VideoClock video_clock;
     bool inited;
@@ -1922,6 +1919,24 @@ std::vector<Attribute> ImageLoadVertex::attributes()
     return result;
 }
 
+static void cleanup_gl_state(void)
+{
+      /* Cleanup OpenGL context before returning to the frontend */
+      /* All of these GL calls are also done in glsm_ctl(UNBIND) */
+      glDisable(GL_BLEND);
+      glBlendColor(0.0, 0.0, 0.0, 0.0);
+      glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+      glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glUseProgram(0);
+      glBindVertexArray(0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      glLineWidth(1.0);
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+}
+
+
 static void gl_context_reset(void)
 {
     puts("OpenGL context reset\n");
@@ -1948,64 +1963,15 @@ static void gl_context_destroy(void)
        GlRenderer_free(static_renderer.state_data);
        delete static_renderer.state_data;
     }
+
     static_renderer.state_data = NULL;
-
-    if (static_renderer.inited)
-       static_renderer.state        = GlState_Invalid;
-
+    static_renderer.state      = GlState_Invalid;
     static_renderer.inited       = false;
 }
 
 static bool gl_context_framebuffer_lock(void* data)
 {
     return false;
-}
-
-static bool RetroGl_alloc(VideoClock video_clock)
-{
-    glsm_ctx_params_t params = {0};
-    retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
-
-    if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) )
-    {
-        puts("Can't set pixel format\n");
-	return false;
-    }
-
-    /* glsm related setup */
-    params.context_reset         = gl_context_reset;
-    params.context_destroy       = gl_context_destroy;
-    params.framebuffer_lock      = gl_context_framebuffer_lock;
-    params.environ_cb            = environ_cb;
-    params.stencil               = false;
-    params.imm_vbo_draw          = NULL;
-    params.imm_vbo_disable       = NULL;
-
-    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
-        puts("Failed to init hardware context\n");
-	return false;
-    }
-
-    // No context until `context_reset` is called
-    static_renderer.state        = GlState_Invalid;
-    static_renderer.state_data   = NULL;
-
-    static_renderer.video_clock  = video_clock;
-
-    return true;
-}
-
-static void RetroGl_free(void)
-{
-    if (static_renderer.state_data)
-    {
-	GlRenderer_free(static_renderer.state_data);
-        delete static_renderer.state_data;
-    }
-    static_renderer.state_data = NULL;
-
-    static_renderer.state       = GlState_Invalid;
-    static_renderer.video_clock = VideoClock_Ntsc;
 }
 
 struct retro_system_av_info get_av_info(VideoClock std)
@@ -2102,13 +2068,50 @@ void rsx_gl_init(void)
 
 bool rsx_gl_open(bool is_pal)
 {
+   glsm_ctx_params_t params = {0};
+   retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
-   return RetroGl_alloc(clock);
+
+   if ( !environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f) )
+   {
+      puts("Can't set pixel format\n");
+      return false;
+   }
+
+    /* glsm related setup */
+    params.context_reset         = gl_context_reset;
+    params.context_destroy       = gl_context_destroy;
+    params.framebuffer_lock      = gl_context_framebuffer_lock;
+    params.environ_cb            = environ_cb;
+    params.stencil               = false;
+    params.imm_vbo_draw          = NULL;
+    params.imm_vbo_disable       = NULL;
+
+    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) ) {
+        puts("Failed to init hardware context\n");
+	return false;
+    }
+
+    // No context until `context_reset` is called
+    static_renderer.state        = GlState_Invalid;
+    static_renderer.state_data   = NULL;
+
+    static_renderer.video_clock  = clock;
+
+    return true;
 }
 
 void rsx_gl_close(void)
 {
-   RetroGl_free();
+   if (static_renderer.state_data)
+   {
+      GlRenderer_free(static_renderer.state_data);
+      delete static_renderer.state_data;
+   }
+   static_renderer.state_data = NULL;
+
+   static_renderer.state       = GlState_Invalid;
+   static_renderer.video_clock = VideoClock_Ntsc;
 }
 
 void rsx_gl_refresh_variables(void)
@@ -2129,7 +2132,7 @@ void rsx_gl_refresh_variables(void)
 
     bool reconfigure_frontend = retro_refresh_variables(renderer);
 
-#if 0
+#if 1
     if (reconfigure_frontend)
     {
         // The resolution has changed, we must tell the frontend
@@ -2304,19 +2307,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 	 glDeleteFramebuffers(1, &_fb.id);
       }
 
-      // Cleanup OpenGL context before returning to the frontend
-      /* All of these GL calls are also done in glsm_ctl(UNBIND) */
-      glDisable(GL_BLEND);
-      glBlendColor(0.0, 0.0, 0.0, 0.0);
-      glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-      glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, 0);
-      glUseProgram(0);
-      glBindVertexArray(0);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      glLineWidth(1.0);
-      glClearColor(0.0, 0.0, 0.0, 0.0);
+      cleanup_gl_state();
 
       // When using a hardware renderer we set the data pointer to
       // -1 to notify the frontend that the frame has been rendered
