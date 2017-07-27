@@ -569,14 +569,6 @@ static bool Program_init(
    program->id       = id;
    program->uniforms = uniforms;
 
-   log_cb(RETRO_LOG_INFO, "Binding program for first time: %d\n", id);
-
-   glUseProgram(id);
-
-   log_cb(RETRO_LOG_INFO, "Unbinding program for first time: %d\n", id);
-
-   glUseProgram(0);
-
    return true;
 }
 
