@@ -954,10 +954,11 @@ static void GlRenderer_draw(GlRenderer *renderer)
    y = renderer->config.draw_offset[1];
 
    if (renderer->command_buffer->program)
-   {
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
 
+   if (renderer->command_buffer->program)
+   {
+      glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
       /* We use texture unit 0 */
       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
    }
@@ -977,13 +978,9 @@ static void GlRenderer_draw(GlRenderer *renderer)
    glDisable(GL_BLEND);
 
    if (renderer->command_buffer->program)
-   {
-      glUseProgram(renderer->command_buffer->program->id);
       glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 0);
-   }
 
    glBindVertexArray(renderer->command_buffer->vao);
-   glUseProgram(renderer->command_buffer->program->id);
 
    /* I don't need to bind this to draw (it's captured by the
     * VAO) but I need it to map/unmap the storage. */
@@ -1045,10 +1042,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
       glEnable(GL_BLEND);
 
       if (renderer->command_buffer->program)
-      {
-         glUseProgram(renderer->command_buffer->program->id);
          glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 1);
-      }
 
       unsigned cur_index = 0;
 
