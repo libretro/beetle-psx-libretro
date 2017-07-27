@@ -2727,7 +2727,7 @@ void rsx_gl_copy_rect(
        glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
        glFramebufferTexture(GL_READ_FRAMEBUFFER,
              GL_COLOR_ATTACHMENT0,
-             renderer->fb_out->id,
+             renderer->fb_out.id,
              0);
 
        glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -2736,7 +2736,7 @@ void rsx_gl_copy_rect(
        // GL_TEXTURE_2D? Something tells me this is undefined
        // behaviour. I could use glReadPixels and glWritePixels instead
        // or something like that.
-       glBindTexture(GL_TEXTURE_2D, renderer->fb_out->id);
+       glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
 
