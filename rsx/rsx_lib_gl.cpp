@@ -287,7 +287,6 @@ static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
    /* I don't need to bind this to draw (it's captured by the
     * VAO) but I need it to map/unmap the storage. */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
-
    /* Unmap the active buffer */
    glUnmapBuffer(GL_ARRAY_BUFFER);
 
@@ -300,19 +299,6 @@ static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
    drawbuffer->map_index  = 0;
 
    DrawBuffer_map__no_bind(drawbuffer);
-}
-
-/* Unmap the active buffer */
-   template<typename T>
-static void DrawBuffer_unmap__no_bind(DrawBuffer<T> *drawbuffer)
-{
-   assert(drawbuffer->map != NULL);
-
-   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
-
-   glUnmapBuffer(GL_ARRAY_BUFFER);
-
-   drawbuffer->map = NULL;
 }
 
 /* Map the buffer for write-only access */
@@ -351,18 +337,27 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
    drawbuffer->map = reinterpret_cast<T *>(m);
 }
 
-   template<typename T>
+template<typename T>
 static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
 {
    if (!drawbuffer)
       return;
 
+   /* Unmap the active buffer */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+   glUnmapBuffer(GL_ARRAY_BUFFER);
 
-   DrawBuffer_unmap__no_bind(drawbuffer);
-
+   Program_free(drawbuffer->program);
    glDeleteBuffers(1, &drawbuffer->id);
    glDeleteVertexArrays(1, &drawbuffer->vao);
+
+   drawbuffer->map       = NULL;
+   drawbuffer->id        = 0;
+   drawbuffer->vao       = 0;
+   drawbuffer->program   = NULL;
+   drawbuffer->capacity  = 0;
+   drawbuffer->map_index = 0;
+   drawbuffer->map_start = 0;
 }
 
    template<typename T>
@@ -1419,7 +1414,6 @@ static void GlRenderer_free(GlRenderer *renderer)
 
    if (renderer->command_buffer)
    {
-      Program_free(renderer->command_buffer->program);
       DrawBuffer_free(renderer->command_buffer);
       delete renderer->command_buffer->program;
       delete renderer->command_buffer;
@@ -1428,7 +1422,6 @@ static void GlRenderer_free(GlRenderer *renderer)
 
    if (renderer->output_buffer)
    {
-      Program_free(renderer->output_buffer->program);
       DrawBuffer_free(renderer->output_buffer);
       delete renderer->output_buffer;
    }
@@ -1436,7 +1429,6 @@ static void GlRenderer_free(GlRenderer *renderer)
 
    if (renderer->image_load_buffer)
    {
-      Program_free(renderer->image_load_buffer->program);
       DrawBuffer_free(renderer->image_load_buffer);
       delete renderer->image_load_buffer;
    }
