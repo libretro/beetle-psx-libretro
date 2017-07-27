@@ -1205,10 +1205,46 @@ static void GlRenderer_upload_textures(
     glDeleteFramebuffers(1, &_fb.id);
 }
 
+static void get_variables(uint8_t *upscaling, bool *display_vram)
+{
+    struct retro_variable var = {0};
+
+    var.key = option_internal_resolution;
+
+    if (upscaling)
+    {
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        /* Same limitations as libretro.cpp */
+        *upscaling = var.value[0] -'0';
+	if (var.value[1] != 'x')
+	{
+	   *upscaling  = (var.value[0] - '0') * 10;
+	   *upscaling += var.value[1] - '0';
+
+	   if (*upscaling == 32) /* Too high for GL */
+              *upscaling = 16;
+	}
+    }
+    }
+
+    if (*display_vram)
+    {
+    var.key = option_display_vram;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (!strcmp(var.value, "enabled"))
+	*display_vram = true;
+      else
+	*display_vram = false;
+    }
+    }
+}
+
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
-    uint8_t upscaling = 1;
     DrawBuffer<CommandVertex>* command_buffer;
+    uint8_t upscaling = 1;
+    bool display_vram = false;
     struct retro_variable var = {0};
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
@@ -1216,20 +1252,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     if (!renderer)
        return false;
 
-    var.key = option_internal_resolution;
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        /* Same limitations as libretro.cpp */
-        upscaling = var.value[0] -'0';
-	if (var.value[1] != 'x')
-	{
-	   upscaling  = (var.value[0] - '0') * 10;
-	   upscaling += var.value[1] - '0';
-
-	   if (upscaling == 32) /* Too high for GL */
-              upscaling = 16;
-	}
-    }
+    get_variables(&upscaling, &display_vram);
 
     var.key = option_filter;
     uint8_t filter = FILTER_MODE_NEAREST;
@@ -1277,15 +1300,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
           wireframe = true;
        else
           wireframe = false;
-    }
-
-    var.key = option_display_vram;
-    bool display_vram = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      if (!strcmp(var.value, "enabled"))
-	display_vram = true;
-      else
-	display_vram = false;
     }
 
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
@@ -1552,6 +1566,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
+    uint8_t upscaling = 1;
+    bool display_vram = false;
     struct retro_variable var = {0};
 
     var.key = option_renderer_software_fb;
@@ -1564,20 +1580,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
           has_software_fb = false;
     }
 
-    var.key = option_internal_resolution;
-    uint8_t upscaling = 1;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-        /* Same limitations as libretro.cpp */
-        upscaling = var.value[0] -'0';
-	if (var.value[1] != 'x')
-	{
-           upscaling  = (var.value[0] -'0') * 10;
-           upscaling += (var.value[1] -'0');
-
-	   if (upscaling == 32) /* Too high for GL */
-	      upscaling = 16;
-	}
-    }
+    get_variables(&upscaling, &display_vram);
 
     var.key = option_filter;
     uint8_t filter = FILTER_MODE_NEAREST;
@@ -1619,15 +1622,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
           wireframe = true;
        else
           wireframe = false;
-    }
-
-    var.key = option_display_vram;
-    bool display_vram = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      if (!strcmp(var.value, "enabled")) {
-	display_vram = true;
-      } else
-	display_vram = false;
     }
 
     bool rebuild_fb_out =
@@ -1976,31 +1970,13 @@ static bool gl_context_framebuffer_lock(void* data)
 
 struct retro_system_av_info get_av_info(VideoClock std)
 {
+    uint8_t upscaling = 1;
+    bool display_vram = false;
     struct retro_variable var = {0};
 
     var.key = option_internal_resolution;
-    uint8_t upscaling = 1;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      /* Same limitations as libretro.cpp */
-      upscaling = var.value[0] -'0';
-      if (var.value[1] != 'x')
-      {
-         upscaling  = (var.value[0] -'0') * 10;
-         upscaling += (var.value[1] -'0');
 
-	 if (upscaling == 32) /* Too high for GL */
-            upscaling = 16;
-      }
-    }
-
-    var.key = option_display_vram;
-    bool display_vram = false;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      if (!strcmp(var.value, "enabled"))
-	display_vram = true;
-      else
-	display_vram = false;
-    }
+    get_variables(&upscaling, &display_vram);
 
     var.key = option_widescreen_hack;
     bool widescreen_hack = false;
