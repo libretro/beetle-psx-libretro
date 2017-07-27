@@ -69,14 +69,14 @@ static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
 
-/// How many vertices we buffer before forcing a draw. Since the
-/// indexes are stored on 16bits we need to make sure that the length
-/// multiplied by 3 (for triple buffering) doesn't overflow 0xffff.
+/* How many vertices we buffer before forcing a draw. Since the
+ * indexes are stored on 16bits we need to make sure that the length
+ * multiplied by 3 (for triple buffering) doesn't overflow 0xffff. */
 static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
 
-/// Maximum number of indices for a vertex buffer. Since quads have
-/// two duplicated vertices it can be up to 3/2 the vertex buffer
-/// length
+/* Maximum number of indices for a vertex buffer. Since quads have
+ * two duplicated vertices it can be up to 3/2 the vertex buffer
+ * length */
 static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
 typedef std::map<std::string, GLint> UniformMap;
@@ -106,20 +106,20 @@ enum GlState
 };
 
 enum SemiTransparencyMode {
-    /// Source / 2 + destination / 2
+    /* Source / 2 + destination / 2 */
     SemiTransparencyMode_Average = 0,
-    /// Source + destination
+    /* Source + destination */
     SemiTransparencyMode_Add = 1,
-    /// Destination - source
+    /* Destination - source */
     SemiTransparencyMode_SubtractSource = 2,
-    /// Destination + source / 4
+    /* Destination + source / 4 */
     SemiTransparencyMode_AddQuarterSource = 3,
 };
 
 struct Program
 {
     GLuint id;
-    /// Hash map of all the active uniforms in this program
+    /* Hash map of all the active uniforms in this program */
     UniformMap uniforms;
     char *info_log;
 };
@@ -134,13 +134,13 @@ struct Attribute
 {
    char name[32];
    size_t offset;
-   /// Attribute type (BYTE, UNSIGNED_SHORT, FLOAT etc...)
+   /* Attribute type (BYTE, UNSIGNED_SHORT, FLOAT etc...) */
    GLenum ty;
    GLint components;
 };
 
 struct CommandVertex {
-    /// Position in PlayStation VRAM coordinates
+    /* Position in PlayStation VRAM coordinates */
     float position[4];
     /// RGB color, 8bits per component
     uint8_t color[3];
@@ -284,8 +284,8 @@ static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
    glBindVertexArray(drawbuffer->vao);
    glUseProgram(drawbuffer->program->id);
 
-   // I don't need to bind this to draw (it's captured by the
-   // VAO) but I need it to map/unmap the storage.
+   /* I don't need to bind this to draw (it's captured by the
+    * VAO) but I need it to map/unmap the storage. */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
 
    /* Unmap the active buffer */
@@ -315,22 +315,22 @@ static void DrawBuffer_unmap__no_bind(DrawBuffer<T> *drawbuffer)
    drawbuffer->map = NULL;
 }
 
-// Map the buffer for write-only access
+/* Map the buffer for write-only access */
 template<typename T>
 static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 {
+   GLintptr offset_bytes;
+   void *m                = NULL;
    size_t element_size    = sizeof(T);
    GLsizeiptr buffer_size = drawbuffer->capacity * element_size;
-   GLintptr offset_bytes;
-   void *m;
 
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
 
-   // If we're already mapped something's wrong
+   /* If we're already mapped something's wrong */
    assert(drawbuffer->map == NULL);
 
-   // We don't have enough room left to remap `capacity`,
-   // start back from the beginning of the buffer.
+   /* We don't have enough room left to remap `capacity`,
+    * start back from the beginning of the buffer. */
    if (drawbuffer->map_start > 2 * drawbuffer->capacity)
 	   drawbuffer->map_start = 0;
 
@@ -346,7 +346,6 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 		   GL_MAP_WRITE_BIT |
 		   GL_MAP_INVALIDATE_RANGE_BIT);
 
-   // Just in case...
    assert(m != NULL);
 
    drawbuffer->map = reinterpret_cast<T *>(m);
@@ -369,6 +368,9 @@ static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
 template<typename T>
 static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 {
+   unsigned i;
+   GLint nVertexAttribs;
+
    glBindVertexArray(drawbuffer->vao);
 
    /* ARRAY_BUFFER is captured by VertexAttribPointer */
@@ -377,93 +379,93 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
    std::vector<Attribute> attrs = T::attributes();
    GLint element_size = (GLint) sizeof( T );
 
-   //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
-   //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
-   //we need to make sure they're all disabled before then re-enabling the attribs we want
-   //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
-   GLint nVertexAttribs;
+   /* speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
+    * as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
+    * we need to make sure they're all disabled before then re-enabling the attribs we want
+    * (solves crashes on some drivers/compilers due to accidentally enabled attribs) */
    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
 
-	for (int i = 0; i < nVertexAttribs; i++)
-		glDisableVertexAttribArray(i);
+   for (i = 0; i < nVertexAttribs; i++)
+      glDisableVertexAttribArray(i);
 
-	for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
-	{
-		Attribute& attr = *it;
-		GLint index     = glGetAttribLocation(drawbuffer->program->id, attr.name);
+   for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
+   {
+      Attribute& attr = *it;
+      GLint index     = glGetAttribLocation(drawbuffer->program->id, attr.name);
 
-		// Don't error out if the shader doesn't use this
-		// attribute, it could be caused by shader
-		// optimization if the attribute is unused for
-		// some reason.
-		if (index < 0)
-			continue;
+      /* Don't error out if the shader doesn't use this
+       * attribute, it could be caused by shader
+       * optimization if the attribute is unused for
+       * some reason. */
+      if (index < 0)
+         continue;
 
-		glEnableVertexAttribArray((GLuint) index);
+      glEnableVertexAttribArray((GLuint) index);
 
-		// This captures the buffer so that we don't have to bind it
-		// when we draw later on, we'll just have to bind the vao
-		switch (attr.ty)
-		{
-			case GL_BYTE:
-			case GL_UNSIGNED_BYTE:
-			case GL_SHORT:
-			case GL_UNSIGNED_SHORT:
-			case GL_INT:
-			case GL_UNSIGNED_INT:
-				glVertexAttribIPointer( index,
-						attr.components,
-						attr.ty,
-						element_size,
-						(GLvoid*)attr.offset);
-				break;
-			case GL_FLOAT:
-				glVertexAttribPointer(  index,
-						attr.components,
-						attr.ty,
-						GL_FALSE,
-						element_size,
-						(GLvoid*)attr.offset);
-				break;
-			case GL_DOUBLE:
-				glVertexAttribLPointer( index,
-						attr.components,
-						attr.ty,
-						element_size,
-						(GLvoid*)attr.offset);
-				break;
-		}
-	}
+      /* This captures the buffer so that we don't have to bind it
+       * when we draw later on, we'll just have to bind the vao */
+      switch (attr.ty)
+      {
+         case GL_BYTE:
+	 case GL_UNSIGNED_BYTE:
+	 case GL_SHORT:
+	 case GL_UNSIGNED_SHORT:
+	 case GL_INT:
+	 case GL_UNSIGNED_INT:
+            glVertexAttribIPointer( index,
+			    attr.components,
+			    attr.ty,
+			    element_size,
+			    (GLvoid*)attr.offset);
+	    break;
+	 case GL_FLOAT:
+	    glVertexAttribPointer(  index,
+			    attr.components,
+			    attr.ty,
+			    GL_FALSE,
+			    element_size,
+			    (GLvoid*)attr.offset);
+	    break;
+	 case GL_DOUBLE:
+	    glVertexAttribLPointer( index,
+			    attr.components,
+			    attr.ty,
+			    element_size,
+			    (GLvoid*)attr.offset);
+	    break;
+      }
+   }
 }
 
 template<typename T>
 static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* program)
 {
    GLuint id = 0;
+   size_t element_size = sizeof(T);
+
    glGenVertexArrays(1, &id);
 
-   drawbuffer->map = NULL;
+   drawbuffer->map       = NULL;
    drawbuffer->vao       = id;
 
-   id              = 0;
+   id                    = 0;
 
-   // Generate the buffer object
+   /* Generate the buffer object */
    glGenBuffers(1, &id);
 
    drawbuffer->program  = program;
    drawbuffer->capacity = capacity;
    drawbuffer->id       = id;
 
-   // Create and map the buffer
+   /* Create and map the buffer */
    glBindBuffer(GL_ARRAY_BUFFER, id);
 
-   size_t element_size = sizeof(T);
-   // We allocate enough space for 3 times the buffer space and
-   // we only remap one third of it at a time
+   /* We allocate enough space for 3 times the buffer space and
+    * we only remap one third of it at a time */
    GLsizeiptr storage_size = drawbuffer->capacity * element_size * 3;
 
-   // Since we store indexes in unsigned shorts we want to make
-   // sure the entire buffer is indexable.
+   /* Since we store indexes in unsigned shorts we want to make
+    * sure the entire buffer is indexable. */
    assert(drawbuffer->capacity * 3 <= 0xffff);
 
    glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
@@ -487,35 +489,35 @@ struct GlRenderer {
     GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
     GLushort opaque_line_indices[INDEX_BUFFER_LEN];
     GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
-    /// Primitive type for the vertices in the command buffers
-    /// (TRIANGLES or LINES)
+    /* Primitive type for the vertices in the command buffers
+     * (TRIANGLES or LINES) */
     GLenum command_draw_mode;
     unsigned opaque_triangle_index_pos;
     unsigned opaque_line_index_pos;
     unsigned semi_transparent_index_pos;
-    /// Current semi-transparency mode
+    /* Current semi-transparency mode */
     SemiTransparencyMode semi_transparency_mode;
     std::vector<TransparencyIndex> transparency_mode_index;
-    /// Polygon mode (for wireframe)
+    /* Polygon mode (for wireframe) */
     GLenum command_polygon_mode;
-    /// Texture used to store the VRAM for texture mapping
+    /* Texture used to store the VRAM for texture mapping */
     DrawConfig config;
-    /// Framebuffer used as a shader input for texturing draw commands
+    /* Framebuffer used as a shader input for texturing draw commands */
     Texture fb_texture;
-    /// Framebuffer used as an output when running draw commands
+    /* Framebuffer used as an output when running draw commands */
     Texture fb_out;
-    /// Depth buffer for fb_out
+    /* Depth buffer for fb_out */
     Texture fb_out_depth;
-    /// Current resolution of the frontend's framebuffer
+    /* Current resolution of the frontend's framebuffer */
     uint32_t frontend_resolution[2];
-    /// Current internal resolution upscaling factor
+    /* Current internal resolution upscaling factor */
     uint32_t internal_upscaling;
-    /// Current internal color depth
+    /* Current internal color depth */
     uint8_t internal_color_depth;
-    /// Counter for preserving primitive draw order in the z-buffer
-    /// since we draw semi-transparent primitives out-of-order.
+    /* Counter for preserving primitive draw order in the z-buffer
+     * since we draw semi-transparent primitives out-of-order. */
     int16_t primitive_ordering;
-    /// Texture window mask/OR values
+    /* Texture window mask/OR values */
     uint8_t tex_x_mask;
     uint8_t tex_x_or;
     uint8_t tex_y_mask;
@@ -526,8 +528,8 @@ struct GlRenderer {
 
     uint8_t filter_type;
 
-    /// When true we display the entire VRAM buffer instead of just
-    /// the visible area
+    /* When true we display the entire VRAM buffer instead of just
+     * the visible area */
     bool display_vram;
 };
 
@@ -540,13 +542,13 @@ struct RetroGl
 };
 
 static DrawConfig persistent_config = {
-	{0, 0},         // display_top_left
-	{1024, 512},    // display_resolution
-	false,          // display_24bpp
-	true,           // display_off
-	{0, 0},         // draw_area_top_left
-	{0, 0},         // draw_area_dimensions
-	{0, 0},         // draw_offset
+	{0, 0},         /* display_top_left */
+	{1024, 512},    /* display_resolution */
+	false,          /* display_24bpp */
+	true,           /* display_off */
+	{0, 0},         /* draw_area_top_left */
+	{0, 0},         /* draw_area_dimensions */
+	{0, 0},         /* draw_offset */
 };
 
 /* This was originally in rustation-libretro/lib.rs */
@@ -571,35 +573,36 @@ extern "C"
 #endif
 
 
-static void get_error(void)
+static void get_error(const char *msg)
 {
-#ifdef DEBUG
    GLenum error = glGetError();
    switch (error)
    {
       case GL_NO_ERROR:
-         //puts("GL error flag: GL_NO_ERROR\n");
+#if 0
+         puts("GL error flag: GL_NO_ERROR\n");
+#endif
          return;
       case GL_INVALID_ENUM:
-         puts("GL error flag: GL_INVALID_ENUM\n");
+         printf("GL error flag: GL_INVALID_ENUM [%s]\n", msg);
          break;
       case GL_INVALID_VALUE:
-         puts("GL error flag: GL_INVALID_VALUE\n");
+         printf("GL error flag: GL_INVALID_VALUE [%s]\n", msg);
          break;
       case GL_INVALID_FRAMEBUFFER_OPERATION:
-         puts("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION\n");
+         printf("GL error flag: GL_INVALID_FRAMEBUFFER_OPERATION [%s]\n", msg);
          break;
       case GL_OUT_OF_MEMORY:
-         puts("GL error flag: GL_OUT_OF_MEMORY\n");
+         printf("GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
          break;
       case GL_STACK_UNDERFLOW:
-         puts("GL error flag: GL_STACK_UNDERFLOW\n");
+         printf("GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
          break;
       case GL_STACK_OVERFLOW:
-         puts("GL error flag: GL_STACK_OVERFLOW\n");
+         printf("GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
          break;
       case GL_INVALID_OPERATION:
-         puts("GL error flag: GL_INVALID_OPERATION\n");
+         printf("GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
          break;
       default:
          printf("GL error flag: %d\n", (int) error);
@@ -607,7 +610,6 @@ static void get_error(void)
    }
 
    assert(error == GL_NO_ERROR);
-#endif
 }
 
 static void Framebuffer_init(struct Framebuffer *fb,
@@ -637,7 +639,7 @@ static void Framebuffer_init(struct Framebuffer *fb,
          (GLsizei) color_texture->height);
 }
 
-static void Shader_init(
+static bool Shader_init(
       struct Shader *shader,
       const char* source,
       GLenum shader_type)
@@ -652,7 +654,7 @@ static void Shader_init(
    if (id == 0)
    {
       puts("An error occured creating the shader object\n");
-      exit(EXIT_FAILURE);
+      return false;
    }
 
    glShaderSource( id,
@@ -678,15 +680,7 @@ static void Shader_init(
             (char*)shader->info_log);
 
       if (log_len > 0)
-      {
-         // The length returned by GetShaderInfoLog *excludes*
-         // the ending \0 unlike the call to GetShaderiv above
-         // so we can get rid of it by truncating here.
-         /* log.truncate(log_len as usize); */
-         /* Don't want to spend time thinking about the above, I'll just put a \0
-            in the last index */
          shader->info_log[log_len - 1] = '\0';
-      }
    }
 
    if (status != (GLint) GL_TRUE)
@@ -699,11 +693,12 @@ static void Shader_init(
       puts("Shader info log:\n");
       puts(shader->info_log);
 
-      exit(EXIT_FAILURE);
-      return;
+      return false;
    }
 
    shader->id = id;
+
+   return true;
 }
 
 static void Shader_free(struct Shader *shader)
@@ -720,7 +715,7 @@ static UniformMap load_program_uniforms(GLuint program)
 {
    size_t u;
    UniformMap uniforms;
-   // Figure out how long a uniform name can be
+   /* Figure out how long a uniform name can be */
    GLint max_name_len = 0;
    GLint n_uniforms   = 0;
 
@@ -734,11 +729,9 @@ static UniformMap load_program_uniforms(GLuint program)
 
    for (u = 0; u < n_uniforms; ++u)
    {
-      // Retrieve the name of this uniform. Don't use the size we just fetched, because it's inconvenient. Use something monstrously large.
       char name[256];
       size_t name_len = max_name_len;
       GLsizei len     = 0;
-      /* XXX we might want to validate those at some point */
       GLint size      = 0;
       GLenum ty       = 0;
 
@@ -756,11 +749,8 @@ static UniformMap load_program_uniforms(GLuint program)
          continue;
       }
 
-      // Retrieve the location of this uniform
+      /* Retrieve the location of this uniform */
       GLint location = glGetUniformLocation(program, (const char*) name);
-
-      /* name.truncate(len as usize); */
-      /* name[len - 1] = '\0'; */
 
       if (location < 0)
       {
@@ -795,12 +785,6 @@ static void get_program_info_log(Program *pg, GLuint id)
    if (log_len <= 0)
       return;
 
-   // The length returned by GetShaderInfoLog *excludes*
-   // the ending \0 unlike the call to GetShaderiv above
-   // so we can get rid of it by truncating here.
-   /* log.truncate(log_len as usize); */
-   /* Don't want to spend time thinking about the above, I'll just put a \0
-      in the last index */
    pg->info_log[log_len - 1] = '\0';
 }
 
@@ -978,7 +962,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
    }
 
-   // Bind the out framebuffer
+   /* Bind the out framebuffer */
    Framebuffer_init(&_fb, &renderer->fb_out);
 
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
@@ -988,7 +972,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
 
    glClear(GL_DEPTH_BUFFER_BIT);
 
-   // First we draw the opaque vertices
+   /* First we draw the opaque vertices */
    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
    glDisable(GL_BLEND);
 
@@ -1019,10 +1003,10 @@ static void GlRenderer_draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
+	      /* This method doesn't call prepare_draw/finalize_draw itself, it
+	       * must be handled by the caller. This is because this command
+	       * can be called several times on the same buffer (i.e. multiple
+	       * draw calls between the prepare/finalize) */
 	      glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
 	      glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
       }
@@ -1037,20 +1021,21 @@ static void GlRenderer_draw(GlRenderer *renderer)
    {
       if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
+	      /* This method doesn't call prepare_draw/finalize_draw itself, it
+	       * must be handled by the caller. This is because this command
+	       * can be called several times on the same buffer (i.e. multiple
+	       * draw calls between the prepare/finalize) */
 	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
 	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
       }
    }
 
-   if (renderer->semi_transparent_index_pos > 0) {
-      // Semi-transparency pass
-
-      // Push the current semi-transparency mode
+   if (renderer->semi_transparent_index_pos > 0)
+   {
       TransparencyIndex ti;
+      /* Semi-transparency pass */
+
+      /* Push the current semi-transparency mode */
       ti.transparency_mode = renderer->semi_transparency_mode;
       ti.last_index        = renderer->semi_transparent_index_pos;
       ti.draw_mode         = renderer->command_draw_mode;
@@ -1083,7 +1068,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
             /* 0.5xB + 0.5 x F */
             case SemiTransparencyMode_Average:
                blend_func = GL_FUNC_ADD;
-               // Set to 0.5 with glBlendColor
+               /* Set to 0.5 with glBlendColor */
                blend_src = GL_CONSTANT_ALPHA;
                blend_dst = GL_CONSTANT_ALPHA;
                break;
@@ -1114,10 +1099,10 @@ static void GlRenderer_draw(GlRenderer *renderer)
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
+	      /* This method doesn't call prepare_draw/finalize_draw itself, it
+	       * must be handled by the caller. This is because this command
+	       * can be called several times on the same buffer (i.e. multiple
+	       * draw calls between the prepare/finalize) */
 	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
 	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
          }
@@ -1199,9 +1184,7 @@ static void GlRenderer_upload_textures(
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
-#ifdef DEBUG
-    get_error();
-#endif
+    get_error("GlRenderer_upload_textures");
     glDeleteFramebuffers(1, &_fb.id);
 }
 
@@ -2196,7 +2179,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 	 glActiveTexture(GL_TEXTURE1);
 	 glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
-         // First we draw the visible part of fb_out
+         /* First we draw the visible part of fb_out */
          uint16_t fb_x_start = renderer->config.display_top_left[0];
          uint16_t fb_y_start = renderer->config.display_top_left[1];
          uint16_t fb_width   = renderer->config.display_resolution[0];
@@ -2723,7 +2706,7 @@ void rsx_gl_copy_rect(
        uint16_t target_top_left[2] = {dst_x, dst_y};
        uint16_t dimensions[2]      = {w, h};
 
-       // Draw pending commands
+       /* Draw pending commands */
        if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
          GlRenderer_draw(renderer);
 
@@ -2781,9 +2764,7 @@ void rsx_gl_copy_rect(
              w, h, 1 );
 #endif
 
-#ifdef DEBUG
-       get_error();
-#endif
+       get_error("rsx_gl_copy_rect");
     }
 }
 
@@ -2927,9 +2908,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
       glEnable(GL_SCISSOR_TEST);
 
-#ifdef DEBUG
-      get_error();
-#endif
+      get_error("rsx_gl_load_image");
 
       glDeleteFramebuffers(1, &_fb.id);
    }
