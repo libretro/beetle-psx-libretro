@@ -475,7 +475,6 @@ public:
 
        this->finalize_draw__no_bind();
     }
-
 };
 
 
@@ -641,61 +640,40 @@ static void Framebuffer_init(struct Framebuffer *fb,
 }
 
 /* forward decls */
-static GLint Program_uniform(Program *program, const char* name)
-{
-   bool found = program->uniforms.find(name) != program->uniforms.end();
-   if (!found)
-   {
-      printf("Attempted to access unknown uniform %s\n", name);
-      exit(EXIT_FAILURE);
-   }
-
-   return program->uniforms[name];
-}
-
-
 static void program_uniform1i(Program *prog, const char *name, GLint i)
 {
-   GLint u;
    if (!prog)
       return;
 
    glUseProgram(prog->id);
-   u = Program_uniform(prog, name);
-   glUniform1i(u, i);
+   glUniform1i(prog->uniforms[name], i);
 }
 
 static void program_uniform1ui(Program *prog, const char *name, GLuint i)
 {
-   GLint u;
    if (!prog)
       return;
 
    glUseProgram(prog->id);
-   u = Program_uniform(prog, name);
-   glUniform1ui(u, i);
+   glUniform1ui(prog->uniforms[name], i);
 }
 
 static void program_uniform2i(Program *prog, const char *name, GLint a, GLint b)
 {
-   GLint u;
    if (!prog)
       return;
 
    glUseProgram(prog->id);
-   u = Program_uniform(prog, name);
-   glUniform2i(u, a, b);
+   glUniform2i(prog->uniforms[name], a, b);
 }
 
 static void program_uniform2ui(Program *prog, const char *name, GLuint a, GLuint b)
 {
-   GLint u;
    if (!prog)
       return;
 
    glUseProgram(prog->id);
-   u = Program_uniform(prog, name);
-   glUniform2ui(u, a, b);
+   glUniform2ui(prog->uniforms[name], a, b);
 }
 
 static void Shader_init(
