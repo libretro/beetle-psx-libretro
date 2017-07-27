@@ -488,8 +488,7 @@ public:
 
 };
 
-class GlRenderer {
-public:
+struct GlRenderer {
     /// Buffer used to handle PlayStation GPU draw commands
     DrawBuffer<CommandVertex>* command_buffer;
     GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
@@ -541,10 +540,6 @@ public:
     /// When true we display the entire VRAM buffer instead of just
     /// the visible area
     bool display_vram;
-
-    /* pub fn from_config(config: DrawConfig) -> Result<GlRenderer, Error> */
-    GlRenderer(DrawConfig config);
-    ~GlRenderer();
 };
 
 
@@ -939,7 +934,7 @@ static void Texture_init(
     tex->height = height;
 }
 
-void Texture_free(struct Texture *tex)
+static void Texture_free(struct Texture *tex)
 {
    if (tex)
       glDeleteTextures(1, &tex->id);
@@ -1013,9 +1008,12 @@ static void upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS]);
 
-GlRenderer::GlRenderer(DrawConfig config)
+static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
     struct retro_variable var = {0};
+
+    if (!renderer)
+       return false;
 
     var.key = option_internal_resolution;
     uint8_t upscaling = 1;
@@ -1049,7 +1047,7 @@ GlRenderer::GlRenderer(DrawConfig config)
        else if (!strcmp(var.value, "JINC2"))
           filter = FILTER_MODE_JINC2;
 
-       this->filter_type = filter;
+       renderer->filter_type = filter;
     }
 
     var.key = option_depth;
@@ -1092,7 +1090,8 @@ GlRenderer::GlRenderer(DrawConfig config)
     printf("Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
     DrawBuffer<CommandVertex>* command_buffer;
-    switch(this->filter_type)
+
+    switch(renderer->filter_type)
     {
     case FILTER_MODE_SABR:
       command_buffer = build_buffer<CommandVertex>(
@@ -1150,7 +1149,7 @@ GlRenderer::GlRenderer(DrawConfig config)
     // Texture holding the raw VRAM texture contents. We can't
     // meaningfully upscale it since most games use paletted
     // textures.
-    Texture_init(&this->fb_texture, native_width, native_height, GL_RGB5_A1);
+    Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
     if (depth > 16) {
         // Dithering is superfluous when we increase the internal
@@ -1177,77 +1176,79 @@ GlRenderer::GlRenderer(DrawConfig config)
     }
 
     Texture_init(
-          &this->fb_out,
+          &renderer->fb_out,
           native_width * upscaling,
           native_height * upscaling,
           texture_storage);
 
     Texture_init(
-          &this->fb_out_depth,
-          this->fb_out.width,
-          this->fb_out.height,
+          &renderer->fb_out_depth,
+          renderer->fb_out.width,
+          renderer->fb_out.height,
           GL_DEPTH_COMPONENT32F);
 
-    this->filter_type = filter;
-    this->command_buffer = command_buffer;
-    this->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-    this->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-    this->semi_transparent_index_pos = 0;
-    this->command_draw_mode = GL_TRIANGLES;
-    this->semi_transparency_mode =  SemiTransparencyMode_Average;
-    this->command_polygon_mode = command_draw_mode;
-    this->output_buffer = output_buffer;
-    this->image_load_buffer = image_load_buffer;
-    this->config = config;
-    this->frontend_resolution[0] = 0;
-    this->frontend_resolution[1] = 0;
-    this->internal_upscaling = upscaling;
-    this->internal_color_depth = depth;
-    this->primitive_ordering = 0;
-    this->tex_x_mask = 0;
-    this->tex_x_or = 0;
-    this->tex_y_mask = 0;
-    this->tex_y_or = 0;
-    this->display_vram = display_vram;
-    this->mask_set_or  = 0;
-    this->mask_eval_and = 0;
+    renderer->filter_type = filter;
+    renderer->command_buffer = command_buffer;
+    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+    renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+    renderer->semi_transparent_index_pos = 0;
+    renderer->command_draw_mode = GL_TRIANGLES;
+    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
+    renderer->command_polygon_mode = command_draw_mode;
+    renderer->output_buffer = output_buffer;
+    renderer->image_load_buffer = image_load_buffer;
+    renderer->config = config;
+    renderer->frontend_resolution[0] = 0;
+    renderer->frontend_resolution[1] = 0;
+    renderer->internal_upscaling = upscaling;
+    renderer->internal_color_depth = depth;
+    renderer->primitive_ordering = 0;
+    renderer->tex_x_mask = 0;
+    renderer->tex_x_or = 0;
+    renderer->tex_y_mask = 0;
+    renderer->tex_y_or = 0;
+    renderer->display_vram = display_vram;
+    renderer->mask_set_or  = 0;
+    renderer->mask_eval_and = 0;
 
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-    upload_textures(this, top_left, dimensions, GPU_get_vram());
+    upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+
+    return true;
 }
 
-GlRenderer::~GlRenderer()
+void GlRenderer_free(GlRenderer *renderer)
 {
-    if (this->command_buffer) {
-        Program_free(this->command_buffer->program);
-        delete this->command_buffer->program;
-        delete this->command_buffer;
+    if (renderer->command_buffer) {
+        Program_free(renderer->command_buffer->program);
+        delete renderer->command_buffer->program;
+        delete renderer->command_buffer;
     }
-    this->command_buffer = NULL;
+    renderer->command_buffer = NULL;
 
-    if (this->output_buffer)
-        delete this->output_buffer;
-    this->output_buffer = NULL;
+    if (renderer->output_buffer)
+        delete renderer->output_buffer;
+    renderer->output_buffer = NULL;
 
-    if (this->image_load_buffer)
-        delete this->image_load_buffer;
-    this->image_load_buffer = NULL;
+    if (renderer->image_load_buffer)
+        delete renderer->image_load_buffer;
+    renderer->image_load_buffer = NULL;
 
-    Texture_free(&this->fb_texture);
-    this->fb_texture.id     = 0;
-    this->fb_texture.width  = 0;
-    this->fb_texture.height = 0;
+    Texture_free(&renderer->fb_texture);
+    renderer->fb_texture.id     = 0;
+    renderer->fb_texture.width  = 0;
+    renderer->fb_texture.height = 0;
 
-    Texture_free(&this->fb_out);
-    this->fb_out.id     = 0;
-    this->fb_out.width  = 0;
-    this->fb_out.height = 0;
+    Texture_free(&renderer->fb_out);
+    renderer->fb_out.id     = 0;
+    renderer->fb_out.width  = 0;
+    renderer->fb_out.height = 0;
 
-    Texture_free(&this->fb_out_depth);
-    this->fb_out_depth.id     = 0;
-    this->fb_out_depth.width  = 0;
-    this->fb_out_depth.height = 0;
+    Texture_free(&renderer->fb_out_depth);
+    renderer->fb_out_depth.id     = 0;
+    renderer->fb_out_depth.width  = 0;
+    renderer->fb_out_depth.height = 0;
 }
 
 extern bool doCleanFrame;
@@ -1964,31 +1965,20 @@ static void gl_context_reset(void)
         break;
     }
 
-    static_renderer.state_data.r = new GlRenderer(config);
-    static_renderer.state = GlState_Valid;
+    static_renderer.state_data.r = new GlRenderer();
+
+    if (GlRenderer_new(static_renderer.state_data.r, config))
+       static_renderer.state = GlState_Valid;
 }
 
 static void gl_context_destroy(void)
 {
-    if (static_renderer.inited)
-    {
-	    switch (static_renderer.state)
-	    {
-		    case GlState_Valid:
-			    break;
-		    case GlState_Invalid:
-			    // Looks like we didn't have an OpenGL context anyway...
-			    return;
-	    }
-    }
-
     glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
+    GlRenderer_free(static_renderer.state_data.r);
+
     if (static_renderer.state_data.r)
-    {
         delete static_renderer.state_data.r;
-        static_renderer.inited = false;
-    }
     static_renderer.state_data.r = NULL;
 
     if (static_renderer.inited)
@@ -1996,6 +1986,8 @@ static void gl_context_destroy(void)
         static_renderer.state        = GlState_Invalid;
         static_renderer.state_data.c = static_renderer.state_data.r->config;
     }
+
+    static_renderer.inited       = false;
 }
 
 static bool gl_context_framebuffer_lock(void* data)
