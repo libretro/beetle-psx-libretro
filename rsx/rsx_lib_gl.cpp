@@ -65,35 +65,6 @@ static const GLushort indices[6] = {0, 1, 2, 2, 1, 3};
 static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 #endif
 
-enum VideoClock {
-    VideoClock_Ntsc,
-    VideoClock_Pal
-};
-
-enum FilterMode {
-   FILTER_MODE_NEAREST,
-   FILTER_MODE_SABR,
-   FILTER_MODE_XBR,
-   FILTER_MODE_BILINEAR,
-   FILTER_MODE_3POINT,
-   FILTER_MODE_JINC2
-};
-
-static bool has_software_fb = false;
-
-extern "C" unsigned char widescreen_hack;
-
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-	extern retro_environment_t environ_cb;
-	extern retro_video_refresh_t video_cb;
-#ifdef __cplusplus
-}
-#endif
-
 #define VRAM_WIDTH_PIXELS 1024
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
@@ -108,19 +79,43 @@ static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
 /// length
 static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
-struct DrawConfig
-{
-    uint16_t display_top_left[2];
-    uint16_t display_resolution[2];
-    bool     display_24bpp;
-    bool     display_off;
-    int16_t  draw_offset[2];
-    uint16_t draw_area_top_left[2];
-    uint16_t draw_area_bot_right[2];
+typedef std::map<std::string, GLint> UniformMap;
+
+
+enum VideoClock {
+    VideoClock_Ntsc,
+    VideoClock_Pal
 };
 
+enum FilterMode {
+   FILTER_MODE_NEAREST,
+   FILTER_MODE_SABR,
+   FILTER_MODE_XBR,
+   FILTER_MODE_BILINEAR,
+   FILTER_MODE_3POINT,
+   FILTER_MODE_JINC2
+};
 
-typedef std::map<std::string, GLint> UniformMap;
+/* State machine dealing with OpenGL context
+ * destruction/reconstruction */
+enum GlState
+{
+    /* OpenGL context is ready */
+    GlState_Valid,
+    /* OpenGL context has been destroyed (or is not created yet) */
+    GlState_Invalid
+};
+
+enum SemiTransparencyMode {
+    /// Source / 2 + destination / 2
+    SemiTransparencyMode_Average = 0,
+    /// Source + destination
+    SemiTransparencyMode_Add = 1,
+    /// Destination - source
+    SemiTransparencyMode_SubtractSource = 2,
+    /// Destination + source / 4
+    SemiTransparencyMode_AddQuarterSource = 3,
+};
 
 struct Program
 {
@@ -171,6 +166,17 @@ struct CommandVertex {
     static std::vector<Attribute> attributes();
 };
 
+struct DrawConfig
+{
+    uint16_t display_top_left[2];
+    uint16_t display_resolution[2];
+    bool     display_24bpp;
+    bool     display_off;
+    int16_t  draw_offset[2];
+    uint16_t draw_area_top_left[2];
+    uint16_t draw_area_bot_right[2];
+};
+
 struct Texture
 {
     GLuint id;
@@ -198,17 +204,6 @@ struct ImageLoadVertex {
     uint16_t position[2];
 
     static std::vector<Attribute> attributes();
-};
-
-enum SemiTransparencyMode {
-    /// Source / 2 + destination / 2
-    SemiTransparencyMode_Average = 0,
-    /// Source + destination
-    SemiTransparencyMode_Add = 1,
-    /// Destination - source
-    SemiTransparencyMode_SubtractSource = 2,
-    /// Destination + source / 4
-    SemiTransparencyMode_AddQuarterSource = 3,
 };
 
 struct TransparencyIndex {
@@ -484,6 +479,7 @@ public:
 
 };
 
+
 struct GlRenderer {
     /// Buffer used to handle PlayStation GPU draw commands
     DrawBuffer<CommandVertex>* command_buffer;
@@ -537,6 +533,46 @@ struct GlRenderer {
     /// the visible area
     bool display_vram;
 };
+
+
+
+struct GlStateData
+{
+    GlRenderer* r;
+    DrawConfig c;
+};
+
+struct RetroGl {
+    /*
+    Rust's enums members can contain data. To emulate that,
+    I'll use a helper struct to save the data.
+    */
+    GlStateData state_data;
+    GlState state;
+    VideoClock video_clock;
+    bool inited;
+};
+
+/* This was originally in rustation-libretro/lib.rs */
+retro_system_av_info get_av_info(VideoClock std);
+
+static RetroGl static_renderer;
+
+
+static bool has_software_fb = false;
+
+extern "C" unsigned char widescreen_hack;
+
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+	extern retro_environment_t environ_cb;
+	extern retro_video_refresh_t video_cb;
+#ifdef __cplusplus
+}
+#endif
 
 
 static void get_error(void)
@@ -991,11 +1027,219 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
    return new DrawBuffer<T>(capacity, program);
 }
 
-static void upload_textures(
+static void GlRenderer_draw(GlRenderer *renderer)
+{
+   Framebuffer _fb;
+   int16_t x, y;
+
+   if (!renderer || static_renderer.state == GlState_Invalid)
+	   return;
+
+   x = renderer->config.draw_offset[0];
+   y = renderer->config.draw_offset[1];
+
+   program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
+
+   // We use texture unit 0
+   program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
+
+   // Bind the out framebuffer
+   Framebuffer_init(&_fb, &renderer->fb_out);
+
+   glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
+         GL_DEPTH_ATTACHMENT,
+         renderer->fb_out_depth.id,
+         0);
+
+   glClear(GL_DEPTH_BUFFER_BIT);
+
+   // First we draw the opaque vertices
+   glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+   glDisable(GL_BLEND);
+
+   program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
+
+   renderer->command_buffer->prepare_draw();
+
+   GLushort *opaque_triangle_indices =
+      renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
+   GLsizei opaque_triangle_len =
+      INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
+
+   if (opaque_triangle_len)
+   {
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      {
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
+	      glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	      glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
+      }
+   }
+
+   GLushort *opaque_line_indices =
+      renderer->opaque_line_indices + renderer->opaque_line_index_pos + 1;
+   GLsizei opaque_line_len =
+      INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
+
+   if (opaque_line_len)
+   {
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      {
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
+	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
+      }
+   }
+
+   if (renderer->semi_transparent_index_pos > 0) {
+      // Semi-transparency pass
+
+      // Push the current semi-transparency mode
+      TransparencyIndex ti;
+      ti.transparency_mode = renderer->semi_transparency_mode;
+      ti.last_index        = renderer->semi_transparent_index_pos;
+      ti.draw_mode         = renderer->command_draw_mode;
+
+      renderer->transparency_mode_index.push_back(ti);
+
+      glEnable(GL_BLEND);
+      program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 1);
+
+      unsigned cur_index = 0;
+
+      for (std::vector<TransparencyIndex>::iterator it =
+            renderer->transparency_mode_index.begin();
+            it != renderer->transparency_mode_index.end();
+            ++it) {
+
+         if (it->last_index == cur_index)
+            continue;
+
+         GLenum blend_func = GL_FUNC_ADD;
+         GLenum blend_src = GL_CONSTANT_ALPHA;
+         GLenum blend_dst = GL_CONSTANT_ALPHA;
+
+         switch (it->transparency_mode) {
+            /* 0.5xB + 0.5 x F */
+            case SemiTransparencyMode_Average:
+               blend_func = GL_FUNC_ADD;
+               // Set to 0.5 with glBlendColor
+               blend_src = GL_CONSTANT_ALPHA;
+               blend_dst = GL_CONSTANT_ALPHA;
+               break;
+               /* 1.0xB + 1.0 x F */
+            case SemiTransparencyMode_Add:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+               /* 1.0xB - 1.0 x F */
+            case SemiTransparencyMode_SubtractSource:
+               blend_func = GL_FUNC_REVERSE_SUBTRACT;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+            case SemiTransparencyMode_AddQuarterSource:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_CONSTANT_COLOR;
+               blend_dst = GL_ONE;
+               break;
+         }
+
+         glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+         glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+
+         unsigned len = it->last_index - cur_index;
+         GLushort *indices = renderer->semi_transparent_indices + cur_index;
+
+         if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+         {
+	      /// This method doesn't call prepare_draw/finalize_draw itself, it
+	      /// must be handled by the caller. This is because this command
+	      /// can be called several times on the same buffer (i.e. multiple
+	      /// draw calls between the prepare/finalize)
+	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
+         }
+
+         cur_index = it->last_index;
+      }
+   }
+
+   renderer->command_buffer->finalize_draw__no_bind();
+
+   renderer->primitive_ordering = 0;
+   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
+   renderer->semi_transparent_index_pos = 0;
+   renderer->transparency_mode_index.clear();
+
+   glDeleteFramebuffers(1, &_fb.id);
+}
+
+static void GlRenderer_upload_textures(
       GlRenderer *renderer,
       uint16_t top_left[2],
       uint16_t dimensions[2],
-      uint16_t pixel_buffer[VRAM_PIXELS]);
+      uint16_t pixel_buffer[VRAM_PIXELS])
+{
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      GlRenderer_draw(renderer);
+
+    Texture_set_sub_image(
+          &renderer->fb_texture,
+          top_left,
+          dimensions,
+          GL_RGBA,
+          GL_UNSIGNED_SHORT_1_5_5_5_REV,
+          pixel_buffer);
+
+    uint16_t x_start    = top_left[0];
+    uint16_t x_end      = x_start + dimensions[0];
+    uint16_t y_start    = top_left[1];
+    uint16_t y_end      = y_start + dimensions[1];
+
+    const size_t slice_len = 4;
+    ImageLoadVertex slice[slice_len] =
+    {
+        {   {x_start,   y_start }   },
+        {   {x_end,     y_start }   },
+        {   {x_start,   y_end   }   },
+        {   {x_end,     y_end   }   }
+    };
+
+    renderer->image_load_buffer->push_slice(slice, slice_len);
+
+    program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
+
+    // fb_texture is always at 1x
+    program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
+
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_BLEND);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    // Bind the output framebuffer
+    // let _fb = Framebuffer::new(&self.fb_out);
+    Framebuffer _fb;
+    Framebuffer_init(&_fb, &renderer->fb_out);
+
+    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
+       renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
+    glEnable(GL_SCISSOR_TEST);
+
+#ifdef DEBUG
+    get_error();
+#endif
+    glDeleteFramebuffers(1, &_fb.id);
+}
 
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
@@ -1202,7 +1446,8 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
     uint16_t top_left[2] = {0, 0};
     uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
-    upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+
+    GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
     return true;
 }
@@ -1273,10 +1518,12 @@ static inline void apply_scissor(GlRenderer *renderer)
 
 static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
+    GLuint fbo;
     uint32_t f_w = renderer->frontend_resolution[0];
     uint32_t f_h = renderer->frontend_resolution[1];
     uint16_t _w;
     uint16_t _h;
+    uint32_t w, h, upscale;
     float    aspect_ratio;
 
     if (renderer->display_vram)
@@ -1291,19 +1538,18 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
     }
 
-    uint32_t upscale = renderer->internal_upscaling;
+    upscale = renderer->internal_upscaling;
+    w       = (uint32_t) _w * upscale;
+    h       = (uint32_t) _h * upscale;
 
-    // XXX scale w and h when implementing increased internal
-    // resolution
-    uint32_t w = (uint32_t) _w * upscale;
-    uint32_t h = (uint32_t) _h * upscale;
-
-    if (w != f_w || h != f_h) {
-        // We need to change the frontend's resolution
+    if (w != f_w || h != f_h)
+    {
+        /* We need to change the frontend's resolution */
         struct retro_game_geometry geometry;
         geometry.base_width  = w;
         geometry.base_height = h;
-        // Max parameters are ignored by this call
+
+        /* Max parameters are ignored by this call */
         geometry.max_width  = 0;
         geometry.max_height = 0;
 
@@ -1319,70 +1565,11 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
     // Bind the output framebuffer provided by the frontend
     /* TODO/FIXME - I think glsm_ctl(BIND) is the way to go here. Check with the libretro devs */
-    GLuint fbo = glsm_get_current_framebuffer();
+    fbo = glsm_get_current_framebuffer();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
     glViewport(0, 0, (GLsizei) w, (GLsizei) h);
 }
 
-static void GlRenderer_draw(GlRenderer *renderer);
-
-static void upload_textures(
-      GlRenderer *renderer,
-      uint16_t top_left[2],
-      uint16_t dimensions[2],
-      uint16_t pixel_buffer[VRAM_PIXELS])
-{
-   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      GlRenderer_draw(renderer);
-
-    Texture_set_sub_image(
-          &renderer->fb_texture,
-          top_left,
-          dimensions,
-          GL_RGBA,
-          GL_UNSIGNED_SHORT_1_5_5_5_REV,
-          pixel_buffer);
-
-    uint16_t x_start    = top_left[0];
-    uint16_t x_end      = x_start + dimensions[0];
-    uint16_t y_start    = top_left[1];
-    uint16_t y_end      = y_start + dimensions[1];
-
-    const size_t slice_len = 4;
-    ImageLoadVertex slice[slice_len] =
-    {
-        {   {x_start,   y_start }   },
-        {   {x_end,     y_start }   },
-        {   {x_start,   y_end   }   },
-        {   {x_end,     y_end   }   }
-    };
-
-    renderer->image_load_buffer->push_slice(slice, slice_len);
-
-    program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
-
-    // fb_texture is always at 1x
-    program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
-
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_BLEND);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    // Bind the output framebuffer
-    // let _fb = Framebuffer::new(&self.fb_out);
-    Framebuffer _fb;
-    Framebuffer_init(&_fb, &renderer->fb_out);
-
-    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-       renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
-    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-    glEnable(GL_SCISSOR_TEST);
-
-#ifdef DEBUG
-    get_error();
-#endif
-    glDeleteFramebuffers(1, &_fb.id);
-}
 
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
@@ -1507,7 +1694,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
         uint16_t top_left[2] = {0, 0};
         uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-        upload_textures(renderer, top_left, dimensions,
+        GlRenderer_upload_textures(renderer, top_left, dimensions,
 			      GPU_get_vram());
 
 
@@ -1746,192 +1933,6 @@ std::vector<Attribute> ImageLoadVertex::attributes()
     result.push_back(attr);
 
     return result;
-}
-
-/// State machine dealing with OpenGL context
-/// destruction/reconstruction
-enum GlState {
-    // OpenGL context is ready
-    GlState_Valid,
-    /// OpenGL context has been destroyed (or is not created yet)
-    GlState_Invalid
-};
-
-struct GlStateData {
-    GlRenderer* r;
-    DrawConfig c;
-};
-
-struct RetroGl {
-    /*
-    Rust's enums members can contain data. To emulate that,
-    I'll use a helper struct to save the data.
-    */
-    GlStateData state_data;
-    GlState state;
-    VideoClock video_clock;
-    bool inited;
-};
-
-/* This was originally in rustation-libretro/lib.rs */
-retro_system_av_info get_av_info(VideoClock std);
-
-static RetroGl static_renderer;
-
-static void GlRenderer_draw(GlRenderer *renderer)
-{
-   int16_t x, y;
-
-   if (!renderer || static_renderer.state == GlState_Invalid)
-	   return;
-
-   x = renderer->config.draw_offset[0];
-   y = renderer->config.draw_offset[1];
-
-   program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
-
-   // We use texture unit 0
-   program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
-
-   // Bind the out framebuffer
-   Framebuffer _fb;
-   Framebuffer_init(&_fb, &renderer->fb_out);
-
-   glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
-         GL_DEPTH_ATTACHMENT,
-         renderer->fb_out_depth.id,
-         0);
-
-   glClear(GL_DEPTH_BUFFER_BIT);
-
-   // First we draw the opaque vertices
-   glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-   glDisable(GL_BLEND);
-
-   program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
-
-   renderer->command_buffer->prepare_draw();
-
-   GLushort *opaque_triangle_indices =
-      renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
-   GLsizei opaque_triangle_len =
-      INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
-
-   if (opaque_triangle_len)
-   {
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
-	      glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	      glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
-      }
-   }
-
-   GLushort *opaque_line_indices =
-      renderer->opaque_line_indices + renderer->opaque_line_index_pos + 1;
-   GLsizei opaque_line_len =
-      INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
-
-   if (opaque_line_len)
-   {
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
-	 glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	 glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
-      }
-   }
-
-   if (renderer->semi_transparent_index_pos > 0) {
-      // Semi-transparency pass
-
-      // Push the current semi-transparency mode
-      TransparencyIndex ti;
-      ti.transparency_mode = renderer->semi_transparency_mode;
-      ti.last_index        = renderer->semi_transparent_index_pos;
-      ti.draw_mode         = renderer->command_draw_mode;
-
-      renderer->transparency_mode_index.push_back(ti);
-
-      glEnable(GL_BLEND);
-      program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 1);
-
-      unsigned cur_index = 0;
-
-      for (std::vector<TransparencyIndex>::iterator it =
-            renderer->transparency_mode_index.begin();
-            it != renderer->transparency_mode_index.end();
-            ++it) {
-
-         if (it->last_index == cur_index)
-            continue;
-
-         GLenum blend_func = GL_FUNC_ADD;
-         GLenum blend_src = GL_CONSTANT_ALPHA;
-         GLenum blend_dst = GL_CONSTANT_ALPHA;
-
-         switch (it->transparency_mode) {
-            /* 0.5xB + 0.5 x F */
-            case SemiTransparencyMode_Average:
-               blend_func = GL_FUNC_ADD;
-               // Set to 0.5 with glBlendColor
-               blend_src = GL_CONSTANT_ALPHA;
-               blend_dst = GL_CONSTANT_ALPHA;
-               break;
-               /* 1.0xB + 1.0 x F */
-            case SemiTransparencyMode_Add:
-               blend_func = GL_FUNC_ADD;
-               blend_src = GL_ONE;
-               blend_dst = GL_ONE;
-               break;
-               /* 1.0xB - 1.0 x F */
-            case SemiTransparencyMode_SubtractSource:
-               blend_func = GL_FUNC_REVERSE_SUBTRACT;
-               blend_src = GL_ONE;
-               blend_dst = GL_ONE;
-               break;
-            case SemiTransparencyMode_AddQuarterSource:
-               blend_func = GL_FUNC_ADD;
-               blend_src = GL_CONSTANT_COLOR;
-               blend_dst = GL_ONE;
-               break;
-         }
-
-         glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-         glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
-
-         unsigned len = it->last_index - cur_index;
-         GLushort *indices = renderer->semi_transparent_indices + cur_index;
-
-         if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         {
-	      /// This method doesn't call prepare_draw/finalize_draw itself, it
-	      /// must be handled by the caller. This is because this command
-	      /// can be called several times on the same buffer (i.e. multiple
-	      /// draw calls between the prepare/finalize)
-	    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-	    glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
-         }
-
-         cur_index = it->last_index;
-      }
-   }
-
-   renderer->command_buffer->finalize_draw__no_bind();
-
-   renderer->primitive_ordering = 0;
-   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->semi_transparent_index_pos = 0;
-   renderer->transparency_mode_index.clear();
-
-   glDeleteFramebuffers(1, &_fb.id);
 }
 
 static void gl_context_reset(void)
@@ -2303,6 +2304,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       // frame to make offscreen rendering kinda sorta work. Very messy
       // and slow.
       {
+	 Framebuffer _fb;
          ImageLoadVertex slice[4] =
          {
             {   {0,    0 }   },
@@ -2319,7 +2321,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          glDisable(GL_BLEND);
          glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-         Framebuffer _fb;
          Framebuffer_init(&_fb, &renderer->fb_texture);
 
          program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
@@ -2929,6 +2930,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
 
    if (static_renderer.state == GlState_Valid)
    {
+      Framebuffer _fb;
       uint16_t top_left[2];
       uint16_t dimensions[2];
       GlRenderer *renderer   = static_renderer.state_data.r;
@@ -2973,9 +2975,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       glDisable(GL_BLEND);
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-      // Bind the output framebuffer
-      Framebuffer _fb;
-
+      /* Bind the output framebuffer */
       Framebuffer_init(&_fb, &renderer->fb_out);
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
