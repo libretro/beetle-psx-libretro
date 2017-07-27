@@ -639,43 +639,6 @@ static void Framebuffer_init(struct Framebuffer *fb,
          (GLsizei) color_texture->height);
 }
 
-/* forward decls */
-static void program_uniform1i(Program *prog, const char *name, GLint i)
-{
-   if (!prog)
-      return;
-
-   glUseProgram(prog->id);
-   glUniform1i(prog->uniforms[name], i);
-}
-
-static void program_uniform1ui(Program *prog, const char *name, GLuint i)
-{
-   if (!prog)
-      return;
-
-   glUseProgram(prog->id);
-   glUniform1ui(prog->uniforms[name], i);
-}
-
-static void program_uniform2i(Program *prog, const char *name, GLint a, GLint b)
-{
-   if (!prog)
-      return;
-
-   glUseProgram(prog->id);
-   glUniform2i(prog->uniforms[name], a, b);
-}
-
-static void program_uniform2ui(Program *prog, const char *name, GLuint a, GLuint b)
-{
-   if (!prog)
-      return;
-
-   glUseProgram(prog->id);
-   glUniform2ui(prog->uniforms[name], a, b);
-}
-
 static void Shader_init(
       struct Shader *shader,
       const char* source,
@@ -1007,10 +970,18 @@ static void GlRenderer_draw(GlRenderer *renderer)
    x = renderer->config.draw_offset[0];
    y = renderer->config.draw_offset[1];
 
-   program_uniform2i(renderer->command_buffer->program, "offset", (GLint)x, (GLint)y);
+   if (renderer->command_buffer->program)
+   {
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
+   }
 
    // We use texture unit 0
-   program_uniform1i(renderer->command_buffer->program, "fb_texture", 0);
+   if (renderer->command_buffer->program)
+   {
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+   }
 
    // Bind the out framebuffer
    Framebuffer_init(&_fb, &renderer->fb_out);
@@ -1026,7 +997,11 @@ static void GlRenderer_draw(GlRenderer *renderer)
    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
    glDisable(GL_BLEND);
 
-   program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 0);
+   if (renderer->command_buffer->program)
+   {
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 0);
+   }
 
    renderer->command_buffer->prepare_draw();
 
@@ -1078,7 +1053,12 @@ static void GlRenderer_draw(GlRenderer *renderer)
       renderer->transparency_mode_index.push_back(ti);
 
       glEnable(GL_BLEND);
-      program_uniform1ui(renderer->command_buffer->program, "draw_semi_transparent", 1);
+
+      if (renderer->command_buffer->program)
+      {
+         glUseProgram(renderer->command_buffer->program->id);
+	 glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 1);
+      }
 
       unsigned cur_index = 0;
 
@@ -1185,10 +1165,18 @@ static void GlRenderer_upload_textures(
 
     renderer->image_load_buffer->push_slice(slice, slice_len);
 
-    program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
+    if (renderer->image_load_buffer->program)
+    {
+      glUseProgram(renderer->image_load_buffer->program->id);
+      glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
 
-    // fb_texture is always at 1x
-    program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
+       glUseProgram(renderer->command_buffer->program->id);
+       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+
+       /* fb_texture is always at 1x */
+       glUseProgram(renderer->image_load_buffer->program->id);
+       glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+    }
 
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
@@ -1362,7 +1350,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
     GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
-    program_uniform1ui(command_buffer->program, "dither_scaling", dither_scaling);
+    if (command_buffer->program)
+    {
+       glUseProgram(command_buffer->program->id);
+       glUniform1ui(command_buffer->program->uniforms["dither_scaling"], dither_scaling);
+    }
 
     GLenum texture_storage = GL_RGB5_A1;
     switch (depth) {
@@ -1675,7 +1667,12 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
-    program_uniform1ui(renderer->command_buffer->program, "dither_scaling", (GLuint) dither_scaling);
+
+    if (renderer->command_buffer->program)
+    {
+       glUseProgram(renderer->command_buffer->program->id);
+       glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], (GLuint)dither_scaling);
+    }
 
     renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
 
@@ -2258,11 +2255,20 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 		 };
 		 renderer->output_buffer->push_slice(slice, 4);
 
-		 program_uniform1i(renderer->output_buffer->program, "fb", 1);
-		 program_uniform2ui(renderer->output_buffer->program, "offset", fb_x_start, fb_y_start);
-		 program_uniform1i(renderer->output_buffer->program,  "depth_24bpp", depth_24bpp);
-		 program_uniform1ui(renderer->output_buffer->program, "internal_upscaling",
-				 renderer->internal_upscaling);
+
+		 if (renderer->output_buffer->program)
+		 {
+                    glUseProgram(renderer->output_buffer->program->id);
+		    glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
+	            glUseProgram(renderer->output_buffer->program->id);
+		    glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
+
+                    glUseProgram(renderer->output_buffer->program->id);
+		    glUniform1i(renderer->output_buffer->program->uniforms["depth"], depth_24bpp);
+
+                    glUseProgram(renderer->output_buffer->program->id);
+		    glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+		 }
 
 		 if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
 			 renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
@@ -2284,7 +2290,11 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          renderer->image_load_buffer->push_slice(slice, 4);
 
-         program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 1);
+	 if (renderer->image_load_buffer->program)
+	 {
+	    glUseProgram(renderer->image_load_buffer->program->id);
+	    glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+	 }
 
          glDisable(GL_SCISSOR_TEST);
          glDisable(GL_BLEND);
@@ -2292,8 +2302,11 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
          Framebuffer_init(&_fb, &renderer->fb_texture);
 
-         program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling",
-               renderer->internal_upscaling);
+	 if (renderer->image_load_buffer->program)
+	 {
+	    glUseProgram(renderer->image_load_buffer->program->id);
+	    glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+	 }
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
             renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
@@ -2936,9 +2949,15 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       };
       renderer->image_load_buffer->push_slice(slice, slice_len);
 
-      program_uniform1i(renderer->image_load_buffer->program, "fb_texture", 0);
-      // fb_texture is always at 1x
-      program_uniform1ui(renderer->image_load_buffer->program, "internal_upscaling", 1);
+      if (renderer->image_load_buffer->program)
+      {
+	 glUseProgram(renderer->image_load_buffer->program->id);
+	 glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
+         /* fb_texture is always at 1x */
+	 glUseProgram(renderer->image_load_buffer->program->id);
+	 glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      }
+
 
       glDisable(GL_SCISSOR_TEST);
       glDisable(GL_BLEND);
