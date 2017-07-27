@@ -217,10 +217,6 @@ struct TransparencyIndex {
     GLenum draw_mode;
 };
 
-/* forward decls */
-static void Program_free(Program *program);
-static GLint Program_find_attribute(Program *program, const char* attr);
-
 template<typename T>
 class DrawBuffer
 {
@@ -318,7 +314,7 @@ public:
        for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
        {
           Attribute& attr = *it;
-          GLint index     = Program_find_attribute(this->program, attr.name);
+          GLint index     = glGetAttribLocation(this->program->id, attr.name);
 
           // Don't error out if the shader doesn't use this
           // attribute, it could be caused by shader
@@ -415,7 +411,7 @@ public:
 
     void enable_attribute(const char* attr)
     {
-       GLint index = Program_find_attribute(this->program, attr);
+       GLint index = glGetAttribLocation(this->program->id, attr);
 
        if (index < 0)
           return;
@@ -427,7 +423,7 @@ public:
 
     void disable_attribute(const char* attr)
     {
-       GLint index = Program_find_attribute(this->program, attr);
+       GLint index = glGetAttribLocation(this->program->id, attr);
 
        if (index < 0)
           return;
@@ -838,10 +834,6 @@ static void Program_free(Program *program)
       free(program->info_log);
 }
 
-static GLint Program_find_attribute(Program *program, const char* attr)
-{
-   return glGetAttribLocation(program->id, attr);
-}
 
 static GLint Program_uniform(Program *program, const char* name)
 {
