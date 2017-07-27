@@ -846,8 +846,6 @@ static bool Program_init(
       return false;
    }
 
-   /* Rust code has a try statement here, perhaps we should fail fast with
-      exit(EXIT_FAILURE) ? */
    UniformMap uniforms = load_program_uniforms(id);
 
    program->id       = id;
@@ -861,7 +859,8 @@ static void Program_free(Program *program)
    if (!program)
       return;
 
-   glDeleteProgram(program->id);
+   if (glIsProgram(program->id))
+      glDeleteProgram(program->id);
    if (program->info_log)
       free(program->info_log);
 }
