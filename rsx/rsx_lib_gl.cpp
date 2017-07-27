@@ -1915,6 +1915,9 @@ static void cleanup_gl_state(void)
    glClearColor(0.0, 0.0, 0.0, 0.0);
 }
 
+extern void GPU_RestoreStateP1(bool val);
+extern void GPU_RestoreStateP2(bool val);
+extern void GPU_RestoreStateP3(void);
 
 static void gl_context_reset(void)
 {
@@ -1930,6 +1933,10 @@ static void gl_context_reset(void)
    {
       static_renderer.inited = true;
       static_renderer.state  = GlState_Valid;
+
+      GPU_RestoreStateP1(true);
+      GPU_RestoreStateP2(true);
+      GPU_RestoreStateP3();
    }
 }
 
