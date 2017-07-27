@@ -212,9 +212,8 @@ struct TransparencyIndex {
 };
 
 template<typename T>
-class DrawBuffer
+struct DrawBuffer
 {
-public:
     /// OpenGL name for this buffer
     GLuint id;
     /// Vertex Array Object containing the bindings for this
@@ -234,253 +233,253 @@ public:
     /// Absolute offset of the 1st mapped element in the current
     /// buffer relative to the beginning of the GL storage.
     size_t map_start;
-
-    DrawBuffer(size_t capacity, Program* program)
-       :map(NULL)
-    {
-       GLuint id = 0;
-       glGenVertexArrays(1, &id);
-
-       this->vao      = id;
-
-       id             = 0;
-
-       // Generate the buffer object
-       glGenBuffers(1, &id);
-
-       this->program  = program;
-       this->capacity = capacity;
-       this->id       = id;
-
-       // Create and map the buffer
-       glBindBuffer(GL_ARRAY_BUFFER, id);
-
-       size_t element_size = sizeof(T);
-       // We allocate enough space for 3 times the buffer space and
-       // we only remap one third of it at a time
-       GLsizeiptr storage_size = this->capacity * element_size * 3;
-
-       // Since we store indexes in unsigned shorts we want to make
-       // sure the entire buffer is indexable.
-       assert(this->capacity * 3 <= 0xffff);
-
-       glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
-
-       this->bind_attributes();
-
-       this->map_index = 0;
-       this->map_start = 0;
-
-       this->map__no_bind();
-    }
-
-    ~DrawBuffer()
-    {
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-
-       this->unmap__no_bind();
-
-       glDeleteBuffers(1, &this->id);
-       glDeleteVertexArrays(1, &this->vao);
-    }
-
-    void bind_attributes()
-    {
-       glBindVertexArray(this->vao);
-
-       // ARRAY_BUFFER is captured by VertexAttribPointer
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-
-       std::vector<Attribute> attrs = T::attributes();
-
-       GLint element_size = (GLint) sizeof( T );
-
-       //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
-       //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
-       //we need to make sure they're all disabled before then re-enabling the attribs we want
-       //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
-       GLint nVertexAttribs;
-       glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
-
-       for (int i = 0; i < nVertexAttribs; i++)
-          glDisableVertexAttribArray(i);
-
-       for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
-       {
-          Attribute& attr = *it;
-          GLint index     = glGetAttribLocation(this->program->id, attr.name);
-
-          // Don't error out if the shader doesn't use this
-          // attribute, it could be caused by shader
-          // optimization if the attribute is unused for
-          // some reason.
-          if (index < 0)
-             continue;
-
-          glEnableVertexAttribArray((GLuint) index);
-
-          // This captures the buffer so that we don't have to bind it
-          // when we draw later on, we'll just have to bind the vao
-          switch (attr.ty)
-          {
-             case GL_BYTE:
-             case GL_UNSIGNED_BYTE:
-             case GL_SHORT:
-             case GL_UNSIGNED_SHORT:
-             case GL_INT:
-             case GL_UNSIGNED_INT:
-                glVertexAttribIPointer( index,
-                      attr.components,
-                      attr.ty,
-                      element_size,
-                      (GLvoid*)attr.offset);
-                break;
-             case GL_FLOAT:
-                glVertexAttribPointer(  index,
-                      attr.components,
-                      attr.ty,
-                      GL_FALSE,
-                      element_size,
-                      (GLvoid*)attr.offset);
-                break;
-             case GL_DOUBLE:
-                glVertexAttribLPointer( index,
-                      attr.components,
-                      attr.ty,
-                      element_size,
-                      (GLvoid*)attr.offset);
-                break;
-          }
-       }
-    }
-
-
-    // Map the buffer for write-only access
-    void map__no_bind()
-    {
-       size_t element_size    = sizeof(T);
-       GLsizeiptr buffer_size = this->capacity * element_size;
-       GLintptr offset_bytes;
-       void *m;
-
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-
-       // If we're already mapped something's wrong
-       assert(this->map == NULL);
-
-       // We don't have enough room left to remap `capacity`,
-       // start back from the beginning of the buffer.
-       if (this->map_start > 2 * this->capacity)
-          this->map_start = 0;
-
-       offset_bytes = this->map_start * element_size;
-
-#if 0
-       printf("Remap %lu %lu\n", this->capacity, this->map_start);
-#endif
-
-       m = glMapBufferRange(GL_ARRAY_BUFFER,
-             offset_bytes,
-             buffer_size,
-             GL_MAP_WRITE_BIT |
-             GL_MAP_INVALIDATE_RANGE_BIT);
-
-       // Just in case...
-       assert(m != NULL);
-
-       this->map = reinterpret_cast<T *>(m);
-    }
-
-    // Unmap the active buffer
-    void unmap__no_bind()
-    {
-       assert(this->map != NULL);
-
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-
-       glUnmapBuffer(GL_ARRAY_BUFFER);
-
-       this->map = NULL;
-    }
-
-    void enable_attribute(const char* attr)
-    {
-       GLint index = glGetAttribLocation(this->program->id, attr);
-
-       if (index < 0)
-          return;
-
-       glBindVertexArray(this->vao);
-
-       glEnableVertexAttribArray(index);
-    }
-
-    void disable_attribute(const char* attr)
-    {
-       GLint index = glGetAttribLocation(this->program->id, attr);
-
-       if (index < 0)
-          return;
-
-       glBindVertexArray(this->vao);
-
-       glDisableVertexAttribArray(index);
-    }
-
-
-    void push_slice(T slice[], size_t n)
-    {
-       assert(n <= DRAWBUFFER_REMAINING_CAPACITY(this));
-       assert(this->map != NULL);
-
-       memcpy(this->map + this->map_index,
-             slice,
-             n * sizeof(T));
-
-       this->map_index += n;
-    }
-
-    void prepare_draw()
-    {
-       glBindVertexArray(this->vao);
-       glUseProgram(this->program->id);
-
-       // I don't need to bind this to draw (it's captured by the
-       // VAO) but I need it to map/unmap the storage.
-       glBindBuffer(GL_ARRAY_BUFFER, this->id);
-
-       /* Unmap the active buffer */
-       glUnmapBuffer(GL_ARRAY_BUFFER);
-
-       this->map = NULL;
-    }
-
-    /// Finalize the current buffer data and remap a fresh slice of
-    /// the storage.
-    void finalize_draw__no_bind()
-    {
-       this->map_start += this->map_index;
-       this->map_index  = 0;
-
-       this->map__no_bind();
-    }
-
-    void draw(GLenum mode)
-    {
-
-       this->prepare_draw();
-
-       // Length in number of vertices
-       glDrawArrays(mode, this->map_start, this->map_index);
-
-       this->finalize_draw__no_bind();
-    }
 };
 
+template<typename T>
+static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
+{
+   GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
+
+   if (index < 0)
+      return;
+
+   glBindVertexArray(drawbuffer->vao);
+
+   glEnableVertexAttribArray(index);
+}
+
+template<typename T>
+static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
+{
+   GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
+
+   if (index < 0)
+      return;
+
+   glBindVertexArray(drawbuffer->vao);
+
+   glDisableVertexAttribArray(index);
+}
+
+template<typename T>
+static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n)
+{
+   assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer));
+   assert(drawbuffer->map != NULL);
+
+   memcpy(drawbuffer->map + drawbuffer->map_index,
+		   slice,
+		   n * sizeof(T));
+
+   drawbuffer->map_index += n;
+}
+
+template<typename T>
+static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
+{
+   glBindVertexArray(drawbuffer->vao);
+   glUseProgram(drawbuffer->program->id);
+
+   // I don't need to bind this to draw (it's captured by the
+   // VAO) but I need it to map/unmap the storage.
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+
+   /* Unmap the active buffer */
+   glUnmapBuffer(GL_ARRAY_BUFFER);
+
+   drawbuffer->map = NULL;
+
+   /* Length in number of vertices */
+   glDrawArrays(mode, drawbuffer->map_start, drawbuffer->map_index);
+
+   drawbuffer->map_start += drawbuffer->map_index;
+   drawbuffer->map_index  = 0;
+
+   DrawBuffer_map__no_bind(drawbuffer);
+}
+
+/* Unmap the active buffer */
+template<typename T>
+static void DrawBuffer_unmap__no_bind(DrawBuffer<T> *drawbuffer)
+{
+   assert(drawbuffer->map != NULL);
+
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+
+   glUnmapBuffer(GL_ARRAY_BUFFER);
+
+   drawbuffer->map = NULL;
+}
+
+// Map the buffer for write-only access
+template<typename T>
+static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
+{
+   size_t element_size    = sizeof(T);
+   GLsizeiptr buffer_size = drawbuffer->capacity * element_size;
+   GLintptr offset_bytes;
+   void *m;
+
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+
+   // If we're already mapped something's wrong
+   assert(drawbuffer->map == NULL);
+
+   // We don't have enough room left to remap `capacity`,
+   // start back from the beginning of the buffer.
+   if (drawbuffer->map_start > 2 * drawbuffer->capacity)
+	   drawbuffer->map_start = 0;
+
+   offset_bytes = drawbuffer->map_start * element_size;
+
+#if 0
+   printf("Remap %lu %lu\n", drawbuffer->capacity, drawbuffer->map_start);
+#endif
+
+   m = glMapBufferRange(GL_ARRAY_BUFFER,
+		   offset_bytes,
+		   buffer_size,
+		   GL_MAP_WRITE_BIT |
+		   GL_MAP_INVALIDATE_RANGE_BIT);
+
+   // Just in case...
+   assert(m != NULL);
+
+   drawbuffer->map = reinterpret_cast<T *>(m);
+}
+
+template<typename T>
+static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
+{
+   if (!drawbuffer)
+      return;
+
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+
+   DrawBuffer_unmap__no_bind(drawbuffer);
+
+   glDeleteBuffers(1, &drawbuffer->id);
+   glDeleteVertexArrays(1, &drawbuffer->vao);
+}
+
+template<typename T>
+static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
+{
+   glBindVertexArray(drawbuffer->vao);
+
+   /* ARRAY_BUFFER is captured by VertexAttribPointer */
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+
+   std::vector<Attribute> attrs = T::attributes();
+   GLint element_size = (GLint) sizeof( T );
+
+   //speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
+   //as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
+   //we need to make sure they're all disabled before then re-enabling the attribs we want
+   //(solves crashes on some drivers/compilers due to accidentally enabled attribs)
+   GLint nVertexAttribs;
+   glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
+
+	for (int i = 0; i < nVertexAttribs; i++)
+		glDisableVertexAttribArray(i);
+
+	for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
+	{
+		Attribute& attr = *it;
+		GLint index     = glGetAttribLocation(drawbuffer->program->id, attr.name);
+
+		// Don't error out if the shader doesn't use this
+		// attribute, it could be caused by shader
+		// optimization if the attribute is unused for
+		// some reason.
+		if (index < 0)
+			continue;
+
+		glEnableVertexAttribArray((GLuint) index);
+
+		// This captures the buffer so that we don't have to bind it
+		// when we draw later on, we'll just have to bind the vao
+		switch (attr.ty)
+		{
+			case GL_BYTE:
+			case GL_UNSIGNED_BYTE:
+			case GL_SHORT:
+			case GL_UNSIGNED_SHORT:
+			case GL_INT:
+			case GL_UNSIGNED_INT:
+				glVertexAttribIPointer( index,
+						attr.components,
+						attr.ty,
+						element_size,
+						(GLvoid*)attr.offset);
+				break;
+			case GL_FLOAT:
+				glVertexAttribPointer(  index,
+						attr.components,
+						attr.ty,
+						GL_FALSE,
+						element_size,
+						(GLvoid*)attr.offset);
+				break;
+			case GL_DOUBLE:
+				glVertexAttribLPointer( index,
+						attr.components,
+						attr.ty,
+						element_size,
+						(GLvoid*)attr.offset);
+				break;
+		}
+	}
+}
+
+template<typename T>
+static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, size_t capacity, Program* program)
+{
+   GLuint id = 0;
+   glGenVertexArrays(1, &id);
+
+   drawbuffer->map = NULL;
+   drawbuffer->vao       = id;
+
+   id              = 0;
+
+   // Generate the buffer object
+   glGenBuffers(1, &id);
+
+   drawbuffer->program  = program;
+   drawbuffer->capacity = capacity;
+   drawbuffer->id       = id;
+
+   // Create and map the buffer
+   glBindBuffer(GL_ARRAY_BUFFER, id);
+
+   size_t element_size = sizeof(T);
+   // We allocate enough space for 3 times the buffer space and
+   // we only remap one third of it at a time
+   GLsizeiptr storage_size = drawbuffer->capacity * element_size * 3;
+
+   // Since we store indexes in unsigned shorts we want to make
+   // sure the entire buffer is indexable.
+   assert(drawbuffer->capacity * 3 <= 0xffff);
+
+   glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
+
+   DrawBuffer_bind_attributes<T>(drawbuffer);
+
+   drawbuffer->map_index = 0;
+   drawbuffer->map_start = 0;
+
+   DrawBuffer_map__no_bind(drawbuffer);
+}
 
 struct GlRenderer {
-    /// Buffer used to handle PlayStation GPU draw commands
+    /* Buffer used to handle PlayStation GPU draw commands */
     DrawBuffer<CommandVertex>* command_buffer;
+    /* Buffer used to draw to the frontend's framebuffer */
+    DrawBuffer<OutputVertex>* output_buffer;
+    /* Buffer used to copy textures from `fb_texture` to `fb_out` */
+    DrawBuffer<ImageLoadVertex>* image_load_buffer;
+
     GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
     GLushort opaque_line_indices[INDEX_BUFFER_LEN];
     GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
@@ -495,10 +494,6 @@ struct GlRenderer {
     std::vector<TransparencyIndex> transparency_mode_index;
     /// Polygon mode (for wireframe)
     GLenum command_polygon_mode;
-    /// Buffer used to draw to the frontend's framebuffer
-    DrawBuffer<OutputVertex>* output_buffer;
-    /// Buffer used to copy textures from `fb_texture` to `fb_out`
-    DrawBuffer<ImageLoadVertex>* image_load_buffer;
     /// Texture used to store the VRAM for texture mapping
     DrawConfig config;
     /// Framebuffer used as a shader input for texturing draw commands
@@ -940,8 +935,9 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
 		const char* fragment_shader,
 		size_t capacity)
 {
-   Shader *vs = new Shader;
-   Shader *fs = new Shader;
+   DrawBuffer<T> *t = new DrawBuffer<T>;
+   Shader       *vs = new Shader;
+   Shader       *fs = new Shader;
 
    Shader_init(vs, vertex_shader, GL_VERTEX_SHADER);
    Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
@@ -956,7 +952,9 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
    delete vs;
    delete fs;
 
-   return new DrawBuffer<T>(capacity, program);
+   DrawBuffer_new<T>(t, capacity, program);
+
+   return t;
 }
 
 static void GlRenderer_draw(GlRenderer *renderer)
@@ -999,7 +997,17 @@ static void GlRenderer_draw(GlRenderer *renderer)
       glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 0);
    }
 
-   renderer->command_buffer->prepare_draw();
+   glBindVertexArray(renderer->command_buffer->vao);
+   glUseProgram(renderer->command_buffer->program->id);
+
+   /* I don't need to bind this to draw (it's captured by the
+    * VAO) but I need it to map/unmap the storage. */
+   glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
+
+   /* Unmap the active buffer */
+   glUnmapBuffer(GL_ARRAY_BUFFER);
+
+   renderer->command_buffer->map = NULL;
 
    GLushort *opaque_triangle_indices =
       renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
@@ -1117,7 +1125,9 @@ static void GlRenderer_draw(GlRenderer *renderer)
       }
    }
 
-   renderer->command_buffer->finalize_draw__no_bind();
+   renderer->command_buffer->map_start += renderer->command_buffer->map_index;
+   renderer->command_buffer->map_index  = 0;
+   DrawBuffer_map__no_bind(renderer->command_buffer);
 
    renderer->primitive_ordering = 0;
    renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
@@ -1159,7 +1169,7 @@ static void GlRenderer_upload_textures(
         {   {x_end,     y_end   }   }
     };
 
-    renderer->image_load_buffer->push_slice(slice, slice_len);
+    DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
 
     if (renderer->image_load_buffer->program)
     {
@@ -1184,7 +1194,7 @@ static void GlRenderer_upload_textures(
     Framebuffer_init(&_fb, &renderer->fb_out);
 
     if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-       renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
     glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
     glEnable(GL_SCISSOR_TEST);
 
@@ -1337,10 +1347,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     // textures.
     Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
-    if (depth > 16) {
-        // Dithering is superfluous when we increase the internal
-        // color depth
-        command_buffer->disable_attribute("dither");
+    if (depth > 16)
+    {
+        /* Dithering is superfluous when we increase the internal
+         * color depth */
+        DrawBuffer_disable_attribute(command_buffer, "dither");
     }
 
     uint32_t dither_scaling = scale_dither ? upscaling : 1;
@@ -1414,19 +1425,29 @@ static void GlRenderer_free(GlRenderer *renderer)
    if (!renderer)
       return;
 
-    if (renderer->command_buffer) {
+    if (renderer->command_buffer)
+    {
         Program_free(renderer->command_buffer->program);
+	DrawBuffer_free(renderer->command_buffer);
         delete renderer->command_buffer->program;
         delete renderer->command_buffer;
     }
     renderer->command_buffer = NULL;
 
     if (renderer->output_buffer)
+    {
+        Program_free(renderer->output_buffer->program);
+	DrawBuffer_free(renderer->output_buffer);
         delete renderer->output_buffer;
+    }
     renderer->output_buffer = NULL;
 
     if (renderer->image_load_buffer)
+    {
+        Program_free(renderer->image_load_buffer->program);
+	DrawBuffer_free(renderer->image_load_buffer);
         delete renderer->image_load_buffer;
+    }
     renderer->image_load_buffer = NULL;
 
     glDeleteTextures(1, &renderer->fb_texture.id);
@@ -1615,9 +1636,9 @@ static bool retro_refresh_variables(GlRenderer *renderer)
     if (rebuild_fb_out)
     {
         if (depth > 16)
-            renderer->command_buffer->disable_attribute("dither");
+            DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
         else
-            renderer->command_buffer->enable_attribute("dither");
+            DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
 
         uint32_t native_width = (uint32_t) VRAM_WIDTH_PIXELS;
         uint32_t native_height = (uint32_t) VRAM_HEIGHT;
@@ -1779,7 +1800,7 @@ static void push_primitive(
       index++;
    }
 
-   renderer->command_buffer->push_slice(v, count);
+   DrawBuffer_push_slice(renderer->command_buffer, v, count);
 }
 
 std::vector<Attribute> CommandVertex::attributes()
@@ -2227,8 +2248,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 			 { {-1.0,  1.0}, {0,         0} },
 			 { { 1.0,  1.0}, {fb_width,  0} }
 		 };
-		 renderer->output_buffer->push_slice(slice, 4);
 
+		 DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
 
 		 if (renderer->output_buffer->program)
 		 {
@@ -2242,7 +2263,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 		 }
 
 		 if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
-			 renderer->output_buffer->draw(GL_TRIANGLE_STRIP);
+			 DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
 	 }
       }
 
@@ -2259,7 +2280,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
             {   {1023, 511   }   },
          };
 
-         renderer->image_load_buffer->push_slice(slice, 4);
+         DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4);
 
 	 if (renderer->image_load_buffer->program)
 	 {
@@ -2280,7 +2301,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 	 }
 
          if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-            renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+            DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
 	 glDeleteFramebuffers(1, &_fb.id);
       }
@@ -2554,7 +2575,7 @@ void rsx_gl_push_quad(
          }
       }
 
-      renderer->command_buffer->push_slice(v, 4);
+      DrawBuffer_push_slice(renderer->command_buffer, v, 4);
    }
 }
 
@@ -2918,7 +2939,8 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
          {   {x_start,   y_end   }   },
          {   {x_end,     y_end   }   }
       };
-      renderer->image_load_buffer->push_slice(slice, slice_len);
+
+      DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
 
       if (renderer->image_load_buffer->program)
       {
@@ -2937,7 +2959,7 @@ void rsx_gl_load_image(uint16_t x, uint16_t y,
       Framebuffer_init(&_fb, &renderer->fb_out);
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-         renderer->image_load_buffer->draw(GL_TRIANGLE_STRIP);
+         DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
       glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
       glEnable(GL_SCISSOR_TEST);
 
