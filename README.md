@@ -6,7 +6,7 @@ It currently runs on Linux, OSX and Windows.
 ## Running
 
 To run this core, the "system directory" must be defined if running in RetroArch.
-The PSX BIOS must be placed there, $sysdir/SCPH550{0,1,2} for Japanese, NA and EU regions respectively.
+The PSX BIOS must be placed there, $sysdir/scph550{0,1,2} for Japanese, NA and EU regions respectively.
 
 Memory cards will be saved to "save directory", memory card #1 is saved using libretro's standard interface. The rest of memory cards are saved using Mednafen's standard mechanism. You might have to rename your old 
 memory cards to gamename.srm. Alternatively you may just rename it from gamename.gamenamehash.0.mcr to gamename.gamenamehash.1.mcr and load them off the corresponding slot.
@@ -52,32 +52,37 @@ Note that RetroArch does not currently have .pbp database due to variability in 
 
 ## Options
 
-* Renderer (restart) - 'software' or 'opengl'. 'opengl' uses the OpenGL API to accelerate tasks like upscaling.
+* Renderer (restart) - 'software', 'vulkan' and 'opengl'. The last two options will enable and/or speedup enhancements like upscaling and texture filtering.
 * Software framebuffer - If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.
-* CD Image Cache - Loads the complete image in memory at startup.
-* CPU Overclock - Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
-* Skip BIOS - Self-explanatory. Some games have issues when enabled.
-* Widescreen mode hack - If on, renders in 16:9. Works best on 3D games.
+* Adaptive smoothing - When upscaling, smooths out 2D elements while keeping 3D elements sharp. Vulkan renderer only at the moment.
 * Internal GPU resolution - Graphics upscaling.
-* Texture filtering - Self-explanatory.
-* Internal color depth - PSX had 16bpp depth, beetle-psx can go up to 32bpp.
-* Scale dithering pattern with internal resolution - Self-explanatory
-* Wireframe mode - For debug use. Shows only the outlines of polygons. 
+* Texture filtering - Per-texture filtering using e.g. xBR, SABR, bilinear, etc. OpenGL only at the moment.
+* Internal color depth - PSX had 16bpp depth, beetle-psx can go up to 32bpp. OpenGL only at the moment. Vulkan always uses 32bpp.
+* Wireframe mode - For debug use. Shows only the outlines of polygons. OpenGL only.
 * Display full VRAM - Everything in VRAM is drawn on screen.
-* Dithering pattern - If off, disables the dithering pattern the PSX applies to combat color banding.
-* GTE pixel accuracy - If on, uses floating point coordinates instead of integer ones for vertex positions, to avoid the PSX poly jitter. This option does nothing at the moment.
-* Memcard 0 method - Picks the format (libretro or mednafen) used for storing memcard 0 save data.
-* Enable memory card 1 - Specifically enables memcard slot 1. Needed for game "Codename Tenka".
-* Shared memory cards (restart) - Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
+* PGXP operation mode - When not off, floating point coordinates will be used for vertex positions, to avoid the PSX polygon jitter. 'memory + cpu' mode can further reduce jitter at the cost of performance and geometry glitches.
+* PGXP vertex cache - Maintains a cache for vertices. May result in better performance but can result in graphics glitches in most games.
+* PGXP perspective correct texturing - Original PSX did affine texture mapping, resulting in e.g. crooked lines across walls. This fixes it.
+* Dithering pattern - If off, disables the dithering pattern the PSX applies to combat color banding. OpenGL only. Vulkan always disables the pattern.
+* Scale dithering pattern with internal resolution - Self-explanatory. OpenGL only.
 * Initial Scanline - Sets the first scanline to be drawn on screen.
 * Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems.
 * Last Scanline - Sets the last scanline to be drawn on screen.
 * Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems.
-* DualShock Analog button toggle - Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.
-* Port 1 PSX Enable Multitap - Enables/Disables multitap functionality on port 1.
-* Port 2 PSX Enable Multitap - Enables/Disables multitap functionality on port 2.
 * Frame duping (speedup) - Redraws/reuses the last frame if there was no new data.
-* Display internal FPS - Shows the frame rate at which the emulated PSX is drawing at.
+* Widescreen mode hack - If on, renders in 16:9. Works best on 3D games.
 * Crop Overscan - Self-explanatory.
-* Offset cropped image - Self-explanatory.
 * Additional cropping - Self-explanatory.
+* Offset cropped image - Self-explanatory.
+* Display internal FPS - Shows the frame rate at which the emulated PSX is drawing at.
+* Analog self-calibration - Monitors the max values reached by the input, using it as a calibration heuristic which then scales the analog coordinates sent to the emulator accordingly.
+For best results, rotate the sticks at max amplitude for the algorithm to get a good estimate of the scaling factor, otherwise it will adjust while playing content.
+* DualShock Analog button toggle - Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.
+* Port 1: Multitap Enable - Enables/Disables multitap functionality on port 1.
+* Port 2: Multitap Enable - Enables/Disables multitap functionality on port 2.
+* CPU Overclock - Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
+* CD Image Cache - Loads the complete image in memory at startup.
+* Skip BIOS - Self-explanatory. Some games have issues when enabled.
+* Memcard 0 method - Picks the format (libretro or mednafen) used for storing memcard 0 save data.
+* Enable memory card 1 - Specifically enables memcard slot 1. Needed for game "Codename Tenka".
+* Shared memory cards (restart) - Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
