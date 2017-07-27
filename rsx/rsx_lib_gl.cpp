@@ -351,6 +351,8 @@ static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
    glDeleteBuffers(1, &drawbuffer->id);
    glDeleteVertexArrays(1, &drawbuffer->vao);
 
+   delete drawbuffer->program;
+
    drawbuffer->map       = NULL;
    drawbuffer->id        = 0;
    drawbuffer->vao       = 0;
@@ -1415,7 +1417,6 @@ static void GlRenderer_free(GlRenderer *renderer)
    if (renderer->command_buffer)
    {
       DrawBuffer_free(renderer->command_buffer);
-      delete renderer->command_buffer->program;
       delete renderer->command_buffer;
    }
    renderer->command_buffer = NULL;
