@@ -81,7 +81,6 @@ static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
 typedef std::map<std::string, GLint> UniformMap;
 
-
 enum VideoClock {
     VideoClock_Ntsc,
     VideoClock_Pal
@@ -810,7 +809,7 @@ static void get_program_info_log(Program *pg, GLuint id)
    pg->info_log[log_len - 1] = '\0';
 }
 
-static void Program_init(
+static bool Program_init(
       Program *program,
       Shader* vertex_shader,
       Shader* fragment_shader)
@@ -825,7 +824,7 @@ static void Program_init(
    if (id == 0)
    {
       puts("An error occured creating the program object\n");
-      exit(EXIT_FAILURE);
+      return false;
    }
 
    glAttachShader(id, vertex_shader->id);
@@ -836,22 +835,7 @@ static void Program_init(
    glDetachShader(id, vertex_shader->id);
    glDetachShader(id, fragment_shader->id);
 
-   /* Program owns the two pointers, so we clean them up now */
-   if (vertex_shader)
-   {
-      Shader_free(vertex_shader);
-      delete vertex_shader;
-      vertex_shader = NULL;
-   }
-
-   if (fragment_shader)
-   {
-      Shader_free(fragment_shader);
-      delete fragment_shader;
-      fragment_shader = NULL;
-   }
-
-   // Check if the program linking was successful
+   /* Check if the program linking was successful */
    status = (GLint) GL_FALSE;
    glGetProgramiv(id, GL_LINK_STATUS, &status);
    get_program_info_log(program, id);
@@ -862,8 +846,7 @@ static void Program_init(
       puts("Program info log:\n");
       puts(program->info_log );
 
-      exit(EXIT_FAILURE);
-      return;
+      return false;
    }
 
    /* Rust code has a try statement here, perhaps we should fail fast with
@@ -872,6 +855,8 @@ static void Program_init(
 
    program->id       = id;
    program->uniforms = uniforms;
+
+   return true;
 }
 
 static void Program_free(Program *program)
@@ -1021,7 +1006,14 @@ static DrawBuffer<T>* build_buffer( const char* vertex_shader,
    Shader_init(fs, fragment_shader, GL_FRAGMENT_SHADER);
    Program* program = new Program;
 
-   Program_init(program, vs, fs);
+   if (!Program_init(program, vs, fs))
+      return NULL;
+
+   /* Program owns the two pointers, so we clean them up now */
+   Shader_free(fs);
+   Shader_free(vs);
+   delete vs;
+   delete fs;
 
    return new DrawBuffer<T>(capacity, program);
 }
