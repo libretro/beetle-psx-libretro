@@ -145,40 +145,40 @@ struct Attribute
 struct CommandVertex {
    /* Position in PlayStation VRAM coordinates */
    float position[4];
-   /// RGB color, 8bits per component
+   /* RGB color, 8bits per component */
    uint8_t color[3];
-   /// Texture coordinates within the page
+   /* Texture coordinates within the page */
    uint16_t texture_coord[2];
-   /// Texture page (base offset in VRAM used for texture lookup)
+   /* Texture page (base offset in VRAM used for texture lookup) */
    uint16_t texture_page[2];
-   /// Color Look-Up Table (palette) coordinates in VRAM
+   /* Color Look-Up Table (palette) coordinates in VRAM */
    uint16_t clut[2];
-   /// Blending mode: 0: no texture, 1: raw-texture, 2: texture-blended
+   /* Blending mode: 0: no texture, 1: raw-texture, 2: texture-blended */
    uint8_t texture_blend_mode;
-   /// Right shift from 16bits: 0 for 16bpp textures, 1 for 8bpp, 2
-   /// for 4bpp
+   /* Right shift from 16bits: 0 for 16bpp textures, 1 for 8bpp, 2
+    * for 4bpp */
    uint8_t depth_shift;
-   /// True if dithering is enabled for this primitive
+   /* True if dithering is enabled for this primitive */
    uint8_t dither;
-   /// 0: primitive is opaque, 1: primitive is semi-transparent
+   /* 0: primitive is opaque, 1: primitive is semi-transparent */
    uint8_t semi_transparent;
-   /// Texture window mask/OR values
+   /* Texture window mask/OR values */
    uint8_t texture_window[4];
 
    static std::vector<Attribute> attributes();
 };
 
 struct OutputVertex {
-   /// Vertex position on the screen
+   /* Vertex position on the screen */
    float position[2];
-   /// Corresponding coordinate in the framebuffer
+   /* Corresponding coordinate in the framebuffer */
    uint16_t fb_coord[2];
 
    static std::vector<Attribute> attributes();
 };
 
 struct ImageLoadVertex {
-   // Vertex position in VRAM
+   /* Vertex position in VRAM */
    uint16_t position[2];
 
    static std::vector<Attribute> attributes();
@@ -218,34 +218,32 @@ struct TransparencyIndex {
 template<typename T>
 struct DrawBuffer
 {
-   /// OpenGL name for this buffer
+   /* OpenGL name for this buffer */
    GLuint id;
-   /// Vertex Array Object containing the bindings for this
-   /// buffer. I'm assuming that each VAO will only use a single
-   /// buffer for simplicity.
+   /* Vertex Array Object containing the bindings for this
+    * buffer. I'm assuming that each VAO will only use a single
+    * buffer for simplicity. */
    GLuint vao;
-   /// Program used to draw this buffer
+   /* Program used to draw this buffer */
    Program* program;
-   /// Currently mapped buffer range (write-only)
+   /* Currently mapped buffer range (write-only) */
    T *map;
-
-   /// Number of elements T mapped at once in 'map'
+   /* Number of elements T mapped at once in 'map' */
    size_t capacity;
-   /// Index one-past the last element stored in `map`, relative to
-   /// the first element in `map`
+   /* Index one-past the last element stored in 'map', relative to
+    * the first element in 'map' */
    size_t map_index;
-   /// Absolute offset of the 1st mapped element in the current
-   /// buffer relative to the beginning of the GL storage.
+   /* Absolute offset of the 1st mapped element in the current
+    * buffer relative to the beginning of the GL storage. */
    size_t map_start;
 };
-
 
 struct GlRenderer {
    /* Buffer used to handle PlayStation GPU draw commands */
    DrawBuffer<CommandVertex>* command_buffer;
    /* Buffer used to draw to the frontend's framebuffer */
    DrawBuffer<OutputVertex>* output_buffer;
-   /* Buffer used to copy textures from `fb_texture` to `fb_out` */
+   /* Buffer used to copy textures from 'fb_texture' to 'fb_out' */
    DrawBuffer<ImageLoadVertex>* image_load_buffer;
 
    GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
@@ -372,7 +370,7 @@ static void get_error(const char *msg)
    }
 
    /* glGetError should always be called in a loop, until 
-   it returns GL_NO_ERROR, if all error flags are to be reset. */
+    * it returns GL_NO_ERROR, if all error flags are to be reset. */
    while (error != GL_NO_ERROR)
       error = glGetError();
 
@@ -601,7 +599,6 @@ static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* a
       return;
 
    glBindVertexArray(drawbuffer->vao);
-
    glEnableVertexAttribArray(index);
 }
 
@@ -614,7 +611,6 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
       return;
 
    glBindVertexArray(drawbuffer->vao);
-
    glDisableVertexAttribArray(index);
 }
 
@@ -627,9 +623,9 @@ static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n
    assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer));
    assert(drawbuffer->map != NULL);
 
-   memcpy(drawbuffer->map + drawbuffer->map_index,
-         slice,
-         n * sizeof(T));
+   memcpy(  drawbuffer->map + drawbuffer->map_index,
+            slice,
+            n * sizeof(T));
 
    drawbuffer->map_index += n;
 }
@@ -671,7 +667,7 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
    /* If we're already mapped something's wrong */
    assert(drawbuffer->map == NULL);
 
-   /* We don't have enough room left to remap `capacity`,
+   /* We don't have enough room left to remap 'capacity',
     * start back from the beginning of the buffer. */
    if (drawbuffer->map_start > 2 * drawbuffer->capacity)
       drawbuffer->map_start = 0;
@@ -855,18 +851,18 @@ static void Framebuffer_init(struct Framebuffer *fb,
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb->id);
 
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
-         GL_COLOR_ATTACHMENT0,
-         color_texture->id,
-         0);
+                           GL_COLOR_ATTACHMENT0,
+                           color_texture->id,
+                           0);
 
    GLenum col_attach_0 = GL_COLOR_ATTACHMENT0;
+   
    glDrawBuffers(1, &col_attach_0);
    glViewport( 0,
-         0,
-         (GLsizei) color_texture->width,
-         (GLsizei) color_texture->height);
+               0,
+               (GLsizei) color_texture->width,
+               (GLsizei) color_texture->height);
 }
-
 
 static void Texture_init(
       struct Texture *tex,
@@ -879,10 +875,10 @@ static void Texture_init(
    glGenTextures(1, &id);
    glBindTexture(GL_TEXTURE_2D, id);
    glTexStorage2D(GL_TEXTURE_2D,
-         1,
-         internal_format,
-         (GLsizei) width,
-         (GLsizei) height);
+                  1,
+                  internal_format,
+                  (GLsizei) width,
+                  (GLsizei) height);
 
    tex->id     = id;
    tex->width  = width;
@@ -899,15 +895,15 @@ static void Texture_set_sub_image(
 {
    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
    glBindTexture(GL_TEXTURE_2D, tex->id);
-   glTexSubImage2D(GL_TEXTURE_2D,
-         0,
-         (GLint) top_left[0],
-         (GLint) top_left[1],
-         (GLsizei) resolution[0],
-         (GLsizei) resolution[1],
-         format,
-         ty,
-         (void*) data);
+   glTexSubImage2D(  GL_TEXTURE_2D,
+                     0,
+                     (GLint) top_left[0],
+                     (GLint) top_left[1],
+                     (GLsizei) resolution[0],
+                     (GLsizei) resolution[1],
+                     format,
+                     ty,
+                     (void*) data);
 }
 
 static void Texture_set_sub_image_window(
@@ -928,9 +924,7 @@ static void Texture_set_sub_image_window(
    uint16_t* sub_data = &( data[index] );
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
-
    Texture_set_sub_image(tex, top_left, resolution, format, ty, sub_data);
-
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
@@ -1171,8 +1165,8 @@ static void GlRenderer_upload_textures(
    glDisable(GL_BLEND);
    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-   // Bind the output framebuffer
-   // let _fb = Framebuffer::new(&self.fb_out);
+   /* Bind the output framebuffer */
+   /* let _fb = Framebuffer::new(&self.fb_out); */
    Framebuffer _fb;
    Framebuffer_init(&_fb, &renderer->fb_out);
 
@@ -1257,29 +1251,26 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    var.key = option_depth;
    uint8_t depth = 16;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   {
       if (!strcmp(var.value, "32bpp"))
          depth = 32;
-      else
-         depth = 16;
    }
 
    var.key = option_scale_dither;
    bool scale_dither = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   {
       if (!strcmp(var.value, "enabled"))
          scale_dither = true;
-      else
-         scale_dither = false;
    }
 
    var.key = option_wireframe;
    bool wireframe = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   {
       if (!strcmp(var.value, "enabled"))
          wireframe = true;
-      else
-         wireframe = false;
    }
 
    log_cb(RETRO_LOG_INFO, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
@@ -1339,9 +1330,9 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
    uint32_t native_height = (uint32_t) VRAM_HEIGHT;
 
-   // Texture holding the raw VRAM texture contents. We can't
-   // meaningfully upscale it since most games use paletted
-   // textures.
+   /* Texture holding the raw VRAM texture contents. We can't
+    * meaningfully upscale it since most games use paletted
+    * textures. */
    Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
    if (depth > 16)
@@ -1481,8 +1472,8 @@ static inline void apply_scissor(GlRenderer *renderer)
 
    GLsizei upscale = (GLsizei)renderer->internal_upscaling;
 
-   // We need to scale those to match the internal resolution if
-   // upscaling is enabled
+   /* We need to scale those to match the internal resolution if
+    * upscaling is enabled */
    GLsizei x = (GLsizei) _x * upscale;
    GLsizei y = (GLsizei) _y * upscale;
    GLsizei w = (GLsizei) _w * upscale;
@@ -1505,7 +1496,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    {
       _w = VRAM_WIDTH_PIXELS;
       _h = VRAM_HEIGHT;
-      // Is this accurate?
+      /* Is this accurate? */
       aspect_ratio = 2.0 / 1.0;
    } else {
       _w = renderer->config.display_resolution[0];
@@ -1538,7 +1529,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       renderer->frontend_resolution[1] = h;
    }
 
-   // Bind the output framebuffer provided by the frontend
+   /* Bind the output framebuffer provided by the frontend */
    fbo = glsm_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
@@ -1640,9 +1631,9 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       renderer->fb_out.height = 0;
       Texture_init(&renderer->fb_out, w, h, texture_storage);
 
-      // This is a bit wasteful since it'll re-upload the data
-      // to `fb_texture` even though we haven't touched it but
-      // this code is not very performance-critical anyway.
+      /* This is a bit wasteful since it'll re-upload the data
+       * to 'fb_texture' even though we haven't touched it but
+       * this code is not very performance-critical anyway. */
 
       uint16_t top_left[2]   = {0, 0};
       uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
@@ -1715,8 +1706,9 @@ static void vertex_preprocessing(
 
    if (is_semi_transparent &&
          (stm != renderer->semi_transparency_mode ||
-          mode != renderer->command_draw_mode)) {
-      // We're changing the transparency mode
+          mode != renderer->command_draw_mode)) 
+   {
+      /* We're changing the transparency mode */
       TransparencyIndex ti;
       ti.transparency_mode = renderer->semi_transparency_mode;
       ti.last_index        = renderer->semi_transparent_index_pos;
@@ -1737,11 +1729,11 @@ static void push_primitive(
 {
    bool is_semi_transparent = v[0].semi_transparent   == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
-   // Textured semi-transparent polys can contain opaque texels (when
-   // bit 15 of the color is set to 0). Therefore they're drawn twice,
-   // once for the opaque texels and once for the semi-transparent
-   // ones. Only untextured semi-transparent triangles don't need to be
-   // drawn as opaque.
+   /* Textured semi-transparent polys can contain opaque texels (when
+    * bit 15 of the color is set to 0). Therefore they're drawn twice,
+    * once for the opaque texels and once for the semi-transparent
+    * ones. Only untextured semi-transparent triangles don't need to be
+    * drawn as opaque. */
    bool is_opaque = !is_semi_transparent || is_textured;
 
    vertex_preprocessing(renderer, v, count, mode, stm);
@@ -2084,7 +2076,7 @@ void rsx_gl_refresh_variables(void)
       struct retro_system_av_info av_info = get_av_info(static_renderer.video_clock);
 
       /* This call can potentially (but not necessarily) call
-       * 'context_destroy' and `context_reset` to reinitialize */
+       * 'context_destroy' and 'context_reset' to reinitialize */
       bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 
       if (!ok)
@@ -2338,7 +2330,7 @@ void  rsx_gl_set_draw_area(uint16_t x0,
 
       renderer->config.draw_area_top_left[0] = x0;
       renderer->config.draw_area_top_left[1] = y0;
-      // Draw area coordinates are inclusive
+      /* Draw area coordinates are inclusive */
       renderer->config.draw_area_bot_right[0] = x1 + 1;
       renderer->config.draw_area_bot_right[1] = y1 + 1;
 
