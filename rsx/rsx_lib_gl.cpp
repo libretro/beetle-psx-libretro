@@ -305,7 +305,7 @@ struct RetroGl
 
 static DrawConfig persistent_config = {
    {0, 0},         /* display_top_left */
-   {700, 576},     /* display_resolution */
+   {MEDNAFEN_CORE_GEOMETRY_MAX_W, MEDNAFEN_CORE_GEOMETRY_MAX_H}, /* display_resolution */
    false,          /* display_24bpp */
    true,           /* display_off */
    {0, 0},         /* draw_area_top_left */
@@ -423,7 +423,7 @@ static bool Shader_init(
          shader->info_log[log_len - 1] = '\0';
    }
 
-   if (status != (GLint) GL_TRUE)
+   if (status != GL_TRUE)
    {
       log_cb(RETRO_LOG_ERROR, "Shader compilation failed:\n");
 
@@ -1534,12 +1534,12 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       geometry.base_height = h;
 
       /* Max parameters are ignored by this call */
-      geometry.max_width  = 0;
-      geometry.max_height = 0;
+      geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+      geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H;
 
       geometry.aspect_ratio = aspect_ratio;
 
-      //printf("Target framebuffer size: %dx%d\n", w, h);
+      log_cb(RETRO_LOG_INFO, "Target framebuffer size: %dx%d\n", w, h);
 
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
@@ -1548,7 +1548,6 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    }
 
    // Bind the output framebuffer provided by the frontend
-   /* TODO/FIXME - I think glsm_ctl(BIND) is the way to go here. Check with the libretro devs */
    fbo = glsm_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
@@ -1959,7 +1958,7 @@ static void gl_context_destroy(void)
 
    static_renderer.state_data = NULL;
    static_renderer.state      = GlState_Invalid;
-   static_renderer.inited       = false;
+   static_renderer.inited     = false;
 }
 
 static bool gl_context_framebuffer_lock(void* data)
@@ -1975,12 +1974,10 @@ struct retro_system_av_info get_av_info(VideoClock std)
    uint8_t upscaling         = 1;
    bool widescreen_hack      = false;
    bool display_vram         = false;
-   struct retro_variable var = {0};
-
-   var.key = option_internal_resolution;
 
    get_variables(&upscaling, &display_vram);
 
+   struct retro_variable var = {0};
    var.key = option_widescreen_hack;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2009,7 +2006,7 @@ struct retro_system_av_info get_av_info(VideoClock std)
     * this base value is not really important */
    info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-   info.geometry.max_width      = max_width * upscaling;
+   info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
@@ -2381,34 +2378,17 @@ void rsx_gl_set_display_mode(uint16_t x,
 
 
 void rsx_gl_push_quad(
-      float p0x,
-      float p0y,
-      float p0w,
-      float p1x,
-      float p1y,
-      float p1w,
-      float p2x,
-      float p2y,
-      float p2w,
-      float p3x,
-      float p3y,
-      float p3w,
-      uint32_t c0,
-      uint32_t c1,
-      uint32_t c2,
-      uint32_t c3,
-      uint16_t t0x,
-      uint16_t t0y,
-      uint16_t t1x,
-      uint16_t t1y,
-      uint16_t t2x,
-      uint16_t t2y,
-      uint16_t t3x,
-      uint16_t t3y,
-      uint16_t texpage_x,
-      uint16_t texpage_y,
-      uint16_t clut_x,
-      uint16_t clut_y,
+      float p0x, float p0y, float p0w,
+      float p1x, float p1y, float p1w,
+      float p2x, float p2y, float p2w,
+      float p3x, float p3y, float p3w,
+      uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+      uint16_t t0x, uint16_t t0y,
+      uint16_t t1x, uint16_t t1y,
+      uint16_t t2x, uint16_t t2y,
+      uint16_t t3x, uint16_t t3y,
+      uint16_t texpage_x, uint16_t texpage_y,
+      uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
       bool dither,
@@ -2526,28 +2506,15 @@ void rsx_gl_push_quad(
 }
 
 void rsx_gl_push_triangle(
-      float p0x,
-      float p0y,
-      float p0w,
-      float p1x,
-      float p1y,
-      float p1w,
-      float p2x,
-      float p2y,
-      float p2w,
-      uint32_t c0,
-      uint32_t c1,
-      uint32_t c2,
-      uint16_t t0x,
-      uint16_t t0y,
-      uint16_t t1x,
-      uint16_t t1y,
-      uint16_t t2x,
-      uint16_t t2y,
-      uint16_t texpage_x,
-      uint16_t texpage_y,
-      uint16_t clut_x,
-      uint16_t clut_y,
+      float p0x, float p0y, float p0w,
+      float p1x, float p1y, float p1w,
+      float p2x, float p2y, float p2w,
+      uint32_t c0, uint32_t c1, uint32_t c2,
+      uint16_t t0x, uint16_t t0y,
+      uint16_t t1x, uint16_t t1y,
+      uint16_t t2x, uint16_t t2y,
+      uint16_t texpage_x, uint16_t texpage_y,
+      uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
       bool dither,
@@ -2691,7 +2658,6 @@ void rsx_gl_fill_rect(uint32_t color,
    }
 }
 
-
 void rsx_gl_copy_rect(
       uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
@@ -2767,12 +2733,10 @@ void rsx_gl_copy_rect(
    }
 }
 
-void rsx_gl_push_line(int16_t p0x,
-      int16_t p0y,
-      int16_t p1x,
-      int16_t p1y,
-      uint32_t c0,
-      uint32_t c1,
+void rsx_gl_push_line(
+      int16_t p0x, int16_t p0y,
+      int16_t p1x, int16_t p1y,
+      uint32_t c0, uint32_t c1,
       bool dither,
       int blend_mode)
 {
@@ -2917,7 +2881,7 @@ void rsx_gl_toggle_display(bool status)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer         = static_renderer.state_data;
-      renderer->config.display_off = status;
+      GlRenderer *renderer          = static_renderer.state_data;
+      renderer->config.display_off  = status;
    }
 }
