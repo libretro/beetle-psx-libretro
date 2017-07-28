@@ -347,7 +347,8 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
+         /* We'll do it like Vulkan and...not do it all */
+         //rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
 #endif
          break;
       case RSX_VULKAN:
