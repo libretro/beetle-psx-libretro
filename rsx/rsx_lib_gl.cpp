@@ -138,7 +138,7 @@ struct Attribute
    char name[32];
    size_t offset;
    /* Attribute type (BYTE, UNSIGNED_SHORT, FLOAT etc...) */
-   GLenum ty;
+   GLenum type;
    GLint components;
 };
 
@@ -423,15 +423,12 @@ static bool Shader_init(
          shader->info_log[log_len - 1] = '\0';
    }
 
-   if (status != GL_TRUE)
+   if (status == GL_FALSE)
    {
-      log_cb(RETRO_LOG_ERROR, "Shader compilation failed:\n");
+      log_cb(RETRO_LOG_ERROR, "Shader_init() - Shader compilation failed:\n%s\n", source);
 
-      /* print shader source */
-      puts( source );
 
-      puts("Shader info log:\n");
-      puts(shader->info_log);
+      log_cb(RETRO_LOG_INFO, "Shader info log:\n%s\n", shader->info_log);
 
       return false;
    }
@@ -543,7 +540,7 @@ static bool Program_init(
 
    if (id == 0)
    {
-      puts("An error occured creating the program object\n");
+      log_cb(RETRO_LOG_ERROR, "Program_init() - glCreateProgram() returned 0\n");
       return false;
    }
 
@@ -556,15 +553,14 @@ static bool Program_init(
    glDetachShader(id, fragment_shader->id);
 
    /* Check if the program linking was successful */
-   status = (GLint) GL_FALSE;
+   status = GL_FALSE;
    glGetProgramiv(id, GL_LINK_STATUS, &status);
    get_program_info_log(program, id);
 
-   if (status != (GLint) GL_TRUE)
+   if (status == GL_FALSE)
    {
-      puts("OpenGL program linking failed\n");
-      puts("Program info log:\n");
-      puts(program->info_log );
+      log_cb(RETRO_LOG_ERROR, "Program_init() - glLinkProgram() returned GL_FALSE\n");
+      log_cb(RETRO_LOG_ERROR, "Program info log:\n%s\n", program->info_log);
 
       return false;
    }
@@ -682,10 +678,6 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 
    offset_bytes = drawbuffer->map_start * element_size;
 
-#if 0
-   printf("Remap %lu %lu\n", drawbuffer->capacity, drawbuffer->map_start);
-#endif
-
    m = glMapBufferRange(GL_ARRAY_BUFFER,
          offset_bytes,
          buffer_size,
@@ -761,7 +753,7 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 
       /* This captures the buffer so that we don't have to bind it
        * when we draw later on, we'll just have to bind the vao */
-      switch (attr.ty)
+      switch (attr.type)
       {
          case GL_BYTE:
          case GL_UNSIGNED_BYTE:
@@ -771,14 +763,14 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
          case GL_UNSIGNED_INT:
             glVertexAttribIPointer( index,
                   attr.components,
-                  attr.ty,
+                  attr.type,
                   element_size,
                   (GLvoid*)attr.offset);
             break;
          case GL_FLOAT:
             glVertexAttribPointer(  index,
                   attr.components,
-                  attr.ty,
+                  attr.type,
                   GL_FALSE,
                   element_size,
                   (GLvoid*)attr.offset);
@@ -786,7 +778,7 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
          case GL_DOUBLE:
             glVertexAttribLPointer( index,
                   attr.components,
-                  attr.ty,
+                  attr.type,
                   element_size,
                   (GLvoid*)attr.offset);
             break;
@@ -1794,70 +1786,70 @@ std::vector<Attribute> CommandVertex::attributes()
 
    strcpy(attr.name, "position");
    attr.offset     = offsetof(CommandVertex, position);
-   attr.ty         = GL_FLOAT;
+   attr.type         = GL_FLOAT;
    attr.components = 4;
 
    result.push_back(attr);
 
    strcpy(attr.name, "color");
    attr.offset     = offsetof(CommandVertex, color);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 3;
 
    result.push_back(attr);
 
    strcpy(attr.name, "texture_coord");
    attr.offset     = offsetof(CommandVertex, texture_coord);
-   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.type         = GL_UNSIGNED_SHORT;
    attr.components = 2;
 
    result.push_back(attr);
 
    strcpy(attr.name, "texture_page");
    attr.offset     = offsetof(CommandVertex, texture_page);
-   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.type         = GL_UNSIGNED_SHORT;
    attr.components = 2;
 
    result.push_back(attr);
 
    strcpy(attr.name, "clut");
    attr.offset     = offsetof(CommandVertex, clut);
-   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.type         = GL_UNSIGNED_SHORT;
    attr.components = 2;
 
    result.push_back(attr);
 
    strcpy(attr.name, "texture_blend_mode");
    attr.offset     = offsetof(CommandVertex, texture_blend_mode);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 1;
 
    result.push_back(attr);
 
    strcpy(attr.name, "depth_shift");
    attr.offset     = offsetof(CommandVertex, depth_shift);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 1;
 
    result.push_back(attr);
 
    strcpy(attr.name, "dither");
    attr.offset     = offsetof(CommandVertex, dither);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 1;
 
    result.push_back(attr);
 
    strcpy(attr.name, "semi_transparent");
    attr.offset     = offsetof(CommandVertex, semi_transparent);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 1;
 
    result.push_back(attr);
 
    strcpy(attr.name, "texture_window");
    attr.offset     = offsetof(CommandVertex, texture_window);
-   attr.ty         = GL_UNSIGNED_BYTE;
+   attr.type         = GL_UNSIGNED_BYTE;
    attr.components = 4;
 
    result.push_back(attr);
@@ -1872,14 +1864,14 @@ std::vector<Attribute> OutputVertex::attributes()
 
    strcpy(attr.name, "position");
    attr.offset     = offsetof(OutputVertex, position);
-   attr.ty         = GL_FLOAT;
+   attr.type         = GL_FLOAT;
    attr.components = 2;
 
    result.push_back(attr);
 
    strcpy(attr.name, "fb_coord");
    attr.offset     = offsetof(OutputVertex, fb_coord);
-   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.type         = GL_UNSIGNED_SHORT;
    attr.components = 2;
 
    result.push_back(attr);
@@ -1894,7 +1886,7 @@ std::vector<Attribute> ImageLoadVertex::attributes()
 
    strcpy(attr.name, "position");
    attr.offset     = offsetof(ImageLoadVertex, position);
-   attr.ty         = GL_UNSIGNED_SHORT;
+   attr.type         = GL_UNSIGNED_SHORT;
    attr.components = 2;
 
    result.push_back(attr);
@@ -2102,8 +2094,8 @@ void rsx_gl_refresh_variables(void)
 
       if (!ok)
       {
-         puts("Couldn't change frontend resolution\n");
-         puts("Try resetting to enable the new configuration\n");
+         log_cb(RETRO_LOG_WARN, "Couldn't change frontend resolution\n");
+         log_cb(RETRO_LOG_INFO, "Try resetting to enable the new configuration\n");
       }
    }
 }
