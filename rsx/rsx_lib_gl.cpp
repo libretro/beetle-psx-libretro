@@ -1208,7 +1208,7 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
       }
    }
 
-   if (*display_vram)
+   if (display_vram)
    {
       var.key = option_display_vram;
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
