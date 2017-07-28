@@ -337,13 +337,13 @@ extern "C"
 
 static void get_error(const char *msg)
 {
+#ifdef DEBUG
+
    GLenum error = glGetError();
    switch (error)
    {
       case GL_NO_ERROR:
-#if 0
-         puts("GL error flag: GL_NO_ERROR\n");
-#endif
+         log_cb(RETRO_LOG_INFO, "GL error flag: GL_NO_ERROR [%s]\n", msg);
          return;
       case GL_INVALID_ENUM:
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_ENUM [%s]\n", msg);
@@ -367,11 +367,16 @@ static void get_error(const char *msg)
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
          break;
       default:
-         log_cb(RETRO_LOG_ERROR, "GL error flag: %d\n", (int) error);
+         log_cb(RETRO_LOG_ERROR, "GL error flag: %d [%s]\n", (int) error, msg);
          break;
    }
 
-   assert(error == GL_NO_ERROR);
+   /* glGetError should always be called in a loop, until 
+   it returns GL_NO_ERROR, if all error flags are to be reset. */
+   while (error != GL_NO_ERROR)
+      error = glGetError();
+
+#endif
 }
 
 static bool Shader_init(
