@@ -305,7 +305,7 @@ struct RetroGl
 
 static DrawConfig persistent_config = {
    {0, 0},         /* display_top_left */
-   {1024, 512},    /* display_resolution */
+   {700, 576},     /* display_resolution */
    false,          /* display_24bpp */
    true,           /* display_off */
    {0, 0},         /* draw_area_top_left */
@@ -1519,7 +1519,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    } else {
       _w = renderer->config.display_resolution[0];
       _h = renderer->config.display_resolution[1];
-      aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
+      aspect_ratio = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
    }
 
    upscale = renderer->internal_upscaling;
@@ -1993,31 +1993,25 @@ struct retro_system_av_info get_av_info(VideoClock std)
 
    if (display_vram)
    {
-      max_width  = 1024;
-      max_height = 512;
+      max_width  = VRAM_WIDTH_PIXELS;
+      max_height = VRAM_HEIGHT;
    }
    else
    {
-      /* Maximum resolution supported by the PlayStation video
-       * output is 640x480 */
-      max_width  = 640;
-      max_height = 480;
+      max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
+      max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H;
    }
-
-   max_width *= upscaling;
-   max_height *= upscaling;
 
    memset(&info, 0, sizeof(info));
 
    /* The base resolution will be overriden using
     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
     * this base value is not really important */
-   info.geometry.base_width     = max_width;
-   info.geometry.base_height    = max_height;
-   info.geometry.max_width      = max_width;
-   info.geometry.max_height     = max_height;
-   /* TODO: Replace 4/3 with MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO */
-   info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : 4.0/3.0;
+   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+   info.geometry.max_width      = max_width * upscaling;
+   info.geometry.max_height     = max_height * upscaling;
+   info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
    if (display_vram)
       info.geometry.aspect_ratio = 2./1.;
@@ -2923,7 +2917,7 @@ void rsx_gl_toggle_display(bool status)
 {
    if (static_renderer.state == GlState_Valid)
    {
-      GlRenderer *renderer          = static_renderer.state_data;
+      GlRenderer *renderer         = static_renderer.state_data;
       renderer->config.display_off = status;
    }
 }
