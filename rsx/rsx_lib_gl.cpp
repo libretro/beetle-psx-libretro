@@ -2204,7 +2204,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
                glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
                glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
 
-               glUniform1i(renderer->output_buffer->program->uniforms["depth"], depth_24bpp);
+               glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
 
                glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
             }
