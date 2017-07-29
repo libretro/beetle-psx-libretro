@@ -1150,15 +1150,13 @@ static void GlRenderer_upload_textures(
 
    if (renderer->image_load_buffer->program)
    {
-      glUseProgram(renderer->image_load_buffer->program->id);
-      glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
-
-      glUseProgram(renderer->command_buffer->program->id);
-      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
-
       /* fb_texture is always at 1x */
       glUseProgram(renderer->image_load_buffer->program->id);
+      glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
       glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      
+      glUseProgram(renderer->command_buffer->program->id);
+      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
    }
 
    glDisable(GL_SCISSOR_TEST);
