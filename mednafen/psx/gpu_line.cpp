@@ -118,7 +118,7 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
    line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
    line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
 
-   for(int32_t i = 0; i <= k; i++)	// <= is not a typo.
+   for(int32_t i = 0; i <= k; i++)  // <= is not a typo.
    {
       // Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain.
       int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047;
@@ -168,7 +168,7 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
    line_point points[2];
    const uint8_t cc = cb[0] >> 24; // For pline handling later.
 
-   gpu->DrawTimeAvail   -= 16;	// FIXME, correct time.
+   gpu->DrawTimeAvail   -= 16;   // FIXME, correct time.
 
    if(polyline && gpu->InCmd == INCMD_PLINE)
    {
@@ -225,14 +225,14 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
    if(delta_y >= 512)
      return;
 
-   rsx_intf_push_line(points[0].x, points[0].y,
-		      points[1].x, points[1].y,
-		      ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
-		      ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
-		      DitherEnabled(gpu),
-		      BlendMode,
-            MaskEval_TA,
-            gpu->MaskSetOR);
+   rsx_intf_push_line(  points[0].x, points[0].y,
+                        points[1].x, points[1].y,
+                        ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
+                        ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
+                        DitherEnabled(gpu),
+                        BlendMode,
+                        MaskEval_TA,
+                        gpu->MaskSetOR);
 
    if (rsx_intf_has_software_renderer())
       DrawLine<goraud, BlendMode, MaskEval_TA>(gpu, points);
