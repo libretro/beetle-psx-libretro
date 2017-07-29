@@ -43,12 +43,25 @@ NEED_BPP = 32
 WANT_NEW_API = 1
 NEED_DEINTERLACER = 1
 NEED_THREADING = 1
+SET_HAVE_HW = 0
 CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx
 
-ifeq ($(HAVE_HW),1)
+ifeq ($(HAVE_HW), 1)
 HAVE_VULKAN=1
 HAVE_OPENGL=1
+SET_HAVE_HW=1
+endif
+
+ifeq ($(VULKAN), 1)
+SET_HAVE_HW=1
+endif
+
+ifeq ($(HAVE_OPENGL), 1)
+SET_HAVE_HW=1
+endif
+
+ifeq ($(SET_HAVE_HW), 1)
 FLAGS += -DHAVE_HW
 endif
 
