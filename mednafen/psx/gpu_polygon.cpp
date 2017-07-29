@@ -597,82 +597,89 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
          blend_mode = BLEND_MODE_ADD;
    }
 
-   if (numvertices == 4)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
    {
-      if (gpu->InCmd == INCMD_NONE)
+      if (numvertices == 4)
       {
-         // We have 4 quad vertices, we can push that at once
-         tri_vertex *first = &gpu->InQuad_F3Vertices[0];
+         if (gpu->InCmd == INCMD_NONE)
+         {
+            // We have 4 quad vertices, we can push that at once
+            tri_vertex *first = &gpu->InQuad_F3Vertices[0];
 
-         rsx_intf_push_quad(  first->precise[0],
-                              first->precise[1],
-                              first->precise[2],
-                              vertices[0].precise[0],
-                              vertices[0].precise[1],
-                              vertices[0].precise[2],
-                              vertices[1].precise[0],
-                              vertices[1].precise[1],
-                              vertices[1].precise[2],
-                              vertices[2].precise[0],
-                              vertices[2].precise[1],
-                              vertices[2].precise[2],
-                              ((uint32_t)first->r) |
-                              ((uint32_t)first->g << 8) |
-                              ((uint32_t)first->b << 16),
-                              ((uint32_t)vertices[0].r) |
-                              ((uint32_t)vertices[0].g << 8) |
-                              ((uint32_t)vertices[0].b << 16),
-                              ((uint32_t)vertices[1].r) |
-                              ((uint32_t)vertices[1].g << 8) |
-                              ((uint32_t)vertices[1].b << 16),
-                              ((uint32_t)vertices[2].r) |
-                              ((uint32_t)vertices[2].g << 8) |
-                              ((uint32_t)vertices[2].b << 16),
-                              first->u, first->v,
-                              vertices[0].u, vertices[0].v,
-                              vertices[1].u, vertices[1].v,
-                              vertices[2].u, vertices[2].v,
-                              gpu->TexPageX, gpu->TexPageY,
-                              clut_x, clut_y,
-                              blend_mode,
-                              2 - TexMode_TA,
-                              DitherEnabled(gpu),
-                              BlendMode,
-                              MaskEval_TA,
-                              gpu->MaskSetOR);
+            rsx_intf_push_quad(  first->precise[0],
+                  first->precise[1],
+                  first->precise[2],
+                  vertices[0].precise[0],
+                  vertices[0].precise[1],
+                  vertices[0].precise[2],
+                  vertices[1].precise[0],
+                  vertices[1].precise[1],
+                  vertices[1].precise[2],
+                  vertices[2].precise[0],
+                  vertices[2].precise[1],
+                  vertices[2].precise[2],
+                  ((uint32_t)first->r) |
+                  ((uint32_t)first->g << 8) |
+                  ((uint32_t)first->b << 16),
+                  ((uint32_t)vertices[0].r) |
+                  ((uint32_t)vertices[0].g << 8) |
+                  ((uint32_t)vertices[0].b << 16),
+                  ((uint32_t)vertices[1].r) |
+                  ((uint32_t)vertices[1].g << 8) |
+                  ((uint32_t)vertices[1].b << 16),
+                  ((uint32_t)vertices[2].r) |
+                     ((uint32_t)vertices[2].g << 8) |
+                     ((uint32_t)vertices[2].b << 16),
+                  first->u, first->v,
+                  vertices[0].u, vertices[0].v,
+                  vertices[1].u, vertices[1].v,
+                  vertices[2].u, vertices[2].v,
+                  gpu->TexPageX, gpu->TexPageY,
+                  clut_x, clut_y,
+                  blend_mode,
+                  2 - TexMode_TA,
+                  DitherEnabled(gpu),
+                  BlendMode,
+                  MaskEval_TA,
+                  gpu->MaskSetOR);
+         }
       }
-   } else {
-      // Push a single triangle
-      rsx_intf_push_triangle( vertices[0].precise[0],
-                              vertices[0].precise[1],
-                              vertices[0].precise[2],
-                              vertices[1].precise[0],
-                              vertices[1].precise[1],
-                              vertices[1].precise[2],
-                              vertices[2].precise[0],
-                              vertices[2].precise[1],
-                              vertices[2].precise[2],
-                              ((uint32_t)vertices[0].r) |
-                              ((uint32_t)vertices[0].g << 8) |
-                              ((uint32_t)vertices[0].b << 16),
-                              ((uint32_t)vertices[1].r) |
-                              ((uint32_t)vertices[1].g << 8) |
-                              ((uint32_t)vertices[1].b << 16),
-                              ((uint32_t)vertices[2].r) |
-                              ((uint32_t)vertices[2].g << 8) |
-                              ((uint32_t)vertices[2].b << 16),
-                              vertices[0].u, vertices[0].v,
-                              vertices[1].u, vertices[1].v,
-                              vertices[2].u, vertices[2].v,
-                              gpu->TexPageX, gpu->TexPageY,
-                              clut_x, clut_y,
-                              blend_mode,
-                              2 - TexMode_TA,
-                              DitherEnabled(gpu),
-                              BlendMode,
-                              MaskEval_TA,
-                              gpu->MaskSetOR);
+      else
+      {
+         // Push a single triangle
+         rsx_intf_push_triangle( vertices[0].precise[0],
+               vertices[0].precise[1],
+               vertices[0].precise[2],
+               vertices[1].precise[0],
+               vertices[1].precise[1],
+               vertices[1].precise[2],
+               vertices[2].precise[0],
+               vertices[2].precise[1],
+               vertices[2].precise[2],
+               ((uint32_t)vertices[0].r) |
+               ((uint32_t)vertices[0].g << 8) |
+               ((uint32_t)vertices[0].b << 16),
+               ((uint32_t)vertices[1].r) |
+               ((uint32_t)vertices[1].g << 8) |
+               ((uint32_t)vertices[1].b << 16),
+               ((uint32_t)vertices[2].r) |
+               ((uint32_t)vertices[2].g << 8) |
+               ((uint32_t)vertices[2].b << 16),
+               vertices[0].u, vertices[0].v,
+               vertices[1].u, vertices[1].v,
+               vertices[2].u, vertices[2].v,
+               gpu->TexPageX, gpu->TexPageY,
+               clut_x, clut_y,
+               blend_mode,
+               2 - TexMode_TA,
+               DitherEnabled(gpu),
+               BlendMode,
+               MaskEval_TA,
+               gpu->MaskSetOR);
+      }
    }
+#endif
 
    if (rsx_intf_has_software_renderer())
       DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices, clut);

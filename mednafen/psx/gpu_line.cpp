@@ -225,14 +225,19 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
    if(delta_y >= 512)
      return;
 
-   rsx_intf_push_line(  points[0].x, points[0].y,
-                        points[1].x, points[1].y,
-                        ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
-                        ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
-                        DitherEnabled(gpu),
-                        BlendMode,
-                        MaskEval_TA,
-                        gpu->MaskSetOR);
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
+   {
+      rsx_intf_push_line(  points[0].x, points[0].y,
+            points[1].x, points[1].y,
+            ((uint32_t)points[0].r) | ((uint32_t)points[0].g << 8) | ((uint32_t)points[0].b << 16),
+            ((uint32_t)points[1].r) | ((uint32_t)points[1].g << 8) | ((uint32_t)points[1].b << 16),
+            DitherEnabled(gpu),
+            BlendMode,
+            MaskEval_TA,
+            gpu->MaskSetOR);
+   }
+#endif
 
    if (rsx_intf_has_software_renderer())
       DrawLine<goraud, BlendMode, MaskEval_TA>(gpu, points);

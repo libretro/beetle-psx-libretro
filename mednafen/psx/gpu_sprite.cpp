@@ -223,47 +223,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
                            MaskEval_TA,
                            gpu->MaskSetOR);
    }
-   else
 #endif
-   {
-      rsx_intf_push_triangle( x, y, 1,
-                              x + w, y, 1,
-                              x, y + h, 1,
-                              color,
-                              color,
-                              color,
-                              u, v,
-                              u + w, v,
-                              u, v + h,
-                              gpu->TexPageX,
-                              gpu->TexPageY,
-                              clut_x, clut_y,
-                              blend_mode,
-                              2 - TexMode_TA,
-                              DitherEnabled(gpu),
-                              BlendMode,
-                              MaskEval_TA,
-                              gpu->MaskSetOR);
-
-      rsx_intf_push_triangle( x + w, y, 1,
-                              x, y + h, 1,
-                              x + w, y + h, 1,
-                              color,
-                              color,
-                              color,
-                              u + w, v,
-                              u, v + h,
-                              u + w, v + h,
-                              gpu->TexPageX,
-                              gpu->TexPageY,
-                              clut_x, clut_y,
-                              blend_mode,
-                              2 - TexMode_TA,
-                              DitherEnabled(gpu),
-                              BlendMode,
-                              MaskEval_TA,
-                              gpu->MaskSetOR);
-   }
 
 #if 0
    printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);
