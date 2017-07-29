@@ -2118,7 +2118,7 @@ void rsx_gl_prepare_frame(void)
 }
 
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
-      unsigned height, unsigned pitch)
+                           unsigned height, unsigned pitch)
 {
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
@@ -2303,7 +2303,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 }
 
 void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
-      uint8_t twx, uint8_t twy)
+                           uint8_t twx, uint8_t twy)
 {
    if (static_renderer.state == GlState_Valid)
    {
@@ -2315,10 +2315,8 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
    }
 }
 
-void  rsx_gl_set_draw_area(uint16_t x0,
-      uint16_t y0,
-      uint16_t x1,
-      uint16_t y1)
+void  rsx_gl_set_draw_area(uint16_t x0, uint16_t y0,
+                           uint16_t x1, uint16_t y1)
 {
    if (static_renderer.state == GlState_Valid)
    {
@@ -2338,11 +2336,9 @@ void  rsx_gl_set_draw_area(uint16_t x0,
    }
 }
 
-void rsx_gl_set_display_mode(uint16_t x,
-      uint16_t y,
-      uint16_t w,
-      uint16_t h,
-      bool depth_24bpp)
+void rsx_gl_set_display_mode( uint16_t x, uint16_t y,
+                              uint16_t w, uint16_t h,
+                              bool depth_24bpp)
 {
    if (static_renderer.state == GlState_Valid)
    {
@@ -2357,24 +2353,30 @@ void rsx_gl_set_display_mode(uint16_t x,
    }
 }
 
-
-void rsx_gl_push_quad(
-      float p0x, float p0y, float p0w,
-      float p1x, float p1y, float p1w,
-      float p2x, float p2y, float p2w,
-      float p3x, float p3y, float p3w,
-      uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
-      uint16_t t0x, uint16_t t0y,
-      uint16_t t1x, uint16_t t1y,
-      uint16_t t2x, uint16_t t2y,
-      uint16_t t3x, uint16_t t3y,
-      uint16_t texpage_x, uint16_t texpage_y,
-      uint16_t clut_x, uint16_t clut_y,
-      uint8_t texture_blend_mode,
-      uint8_t depth_shift,
-      bool dither,
-      int blend_mode)
+void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
+                        float p1x, float p1y, float p1w,
+                        float p2x, float p2y, float p2w,
+                        float p3x, float p3y, float p3w,
+                        uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+                        uint16_t t0x, uint16_t t0y,
+                        uint16_t t1x, uint16_t t1y,
+                        uint16_t t2x, uint16_t t2y,
+                        uint16_t t3x, uint16_t t3y,
+                        uint16_t texpage_x, uint16_t texpage_y,
+                        uint16_t clut_x, uint16_t clut_y,
+                        uint8_t texture_blend_mode,
+                        uint8_t depth_shift,
+                        bool dither,
+                        int blend_mode, 
+                        uint32_t mask_eval_and, uint32_t mask_set_or)
 {
+   GlRenderer *renderer = NULL;
+
+   if (static_renderer.state == GlState_Valid)
+      renderer = static_renderer.state_data;
+   else
+      return;
+
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
    switch (blend_mode) {
@@ -2450,57 +2452,51 @@ void rsx_gl_push_quad(
       },
    };
 
-   if (static_renderer.state == GlState_Valid)
+   bool is_semi_transparent = v[0].semi_transparent == 1;
+   bool is_textured         = v[0].texture_blend_mode != 0;
+   
+   /* Textured semi-transparent polys can contain opaque texels (when
+    * bit 15 of the color is set to 0). Therefore they're drawn twice,
+    * once for the opaque texels and once for the semi-transparent
+    * ones. Only untextured semi-transparent triangles don't need to be
+    * drawn as opaque. */
+   bool is_opaque           = !is_semi_transparent || is_textured;
+
+   vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
+
+   unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
+
+   for (unsigned i = 0; i < 6; i++)
    {
-      GlRenderer *renderer     = static_renderer.state_data;
-
-      bool is_semi_transparent = v[0].semi_transparent == 1;
-      bool is_textured         = v[0].texture_blend_mode != 0;
-      
-      /* Textured semi-transparent polys can contain opaque texels (when
-       * bit 15 of the color is set to 0). Therefore they're drawn twice,
-       * once for the opaque texels and once for the semi-transparent
-       * ones. Only untextured semi-transparent triangles don't need to be
-       * drawn as opaque. */
-      bool is_opaque           = !is_semi_transparent || is_textured;
-
-      vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
-
-      unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
-
-      for (unsigned i = 0; i < 6; i++)
+      if (is_opaque)
       {
-         if (is_opaque)
-         {
-            renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
-               index + indices[i];
-         }
-
-         if (is_semi_transparent)
-         {
-            renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
-               = index + indices[i];
-         }
+         renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
+            index + indices[i];
       }
 
-      DrawBuffer_push_slice(renderer->command_buffer, v, 4);
+      if (is_semi_transparent)
+      {
+         renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
+            = index + indices[i];
+      }
    }
+
+   DrawBuffer_push_slice(renderer->command_buffer, v, 4);
 }
 
-void rsx_gl_push_triangle(
-      float p0x, float p0y, float p0w,
-      float p1x, float p1y, float p1w,
-      float p2x, float p2y, float p2w,
-      uint32_t c0, uint32_t c1, uint32_t c2,
-      uint16_t t0x, uint16_t t0y,
-      uint16_t t1x, uint16_t t1y,
-      uint16_t t2x, uint16_t t2y,
-      uint16_t texpage_x, uint16_t texpage_y,
-      uint16_t clut_x, uint16_t clut_y,
-      uint8_t texture_blend_mode,
-      uint8_t depth_shift,
-      bool dither,
-      int blend_mode, uint32_t mask_set_or, uint32_t mask_eval_and)
+void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
+                           float p1x, float p1y, float p1w,
+                           float p2x, float p2y, float p2w,
+                           uint32_t c0, uint32_t c1, uint32_t c2,
+                           uint16_t t0x, uint16_t t0y,
+                           uint16_t t1x, uint16_t t1y,
+                           uint16_t t2x, uint16_t t2y,
+                           uint16_t texpage_x, uint16_t texpage_y,
+                           uint16_t clut_x, uint16_t clut_y,
+                           uint8_t texture_blend_mode,
+                           uint8_t depth_shift,
+                           bool dither,
+                           int blend_mode, uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    GlRenderer *renderer = NULL;
 
@@ -2579,9 +2575,9 @@ void rsx_gl_push_triangle(
       push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode);
 }
 
-void rsx_gl_fill_rect(uint32_t color,
-      uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h)
+void rsx_gl_fill_rect(  uint32_t color,
+                        uint16_t x, uint16_t y,
+                        uint16_t w, uint16_t h)
 {
 
    uint16_t top_left[2]   = {x, y};
@@ -2646,16 +2642,17 @@ void rsx_gl_fill_rect(uint32_t color,
    }
 }
 
-void rsx_gl_copy_rect(
-      uint16_t src_x, uint16_t src_y,
-      uint16_t dst_x, uint16_t dst_y,
-      uint16_t w, uint16_t h, uint32_t mask_set_or, uint32_t mask_eval_and)
+void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
+                        uint16_t dst_x, uint16_t dst_y,
+                        uint16_t w, uint16_t h, 
+                        uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    GlRenderer *renderer = NULL;
    if (static_renderer.state == GlState_Valid)
-      GlRenderer *renderer = static_renderer.state_data;
+      renderer = static_renderer.state_data;
    else
       return;
+
 
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
@@ -2670,13 +2667,13 @@ void rsx_gl_copy_rect(
 
    uint32_t upscale = renderer->internal_upscaling;
 
-   GLint src_x = (GLint) source_top_left[0] * (GLint) upscale;
-   GLint src_y = (GLint) source_top_left[1] * (GLint) upscale;
-   GLint dst_x = (GLint) target_top_left[0] * (GLint) upscale;
-   GLint dst_y = (GLint) target_top_left[1] * (GLint) upscale;
+   GLint new_src_x = (GLint) source_top_left[0] * (GLint) upscale;
+   GLint new_src_y = (GLint) source_top_left[1] * (GLint) upscale;
+   GLint new_dst_x = (GLint) target_top_left[0] * (GLint) upscale;
+   GLint new_dst_y = (GLint) target_top_left[1] * (GLint) upscale;
 
-   GLsizei w = (GLsizei) dimensions[0] * (GLsizei) upscale;
-   GLsizei h = (GLsizei) dimensions[1] * (GLsizei) upscale;
+   GLsizei new_w = (GLsizei) dimensions[0] * (GLsizei) upscale;
+   GLsizei new_h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
 #ifdef NEW_COPY_RECT
    /* TODO/FIXME - buggy code!
@@ -2705,7 +2702,8 @@ void rsx_gl_copy_rect(
     * behaviour. I could use glReadPixels and glWritePixels instead
     * or something like that. */
    glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-   glCopyTexSubImage2D(GL_TEXTURE_2D, 0, dst_x, dst_y, src_x, src_y, w, h);
+   glCopyTexSubImage2D( GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 
+                        new_src_x, new_src_y, new_w, new_h);
 
    glDeleteFramebuffers(1, &fb);
 #else
@@ -2716,24 +2714,24 @@ void rsx_gl_copy_rect(
     * and target area overlap, this should be handled
     * explicitely */
    /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-   glCopyImageSubData( renderer->fb_out.id, GL_TEXTURE_2D, 0, src_x, src_y, 0,
-         renderer->fb_out.id, GL_TEXTURE_2D, 0, dst_x, dst_y, 0,
-         w, h, 1 );
+   glCopyImageSubData(  renderer->fb_out.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
+                        renderer->fb_out.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
+                        new_w, new_h, 1 );
 #endif
 
    get_error("rsx_gl_copy_rect");
 }
 
-void rsx_gl_push_line(
-      int16_t p0x, int16_t p0y,
-      int16_t p1x, int16_t p1y,
-      uint32_t c0, uint32_t c1,
-      bool dither,
-      int blend_mode, uint32_t mask_set_or, uint32_t mask_eval_and)
+void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
+                        int16_t p1x, int16_t p1y,
+                        uint32_t c0, uint32_t c1,
+                        bool dither,
+                        int blend_mode,
+                        uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    GlRenderer *renderer = NULL;
    if (static_renderer.state == GlState_Valid)
-      GlRenderer *renderer = static_renderer.state_data;
+      renderer = static_renderer.state_data;
    else
       return;
 
@@ -2797,13 +2795,14 @@ void rsx_gl_push_line(
    push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode);
 }
 
-void rsx_gl_load_image(uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h,
-      uint16_t *vram, uint32_t mask_set_or, uint32_t mask_eval_and)
+void rsx_gl_load_image( uint16_t x, uint16_t y,
+                        uint16_t w, uint16_t h,
+                        uint16_t *vram, 
+                        uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    GlRenderer *renderer = NULL;
    if (static_renderer.state == GlState_Valid)
-      GlRenderer *renderer = static_renderer.state_data;
+      renderer = static_renderer.state_data;
    else
       return;
 
