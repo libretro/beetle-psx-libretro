@@ -2484,14 +2484,6 @@ void retro_init(void)
    setting_last_scanline_pal = 287;
 
    check_system_specs();
-
-#ifdef HAVE_VULKAN
-   rsx_intf_init(RSX_VULKAN);
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   rsx_intf_init(RSX_OPENGL);
-#endif
-   rsx_intf_init(RSX_SOFTWARE);
 }
 
 void retro_reset(void)
@@ -2542,11 +2534,6 @@ static void check_variables(bool startup)
          {
             rsx_intf_set_type(RSX_VULKAN);
             rsx_intf_set_fallback_type(RSX_OPENGL);
-         }
-         else if (!strcmp(var.value, "opengl-rust"))
-         {
-            rsx_intf_set_type(RSX_EXTERNAL_RUST);
-            rsx_intf_set_type(RSX_VULKAN);
          }
       }
    }
@@ -2660,7 +2647,6 @@ static void check_variables(bool startup)
          break;
       case RSX_OPENGL:
       case RSX_VULKAN:
-      case RSX_EXTERNAL_RUST:
          psx_gpu_upscale_shift = 0;
          break;
    }

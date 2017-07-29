@@ -283,9 +283,6 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
       case RSX_VULKAN:
          /* TODO/FIXME */
          break;
-      case RSX_EXTERNAL_RUST:
-         /* TODO/FIXME */
-         break;
    }
 }
 
@@ -486,8 +483,6 @@ void rsx_intf_push_quad(
 			blend_mode, mask_test != 0, set_mask != 0);
 #endif
       break;
-	case RSX_EXTERNAL_RUST:
-		break;
 	}
 }
 
@@ -620,8 +615,6 @@ bool rsx_intf_has_software_renderer(void)
 #else
          break;
 #endif
-      case RSX_EXTERNAL_RUST:
-         return true;
    }
 
    return false;
