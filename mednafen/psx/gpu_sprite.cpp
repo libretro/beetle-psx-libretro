@@ -158,7 +158,7 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
    uint32_t color   = 0;
    uint32_t clut    = 0;
 
-   gpu->DrawTimeAvail   -= 16;	// FIXME, correct time.
+   gpu->DrawTimeAvail   -= 16;   // FIXME, correct time.
 
    color            = *cb & 0x00FFFFFF;
    cb++;
@@ -220,82 +220,81 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
    {
-	   rsx_intf_push_quad(
-		   x,                /* p0x */
-		   y,                /* p0y */
-		   1,
-		   x + w,            /* p1x */
-		   y,                /* p1y */
-		   1,
-		   x,                /* p2x */
-		   y + h,            /* p2y */
-		   1,
-		   x + w,            /* p3x */
-		   y + h,            /* p3y */
-		   1,
-		   color,            /* c0 */
-		   color,            /* c1 */
-		   color,            /* c2 */
-		   color,            /* c3 */
-		   u,                /* t0x */
-		   v,                /* t0y */
-		   u + w,            /* t1x */
-		   v,                /* t1y */
-		   u,                /* t2x */
-		   v + h,            /* t2y */
-		   u + w,            /* t5x */
-		   v + h,            /* t5y */
-            gpu->TexPageX,
-            gpu->TexPageY,
-            clut_x,
-            clut_y,
-            blend_mode,
-            2 - TexMode_TA,
-            DitherEnabled(gpu),
-            BlendMode,
-            MaskEval_TA,
-            gpu->MaskSetOR != 0);
+      rsx_intf_push_quad(  x,                /* p0x */
+                           y,                /* p0y */
+                           1,
+                           x + w,            /* p1x */
+                           y,                /* p1y */
+                           1,
+                           x,                /* p2x */
+                           y + h,            /* p2y */
+                           1,
+                           x + w,            /* p3x */
+                           y + h,            /* p3y */
+                           1,
+                           color,            /* c0 */
+                           color,            /* c1 */
+                           color,            /* c2 */
+                           color,            /* c3 */
+                           u,                /* t0x */
+                           v,                /* t0y */
+                           u + w,            /* t1x */
+                           v,                /* t1y */
+                           u,                /* t2x */
+                           v + h,            /* t2y */
+                           u + w,            /* t5x */
+                           v + h,            /* t5y */
+                           gpu->TexPageX,
+                           gpu->TexPageY,
+                           clut_x,
+                           clut_y,
+                           blend_mode,
+                           2 - TexMode_TA,
+                           DitherEnabled(gpu),
+                           BlendMode,
+                           MaskEval_TA,
+                           gpu->MaskSetOR);
    }
    else
 #endif
    {
-      rsx_intf_push_triangle(x, y, 1,
-            x + w, y, 1,
-            x, y + h, 1,
-            color,
-            color,
-            color,
-            u, v,
-            u + w, v,
-            u, v + h,
-            gpu->TexPageX,
-            gpu->TexPageY,
-            clut_x, clut_y,
-            blend_mode,
-            2 - TexMode_TA,
-            DitherEnabled(gpu),
-            BlendMode,
-            MaskEval_TA,
-            gpu->MaskSetOR != 0);
+      rsx_intf_push_triangle( x, y, 1,
+                              x + w, y, 1,
+                              x, y + h, 1,
+                              color,
+                              color,
+                              color,
+                              u, v,
+                              u + w, v,
+                              u, v + h,
+                              gpu->TexPageX,
+                              gpu->TexPageY,
+                              clut_x, clut_y,
+                              blend_mode,
+                              2 - TexMode_TA,
+                              DitherEnabled(gpu),
+                              BlendMode,
+                              MaskEval_TA,
+                              gpu->MaskSetOR);
 
-      rsx_intf_push_triangle(x + w, y, 1,
-            x, y + h, 1,
-            x + w, y + h, 1,
-            color,
-            color,
-            color,
-            u + w, v,
-            u, v + h,
-            u + w, v + h,
-            gpu->TexPageX,
-            gpu->TexPageY,
-            clut_x, clut_y,
-            blend_mode,
-            2 - TexMode_TA,
-            DitherEnabled(gpu),
-            BlendMode,
-            MaskEval_TA,
-            gpu->MaskSetOR != 0);
+      rsx_intf_push_triangle( x + w, y, 1,
+                              x, y + h, 1,
+                              x + w, y + h, 1,
+                              color,
+                              color,
+                              color,
+                              u + w, v,
+                              u, v + h,
+                              u + w, v + h,
+                              gpu->TexPageX,
+                              gpu->TexPageY,
+                              clut_x, clut_y,
+                              blend_mode,
+                              2 - TexMode_TA,
+                              DitherEnabled(gpu),
+                              BlendMode,
+                              MaskEval_TA,
+                              gpu->MaskSetOR);
    }
 
 #if 0
