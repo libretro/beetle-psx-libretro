@@ -347,7 +347,8 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
+         /* We'll do it like Vulkan and...not do it all */
+         //rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
 #endif
          break;
       case RSX_VULKAN:
@@ -462,8 +463,8 @@ void rsx_intf_push_triangle(
       uint8_t depth_shift,
       bool dither,
       int blend_mode,
-      bool mask_test,
-      bool set_mask)
+      uint32_t mask_test,
+      uint32_t set_mask)
 {
 #ifdef RSX_DUMP
    const rsx_dump_vertex vertices[3] = {
@@ -490,7 +491,7 @@ void rsx_intf_push_triangle(
                texture_blend_mode,
                depth_shift,
                dither,
-               blend_mode);
+               blend_mode, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:
@@ -501,7 +502,7 @@ void rsx_intf_push_triangle(
                texture_blend_mode,
                depth_shift,
                dither,
-               blend_mode, mask_test, set_mask);
+               blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -537,8 +538,8 @@ void rsx_intf_push_quad(
 	uint8_t depth_shift,
 	bool dither,
 	int blend_mode,
-   bool mask_test,
-   bool set_mask)
+   uint32_t mask_test,
+   uint32_t set_mask)
 {
 #ifdef RSX_DUMP
    const rsx_dump_vertex vertices[4] = {
@@ -567,7 +568,7 @@ void rsx_intf_push_quad(
 			texture_blend_mode,
 			depth_shift,
 			dither,
-			blend_mode);
+			blend_mode, mask_test, set_mask);
 #endif
 		break;
    case RSX_VULKAN:
@@ -579,7 +580,7 @@ void rsx_intf_push_quad(
 			texture_blend_mode,
 			depth_shift,
 			dither,
-			blend_mode, mask_test, set_mask);
+			blend_mode, mask_test != 0, set_mask != 0);
 #endif
       break;
 	case RSX_EXTERNAL_RUST:
@@ -593,13 +594,13 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       uint32_t c1,
       bool dither,
       int blend_mode,
-      bool mask_test,
-      bool set_mask)
+      uint32_t mask_test,
+      uint32_t set_mask)
 {
 #ifdef RSX_DUMP
    const rsx_dump_line_data line = {
       p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode,
-      mask_test, set_mask,
+      mask_test != 0, set_mask != 0,
    };
    rsx_dump_line(&line);
 #endif
@@ -610,12 +611,12 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode);
+         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
+         rsx_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_EXTERNAL_RUST:
@@ -628,10 +629,10 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
 
 void rsx_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
-      uint16_t *vram, bool mask_test, bool set_mask)
+      uint16_t *vram, uint32_t mask_test, uint32_t set_mask)
 {
 #ifdef RSX_DUMP
-   rsx_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
+   rsx_dump_load_image(x, y, w, h, vram, mask_test != 0, set_mask != 0);
 #endif
 
    switch (rsx_type)
@@ -640,7 +641,7 @@ void rsx_intf_load_image(uint16_t x, uint16_t y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_load_image(x, y, w, h, vram);
+         rsx_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:
@@ -688,10 +689,10 @@ void rsx_intf_fill_rect(uint32_t color,
 
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
-      uint16_t w, uint16_t h, bool mask_test, bool set_mask)
+      uint16_t w, uint16_t h, uint32_t mask_test, uint32_t set_mask)
 {
 #ifdef RSX_DUMP
-   rsx_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
+   rsx_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test != 0, set_mask != 0);
 #endif
 
    switch (rsx_type)
@@ -701,7 +702,7 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_copy_rect(src_x, src_y, dst_x, dst_y,
-               w, h);
+               w, h, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:

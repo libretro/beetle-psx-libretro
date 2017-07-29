@@ -238,7 +238,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
       }
    }
 
-   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
+   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND, g->MaskSetOR);
 }
 
 static void Command_FBWrite(PS_GPU* g, const uint32 *cb)
@@ -903,8 +903,8 @@ static void ProcessFIFO(uint32_t in_count)
                         GPU->FBRW_X, GPU->FBRW_Y,
                         GPU->FBRW_W, GPU->FBRW_H,
                         GPU->vram,
-                        GPU->MaskEvalAND != 0,
-                        GPU->MaskSetOR != 0);
+                        GPU->MaskEvalAND,
+                        GPU->MaskSetOR);
                   GPU->InCmd = INCMD_NONE;
                   break;	// Break out of the for() loop.
                }
