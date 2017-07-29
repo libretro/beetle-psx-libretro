@@ -2485,9 +2485,6 @@ void retro_init(void)
 
    check_system_specs();
 
-#ifdef HAVE_RUST
-   rsx_intf_init(RSX_EXTERNAL_RUST);
-#endif
 #ifdef HAVE_VULKAN
    rsx_intf_init(RSX_VULKAN);
 #endif
@@ -3985,9 +3982,6 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
 #endif
 #elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #define FIRST_RENDERER "opengl"
-#define EXT_RENDERER "|software"
-#elif defined(HAVE_RUST)
-#define FIRST_RENDERER "opengl-rust"
 #define EXT_RENDERER "|software"
 #else
 #define FIRST_RENDERER "software"

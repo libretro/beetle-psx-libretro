@@ -10,8 +10,7 @@ enum rsx_renderer_type
 {
    RSX_SOFTWARE = 0,
    RSX_OPENGL,
-   RSX_VULKAN,
-   RSX_EXTERNAL_RUST
+   RSX_VULKAN
 };
 
 enum blending_modes

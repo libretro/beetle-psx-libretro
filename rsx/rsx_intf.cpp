@@ -21,9 +21,7 @@
 #endif
 
 static enum rsx_renderer_type rsx_type = 
-#ifdef HAVE_RUST
-RSX_EXTERNAL_RUST
-#elif defined(HAVE_VULKAN)
+#if defined(HAVE_VULKAN)
 RSX_VULKAN
 #elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 RSX_OPENGL
@@ -51,11 +49,6 @@ void rsx_intf_set_environment(retro_environment_t cb)
          rsx_vulkan_set_environment(cb);
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_set_environment(cb);
-#endif
-         break;
    }
 }
 
@@ -74,11 +67,6 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_set_video_refresh(cb);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_set_video_refresh(cb);
 #endif
          break;
    }
@@ -100,37 +88,6 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
 #if defined(HAVE_VULKAN)
          rsx_vulkan_get_system_av_info(info);
 #endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_get_system_av_info(info);
-#endif
-         break;
-   }
-}
-
-void rsx_intf_init(enum rsx_renderer_type type)
-{
-   rsx_type = type;
-
-   switch (rsx_type)
-   {
-      case RSX_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_init();
-#endif
-         break;
-      case RSX_VULKAN:
-#if defined(HAVE_VULKAN)
-         rsx_vulkan_init();
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_init();
-#endif
-         break;
-      default:
          break;
    }
 }
@@ -170,14 +127,6 @@ bool rsx_intf_open(bool is_pal)
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          if (!rsx_vulkan_open(is_pal))
-            ret = false;
-#else
-         ret = false;
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         if (!rsx_open(is_pal))
             ret = false;
 #else
          ret = false;
@@ -225,11 +174,6 @@ void rsx_intf_close(void)
          rsx_vulkan_close();
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_close();
-#endif
-         break;
    }
 }
 
@@ -247,11 +191,6 @@ void rsx_intf_refresh_variables(void)
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_refresh_variables();
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_refresh_variables();
 #endif
          break;
    }
@@ -277,11 +216,6 @@ void rsx_intf_prepare_frame(void)
          rsx_vulkan_prepare_frame();
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_prepare_frame();
-#endif
-         break;
    }
 }
 
@@ -305,11 +239,6 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_finalize_frame(fb, width, height, pitch);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_finalize_frame();
 #endif
          break;
    }
@@ -380,11 +309,6 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
          rsx_vulkan_set_draw_offset(x, y);
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_set_draw_offset(x, y);
-#endif
-         break;
    }
 }
 
@@ -407,11 +331,6 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_set_draw_area(x0, y0, x1, y1);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
    }
@@ -437,11 +356,6 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_set_display_mode(x, y, w, h, depth_24bpp);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_set_display_mode(x, y, w, h, depth_24bpp);
 #endif
          break;
    }
@@ -503,17 +417,6 @@ void rsx_intf_push_triangle(
                depth_shift,
                dither,
                blend_mode, mask_test != 0, set_mask != 0);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_push_triangle(p0x, p0y, p1x, p1y, p2x, p2y,
-               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
-               texpage_x, texpage_y, clut_x, clut_y,
-               texture_blend_mode,
-               depth_shift,
-               dither,
-               blend_mode);
 #endif
          break;
    }
@@ -619,11 +522,6 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
          rsx_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode);
-#endif
-         break;
    }
 }
 
@@ -647,11 +545,6 @@ void rsx_intf_load_image(uint16_t x, uint16_t y,
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          rsx_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_load_image(x, y, w, h, vram);
 #endif
          break;
    }
@@ -679,11 +572,6 @@ void rsx_intf_fill_rect(uint32_t color,
          rsx_vulkan_fill_rect(color, x, y, w, h);
 #endif
          break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_fill_rect(color, x, y, w, h);
-#endif
-         break;
    }
 }
 
@@ -709,12 +597,6 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
 #if defined(HAVE_VULKAN)
          rsx_vulkan_copy_rect(src_x, src_y, dst_x, dst_y,
                w, h, mask_test, set_mask);
-#endif
-         break;
-      case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-         rsx_copy_rect(src_x, src_y, dst_x, dst_y,
-               w, h);
 #endif
          break;
    }
@@ -763,11 +645,6 @@ void rsx_intf_toggle_display(bool status)
     case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
         rsx_vulkan_toggle_display(status);
-#endif
-        break;
-    case RSX_EXTERNAL_RUST:
-#ifdef HAVE_RUST
-        puts("rsx_toggle_display: NOT IMPLEMENTED!");
 #endif
         break;
     }
