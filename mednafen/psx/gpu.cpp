@@ -1978,13 +1978,6 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    return(ret);
 }
 
-
-void GPU_set_dither_upscale_shift(uint8 upscale_shift)
-{
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   gpu->dither_upscale_shift = upscale_shift;
-}
-
 void GPU_set_display_change_count(unsigned a)
 {
    PS_GPU *gpu = (PS_GPU*)GPU;
@@ -1997,10 +1990,28 @@ unsigned GPU_get_display_change_count(void)
    return gpu->display_change_count;
 }
 
+void GPU_set_dither_upscale_shift(uint8 factor)
+{
+   PS_GPU *gpu = (PS_GPU*)GPU;
+   gpu->dither_upscale_shift = factor;
+}
+
 uint8 GPU_get_dither_upscale_shift(void)
 {
    PS_GPU *gpu = (PS_GPU*)GPU;
    return gpu->dither_upscale_shift;
+}
+
+void GPU_set_upscale_shift(uint8 factor)
+{
+   PS_GPU *gpu = (PS_GPU*)GPU;
+   gpu->upscale_shift = factor;
+}
+
+uint8 GPU_get_upscale_shift(void)
+{
+   PS_GPU *gpu = (PS_GPU*)GPU;
+   return gpu->upscale_shift;
 }
 
 bool GPU_DMACanWrite(void)

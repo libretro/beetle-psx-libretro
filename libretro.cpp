@@ -2269,8 +2269,8 @@ static void alloc_surface(void)
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
    uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
 
-   width  <<= GPU_get_dither_upscale_shift();
-   height <<= GPU_get_dither_upscale_shift();
+   width  <<= GPU_get_upscale_shift();
+   height <<= GPU_get_upscale_shift();
 
    if (surf != NULL)
       delete surf;
@@ -3596,7 +3596,7 @@ void retro_run(void)
       retro_get_system_av_info(&new_av_info);
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
 
-      if (GPU_get_dither_upscale_shift() != psx_gpu_upscale_shift)
+      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
       {
 	      struct retro_system_av_info new_av_info;
 	      retro_get_system_av_info(&new_av_info);
@@ -3610,17 +3610,17 @@ void retro_run(void)
 	      else
          {
             // Failed, we have to postpone the upscaling change
-            psx_gpu_upscale_shift = GPU_get_dither_upscale_shift();
+            psx_gpu_upscale_shift = GPU_get_upscale_shift();
          }
       }
 
       switch (psx_gpu_dither_mode)
       {
          case DITHER_NATIVE:
-            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+            GPU_set_dither_upscale_shift(0);
             break;
          case DITHER_UPSCALED:
-            GPU_set_dither_upscale_shift(0);
+            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
             break;
          case DITHER_OFF:
             break;
@@ -3766,7 +3766,7 @@ void retro_run(void)
    const void *fb        = NULL;
    unsigned width        = rects[0];
    unsigned height       = spec.DisplayRect.h;
-   uint8_t upscale_shift = GPU_get_dither_upscale_shift();
+   uint8_t upscale_shift = GPU_get_upscale_shift();
 
    if (rsx_intf_is_type() == RSX_SOFTWARE)
    {
