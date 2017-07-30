@@ -4000,7 +4000,6 @@ void retro_set_environment(retro_environment_t cb)
       { option_pgxp_texture, "PGXP perspective correct texturing; disabled|enabled" },
 #endif
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
-      { option_scale_dither, "Scale dithering pattern with internal resolution; enabled|disabled" },
       { option_initial_scanline, "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { option_last_scanline, "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
       { option_initial_scanline_pal, "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },

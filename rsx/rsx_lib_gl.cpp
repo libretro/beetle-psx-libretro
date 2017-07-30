@@ -1255,11 +1255,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          depth = 32;
    }
 
-   var.key = option_scale_dither;
+   var.key = option_dither_mode;
    bool scale_dither = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
    {
-      if (!strcmp(var.value, "enabled"))
+      if (!strcmp(var.value, "internal resolution"))
          scale_dither = true;
    }
 
@@ -1577,11 +1577,11 @@ static bool retro_refresh_variables(GlRenderer *renderer)
          depth = 32;
    }
 
-   var.key = option_scale_dither;
+   var.key = option_dither_mode;
    bool scale_dither = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
    {
-      if (!strcmp(var.value, "enabled"))
+      if (!strcmp(var.value, "internal resolution"))
          scale_dither = true;
    }
 
