@@ -1256,11 +1256,13 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    }
 
    var.key = option_dither_mode;
-   bool scale_dither = false;
+   dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
    {
       if (!strcmp(var.value, "internal resolution"))
-         scale_dither = true;
+         dither_mode = DITHER_UPSCALED;
+      else if (!strcmp(var.value, "disabled"))
+         dither_mode  = DITHER_OFF;
    }
 
    var.key = option_wireframe;
@@ -1333,18 +1335,19 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     * textures. */
    Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
-   if (depth > 16)
+   if (depth > 16 || dither_mode == DITHER_OFF)
    {
       /* Dithering is superfluous when we increase the internal
        * color depth */
       DrawBuffer_disable_attribute(command_buffer, "dither");
    }
 
-   uint32_t dither_scaling = scale_dither ? upscaling : 1;
    GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
 
    if (command_buffer->program)
    {
+      uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
+
       glUseProgram(command_buffer->program->id);
       glUniform1ui(command_buffer->program->uniforms["dither_scaling"], dither_scaling);
    }
@@ -1364,7 +1367,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    Texture_init(
          &renderer->fb_out,
-         native_width * upscaling,
+         native_width  * upscaling,
          native_height * upscaling,
          texture_storage);
 
@@ -1514,8 +1517,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       geometry.base_height = h;
 
       /* Max parameters are ignored by this call */
-      geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-      geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H;
+      geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
+      geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
 
       geometry.aspect_ratio = aspect_ratio;
 
@@ -1578,11 +1581,13 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    }
 
    var.key = option_dither_mode;
-   bool scale_dither = false;
+   dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
    {
       if (!strcmp(var.value, "internal resolution"))
-         scale_dither = true;
+         dither_mode = DITHER_UPSCALED;
+      else if (!strcmp(var.value, "disabled"))
+         dither_mode  = DITHER_OFF;
    }
 
    var.key = option_wireframe;
@@ -1599,12 +1604,12 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    if (rebuild_fb_out)
    {
-      if (depth > 16)
+      if (depth > 16 || dither_mode == DITHER_OFF)
          DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
       else
          DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
 
-      uint32_t native_width = (uint32_t) VRAM_WIDTH_PIXELS;
+      uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
       uint32_t native_height = (uint32_t) VRAM_HEIGHT;
 
       uint32_t w = native_width  * upscaling;
@@ -1636,8 +1641,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       uint16_t top_left[2]   = {0, 0};
       uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-      GlRenderer_upload_textures(renderer, top_left, dimensions,
-            GPU_get_vram());
+      GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
       glDeleteTextures(1, &renderer->fb_out_depth.id);
       renderer->fb_out_depth.id     = 0;
@@ -1646,12 +1650,12 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
    }
 
-   uint32_t dither_scaling = scale_dither ? upscaling : 1;
-
    if (renderer->command_buffer->program)
    {
+      uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
+  
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], (GLuint)dither_scaling);
+      glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], dither_scaling);
    }
 
    renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
@@ -1666,10 +1670,10 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       renderer->display_vram != display_vram ||
       renderer->filter_type != filter;
 
-   renderer->internal_upscaling = upscaling;
-   renderer->display_vram = display_vram;
-   renderer->internal_color_depth = depth;
-   renderer->filter_type = filter;
+   renderer->internal_upscaling     = upscaling;
+   renderer->display_vram           = display_vram;
+   renderer->internal_color_depth   = depth;
+   renderer->filter_type            = filter;
 
    return reconfigure_frontend;
 }
@@ -1981,8 +1985,8 @@ struct retro_system_av_info get_av_info(VideoClock std)
    /* The base resolution will be overriden using
     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
     * this base value is not really important */
-   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W;
-   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W * upscaling;
+   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H * upscaling;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
