@@ -277,4 +277,6 @@ void GPU_PokeRAM(uint32 A, uint16 V);
 
 int32_t GPU_GetScanlineNum(void);
 
+void texel_put(uint32 x, uint32 y, uint16 v);
+
 #endif

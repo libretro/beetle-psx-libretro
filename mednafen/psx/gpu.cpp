@@ -85,23 +85,6 @@ struct CTEntry
 
 PS_GPU *GPU = NULL;
 
-/* Set a pixel in VRAM, upscaling it if necessary */
-static void texel_put(uint32 x, uint32 y, uint16 v)
-{
-   uint32_t dy, dx;
-   x <<= GPU->upscale_shift;
-   y <<= GPU->upscale_shift;
-
-   /* Duplicate the pixel as many times as necessary (nearest
-    * neighbour upscaling) */
-   for (dy = 0; dy < UPSCALE(GPU); dy++)
-   {
-      for (dx = 0; dx < UPSCALE(GPU); dx++)
-         vram_put(GPU, x + dx, y + dy, v);
-   }
-}
-
-
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
    unsigned i;
@@ -2050,6 +2033,22 @@ uint16 GPU_PeekRAM(uint32 A)
 void GPU_PokeRAM(uint32 A, uint16 V)
 {
    texel_put(A & 0x3FF, (A >> 10) & 0x1FF, V);
+}
+
+/* Set a pixel in VRAM, upscaling it if necessary */
+void texel_put(uint32 x, uint32 y, uint16 v)
+{
+   uint32_t dy, dx;
+   x <<= GPU->upscale_shift;
+   y <<= GPU->upscale_shift;
+
+   /* Duplicate the pixel as many times as necessary (nearest
+    * neighbour upscaling) */
+   for (dy = 0; dy < UPSCALE(GPU); dy++)
+   {
+      for (dx = 0; dx < UPSCALE(GPU); dx++)
+         vram_put(GPU, x + dx, y + dy, v);
+   }
 }
 
 int32_t GPU_GetScanlineNum(void)
