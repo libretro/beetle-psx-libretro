@@ -158,9 +158,9 @@ MDFNGI *MDFNGameInfo = NULL;
 
 enum
 {
- REGION_JP = 0,
- REGION_NA = 1,
- REGION_EU = 2,
+   REGION_JP = 0,
+   REGION_NA = 1,
+   REGION_EU = 2,
 };
 
 #if PSX_DBGPRINT_ENABLE
@@ -243,32 +243,32 @@ static uint32_t TextMem_Start;
 static std::vector<uint8> TextMem;
 
 static const uint32_t SysControl_Mask[9] = { 0x00ffffff, 0x00ffffff, 0xffffffff, 0x2f1fffff,
-					   0xffffffff, 0x2f1fffff, 0x2f1fffff, 0xffffffff,
-					   0x0003ffff };
+                                             0xffffffff, 0x2f1fffff, 0x2f1fffff, 0xffffffff,
+                                             0x0003ffff };
 
 static const uint32_t SysControl_OR[9] = { 0x1f000000, 0x1f000000, 0x00000000, 0x00000000,
-					 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-					 0x00000000 };
+                                           0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                                           0x00000000 };
 
 static struct
 {
- union
- {
-  struct
-  {
-   uint32_t PIO_Base;	// 0x1f801000	// BIOS Init: 0x1f000000, Writeable bits: 0x00ffffff(assumed, verify), FixedOR = 0x1f000000
-   uint32_t Unknown0;	// 0x1f801004	// BIOS Init: 0x1f802000, Writeable bits: 0x00ffffff, FixedOR = 0x1f000000
-   uint32_t Unknown1;	// 0x1f801008	// BIOS Init: 0x0013243f, ????
-   uint32_t Unknown2;	// 0x1f80100c	// BIOS Init: 0x00003022, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
+   union
+   {
+      struct
+      {
+         uint32_t PIO_Base;   // 0x1f801000  // BIOS Init: 0x1f000000, Writeable bits: 0x00ffffff(assumed, verify), FixedOR = 0x1f000000
+         uint32_t Unknown0;   // 0x1f801004  // BIOS Init: 0x1f802000, Writeable bits: 0x00ffffff, FixedOR = 0x1f000000
+         uint32_t Unknown1;   // 0x1f801008  // BIOS Init: 0x0013243f, ????
+         uint32_t Unknown2;   // 0x1f80100c  // BIOS Init: 0x00003022, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
 
-   uint32_t BIOS_Mapping;	// 0x1f801010	// BIOS Init: 0x0013243f, ????
-   uint32_t SPU_Delay;	// 0x1f801014	// BIOS Init: 0x200931e1, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000 - Affects bus timing on access to SPU
-   uint32_t CDC_Delay;	// 0x1f801018	// BIOS Init: 0x00020843, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
-   uint32_t Unknown4;	// 0x1f80101c	// BIOS Init: 0x00070777, ????
-   uint32_t Unknown5;	// 0x1f801020	// BIOS Init: 0x00031125(but rewritten with other values often), Writeable bits: 0x0003ffff, FixedOR = 0x00000000 -- Possibly CDC related
-  };
-  uint32_t Regs[9];
- };
+         uint32_t BIOS_Mapping;  // 0x1f801010  // BIOS Init: 0x0013243f, ????
+         uint32_t SPU_Delay;  // 0x1f801014  // BIOS Init: 0x200931e1, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000 - Affects bus timing on access to SPU
+         uint32_t CDC_Delay;  // 0x1f801018  // BIOS Init: 0x00020843, Writeable bits: 0x2f1fffff, FixedOR = 0x00000000
+         uint32_t Unknown4;   // 0x1f80101c  // BIOS Init: 0x00070777, ????
+         uint32_t Unknown5;   // 0x1f801020  // BIOS Init: 0x00031125(but rewritten with other values often), Writeable bits: 0x0003ffff, FixedOR = 0x00000000 -- Possibly CDC related
+      };
+      uint32_t Regs[9];
+   };
 } SysControl;
 
 static unsigned DMACycleSteal = 0;   // Doesn't need to be saved in save states, since it's calculated in the ForceEventUpdates() call chain.
@@ -285,14 +285,14 @@ void PSX_SetDMACycleSteal(unsigned stealage)
 // Event stuff
 //
 
-static int32_t Running;	// Set to -1 when not desiring exit, and 0 when we are.
+static int32_t Running; // Set to -1 when not desiring exit, and 0 when we are.
 
 struct event_list_entry
 {
- uint32_t which;
- int32_t event_time;
- event_list_entry *prev;
- event_list_entry *next;
+   uint32_t which;
+   int32_t event_time;
+   event_list_entry *prev;
+   event_list_entry *next;
 };
 
 static event_list_entry events[PSX_EVENT__COUNT];
@@ -305,7 +305,7 @@ static void EventReset(void)
       events[i].which = i;
 
       if(i == PSX_EVENT__SYNFIRST)
-		  events[i].event_time = (int32_t)0x80000000;
+        events[i].event_time = (int32_t)0x80000000;
       else if(i == PSX_EVENT__SYNLAST)
          events[i].event_time = 0x7FFFFFFF;
       else
@@ -406,7 +406,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
 {
    event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
 
-   while(timestamp >= e->event_time)	// If Running = 0, PSX_EventHandler() may be called even if there isn't an event per-se, so while() instead of do { ... } while
+   while(timestamp >= e->event_time)   // If Running = 0, PSX_EventHandler() may be called even if there isn't an event per-se, so while() instead of do { ... } while
    {
       int32_t nt;
       event_list_entry *prev = e->prev;
@@ -474,7 +474,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
    {
       if(IsWrite)
       {
-         //timestamp++;	// Best-case timing.
+         //timestamp++; // Best-case timing.
       }
       else
       {
@@ -571,7 +571,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
             }
          }
          return;
-      }		// End SPU
+      }     // End SPU
 
 
       // CDC: TODO - 8-bit access.
@@ -690,7 +690,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       }
 #endif
 
-      if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
+      if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
       {
          if(!IsWrite)
             timestamp++;
@@ -702,7 +702,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          return;
       }
 
-      if(A >= 0x1F801080 && A <= 0x1F8010FF) 	// DMA
+      if(A >= 0x1F801080 && A <= 0x1F8010FF)    // DMA
       {
          if(!IsWrite)
             timestamp++;
@@ -715,7 +715,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          return;
       }
 
-      if(A >= 0x1F801100 && A <= 0x1F80113F)	// Root counters
+      if(A >= 0x1F801100 && A <= 0x1F80113F) // Root counters
       {
          if(!IsWrite)
             timestamp++;
@@ -737,7 +737,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          //if((A & 0x7FFFFF) <= 0x84)
          //PSX_WARNING("[PIO] Read%d from 0x%08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
 
-         V = ~0U;	// A game this affects:  Tetris with Cardcaptor Sakura
+         V = ~0U; // A game this affects:  Tetris with Cardcaptor Sakura
 
          if(PIOMem)
          {
@@ -797,48 +797,48 @@ void MDFN_FASTCALL PSX_MemWrite16(int32_t timestamp, uint32_t A, uint32_t V)
 
 void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V)
 {
- MemRW<uint32, true, true>(timestamp, A, V);
+   MemRW<uint32, true, true>(timestamp, A, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite32(int32_t timestamp, uint32_t A, uint32_t V)
 {
- MemRW<uint32, true, false>(timestamp, A, V);
+   MemRW<uint32, true, false>(timestamp, A, V);
 }
 
 uint8_t MDFN_FASTCALL PSX_MemRead8(int32_t &timestamp, uint32_t A)
 {
- uint32_t V;
+   uint32_t V;
 
- MemRW<uint8, false, false>(timestamp, A, V);
+   MemRW<uint8, false, false>(timestamp, A, V);
 
- return(V);
+   return(V);
 }
 
 uint16_t MDFN_FASTCALL PSX_MemRead16(int32_t &timestamp, uint32_t A)
 {
- uint32_t V;
+   uint32_t V;
 
- MemRW<uint16, false, false>(timestamp, A, V);
+   MemRW<uint16, false, false>(timestamp, A, V);
 
- return(V);
+   return(V);
 }
 
 uint32_t MDFN_FASTCALL PSX_MemRead24(int32_t &timestamp, uint32_t A)
 {
- uint32_t V;
+   uint32_t V;
 
- MemRW<uint32, false, true>(timestamp, A, V);
+   MemRW<uint32, false, true>(timestamp, A, V);
 
- return(V);
+   return(V);
 }
 
 uint32_t MDFN_FASTCALL PSX_MemRead32(int32_t &timestamp, uint32_t A)
 {
- uint32_t V;
+   uint32_t V;
 
- MemRW<uint32, false, false>(timestamp, A, V);
+   MemRW<uint32, false, false>(timestamp, A, V);
 
- return(V);
+   return(V);
 }
 
 template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A)
@@ -863,7 +863,7 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
       {
          // TODO
 
-      }		// End SPU
+      }     // End SPU
 
 
       // CDC: TODO - 8-bit access.
@@ -904,19 +904,19 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
       }
 
 
-      if(A >= 0x1F801070 && A <= 0x1F801077)	// IRQ
+      if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
       {
          // TODO
 
       }
 
-      if(A >= 0x1F801080 && A <= 0x1F8010FF) 	// DMA
+      if(A >= 0x1F801080 && A <= 0x1F8010FF)    // DMA
       {
          // TODO
 
       }
 
-      if(A >= 0x1F801100 && A <= 0x1F80113F)	// Root counters
+      if(A >= 0x1F801100 && A <= 0x1F80113F) // Root counters
       {
          // TODO
 
@@ -1003,7 +1003,7 @@ static void PSX_Power(void)
    MDEC_Power();
    CDC->Power();
    GPU_Power();
-   //SPU->Power();	// Called from CDC->Power()
+   //SPU->Power();   // Called from CDC->Power()
    IRQ_Power();
 
    ForceEventUpdates(0);
@@ -1168,7 +1168,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    rdel = MDFN_de32lsb(&pvd[0x9E]);
    rdel_len = MDFN_de32lsb(&pvd[0xA6]);
 
-   if(rdel_len >= (1024 * 1024 * 10))	/* Arbitrary sanity check. */
+   if(rdel_len >= (1024 * 1024 * 10))  /* Arbitrary sanity check. */
    {
       log_cb(RETRO_LOG_ERROR, "Root directory table too large\n");
       ret = NULL;
@@ -1234,7 +1234,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
                                ret = "SCEA";
                                goto Breakout;
 
-                     case 'K':	// Korea?
+                     case 'K':   // Korea?
                      case 'B':
                      case 'P': if(rr)
                                   *rr = REGION_JP;
@@ -1307,7 +1307,7 @@ static unsigned CalcDiscSCEx(void)
                }
                else if(strstr((char *)fbuf, "japan") != NULL)
                {
-                  id = "SCEI";	// ?
+                  id = "SCEI";   // ?
                   if(!i)
                      ret_region = REGION_JP;
                }
@@ -1317,13 +1317,13 @@ static unsigned CalcDiscSCEx(void)
                   if(!i)
                      ret_region = REGION_JP;
                }
-               else	// Failure case
+               else  // Failure case
                {
                   if(prev_valid_id != NULL)
                      id = prev_valid_id;
                   else
                   {
-                     switch(ret_region)	// Less than correct, but meh, what can we do.
+                     switch(ret_region)   // Less than correct, but meh, what can we do.
                      {
                         case REGION_JP:
                            id = "SCEI";
@@ -1588,9 +1588,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    po = &PIOMem->data8[0x0800];
 
-   MDFN_en32lsb(po, (0x0 << 26) | (31 << 21) | (0x8 << 0));	// JR
+   MDFN_en32lsb(po, (0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
    po += 4;
-   MDFN_en32lsb(po, 0);	// NOP(kinda)
+   MDFN_en32lsb(po, 0); // NOP(kinda)
    po += 4;
 
    po = &PIOMem->data8[0x1000];
@@ -1602,9 +1602,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    po += 4;
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));	// JR
+   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
    po += 4;
-   MDFN_en32lsb(po, 0);	// NOP(kinda)
+   MDFN_en32lsb(po, 0); // NOP(kinda)
    po += 4;
 
    //
@@ -1613,42 +1613,42 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    // Load source address into r8
    uint32 sa = 0x9F000000 + 65536;
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));	// LUI
+   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF)); 	// ORI
+   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF));  // ORI
    po += 4;
 
    // Load dest address into r9
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));	// LUI
+   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));  // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF)); 	// ORI
+   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF));   // ORI
    po += 4;
 
    // Load size into r10
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem.size() >> 16));	// LUI
+   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem.size() >> 16)); // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (10 << 16) | (TextMem.size() & 0xFFFF)); 	// ORI
+   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (10 << 16) | (TextMem.size() & 0xFFFF));    // ORI
    po += 4;
 
    //
    // Loop begin
    //
 
-   MDFN_en32lsb(po, (0x24 << 26) | (8 << 21) | (1 << 16));	// LBU to r1
+   MDFN_en32lsb(po, (0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);	// Decrement size
+   MDFN_en32lsb(po, (0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);   // Decrement size
    po += 4;
 
-   MDFN_en32lsb(po, (0x28 << 26) | (9 << 21) | (1 << 16));	// SB from r1
+   MDFN_en32lsb(po, (0x28 << 26) | (9 << 21) | (1 << 16));  // SB from r1
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);	// Increment source addr
+   MDFN_en32lsb(po, (0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);  // Increment source addr
    po += 4;
 
    MDFN_en32lsb(po, (0x05 << 26) | (0 << 21) | (10 << 16) | (-5 & 0xFFFF));
    po += 4;
-   MDFN_en32lsb(po, (0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);	// Increment dest addr
+   MDFN_en32lsb(po, (0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);  // Increment dest addr
    po += 4;
 
    //
@@ -1662,9 +1662,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    }
    else
    {
-      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16));	// LUI
+      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
       po += 4;
-      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF)); 	// ORI
+      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
       po += 4;
 
       // Load PC into r2
@@ -1684,9 +1684,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));	// JR
+   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
    po += 4;
-   MDFN_en32lsb(po, 0);	// NOP(kinda)
+   MDFN_en32lsb(po, 0); // NOP(kinda)
    po += 4;
 
    return true;
@@ -1845,7 +1845,7 @@ int StateAction(StateMem *sm, int load, int data_only)
 
    ret &= FIO->StateAction(sm, load, data_only);
 
-   ret &= IRQ_StateAction(sm, load, data_only);	// Do it last.
+   ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
 
    if(load)
    {
@@ -1936,213 +1936,212 @@ static void DoSimpleCommand(int cmd)
 
 static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, const uint32 addr, const uint16 val)
 {
- char tmp[256];
+   char tmp[256];
 
- if(patch->conditions.size() > 0)
-  patch->conditions.append(", ");
+   if(patch->conditions.size() > 0)
+      patch->conditions.append(", ");
 
- if(len == 2)
-  snprintf(tmp, 256, "%u L 0x%08x %s 0x%04x", len, addr, cc, val & 0xFFFFU);
- else
-  snprintf(tmp, 256, "%u L 0x%08x %s 0x%02x", len, addr, cc, val & 0xFFU);
+   if(len == 2)
+      snprintf(tmp, 256, "%u L 0x%08x %s 0x%04x", len, addr, cc, val & 0xFFFFU);
+   else
+      snprintf(tmp, 256, "%u L 0x%08x %s 0x%02x", len, addr, cc, val & 0xFFU);
 
- patch->conditions.append(tmp);
+   patch->conditions.append(tmp);
 }
 
 static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
 {
- uint64 code = 0;
- unsigned nybble_count = 0;
+   uint64 code = 0;
+   unsigned nybble_count = 0;
 
- for(unsigned i = 0; i < cheat_string.size(); i++)
- {
-  if(cheat_string[i] == ' ' || cheat_string[i] == '-' || cheat_string[i] == ':' || cheat_string[i] == '+')
-   continue;
+   for(unsigned i = 0; i < cheat_string.size(); i++)
+   {
+      if(cheat_string[i] == ' ' || cheat_string[i] == '-' || cheat_string[i] == ':' || cheat_string[i] == '+')
+         continue;
 
-  nybble_count++;
-  code <<= 4;
+      nybble_count++;
+      code <<= 4;
 
-  if(cheat_string[i] >= '0' && cheat_string[i] <= '9')
-   code |= cheat_string[i] - '0';
-  else if(cheat_string[i] >= 'a' && cheat_string[i] <= 'f')
-   code |= cheat_string[i] - 'a' + 0xA;
-  else if(cheat_string[i] >= 'A' && cheat_string[i] <= 'F')
-   code |= cheat_string[i] - 'A' + 0xA;
-  else
-  {
-   if(cheat_string[i] & 0x80)
-      log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code..\n");
-   else
-      log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code: %c.\n", cheat_string[i]);
-   return false;
-  }
- }
+      if(cheat_string[i] >= '0' && cheat_string[i] <= '9')
+         code |= cheat_string[i] - '0';
+      else if(cheat_string[i] >= 'a' && cheat_string[i] <= 'f')
+         code |= cheat_string[i] - 'a' + 0xA;
+      else if(cheat_string[i] >= 'A' && cheat_string[i] <= 'F')
+         code |= cheat_string[i] - 'A' + 0xA;
+      else
+      {
+         if(cheat_string[i] & 0x80)
+            log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code..\n");
+         else
+            log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code: %c.\n", cheat_string[i]);
+         return false;
+      }
+   }
 
- if(nybble_count != 12)
- {
-    log_cb(RETRO_LOG_ERROR, "GameShark code is of an incorrect length.\n");
-    return false;
- }
+   if(nybble_count != 12)
+   {
+      log_cb(RETRO_LOG_ERROR, "GameShark code is of an incorrect length.\n");
+      return false;
+   }
 
- const uint8 code_type = code >> 40;
- const uint64 cl = code & 0xFFFFFFFFFFULL;
+   const uint8 code_type = code >> 40;
+   const uint64 cl = code & 0xFFFFFFFFFFULL;
 
- patch->bigendian = false;
- patch->compare = 0;
+   patch->bigendian = false;
+   patch->compare = 0;
 
- if(patch->type == 'T')
- {
-  if(code_type != 0x80)
-     log_cb(RETRO_LOG_ERROR, "Unrecognized GameShark code type for second part to copy bytes code.\n");
+   if(patch->type == 'T')
+   {
+      if(code_type != 0x80)
+      log_cb(RETRO_LOG_ERROR, "Unrecognized GameShark code type for second part to copy bytes code.\n");
 
-  patch->addr = cl >> 16;
-  return(false);
- }
+      patch->addr = cl >> 16;
+      return(false);
+   }
 
- switch(code_type)
- {
-  default:
-     log_cb(RETRO_LOG_ERROR, "GameShark code type 0x%02X is currently not supported.\n", code_type);
+   switch(code_type)
+   {
+   default:
+      log_cb(RETRO_LOG_ERROR, "GameShark code type 0x%02X is currently not supported.\n", code_type);
+      return(false);
 
-	return(false);
+   // TODO:
+   case 0x10:   // 16-bit increment
+      patch->length = 2;
+      patch->type = 'A';
+      patch->addr = cl >> 16;
+      patch->val = cl & 0xFFFF;
+      return(false);
 
-  // TODO:
-  case 0x10:	// 16-bit increment
-	patch->length = 2;
-	patch->type = 'A';
-	patch->addr = cl >> 16;
-	patch->val = cl & 0xFFFF;
-	return(false);
+   case 0x11:   // 16-bit decrement
+      patch->length = 2;
+      patch->type = 'A';
+      patch->addr = cl >> 16;
+      patch->val = (0 - cl) & 0xFFFF;
+      return(false);
 
-  case 0x11:	// 16-bit decrement
-	patch->length = 2;
-	patch->type = 'A';
-	patch->addr = cl >> 16;
-	patch->val = (0 - cl) & 0xFFFF;
-	return(false);
+   case 0x20:   // 8-bit increment
+      patch->length = 1;
+      patch->type = 'A';
+      patch->addr = cl >> 16;
+      patch->val = cl & 0xFF;
+      return(false);
 
-  case 0x20:	// 8-bit increment
-	patch->length = 1;
-	patch->type = 'A';
-	patch->addr = cl >> 16;
-	patch->val = cl & 0xFF;
-	return(false);
+   case 0x21:   // 8-bit decrement
+      patch->length = 1;
+      patch->type = 'A';
+      patch->addr = cl >> 16;
+      patch->val = (0 - cl) & 0xFF;
+      return(false);
+   //
+   //
+   //
 
-  case 0x21:	// 8-bit decrement
-	patch->length = 1;
-	patch->type = 'A';
-	patch->addr = cl >> 16;
-	patch->val = (0 - cl) & 0xFF;
-	return(false);
-  //
-  //
-  //
+   case 0x30:   // 8-bit constant
+      patch->length = 1;
+      patch->type = 'R';
+      patch->addr = cl >> 16;
+      patch->val = cl & 0xFF;
+      return(false);
 
-  case 0x30:	// 8-bit constant
-	patch->length = 1;
-	patch->type = 'R';
-	patch->addr = cl >> 16;
-	patch->val = cl & 0xFF;
-	return(false);
+   case 0x80:   // 16-bit constant
+      patch->length = 2;
+      patch->type = 'R';
+      patch->addr = cl >> 16;
+      patch->val = cl & 0xFFFF;
+      return(false);
 
-  case 0x80:	// 16-bit constant
-	patch->length = 2;
-	patch->type = 'R';
-	patch->addr = cl >> 16;
-	patch->val = cl & 0xFFFF;
-	return(false);
+   case 0x50:   // Repeat thingy
+   {
+      const uint8 wcount = (cl >> 24) & 0xFF;
+      const uint8 addr_inc = (cl >> 16) & 0xFF;
+      const uint8 val_inc = (cl >> 0) & 0xFF;
 
-  case 0x50:	// Repeat thingy
-	{
-	 const uint8 wcount = (cl >> 24) & 0xFF;
-	 const uint8 addr_inc = (cl >> 16) & 0xFF;
-	 const uint8 val_inc = (cl >> 0) & 0xFF;
+      patch->mltpl_count = wcount;
+      patch->mltpl_addr_inc = addr_inc;
+      patch->mltpl_val_inc = val_inc;
+   }
+   return(true);
 
-	 patch->mltpl_count = wcount;
-	 patch->mltpl_addr_inc = addr_inc;
-	 patch->mltpl_val_inc = val_inc;
-	}
-	return(true);
+   case 0xC2:   // Copy
+   {
+      const uint16 ccount = cl & 0xFFFF;
 
-  case 0xC2:	// Copy
-	{
-	 const uint16 ccount = cl & 0xFFFF;
+      patch->type = 'T';
+      patch->val = 0;
+      patch->length = 1;
 
-	 patch->type = 'T';
-	 patch->val = 0;
-	 patch->length = 1;
+      patch->copy_src_addr = cl >> 16;
+      patch->copy_src_addr_inc = 1;
 
-	 patch->copy_src_addr = cl >> 16;
-	 patch->copy_src_addr_inc = 1;
+      patch->mltpl_count = ccount;
+      patch->mltpl_addr_inc = 1;
+      patch->mltpl_val_inc = 0;
+   }
+   return(true);
 
-	 patch->mltpl_count = ccount;
-	 patch->mltpl_addr_inc = 1;
-	 patch->mltpl_val_inc = 0;
-	}
-	return(true);
+  case 0xD0:   // 16-bit == condition
+   GSCondCode(patch, "==", 2, cl >> 16, cl);
+   return(true);
 
-  case 0xD0:	// 16-bit == condition
-	GSCondCode(patch, "==", 2, cl >> 16, cl);
-	return(true);
+  case 0xD1:   // 16-bit != condition
+   GSCondCode(patch, "!=", 2, cl >> 16, cl);
+   return(true);
 
-  case 0xD1:	// 16-bit != condition
-	GSCondCode(patch, "!=", 2, cl >> 16, cl);
-	return(true);
+  case 0xD2:   // 16-bit < condition
+   GSCondCode(patch, "<", 2, cl >> 16, cl);
+   return(true);
 
-  case 0xD2:	// 16-bit < condition
-	GSCondCode(patch, "<", 2, cl >> 16, cl);
-	return(true);
-
-  case 0xD3:	// 16-bit > condition
-	GSCondCode(patch, ">", 2, cl >> 16, cl);
-	return(true);
-
+  case 0xD3:   // 16-bit > condition
+   GSCondCode(patch, ">", 2, cl >> 16, cl);
+   return(true);
 
 
-  case 0xE0:	// 8-bit == condition
-	GSCondCode(patch, "==", 1, cl >> 16, cl);
-	return(true);
 
-  case 0xE1:	// 8-bit != condition
-	GSCondCode(patch, "!=", 1, cl >> 16, cl);
-	return(true);
+  case 0xE0:   // 8-bit == condition
+   GSCondCode(patch, "==", 1, cl >> 16, cl);
+   return(true);
 
-  case 0xE2:	// 8-bit < condition
-	GSCondCode(patch, "<", 1, cl >> 16, cl);
-	return(true);
+  case 0xE1:   // 8-bit != condition
+   GSCondCode(patch, "!=", 1, cl >> 16, cl);
+   return(true);
 
-  case 0xE3:	// 8-bit > condition
-	GSCondCode(patch, ">", 1, cl >> 16, cl);
-	return(true);
+  case 0xE2:   // 8-bit < condition
+   GSCondCode(patch, "<", 1, cl >> 16, cl);
+   return(true);
+
+  case 0xE3:   // 8-bit > condition
+   GSCondCode(patch, ">", 1, cl >> 16, cl);
+   return(true);
 
  }
 }
 
 static CheatFormatStruct CheatFormats[] =
 {
- { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
+   { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
 };
 
 static CheatFormatInfoStruct CheatFormatInfo =
 {
- 1,
- CheatFormats
+   1,
+   CheatFormats
 };
 
 static const FileExtensionSpecStruct KnownExtensions[] =
 {
- { ".psf", "PSF1 Rip" },
- { ".psx", "PS-X Executable" },
- { ".exe", "PS-X Executable" },
- { NULL, NULL }
+   { ".psf", "PSF1 Rip" },
+   { ".psx", "PS-X Executable" },
+   { ".exe", "PS-X Executable" },
+   { NULL, NULL }
 };
 
 static const MDFNSetting_EnumList Region_List[] =
 {
- { "jp", REGION_JP, "Japan" },
- { "na", REGION_NA, "North America" },
- { "eu", REGION_EU, "Europe" },
- { NULL, 0 },
+   { "jp", REGION_JP, "Japan" },
+   { "na", REGION_NA, "North America" },
+   { "eu", REGION_EU, "Europe" },
+   { NULL, 0 },
 };
 
 #if 0
@@ -2157,54 +2156,54 @@ static const MDFNSetting_EnumList MultiTap_List[] =
 
 static MDFNSetting PSXSettings[] =
 {
- { "psx.input.mouse_sensitivity", MDFNSF_NOFLAGS, "Emulated mouse sensitivity.", NULL, MDFNST_FLOAT, "1.00", NULL, NULL },
+   { "psx.input.mouse_sensitivity", MDFNSF_NOFLAGS, "Emulated mouse sensitivity.", NULL, MDFNST_FLOAT, "1.00", NULL, NULL },
 
- { "psx.input.analog_mode_ct", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable analog mode combo-button alternate toggle.", "When enabled, instead of the configured Analog mode toggle button for the emulated DualShock, use a combination of buttons to toggle it instead.  When Select, Start, and all four shoulder buttons are held down for about 1 second, the mode will toggle.", MDFNST_BOOL, "0", NULL, NULL },
+   { "psx.input.analog_mode_ct", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable analog mode combo-button alternate toggle.", "When enabled, instead of the configured Analog mode toggle button for the emulated DualShock, use a combination of buttons to toggle it instead.  When Select, Start, and all four shoulder buttons are held down for about 1 second, the mode will toggle.", MDFNST_BOOL, "0", NULL, NULL },
 
- { "psx.input.pport1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 1.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL }, //MDFNST_ENUM, "auto", NULL, NULL, NULL, NULL, MultiTap_List },
- { "psx.input.pport2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 2.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL },
+   { "psx.input.pport1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 1.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL }, //MDFNST_ENUM, "auto", NULL, NULL, NULL, NULL, MultiTap_List },
+   { "psx.input.pport2.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 2.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL },
 
- { "psx.input.port1.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 1.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port2.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 2.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port3.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 3.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port4.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 4.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port5.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 5.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port6.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 6.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port7.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 7.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
- { "psx.input.port8.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 8.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
-
-
- { "psx.input.port1.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 1.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF0000", "0x000000", "0x1000000" },
- { "psx.input.port2.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 2.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FF00", "0x000000", "0x1000000" },
- { "psx.input.port3.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 3.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF00FF", "0x000000", "0x1000000" },
- { "psx.input.port4.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 4.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF8000", "0x000000", "0x1000000" },
- { "psx.input.port5.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 5.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFFFF00", "0x000000", "0x1000000" },
- { "psx.input.port6.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 6.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FFFF", "0x000000", "0x1000000" },
- { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 7.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
- { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 8.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
-
- { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Attempt to auto-detect region of game.", NULL, MDFNST_BOOL, "1" },
- { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Default region to use.", "Used if region autodetection fails or is disabled.", MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
-
- { "psx.bios_jp", MDFNSF_EMU_STATE, "Path to the Japan SCPH-5500 ROM BIOS", NULL, MDFNST_STRING, "scph5500.bin" },
- { "psx.bios_na", MDFNSF_EMU_STATE, "Path to the North America SCPH-5501 ROM BIOS", "SHA1 0555c6fae8906f3f09baf5988f00e55f88e9f30b", MDFNST_STRING, "scph5501.bin" },
- { "psx.bios_eu", MDFNSF_EMU_STATE, "Path to the Europe SCPH-5502 ROM BIOS", NULL, MDFNST_STRING, "scph5502.bin" },
-
- { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, "SPU output resampler quality.",
-	"0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors.", MDFNST_UINT, "5", "0", "10" },
+   { "psx.input.port1.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 1.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port2.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 2.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port3.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 3.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port4.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 4.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port5.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 5.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port6.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 6.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port7.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 7.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
+   { "psx.input.port8.memcard", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Emulate memcard on virtual port 8.", NULL, MDFNST_BOOL, "1", NULL, NULL, },
 
 
- { "psx.slstart", MDFNSF_NOFLAGS, "First displayed scanline in NTSC mode.", NULL, MDFNST_INT, "0", "0", "239" },
- { "psx.slend", MDFNSF_NOFLAGS, "Last displayed scanline in NTSC mode.", NULL, MDFNST_INT, "239", "0", "239" },
+   { "psx.input.port1.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 1.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF0000", "0x000000", "0x1000000" },
+   { "psx.input.port2.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 2.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FF00", "0x000000", "0x1000000" },
+   { "psx.input.port3.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 3.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF00FF", "0x000000", "0x1000000" },
+   { "psx.input.port4.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 4.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFF8000", "0x000000", "0x1000000" },
+   { "psx.input.port5.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 5.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0xFFFF00", "0x000000", "0x1000000" },
+   { "psx.input.port6.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 6.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x00FFFF", "0x000000", "0x1000000" },
+   { "psx.input.port7.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 7.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x0080FF", "0x000000", "0x1000000" },
+   { "psx.input.port8.gun_chairs", MDFNSF_NOFLAGS, "Crosshairs color for lightgun on virtual port 8.", "A value of 0x1000000 disables crosshair drawing.", MDFNST_UINT, "0x8000FF", "0x000000", "0x1000000" },
 
- { "psx.slstartp", MDFNSF_NOFLAGS, "First displayed scanline in PAL mode.", NULL, MDFNST_INT, "0", "0", "287" },
- { "psx.slendp", MDFNSF_NOFLAGS, "Last displayed scanline in PAL mode.", NULL, MDFNST_INT, "287", "0", "287" },
+   { "psx.region_autodetect", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Attempt to auto-detect region of game.", NULL, MDFNST_BOOL, "1" },
+   { "psx.region_default", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Default region to use.", "Used if region autodetection fails or is disabled.", MDFNST_ENUM, "jp", NULL, NULL, NULL, NULL, Region_List },
+
+   { "psx.bios_jp", MDFNSF_EMU_STATE, "Path to the Japan SCPH-5500 ROM BIOS", NULL, MDFNST_STRING, "scph5500.bin" },
+   { "psx.bios_na", MDFNSF_EMU_STATE, "Path to the North America SCPH-5501 ROM BIOS", "SHA1 0555c6fae8906f3f09baf5988f00e55f88e9f30b", MDFNST_STRING, "scph5501.bin" },
+   { "psx.bios_eu", MDFNSF_EMU_STATE, "Path to the Europe SCPH-5502 ROM BIOS", NULL, MDFNST_STRING, "scph5502.bin" },
+
+   { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, "SPU output resampler quality.",
+   "0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors.", MDFNST_UINT, "5", "0", "10" },
+
+
+   { "psx.slstart", MDFNSF_NOFLAGS, "First displayed scanline in NTSC mode.", NULL, MDFNST_INT, "0", "0", "239" },
+   { "psx.slend", MDFNSF_NOFLAGS, "Last displayed scanline in NTSC mode.", NULL, MDFNST_INT, "239", "0", "239" },
+
+   { "psx.slstartp", MDFNSF_NOFLAGS, "First displayed scanline in PAL mode.", NULL, MDFNST_INT, "0", "0", "287" },
+   { "psx.slendp", MDFNSF_NOFLAGS, "Last displayed scanline in PAL mode.", NULL, MDFNST_INT, "287", "0", "287" },
 
 #if PSX_DBGPRINT_ENABLE
- { "psx.dbg_level", MDFNSF_NOFLAGS, "Debug printf verbosity level.", NULL, MDFNST_UINT, "0", "0", "4" },
+   { "psx.dbg_level", MDFNSF_NOFLAGS, "Debug printf verbosity level.", NULL, MDFNST_UINT, "0", "0", "4" },
 #endif
 
- { NULL },
+   { NULL },
 };
 
 // Note for the future: If we ever support PSX emulation with non-8-bit RGB color components, or add a new linear RGB colorspace to MDFN_PixelFormat, we'll need
@@ -2212,29 +2211,29 @@ static MDFNSetting PSXSettings[] =
 // an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
 MDFNGI EmulatedPSX =
 {
- PSXSettings,
- MDFN_MASTERCLOCK_FIXED(33868800),
- 0,
+   PSXSettings,
+   MDFN_MASTERCLOCK_FIXED(33868800),
+   0,
 
- true, // Multires possible?
+   true, // Multires possible?
 
- //
- // Note: Following video settings will be overwritten during game load.
- //
- 0,	// lcm_width
- 0,	// lcm_height
- NULL,  // Dummy
+   //
+   // Note: Following video settings will be overwritten during game load.
+   //
+   0,   // lcm_width
+   0,   // lcm_height
+   NULL,  // Dummy
 
- 320,   // Nominal width
- 240,   // Nominal height
+   320,   // Nominal width
+   240,   // Nominal height
 
- 0,   // Framebuffer width
- 0,   // Framebuffer height
- //
- //
- //
+   0,   // Framebuffer width
+   0,   // Framebuffer height
+   //
+   //
+   //
 
- 2,     // Number of output sound channels
+   2,     // Number of output sound channels
 
 };
 
@@ -2288,7 +2287,7 @@ static void check_system_specs(void)
 static unsigned disk_get_num_images(void)
 {
    if(cdifs)
-       return CD_IsPBP ? PBP_DiscCount : cdifs->size();
+      return CD_IsPBP ? PBP_DiscCount : cdifs->size();
    return 0;
 }
 
@@ -2624,11 +2623,11 @@ static void check_variables(bool startup)
          {
             uint8_t val = var.value[0] - '0';
 
-	    if (var.value[1] != 'x')
-	    {
-	       val  = (var.value[0] - '0') * 10;
+       if (var.value[1] != 'x')
+       {
+          val  = (var.value[0] - '0') * 10;
                val += var.value[1] - '0';
-	    }
+       }
 
             // Upscale must be a power of two
             assert((val & (val - 1)) == 0);
@@ -2670,39 +2669,39 @@ static void check_variables(bool startup)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if (strcmp(var.value, "disabled") == 0)
-		   psx_pgxp_mode = PGXP_MODE_NONE;
-	   else if (strcmp(var.value, "memory only") == 0)
-		   psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE;
-	   else if (strcmp(var.value, "memory + CPU") == 0)
-		   psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE | PGXP_MODE_CPU;
+      if (strcmp(var.value, "disabled") == 0)
+         psx_pgxp_mode = PGXP_MODE_NONE;
+      else if (strcmp(var.value, "memory only") == 0)
+         psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE;
+      else if (strcmp(var.value, "memory + CPU") == 0)
+         psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE | PGXP_MODE_CPU;
    }
    else
-	   psx_pgxp_mode = PGXP_MODE_NONE;
+      psx_pgxp_mode = PGXP_MODE_NONE;
 
    var.key = option_pgxp_vertex;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if (strcmp(var.value, "disabled") == 0)
-		   psx_pgxp_vertex_caching = PGXP_MODE_NONE;
-	   else if (strcmp(var.value, "enabled") == 0)
-		   psx_pgxp_vertex_caching = PGXP_VERTEX_CACHE;
+      if (strcmp(var.value, "disabled") == 0)
+         psx_pgxp_vertex_caching = PGXP_MODE_NONE;
+      else if (strcmp(var.value, "enabled") == 0)
+         psx_pgxp_vertex_caching = PGXP_VERTEX_CACHE;
    }
    else
-	   psx_pgxp_vertex_caching = PGXP_MODE_NONE;
+      psx_pgxp_vertex_caching = PGXP_MODE_NONE;
 
    var.key = option_pgxp_texture;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if (strcmp(var.value, "disabled") == 0)
-		   psx_pgxp_texture_correction = PGXP_MODE_NONE;
-	   else if (strcmp(var.value, "enabled") == 0)
-		   psx_pgxp_texture_correction = PGXP_TEXTURE_CORRECTION;
+      if (strcmp(var.value, "disabled") == 0)
+         psx_pgxp_texture_correction = PGXP_MODE_NONE;
+      else if (strcmp(var.value, "enabled") == 0)
+         psx_pgxp_texture_correction = PGXP_TEXTURE_CORRECTION;
    }
    else
-	   psx_pgxp_texture_correction = PGXP_MODE_NONE;
+      psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
 
    var.key = option_analog_toggle;
@@ -2955,7 +2954,7 @@ end:
    fclose(fp);
 }
 
-static std::vector<CDIF *> CDInterfaces;	// FIXME: Cleanup on error out.
+static std::vector<CDIF *> CDInterfaces;  // FIXME: Cleanup on error out.
 // TODO: LoadCommon()
 
 static MDFNGI *MDFNI_LoadCD(const char *devicename)
@@ -3092,8 +3091,8 @@ static MDFNGI *MDFNI_LoadGame(const char *name)
 {
    MDFNFILE *GameFile;
 
-	if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
-	 return MDFNI_LoadCD(name);
+   if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
+    return MDFNI_LoadCD(name);
 
    GameFile = file_open(name);
 
@@ -3501,55 +3500,50 @@ static void update_input(void)
       uint32_t l_up    = analog_left_y < 0 ? -analog_left_y : 0;
 
       if (enable_analog_calibration) {
-	// Compute the "radius" (distance from 0, 0) of the current
-	// stick position, using the same normalized values
-	float l = analog_radius(analog_left_x, analog_left_y);
-	float r = analog_radius(analog_right_x, analog_right_y);
+         // Compute the "radius" (distance from 0, 0) of the current
+         // stick position, using the same normalized values
+         float l = analog_radius(analog_left_x, analog_left_y);
+         float r = analog_radius(analog_right_x, analog_right_y);
 
-	// We recalibrate when we find a new max value for the sticks
-	if (l > analog_calibration->left) {
-	  analog_calibration->left = l;
+         // We recalibrate when we find a new max value for the sticks
+         if (l > analog_calibration->left) {
+            analog_calibration->left = l;
+            log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius: %f\n", l);
+         }
 
-	  log_cb(RETRO_LOG_DEBUG,
-		 "Recalibrating left stick, radius: %f\n",
-		 l);
-	}
+         if (r > analog_calibration->right) {
+            analog_calibration->right = r;
 
-	if (r > analog_calibration->right) {
-	  analog_calibration->right = r;
+            log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
+         }
 
-	  log_cb(RETRO_LOG_DEBUG,
-		 "Recalibrating right stick, radius: %f\n",
-		 r);
-	}
+         // This represents the maximal value the DualShock sticks can
+         // reach, where 1.0 would be the maximum value along the X or
+         // Y axis. XXX I need to measure this value more precisely,
+         // it's a rough estimate at the moment.
+         static const float dualshock_analog_radius = 1.35;
 
-	// This represents the maximal value the DualShock sticks can
-	// reach, where 1.0 would be the maximum value along the X or
-	// Y axis. XXX I need to measure this value more precisely,
-	// it's a rough estimate at the moment.
-	static const float dualshock_analog_radius = 1.35;
+         // Now compute the scaling factor to apply to convert the
+         // emulator's controller coordinates to a native DualShock's
+         // ones
+         float l_scaling = dualshock_analog_radius / analog_calibration->left;
+         float r_scaling = dualshock_analog_radius / analog_calibration->right;
 
-	// Now compute the scaling factor to apply to convert the
-	// emulator's controller coordinates to a native DualShock's
-	// ones
-	float l_scaling = dualshock_analog_radius / analog_calibration->left;
-	float r_scaling = dualshock_analog_radius / analog_calibration->right;
+         analog_scale(&l_left, l_scaling);
+         analog_scale(&l_right, l_scaling);
+         analog_scale(&l_up, l_scaling);
+         analog_scale(&l_down, l_scaling);
 
-	analog_scale(&l_left, l_scaling);
-	analog_scale(&l_right, l_scaling);
-	analog_scale(&l_up, l_scaling);
-	analog_scale(&l_down, l_scaling);
-
-	analog_scale(&r_left, r_scaling);
-	analog_scale(&r_right, r_scaling);
-	analog_scale(&r_up, r_scaling);
-	analog_scale(&r_down, r_scaling);
+         analog_scale(&r_left, r_scaling);
+         analog_scale(&r_right, r_scaling);
+         analog_scale(&r_up, r_scaling);
+         analog_scale(&r_down, r_scaling);
       } else {
-	// Reset the calibration. Since we only increase the
-	// calibration coordinates we can start with a reasonably
-	// small value.
-	analog_calibration->left = 0.7;
-	analog_calibration->right = 0.7;
+         // Reset the calibration. Since we only increase the
+         // calibration coordinates we can start with a reasonably
+         // small value.
+         analog_calibration->left = 0.7;
+         analog_calibration->right = 0.7;
       }
 
       buf.u32[j][1] = r_right;
@@ -3598,16 +3592,16 @@ void retro_run(void)
 
       if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
       {
-	      struct retro_system_av_info new_av_info;
-	      retro_get_system_av_info(&new_av_info);
+         struct retro_system_av_info new_av_info;
+         retro_get_system_av_info(&new_av_info);
 
-	      if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
-			     &new_av_info))
+         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
+              &new_av_info))
          {
             GPU_Reinit(psx_gpu_upscale_shift);
             alloc_surface();
          }
-	      else
+         else
          {
             // Failed, we have to postpone the upscaling change
             psx_gpu_upscale_shift = GPU_get_upscale_shift();
@@ -3633,27 +3627,27 @@ void retro_run(void)
 
    if (display_internal_framerate)
    {
-     frame_count++;
+      frame_count++;
 
-     if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
-     {
-       char msg_buffer[64];
+      if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
+      {
+         char msg_buffer[64];
 
-       float fps = (internal_frame_count * video_output_framerate()) / INTERNAL_FPS_SAMPLE_PERIOD;
+         float fps = (internal_frame_count * video_output_framerate()) / INTERNAL_FPS_SAMPLE_PERIOD;
 
-       snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), fps);
+         snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), fps);
 
-       MDFN_DispMessage(msg_buffer);
+         MDFN_DispMessage(msg_buffer);
 
-       internal_frame_count = 0;
-     }
+         internal_frame_count = 0;
+      }
    }
    else
    {
-     // Keep the counters at 0 so that they don't display a bogus
-     // value if this option is enabled later on
-     frame_count = 0;
-     internal_frame_count = 0;
+      // Keep the counters at 0 so that they don't display a bogus
+      // value if this option is enabled later on
+      frame_count = 0;
+      internal_frame_count = 0;
    }
 
    if (setting_apply_analog_toggle)
@@ -3821,7 +3815,6 @@ void retro_run(void)
                pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
                width = 364 - image_crop;
                break;
-
 
             case 560:
                pix_offset += 26 + (image_offset + floor(0.5 * image_crop));
@@ -3995,30 +3988,32 @@ void retro_set_environment(retro_environment_t cb)
       { option_display_vram, "Display full VRAM; disabled|enabled" },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { option_pgxp_mode, "PGXP operation mode; disabled|memory only|memory + CPU" },	//iCB:PGXP mode options
+      { option_pgxp_mode, "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
       { option_pgxp_vertex, "PGXP vertex cache; disabled|enabled" },
       { option_pgxp_texture, "PGXP perspective correct texturing; disabled|enabled" },
 #endif
+      { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },      
+      { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
+      { option_cpu_overclock, "CPU Overclock; disabled|enabled" },
+      { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
+      { option_display_internal_fps, "Display internal FPS; disabled|enabled" },
+      
       { option_initial_scanline, "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { option_last_scanline, "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
       { option_initial_scanline_pal, "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
       { option_last_scanline_pal, "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
-      { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
-      { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
       { option_crop_overscan, "Crop Overscan; enabled|disabled" },
       { option_image_crop, "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
-      { option_image_offset, "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
-      { option_display_internal_fps, "Display internal FPS; disabled|enabled" },
+      { option_image_offset, "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },      
+      
       { option_analog_calibration, "Analog self-calibration; disabled|enabled" },
       { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
       { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
       { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
-      { option_cpu_overclock, "CPU Overclock; disabled|enabled" },
 #ifndef EMSCRIPTEN
       { option_cd_image_cache, "CD Image Cache (restart); disabled|enabled" },
 #endif
-      { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_memcard0_method, "Memcard 0 method; libretro|mednafen" },
       { option_memcard1_enable, "Enable memory card 1; enabled|disabled" },
       { option_memcard_shared, "Shared memcards (restart); disabled|enabled" },
@@ -4116,7 +4111,6 @@ bool retro_serialize(void *data, size_t size)
       logged = true;
    }
 
-
    bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
 
    memcpy(data,st.data,size);
@@ -4124,6 +4118,7 @@ bool retro_serialize(void *data, size_t size)
 return ret;
 
 }
+
 bool retro_unserialize(const void *data, size_t size)
 {
    StateMem st;
