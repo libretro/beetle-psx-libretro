@@ -587,6 +587,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
 
    if (textured)
@@ -597,7 +598,6 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
          blend_mode = BLEND_MODE_ADD;
    }
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
    {
       if (numvertices == 4)
