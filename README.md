@@ -3,10 +3,10 @@
 Beetle PSX is a port/fork of Mednafen's PSX module to the libretro API. It can be compiled in C++98 mode, excluding the Vulkan renderer, which is written in C++11 for the time being. Beetle PSX currently runs on Linux, OSX and Windows.
 
 Notable additions in this fork are:
-. Software renderer internal resolution upscaling;
-. An OpenGL 3.2 renderer, developed by @simias;
-. A Vulkan renderer, developed by TinyTiger;
-. PGXP perspectve correct texturing and subpixel precision, developed by @iCatButler;
+* Software renderer internal resolution upscaling, implemented by simias;
+* An OpenGL 3.2 renderer, developed by simias;
+* A Vulkan renderer, developed by TinyTiger;
+* PGXP perspectve correct texturing and subpixel precision, developed by iCatButler;
 
 ## Running
 
@@ -14,9 +14,10 @@ To run this core, the "system directory" must be defined if running in RetroArch
 The PSX BIOS must be placed there and must be named scph5500.bin, scph5501.bin and/or scph5502.bin for Japanese, NA and/or EU regions respectively.
 
 Memory cards will be saved to "save directory", memory card #1 is saved using libretro's standard interface. The rest of memory cards are saved using Mednafen's standard mechanism. You might have to rename your old 
-memory cards to gamename.srm. Alternatively you may just rename it from gamename.gamenamehash.0.mcr to gamename.gamenamehash.1.mcr and load them off the corresponding slot.
+memory cards to gamename.srm. 
+Alternatively you may just rename it from gamename.gamenamehash.0.mcr to gamename.gamenamehash.1.mcr and load them off the corresponding slot.
 
-Core now supports save states. Keep in mind states might result on loss your memorycards if you are careless.
+This core also supports save states. Keep in mind that save states also include the state of the memory card; carelessly loading an old save state will OVEWRITE the memory card, potentially resulting in lost saved games.
 
 ## Loading ISOs
 
