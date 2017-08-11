@@ -1,12 +1,17 @@
 # Beetle PSX libretro
 
-This is a fork of Mednafen PSX. It has been ported to the libretro API.
-It currently runs on Linux, OSX and Windows.
+Beetle PSX is a port/fork of Mednafen's PSX module to the libretro API. It can be compiled in C++98 mode, excluding the Vulkan renderer, which is written in C++11 for the time being. Beetle PSX currently runs on Linux, OSX and Windows.
+
+Notable additions in this fork are:
+. Software renderer internal resolution upscaling;
+. An OpenGL 3.2 renderer, developed by @simias;
+. A Vulkan renderer, developed by TinyTiger;
+. PGXP perspectve correct texturing and subpixel precision, developed by @iCatButler;
 
 ## Running
 
 To run this core, the "system directory" must be defined if running in RetroArch.
-The PSX BIOS must be placed there, $sysdir/scph550{0,1,2} for Japanese, NA and EU regions respectively.
+The PSX BIOS must be placed there and must be named scph5500.bin, scph5501.bin and/or scph5502.bin for Japanese, NA and/or EU regions respectively.
 
 Memory cards will be saved to "save directory", memory card #1 is saved using libretro's standard interface. The rest of memory cards are saved using Mednafen's standard mechanism. You might have to rename your old 
 memory cards to gamename.srm. Alternatively you may just rename it from gamename.gamenamehash.0.mcr to gamename.gamenamehash.1.mcr and load them off the corresponding slot.
@@ -45,6 +50,9 @@ Most conversion tools will want a single .bin/.iso file for each disk. If your g
 Note that RetroArch does not currently have .pbp database due to variability in users' conversion methods. All .pbp games will have to be added to playlists manually.
 
 ## Suggested Firmware
+
+Ryphecha and the Mednafen team developed the PSX module around a particular hardware revision which used a particular BIOS version.
+Using a BIOS version not listed below might result unforeseen bugs and is therefore discouraged: 
 
 - scph5500.bin (8dd7d5296a650fac7319bce665a6a53c)
 - scph5501.bin (490f666e1afb15b7362b406ed1cea246)
