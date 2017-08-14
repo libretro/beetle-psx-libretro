@@ -722,10 +722,10 @@ uint32_t GTE_ReadDR(unsigned int which)
  * update the flags if an overflow occurs */
 static INLINE int64_t i64_to_i44(unsigned which, int64_t value)
 {
-   if(value >= 0x7ffffffffff)
+   if(value >= 0x7ffffffffffLL)
       FLAGS |= 1 << (30 - which);
 
-   if(value < -0x80000000000)
+   if(value < -0x80000000000LL)
       FLAGS |= 1 << (27 - which);
 
    return (((int64_t)((uint64_t)(value) << (64 - 44))) >> (64 - 44));
