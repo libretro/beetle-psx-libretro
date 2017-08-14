@@ -1712,6 +1712,8 @@ static int Load(const char *name, MDFNFILE *fp)
          return -1;
    }
 
+   MDFNGameInfo = &EmulatedPSX;
+
    return(1);
 }
 
