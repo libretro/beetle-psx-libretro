@@ -44,8 +44,6 @@ static bool enable_memcard1 = false;
 static bool enable_analog_calibration = false;
 static bool enable_variable_serialization_size = false;
 
-bool doCleanFrame = false;
-
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
 // display_internal_framerate is true.
@@ -3624,8 +3622,6 @@ void retro_run(void)
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
-
-   doCleanFrame = true;
 
    if (display_internal_framerate)
    {

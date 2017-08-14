@@ -1456,8 +1456,6 @@ static void GlRenderer_free(GlRenderer *renderer)
    }
 }
 
-extern bool doCleanFrame;
-
 static inline void apply_scissor(GlRenderer *renderer)
 {
    uint16_t _x = renderer->config.draw_area_top_left[0];
@@ -2143,12 +2141,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       /* If the display is off, just clear the screen */
       if (renderer->config.display_off && !renderer->display_vram)
       {
-         if (doCleanFrame)
-         {
-            glClearColor(0.0, 0.0, 0.0, 0.0);
-            glClear(GL_COLOR_BUFFER_BIT);
-            doCleanFrame = false;
-         }
+         glClearColor(0.0, 0.0, 0.0, 0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
       }
       else
       {
@@ -2619,17 +2613,13 @@ void rsx_gl_fill_rect(  uint32_t color,
          Framebuffer _fb;
          Framebuffer_init(&_fb, &renderer->fb_out);
 
-         if (doCleanFrame)
-         {
-            glClearColor(   (float) col[0] / 255.0,
-                  (float) col[1] / 255.0,
-                  (float) col[2] / 255.0,
-                  /* TODO - XXX Not entirely sure what happens to
-                     the mask bit in fill_rect commands */
-                  0.0);
-            glClear(GL_COLOR_BUFFER_BIT);
-            doCleanFrame = false;
-         }
+         glClearColor(   (float) col[0] / 255.0,
+               (float) col[1] / 255.0,
+               (float) col[2] / 255.0,
+               /* TODO - XXX Not entirely sure what happens to
+                  the mask bit in fill_rect commands */
+               0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
 
          glDeleteFramebuffers(1, &_fb.id);
       }
