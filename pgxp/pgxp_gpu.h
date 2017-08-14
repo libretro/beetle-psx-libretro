@@ -46,9 +46,6 @@ extern "C" {
 	//struct OGLVertexTag;
 	//typedef struct OGLVertexTag OGLVertex;
 
-	struct PGXP_value_Tag;
-	typedef struct PGXP_value_Tag PGXP_value;
-
 	void		PGXP_WriteFIFO(PGXP_value* pV, u32 pos);
 	PGXP_value*	PGXP_ReadFIFO(u32 pos);
 	void		PGXP_WriteCB(PGXP_value* pV, u32 pos);

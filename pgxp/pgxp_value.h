@@ -36,7 +36,7 @@ extern "C" {
 #include "pgxp_types.h"
 
 	typedef union {
-#if defined(__BIGENDIAN__)
+#if defined(MSB_FIRST)
 		struct { u8 h3, h2, h, l; } b;
 		struct { s8 h3, h2, h, l; } sb;
 		struct { u16 h, l; } w;
@@ -50,25 +50,6 @@ extern "C" {
 		u32 d;
 		s32 sd;
 	} psx_value;
-
-	typedef struct PGXP_value_Tag
-	{
-		float			x;
-		float			y;
-		float			z;
-		union
-		{
-			unsigned int	flags;
-			unsigned char	compFlags[4];
-			unsigned short	halfFlags[2];
-		};
-		unsigned int	count;
-		unsigned int	value;
-
-		unsigned short	gFlags;
-		unsigned char	lFlags;
-		unsigned char	hFlags;
-	} PGXP_value;
 
 	typedef enum
 	{

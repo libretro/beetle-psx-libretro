@@ -33,11 +33,7 @@
 extern "C" {
 #endif
 
-
 #include "pgxp_types.h"
-
-struct PGXP_value_Tag;
-typedef struct PGXP_value_Tag PGXP_value;
 
 extern PGXP_value* GTE_data_reg;
 extern PGXP_value* GTE_ctrl_reg;

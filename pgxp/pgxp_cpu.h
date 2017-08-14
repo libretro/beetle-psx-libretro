@@ -34,9 +34,6 @@ extern "C" {
 
 #include "pgxp_types.h"
 
-struct PGXP_value_Tag;
-typedef struct PGXP_value_Tag PGXP_value;
-
 extern PGXP_value* CPU_reg;
 extern PGXP_value* CP0_reg;
 #define CPU_Hi CPU_reg[33]
