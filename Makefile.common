@@ -229,7 +229,7 @@ ifeq ($(HAVE_VULKAN), 1)
 	endif
 endif
 
-#ifneq ($(STATIC_LINKING), 1)
+ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 	     $(LIBRETRO_DIR)/string/stdstring.c \
 	     $(LIBRETRO_DIR)/compat/compat_strl.c \
@@ -241,7 +241,7 @@ SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
 endif
 
 endif
-#endif
+endif
 
 SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/amctrl.c \
