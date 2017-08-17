@@ -336,6 +336,7 @@ else ifeq ($(platform), emscripten)
                  -Dsthread_isself=gg_sthread_isself\
                  -Dstring_is_equal_noncase=gg_string_is_equal_noncase\
                  -Dmkdir_norecurse=gg_mkdir_norecurse
+	STATIC_LINKING = 1
 
 ifeq ($(HAVE_OPENGL),1)
 	ifneq (,$(findstring gles,$(platform)))
