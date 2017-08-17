@@ -3,6 +3,7 @@
 Beetle PSX is a port/fork of Mednafen's PSX module to the libretro API. It can be compiled in C++98 mode, excluding the Vulkan renderer, which is written in C++11 for the time being. Beetle PSX currently runs on Linux, OSX and Windows.
 
 Notable additions in this fork are:
+* PBP file format support, developed by Zapeth;
 * Software renderer internal resolution upscaling, implemented by simias;
 * An OpenGL 3.2 renderer, developed by simias;
 * A Vulkan renderer, developed by TinyTiger;
