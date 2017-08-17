@@ -238,6 +238,7 @@ else ifeq ($(platform), wiiu)
    ENDIANNESS_DEFINES += -DMSB_FIRST
    EXTRA_INCLUDES := -Ideps
    STATIC_LINKING = 1
+	NEED_THREADING=0
 
 # GCW0
 else ifeq ($(platform), gcw0)
