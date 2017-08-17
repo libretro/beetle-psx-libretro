@@ -234,7 +234,8 @@ SOURCES_C += $(LIBRETRO_DIR)/streams/file_stream.c \
 	     $(LIBRETRO_DIR)/string/stdstring.c \
 	     $(LIBRETRO_DIR)/compat/compat_strl.c \
 	     $(LIBRETRO_DIR)/compat/compat_strcasestr.c \
-	     $(LIBRETRO_DIR)/file/retro_dirent.c
+	     $(LIBRETRO_DIR)/file/retro_dirent.c \
+		  $(LIBRETRO_DIR)/file/file_path.c
 
 ifeq ($(NEED_THREADING), 1)
 SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
@@ -251,7 +252,6 @@ SOURCES_C += $(LIBKIRK_DIR)/aes.c \
 				 $(LIBKIRK_DIR)/kirk_engine.c \
 				 $(LIBKIRK_DIR)/sha1.c
 
-SOURCES_C += $(LIBRETRO_DIR)/file/file_path.c
 
 SOURCES_C += $(CORE_DIR)/pgxp/pgxp_cpu.c \
 				 $(CORE_DIR)/pgxp/pgxp_debug.c \
