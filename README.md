@@ -43,6 +43,8 @@ Open a text file and enter your game's .cue files on it, like this:
 
 Save as foo.m3u and use this file in place of each disk's individual cue sheet.
 
+Some games also need sub-channel data files (.sbi) in order to work properly. For example, in the PAL version of Ape Escape, input will not work if sub-channel data is missing.
+
 ## Condensing Games
 
 Alternatively to using cue sheets with .bin/.iso files, you can convert your games to .pbp (Playstation Portable update file) to reduce file sizes and neaten up your game folder. If converting a multiple-disk game, all disks should be added to the same .pbp file, rather than making a .m3u file for them.
