@@ -1,17 +1,17 @@
 extern enum dither_mode psx_gpu_dither_mode;
 
 /* Return a pixel from VRAM */
-#define vram_fetch(gpu, x, y)  (gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)])
+#define vram_fetch(gpu, x, y)  ((gpu)->vram[((y) << (10 + (gpu)->upscale_shift)) | (x)])
 
 /* Return a pixel from VRAM, ignoring the internal upscaling */
-#define texel_fetch(gpu, x, y) vram_fetch(gpu, (x) << gpu->upscale_shift, (y) << gpu->upscale_shift)
+#define texel_fetch(gpu, x, y) vram_fetch((gpu), (x) << (gpu)->upscale_shift, (y) << (gpu)->upscale_shift)
 
 /* Set a pixel in VRAM */
-#define vram_put(gpu, x, y, v) gpu->vram[((y) << (10 + gpu->upscale_shift)) | (x)] = (v)
+#define vram_put(gpu, x, y, v) (gpu)->vram[((y) << (10 + (gpu)->upscale_shift)) | (x)] = (v)
 
-#define DitherEnabled(gpu)    (psx_gpu_dither_mode != DITHER_OFF && gpu->dtd)
+#define DitherEnabled(gpu)    (psx_gpu_dither_mode != DITHER_OFF && (gpu)->dtd)
 
-#define UPSCALE(gpu)          (1U << gpu->upscale_shift)
+#define UPSCALE(gpu)          (1U << (gpu)->upscale_shift)
 
 template<int BlendMode>
 static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
@@ -157,28 +157,28 @@ static INLINE void Update_CLUT_Cache(PS_GPU *gpu, uint16 raw_clut)
      }
 #endif
 
-INLINE void PS_GPU::RecalcTexWindowStuff(void)
+static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 {
    unsigned x, y;
-   const unsigned TexWindowX_AND = ~(tww << 3);
-   const unsigned TexWindowX_OR = (twx & tww) << 3;
-   const unsigned TexWindowY_AND = ~(twh << 3);
-   const unsigned TexWindowY_OR = (twy & twh) << 3;
+   const unsigned TexWindowX_AND = ~(g->tww << 3);
+   const unsigned TexWindowX_OR = (g->twx & g->tww) << 3;
+   const unsigned TexWindowY_AND = ~(g->twh << 3);
+   const unsigned TexWindowY_OR = (g->twy & g->twh) << 3;
 
    for(x = 0; x < 256; x++)
-      TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
+      g->TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
    for(y = 0; y < 256; y++)
-      TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
-   memset(TexWindowXLUT_Pre, TexWindowXLUT[0], sizeof(TexWindowXLUT_Pre));
-   memset(TexWindowXLUT_Post, TexWindowXLUT[255], sizeof(TexWindowXLUT_Post));
-   memset(TexWindowYLUT_Pre, TexWindowYLUT[0], sizeof(TexWindowYLUT_Pre));
-   memset(TexWindowYLUT_Post, TexWindowYLUT[255], sizeof(TexWindowYLUT_Post));
+      g->TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
+   memset(g->TexWindowXLUT_Pre,  g->TexWindowXLUT[0],   sizeof(g->TexWindowXLUT_Pre));
+   memset(g->TexWindowXLUT_Post, g->TexWindowXLUT[255], sizeof(g->TexWindowXLUT_Post));
+   memset(g->TexWindowYLUT_Pre,  g->TexWindowYLUT[0],   sizeof(g->TexWindowYLUT_Pre));
+   memset(g->TexWindowYLUT_Post, g->TexWindowYLUT[255], sizeof(g->TexWindowYLUT_Post));
 
-   SUCV.TWX_AND = ~(tww << 3);
-   SUCV.TWX_ADD = ((twx & tww) << 3) + (TexPageX << (2 - std::min<uint32_t>(2, TexMode)));
+   g->SUCV.TWX_AND = ~(g->tww << 3);
+   g->SUCV.TWX_ADD = ((g->twx & g->tww) << 3) + (g->TexPageX << (2 - std::min<uint32_t>(2, g->TexMode)));
 
-   SUCV.TWY_AND = ~(twh << 3);
-   SUCV.TWY_ADD = ((twy & twh) << 3) + TexPageY;
+   g->SUCV.TWY_AND = ~(g->twh << 3);
+   g->SUCV.TWY_ADD = ((g->twy & g->twh) << 3) + g->TexPageY;
 }
 
 template<uint32_t TexMode_TA>

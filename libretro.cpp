@@ -3588,17 +3588,16 @@ void retro_run(void)
       check_variables(false);
       struct retro_system_av_info new_av_info;
       retro_get_system_av_info(&new_av_info);
-      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info);
 
       if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
       {
-         struct retro_system_av_info new_av_info;
-         retro_get_system_av_info(&new_av_info);
-
-         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
+         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY,
               &new_av_info))
          {
-            GPU_Reinit(psx_gpu_upscale_shift);
+            // We successfully changed the frontend's resolution, we can
+            // apply the change immediately
+            GPU_Rescale(psx_gpu_upscale_shift);
             alloc_surface();
          }
          else

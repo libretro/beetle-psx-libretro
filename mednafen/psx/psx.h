@@ -22,11 +22,11 @@
 #undef PSX_EVENT_SYSTEM_CHECKS
 #endif
 
-#define PSX_DBG_ERROR		0	// Emulator-level error.
-#define PSX_DBG_WARNING	1	// Warning about game doing questionable things/hitting stuff that might not be emulated correctly.
-#define PSX_DBG_BIOS_PRINT	2	// BIOS printf/putchar output.
-#define PSX_DBG_SPARSE		3	// Sparse(relatively) information debug messages(CDC commands).
-#define PSX_DBG_FLOOD		4	// Heavy informational debug messages(GPU commands; TODO).
+#define PSX_DBG_ERROR      0  // Emulator-level error.
+#define PSX_DBG_WARNING    1  // Warning about game doing questionable things/hitting stuff that might not be emulated correctly.
+#define PSX_DBG_BIOS_PRINT 2  // BIOS printf/putchar output.
+#define PSX_DBG_SPARSE     3  // Sparse(relatively) information debug messages(CDC commands).
+#define PSX_DBG_FLOOD      4  // Heavy informational debug messages(GPU commands; TODO).
 
 #if PSX_DBGPRINT_ENABLE
 void PSX_DBG(unsigned level, const char *format, ...);
@@ -78,7 +78,7 @@ enum
    PSX_EVENT__COUNT
 };
 
-#define PSX_EVENT_MAXTS       		0x20000000
+#define PSX_EVENT_MAXTS             0x20000000
 void PSX_SetEventNT(const int type, const int32_t next_timestamp);
 
 void PSX_SetDMACycleSteal(unsigned stealage);
@@ -98,7 +98,6 @@ class PS_CDC;
 class PS_SPU;
 
 extern PS_CPU *CPU;
-extern PS_GPU *GPU;
 extern PS_CDC *CDC;
 extern PS_SPU *SPU;
 extern MultiAccessSizeMem<2048 * 1024, uint32_t, false> MainRAM;
