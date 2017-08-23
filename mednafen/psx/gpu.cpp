@@ -702,7 +702,6 @@ void GPU_Rescale(uint8 ushift)
          texel_put(x, y, vram_new[y * 1024 + x]);
    }
 
-
    /* Cleanup the temporary buffer */
    if (vram_new)
       delete [] vram_new;
