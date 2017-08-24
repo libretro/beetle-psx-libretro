@@ -599,7 +599,6 @@ void GPU_Init(bool pal_clock_and_tv,
    
    GPU.vram = VRAM_Alloc(upscale_shift);
 
-   /* Build the GPU */
    int x, y, v;
 
    GPU.HardwarePALType = pal_clock_and_tv;
