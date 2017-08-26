@@ -67,37 +67,38 @@ Using a BIOS version not listed below might result unforeseen bugs and is theref
 
 ## Options
 
-* Renderer (restart) - 'software', 'vulkan' and 'opengl'. The last two options will enable and/or speedup enhancements like upscaling and texture filtering.
-* Software framebuffer - If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.
-* Adaptive smoothing - When upscaling, smooths out 2D elements while keeping 3D elements sharp. Vulkan renderer only at the moment.
-* Internal GPU resolution - Graphics upscaling.
-* Texture filtering - Per-texture filtering using e.g. xBR, SABR, bilinear, etc. OpenGL only at the moment.
-* Internal color depth - PSX had 16bpp depth, beetle-psx can go up to 32bpp. OpenGL only at the moment. Vulkan always uses 32bpp.
-* Wireframe mode - For debug use. Shows only the outlines of polygons. OpenGL only.
-* Display full VRAM - Everything in VRAM is drawn on screen.
-* PGXP operation mode - When not off, floating point coordinates will be used for vertex positions, to avoid the PSX polygon jitter. 'memory + cpu' mode can further reduce jitter at the cost of performance and geometry glitches.
-* PGXP vertex cache - Maintains a cache for vertices. May result in better performance but can result in graphics glitches in most games.
-* PGXP perspective correct texturing - Original PSX did affine texture mapping, resulting in e.g. crooked lines across walls. This fixes it.
-* Dithering pattern - If off, disables the dithering pattern the PSX applies to combat color banding. OpenGL only. Vulkan always disables the pattern.
-* Scale dithering pattern with internal resolution - Self-explanatory. OpenGL only.
-* Initial Scanline - Sets the first scanline to be drawn on screen.
-* Initial Scanline PAL - Sets the first scanline to be drawn on screen for PAL systems.
-* Last Scanline - Sets the last scanline to be drawn on screen.
-* Last Scanline PAL - Sets the last scanline to be drawn on screen for PAL systems.
-* Frame duping (speedup) - Redraws/reuses the last frame if there was no new data.
-* Widescreen mode hack - If on, renders in 16:9. Works best on 3D games.
-* Crop Overscan - Self-explanatory.
-* Additional cropping - Self-explanatory.
-* Offset cropped image - Self-explanatory.
-* Display internal FPS - Shows the frame rate at which the emulated PSX is drawing at.
-* Analog self-calibration - Monitors the max values reached by the input, using it as a calibration heuristic which then scales the analog coordinates sent to the emulator accordingly.
-For best results, rotate the sticks at max amplitude for the algorithm to get a good estimate of the scaling factor, otherwise it will adjust while playing content.
-* DualShock Analog button toggle - Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.
-* Port 1: Multitap Enable - Enables/Disables multitap functionality on port 1.
-* Port 2: Multitap Enable - Enables/Disables multitap functionality on port 2.
-* CPU Overclock - Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
-* CD Image Cache - Loads the complete image in memory at startup.
-* Skip BIOS - Self-explanatory. Some games have issues when enabled.
-* Memcard 0 method - Picks the format (libretro or mednafen) used for storing memcard 0 save data.
-* Enable memory card 1 - Specifically enables memcard slot 1. Needed for game "Codename Tenka".
-* Shared memory cards (restart) - Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
+Option name | Description
+:---|:---
+Renderer (restart) | 'software', 'vulkan' and 'opengl'. The last two options will enable and/or speedup enhancements like upscaling and texture filtering.
+Software framebuffer | If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.
+Adaptive smoothing | When upscaling, smooths out 2D elements while keeping 3D elements sharp. Vulkan renderer only at the moment.
+Internal GPU resolution | Graphics upscaling.
+Texture filtering | Per-texture filtering using e.g. xBR, SABR, bilinear, etc. OpenGL only at the moment.
+Internal color depth | PSX had 16bpp depth, beetle-psx can go up to 32bpp. OpenGL only at the moment. Vulkan always uses 32bpp.
+Wireframe mode | For debug use. Shows only the outlines of polygons. OpenGL only.
+Display full VRAM | Everything in VRAM is drawn on screen.
+PGXP operation mode | When not off, floating point coordinates will be used for vertex positions, to avoid the PSX polygon jitter. 'memory + cpu' mode can further reduce jitter at the cost of performance and geometry glitches.
+PGXP vertex cache | Maintains a cache for vertices. May result in better performance but can result in graphics glitches in most games.
+PGXP perspective correct texturing | Original PSX did affine texture mapping, resulting in e.g. crooked lines across walls. This fixes it.
+Dithering pattern | If off, disables the dithering pattern the PSX applies to combat color banding. OpenGL only. Vulkan always disables the pattern.
+Scale dithering pattern with internal resolution | Self-explanatory. OpenGL only.
+Initial Scanline | Sets the first scanline to be drawn on screen.
+Initial Scanline PAL | Sets the first scanline to be drawn on screen for PAL systems.
+Last Scanline | Sets the last scanline to be drawn on screen.
+Last Scanline PAL | Sets the last scanline to be drawn on screen for PAL systems.
+Frame duping (speedup) | Redraws/reuses the last frame if there was no new data.
+Widescreen mode hack | If on, renders in 16:9. Works best on 3D games.
+Crop Overscan | Self-explanatory.
+Additional cropping | Self-explanatory.
+Offset cropped image | Self-explanatory.
+Display internal FPS | Shows the frame rate at which the emulated PSX is drawing at.
+Analog self-calibration | Monitors the max values reached by the input, using it as a calibration heuristic which then scales the analog coordinates sent to the emulator accordingly.<br>For best results, rotate the sticks at max amplitude for the algorithm to get a good estimate of the scaling factor, otherwise it will adjust while playing content.
+DualShock Analog button toggle | Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.
+Port 1: Multitap Enable | Enables/Disables multitap functionality on port 1.
+Port 2: Multitap Enable | Enables/Disables multitap functionality on port 2.
+CPU Overclock | Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
+CD Image Cache | Loads the complete image in memory at startup.
+Skip BIOS | Self-explanatory. Some games have issues when enabled.
+Memcard 0 method | Picks the format (libretro or mednafen) used for storing memcard 0 save data.
+Enable memory card 1 | Specifically enables memcard slot 1. Needed for game "Codename Tenka".
+Shared memory cards (restart) | Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
