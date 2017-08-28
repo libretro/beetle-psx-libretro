@@ -797,7 +797,7 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    now.tv_nsec = tm.tv_usec * 1000;
 #elif defined(RETRO_WIN32_USE_PTHREADS)
    _ftime64_s(&now);
-#elif !defined(GEKKO)
+#elif !defined(GEKKO) || !defined(BSD)
    /* timeout on libogc is duration, not end time. */
    clock_gettime(CLOCK_REALTIME, &now);
 #endif
