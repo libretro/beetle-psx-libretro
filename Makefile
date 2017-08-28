@@ -30,6 +30,10 @@ else ifneq (,$(findstring armv,$(platform)))
    override platform += unix
 endif
 
+ifneq ($(findstring BSD,$(shell uname -a)),)
+   FLAGS += -DBSD
+endif
+
 ifneq ($(platform), osx)
    ifeq ($(findstring Haiku,$(shell uname -a)),)
       PTHREAD_FLAGS = -lpthread
