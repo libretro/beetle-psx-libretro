@@ -55,6 +55,11 @@
 #include <time.h>
 #endif
 
+#if defined(__unix__) || defined(__MACH__)
+/* needed for #define BSD */
+#include <sys/param.h>
+#endif
+
 #if defined(VITA) || defined(BSD)
 #include <sys/time.h>
 #endif

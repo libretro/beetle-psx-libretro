@@ -3,6 +3,11 @@
 #include <memory>
 #include <vector>
 
+#ifdef __FreeBSD__
+#include <stdlib.h>
+#include <malloc_np.h>
+#endif
+
 namespace Vulkan
 {
 template <typename T>

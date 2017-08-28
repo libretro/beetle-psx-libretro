@@ -6,6 +6,7 @@
 #include "vulkan.hpp"
 #include <assert.h>
 #include <memory>
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <vector>

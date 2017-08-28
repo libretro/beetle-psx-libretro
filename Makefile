@@ -85,7 +85,7 @@ ifneq (,$(findstring unix,$(platform)))
          GLES = 1
          GL_LIB := -lGLESv2
       else
-         GL_LIB := -lGL
+         GL_LIB := -L/usr/local/lib -lGL
       endif
    endif
 
