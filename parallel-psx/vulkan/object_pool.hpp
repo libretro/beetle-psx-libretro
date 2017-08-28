@@ -2,9 +2,9 @@
 
 #include <memory>
 #include <vector>
+#include <stdlib.h>
 
 #ifdef __FreeBSD__
-#include <stdlib.h>
 #include <malloc_np.h>
 #endif
 
