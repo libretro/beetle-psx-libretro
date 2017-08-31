@@ -3093,7 +3093,14 @@ static MDFNGI *MDFNI_LoadGame(const char *name)
 {
    MDFNFILE *GameFile;
 
-   if(strlen(name) > 4 && (!strcasecmp(name + strlen(name) - 4, ".cue") || !strcasecmp(name + strlen(name) - 4, ".ccd") || !strcasecmp(name + strlen(name) - 4, ".toc") || !strcasecmp(name + strlen(name) - 4, ".m3u") || !strcasecmp(name + strlen(name) - 4, ".pbp")))
+   if(strlen(name) > 4 && (
+      !strcasecmp(name + strlen(name) - 4, ".cue") || 
+      !strcasecmp(name + strlen(name) - 4, ".ccd") || 
+      !strcasecmp(name + strlen(name) - 4, ".toc") || 
+      !strcasecmp(name + strlen(name) - 4, ".m3u") || 
+      !strcasecmp(name + strlen(name) - 4, ".chd") ||
+      !strcasecmp(name + strlen(name) - 4, ".pbp")
+      ))
     return MDFNI_LoadCD(name);
 
    GameFile = file_open(name);
