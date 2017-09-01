@@ -42,8 +42,6 @@ class CDAccess_CHD : public CDAccess
       int LoadSBI(const char* sbi_path);
       void Cleanup(void);
 
-      bool Read_CHD_Hunk_RAW(uint8_t *buf, int32_t lba, CDRFILE_TRACK_INFO* track);
-
       CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
       struct cpp11_array_doodad
       {

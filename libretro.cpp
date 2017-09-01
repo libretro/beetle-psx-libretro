@@ -2331,13 +2331,13 @@ static bool disk_set_image_index(unsigned index)
 
 // Mednafen PSX really doesn't support adding disk images on the fly ...
 // Hack around this.
-static void update_md5_checksum(CDIF *iface)
+static void mednafen_update_md5_checksum(CDIF *iface)
 {
    uint8 LayoutMD5[16];
    md5_context layout_md5;
    TOC toc;
 
-   md5_starts(&layout_md5);
+   mednafen_md5_starts(&layout_md5);
 
 #ifndef HAVE_CDROM_NEW
    TOC_Clear(&toc);
@@ -2345,20 +2345,20 @@ static void update_md5_checksum(CDIF *iface)
 
    iface->ReadTOC(&toc);
 
-   md5_update_u32_as_lsb(&layout_md5, toc.first_track);
-   md5_update_u32_as_lsb(&layout_md5, toc.last_track);
-   md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
+   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.first_track);
+   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.last_track);
+   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
 
    for (uint32 track = toc.first_track; track <= toc.last_track; track++)
    {
-      md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
-      md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
+      mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
+      mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
    }
 
-   md5_finish(&layout_md5, LayoutMD5);
+   mednafen_md5_finish(&layout_md5, LayoutMD5);
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
 
-   char *md5 = md5_asciistr(MDFNGameInfo->MD5);
+   char *md5 = mednafen_md5_asciistr(MDFNGameInfo->MD5);
    log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
 }
 
@@ -2398,7 +2398,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
    /* If we replace, we want the "swap disk manually effect". */
    extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
    /* Ugly, but needed to get proper disk swapping effect. */
-   update_md5_checksum(iface);
+   mednafen_update_md5_checksum(iface);
    return true;
 }
 
@@ -3037,7 +3037,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
    {
       md5_context layout_md5;
 
-      md5_starts(&layout_md5);
+      mednafen_md5_starts(&layout_md5);
 
       for(unsigned i = 0; i < CDInterfaces.size(); i++)
       {
@@ -3048,18 +3048,18 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 #endif
          CDInterfaces[i]->ReadTOC(&toc);
 
-         md5_update_u32_as_lsb(&layout_md5, toc.first_track);
-         md5_update_u32_as_lsb(&layout_md5, toc.last_track);
-         md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
+         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.first_track);
+         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.last_track);
+         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
 
          for(uint32 track = toc.first_track; track <= toc.last_track; track++)
          {
-            md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
-            md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
+            mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
+            mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
          }
       }
 
-      md5_finish(&layout_md5, LayoutMD5);
+      mednafen_md5_finish(&layout_md5, LayoutMD5);
    }
 
    if (MDFNGameInfo == NULL)

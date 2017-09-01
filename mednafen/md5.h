@@ -14,13 +14,13 @@ struct md5_context
 	uint8_t buffer[64];
 };
 
-void md5_starts(struct md5_context *ctx);
-void md5_update_u32_as_lsb(struct md5_context *ctx, uint32_t input);
-void md5_update(struct md5_context *ctx, uint8_t *input, uint32_t length);
-void md5_finish(struct md5_context *ctx, uint8_t digest[16]);
+void mednafen_md5_starts(struct md5_context *ctx);
+void mednafen_md5_update_u32_as_lsb(struct md5_context *ctx, uint32_t input);
+void mednafen_md5_update(struct md5_context *ctx, uint8_t *input, uint32_t length);
+void mednafen_md5_finish(struct md5_context *ctx, uint8_t digest[16]);
 
 /* Uses a static buffer, so beware of how it's used. */
-char *md5_asciistr(uint8_t digest[16]);
+char *mednafen_md5_asciistr(uint8_t digest[16]);
 
 #ifdef __cplusplus
 }
