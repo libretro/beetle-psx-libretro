@@ -33,10 +33,6 @@ class CDAccess_CHD : public CDAccess
       TOC* ptoc;
 
       std::string sbi_path;
-      uint32_t discs_start_offset[5];
-      uint32_t psisoimg_offset;
-
-      uint16_t fixed_sectors;
 
       bool ImageOpen(const char *path, bool image_memcache);
       int LoadSBI(const char* sbi_path);
