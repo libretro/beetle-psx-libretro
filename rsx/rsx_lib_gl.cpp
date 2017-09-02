@@ -1507,9 +1507,9 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    {
       /* We need to change the frontend's resolution */
       struct retro_game_geometry geometry;
-      geometry.base_width  = w;
-      geometry.base_height = h;
-
+      geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+      geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+      
       /* Max parameters are ignored by this call */
       geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
       geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
@@ -1979,8 +1979,8 @@ struct retro_system_av_info get_av_info(VideoClock std)
    /* The base resolution will be overriden using
     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
     * this base value is not really important */
-   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W * upscaling;
-   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H * upscaling;
+   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
