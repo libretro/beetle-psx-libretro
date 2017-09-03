@@ -2507,6 +2507,8 @@ static bool boot = true;
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
+static bool has_new_geometry = false;
+
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
@@ -2580,10 +2582,16 @@ static void check_variables(bool startup)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (strcmp(var.value, "enabled") == 0)
+      if (strcmp(var.value, "enabled") == 0) 
+      {
+         if (widescreen_hack == false) has_new_geometry = true;
          widescreen_hack = true;
+      }
       else if (strcmp(var.value, "disabled") == 0)
+      {
+         if (widescreen_hack == true) has_new_geometry = true;
          widescreen_hack = false;
+      }
    }
    else
       widescreen_hack = false;
@@ -2623,26 +2631,30 @@ static void check_variables(bool startup)
          {
             uint8_t val = var.value[0] - '0';
 
-       if (var.value[1] != 'x')
-       {
-          val  = (var.value[0] - '0') * 10;
+            if (var.value[1] != 'x')
+            {
+               val  = (var.value[0] - '0') * 10;
                val += var.value[1] - '0';
-       }
+            }
 
             // Upscale must be a power of two
             assert((val & (val - 1)) == 0);
 
             // Crappy "ffs" implementation since the standard function is not
             // widely supported by libc in the wild
-            psx_gpu_upscale_shift = 0;
+            
+            uint8_t new_upscale_shift = 0;
             while ((val & 1) == 0)
             {
-               psx_gpu_upscale_shift++;
+               new_upscale_shift++;
                val >>= 1;
             }
+            if (new_upscale_shift != psx_gpu_upscale_shift) has_new_geometry = true;
+            psx_gpu_upscale_shift = new_upscale_shift;
          }
          else
             psx_gpu_upscale_shift = 0;
+         
          break;
       case RSX_OPENGL:
       case RSX_VULKAN:
@@ -3593,12 +3605,12 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
       check_variables(false);
-      struct retro_system_av_info new_av_info;
-      retro_get_system_av_info(&new_av_info);
-      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info);
-
-      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
+      
+      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift || has_new_geometry)
       {
+         struct retro_system_av_info new_av_info;
+         retro_get_system_av_info(&new_av_info);
+
          if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY,
               &new_av_info))
          {
@@ -3606,6 +3618,7 @@ void retro_run(void)
             // apply the change immediately
             GPU_Rescale(psx_gpu_upscale_shift);
             alloc_surface();
+            has_new_geometry = false;
          }
          else
          {
