@@ -18,8 +18,8 @@ void rsx_soft_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->timing.fps            = video_output_framerate();
    info->timing.sample_rate    = 44100;
-   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W << psx_gpu_upscale_shift;
-   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H << psx_gpu_upscale_shift;
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : (float)16/9;
