@@ -633,16 +633,16 @@ static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n
    template<typename T>
 static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
 {
-   glBindVertexArray(drawbuffer->vao);
-   glUseProgram(drawbuffer->program->id);
-
-   /* I don't need to bind this to draw (it's captured by the
-    * VAO) but I need it to map/unmap the storage. */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
    /* Unmap the active buffer */
    glUnmapBuffer(GL_ARRAY_BUFFER);
 
    drawbuffer->map = NULL;
+
+   /* The VAO needs to be bound now or else glDrawArrays
+    * errors out on some systems */
+   glBindVertexArray(drawbuffer->vao);
+   glUseProgram(drawbuffer->program->id);
 
    /* Length in number of vertices */
    glDrawArrays(mode, drawbuffer->map_start, drawbuffer->map_index);
@@ -977,14 +977,13 @@ static void GlRenderer_draw(GlRenderer *renderer)
    if (renderer->command_buffer->program)
       glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 0);
 
-   glBindVertexArray(renderer->command_buffer->vao);
-
-   /* I don't need to bind this to draw (it's captured by the
-    * VAO) but I need it to map/unmap the storage. */
+   /* Bind and unmap the command buffer */
    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
-
-   /* Unmap the active buffer */
    glUnmapBuffer(GL_ARRAY_BUFFER);
+
+   /* The VAO needs to be bound here or the glDrawElements calls
+    * will error out on some systems */
+   glBindVertexArray(renderer->command_buffer->vao);
 
    renderer->command_buffer->map = NULL;
 
@@ -1001,7 +1000,6 @@ static void GlRenderer_draw(GlRenderer *renderer)
           * must be handled by the caller. This is because this command
           * can be called several times on the same buffer (i.e. multiple
           * draw calls between the prepare/finalize) */
-         glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
          glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
       }
    }
@@ -1019,7 +1017,6 @@ static void GlRenderer_draw(GlRenderer *renderer)
           * must be handled by the caller. This is because this command
           * can be called several times on the same buffer (i.e. multiple
           * draw calls between the prepare/finalize) */
-         glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
          glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
       }
    }
@@ -1094,7 +1091,6 @@ static void GlRenderer_draw(GlRenderer *renderer)
              * must be handled by the caller. This is because this command
              * can be called several times on the same buffer (i.e. multiple
              * draw calls between the prepare/finalize) */
-            glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
             glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
          }
 
@@ -1456,8 +1452,6 @@ static void GlRenderer_free(GlRenderer *renderer)
    }
 }
 
-extern bool doCleanFrame;
-
 static inline void apply_scissor(GlRenderer *renderer)
 {
    uint16_t _x = renderer->config.draw_area_top_left[0];
@@ -1513,9 +1507,9 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    {
       /* We need to change the frontend's resolution */
       struct retro_game_geometry geometry;
-      geometry.base_width  = w;
-      geometry.base_height = h;
-
+      geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+      geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+      
       /* Max parameters are ignored by this call */
       geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
       geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
@@ -1985,8 +1979,8 @@ struct retro_system_av_info get_av_info(VideoClock std)
    /* The base resolution will be overriden using
     * ENVIRONMENT_SET_GEOMETRY before rendering a frame so
     * this base value is not really important */
-   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W * upscaling;
-   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H * upscaling;
+   info.geometry.base_width     = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
    info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
@@ -2143,12 +2137,8 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       /* If the display is off, just clear the screen */
       if (renderer->config.display_off && !renderer->display_vram)
       {
-         if (doCleanFrame)
-         {
-            glClearColor(0.0, 0.0, 0.0, 0.0);
-            glClear(GL_COLOR_BUFFER_BIT);
-            doCleanFrame = false;
-         }
+         glClearColor(0.0, 0.0, 0.0, 0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
       }
       else
       {
@@ -2619,17 +2609,13 @@ void rsx_gl_fill_rect(  uint32_t color,
          Framebuffer _fb;
          Framebuffer_init(&_fb, &renderer->fb_out);
 
-         if (doCleanFrame)
-         {
-            glClearColor(   (float) col[0] / 255.0,
-                  (float) col[1] / 255.0,
-                  (float) col[2] / 255.0,
-                  /* TODO - XXX Not entirely sure what happens to
-                     the mask bit in fill_rect commands */
-                  0.0);
-            glClear(GL_COLOR_BUFFER_BIT);
-            doCleanFrame = false;
-         }
+         glClearColor(   (float) col[0] / 255.0,
+               (float) col[1] / 255.0,
+               (float) col[2] / 255.0,
+               /* TODO - XXX Not entirely sure what happens to
+                  the mask bit in fill_rect commands */
+               0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
 
          glDeleteFramebuffers(1, &_fb.id);
       }

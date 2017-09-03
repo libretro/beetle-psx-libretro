@@ -80,13 +80,13 @@ ifneq (,$(findstring unix,$(platform)))
       IS_X86 = 1
    endif
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS += $(PTHREAD_FLAGS)
+   FLAGS +=
    ifeq ($(HAVE_OPENGL),1)
       ifneq (,$(findstring gles,$(platform)))
          GLES = 1
          GL_LIB := -lGLESv2
       else
-         GL_LIB := -lGL
+         GL_LIB := -L/usr/local/lib -lGL
       endif
    endif
 
@@ -239,6 +239,7 @@ else ifeq ($(platform), wiiu)
    ENDIANNESS_DEFINES += -DMSB_FIRST
    EXTRA_INCLUDES := -Ideps
    STATIC_LINKING = 1
+	NEED_THREADING=0
 
 # GCW0
 else ifeq ($(platform), gcw0)
@@ -336,6 +337,7 @@ else ifeq ($(platform), emscripten)
                  -Dsthread_isself=gg_sthread_isself\
                  -Dstring_is_equal_noncase=gg_string_is_equal_noncase\
                  -Dmkdir_norecurse=gg_mkdir_norecurse
+	STATIC_LINKING = 1
 
 ifeq ($(HAVE_OPENGL),1)
 	ifneq (,$(findstring gles,$(platform)))

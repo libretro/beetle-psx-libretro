@@ -83,7 +83,12 @@ struct CTEntry
    bool ss_cmd;
 };
 
-PS_GPU *GPU = NULL;
+PS_GPU GPU;
+
+/* Buffers used to hold data during upscale operations */
+uint32 TexCache_Tag[256];
+uint16 TexCache_Data[256][4];
+uint16 *vram_new = NULL;
 
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
@@ -124,18 +129,17 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
    gpu->TexMode  = NewTexMode;
 }
 
-
 /* C-style function wrappers so our command table isn't so ginormous(in memory usage). */
 template<int numvertices, bool shaded, bool textured,
-	 int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
+    int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
   if (PGXP_enabled())
     Command_DrawPolygon<numvertices, shaded, textured,
-			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb);
+            BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb);
   else
     Command_DrawPolygon<numvertices, shaded, textured,
-			   BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
+            BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
 }
 
 
@@ -315,7 +319,7 @@ static void Command_TexWindow(PS_GPU* g, const uint32 *cb)
    g->twx = ((*cb >> 10) & 0x1F);
    g->twy = ((*cb >> 15) & 0x1F);
 
-   g->RecalcTexWindowStuff();
+   RecalcTexWindowStuff(g);
    rsx_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
@@ -324,7 +328,7 @@ static void Command_Clip0(PS_GPU* g, const uint32 *cb)
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
    rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
-			  g->ClipX1, g->ClipY1);
+           g->ClipX1, g->ClipY1);
 }
 
 static void Command_Clip1(PS_GPU* g, const uint32 *cb)
@@ -499,13 +503,13 @@ static CTEntry Commands[256] =
 
 static INLINE bool CalcFIFOReadyBit(void)
 {
-   if(GPU->InCmd & (INCMD_PLINE | INCMD_QUAD))
+   if(GPU.InCmd & (INCMD_PLINE | INCMD_QUAD))
       return(false);
 
    if(GPU_BlitterFIFO.in_count == 0)
       return(true);
 
-   if(GPU->InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
+   if(GPU.InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
       return(false);
 
    if(GPU_BlitterFIFO.in_count >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len)
@@ -514,514 +518,26 @@ static INLINE bool CalcFIFOReadyBit(void)
    return(true);
 }
 
-PS_GPU::PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8_t upscale_shift)
-{
-   int x, y, v;
-
-   HardwarePALType = pal_clock_and_tv;
-
-   for(y = 0; y < 4; y++)
-   {
-      for(x = 0; x < 4; x++)
-      {
-         for(v = 0; v < 512; v++)
-         {
-            int value = v;
-
-            value += dither_table[y][x];
-
-            value >>= 3;
-
-            if(value < 0)
-               value = 0;
-
-            if(value > 0x1F)
-               value = 0x1F;
-
-            DitherLUT[y][x][v] = value;
-         }
-      }
-   }
-
-   if(HardwarePALType == false)	// NTSC clock
-      GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
-   else	// PAL clock
-      GPUClockRatio = 102948; // 65536 * 53203425 / (44100 * 768)
-
-   memset(RGB8SAT_Under, 0, sizeof(RGB8SAT_Under));
-
-   for(int i = 0; i < 256; i++)
-      RGB8SAT[i] = i;
-
-   memset(RGB8SAT_Over, 0xFF, sizeof(RGB8SAT_Over));
-
-   LineVisFirst = sls;
-   LineVisLast = sle;
-
-   display_change_count = 0;
-
-   this->upscale_shift = upscale_shift;
-   this->dither_upscale_shift = 0;
-}
-
-PS_GPU::PS_GPU(const PS_GPU &g, uint8 ushift)
-{
-   // Recopy the GPU state in the new buffer
-   *this = g;
-
-   // Override the upscaling factor
-   upscale_shift = ushift;
-
-   //For simplicity we do the transfer at 1x internal resolution.
-   for (unsigned y = 0; y < 512; y++)
-   {
-      for (unsigned x = 0; x < 1024; x++)
-         texel_put(x, y, texel_fetch(GPU, x, y));
-   }
-}
-
-PS_GPU::~PS_GPU()
-{
-}
-
-
-/* Allocate enough room for the PS_GPU class and VRAM */
-static void *GPU_Alloc(uint8 upscale_shift)
-{
-  unsigned width = 1024 << upscale_shift;
-  unsigned height = 512 << upscale_shift;
-
-  unsigned size   = sizeof(PS_GPU) + width * height * sizeof(uint16_t);
-
-  char *buffer    = new char[size];
-
-  memset(buffer, 0, size);
-
-  return (void*)buffer;
-}
-
-
-static PS_GPU *GPU_Build(bool pal_clock_and_tv,
-      int sls, int sle, uint8 upscale_shift)
-{
-  void *buffer = GPU_Alloc(upscale_shift);
-
-  // Place the new GPU inside the buffer
-  return new (buffer) PS_GPU(pal_clock_and_tv, sls, sle, upscale_shift);
-}
-
-void GPU_Init(bool pal_clock_and_tv,
-      int sls, int sle, uint8 upscale_shift)
-{
-   GPU = GPU_Build(pal_clock_and_tv, sls, sle, upscale_shift);
-}
-
-void GPU_Destroy(void)
-{
-   if(GPU)
-   {
-      GPU->~PS_GPU();
-      delete [] (char*)GPU;
-   }
-   GPU = NULL;
-}
-
-// Build a new GPU with a different upscale_shift
-static PS_GPU *GPU_Rescale(PS_GPU *gpu, uint8 ushift)
-{
-   void *buffer = GPU_Alloc(ushift);
-
-   return new (buffer) PS_GPU(*gpu, ushift);
-}
-
-void GPU_Reinit(uint8 ushift)
-{
-   // We successfully changed the frontend's resolution, we can
-   // apply the change immediately
-   PS_GPU *new_gpu = GPU_Rescale(GPU, ushift);
-   GPU_Destroy();
-   GPU = new_gpu;
-}
-
-void GPU_FillVideoParams(MDFNGI* gi)
-{
-   PS_GPU *gpu = (PS_GPU*)GPU;
-
-   if(gpu->HardwarePALType)
-   {
-      gi->lcm_width = 2800;
-      gi->lcm_height = (gpu->LineVisLast + 1 - gpu->LineVisFirst) * 2; //576;
-
-      gi->nominal_width = 384;	// Dunno. :(
-      gi->nominal_height = gpu->LineVisLast + 1 - gpu->LineVisFirst; //288;
-
-      gi->fb_width = 768;
-      gi->fb_height = 576;
-
-      gi->fps = 836203078; // 49.842
-
-      gi->VideoSystem = VIDSYS_PAL;
-   }
-   else
-   {
-      gi->lcm_width = 2800;
-      gi->lcm_height = (gpu->LineVisLast + 1 - gpu->LineVisFirst) * 2; //480;
-
-      gi->nominal_width = 320;
-      gi->nominal_height = gpu->LineVisLast + 1 - gpu->LineVisFirst; //240;
-
-      gi->fb_width = 768;
-      gi->fb_height = 480;
-
-      gi->fps = 1005643085; // 59.941
-
-      gi->VideoSystem = VIDSYS_NTSC;
-   }
-
-   //
-   // For Justifier and Guncon.
-   //
-   gi->mouse_scale_x = (float)gi->lcm_width / gi->nominal_width;
-   gi->mouse_offs_x = (float)(2800 - gi->lcm_width) / 2;
-
-   gi->mouse_scale_y = 1.0;
-   gi->mouse_offs_y = gpu->LineVisFirst;
-}
-
-void GPU_SoftReset(void) // Control command 0x00
-{
-   PS_GPU *gpu = (PS_GPU*)GPU;
-
-   gpu->IRQPending = false;
-   IRQ_Assert(IRQ_GPU, gpu->IRQPending);
-
-   InvalidateCache(gpu);
-   gpu->DMAControl = 0;
-
-   if(gpu->DrawTimeAvail < 0)
-      gpu->DrawTimeAvail = 0;
-
-   GPU_BlitterFIFO.Flush();
-   gpu->DataReadBufferEx = 0;
-   gpu->InCmd = INCMD_NONE;
-
-   gpu->DisplayOff = 1;
-   gpu->DisplayFB_XStart = 0;
-   gpu->DisplayFB_YStart = 0;
-
-   gpu->DisplayMode = 0;
-
-   gpu->HorizStart = 0x200;
-   gpu->HorizEnd = 0xC00;
-
-   gpu->VertStart = 0x10;
-   gpu->VertEnd = 0x100;
-
-
-   //
-   gpu->TexPageX = 0;
-   gpu->TexPageY = 0;
-
-   gpu->SpriteFlip = 0;
-
-   gpu->abr = 0;
-   gpu->TexMode = 0;
-
-   gpu->dtd = 0;
-   gpu->dfe = 0;
-
-   //
-   gpu->tww = 0;
-   gpu->twh = 0;
-   gpu->twx = 0;
-   gpu->twy = 0;
-
-   gpu->RecalcTexWindowStuff();
-
-   //
-   gpu->ClipX0 = 0;
-   gpu->ClipY0 = 0;
-
-   //
-   gpu->ClipX1 = 0;
-   gpu->ClipY1 = 0;
-
-   //
-   gpu->OffsX = 0;
-   gpu->OffsY = 0;
-
-   //
-   gpu->MaskSetOR = 0;
-   gpu->MaskEvalAND = 0;
-
-   gpu->TexDisable = false;
-   gpu->TexDisableAllowChange = false;
-}
-
-void GPU_Power(void)
-{
-   PS_GPU *gpu = (PS_GPU*)GPU;
-
-   memset(gpu->vram, 0, 512 * 1024 * UPSCALE(gpu) * UPSCALE(gpu) * sizeof(*gpu->vram));
-
-   memset(gpu->CLUT_Cache, 0, sizeof(gpu->CLUT_Cache));
-   gpu->CLUT_Cache_VB = ~0U;
-
-   memset(gpu->TexCache, 0xFF, sizeof(gpu->TexCache));
-
-   gpu->DMAControl = 0;
-   gpu->ClipX0     = 0;
-   gpu->ClipY0     = 0;
-   gpu->ClipX1     = 0;
-   gpu->ClipY1     = 0;
-
-   gpu->OffsX      = 0;
-   gpu->OffsY      = 0;
-
-   gpu->dtd        = false;
-   gpu->dfe        = false;
-
-   gpu->MaskSetOR  = 0;
-   gpu->MaskEvalAND= 0;
-
-   gpu->TexDisable = false;
-   gpu->TexDisableAllowChange = false;
-
-   gpu->tww = 0;
-   gpu->twh = 0;
-   gpu->twx = 0;
-   gpu->twy = 0;
-
-   gpu->RecalcTexWindowStuff();
-
-   gpu->TexPageX = 0;
-   gpu->TexPageY = 0;
-   gpu->SpriteFlip = 0;
-
-   gpu->abr = 0;
-   gpu->TexMode = 0;
-
-   GPU_BlitterFIFO.Flush();
-
-   gpu->DataReadBuffer = 0; // Don't reset in SoftReset()
-   gpu->DataReadBufferEx = 0;
-   gpu->InCmd = INCMD_NONE;
-   gpu->FBRW_X = 0;
-   gpu->FBRW_Y = 0;
-   gpu->FBRW_W = 0;
-   gpu->FBRW_H = 0;
-   gpu->FBRW_CurY = 0;
-   gpu->FBRW_CurX = 0;
-
-   gpu->DisplayMode = 0;
-   gpu->DisplayOff = 1;
-   gpu->DisplayFB_XStart = 0;
-   gpu->DisplayFB_YStart = 0;
-
-   gpu->HorizStart = 0;
-   gpu->HorizEnd = 0;
-
-   gpu->VertStart = 0;
-   gpu->VertEnd = 0;
-
-   //
-   //
-   //
-   gpu->DisplayFB_CurYOffset = 0;
-   gpu->DisplayFB_CurLineYReadout = 0;
-   gpu->InVBlank = true;
-
-   // TODO: factor out in a separate function.
-   gpu->LinesPerField = 263;
-
-   //
-   //
-   //
-   gpu->scanline = 0;
-   gpu->field = 0;
-   gpu->field_ram_readout = 0;
-   gpu->PhaseChange = 0;
-
-   //
-   //
-   //
-   gpu->DotClockCounter = 0;
-   gpu->GPUClockCounter = 0;
-   gpu->LineClockCounter = 3412 - 200;
-   gpu->LinePhase = 0;
-
-   gpu->DrawTimeAvail = 0;
-
-   gpu->lastts = 0;
-
-   GPU_SoftReset();
-
-   IRQ_Assert(IRQ_VBLANK, gpu->InVBlank);
-   TIMER_SetVBlank(gpu->InVBlank);
-}
-
-void GPU_ResetTS(void)
-{
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   gpu->lastts = 0;
-}
-
-
-static void ProcessFIFO(uint32_t in_count)
-{
-   uint32_t CB[0x10], InData;
-   unsigned i;
-   unsigned command_len;
-   uint32_t cc            = GPU->InCmd_CC;
-   const CTEntry *command = &Commands[cc];
-   bool read_fifo         = false;
-
-   switch (GPU->InCmd)
-   {
-      default:
-      case INCMD_NONE:
-         break;
-      case INCMD_FBWRITE:
-         InData = GPU_BlitterFIFO.Read();
-
-         for(i = 0; i < 2; i++)
-         {
-            bool fetch = texel_fetch(GPU, GPU->FBRW_CurX & 1023, GPU->FBRW_CurY & 511) & GPU->MaskEvalAND;
-
-            if (!fetch)
-               texel_put(GPU->FBRW_CurX & 1023, GPU->FBRW_CurY & 511, InData | GPU->MaskSetOR);
-
-            GPU->FBRW_CurX++;
-            if(GPU->FBRW_CurX == (GPU->FBRW_X + GPU->FBRW_W))
-            {
-               GPU->FBRW_CurX = GPU->FBRW_X;
-               GPU->FBRW_CurY++;
-               if(GPU->FBRW_CurY == (GPU->FBRW_Y + GPU->FBRW_H))
-               {
-                  /* Upload complete, send over to RSX */
-                  rsx_intf_load_image(
-                        GPU->FBRW_X, GPU->FBRW_Y,
-                        GPU->FBRW_W, GPU->FBRW_H,
-                        GPU->vram,
-                        GPU->MaskEvalAND,
-                        GPU->MaskSetOR);
-                  GPU->InCmd = INCMD_NONE;
-                  break;	// Break out of the for() loop.
-               }
-            }
-            InData >>= 16;
-         }
-         return;
-
-      case INCMD_QUAD:
-         if(GPU->DrawTimeAvail < 0)
-            return;
-
-         command_len      = 1 + (bool)(cc & 0x4) + (bool)(cc & 0x10);
-         read_fifo = true;
-         break;
-      case INCMD_PLINE:
-         if(GPU->DrawTimeAvail < 0)
-            return;
-
-         command_len        = 1 + (bool)(GPU->InCmd_CC & 0x10);
-
-         if((GPU_BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
-         {
-            GPU_BlitterFIFO.Read();
-            GPU->InCmd = INCMD_NONE;
-            return;
-         }
-
-         read_fifo = true;
-         break;
-   }
-
-   if (!read_fifo)
-   {
-      cc          = GPU_BlitterFIFO.Peek() >> 24;
-      command     = &Commands[cc];
-      command_len = command->len;
-
-      if(GPU->DrawTimeAvail < 0 && !command->ss_cmd)
-         return;
-   }
-
-   if(in_count < command_len)
-      return;
-
-   for (i = 0; i < command_len; i++)
-   {
-	   PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
-	   CB[i] = GPU_BlitterFIFO.Read();
-   }
-
-   if (!read_fifo)
-   {
-      if(!command->ss_cmd)
-         GPU->DrawTimeAvail -= 2;
-
-      // A very very ugly kludge to support
-      // texture mode specialization.
-      // fixme/cleanup/SOMETHING in the future.
-      
-      /* Don't alter SpriteFlip here. */
-      if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
-         SetTPage(GPU, CB[4 + ((cc >> 4) & 0x1)] >> 16);
-   }
-
-   if ((cc >= 0x80) && (cc <= 0x9F))
-      Command_FBCopy(GPU, CB);
-   else if ((cc >= 0xA0) && (cc <= 0xBF))
-      Command_FBWrite(GPU, CB);
-   else if ((cc >= 0xC0) && (cc <= 0xDF))
-      Command_FBRead(GPU, CB);
-   else
-   {
-	   if (command->func[GPU->abr][GPU->TexMode])
-		   command->func[GPU->abr][GPU->TexMode | (GPU->MaskEvalAND ? 0x4 : 0x0)](GPU, CB);
-   }
-}
-
-static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
-{
-   if(GPU_BlitterFIFO.in_count >= 0x10
-         && 
-         ( GPU->InCmd != INCMD_NONE || 
-          (GPU_BlitterFIFO.in_count - 0x10) >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len))
-   {
-      PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
-      return;
-   }
-
-   PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
-   GPU_BlitterFIFO.Write(InData);
-
-   if(GPU_BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
-      ProcessFIFO(GPU_BlitterFIFO.in_count);
-}
-
-
 static void UpdateDisplayMode(void)
 {
-   bool depth_24bpp = !!(GPU->DisplayMode & 0x10);
+   bool depth_24bpp = !!(GPU.DisplayMode & 0x10);
 
-   uint16_t yres = GPU->VertEnd - GPU->VertStart;
+   uint16_t yres = GPU.VertEnd - GPU.VertStart;
 
    // Both 2nd bit and 5th bit have to be enabled to use interlacing properly.
-   if((GPU->DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
+   if((GPU.DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
       yres *= 2;
 
    unsigned pixelclock_divider;
 
-   if ((GPU->DisplayMode >> 6) & 1)
+   if ((GPU.DisplayMode >> 6) & 1)
    {
       // HRes ~ 368pixels
       pixelclock_divider = 7;
    }
    else
    {
-      switch (GPU->DisplayMode & 3)
+      switch (GPU.DisplayMode & 3)
       {
          case 0:
             // Hres ~ 256pixels
@@ -1043,7 +559,7 @@ static void UpdateDisplayMode(void)
    }
 
    // First we get the horizontal range in number of pixel clock period
-   uint16_t xres = (GPU->HorizEnd - GPU->HorizStart);
+   uint16_t xres = (GPU.HorizEnd - GPU.HorizStart);
 
    // Then we apply the divider
    xres /= pixelclock_divider;
@@ -1052,19 +568,500 @@ static void UpdateDisplayMode(void)
    xres = (xres + 2) & ~3;
 
    rsx_intf_set_display_mode(
-         GPU->DisplayFB_XStart,
-         GPU->DisplayFB_YStart,
+         GPU.DisplayFB_XStart,
+         GPU.DisplayFB_YStart,
          xres, yres,
          depth_24bpp);
 }
 
+/* Forward decls */
+void GPU_RestoreStateP1(bool);
+void GPU_RestoreStateP2(bool);
+void GPU_RestoreStateP3();
+
+/* Return a ptr to memory with enough space
+ * for the VRAM, taking upscaling into account */
+static uint16_t *VRAM_Alloc(uint8 upscale_shift)
+{
+   unsigned width  = 1024 << upscale_shift;
+   unsigned height =  512 << upscale_shift;
+   unsigned size   = width * height;
+
+   uint16_t *vram    = new uint16_t[size];
+   memset(vram, 0, sizeof(vram));
+
+   return vram;
+}
+
+void GPU_Init(bool pal_clock_and_tv,
+      int sls, int sle, uint8 upscale_shift)
+{
+   
+   GPU.vram = VRAM_Alloc(upscale_shift);
+
+   int x, y, v;
+
+   GPU.HardwarePALType = pal_clock_and_tv;
+
+   for(y = 0; y < 4; y++)
+   {
+      for(x = 0; x < 4; x++)
+      {
+         for(v = 0; v < 512; v++)
+         {
+            int value = v;
+
+            value += dither_table[y][x];
+
+            value >>= 3;
+
+            if(value < 0)
+               value = 0;
+
+            if(value > 0x1F)
+               value = 0x1F;
+
+            GPU.DitherLUT[y][x][v] = value;
+         }
+      }
+   }
+
+   if(GPU.HardwarePALType == false)  // NTSC clock
+      GPU.GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
+   else  // PAL clock
+      GPU.GPUClockRatio = 102948; // 65536 * 53203425 / (44100 * 768)
+
+   memset(GPU.RGB8SAT_Under, 0, sizeof(GPU.RGB8SAT_Under));
+
+   for(int i = 0; i < 256; i++)
+      GPU.RGB8SAT[i] = i;
+
+   memset(GPU.RGB8SAT_Over, 0xFF, sizeof(GPU.RGB8SAT_Over));
+
+   GPU.LineVisFirst = sls;
+   GPU.LineVisLast = sle;
+
+   GPU.display_change_count = 0;
+
+   GPU.upscale_shift = upscale_shift;
+   GPU.dither_upscale_shift = 0;
+}
+
+void GPU_Destroy(void)
+{
+   delete [] GPU.vram;
+}
+
+/* Rescale the GPU with a different upscale_shift 
+ * 
+ * We copy, if necessary, the current VRAM (GPU.vram) at 1x
+ * to a buffer (vram_new). 
+ * We allocate enough space for the rescaled VRAM 
+ * and copy the buffer to it, taking the upscale factor into account 
+ * 
+ */
+void GPU_Rescale(uint8 ushift)
+{
+   if (GPU.upscale_shift == 0) 
+   {
+      /* VRAM is already at 1x, make the buffer point to the old VRAM
+       * to avoid copying it */
+      vram_new = GPU.vram;  
+   }
+
+   else
+   {
+      /* Copy current VRAM to temp buffer at 1x */
+      vram_new = VRAM_Alloc(0);
+
+      for (unsigned y = 0; y < 512; y++)
+      {
+         for (unsigned x = 0; x < 1024; x++)
+            vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
+      }
+
+      /* Cleanup the old VRAM */
+      delete [] GPU.vram;
+   }
+
+   GPU.vram = NULL;
+
+   /* Change the state of the upscale shift right now
+    * or else texel_put won't use the new scaling factor
+    * resulting in corrupted VRAM */
+   GPU_set_upscale_shift(ushift);
+   
+   GPU.vram = VRAM_Alloc(ushift);
+
+   /* Copy the temp buffer to the rescaled VRAM, taking the
+    * upscale factor into account (nearest neighbor upscaling) */
+   for (unsigned y = 0; y < 512; y++)
+   {
+      for (unsigned x = 0; x < 1024; x++)
+         texel_put(x, y, vram_new[y * 1024 + x]);
+   }
+
+   /* Cleanup the temporary buffer */
+   if (vram_new)
+      delete [] vram_new;
+   vram_new = NULL;
+}
+
+void GPU_FillVideoParams(MDFNGI* gi)
+{
+   if(GPU.HardwarePALType)
+   {
+      gi->lcm_width = 2800;
+      gi->lcm_height = (GPU.LineVisLast + 1 - GPU.LineVisFirst) * 2; //576;
+
+      gi->nominal_width = 384;   // Dunno. :(
+      gi->nominal_height = GPU.LineVisLast + 1 - GPU.LineVisFirst; //288;
+
+      gi->fb_width = 768;
+      gi->fb_height = 576;
+
+      gi->fps = 836203078; // 49.842
+
+      gi->VideoSystem = VIDSYS_PAL;
+   }
+   else
+   {
+      gi->lcm_width = 2800;
+      gi->lcm_height = (GPU.LineVisLast + 1 - GPU.LineVisFirst) * 2; //480;
+
+      gi->nominal_width = 320;
+      gi->nominal_height = GPU.LineVisLast + 1 - GPU.LineVisFirst; //240;
+
+      gi->fb_width = 768;
+      gi->fb_height = 480;
+
+      gi->fps = 1005643085; // 59.941
+
+      gi->VideoSystem = VIDSYS_NTSC;
+   }
+
+   //
+   // For Justifier and Guncon.
+   //
+   gi->mouse_scale_x = (float)gi->lcm_width / gi->nominal_width;
+   gi->mouse_offs_x = (float)(2800 - gi->lcm_width) / 2;
+
+   gi->mouse_scale_y = 1.0;
+   gi->mouse_offs_y = GPU.LineVisFirst;
+}
+
+void GPU_SoftReset(void) // Control command 0x00
+{
+   GPU.IRQPending = false;
+   IRQ_Assert(IRQ_GPU, GPU.IRQPending);
+
+   InvalidateCache(&GPU);
+   GPU.DMAControl = 0;
+
+   if(GPU.DrawTimeAvail < 0)
+      GPU.DrawTimeAvail = 0;
+
+   GPU_BlitterFIFO.Flush();
+   GPU.DataReadBufferEx = 0;
+   GPU.InCmd = INCMD_NONE;
+
+   GPU.DisplayOff = 1;
+   GPU.DisplayFB_XStart = 0;
+   GPU.DisplayFB_YStart = 0;
+
+   GPU.DisplayMode = 0;
+
+   GPU.HorizStart = 0x200;
+   GPU.HorizEnd = 0xC00;
+
+   GPU.VertStart = 0x10;
+   GPU.VertEnd = 0x100;
+
+
+   //
+   GPU.TexPageX = 0;
+   GPU.TexPageY = 0;
+
+   GPU.SpriteFlip = 0;
+
+   GPU.abr = 0;
+   GPU.TexMode = 0;
+
+   GPU.dtd = 0;
+   GPU.dfe = 0;
+
+   //
+   GPU.tww = 0;
+   GPU.twh = 0;
+   GPU.twx = 0;
+   GPU.twy = 0;
+
+   RecalcTexWindowStuff(&GPU);
+
+   //
+   GPU.ClipX0 = 0;
+   GPU.ClipY0 = 0;
+
+   //
+   GPU.ClipX1 = 0;
+   GPU.ClipY1 = 0;
+
+   //
+   GPU.OffsX = 0;
+   GPU.OffsY = 0;
+
+   //
+   GPU.MaskSetOR = 0;
+   GPU.MaskEvalAND = 0;
+
+   GPU.TexDisable = false;
+   GPU.TexDisableAllowChange = false;
+}
+
+void GPU_Power(void)
+{
+   memset(GPU.vram, 0, 512 * 1024 * UPSCALE(&GPU) * UPSCALE(&GPU) * sizeof(*GPU.vram));
+
+   memset(GPU.CLUT_Cache, 0, sizeof(GPU.CLUT_Cache));
+   GPU.CLUT_Cache_VB = ~0U;
+
+   memset(GPU.TexCache, 0xFF, sizeof(GPU.TexCache));
+
+   GPU.DMAControl    = 0;
+   GPU.ClipX0        = 0;
+   GPU.ClipY0        = 0;
+   GPU.ClipX1        = 0;
+   GPU.ClipY1        = 0;
+
+   GPU.OffsX         = 0;
+   GPU.OffsY         = 0;
+
+   GPU.dtd           = false;
+   GPU.dfe           = false;
+
+   GPU.MaskSetOR     = 0;
+   GPU.MaskEvalAND   = 0;
+
+   GPU.TexDisable            = false;
+   GPU.TexDisableAllowChange = false;
+
+   GPU.tww = 0;
+   GPU.twh = 0;
+   GPU.twx = 0;
+   GPU.twy = 0;
+
+   RecalcTexWindowStuff(&GPU);
+
+   GPU.TexPageX = 0;
+   GPU.TexPageY = 0;
+   GPU.SpriteFlip = 0;
+
+   GPU.abr = 0;
+   GPU.TexMode = 0;
+
+   GPU_BlitterFIFO.Flush();
+
+   GPU.DataReadBuffer = 0; // Don't reset in SoftReset()
+   GPU.DataReadBufferEx = 0;
+   GPU.InCmd = INCMD_NONE;
+   GPU.FBRW_X = 0;
+   GPU.FBRW_Y = 0;
+   GPU.FBRW_W = 0;
+   GPU.FBRW_H = 0;
+   GPU.FBRW_CurY = 0;
+   GPU.FBRW_CurX = 0;
+
+   GPU.DisplayMode = 0;
+   GPU.DisplayOff = 1;
+   GPU.DisplayFB_XStart = 0;
+   GPU.DisplayFB_YStart = 0;
+
+   GPU.HorizStart = 0;
+   GPU.HorizEnd = 0;
+
+   GPU.VertStart = 0;
+   GPU.VertEnd = 0;
+
+   //
+   //
+   //
+   GPU.DisplayFB_CurYOffset = 0;
+   GPU.DisplayFB_CurLineYReadout = 0;
+   GPU.InVBlank = true;
+
+   // TODO: factor out in a separate function.
+   GPU.LinesPerField = 263;
+
+   //
+   //
+   //
+   GPU.scanline = 0;
+   GPU.field = 0;
+   GPU.field_ram_readout = 0;
+   GPU.PhaseChange = 0;
+
+   //
+   //
+   //
+   GPU.DotClockCounter = 0;
+   GPU.GPUClockCounter = 0;
+   GPU.LineClockCounter = 3412 - 200;
+   GPU.LinePhase = 0;
+
+   GPU.DrawTimeAvail = 0;
+
+   GPU.lastts = 0;
+
+   GPU_SoftReset();
+
+   IRQ_Assert(IRQ_VBLANK, GPU.InVBlank);
+   TIMER_SetVBlank(GPU.InVBlank);
+}
+
+void GPU_ResetTS(void)
+{
+   GPU.lastts = 0;
+}
+
+
+static void ProcessFIFO(uint32_t in_count)
+{
+   uint32_t CB[0x10], InData;
+   unsigned i;
+   unsigned command_len;
+   uint32_t cc            = GPU.InCmd_CC;
+   const CTEntry *command = &Commands[cc];
+   bool read_fifo         = false;
+
+   switch (GPU.InCmd)
+   {
+      default:
+      case INCMD_NONE:
+         break;
+      case INCMD_FBWRITE:
+         InData = GPU_BlitterFIFO.Read();
+
+         for(i = 0; i < 2; i++)
+         {
+            bool fetch = texel_fetch(&GPU, GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511) & GPU.MaskEvalAND;
+
+            if (!fetch)
+               texel_put(GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511, InData | GPU.MaskSetOR);
+
+            GPU.FBRW_CurX++;
+            if(GPU.FBRW_CurX == (GPU.FBRW_X + GPU.FBRW_W))
+            {
+               GPU.FBRW_CurX = GPU.FBRW_X;
+               GPU.FBRW_CurY++;
+               if(GPU.FBRW_CurY == (GPU.FBRW_Y + GPU.FBRW_H))
+               {
+                  /* Upload complete, send over to RSX */
+                  rsx_intf_load_image(
+                        GPU.FBRW_X, GPU.FBRW_Y,
+                        GPU.FBRW_W, GPU.FBRW_H,
+                        GPU.vram,
+                        GPU.MaskEvalAND,
+                        GPU.MaskSetOR);
+                  GPU.InCmd = INCMD_NONE;
+                  break;   // Break out of the for() loop.
+               }
+            }
+            InData >>= 16;
+         }
+         return;
+
+      case INCMD_QUAD:
+         if(GPU.DrawTimeAvail < 0)
+            return;
+
+         command_len      = 1 + (bool)(cc & 0x4) + (bool)(cc & 0x10);
+         read_fifo = true;
+         break;
+      case INCMD_PLINE:
+         if(GPU.DrawTimeAvail < 0)
+            return;
+
+         command_len        = 1 + (bool)(GPU.InCmd_CC & 0x10);
+
+         if((GPU_BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
+         {
+            GPU_BlitterFIFO.Read();
+            GPU.InCmd = INCMD_NONE;
+            return;
+         }
+
+         read_fifo = true;
+         break;
+   }
+
+   if (!read_fifo)
+   {
+      cc          = GPU_BlitterFIFO.Peek() >> 24;
+      command     = &Commands[cc];
+      command_len = command->len;
+
+      if(GPU.DrawTimeAvail < 0 && !command->ss_cmd)
+         return;
+   }
+
+   if(in_count < command_len)
+      return;
+
+   for (i = 0; i < command_len; i++)
+   {
+      PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
+      CB[i] = GPU_BlitterFIFO.Read();
+   }
+
+   if (!read_fifo)
+   {
+      if(!command->ss_cmd)
+         GPU.DrawTimeAvail -= 2;
+
+      // A very very ugly kludge to support
+      // texture mode specialization.
+      // fixme/cleanup/SOMETHING in the future.
+      
+      /* Don't alter SpriteFlip here. */
+      if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
+         SetTPage(&GPU, CB[4 + ((cc >> 4) & 0x1)] >> 16);
+   }
+
+   if ((cc >= 0x80) && (cc <= 0x9F))
+      Command_FBCopy(&GPU, CB);
+   else if ((cc >= 0xA0) && (cc <= 0xBF))
+      Command_FBWrite(&GPU, CB);
+   else if ((cc >= 0xC0) && (cc <= 0xDF))
+      Command_FBRead(&GPU, CB);
+   else
+   {
+      if (command->func[GPU.abr][GPU.TexMode])
+         command->func[GPU.abr][GPU.TexMode | (GPU.MaskEvalAND ? 0x4 : 0x0)](&GPU, CB);
+   }
+}
+
+static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
+{
+   if(GPU_BlitterFIFO.in_count >= 0x10
+      && (GPU.InCmd != INCMD_NONE || 
+      (GPU_BlitterFIFO.in_count - 0x10) >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len))
+   {
+      PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
+      return;
+   }
+
+   PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
+   GPU_BlitterFIFO.Write(InData);
+
+   if(GPU_BlitterFIFO.in_count && GPU.InCmd != INCMD_FBREAD)
+      ProcessFIFO(GPU_BlitterFIFO.in_count);
+}
+
 void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-
    V <<= (A & 3) * 8;
 
-   if(A & 4)	// GP1 ("Control")
+   if(A & 4)   // GP1 ("Control")
    {
       uint32_t command = V >> 24;
 
@@ -1080,109 +1077,109 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          default:
             PSX_WARNING("[GPU] Unknown control command %02x - %06x", command, V);
             break;
-         case 0x00:	// Reset GPU
+         case 0x00:  // Reset GPU
             //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             GPU_SoftReset();
-             rsx_intf_set_draw_area(gpu->ClipX0, gpu->ClipY0,
-                   gpu->ClipX1, gpu->ClipY1);
+             rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
+                                    GPU.ClipX1, GPU.ClipY1);
              UpdateDisplayMode();
             break;
 
-         case 0x01:	// Reset command buffer
-            if(gpu->DrawTimeAvail < 0)
-               gpu->DrawTimeAvail = 0;
+         case 0x01:  // Reset command buffer
+            if(GPU.DrawTimeAvail < 0)
+               GPU.DrawTimeAvail = 0;
             GPU_BlitterFIFO.Flush();
-            gpu->InCmd = INCMD_NONE;
+            GPU.InCmd = INCMD_NONE;
             break;
 
-         case 0x02: 	// Acknowledge IRQ
-            gpu->IRQPending = false;
-            IRQ_Assert(IRQ_GPU, gpu->IRQPending);
+         case 0x02:  // Acknowledge IRQ
+            GPU.IRQPending = false;
+            IRQ_Assert(IRQ_GPU, GPU.IRQPending);
             break;
 
-         case 0x03:	// Display enable
-            gpu->DisplayOff = V & 1;
-            rsx_intf_toggle_display(gpu->DisplayOff);
+         case 0x03:  // Display enable
+            GPU.DisplayOff = V & 1;
+            rsx_intf_toggle_display(GPU.DisplayOff);
             break;
 
-         case 0x04:	// DMA Setup
-            gpu->DMAControl = V & 0x3;
+         case 0x04:  // DMA Setup
+            GPU.DMAControl = V & 0x3;
             break;
 
-         case 0x05:	// Start of display area in framebuffer
-            gpu->DisplayFB_XStart = V & 0x3FE; // Lower bit is apparently ignored.
-            gpu->DisplayFB_YStart = (V >> 10) & 0x1FF;
-            gpu->display_change_count++;
+         case 0x05:  // Start of display area in framebuffer
+            GPU.DisplayFB_XStart = V & 0x3FE; // Lower bit is apparently ignored.
+            GPU.DisplayFB_YStart = (V >> 10) & 0x1FF;
+            GPU.display_change_count++;
             break;
 
-         case 0x06:	// Horizontal display range
-            gpu->HorizStart = V & 0xFFF;
-            gpu->HorizEnd = (V >> 12) & 0xFFF;
+         case 0x06:  // Horizontal display range
+            GPU.HorizStart = V & 0xFFF;
+            GPU.HorizEnd = (V >> 12) & 0xFFF;
             break;
 
          case 0x07:
-            gpu->VertStart = V & 0x3FF;
-            gpu->VertEnd = (V >> 10) & 0x3FF;
+            GPU.VertStart = V & 0x3FF;
+            GPU.VertEnd = (V >> 10) & 0x3FF;
             break;
 
          case 0x08:
             //printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
-            gpu->DisplayMode = V & 0xFF;
+            GPU.DisplayMode = V & 0xFF;
             UpdateDisplayMode();
             break;
 
          case 0x09:
-            gpu->TexDisableAllowChange = V & 1;
+            GPU.TexDisableAllowChange = V & 1;
             break;
 
-         case 0x10:	// GPU info(?)
+         case 0x10:  // GPU info(?)
             switch(V & 0xF)
             {
                // DataReadBuffer must remain unchanged for any unhandled GPU info index.
                default:
                   break;
                case 0x2:
-                  gpu->DataReadBufferEx &= 0xFFF00000;
-                  gpu->DataReadBufferEx |= (gpu->tww << 0) | (gpu->twh << 5) | (gpu->twx << 10) | (gpu->twy << 15);
-                  gpu->DataReadBuffer    = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx &= 0xFFF00000;
+                  GPU.DataReadBufferEx |= (GPU.tww << 0) | (GPU.twh << 5) | (GPU.twx << 10) | (GPU.twy << 15);
+                  GPU.DataReadBuffer    = GPU.DataReadBufferEx;
                   break;
                case 0x3:
-                  gpu->DataReadBufferEx &= 0xFFF00000;
-                  gpu->DataReadBufferEx |= (gpu->ClipY0 << 10) | gpu->ClipX0;
-                  gpu->DataReadBuffer = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx &= 0xFFF00000;
+                  GPU.DataReadBufferEx |= (GPU.ClipY0 << 10) | GPU.ClipX0;
+                  GPU.DataReadBuffer = GPU.DataReadBufferEx;
                   break;
 
                case 0x4:
-                  gpu->DataReadBufferEx &= 0xFFF00000;
-                  gpu->DataReadBufferEx |= (gpu->ClipY1 << 10) | gpu->ClipX1;
-                  gpu->DataReadBuffer = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx &= 0xFFF00000;
+                  GPU.DataReadBufferEx |= (GPU.ClipY1 << 10) | GPU.ClipX1;
+                  GPU.DataReadBuffer = GPU.DataReadBufferEx;
                   break;
 
                case 0x5:
-                  gpu->DataReadBufferEx &= 0xFFC00000;
-                  gpu->DataReadBufferEx |= (gpu->OffsX & 2047) | ((gpu->OffsY & 2047) << 11);
-                  gpu->DataReadBuffer = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx &= 0xFFC00000;
+                  GPU.DataReadBufferEx |= (GPU.OffsX & 2047) | ((GPU.OffsY & 2047) << 11);
+                  GPU.DataReadBuffer = GPU.DataReadBufferEx;
                   break;
 
                case 0x7:
-                  gpu->DataReadBufferEx = 2;
-                  gpu->DataReadBuffer = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx = 2;
+                  GPU.DataReadBuffer = GPU.DataReadBufferEx;
                   break;
 
                case 0x8:
-                  gpu->DataReadBufferEx = 0;
-                  gpu->DataReadBuffer = gpu->DataReadBufferEx;
+                  GPU.DataReadBufferEx = 0;
+                  GPU.DataReadBuffer = GPU.DataReadBufferEx;
                   break;
             }
             break;
 
       }
    }
-   else		// GP0 ("Data")
+   else     // GP0 ("Data")
    {
       //uint32_t command = V >> 24;
       //printf("Meow command: %02x\n", command);
-      //assert(!(gpu->DMAControl & 2));
+      //assert(!(GPU.DMAControl & 2));
       GPU_WriteCB(V, A);
    }
 }
@@ -1196,100 +1193,100 @@ static INLINE uint32_t GPU_ReadData(void)
 {
    unsigned i;
 
-   GPU->DataReadBufferEx = 0;
+   GPU.DataReadBufferEx = 0;
 
    for(i = 0; i < 2; i++)
    {
-      GPU->DataReadBufferEx |=
-         texel_fetch(GPU,
-               GPU->FBRW_CurX & 1023,
-               GPU->FBRW_CurY & 511) << (i * 16);
+      GPU.DataReadBufferEx |=
+         texel_fetch(&GPU,
+                     GPU.FBRW_CurX & 1023,
+                     GPU.FBRW_CurY & 511) << (i * 16);
 
-      GPU->FBRW_CurX++;
-      if(GPU->FBRW_CurX == (GPU->FBRW_X + GPU->FBRW_W))
+      GPU.FBRW_CurX++;
+      if(GPU.FBRW_CurX == (GPU.FBRW_X + GPU.FBRW_W))
       {
-         if((GPU->FBRW_CurY + 1) == (GPU->FBRW_Y + GPU->FBRW_H))
-            GPU->InCmd = INCMD_NONE;
+         if((GPU.FBRW_CurY + 1) == (GPU.FBRW_Y + GPU.FBRW_H))
+            GPU.InCmd = INCMD_NONE;
          else
          {
-            GPU->FBRW_CurY++;
-            GPU->FBRW_CurX = GPU->FBRW_X;
+            GPU.FBRW_CurY++;
+            GPU.FBRW_CurX = GPU.FBRW_X;
          }
       }
    }
 
-   return GPU->DataReadBufferEx;
+   return GPU.DataReadBufferEx;
 }
 
 uint32_t GPU_ReadDMA(void)
 {
-   if(GPU->InCmd != INCMD_FBREAD)
-      return GPU->DataReadBuffer;
+   if(GPU.InCmd != INCMD_FBREAD)
+      return GPU.DataReadBuffer;
    return GPU_ReadData();
 }
 
 uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
 {
    uint32_t ret = 0;
-   PS_GPU *gpu  = (PS_GPU*)GPU;
 
-   if(A & 4)	// Status
+
+   if(A & 4)   // Status
    {
-      ret = (((gpu->DisplayMode << 1) & 0x7F) | ((gpu->DisplayMode >> 6) & 1)) << 16;
+      ret = (((GPU.DisplayMode << 1) & 0x7F) | ((GPU.DisplayMode >> 6) & 1)) << 16;
 
-      ret |= (gpu->DisplayMode & 0x80) << 7;
+      ret |= (GPU.DisplayMode & 0x80) << 7;
 
-      ret |= gpu->DMAControl << 29;
+      ret |= GPU.DMAControl << 29;
 
-      ret |= (gpu->DisplayFB_CurLineYReadout & 1) << 31;
+      ret |= (GPU.DisplayFB_CurLineYReadout & 1) << 31;
 
-      ret |= (!gpu->field) << 13;
+      ret |= (!GPU.field) << 13;
 
-      if(gpu->DMAControl & 0x02)
+      if(GPU.DMAControl & 0x02)
          ret |= 1 << 25;
 
-      ret |= gpu->IRQPending << 24;
+      ret |= GPU.IRQPending << 24;
 
-      ret |= gpu->DisplayOff << 23;
+      ret |= GPU.DisplayOff << 23;
 
       /* GPU idle bit */
-      if(gpu->InCmd == INCMD_NONE && gpu->DrawTimeAvail >= 0
+      if(GPU.InCmd == INCMD_NONE && GPU.DrawTimeAvail >= 0
             && GPU_BlitterFIFO.in_count == 0x00)
          ret |= 1 << 26;
 
-      if(gpu->InCmd == INCMD_FBREAD)	// Might want to more accurately emulate this in the future?
+      if(GPU.InCmd == INCMD_FBREAD) // Might want to more accurately emulate this in the future?
          ret |= (1 << 27);
 
-      ret |= CalcFIFOReadyBit() << 28;		// FIFO has room bit? (kinda).
+      ret |= CalcFIFOReadyBit() << 28;    // FIFO has room bit? (kinda).
 
       //
       //
-      ret |= gpu->TexPageX >> 6;
-      ret |= gpu->TexPageY >> 4;
-      ret |= gpu->abr << 5;
-      ret |= gpu->TexMode << 7;
+      ret |= GPU.TexPageX >> 6;
+      ret |= GPU.TexPageY >> 4;
+      ret |= GPU.abr << 5;
+      ret |= GPU.TexMode << 7;
 
-      ret |= gpu->dtd << 9;
-      ret |= gpu->dfe << 10;
+      ret |= GPU.dtd << 9;
+      ret |= GPU.dfe << 10;
 
-      if(gpu->MaskSetOR)
+      if(GPU.MaskSetOR)
          ret |= 1 << 11;
 
-      if(gpu->MaskEvalAND)
+      if(GPU.MaskEvalAND)
          ret |= 1 << 12;
 
-      ret |= gpu->TexDisable << 15;
+      ret |= GPU.TexDisable << 15;
    }
-   else		// "Data"
+   else     // "Data"
    {
-      if(gpu->InCmd == INCMD_FBREAD)
+      if(GPU.InCmd == INCMD_FBREAD)
          ret = GPU_ReadData();
       else
-         ret = gpu->DataReadBuffer;
+         ret = GPU.DataReadBuffer;
    }
 
 #if 0
-   if(gpu->DMAControl & 2)
+   if(GPU.DMAControl & 2)
    {
       //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
    }
@@ -1306,7 +1303,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
 {
   int32_t fb_mask = ((0x7FF << upscale_shift) + upscale - 1);
 
-   if(bpp24)	// 24bpp
+   if(bpp24)   // 24bpp
    {
       for(int32 x = dx_start; x < dx_end; x+= upscale)
       {
@@ -1325,7 +1322,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
 
          fb_x = (fb_x + (3 << upscale_shift)) & fb_mask;
       }
-   }				// 15bpp
+   }           // 15bpp
    else
    {
       for(int32 x = dx_start; x < dx_end; x++)
@@ -1345,151 +1342,150 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
 int32_t GPU_Update(const int32_t sys_timestamp)
 {
    int32 gpu_clocks;
-   PS_GPU *gpu = (PS_GPU*)GPU;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
-   const uint32_t dmc = (gpu->DisplayMode & 0x40) ? 4 : (gpu->DisplayMode & 0x3);
-   const uint32_t dmw = 2800 / DotClockRatios[dmc];	// Must be <= 768
-   int32_t sys_clocks = sys_timestamp - gpu->lastts;
+   const uint32_t dmc = (GPU.DisplayMode & 0x40) ? 4 : (GPU.DisplayMode & 0x3);
+   const uint32_t dmw = 2800 / DotClockRatios[dmc];   // Must be <= 768
+   int32_t sys_clocks = sys_timestamp - GPU.lastts;
 
-   //printf("GPUISH: %d\n", sys_timestamp - gpu->lastts);
+   //printf("GPUISH: %d\n", sys_timestamp - GPU.lastts);
 
    if(!sys_clocks)
       goto TheEnd;
 
-   gpu->DrawTimeAvail += sys_clocks << 1;
+   GPU.DrawTimeAvail += sys_clocks << 1;
 
-   if(gpu->DrawTimeAvail > 256)
-      gpu->DrawTimeAvail = 256;
+   if(GPU.DrawTimeAvail > 256)
+      GPU.DrawTimeAvail = 256;
 
-   if(GPU_BlitterFIFO.in_count && GPU->InCmd != INCMD_FBREAD)
+   if(GPU_BlitterFIFO.in_count && GPU.InCmd != INCMD_FBREAD)
       ProcessFIFO(GPU_BlitterFIFO.in_count);
 
    //puts("GPU Update Start");
 
-   gpu->GPUClockCounter += (uint64)sys_clocks * gpu->GPUClockRatio;
+   GPU.GPUClockCounter += (uint64)sys_clocks * GPU.GPUClockRatio;
 
-   gpu_clocks       = gpu->GPUClockCounter >> 16;
-   gpu->GPUClockCounter -= gpu_clocks << 16;
+   gpu_clocks       = GPU.GPUClockCounter >> 16;
+   GPU.GPUClockCounter -= gpu_clocks << 16;
 
    while(gpu_clocks > 0)
    {
       int32 chunk_clocks = gpu_clocks;
       int32 dot_clocks;
 
-      if(chunk_clocks > gpu->LineClockCounter)
+      if(chunk_clocks > GPU.LineClockCounter)
       {
          //printf("Chunk: %u, LCC: %u\n", chunk_clocks, LineClockCounter);
-         chunk_clocks = gpu->LineClockCounter;
+         chunk_clocks = GPU.LineClockCounter;
       }
 
       gpu_clocks -= chunk_clocks;
-      gpu->LineClockCounter -= chunk_clocks;
+      GPU.LineClockCounter -= chunk_clocks;
 
-      gpu->DotClockCounter += chunk_clocks;
-      dot_clocks = gpu->DotClockCounter / DotClockRatios[gpu->DisplayMode & 0x3];
-      gpu->DotClockCounter -= dot_clocks * DotClockRatios[gpu->DisplayMode & 0x3];
+      GPU.DotClockCounter += chunk_clocks;
+      dot_clocks = GPU.DotClockCounter / DotClockRatios[GPU.DisplayMode & 0x3];
+      GPU.DotClockCounter -= dot_clocks * DotClockRatios[GPU.DisplayMode & 0x3];
 
       TIMER_AddDotClocks(dot_clocks);
 
 
-      if(!gpu->LineClockCounter)
+      if(!GPU.LineClockCounter)
       {
          // We could just call this at the top of GPU_Update(), but
          // do it here for slightly less CPU usage(presumably).
          PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));
 
-         gpu->LinePhase = (gpu->LinePhase + 1) & 1;
+         GPU.LinePhase = (GPU.LinePhase + 1) & 1;
 
-         if(gpu->LinePhase)
+         if(GPU.LinePhase)
          {
             TIMER_SetHRetrace(true);
-            gpu->LineClockCounter = 200;
+            GPU.LineClockCounter = 200;
             TIMER_ClockHRetrace();
          }
          else
          {
             const unsigned int FirstVisibleLine =
-               gpu->LineVisFirst + (gpu->HardwarePALType ? 20 : 16);
+               GPU.LineVisFirst + (GPU.HardwarePALType ? 20 : 16);
             const unsigned int VisibleLineCount =
-               gpu->LineVisLast + 1 - gpu->LineVisFirst; //HardwarePALType ? 288 : 240;
+               GPU.LineVisLast + 1 - GPU.LineVisFirst; //HardwarePALType ? 288 : 240;
 
             TIMER_SetHRetrace(false);
 
-            if(gpu->DisplayMode & DISP_PAL)
-               gpu->LineClockCounter = 3405 - 200;
+            if(GPU.DisplayMode & DISP_PAL)
+               GPU.LineClockCounter = 3405 - 200;
             else
-               gpu->LineClockCounter = 3412 + gpu->PhaseChange - 200;
+               GPU.LineClockCounter = 3412 + GPU.PhaseChange - 200;
 
-            gpu->scanline = (gpu->scanline + 1) % gpu->LinesPerField;
-            gpu->PhaseChange = !gpu->PhaseChange;
+            GPU.scanline = (GPU.scanline + 1) % GPU.LinesPerField;
+            GPU.PhaseChange = !GPU.PhaseChange;
 
 #ifdef WANT_DEBUGGER
-            DBG_GPUScanlineHook(gpu->scanline);
+            DBG_GPUScanlineHook(GPU.scanline);
 #endif
 
             //
             //
             //
-            if(gpu->scanline == (gpu->HardwarePALType ? 308 : 256))	// Will need to be redone if we ever allow for visible vertical overscan with NTSC.
+            if(GPU.scanline == (GPU.HardwarePALType ? 308 : 256)) // Will need to be redone if we ever allow for visible vertical overscan with NTSC.
             {
-               if(gpu->sl_zero_reached)
+               if(GPU.sl_zero_reached)
                {
-                  //printf("Req Exit(visible fallthrough case): %u\n", gpu->scanline);
+                  //printf("Req Exit(visible fallthrough case): %u\n", GPU.scanline);
                   PSX_RequestMLExit();
                }
             }
 
-            if(gpu->scanline == (gpu->LinesPerField - 1))
+            if(GPU.scanline == (GPU.LinesPerField - 1))
             {
-               if(gpu->sl_zero_reached)
+               if(GPU.sl_zero_reached)
                {
-                  //printf("Req Exit(final fallthrough case): %u\n", gpu->scanline);
+                  //printf("Req Exit(final fallthrough case): %u\n", GPU.scanline);
                   PSX_RequestMLExit();
                }
 
-               if(gpu->DisplayMode & DISP_INTERLACED)
-                  gpu->field = !gpu->field;
+               if(GPU.DisplayMode & DISP_INTERLACED)
+                  GPU.field = !GPU.field;
                else
-                  gpu->field = 0;
+                  GPU.field = 0;
             }
 
-            if(gpu->scanline == 0)
+            if(GPU.scanline == 0)
             {
-               assert(gpu->sl_zero_reached == false);
-               gpu->sl_zero_reached = true;
+               assert(GPU.sl_zero_reached == false);
+               GPU.sl_zero_reached = true;
 
-               if(gpu->DisplayMode & DISP_INTERLACED)
+               if(GPU.DisplayMode & DISP_INTERLACED)
                {
-                  if(gpu->DisplayMode & DISP_PAL)
-                     gpu->LinesPerField = 313 - gpu->field;
+                  if(GPU.DisplayMode & DISP_PAL)
+                     GPU.LinesPerField = 313 - GPU.field;
                   else                   // NTSC
-                     gpu->LinesPerField = 263 - gpu->field;
+                     GPU.LinesPerField = 263 - GPU.field;
                }
                else
                {
-                  gpu->field = 0;  // May not be the correct place for this?
+                  GPU.field = 0;  // May not be the correct place for this?
 
-                  if(gpu->DisplayMode & DISP_PAL)
-                     gpu->LinesPerField = 314;
-                  else			// NTSC
-                     gpu->LinesPerField = 263;
+                  if(GPU.DisplayMode & DISP_PAL)
+                     GPU.LinesPerField = 314;
+                  else        // NTSC
+                     GPU.LinesPerField = 263;
                }
 
 
-               if (rsx_intf_is_type() == RSX_SOFTWARE && gpu->espec)
+               if (rsx_intf_is_type() == RSX_SOFTWARE && GPU.espec)
                {
-                  if((bool)(gpu->DisplayMode & DISP_PAL) != gpu->HardwarePALType)
+                  if((bool)(GPU.DisplayMode & DISP_PAL) != GPU.HardwarePALType)
                   {
-                     gpu->DisplayRect->x = 0;
-                     gpu->DisplayRect->y = 0;
-                     gpu->DisplayRect->w = 384;
-                     gpu->DisplayRect->h = VisibleLineCount;
+                     GPU.DisplayRect->x = 0;
+                     GPU.DisplayRect->y = 0;
+                     GPU.DisplayRect->w = 384;
+                     GPU.DisplayRect->h = VisibleLineCount;
 
-                     for(int32 y = 0; y < gpu->DisplayRect->h; y++)
+                     for(int32 y = 0; y < GPU.DisplayRect->h; y++)
                      {
-                        uint32_t *dest = gpu->surface->pixels + y * gpu->surface->pitch32;
+                        uint32_t *dest = GPU.surface->pixels + y * GPU.surface->pitch32;
 
-                        gpu->LineWidths[y] = 384;
+                        GPU.LineWidths[y] = 384;
 
                         memset(dest, 0, 384 * sizeof(int32));
                      }
@@ -1501,22 +1497,22 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   }
                   else
                   {
-                     gpu->espec->InterlaceOn = (bool)(gpu->DisplayMode & DISP_INTERLACED);
-                     gpu->espec->InterlaceField = (bool)(gpu->DisplayMode & DISP_INTERLACED) && gpu->field;
+                     GPU.espec->InterlaceOn = (bool)(GPU.DisplayMode & DISP_INTERLACED);
+                     GPU.espec->InterlaceField = (bool)(GPU.DisplayMode & DISP_INTERLACED) && GPU.field;
 
-                     gpu->DisplayRect->x = 0;
-                     gpu->DisplayRect->y = 0;
-                     gpu->DisplayRect->w = 0;
-                     gpu->DisplayRect->h = VisibleLineCount << (bool)(gpu->DisplayMode & DISP_INTERLACED);
+                     GPU.DisplayRect->x = 0;
+                     GPU.DisplayRect->y = 0;
+                     GPU.DisplayRect->w = 0;
+                     GPU.DisplayRect->h = VisibleLineCount << (bool)(GPU.DisplayMode & DISP_INTERLACED);
 
                      // Clear ~0 state.
-                     gpu->LineWidths[0] = 0;
+                     GPU.LineWidths[0] = 0;
 
-                     for(int i = 0; i < (gpu->DisplayRect->y + gpu->DisplayRect->h); i++)
+                     for(int i = 0; i < (GPU.DisplayRect->y + GPU.DisplayRect->h); i++)
                      {
-                        gpu->surface->pixels[i * gpu->surface->pitch32 + 0] =
-                           gpu->surface->pixels[i * gpu->surface->pitch32 + 1] = 0;
-                        gpu->LineWidths[i] = 2;
+                        GPU.surface->pixels[i * GPU.surface->pitch32 + 0] =
+                           GPU.surface->pixels[i * GPU.surface->pitch32 + 1] = 0;
+                        GPU.LineWidths[i] = 2;
                      }
                   }
                }
@@ -1528,42 +1524,42 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             // and the following IRQ/timer vblank stuff
             // unless you know what you're doing!!!
             // (IE you've run further tests to refine the behavior)
-            if(gpu->scanline == gpu->VertEnd && !gpu->InVBlank)
+            if(GPU.scanline == GPU.VertEnd && !GPU.InVBlank)
             {
-               if(gpu->sl_zero_reached)
+               if(GPU.sl_zero_reached)
                {
                   // Gameplay in Descent(NTSC) has vblank at scanline 236
                   //
                   // Mikagura Shoujo Tanteidan has vblank at scanline 192 during intro
                   //  FMV(which we don't handle here because low-latency in that case is not so important).
                   //
-                  if(gpu->scanline >= (gpu->HardwarePALType ? 260 : 232))
+                  if(GPU.scanline >= (GPU.HardwarePALType ? 260 : 232))
                   {
-                     //printf("Req Exit(vblank case): %u\n", gpu->scanline);
+                     //printf("Req Exit(vblank case): %u\n", GPU.scanline);
                      PSX_RequestMLExit();
                   }
 #if 0
                   else
                   {
-                     //printf("VBlank too early, chickening out early exit: %u!\n", gpu->scanline);
+                     //printf("VBlank too early, chickening out early exit: %u!\n", GPU.scanline);
                   }
 #endif
                }
 
-               //printf("VBLANK: %u\n", gpu->scanline);
-               gpu->InVBlank = true;
+               //printf("VBLANK: %u\n", GPU.scanline);
+               GPU.InVBlank = true;
 
-               gpu->DisplayFB_CurYOffset = 0;
+               GPU.DisplayFB_CurYOffset = 0;
 
-               if((gpu->DisplayMode & 0x24) == 0x24)
-                  gpu->field_ram_readout = !gpu->field;
+               if((GPU.DisplayMode & 0x24) == 0x24)
+                  GPU.field_ram_readout = !GPU.field;
                else
-                  gpu->field_ram_readout = 0;
+                  GPU.field_ram_readout = 0;
             }
 
-            if(gpu->scanline == gpu->VertStart && gpu->InVBlank)
+            if(GPU.scanline == GPU.VertStart && GPU.InVBlank)
             {
-               gpu->InVBlank = false;
+               GPU.InVBlank = false;
 
                // Note to self: X-Men Mutant Academy
                // relies on this being set on the proper
@@ -1572,10 +1568,10 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                // DisplayFB_CurYOffset = field;
             }
 
-            IRQ_Assert(IRQ_VBLANK, gpu->InVBlank);
-            TIMER_SetVBlank(gpu->InVBlank);
+            IRQ_Assert(IRQ_VBLANK, GPU.InVBlank);
+            TIMER_SetVBlank(GPU.InVBlank);
 
-            unsigned displayfb_yoffset = gpu->DisplayFB_CurYOffset;
+            unsigned displayfb_yoffset = GPU.DisplayFB_CurYOffset;
 
             // Needs to occur even in vblank.
             // Not particularly confident about the timing
@@ -1583,10 +1579,10 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             // upper bit(ODE) of the GPU status port, though the
             // test that showed an oddity was pathological in
             // that VertEnd < VertStart in it.
-            if((gpu->DisplayMode & 0x24) == 0x24)
-               displayfb_yoffset = (gpu->DisplayFB_CurYOffset << 1) + (gpu->InVBlank ? 0 : gpu->field_ram_readout);
+            if((GPU.DisplayMode & 0x24) == 0x24)
+               displayfb_yoffset = (GPU.DisplayFB_CurYOffset << 1) + (GPU.InVBlank ? 0 : GPU.field_ram_readout);
 
-            gpu->DisplayFB_CurLineYReadout = (gpu->DisplayFB_YStart + displayfb_yoffset) & 0x1FF;
+            GPU.DisplayFB_CurLineYReadout = (GPU.DisplayFB_YStart + displayfb_yoffset) & 0x1FF;
 
             unsigned dmw_width = 0;
             unsigned pix_clock_offset = 0;
@@ -1594,15 +1590,15 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             unsigned pix_clock_div = 0;
             uint32_t *dest = NULL;
 
-            if(      (bool)(gpu->DisplayMode & DISP_PAL) == gpu->HardwarePALType
-                  && gpu->scanline >= FirstVisibleLine
-                  && gpu->scanline < (FirstVisibleLine + VisibleLineCount))
+            if((bool)(GPU.DisplayMode & DISP_PAL) == GPU.HardwarePALType
+                  && GPU.scanline >= FirstVisibleLine
+                  && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
-               int32 fb_x      = gpu->DisplayFB_XStart * 2;
-               int32 dx_start  = gpu->HorizStart, dx_end = gpu->HorizEnd;
+               int32 fb_x      = GPU.DisplayFB_XStart * 2;
+               int32 dx_start  = GPU.HorizStart, dx_end = GPU.HorizEnd;
                int32 dest_line =
-                  ((gpu->scanline - FirstVisibleLine) << gpu->espec->InterlaceOn)
-                  + gpu->espec->InterlaceField;
+                  ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
+                  + GPU.espec->InterlaceField;
 
                if(dx_end < dx_start)
                   dx_end = dx_start;
@@ -1615,7 +1611,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                if(dx_start < 0)
                {
-                  fb_x -= dx_start * ((gpu->DisplayMode & DISP_RGB24) ? 3 : 2);
+                  fb_x -= dx_start * ((GPU.DisplayMode & DISP_RGB24) ? 3 : 2);
                   fb_x &= 0x7FF; //0x3FF;
                   dx_start = 0;
                }
@@ -1623,10 +1619,10 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                if((uint32)dx_end > dmw)
                   dx_end = dmw;
 
-               if(gpu->InVBlank || gpu->DisplayOff)
+               if(GPU.InVBlank || GPU.DisplayOff)
                   dx_start = dx_end = 0;
 
-               gpu->LineWidths[dest_line] = dmw;
+               GPU.LineWidths[dest_line] = dmw;
 
                //printf("dx_start base: %d, dmw: %d\n", dx_start, dmw);
 
@@ -1634,24 +1630,24 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                {
                   // Convert the necessary variables to the upscaled version
                   uint32_t x;
-                  uint32_t y        = gpu->DisplayFB_CurLineYReadout << gpu->upscale_shift;
-                  uint32_t udmw     = dmw      << gpu->upscale_shift;
-                  int32 udx_start   = dx_start << gpu->upscale_shift;
-                  int32 udx_end     = dx_end   << gpu->upscale_shift;
-                  int32 ufb_x       = fb_x     << gpu->upscale_shift;
-                  unsigned _upscale = UPSCALE(gpu);
+                  uint32_t y        = GPU.DisplayFB_CurLineYReadout << GPU.upscale_shift;
+                  uint32_t udmw     = dmw      << GPU.upscale_shift;
+                  int32 udx_start   = dx_start << GPU.upscale_shift;
+                  int32 udx_end     = dx_end   << GPU.upscale_shift;
+                  int32 ufb_x       = fb_x     << GPU.upscale_shift;
+                  unsigned _upscale = UPSCALE(&GPU);
 
                   for (uint32_t i = 0; i < _upscale; i++)
                   {
-                     const uint16_t *src = gpu->vram +
-                        ((y + i) << (10 + gpu->upscale_shift));
+                     const uint16_t *src = GPU.vram +
+                        ((y + i) << (10 + GPU.upscale_shift));
 
                      // printf("surface: %dx%d (%d) %u %u + %u\n",
-                     // 	   surface->w, surface->h, surface->pitchinpix,
-                     // 	   dest_line, y, i);
+                     //       surface->w, surface->h, surface->pitchinpix,
+                     //       dest_line, y, i);
 
-                     dest = gpu->surface->pixels +
-                        ((dest_line << gpu->upscale_shift) + i) * gpu->surface->pitch32;
+                     dest = GPU.surface->pixels +
+                        ((dest_line << GPU.upscale_shift) + i) * GPU.surface->pitch32;
                      memset(dest, 0, udx_start * sizeof(int32));
 
                      //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
@@ -1659,13 +1655,13 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                            RED_SHIFT,
                            GREEN_SHIFT,
                            BLUE_SHIFT,
-                           gpu->DisplayMode & DISP_RGB24,
+                           GPU.DisplayMode & DISP_RGB24,
                            src,
                            dest,
                            udx_start,
                            udx_end,
                            ufb_x,
-                           gpu->upscale_shift,
+                           GPU.upscale_shift,
                            _upscale);
 
                      //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
@@ -1675,26 +1671,26 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   }
                }
 
-               //if(gpu->scanline == 64)
-               // printf("%u\n", sys_timestamp - ((uint64)gpu_clocks * 65536) / gpu->GPUClockRatio);
+               //if(GPU.scanline == 64)
+               // printf("%u\n", sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio);
 
                dmw_width = dmw;
                pix_clock_offset = (488 - 146) / DotClockRatios[dmc];
-               pix_clock = (gpu->HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
+               pix_clock = (GPU.HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
                pix_clock_div = DotClockRatios[dmc];
             }
             // XXX fixme when upscaling is active
             PSX_GPULineHook(sys_timestamp,
-                  sys_timestamp - ((uint64)gpu_clocks * 65536) / gpu->GPUClockRatio, gpu->scanline == 0,
+                  sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio, GPU.scanline == 0,
                   dest,
-                  &gpu->surface->format,
+                  &GPU.surface->format,
                   dmw_width,
                   pix_clock_offset,
                   pix_clock,
                   pix_clock_div);
 
-            if(!gpu->InVBlank)
-               gpu->DisplayFB_CurYOffset = (gpu->DisplayFB_CurYOffset + 1) & 0x1FF;
+            if(!GPU.InVBlank)
+               GPU.DisplayFB_CurYOffset = (GPU.DisplayFB_CurYOffset + 1) & 0x1FF;
          }
 
          // Mostly so the next event time gets
@@ -1702,17 +1698,17 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(sys_timestamp));
 
          // to TIMER_SetVBlank() and TIMER_SetHRetrace().
-      }	// end if(!LineClockCounter)
-   }	// end while(gpu_clocks > 0)
+      }  // end if(!LineClockCounter)
+   }  // end while(gpu_clocks > 0)
 
    //puts("GPU Update End");
 
 TheEnd:
-   gpu->lastts = sys_timestamp;
+   GPU.lastts = sys_timestamp;
 
-   int32 next_dt = gpu->LineClockCounter;
+   int32 next_dt = GPU.LineClockCounter;
 
-   next_dt = (((int64)next_dt << 16) - gpu->GPUClockCounter + gpu->GPUClockRatio - 1) / gpu->GPUClockRatio;
+   next_dt = (((int64)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
    next_dt = std::max<int32>(1, next_dt);
    next_dt = std::min<int32>(128, next_dt);
@@ -1724,27 +1720,20 @@ TheEnd:
 
 void GPU_StartFrame(EmulateSpecStruct *espec_arg)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-
-   gpu->sl_zero_reached = false;
-   gpu->espec           = espec_arg;
-   gpu->surface         = gpu->espec->surface;
-   gpu->DisplayRect     = &gpu->espec->DisplayRect;
-   gpu->LineWidths      = gpu->espec->LineWidths;
+   GPU.sl_zero_reached = false;
+   GPU.espec           = espec_arg;
+   GPU.surface         = GPU.espec->surface;
+   GPU.DisplayRect     = &GPU.espec->DisplayRect;
+   GPU.LineWidths      = GPU.espec->LineWidths;
 }
 
-uint32 TexCache_Tag[256];
-uint16 TexCache_Data[256][4];
-uint16 *vram_new = NULL;
 
 void GPU_RestoreStateP1(bool load)
 {
-   PS_GPU *gpu      = (PS_GPU*)GPU;
-
-   if (gpu->upscale_shift == 0)
+   if (GPU.upscale_shift == 0)
    {
       // No upscaling, we can dump the VRAM contents directly
-      vram_new = gpu->vram;
+      vram_new = GPU.vram;
    }
    else
    {
@@ -1758,26 +1747,24 @@ void GPU_RestoreStateP1(bool load)
          for (unsigned y = 0; y < 512; y++)
          {
             for (unsigned x = 0; x < 1024; x++)
-               vram_new[y * 1024 + x] = texel_fetch(gpu, x, y);
+               vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
          }
       }
    }
 
    for(unsigned i = 0; i < 256; i++)
    {
-      TexCache_Tag[i] = gpu->TexCache[i].Tag;
+      TexCache_Tag[i] = GPU.TexCache[i].Tag;
 
       for(unsigned j = 0; j < 4; j++)
-         TexCache_Data[i][j] = gpu->TexCache[i].Data[j];
+         TexCache_Data[i][j] = GPU.TexCache[i].Data[j];
 
    }
 }
 
 void GPU_RestoreStateP2(bool load)
 {
-   PS_GPU *gpu      = (PS_GPU*)GPU;
-
-   if (gpu->upscale_shift > 0)
+   if (GPU.upscale_shift > 0)
    {
       if (load)
       {
@@ -1796,55 +1783,52 @@ void GPU_RestoreStateP2(bool load)
 
 void GPU_RestoreStateP3(void)
 {
-   PS_GPU *gpu      = (PS_GPU*)GPU;
    for(unsigned i = 0; i < 256; i++)
    {
-      gpu->TexCache[i].Tag = TexCache_Tag[i];
+      GPU.TexCache[i].Tag = TexCache_Tag[i];
 
       for(unsigned j = 0; j < 4; j++)
-         gpu->TexCache[i].Data[j] = TexCache_Data[i][j];
+         GPU.TexCache[i].Data[j] = TexCache_Data[i][j];
    }
-   gpu->RecalcTexWindowStuff();
-   rsx_intf_set_tex_window(gpu->tww, gpu->twh, gpu->twx, gpu->twy);
+   RecalcTexWindowStuff(&GPU);
+   rsx_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
 
    GPU_BlitterFIFO.SaveStatePostLoad();
 
-   gpu->HorizStart &= 0xFFF;
-   gpu->HorizEnd &= 0xFFF;
+   GPU.HorizStart &= 0xFFF;
+   GPU.HorizEnd &= 0xFFF;
 
-   gpu->DisplayFB_CurYOffset &= 0x1FF;
-   gpu->DisplayFB_CurLineYReadout &= 0x1FF;
+   GPU.DisplayFB_CurYOffset &= 0x1FF;
+   GPU.DisplayFB_CurLineYReadout &= 0x1FF;
 
-   gpu->TexPageX &= 0xF * 64;
-   gpu->TexPageY &= 0x10 * 16;
-   gpu->TexMode &= 0x3;
-   gpu->abr &= 0x3;
+   GPU.TexPageX &= 0xF * 64;
+   GPU.TexPageY &= 0x10 * 16;
+   GPU.TexMode &= 0x3;
+   GPU.abr &= 0x3;
 
-   gpu->ClipX0 &= 1023;
-   gpu->ClipY0 &= 1023;
-   gpu->ClipX1 &= 1023;
-   gpu->ClipY1 &= 1023;
+   GPU.ClipX0 &= 1023;
+   GPU.ClipY0 &= 1023;
+   GPU.ClipX1 &= 1023;
+   GPU.ClipY1 &= 1023;
 
-   gpu->OffsX = sign_x_to_s32(11, gpu->OffsX);
-   gpu->OffsY = sign_x_to_s32(11, gpu->OffsY);
+   GPU.OffsX = sign_x_to_s32(11, GPU.OffsX);
+   GPU.OffsY = sign_x_to_s32(11, GPU.OffsY);
 
-   IRQ_Assert(IRQ_GPU, gpu->IRQPending);
+   IRQ_Assert(IRQ_GPU, GPU.IRQPending);
 
-   rsx_intf_toggle_display(gpu->DisplayOff);
-   rsx_intf_set_draw_area(gpu->ClipX0, gpu->ClipY0,
-         gpu->ClipX1, gpu->ClipY1);
+   rsx_intf_toggle_display(GPU.DisplayOff);
+   rsx_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
+                           GPU.ClipX1, GPU.ClipY1);
 
-   rsx_intf_load_image(0, 0,
-         1024, 512,
-         gpu->vram, false, false);
+   rsx_intf_load_image( 0,    0,
+                        1024, 512,
+                        GPU.vram, false, false);
 
    UpdateDisplayMode();
 }
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)
 {
-   PS_GPU *gpu      = (PS_GPU*)GPU;
-
    GPU_RestoreStateP1(load);
 
    SFORMAT StateRegs[] =
@@ -1853,117 +1837,117 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       // previous fixed internal resolution code
       SFARRAY16N(vram_new, 1024 * 512, "&GPURAM[0][0]"),
 
-      SFVARN(gpu->DMAControl, "DMAControl"),
+      SFVARN(GPU.DMAControl, "DMAControl"),
 
-      SFVARN(gpu->ClipX0, "ClipX0"),
-      SFVARN(gpu->ClipY0, "ClipY0"),
-      SFVARN(gpu->ClipX1, "ClipX1"),
-      SFVARN(gpu->ClipY1, "ClipY1"),
+      SFVARN(GPU.ClipX0, "ClipX0"),
+      SFVARN(GPU.ClipY0, "ClipY0"),
+      SFVARN(GPU.ClipX1, "ClipX1"),
+      SFVARN(GPU.ClipY1, "ClipY1"),
 
-      SFVARN(gpu->OffsX, "OffsX"),
-      SFVARN(gpu->OffsY, "OffsY"),
+      SFVARN(GPU.OffsX, "OffsX"),
+      SFVARN(GPU.OffsY, "OffsY"),
 
-      SFVARN(gpu->dtd, "dtd"),
-      SFVARN(gpu->dfe, "dfe"),
+      SFVARN(GPU.dtd, "dtd"),
+      SFVARN(GPU.dfe, "dfe"),
 
-      SFVARN(gpu->MaskSetOR, "MaskSetOR"),
-      SFVARN(gpu->MaskEvalAND, "MaskEvalAND"),
+      SFVARN(GPU.MaskSetOR, "MaskSetOR"),
+      SFVARN(GPU.MaskEvalAND, "MaskEvalAND"),
 
-      SFVARN(gpu->TexDisable, "TexDisable"),
-      SFVARN(gpu->TexDisableAllowChange, "TexDisableAllowChange"),
+      SFVARN(GPU.TexDisable, "TexDisable"),
+      SFVARN(GPU.TexDisableAllowChange, "TexDisableAllowChange"),
 
-      SFVARN(gpu->tww, "tww"),
-      SFVARN(gpu->twh, "twh"),
-      SFVARN(gpu->twx, "twx"),
-      SFVARN(gpu->twy, "twy"),
+      SFVARN(GPU.tww, "tww"),
+      SFVARN(GPU.twh, "twh"),
+      SFVARN(GPU.twx, "twx"),
+      SFVARN(GPU.twy, "twy"),
 
-      SFVARN(gpu->TexPageX, "TexPageX"),
-      SFVARN(gpu->TexPageY, "TexPageY"),
+      SFVARN(GPU.TexPageX, "TexPageX"),
+      SFVARN(GPU.TexPageY, "TexPageY"),
 
-      SFVARN(gpu->SpriteFlip, "SpriteFlip"),
+      SFVARN(GPU.SpriteFlip, "SpriteFlip"),
 
-      SFVARN(gpu->abr, "abr"),
-      SFVARN(gpu->TexMode, "TexMode"),
+      SFVARN(GPU.abr, "abr"),
+      SFVARN(GPU.TexMode, "TexMode"),
 
       SFARRAY32N(&GPU_BlitterFIFO.data[0], sizeof(GPU_BlitterFIFO.data) / sizeof(GPU_BlitterFIFO.data[0]), "&BlitterFIFO.data[0]"),
       SFVARN(GPU_BlitterFIFO.read_pos, "BlitterFIFO.read_pos"),
       SFVARN(GPU_BlitterFIFO.write_pos, "BlitterFIFO.write_pos"),
       SFVARN(GPU_BlitterFIFO.in_count, "BlitterFIFO.in_count"),
 
-      SFVARN(gpu->DataReadBuffer, "DataReadBuffer"),
-      SFVARN(gpu->DataReadBufferEx, "DataReadBufferEx"),
+      SFVARN(GPU.DataReadBuffer, "DataReadBuffer"),
+      SFVARN(GPU.DataReadBufferEx, "DataReadBufferEx"),
 
-      SFVARN(gpu->IRQPending, "IRQPending"),
+      SFVARN(GPU.IRQPending, "IRQPending"),
 
-      SFVARN(gpu->InCmd, "InCmd"),
-      SFVARN(gpu->InCmd_CC, "InCmd_CC"),
+      SFVARN(GPU.InCmd, "InCmd"),
+      SFVARN(GPU.InCmd_CC, "InCmd_CC"),
 
-      SFVARN(gpu->InQuad_F3Vertices[0].x, "InQuad_F3Vertices[0].x"),
-      SFVARN(gpu->InQuad_F3Vertices[0].y, "InQuad_F3Vertices[0].y"),
-      SFVARN(gpu->InQuad_F3Vertices[0].u, "InQuad_F3Vertices[0].u"),
-      SFVARN(gpu->InQuad_F3Vertices[0].v, "InQuad_F3Vertices[0].v"),
-      SFVARN(gpu->InQuad_F3Vertices[0].r, "InQuad_F3Vertices[0].r"),
-      SFVARN(gpu->InQuad_F3Vertices[0].g, "InQuad_F3Vertices[0].g"),
-      SFVARN(gpu->InQuad_F3Vertices[0].b, "InQuad_F3Vertices[0].b"),
+      SFVARN(GPU.InQuad_F3Vertices[0].x, "InQuad_F3Vertices[0].x"),
+      SFVARN(GPU.InQuad_F3Vertices[0].y, "InQuad_F3Vertices[0].y"),
+      SFVARN(GPU.InQuad_F3Vertices[0].u, "InQuad_F3Vertices[0].u"),
+      SFVARN(GPU.InQuad_F3Vertices[0].v, "InQuad_F3Vertices[0].v"),
+      SFVARN(GPU.InQuad_F3Vertices[0].r, "InQuad_F3Vertices[0].r"),
+      SFVARN(GPU.InQuad_F3Vertices[0].g, "InQuad_F3Vertices[0].g"),
+      SFVARN(GPU.InQuad_F3Vertices[0].b, "InQuad_F3Vertices[0].b"),
 
-      SFVARN(gpu->InQuad_F3Vertices[1].x, "InQuad_F3Vertices[1].x"),
-      SFVARN(gpu->InQuad_F3Vertices[1].y, "InQuad_F3Vertices[1].y"),
-      SFVARN(gpu->InQuad_F3Vertices[1].u, "InQuad_F3Vertices[1].u"),
-      SFVARN(gpu->InQuad_F3Vertices[1].v, "InQuad_F3Vertices[1].v"),
-      SFVARN(gpu->InQuad_F3Vertices[1].r, "InQuad_F3Vertices[1].r"),
-      SFVARN(gpu->InQuad_F3Vertices[1].g, "InQuad_F3Vertices[1].g"),
-      SFVARN(gpu->InQuad_F3Vertices[1].b, "InQuad_F3Vertices[1].b"),
+      SFVARN(GPU.InQuad_F3Vertices[1].x, "InQuad_F3Vertices[1].x"),
+      SFVARN(GPU.InQuad_F3Vertices[1].y, "InQuad_F3Vertices[1].y"),
+      SFVARN(GPU.InQuad_F3Vertices[1].u, "InQuad_F3Vertices[1].u"),
+      SFVARN(GPU.InQuad_F3Vertices[1].v, "InQuad_F3Vertices[1].v"),
+      SFVARN(GPU.InQuad_F3Vertices[1].r, "InQuad_F3Vertices[1].r"),
+      SFVARN(GPU.InQuad_F3Vertices[1].g, "InQuad_F3Vertices[1].g"),
+      SFVARN(GPU.InQuad_F3Vertices[1].b, "InQuad_F3Vertices[1].b"),
 
-      SFVARN(gpu->InQuad_F3Vertices[2].x, "InQuad_F3Vertices[2].x"),
-      SFVARN(gpu->InQuad_F3Vertices[2].y, "InQuad_F3Vertices[2].y"),
-      SFVARN(gpu->InQuad_F3Vertices[2].u, "InQuad_F3Vertices[2].u"),
-      SFVARN(gpu->InQuad_F3Vertices[2].v, "InQuad_F3Vertices[2].v"),
-      SFVARN(gpu->InQuad_F3Vertices[2].r, "InQuad_F3Vertices[2].r"),
-      SFVARN(gpu->InQuad_F3Vertices[2].g, "InQuad_F3Vertices[2].g"),
-      SFVARN(gpu->InQuad_F3Vertices[2].b, "InQuad_F3Vertices[2].b"),
+      SFVARN(GPU.InQuad_F3Vertices[2].x, "InQuad_F3Vertices[2].x"),
+      SFVARN(GPU.InQuad_F3Vertices[2].y, "InQuad_F3Vertices[2].y"),
+      SFVARN(GPU.InQuad_F3Vertices[2].u, "InQuad_F3Vertices[2].u"),
+      SFVARN(GPU.InQuad_F3Vertices[2].v, "InQuad_F3Vertices[2].v"),
+      SFVARN(GPU.InQuad_F3Vertices[2].r, "InQuad_F3Vertices[2].r"),
+      SFVARN(GPU.InQuad_F3Vertices[2].g, "InQuad_F3Vertices[2].g"),
+      SFVARN(GPU.InQuad_F3Vertices[2].b, "InQuad_F3Vertices[2].b"),
 
-      SFVARN(gpu->InPLine_PrevPoint.x, "InPLine_PrevPoint.x"),
-      SFVARN(gpu->InPLine_PrevPoint.y, "InPLine_PrevPoint.y"),
-      SFVARN(gpu->InPLine_PrevPoint.r, "InPLine_PrevPoint.r"),
-      SFVARN(gpu->InPLine_PrevPoint.g, "InPLine_PrevPoint.g"),
-      SFVARN(gpu->InPLine_PrevPoint.b, "InPLine_PrevPoint.b"),
+      SFVARN(GPU.InPLine_PrevPoint.x, "InPLine_PrevPoint.x"),
+      SFVARN(GPU.InPLine_PrevPoint.y, "InPLine_PrevPoint.y"),
+      SFVARN(GPU.InPLine_PrevPoint.r, "InPLine_PrevPoint.r"),
+      SFVARN(GPU.InPLine_PrevPoint.g, "InPLine_PrevPoint.g"),
+      SFVARN(GPU.InPLine_PrevPoint.b, "InPLine_PrevPoint.b"),
 
-      SFVARN(gpu->FBRW_X, "FBRW_X"),
-      SFVARN(gpu->FBRW_Y, "FBRW_Y"),
-      SFVARN(gpu->FBRW_W, "FBRW_W"),
-      SFVARN(gpu->FBRW_H, "FBRW_H"),
-      SFVARN(gpu->FBRW_CurY, "FBRW_CurY"),
-      SFVARN(gpu->FBRW_CurX, "FBRW_CurX"),
+      SFVARN(GPU.FBRW_X, "FBRW_X"),
+      SFVARN(GPU.FBRW_Y, "FBRW_Y"),
+      SFVARN(GPU.FBRW_W, "FBRW_W"),
+      SFVARN(GPU.FBRW_H, "FBRW_H"),
+      SFVARN(GPU.FBRW_CurY, "FBRW_CurY"),
+      SFVARN(GPU.FBRW_CurX, "FBRW_CurX"),
 
-      SFVARN(gpu->DisplayMode, "DisplayMode"),
-      SFVARN(gpu->DisplayOff, "DisplayOff"),
-      SFVARN(gpu->DisplayFB_XStart, "DisplayFB_XStart"),
-      SFVARN(gpu->DisplayFB_YStart, "DisplayFB_YStart"),
+      SFVARN(GPU.DisplayMode, "DisplayMode"),
+      SFVARN(GPU.DisplayOff, "DisplayOff"),
+      SFVARN(GPU.DisplayFB_XStart, "DisplayFB_XStart"),
+      SFVARN(GPU.DisplayFB_YStart, "DisplayFB_YStart"),
 
-      SFVARN(gpu->HorizStart, "HorizStart"),
-      SFVARN(gpu->HorizEnd, "HorizEnd"),
+      SFVARN(GPU.HorizStart, "HorizStart"),
+      SFVARN(GPU.HorizEnd, "HorizEnd"),
 
-      SFVARN(gpu->VertStart, "VertStart"),
-      SFVARN(gpu->VertEnd, "VertEnd"),
+      SFVARN(GPU.VertStart, "VertStart"),
+      SFVARN(GPU.VertEnd, "VertEnd"),
 
-      SFVARN(gpu->DisplayFB_CurYOffset, "DisplayFB_CurYOffset"),
-      SFVARN(gpu->DisplayFB_CurLineYReadout, "DisplayFB_CurLineYReadout"),
+      SFVARN(GPU.DisplayFB_CurYOffset, "DisplayFB_CurYOffset"),
+      SFVARN(GPU.DisplayFB_CurLineYReadout, "DisplayFB_CurLineYReadout"),
 
-      SFVARN(gpu->InVBlank, "InVBlank"),
+      SFVARN(GPU.InVBlank, "InVBlank"),
 
-      SFVARN(gpu->LinesPerField, "LinesPerField"),
-      SFVARN(gpu->scanline, "scanline"),
-      SFVARN(gpu->field, "field"),
-      SFVARN(gpu->field_ram_readout, "field_ram_readout"),
-      SFVARN(gpu->PhaseChange, "PhaseChange"),
+      SFVARN(GPU.LinesPerField, "LinesPerField"),
+      SFVARN(GPU.scanline, "scanline"),
+      SFVARN(GPU.field, "field"),
+      SFVARN(GPU.field_ram_readout, "field_ram_readout"),
+      SFVARN(GPU.PhaseChange, "PhaseChange"),
 
-      SFVARN(gpu->DotClockCounter, "DotClockCounter"),
+      SFVARN(GPU.DotClockCounter, "DotClockCounter"),
 
-      SFVARN(gpu->GPUClockCounter, "GPUClockCounter"),
-      SFVARN(gpu->LineClockCounter, "LineClockCounter"),
-      SFVARN(gpu->LinePhase, "LinePhase"),
+      SFVARN(GPU.GPUClockCounter, "GPUClockCounter"),
+      SFVARN(GPU.LineClockCounter, "LineClockCounter"),
+      SFVARN(GPU.LinePhase, "LinePhase"),
 
-      SFVARN(gpu->DrawTimeAvail, "DrawTimeAvail"),
+      SFVARN(GPU.DrawTimeAvail, "DrawTimeAvail"),
 
       SFEND
    };
@@ -1980,38 +1964,32 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 
 void GPU_set_display_change_count(unsigned a)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   gpu->display_change_count = a;
+   GPU.display_change_count = a;
 }
 
 unsigned GPU_get_display_change_count(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   return gpu->display_change_count;
+   return GPU.display_change_count;
 }
 
 void GPU_set_dither_upscale_shift(uint8 factor)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   gpu->dither_upscale_shift = factor;
+   GPU.dither_upscale_shift = factor;
 }
 
 uint8 GPU_get_dither_upscale_shift(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   return gpu->dither_upscale_shift;
+   return GPU.dither_upscale_shift;
 }
 
 void GPU_set_upscale_shift(uint8 factor)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   gpu->upscale_shift = factor;
+   GPU.upscale_shift = factor;
 }
 
 uint8 GPU_get_upscale_shift(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   return gpu->upscale_shift;
+   return GPU.upscale_shift;
 }
 
 bool GPU_DMACanWrite(void)
@@ -2021,13 +1999,12 @@ bool GPU_DMACanWrite(void)
 
 uint16 *GPU_get_vram(void)
 {
-   PS_GPU *gpu = (PS_GPU*)GPU;
-   return gpu->vram;
+   return GPU.vram;
 }
 
 uint16 GPU_PeekRAM(uint32 A)
 {
-   return texel_fetch(GPU, A & 0x3FF, (A >> 10) & 0x1FF);
+   return texel_fetch(&GPU, A & 0x3FF, (A >> 10) & 0x1FF);
 }
 
 void GPU_PokeRAM(uint32 A, uint16 V)
@@ -2039,19 +2016,19 @@ void GPU_PokeRAM(uint32 A, uint16 V)
 void texel_put(uint32 x, uint32 y, uint16 v)
 {
    uint32_t dy, dx;
-   x <<= GPU->upscale_shift;
-   y <<= GPU->upscale_shift;
+   x <<= GPU.upscale_shift;
+   y <<= GPU.upscale_shift;
 
    /* Duplicate the pixel as many times as necessary (nearest
     * neighbour upscaling) */
-   for (dy = 0; dy < UPSCALE(GPU); dy++)
+   for (dy = 0; dy < UPSCALE(&GPU); dy++)
    {
-      for (dx = 0; dx < UPSCALE(GPU); dx++)
-         vram_put(GPU, x + dx, y + dy, v);
+      for (dx = 0; dx < UPSCALE(&GPU); dx++)
+         vram_put(&GPU, x + dx, y + dy, v);
    }
 }
 
 int32_t GPU_GetScanlineNum(void)
 {
-   return GPU->scanline;
+   return GPU.scanline;
 }

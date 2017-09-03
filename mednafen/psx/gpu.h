@@ -59,172 +59,168 @@ struct line_point
    _b = tmp;                \
 }                           \
 
-class PS_GPU
+struct PS_GPU
 {
-   public:
-      // Private constructors and destructors since we need to use
-      // custom allocators to allocate the flexible vram
-      PS_GPU(bool pal_clock_and_tv, int sls, int sle, uint8 upscale_shift) MDFN_COLD;
-      PS_GPU(const PS_GPU &, uint8 upscale_shift) MDFN_COLD;
-      ~PS_GPU() MDFN_COLD;
+   uint16 CLUT_Cache[256];
 
-      uint8 upscale_shift;
-      uint8 dither_upscale_shift;
+   uint32 CLUT_Cache_VB;   // Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
 
-      uint32 DMAControl;
+   struct   // Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
+   {
+      // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
+      uint32 TWX_AND;
+      uint32 TWX_ADD;
 
-      // Drawing stuff
-      int32 ClipX0;
-      int32 ClipY0;
-      int32 ClipX1;
-      int32 ClipY1;
+      uint32 TWY_AND;
+      uint32 TWY_ADD;
+   } SUCV;
 
-      int32 OffsX;
-      int32 OffsY;
+   struct
+   {
+      uint16 Data[4];
+      uint32 Tag;
+   } TexCache[256];
 
-      bool dtd;            // Dithering enable 
-      bool dfe;
+   uint32 DMAControl;
 
-      uint32 MaskSetOR;
-      uint32 MaskEvalAND;
+   /* Beetle-psx upscaling vars */
+   uint8 upscale_shift;
+   uint8 dither_upscale_shift;
 
-      bool TexDisable;
-      bool TexDisableAllowChange;
+   // Drawing stuff
+   int32 ClipX0;
+   int32 ClipY0;
+   int32 ClipX1;
+   int32 ClipY1;
 
-      uint8_t tww, twh, twx, twy;
-      struct
-      {
-         uint8 TexWindowXLUT_Pre[16];
-         uint8 TexWindowXLUT[256];
-         uint8 TexWindowXLUT_Post[16];
-      };
+   int32 OffsX;
+   int32 OffsY;
 
-      struct
-      {
-         uint8 TexWindowYLUT_Pre[16];
-         uint8 TexWindowYLUT[256];
-         uint8 TexWindowYLUT_Post[16];
-      };
-      void RecalcTexWindowStuff(void);
+   bool dtd;            // Dithering enable 
+   bool dfe;
 
-      uint32_t TexPageX; // 0, 64, 128, 192, etc up to 960
-      uint32_t TexPageY; // 0 or 256
+   uint32 MaskSetOR;
+   uint32 MaskEvalAND;
 
-      uint32 SpriteFlip;
+   bool TexDisable;
+   bool TexDisableAllowChange;
 
-      uint32 abr;        // Semi-transparency mode(0~3)
-      uint32 TexMode;
+   uint8_t tww, twh, twx, twy;
+   struct
+   {
+      uint8 TexWindowXLUT_Pre[16];
+      uint8 TexWindowXLUT[256];
+      uint8 TexWindowXLUT_Post[16];
+   };
 
-      struct
-      {
-         uint8 RGB8SAT_Under[256];
-         uint8 RGB8SAT[256];
-         uint8 RGB8SAT_Over[256];
-      };
+   struct
+   {
+      uint8 TexWindowYLUT_Pre[16];
+      uint8 TexWindowYLUT[256];
+      uint8 TexWindowYLUT_Post[16];
+   };
 
-      uint32 DataReadBuffer;
-      uint32 DataReadBufferEx;
+   uint32_t TexPageX; // 0, 64, 128, 192, etc up to 960
+   uint32_t TexPageY; // 0 or 256
 
-      bool IRQPending;
+   uint32 SpriteFlip;
 
-      // Powers of 2 for faster multiple equality testing(just for multi-testing; InCmd itself will only contain 0, or a power of 2).
-      uint8 InCmd;
-      uint8 InCmd_CC;
+   uint32 abr;        // Semi-transparency mode(0~3)
+   uint32 TexMode;
 
-      tri_vertex InQuad_F3Vertices[3];
-      uint32 InQuad_clut;
-      bool InQuad_invalidW;
+   struct
+   {
+      uint8 RGB8SAT_Under[256];
+      uint8 RGB8SAT[256];
+      uint8 RGB8SAT_Over[256];
+   };
 
-      line_point InPLine_PrevPoint;
+   uint32 DataReadBuffer;
+   uint32 DataReadBufferEx;
 
-      uint32 FBRW_X;
-      uint32 FBRW_Y;
-      uint32 FBRW_W;
-      uint32 FBRW_H;
-      uint32 FBRW_CurY;
-      uint32 FBRW_CurX;
+   bool IRQPending;
 
-      //
-      // Display Parameters
-      //
-      uint32 DisplayMode;
+   // Powers of 2 for faster multiple equality testing(just for multi-testing; InCmd itself will only contain 0, or a power of 2).
+   uint8 InCmd;
+   uint8 InCmd_CC;
 
-      bool DisplayOff;
-      uint32 DisplayFB_XStart;
-      uint32 DisplayFB_YStart;
+   tri_vertex InQuad_F3Vertices[3];
+   uint32 InQuad_clut;
+   bool InQuad_invalidW;
 
-      unsigned display_change_count;
+   line_point InPLine_PrevPoint;
 
-      uint32 HorizStart;
-      uint32 HorizEnd;
+   uint32 FBRW_X;
+   uint32 FBRW_Y;
+   uint32 FBRW_W;
+   uint32 FBRW_H;
+   uint32 FBRW_CurY;
+   uint32 FBRW_CurX;
 
-      uint32 VertStart;
-      uint32 VertEnd;
+   //
+   // Display Parameters
+   //
+   uint32 DisplayMode;
 
-      //
-      // Display work vars
-      //
-      uint32 DisplayFB_CurYOffset;
-      uint32 DisplayFB_CurLineYReadout;
+   bool DisplayOff;
+   uint32 DisplayFB_XStart;
+   uint32 DisplayFB_YStart;
 
-      bool InVBlank;
+   unsigned display_change_count;
 
-      //
-      //
-      //
-      uint32 LinesPerField;
-      uint32 scanline;
-      bool field;
-      bool field_ram_readout;
-      bool PhaseChange;
+   uint32 HorizStart;
+   uint32 HorizEnd;
 
-      uint32 DotClockCounter;
+   uint32 VertStart;
+   uint32 VertEnd;
 
-      uint64 GPUClockCounter;
-      uint32 GPUClockRatio;
-      int32 LineClockCounter;
-      int32 LinePhase;
+   //
+   // Display work vars
+   //
+   uint32 DisplayFB_CurYOffset;
+   uint32 DisplayFB_CurLineYReadout;
 
-      int32 DrawTimeAvail;
+   bool InVBlank;
 
-      int32_t lastts;
+   //
+   //
+   //
+   uint32 LinesPerField;
+   uint32 scanline;
+   bool field;
+   bool field_ram_readout;
+   bool PhaseChange;
 
-      bool sl_zero_reached;
+   uint32 DotClockCounter;
 
-      EmulateSpecStruct *espec;
-      MDFN_Surface *surface;
-      MDFN_Rect *DisplayRect;
-      int32 *LineWidths;
-      bool HardwarePALType;
-      int LineVisFirst, LineVisLast;
+   uint64 GPUClockCounter;
+   uint32 GPUClockRatio;
+   int32 LineClockCounter;
+   int32 LinePhase;
 
-      uint16 CLUT_Cache[256];
+   int32 DrawTimeAvail;
 
-      uint32 CLUT_Cache_VB;	// Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
+   int32_t lastts;
 
-      struct	// Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
-      {
-         // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
-         uint32 TWX_AND;
-         uint32 TWX_ADD;
+   bool sl_zero_reached;
 
-         uint32 TWY_AND;
-         uint32 TWY_ADD;
-      } SUCV;
+   EmulateSpecStruct *espec;
+   MDFN_Surface *surface;
+   MDFN_Rect *DisplayRect;
+   int32 *LineWidths;
+   bool HardwarePALType;
+   int LineVisFirst, LineVisLast;
 
-      struct
-      {
-         uint16 Data[4];
-         uint32 Tag;
-      } TexCache[256];
+   uint8_t DitherLUT[4][4][512]; // Y, X, 8-bit source value(256 extra for saturation)
 
-      uint8_t DitherLUT[4][4][512];	// Y, X, 8-bit source value(256 extra for saturation)
-      // "Flexible" array at the end of the struct. This lets us
-      // having a dynamically sized vram (depending on the internal
-      // upscaling ratio) without having an additional level of
-      // indirection since it'll be allocated right after the struct
-      uint16 vram[0];
+   /*
+   VRAM has to be a ptr type or else we have to rely on smartcode void* shenanigans to
+   wrestle a variable-sized struct.
+   */
+   uint16 *vram;
 };
+
+
 
 uint16 *GPU_get_vram(void);
 
@@ -253,7 +249,7 @@ void GPU_SoftReset(void);
 
 void GPU_Destroy(void);
 
-void GPU_Reinit(uint8 ushift);
+void GPU_Rescale(uint8 ushift);
 
 int32_t GPU_Update(const int32_t sys_timestamp);
 

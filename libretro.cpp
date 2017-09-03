@@ -44,8 +44,6 @@ static bool enable_memcard1 = false;
 static bool enable_analog_calibration = false;
 static bool enable_variable_serialization_size = false;
 
-bool doCleanFrame = false;
-
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
 // display_internal_framerate is true.
@@ -3597,17 +3595,16 @@ void retro_run(void)
       check_variables(false);
       struct retro_system_av_info new_av_info;
       retro_get_system_av_info(&new_av_info);
-      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info);
 
       if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
       {
-         struct retro_system_av_info new_av_info;
-         retro_get_system_av_info(&new_av_info);
-
-         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO,
+         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY,
               &new_av_info))
          {
-            GPU_Reinit(psx_gpu_upscale_shift);
+            // We successfully changed the frontend's resolution, we can
+            // apply the change immediately
+            GPU_Rescale(psx_gpu_upscale_shift);
             alloc_surface();
          }
          else
@@ -3631,8 +3628,6 @@ void retro_run(void)
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
-
-   doCleanFrame = true;
 
    if (display_internal_framerate)
    {
