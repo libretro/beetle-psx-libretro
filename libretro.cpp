@@ -2642,14 +2642,11 @@ static void check_variables(bool startup)
 
             // Crappy "ffs" implementation since the standard function is not
             // widely supported by libc in the wild
-            
-            uint8_t new_upscale_shift = 0;
-            while ((val & 1) == 0)
+            uint8_t new_upscale_shift;
+            for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
             {
-               new_upscale_shift++;
                val >>= 1;
             }
-            if (new_upscale_shift != psx_gpu_upscale_shift) has_new_geometry = true;
             psx_gpu_upscale_shift = new_upscale_shift;
          }
          else
@@ -3605,14 +3602,13 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
       check_variables(false);
-      
-      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift || has_new_geometry)
-      {
-         struct retro_system_av_info new_av_info;
-         retro_get_system_av_info(&new_av_info);
+      struct retro_system_av_info new_av_info;
 
-         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY,
-              &new_av_info))
+      /* Max width/height changed, need to call SET_SYSTEM_AV_INFO */
+      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
+      {
+         retro_get_system_av_info(&new_av_info);
+         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
          {
             // We successfully changed the frontend's resolution, we can
             // apply the change immediately
@@ -3625,6 +3621,17 @@ void retro_run(void)
             // Failed, we have to postpone the upscaling change
             psx_gpu_upscale_shift = GPU_get_upscale_shift();
          }
+      }
+
+      /* Widescreen hack changed, need to call SET_GEOMETRY to change aspect ratio */
+      if (has_new_geometry)
+      {
+         retro_get_system_av_info(&new_av_info);
+         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info))
+         {
+            has_new_geometry = false;
+         }
+
       }
 
       switch (psx_gpu_dither_mode)
