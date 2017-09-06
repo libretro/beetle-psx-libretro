@@ -588,7 +588,7 @@ static uint16_t *VRAM_Alloc(uint8 upscale_shift)
    unsigned size   = width * height;
 
    uint16_t *vram    = new uint16_t[size];
-   memset(vram, 0, sizeof(vram));
+   memset(vram, 0, size * sizeof(*vram));
 
    return vram;
 }
