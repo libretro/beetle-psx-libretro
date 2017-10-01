@@ -23,8 +23,6 @@ class CDAccess_CHD : public CDAccess
       chd_file *chd;
       /* hunk data cache */
       uint8_t *hunkmem;
-      /* cached entire disc? */
-      bool memcache;
       /* last hunknum read */
       int oldhunk;
 
