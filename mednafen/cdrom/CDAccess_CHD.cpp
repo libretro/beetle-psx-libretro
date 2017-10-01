@@ -58,12 +58,8 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 
    /* allocate storage for sector reads */
    const chd_header *head = chd_get_header(chd);
-   memcache = image_memcache;
+   hunkmem = (uint8_t*)malloc(head->hunkbytes);
    oldhunk = -1;
-   if (memcache)
-      hunkmem = (uint8_t*)malloc(head->hunkbytes * head->hunkcount);
-   else
-      hunkmem = (uint8_t*)malloc(head->hunkbytes);
    
    log_cb(RETRO_LOG_INFO, "chd_load '%s' hunkbytes=%d\n", path, head->hunkbytes);
 
@@ -193,16 +189,6 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
       }
    }
    sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
-
-   if (memcache)
-   {
-      for (int i = 0; i < head->hunkcount; ++i)
-      {
-         err = chd_read(chd, i, hunkmem + i * head->hunkbytes);
-         if (err)
-            return false;
-      }
-   }
 
    return true;
 }
@@ -423,32 +409,26 @@ bool CDAccess_CHD::Read_Raw_Sector(uint8 *buf, int32 lba)
    }
    else
    {
+      // read CHD hunk
+      const chd_header *head = chd_get_header(chd);
+      //int cad = (((lba - ct->LBA) * 2352) + ct->FileOffset) / 2352;
       int cad = lba - ct->LBA + ct->FileOffset;
-      if (memcache)
-      {
-         memcpy(buf, hunkmem + cad * (2352 + 96), 2352);
-      }
-      else
-      {
-         // read CHD hunk
-         const chd_header *head = chd_get_header(chd);
-         //int cad = (((lba - ct->LBA) * 2352) + ct->FileOffset) / 2352;
-         int sph = head->hunkbytes / (2352 + 96);
-         int hunknum = cad / sph; //(cad * head->unitbytes) / head->hunkbytes;
-         int hunkofs = cad % sph; //(cad * head->unitbytes) % head->hunkbytes;
-         int err = CHDERR_NONE;
+      int sph = head->hunkbytes / (2352 + 96);
+      int hunknum = cad / sph; //(cad * head->unitbytes) / head->hunkbytes;
+      int hunkofs = cad % sph; //(cad * head->unitbytes) % head->hunkbytes;
+      int err = CHDERR_NONE;
 
-         /* each hunk holds ~8 sectors, optimize when reading contiguous sectors */
-         if (hunknum != oldhunk)
-         {
-            err = chd_read(chd, hunknum, hunkmem);
-            if (err != CHDERR_NONE)
-               log_cb(RETRO_LOG_ERROR, "chd_read_sector failed lba=%d error=%d\n", lba, err);
-            else
-               oldhunk = hunknum;
-         }
-         memcpy(buf, hunkmem + hunkofs * (2352 + 96), 2352);
+      /* each hunk holds ~8 sectors, optimize when reading contiguous sectors */
+      if (hunknum != oldhunk)
+      {
+         err = chd_read(chd, hunknum, hunkmem);
+         if (err != CHDERR_NONE)
+            log_cb(RETRO_LOG_ERROR, "chd_read_sector failed lba=%d error=%d\n", lba, err);
+         else
+            oldhunk = hunknum;
       }
+
+      memcpy(buf, hunkmem + hunkofs * (2352 + 96), 2352);
 
       if (ct->DIFormat == DI_FORMAT_AUDIO && ct->RawAudioMSBFirst)
          Endian_A16_Swap(buf, 588 * 2);
