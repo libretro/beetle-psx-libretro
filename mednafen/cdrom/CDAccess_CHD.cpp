@@ -56,6 +56,13 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
    if (err != CHDERR_NONE)
       return false;
 
+   if (image_memcache)
+   {
+      err = chd_precache(chd);
+      if (err != CHDERR_NONE)
+         return false;
+   }
+
    /* allocate storage for sector reads */
    const chd_header *head = chd_get_header(chd);
    hunkmem = (uint8_t*)malloc(head->hunkbytes);
