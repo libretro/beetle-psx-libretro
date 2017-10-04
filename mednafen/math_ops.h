@@ -92,6 +92,6 @@ static INLINE uint32 round_up_pow2(uint32 v)
 // This obviously won't convert higher-than-32 bit numbers to signed 32-bit ;)
 // Also, this shouldn't be used for 8-bit and 16-bit signed numbers, since you can
 // convert those faster with typecasts...
-#define sign_x_to_s32(_bits, _value) (((int32)((uint32)(_value) << (32 - _bits))) >> (32 - _bits))
+#define sign_x_to_s32(_bits, _value) (((int32)((uint32)(_value) << (32 - (_bits)))) >> (32 - (_bits)))
 
 #endif
