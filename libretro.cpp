@@ -83,6 +83,33 @@ char retro_cd_base_name[4096];
    static char retro_slash = '/';
 #endif
 
+enum
+{
+   REGION_JP = 0,
+   REGION_NA = 1,
+   REGION_EU = 2,
+};
+
+static bool firmware_is_present(unsigned region)
+{
+   char bios_path[4096];
+   const char *bios_name;
+   
+   if (region == REGION_JP)
+      bios_name = "scph5500.bin";
+   else if (region == REGION_NA)
+      bios_name = "scph5501.bin";
+   else if (region == REGION_EU)
+      bios_name = "scph5502.bin";
+
+   snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name);
+   if (!path_is_valid(bios_path)) 
+   {
+      log_cb(RETRO_LOG_ERROR, "Firmware is missing:\n%s\n", bios_path);
+      return false;
+   }
+}
+
 static void extract_basename(char *buf, const char *path, size_t size)
 {
    const char *base = strrchr(path, '/');
@@ -153,13 +180,6 @@ bool use_mednafen_memcard0_method = false;
 
 extern MDFNGI EmulatedPSX;
 MDFNGI *MDFNGameInfo = NULL;
-
-enum
-{
-   REGION_JP = 0,
-   REGION_NA = 1,
-   REGION_EU = 2,
-};
 
 #if PSX_DBGPRINT_ENABLE
 static unsigned psx_dbg_level = 0;
@@ -1480,7 +1500,9 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       abort();
 
    {
+      
       const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
+
       FileStream BIOSFile(biospath, MODE_READ);
 
       BIOSFile.read(BIOSROM->data8, 512 * 1024);
@@ -3346,6 +3368,16 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!MDFNI_LoadGame(retro_cd_path))
    {
       failed_init = true;
+      return false;
+   }
+
+   /* MDFNI_LoadGame() has been called, we can now query the game's region to deduce
+   which firmware version is needed. 
+   In case the file is missing, we log error messages and make this function fail in order
+   to prevent the core and the frontend hanging in a black screen */
+   if ( !firmware_is_present(CalcDiscSCEx()) )
+   {
+      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
       return false;
    }
 
