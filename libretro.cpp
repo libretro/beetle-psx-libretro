@@ -108,6 +108,8 @@ static bool firmware_is_present(unsigned region)
       log_cb(RETRO_LOG_ERROR, "Firmware is missing:\n%s\n", bios_path);
       return false;
    }
+  
+   return true;
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
