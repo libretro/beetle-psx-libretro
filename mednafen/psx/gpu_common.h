@@ -18,7 +18,7 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 {
    /*
     * fore_pix - foreground -  the screen
-    * bg_pix   - background  - the texture 
+    * bg_pix   - background  - the texture
     */
 
    uint32_t sum, carry;
@@ -152,92 +152,83 @@ static INLINE void Update_CLUT_Cache(PS_GPU *gpu, uint16 raw_clut)
        fbw = (fbw >> ((u & 3) * 4)) & 0xF;
       else
        fbw = (fbw >> ((u & 1) * 8)) & 0xFF;
- 
+
       fbw = CLUT_Cache[fbw];
      }
 #endif
 
 static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 {
-   unsigned x, y;
-   const unsigned TexWindowX_AND = ~(g->tww << 3);
-   const unsigned TexWindowX_OR = (g->twx & g->tww) << 3;
-   const unsigned TexWindowY_AND = ~(g->twh << 3);
-   const unsigned TexWindowY_OR = (g->twy & g->twh) << 3;
+   uint8_t tww = g->tww;
+   uint8_t twh = g->twh;
+   uint8_t twx = g->twx;
+   uint8_t twy = g->twy;
 
-   for(x = 0; x < 256; x++)
-      g->TexWindowXLUT[x] = (x & TexWindowX_AND) | TexWindowX_OR;
-   for(y = 0; y < 256; y++)
-      g->TexWindowYLUT[y] = (y & TexWindowY_AND) | TexWindowY_OR;
-   memset(g->TexWindowXLUT_Pre,  g->TexWindowXLUT[0],   sizeof(g->TexWindowXLUT_Pre));
-   memset(g->TexWindowXLUT_Post, g->TexWindowXLUT[255], sizeof(g->TexWindowXLUT_Post));
-   memset(g->TexWindowYLUT_Pre,  g->TexWindowYLUT[0],   sizeof(g->TexWindowYLUT_Pre));
-   memset(g->TexWindowYLUT_Post, g->TexWindowYLUT[255], sizeof(g->TexWindowYLUT_Post));
+   g->SUCV.TWX_AND = ~(tww << 3);
+   g->SUCV.TWX_ADD = ((twx & tww) << 3) + (g->TexPageX << (2 - std::min<uint32>(2, g->TexMode)));
 
-   g->SUCV.TWX_AND = ~(g->tww << 3);
-   g->SUCV.TWX_ADD = ((g->twx & g->tww) << 3) + (g->TexPageX << (2 - std::min<uint32_t>(2, g->TexMode)));
-
-   g->SUCV.TWY_AND = ~(g->twh << 3);
-   g->SUCV.TWY_ADD = ((g->twy & g->twh) << 3) + g->TexPageY;
+   g->SUCV.TWY_AND = ~(twh << 3);
+   g->SUCV.TWY_ADD = ((twy & twh) << 3) + g->TexPageY;
 }
 
-template<uint32_t TexMode_TA>
-static INLINE uint16_t GetTexel(PS_GPU *gpu, const uint32_t clut_offset, int32_t u_arg, int32_t v_arg)
+struct TexCache_t
 {
-#if 0
-   /* TODO */
-   uint32_t u_ext = ((u_arg & SUCV.TWX_AND) + SUCV.TWX_ADD);
-   uint32_t fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
-   uint32_t fbtex_y = (v_arg & SUCV.TWY_AND) + SUCV.TWY_ADD;
-   uint32_t gro = fbtex_y * 1024U + fbtex_x;
+      uint16 Data[4];
+      uint32 Tag;
+};
 
-   decltype(&TexCache[0]) c;
+template<uint32_t TexMode_TA>
+static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)
+{
+     static_assert(TexMode_TA <= 2, "TexMode_TA must be <= 2");
 
-   switch(TexMode_TA)
-   {
+
+     uint32_t u_ext = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD);
+     uint32_t fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
+     uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD;
+     uint32_t gro = fbtex_y * 1024U + fbtex_x;
+
+     PS_GPU::TexCache_t *TexCache = &g->TexCache[0];
+     PS_GPU::TexCache_t *c;
+
+     switch(TexMode_TA)
+     {
       case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break;	// 64x64
       case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 64x32 (NOT 32x64!)
       case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 32x32
-   }
+     }
 
-   if(MDFN_UNLIKELY(c->Tag != (gro &~ 0x3)))
-   {
+     if(MDFN_UNLIKELY(c->Tag != (gro &~ 0x3)))
+     {
       // SCPH-1001 old revision GPU is like(for sprites at least): (20 + 4)
       // SCPH-5501 new revision GPU is like(for sprites at least): (12 + 4)
       //
       // We'll be conservative and just go with 4 for now, until we can run some tests with triangles too.
       //
-      DrawTimeAvail -= 4;
-      c->Data[0] = (&GPURAM[0][0])[gro &~ 0x3];
-      c->Data[1] = (&GPURAM[0][1])[gro &~ 0x3];
-      c->Data[2] = (&GPURAM[0][2])[gro &~ 0x3];
-      c->Data[3] = (&GPURAM[0][3])[gro &~ 0x3];
+      g->DrawTimeAvail -= 4;
+
+      uint32_t cache_x= fbtex_x & ~3;
+
+      c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y);
+      c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y);
+      c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y);
+      c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y);
       c->Tag = (gro &~ 0x3);
-   }
+     }
 
-   uint16 fbw = c->Data[gro & 0x3];
-#else
-   uint32_t u_ext   = gpu->TexWindowXLUT[u_arg];
-   uint32_t v       = gpu->TexWindowYLUT[v_arg];
-   uint32_t fbtex_x = gpu->TexPageX + (u_ext >> (2 - TexMode_TA));
-   uint32_t fbtex_y = gpu->TexPageY + v;
-   uint16_t fbw     = texel_fetch(gpu, fbtex_x & 1023, fbtex_y);
-#endif
-   if(TexMode_TA != 2)
-   {
+     uint16 fbw = c->Data[gro & 0x3];
+
+     if(TexMode_TA != 2)
+     {
       if(TexMode_TA == 0)
-         fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
+       fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
       else
-         fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
+       fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
 
-#if 0
-      fbw = CLUT_Cache[fbw];
-#else
-      fbw = texel_fetch(gpu, (clut_offset + fbw) & 1023, (clut_offset >> 10) & 511);
-#endif
-   }
+      fbw = g->CLUT_Cache[fbw];
+     }
 
-   return(fbw);
+     return(fbw);
 }
 
 static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
@@ -331,5 +322,5 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 #define OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 #define OTHER_HELPER_X32(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 
-#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL } 
+#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 #define NULLCMD() { { NULLCMD_FG(0), NULLCMD_FG(1), NULLCMD_FG(2), NULLCMD_FG(3) }, 1, 1, true }

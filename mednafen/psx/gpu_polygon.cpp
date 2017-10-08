@@ -114,7 +114,7 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t coun
 }
 
 template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl)
+static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl)
 {
    if(LineSkipTest(gpu, y >> gpu->upscale_shift))
       return;
@@ -172,7 +172,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
 
    if(textured)
    {
-      uint16 fbw = GetTexel<TexMode_TA>(gpu, clut_offset, ig.u >> (COORD_FBS + COORD_POST_PADDING), ig.v >> (COORD_FBS + COORD_POST_PADDING));
+      uint16 fbw = GetTexel<TexMode_TA>(gpu, ig.u >> (COORD_FBS + COORD_POST_PADDING), ig.v >> (COORD_FBS + COORD_POST_PADDING));
 
     if(fbw)
     {
@@ -219,7 +219,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, uint32_t clut_offset, const int3
 }
 
 template<bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices, uint32_t clut)
+static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices)
 {
    i_deltas idl;
    unsigned core_vertex;
@@ -452,7 +452,7 @@ if(vertices[1].y == vertices[0].y)
      continue;
     }
 
-    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, clut, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
+    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
    }
   }
   else
@@ -470,7 +470,7 @@ if(vertices[1].y == vertices[0].y)
      goto skipit;
     }
 
-    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, clut, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
+    DrawSpan<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
     //
     //
     //
@@ -615,6 +615,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
          if(v == 0)
          {
             clut = ((*cb >> 16) & 0xFFFF) << 4;
+            Update_CLUT_Cache<TexMode_TA>(gpu, (*cb >> 16) & 0xFFFF);
          }
 
          cb++;
@@ -761,7 +762,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 #endif
 
    if (rsx_intf_has_software_renderer())
-      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices, clut);
+      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
 }
 
 #undef COORD_POST_PADDING
