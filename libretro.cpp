@@ -105,13 +105,13 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[0] = "scph5500.bin";
       bios_name_list[1] = "SCPH5500.bin";
       bios_name_list[2] = "SCPH-5500.bin";
-      bios_name_list[3] = "\0";
-      bios_name_list[4] = "\0";
-      bios_name_list[5] = "\0";
-      bios_name_list[6] = "\0";
-      bios_name_list[7] = "\0";
-      bios_name_list[8] = "\0";
-      bios_name_list[9] = "\0";
+      bios_name_list[3] = NULL;
+      bios_name_list[4] = NULL;
+      bios_name_list[5] = NULL;
+      bios_name_list[6] = NULL;
+      bios_name_list[7] = NULL;
+      bios_name_list[8] = NULL;
+      bios_name_list[9] = NULL;
       bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    }
    else if (region == REGION_NA) 
@@ -125,7 +125,7 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[6] = "scph7003.bin";
       bios_name_list[7] = "SCPH7003.bin";
       bios_name_list[8] = "SCPH-7003.bin";
-      bios_name_list[9] = "\0";
+      bios_name_list[9] = NULL;
       bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    }
    else if (region == REGION_EU) 
@@ -136,10 +136,10 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[3] = "scph5552.bin";
       bios_name_list[4] = "SCPH5552.bin";
       bios_name_list[5] = "SCPH-5552.bin";
-      bios_name_list[6] = "\0";
-      bios_name_list[7] = "\0";
-      bios_name_list[8] = "\0";
-      bios_name_list[9] = "\0";
+      bios_name_list[6] = NULL;
+      bios_name_list[7] = NULL;
+      bios_name_list[8] = NULL;
+      bios_name_list[9] = NULL;
       bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
@@ -147,6 +147,9 @@ static bool firmware_is_present(unsigned region)
    size_t i;
    for (i = 0; i < list_size; ++i)
    {
+      if (!bios_name_list[i])
+         break;
+      
       snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
       if (path_is_valid(bios_path))
       {
