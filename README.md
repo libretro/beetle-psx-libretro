@@ -12,7 +12,7 @@ Notable additions in this fork are:
 ## Running
 
 To run this core, the "system directory" must be defined if running in RetroArch.
-The PSX BIOS must be placed there and must be named <tt>scph5500.bin</tt>, <tt>scph5501.bin</tt> and/or <tt>scph5502.bin</tt> for Japanese, NA and/or EU regions respectively. The file names are case sensitive.
+The PSX BIOS must be placed there and must be named <tt>scph5500.bin</tt>, <tt>scph5501.bin</tt> and/or <tt>scph5502.bin</tt> for Japanese, NA and/or EU regions respectively. The file names are case sensitive, they can be lowercase, uppercase, uppercase with hifen (SCPH-XXXX) and the extension must be a lowercase <tt>.bin</tt>.
 
 Memory cards will be saved to "save directory", memory card #1 is saved using libretro's standard interface. The rest of memory cards are saved using Mednafen's standard mechanism. You might have to rename your old 
 memory cards to gamename.srm. 
@@ -74,9 +74,9 @@ Using a BIOS version not listed below might result unforeseen bugs and is theref
 
 <table border>
  <tr><th>Filename:</th><th>Purpose:</th><th>Hash:</tr>
- <tr><td>scph5500.bin</td><td><b>SCPH-5500</b>/v<b>3.0J</b> BIOS image.<br>Required for Japan-region games.</td><td><b><u>MD5:</u></b> 8dd7d5296a650fac7319bce665a6a53c<br><b><u>SHA256:</u></b> 9c0421858e217805f4abe18698afea8d5aa36ff0727eb8484944e00eb5e7eadb</td></tr>
- <tr><td>scph5501.bin</td><td><b>SCPH-5501</b>/v<b>3.0A</b> BIOS image.<br>Required for North America/US-region games.<br>Reportedly the same as the SCPH-7003 BIOS image.</td><td><b><u>MD5:</u></b> 490f666e1afb15b7362b406ed1cea246<br><b><u>SHA256:</u></b> 11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef</td></tr>
- <tr><td>scph5502.bin</td><td><b>SCPH-5502</b>/v<b>3.0E</b> BIOS image.<br>Required for Europe-region games.</td><td><b><u>MD5:</b></u> 32736f17079d0b2b7024407c39bd3050<br><b><u>SHA256:</u></b> 1faaa18fa820a0225e488d9f086296b8e6c46df739666093987ff7d8fd352c09</td></tr>
+ <tr><td>scph5500.bin</td><td>BIOS image, Version 3.0 09/09/96 J.<br>Required for Japan-region games.</td><td><b><u>MD5:</u></b> 8dd7d5296a650fac7319bce665a6a53c<br><b><u>SHA256:</u></b> 9c0421858e217805f4abe18698afea8d5aa36ff0727eb8484944e00eb5e7eadb</td></tr>
+ <tr><td>scph5501.bin</td><td>BIOS image, Version 3.0 11/18/96 A.<br>Required for North America/US-region games.<br>The same as the SCPH-5503 and SCPH-7003 BIOS images.</td><td><b><u>MD5:</u></b> 490f666e1afb15b7362b406ed1cea246<br><b><u>SHA256:</u></b> 11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef</td></tr>
+ <tr><td>scph5502.bin</td><td>BIOS image, Version 3.0 01/06/97 E.<br>Required for Europe-region games.<br>The same as the SCPH-5552 BIOS image.</td><td><b><u>MD5:</b></u> 32736f17079d0b2b7024407c39bd3050<br><b><u>SHA256:</u></b> 1faaa18fa820a0225e488d9f086296b8e6c46df739666093987ff7d8fd352c09</td></tr>
 </table>
 
 ## Options
