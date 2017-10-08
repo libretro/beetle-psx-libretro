@@ -67,6 +67,8 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
 #endif
 }
 
+extern unsigned cd_2x_speedup;
+
 PS_CDC::~PS_CDC()
 {
 
@@ -859,7 +861,7 @@ void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
 {
    CD_Audio_Buffer *ab = &AudioBuffer;
 
-   ab->Freq = 7 * ((Mode & MODE_SPEED) ? 2 : 1);
+   ab->Freq = 7 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1);
    ab->Size = 588;
 
    if(SubQBuf_Safe[0] & 0x40)
@@ -1050,7 +1052,7 @@ void PS_CDC::HandlePlayRead(void)
    SectorPipe_Pos = (SectorPipe_Pos + 1) % SectorPipe_Count;
    SectorPipe_In++;
 
-   PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+   PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
 
    if(DriveStatus == DS_PLAYING)
    {
@@ -1160,7 +1162,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                      DriveStatus = StatusAfterSeek;
 
                      if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
-                        PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+                        PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
                   }
                   break;
                case DS_SEEKING_LOGICAL:
@@ -1188,7 +1190,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                         DriveStatus = StatusAfterSeek;
 
                         if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
-                           PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
+                           PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
                      }
                   }
                   break;
@@ -1617,7 +1619,11 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
       //else
       {
          // Take twice as long for 1x mode.
-         ret += 1237952 * ((Mode & MODE_SPEED) ? 1 : 2);
+         if (Mode & MODE_SPEED) {
+            ret += 1237952 / cd_2x_speedup;
+         } else {
+            ret += 1237952 * 2;
+         }
       }
    }
    //else if(target < initial)

@@ -46,6 +46,7 @@
 #define option_memcard0_method       "beetle_psx_hw_use_mednafen_memcard0_method"
 #define option_memcard1_enable       "beetle_psx_hw_enable_memcard1"
 #define option_memcard_shared        "beetle_psx_hw_shared_memory_cards"
+#define option_cd_fastload           "beetle_psx_hw_cd_fastload"
 #else
 #define option_renderer              "beetle_psx_renderer"
 #define option_renderer_software_fb  "beetle_psx_renderer_software_fb"
@@ -80,4 +81,5 @@
 #define option_memcard0_method       "beetle_psx_use_mednafen_memcard0_method"
 #define option_memcard1_enable       "beetle_psx_enable_memcard1"
 #define option_memcard_shared        "beetle_psx_shared_memory_cards"
+#define option_cd_fastload           "beetle_psx_cd_fastload"
 #endif

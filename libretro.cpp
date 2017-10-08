@@ -44,6 +44,7 @@ static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_analog_calibration = false;
 static bool enable_variable_serialization_size = false;
+unsigned cd_2x_speedup = 1;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -3008,6 +3009,23 @@ static void check_variables(bool startup)
          image_crop = 8;
    }
 
+   var.key = option_cd_fastload;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         uint8_t val = var.value[0] - '0';
+
+         if (var.value[1] != 'x')
+            {
+               val  = (var.value[0] - '0') * 10;
+               val += var.value[1] - '0';
+            }
+
+         // Value is a multiplier from the native 1x, so we divide by two
+         cd_2x_speedup = val / 2;
+      }
+   else
+      cd_2x_speedup = 1;
 }
 
 #ifdef NEED_CD
@@ -4146,6 +4164,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_memcard0_method, "Memcard 0 method; libretro|mednafen" },
       { option_memcard1_enable, "Enable memory card 1; enabled|disabled" },
       { option_memcard_shared, "Shared memcards (restart); disabled|enabled" },
+      { option_cd_fastload, "Increase CD loading speed; 2x (native)|4x|6x|8x|10x|12x|14x" },
       { NULL, NULL },
    };
    static const struct retro_controller_description pads[] = {
