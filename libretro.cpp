@@ -12,6 +12,7 @@
 #include <rthreads/rthreads.h>
 #include <file/file_path.h>
 #include <string/stdstring.h>
+#include <rhash.h>
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 #include "libretro_options.h"
@@ -93,21 +94,73 @@ enum
 static bool firmware_is_present(unsigned region)
 {
    char bios_path[4096];
-   const char *bios_name;
+   size_t list_size = 10;
+   const char *bios_name_list[list_size];
+   const char *bios_sha1;
    
    if (region == REGION_JP)
-      bios_name = "scph5500.bin";
-   else if (region == REGION_NA)
-      bios_name = "scph5501.bin";
-   else if (region == REGION_EU)
-      bios_name = "scph5502.bin";
-
-   snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name);
-   if (!path_is_valid(bios_path)) 
    {
-      log_cb(RETRO_LOG_ERROR, "Firmware is missing:\n%s\n", bios_path);
+      bios_name_list[0] = "scph5500.bin";
+      bios_name_list[1] = "SCPH5500.bin";
+      bios_name_list[2] = "SCPH-5500.bin";
+      bios_sha1 = "b05def971d8ec59f346f2d9ac21fb742e3eb6917";
+   }
+   else if (region == REGION_NA) 
+   {
+      bios_name_list[0] = "scph5501.bin";
+      bios_name_list[1] = "SCPH5501.bin";
+      bios_name_list[2] = "SCPH-5501.bin";
+      bios_name_list[3] = "scph5503.bin";
+      bios_name_list[4] = "SCPH5503.bin";
+      bios_name_list[5] = "SCPH-5503.bin";
+      bios_name_list[6] = "scph7003.bin";
+      bios_name_list[7] = "SCPH7003.bin";
+      bios_name_list[8] = "SCPH-7003.bin";
+      bios_sha1 = "0555c6fae8906f3f09baf5988f00e55f88e9f30b";
+   }
+   else if (region == REGION_EU) 
+   {
+      bios_name_list[0] = "scph5502.bin";
+      bios_name_list[1] = "SCPH5502.bin";
+      bios_name_list[2] = "SCPH-5502.bin";
+      bios_name_list[3] = "scph5552.bin";
+      bios_name_list[4] = "SCPH5552.bin";
+      bios_name_list[5] = "SCPH-5552.bin";
+      bios_sha1 = "f6bc2d1f5eb6593de7d089c425ac681d6fffd3f0";
+   }
+
+   bool found = false;
+   size_t i;
+   for (i = 0; i < list_size; ++i)
+   {
+      snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
+      if (path_is_valid(bios_path))
+      {
+         found = true;
+         break;
+      }      
+   }
+
+   if (!found) 
+   {
+      log_cb(RETRO_LOG_ERROR, "Firmware is missing:\n%s\n", bios_name_list[0]);
       return false;
    }
+
+   char obtained_sha1[41];
+   sha1_calculate(bios_path, obtained_sha1);
+   if (strcasecmp(obtained_sha1, bios_sha1))
+   {
+      log_cb(RETRO_LOG_ERROR, 
+               "Firmware has invalid SHA1: \n%s\n"
+               "Expected SHA1: %s\n"
+               "Obtained SHA1: %s\n", bios_path, bios_sha1, obtained_sha1);
+      return false;
+   }
+
+   log_cb(RETRO_LOG_INFO, 
+            "Firmware found: %s\n"
+            "Firmware SHA1: %s\n", bios_path, bios_sha1);
   
    return true;
 }
