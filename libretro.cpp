@@ -98,6 +98,8 @@ static bool firmware_is_present(unsigned region)
    const char *bios_name_list[list_size];
    const char *bios_sha1;
    
+   log_cb(RETRO_LOG_INFO, "Checking if required firmware is present.\n");
+
    /* SHA1 and alternate BIOS names sourced from
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
    if (region == REGION_JP)
@@ -160,7 +162,7 @@ static bool firmware_is_present(unsigned region)
 
    if (!found) 
    {
-      log_cb(RETRO_LOG_ERROR, "Firmware is missing:\n%s\n", bios_name_list[0]);
+      log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
       return false;
    }
 
@@ -168,14 +170,15 @@ static bool firmware_is_present(unsigned region)
    sha1_calculate(bios_path, obtained_sha1);
    if (strcmp(obtained_sha1, bios_sha1))
    {
-      log_cb(RETRO_LOG_ERROR, "Firmware has invalid SHA1: \n%s\n", bios_path);
-      log_cb(RETRO_LOG_ERROR, "Expected SHA1: %s\n", bios_sha1);
-      log_cb(RETRO_LOG_ERROR, "Obtained SHA1: %s\n", obtained_sha1);
-      return false;
+      log_cb(RETRO_LOG_WARN, "Firmware found but has invalid SHA1: %s\n", bios_path);
+      log_cb(RETRO_LOG_WARN, "Expected SHA1: %s\n", bios_sha1);
+      log_cb(RETRO_LOG_WARN, "Obtained SHA1: %s\n", obtained_sha1);
+      log_cb(RETRO_LOG_WARN, "Unsupported firmware may cause emulation glitches.\n");
+      return true;
    }
 
    log_cb(RETRO_LOG_INFO, "Firmware found: %s\n", bios_path);
-   log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", bios_sha1);
+   log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", obtained_sha1);
   
    return true;
 }
