@@ -127,6 +127,8 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
    gpu->TexPageX = NewTexPageX;
    gpu->TexPageY = NewTexPageY;
    gpu->TexMode  = NewTexMode;
+
+   RecalcTexWindowStuff(gpu);
 }
 
 /* C-style function wrappers so our command table isn't so ginormous(in memory usage). */

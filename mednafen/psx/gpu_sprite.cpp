@@ -91,7 +91,7 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
          {
             if(textured)
             {
-               uint16_t fbw = GetTexel<TexMode_TA>(gpu, clut_offset, u_r, v);
+               uint16_t fbw = GetTexel<TexMode_TA>(gpu, u_r, v);
 
                if(fbw)
                {

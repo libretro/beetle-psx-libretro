@@ -75,7 +75,7 @@ struct PS_GPU
       uint32 TWY_ADD;
    } SUCV;
 
-   struct
+   struct TexCache_t
    {
       uint16 Data[4];
       uint32 Tag;
