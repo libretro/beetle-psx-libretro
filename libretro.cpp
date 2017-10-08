@@ -94,16 +94,25 @@ enum
 static bool firmware_is_present(unsigned region)
 {
    char bios_path[4096];
-   size_t list_size = 10;
+   static const size_t list_size = 10;
    const char *bios_name_list[list_size];
    const char *bios_sha1;
    
+   /* SHA1 and alternate BIOS names sourced from
+   https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
    if (region == REGION_JP)
    {
       bios_name_list[0] = "scph5500.bin";
       bios_name_list[1] = "SCPH5500.bin";
       bios_name_list[2] = "SCPH-5500.bin";
-      bios_sha1 = "b05def971d8ec59f346f2d9ac21fb742e3eb6917";
+      bios_name_list[3] = "\0";
+      bios_name_list[4] = "\0";
+      bios_name_list[5] = "\0";
+      bios_name_list[6] = "\0";
+      bios_name_list[7] = "\0";
+      bios_name_list[8] = "\0";
+      bios_name_list[9] = "\0";
+      bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    }
    else if (region == REGION_NA) 
    {
@@ -116,7 +125,8 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[6] = "scph7003.bin";
       bios_name_list[7] = "SCPH7003.bin";
       bios_name_list[8] = "SCPH-7003.bin";
-      bios_sha1 = "0555c6fae8906f3f09baf5988f00e55f88e9f30b";
+      bios_name_list[9] = "\0";
+      bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    }
    else if (region == REGION_EU) 
    {
@@ -126,7 +136,11 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[3] = "scph5552.bin";
       bios_name_list[4] = "SCPH5552.bin";
       bios_name_list[5] = "SCPH-5552.bin";
-      bios_sha1 = "f6bc2d1f5eb6593de7d089c425ac681d6fffd3f0";
+      bios_name_list[6] = "\0";
+      bios_name_list[7] = "\0";
+      bios_name_list[8] = "\0";
+      bios_name_list[9] = "\0";
+      bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
    bool found = false;
@@ -149,18 +163,16 @@ static bool firmware_is_present(unsigned region)
 
    char obtained_sha1[41];
    sha1_calculate(bios_path, obtained_sha1);
-   if (strcasecmp(obtained_sha1, bios_sha1))
+   if (strcmp(obtained_sha1, bios_sha1))
    {
-      log_cb(RETRO_LOG_ERROR, 
-               "Firmware has invalid SHA1: \n%s\n"
-               "Expected SHA1: %s\n"
-               "Obtained SHA1: %s\n", bios_path, bios_sha1, obtained_sha1);
+      log_cb(RETRO_LOG_ERROR, "Firmware has invalid SHA1: \n%s\n", bios_path);
+      log_cb(RETRO_LOG_ERROR, "Expected SHA1: %s\n", bios_sha1);
+      log_cb(RETRO_LOG_ERROR, "Obtained SHA1: %s\n", obtained_sha1);
       return false;
    }
 
-   log_cb(RETRO_LOG_INFO, 
-            "Firmware found: %s\n"
-            "Firmware SHA1: %s\n", bios_path, bios_sha1);
+   log_cb(RETRO_LOG_INFO, "Firmware found: %s\n", bios_path);
+   log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", bios_sha1);
   
    return true;
 }
