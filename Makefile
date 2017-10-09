@@ -407,7 +407,7 @@ ifeq ($(HAVE_JIT),1)
    LDFLAGS += -ljit
 endif
 
-CXXFLAGS += $(FLAGS) -std=c++98
+CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
 
 ifneq ($(SANITIZER),)
