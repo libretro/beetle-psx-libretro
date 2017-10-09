@@ -861,7 +861,7 @@ void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
 {
    CD_Audio_Buffer *ab = &AudioBuffer;
 
-   ab->Freq = 7 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1);
+   ab->Freq = 7 * ((Mode & MODE_SPEED) ? 2 : 1);
    ab->Size = 588;
 
    if(SubQBuf_Safe[0] & 0x40)
@@ -1052,7 +1052,25 @@ void PS_CDC::HandlePlayRead(void)
    SectorPipe_Pos = (SectorPipe_Pos + 1) % SectorPipe_Count;
    SectorPipe_In++;
 
-   PSRCounter += 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
+   unsigned speed_mul;
+
+   if (Mode & MODE_SPEED) {
+      // We're in 2x mode
+      if (Mode & (MODE_CDDA | MODE_STRSND)) {
+         // We're probably streaming audio to the CD drive, keep the
+         // native speed
+         speed_mul = 2;
+      } else {
+         // *Probably* not streaming audio, we can try increasing the
+         // *CD speed beyond native
+         speed_mul = 2 * cd_2x_speedup;
+      }
+   } else {
+      // 1x mode
+      speed_mul = 1;
+   }
+
+   PSRCounter += 33868800 / (75 * speed_mul);
 
    if(DriveStatus == DS_PLAYING)
    {

@@ -3021,7 +3021,8 @@ static void check_variables(bool startup)
                val += var.value[1] - '0';
             }
 
-         // Value is a multiplier from the native 1x, so we divide by two
+         // Value is a multiplier from the native 2x, so we divide by
+         // two
          cd_2x_speedup = val / 2;
       }
    else
