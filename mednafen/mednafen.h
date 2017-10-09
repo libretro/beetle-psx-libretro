@@ -15,6 +15,10 @@
 #define strcasecmp _stricmp
 #endif
 
+#if __cplusplus <= 199711L
+# define static_assert(_x, _y)
+#endif
+
 #define GET_FDATA_PTR(fp) (fp->data)
 #define GET_FSIZE_PTR(fp) (fp->size)
 #define GET_FEXTS_PTR(fp) (fp->ext)
