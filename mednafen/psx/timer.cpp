@@ -22,55 +22,68 @@
  Notes(some of it may be incomplete or wrong in subtle ways)
 
  Control bits:
-	Lower 3 bits of mode, for timer1(when mode is | 0x100):
-		0x1 = don't count while in vblank(except that the first count while in vblank does go through)
-		0x3 = vblank going inactive triggers timer reset, then some interesting behavior where counting again is delayed...
-		0x5 = vblank going inactive triggers timer reset, and only count within vblank.
-		0x7 = Wait until vblank goes active then inactive, then start counting?
-	For timer2:
-		0x1 = timer stopped(TODO: confirm on real system)
+    Lower 3 bits of mode, for timer1(when mode is | 0x100):
+        0x1 = don't count while in vblank(except that the first count while in vblank does go through)
+        0x3 = vblank going inactive triggers timer reset, then some interesting behavior where counting again is delayed...
+        0x5 = vblank going inactive triggers timer reset, and only count within vblank.
+        0x7 = Wait until vblank goes active then inactive, then start counting?
+    For timer2:
+        0x1 = timer stopped(TODO: confirm on real system)
 
-	Target mode enabled		0x008
-	IRQ enable			0x010
-	--?Affects 0x400 status flag?-- 0x020
-	IRQ evaluation auto-reset	0x040
-	--unknown--			0x080
-	Clock selection			0x100
-	Divide by 8(timer 2 only?)	0x200
+    Target match counter reset enable 0x008
+    Target match IRQ enable       0x010
+    Overflow IRQ enable       0x020
+    IRQ evaluation auto-reset     0x040
+    --unknown--           0x080
+    Clock selection           0x100
+    Divide by 8(timer 2 only?)    0x200
 
  Counter:
-	Reset to 0 on writes to the mode/status register.
+    Reset to 0 on writes to the mode/status register.
 
  Status flags:
-	Unknown flag 		      0x0400
-	Compare flag		      0x0800
-		Cleared on mode/status read.
-		Set when:	//ever Counter == 0(proooobably, need to investigate lower 3 bits in relation to this).
-			
+    Current IRQ line status?      0x0400
+    Compare flag              0x0800
+        Cleared on mode/status read.
+        Set repeatedly while counter == target.
 
-	Overflow/Carry flag	      0x1000
-		Cleared on mode/status read.
-		Set when counter overflows from 0xFFFF->0.
+    Overflow/Carry flag       0x1000
+        Cleared on mode/status read.
+        Set repeatedly after counter overflows from 0xFFFF->0 while before the next clocking(FIXME: currently not emulated correctly in respect
+        to the constant/repeated setting after an overflow but before the next clocking).
 
  Hidden flags:
-	IRQ done
-		Cleared on writes to the mode/status register, on writes to the count register, and apparently automatically when the counter
-		increments if (Mode & 0x40) [Note: If target mode is enabled, and target is 0, IRQ done flag won't be automatically reset]
+    IRQ done
+        Cleared on writes to the mode/status register, on writes to the count register, and apparently automatically when the counter
+        increments if (Mode & 0x40) [Note: If target mode is enabled, and target is 0, IRQ done flag won't be automatically reset]
 
- There seems to be a brief period(edge condition?) where, if count to target is enabled, you can (sometimes?) read the target value in the count
- register before it's reset to 0.  I doubt any games rely on this, but who knows.  Maybe a PSX equivalent of the PC Engine "Battle Royale"? ;)
+ There seems to be a brief period(edge condition?) where, if target match reset mode is enabled, you can (sometimes?) read the target value in the count
+ register before it's reset to 0.  Currently not emulated; I doubt any games rely on this, but who knows.  Maybe a PSX equivalent
+ of the PC Engine "Battle Royale"? ;)
 
- When the counter == 0, the compare flag is set.  An IRQ will be generated if (Mode & 0x10), and the hidden IRQ done flag will be set.
+ A timer is somewhat unreliable when target match reset mode is enabled and the 33MHz clock is used.  Average 2.4 counts seem to be
+ skipped for that timer every target match reset, but oddly subtracting only 2 from the desired target match value seems to effectively
+ negate the loss...wonder if my test program is faulty in some way.  Currently not emulated.
+
+ Counters using GPU clock sources(hretrace,dot clock) reportedly will with a low probability return wrong count values on an actual PS1,
+ so keep this in mind when writing test programs(IE keep reading the count value until two consecutive reads return the same value).
+ Currently not emulated.
+*/
+
+/*
+ FIXME: Clock appropriately(and update events) when using SetRegister() via the debugger.
+
+ TODO: If we ever return randomish values to "simulate" open bus, remember to change the return type and such of the TIMER_Read() function to full 32-bit too.
 */
 
 /*
  Dec. 26, 2011 Note
-	Due to problems I've had with my GPU timing test program, timer2 appears to be unreliable(clocks are skipped?) when target mode is enabled and the full
-	33MHz clock is used(rather than 33MHz / 8).  TODO: Investigate further and confirm(or not).
+   Due to problems I've had with my GPU timing test program, timer2 appears to be unreliable(clocks are skipped?) when target mode is enabled and the full
+   33MHz clock is used(rather than 33MHz / 8).  TODO: Investigate further and confirm(or not).
 
  Jan. 15, 2013 Note:
-	Counters using GPU clock sources(hretrace,dot clock) reportedly will with a low probability return wrong count values on an actual PS1, so keep this in mind
-	when writing test programs(IE keep reading the count value until two consecutive reads return the same value).
+   Counters using GPU clock sources(hretrace,dot clock) reportedly will with a low probability return wrong count values on an actual PS1, so keep this in mind
+   when writing test programs(IE keep reading the count value until two consecutive reads return the same value).
 */
 
 /*
@@ -82,10 +95,10 @@
 struct Timer
 {
    uint32_t Mode;
-   int32_t Counter;	/* Counter value. Only 16-bit, but 32-bit here for detecting counting past target. */
-   int32_t Target;   /* Counter target */
+   uint32_t Counter;  /* Counter value. Only 16-bit, but 32-bit here for detecting counting past target. */
+   uint32_t Target;   /* Counter target */
 
-   int32_t Div8Counter;
+   uint32_t Div8Counter;
 
    bool IRQDone;
    int32_t DoZeCounting;
@@ -96,22 +109,14 @@ static bool hretrace;
 static Timer Timers[3];
 static int32_t lastts;
 
-static int32_t CalcNextEvent(int32_t next_event)
+static uint32_t CalcNextEvent(void)
 {
-   int i;
+   uint32_t next_event = 1024; /**/
 
+   unsigned i;
    for(i = 0; i < 3; i++)
    {
-      int32_t target, count_delta;
-
-      /* If clocked by GPU, abort for this timer(will result in poor granularity
-       * for pixel-clock-derived timer IRQs, but whatever).
-       */
-      if((i == 0 || i == 1) && (Timers[i].Mode & 0x100))
-         continue;
-
-      /* If IRQ is disabled, abort for this timer. */
-      if(!(Timers[i].Mode & 0x10))
+      if(!(Timers[i].Mode & 0x30)) /* If IRQ is disabled, abort for this timer. */
          continue;
 
       if((Timers[i].Mode & 0x8) && (Timers[i].Counter == 0) && (Timers[i].Target == 0) && !Timers[i].IRQDone)
@@ -120,42 +125,93 @@ static int32_t CalcNextEvent(int32_t next_event)
          continue;
       }
 
-      target = ((Timers[i].Mode & 0x8) && (Timers[i].Counter < Timers[i].Target)) ? Timers[i].Target : 0x10000;
-
-      count_delta = target - Timers[i].Counter;
-
-      //PSX_DBG(PSX_DBG_ERROR, "timer %d count_delta <= 0!!! %d %d\n", i, target, Timers[i].Counter);
-      if(count_delta <= 0)
+      /**/
+      /**/
+      if((i == 0 || i == 1) && (Timers[i].Mode & 0x100)) /* If clocked by GPU, abort for this timer(will result in poor granularity for pixel-clock-derived timer IRQs, but whatever). */
          continue;
 
-      {
-         int32_t tmp_clocks;
+      if(Timers[i].DoZeCounting <= 0)
+         continue;
 
-         if(Timers[i].DoZeCounting <= 0)
-            continue;
+      if((i == 0x2) && (Timers[i].Mode & 0x1))
+         continue;
 
-         if((i == 0x2) && (Timers[i].Mode & 0x1))
-            continue;
+      /**/
+      /**/
+      /**/
+      const uint32_t target = ((Timers[i].Mode & 0x18) && (Timers[i].Counter < Timers[i].Target)) ? Timers[i].Target : 0x10000;
+      const uint32_t count_delta = target - Timers[i].Counter;
+      uint32_t tmp_clocks;
+         
+      if((i == 0x2) && (Timers[i].Mode & 0x200))
+         tmp_clocks = (count_delta * 8) - Timers[i].Div8Counter;
+      else
+         tmp_clocks = count_delta;
 
-         if((i == 0x2) && (Timers[i].Mode & 0x200))
-         {
-            assert(Timers[i].Div8Counter >= 0 && Timers[i].Div8Counter < 8);
-            tmp_clocks = ((count_delta - 1) * 8) + (8 - Timers[i].Div8Counter);
-         }
-         else
-            tmp_clocks = count_delta;
-
-         assert(tmp_clocks > 0);
-
-         if(next_event > tmp_clocks)
-            next_event = tmp_clocks;
-      }
+      if(next_event > tmp_clocks)
+         next_event = tmp_clocks;
    }
 
    return(next_event);
 }
 
-static void ClockTimer(int i, uint32_t clocks)
+static MDFN_FASTCALL bool TimerMatch(unsigned i)
+{
+   bool irq_exact = false;
+
+   Timers[i].Mode |= 0x0800;
+
+   if(Timers[i].Mode & 0x008)
+      Timers[i].Counter %= 1 < Timers[i].Target ? Timers[i].Target : 1;
+
+   if((Timers[i].Mode & 0x10) && !Timers[i].IRQDone)
+   {
+      if(Timers[i].Counter == 0 || Timers[i].Counter == Timers[i].Target)
+         irq_exact = true;
+
+#if 1
+      {
+         const uint16_t lateness = (Timers[i].Mode & 0x008) ? Timers[i].Counter : (Timers[i].Counter - Timers[i].Target);
+
+         if(lateness > ((i == 1 && (Timers[i].Mode & 0x100)) ? 0 : 3))
+            PSX_DBG(PSX_DBG_WARNING, "[TIMER] Timer %d match IRQ trigger late: %u\n", i, lateness);
+      }
+#endif
+
+      Timers[i].IRQDone = true;
+      IRQ_Assert(IRQ_TIMER_0 + i, true);
+      IRQ_Assert(IRQ_TIMER_0 + i, false);
+   }
+
+   return irq_exact;
+}
+
+static MDFN_FASTCALL bool TimerOverflow(unsigned i)
+{
+   bool irq_exact = false;
+
+   Timers[i].Mode |= 0x1000;
+   Timers[i].Counter &= 0xFFFF;
+
+   if((Timers[i].Mode & 0x20) && !Timers[i].IRQDone)
+   {
+      if(Timers[i].Counter == 0)
+         irq_exact = true;
+
+#if 1
+      if(Timers[i].Counter > ((i == 1 && (Timers[i].Mode & 0x100)) ? 0 : 3))
+         PSX_DBG(PSX_DBG_WARNING, "[TIMER] Timer %d overflow IRQ trigger late: %u\n", i, Timers[i].Counter);
+#endif
+
+      Timers[i].IRQDone = true;
+      IRQ_Assert(IRQ_TIMER_0 + i, true);
+      IRQ_Assert(IRQ_TIMER_0 + i, false);
+   }
+
+   return irq_exact;
+}
+
+static MDFN_FASTCALL void ClockTimer(int i, uint32_t clocks)
 {
    int32_t before = Timers[i].Counter;
    int32_t target = 0x10000;
@@ -170,68 +226,47 @@ static void ClockTimer(int i, uint32_t clocks)
 
       Timers[i].Div8Counter += clocks;
       d8_clocks = Timers[i].Div8Counter >> 3;
-      Timers[i].Div8Counter -= d8_clocks << 3;
+      Timers[i].Div8Counter &= 0x7;
 
-      if(Timers[i].Mode & 0x200)	// Divide by 8, at least for timer 0x2
+      if(Timers[i].Mode & 0x200) /* Divide by 8, at least for timer 0x2 */
          clocks = d8_clocks;
 
       if(Timers[i].Mode & 1)
          clocks = 0;
    }
 
-   if(Timers[i].Mode & 0x008)
-      target = Timers[i].Target;
+   if((Timers[i].Mode & 0x008) && Timers[i].Target == 0 && Timers[i].Counter == 0)
+      TimerMatch(i);
+   else if(clocks)
+   {
+      uint32_t before = Timers[i].Counter;
 
-   if(target == 0 && Timers[i].Counter == 0)
-      zero_tm = true;
-   else
       Timers[i].Counter += clocks;
 
-   if(clocks && (Timers[i].Mode & 0x40))
-      Timers[i].IRQDone = false;
+      if(Timers[i].Mode & 0x40)
+         Timers[i].IRQDone = false;
 
-   if((before < target && Timers[i].Counter >= target) || zero_tm || Timers[i].Counter > 0xFFFF)
-   {
-#if 0
-      if(Timers[i].Mode & 0x10)
-      {
-         if((Timers[i].Counter - target) > 3)
-            PSX_WARNING("Timer %d IRQ trigger error: %d", i, Timers[i].Counter - target);
-      }
+      bool irq_exact = false;
 
-#endif
+      /*
+       * Target match handling
+       */
+      if((before < Timers[i].Target && Timers[i].Counter >= Timers[i].Target) || (Timers[i].Counter >= Timers[i].Target + 0x10000))
+         irq_exact |= TimerMatch(i);
 
+      /*
+       * Overflow handling
+       */
+      if(Timers[i].Counter >= 0x10000)
+         irq_exact |= TimerOverflow(i);
 
-      Timers[i].Mode |= 0x0800;
-
-      if(Timers[i].Counter > 0xFFFF)
-      {
-         Timers[i].Counter -= 0x10000;
-
-         if(target == 0x10000)
-            Timers[i].Mode |= 0x1000;
-
-         if(!target)
-            Timers[i].Counter = 0;
-      }
-
-      if(target)
-         Timers[i].Counter -= (Timers[i].Counter / target) * target;
-
-      if((Timers[i].Mode & 0x10) && !Timers[i].IRQDone)
-      {
-         Timers[i].IRQDone = true;
-
-         IRQ_Assert(IRQ_TIMER_0 + i, true);
-         IRQ_Assert(IRQ_TIMER_0 + i, false);
-      }
-
-      if(Timers[i].Counter && (Timers[i].Mode & 0x40))
+      /**/
+      if((Timers[i].Mode & 0x40) && !irq_exact)
          Timers[i].IRQDone = false;
    }
 }
 
-void TIMER_SetVBlank(bool status)
+MDFN_FASTCALL void TIMER_SetVBlank(bool status)
 {
    switch(Timers[1].Mode & 0x7)
    {
@@ -241,13 +276,21 @@ void TIMER_SetVBlank(bool status)
 
       case 0x3:
          if(vblank && !status)
+         {
             Timers[1].Counter = 0;
+            if(Timers[1].Counter == Timers[1].Target)
+               TimerMatch(1);
+         }
          break;
 
       case 0x5:
          Timers[1].DoZeCounting = status;
          if(vblank && !status)
+         {
             Timers[1].Counter = 0;
+            if(Timers[1].Counter == Timers[1].Target)
+               TimerMatch(1);
+         }
          break;
 
       case 0x7:
@@ -266,18 +309,23 @@ void TIMER_SetVBlank(bool status)
    vblank = status;
 }
 
-void TIMER_SetHRetrace(bool status)
+MDFN_FASTCALL void TIMER_SetHRetrace(bool status)
 {
    if(hretrace && !status)
    {
       if((Timers[0].Mode & 0x7) == 0x3)
+      {
          Timers[0].Counter = 0;
+
+         if(Timers[0].Counter == Timers[0].Target)
+            TimerMatch(0);
+      }
    }
 
    hretrace = status;
 }
 
-void TIMER_AddDotClocks(uint32_t count)
+MDFN_FASTCALL void TIMER_AddDotClocks(uint32_t count)
 {
    if(Timers[0].Mode & 0x100)
       ClockTimer(0, count);
@@ -289,11 +337,11 @@ void TIMER_ClockHRetrace(void)
       ClockTimer(1, 1);
 }
 
-int32_t TIMER_Update(const int32_t timestamp)
+MDFN_FASTCALL int32_t TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
+   
    int32_t i;
-
    for(i = 0; i < 3; i++)
    {
       if(Timers[i].Mode & 0x100)
@@ -304,125 +352,110 @@ int32_t TIMER_Update(const int32_t timestamp)
 
    lastts = timestamp;
 
-   return(timestamp + CalcNextEvent(1024));
+   return(timestamp + CalcNextEvent());
 }
 
-static void CalcCountingStart(unsigned which)
+static MDFN_FASTCALL void CalcCountingStart(unsigned which)
 {
-   switch(Timers[which].Mode & 0x07)
+   Timers[which].DoZeCounting = true;
+
+   switch(which)
    {
-      case 0x1:
-         Timers[which].DoZeCounting = !vblank;
-         break;
+      case 1:
+         switch(Timers[which].Mode & 0x07)
+         {
+            case 0x1:
+               Timers[which].DoZeCounting = !vblank;
+               break;
 
-      case 0x5:
-         Timers[which].DoZeCounting = vblank;
-         break;
+            case 0x5:
+               Timers[which].DoZeCounting = vblank;
+               break;
 
-      case 0x7:
-         Timers[which].DoZeCounting = -1;
+            case 0x7:
+               Timers[which].DoZeCounting = -1;
+               break;
+         }
          break;
    }
+
 }
 
 void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 {
-   int which = (A >> 4) & 0x3;
-
    TIMER_Update(timestamp);
+
+   int which = (A >> 4) & 0x3;
 
    V <<= (A & 3) * 8;
 
-   //PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V);
+   /* 
+   PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V); 
+   */
 
    if(which >= 3)
       return;
 
-   // TODO: See if the "Timers[which].Counter" part of the IRQ if() statements below is what a real PSX does.
    switch(A & 0xC)
    {
-      case 0x0:
-         Timers[which].IRQDone = false;
-#if 1
-         if(Timers[which].Counter && (V & 0xFFFF) == 0)
-         {
-            Timers[which].Mode |= 0x0800;
-            if((Timers[which].Mode & 0x10) && !Timers[which].IRQDone)
-            {
-               Timers[which].IRQDone = true;
-               IRQ_Assert(IRQ_TIMER_0 + which, true);
-               IRQ_Assert(IRQ_TIMER_0 + which, false);
-            }
-         }
-#endif
-         Timers[which].Counter = V & 0xFFFF;
-         break;
-      case 0x4:
-         Timers[which].Mode = (V & 0x3FF) | (Timers[which].Mode & 0x1C00);
-         Timers[which].IRQDone = false;
-#if 1
-         if(Timers[which].Counter)
-         {
-            Timers[which].Mode |= 0x0800;
-            if((Timers[which].Mode & 0x10) && !Timers[which].IRQDone)
-            {
-               Timers[which].IRQDone = true;
-               IRQ_Assert(IRQ_TIMER_0 + which, true);
-               IRQ_Assert(IRQ_TIMER_0 + which, false);
-            }
-         }
-         Timers[which].Counter = 0;
-#endif
-         Timers[which].DoZeCounting = true;
-         if (which == 1)
-            CalcCountingStart(which);	// Call after setting .Mode
-         break;
-      case 0x8:
-         Timers[which].Target = V & 0xFFFF;
-         break;
-      case 0xC:
-         // Open bus
-         break;
+      case 0x0: Timers[which].IRQDone = false;
+                Timers[which].Counter = V & 0xFFFF;
+                break;
+
+      case 0x4: Timers[which].Mode = (V & 0x3FF) | (Timers[which].Mode & 0x1C00);
+                Timers[which].IRQDone = false;
+                Timers[which].Counter = 0;
+
+                CalcCountingStart(which); /* Call after setting .Mode */
+                break;
+
+      case 0x8: Timers[which].Target = V & 0xFFFF;
+                break;
+
+      case 0xC: /* Open bus */
+                break;
    }
 
-   // TIMER_Update(timestamp);
+   if(Timers[which].Counter == Timers[which].Target)
+      TimerMatch(which);
 
-   PSX_SetEventNT(PSX_EVENT_TIMER, timestamp + CalcNextEvent(1024));
+   PSX_SetEventNT(PSX_EVENT_TIMER, timestamp + CalcNextEvent());
 }
 
-uint16_t TIMER_Read(const int32_t timestamp, uint32_t A)
+MDFN_FASTCALL uint16_t TIMER_Read(const int32_t timestamp, uint32_t A)
 {
    uint16_t ret = 0;
    int which = (A >> 4) & 0x3;
 
-   /* if which is greater than or equal to 3,
-    * Open Bus Read. */
-
-   if(which < 3)
+   if(which >= 3)
    {
-      TIMER_Update(timestamp);
+      PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
 
-      switch(A & 0xC)
-      {
-         case 0x0:
-            ret = Timers[which].Counter;
-            break;
-         case 0x4:
-            ret = Timers[which].Mode;
-            Timers[which].Mode &= ~0x1800;
-            break;
-         case 0x8:
-            ret = Timers[which].Target;
-            break;
-         case 0xC:
-            //PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
-            break;
-      }
+      return(ret >> ((A & 3) * 8));
+   }
+
+   TIMER_Update(timestamp);
+
+   switch(A & 0xC)
+   {
+      case 0x0: ret = Timers[which].Counter;
+                        break;
+
+      case 0x4: ret = Timers[which].Mode;
+                Timers[which].Mode &= ~0x1000;
+                if(Timers[which].Counter != Timers[which].Target)
+                   Timers[which].Mode &= ~0x0800;
+                 break;
+
+      case 0x8: ret = Timers[which].Target;
+                break;
+
+      case 0xC: /* PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A); */
+                break;
    }
 
    return(ret >> ((A & 3) * 8));
 }
-
 
 void TIMER_ResetTS(void)
 {
@@ -439,15 +472,15 @@ void TIMER_Power(void)
 }
 
 
-int TIMER_StateAction(void *data, int load, int data_only)
+int TIMER_StateAction(void *sm, const unsigned load, const bool data_only)
 {
    int ret;
    SFORMAT StateRegs[] =
    {
-#define SFTIMER(n)	SFVARN(Timers[n].Mode, #n "Mode"),			\
-      SFVARN(Timers[n].Counter, #n "Counter"),		\
-      SFVARN(Timers[n].Target, #n "Target"),			\
-      SFVARN(Timers[n].Div8Counter, #n "Div8Counter"),	\
+#define SFTIMER(n)   SFVARN(Timers[n].Mode, #n "Mode"),        \
+      SFVARN(Timers[n].Counter, #n "Counter"),     \
+      SFVARN(Timers[n].Target, #n "Target"),       \
+      SFVARN(Timers[n].Div8Counter, #n "Div8Counter"),   \
       SFVARN(Timers[n].IRQDone, #n "IRQDone"),     \
       SFVARN(Timers[n].DoZeCounting, #n "DoZeCounting")
       SFTIMER(0),
@@ -457,13 +490,20 @@ int TIMER_StateAction(void *data, int load, int data_only)
 
       SFVAR(vblank),
       SFVAR(hretrace),
+
       SFEND
    };
-   ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "TIMER");
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "TIMER");
 
    if(load)
    {
-
+      unsigned n;
+      for(n = 0; n < 3; n++)
+      {
+         Timers[n].Counter &= 0xFFFF;
+         Timers[n].Target &= 0xFFFF;
+         Timers[n].Div8Counter &= 0x7;
+      }
    }
 
    return(ret);
@@ -493,16 +533,18 @@ void TIMER_SetRegister(unsigned int which, uint32_t value)
    switch(which & 0xF)
    {
       case TIMER_GSREG_COUNTER0:
-         Timers[tw].Counter = value & 0xFFFF;
-         break;
+            Timers[tw].Counter = value & 0xFFFF;
+            break;
 
       case TIMER_GSREG_MODE0:
-         Timers[tw].Mode = value & 0xFFFF;
-         break;
+            Timers[tw].Mode = value & 0xFFFF;
+            break;
 
       case TIMER_GSREG_TARGET0:
-         Timers[tw].Target = value & 0xFFFF;
-         break;
+            Timers[tw].Target = value & 0xFFFF;
+            break;
    }
 
+   if(Timers[tw].Counter == Timers[tw].Target)
+      TimerMatch(tw);
 }

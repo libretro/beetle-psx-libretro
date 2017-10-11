@@ -22,18 +22,18 @@ uint32_t TIMER_GetRegister(unsigned int which, char *special, const uint32_t spe
 void TIMER_SetRegister(unsigned int which, uint32_t value);
 
 
-void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V);
-uint16_t TIMER_Read(const int32_t timestamp, uint32_t A);
+MDFN_FASTCALL void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V);
+MDFN_FASTCALL uint16_t TIMER_Read(const int32_t timestamp, uint32_t A);
 
-void TIMER_AddDotClocks(uint32_t count);
+MDFN_FASTCALL void TIMER_AddDotClocks(uint32_t count);
 void TIMER_ClockHRetrace(void);
-void TIMER_SetHRetrace(bool status);
-void TIMER_SetVBlank(bool status);
+MDFN_FASTCALL void TIMER_SetHRetrace(bool status);
+MDFN_FASTCALL void TIMER_SetVBlank(bool status);
 
-int32_t TIMER_Update(const int32_t);
+MDFN_FASTCALL int32_t TIMER_Update(const int32_t);
 void TIMER_ResetTS(void);
 
-void TIMER_Power(void);
-int TIMER_StateAction(void *data, int load, int data_only);
+void TIMER_Power(void) MDFN_COLD;
+int TIMER_StateAction(void *sm, const unsigned load, const bool data_only);
 
 #endif
