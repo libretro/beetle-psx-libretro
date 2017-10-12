@@ -142,7 +142,7 @@ bool rsx_intf_open(bool is_pal)
       // Try the fallback type.
       rsx_type = rsx_fallback_type;
       rsx_fallback_type = RSX_SOFTWARE; // This shouldn't ever fail.
-      return rsx_intf_open(rsx_type);
+      return rsx_intf_open(is_pal);
    }
 
 #if defined(RSX_DUMP)
