@@ -904,9 +904,16 @@ void PS_CDC::HandlePlayRead(void)
       PSX_WARNING("[CDC] In leadout area: %u", CurSector);
    }
 
-   Cur_CDIF->ReadRawSector(read_buf, CurSector);	// FIXME: error out on error.
-   DecodeSubQ(read_buf + 2352);
+   if(!SeekRetryCounter)
+      Cur_CDIF->ReadRawSector(read_buf, CurSector, false);
+   else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, true))
+   {
+      SeekRetryCounter--;
+      PSRCounter = 33868800 / 75;
+      return;
+   }
 
+   DecodeSubQ(read_buf + 2352);
 
    if(SubQBuf_Safe[1] == 0xAA && (DriveStatus == DS_PLAYING || (!(SubQBuf_Safe[0] & 0x40) && (Mode & MODE_CDDA))))
    {
