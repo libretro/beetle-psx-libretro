@@ -941,11 +941,11 @@ static DrawBuffer<T>* DrawBuffer_build( const char* vertex_shader,
 
 static void GlRenderer_draw(GlRenderer *renderer)
 {
-   Framebuffer _fb;
-   int16_t x, y;
-
    if (!renderer || static_renderer.state == GlState_Invalid)
       return;
+
+   Framebuffer _fb;
+   int16_t x, y;
 
    x = renderer->config.draw_offset[0];
    y = renderer->config.draw_offset[1];
@@ -1117,6 +1117,9 @@ static void GlRenderer_upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
+   if (!renderer)
+      return;
+
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
 
@@ -1404,7 +1407,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
 static void GlRenderer_free(GlRenderer *renderer)
 {
-   unsigned i;
    if (!renderer)
       return;
 
@@ -1444,6 +1446,7 @@ static void GlRenderer_free(GlRenderer *renderer)
    renderer->fb_out_depth.width  = 0;
    renderer->fb_out_depth.height = 0;
 
+   unsigned i;
    for (i = 0; i < INDEX_BUFFER_LEN; i++)
    {
       renderer->opaque_triangle_indices[i]   = 0;
@@ -1454,6 +1457,9 @@ static void GlRenderer_free(GlRenderer *renderer)
 
 static inline void apply_scissor(GlRenderer *renderer)
 {
+   if (!renderer)
+      return;
+
    uint16_t _x = renderer->config.draw_area_top_left[0];
    uint16_t _y = renderer->config.draw_area_top_left[1];
    int _w      = renderer->config.draw_area_bot_right[0] - _x;
@@ -1479,6 +1485,9 @@ static inline void apply_scissor(GlRenderer *renderer)
 
 static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
+   if (!renderer)
+      return;
+
    GLuint fbo;
    uint32_t f_w = renderer->frontend_resolution[0];
    uint32_t f_h = renderer->frontend_resolution[1];
@@ -1532,6 +1541,9 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
+   if (!renderer)
+      return false;
+
    uint8_t upscaling = 1;
    bool display_vram = false;
    struct retro_variable var = {0};
@@ -1679,6 +1691,9 @@ static void vertex_preprocessing(
       GLenum mode,
       SemiTransparencyMode stm)
 {
+   if (!renderer)
+      return;
+
    bool is_semi_transparent = v[0].semi_transparent == 1;
    bool buffer_full         = DRAWBUFFER_REMAINING_CAPACITY(renderer->command_buffer) < count;
 
@@ -1723,6 +1738,9 @@ static void push_primitive(
       GLenum mode,
       SemiTransparencyMode stm)
 {
+   if (!renderer)
+      return;
+
    bool is_semi_transparent = v[0].semi_transparent   == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
    /* Textured semi-transparent polys can contain opaque texels (when
@@ -1918,6 +1936,8 @@ static void gl_context_reset(void)
       GPU_RestoreStateP1(true);
       GPU_RestoreStateP2(true);
       GPU_RestoreStateP3();
+   } else {
+      log_cb(RETRO_LOG_WARN, "[gl_context_reset] GlRenderer_new failed. State will be invalid.\n");
    }
 }
 
@@ -2092,25 +2112,30 @@ bool rsx_gl_has_software_renderer(void)
 
 void rsx_gl_prepare_frame(void)
 {
-   if (static_renderer.state == GlState_Valid)
+   if (static_renderer.state == GlState_Invalid)
+      return;
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
    {
-      GlRenderer *renderer = static_renderer.state_data;
-
-      /* In case we're upscaling we need to increase the line width
-       * proportionally */
-      glLineWidth((GLfloat)renderer->internal_upscaling);
-      glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-      glEnable(GL_SCISSOR_TEST);
-      glEnable(GL_DEPTH_TEST);
-      glDepthFunc(GL_LEQUAL);
-      /* Used for PSX GPU command blending */
-      glBlendColor(0.25, 0.25, 0.25, 0.5);
-
-      apply_scissor(renderer);
-
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
+      log_cb(RETRO_LOG_ERROR, "[rsx_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
+      return;
    }
+
+   /* In case we're upscaling we need to increase the line width
+    * proportionally */
+   glLineWidth((GLfloat)renderer->internal_upscaling);
+   glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
+   glEnable(GL_SCISSOR_TEST);
+   glEnable(GL_DEPTH_TEST);
+   glDepthFunc(GL_LEQUAL);
+   /* Used for PSX GPU command blending */
+   glBlendColor(0.25, 0.25, 0.25, 0.5);
+
+   apply_scissor(renderer);
+
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
 }
 
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
@@ -2119,128 +2144,131 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
 
-   if (static_renderer.state == GlState_Valid)
+   if (static_renderer.state == GlState_Invalid)
+      return;
+
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+
+   /* Draw pending commands */
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      GlRenderer_draw(renderer);
+
+   /* We can now render to the frontend's buffer */
+   bind_libretro_framebuffer(renderer);
+
+   glDisable(GL_SCISSOR_TEST);
+   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_BLEND);
+
+   /* If the display is off, just clear the screen */
+   if (renderer->config.display_off && !renderer->display_vram)
    {
-      GlRenderer *renderer = static_renderer.state_data;
-      /* Draw pending commands */
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         GlRenderer_draw(renderer);
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
+   }
+   else
+   {
+      /* Bind 'fb_out' to texture unit 1 */
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
-      /* We can now render to the frontend's buffer */
-      bind_libretro_framebuffer(renderer);
+      /* First we draw the visible part of fb_out */
+      uint16_t fb_x_start = renderer->config.display_top_left[0];
+      uint16_t fb_y_start = renderer->config.display_top_left[1];
+      uint16_t fb_width   = renderer->config.display_resolution[0];
+      uint16_t fb_height  = renderer->config.display_resolution[1];
 
-      glDisable(GL_SCISSOR_TEST);
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-      glDisable(GL_DEPTH_TEST);
-      glDisable(GL_BLEND);
+      GLint depth_24bpp   = (GLint) renderer->config.display_24bpp;
 
-      /* If the display is off, just clear the screen */
-      if (renderer->config.display_off && !renderer->display_vram)
+      if (renderer->display_vram)
       {
-         glClearColor(0.0, 0.0, 0.0, 0.0);
-         glClear(GL_COLOR_BUFFER_BIT);
-      }
-      else
-      {
-         /* Bind 'fb_out' to texture unit 1 */
-         glActiveTexture(GL_TEXTURE1);
-         glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+         /* Display the entire VRAM as a 16bpp buffer */
+         fb_x_start = 0;
+         fb_y_start = 0;
+         fb_width = VRAM_WIDTH_PIXELS;
+         fb_height = VRAM_HEIGHT;
 
-         /* First we draw the visible part of fb_out */
-         uint16_t fb_x_start = renderer->config.display_top_left[0];
-         uint16_t fb_y_start = renderer->config.display_top_left[1];
-         uint16_t fb_width   = renderer->config.display_resolution[0];
-         uint16_t fb_height  = renderer->config.display_resolution[1];
-
-         GLint depth_24bpp   = (GLint) renderer->config.display_24bpp;
-
-         if (renderer->display_vram)
-         {
-            /* Display the entire VRAM as a 16bpp buffer */
-            fb_x_start = 0;
-            fb_y_start = 0;
-            fb_width = VRAM_WIDTH_PIXELS;
-            fb_height = VRAM_HEIGHT;
-
-            depth_24bpp = 0;
-         }
-
-         if (renderer->output_buffer)
-         {
-            OutputVertex slice[4] =
-            {
-               { {-1.0, -1.0}, {0,         fb_height}   },
-               { { 1.0, -1.0}, {fb_width , fb_height}   },
-               { {-1.0,  1.0}, {0,         0} },
-               { { 1.0,  1.0}, {fb_width,  0} }
-            };
-
-            DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
-
-            if (renderer->output_buffer->program)
-            {
-               glUseProgram(renderer->output_buffer->program->id);
-               glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
-               glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
-
-               glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
-
-               glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
-            }
-
-            if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
-               DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
-         }
+         depth_24bpp = 0;
       }
 
-      /* TODO - Hack: copy fb_out back into fb_texture at the end of every
-       * frame to make offscreen rendering kinda sorta work. Very messy
-       * and slow. */
+      if (renderer->output_buffer)
       {
-         Framebuffer _fb;
-         ImageLoadVertex slice[4] =
+         OutputVertex slice[4] =
          {
-            {   {0,    0 }   },
-            {   {1023, 0 }   },
-            {   {0,    511   }   },
-            {   {1023, 511   }   },
+            { {-1.0, -1.0}, {0,         fb_height}   },
+            { { 1.0, -1.0}, {fb_width , fb_height}   },
+            { {-1.0,  1.0}, {0,         0} },
+            { { 1.0,  1.0}, {fb_width,  0} }
          };
 
-         DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4);
+         DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
 
-         if (renderer->image_load_buffer->program)
+         if (renderer->output_buffer->program)
          {
-            glUseProgram(renderer->image_load_buffer->program->id);
-            glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+            glUseProgram(renderer->output_buffer->program->id);
+            glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
+            glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
+
+            glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
+
+            glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
          }
 
-         glDisable(GL_SCISSOR_TEST);
-         glDisable(GL_BLEND);
-         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+         if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
+            DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
+      }
+   }
 
-         Framebuffer_init(&_fb, &renderer->fb_texture);
+   /* TODO - Hack: copy fb_out back into fb_texture at the end of every
+    * frame to make offscreen rendering kinda sorta work. Very messy
+    * and slow. */
+   {
+      Framebuffer _fb;
+      ImageLoadVertex slice[4] =
+      {
+         {   {   0,   0   }   },
+         {   {1023,   0   }   },
+         {   {   0, 511   }   },
+         {   {1023, 511   }   },
+      };
 
-         if (renderer->image_load_buffer->program)
-         {
-            glUseProgram(renderer->image_load_buffer->program->id);
-            glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
-         }
+      DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4);
 
-         if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
-            DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
-
-         glDeleteFramebuffers(1, &_fb.id);
+      if (renderer->image_load_buffer->program)
+      {
+         glUseProgram(renderer->image_load_buffer->program->id);
+         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
       }
 
-      cleanup_gl_state();
+      glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_BLEND);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-      /* When using a hardware renderer we set the data pointer to
-       * -1 to notify the frontend that the frame has been rendered
-       * in the framebuffer. */
-      video_cb(   RETRO_HW_FRAME_BUFFER_VALID,
-            renderer->frontend_resolution[0],
-            renderer->frontend_resolution[1], 0);
+      Framebuffer_init(&_fb, &renderer->fb_texture);
+
+      if (renderer->image_load_buffer->program)
+      {
+         glUseProgram(renderer->image_load_buffer->program->id);
+         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+      }
+
+      if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
+         DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
+
+      glDeleteFramebuffers(1, &_fb.id);
    }
+
+   cleanup_gl_state();
+
+   /* When using a hardware renderer we set the data pointer to
+    * -1 to notify the frontend that the frame has been rendered
+    * in the framebuffer. */
+   video_cb(   RETRO_HW_FRAME_BUFFER_VALID,
+         renderer->frontend_resolution[0],
+         renderer->frontend_resolution[1], 0);
 }
 
 void rsx_gl_set_environment(retro_environment_t callback)
@@ -2266,83 +2294,94 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 
 void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer = static_renderer.state_data;
+   if (static_renderer.state == GlState_Invalid)
+      return;
 
-      /* Finish drawing anything with the current offset */
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         GlRenderer_draw(renderer);
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
 
-      renderer->mask_set_or   = mask_set_or;
-      renderer->mask_eval_and = mask_eval_and;
-   }
+   /* Finish drawing anything with the current offset */
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      GlRenderer_draw(renderer);
+
+   renderer->mask_set_or   = mask_set_or;
+   renderer->mask_eval_and = mask_eval_and;
 }
 
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer = static_renderer.state_data;
+   if (static_renderer.state == GlState_Invalid)
+      return;
 
-      /* Finish drawing anything with the current offset */
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer)) 
-         GlRenderer_draw(renderer);
-      
-      renderer->config.draw_offset[0] = x;
-      renderer->config.draw_offset[1] = y;
-   }
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+
+   /* Finish drawing anything with the current offset */
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer)) 
+      GlRenderer_draw(renderer);
+   
+   renderer->config.draw_offset[0] = x;
+   renderer->config.draw_offset[1] = y;
 }
 
 void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
                            uint8_t twx, uint8_t twy)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer = static_renderer.state_data;
-      renderer->tex_x_mask = ~(tww << 3);
-      renderer->tex_x_or   = (twx & tww) << 3;
-      renderer->tex_y_mask = ~(twh << 3);
-      renderer->tex_y_or   = (twy & twh) << 3;
-   }
+   if (static_renderer.state == GlState_Invalid)
+      return;
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+
+   renderer->tex_x_mask = ~(tww << 3);
+   renderer->tex_x_or   = (twx & tww) << 3;
+   renderer->tex_y_mask = ~(twh << 3);
+   renderer->tex_y_or   = (twy & twh) << 3;
 }
 
 void  rsx_gl_set_draw_area(uint16_t x0, uint16_t y0,
                            uint16_t x1, uint16_t y1)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer = static_renderer.state_data;
+   if (static_renderer.state == GlState_Invalid)
+      return;
 
-      /* Finish drawing anything in the current area */
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         GlRenderer_draw(renderer);
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
 
-      renderer->config.draw_area_top_left[0] = x0;
-      renderer->config.draw_area_top_left[1] = y0;
-      /* Draw area coordinates are inclusive */
-      renderer->config.draw_area_bot_right[0] = x1 + 1;
-      renderer->config.draw_area_bot_right[1] = y1 + 1;
+   /* Finish drawing anything in the current area */
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      GlRenderer_draw(renderer);
 
-      apply_scissor(renderer);
-   }
+   renderer->config.draw_area_top_left[0] = x0;
+   renderer->config.draw_area_top_left[1] = y0;
+   /* Draw area coordinates are inclusive */
+   renderer->config.draw_area_bot_right[0] = x1 + 1;
+   renderer->config.draw_area_bot_right[1] = y1 + 1;
+
+   apply_scissor(renderer);
 }
 
 void rsx_gl_set_display_mode( uint16_t x, uint16_t y,
                               uint16_t w, uint16_t h,
                               bool depth_24bpp)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer                    = static_renderer.state_data;
+   if (static_renderer.state == GlState_Invalid)
+      return;
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
+   renderer->config.display_top_left[0]   = x;
+   renderer->config.display_top_left[1]   = y;
 
-      renderer->config.display_top_left[0]   = x;
-      renderer->config.display_top_left[1]   = y;
-
-      renderer->config.display_resolution[0] = w;
-      renderer->config.display_resolution[1] = h;
-      renderer->config.display_24bpp = depth_24bpp;
-   }
+   renderer->config.display_resolution[0] = w;
+   renderer->config.display_resolution[1] = h;
+   renderer->config.display_24bpp = depth_24bpp;
 }
 
 void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
@@ -2362,13 +2401,13 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
                         int blend_mode, 
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   GlRenderer *renderer = NULL;
-
-   if (static_renderer.state == GlState_Valid)
-      renderer = static_renderer.state_data;
-   else
+   if (static_renderer.state == GlState_Invalid)
       return;
-
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
    switch (blend_mode) {
@@ -2490,13 +2529,13 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
                            bool dither,
                            int blend_mode, uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   GlRenderer *renderer = NULL;
-
-   if (static_renderer.state == GlState_Valid)
-      renderer = static_renderer.state_data;
-   else
+   if (static_renderer.state == GlState_Invalid)
       return;
-
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2570,64 +2609,66 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
 void rsx_gl_fill_rect(  uint32_t color,
                         uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h)
-{
-
+{   
+   if (static_renderer.state == GlState_Invalid)
+      return;
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+     
    uint16_t top_left[2]   = {x, y};
    uint16_t dimensions[2] = {w, h};
    uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};
 
-   if (static_renderer.state == GlState_Valid)
+
+   /* Draw pending commands */
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      GlRenderer_draw(renderer);
+
+   /* Fill rect ignores the draw area. Save the previous value
+    * and reconfigure the scissor box to the fill rectangle
+    * instead. */
+   uint16_t draw_area_top_left[2] = {
+      renderer->config.draw_area_top_left[0],
+      renderer->config.draw_area_top_left[1]
+   };
+   uint16_t draw_area_bot_right[2] = {
+      renderer->config.draw_area_bot_right[0],
+      renderer->config.draw_area_bot_right[1]
+   };
+
+   renderer->config.draw_area_top_left[0]  = top_left[0];
+   renderer->config.draw_area_top_left[1]  = top_left[1];
+   renderer->config.draw_area_bot_right[0] = top_left[0] + dimensions[0];
+   renderer->config.draw_area_bot_right[1] = top_left[1] + dimensions[1];
+
+   apply_scissor(renderer);
+
+   /* This scope is intentional, just like in the Rust version */
    {
-      GlRenderer *renderer = static_renderer.state_data;
+      /* Bind the out framebuffer */
+      Framebuffer _fb;
+      Framebuffer_init(&_fb, &renderer->fb_out);
 
-      /* Draw pending commands */
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         GlRenderer_draw(renderer);
+      glClearColor(   (float) col[0] / 255.0,
+            (float) col[1] / 255.0,
+            (float) col[2] / 255.0,
+            /* TODO - XXX Not entirely sure what happens to
+               the mask bit in fill_rect commands */
+            0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
 
-      /* Fill rect ignores the draw area. Save the previous value
-       * and reconfigure the scissor box to the fill rectangle
-       * instead. */
-      uint16_t draw_area_top_left[2] = {
-         renderer->config.draw_area_top_left[0],
-         renderer->config.draw_area_top_left[1]
-      };
-      uint16_t draw_area_bot_right[2] = {
-         renderer->config.draw_area_bot_right[0],
-         renderer->config.draw_area_bot_right[1]
-      };
-
-      renderer->config.draw_area_top_left[0]  = top_left[0];
-      renderer->config.draw_area_top_left[1]  = top_left[1];
-      renderer->config.draw_area_bot_right[0] = top_left[0] + dimensions[0];
-      renderer->config.draw_area_bot_right[1] = top_left[1] + dimensions[1];
-
-      apply_scissor(renderer);
-
-      /* This scope is intentional, just like in the Rust version */
-      {
-         /* Bind the out framebuffer */
-         Framebuffer _fb;
-         Framebuffer_init(&_fb, &renderer->fb_out);
-
-         glClearColor(   (float) col[0] / 255.0,
-               (float) col[1] / 255.0,
-               (float) col[2] / 255.0,
-               /* TODO - XXX Not entirely sure what happens to
-                  the mask bit in fill_rect commands */
-               0.0);
-         glClear(GL_COLOR_BUFFER_BIT);
-
-         glDeleteFramebuffers(1, &_fb.id);
-      }
-
-      /* Reconfigure the draw area */
-      renderer->config.draw_area_top_left[0]    = draw_area_top_left[0];
-      renderer->config.draw_area_top_left[1]    = draw_area_top_left[1];
-      renderer->config.draw_area_bot_right[0]   = draw_area_bot_right[0];
-      renderer->config.draw_area_bot_right[1]   = draw_area_bot_right[1];
-
-      apply_scissor(renderer);
+      glDeleteFramebuffers(1, &_fb.id);
    }
+
+   /* Reconfigure the draw area */
+   renderer->config.draw_area_top_left[0]    = draw_area_top_left[0];
+   renderer->config.draw_area_top_left[1]    = draw_area_top_left[1];
+   renderer->config.draw_area_bot_right[0]   = draw_area_bot_right[0];
+   renderer->config.draw_area_bot_right[1]   = draw_area_bot_right[1];
+
+   apply_scissor(renderer);
 }
 
 void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
@@ -2635,13 +2676,13 @@ void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
                         uint16_t w, uint16_t h, 
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   GlRenderer *renderer = NULL;
-   if (static_renderer.state == GlState_Valid)
-      renderer = static_renderer.state_data;
-   else
+   if (static_renderer.state == GlState_Invalid)
       return;
-
-
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2717,12 +2758,13 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
                         int blend_mode,
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   GlRenderer *renderer = NULL;
-   if (static_renderer.state == GlState_Valid)
-      renderer = static_renderer.state_data;
-   else
+   if (static_renderer.state == GlState_Invalid)
       return;
-
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2788,12 +2830,13 @@ void rsx_gl_load_image( uint16_t x, uint16_t y,
                         uint16_t *vram, 
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   GlRenderer *renderer = NULL;
-   if (static_renderer.state == GlState_Valid)
-      renderer = static_renderer.state_data;
-   else
+   if (static_renderer.state == GlState_Invalid)
       return;
-
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
       
@@ -2862,9 +2905,12 @@ void rsx_gl_load_image( uint16_t x, uint16_t y,
 
 void rsx_gl_toggle_display(bool status)
 {
-   if (static_renderer.state == GlState_Valid)
-   {
-      GlRenderer *renderer          = static_renderer.state_data;
+   if (static_renderer.state == GlState_Invalid)
+      return;
+   
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+   
       renderer->config.display_off  = status;
-   }
 }
