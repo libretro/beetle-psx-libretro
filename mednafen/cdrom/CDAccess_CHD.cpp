@@ -443,6 +443,13 @@ bool CDAccess_CHD::Read_Raw_Sector(uint8 *buf, int32 lba)
    return true;
 }
 
+bool CDAccess_CHD::Read_Raw_PW(uint8_t *buf, int32_t lba)
+{
+   memset(buf, 0, 96);
+   MakeSubPQ(lba, buf);
+   return true;
+}
+
 bool CDAccess_CHD::Read_TOC(TOC *toc)
 {
    TOC_Clear(toc);

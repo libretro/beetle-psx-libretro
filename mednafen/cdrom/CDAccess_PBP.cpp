@@ -340,6 +340,14 @@ void CDAccess_PBP::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       SubPWBuf[i] |= (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | pause_or;
 }
 
+bool CDAccess_PBP::Read_Raw_PW(uint8_t *buf, int32_t lba)
+{
+   memset(buf, 0, 96);
+   MakeSubPQ(lba, buf);
+   return true;
+}
+
+
 int CDAccess_PBP::decompress2(void *out, uint32_t *out_size, void *in, uint32_t in_size)
 {
    static z_stream z;

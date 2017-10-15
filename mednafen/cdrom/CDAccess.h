@@ -18,6 +18,8 @@ class CDAccess
 
  virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba) = 0;
 
+ virtual bool Read_Raw_PW(uint8_t *buf, int32_t lba);
+
  virtual bool Read_TOC(TOC *toc) = 0;
 
  virtual void Eject(bool eject_status) = 0;		// Eject a disc if it's physical, otherwise NOP.  Returns true on success(or NOP), false on error

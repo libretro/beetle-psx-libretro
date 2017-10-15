@@ -1199,6 +1199,13 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       SubPWBuf[i] |= (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | pause_or;
 }
 
+bool CDAccess_Image::Read_Raw_PW(uint8_t *buf, int32_t lba)
+{
+   memset(buf, 0, 96);
+   MakeSubPQ(lba, buf);
+   return true;
+}
+
 bool CDAccess_Image::Read_TOC(TOC *toc)
 {
    unsigned i;

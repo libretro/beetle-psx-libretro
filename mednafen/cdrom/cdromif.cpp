@@ -493,9 +493,6 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba, bool async)
 
 bool CDIF_MT::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
 {
-   uint8 tmpbuf[2352 + 96];
-   bool ret;
-
    if(UnrecoverableError)
    {
       memset(buf, 0, 96);
@@ -511,10 +508,12 @@ bool CDIF_MT::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
       return(false);
    }
 
-   ret = ReadRawSector(tmpbuf, lba);
-   memcpy(buf, tmpbuf + 2352, 96);
+   if (hint_fullread)
+   {
+      HintReadSector(lba);
+   }
 
-   return ret;
+   return disc_cdaccess->Read_Raw_PW(buf, lba);
 }
 
 void CDIF_MT::HintReadSector(uint32 lba)
@@ -628,9 +627,6 @@ bool CDIF_ST::ReadRawSector(uint8 *buf, uint32 lba, bool async)
 
 bool CDIF_ST::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
 {
-   uint8 tmpbuf[2352 + 96];
-   bool ret;
-
    if(UnrecoverableError)
    {
       memset(buf, 0, 96);
@@ -646,10 +642,7 @@ bool CDIF_ST::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
       return(false);
    }
 
-   ret = ReadRawSector(tmpbuf, lba);
-   memcpy(buf, tmpbuf + 2352, 96);
-
-   return ret;
+   return disc_cdaccess->Read_Raw_PW(buf, lba);
 }
 
 bool CDIF_ST::Eject(bool eject_status)
