@@ -59,3 +59,14 @@ CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcac
 #endif
    return new CDAccess_Image(success, path, image_memcache);
 }
+
+bool CDAccess::Read_Raw_PW(uint8_t *buf, int32_t lba)
+{
+   uint8 tmpbuf[2352 + 96];
+
+   if (!Read_Raw_Sector(tmpbuf, lba))
+      return false;
+   memcpy(buf, tmpbuf + 2352, 96);
+
+   return true;
+}

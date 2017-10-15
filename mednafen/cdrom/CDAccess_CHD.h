@@ -15,6 +15,8 @@ class CDAccess_CHD : public CDAccess
 
       virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
 
+      virtual bool Read_Raw_PW(uint8_t *buf, int32_t lba);
+
       virtual bool Read_TOC(TOC *toc);
 
       virtual void Eject(bool eject_status);
