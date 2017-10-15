@@ -68,6 +68,7 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
 }
 
 extern unsigned cd_2x_speedup;
+extern bool cd_async;
 
 PS_CDC::~PS_CDC()
 {
@@ -904,7 +905,7 @@ void PS_CDC::HandlePlayRead(void)
       PSX_WARNING("[CDC] In leadout area: %u", CurSector);
    }
 
-   if(!SeekRetryCounter)
+   if(!cd_async || !SeekRetryCounter)
       Cur_CDIF->ReadRawSector(read_buf, CurSector, false);
    else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, true))
    {
