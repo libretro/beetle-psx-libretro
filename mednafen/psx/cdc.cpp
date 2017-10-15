@@ -69,6 +69,8 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
 
 extern unsigned cd_2x_speedup;
 extern bool cd_async;
+extern bool cd_warned_slow;
+extern int64 cd_slow_timeout;
 
 PS_CDC::~PS_CDC()
 {
@@ -905,13 +907,27 @@ void PS_CDC::HandlePlayRead(void)
       PSX_WARNING("[CDC] In leadout area: %u", CurSector);
    }
 
-   if(!cd_async || !SeekRetryCounter)
-      Cur_CDIF->ReadRawSector(read_buf, CurSector, false);
-   else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, true))
+   if (cd_async && SeekRetryCounter)
    {
-      SeekRetryCounter--;
-      PSRCounter = 33868800 / 75;
-      return;
+      if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, 0))
+      {
+         SeekRetryCounter--;
+         PSRCounter = 33868800 / 75;
+         return;
+      }
+   }
+   else if (cd_warned_slow)
+   {
+      Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
+   }
+   else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, cd_slow_timeout))
+   {
+      if (cd_async)
+         MDFN_DispMessage("*Really* slow CD image read detected -- consider using precache CD Access Method");
+      else
+         MDFN_DispMessage("Slow CD image read detected -- consider using async or precache CD Access Method");
+      cd_warned_slow = true;
+      Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
    }
 
    DecodeSubQ(read_buf + 2352);

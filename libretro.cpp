@@ -46,6 +46,8 @@ static bool enable_analog_calibration = false;
 static bool enable_variable_serialization_size = false;
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
+bool cd_warned_slow = false;
+int64 cd_slow_timeout = 8000; // microseconds
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -1076,6 +1078,8 @@ static void PSX_Power(void)
    PSX_PRNG.z = 43219876;
    PSX_PRNG.c = 6543217;
    PSX_PRNG.lcgo = 0xDEADBEEFCAFEBABEULL;
+
+   cd_warned_slow = false;
 
    memset(MainRAM.data32, 0, 2048 * 1024);
 
