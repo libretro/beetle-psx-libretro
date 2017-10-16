@@ -45,6 +45,9 @@ static bool enable_memcard1 = false;
 static bool enable_analog_calibration = false;
 static bool enable_variable_serialization_size = false;
 unsigned cd_2x_speedup = 1;
+bool cd_async = false;
+bool cd_warned_slow = false;
+int64 cd_slow_timeout = 8000; // microseconds
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -1075,6 +1078,8 @@ static void PSX_Power(void)
    PSX_PRNG.z = 43219876;
    PSX_PRNG.c = 6543217;
    PSX_PRNG.lcgo = 0xDEADBEEFCAFEBABEULL;
+
+   cd_warned_slow = false;
 
    memset(MainRAM.data32, 0, 2048 * 1024);
 
@@ -2636,18 +2641,24 @@ static void check_variables(bool startup)
    }
 
 #ifndef EMSCRIPTEN
-   var.key = option_cd_image_cache;
+   var.key = option_cd_access_method;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      bool cdimage_cache = true;
-      if (strcmp(var.value, "enabled") == 0)
-         cdimage_cache = true;
-      else if (strcmp(var.value, "disabled") == 0)
-         cdimage_cache = false;
-      if (cdimage_cache != old_cdimagecache)
+      if (strcmp(var.value, "sync") == 0)
       {
-         old_cdimagecache = cdimage_cache;
+         old_cdimagecache = false;
+         cd_async = false;
+      }
+      else if (strcmp(var.value, "async") == 0)
+      {
+         old_cdimagecache = false;
+         cd_async = true;
+      }
+      else if (strcmp(var.value, "precache") == 0)
+      {
+         old_cdimagecache = true;
+         cd_async = false;
       }
    }
 #endif
@@ -4160,7 +4171,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
       { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
 #ifndef EMSCRIPTEN
-      { option_cd_image_cache, "CD Image Cache (restart); disabled|enabled" },
+      { option_cd_access_method, "CD Access Method (restart); sync|async|precache" },
 #endif
       { option_memcard0_method, "Memcard 0 method; libretro|mednafen" },
       { option_memcard1_enable, "Enable memory card 1; enabled|disabled" },
