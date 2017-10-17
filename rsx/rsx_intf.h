@@ -6,6 +6,10 @@
 
 #include "rsx.h"
 
+#define SOUND_FREQUENCY 44100
+#define FPS_NTSC 59.941
+#define FPS_PAL 49.76
+
 enum rsx_renderer_type
 {
    RSX_SOFTWARE = 0,
@@ -15,11 +19,11 @@ enum rsx_renderer_type
 
 enum blending_modes
 {
-  BLEND_MODE_OPAQUE = -1,
-  BLEND_MODE_AVERAGE = 0,
-  BLEND_MODE_ADD = 1,
-  BLEND_MODE_SUBTRACT = 2,
-  BLEND_MODE_ADD_FOURTH = 3
+   BLEND_MODE_OPAQUE     = -1,
+   BLEND_MODE_AVERAGE    =  0,
+   BLEND_MODE_ADD        =  1,
+   BLEND_MODE_SUBTRACT   =  2,
+   BLEND_MODE_ADD_FOURTH =  3
 };
 
 void rsx_intf_set_environment(retro_environment_t cb);
@@ -32,15 +36,15 @@ void rsx_intf_close(void);
 void rsx_intf_refresh_variables(void);
 void rsx_intf_prepare_frame(void);
 void rsx_intf_finalize_frame(const void *data, unsigned width,
-     unsigned height, unsigned pitch);
+                             unsigned height, unsigned pitch);
 
 void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
-     uint8_t twx, uint8_t twy);
+                             uint8_t twx, uint8_t twy);
 
 void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
 void rsx_intf_set_draw_offset(int16_t x, int16_t y);
 void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
-                           uint16_t x1, uint16_t y1);
+                            uint16_t x1, uint16_t y1);
 void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,
                                bool depth_24bpp);
@@ -48,9 +52,7 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
 void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                             float p1x, float p1y, float p1w,
                             float p2x, float p2y, float p2w,
-                            uint32_t c0,
-                            uint32_t c1,
-                            uint32_t c2,
+                            uint32_t c0, uint32_t c1, uint32_t c2,
                             uint16_t t0x, uint16_t t0y,
                             uint16_t t1x, uint16_t t1y,
                             uint16_t t2x, uint16_t t2y,
@@ -92,9 +94,8 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
                         uint32_t c0,
                         uint32_t c1,
                         bool dither,
-                        // This is really an `enum blending_modes`
-                        // but I don't want to deal with enums in the
-                        // FFI
+                        /* This is really an `enum blending_modes`
+                         * but I don't want to deal with enums in the FFI */
                         int blend_mode,
                         uint32_t mask_test,
                         uint32_t set_mask);
@@ -111,7 +112,8 @@ void rsx_intf_fill_rect(uint32_t color,
 
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
-                        uint16_t w, uint16_t h, uint32_t mask_test, uint32_t set_mask);
+                        uint16_t w, uint16_t h, 
+                        uint32_t mask_test, uint32_t set_mask);
 
 void rsx_intf_set_type(enum rsx_renderer_type type);
 void rsx_intf_set_fallback_type(enum rsx_renderer_type type);
@@ -123,11 +125,11 @@ void rsx_intf_toggle_display(bool status);
 bool rsx_intf_has_software_renderer(void);
 
 #ifdef __cplusplus
-  extern "C" {
+extern "C" {
 #endif
-     extern retro_environment_t environ_cb;
+  extern retro_environment_t environ_cb;
 #ifdef __cplusplus
-  }
+}
 #endif
 
 #endif /*__RSX_H__ */

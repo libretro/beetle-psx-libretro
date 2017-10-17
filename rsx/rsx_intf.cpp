@@ -8,25 +8,25 @@
 #include "rsx.h"
 #include "../libretro_cbs.h"
 #ifdef HAVE_OPENGL
-#include "rsx_lib_gl.h"
+   #include "rsx_lib_gl.h"
 #endif
 #ifdef HAVE_VULKAN
-#include "rsx_lib_vulkan.h"
+   #include "rsx_lib_vulkan.h"
 #endif
 #include "rsx_lib_soft.h"
 
 #ifdef RSX_DUMP
-#include "rsx_dump.h"
+   #include "rsx_dump.h"
 #include <stdlib.h>
 #endif
 
 static enum rsx_renderer_type rsx_type = 
 #if defined(HAVE_VULKAN)
-RSX_VULKAN
+   RSX_VULKAN
 #elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-RSX_OPENGL
+   RSX_OPENGL
 #else
-RSX_SOFTWARE
+   RSX_SOFTWARE
 #endif
 ;
 
@@ -220,7 +220,7 @@ void rsx_intf_prepare_frame(void)
 }
 
 void rsx_intf_finalize_frame(const void *fb, unsigned width, 
-      unsigned height, unsigned pitch)
+                             unsigned height, unsigned pitch)
 {
 #ifdef RSX_DUMP
    rsx_dump_finalize_frame();
@@ -245,7 +245,7 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
 }
 
 void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
-      uint8_t twx, uint8_t twy)
+                             uint8_t twx, uint8_t twy)
 {
 #ifdef RSX_DUMP
    rsx_dump_set_tex_window(tww, twh, twx, twy);
@@ -310,7 +310,7 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 }
 
 void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
-			    uint16_t x1, uint16_t y1)
+			                   uint16_t x1, uint16_t y1)
 {
 #ifdef RSX_DUMP
    rsx_dump_set_draw_area(x0, y0, x1, y1);
@@ -334,8 +334,8 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
 }
 
 void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h,
-      bool depth_24bpp)
+                               uint16_t w, uint16_t h,
+                               bool depth_24bpp)
 {
 #ifdef RSX_DUMP
    rsx_dump_set_display_mode(x, y, w, h, depth_24bpp);
@@ -424,10 +424,7 @@ void rsx_intf_push_quad(
 	float p1x, float p1y, float p1w,
 	float p2x, float p2y, float p2w,
 	float p3x, float p3y, float p3w,
-	uint32_t c0,
-	uint32_t c1,
-	uint32_t c2,
-	uint32_t c3,
+	uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
 	uint16_t t0x, uint16_t t0y,
 	uint16_t t1x, uint16_t t1y,
 	uint16_t t2x, uint16_t t2y,
@@ -488,8 +485,7 @@ void rsx_intf_push_quad(
 
 void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
-      uint32_t c0,
-      uint32_t c1,
+      uint32_t c0, uint32_t c1,
       bool dither,
       int blend_mode,
       uint32_t mask_test,
@@ -572,7 +568,8 @@ void rsx_intf_fill_rect(uint32_t color,
 
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
-      uint16_t w, uint16_t h, uint32_t mask_test, uint32_t set_mask)
+      uint16_t w, uint16_t h, 
+      uint32_t mask_test, uint32_t set_mask)
 {
 #ifdef RSX_DUMP
    rsx_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test != 0, set_mask != 0);

@@ -2003,12 +2003,12 @@ struct retro_system_av_info get_av_info(VideoClock std)
    info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
-   info.geometry.aspect_ratio   = widescreen_hack ? 16.0/9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+   info.geometry.aspect_ratio   = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0/9.0;
 
    if (display_vram)
       info.geometry.aspect_ratio = 2./1.;
 
-   info.timing.sample_rate     = 44100;
+   info.timing.sample_rate     = SOUND_FREQUENCY;
 
    /* Precise FPS values for the video output for the given
     * VideoClock. It's actually possible to configure the PlayStation GPU
@@ -2018,10 +2018,10 @@ struct retro_system_av_info get_av_info(VideoClock std)
    switch (std)
    {
       case VideoClock_Ntsc:
-         info.timing.fps = 59.941;
+         info.timing.fps = FPS_NTSC;
          break;
       case VideoClock_Pal:
-         info.timing.fps = 49.76;
+         info.timing.fps = FPS_PAL;
          break;
    }
 

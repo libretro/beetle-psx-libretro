@@ -13,8 +13,6 @@ extern retro_environment_t environ_cb;
 extern uint8_t widescreen_hack;
 extern uint8_t psx_gpu_upscale_shift;
 
-float video_output_framerate(void);
-
 #ifdef __cplusplus
 }
 #endif

@@ -10,7 +10,7 @@
 #include <vector>
 #include <functional>
 
-
+#include "../libretro_cbs.h"
 
 using namespace Vulkan;
 using namespace PSX;
@@ -19,7 +19,6 @@ using namespace std;
 static Context *context;
 static Device *device;
 static Renderer *renderer;
-static bool video_is_pal;
 static unsigned scaling = 4;
 
 static retro_hw_render_callback hw_render;
@@ -30,7 +29,6 @@ static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
-static bool widescreen_hack;
 static vector<function<void ()>> defer;
 
 static retro_video_refresh_t video_refresh_cb;
@@ -103,7 +101,7 @@ static void context_destroy(void)
 
 bool rsx_vulkan_open(bool is_pal)
 {
-   video_is_pal = is_pal;
+   content_is_pal = is_pal;
 
    hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
    hw_render.version_major = VK_MAKE_VERSION(1, 0, 32);
@@ -133,59 +131,59 @@ void rsx_vulkan_close(void)
 
 void rsx_vulkan_refresh_variables(void)
 {
-    struct retro_variable var = {0};
-    var.key = option_renderer_software_fb;
+   struct retro_variable var = {0};
+   var.key = option_renderer_software_fb;
 
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-       if (!strcmp(var.value, "enabled"))
-          has_software_fb = true;
-       else
-          has_software_fb = false;
-    }
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         has_software_fb = true;
+      else
+         has_software_fb = false;
+   }
 
-    unsigned old_scaling = scaling;
-    var.key = option_internal_resolution;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        /* Same limitations as libretro.cpp */
-        scaling = var.value[0] - '0';
-	if (var.value[1] != 'x')
-	{
-           scaling  = (var.value[0] - '0') * 10;
-	   scaling += var.value[1] - '0';
-	}
-    }
+   unsigned old_scaling = scaling;
+   var.key = option_internal_resolution;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      /* Same limitations as libretro.cpp */
+      scaling = var.value[0] - '0';
+      if (var.value[1] != 'x')
+      {
+         scaling  = (var.value[0] - '0') * 10;
+         scaling += var.value[1] - '0';
+      }
+   }
 
-    var.key = option_adaptive_smoothing;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        if (!strcmp(var.value, "enabled"))
-           adaptive_smoothing = true;
-        else
-           adaptive_smoothing = false;
-    }
-    
-    var.key = option_widescreen_hack;
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        if (!strcmp(var.value, "enabled"))
-            widescreen_hack = true;
-        else
-            widescreen_hack = false;
-    }
+   var.key = option_adaptive_smoothing;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         adaptive_smoothing = true;
+      else
+         adaptive_smoothing = false;
+   }
 
-    if (old_scaling != scaling && renderer)
-    {
-       retro_system_av_info info;
-       rsx_vulkan_get_system_av_info(&info);
+   var.key = option_widescreen_hack;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         widescreen_hack = true;
+      else
+         widescreen_hack = false;
+   }
 
-       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
-       {
-          // Failed to change scale, just keep using the old one.
-          scaling = old_scaling;
-       }
-    }
+   if (old_scaling != scaling && renderer)
+   {
+      retro_system_av_info info;
+      rsx_vulkan_get_system_av_info(&info);
+
+      if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
+      {
+         // Failed to change scale, just keep using the old one.
+         scaling = old_scaling;
+      }
+   }
 }
 
 bool rsx_vulkan_has_software_renderer(void)
@@ -218,7 +216,7 @@ void rsx_vulkan_prepare_frame(void)
 }
 
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
-      unsigned height, unsigned pitch)
+                               unsigned height, unsigned pitch)
 {
    (void)fb;
    (void)width;
@@ -273,17 +271,17 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    rsx_vulkan_refresh_variables();
 
    memset(info, 0, sizeof(*info));
-   info->geometry.base_width = 320;
-   info->geometry.base_height = 240;
-   info->geometry.max_width = 640 * scaling;
-   info->geometry.max_height = 480 * scaling;
-   info->timing.sample_rate = 44100.0;
+   info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * scaling;
+   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * scaling;
+   info->timing.sample_rate   = SOUND_FREQUENCY;
 
-   info->geometry.aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 4.0 / 3.0;
-   if (video_is_pal)
-      info->timing.fps = 49.76;
+   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
+   if (content_is_pal)
+      info->timing.fps = FPS_PAL;
    else
-      info->timing.fps = 59.941;
+      info->timing.fps = FPS_NTSC;
 }
 
 /* Draw commands */
@@ -318,17 +316,15 @@ void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    }
 }
 
-void rsx_vulkan_set_draw_area(uint16_t x0,
-      uint16_t y0,
-      uint16_t x1,
-      uint16_t y1)
+void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
+                              uint16_t x1, uint16_t y1)
 {
-   int width = x1 - x0 + 1;
+   int width  = x1 - x0 + 1;
    int height = y1 - y0 + 1;
-   width = max(width, 0);
+   width  = max(width, 0);
    height = max(height, 0);
 
-   width = min(width, int(FB_WIDTH - x0));
+   width  = min(width, int(FB_WIDTH - x0));
    height = min(height, int(FB_HEIGHT - y0));
 
    if (renderer)
@@ -341,11 +337,9 @@ void rsx_vulkan_set_draw_area(uint16_t x0,
    }
 }
 
-void rsx_vulkan_set_display_mode(uint16_t x,
-      uint16_t y,
-      uint16_t w,
-      uint16_t h,
-      bool depth_24bpp)
+void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
+                                 uint16_t w, uint16_t h,
+                                 bool depth_24bpp)
 {
    if (renderer)
       renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
@@ -358,34 +352,17 @@ void rsx_vulkan_set_display_mode(uint16_t x,
 }
 
 void rsx_vulkan_push_quad(
-      float p0x,
-      float p0y,
-      float p0w,
-      float p1x,
-      float p1y,
-      float p1w,
-      float p2x,
-      float p2y,
-      float p2w,
-      float p3x,
-      float p3y,
-      float p3w,
-      uint32_t c0,
-      uint32_t c1,
-      uint32_t c2,
-      uint32_t c3,
-      uint16_t t0x,
-      uint16_t t0y,
-      uint16_t t1x,
-      uint16_t t1y,
-      uint16_t t2x,
-      uint16_t t2y,
-      uint16_t t3x,
-      uint16_t t3y,
-      uint16_t texpage_x,
-      uint16_t texpage_y,
-      uint16_t clut_x,
-      uint16_t clut_y,
+      float p0x, float p0y, float p0w,
+      float p1x, float p1y, float p1w,
+      float p2x, float p2y, float p2w,
+      float p3x, float p3y, float p3w,
+      uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+      uint16_t t0x, uint16_t t0y, 
+      uint16_t t1x, uint16_t t1y,
+      uint16_t t2x, uint16_t t2y,
+      uint16_t t3x, uint16_t t3y,
+      uint16_t texpage_x, uint16_t texpage_y,
+      uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
       bool dither,
@@ -450,28 +427,17 @@ void rsx_vulkan_push_quad(
 }
 
 void rsx_vulkan_push_triangle(
-      float p0x,
-      float p0y,
-      float p0w,
-      float p1x,
-      float p1y,
-      float p1w,
-      float p2x,
-      float p2y,
+      float p0x, float p0y,
+      float p0w, float p1x,
+      float p1y, float p1w,
+      float p2x, float p2y,
       float p2w,
-      uint32_t c0,
-      uint32_t c1,
-      uint32_t c2,
-      uint16_t t0x,
-      uint16_t t0y,
-      uint16_t t1x,
-      uint16_t t1y,
-      uint16_t t2x,
-      uint16_t t2y,
-      uint16_t texpage_x,
-      uint16_t texpage_y,
-      uint16_t clut_x,
-      uint16_t clut_y,
+      uint32_t c0, uint32_t c1, uint32_t c2,
+      uint16_t t0x, uint16_t t0y,
+      uint16_t t1x, uint16_t t1y,
+      uint16_t t2x, uint16_t t2y,
+      uint16_t texpage_x, uint16_t texpage_y,
+      uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
       uint8_t depth_shift,
       bool dither,
@@ -535,8 +501,8 @@ void rsx_vulkan_push_triangle(
 }
 
 void rsx_vulkan_fill_rect(uint32_t color,
-      uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h)
+                          uint16_t x, uint16_t y,
+                          uint16_t w, uint16_t h)
 {
    if (renderer)
       renderer->clear_rect({ x, y, w, h }, color);
@@ -555,14 +521,11 @@ void rsx_vulkan_copy_rect(
    renderer->blit_vram({ dst_x, dst_y, w, h }, { src_x, src_y, w, h });
 }
 
-void rsx_vulkan_push_line(int16_t p0x,
-      int16_t p0y,
-      int16_t p1x,
-      int16_t p1y,
-      uint32_t c0,
-      uint32_t c1,
-      bool dither,
-      int blend_mode, bool mask_test, bool set_mask)
+void rsx_vulkan_push_line(int16_t p0x, int16_t p0y,
+                          int16_t p1x, int16_t p1y,
+                          uint32_t c0, uint32_t c1,
+                          bool dither,
+                          int blend_mode, bool mask_test, bool set_mask)
 {
    if (!renderer)
       return;
@@ -600,8 +563,8 @@ void rsx_vulkan_push_line(int16_t p0x,
 }
 
 void rsx_vulkan_load_image(uint16_t x, uint16_t y,
-      uint16_t w, uint16_t h,
-      uint16_t *vram, bool mask_test, bool set_mask)
+                           uint16_t w, uint16_t h,
+                           uint16_t *vram, bool mask_test, bool set_mask)
 {
    if (!renderer)
    {
