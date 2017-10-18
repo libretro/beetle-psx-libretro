@@ -523,7 +523,7 @@ int CDAccess_CHD::LoadSBI(const char* sbi_path)
 #if 0
    MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
 #endif
-   log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
+   log_cb(RETRO_LOG_INFO, "[CHD] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 

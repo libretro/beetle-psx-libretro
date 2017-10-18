@@ -349,7 +349,7 @@ int CDAccess_Image::LoadSBI(const char* sbi_path)
    }
 
    //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
-
+   log_cb(RETRO_LOG_INFO, "[Image] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 
