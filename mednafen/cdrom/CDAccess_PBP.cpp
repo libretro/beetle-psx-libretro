@@ -659,12 +659,21 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
    if(PBP_DiscCount > 1 && PBP_DiscCount < 10)
       sbi_path[sbi_path.length()-5] = (CD_SelectedDisc+1) + '0';
 
-   if(!SubQReplaceMap.empty())
-      SubQReplaceMap.clear();
-
    // Load SBI file, if present
    if (path_is_valid(sbi_path.c_str()))
+   {
+      if(!SubQReplaceMap.empty())
+         SubQReplaceMap.clear();
+
       LoadSBI(sbi_path.c_str());
+   }
+   else if (!SubQReplaceMap.empty())
+   {
+      SubQReplaceMap.clear();
+
+      // SBI should probably be loaded in this case but file path is invalid
+      log_cb(RETRO_LOG_WARN, "[PBP] Invalid path/filename for SBI file %s\n", sbi_path);
+   }
 
    return true;
 }
@@ -706,7 +715,7 @@ int CDAccess_PBP::LoadSBI(const char* sbi_path)
 #if 0
    MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
 #endif
-   log_cb(RETRO_LOG_DEBUG, "[PBP] Loaded SBI file %s\n", sbi_path);
+   log_cb(RETRO_LOG_INFO, "[PBP] Loaded SBI file %s\n", sbi_path);
    return 0;
 }
 
