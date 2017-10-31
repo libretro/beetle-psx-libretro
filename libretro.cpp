@@ -4295,6 +4295,8 @@ void *retro_get_memory_data(unsigned type)
 
    switch (type)
    {
+      case RETRO_MEMORY_SYSTEM_RAM:
+         return MainRAM.data8;
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
             return NULL;
