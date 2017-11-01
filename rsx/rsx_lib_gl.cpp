@@ -369,7 +369,7 @@ static void get_error(const char *msg)
          break;
    }
 
-   /* glGetError should always be called in a loop, until 
+   /* glGetError should always be called in a loop, until
     * it returns GL_NO_ERROR, if all error flags are to be reset. */
    while (error != GL_NO_ERROR)
       error = glGetError();
@@ -783,7 +783,7 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 }
 
    template<typename T>
-static void DrawBuffer_new(DrawBuffer<T> *drawbuffer, 
+static void DrawBuffer_new(DrawBuffer<T> *drawbuffer,
       const char *vertex_shader, const char *fragment_shader, size_t capacity)
 {
    GLuint id = 0;
@@ -856,7 +856,7 @@ static void Framebuffer_init(struct Framebuffer *fb,
                            0);
 
    GLenum col_attach_0 = GL_COLOR_ATTACHMENT0;
-   
+
    glDrawBuffers(1, &col_attach_0);
    glViewport( 0,
                0,
@@ -1153,7 +1153,7 @@ static void GlRenderer_upload_textures(
       glUseProgram(renderer->image_load_buffer->program->id);
       glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
       glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
-      
+
       glUseProgram(renderer->command_buffer->program->id);
       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
    }
@@ -1169,7 +1169,7 @@ static void GlRenderer_upload_textures(
 
    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
-   
+
    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
    glEnable(GL_SCISSOR_TEST);
 
@@ -1248,7 +1248,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    var.key = option_depth;
    uint8_t depth = 16;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "32bpp"))
          depth = 32;
@@ -1256,7 +1256,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    var.key = option_dither_mode;
    dither_mode dither_mode = DITHER_NATIVE;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "internal resolution"))
          dither_mode = DITHER_UPSCALED;
@@ -1266,7 +1266,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    var.key = option_wireframe;
    bool wireframe = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
          wireframe = true;
@@ -1518,7 +1518,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       struct retro_game_geometry geometry;
       geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
       geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-      
+
       /* Max parameters are ignored by this call */
       geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
       geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
@@ -1562,7 +1562,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = option_filter;
    uint8_t filter = FILTER_MODE_NEAREST;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "nearest"))
          filter = FILTER_MODE_NEAREST;
@@ -1580,7 +1580,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = option_depth;
    uint8_t depth = 16;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "32bpp"))
          depth = 32;
@@ -1588,7 +1588,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = option_dither_mode;
    dither_mode dither_mode = DITHER_NATIVE;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "internal resolution"))
          dither_mode = DITHER_UPSCALED;
@@ -1598,7 +1598,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = option_wireframe;
    bool wireframe = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
          wireframe = true;
@@ -1659,7 +1659,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    if (renderer->command_buffer->program)
    {
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
-  
+
       glUseProgram(renderer->command_buffer->program->id);
       glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], dither_scaling);
    }
@@ -1717,7 +1717,7 @@ static void vertex_preprocessing(
 
    if (is_semi_transparent &&
          (stm != renderer->semi_transparency_mode ||
-          mode != renderer->command_draw_mode)) 
+          mode != renderer->command_draw_mode))
    {
       /* We're changing the transparency mode */
       TransparencyIndex ti;
@@ -2114,7 +2114,7 @@ void rsx_gl_prepare_frame(void)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
    {
@@ -2319,9 +2319,9 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
       return;
 
    /* Finish drawing anything with the current offset */
-   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer)) 
+   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
-   
+
    renderer->config.draw_offset[0] = x;
    renderer->config.draw_offset[1] = y;
 }
@@ -2331,7 +2331,7 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh,
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
@@ -2371,11 +2371,11 @@ void rsx_gl_set_display_mode( uint16_t x, uint16_t y,
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    renderer->config.display_top_left[0]   = x;
    renderer->config.display_top_left[1]   = y;
 
@@ -2398,16 +2398,16 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
                         uint8_t texture_blend_mode,
                         uint8_t depth_shift,
                         bool dither,
-                        int blend_mode, 
+                        int blend_mode,
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
    switch (blend_mode) {
@@ -2485,7 +2485,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
 
    bool is_semi_transparent = v[0].semi_transparent == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
-   
+
    /* Textured semi-transparent polys can contain opaque texels (when
     * bit 15 of the color is set to 0). Therefore they're drawn twice,
     * once for the opaque texels and once for the semi-transparent
@@ -2531,11 +2531,11 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2609,14 +2609,14 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
 void rsx_gl_fill_rect(  uint32_t color,
                         uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h)
-{   
+{
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-     
+
    uint16_t top_left[2]   = {x, y};
    uint16_t dimensions[2] = {w, h};
    uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};
@@ -2673,16 +2673,16 @@ void rsx_gl_fill_rect(  uint32_t color,
 
 void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
-                        uint16_t w, uint16_t h, 
+                        uint16_t w, uint16_t h,
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2731,7 +2731,7 @@ void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
     * behaviour. I could use glReadPixels and glWritePixels instead
     * or something like that. */
    glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-   glCopyTexSubImage2D( GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 
+   glCopyTexSubImage2D( GL_TEXTURE_2D, 0, new_dst_x, new_dst_y,
                         new_src_x, new_src_y, new_w, new_h);
 
    glDeleteFramebuffers(1, &fb);
@@ -2760,11 +2760,11 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
 
@@ -2827,19 +2827,19 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
 
 void rsx_gl_load_image( uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h,
-                        uint16_t *vram, 
+                        uint16_t *vram,
                         uint32_t mask_eval_and, uint32_t mask_set_or)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
+
    renderer->mask_set_or   = mask_set_or;
    renderer->mask_eval_and = mask_eval_and;
-      
+
    Framebuffer _fb;
    uint16_t top_left[2];
    uint16_t dimensions[2];
@@ -2894,7 +2894,7 @@ void rsx_gl_load_image( uint16_t x, uint16_t y,
 
    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
-   
+
    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
    glEnable(GL_SCISSOR_TEST);
 
@@ -2907,10 +2907,10 @@ void rsx_gl_toggle_display(bool status)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
-   
+
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-   
-      renderer->config.display_off  = status;
+
+   renderer->config.display_off  = status;
 }
