@@ -4311,6 +4311,8 @@ size_t retro_get_memory_size(unsigned type)
 {
    switch (type)
    {
+      case RETRO_MEMORY_SYSTEM_RAM:
+         return 0x200000;
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
             return 0;
