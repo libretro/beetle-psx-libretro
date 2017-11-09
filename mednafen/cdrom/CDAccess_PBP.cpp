@@ -672,7 +672,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
       SubQReplaceMap.clear();
 
       // SBI should probably be loaded in this case but file path is invalid
-      log_cb(RETRO_LOG_WARN, "[PBP] Invalid path/filename for SBI file %s\n", sbi_path);
+      log_cb(RETRO_LOG_WARN, "[PBP] Invalid path/filename for SBI file %s\n", sbi_path.c_str());
    }
 
    return true;
