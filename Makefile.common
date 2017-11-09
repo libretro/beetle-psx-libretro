@@ -46,20 +46,20 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(DEPS_DIR)/zlib \
             -I/usr/local/include
 
-SOURCES_C += $(DEPS_DIR)/zlib/adler32.c \
-				 $(DEPS_DIR)/zlib/compress.c \
-				 $(DEPS_DIR)/zlib/crc32.c \
-				 $(DEPS_DIR)/zlib/deflate.c \
-				 $(DEPS_DIR)/zlib/gzclose.c \
-				 $(DEPS_DIR)/zlib/gzlib.c \
-				 $(DEPS_DIR)/zlib/gzread.c \
-				 $(DEPS_DIR)/zlib/gzwrite.c \
-				 $(DEPS_DIR)/zlib/inffast.c \
-				 $(DEPS_DIR)/zlib/inflate.c \
-				 $(DEPS_DIR)/zlib/inftrees.c \
-				 $(DEPS_DIR)/zlib/trees.c \
-				 $(DEPS_DIR)/zlib/uncompr.c \
-				 $(DEPS_DIR)/zlib/zutil.c
+SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
+               $(DEPS_DIR)/zlib/compress.c \
+               $(DEPS_DIR)/zlib/crc32.c \
+               $(DEPS_DIR)/zlib/deflate.c \
+               $(DEPS_DIR)/zlib/gzclose.c \
+               $(DEPS_DIR)/zlib/gzlib.c \
+               $(DEPS_DIR)/zlib/gzread.c \
+               $(DEPS_DIR)/zlib/gzwrite.c \
+               $(DEPS_DIR)/zlib/inffast.c \
+               $(DEPS_DIR)/zlib/inflate.c \
+               $(DEPS_DIR)/zlib/inftrees.c \
+               $(DEPS_DIR)/zlib/trees.c \
+               $(DEPS_DIR)/zlib/uncompr.c \
+               $(DEPS_DIR)/zlib/zutil.c
 
 ifeq ($(HAVE_GRIFFIN),1)
    SOURCES_CXX += beetle_psx_griffin.cpp \
@@ -72,7 +72,7 @@ endif
 FLAGS += -DHAVE_PBP
 
 ifeq ($(DEBUG), 1)
-	SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
+   SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
 endif
 
 ifeq ($(NEED_THREADING), 1)
@@ -81,7 +81,7 @@ endif
 
 ifeq ($(NEED_CRC32), 1)
    FLAGS += -DWANT_CRC32
-	SOURCES_C += $(CORE_DIR)/scrc32.c
+   SOURCES_C += $(CORE_DIR)/scrc32.c
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)
@@ -169,7 +169,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_EMU_DIR)/input/mouse.cpp
 
    ifeq ($(HAVE_JIT), 1)
-	   SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
+      SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
    endif
 
    SOURCES_C += $(CORE_DIR)/libretro_cbs.c
@@ -221,7 +221,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(MEDNAFEN_DIR)/video/surface.cpp \
                   $(CORE_DIR)/libretro.cpp
 
-   SOURCES_C += 	$(MEDNAFEN_DIR)/file.c \
+   SOURCES_C +=   $(MEDNAFEN_DIR)/file.c \
                   $(CORE_DIR)/rsx/rsx_lib_soft.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(MEDNAFEN_DIR)/md5.c
@@ -230,12 +230,12 @@ ifneq ($(HAVE_GRIFFIN), 1)
 
    ifneq ($(RSX_DUMP),)
       SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp
-      CFLAGS += -DRSX_DUMP
-      CXXFLAGS += -DRSX_DUMP
+      CFLAGS      += -DRSX_DUMP
+      CXXFLAGS    += -DRSX_DUMP
    endif
 
    ifeq ($(HAVE_VULKAN), 1)
-	   SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
+      SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp) \
                      $(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/spirv_cross.cpp \
@@ -248,7 +248,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                         -I$(CORE_DIR)/parallel-psx/vulkan \
                         -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
 
-	   CXXFLAGS += -std=c++11
+      CXXFLAGS += -std=c++11
       ifneq ($(VULKAN_DEBUG),)
          FLAGS += -DVULKAN_DEBUG
       endif
@@ -271,21 +271,21 @@ ifneq ($(HAVE_GRIFFIN), 1)
    endif
 endif ## ifneq($(HAVE_GRIFFIN, 1))
 
-SOURCES_C += $(LIBKIRK_DIR)/aes.c \
-             $(LIBKIRK_DIR)/amctrl.c \
-             $(LIBKIRK_DIR)/bn.c \
-             $(LIBKIRK_DIR)/des.c \
-             $(LIBKIRK_DIR)/ec.c \
-             $(LIBKIRK_DIR)/kirk_engine.c \
-             $(LIBKIRK_DIR)/sha1.c
+SOURCES_C +=   $(LIBKIRK_DIR)/aes.c \
+               $(LIBKIRK_DIR)/amctrl.c \
+               $(LIBKIRK_DIR)/bn.c \
+               $(LIBKIRK_DIR)/des.c \
+               $(LIBKIRK_DIR)/ec.c \
+               $(LIBKIRK_DIR)/kirk_engine.c \
+               $(LIBKIRK_DIR)/sha1.c
 
-SOURCES_C += $(CORE_DIR)/pgxp/pgxp_cpu.c \
-             $(CORE_DIR)/pgxp/pgxp_debug.c \
-				 $(CORE_DIR)/pgxp/pgxp_gpu.c \
-				 $(CORE_DIR)/pgxp/pgxp_gte.c \
-				 $(CORE_DIR)/pgxp/pgxp_main.c \
-				 $(CORE_DIR)/pgxp/pgxp_mem.c \
-				 $(CORE_DIR)/pgxp/pgxp_value.c
+SOURCES_C +=   $(CORE_DIR)/pgxp/pgxp_cpu.c \
+               $(CORE_DIR)/pgxp/pgxp_debug.c \
+               $(CORE_DIR)/pgxp/pgxp_gpu.c \
+               $(CORE_DIR)/pgxp/pgxp_gte.c \
+               $(CORE_DIR)/pgxp/pgxp_main.c \
+               $(CORE_DIR)/pgxp/pgxp_mem.c \
+               $(CORE_DIR)/pgxp/pgxp_value.c
 
 ifeq ($(HAVE_CHD), 1)
    SOURCES_C +=   $(DEPS_DIR)/crypto/md5.c \
