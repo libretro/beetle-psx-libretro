@@ -63,13 +63,9 @@ endif
 
 ifeq ($(SET_HAVE_HW), 1)
    FLAGS += -DHAVE_HW
+   TARGET_NAME := mednafen_psx_hw
 endif
 
-ifeq ($(HAVE_VULKAN),1)
-   TARGET_NAME := mednafen_psx_hw
-else ifeq ($(HAVE_OPENGL),1)
-   TARGET_NAME := mednafen_psx_hw
-endif
 
 # Unix
 ifneq (,$(findstring unix,$(platform)))
@@ -340,15 +336,14 @@ else ifeq ($(platform), emscripten)
 
    STATIC_LINKING = 1
 
-ifeq ($(HAVE_OPENGL),1)
-   ifneq (,$(findstring gles,$(platform)))
-      GLES = 1
-      GL_LIB := -lGLESv2
-   else
-      GL_LIB := -lGL
+   ifeq ($(HAVE_OPENGL),1)
+      ifneq (,$(findstring gles,$(platform)))
+         GLES = 1
+         GL_LIB := -lGLESv2
+      else
+         GL_LIB := -lGL
+      endif
    endif
-endif
-
 
 # Windows
 else
@@ -359,26 +354,34 @@ else
    SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    FLAGS   += -DHAVE__MKDIR
+   
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -lopengl32
    endif
-
 endif
 
 include Makefile.common
 
-WARNINGS := -Wall \
-   -Wno-sign-compare \
-   -Wno-unused-variable \
-   -Wno-unused-function \
-   -Wno-uninitialized \
-   $(NEW_GCC_WARNING_FLAGS) \
-   -Wno-strict-aliasing
+# https://github.com/libretro-mirrors/mednafen-git/blob/master/README.PORTING
+MEDNAFEN_GCC_FLAGS = -fwrapv \
+                     -fsigned-char
+                     
+ifeq ($(IS_X86),1)
+   MEDNAFEN_GCC_FLAGS += -fomit-frame-pointer
+endif
 
-#EXTRA_GCC_FLAGS := -funroll-loops
+WARNINGS := -Wall \
+            -Wno-sign-compare \
+            -Wno-unused-variable \
+            -Wno-unused-function \
+            -Wno-uninitialized \
+            $(NEW_GCC_WARNING_FLAGS) \
+            -Wno-strict-aliasing
 
 ifeq ($(NO_GCC),1)
    WARNINGS :=
+else
+   FLAGS += $(MEDNAFEN_GCC_FLAGS)
 endif
 
 OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
@@ -389,7 +392,7 @@ all: $(TARGET)
 -include $(DEPS)
 
 ifeq ($(DEBUG),0)
-   FLAGS += -O2 -DNDEBUG $(EXTRA_GCC_FLAGS)
+   FLAGS += -O3 -DNDEBUG $(EXTRA_GCC_FLAGS)
 else
    FLAGS += -O0 -g -DDEBUG
 endif
@@ -398,7 +401,22 @@ LDFLAGS += $(fpic) $(SHARED)
 FLAGS   += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS   += $(INCFLAGS)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.38.6\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=9386 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) -D__STDC_CONSTANT_MACROS
+FLAGS += $(ENDIANNESS_DEFINES) \
+         -DSIZEOF_DOUBLE=8 \
+         $(WARNINGS) \
+         -DMEDNAFEN_VERSION=\"0.9.38.6\" \
+         -DPACKAGE=\"mednafen\" \
+         -DMEDNAFEN_VERSION_NUMERIC=9386 \
+         -DPSS_STYLE=1 \
+         -DMPC_FIXED_POINT \
+         $(CORE_DEFINE) \
+         -DSTDC_HEADERS \
+         -D__STDC_LIMIT_MACROS \
+         -D__LIBRETRO__ \
+         -D_LOW_ACCURACY_ \
+         $(EXTRA_INCLUDES) \
+         $(SOUND_DEFINE) \
+         -D__STDC_CONSTANT_MACROS
 
 ifeq ($(HAVE_VULKAN),1)
    FLAGS += -DHAVE_VULKAN
