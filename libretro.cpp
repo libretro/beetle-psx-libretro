@@ -2829,7 +2829,7 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_2 = false;
    }
 
-	var.key = input_set_gun_trigger;
+	var.key = option_gun_trigger;
 
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
 	{
