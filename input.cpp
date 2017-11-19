@@ -24,6 +24,7 @@ typedef union
 {
 	uint8_t u8[ 10 * sizeof( uint32_t ) ];
 	uint32_t u32[ 10 ]; /* 1 + 8 + 1 */
+	uint16_t gun_pos[ 2 ];
 	uint16_t buttons;
 }
 INPUT_DATA;
@@ -52,10 +53,11 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_DUALSHOCK          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
 #define RETRO_DEVICE_PS_ANALOG             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
 #define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+#define RETRO_DEVICE_PS_GUNCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0)
 #define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
 #define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 6 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 7 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -63,6 +65,7 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ "DualShock", RETRO_DEVICE_PS_DUALSHOCK },
 	{ "Analog Controller", RETRO_DEVICE_PS_ANALOG },
 	{ "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
+	{ "Guncon / G-Con 45", RETRO_DEVICE_PS_GUNCON },
 	{ "Mouse", RETRO_DEVICE_PS_MOUSE },
 	{ "neGcon", RETRO_DEVICE_PS_NEGCON },
 	{ NULL, 0 },
@@ -437,9 +440,6 @@ void input_update( retro_input_state_t input_state_cb )
 	{
 		INPUT_DATA* p_input = &(input_data[ iplayer ]);
 
-		//
-		// -- Buttons
-
 		switch ( input_type[ iplayer ] )
 		{
 
@@ -460,6 +460,78 @@ void input_update( retro_input_state_t input_state_cb )
 				p_input->buttons |=
 					input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, input_map_controller[ i ] )
 						? ( 1 << i ) : 0;
+			}
+
+			break;
+
+		case RETRO_DEVICE_PS_GUNCON:
+
+			{
+				p_input->u8[4] = 0;
+				uint8_t trigger = 0;
+
+				// trigger
+				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ) {
+					trigger = ( 1 << 0 ); // Trigger
+				}
+
+				// a
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
+					p_input->u8[4] |= ( 1 << 1 ); // a
+				}
+
+				// b
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_MIDDLE ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
+					p_input->u8[4] |= ( 1 << 2 ); // b
+				}
+
+				// -- Position
+
+				int gun_x, gun_y;
+				int gun_x_raw, gun_y_raw;
+				gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X );
+				gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y );
+
+				// off-screen?
+				if ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) )
+				{
+					if ( trigger ) {
+						trigger |= ( 1 << 3 ); // off-screen flag
+					}
+					gun_x = 0;
+					gun_y = 0;
+				}
+				else
+				{
+					//
+					// .. scale into screen space:
+					// NOTE: this is complete hacky guesswork for this first pass, need to re-write.
+					//
+					// Compute a scale for assumed 320 x 240 pixel resolution.
+					//
+					// See in [guncon.cpp]GPULineHook:
+					// gx = (nom_x * 2 + pix_clock_divider) / (pix_clock_divider * 2)
+					// ### Measured pix_clock_divider as 10 in "Time Crisis"[U] (seems to be consistently 10?)
+					// gx = (nom_x * 2 + 10) / 20;
+					// gx * 20 = nom_x * 2 + 10;
+					// gx * 20 - 10 = nom_x * 2
+					// nom_x = ( gx * 20 - 10 ) / 2;
+					// nom_x[@319px] = ( 319 * 20 - 10 ) / 2;
+					// nom_x[@319px] = 3195;
+					//
+
+					const int scale_x = 3185;
+					const int scale_y = 239;
+
+					gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+					gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+				}
+
+				p_input->gun_pos[ 0 ] = gun_x;
+				p_input->gun_pos[ 1 ] = gun_y;
+				p_input->u8[4] |= trigger;
 			}
 
 			break;
@@ -772,6 +844,11 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 		case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Analog Joystick\n", (in_port+1) );
 			SetInput( in_port, "analogjoy", (uint8*)&input_data[ in_port ] );
+			break;
+
+		case RETRO_DEVICE_PS_GUNCON:
+			log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
+			SetInput( in_port, "guncon", (uint8*)&input_data[ in_port ] );
 			break;
 
 		case RETRO_DEVICE_PS_MOUSE:
