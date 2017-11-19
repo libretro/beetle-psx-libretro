@@ -19,6 +19,7 @@ static FrontIO* FIO; // cached in input_set_fio
 
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
+static bool gun_trigger_rmb = false;
 
 typedef union
 {
@@ -428,6 +429,11 @@ void input_set_player_count( unsigned _players )
 	players = _players;
 }
 
+void input_set_gun_trigger( bool use_rmb )
+{
+	gun_trigger_rmb = use_rmb;
+}
+
 unsigned input_get_player_count()
 {
 	return players;
@@ -468,24 +474,7 @@ void input_update( retro_input_state_t input_state_cb )
 
 			{
 				p_input->u8[4] = 0;
-				uint8_t trigger = 0;
-
-				// trigger
-				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ) {
-					trigger = ( 1 << 0 ); // Trigger
-				}
-
-				// a
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
-					p_input->u8[4] |= ( 1 << 1 ); // a
-				}
-
-				// b
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_MIDDLE ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
-					p_input->u8[4] |= ( 1 << 2 ); // b
-				}
+				uint8_t shot_type = 0;
 
 				// -- Position
 
@@ -494,17 +483,24 @@ void input_update( retro_input_state_t input_state_cb )
 				gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X );
 				gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y );
 
+				int gun_edge_detect = 32700;
+
 				// off-screen?
-				if ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) )
+				if ( ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) ) ||
+					 ( gun_x_raw < -gun_edge_detect ) ||
+					 ( gun_x_raw > gun_edge_detect ) ||
+					 ( gun_y_raw < -gun_edge_detect ) ||
+					 ( gun_y_raw > gun_edge_detect ) )
 				{
-					if ( trigger ) {
-						trigger |= ( 1 << 3 ); // off-screen flag
-					}
-					gun_x = 0;
-					gun_y = 0;
+					shot_type = ( 1 << 3 ); // Off-screen shot
+
+					gun_x = -16384; // magic position to disable cross-hair drawing.
+					gun_y = -16384;
 				}
 				else
 				{
+					shot_type = ( 1 << 0 ); // On-screen shot!
+
 					//
 					// .. scale into screen space:
 					// NOTE: this is complete hacky guesswork for this first pass, need to re-write.
@@ -531,7 +527,37 @@ void input_update( retro_input_state_t input_state_cb )
 
 				p_input->gun_pos[ 0 ] = gun_x;
 				p_input->gun_pos[ 1 ] = gun_y;
-				p_input->u8[4] |= trigger;
+
+				unsigned mbutton_trigger;
+				unsigned mbutton_a;
+				unsigned mbutton_b;
+
+				if ( gun_trigger_rmb ) {
+					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_RIGHT;
+					mbutton_a = RETRO_DEVICE_ID_MOUSE_LEFT;
+					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
+				} else {
+					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_LEFT;
+					mbutton_a = RETRO_DEVICE_ID_MOUSE_RIGHT;
+					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
+				}
+
+				// trigger
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_trigger ) ) {
+					p_input->u8[4] = shot_type;
+				}
+
+				// a
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_a ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
+					p_input->u8[4] |= ( 1 << 1 ); // a
+				}
+
+				// b
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_b ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
+					p_input->u8[4] |= ( 1 << 2 ); // b
+				}
 			}
 
 			break;
