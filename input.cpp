@@ -53,7 +53,7 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 #define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 4 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 5 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -61,6 +61,7 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ "DualShock", RETRO_DEVICE_PS_DUALSHOCK },
 	{ "Analog Controller", RETRO_DEVICE_PS_ANALOG },
 	{ "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
+	{ "Mouse", RETRO_DEVICE_PS_MOUSE },
 	{ NULL, 0 },
 };
 
@@ -394,14 +395,15 @@ void input_update( retro_input_state_t input_state_cb )
 	{
 		INPUT_DATA* p_input = &(input_data[ iplayer ]);
 
-		// reset input
-		p_input->buttons = 0;
-
 		//
 		// -- Buttons
 
 		switch ( input_type[ iplayer ] )
 		{
+
+		default:
+			p_input->buttons = 0;
+			break;
 
 		case RETRO_DEVICE_JOYPAD:
 		case RETRO_DEVICE_PS_CONTROLLER:
@@ -410,6 +412,7 @@ void input_update( retro_input_state_t input_state_cb )
 		case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 
 			// Use fixed lookup table to map RetroPad inputs to PlayStation input bitmap.
+			p_input->buttons = 0;
 			for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
 			{
 				p_input->buttons |=
@@ -419,10 +422,37 @@ void input_update( retro_input_state_t input_state_cb )
 
 			break;
 
+		case RETRO_DEVICE_PS_MOUSE:
+
+			// Simple two-button mouse.
+			{
+				p_input->u32[ 2 ] = 0;
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT ) ) {
+					p_input->u32[ 2 ] |= ( 1 << 1 ); // Left
+				}
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) ) {
+					p_input->u32[ 2 ] |= ( 1 << 0 ); // Right
+				}
+			}
+
+			// Relative input.
+			{
+				// mouse input
+				int dx_raw, dy_raw;
+				dx_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X );
+				dy_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y );
+
+				p_input->u32[ 0 ] = dx_raw;
+				p_input->u32[ 1 ] = dy_raw;
+			}
+
+			break;
+
 		}; // switch ( input_type[ iplayer ] )
 
+
 		//
-		// -- Analog
+		// -- Analog Sticks
 
 		switch ( input_type[ iplayer ] )
 		{
@@ -518,21 +548,8 @@ void input_update( retro_input_state_t input_state_cb )
 
 			break;
 
-		default:
-
-			// Neutral
-			p_input->u32[1] = 0;
-			p_input->u32[2] = 0;
-			p_input->u32[3] = 0;
-			p_input->u32[4] = 0;
-			p_input->u32[5] = 0;
-			p_input->u32[6] = 0;
-			p_input->u32[7] = 0;
-			p_input->u32[8] = 0;
-
-			break;
-
 		}; // switch ( input_type[ iplayer ] )
+
 
 		//
 		// -- Rumble
@@ -603,6 +620,11 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 		case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Analog Joystick\n", (in_port+1) );
 			SetInput( in_port, "analogjoy", (uint8*)&input_data[ in_port ] );
+			break;
+
+		case RETRO_DEVICE_PS_MOUSE:
+			log_cb( RETRO_LOG_INFO, "Controller %u: Mouse\n", (in_port+1) );
+			SetInput( in_port, "mouse", (uint8*)&input_data[ in_port ] );
 			break;
 
 		default:
