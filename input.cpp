@@ -22,26 +22,19 @@ static bool enable_analog_calibration = false;
 
 typedef union
 {
-	uint8_t u8[ 10 * sizeof(uint32_t) ];
-	uint8_t u32[ 10 ];
+	uint8_t u8[ 10 * sizeof( uint32_t ) ];
+	uint32_t u32[ 10 ]; /* 1 + 8 + 1 */
+	uint16_t buttons;
 }
 INPUT_DATA;
 
 // Controller state buffer (per player)
 static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {0};
 
-union
+struct analog_calibration
 {
-   uint32_t u32[MAX_CONTROLLERS][1 + 8 + 1]; // Buttons + Axes + Rumble
-   uint8_t u8[MAX_CONTROLLERS][(1 + 8 + 1) * sizeof(uint32_t)];
-} static buf;
-#define MAX_BUTTONS 16
-
-static uint16_t input_buf[MAX_CONTROLLERS] = {0};
-
-struct analog_calibration {
-  float left;
-  float right;
+	float left;
+	float right;
 };
 
 static struct analog_calibration analog_calibration[MAX_CONTROLLERS];
@@ -71,6 +64,54 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ NULL, 0 },
 };
 
+
+
+//------------------------------------------------------------------------------
+// Mapping Helpers
+//------------------------------------------------------------------------------
+
+/* Controller (default) */
+enum { INPUT_MAP_CONTROLLER_SIZE = 16 };
+static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
+{
+	// libretro input				 at position	|| maps to PS1			on bit
+	//-----------------------------------------------------------------------------
+#ifdef MSB_FIRST
+	RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2
+	RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2
+	RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1
+	RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1
+	RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle
+	RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle
+	RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross
+	RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square
+	RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select
+	RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3
+	RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3
+	RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start
+	RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up
+	RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Down		-> Pad-Down
+	RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Left		-> Pad-Left
+	RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Right	-> Pad-Right
+#else
+	RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select				0
+	RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3					1
+	RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3					2
+	RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start				3
+	RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up				4
+	RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Down		-> Pad-Down				5
+	RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Left		-> Pad-Left				6
+	RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Right	-> Pad-Right			7
+	RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2					8
+	RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2					9
+	RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1					10
+	RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1					11
+	RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle				12
+	RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle				13
+	RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross				14
+	RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square				15
+#endif
+};
 
 //------------------------------------------------------------------------------
 // Local Functions
@@ -348,170 +389,180 @@ unsigned input_get_player_count()
 
 void input_update( retro_input_state_t input_state_cb )
 {
-   //input_buf[0] = 0;
-   //input_buf[1] = 0;
+	// For each player (logical controller)
+	for ( unsigned iplayer = 0; iplayer < players; ++iplayer )
+	{
+		INPUT_DATA* p_input = &(input_data[ iplayer ]);
 
-   for (unsigned j = 0; j < players; j++)
-   {
-       input_buf[j] = 0;
-   }
+		// reset input
+		p_input->buttons = 0;
 
-   static unsigned map[] = {
-#ifdef MSB_FIRST
-      RETRO_DEVICE_ID_JOYPAD_L2,
-      RETRO_DEVICE_ID_JOYPAD_R2,
-      RETRO_DEVICE_ID_JOYPAD_L,
-      RETRO_DEVICE_ID_JOYPAD_R,
-      RETRO_DEVICE_ID_JOYPAD_X,
-      RETRO_DEVICE_ID_JOYPAD_A,
-      RETRO_DEVICE_ID_JOYPAD_B,
-      RETRO_DEVICE_ID_JOYPAD_Y,
-      RETRO_DEVICE_ID_JOYPAD_SELECT,
-      RETRO_DEVICE_ID_JOYPAD_L3,
-      RETRO_DEVICE_ID_JOYPAD_R3,
-      RETRO_DEVICE_ID_JOYPAD_START,
-      RETRO_DEVICE_ID_JOYPAD_UP,
-      RETRO_DEVICE_ID_JOYPAD_RIGHT,
-      RETRO_DEVICE_ID_JOYPAD_DOWN,
-      RETRO_DEVICE_ID_JOYPAD_LEFT,
-#else
-      RETRO_DEVICE_ID_JOYPAD_SELECT,
-      RETRO_DEVICE_ID_JOYPAD_L3,
-      RETRO_DEVICE_ID_JOYPAD_R3,
-      RETRO_DEVICE_ID_JOYPAD_START,
-      RETRO_DEVICE_ID_JOYPAD_UP,
-      RETRO_DEVICE_ID_JOYPAD_RIGHT,
-      RETRO_DEVICE_ID_JOYPAD_DOWN,
-      RETRO_DEVICE_ID_JOYPAD_LEFT,
-      RETRO_DEVICE_ID_JOYPAD_L2,
-      RETRO_DEVICE_ID_JOYPAD_R2,
-      RETRO_DEVICE_ID_JOYPAD_L,
-      RETRO_DEVICE_ID_JOYPAD_R,
-      RETRO_DEVICE_ID_JOYPAD_X,
-      RETRO_DEVICE_ID_JOYPAD_A,
-      RETRO_DEVICE_ID_JOYPAD_B,
-      RETRO_DEVICE_ID_JOYPAD_Y,
-#endif
-   };
+		//
+		// -- Buttons
 
-   for (unsigned j = 0; j < players; j++)
-   {
-      for (unsigned i = 0; i < MAX_BUTTONS; i++)
-         input_buf[j] |= input_state_cb(j, RETRO_DEVICE_JOYPAD, 0, map[i]) ? (1 << i) : 0;
-   }
+		switch ( input_type[ iplayer ] )
+		{
 
-   // Buttons.
-   //buf.u8[0][0] = (input_buf[0] >> 0) & 0xff;
-   //buf.u8[0][1] = (input_buf[0] >> 8) & 0xff;
-   //buf.u8[1][0] = (input_buf[1] >> 0) & 0xff;
-   //buf.u8[1][1] = (input_buf[1] >> 8) & 0xff;
+		case RETRO_DEVICE_JOYPAD:
+		case RETRO_DEVICE_PS_CONTROLLER:
+		case RETRO_DEVICE_PS_DUALSHOCK:
+		case RETRO_DEVICE_PS_ANALOG:
+		case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 
-   for (unsigned j = 0; j < players; j++)
-   {
-        buf.u8[j][0] = (input_buf[j] >> 0) & 0xff;
-        buf.u8[j][1] = (input_buf[j] >> 8) & 0xff;
-   }
+			// Use fixed lookup table to map RetroPad inputs to PlayStation input bitmap.
+			for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+			{
+				p_input->buttons |=
+					input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, input_map_controller[ i ] )
+						? ( 1 << i ) : 0;
+			}
 
-   // Analogs
-   for (unsigned j = 0; j < players; j++)
-   {
-      int analog_left_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-            RETRO_DEVICE_ID_ANALOG_X);
+			break;
 
-      int analog_left_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-            RETRO_DEVICE_ID_ANALOG_Y);
+		}; // switch ( input_type[ iplayer ] )
 
-      int analog_right_x = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-            RETRO_DEVICE_ID_ANALOG_X);
+		//
+		// -- Analog
 
-      int analog_right_y = input_state_cb(j, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-            RETRO_DEVICE_ID_ANALOG_Y);
+		switch ( input_type[ iplayer ] )
+		{
 
-      struct analog_calibration *calibration = &analog_calibration[j];
+		case RETRO_DEVICE_PS_DUALSHOCK:
+		case RETRO_DEVICE_PS_ANALOG:
+		case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 
-      uint32_t r_right = analog_right_x > 0 ?  analog_right_x : 0;
-      uint32_t r_left  = analog_right_x < 0 ? -analog_right_x : 0;
-      uint32_t r_down  = analog_right_y > 0 ?  analog_right_y : 0;
-      uint32_t r_up    = analog_right_y < 0 ? -analog_right_y : 0;
+			{
+				int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+					RETRO_DEVICE_ID_ANALOG_X);
 
-      uint32_t l_right = analog_left_x > 0 ?  analog_left_x : 0;
-      uint32_t l_left  = analog_left_x < 0 ? -analog_left_x : 0;
-      uint32_t l_down  = analog_left_y > 0 ?  analog_left_y : 0;
-      uint32_t l_up    = analog_left_y < 0 ? -analog_left_y : 0;
+				int analog_left_y = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+					RETRO_DEVICE_ID_ANALOG_Y);
 
-      if (enable_analog_calibration) {
-         // Compute the "radius" (distance from 0, 0) of the current
-         // stick position, using the same normalized values
-         float l = analog_radius(analog_left_x, analog_left_y);
-         float r = analog_radius(analog_right_x, analog_right_y);
+				int analog_right_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+					RETRO_DEVICE_ID_ANALOG_X);
 
-         // We recalibrate when we find a new max value for the sticks
-         if (l > analog_calibration->left) {
-            analog_calibration->left = l;
-            log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius: %f\n", l);
-         }
+				int analog_right_y = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+					RETRO_DEVICE_ID_ANALOG_Y);
 
-         if (r > analog_calibration->right) {
-            analog_calibration->right = r;
+      			struct analog_calibration *calibration = &analog_calibration[ iplayer ];
 
-            log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
-         }
+				uint32_t r_right = analog_right_x > 0 ?  analog_right_x : 0;
+				uint32_t r_left  = analog_right_x < 0 ? -analog_right_x : 0;
+				uint32_t r_down  = analog_right_y > 0 ?  analog_right_y : 0;
+				uint32_t r_up    = analog_right_y < 0 ? -analog_right_y : 0;
 
-         // This represents the maximal value the DualShock sticks can
-         // reach, where 1.0 would be the maximum value along the X or
-         // Y axis. XXX I need to measure this value more precisely,
-         // it's a rough estimate at the moment.
-         static const float dualshock_analog_radius = 1.35;
+				uint32_t l_right = analog_left_x > 0 ?  analog_left_x : 0;
+				uint32_t l_left  = analog_left_x < 0 ? -analog_left_x : 0;
+				uint32_t l_down  = analog_left_y > 0 ?  analog_left_y : 0;
+				uint32_t l_up    = analog_left_y < 0 ? -analog_left_y : 0;
 
-         // Now compute the scaling factor to apply to convert the
-         // emulator's controller coordinates to a native DualShock's
-         // ones
-         float l_scaling = dualshock_analog_radius / analog_calibration->left;
-         float r_scaling = dualshock_analog_radius / analog_calibration->right;
+				if ( enable_analog_calibration )
+				{
+					// Compute the "radius" (distance from 0, 0) of the current
+					// stick position, using the same normalized values
+					float l = analog_radius(analog_left_x, analog_left_y);
+					float r = analog_radius(analog_right_x, analog_right_y);
 
-         analog_scale(&l_left, l_scaling);
-         analog_scale(&l_right, l_scaling);
-         analog_scale(&l_up, l_scaling);
-         analog_scale(&l_down, l_scaling);
+					// We recalibrate when we find a new max value for the sticks
+					if ( l > analog_calibration->left ) {
+						analog_calibration->left = l;
+						log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius: %f\n", l);
+					}
 
-         analog_scale(&r_left, r_scaling);
-         analog_scale(&r_right, r_scaling);
-         analog_scale(&r_up, r_scaling);
-         analog_scale(&r_down, r_scaling);
-      } else {
-         // Reset the calibration. Since we only increase the
-         // calibration coordinates we can start with a reasonably
-         // small value.
-         analog_calibration->left = 0.7;
-         analog_calibration->right = 0.7;
-      }
+					if ( r > analog_calibration->right ) {
+						analog_calibration->right = r;
+						log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
+					}
 
-      buf.u32[j][1] = r_right;
-      buf.u32[j][2] = r_left;
-      buf.u32[j][3] = r_down;
-      buf.u32[j][4] = r_up;
+					// This represents the maximal value the DualShock sticks can
+					// reach, where 1.0 would be the maximum value along the X or
+					// Y axis. XXX I need to measure this value more precisely,
+					// it's a rough estimate at the moment.
+					static const float dualshock_analog_radius = 1.35;
 
-      buf.u32[j][5] = l_right;
-      buf.u32[j][6] = l_left;
-      buf.u32[j][7] = l_down;
-      buf.u32[j][8] = l_up;
-   }
+					// Now compute the scaling factor to apply to convert the
+					// emulator's controller coordinates to a native DualShock's
+					// ones
+					float l_scaling = dualshock_analog_radius / analog_calibration->left;
+					float r_scaling = dualshock_analog_radius / analog_calibration->right;
 
-   //fprintf(stderr, "Rumble strong: %u, weak: %u.\n", buf.u8[0][9 * 4 + 1], buf.u8[0][9 * 4]);
-   if (rumble.set_rumble_state)
-   {
-      // Appears to be correct.
-      //rumble.set_rumble_state(0, RETRO_RUMBLE_WEAK, buf.u8[0][9 * 4] * 0x101);
-      //rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, buf.u8[0][9 * 4 + 1] * 0x101);
-      //rumble.set_rumble_state(1, RETRO_RUMBLE_WEAK, buf.u8[1][9 * 4] * 0x101);
-      //rumble.set_rumble_state(1, RETRO_RUMBLE_STRONG, buf.u8[1][9 * 4 + 1] * 0x101);
+					analog_scale(&l_left, l_scaling);
+					analog_scale(&l_right, l_scaling);
+					analog_scale(&l_up, l_scaling);
+					analog_scale(&l_down, l_scaling);
 
-      for (unsigned j = 0; j < players; j++)
-      {
-          rumble.set_rumble_state(j, RETRO_RUMBLE_WEAK, buf.u8[j][9 * 4] * 0x101);
-          rumble.set_rumble_state(j, RETRO_RUMBLE_STRONG, buf.u8[j][9 * 4 + 1] * 0x101);
-      }
-   }
+					analog_scale(&r_left, r_scaling);
+					analog_scale(&r_right, r_scaling);
+					analog_scale(&r_up, r_scaling);
+					analog_scale(&r_down, r_scaling);
+				}
+				else
+				{
+					// Reset the calibration. Since we only increase the
+					// calibration coordinates we can start with a reasonably
+					// small value.
+					analog_calibration->left = 0.7;
+					analog_calibration->right = 0.7;
+				}
+
+				p_input->u32[1] = r_right;
+				p_input->u32[2] = r_left;
+				p_input->u32[3] = r_down;
+				p_input->u32[4] = r_up;
+
+				p_input->u32[5] = l_right;
+				p_input->u32[6] = l_left;
+				p_input->u32[7] = l_down;
+				p_input->u32[8] = l_up;
+      		}
+
+			break;
+
+		default:
+
+			// Neutral
+			p_input->u32[1] = 0;
+			p_input->u32[2] = 0;
+			p_input->u32[3] = 0;
+			p_input->u32[4] = 0;
+			p_input->u32[5] = 0;
+			p_input->u32[6] = 0;
+			p_input->u32[7] = 0;
+			p_input->u32[8] = 0;
+
+			break;
+
+		}; // switch ( input_type[ iplayer ] )
+
+		//
+		// -- Rumble
+
+		if ( rumble.set_rumble_state )
+		{
+			switch ( input_type[ iplayer ] )
+			{
+
+			case RETRO_DEVICE_PS_DUALSHOCK:
+
+				{
+					// Appears to be correct.
+					rumble.set_rumble_state( iplayer, RETRO_RUMBLE_WEAK, p_input->u8[9 * 4] * 0x101);
+					rumble.set_rumble_state( iplayer, RETRO_RUMBLE_STRONG, p_input->u8[9 * 4 + 1] * 0x101);
+
+					/*log_cb( RETRO_LOG_INFO, "Controller %u: Rumble: %d %d\n",
+						iplayer,
+						p_input->u8[9 * 4] * 0x101,
+						p_input->u8[9 * 4 + 1] * 0x101
+					);*/
+				}
+
+				break;
+
+			}; // switch ( input_type[ iplayer ] )
+
+		}; // can we rumble?
+
+	}; // for each player
 }
 
 //------------------------------------------------------------------------------
@@ -561,12 +612,13 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 
 		}; // switch ( device )
 
+		// Clear rumble.
 		if ( rumble.set_rumble_state )
 		{
 			rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
 			rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
-			input_data[ in_port ].u32[ 9 ] = 0;
 		}
+		input_data[ in_port ].u32[ 9 ] = 0;
 
 	}; // valid port?
 }

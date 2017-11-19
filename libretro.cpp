@@ -2327,9 +2327,6 @@ extern void Emulate(EmulateSpecStruct *espec);
 static bool overscan;
 static double last_sound_rate;
 
-
-char *psx_analog_type;
-
 #ifdef NEED_DEINTERLACER
 static bool PrevInterlaced;
 static Deinterlacer deint;
