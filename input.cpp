@@ -494,17 +494,19 @@ void input_update( retro_input_state_t input_state_cb )
 
 			// Analog Inputs
 			{
-				uint16_t button_ii = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 );
-				uint16_t button_i = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 );
-				uint16_t left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
+				uint16_t button_ii, button_i, left_shoulder;
 
-				// Digital overrides for analog face buttons
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B ) ) {
-					button_i = 0x7FFF;
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y ) ) {
-					button_ii = 0x7FFF;
-				}
+				button_ii = std::max(
+					get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 ),
+					get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y )
+				);
+
+				button_i = std::max(
+					get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 ),
+					get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B )
+				);
+
+				left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
 
 				p_input->u32[ 3 ] = button_i; // Analog button I
 				p_input->u32[ 4 ] = button_ii; // Analog button II
