@@ -504,25 +504,10 @@ void input_update( retro_input_state_t input_state_cb )
 				{
 					shot_type = ( 1 << 0 ); // On-screen shot!
 
-					//
 					// .. scale into screen space:
-					// NOTE: this is complete hacky guesswork for this first pass, need to re-write.
-					//
-					// Compute a scale for assumed 320 x 240 pixel resolution.
-					//
-					// See in [guncon.cpp]GPULineHook:
-					// gx = (nom_x * 2 + pix_clock_divider) / (pix_clock_divider * 2)
-					// ### Measured pix_clock_divider as 10 in "Time Crisis"[U] (seems to be consistently 10?)
-					// gx = (nom_x * 2 + 10) / 20;
-					// gx * 20 = nom_x * 2 + 10;
-					// gx * 20 - 10 = nom_x * 2
-					// nom_x = ( gx * 20 - 10 ) / 2;
-					// nom_x[@319px] = ( 319 * 20 - 10 ) / 2;
-					// nom_x[@319px] = 3195;
-					//
-
-					const int scale_x = 3185;
-					const int scale_y = 239;
+					// NOTE: these are based on empirical evidence only.
+					const int scale_x = 2800;
+					const int scale_y = 240;
 
 					gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
 					gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
