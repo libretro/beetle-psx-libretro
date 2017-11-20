@@ -55,10 +55,11 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_ANALOG             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
 #define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 #define RETRO_DEVICE_PS_GUNCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0)
+#define RETRO_DEVICE_PS_JUSTIFIER          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1)
 #define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
 #define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 7 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 8 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -67,6 +68,7 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ "Analog Controller", RETRO_DEVICE_PS_ANALOG },
 	{ "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
 	{ "Guncon / G-Con 45", RETRO_DEVICE_PS_GUNCON },
+	{ "Justifier", RETRO_DEVICE_PS_JUSTIFIER },
 	{ "Mouse", RETRO_DEVICE_PS_MOUSE },
 	{ "neGcon", RETRO_DEVICE_PS_NEGCON },
 	{ NULL, 0 },
@@ -471,6 +473,7 @@ void input_update( retro_input_state_t input_state_cb )
 			break;
 
 		case RETRO_DEVICE_PS_GUNCON:
+		case RETRO_DEVICE_PS_JUSTIFIER:
 
 			{
 				p_input->u8[4] = 0;
@@ -544,19 +547,27 @@ void input_update( retro_input_state_t input_state_cb )
 
 				// trigger
 				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_trigger ) ) {
-					p_input->u8[4] = shot_type;
+					p_input->u8[4] |= shot_type;
 				}
 
-				// a
+				// Guncon 'A' or Justifier 'Aux'
 				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_a ) ||
 					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
-					p_input->u8[4] |= ( 1 << 1 ); // a
+					p_input->u8[4] |= ( 1 << 1 );
 				}
 
-				// b
+				// Guncon 'B' or Justifier 'Start'
 				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_b ) ||
 					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
-					p_input->u8[4] |= ( 1 << 2 ); // b
+					p_input->u8[4] |= ( 1 << 2 );
+				}
+
+				// Justifier 'Start'
+				if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+				{
+					if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) ) {
+						p_input->u8[4] |= ( 1 << 2 );
+					}
 				}
 			}
 
@@ -875,6 +886,11 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 		case RETRO_DEVICE_PS_GUNCON:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
 			SetInput( in_port, "guncon", (uint8*)&input_data[ in_port ] );
+			break;
+
+		case RETRO_DEVICE_PS_JUSTIFIER:
+			log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
+			SetInput( in_port, "justifier", (uint8*)&input_data[ in_port ] );
 			break;
 
 		case RETRO_DEVICE_PS_MOUSE:
