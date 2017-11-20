@@ -19,7 +19,6 @@ static FrontIO* FIO; // cached in input_set_fio
 
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
-static bool gun_trigger_rmb = false;
 
 typedef union
 {
@@ -431,11 +430,6 @@ void input_set_player_count( unsigned _players )
 	players = _players;
 }
 
-void input_set_gun_trigger( bool use_rmb )
-{
-	gun_trigger_rmb = use_rmb;
-}
-
 unsigned input_get_player_count()
 {
 	return players;
@@ -476,36 +470,30 @@ void input_update( retro_input_state_t input_state_cb )
 		case RETRO_DEVICE_PS_JUSTIFIER:
 
 			{
-				p_input->u8[4] = 0;
-				uint8_t shot_type = 0;
-
-				// -- Position
-
+				uint8_t shot_type;
 				int gun_x, gun_y;
-				int gun_x_raw, gun_y_raw;
-				gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X );
-				gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y );
-
-				int gun_edge_detect = 32700;
 
 				// off-screen?
-				if ( ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) ) ||
-					 ( gun_x_raw < -gun_edge_detect ) ||
-					 ( gun_x_raw > gun_edge_detect ) ||
-					 ( gun_y_raw < -gun_edge_detect ) ||
-					 ( gun_y_raw > gun_edge_detect ) )
+				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT ) )
 				{
-					shot_type = ( 1 << 3 ); // Off-screen shot
+					shot_type = 0x8; // off-screen shot
 
 					gun_x = -16384; // magic position to disable cross-hair drawing.
 					gun_y = -16384;
 				}
 				else
 				{
-					shot_type = ( 1 << 0 ); // On-screen shot!
+					shot_type = 0x1; // on-screen shot
+
+					int gun_x_raw, gun_y_raw;
+					gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
+					gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
 
 					// .. scale into screen space:
-					// NOTE: these are based on empirical evidence only.
+					// NOTE: the scaling here is semi-guesswork, need to re-write.
+					// TODO: Test with PAL games.
+
 					const int scale_x = 2800;
 					const int scale_y = 240;
 
@@ -513,45 +501,40 @@ void input_update( retro_input_state_t input_state_cb )
 					gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
 				}
 
+				// position
 				p_input->gun_pos[ 0 ] = gun_x;
 				p_input->gun_pos[ 1 ] = gun_y;
 
-				unsigned mbutton_trigger;
-				unsigned mbutton_a;
-				unsigned mbutton_b;
-
-				if ( gun_trigger_rmb ) {
-					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_RIGHT;
-					mbutton_a = RETRO_DEVICE_ID_MOUSE_LEFT;
-					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
-				} else {
-					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_LEFT;
-					mbutton_a = RETRO_DEVICE_ID_MOUSE_RIGHT;
-					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
-				}
+				// buttons
+				p_input->u8[ 4 ] = 0;
 
 				// trigger
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_trigger ) ) {
-					p_input->u8[4] |= shot_type;
+				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ) {
+					p_input->u8[ 4 ] |= shot_type;
 				}
 
-				// Guncon 'A' or Justifier 'Aux'
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_a ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
-					p_input->u8[4] |= ( 1 << 1 );
-				}
-
-				// Guncon 'B' or Justifier 'Start'
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_b ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
-					p_input->u8[4] |= ( 1 << 2 );
-				}
-
-				// Justifier 'Start'
 				if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
 				{
-					if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) ) {
-						p_input->u8[4] |= ( 1 << 2 );
+					// Justifier 'Aux'
+					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+						p_input->u8[ 4 ] |= 0x2;
+					}
+
+					// Justifier 'Start'
+					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) ) {
+						p_input->u8[ 4 ] |= 0x4;
+					}
+				}
+				else
+				{
+					// Guncon 'A'
+					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+						p_input->u8[ 4 ] |= 0x2;
+					}
+
+					// Guncon 'B'
+					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) ) {
+						p_input->u8[ 4 ] |= 0x4;
 					}
 				}
 			}

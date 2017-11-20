@@ -18,8 +18,6 @@ extern void input_enable_calibration( bool enable );
 
 extern void input_set_env( retro_environment_t environ_cb );
 
-extern void input_set_gun_trigger( bool use_rmb );
-
 extern void input_set_player_count( unsigned players );
 
 extern unsigned input_get_player_count();
