@@ -19,6 +19,7 @@ static FrontIO* FIO; // cached in input_set_fio
 
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
+static bool gun_trigger_rmb = false;
 
 typedef union
 {
@@ -54,10 +55,11 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_ANALOG             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
 #define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 #define RETRO_DEVICE_PS_GUNCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0)
+#define RETRO_DEVICE_PS_JUSTIFIER          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1)
 #define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
 #define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 7 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 8 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -66,6 +68,7 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ "Analog Controller", RETRO_DEVICE_PS_ANALOG },
 	{ "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
 	{ "Guncon / G-Con 45", RETRO_DEVICE_PS_GUNCON },
+	{ "Justifier", RETRO_DEVICE_PS_JUSTIFIER },
 	{ "Mouse", RETRO_DEVICE_PS_MOUSE },
 	{ "neGcon", RETRO_DEVICE_PS_NEGCON },
 	{ NULL, 0 },
@@ -428,6 +431,11 @@ void input_set_player_count( unsigned _players )
 	players = _players;
 }
 
+void input_set_gun_trigger( bool use_rmb )
+{
+	gun_trigger_rmb = use_rmb;
+}
+
 unsigned input_get_player_count()
 {
 	return players;
@@ -465,27 +473,11 @@ void input_update( retro_input_state_t input_state_cb )
 			break;
 
 		case RETRO_DEVICE_PS_GUNCON:
+		case RETRO_DEVICE_PS_JUSTIFIER:
 
 			{
 				p_input->u8[4] = 0;
-				uint8_t trigger = 0;
-
-				// trigger
-				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ) {
-					trigger = ( 1 << 0 ); // Trigger
-				}
-
-				// a
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
-					p_input->u8[4] |= ( 1 << 1 ); // a
-				}
-
-				// b
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_MIDDLE ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
-					p_input->u8[4] |= ( 1 << 2 ); // b
-				}
+				uint8_t shot_type = 0;
 
 				// -- Position
 
@@ -494,17 +486,24 @@ void input_update( retro_input_state_t input_state_cb )
 				gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X );
 				gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y );
 
+				int gun_edge_detect = 32700;
+
 				// off-screen?
-				if ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) )
+				if ( ( ( gun_x_raw == 0 ) && ( gun_y_raw == 0 ) ) ||
+					 ( gun_x_raw < -gun_edge_detect ) ||
+					 ( gun_x_raw > gun_edge_detect ) ||
+					 ( gun_y_raw < -gun_edge_detect ) ||
+					 ( gun_y_raw > gun_edge_detect ) )
 				{
-					if ( trigger ) {
-						trigger |= ( 1 << 3 ); // off-screen flag
-					}
-					gun_x = 0;
-					gun_y = 0;
+					shot_type = ( 1 << 3 ); // Off-screen shot
+
+					gun_x = -16384; // magic position to disable cross-hair drawing.
+					gun_y = -16384;
 				}
 				else
 				{
+					shot_type = ( 1 << 0 ); // On-screen shot!
+
 					//
 					// .. scale into screen space:
 					// NOTE: this is complete hacky guesswork for this first pass, need to re-write.
@@ -531,7 +530,45 @@ void input_update( retro_input_state_t input_state_cb )
 
 				p_input->gun_pos[ 0 ] = gun_x;
 				p_input->gun_pos[ 1 ] = gun_y;
-				p_input->u8[4] |= trigger;
+
+				unsigned mbutton_trigger;
+				unsigned mbutton_a;
+				unsigned mbutton_b;
+
+				if ( gun_trigger_rmb ) {
+					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_RIGHT;
+					mbutton_a = RETRO_DEVICE_ID_MOUSE_LEFT;
+					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
+				} else {
+					mbutton_trigger = RETRO_DEVICE_ID_MOUSE_LEFT;
+					mbutton_a = RETRO_DEVICE_ID_MOUSE_RIGHT;
+					mbutton_b = RETRO_DEVICE_ID_MOUSE_MIDDLE;
+				}
+
+				// trigger
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_trigger ) ) {
+					p_input->u8[4] |= shot_type;
+				}
+
+				// Guncon 'A' or Justifier 'Aux'
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_a ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_4 ) ) {
+					p_input->u8[4] |= ( 1 << 1 );
+				}
+
+				// Guncon 'B' or Justifier 'Start'
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, mbutton_b ) ||
+					 input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_BUTTON_5 ) ) {
+					p_input->u8[4] |= ( 1 << 2 );
+				}
+
+				// Justifier 'Start'
+				if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+				{
+					if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) ) {
+						p_input->u8[4] |= ( 1 << 2 );
+					}
+				}
 			}
 
 			break;
@@ -849,6 +886,11 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 		case RETRO_DEVICE_PS_GUNCON:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
 			SetInput( in_port, "guncon", (uint8*)&input_data[ in_port ] );
+			break;
+
+		case RETRO_DEVICE_PS_JUSTIFIER:
+			log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
+			SetInput( in_port, "justifier", (uint8*)&input_data[ in_port ] );
 			break;
 
 		case RETRO_DEVICE_PS_MOUSE:

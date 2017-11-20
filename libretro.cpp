@@ -2829,6 +2829,14 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_2 = false;
    }
 
+	var.key = option_gun_trigger;
+
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+	{
+		bool newval = (!strcmp(var.value, "Right Mouse Button"));
+		input_set_gun_trigger( newval );
+	}
+
    var.key = option_initial_scanline;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3731,6 +3739,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
       { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
       { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
+      { option_gun_trigger, "Gun Trigger; Left Mouse Button|Right Mouse Button" },
 #ifndef EMSCRIPTEN
       { option_cd_access_method, "CD Access Method (restart); sync|async|precache" },
 #endif
