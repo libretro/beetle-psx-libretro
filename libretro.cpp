@@ -1883,59 +1883,6 @@ static void CloseGame(void)
    Cleanup();
 }
 
-int StateAction(StateMem *sm, int load, int data_only)
-{
-   SFORMAT StateRegs[] =
-   {
-      SFVAR(CD_TrayOpen),
-      SFVAR(CD_SelectedDisc),
-      SFARRAY(MainRAM.data8, 1024 * 2048),
-      SFARRAY32(SysControl.Regs, 9),
-      SFVAR(PSX_PRNG.lcgo),
-      SFVAR(PSX_PRNG.x),
-      SFVAR(PSX_PRNG.y),
-      SFVAR(PSX_PRNG.z),
-      SFVAR(PSX_PRNG.c),
-      SFEND
-   };
-
-
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
-
-   // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
-   if(load)
-   {
-      if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
-         CD_SelectedDisc = -1;
-
-      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
-   }
-
-   // TODO: Remember to increment dirty count in memory card state loading routine.
-
-   ret &= CPU->StateAction(sm, load, data_only);
-   ret &= DMA_StateAction(sm, load, data_only);
-   ret &= TIMER_StateAction(sm, load, data_only);
-   ret &= SIO_StateAction(sm, load, data_only);
-
-   ret &= CDC->StateAction(sm, load, data_only);
-   ret &= MDEC_StateAction(sm, load, data_only);
-   ret &= GPU_StateAction(sm, load, data_only);
-   ret &= SPU->StateAction(sm, load, data_only);
-
-   ret &= FIO->StateAction(sm, load, data_only);
-
-   ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
-
-   if(load)
-   {
-      ForceEventUpdates(0); // FIXME to work with debugger step mode.
-   }
-
-   return(ret);
-}
-
 static void CDInsertEject(void)
 {
    CD_TrayOpen = !CD_TrayOpen;
@@ -1991,6 +1938,70 @@ static void CDSelect(void)
   else
    MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, disc_count);
  }
+}
+
+int StateAction(StateMem *sm, int load, int data_only)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(CD_TrayOpen),
+      SFVAR(CD_SelectedDisc),
+      SFARRAY(MainRAM.data8, 1024 * 2048),
+      SFARRAY32(SysControl.Regs, 9),
+      SFVAR(PSX_PRNG.lcgo),
+      SFVAR(PSX_PRNG.x),
+      SFVAR(PSX_PRNG.y),
+      SFVAR(PSX_PRNG.z),
+      SFVAR(PSX_PRNG.c),
+      SFEND
+   };
+
+
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
+
+   // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
+   if(load)
+   {
+      if(CD_IsPBP)
+      {
+         if(!cdifs || CD_SelectedDisc >= PBP_DiscCount)
+            CD_SelectedDisc = -1;
+
+         CDEject();
+         CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[0] : NULL,
+               (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[0] : NULL);
+         CDInsertEject();
+      } else {
+         if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
+            CD_SelectedDisc = -1;
+
+         CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
+            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
+      }
+   }
+
+   // TODO: Remember to increment dirty count in memory card state loading routine.
+
+   ret &= CPU->StateAction(sm, load, data_only);
+   ret &= DMA_StateAction(sm, load, data_only);
+   ret &= TIMER_StateAction(sm, load, data_only);
+   ret &= SIO_StateAction(sm, load, data_only);
+
+   ret &= CDC->StateAction(sm, load, data_only);
+   ret &= MDEC_StateAction(sm, load, data_only);
+   ret &= GPU_StateAction(sm, load, data_only);
+   ret &= SPU->StateAction(sm, load, data_only);
+
+   ret &= FIO->StateAction(sm, load, data_only);
+
+   ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
+
+   if(load)
+   {
+      ForceEventUpdates(0); // FIXME to work with debugger step mode.
+   }
+
+   return(ret);
 }
 
 static void DoSimpleCommand(int cmd)
