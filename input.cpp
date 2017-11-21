@@ -472,10 +472,13 @@ void input_update( retro_input_state_t input_state_cb )
 			{
 				uint8_t shot_type;
 				int gun_x, gun_y;
+				int off_screen_shot;
+
+				off_screen_shot = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT );
 
 				// off-screen?
 				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) ||
-					 input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT ) )
+					 off_screen_shot )
 				{
 					shot_type = 0x8; // off-screen shot
 
@@ -509,7 +512,8 @@ void input_update( retro_input_state_t input_state_cb )
 				p_input->u8[ 4 ] = 0;
 
 				// trigger
-				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) ||
+					 off_screen_shot ) {
 					p_input->u8[ 4 ] |= shot_type;
 				}
 
