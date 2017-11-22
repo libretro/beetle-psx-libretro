@@ -19,6 +19,7 @@ static FrontIO* FIO; // cached in input_set_fio
 
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
+static float mouse_sensitivity = 1.0f;
 static bool gun_trigger_rmb = false;
 
 typedef union
@@ -431,6 +432,13 @@ void input_set_player_count( unsigned _players )
 	players = _players;
 }
 
+void input_set_mouse_sensitivity( int percent )
+{
+	if ( percent > 0 && percent <= 200 ) {
+		mouse_sensitivity = (float)percent / 100.0f;
+	}
+}
+
 void input_set_gun_trigger( bool use_rmb )
 {
 	gun_trigger_rmb = use_rmb;
@@ -578,8 +586,8 @@ void input_update( retro_input_state_t input_state_cb )
 				dx_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X );
 				dy_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y );
 
-				p_input->u32[ 0 ] = dx_raw;
-				p_input->u32[ 1 ] = dy_raw;
+				p_input->u32[ 0 ] = (int)roundf( dx_raw * mouse_sensitivity );
+				p_input->u32[ 1 ] = (int)roundf( dy_raw * mouse_sensitivity );
 			}
 
 			break;
