@@ -1968,8 +1968,6 @@ int StateAction(StateMem *sm, int load, int data_only)
             CD_SelectedDisc = -1;
 
          CDEject();
-         CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[0] : NULL,
-               (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[0] : NULL);
          CDInsertEject();
       } else {
          if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
