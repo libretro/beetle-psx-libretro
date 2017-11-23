@@ -24,6 +24,7 @@ class InputDevice
       void DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock);
 
       virtual void SetAMCT(bool enabled);
+      virtual void SetCrosshairsCursor(int cursor);
       virtual void SetCrosshairsColor(uint32_t color);
 
       virtual void SetDTR(bool new_dtr);
@@ -43,7 +44,7 @@ class InputDevice
 
    private:
       unsigned chair_r, chair_g, chair_b;
-      bool draw_chair;
+      int chair_cursor;
    protected:
       int32 chair_x, chair_y;
 };
@@ -51,6 +52,14 @@ class InputDevice
 class FrontIO
 {
    public:
+
+		enum {
+			SETTING_GUN_CROSSHAIR_OFF,
+			SETTING_GUN_CROSSHAIR_CROSS,
+			SETTING_GUN_CROSSHAIR_DOT,
+
+			SETTING_GUN_CROSSHAIR_LAST,
+		};
 
       FrontIO(bool emulate_memcards_[8], bool emulate_multitap_[2]);
       ~FrontIO();
@@ -68,6 +77,7 @@ class FrontIO
       void UpdateInput(void);
       void SetInput(unsigned int port, const char *type, void *ptr);
       void SetAMCT(bool enabled);
+      void SetCrosshairsCursor(unsigned port, int cursor);
       void SetCrosshairsColor(unsigned port, uint32_t color);
 
       InputDevice *GetMemcardDevice(unsigned int which);
@@ -128,6 +138,7 @@ class FrontIO
       int32_t dsr_active_until_ts[4];
       int32_t lastts;
       bool amct_enabled;
+      int chair_cursor[8];
       uint32_t chair_colors[8];
 };
 
