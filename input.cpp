@@ -20,6 +20,7 @@ static FrontIO* FIO; // cached in input_set_fio
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
 static float mouse_sensitivity = 1.0f;
+static int gun_cursor = FrontIO::SETTING_GUN_CROSSHAIR_CROSS;
 static bool gun_trigger_rmb = false;
 
 typedef union
@@ -436,6 +437,17 @@ void input_set_mouse_sensitivity( int percent )
 {
 	if ( percent > 0 && percent <= 200 ) {
 		mouse_sensitivity = (float)percent / 100.0f;
+	}
+}
+
+void input_set_gun_cursor( int cursor )
+{
+	gun_cursor = cursor;
+	if ( FIO ) {
+		// todo -- support multiple guns.
+		for ( int port = 0; port < 8; ++port ) {
+			FIO->SetCrosshairsCursor( port, gun_cursor );
+		}
 	}
 }
 
@@ -879,11 +891,17 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 		case RETRO_DEVICE_PS_GUNCON:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
 			SetInput( in_port, "guncon", (uint8*)&input_data[ in_port ] );
+			if ( FIO ) {
+				FIO->SetCrosshairsCursor( in_port, gun_cursor );
+			}
 			break;
 
 		case RETRO_DEVICE_PS_JUSTIFIER:
 			log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
 			SetInput( in_port, "justifier", (uint8*)&input_data[ in_port ] );
+			if ( FIO ) {
+				FIO->SetCrosshairsCursor( in_port, gun_cursor );
+			}
 			break;
 
 		case RETRO_DEVICE_PS_MOUSE:

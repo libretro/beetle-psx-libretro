@@ -2842,7 +2842,22 @@ static void check_variables(bool startup)
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
 		input_set_mouse_sensitivity( atoi( var.value ) );
 
+	var.key = option_gun_cursor;
+	var.value = NULL;
+
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+	{
+		if ( !strcmp(var.value, "Off") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_OFF );
+		} else if ( !strcmp(var.value, "Cross") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS );
+		} else if ( !strcmp(var.value, "Dot") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
+		}
+	}
+
 	var.key = option_gun_trigger;
+	var.value = NULL;
 
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
 	{
@@ -3751,6 +3766,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
       { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
       { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
+      { option_gun_cursor, "Gun Cursor; Cross|Dot|Off" },
       { option_gun_trigger, "Gun Trigger; Left Mouse Button|Right Mouse Button" },
       { option_mouse_sensitivity, "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
 #ifndef EMSCRIPTEN

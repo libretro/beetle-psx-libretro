@@ -37,7 +37,13 @@ static void PSX_FIODBGINFO(const char *format, ...)
 {
 }
 
-InputDevice::InputDevice() : chair_r(0), chair_g(0), chair_b(0), draw_chair(0), chair_x(-1000), chair_y(-1000)
+InputDevice::InputDevice() :
+	chair_r(0),
+	chair_g(0),
+	chair_b(0),
+	chair_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS ),
+	chair_x(-1000),
+	chair_y(-1000)
 {
 }
 
@@ -69,60 +75,108 @@ void InputDevice::SetAMCT(bool)
 
 }
 
+void InputDevice::SetCrosshairsCursor(int cursor)
+{
+	if ( cursor >= 0 && cursor < FrontIO::SETTING_GUN_CROSSHAIR_LAST ) {
+		chair_cursor = cursor;
+	}
+}
+
 void InputDevice::SetCrosshairsColor(uint32_t color)
 {
    chair_r = (color >> 16) & 0xFF;
    chair_g = (color >>  8) & 0xFF;
    chair_b = (color >>  0) & 0xFF;
+}
 
-   draw_chair = (color != (1 << 24));
+static void crosshair_plot( uint32 *pixels,
+							int x,
+							const MDFN_PixelFormat* const format,
+							unsigned chair_r,
+							unsigned chair_g,
+							unsigned chair_b )
+{
+	int r, g, b, a;
+	int nr, ng, nb;
+
+	format->DecodeColor(pixels[x], r, g, b, a);
+
+	nr = (r + chair_r * 3) >> 2;
+	ng = (g + chair_g * 3) >> 2;
+	nb = (b + chair_b * 3) >> 2;
+
+	if ( (int)((abs(r - nr) - 0x40) & (abs(g - ng) - 0x40) & (abs(b - nb) - 0x40)) < 0)
+	{
+		if((nr | ng | nb) & 0x80)
+		{
+			nr >>= 1;
+			ng >>= 1;
+			nb >>= 1;
+		}
+		else
+		{
+			nr ^= 0x80;
+			ng ^= 0x80;
+			nb ^= 0x80;
+		}
+	}
+
+	pixels[x] = MAKECOLOR(nr, ng, nb, a);
 }
 
 INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock)
 {
-   if(draw_chair && chair_y >= -8 && chair_y <= 8)
-   {
-      int32 ic;
-      int32 x_start, x_bound;
+	switch ( chair_cursor )
+	{
 
-      if(chair_y == 0)
-         ic = pix_clock / 762925;
-      else
-         ic = 0;
+	case FrontIO::SETTING_GUN_CROSSHAIR_OFF:
+		return;
 
-      x_start = std::max<int32>(0, chair_x - ic);
-      x_bound = std::min<int32>(width, chair_x + ic + 1);
+	case FrontIO::SETTING_GUN_CROSSHAIR_CROSS:
 
-      for(int32 x = x_start; x < x_bound; x++)
-      {
-         int r, g, b, a;
-         int nr, ng, nb;
+		if ( chair_y >= -8 && chair_y <= 8 )
+		{
+			int32 ic;
+			int32 x_start, x_bound;
 
-         format->DecodeColor(pixels[x], r, g, b, a);
+			if ( chair_y == 0 ) {
+				ic = pix_clock / 762925;
+			} else {
+				ic = 0;
+			}
 
-         nr = (r + chair_r * 3) >> 2;
-         ng = (g + chair_g * 3) >> 2;
-         nb = (b + chair_b * 3) >> 2;
+			x_start = std::max<int32>(0, chair_x - ic);
+			x_bound = std::min<int32>(width, chair_x + ic + 1);
 
-         if((int)((abs(r - nr) - 0x40) & (abs(g - ng) - 0x40) & (abs(b - nb) - 0x40)) < 0)
-         {
-            if((nr | ng | nb) & 0x80)
-            {
-               nr >>= 1;
-               ng >>= 1;
-               nb >>= 1;
-            }
-            else
-            {
-               nr ^= 0x80;
-               ng ^= 0x80;
-               nb ^= 0x80;
-            }
-         }
+			for ( int32 x = x_start; x < x_bound; x++ )
+			{
+				crosshair_plot( pixels, x, format, chair_r, chair_g, chair_b );
+			}
+		}
 
-         pixels[x] = MAKECOLOR(nr, ng, nb, a);
-      }
-   }
+		break;
+
+	case FrontIO::SETTING_GUN_CROSSHAIR_DOT:
+
+		if ( chair_y >= -1 && chair_y <= 1 )
+		{
+			int32 ic;
+			int32 x_start, x_bound;
+
+			ic = pix_clock / ( 762925 * 6 );
+
+			x_start = std::max<int32>(0, chair_x - ic);
+			x_bound = std::min<int32>(width, chair_x + ic);
+
+			for ( int32 x = x_start; x < x_bound; x++ )
+			{
+				crosshair_plot( pixels, x, format, chair_r, chair_g, chair_b );
+			}
+		}
+
+		break;
+
+	}; // switch ( chair_cursor )
 }
 
 int FrontIO::StateAction(StateMem* sm, int load, int data_only)
@@ -345,6 +399,8 @@ FrontIO::FrontIO(bool emulate_memcards_[8], bool emulate_multitap_[2])
       DeviceData[i] = NULL;
       Devices[i] = new InputDevice();
       DevicesMC[i] = Device_Memcard_Create();
+      chair_cursor[i] = SETTING_GUN_CROSSHAIR_CROSS;
+      Devices[i]->SetCrosshairsCursor(chair_cursor[i]);
       chair_colors[i] = 1 << 24;
       Devices[i]->SetCrosshairsColor(chair_colors[i]);
    }
@@ -361,6 +417,12 @@ void FrontIO::SetAMCT(bool enabled)
    for(i = 0; i < 8; i++)
       Devices[i]->SetAMCT(enabled);
    amct_enabled = enabled;
+}
+
+void FrontIO::SetCrosshairsCursor(unsigned port, int cursor)
+{
+   chair_cursor[port] = cursor;
+   Devices[port]->SetCrosshairsCursor(cursor);
 }
 
 void FrontIO::SetCrosshairsColor(unsigned port, uint32_t color)
@@ -852,6 +914,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
       Devices[port] = new InputDevice();
 
    Devices[port]->SetAMCT(amct_enabled);
+   Devices[port]->SetCrosshairsCursor(chair_cursor[port]);
    Devices[port]->SetCrosshairsColor(chair_colors[port]);
    DeviceData[port] = ptr;
 
@@ -974,7 +1037,7 @@ static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =
   NULL,
   NULL,
   0,
-  NULL 
+  NULL
  },
 
  // Gamepad(SCPH-1080)
