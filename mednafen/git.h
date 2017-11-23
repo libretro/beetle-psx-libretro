@@ -322,9 +322,6 @@ typedef struct
 
    std::vector<const char *>DesiredInput; // Desired input device for the input ports, NULL for don't care
 
-   // For mouse relative motion.
-   double mouse_sensitivity;
-
 
    // For absolute coordinates(IDIT_X_AXIS and IDIT_Y_AXIS), usually mapped to a mouse(hence the naming).
    float mouse_scale_x, mouse_scale_y;
