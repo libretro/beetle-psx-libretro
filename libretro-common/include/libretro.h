@@ -221,26 +221,26 @@ extern "C" {
 #define RETRO_DEVICE_ID_MOUSE_BUTTON_5         10
 
 /* Id values for LIGHTGUN aiming. */
-#define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X        12 /*Absolute Position*/
-#define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y        13 /*Absolute*/
-#define RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN    14 /*Status Check*/
-#define RETRO_DEVICE_ID_LIGHTGUN_TRIGGER  2
-#define RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT  15 /*forced*/
+#define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X        13 /*Absolute Position*/
+#define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y        14 /*Absolute*/
+#define RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN    15 /*Status Check*/
+#define RETRO_DEVICE_ID_LIGHTGUN_TRIGGER          2
+#define RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT  16 /*forced*/
 #define RETRO_DEVICE_ID_LIGHTGUN_AUX_A            3
 #define RETRO_DEVICE_ID_LIGHTGUN_AUX_B            4
-#define RETRO_DEVICE_ID_LIGHTGUN_START            5
-#define RETRO_DEVICE_ID_LIGHTGUN_SELECT           6
-#define RETRO_DEVICE_ID_LIGHTGUN_AUX_C            7
-#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_UP          8
-#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_DOWN        9
-#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_LEFT       10
-#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_RIGHT      11
+#define RETRO_DEVICE_ID_LIGHTGUN_START            6
+#define RETRO_DEVICE_ID_LIGHTGUN_SELECT           7
+#define RETRO_DEVICE_ID_LIGHTGUN_AUX_C            8
+#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_UP          9
+#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_DOWN       10
+#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_LEFT       11
+#define RETRO_DEVICE_ID_LIGHTGUN_DPAD_RIGHT      12
 /* deprecated */
-#define RETRO_DEVICE_ID_LIGHTGUN_X             0 /*Relative*/
-#define RETRO_DEVICE_ID_LIGHTGUN_Y             1 /*Relative*/
-#define RETRO_DEVICE_ID_LIGHTGUN_CURSOR        3 /*= Aux:A*/
-#define RETRO_DEVICE_ID_LIGHTGUN_TURBO         4 /*= Aux:B*/
-#define RETRO_DEVICE_ID_LIGHTGUN_PAUSE         5 /*Remapped to Start*/
+#define RETRO_DEVICE_ID_LIGHTGUN_X                0 /*Relative Position*/
+#define RETRO_DEVICE_ID_LIGHTGUN_Y                1 /*Relative*/
+#define RETRO_DEVICE_ID_LIGHTGUN_CURSOR           3 /*Use Aux:A*/
+#define RETRO_DEVICE_ID_LIGHTGUN_TURBO            4 /*Use Aux:B*/
+#define RETRO_DEVICE_ID_LIGHTGUN_PAUSE            5 /*Use Start*/
 
 /* Id values for POINTER. */
 #define RETRO_DEVICE_ID_POINTER_X         0
