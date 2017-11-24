@@ -90,6 +90,8 @@ const int dither_pattern[16] =
            3, -1,  2, -2);
 
 vec4 sample_texel(vec2 coords) {
+   coords.x += 0.5 / 1024;
+   coords.y += 0.5 / 512;
    // Number of texel per VRAM 16bit "pixel" for the current depth
    uint pix_per_hw = 1U << frag_depth_shift;
 
