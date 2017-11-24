@@ -220,12 +220,12 @@ extern "C" {
 #define RETRO_DEVICE_ID_MOUSE_BUTTON_4         9
 #define RETRO_DEVICE_ID_MOUSE_BUTTON_5         10
 
-/* Id values for LIGHTGUN aiming. */
+/* Id values for LIGHTGUN. */
 #define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X        13 /*Absolute Position*/
 #define RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y        14 /*Absolute*/
 #define RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN    15 /*Status Check*/
 #define RETRO_DEVICE_ID_LIGHTGUN_TRIGGER          2
-#define RETRO_DEVICE_ID_LIGHTGUN_OFFSCREEN_SHOT  16 /*forced*/
+#define RETRO_DEVICE_ID_LIGHTGUN_RELOAD          16 /*Forced off-screen shot*/
 #define RETRO_DEVICE_ID_LIGHTGUN_AUX_A            3
 #define RETRO_DEVICE_ID_LIGHTGUN_AUX_B            4
 #define RETRO_DEVICE_ID_LIGHTGUN_START            6
