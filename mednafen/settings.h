@@ -16,7 +16,6 @@ extern int setting_last_scanline_pal;
 // be a totally tubular error!
 uint64 MDFN_GetSettingUI(const char *name);
 int64 MDFN_GetSettingI(const char *name);
-double MDFN_GetSettingF(const char *name);
 bool MDFN_GetSettingB(const char *name);
 std::string MDFN_GetSettingS(const char *name);
 #endif

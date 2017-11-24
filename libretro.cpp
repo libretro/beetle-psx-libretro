@@ -1883,59 +1883,6 @@ static void CloseGame(void)
    Cleanup();
 }
 
-int StateAction(StateMem *sm, int load, int data_only)
-{
-   SFORMAT StateRegs[] =
-   {
-      SFVAR(CD_TrayOpen),
-      SFVAR(CD_SelectedDisc),
-      SFARRAY(MainRAM.data8, 1024 * 2048),
-      SFARRAY32(SysControl.Regs, 9),
-      SFVAR(PSX_PRNG.lcgo),
-      SFVAR(PSX_PRNG.x),
-      SFVAR(PSX_PRNG.y),
-      SFVAR(PSX_PRNG.z),
-      SFVAR(PSX_PRNG.c),
-      SFEND
-   };
-
-
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
-
-   // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
-   if(load)
-   {
-      if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
-         CD_SelectedDisc = -1;
-
-      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
-   }
-
-   // TODO: Remember to increment dirty count in memory card state loading routine.
-
-   ret &= CPU->StateAction(sm, load, data_only);
-   ret &= DMA_StateAction(sm, load, data_only);
-   ret &= TIMER_StateAction(sm, load, data_only);
-   ret &= SIO_StateAction(sm, load, data_only);
-
-   ret &= CDC->StateAction(sm, load, data_only);
-   ret &= MDEC_StateAction(sm, load, data_only);
-   ret &= GPU_StateAction(sm, load, data_only);
-   ret &= SPU->StateAction(sm, load, data_only);
-
-   ret &= FIO->StateAction(sm, load, data_only);
-
-   ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
-
-   if(load)
-   {
-      ForceEventUpdates(0); // FIXME to work with debugger step mode.
-   }
-
-   return(ret);
-}
-
 static void CDInsertEject(void)
 {
    CD_TrayOpen = !CD_TrayOpen;
@@ -1991,6 +1938,68 @@ static void CDSelect(void)
   else
    MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, disc_count);
  }
+}
+
+int StateAction(StateMem *sm, int load, int data_only)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFVAR(CD_TrayOpen),
+      SFVAR(CD_SelectedDisc),
+      SFARRAY(MainRAM.data8, 1024 * 2048),
+      SFARRAY32(SysControl.Regs, 9),
+      SFVAR(PSX_PRNG.lcgo),
+      SFVAR(PSX_PRNG.x),
+      SFVAR(PSX_PRNG.y),
+      SFVAR(PSX_PRNG.z),
+      SFVAR(PSX_PRNG.c),
+      SFEND
+   };
+
+
+   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
+
+   // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
+   if(load)
+   {
+      if(CD_IsPBP)
+      {
+         if(!cdifs || CD_SelectedDisc >= PBP_DiscCount)
+            CD_SelectedDisc = -1;
+
+         CDEject();
+         CDInsertEject();
+      } else {
+         if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
+            CD_SelectedDisc = -1;
+
+         CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
+            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
+      }
+   }
+
+   // TODO: Remember to increment dirty count in memory card state loading routine.
+
+   ret &= CPU->StateAction(sm, load, data_only);
+   ret &= DMA_StateAction(sm, load, data_only);
+   ret &= TIMER_StateAction(sm, load, data_only);
+   ret &= SIO_StateAction(sm, load, data_only);
+
+   ret &= CDC->StateAction(sm, load, data_only);
+   ret &= MDEC_StateAction(sm, load, data_only);
+   ret &= GPU_StateAction(sm, load, data_only);
+   ret &= SPU->StateAction(sm, load, data_only);
+
+   ret &= FIO->StateAction(sm, load, data_only);
+
+   ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
+
+   if(load)
+   {
+      ForceEventUpdates(0); // FIXME to work with debugger step mode.
+   }
+
+   return(ret);
 }
 
 static void DoSimpleCommand(int cmd)
@@ -2237,8 +2246,6 @@ static const MDFNSetting_EnumList MultiTap_List[] =
 
 static MDFNSetting PSXSettings[] =
 {
-   { "psx.input.mouse_sensitivity", MDFNSF_NOFLAGS, "Emulated mouse sensitivity.", NULL, MDFNST_FLOAT, "1.00", NULL, NULL },
-
    { "psx.input.analog_mode_ct", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable analog mode combo-button alternate toggle.", "When enabled, instead of the configured Analog mode toggle button for the emulated DualShock, use a combination of buttons to toggle it instead.  When Select, Start, and all four shoulder buttons are held down for about 1 second, the mode will toggle.", MDFNST_BOOL, "0", NULL, NULL },
 
    { "psx.input.pport1.multitap", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Enable multitap on PSX port 1.", "Makes 3 more virtual ports available.\n\nNOTE: Enabling multitap in games that don't fully support it may cause deleterious effects.", MDFNST_BOOL, "0", NULL, NULL }, //MDFNST_ENUM, "auto", NULL, NULL, NULL, NULL, MultiTap_List },
@@ -2828,6 +2835,26 @@ static void check_variables(bool startup)
       else if (strcmp(var.value, "disabled") == 0)
          setting_psx_multitap_port_2 = false;
    }
+
+	var.key = option_mouse_sensitivity;
+	var.value = NULL;
+
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+		input_set_mouse_sensitivity( atoi( var.value ) );
+
+	var.key = option_gun_cursor;
+	var.value = NULL;
+
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+	{
+		if ( !strcmp(var.value, "Off") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_OFF );
+		} else if ( !strcmp(var.value, "Cross") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS );
+		} else if ( !strcmp(var.value, "Dot") ) {
+			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
+		}
+	}
 
    var.key = option_initial_scanline;
 
@@ -3434,7 +3461,6 @@ void retro_run(void)
    int32_t timestamp = 0;
 
    espec->skip = false;
-   MDFNGameInfo->mouse_sensitivity = MDFN_GetSettingF("psx.input.mouse_sensitivity");
 
    MDFNMP_ApplyPeriodicCheats();
 
@@ -3731,6 +3757,8 @@ void retro_set_environment(retro_environment_t cb)
       { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
       { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
       { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
+      { option_gun_cursor, "Gun Cursor; Cross|Dot|Off" },
+      { option_mouse_sensitivity, "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
 #ifndef EMSCRIPTEN
       { option_cd_access_method, "CD Access Method (restart); sync|async|precache" },
 #endif
