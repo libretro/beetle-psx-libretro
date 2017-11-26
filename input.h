@@ -20,7 +20,6 @@ extern void input_set_env( retro_environment_t environ_cb );
 
 extern void input_set_mouse_sensitivity( int percent );
 extern void input_set_gun_cursor( int cursor );
-extern void input_set_gun_trigger( bool use_rmb );
 
 extern void input_set_player_count( unsigned players );
 
