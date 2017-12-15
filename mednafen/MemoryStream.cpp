@@ -189,14 +189,6 @@ void MemoryStream::close(void)
 
 }
 
-void MemoryStream::truncate(uint64_t length)
-{
-}
-
-void MemoryStream::flush(void)
-{
-}
-
 int MemoryStream::get_line(std::string &str)
 {
  str.clear();	// or str.resize(0)??

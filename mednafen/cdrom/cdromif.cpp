@@ -691,7 +691,6 @@ class CDIF_Stream_Thing : public Stream
 
       virtual uint64 read(void *data, uint64 count, bool error_on_eos = true);
       virtual void write(const void *data, uint64 count);
-      virtual void truncate(uint64_t length);
 
       virtual void seek(int64 offset, int whence);
       virtual uint64_t tell(void);
@@ -766,11 +765,6 @@ uint64 CDIF_Stream_Thing::read(void *data, uint64 count, bool error_on_eos)
 }
 
 void CDIF_Stream_Thing::write(const void *data, uint64 count)
-{
-   throw MDFN_Error(ErrnoHolder(EBADF));
-}
-
-void CDIF_Stream_Thing::truncate(uint64_t length)
 {
    throw MDFN_Error(ErrnoHolder(EBADF));
 }
