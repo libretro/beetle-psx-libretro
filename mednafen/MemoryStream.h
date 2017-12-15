@@ -37,8 +37,6 @@ class MemoryStream : public Stream
 
  virtual ~MemoryStream();
 
- virtual uint64 attributes(void);
-
  virtual uint8 *map(void);
  virtual void unmap(void);
 

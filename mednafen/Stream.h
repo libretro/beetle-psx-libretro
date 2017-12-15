@@ -22,14 +22,6 @@ class Stream
       Stream();
       virtual ~Stream();
 
-      enum
-      {
-         ATTRIBUTE_READABLE = 0,
-         ATTRIBUTE_WRITEABLE,
-         ATTRIBUTE_SEEKABLE
-      };
-      virtual uint64_t attributes(void) = 0;
-
       virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true) = 0;
       virtual void write(const void *data, uint64_t count) = 0;
 

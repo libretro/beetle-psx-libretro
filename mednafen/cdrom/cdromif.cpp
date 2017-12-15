@@ -685,7 +685,6 @@ class CDIF_Stream_Thing : public Stream
       CDIF_Stream_Thing(CDIF *cdintf_arg, uint32 lba_arg, uint32 sector_count_arg);
       ~CDIF_Stream_Thing();
 
-      virtual uint64 attributes(void);
       virtual uint8 *map(void);
       virtual void unmap(void);
 
@@ -714,11 +713,6 @@ CDIF_Stream_Thing::CDIF_Stream_Thing(CDIF *cdintf_arg, uint32 start_lba_arg,
 CDIF_Stream_Thing::~CDIF_Stream_Thing()
 {
 
-}
-
-uint64 CDIF_Stream_Thing::attributes(void)
-{
-   return(ATTRIBUTE_READABLE | ATTRIBUTE_SEEKABLE);
 }
 
 uint8 *CDIF_Stream_Thing::map(void)

@@ -45,25 +45,6 @@ FileStream::~FileStream()
    original_path = NULL;
 }
 
-uint64_t FileStream::attributes(void)
-{
-   uint64_t ret = ATTRIBUTE_SEEKABLE;
-
-   switch(OpenedMode)
-   {
-      case MODE_READ:
-         ret |= ATTRIBUTE_READABLE;
-         break;
-      case MODE_WRITE_INPLACE:
-      case MODE_WRITE_SAFE:
-      case MODE_WRITE:
-         ret |= ATTRIBUTE_WRITEABLE;
-         break;
-   }
-
-   return ret;
-}
-
 uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
 {
    if (!fp)
