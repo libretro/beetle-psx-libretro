@@ -235,9 +235,12 @@ ifneq ($(HAVE_GRIFFIN), 1)
 
    ifneq ($(STATIC_LINKING), 1)
       SOURCES_C +=   $(LIBRETRO_DIR)/streams/file_stream.c \
+                     $(LIBRETRO_DIR)/vfs/vfs_implementation.c \
                      $(LIBRETRO_DIR)/string/stdstring.c \
                      $(LIBRETRO_DIR)/compat/compat_strl.c \
+                     $(LIBRETRO_DIR)/compat/fopen_utf8.c \
                      $(LIBRETRO_DIR)/compat/compat_strcasestr.c \
+                     $(LIBRETRO_DIR)/encodings/encoding_utf.c \
                      $(LIBRETRO_DIR)/file/retro_dirent.c \
                      $(LIBRETRO_DIR)/file/file_path.c \
                      $(LIBRETRO_DIR)/hash/rhash.c

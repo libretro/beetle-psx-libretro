@@ -37,6 +37,7 @@
 #endif
 #include <compat/strcasestr.h>
 #include <retro_miscellaneous.h>
+#include <encodings/utf.h>
 
 #if defined(_WIN32)
 #ifdef _MSC_VER
@@ -51,6 +52,9 @@
 #include <fcntl.h>
 #include <direct.h>
 #include <windows.h>
+#if defined(_MSC_VER) && _MSC_VER <= 1200
+#define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
+#endif
 #endif
 #elif defined(VITA)
 #define SCE_ERROR_ERRNO_EEXIST 0x80010011
@@ -67,10 +71,6 @@
 #include <pspkernel.h>
 #endif
 
-#ifdef __HAIKU__
-#include <kernel/image.h>
-#endif
-
 #if defined(__CELLOS_LV2__)
 #include <cell/cell_fs.h>
 #endif
@@ -81,6 +81,15 @@
 
 #if (defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)) || defined(__QNX__) || defined(PSP)
 #include <unistd.h> /* stat() is defined here */
+#endif
+
+/* Assume W-functions do not work below Win2K and Xbox platforms */
+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0500 || defined(_XBOX)
+
+#ifndef LEGACY_WIN32
+#define LEGACY_WIN32
+#endif
+
 #endif
 
 enum stat_mode
@@ -112,9 +121,34 @@ static bool path_stat(const char *path, enum stat_mode mode, int32_t *size)
        return false;
 #elif defined(_WIN32)
    struct _stat buf;
-   DWORD file_info = GetFileAttributes(path);
+   char *path_local;
+   wchar_t *path_wide;
+   DWORD file_info;
 
-   _stat(path, &buf);
+   if (!path || !*path)
+      return false;
+
+   (void)path_wide;
+   (void)path_local;
+   (void)file_info;
+
+#if defined(LEGACY_WIN32)
+   path_local = utf8_to_local_string_alloc(path);
+   file_info  = GetFileAttributes(path_local);
+
+   _stat(path_local, &buf);
+
+   if (path_local)
+     free(path_local);
+#else
+   path_wide = utf8_to_utf16_string_alloc(path);
+   file_info = GetFileAttributesW(path_wide);
+
+   _wstat(path_wide, &buf);
+
+   if (path_wide)
+      free(path_wide);
+#endif
 
    if (file_info == INVALID_FILE_ATTRIBUTES)
       return false;
@@ -184,6 +218,17 @@ int32_t path_get_size(const char *path)
    return -1;
 }
 
+static bool path_mkdir_error(int ret)
+{
+#if defined(VITA)
+   return (ret == SCE_ERROR_ERRNO_EEXIST);
+#elif defined(PSP) || defined(_3DS) || defined(WIIU)
+   return (ret == -1);
+#else
+   return (ret < 0 && errno == EEXIST);
+#endif
+}
+
 /**
  * path_mkdir:
  * @dir                : directory
@@ -195,10 +240,13 @@ int32_t path_get_size(const char *path)
 bool path_mkdir(const char *dir)
 {
    /* Use heap. Real chance of stack overflow if we recurse too hard. */
-   char     *basedir  = strdup(dir);
    const char *target = NULL;
    bool         sret  = false;
    bool norecurse     = false;
+   char     *basedir  = NULL;
+
+   if (dir && *dir)
+      basedir         = strdup(dir);
 
    if (!basedir)
       return false;
@@ -214,8 +262,8 @@ bool path_mkdir(const char *dir)
    }
    else
    {
-      target = basedir;
-      sret   = path_mkdir(basedir);
+      target    = basedir;
+      sret      = path_mkdir(basedir);
 
       if (sret)
       {
@@ -239,16 +287,9 @@ bool path_mkdir(const char *dir)
 #endif
 
       /* Don't treat this as an error. */
-#if defined(VITA)
-      if ((ret == SCE_ERROR_ERRNO_EEXIST) && path_is_directory(dir))
+      if (path_mkdir_error(ret) && path_is_directory(dir))
          ret = 0;
-#elif defined(PSP) || defined(_3DS) || defined(WIIU)
-      if ((ret == -1) && path_is_directory(dir))
-         ret = 0;
-#else 
-      if (ret < 0 && errno == EEXIST && path_is_directory(dir))
-         ret = 0;
-#endif
+
       if (ret < 0)
          printf("mkdir(%s) error: %s.\n", dir, strerror(errno));
       sret = (ret == 0);
@@ -345,31 +386,12 @@ bool path_is_compressed_file(const char* path)
 {
    const char *ext = path_get_extension(path);
 
-   if (     strcasestr(ext, "zip") 
+   if (     strcasestr(ext, "zip")
          || strcasestr(ext, "apk")
          || strcasestr(ext, "7z"))
       return true;
 
    return false;
-}
-
-/**
- * path_file_exists:
- * @path               : path
- *
- * Checks if a file already exists at the specified path (@path).
- *
- * Returns: true (1) if file already exists, otherwise false (0).
- */
-bool path_file_exists(const char *path)
-{
-   FILE *dummy = fopen(path, "rb");
-
-   if (!dummy)
-      return false;
-
-   fclose(dummy);
-   return true;
 }
 
 /**
@@ -665,7 +687,7 @@ void path_parent_dir(char *path)
  **/
 const char *path_basename(const char *path)
 {
-   /* We cut either at the first compression-related hash 
+   /* We cut either at the first compression-related hash
     * or the last slash; whichever comes last */
    const char *last  = find_last_slash(path);
    const char *delim = path_get_archive_delim(path);
@@ -694,8 +716,8 @@ bool path_is_absolute(const char *path)
 #ifdef _WIN32
    /* Many roads lead to Rome ... */
    if ((    strstr(path, "\\\\") == path)
-         || strstr(path, ":/") 
-         || strstr(path, ":\\") 
+         || strstr(path, ":/")
+         || strstr(path, ":\\")
          || strstr(path, ":\\\\"))
       return true;
 #endif

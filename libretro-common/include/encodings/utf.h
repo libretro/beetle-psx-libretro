@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (compat_snprintf.c).
+ * The following license statement only applies to this file (utf.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,51 +20,48 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/* THIS FILE HAS NOT BEEN VALIDATED ON PLATFORMS BESIDES MSVC */
-#ifdef _MSC_VER
+#ifndef _LIBRETRO_ENCODINGS_UTF_H
+#define _LIBRETRO_ENCODINGS_UTF_H
 
-#include <retro_common.h>
+#include <stdint.h>
+#include <stddef.h>
 
-#include <stdio.h>
-#include <stdarg.h>
+#include <boolean.h>
 
-/* http://stackoverflow.com/questions/2915672/snprintf-and-visual-studio-2010 */
+#include <retro_common_api.h>
 
-int c99_vsnprintf_retro__(char *outBuf, size_t size, const char *format, va_list ap)
+RETRO_BEGIN_DECLS
+
+enum CodePage
 {
-   int count = -1;
+   CODEPAGE_LOCAL = 0, /* CP_ACP */
+   CODEPAGE_UTF8 = 65001 /* CP_UTF8 */
+};
 
-   if (size != 0)
-#if (_MSC_VER <= 1310)
-       count = _vsnprintf(outBuf, size, format, ap);
-#else
-       count = _vsnprintf_s(outBuf, size, _TRUNCATE, format, ap);
-#endif
-   if (count == -1)
-       count = _vscprintf(format, ap);
+size_t utf8_conv_utf32(uint32_t *out, size_t out_chars,
+      const char *in, size_t in_size);
 
-   return count;
-}
+bool utf16_conv_utf8(uint8_t *out, size_t *out_chars,
+      const uint16_t *in, size_t in_size);
 
-int c99_snprintf_retro__(char *outBuf, size_t size, const char *format, ...)
-{
-   int count;
-   va_list ap;
+size_t utf8len(const char *string);
 
-   va_start(ap, format);
-   count = c99_vsnprintf_retro__(outBuf, size, format, ap);
-   va_end(ap);
+size_t utf8cpy(char *d, size_t d_len, const char *s, size_t chars);
 
-   return count;
-}
+const char *utf8skip(const char *str, size_t chars);
 
-int c89_vscprintf_retro__(const char *format, va_list pargs)
-{
-   int retval;
-   va_list argcopy;
-   va_copy(argcopy, pargs);
-   retval = vsnprintf(NULL, 0, format, argcopy);
-   va_end(argcopy);
-   return retval;
-}
+uint32_t utf8_walk(const char **string);
+
+bool utf16_to_char_string(const uint16_t *in, char *s, size_t len);
+
+char* utf8_to_local_string_alloc(const char *str);
+
+char* local_to_utf8_string_alloc(const char *str);
+
+wchar_t* utf8_to_utf16_string_alloc(const char *str);
+
+char* utf16_to_utf8_string_alloc(const wchar_t *str);
+
+RETRO_END_DECLS
+
 #endif

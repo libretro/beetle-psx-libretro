@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2016 The RetroArch team
+/* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (retro_common_api.h).
@@ -25,14 +25,14 @@
 
 /*
 This file is designed to normalize the libretro-common compiling environment
-for public API headers. This should be leaner than a normal compiling environment, 
+for public API headers. This should be leaner than a normal compiling environment,
 since it gets #included into other project's sources.
 */
 
 /* ------------------------------------ */
 
 /*
-Ordinarily we want to put #ifdef __cplusplus extern "C" in C library 
+Ordinarily we want to put #ifdef __cplusplus extern "C" in C library
 headers to enable them to get used by c++ sources.
 However, we want to support building this library as C++ as well, so a
 special technique is called for.
@@ -74,6 +74,19 @@ typedef int ssize_t;
 #elif defined(__MACH__)
 #include <sys/types.h>
 #endif
+
+#ifdef _MSC_VER
+#ifndef PRId64
+#define PRId64 "I64d"
+#define PRIu64 "I64u"
+#define PRIuPTR "Iu"
+#endif
+#else
+#include <inttypes.h>
+#endif
+#define STRING_REP_INT64 "%" PRId64
+#define STRING_REP_UINT64 "%" PRIu64
+#define STRING_REP_USIZE "%" PRIuPTR
 
 /*
 I would like to see retro_inline.h moved in here; possibly boolean too.
