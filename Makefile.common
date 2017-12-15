@@ -7,13 +7,7 @@ LIBKIRK_DIR  := $(DEPS_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
-
-ifeq ($(HAVE_CDROM_NEW), 1)
-   FLAGS     += -DHAVE_CDROM_NEW
-   CDROM_DIR := $(MEDNAFEN_DIR)/cdrom-new
-else
-   CDROM_DIR := $(MEDNAFEN_DIR)/cdrom
-endif
+CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 
 ifeq ($(HAVE_OPENGL), 1)
    ifeq ($(GLES), 1)
@@ -178,36 +172,20 @@ ifneq ($(HAVE_GRIFFIN), 1)
       SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))
    endif
 
-   ifeq ($(HAVE_CDROM_NEW), 1)
-      SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
-                     $(CDROM_DIR)/CDAccess_Image.cpp \
-                     $(CDROM_DIR)/CDAccess_CCD.cpp \
-                     $(CDROM_DIR)/CDAccess_PBP.cpp \
-                     $(CDROM_DIR)/CDAFReader.cpp \
-                     $(CDROM_DIR)/CDAFReader_Vorbis.cpp \
-                     $(CDROM_DIR)/cdromif.cpp \
-                     $(CDROM_DIR)/CDUtility.cpp \
-                     $(CDROM_DIR)/lec.cpp \
-                     $(CDROM_DIR)/galois.cpp \
-                     $(CDROM_DIR)/recover-raw.cpp \
-                     $(CDROM_DIR)/l-ec.cpp \
-                     $(CDROM_DIR)/edc_crc32.cpp
-   else
-      SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
-                     $(CDROM_DIR)/CDAccess_Image.cpp \
-                     $(CDROM_DIR)/CDAccess_CCD.cpp \
-                     $(CDROM_DIR)/CDAccess_PBP.cpp \
-                     $(CDROM_DIR)/audioreader.cpp \
-                     $(CDROM_DIR)/misc.cpp \
-                     $(CDROM_DIR)/cdromif.cpp
+   SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
+		  $(CDROM_DIR)/CDAccess_Image.cpp \
+		  $(CDROM_DIR)/CDAccess_CCD.cpp \
+		  $(CDROM_DIR)/CDAccess_PBP.cpp \
+		  $(CDROM_DIR)/audioreader.cpp \
+		  $(CDROM_DIR)/misc.cpp \
+		  $(CDROM_DIR)/cdromif.cpp
 
-      SOURCES_C +=   $(CDROM_DIR)/CDUtility.c \
-                     $(CDROM_DIR)/galois.c \
-                     $(CDROM_DIR)/l-ec.c \
-                     $(CDROM_DIR)/lec.c \
-                     $(CDROM_DIR)/recover-raw.c \
-                     $(CDROM_DIR)/edc_crc32.c
-   endif
+   SOURCES_C +=   $(CDROM_DIR)/CDUtility.c \
+		  $(CDROM_DIR)/galois.c \
+		  $(CDROM_DIR)/l-ec.c \
+		  $(CDROM_DIR)/lec.c \
+		  $(CDROM_DIR)/recover-raw.c \
+		  $(CDROM_DIR)/edc_crc32.c
 
    SOURCES_CXX += $(MEDNAFEN_DIR)/error.cpp \
                   $(MEDNAFEN_DIR)/settings.cpp \
