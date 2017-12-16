@@ -21,30 +21,21 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <streams/file_stream.h>
+
 #include "file.h"
+#include "mednafen-endian.h"
 
 struct MDFNFILE *file_open(const char *path)
 {
-   const char *ld;
-   FILE *fp;
+   const char        *ld = NULL;
    struct MDFNFILE *file = (struct MDFNFILE*)calloc(1, sizeof(*file));
 
    if (!file)
       return NULL;
 
-   fp = fopen(path, "rb");
-
-   if (!fp)
+   if (!filestream_read_file(path, (void**)&file->data, &file->size))
       goto error;
-
-   fseek(fp, 0, SEEK_SET);
-   fseek((FILE *)fp, 0, SEEK_END);
-   file->size = ftell((FILE *)fp);
-   fseek((FILE *)fp, 0, SEEK_SET);
-
-   if (!(file->data = (uint8_t*)malloc(file->size)))
-      goto error;
-   fread(file->data, 1, file->size, (FILE *)fp);
 
    ld = (const char*)strrchr(path, '.');
    file->ext = strdup(ld ? ld + 1 : "");
@@ -52,8 +43,6 @@ struct MDFNFILE *file_open(const char *path)
    return file;
 
 error:
-   if (fp)
-      fclose((FILE*)fp);
    if (file)
       free(file);
    return NULL;
