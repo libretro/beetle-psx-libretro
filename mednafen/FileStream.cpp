@@ -61,9 +61,22 @@ void FileStream::write(const void *data, uint64_t count)
 
 void FileStream::seek(int64_t offset, int whence)
 {
+   int seek_position = -1;
    if (!fp)
       return;
-   filestream_seek(fp, offset, whence);
+   switch (whence)
+   {
+      case SEEK_SET:
+         seek_position = RETRO_VFS_SEEK_POSITION_START;
+         break;
+      case SEEK_CUR:
+         seek_position = RETRO_VFS_SEEK_POSITION_CURRENT;
+         break;
+      case SEEK_END:
+         seek_position = RETRO_VFS_SEEK_POSITION_END;
+         break;
+   }
+   filestream_seek(fp, offset, seek_position);
 }
 
 uint64_t FileStream::tell(void)
