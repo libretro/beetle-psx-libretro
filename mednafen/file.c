@@ -112,29 +112,3 @@ int file_seek(struct MDFNFILE *file, int64_t offset, int whence)
 
    return 0;
 }
-
-char *file_fgets(struct MDFNFILE *file, char *s, int len)
-{
-   int pos = 0;
-
-   if (!len)
-      return(NULL);
-
-   if (file->location >= len)
-      return(NULL);
-
-   while(pos < (len - 1) && file->location < len)
-   {
-      int v = file->data[file->location];
-      s[pos] = v;
-      file->location++;
-      pos++;
-      if (v == '\n')
-         break;
-   }
-
-   if (len)
-      s[pos] = 0;
-
-   return s;
-}
