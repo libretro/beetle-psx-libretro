@@ -3869,9 +3869,12 @@ bool retro_serialize(void *data, size_t size)
 bool retro_unserialize(const void *data, size_t size)
 {
    StateMem st;
-   memset(&st, 0, sizeof(st));
-   st.data = (uint8_t*)data;
-   st.len  = size;
+
+   st.data           = (uint8_t*)data;
+   st.loc            = 0;
+   st.len            = size;
+   st.malloced       = 0;
+   st.initial_malloc = 0;
 
    return MDFNSS_LoadSM(&st, 0, 0);
 }
