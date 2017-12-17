@@ -19,6 +19,7 @@
 #include <mednafen/general.h>
 #include <mednafen/mednafen-endian.h>
 #include <mednafen/FileStream.h>
+#include <file/file_path.h>
 
 #include "CDAccess_CHD.h"
 
