@@ -115,4 +115,4 @@ CD Image Cache | Loads the complete image in memory at startup.
 Skip BIOS | Self-explanatory. Some games have issues when enabled.
 Memcard 0 method | Picks the format (libretro or mednafen) used for storing memcard 0 save data.
 Enable memory card 1 | Specifically enables memcard slot 1. Needed for game "Codename Tenka".
-Shared memory cards (restart) | Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'libretro'.
+Shared memory cards (restart) | Stores everything in the same savefile. 'Memcard 0 method' needs to be set to 'mednafen'.
