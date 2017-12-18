@@ -1835,6 +1835,7 @@ static void Cleanup(void)
    if(FIO)
       delete FIO;
    FIO = NULL;
+   input_set_fio(NULL);
 
    DMA_Kill();
 
