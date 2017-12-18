@@ -39,7 +39,6 @@ class FileStream : public Stream
 
    private:
       RFILE *fp;
-      const int OpenedMode;
 };
 
 
