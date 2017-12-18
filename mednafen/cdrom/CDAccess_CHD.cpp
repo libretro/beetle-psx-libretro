@@ -19,7 +19,6 @@
 #include <mednafen/general.h>
 #include <mednafen/mednafen-endian.h>
 #include <mednafen/FileStream.h>
-#include <file/file_path.h>
 
 #include "CDAccess_CHD.h"
 
@@ -479,7 +478,7 @@ bool CDAccess_CHD::Read_TOC(TOC *toc)
       SubQReplaceMap.clear();
 
    // Load SBI file, if present
-   if (path_is_valid(sbi_path.c_str()))
+   if (filestream_exists(sbi_path.c_str()))
       LoadSBI(sbi_path.c_str());
 
    ptoc = toc;
