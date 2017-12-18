@@ -34,15 +34,10 @@ FileStream::FileStream(const char *path, const int mode): OpenedMode(mode)
 
       MDFN_Error(ene.Errno(), "Error opening file:\n%s\n%s", path, ene.StrError());
    }
-
-   original_path = strdup(path);
 }
 
 FileStream::~FileStream()
 {
-   if (original_path)
-      free(original_path);
-   original_path = NULL;
 }
 
 uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
