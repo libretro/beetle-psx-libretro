@@ -31,7 +31,7 @@
 */
 
 #include <boolean.h>
-#include <file/file_path.h>
+#include <streams/file_stream.h>
 
 #include "../mednafen.h"
 
@@ -904,7 +904,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
       sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
 
-      if (path_is_valid(sbi_path.c_str()))
+      if (filestream_exists(sbi_path.c_str()))
          LoadSBI(sbi_path.c_str());
    }
 

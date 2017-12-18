@@ -10,7 +10,7 @@
 #endif
 #include <libretro.h>
 #include <rthreads/rthreads.h>
-#include <file/file_path.h>
+#include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <rhash.h>
 #include "rsx/rsx_intf.h"
@@ -144,7 +144,7 @@ static bool firmware_is_present(unsigned region)
          break;
 
       snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
-      if (path_is_valid(bios_path))
+      if (filestream_exists(bios_path))
       {
          found = true;
          break;
@@ -3273,7 +3273,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
 
-   if (path_is_valid(tocbasepath))
+   if (filestream_exists(tocbasepath))
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", tocbasepath);
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
