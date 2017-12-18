@@ -16,7 +16,7 @@
  */
 
 #include <boolean.h>
-#include <file/file_path.h>
+#include <streams/file_stream.h>
 
 #include "../mednafen.h"
 
@@ -660,7 +660,7 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
       sbi_path[sbi_path.length()-5] = (CD_SelectedDisc+1) + '0';
 
    // Load SBI file, if present
-   if (path_is_valid(sbi_path.c_str()))
+   if (filestream_exists(sbi_path.c_str()))
    {
       if(!SubQReplaceMap.empty())
          SubQReplaceMap.clear();
