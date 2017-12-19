@@ -355,6 +355,7 @@ else ifeq ($(platform), emscripten)
 else ifneq (,$(findstring windows_msvc2017,$(platform)))
 
     NO_GCC := 1
+    HAVE_CHD = 0
 
 	PlatformSuffix = $(subst windows_msvc2017_,,$(platform))
 	ifneq (,$(findstring desktop,$(PlatformSuffix)))
@@ -367,8 +368,6 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
 		MSVC2017CompileFlags = -DWINAPI_FAMILY=WINAPI_FAMILY_APP -DWINDLL -D_UNICODE -DUNICODE -DWRL_NO_DEFAULT_LIB -FS
 		LDFLAGS += -APPCONTAINER -NXCOMPAT -DYNAMICBASE -MANIFEST:NO -LTCG -OPT:REF -SUBSYSTEM:CONSOLE -MANIFESTUAC:NO -OPT:ICF -ERRORREPORT:PROMPT -NOLOGO -TLBID:1 -DEBUG:FULL -WINMD:NO
 		LIBS += WindowsApp.lib
-
-        HAVE_CHD = 1
 	endif
 
 	CFLAGS += $(MSVC2017CompileFlags)
