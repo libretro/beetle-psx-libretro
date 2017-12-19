@@ -72,13 +72,15 @@ void main() {
    frag_texture_window = texture_window;
 
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
-	tc = frag_texture_coord.xy;
-	xyp_1_2_3    = tc.xxxy + vec4(-1.,  0., 1., -2.);
-	xyp_6_7_8    = tc.xxxy + vec4(-1.,  0., 1., -1.);
-	xyp_11_12_13 = tc.xxxy + vec4(-1.,  0., 1.,  0.);
-	xyp_16_17_18 = tc.xxxy + vec4(-1.,  0., 1.,  1.);
-	xyp_21_22_23 = tc.xxxy + vec4(-1.,  0., 1.,  2.);
-	xyp_5_10_15  = tc.xyyy + vec4(-2., -1., 0.,  1.);
-	xyp_9_14_9   = tc.xyyy + vec4( 2., -1., 0.,  1.);
+   tc = frag_texture_coord.xy;
+   xyp_1_2_3    = tc.xxxy + vec4(-1.,  0., 1., -2.);
+   xyp_6_7_8    = tc.xxxy + vec4(-1.,  0., 1., -1.);
+   xyp_11_12_13 = tc.xxxy + vec4(-1.,  0., 1.,  0.);
+   xyp_16_17_18 = tc.xxxy + vec4(-1.,  0., 1.,  1.);
+   xyp_21_22_23 = tc.xxxy + vec4(-1.,  0., 1.,  2.);
+   xyp_5_10_15  = tc.xyyy + vec4(-2., -1., 0.,  1.);
+   xyp_9_14_9   = tc.xyyy + vec4( 2., -1., 0.,  1.);
 #endif
-});
+}
+
+);

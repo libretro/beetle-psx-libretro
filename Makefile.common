@@ -40,6 +40,10 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(DEPS_DIR)/zlib \
             -I/usr/local/include
 
+ifneq (,$(findstring msvc,$(platform)))
+INCFLAGS += -I$(CORE_DIR)/msvc
+endif
+
 SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
                $(DEPS_DIR)/zlib/compress.c \
                $(DEPS_DIR)/zlib/crc32.c \
