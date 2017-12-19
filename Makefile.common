@@ -200,8 +200,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_DIR)/libretro.cpp \
                   $(CORE_DIR)/input.cpp
 
-   SOURCES_C +=   $(MEDNAFEN_DIR)/file.c \
-                  $(CORE_DIR)/rsx/rsx_lib_soft.c \
+   SOURCES_C +=   $(CORE_DIR)/rsx/rsx_lib_soft.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(MEDNAFEN_DIR)/md5.c
 

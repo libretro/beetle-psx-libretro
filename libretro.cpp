@@ -1152,13 +1152,26 @@ void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool
    FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
 }
 
-static bool TestMagic(const char *name, MDFNFILE *fp)
+static bool TestMagic(const char *name, RFILE *fp, int64_t size)
 {
-   if(GET_FSIZE_PTR(fp) < 0x800)
+   uint8_t header[8];
+
+   if (size < 0x800)
       return(false);
 
-   if(memcmp(GET_FDATA_PTR(fp), "PS-X EXE", 8))
-      return(false);
+   filestream_read(fp, header, 8);
+
+   if (
+         (header[0] == 'P') &&
+         (header[1] == 'S') &&
+         (header[2] == '-') &&
+         (header[3] == 'X') &&
+         (header[4] == ' ') &&
+         (header[5] == 'E') &&
+         (header[6] == 'X') &&
+         (header[7] == 'E')
+      )
+      return(true);
 
    return(true);
 }
@@ -1781,11 +1794,12 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    return true;
 }
 
-static int Load(const char *name, MDFNFILE *fp)
+static int Load(const char *name, RFILE *fp)
 {
+   int64_t size     = filestream_get_size(fp);
    const bool IsPSF = false;
 
-   if(!TestMagic(name, fp))
+   if(!TestMagic(name, fp, size))
    {
       MDFN_Error(0, "File format is unknown to module psx..");
       return -1;
@@ -1795,10 +1809,17 @@ static int Load(const char *name, MDFNFILE *fp)
 
    TextMem.resize(0);
 
-   if(GET_FSIZE_PTR(fp) >= 0x800)
+   if(size >= 0x800)
    {
-      if (!LoadEXE(GET_FDATA_PTR(fp), GET_FSIZE_PTR(fp)))
+      ssize_t len     = size;
+      uint8_t *header = (uint8_t*)malloc(filestream_get_size(fp) * sizeof(uint8_t));
+
+      filestream_read_file(name, (void**)&header, &len);
+
+      if (!LoadEXE(header, len))
          return -1;
+
+      free(header);
    }
 
    MDFNGameInfo = &EmulatedPSX;
@@ -3227,7 +3248,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 
 static MDFNGI *MDFNI_LoadGame(const char *name)
 {
-   MDFNFILE *GameFile;
+   RFILE *GameFile = NULL;
 
    if(strlen(name) > 4 && (
       !strcasecmp(name + strlen(name) - 4, ".cue") ||
@@ -3239,7 +3260,9 @@ static MDFNGI *MDFNI_LoadGame(const char *name)
       ))
     return MDFNI_LoadCD(name);
 
-   GameFile = file_open(name);
+   GameFile = filestream_open(name,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
    if(!GameFile)
       goto error;
@@ -3247,14 +3270,14 @@ static MDFNGI *MDFNI_LoadGame(const char *name)
    if(Load(name, GameFile) <= 0)
       goto error;
 
-   file_close(GameFile);
+   filestream_close(GameFile);
    GameFile   = NULL;
 
    return(MDFNGameInfo);
 
 error:
    if (GameFile)
-      file_close(GameFile);
+      filestream_close(GameFile);
    GameFile     = NULL;
    MDFNGameInfo = NULL;
    return NULL;

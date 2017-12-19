@@ -15,8 +15,6 @@ typedef struct
    const char *description;
 } FileExtensionSpecStruct;
 
-#include "file.h"
-
 enum
 {
    MDFN_ROTATE0 = 0,
