@@ -320,22 +320,27 @@ int CDAccess_Image::LoadSBI(const char* sbi_path)
    uint8 header[4];
    uint8 ed[4 + 10];
    uint8 tmpq[12];
-   FileStream sbis(sbi_path, MODE_READ);
+   RFILE *sbis      = filestream_open(sbi_path, 
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-   sbis.read(header, 4);
-
-   if(memcmp(header, "SBI\0", 4))
+   if (!sbis)
       return -1;
 
-   while(sbis.read(ed, sizeof(ed), false) == sizeof(ed))
+   filestream_read(sbis, header, 4);
+
+   if(memcmp(header, "SBI\0", 4))
+      goto error;
+
+   while(filestream_read(sbis, ed, sizeof(ed)) == sizeof(ed))
    {
       /* Bad BCD MSF offset in SBI file. */
       if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
-         return -1;
+         goto error;
 
       /* Unrecognized boogly oogly in SBI file */
       if(ed[3] != 0x01)
-         return -1;
+         goto error;
 
       memcpy(tmpq, &ed[4], 10);
 
@@ -350,7 +355,13 @@ int CDAccess_Image::LoadSBI(const char* sbi_path)
 
    //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
    log_cb(RETRO_LOG_INFO, "[Image] Loaded SBI file %s\n", sbi_path);
+   filestream_close(sbis);
    return 0;
+
+error:
+   if (sbis)
+      filestream_close(sbis);
+   return -1;
 }
 
 bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)

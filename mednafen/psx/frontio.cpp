@@ -945,12 +945,18 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
 
  if(DevicesMC[which]->GetNVSize())
  {
-    FileStream mf(path, MODE_READ);
+    RFILE *mf = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, 
+          RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-    mf.read(DevicesMC[which]->GetNVData(), (1 << 17));
+    if (!mf)
+       return;
+
+    filestream_read(mf, DevicesMC[which]->GetNVData(), (1 << 17));
 
     DevicesMC[which]->WriteNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
     DevicesMC[which]->ResetNVDirtyCount();		// There's no need to rewrite the file if it's the same data.
+
+    filestream_close(mf);
  }
 }
 
@@ -971,14 +977,19 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path)
 
  if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
  {
-  FileStream mf(path, MODE_WRITE);	// TODO: MODE_WRITE_ATOMIC_OVERWRITE
+    RFILE *mf = filestream_open(path, 
+          RETRO_VFS_FILE_ACCESS_WRITE,
+          RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-  DevicesMC[which]->ReadNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
-  mf.write(DevicesMC[which]->GetNVData(), (1 << 17));
+    if (!mf)
+       return;
 
-  mf.close();	// Call before resetting the NV dirty count!
+    DevicesMC[which]->ReadNV(DevicesMC[which]->GetNVData(), 0, (1 << 17));
+    filestream_write(mf, DevicesMC[which]->GetNVData(), (1 << 17));
 
-  DevicesMC[which]->ResetNVDirtyCount();
+    filestream_close(mf);	// Call before resetting the NV dirty count!
+
+    DevicesMC[which]->ResetNVDirtyCount();
  }
 }
 

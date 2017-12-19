@@ -1568,12 +1568,17 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       abort();
 
    {
+      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 
+            0, MDFN_GetSettingS(biospath_sname).c_str());
+      RFILE *BIOSFile      = filestream_open(biospath,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 0, MDFN_GetSettingS(biospath_sname).c_str());
-
-      FileStream BIOSFile(biospath, MODE_READ);
-
-      BIOSFile.read(BIOSROM->data8, 512 * 1024);
+      if (BIOSFile)
+      {
+         filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
+         filestream_close(BIOSFile);
+      }
    }
 
    i = 0;
