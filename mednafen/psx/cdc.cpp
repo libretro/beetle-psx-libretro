@@ -53,6 +53,7 @@
 #include "spu.h"
 
 #include "../mednafen-endian.h"
+#include "../state_helpers.h"
 
 PS_CDC::PS_CDC() : DMABuffer(4096)
 {

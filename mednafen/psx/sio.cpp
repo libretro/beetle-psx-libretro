@@ -18,6 +18,8 @@
 #include "psx.h"
 #include "sio.h"
 
+#include "../state_helpers.h"
+
 // Dummy implementation.
 
 static uint16_t Status;

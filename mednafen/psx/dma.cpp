@@ -20,6 +20,8 @@
 #include "cdc.h"
 #include "spu.h"
 
+#include "../state_helpers.h"
+
 #include "../pgxp/pgxp_mem.h"
 
 /* Notes:

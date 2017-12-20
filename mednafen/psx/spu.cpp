@@ -71,6 +71,8 @@
 #include "spu.h"
 #include <libretro.h>
 
+#include "../state_helpers.h"
+
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
 

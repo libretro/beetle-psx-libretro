@@ -19,6 +19,8 @@
 #include "timer.h"
 #include "../../rsx/rsx_intf.h"
 
+#include "../state_helpers.h"
+
 #include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"
 #include "../pgxp/pgxp_mem.h"

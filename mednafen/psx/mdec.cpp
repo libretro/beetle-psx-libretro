@@ -57,6 +57,8 @@
 #include "mdec.h"
 
 #include "../masmem.h"
+#include "../state_helpers.h"
+
 #include "FastFIFO.h"
 #include <math.h>
 

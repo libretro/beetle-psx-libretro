@@ -19,7 +19,9 @@
 #include "frontio.h"
 #include <compat/msvc.h>
 
+#include "../state_helpers.h"
 #include "../video/surface.h"
+
 #include "input/gamepad.h"
 #include "input/dualanalog.h"
 #include "input/dualshock.h"

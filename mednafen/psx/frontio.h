@@ -1,6 +1,8 @@
 #ifndef __MDFN_PSX_FRONTIO_H
 #define __MDFN_PSX_FRONTIO_H
 
+#include "../state_helpers.h"
+
 class InputDevice_Multitap;
 
 class InputDevice

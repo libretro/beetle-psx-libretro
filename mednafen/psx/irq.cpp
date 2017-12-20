@@ -17,6 +17,8 @@
 
 #include "psx.h"
 
+#include "../state_helpers.h"
+
 static uint16_t Asserted;
 static uint16_t Mask;
 static uint16_t Status;

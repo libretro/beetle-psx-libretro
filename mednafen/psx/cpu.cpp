@@ -18,6 +18,8 @@
 #include "psx.h"
 #include "cpu.h"
 
+#include "../state_helpers.h"
+
 // iCB: PGXP STUFF
 #include "../pgxp/pgxp_cpu.h"
 #include "../pgxp/pgxp_gte.h"

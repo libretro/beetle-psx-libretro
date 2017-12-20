@@ -18,6 +18,8 @@
 #include "psx.h"
 #include "timer.h"
 
+#include "../state_helpers.h"
+
 /*
  Notes(some of it may be incomplete or wrong in subtle ways)
 
