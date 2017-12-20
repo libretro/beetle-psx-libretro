@@ -111,7 +111,6 @@ class SSDescriptor
       bool optional;
 };
 
-int MDFNSS_StateAction(void *st, int load, int data_only, std::vector <SSDescriptor> &sections);
-int MDFNSS_StateAction(void *st, int load, int data_only, SFORMAT *sf, const char *name, bool optional = 0);
+int MDFNSS_StateAction(void *st, int load, int data_only, SFORMAT *sf, const char *name);
 
 #endif
