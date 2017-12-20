@@ -9,11 +9,11 @@ typedef struct
    uint32_t loc;
    uint32_t len;
    uint32_t malloced;
-   uint32_t initial_malloc; // A setting!
+   uint32_t initial_malloc; /* A setting! */
 } StateMem;
 
-// Eh, we abuse the smem_* in-memory stream code
-// in a few other places. :)
+/* Eh, we abuse the smem_* in-memory stream code
+ * in a few other places. :) */
 int32_t smem_read(StateMem *st, void *buffer, uint32_t len);
 int32_t smem_write(StateMem *st, void *buffer, uint32_t len);
 int32_t smem_putc(StateMem *st, int value);
@@ -92,25 +92,14 @@ INLINE uint32_t SF_FORCE_D(double *) { return(0); }
 #include <vector>
 
 // State-Section Descriptor
-class SSDescriptor
+struct SSDescriptor
 {
-   public:
-      SSDescriptor(SFORMAT *n_sf, const char *n_name, bool n_optional = 0)
-      {
-         sf = n_sf;
-         name = n_name;
-         optional = n_optional;
-      }
-      ~SSDescriptor(void)
-      {
-
-      }
-
-      SFORMAT *sf;
-      const char *name;
-      bool optional;
+   SFORMAT *sf;
+   const char *name;
+   bool optional;
 };
 
-int MDFNSS_StateAction(void *st, int load, int data_only, SFORMAT *sf, const char *name);
+int MDFNSS_StateAction(void *st, int load, int data_only,
+      SFORMAT *sf, const char *name);
 
 #endif
