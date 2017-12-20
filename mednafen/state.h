@@ -1,6 +1,7 @@
 #ifndef _STATE_H
 #define _STATE_H
 
+#include <stdint.h>
 #include <retro_inline.h>
 
 typedef struct
@@ -88,8 +89,6 @@ INLINE uint32_t SF_FORCE_D(double *) { return(0); }
 #define SFARRAYD(x, l) SFARRAYDN((x), (l), #x)
 
 #define SFEND { 0, 0, 0, 0 }
-
-#include <vector>
 
 // State-Section Descriptor
 struct SSDescriptor

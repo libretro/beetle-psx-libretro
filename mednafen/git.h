@@ -318,9 +318,6 @@ typedef struct
 
    const char *cspecial;  /* Special cart expansion: DIP switches, barcode reader, etc. */
 
-   std::vector<const char *>DesiredInput; // Desired input device for the input ports, NULL for don't care
-
-
    // For absolute coordinates(IDIT_X_AXIS and IDIT_Y_AXIS), usually mapped to a mouse(hence the naming).
    float mouse_scale_x, mouse_scale_y;
    float mouse_offs_x, mouse_offs_y;
