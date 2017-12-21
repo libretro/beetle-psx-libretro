@@ -111,7 +111,7 @@ DualShock Analog button toggle | Toggles the Analog button from DualShock contro
 Port 1: Multitap Enable | Enables/Disables multitap functionality on port 1.
 Port 2: Multitap Enable | Enables/Disables multitap functionality on port 2.
 CPU Overclock | Gets rid of memory access latency and makes all GTE instructions have 1 cycle latency.
-CD Image Cache | Loads the complete image in memory at startup.
+CD Access Method | If "precache" is selected, loads the complete image in memory at startup.
 Skip BIOS | Self-explanatory. Some games have issues when enabled.
 Memcard 0 method | Picks the format (libretro or mednafen) used for storing memcard 0 save data.
 Enable memory card 1 | Specifically enables memcard slot 1. Needed for game "Codename Tenka".
