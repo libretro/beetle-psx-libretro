@@ -238,6 +238,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
 
    ifneq ($(STATIC_LINKING), 1)
       SOURCES_C +=   $(LIBRETRO_DIR)/streams/file_stream.c \
+                     $(LIBRETRO_DIR)/streams/file_stream_transforms.c \
                      $(LIBRETRO_DIR)/vfs/vfs_implementation.c \
                      $(LIBRETRO_DIR)/string/stdstring.c \
                      $(LIBRETRO_DIR)/compat/compat_strl.c \
