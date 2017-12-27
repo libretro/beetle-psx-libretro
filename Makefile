@@ -355,7 +355,6 @@ else ifeq ($(platform), emscripten)
 else ifneq (,$(findstring windows_msvc2017,$(platform)))
 
     NO_GCC := 1
-    HAVE_CHD = 0
 
 	PlatformSuffix = $(subst windows_msvc2017_,,$(platform))
 	ifneq (,$(findstring desktop,$(PlatformSuffix)))
@@ -437,7 +436,7 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
 
 	export INCLUDE := $(INCLUDE);$(WindowsSDKSharedIncludeDir);$(WindowsSDKUCRTIncludeDir);$(WindowsSDKUMIncludeDir)
 	export LIB := $(LIB);$(WindowsSDKUCRTLibDir);$(WindowsSDKUMLibDir)
-	TARGET := $(TARGET_NAME)_libretro.dll
+	TARGET := $(TARGET_NAME)_libretro.dll $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
 	PSS_STYLE :=2
 	LDFLAGS += -DLL
 
