@@ -177,11 +177,15 @@ Bool CPU_Is_InOrder()
 #include <windows.h>
 static Bool CPU_Sys_Is_SSE_Supported()
 {
+#if _MSC_VER >= 1900 && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
+  return True;
+#else
   OSVERSIONINFO vi;
   vi.dwOSVersionInfoSize = sizeof(vi);
   if (!GetVersionEx(&vi))
     return False;
   return (vi.dwMajorVersion >= 5);
+#endif
 }
 #define CHECK_SYS_SSE_SUPPORT if (!CPU_Sys_Is_SSE_Supported()) return False;
 #else
