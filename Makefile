@@ -550,7 +550,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(GL_LIB)
+	$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(GL_LIB) $(LIBS)
 endif
 
 %.o: %.cpp
