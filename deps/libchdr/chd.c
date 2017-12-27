@@ -61,6 +61,10 @@ typedef unsigned char Byte;
 
 #include "../deps/crypto/md5.h"
 
+#ifdef __LIBRETRO__
+#include <retro_common_api.h>
+#endif
+
 #define TRUE 1
 #define FALSE 0
 

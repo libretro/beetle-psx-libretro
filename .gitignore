@@ -3,6 +3,11 @@
 *.so
 *.dll
 *.dylib
+*.lib
+*.pdb
+*.exp
+*.manifest
+nul
 /old
 
 /msvc/Debug
