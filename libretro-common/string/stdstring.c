@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2016 The RetroArch team
+/* Copyright  (C) 2010-2017 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (stdstring.c).
@@ -24,36 +24,13 @@
 #include <ctype.h>
 
 #include <string/stdstring.h>
-
-bool string_is_empty(const char *data)
-{
-   return data==NULL || *data=='\0';
-}
-
-bool string_is_equal(const char *a, const char *b)
-{
-   if (!a || !b)
-      return false;
-   return (strcmp(a, b) == 0);
-}
-
-bool string_is_equal_noncase(const char *a, const char *b)
-{
-   if (!a || !b)
-      return false;
- 
-#if _MSC_VER
-   return (_stricmp(a, b) == 0);
-#else
-   return (strcasecmp(a, b) == 0);
-#endif
-}
+#include <encodings/utf.h>
 
 char *string_to_upper(char *s)
 {
    char *cs = (char *)s;
    for ( ; *cs != '\0'; cs++)
-      *cs = toupper(*cs);
+      *cs = toupper((unsigned char)*cs);
    return s;
 }
 
@@ -61,38 +38,37 @@ char *string_to_lower(char *s)
 {
    char *cs = (char *)s;
    for ( ; *cs != '\0'; cs++)
-      *cs = tolower(*cs);
+      *cs = tolower((unsigned char)*cs);
    return s;
 }
 
 char *string_ucwords(char *s)
 {
-  char *cs = (char *)s;
-  for ( ; *cs != '\0'; cs++)
-  {
-    if (*cs == ' ')
-    {
-      *(cs+1) = toupper(*(cs+1));
-    }
-  }
+   char *cs = (char *)s;
+   for ( ; *cs != '\0'; cs++)
+   {
+      if (*cs == ' ')
+         *(cs+1) = toupper((unsigned char)*(cs+1));
+   }
 
-  s[0] = toupper(s[0]);
-  return s;
+   s[0] = toupper((unsigned char)s[0]);
+   return s;
 }
 
 char *string_replace_substring(const char *in,
       const char *pattern, const char *replacement)
 {
    size_t numhits, pattern_len, replacement_len, outlen;
-   const char *inat;
-   const char *inprev;
-   char *out, *outat;
-   
+   const char *inat   = NULL;
+   const char *inprev = NULL;
+   char          *out = NULL;
+   char        *outat = NULL;
+
    /* if either pattern or replacement is NULL,
     * duplicate in and let caller handle it. */
    if (!pattern || !replacement)
       return strdup(in);
-   
+
    pattern_len     = strlen(pattern);
    replacement_len = strlen(replacement);
    numhits         = 0;
@@ -103,7 +79,7 @@ char *string_replace_substring(const char *in,
       inat += pattern_len;
       numhits++;
    }
-   
+
    outlen          = strlen(in) - pattern_len*numhits + replacement_len*numhits;
    out             = (char *)malloc(outlen+1);
    outat           = out;
@@ -120,13 +96,9 @@ char *string_replace_substring(const char *in,
       inprev = inat;
    }
    strcpy(outat, inprev);
-   
+
    return out;
 }
-
-/* Non-GPL licensed versions of whitespace trimming:
- * http://stackoverflow.com/questions/656542/trim-a-string-in-c
- */
 
 /* Remove leading whitespaces */
 char *string_trim_whitespace_left(char *const s)
@@ -136,7 +108,7 @@ char *string_trim_whitespace_left(char *const s)
       size_t len = strlen(s);
       char *cur  = s;
 
-      while(*cur && isspace(*cur))
+      while(*cur && isspace((unsigned char)*cur))
          ++cur, --len;
 
       if(s != cur)
@@ -155,10 +127,10 @@ char *string_trim_whitespace_right(char *const s)
       size_t len = strlen(s);
       char  *cur = s + len - 1;
 
-      while(cur != s && isspace(*cur))
+      while(cur != s && isspace((unsigned char)*cur))
          --cur, --len;
 
-      cur[isspace(*cur) ? 0 : 1] = '\0';
+      cur[isspace((unsigned char)*cur) ? 0 : 1] = '\0';
    }
 
    return s;
@@ -171,4 +143,75 @@ char *string_trim_whitespace(char *const s)
    string_trim_whitespace_left(s);
 
    return s;
+}
+
+char *word_wrap(char* buffer, const char *string, int line_width, bool unicode)
+{
+   unsigned i   = 0;
+   unsigned len = (unsigned)strlen(string);
+
+   while (i < len)
+   {
+      unsigned counter;
+
+      /* copy string until the end of the line is reached */
+      for (counter = 1; counter <= (unsigned)line_width; counter++)
+      {
+         const char *character;
+         unsigned char_len;
+         unsigned j = i;
+
+         /* check if end of string reached */
+         if (i == len)
+         {
+            buffer[i] = 0;
+            return buffer;
+         }
+
+         character = utf8skip(&string[i], 1);
+         char_len = character - &string[i];
+
+         if (!unicode)
+            counter += char_len - 1;
+
+         do
+         {
+            buffer[i] = string[i];
+            char_len--;
+            i++;
+         } while(char_len);
+
+         /* check for newlines embedded in the original input
+          * and reset the index */
+         if (buffer[j] == '\n')
+            counter = 1;
+      }
+
+      /* check for whitespace */
+      if (string[i] == ' ')
+      {
+         buffer[i] = '\n';
+         i++;
+      }
+      else
+      {
+         int k;
+
+         /* check for nearest whitespace back in string */
+         for (k = i; k > 0; k--)
+         {
+            if (string[k] != ' ')
+               continue;
+
+            buffer[k] = '\n';
+            /* set string index back to character after this one */
+            i         = k + 1;
+            break;
+         }
+      }
+   }
+
+   buffer[i] = 0;
+
+   return buffer;
 }
