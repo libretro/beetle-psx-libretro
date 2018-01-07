@@ -597,7 +597,7 @@ int MDFNI_DecodePAR(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)
  int boo[4];
  if(strlen(str)!=8) return(0);
 
- sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
+ sscanf(str,"%02p%02p%02p%02p",boo,boo+1,boo+2,boo+3);
 
  *c = 0;
 
