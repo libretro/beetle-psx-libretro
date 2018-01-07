@@ -149,7 +149,7 @@ std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_pat
 }
 
 // Remove whitespace from beginning of string
-void MDFN_ltrim(std::string &string)
+static void MDFN_ltrim(std::string &string)
 {
  size_t len = string.length();
  size_t di, si;
@@ -176,7 +176,7 @@ void MDFN_ltrim(std::string &string)
 }
 
 // Remove whitespace from end of string
-void MDFN_rtrim(std::string &string)
+static void MDFN_rtrim(std::string &string)
 {
  size_t len = string.length();
 
