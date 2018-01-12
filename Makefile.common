@@ -37,8 +37,7 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(MEDNAFEN_DIR)/hw_cpu \
             -I$(MEDNAFEN_DIR)/hw_misc \
             -I$(LIBRETRO_DIR)/include \
-            -I$(DEPS_DIR)/zlib \
-            -I/usr/local/include
+            -I$(DEPS_DIR)/zlib
 
 ifneq (,$(findstring msvc,$(platform)))
 INCFLAGS += -I$(CORE_DIR)/msvc
