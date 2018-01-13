@@ -1448,7 +1448,7 @@ static unsigned CalcDiscSCEx(void)
    return ret_region;
 }
 
-static void SetDiscWrapper(bool CD_TrayOpen) {
+static void SetDiscWrapper(const bool CD_TrayOpen) {
     CDIF *cdif = NULL;
     const char *disc_id = NULL;
     if (CD_SelectedDisc >= 0 && !CD_TrayOpen) {
