@@ -1448,6 +1448,23 @@ static unsigned CalcDiscSCEx(void)
    return ret_region;
 }
 
+static void SetDiscWrapper(const bool CD_TrayOpen) {
+    CDIF *cdif = NULL;
+    const char *disc_id = NULL;
+    if (CD_SelectedDisc >= 0 && !CD_TrayOpen) {
+        // only allow one pbp file to be loaded (at index 0)
+        if (CD_IsPBP) {
+            cdif = (*cdifs)[0];
+            disc_id = cdifs_scex_ids[0];
+        } else {
+            cdif = (*cdifs)[CD_SelectedDisc];
+            disc_id = cdifs_scex_ids[CD_SelectedDisc];
+        }
+    }
+
+    CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
+}
+
 static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
 {
    unsigned region, i;
@@ -1534,9 +1551,8 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    }
 
    CDC->SetDisc(true, NULL, NULL);
-   CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-         (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
-
+   SetDiscWrapper(CD_TrayOpen);
+   
 
    BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
    PIOMem  = NULL;
@@ -1930,17 +1946,7 @@ static void CDInsertEject(void)
    else
       MDFN_DispMessage(_("Virtual CD Drive Tray Closed"));
 
-   if(CD_IsPBP)
-   {
-      // only allow one pbp file to be loaded (at index 0)
-      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[0] : NULL,
-            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[0] : NULL);
-   }
-   else
-   {
-      CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
-   }
+   SetDiscWrapper(CD_TrayOpen);
 }
 
 static void CDEject(void)
@@ -2000,8 +2006,7 @@ int StateAction(StateMem *sm, int load, int data_only)
          if(!cdifs || CD_SelectedDisc >= (int)cdifs->size())
             CD_SelectedDisc = -1;
 
-         CDC->SetDisc(CD_TrayOpen, (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? (*cdifs)[CD_SelectedDisc] : NULL,
-            (CD_SelectedDisc >= 0 && !CD_TrayOpen) ? cdifs_scex_ids[CD_SelectedDisc] : NULL);
+         SetDiscWrapper(CD_TrayOpen);
       }
    }
 
