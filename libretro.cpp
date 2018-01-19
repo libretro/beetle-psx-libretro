@@ -1997,7 +1997,7 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       if(CD_IsPBP)
       {
-         if(!cdifs || CD_SelectedDisc >= PBP_DiscCount)
+         if((!cdifs || CD_SelectedDisc >= PBP_DiscCount) && PBP_DiscCount > 0)
             CD_SelectedDisc = -1;
 
          CDEject();
