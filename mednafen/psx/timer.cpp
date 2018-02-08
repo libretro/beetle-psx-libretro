@@ -113,7 +113,7 @@ static int32_t lastts;
 
 static uint32_t CalcNextEvent(void)
 {
-   uint32_t next_event = 1024; /**/
+   int32_t next_event = 1024; /**/
 
    unsigned i;
    for(i = 0; i < 3; i++)
@@ -153,6 +153,8 @@ static uint32_t CalcNextEvent(void)
       if(next_event > tmp_clocks)
          next_event = tmp_clocks;
    }
+
+   overclock_device_to_cpu(next_event);
 
    return(next_event);
 }
@@ -342,7 +344,9 @@ void TIMER_ClockHRetrace(void)
 MDFN_FASTCALL int32_t TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
-   
+
+   overclock_cpu_to_device(cpu_clocks);
+
    int32_t i;
    for(i = 0; i < 3; i++)
    {

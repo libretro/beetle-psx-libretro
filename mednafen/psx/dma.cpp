@@ -511,6 +511,8 @@ static INLINE int32_t CalcNextEvent(int32_t next_event)
    if(DMACycleCounter < next_event)
       next_event = DMACycleCounter;
 
+   overclock_device_to_cpu(next_event);
+
    return(next_event);
 }
 
@@ -519,6 +521,9 @@ int32_t DMA_Update(const int32_t timestamp)
    int32_t clocks, i;
    //   uint32_t dc = (DMAControl >> (ch * 4)) & 0xF;
    clocks = timestamp - lastts;
+
+   overclock_cpu_to_device(clocks);
+
    lastts = timestamp;
 
    GPU_Update(timestamp);

@@ -630,10 +630,7 @@ void GPU_Init(bool pal_clock_and_tv,
       }
    }
 
-   if(GPU.HardwarePALType == false)  // NTSC clock
-      GPU.GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
-   else  // PAL clock
-      GPU.GPUClockRatio = 102948; // 65536 * 53203425 / (44100 * 768)
+   GPU_RecalcClockRatio();
 
    memset(GPU.RGB8SAT_Under, 0, sizeof(GPU.RGB8SAT_Under));
 
@@ -649,6 +646,15 @@ void GPU_Init(bool pal_clock_and_tv,
 
    GPU.upscale_shift = upscale_shift;
    GPU.dither_upscale_shift = 0;
+}
+
+void GPU_RecalcClockRatio(void) {
+   if(GPU.HardwarePALType == false)  // NTSC clock
+      GPU.GPUClockRatio = 103896; // 65536 * 53693181.818 / (44100 * 768)
+   else  // PAL clock
+      GPU.GPUClockRatio = 102948; // 65536 * 53203425 / (44100 * 768)
+
+   overclock_cpu_to_device(GPU.GPUClockRatio);
 }
 
 void GPU_Destroy(void)

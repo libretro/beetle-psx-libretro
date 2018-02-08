@@ -194,7 +194,7 @@ struct PS_GPU
    uint32 DotClockCounter;
 
    uint64 GPUClockCounter;
-   uint32 GPUClockRatio;
+   int32 GPUClockRatio;
    int32 LineClockCounter;
    int32 LinePhase;
 
@@ -246,6 +246,8 @@ void GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift);
 
 void GPU_SoftReset(void);
+
+void GPU_RecalcClockRatio(void);
 
 void GPU_Destroy(void);
 

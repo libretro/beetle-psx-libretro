@@ -19,6 +19,7 @@
 #include "input.h"
 
 #include "mednafen/mednafen-endian.h"
+#include "mednafen/psx/psx.h"
 
 #include "../pgxp/pgxp_main.h"
 
@@ -46,6 +47,9 @@ unsigned cd_2x_speedup = 1;
 bool cd_async = false;
 bool cd_warned_slow = false;
 int64 cd_slow_timeout = 8000; // microseconds
+
+// CPU overclock factor (or 0 if disabled)
+int32_t psx_overclock_factor = 0;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2673,6 +2677,24 @@ static void check_variables(bool startup)
    }
 #endif
 
+   var.key = option_cpu_freq_scale;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int scale_percent = atoi(var.value);
+
+      if (scale_percent == 100) {
+         psx_overclock_factor = 0;
+      } else {
+         psx_overclock_factor = ((scale_percent << OVERCLOCK_SHIFT) + 50) / 100;
+      }
+   }
+   else
+      psx_overclock_factor = 0;
+
+   // Need to adjust the CPU<->GPU frequency ratio if the overclocking changes
+   GPU_RecalcClockRatio();
+
    var.key = option_gte_overclock;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3775,6 +3797,7 @@ void retro_set_environment(retro_environment_t cb)
 #endif
       { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
       { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
+      { option_cpu_freq_scale, "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|300%|400%|500%|90%|80%|70%|60%|50%" },
       { option_gte_overclock, "GTE Overclock; disabled|enabled" },
       { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },

@@ -102,4 +102,31 @@ extern PS_CDC *CDC;
 extern PS_SPU *SPU;
 extern MultiAccessSizeMem<2048 * 1024, uint32_t, false> MainRAM;
 
+#define OVERCLOCK_SHIFT 8
+extern int32_t psx_overclock_factor;
+
+static INLINE void overclock_device_to_cpu(int32_t &clock) {
+   if (psx_overclock_factor) {
+      int64_t n = clock;
+
+      n = (n * psx_overclock_factor) + (1 << (OVERCLOCK_SHIFT)) - 1;
+
+      n >>= OVERCLOCK_SHIFT;
+
+      clock = n;
+   }
+}
+
+static INLINE void overclock_cpu_to_device(int32_t &clock) {
+   if (psx_overclock_factor) {
+      int64_t n = clock;
+
+      n = (n << OVERCLOCK_SHIFT) + (psx_overclock_factor - 1);
+
+      n /= psx_overclock_factor;
+
+      clock = n;
+   }
+}
+
 #endif
