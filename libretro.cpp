@@ -3472,7 +3472,7 @@ void retro_run(void)
          float fps = is_pal ? FPS_PAL : FPS_NTSC;
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
-         snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), fps);
+         snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
 
          MDFN_DispMessage(msg_buffer);
 
