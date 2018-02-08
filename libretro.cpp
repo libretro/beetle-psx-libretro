@@ -3797,7 +3797,7 @@ void retro_set_environment(retro_environment_t cb)
 #endif
       { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
       { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
-      { option_cpu_freq_scale, "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|300%|400%|500%|90%|80%|70%|60%|50%" },
+      { option_cpu_freq_scale, "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|90%|80%|70%|60%|50%" },
       { option_gte_overclock, "GTE Overclock; disabled|enabled" },
       { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
