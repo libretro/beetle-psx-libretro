@@ -26,7 +26,7 @@
 #include "../pgxp/pgxp_main.h"
 // int pgxpMode = PGXP_GetModes();
 
-extern bool psx_cpu_overclock;
+extern bool psx_gte_overclock;
 
 #define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
 #define BIU_ICACHE_FSIZE_MASK	0x00000300  // I-cache fill size mask; 0x000 = 2 words, 0x100 = 4 words, 0x200 = 8 words, 0x300 = 16 words
@@ -398,7 +398,7 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
 		{
 			instr = LoadU32_LE((uint32_t *)&FastMap[address >> FAST_MAP_SHIFT][address]);
 
-			if (!psx_cpu_overclock)
+			if (!psx_gte_overclock)
 			{
 				// Approximate best-case cache-disabled time, per PS1 tests
 				// (executing out of 0xA0000000+); it can be 5 in 
@@ -419,28 +419,28 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
 			ICI[0x03].TV = (address &~ 0xF) | 0x0C | 0x2;
 
 			// When overclock is enabled, remove code cache fetch latency
-			if (!psx_cpu_overclock)
+			if (!psx_gte_overclock)
 				timestamp += 3;
 
 			switch(address & 0xC)
 			{
 			case 0x0:
-				if (!psx_cpu_overclock)
+				if (!psx_gte_overclock)
 					timestamp++;
 				ICI[0x00].TV &= ~0x2;
 				ICI[0x00].Data = LoadU32_LE(&FMP[0]);
 			case 0x4:
-				if (!psx_cpu_overclock)
+				if (!psx_gte_overclock)
 					timestamp++;
 				ICI[0x01].TV &= ~0x2;
 				ICI[0x01].Data = LoadU32_LE(&FMP[1]);
 			case 0x8:
-				if (!psx_cpu_overclock)
+				if (!psx_gte_overclock)
 					timestamp++;
 				ICI[0x02].TV &= ~0x2;
 				ICI[0x02].Data = LoadU32_LE(&FMP[2]);
 			case 0xC:
-				if (!psx_cpu_overclock)
+				if (!psx_gte_overclock)
 					timestamp++;
 				ICI[0x03].TV &= ~0x2;
 				ICI[0x03].Data = LoadU32_LE(&FMP[3]);

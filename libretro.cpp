@@ -54,7 +54,7 @@ int64 cd_slow_timeout = 8000; // microseconds
 
 static int psx_skipbios;
 
-bool psx_cpu_overclock;
+bool psx_gte_overclock;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
 
@@ -561,7 +561,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       else
       {
          // Overclock: get rid of memory access latency
-         if (!psx_cpu_overclock)
+         if (!psx_gte_overclock)
             timestamp += 3;
       }
 
@@ -2673,17 +2673,17 @@ static void check_variables(bool startup)
    }
 #endif
 
-   var.key = option_cpu_overclock;
+   var.key = option_gte_overclock;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
-         psx_cpu_overclock = true;
+         psx_gte_overclock = true;
       else if (strcmp(var.value, "disabled") == 0)
-         psx_cpu_overclock = false;
+         psx_gte_overclock = false;
    }
    else
-      psx_cpu_overclock = false;
+      psx_gte_overclock = false;
 
    var.key = option_skip_bios;
 
@@ -3775,7 +3775,7 @@ void retro_set_environment(retro_environment_t cb)
 #endif
       { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
       { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
-      { option_cpu_overclock, "CPU Overclock; disabled|enabled" },
+      { option_gte_overclock, "GTE Overclock; disabled|enabled" },
       { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { option_display_internal_fps, "Display internal FPS; disabled|enabled" },

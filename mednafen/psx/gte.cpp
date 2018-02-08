@@ -27,7 +27,7 @@
 #include "../pgxp/pgxp_gte.h"
 #include "../pgxp/pgxp_main.h"
 
-extern bool psx_cpu_overclock;
+extern bool psx_gte_overclock;
 
 #include "../clamp.h"
 
@@ -1866,7 +1866,7 @@ int32_t GTE_Instruction(uint32_t instr)
    }
 
    // Overclock: force all GTE instruction to have 1 cycle latency
-   if (psx_cpu_overclock)
+   if (psx_gte_overclock)
       ret = 1;
 
    if(FLAGS & 0x7f87e000)
