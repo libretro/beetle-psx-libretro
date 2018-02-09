@@ -56,7 +56,7 @@ unsigned psx_gpu_overclock_shift = 0;
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
 // display_internal_framerate is true.
-#define INTERNAL_FPS_SAMPLE_PERIOD 32
+#define INTERNAL_FPS_SAMPLE_PERIOD 64
 
 static int psx_skipbios;
 
@@ -3479,7 +3479,11 @@ void retro_run(void)
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }
 
-   if (display_internal_framerate)
+   /* We only start counting after the first frame we encounter. This
+      way the value we display remains consistent if the real
+      framerate is not a multiple of INTERNAL_FPS_SAMPLE_PERIOD
+   */
+   if (display_internal_framerate && internal_frame_count)
    {
       frame_count++;
 
@@ -3724,7 +3728,6 @@ void retro_run(void)
       // obviously an oversimplification, if the game uses simple
       // buffering it will report 0 fps.
       internal_frame_count++;
-
       GPU_set_display_change_count(0);
    }
 }
