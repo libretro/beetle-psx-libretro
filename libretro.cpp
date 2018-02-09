@@ -50,6 +50,8 @@ int64 cd_slow_timeout = 8000; // microseconds
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
+// GPU rasterizer overclock shift
+unsigned psx_gpu_overclock_shift = 0;
 
 // Sets how often (in number of output frames/retro_run invocations)
 // the internal framerace counter should be updated if
@@ -2707,6 +2709,27 @@ static void check_variables(bool startup)
    else
       psx_gte_overclock = false;
 
+   var.key = option_gpu_overclock;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         unsigned val = atoi(var.value);
+
+         // Upscale must be a power of two
+         assert((val & (val - 1)) == 0);
+
+         // Crappy "ffs" implementation since the standard function is not
+         // widely supported by libc in the wild
+         uint8_t n;
+         for (n = 0; (val & 1) == 0; ++n)
+            {
+               val >>= 1;
+            }
+         psx_gpu_overclock_shift = n;
+      }
+   else
+      psx_gpu_overclock_shift = 0;
+
    var.key = option_skip_bios;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2768,13 +2791,7 @@ static void check_variables(bool startup)
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
          {
-            uint8_t val = var.value[0] - '0';
-
-            if (var.value[1] != 'x')
-            {
-               val  = (var.value[0] - '0') * 10;
-               val += var.value[1] - '0';
-            }
+            uint8_t val = atoi(var.value);
 
             // Upscale must be a power of two
             assert((val & (val - 1)) == 0);
@@ -3799,6 +3816,7 @@ void retro_set_environment(retro_environment_t cb)
       { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
       { option_cpu_freq_scale, "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
       { option_gte_overclock, "GTE Overclock; disabled|enabled" },
+      { option_gpu_overclock, "GPU rasterizer overclock; 1x(native)|2x|4x|8x|16x|32x" },
       { option_skip_bios, "Skip BIOS; disabled|enabled" },
       { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
       { option_display_internal_fps, "Display internal FPS; disabled|enabled" },
