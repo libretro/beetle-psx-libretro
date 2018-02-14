@@ -511,6 +511,7 @@ FLAGS += $(ENDIANNESS_DEFINES) \
          -D_LOW_ACCURACY_ \
          $(EXTRA_INCLUDES) \
          $(SOUND_DEFINE) \
+         -D_FILE_OFFSET_BITS=64 \
          -D__STDC_CONSTANT_MACROS
 
 ifeq ($(HAVE_VULKAN),1)
