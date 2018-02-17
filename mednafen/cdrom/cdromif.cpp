@@ -60,6 +60,8 @@ class CDIF_Message
       std::string str_message;
 };
 
+#if HAVE_THREADS
+
 class CDIF_Queue
 {
    public:
@@ -135,6 +137,8 @@ class CDIF_MT : public CDIF
       uint32 last_read_lba;
 };
 
+#endif /* HAVE_THREAD */
+
 /* TODO: prohibit copy constructor */
 class CDIF_ST : public CDIF
 {
@@ -189,6 +193,8 @@ CDIF_Message::~CDIF_Message()
 {
 
 }
+
+#if HAVE_THREADS
 
 CDIF_Queue::CDIF_Queue()
 {
@@ -425,19 +431,6 @@ CDIF_MT::~CDIF_MT()
    }
 }
 
-bool CDIF::ValidateRawSector(uint8 *buf)
-{
-   int mode = buf[12 + 3];
-
-   if(mode != 0x1 && mode != 0x2)
-      return(false);
-
-   if(!edc_lec_check_and_correct(buf, mode == 2))
-      return(false);
-
-   return(true);
-}
-
 bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba, int64 timeout_us)
 {
    bool found = false;
@@ -528,6 +521,34 @@ void CDIF_MT::HintReadSector(uint32 lba)
    ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_READ_SECTOR, lba));
 }
 
+bool CDIF_MT::Eject(bool eject_status)
+{
+   CDIF_Message msg;
+
+   if(UnrecoverableError)
+      return(false);
+
+   ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
+   EmuThreadQueue.Read(&msg);
+
+   return(true);
+}
+
+#endif /* HAVE_THREADS */
+
+bool CDIF::ValidateRawSector(uint8 *buf)
+{
+   int mode = buf[12 + 3];
+
+   if(mode != 0x1 && mode != 0x2)
+      return(false);
+
+   if(!edc_lec_check_and_correct(buf, mode == 2))
+      return(false);
+
+   return(true);
+}
+
 int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 {
    int ret = 0;
@@ -572,19 +593,6 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
    }
 
    return(ret);
-}
-
-bool CDIF_MT::Eject(bool eject_status)
-{
-   CDIF_Message msg;
-
-   if(UnrecoverableError)
-      return(false);
-
-   ReadThreadQueue.Write(CDIF_Message(CDIF_MSG_EJECT, eject_status));
-   EmuThreadQueue.Read(&msg);
-
-   return(true);
 }
 
 // Single-threaded implementation follows.
@@ -819,7 +827,10 @@ CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool imag
 {
    CDAccess *cda = cdaccess_open_image(success, path, image_memcache);
 
+#if HAVE_THREADS
    if(!image_memcache)
       return new CDIF_MT(cda);
+#endif /* HAVE_THREADS */
+
    return new CDIF_ST(cda); 
 }
