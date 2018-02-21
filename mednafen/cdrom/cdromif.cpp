@@ -16,6 +16,7 @@
  */
 
 #include "../mednafen.h"
+#include "../error.h"
 #include <string.h>
 #include <sys/types.h>
 #include "cdromif.h"

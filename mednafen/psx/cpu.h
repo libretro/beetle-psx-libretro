@@ -1,184 +1,284 @@
+/******************************************************************************/
+/* Mednafen Sony PS1 Emulation Module                                         */
+/******************************************************************************/
+/* cpu.h:
+**  Copyright (C) 2011-2016 Mednafen Team
+**
+** This program is free software; you can redistribute it and/or
+** modify it under the terms of the GNU General Public License
+** as published by the Free Software Foundation; either version 2
+** of the License, or (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software Foundation, Inc.,
+** 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+
 #ifndef __MDFN_PSX_CPU_H
 #define __MDFN_PSX_CPU_H
 
+/*
+ Load delay notes:
+
+	// Takes 1 less
+	".set noreorder\n\t"
+	".set nomacro\n\t"
+	"lw %0, 0(%2)\n\t"
+	"nop\n\t"
+	"nop\n\t"
+	"or %0, %1, %1\n\t"
+
+	// cycle than this:
+	".set noreorder\n\t"
+	".set nomacro\n\t"
+	"lw %0, 0(%2)\n\t"
+	"nop\n\t"
+	"or %0, %1, %1\n\t"
+	"nop\n\t"
+
+
+	// Both of these
+	".set noreorder\n\t"
+	".set nomacro\n\t"
+	"lw %0, 0(%2)\n\t"
+	"nop\n\t"
+	"nop\n\t"
+	"or %1, %0, %0\n\t"
+
+	// take same...(which is kind of odd).
+	".set noreorder\n\t"
+	".set nomacro\n\t"
+	"lw %0, 0(%2)\n\t"
+	"nop\n\t"
+	"or %1, %0, %0\n\t"
+	"nop\n\t"
+*/
+
 #include "gte.h"
 
-#define FAST_MAP_SHIFT        16
-#define FAST_MAP_PSIZE        (1 << FAST_MAP_SHIFT)
-
-#define CP0REG_BPC            3   /* PC breakpoint address */
-#define CP0REG_BDA            5   /* Data load/store breakpoint address */
-#define CP0REG_TAR            6   /* Target address */
-#define CP0REG_DCIC           7   /* Cache control */
-#define CP0REG_BADA           8
-#define CP0REG_BDAM           9   /* Data load/store address mask */
-#define CP0REG_BPCM           11  /* PC breakpoint address mask */
-#define CP0REG_SR             12
-#define CP0REG_CAUSE          13
-#define CP0REG_EPC            14
-#define CP0REG_PRID           15  /* Product ID */
-#define CP0REG_ERREG          16
-
-#define EXCEPTION_INT         0
-#define EXCEPTION_MOD         1
-#define EXCEPTION_TLBL        2
-#define EXCEPTION_TLBS        3
-#define EXCEPTION_ADEL        4 /* Address error on load */
-#define EXCEPTION_ADES        5 /* Address error on store */
-#define EXCEPTION_IBE         6 /* Instruction bus error */
-#define EXCEPTION_DBE         7 /* Data bus error */
-#define EXCEPTION_SYSCALL     8 /* System call */
-#define EXCEPTION_BP          9 /* Breakpoint */
-#define EXCEPTION_RI         10 /* Reserved instruction */
-#define EXCEPTION_COPU       11 /* Coprocessor unusable */
-#define EXCEPTION_OV         12 /* Arithmetic overflow */
-
-#define GSREG_GPR             0
-#define GSREG_PC             32
-#define GSREG_PC_NEXT        33
-#define GSREG_IN_BD_SLOT     34
-#define GSREG_LO             35
-#define GSREG_HI             36
-#define GSREG_SR             37
-#define GSREG_CAUSE          38
-#define GSREG_EPC            39
+#if NOT_LIBRETRO
+namespace MDFN_IEN_PSX
+{
+#endif
 
 class PS_CPU
 {
-   public:
+ public:
 
-      PS_CPU();
-      ~PS_CPU();
+ PS_CPU() MDFN_COLD;
+ ~PS_CPU() MDFN_COLD;
 
-      void SetFastMap(void *region_mem, uint32_t region_address, uint32_t region_size);
+ // FAST_MAP_* enums are in BYTES(8-bit), not in 32-bit units("words" in MIPS context), but the sizes
+ // will always be multiples of 4.
+ enum { FAST_MAP_SHIFT = 16 };
+ enum { FAST_MAP_PSIZE = 1 << FAST_MAP_SHIFT };
 
-      INLINE void SetEventNT(const int32_t next_event_ts_arg)
-      {
-         next_event_ts = next_event_ts_arg;
-      }
+ void SetFastMap(void *region_mem, uint32 region_address, uint32 region_size);
 
-      int32_t Run(int32_t timestamp_in);
+ INLINE void SetEventNT(const pscpu_timestamp_t next_event_ts_arg)
+ {
+  next_event_ts = next_event_ts_arg;
+ }
 
-      void Power(void);
+ pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode);
 
-      // which ranges 0-5, inclusive
-      void AssertIRQ(unsigned which, bool asserted);
+ void Power(void) MDFN_COLD;
 
-      void SetHalt(bool status);
+ // which ranges 0-5, inclusive
+ void AssertIRQ(unsigned which, bool asserted);
 
-      // TODO eventually: factor BIU address decoding directly in the CPU core somehow without hurting speed.
-      void SetBIU(uint32_t val);
-      uint32_t GetBIU(void);
+ void SetHalt(bool status);
 
-      int StateAction(StateMem *sm, int load, int data_only);
+ // TODO eventually: factor BIU address decoding directly in the CPU core somehow without hurting speed.
+ void SetBIU(uint32 val);
+ uint32 GetBIU(void);
 
-   private:
+ int StateAction(StateMem *sm, const unsigned load, const bool data_only);
 
-      uint32_t GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
-      uint32_t LO;
-      uint32_t HI;
+ private:
 
+ uint32 GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
 
-      uint32_t BACKED_PC;
-      uint32_t BACKED_new_PC;
-      uint32_t BACKED_new_PC_mask;
-
-      uint32_t IPCache;
-      void RecalcIPCache(void);
-      bool Halted;
-
-      uint32_t BACKED_LDWhich;
-      uint32_t BACKED_LDValue;
-      uint32_t LDAbsorb;
-
-      int32_t next_event_ts;
-      int32_t gte_ts_done;
-      int32_t muldiv_ts_done;
-
-      uint32_t BIU;
-
-      struct __ICache
-      {
-         uint32_t TV;
-         uint32_t Data;
-      };
-
-      union
-      {
-         __ICache ICache[1024];
-         uint32_t ICache_Bulk[2048];
-      };
+ uint32 LO;
+ uint32 HI;
 
 
-      struct
-      {
-         union
-         {
-            uint32_t Regs[32];
-            struct
-            {
-               uint32_t Unused00;
-               uint32_t Unused01;
-               uint32_t Unused02;
-               uint32_t BPC;		// RW
-               uint32_t Unused04;
-               uint32_t BDA;		// RW
-               uint32_t TAR;
-               uint32_t DCIC;	   // RW
-               uint32_t BADA;	   // R
-               uint32_t BDAM;	   // R/W
-               uint32_t Unused0A;
-               uint32_t BPCM;	   // R/W
-               uint32_t SR;		// R/W
-               uint32_t CAUSE;	// R/W(partial)
-               uint32_t EPC;		// R
-               uint32_t PRID;	   // R
-               uint32_t ERREG;	// ?(may not exist, test)
-            };
-         };
-      } CP0;
+ uint32 BACKED_PC;
+ uint32 BACKED_new_PC;
 
-      uint8_t ReadAbsorb[0x20 + 1];
-      uint8_t ReadAbsorbWhich;
-      uint8_t ReadFudge;
+ uint32 IPCache;
+ uint8 BDBT;
 
-      uint8 MULT_Tab24[24];
+ uint8 ReadAbsorb[0x20 + 1];
+ uint8 ReadAbsorbWhich;
+ uint8 ReadFudge;
 
-      MultiAccessSizeMem<1024, uint32, false> ScratchRAM;
+ void RecalcIPCache(void);
+ bool Halted;
 
-      uint8_t *FastMap[1 << (32 - FAST_MAP_SHIFT)];
-      uint8_t DummyPage[FAST_MAP_PSIZE];
+ uint32 BACKED_LDWhich;
+ uint32 BACKED_LDValue;
+ uint32 LDAbsorb;
 
+ pscpu_timestamp_t next_event_ts;
+ pscpu_timestamp_t gte_ts_done;
+ pscpu_timestamp_t muldiv_ts_done;
 
-      uint32_t Exception(uint32_t code, uint32_t PC, const uint32_t NP, const uint32_t NPM, const uint32_t instr) MDFN_WARN_UNUSED_RESULT;
+ uint32 BIU;
 
-      template<bool DebugMode> int32_t RunReal(int32_t timestamp_in);
+ const uint32 addr_mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
 
-      template<typename T> T PeekMemory(uint32_t address) MDFN_COLD;
-      template<typename T> void PokeMemory(uint32 address, T value) MDFN_COLD;
-      template<typename T> T ReadMemory(int32_t &timestamp, uint32_t address, bool DS24 = false, bool LWC_timing = false);
-      template<typename T> void WriteMemory(int32_t &timestamp, uint32_t address, uint32_t value, bool DS24 = false);
+ enum
+ {
+  CP0REG_BPC = 3,		// PC breakpoint address.
+  CP0REG_BDA = 5,		// Data load/store breakpoint address.
+  CP0REG_TAR = 6,		// Target address(???)
+  CP0REG_DCIC = 7,		// Cache control
+  CP0REG_BADA = 8,
+  CP0REG_BDAM = 9,		// Data load/store address mask.
+  CP0REG_BPCM = 11,		// PC breakpoint address mask.
+  CP0REG_SR = 12,
+  CP0REG_CAUSE = 13,
+  CP0REG_EPC = 14,
+  CP0REG_PRID = 15		// Product ID
+ };
 
-      uint32 ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address);
+ struct
+ {
+  union
+  {
+   uint32 Regs[32];
+   struct
+   {
+    uint32 Unused00;
+    uint32 Unused01;
+    uint32 Unused02;
+    uint32 BPC;		// RW
+    uint32 Unused04;
+    uint32 BDA;		// RW
+    uint32 TAR;		// R
+    uint32 DCIC;	// RW
+    uint32 BADA;	// R
+    uint32 BDAM;	// R/W
+    uint32 Unused0A;
+    uint32 BPCM;	// R/W
+    uint32 SR;		// R/W
+    uint32 CAUSE;	// R/W(partial)
+    uint32 EPC;		// R
+    uint32 PRID;	// R
+   };
+  };
+ } CP0;
 
-      // Mednafen debugger stuff follows:
-   public:
-      void SetCPUHook(void (*cpuh)(const int32_t timestamp, uint32_t pc), void (*addbt)(uint32_t from, uint32_t to, bool exception));
-      void CheckBreakpoints(void (*callback)(bool write, uint32_t address, unsigned int len), uint32_t instr);
+ uint8 MULT_Tab24[24];
 
+ struct __ICache
+ {
+  /*
+   TV:
+	Mask 0x00000001: 0x0 = icache enabled((BIU & 0x800) == 0x800), 0x1 = icache disabled(changed in bulk on BIU value changes; preserve everywhere else!)
+	Mask 0x00000002: 0x0 = valid, 0x2 = invalid
+	Mask 0x00000FFC: Always 0
+	Mask 0xFFFFF000: Tag.
+  */
+  uint32 TV;
+  uint32 Data;
+ };
 
-      uint32_t GetRegister(unsigned int which, char *special, const uint32_t special_len);
-      void SetRegister(unsigned int which, uint32_t value);
-      bool PeekCheckICache(uint32_t PC, uint32_t *iw);
-      uint8_t PeekMem8(uint32_t A);
-      uint16_t PeekMem16(uint32_t A);
-      uint32_t PeekMem32(uint32_t A);
-      void PokeMem8(uint32 A, uint8 V);
-      void PokeMem16(uint32 A, uint16 V);
-      void PokeMem32(uint32 A, uint32 V);
-   private:
-      void (*CPUHook)(const int32_t timestamp, uint32_t pc);
-      void (*ADDBT)(uint32_t from, uint32_t to, bool exception);
+ union
+ {
+  __ICache ICache[1024];
+  uint32 ICache_Bulk[2048];
+ };
+
+   MultiAccessSizeMem<1024, uint32, false> ScratchRAM;
+
+ //PS_GTE GTE;
+
+ uintptr_t FastMap[1 << (32 - FAST_MAP_SHIFT)];
+ uint8 DummyPage[FAST_MAP_PSIZE];
+
+ enum
+ {
+  EXCEPTION_INT = 0,
+  EXCEPTION_MOD = 1,
+  EXCEPTION_TLBL = 2,
+  EXCEPTION_TLBS = 3,
+  EXCEPTION_ADEL = 4, // Address error on load
+  EXCEPTION_ADES = 5, // Address error on store
+  EXCEPTION_IBE = 6, // Instruction bus error
+  EXCEPTION_DBE = 7, // Data bus error
+  EXCEPTION_SYSCALL = 8, // System call
+  EXCEPTION_BP = 9, // Breakpoint
+  EXCEPTION_RI = 10, // Reserved instruction
+  EXCEPTION_COPU = 11,  // Coprocessor unusable
+  EXCEPTION_OV = 12	// Arithmetic overflow
+ };
+
+ uint32 Exception(uint32 code, uint32 PC, const uint32 NP, const uint32 instr) MDFN_WARN_UNUSED_RESULT;
+
+ template<bool DebugMode, bool BIOSPrintMode, bool ILHMode> pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in) NO_INLINE;
+
+ template<typename T> T PeekMemory(uint32 address) MDFN_COLD;
+ template<typename T> void PokeMemory(uint32 address, T value) MDFN_COLD;
+ template<typename T> T ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool DS24 = false, bool LWC_timing = false);
+ template<typename T> void WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, uint32 value, bool DS24 = false);
+
+ uint32 ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address);
+
+ //
+ // Mednafen debugger stuff follows:
+ //
+ public:
+ void SetCPUHook(void (*cpuh)(const pscpu_timestamp_t timestamp, uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception));
+ void CheckBreakpoints(void (*callback)(bool write, uint32 address, unsigned int len), uint32 instr);
+
+ enum
+ {
+  GSREG_GPR = 0,
+  GSREG_PC = 32,
+  GSREG_PC_NEXT,
+  GSREG_IN_BD_SLOT,
+  GSREG_LO,
+  GSREG_HI,
+  //
+  //
+  GSREG_BPC,
+  GSREG_BDA,
+  GSREG_TAR,
+  GSREG_DCIC,
+  GSREG_BADA,
+  GSREG_BDAM,
+  GSREG_BPCM,
+  GSREG_SR,
+  GSREG_CAUSE,
+  GSREG_EPC
+ };
+
+ uint32 GetRegister(unsigned int which, char *special, const uint32 special_len);
+ void SetRegister(unsigned int which, uint32 value);
+ bool PeekCheckICache(uint32 PC, uint32 *iw);
+
+ uint8 PeekMem8(uint32 A);
+ uint16 PeekMem16(uint32 A);
+ uint32 PeekMem32(uint32 A);
+
+ void PokeMem8(uint32 A, uint8 V);
+ void PokeMem16(uint32 A, uint16 V);
+ void PokeMem32(uint32 A, uint32 V);
+
+ private:
+ void (*CPUHook)(const pscpu_timestamp_t timestamp, uint32 pc);
+ void (*ADDBT)(uint32 from, uint32 to, bool exception);
 };
+
+#if NOT_LIBRETRO
+}
+#endif
 
 #endif

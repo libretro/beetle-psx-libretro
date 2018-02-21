@@ -23,6 +23,7 @@
 
 #include <boolean.h>
 
+#include "error.h"
 #include "mednafen.h"
 #include "general.h"
 #include "state.h"

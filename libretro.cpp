@@ -20,6 +20,7 @@
 
 #include "mednafen/mednafen-endian.h"
 #include "mednafen/psx/psx.h"
+#include "mednafen/error.h"
 
 #include "../pgxp/pgxp_main.h"
 
@@ -3549,7 +3550,7 @@ void retro_run(void)
    GPU_StartFrame(espec);
 
    Running = -1;
-   timestamp = CPU->Run(timestamp);
+   timestamp = CPU->Run(timestamp, false, false);
 
    assert(timestamp);
 

@@ -1,8 +1,6 @@
 #ifndef _GIT_H
 #define _GIT_H
 
-#include <string>
-
 #include "video.h"
 #include "state.h"
 #include "settings-common.h"

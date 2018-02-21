@@ -34,6 +34,7 @@
 #include <streams/file_stream.h>
 
 #include "../mednafen.h"
+#include "../error.h"
 
 #include <sys/types.h>
 
