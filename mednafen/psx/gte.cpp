@@ -29,6 +29,10 @@
 
 extern bool psx_gte_overclock;
 
+#if 0
+#define GTE_SPEEDHACKS
+#endif
+
 #include "../clamp.h"
 
 /* Notes:
@@ -719,6 +723,36 @@ uint32_t GTE_ReadDR(unsigned int which)
    return(ret);
 }
 
+#define sign_x_to_s64(_bits, _value) (((int64_t)((uint64_t)(_value) << (64 - _bits))) >> (64 - _bits))
+
+static INLINE int64_t A_MV(unsigned which, int64_t value)
+{
+   if(value >= (INT64_C(1) << 43))
+      FLAGS |= 1 << (30 - which);
+
+   if(value < -(INT64_C(1) << 43))
+      FLAGS |= 1 << (27 - which);
+
+   return sign_x_to_s64(44, value);
+}
+
+static INLINE int64_t F(int64_t value)
+{
+   if(value < -2147483648LL)
+   {
+      // flag set here
+      FLAGS |= 1 << 15;
+   }
+
+   if(value > 2147483647LL)
+   {
+      // flag set here
+      FLAGS |= 1 << 16;
+   }
+   return(value);
+}
+
+
 /* Truncate i64 value to only keep the low 43 bits + sign and
  * update the flags if an overflow occurs */
 static INLINE int64_t i64_to_i44(unsigned which, int64_t value)
@@ -773,6 +807,109 @@ static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_va
    return(value);
 }
 
+static INLINE uint8_t Lm_C(unsigned int which, int32_t value)
+{
+   if(value & ~0xFF)
+   {
+      // Set flag here
+      FLAGS |= 1 << (21 - which);	// Tested with GPF
+
+      if(value < 0)
+         value = 0;
+
+      if(value > 255)
+         value = 255;
+   }
+
+   return(value);
+}
+
+static INLINE int32_t Lm_D(int32_t value, int unchained)
+{
+   // Not sure if we should have it as int64, or just chain on to and special case when the F flags are set.
+   if(!unchained)
+   {
+      if(FLAGS & (1 << 15))
+      {
+         FLAGS |= 1 << 18;
+         return(0);
+      }
+
+      if(FLAGS & (1 << 16))
+      {
+         FLAGS |= 1 << 18;
+         return(0xFFFF);
+      }
+   }
+
+   if(value < 0)
+   {
+      // Set flag here
+      value = 0;
+      FLAGS |= 1 << 18;	// Tested with AVSZ3
+   }
+   else if(value > 65535)
+   {
+      // Set flag here.
+      value = 65535;
+      FLAGS |= 1 << 18;	// Tested with AVSZ3
+   }
+
+   return(value);
+}
+
+static INLINE int32_t Lm_G(unsigned int which, int32_t value)
+{
+   if(value < -1024)
+   {
+      // Set flag here
+      value = -1024;
+      FLAGS |= 1 << (14 - which);
+   }
+
+   if(value > 1023)
+   {
+      // Set flag here.
+      value = 1023;
+      FLAGS |= 1 << (14 - which);
+   }
+
+   return(value);
+}
+
+// limit to 4096, not 4095
+static INLINE int32_t Lm_H(int32_t value)
+{
+#if 0
+   if(FLAGS & (1 << 15))
+   {
+      value = 0;
+      FLAGS |= 1 << 12;
+      return value;
+   }
+
+   if(FLAGS & (1 << 16))
+   {
+      value = 4096;
+      FLAGS |= 1 << 12;
+      return value;
+   }
+#endif
+
+   if(value < 0)
+   {
+      value = 0;
+      FLAGS |= 1 << 12;
+   }
+
+   if(value > 4096)
+   {
+      value = 4096;
+      FLAGS |= 1 << 12;
+   }
+
+   return(value);
+}
 
 /* Convert a 64bit signed average value to an unsigned halfword
  * while updating the overflow flags */
@@ -829,24 +966,6 @@ static INLINE int32_t i32_to_i11_saturate(uint8_t flag, int32_t value)
    return value;
 }
 
-// limit to 4096, not 4095
-static INLINE int32_t Lm_H(int32_t depth)
-{
-   if(depth < 0)
-   {
-      FLAGS |= 1 << 12;
-      return 0;
-   }
-
-   if(depth > 4096)
-   {
-      FLAGS |= 1 << 12;
-      return 4096;
-   }
-
-   return depth;
-}
-
 static INLINE uint8_t MAC_to_COLOR(uint8_t flag, int32_t mac)
 {
    int32_t c = mac >> 4;
@@ -868,24 +987,57 @@ static INLINE void MAC_to_RGB_FIFO(void)
 {
    RGB_FIFO[0] = RGB_FIFO[1];
    RGB_FIFO[1] = RGB_FIFO[2];
+#ifdef GTE_SPEEDHACKS
    RGB_FIFO[2].R = MAC_to_COLOR(0, MAC[1]);
    RGB_FIFO[2].G = MAC_to_COLOR(1, MAC[2]);
    RGB_FIFO[2].B = MAC_to_COLOR(2, MAC[3]);
+#else
+   RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
+   RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
+   RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
+#endif
    RGB_FIFO[2].CD = RGB.CD;
 }
 
+static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
+{
+   int32_t tmp = lm << 15;
+
+   if(value < (-32768 + tmp))
+   {
+      // set flag here
+      FLAGS |= 1 << (24 - which);
+      value = -32768 + tmp;
+   }
+
+   if(value > 32767)
+   {
+      // Set flag here
+      FLAGS |= 1 << (24 - which);
+      value = 32767;
+   }
+
+   return(value);
+}
 
 static INLINE void MAC_to_IR(int lm)
 {
+#ifdef GTE_SPEEDHACKS
    IR1 = i32_to_i16_saturate(0, MAC[1], lm);
    IR2 = i32_to_i16_saturate(1, MAC[2], lm);
    IR3 = i32_to_i16_saturate(2, MAC[3], lm);
+#else
+   IR1 = Lm_B(0, MAC[1], lm);
+   IR2 = Lm_B(1, MAC[2], lm);
+   IR3 = Lm_B(2, MAC[3], lm);
+#endif
 }
 
 static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
 {
    unsigned i;
 
+#ifdef GTE_SPEEDHACKS
    if(MDFN_LIKELY(matrix != &Matrices.AbbyNormal))
    {
       if(crv == CRVectors.FC)
@@ -979,22 +1131,109 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
          }
       }
    }
+#else
+   for(i = 0; i < 3; i++)
+   {
+      int64_t tmp;
+      int32_t mulr[3];
+
+      tmp = (uint64_t)(int64_t)crv[i] << 12;
+
+      if(matrix == &Matrices.AbbyNormal)
+      {
+         if(i == 0)
+         {
+            mulr[0] = -(RGB.R << 4);
+            mulr[1] = (RGB.R << 4);
+            mulr[2] = IR0;
+         }
+         else
+         {
+            mulr[0] = (int16_t)CR[i];
+            mulr[1] = (int16_t)CR[i];
+            mulr[2] = (int16_t)CR[i];
+         }
+      }
+      else
+      {
+         mulr[0] = matrix->MX[i][0];
+         mulr[1] = matrix->MX[i][1];
+         mulr[2] = matrix->MX[i][2];
+      }
+      mulr[0] *= v[0];
+      mulr[1] *= v[1];
+      mulr[2] *= v[2];
+
+      tmp = A_MV(i, tmp + mulr[0]);
+      if(crv == CRVectors.FC)
+      {
+         Lm_B(i, tmp >> sf, FALSE);
+         tmp = 0;
+      }
+
+      tmp = A_MV(i, tmp + mulr[1]);
+      tmp = A_MV(i, tmp + mulr[2]);
+
+      MAC[1 + i] = tmp >> sf;
+   }
+#endif
 
    MAC_to_IR(lm);
+}
+
+static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
+{
+   int64_t tmp[3];
+   unsigned i;
+
+   for(i = 0; i < 3; i++)
+   {
+      int32_t mulr[3];
+
+      tmp[i] = (uint64_t)(int64_t)crv[i] << 12;
+
+      mulr[0] = matrix->MX[i][0] * v[0];
+      mulr[1] = matrix->MX[i][1] * v[1];
+      mulr[2] = matrix->MX[i][2] * v[2];
+
+      tmp[i] = A_MV(i, tmp[i] + mulr[0]);
+      tmp[i] = A_MV(i, tmp[i] + mulr[1]);
+      tmp[i] = A_MV(i, tmp[i] + mulr[2]);
+
+      MAC[1 + i] = tmp[i] >> sf;
+   }
+
+   IR1 = Lm_B(0, MAC[1], lm);
+   IR2 = Lm_B(1, MAC[2], lm);
+   //printf("FTV: %08x %08x\n", crv[2], (uint32)(tmp[2] >> 12));
+   IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
+
+   Z_FIFO[0] = Z_FIFO[1];
+   Z_FIFO[1] = Z_FIFO[2];
+   Z_FIFO[2] = Z_FIFO[3];
+   Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
 }
 
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
-   unsigned i;
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
+
+#ifdef GTE_SPEEDHACKS
+   /* PSX GTE test fails with this code */
+   unsigned i;
 
    for (i = 0; i < 4; i++)
    {
       int32_t ir = IR[i];
       MAC[i]     = (ir * ir) >> sf;
    }
+#else
+   MAC[1] = ((IR1 * IR1) >> sf);
+   MAC[2] = ((IR2 * IR2) >> sf);
+   MAC[3] = ((IR3 * IR3) >> sf);
+#endif
 
    MAC_to_IR(lm);
 
@@ -1060,6 +1299,7 @@ static INLINE void check_mac_overflow(int64_t value)
       FLAGS |= 1 << 16;
 }
 
+#ifdef GTE_SPEEDHACKS
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 z)
 {
    float fofx       = ((float)OFX / (float)(1 << 16));
@@ -1094,6 +1334,20 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 
    uint32 value = *((uint32*)&XY_FIFO[3]);
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
 }
+#else
+static INLINE void TransformXY(int64_t h_div_sz)
+{
+   MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
+   XY_FIFO[3].X = Lm_G(0, MAC[0]);
+
+   MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
+   XY_FIFO[3].Y = Lm_G(1, MAC[0]);
+
+   XY_FIFO[0] = XY_FIFO[1];
+   XY_FIFO[1] = XY_FIFO[2];
+   XY_FIFO[2] = XY_FIFO[3];
+}
+#endif
 
 /* Perform depth queuing calculations using the projection
  * factor computed by the 'RTP' command */
@@ -1114,6 +1368,13 @@ static INLINE void depth_queuing(int64_t h_div_sz)
    IR0    = Lm_H(((int64_t)depth));
 }
 
+static INLINE void TransformDQ(int64_t h_div_sz)
+{
+   MAC[0] = F((int64_t)DQB + DQA * h_div_sz);
+   IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
+}
+
+#ifdef GTE_SPEEDHACKS
 /* Rotate, Translate and Perspective transform a single vector
  * Returns the projection factor that's also used for depth 
  * queuing */
@@ -1188,11 +1449,24 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
 
    return projection_factor;
 }
+#endif
 
 static int32_t RTPS(uint32_t instr)
 {
+#ifdef GTE_SPEEDHACKS
    int64_t projection_factor = RTP(instr, 0);
    depth_queuing(projection_factor);
+#else
+   int64_t h_div_sz;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
+
+   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
+   h_div_sz = Divide(H, Z_FIFO[3]);
+
+   TransformXY(h_div_sz);
+   TransformDQ(h_div_sz);
+#endif
 
    return(15);
 }
@@ -1201,11 +1475,30 @@ static int32_t RTPS(uint32_t instr)
  * Operates on v0, v1 and v2 */
 static int32_t RTPT(uint32_t instr)
 {
+#ifdef GTE_SPEEDHACKS
    int64_t projection_factor;
    RTP(instr, 0);
    RTP(instr, 1);
    projection_factor = RTP(instr, 2);
    depth_queuing(projection_factor);
+#else
+   unsigned i;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
+
+   for(i = 0; i < 3; i++)
+   {
+      int64_t h_div_sz;
+
+      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
+      h_div_sz = Divide(H, Z_FIFO[3]);
+
+      TransformXY(h_div_sz);
+
+      if(i == 2)
+         TransformDQ(h_div_sz);
+   }
+#endif
 
    return(23);
 }
@@ -1468,10 +1761,11 @@ static int32_t CDP(uint32_t instr)
    return(13);
 }
 
-
 /* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
 {
+#ifdef GTE_SPEEDHACKS
+   /* PSX GTE test fails with this code */
    int16_t x0     = XY_FIFO[0].X;
    int16_t y0     = XY_FIFO[0].Y;
    int16_t x1     = XY_FIFO[1].X;
@@ -1490,6 +1784,10 @@ static int32_t NCLIP(uint32_t instr)
    check_mac_overflow(sum);
 
    MAC[0] = sum;
+#else
+   MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
+         );
+#endif
 
    return(8);
 }
