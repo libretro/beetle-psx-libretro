@@ -184,7 +184,9 @@ struct TexCache_t
 template<uint32_t TexMode_TA>
 static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)
 {
+#ifdef HAS_CXX11
      static_assert(TexMode_TA <= 2, "TexMode_TA must be <= 2");
+#endif
 
      uint32_t u_ext = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD);
      uint32_t fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;

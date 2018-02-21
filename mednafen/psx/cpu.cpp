@@ -58,6 +58,7 @@ namespace MDFN_IEN_PSX
 
 
 PS_CPU::PS_CPU()
+   :addr_mask{ 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }
 {
  //printf("%zu\n", (size_t)((uintptr_t)ICache - (uintptr_t)this));
 

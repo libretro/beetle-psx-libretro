@@ -882,8 +882,8 @@ void PS_CDC::EnbufferizeCDDASector(const uint8 *buf)
    {
       for(int i = 0; i < 588; i++)
       {
-         ab->Samples[0][i] = (int16)MDFN_de16lsb(&buf[i * sizeof(int16) * 2 + 0]);
-         ab->Samples[1][i] = (int16)MDFN_de16lsb(&buf[i * sizeof(int16) * 2 + 2]);
+         ab->Samples[0][i] = (int16)MDFN_de16lsb<false>(&buf[i * sizeof(int16) * 2 + 0]);
+         ab->Samples[1][i] = (int16)MDFN_de16lsb<false>(&buf[i * sizeof(int16) * 2 + 2]);
       }
    }
 
@@ -976,7 +976,7 @@ void PS_CDC::HandlePlayRead(void)
          bool abs_lev_chselect = SubQBuf_Safe[0x8] & 0x01;
 
          for(int i = 0; i < 588; i++)
-            abs_lev_max = std::max<uint16>(abs_lev_max, std::min<int>(abs((int16)MDFN_de16lsb(&read_buf[i * 4 + (abs_lev_chselect * 2)])), 32767));
+            abs_lev_max = std::max<uint16>(abs_lev_max, std::min<int>(abs((int16)MDFN_de16lsb<false>(&read_buf[i * 4 + (abs_lev_chselect * 2)])), 32767));
          abs_lev_max |= abs_lev_chselect << 15;
 #endif
 

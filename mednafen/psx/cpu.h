@@ -131,7 +131,7 @@ class PS_CPU
 
  uint32 BIU;
 
- const uint32 addr_mask[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+ const uint32 addr_mask[8];
 
  enum
  {

@@ -311,7 +311,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
          //tmp = 32767 + MDFN_de16lsb(&aba[0]) - MDFN_de16lsb(&aba[2]);
          //tmp = (tmp * 0x100) / 0xFFFF;
 
-         tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+         tmp = 32768 + MDFN_de32lsb<false>((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb<false>((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
          tmp >>= 8;
          axes[stick][axis] = tmp;
       }
@@ -331,7 +331,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
       //revert to 0.9.33, should be fixed on libretro side instead
       //MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8));
 
-      MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
+      MDFN_en32lsb<false>(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
    }
    else
    {
@@ -342,7 +342,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
 
       //revert to 0.9.33, should be fixed on libretro side instead
       //MDFN_en16lsb(rumb_dp, sneaky_weaky << 0);
-      MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
+      MDFN_en32lsb<false>(&d8[4 + 32 + 0], sneaky_weaky << 0);
    }
 
    //printf("%d %d %d %d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]);

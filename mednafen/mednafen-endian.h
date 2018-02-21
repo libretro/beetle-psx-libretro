@@ -37,6 +37,11 @@ void Endian_A64_NE_BE(void *src, uint32 nelements);
 void Endian_V_NE_LE(void* p, size_t len);
 void Endian_V_NE_BE(void* p, size_t len);
 
+// This is a hack to remove the dependency on C++11. This is *not*
+// correct for structs and anything but base types, but it shoud be
+// enough for our case.
+#define alignof(T) sizeof(T)
+
 //
 //
 //
@@ -119,7 +124,9 @@ static INLINE T MDFN_deXsb(const void* ptr)
 
  if(isbigendian != -1 && isbigendian != (int)MDFN_IS_BIGENDIAN)
  {
+#ifdef HAS_CXX11
   static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Gummy penguins.");
+#endif
 
   if(sizeof(T) == 8)
    return MDFN_bswap64(tmp);
@@ -135,7 +142,7 @@ static INLINE T MDFN_deXsb(const void* ptr)
 //
 // Native endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE T MDFN_densb(const void* ptr)
 {
  return MDFN_deXsb<-1, T, aligned>(ptr);
@@ -144,13 +151,13 @@ static INLINE T MDFN_densb(const void* ptr)
 //
 // Little endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE T MDFN_delsb(const void* ptr)
 {
  return MDFN_deXsb<0, T, aligned>(ptr);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint16 MDFN_de16lsb(const void* ptr)
 {
  return MDFN_delsb<uint16, aligned>(ptr);
@@ -163,13 +170,13 @@ static INLINE uint32 MDFN_de24lsb(const void* ptr)
  return (ptr_u8[0] << 0) | (ptr_u8[1] << 8) | (ptr_u8[2] << 16);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint32 MDFN_de32lsb(const void* ptr)
 {
  return MDFN_delsb<uint32, aligned>(ptr);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint64 MDFN_de64lsb(const void* ptr)
 {
  return MDFN_delsb<uint64, aligned>(ptr);
@@ -178,13 +185,13 @@ static INLINE uint64 MDFN_de64lsb(const void* ptr)
 //
 // Big endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE T MDFN_demsb(const void* ptr)
 {
  return MDFN_deXsb<1, T, aligned>(ptr);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint16 MDFN_de16msb(const void* ptr)
 {
  return MDFN_demsb<uint16, aligned>(ptr);
@@ -197,13 +204,13 @@ static INLINE uint32 MDFN_de24msb(const void* ptr)
  return (ptr_u8[0] << 16) | (ptr_u8[1] << 8) | (ptr_u8[2] << 0);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint32 MDFN_de32msb(const void* ptr)
 {
  return MDFN_demsb<uint32, aligned>(ptr);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE uint64 MDFN_de64msb(const void* ptr)
 {
  return MDFN_demsb<uint64, aligned>(ptr);
@@ -228,7 +235,9 @@ static INLINE void MDFN_enXsb(void* ptr, T value)
 
  if(isbigendian != -1 && isbigendian != (int)MDFN_IS_BIGENDIAN)
  {
+#ifdef HAS_CXX11
   static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Gummy penguins.");
+#endif
 
   if(sizeof(T) == 8)
    tmp = MDFN_bswap64(value);
@@ -244,7 +253,7 @@ static INLINE void MDFN_enXsb(void* ptr, T value)
 //
 // Native endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE void MDFN_ennsb(void* ptr, T value)
 {
  MDFN_enXsb<-1, T, aligned>(ptr, value);
@@ -253,13 +262,13 @@ static INLINE void MDFN_ennsb(void* ptr, T value)
 //
 // Little endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE void MDFN_enlsb(void* ptr, T value)
 {
  MDFN_enXsb<0, T, aligned>(ptr, value);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en16lsb(void* ptr, uint16 value)
 {
  MDFN_enlsb<uint16, aligned>(ptr, value);
@@ -274,13 +283,13 @@ static INLINE void MDFN_en24lsb(void* ptr, uint32 value)
  ptr_u8[2] = value >> 16;
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en32lsb(void* ptr, uint32 value)
 {
  MDFN_enlsb<uint32, aligned>(ptr, value);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en64lsb(void* ptr, uint64 value)
 {
  MDFN_enlsb<uint64, aligned>(ptr, value);
@@ -290,13 +299,13 @@ static INLINE void MDFN_en64lsb(void* ptr, uint64 value)
 //
 // Big endian.
 //
-template<typename T, bool aligned = false>
+template<typename T, bool aligned>
 static INLINE void MDFN_enmsb(void* ptr, T value)
 {
  MDFN_enXsb<1, T, aligned>(ptr, value);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en16msb(void* ptr, uint16 value)
 {
  MDFN_enmsb<uint16, aligned>(ptr, value);
@@ -311,13 +320,13 @@ static INLINE void MDFN_en24msb(void* ptr, uint32 value)
  ptr_u8[2] = value >> 0;
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en32msb(void* ptr, uint32 value)
 {
  MDFN_enmsb<uint32, aligned>(ptr, value);
 }
 
-template<bool aligned = false>
+template<bool aligned>
 static INLINE void MDFN_en64msb(void* ptr, uint64 value)
 {
  MDFN_enmsb<uint64, aligned>(ptr, value);
@@ -354,8 +363,10 @@ static INLINE uintptr_t neX_ptr_le(uintptr_t const base, const size_t byte_offse
 template<typename T, typename BT>
 static INLINE void ne16_wbo_be(BT base, const size_t byte_offset, const T value)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, uint16*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_be<T, uint16>((uintptr_t)base, byte_offset);
 
@@ -373,8 +384,10 @@ static INLINE void ne16_wbo_be(BT base, const size_t byte_offset, const T value)
 template<typename T, typename BT>
 static INLINE T ne16_rbo_be(BT base, const size_t byte_offset)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, const uint16*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_be<T, uint16>((uintptr_t)base, byte_offset);
 
@@ -408,8 +421,10 @@ static INLINE void ne16_rwbo_be(BT base, const size_t byte_offset, T* value)
 template<typename T, typename BT>
 static INLINE void ne16_wbo_le(BT base, const size_t byte_offset, const T value)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, uint16*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_le<T, uint16>((uintptr_t)base, byte_offset);
 
@@ -427,8 +442,10 @@ static INLINE void ne16_wbo_le(BT base, const size_t byte_offset, const T value)
 template<typename T, typename BT>
 static INLINE T ne16_rbo_le(BT base, const size_t byte_offset)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, const uint16*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_le<T, uint16>((uintptr_t)base, byte_offset);
 
@@ -462,8 +479,10 @@ static INLINE void ne16_rwbo_le(BT base, const size_t byte_offset, T* value)
 template<typename T, typename BT>
 static INLINE void ne64_wbo_be(BT base, const size_t byte_offset, const T value)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, uint64*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_be<T, uint64>((uintptr_t)base, byte_offset);
 
@@ -473,8 +492,10 @@ static INLINE void ne64_wbo_be(BT base, const size_t byte_offset, const T value)
 template<typename T, typename BT>
 static INLINE T ne64_rbo_be(BT base, const size_t byte_offset)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, const uint64*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_be<T, uint64>((uintptr_t)base, byte_offset);
  T ret;
@@ -498,8 +519,10 @@ static INLINE void ne64_rwbo_be(BT base, const size_t byte_offset, T* value)
 template<typename T, typename BT>
 static INLINE void ne64_wbo_le(BT base, const size_t byte_offset, const T value)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, uint64*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_le<T, uint64>((uintptr_t)base, byte_offset);
 
@@ -509,8 +532,10 @@ static INLINE void ne64_wbo_le(BT base, const size_t byte_offset, const T value)
 template<typename T, typename BT>
 static INLINE T ne64_rbo_le(BT base, const size_t byte_offset)
 {
+#ifdef HAS_CXX11
  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Unsupported type size");
  static_assert(std::is_same<BT, uintptr_t>::value || std::is_convertible<BT, const uint64*>::value, "Wrong base type");
+#endif
 
  uintptr_t const ptr = neX_ptr_le<T, uint64>((uintptr_t)base, byte_offset);
  T ret;

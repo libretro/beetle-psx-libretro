@@ -16,7 +16,7 @@
 #endif
 
 #if __cplusplus <= 199711L
-# define static_assert(_x, _y)
+# define HAS_CXX11
 #endif
 
 #define GET_FDATA_PTR(fp) (fp->data)

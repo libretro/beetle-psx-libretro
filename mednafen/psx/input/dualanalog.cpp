@@ -123,7 +123,7 @@ void InputDevice_DualAnalog::UpdateInput(const void *data)
          //revert to 0.9.33, should be fixed on libretro side instead
          //tmp = 32768 + MDFN_de16lsb(&aba[0]) - ((int32)MDFN_de16lsb(&aba[2]) * 32768 / 32767);
 
-         tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+         tmp = 32768 + MDFN_de32lsb<false>((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb<false>((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
          tmp >>= 8;
 
          axes[stick][axis] = tmp;

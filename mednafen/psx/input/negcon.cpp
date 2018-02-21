@@ -98,11 +98,11 @@ void InputDevice_neGcon::UpdateInput(const void *data)
    buttons[0] = d8[0];
    buttons[1] = d8[1];
 
-   twist = ((32768 + MDFN_de32lsb((const uint8 *)data + 4) - (((int32)MDFN_de32lsb((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
+   twist = ((32768 + MDFN_de32lsb<false>((const uint8 *)data + 4) - (((int32)MDFN_de32lsb<false>((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
 
-   anabuttons[0] = (MDFN_de32lsb((const uint8 *)data + 12) * 255 + 16383) / 32767; 
-   anabuttons[1] = (MDFN_de32lsb((const uint8 *)data + 16) * 255 + 16383) / 32767;
-   anabuttons[2] = (MDFN_de32lsb((const uint8 *)data + 20) * 255 + 16383) / 32767;
+   anabuttons[0] = (MDFN_de32lsb<false>((const uint8 *)data + 12) * 255 + 16383) / 32767; 
+   anabuttons[1] = (MDFN_de32lsb<false>((const uint8 *)data + 16) * 255 + 16383) / 32767;
+   anabuttons[2] = (MDFN_de32lsb<false>((const uint8 *)data + 20) * 255 + 16383) / 32767;
 
    //printf("%02x %02x %02x %02x\n", twist, anabuttons[0], anabuttons[1], anabuttons[2]);
 }

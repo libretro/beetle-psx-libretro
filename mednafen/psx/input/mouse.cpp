@@ -146,8 +146,8 @@ int InputDevice_Mouse::StateAction(StateMem* sm, int load, int data_only, const 
 
 void InputDevice_Mouse::UpdateInput(const void *data)
 {
-   accum_xdelta += (int32)MDFN_de32lsb((uint8*)data + 0);
-   accum_ydelta += (int32)MDFN_de32lsb((uint8*)data + 4);
+   accum_xdelta += (int32)MDFN_de32lsb<false>((uint8*)data + 0);
+   accum_ydelta += (int32)MDFN_de32lsb<false>((uint8*)data + 4);
 
    if(accum_xdelta > 30 * 127) accum_xdelta = 30 * 127;
    if(accum_xdelta < 30 * -128) accum_xdelta = 30 * -128;

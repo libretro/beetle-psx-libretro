@@ -458,9 +458,9 @@ int MDFNSS_SaveSM(void *st_p, int, int, const void*, const void*, const void*)
    memset(header, 0, sizeof(header));
    memcpy(header, header_magic, 8);
 
-   MDFN_en32lsb(header + 16, MEDNAFEN_VERSION_NUMERIC);
-   MDFN_en32lsb(header + 24, neowidth);
-   MDFN_en32lsb(header + 28, neoheight);
+   MDFN_en32lsb<false>(header + 16, MEDNAFEN_VERSION_NUMERIC);
+   MDFN_en32lsb<false>(header + 24, neowidth);
+   MDFN_en32lsb<false>(header + 28, neoheight);
    smem_write(st, header, 32);
 
    if(!StateAction(st, 0, 0))
@@ -484,7 +484,7 @@ int MDFNSS_LoadSM(void *st_p, int, int)
    if(memcmp(header, "MEDNAFENSVESTATE", 16) && memcmp(header, "MDFNSVST", 8))
       return(0);
 
-   stateversion = MDFN_de32lsb(header + 16);
+   stateversion = MDFN_de32lsb<false>(header + 16);
 
    return(StateAction(st, stateversion, 0));
 }

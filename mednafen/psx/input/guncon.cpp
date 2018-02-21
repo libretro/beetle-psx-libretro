@@ -163,8 +163,8 @@ void InputDevice_GunCon::UpdateInput(const void *data)
 {
    uint8 *d8 = (uint8 *)data;
 
-   nom_x = (int16)MDFN_de16lsb(&d8[0]);
-   nom_y = (int16)MDFN_de16lsb(&d8[2]);
+   nom_x = (int16)MDFN_de16lsb<false>(&d8[0]);
+   nom_y = (int16)MDFN_de16lsb<false>(&d8[2]);
 
    trigger_noclear = (bool)(d8[4] & 0x1);
    trigger_eff |= trigger_noclear;
@@ -327,8 +327,8 @@ bool InputDevice_GunCon::Clock(bool TxD, int32 &dsr_pulse_delay)
                   }
                }
 
-               MDFN_en16lsb(&transmit_buffer[3], hit_x);
-               MDFN_en16lsb(&transmit_buffer[5], hit_y);
+               MDFN_en16lsb<false>(&transmit_buffer[3], hit_x);
+               MDFN_en16lsb<false>(&transmit_buffer[5], hit_y);
 
                hit_x = 0x01;
                hit_y = 0x0A;

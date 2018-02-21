@@ -844,8 +844,8 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                else switch(sizeof(T))
                {
                   case 1: V = TextMem[(A & 0x7FFFFF) - 65536]; break;
-                  case 2: V = MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
-                  case 4: V = MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+                  case 2: V = MDFN_de16lsb<false>(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+                  case 4: V = MDFN_de32lsb<false>(&TextMem[(A & 0x7FFFFF) - 65536]); break;
                }
             }
          }
@@ -1032,9 +1032,9 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
                case 1:
                   return(TextMem[(A & 0x7FFFFF) - 65536]);
                case 2:
-                  return(MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]));
+                  return(MDFN_de16lsb<false>(&TextMem[(A & 0x7FFFFF) - 65536]));
                case 4:
-                  return(MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]));
+                  return(MDFN_de32lsb<false>(&TextMem[(A & 0x7FFFFF) - 65536]));
             }
          }
       }
@@ -1269,8 +1269,8 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    } while(pvd[0] != 0x01);
 
    /*[156 ... 189], 34 bytes */
-   rdel = MDFN_de32lsb(&pvd[0x9E]);
-   rdel_len = MDFN_de32lsb(&pvd[0xA6]);
+   rdel = MDFN_de32lsb<false>(&pvd[0x9E]);
+   rdel_len = MDFN_de32lsb<false>(&pvd[0xA6]);
 
    if(rdel_len >= (1024 * 1024 * 10))  /* Arbitrary sanity check. */
    {
@@ -1299,8 +1299,8 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
       if(len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
       {
-         uint32_t file_lba = MDFN_de32lsb(&dr[0x02]);
-         //uint32_t file_len = MDFN_de32lsb(&dr[0x0A]);
+         uint32_t file_lba = MDFN_de32lsb<false>(&dr[0x02]);
+         //uint32_t file_len = MDFN_de32lsb<false>(&dr[0x0A]);
          uint8_t fb[2048 + 1];
          char *bootpos;
 
@@ -1650,10 +1650,10 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
 static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp = false)
 {
-   uint32 PC        = MDFN_de32lsb(&data[0x10]);
-   uint32 SP        = MDFN_de32lsb(&data[0x30]);
-   uint32 TextStart = MDFN_de32lsb(&data[0x18]);
-   uint32 TextSize  = MDFN_de32lsb(&data[0x1C]);
+   uint32 PC        = MDFN_de32lsb<false>(&data[0x10]);
+   uint32 SP        = MDFN_de32lsb<false>(&data[0x30]);
+   uint32 TextStart = MDFN_de32lsb<false>(&data[0x18]);
+   uint32 TextSize  = MDFN_de32lsb<false>(&data[0x1C]);
 
    if(ignore_pcsp)
       log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
@@ -1713,23 +1713,23 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    po = &PIOMem->data8[0x0800];
 
-   MDFN_en32lsb(po, (0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
+   MDFN_en32lsb<false>(po, (0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   MDFN_en32lsb<false>(po, 0); // NOP(kinda)
    po += 4;
 
    po = &PIOMem->data8[0x1000];
 
    // Load cacheable-region target PC into r2
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16));      // LUI
+   MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16));      // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF));   // ORI
+   MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF));   // ORI
    po += 4;
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   MDFN_en32lsb<false>(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   MDFN_en32lsb<false>(po, 0); // NOP(kinda)
    po += 4;
 
    //
@@ -1738,42 +1738,42 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    // Load source address into r8
    uint32 sa = 0x9F000000 + 65536;
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
+   MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF));  // ORI
+   MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF));  // ORI
    po += 4;
 
    // Load dest address into r9
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));  // LUI
+   MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));  // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF));   // ORI
+   MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF));   // ORI
    po += 4;
 
    // Load size into r10
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem.size() >> 16)); // LUI
+   MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem.size() >> 16)); // LUI
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (10 << 16) | (TextMem.size() & 0xFFFF));    // ORI
+   MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (10 << 16) | (TextMem.size() & 0xFFFF));    // ORI
    po += 4;
 
    //
    // Loop begin
    //
 
-   MDFN_en32lsb(po, (0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
+   MDFN_en32lsb<false>(po, (0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);   // Decrement size
+   MDFN_en32lsb<false>(po, (0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);   // Decrement size
    po += 4;
 
-   MDFN_en32lsb(po, (0x28 << 26) | (9 << 21) | (1 << 16));  // SB from r1
+   MDFN_en32lsb<false>(po, (0x28 << 26) | (9 << 21) | (1 << 16));  // SB from r1
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);  // Increment source addr
+   MDFN_en32lsb<false>(po, (0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);  // Increment source addr
    po += 4;
 
-   MDFN_en32lsb(po, (0x05 << 26) | (0 << 21) | (10 << 16) | (-5 & 0xFFFF));
+   MDFN_en32lsb<false>(po, (0x05 << 26) | (0 << 21) | (10 << 16) | (-5 & 0xFFFF));
    po += 4;
-   MDFN_en32lsb(po, (0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);  // Increment dest addr
+   MDFN_en32lsb<false>(po, (0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);  // Increment dest addr
    po += 4;
 
    //
@@ -1787,31 +1787,31 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    }
    else
    {
-      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
+      MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
       po += 4;
-      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
+      MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
       po += 4;
 
       // Load PC into r2
-      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
+      MDFN_en32lsb<false>(po, (0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
       po += 4;
-      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
+      MDFN_en32lsb<false>(po, (0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
       po += 4;
    }
 
    // Half-assed instruction cache flush. ;)
    for(unsigned i = 0; i < 1024; i++)
    {
-      MDFN_en32lsb(po, 0);
+      MDFN_en32lsb<false>(po, 0);
       po += 4;
    }
 
 
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   MDFN_en32lsb<false>(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   MDFN_en32lsb<false>(po, 0); // NOP(kinda)
    po += 4;
 
    return true;

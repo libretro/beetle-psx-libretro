@@ -119,8 +119,8 @@ void InputDevice_Justifier::UpdateInput(const void *data)
 {
    uint8 *d8 = (uint8 *)data;
 
-   nom_x = (int16)MDFN_de16lsb(&d8[0]);
-   nom_y = (int16)MDFN_de16lsb(&d8[2]);
+   nom_x = (int16)MDFN_de16lsb<false>(&d8[0]);
+   nom_y = (int16)MDFN_de16lsb<false>(&d8[2]);
 
    trigger_noclear = (bool)(d8[4] & 0x1);
    trigger_eff |= trigger_noclear;
