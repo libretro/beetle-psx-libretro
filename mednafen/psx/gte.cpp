@@ -1167,7 +1167,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       tmp = A_MV(i, tmp + mulr[0]);
       if(crv == CRVectors.FC)
       {
-         Lm_B(i, tmp >> sf, FALSE);
+         Lm_B(i, tmp >> sf, false);
          tmp = 0;
       }
 
@@ -1211,7 +1211,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    Z_FIFO[0] = Z_FIFO[1];
    Z_FIFO[1] = Z_FIFO[2];
    Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = Lm_D(tmp[2] >> 12, TRUE);
+   Z_FIFO[3] = Lm_D(tmp[2] >> 12, true);
 }
 
 /* SQR - Square Vector */
