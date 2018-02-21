@@ -91,7 +91,9 @@ typedef uint64_t uint64;
   #define MDFN_MAKE_CLANGV(maj,min,pl) (((maj)*100*100) + ((min) * 100) + (pl))
   #define MDFN_CLANG_VERSION	MDFN_MAKE_CLANGV(__clang_major__, __clang_minor__, __clang_patchlevel__)
 
+  #ifndef INLINE
   #define INLINE inline __attribute__((always_inline))
+  #endif
   #define NO_INLINE __attribute__((noinline))
   #define NO_CLONE
 

@@ -15,8 +15,11 @@
 #define strcasecmp _stricmp
 #endif
 
+/* This breaks on OSX for some reason */
+#if 0
 #if __cplusplus <= 199711L
 # define HAS_CXX11
+#endif
 #endif
 
 #define GET_FDATA_PTR(fp) (fp->data)
