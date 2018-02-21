@@ -41,7 +41,6 @@
 
 #include <stddef.h>
 #include <assert.h>
-#include <inttypes.h>
 #include <stdint.h>
 #include <limits.h>
 #include <stdio.h>
