@@ -18,10 +18,6 @@
 //
 //
 
-#ifdef __USING_SJLJ_EXCEPTIONS__
- #error "SJLJ-style exception handling will incur a significant performance penalty even when exceptions are not thrown, and thus an alternative(e.g. DWARF) should be used if at all possible."
-#endif
-
 #ifdef NOT_LIBRETRO
 #if defined(__PIC__) || defined(__pic__) || defined(__PIE__) || defined(__pie__)
  #if defined(__386__) || defined(__i386__) || defined(__i386) || defined(_M_IX86) || defined(_M_I386) //|| (SIZEOF_VOID_P <= 4)
@@ -54,14 +50,11 @@
 #include <limits>
 #include <exception>
 #include <stdexcept>
-#include <type_traits>
-#include <initializer_list>
 #include <utility>
 #include <memory>
 #include <algorithm>
 #include <string>
 #include <vector>
-#include <array>
 #include <list>
 #endif
 
