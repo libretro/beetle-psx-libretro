@@ -29,10 +29,6 @@
 
 extern bool psx_gte_overclock;
 
-#if 0
-#define GTE_SPEEDHACKS
-#endif
-
 #include "../clamp.h"
 
 /* Notes:
@@ -987,15 +983,9 @@ static INLINE void MAC_to_RGB_FIFO(void)
 {
    RGB_FIFO[0] = RGB_FIFO[1];
    RGB_FIFO[1] = RGB_FIFO[2];
-#ifdef GTE_SPEEDHACKS
-   RGB_FIFO[2].R = MAC_to_COLOR(0, MAC[1]);
-   RGB_FIFO[2].G = MAC_to_COLOR(1, MAC[2]);
-   RGB_FIFO[2].B = MAC_to_COLOR(2, MAC[3]);
-#else
    RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
    RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
    RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
-#endif
    RGB_FIFO[2].CD = RGB.CD;
 }
 
@@ -1022,116 +1012,15 @@ static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
 
 static INLINE void MAC_to_IR(int lm)
 {
-#ifdef GTE_SPEEDHACKS
    IR1 = i32_to_i16_saturate(0, MAC[1], lm);
    IR2 = i32_to_i16_saturate(1, MAC[2], lm);
    IR3 = i32_to_i16_saturate(2, MAC[3], lm);
-#else
-   IR1 = Lm_B(0, MAC[1], lm);
-   IR2 = Lm_B(1, MAC[2], lm);
-   IR3 = Lm_B(2, MAC[3], lm);
-#endif
 }
 
 static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t *v, const int32_t *crv, uint32_t sf, int lm)
 {
    unsigned i;
 
-#ifdef GTE_SPEEDHACKS
-   if(MDFN_LIKELY(matrix != &Matrices.AbbyNormal))
-   {
-      if(crv == CRVectors.FC)
-      {
-         for(i = 0; i < 3; i++)
-         {
-            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
-            tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
-            i32_to_i16_saturate(i, tmp >> sf, false);
-
-            tmp = i64_to_i44(i, (matrix->MX[i][1] * v[1]));
-            tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
-
-            /* Store the results in the accumulator */
-            MAC[1 + i] = tmp >> sf;
-         }
-      }
-      else
-      {
-         for(i = 0; i < 3; i++)
-         {
-            int64_t tmp = (uint64_t)(int64_t)crv[i] << 12;
-
-            tmp = i64_to_i44(i, tmp + (matrix->MX[i][0] * v[0]));
-            tmp = i64_to_i44(i, tmp + (matrix->MX[i][1] * v[1]));
-            tmp = i64_to_i44(i, tmp + (matrix->MX[i][2] * v[2]));
-
-            /* Store the results in the accumulator */
-            MAC[1 + i] = tmp >> sf;
-         }
-      }
-   }
-   else
-   {
-      if(crv == CRVectors.FC)
-      {
-         for(i = 0; i < 3; i++)
-         {
-            int32_t mulr[3];
-            int64_t tmp     = (uint64_t)(int64_t)crv[i] << 12;
-
-            if(i == 0)
-            {
-               mulr[0] = -(RGB.R << 4);
-               mulr[1] = (RGB.R << 4);
-               mulr[2] = IR0;
-            }
-            else
-            {
-               mulr[0] = (int16_t)CR[i];
-               mulr[1] = (int16_t)CR[i];
-               mulr[2] = (int16_t)CR[i];
-            }
-
-            tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
-            i32_to_i16_saturate(i, tmp >> sf, false);
-
-            tmp = i64_to_i44(i, (mulr[1] * v[1]));
-            tmp = i64_to_i44(i, tmp + (mulr[2] * v[2]));
-
-            /* Store the results in the accumulator */
-            MAC[1 + i] = tmp >> sf;
-         }
-      }
-      else
-      {
-         for(i = 0; i < 3; i++)
-         {
-            int32_t mulr[3];
-            int64_t tmp     = (uint64_t)(int64_t)crv[i] << 12;
-
-            if(i == 0)
-            {
-               mulr[0] = -(RGB.R << 4);
-               mulr[1] = (RGB.R << 4);
-               mulr[2] = IR0;
-            }
-            else
-            {
-               mulr[0] = (int16_t)CR[i];
-               mulr[1] = (int16_t)CR[i];
-               mulr[2] = (int16_t)CR[i];
-            }
-
-            tmp = i64_to_i44(i, tmp + (mulr[0] * v[0]));
-            tmp = i64_to_i44(i, tmp + (mulr[1] * v[1]));
-            tmp = i64_to_i44(i, tmp + (mulr[2] * v[2]));
-
-            /* Store the results in the accumulator */
-            MAC[1 + i] = tmp >> sf;
-         }
-      }
-   }
-#else
    for(i = 0; i < 3; i++)
    {
       int64_t tmp;
@@ -1176,7 +1065,6 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 
       MAC[1 + i] = tmp >> sf;
    }
-#endif
 
    MAC_to_IR(lm);
 }
@@ -1220,7 +1108,6 @@ static int32_t SQR(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-#ifdef GTE_SPEEDHACKS
    /* PSX GTE test fails with this code */
    unsigned i;
 
@@ -1229,11 +1116,6 @@ static int32_t SQR(uint32_t instr)
       int32_t ir = IR[i];
       MAC[i]     = (ir * ir) >> sf;
    }
-#else
-   MAC[1] = ((IR1 * IR1) >> sf);
-   MAC[2] = ((IR2 * IR2) >> sf);
-   MAC[3] = ((IR3 * IR3) >> sf);
-#endif
 
    MAC_to_IR(lm);
 
@@ -1299,44 +1181,9 @@ static INLINE void check_mac_overflow(int64_t value)
       FLAGS |= 1 << 16;
 }
 
-#ifdef GTE_SPEEDHACKS
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 z)
 {
-   float fofx       = ((float)OFX / (float)(1 << 16));
-   float fofy       = ((float)OFY / (float)(1 << 16));
 
-   /* Project X and Y onto the plane */
-   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
-   int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
-
-   check_mac_overflow(screen_x);
-   check_mac_overflow(screen_y);
-
-   screen_x = (int32_t)(screen_x >> 16);
-   screen_y = (int32_t)(screen_y >> 16);
-
-   /* Push onto the XY FIFO */
-   XY_FIFO[3].X = i32_to_i11_saturate(0, screen_x);
-   XY_FIFO[3].Y = i32_to_i11_saturate(1, screen_y);
-
-   XY_FIFO[0] = XY_FIFO[1];
-   XY_FIFO[1] = XY_FIFO[2];
-   XY_FIFO[2] = XY_FIFO[3];
-
-   /* Increased precision calculation (sub-pixel precision) */
-   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
-   float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
-
-   /* Clamp precision values to valid range */
-   precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
-   precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
-
-   uint32 value = *((uint32*)&XY_FIFO[3]);
-   PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
-}
-#else
-static INLINE void TransformXY(int64_t h_div_sz)
-{
    MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
    XY_FIFO[3].X = Lm_G(0, MAC[0]);
 
@@ -1346,8 +1193,29 @@ static INLINE void TransformXY(int64_t h_div_sz)
    XY_FIFO[0] = XY_FIFO[1];
    XY_FIFO[1] = XY_FIFO[2];
    XY_FIFO[2] = XY_FIFO[3];
+
+   /*
+    * PGXP hack to add subpixel precision as well
+    */
+   float fofx       = ((float)OFX / (float)(1 << 16));
+   float fofy       = ((float)OFY / (float)(1 << 16));
+
+   /* Project X and Y onto the plane */
+   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
+   int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
+
+   /* Increased precision calculation (sub-pixel precision) */
+   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
+   float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
+
+   uint32 value = *((uint32*)&XY_FIFO[3]);
+
+   /* Clamp precision values to valid range */
+   precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
+   precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
+
+   PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
 }
-#endif
 
 /* Perform depth queuing calculations using the projection
  * factor computed by the 'RTP' command */
@@ -1374,7 +1242,6 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
 }
 
-#ifdef GTE_SPEEDHACKS
 /* Rotate, Translate and Perspective transform a single vector
  * Returns the projection factor that's also used for depth 
  * queuing */
@@ -1449,24 +1316,11 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
 
    return projection_factor;
 }
-#endif
 
 static int32_t RTPS(uint32_t instr)
 {
-#ifdef GTE_SPEEDHACKS
    int64_t projection_factor = RTP(instr, 0);
    depth_queuing(projection_factor);
-#else
-   int64_t h_div_sz;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
-   h_div_sz = Divide(H, Z_FIFO[3]);
-
-   TransformXY(h_div_sz);
-   TransformDQ(h_div_sz);
-#endif
 
    return(15);
 }
@@ -1475,30 +1329,11 @@ static int32_t RTPS(uint32_t instr)
  * Operates on v0, v1 and v2 */
 static int32_t RTPT(uint32_t instr)
 {
-#ifdef GTE_SPEEDHACKS
    int64_t projection_factor;
    RTP(instr, 0);
    RTP(instr, 1);
    projection_factor = RTP(instr, 2);
    depth_queuing(projection_factor);
-#else
-   unsigned i;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   for(i = 0; i < 3; i++)
-   {
-      int64_t h_div_sz;
-
-      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
-      h_div_sz = Divide(H, Z_FIFO[3]);
-
-      TransformXY(h_div_sz);
-
-      if(i == 2)
-         TransformDQ(h_div_sz);
-   }
-#endif
 
    return(23);
 }
@@ -1764,8 +1599,6 @@ static int32_t CDP(uint32_t instr)
 /* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
 {
-#ifdef GTE_SPEEDHACKS
-   /* PSX GTE test fails with this code */
    int16_t x0     = XY_FIFO[0].X;
    int16_t y0     = XY_FIFO[0].Y;
    int16_t x1     = XY_FIFO[1].X;
@@ -1783,11 +1616,8 @@ static int32_t NCLIP(uint32_t instr)
 
    check_mac_overflow(sum);
 
-   MAC[0] = sum;
-#else
    MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
          );
-#endif
 
    return(8);
 }
