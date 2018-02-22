@@ -106,7 +106,7 @@ typedef uint64_t uint64;
   #define MDFN_COLD __attribute__((cold))
   #define MDFN_HOT __attribute__((hot))
 
-  #if MDFN_CLANG_VERSION >= MDFN_MAKE_CLANGV(3,6,0)
+  #if MDFN_CLANG_VERSION >= MDFN_MAKE_CLANGV(3,6,0) && defined(HAS_CXX11)
    #define MDFN_ASSUME_ALIGNED(p, align) ((decltype(p))__builtin_assume_aligned((p), (align)))
   #else
    #define MDFN_ASSUME_ALIGNED(p, align) (p)
@@ -167,7 +167,7 @@ typedef uint64_t uint64;
    #define MDFN_HOT
   #endif
 
-  #if MDFN_GCC_VERSION >= MDFN_MAKE_GCCV(4,7,0)
+  #if MDFN_GCC_VERSION >= MDFN_MAKE_GCCV(4,7,0) && defined(HAS_CXX11)
    #define MDFN_ASSUME_ALIGNED(p, align) ((decltype(p))__builtin_assume_aligned((p), (align)))
   #else
    #define MDFN_ASSUME_ALIGNED(p, align) (p)
