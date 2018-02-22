@@ -660,6 +660,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
+#ifdef DEBUG
    if(DebugMode && CPUHook)
    {
     ACTIVE_TO_BACKING;
@@ -676,6 +677,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
     BACKING_TO_ACTIVE;
    }
+#endif
 
 #if NOT_LIBRETRO
    if(BIOSPrintMode)
@@ -724,6 +726,27 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    #define BEGIN_OPF(name) { op_##name:
    #define END_OPF goto OpDone; }
 
+#ifdef DEBUG
+#define DEBUG_ADDBT() if(DebugMode && ADDBT) { ADDBT(PC, new_PC, false); }
+#define DEBUG_ILH() \
+	  if(ILHMode)						\
+	  {							\
+	   if(old_PC == (((new_PC - 4) & mask) + offset))	\
+	   {							\
+	    if(MDFN_densb<uint32, true>((uint8*)(FastMap[PC >> FAST_MAP_SHIFT] + PC)) == 0)	\
+	    {							\
+	     if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
+	     {							\
+	      timestamp = next_event_ts;			\
+	     }							\
+	    }							\
+	   }							\
+	  }
+#else
+#define DEBUG_ADDBT()
+#define DEBUG_ILH()
+#endif
+
    #define DO_BRANCH(arg_cond, arg_offset, arg_mask, arg_dolink, arg_linkreg)\
 	{							\
 	 const bool cond = (arg_cond);				\
@@ -742,27 +765,10 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 								\
 	 if(cond)						\
 	 {							\
-	  if(ILHMode)						\
-	  {							\
-	   if(old_PC == (((new_PC - 4) & mask) + offset))	\
-	   {							\
-	    if(MDFN_densb<uint32, true>((uint8*)(FastMap[PC >> FAST_MAP_SHIFT] + PC)) == 0)	\
-	    {							\
-	     if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
-	     {							\
-	      timestamp = next_event_ts;			\
-	     }							\
-	    }							\
-	   }							\
-	  }							\
-								\
+     DEBUG_ILH() \
 	  new_PC = ((new_PC - 4) & mask) + offset;		\
 	  BDBT = 3;						\
-								\
-          if(DebugMode && ADDBT)                 		\
-	  {							\
-           ADDBT(PC, new_PC, false);				\
-	  }							\
+     DEBUG_ADDBT() \
 	 }							\
 								\
 	 goto SkipNPCStuff;					\
@@ -2620,18 +2626,13 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode
 {
  if(CPUHook || ADDBT)
   return(RunReal<true, true, false>(timestamp_in));
- else
- {
-  if(ILHMode)
-   return(RunReal<false, false, true>(timestamp_in));
-  else
-  {
-   if(BIOSPrintMode)
-    return(RunReal<false, true, false>(timestamp_in));
-   else
-    return(RunReal<false, false, false>(timestamp_in));
-  }
- }
+#ifdef DEBUG
+ if(ILHMode)
+  return(RunReal<false, false, true>(timestamp_in));
+ if(BIOSPrintMode)
+  return(RunReal<false, true, false>(timestamp_in));
+#endif
+ return(RunReal<false, false, false>(timestamp_in));
 }
 
 void PS_CPU::SetCPUHook(void (*cpuh)(const pscpu_timestamp_t timestamp, uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
