@@ -1111,7 +1111,7 @@ static int32_t SQR(uint32_t instr)
    /* PSX GTE test fails with this code */
    unsigned i;
 
-   for (i = 0; i < 4; i++)
+   for (i = 1; i < 4; i++)
    {
       int32_t ir = IR[i];
       MAC[i]     = (ir * ir) >> sf;
@@ -1122,9 +1122,7 @@ static int32_t SQR(uint32_t instr)
    return(5);
 }
 
-
 /* MVMVA - Multiply Vector by Matrix And Vector Add */
-
 static int32_t MVMVA(uint32_t instr)
 {
    int16_t v[3];
