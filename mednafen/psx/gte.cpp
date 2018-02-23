@@ -1102,11 +1102,30 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
    Z_FIFO[3] = Lm_D(tmp[2] >> 12, true);
 }
 
+#define DECODE_FIELDS							\
+ const uint32 sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
+ const uint32 mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
+ const uint32 v_i = (instr >> 15) & 0x3;				\
+ const int32* cv MDFN_NOWARN_UNUSED = CRVectors.All[(instr >> 13) & 0x3];	\
+ const int lm MDFN_NOWARN_UNUSED = (instr >> 10) & 1;			\
+ int16 v[3] MDFN_NOWARN_UNUSED;					\
+ if(v_i == 3)							\
+ {								\
+  v[0] = IR1;							\
+  v[1] = IR2;							\
+  v[2] = IR3;							\
+ }								\
+ else								\
+ {								\
+  v[0] = Vectors[v_i][0];					\
+  v[1] = Vectors[v_i][1];					\
+  v[2] = Vectors[v_i][2];					\
+ }
+
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
+   DECODE_FIELDS;
 
    /* PSX GTE test fails with this code */
    unsigned i;
@@ -1125,25 +1144,7 @@ static int32_t SQR(uint32_t instr)
 /* MVMVA - Multiply Vector by Matrix And Vector Add */
 static int32_t MVMVA(uint32_t instr)
 {
-   int16_t v[3];
-   const uint32_t mx = (instr >> 17) & 0x3;
-   const int32*   cv = CRVectors.All[(instr >> 13) & 0x3];
-   const uint32_t v_i = (instr >> 15) & 0x3;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   if(v_i == 3)
-   {
-      v[0] = IR1;
-      v[1] = IR2;
-      v[2] = IR3;
-   }
-   else
-   {
-      v[0] = Vectors[v_i][0];
-      v[1] = Vectors[v_i][1];
-      v[2] = Vectors[v_i][2];
-   }
+   DECODE_FIELDS;
 
    MultiplyMatrixByVector(&Matrices.All[mx], v, cv, sf, lm);
 
@@ -1308,19 +1309,38 @@ static int64_t RTP(uint32_t instr, uint32_t vector_index)
    /* Projection factor: 1.16 unsigned */
    projection_factor = Divide(H, Z_FIFO[3]);
 
-   precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]); 
+   precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
 
    TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
 
    return projection_factor;
 }
 
-static int32_t RTPS(uint32_t instr)
+static int32_t RTPS_old(uint32_t instr)
 {
+
    int64_t projection_factor = RTP(instr, 0);
    depth_queuing(projection_factor);
 
    return(15);
+}
+
+static INLINE int32 RTPS(uint32 instr)
+{
+ DECODE_FIELDS;
+ int64 h_div_sz;
+ float precise_h_div_sz;
+ uint16 z;
+
+ MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
+ h_div_sz = Divide(H, Z_FIFO[3]);
+
+ precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
+
+ TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
+ TransformDQ(h_div_sz);
+
+ return(15);
 }
 
 /* RTPT - Rotate, Translate and Perspective Transform Triple.
