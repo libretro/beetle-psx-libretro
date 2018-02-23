@@ -1216,24 +1216,6 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 
    PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
 }
 
-/* Perform depth queuing calculations using the projection
- * factor computed by the 'RTP' command */
-static INLINE void depth_queuing(int64_t h_div_sz)
-{
-   int64_t factor = (int64_t)h_div_sz;
-   int64_t dqa    = (int64_t)DQA;
-   int64_t dqb    = (int64_t)DQB;
-   uint64_t depth = dqb + dqa * factor;
-
-   check_mac_overflow(depth);
-
-   MAC[0] = (int32_t)depth;
-
-   /* compute 16bit IR value */
-   depth = depth >> 12;
-
-   IR0    = Lm_H(((int64_t)depth));
-}
 
 static INLINE void TransformDQ(int64_t h_div_sz)
 {
@@ -1241,96 +1223,11 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
 }
 
-/* Rotate, Translate and Perspective transform a single vector
- * Returns the projection factor that's also used for depth 
- * queuing */
-static int64_t RTP(uint32_t instr, uint32_t vector_index)
-{
-   unsigned i, c;
-   int64_t projection_factor;
-   float precise_h_div_sz;
-   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
-   const int      lm = (instr >> 10) & 1;
-
-   /* Step 1: we compute "tr + vector * rm" and store
-    * the 32bit result in MAC 0, 1 and 2. */
-   int32_t z_shifted = 0;
-   int32_t z_shifted_no_shift = 0;
-   const gtematrix *matrix = &Matrices.Rot;
-   const int32_t *crv      = CRVectors.T;
-
-   /* Iterate over the matrix rows */
-   for(i = 0; i < 3; i++)
-   {
-      /* Start with the translation. Convert translation vector
-       * component from i32 to i64 with 12 fractional bits. */
-      int64_t res = (uint64_t)(int64_t)crv[i] << 12;
-
-      /* Iterate over the rotation matrix columns */
-      for (c = 0; c < 3; c++)
-      {
-         int32_t v    = Vectors[vector_index][c];
-         int32_t m    = matrix->MX[i][c];
-         int64_t rot  = v * m;
-
-         /* The operation is done using 44bit signed
-          * arithmetics. */
-         res = i64_to_i44(c, res + rot);
-      }
-
-      /* Store the result in the accumulator */
-      MAC[1 + i] = res >> sf;
-
-      /* the last resultwill be Z, we can overwrite it each
-       * time and the last one will be the good one. */
-      z_shifted_no_shift = (int32_t)(res);
-      z_shifted          = (int32_t)(res >> 12);
-   }
-
-   /* Step 2: we take the 32bit camera coordinates in MAC and
-    * convert them to 16bit values in the IR vector, saturating
-    * them in case of an overflow. */
-
-   IR1 = i32_to_i16_saturate(0, MAC[1], lm); /* 16bit clamped x coordinate */
-   IR2 = i32_to_i16_saturate(1, MAC[2], lm); /* 16bit clamped y coordinate */
-   IR3 = Lm_B_PTZ(2, MAC[3], z_shifted, lm); /* 16bit clamped z coordinate */
-
-   /* Push 'z_saturated' onto the Z_FIFO */
-   Z_FIFO[0] = Z_FIFO[1];
-   Z_FIFO[1] = Z_FIFO[2];
-   Z_FIFO[2] = Z_FIFO[3];
-   Z_FIFO[3] = i64_to_otz(z_shifted_no_shift, true);
-
-   /* Step 3: perspective projection against the screen plane
-    *
-    * Compute the projection factor by dividing projection plane
-    * distance by the Z coordinate */
-
-   /* Projection factor: 1.16 unsigned */
-   projection_factor = Divide(H, Z_FIFO[3]);
-
-   precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
-
-   TransformXY(projection_factor, precise_h_div_sz, Z_FIFO[3]);
-
-   return projection_factor;
-}
-
-static int32_t RTPS_old(uint32_t instr)
-{
-
-   int64_t projection_factor = RTP(instr, 0);
-   depth_queuing(projection_factor);
-
-   return(15);
-}
-
 static INLINE int32 RTPS(uint32 instr)
 {
  DECODE_FIELDS;
  int64 h_div_sz;
  float precise_h_div_sz;
- uint16 z;
 
  MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
  h_div_sz = Divide(H, Z_FIFO[3]);
@@ -1343,17 +1240,28 @@ static INLINE int32 RTPS(uint32 instr)
  return(15);
 }
 
-/* RTPT - Rotate, Translate and Perspective Transform Triple.
- * Operates on v0, v1 and v2 */
-static int32_t RTPT(uint32_t instr)
+static INLINE int32 RTPT(uint32 instr)
 {
-   int64_t projection_factor;
-   RTP(instr, 0);
-   RTP(instr, 1);
-   projection_factor = RTP(instr, 2);
-   depth_queuing(projection_factor);
+ DECODE_FIELDS;
+ int i;
 
-   return(23);
+ for(i = 0; i < 3; i++)
+ {
+  int64 h_div_sz;
+  float precise_h_div_sz;
+
+  MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
+  h_div_sz = Divide(H, Z_FIFO[3]);
+
+  precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
+
+  TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
+
+  if(i == 2)
+   TransformDQ(h_div_sz);
+ }
+
+ return(23);
 }
 
 static INLINE void NormColor(uint32_t sf, int lm, uint32_t v)
