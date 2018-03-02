@@ -19,7 +19,8 @@ void main()
    gl_Position = vec4(Position.xy / FB_SIZE * 2.0 - 1.0, Position.z, 1.0) * Position.w;
    vColor = Color;
 #ifdef TEXTURED
-   vUV = vec2(UV.xy);
+   // iCB: Offset UVs by half a pixel to account for rounding errors in projection
+   vUV = vec2(UV.xy) + vec2(0.5 / 1024.0, 0.5 / 512.0);
    vParam = Param;
    vBaseUV = UV.zw;
    vWindow = ivec4(Window);

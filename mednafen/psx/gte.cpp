@@ -1180,7 +1180,7 @@ static INLINE void check_mac_overflow(int64_t value)
       FLAGS |= 1 << 16;
 }
 
-static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 z)
+static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float precise_z)
 {
 
    MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
@@ -1213,7 +1213,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, uint16 
    precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
    precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
 
-   PGXP_pushSXYZ2f(precise_x, precise_y, (float)z, value);
+   PGXP_pushSXYZ2f(precise_x, precise_y, precise_z, value);
 }
 
 
@@ -1227,14 +1227,16 @@ static INLINE int32 RTPS(uint32 instr)
 {
  DECODE_FIELDS;
  int64 h_div_sz;
+ float precise_z;
  float precise_h_div_sz;
 
  MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
  h_div_sz = Divide(H, Z_FIFO[3]);
 
- precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
+ precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
+ precise_h_div_sz  = (float)H / precise_z;
 
- TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
+ TransformXY(h_div_sz, precise_h_div_sz, precise_z);
  TransformDQ(h_div_sz);
 
  return(15);
@@ -1248,14 +1250,16 @@ static INLINE int32 RTPT(uint32 instr)
  for(i = 0; i < 3; i++)
  {
   int64 h_div_sz;
+  float precise_z;
   float precise_h_div_sz;
 
   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
   h_div_sz = Divide(H, Z_FIFO[3]);
 
-  precise_h_div_sz  = (float)H / float_max(H/2.f, (float)Z_FIFO[3]);
+  precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
+  precise_h_div_sz  = (float)H / precise_z;
 
-  TransformXY(h_div_sz, precise_h_div_sz, Z_FIFO[3]);
+  TransformXY(h_div_sz, precise_h_div_sz, precise_z);
 
   if(i == 2)
    TransformDQ(h_div_sz);
