@@ -750,9 +750,12 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			float dudy = +abx * float(vertices[2].u) + bcx * float(vertices[0].u) + cax * float(vertices[1].u);
 			float dvdy = +abx * float(vertices[2].v) + bcx * float(vertices[0].v) + cax * float(vertices[1].v);
 			float area = bcx * cay - bcy * cax;
-
+			
+			// iCB: Detect and reject any triangles with 0 size texture area
+			float texArea = (vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - (vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
+			
 			// Shouldn't matter as degenerate primitives will be culled anyways.
-			if (area != 0.0f)
+			if ((area != 0.0f) && (texArea != 0.0f))
 			{
 				float inv_area = 1.0f / area;
 				dudx *= inv_area;
