@@ -692,7 +692,8 @@ float Renderer::allocate_depth(const Rect &rect)
 {
 	atlas.write_fragment(rect);
 	primitive_index++;
-	return 1.0f - primitive_index * (2.0f / 0xffffff); // Double the epsilon to be safe(r) when w is used.
+	return 1.0f - primitive_index * (4.0f / 0xffffff); // Double the epsilon to be safe(r) when w is used.
+	//iCB: Doubled again for added safety, otherwise we get Z-fighting when drawing multi-pass blended primitives.
 }
 
 void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count)
