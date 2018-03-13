@@ -132,7 +132,7 @@ void rsx_vulkan_close(void)
 void rsx_vulkan_refresh_variables(void)
 {
    struct retro_variable var = {0};
-   var.key = option_renderer_software_fb;
+   var.key = BEETLE_OPT(renderer_software_fb);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -143,7 +143,7 @@ void rsx_vulkan_refresh_variables(void)
    }
 
    unsigned old_scaling = scaling;
-   var.key = option_internal_resolution;
+   var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       /* Same limitations as libretro.cpp */
@@ -155,7 +155,7 @@ void rsx_vulkan_refresh_variables(void)
       }
    }
 
-   var.key = option_adaptive_smoothing;
+   var.key = BEETLE_OPT(adaptive_smoothing);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
@@ -164,7 +164,7 @@ void rsx_vulkan_refresh_variables(void)
          adaptive_smoothing = false;
    }
 
-   var.key = option_widescreen_hack;
+   var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
