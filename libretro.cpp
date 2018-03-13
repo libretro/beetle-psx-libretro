@@ -2635,7 +2635,7 @@ static void check_variables(bool startup)
 
    if (startup)
    {
-      var.key = option_renderer;
+      var.key = BEETLE_OPT(renderer);
 
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
@@ -2658,7 +2658,7 @@ static void check_variables(bool startup)
    }
 
 #ifndef EMSCRIPTEN
-   var.key = option_cd_access_method;
+   var.key = BEETLE_OPT(cd_access_method);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2680,7 +2680,7 @@ static void check_variables(bool startup)
    }
 #endif
 
-   var.key = option_cpu_freq_scale;
+   var.key = BEETLE_OPT(cpu_freq_scale);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2698,7 +2698,7 @@ static void check_variables(bool startup)
    // Need to adjust the CPU<->GPU frequency ratio if the overclocking changes
    GPU_RecalcClockRatio();
 
-   var.key = option_gte_overclock;
+   var.key = BEETLE_OPT(gte_overclock);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2710,7 +2710,7 @@ static void check_variables(bool startup)
    else
       psx_gte_overclock = false;
 
-   var.key = option_gpu_overclock;
+   var.key = BEETLE_OPT(gpu_overclock);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
@@ -2731,7 +2731,7 @@ static void check_variables(bool startup)
    else
       psx_gpu_overclock_shift = 0;
 
-   var.key = option_skip_bios;
+   var.key = BEETLE_OPT(skip_bios);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2741,7 +2741,7 @@ static void check_variables(bool startup)
          psx_skipbios = 0;
    }
 
-   var.key = option_widescreen_hack;
+   var.key = BEETLE_OPT(widescreen_hack);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2759,7 +2759,7 @@ static void check_variables(bool startup)
    else
       widescreen_hack = false;
 
-   var.key = option_memcard1_enable;
+   var.key = BEETLE_OPT(enable_memcard1);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2771,7 +2771,7 @@ static void check_variables(bool startup)
    else
       enable_memcard1 = false;
 
-   var.key = option_analog_calibration;
+   var.key = BEETLE_OPT(analog_calibration);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2788,7 +2788,7 @@ static void check_variables(bool startup)
    switch (rsx_intf_is_type())
    {
       case RSX_SOFTWARE:
-         var.key = option_internal_resolution;
+         var.key = BEETLE_OPT(internal_resolution);
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
          {
@@ -2816,7 +2816,7 @@ static void check_variables(bool startup)
          break;
    }
 
-   var.key = option_dither_mode;
+   var.key = BEETLE_OPT(dither_mode);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2831,7 +2831,7 @@ static void check_variables(bool startup)
       psx_gpu_dither_mode = DITHER_NATIVE;
 
    // iCB: PGXP settings
-   var.key = option_pgxp_mode;
+   var.key = BEETLE_OPT(pgxp_mode);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2845,7 +2845,7 @@ static void check_variables(bool startup)
    else
       psx_pgxp_mode = PGXP_MODE_NONE;
 
-   var.key = option_pgxp_vertex;
+   var.key = BEETLE_OPT(pgxp_vertex);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2857,7 +2857,7 @@ static void check_variables(bool startup)
    else
       psx_pgxp_vertex_caching = PGXP_MODE_NONE;
 
-   var.key = option_pgxp_texture;
+   var.key = BEETLE_OPT(pgxp_texture);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2870,7 +2870,7 @@ static void check_variables(bool startup)
       psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
 
-   var.key = option_analog_toggle;
+   var.key = BEETLE_OPT(analog_toggle);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2888,7 +2888,7 @@ static void check_variables(bool startup)
       }
    }
 
-   var.key = option_multitap1;
+   var.key = BEETLE_OPT(enable_multitap_port1);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2898,7 +2898,7 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_1 = false;
    }
 
-   var.key = option_multitap2;
+   var.key = BEETLE_OPT(enable_multitap_port2);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2908,13 +2908,13 @@ static void check_variables(bool startup)
          setting_psx_multitap_port_2 = false;
    }
 
-	var.key = option_mouse_sensitivity;
+   var.key = BEETLE_OPT(mouse_sensitivity);
 	var.value = NULL;
 
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
 		input_set_mouse_sensitivity( atoi( var.value ) );
 
-	var.key = option_gun_cursor;
+	var.key = BEETLE_OPT(gun_cursor);
 	var.value = NULL;
 
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
@@ -2928,28 +2928,28 @@ static void check_variables(bool startup)
 		}
 	}
 
-   var.key = option_initial_scanline;
+        var.key = BEETLE_OPT(initial_scanline);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_initial_scanline = atoi(var.value);
    }
 
-   var.key = option_last_scanline;
+   var.key = BEETLE_OPT(last_scanline);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_last_scanline = atoi(var.value);
    }
 
-   var.key = option_initial_scanline_pal;
+   var.key = BEETLE_OPT(initial_scanline_pal);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       setting_initial_scanline_pal = atoi(var.value);
    }
 
-   var.key = option_last_scanline_pal;
+   var.key = BEETLE_OPT(last_scanline_pal);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2963,7 +2963,7 @@ static void check_variables(bool startup)
    else
       input_set_player_count( 2 );
 
-   var.key = option_memcard0_method;
+   var.key = BEETLE_OPT(use_mednafen_memcard0_method);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -2974,7 +2974,7 @@ static void check_variables(bool startup)
    }
 
    //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
-   var.key = option_memcard_shared;
+   var.key = BEETLE_OPT(shared_memory_cards);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3003,7 +3003,7 @@ static void check_variables(bool startup)
      }
    }
 
-   var.key = option_frame_duping;
+   var.key = BEETLE_OPT(frame_duping);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3020,7 +3020,7 @@ static void check_variables(bool startup)
    else
       allow_frame_duping = false;
 
-   var.key = option_display_internal_fps;
+   var.key = BEETLE_OPT(display_internal_fps);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
@@ -3032,7 +3032,7 @@ static void check_variables(bool startup)
    else
      display_internal_framerate = false;
 
-   var.key = option_crop_overscan;
+   var.key = BEETLE_OPT(crop_overscan);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
      {
@@ -3042,7 +3042,7 @@ static void check_variables(bool startup)
          crop_overscan = false;
      }
 
-   var.key = option_image_offset;
+   var.key = BEETLE_OPT(image_offset);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3066,7 +3066,7 @@ static void check_variables(bool startup)
          image_offset = 4;
    }
 
-   var.key = option_image_crop;
+   var.key = BEETLE_OPT(image_crop);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3090,7 +3090,7 @@ static void check_variables(bool startup)
          image_crop = 8;
    }
 
-   var.key = option_cd_fastload;
+   var.key = BEETLE_OPT(cd_fastload);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
@@ -3797,55 +3797,55 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { option_renderer, "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
-      { option_renderer_software_fb, "Software framebuffer; enabled|disabled" },
+      { BEETLE_OPT(renderer), "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
+      { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled|disabled" },
 #endif
 #ifdef HAVE_VULKAN
-      { option_adaptive_smoothing, "Adaptive smoothing; enabled|disabled" },
+      { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
 #endif
-      { option_internal_resolution, "Internal GPU resolution; 1x(native)|2x|4x|8x|16x|32x" },
+      { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x|32x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
-      { option_filter, "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
-      { option_depth, "Internal color depth; dithered 16bpp (native)|32bpp" },
-      { option_wireframe, "Wireframe mode; disabled|enabled" },
-      { option_display_vram, "Display full VRAM; disabled|enabled" },
+      { BEETLE_OPT(filter), "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
+      { BEETLE_OPT(depth), "Internal color depth; dithered 16bpp (native)|32bpp" },
+      { BEETLE_OPT(wireframe), "Wireframe mode; disabled|enabled" },
+      { BEETLE_OPT(display_vram), "Display full VRAM; disabled|enabled" },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { option_pgxp_mode, "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
-      { option_pgxp_vertex, "PGXP vertex cache; disabled|enabled" },
-      { option_pgxp_texture, "PGXP perspective correct texturing; disabled|enabled" },
+      { BEETLE_OPT(pgxp_mode), "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
+      { BEETLE_OPT(pgxp_vertex), "PGXP vertex cache; disabled|enabled" },
+      { BEETLE_OPT(pgxp_texture), "PGXP perspective correct texturing; disabled|enabled" },
 #endif
-      { option_widescreen_hack, "Widescreen mode hack; disabled|enabled" },
-      { option_frame_duping, "Frame duping (speedup); disabled|enabled" },
-      { option_cpu_freq_scale, "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
-      { option_gte_overclock, "GTE Overclock; disabled|enabled" },
-      { option_gpu_overclock, "GPU rasterizer overclock; 1x(native)|2x|4x|8x|16x|32x" },
-      { option_skip_bios, "Skip BIOS; disabled|enabled" },
-      { option_dither_mode, "Dithering pattern; 1x(native)|internal resolution|disabled" },
-      { option_display_internal_fps, "Display internal FPS; disabled|enabled" },
+      { BEETLE_OPT(widescreen_hack), "Widescreen mode hack; disabled|enabled" },
+      { BEETLE_OPT(frame_duping), "Frame duping (speedup); disabled|enabled" },
+      { BEETLE_OPT(cpu_freq_scale), "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
+      { BEETLE_OPT(gte_overclock), "GTE Overclock; disabled|enabled" },
+      { BEETLE_OPT(gpu_overclock), "GPU rasterizer overclock; 1x(native)|2x|4x|8x|16x|32x" },
+      { BEETLE_OPT(skip_bios), "Skip BIOS; disabled|enabled" },
+      { BEETLE_OPT(dither_mode), "Dithering pattern; 1x(native)|internal resolution|disabled" },
+      { BEETLE_OPT(display_internal_fps), "Display internal FPS; disabled|enabled" },
 
-      { option_initial_scanline, "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { option_last_scanline, "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
-      { option_initial_scanline_pal, "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { option_last_scanline_pal, "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
-      { option_crop_overscan, "Crop Overscan; enabled|disabled" },
-      { option_image_crop, "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
-      { option_image_offset, "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
+      { BEETLE_OPT(initial_scanline), "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { BEETLE_OPT(last_scanline), "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
+      { BEETLE_OPT(initial_scanline_pal), "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
+      { BEETLE_OPT(last_scanline_pal), "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
+      { BEETLE_OPT(crop_overscan), "Crop Overscan; enabled|disabled" },
+      { BEETLE_OPT(image_crop), "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
+      { BEETLE_OPT(image_offset), "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
 
-      { option_analog_calibration, "Analog self-calibration; disabled|enabled" },
-      { option_analog_toggle, "DualShock Analog button toggle; disabled|enabled" },
-      { option_multitap1, "Port 1: Multitap enable; disabled|enabled" },
-      { option_multitap2, "Port 2: Multitap enable; disabled|enabled" },
-      { option_gun_cursor, "Gun Cursor; Cross|Dot|Off" },
-      { option_mouse_sensitivity, "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
+      { BEETLE_OPT(analog_calibration), "Analog self-calibration; disabled|enabled" },
+      { BEETLE_OPT(analog_toggle), "DualShock Analog button toggle; disabled|enabled" },
+      { BEETLE_OPT(enable_multitap_port1), "Port 1: Multitap enable; disabled|enabled" },
+      { BEETLE_OPT(enable_multitap_port2), "Port 2: Multitap enable; disabled|enabled" },
+      { BEETLE_OPT(gun_cursor), "Gun Cursor; Cross|Dot|Off" },
+      { BEETLE_OPT(mouse_sensitivity), "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
 #ifndef EMSCRIPTEN
-      { option_cd_access_method, "CD Access Method (restart); sync|async|precache" },
+      { BEETLE_OPT(cd_access_method), "CD Access Method (restart); sync|async|precache" },
 #endif
-      { option_memcard0_method, "Memcard 0 method; libretro|mednafen" },
-      { option_memcard1_enable, "Enable memory card 1; enabled|disabled" },
-      { option_memcard_shared, "Shared memcards (restart); disabled|enabled" },
-      { option_cd_fastload, "Increase CD loading speed; 2x (native)|4x|6x|8x|10x|12x|14x" },
+      { BEETLE_OPT(use_mednafen_memcard0_method), "Memcard 0 method; libretro|mednafen" },
+      { BEETLE_OPT(enable_memcard1), "Enable memory card 1; enabled|disabled" },
+      { BEETLE_OPT(shared_memory_cards), "Shared memcards (restart); disabled|enabled" },
+      { BEETLE_OPT(cd_fastload), "Increase CD loading speed; 2x (native)|4x|6x|8x|10x|12x|14x" },
       { NULL, NULL },
    };
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
