@@ -1181,7 +1181,7 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
 {
    struct retro_variable var = {0};
 
-   var.key = option_internal_resolution;
+   var.key = BEETLE_OPT(internal_resolution);
 
    if (upscaling)
    {
@@ -1202,7 +1202,7 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
 
    if (display_vram)
    {
-      var.key = option_display_vram;
+      var.key = BEETLE_OPT(display_vram);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
          if (!strcmp(var.value, "enabled"))
             *display_vram = true;
@@ -1226,7 +1226,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    get_variables(&upscaling, &display_vram);
 
-   var.key = option_filter;
+   var.key = BEETLE_OPT(filter);
    uint8_t filter = FILTER_MODE_NEAREST;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1246,7 +1246,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
       renderer->filter_type = filter;
    }
 
-   var.key = option_depth;
+   var.key = BEETLE_OPT(depth);
    uint8_t depth = 16;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1254,7 +1254,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          depth = 32;
    }
 
-   var.key = option_dither_mode;
+   var.key = BEETLE_OPT(dither_mode);
    dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1264,7 +1264,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          dither_mode  = DITHER_OFF;
    }
 
-   var.key = option_wireframe;
+   var.key = BEETLE_OPT(wireframe);
    bool wireframe = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1548,7 +1548,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    bool display_vram = false;
    struct retro_variable var = {0};
 
-   var.key = option_renderer_software_fb;
+   var.key = BEETLE_OPT(renderer_software_fb);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1560,7 +1560,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    get_variables(&upscaling, &display_vram);
 
-   var.key = option_filter;
+   var.key = BEETLE_OPT(filter);
    uint8_t filter = FILTER_MODE_NEAREST;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1578,7 +1578,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
          filter = FILTER_MODE_JINC2;
    }
 
-   var.key = option_depth;
+   var.key = BEETLE_OPT(depth);
    uint8_t depth = 16;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1586,7 +1586,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
          depth = 32;
    }
 
-   var.key = option_dither_mode;
+   var.key = BEETLE_OPT(dither_mode);
    dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1596,7 +1596,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
          dither_mode  = DITHER_OFF;
    }
 
-   var.key = option_wireframe;
+   var.key = BEETLE_OPT(wireframe);
    bool wireframe = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -1975,7 +1975,7 @@ struct retro_system_av_info get_av_info(VideoClock std)
    get_variables(&upscaling, &display_vram);
 
    struct retro_variable var = {0};
-   var.key = option_widescreen_hack;
+   var.key = BEETLE_OPT(widescreen_hack);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
