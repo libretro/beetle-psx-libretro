@@ -31,6 +31,7 @@
 #endif
 
 #include <streams/file_stream.h>
+#define VFS_FRONTEND
 #include <vfs/vfs_implementation.h>
 
 static const int64_t vfs_error_return_value      = -1;
@@ -110,9 +111,9 @@ bool filestream_exists(const char *path)
    return true;
 }
 
-int64_t filestream_get_size(RFILE *stream)
+ssize_t filestream_get_size(RFILE *stream)
 {
-   int64_t output;
+   ssize_t output;
 
    if (filestream_size_cb != NULL)
       output = filestream_size_cb(stream->hfile);
@@ -460,21 +461,27 @@ bool filestream_write_file(const char *path, const void *data, ssize_t size)
 
 char *filestream_getline(RFILE *stream)
 {
-   char* newline     = (char*)malloc(9);
-   char* newline_tmp = NULL;
-   size_t cur_size   = 8;
-   size_t idx        = 0;
-   int in            = filestream_getc(stream);
+   char* newline_tmp  = NULL;
+   size_t cur_size    = 8;
+   size_t idx         = 0;
+   int in             = 0;
+   char* newline      = (char*)malloc(9);
 
-   if (!newline)
+   if (!stream || !newline)
+   {
+      if (newline)
+         free(newline);
       return NULL;
+   }
+
+   in                 = filestream_getc(stream);
 
    while (in != EOF && in != '\n')
    {
       if (idx == cur_size)
       {
-         cur_size *= 2;
-         newline_tmp = (char*)realloc(newline, cur_size + 1);
+         cur_size    *= 2;
+         newline_tmp  = (char*)realloc(newline, cur_size + 1);
 
          if (!newline_tmp)
          {
@@ -482,13 +489,13 @@ char *filestream_getline(RFILE *stream)
             return NULL;
          }
 
-         newline = newline_tmp;
+         newline     = newline_tmp;
       }
 
       newline[idx++] = in;
       in             = filestream_getc(stream);
    }
 
-   newline[idx] = '\0';
+   newline[idx]      = '\0';
    return newline;
 }

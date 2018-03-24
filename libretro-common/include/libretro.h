@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 #ifndef __cplusplus
-#if defined(_MSC_VER) && !defined(SN_TARGET_PS3)
+#if defined(_MSC_VER) && _MSC_VER < 1800 && !defined(SN_TARGET_PS3)
 /* Hack applied for MSVC when compiling in C89 mode
  * as it isn't C99-compliant. */
 #define bool unsigned char
@@ -270,6 +270,7 @@ enum retro_language
    RETRO_LANGUAGE_ESPERANTO           = 13,
    RETRO_LANGUAGE_POLISH              = 14,
    RETRO_LANGUAGE_VIETNAMESE          = 15,
+   RETRO_LANGUAGE_ARABIC              = 16,
    RETRO_LANGUAGE_LAST,
 
    /* Ensure sizeof(enum) == sizeof(int) */
@@ -375,6 +376,10 @@ enum retro_key
    RETROK_x              = 120,
    RETROK_y              = 121,
    RETROK_z              = 122,
+   RETROK_LEFTBRACE      = 123,
+   RETROK_BAR            = 124,
+   RETROK_RIGHTBRACE     = 125,
+   RETROK_TILDE          = 126,
    RETROK_DELETE         = 127,
 
    RETROK_KP0            = 256,
@@ -1108,6 +1113,15 @@ struct retro_led_interface
     retro_set_led_state_t set_led_state;
 };
 
+#define RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+                                           /* int * --
+                                            * Queries the frontend if audio and video are enabled or not.
+                                            * If not enabled, the frontend will discard the audio or video,
+                                            * so the core may decide to skip producing audio or video.
+                                            * Bit 0 (value 1) is set if Video is enabled,
+                                            * Bit 1 (value 2) is set if Audio is enabled.
+                                            * Other bits are reserved for future use.
+                                            */
 
 #define RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE (41 | RETRO_ENVIRONMENT_EXPERIMENTAL)
                                            /* const struct retro_hw_render_interface ** --
