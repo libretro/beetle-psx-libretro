@@ -8,7 +8,7 @@ Beetle PSX is a port/fork of Mednafen's PSX module to the libretro API. It can b
 Notable additions in this fork are:
 * PBP and CHD file format support, developed by Zapeth;
 * Software renderer internal resolution upscaling, implemented by simias;
-* An OpenGL 3.2 renderer, developed by simias;
+* An OpenGL 3.3 renderer, developed by simias;
 * A Vulkan renderer, developed by TinyTiger;
 * PGXP perspectve correct texturing and subpixel precision, developed by iCatButler;
 
