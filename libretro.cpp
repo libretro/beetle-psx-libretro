@@ -2633,30 +2633,6 @@ static void check_variables(bool startup)
 
    extern void PSXDitherApply(bool);
 
-   if (startup)
-   {
-      var.key = BEETLE_OPT(renderer);
-
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      {
-         if (!strcmp(var.value, "software"))
-         {
-            rsx_intf_set_type(RSX_SOFTWARE);
-            rsx_intf_set_fallback_type(RSX_SOFTWARE);
-         }
-         else if (!strcmp(var.value, "opengl"))
-         {
-            rsx_intf_set_type(RSX_OPENGL);
-            rsx_intf_set_fallback_type(RSX_VULKAN);
-         }
-         else if (!strcmp(var.value, "vulkan"))
-         {
-            rsx_intf_set_type(RSX_VULKAN);
-            rsx_intf_set_fallback_type(RSX_OPENGL);
-         }
-      }
-   }
-
 #ifndef EMSCRIPTEN
    var.key = BEETLE_OPT(cd_access_method);
 
@@ -2783,15 +2759,17 @@ static void check_variables(bool startup)
    else
       input_enable_calibration( false );
 
-   rsx_intf_refresh_variables();
-
-   switch (rsx_intf_is_type())
+   if (startup)
    {
-      case RSX_SOFTWARE:
+      var.key = BEETLE_OPT(renderer);
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value && !strcmp(var.value, "software"))
+      {
          var.key = BEETLE_OPT(internal_resolution);
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
          {
+            uint8_t new_upscale_shift;
             uint8_t val = atoi(var.value);
 
             // Upscale must be a power of two
@@ -2799,21 +2777,48 @@ static void check_variables(bool startup)
 
             // Crappy "ffs" implementation since the standard function is not
             // widely supported by libc in the wild
-            uint8_t new_upscale_shift;
             for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
-            {
                val >>= 1;
-            }
             psx_gpu_upscale_shift = new_upscale_shift;
          }
          else
             psx_gpu_upscale_shift = 0;
-
-         break;
-      case RSX_OPENGL:
-      case RSX_VULKAN:
+      }
+      else
          psx_gpu_upscale_shift = 0;
-         break;
+   }
+   else
+   {
+      rsx_intf_refresh_variables();
+
+      switch (rsx_intf_is_type())
+      {
+         case RSX_SOFTWARE:
+            var.key = BEETLE_OPT(internal_resolution);
+
+            if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+            {
+               uint8_t new_upscale_shift;
+               uint8_t val = atoi(var.value);
+
+               // Upscale must be a power of two
+               assert((val & (val - 1)) == 0);
+
+               // Crappy "ffs" implementation since the standard function is not
+               // widely supported by libc in the wild
+               for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
+                  val >>= 1;
+               psx_gpu_upscale_shift = new_upscale_shift;
+            }
+            else
+               psx_gpu_upscale_shift = 0;
+
+            break;
+         case RSX_OPENGL:
+         case RSX_VULKAN:
+            psx_gpu_upscale_shift = 0;
+            break;
+      }
    }
 
    var.key = BEETLE_OPT(dither_mode);
@@ -3775,21 +3780,6 @@ unsigned retro_api_version(void)
    return RETRO_API_VERSION;
 }
 
-#if defined(HAVE_VULKAN)
-#define FIRST_RENDERER "vulkan"
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#define EXT_RENDERER "|opengl|software"
-#else
-#define EXT_RENDERER "|software"
-#endif
-#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#define FIRST_RENDERER "opengl"
-#define EXT_RENDERER "|software"
-#else
-#define FIRST_RENDERER "software"
-#define EXT_RENDERER ""
-#endif
-
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
@@ -3797,7 +3787,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_variable vars[] = {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { BEETLE_OPT(renderer), "Renderer (restart); " FIRST_RENDERER EXT_RENDERER },
+      { BEETLE_OPT(renderer), "Renderer (restart); hardware|software"},
       { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled|disabled" },
 #endif
 #ifdef HAVE_VULKAN

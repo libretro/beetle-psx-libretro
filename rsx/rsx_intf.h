@@ -115,9 +115,6 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
                         uint16_t w, uint16_t h, 
                         uint32_t mask_test, uint32_t set_mask);
 
-void rsx_intf_set_type(enum rsx_renderer_type type);
-void rsx_intf_set_fallback_type(enum rsx_renderer_type type);
-
 enum rsx_renderer_type rsx_intf_is_type(void);
 
 void rsx_intf_toggle_display(bool status);

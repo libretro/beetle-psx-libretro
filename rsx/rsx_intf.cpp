@@ -20,17 +20,19 @@
 #include <stdlib.h>
 #endif
 
-static enum rsx_renderer_type rsx_type = 
-#if defined(HAVE_VULKAN)
-   RSX_VULKAN
-#elif defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   RSX_OPENGL
-#else
-   RSX_SOFTWARE
+#ifdef __cplusplus
+extern "C"
+{
 #endif
-;
+   extern retro_environment_t environ_cb;
+#ifdef __cplusplus
+}
+#endif
 
-static enum rsx_renderer_type rsx_fallback_type = RSX_SOFTWARE;
+static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
+
+static bool gl_initialized                      = false;
+static bool vk_initialized                      = false;
 
 void rsx_intf_set_environment(retro_environment_t cb)
 {
@@ -97,60 +99,51 @@ enum rsx_renderer_type rsx_intf_is_type(void)
    return rsx_type;
 }
 
-void rsx_intf_set_type(enum rsx_renderer_type type)
-{
-   rsx_type = type;
-}
-
-void rsx_intf_set_fallback_type(enum rsx_renderer_type type)
-{
-   rsx_fallback_type = type;
-}
-
 bool rsx_intf_open(bool is_pal)
 {
-   bool ret = true;
-   switch (rsx_type)
-   {
-      case RSX_SOFTWARE:
-         if (!rsx_soft_open(is_pal))
-            ret = false;
-         break;
-      case RSX_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         if (!rsx_gl_open(is_pal))
-            ret = false;
-#else
-         ret = false;
-#endif
-         break;
-      case RSX_VULKAN:
+   struct retro_variable var = {0};
+   bool software_selected    = false;
+   vk_initialized            = false;
+   gl_initialized            = false;
+
+   var.key                   = BEETLE_OPT(renderer);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      if (!strcmp(var.value, "software"))
+         software_selected = true;
+
 #if defined(HAVE_VULKAN)
-         if (!rsx_vulkan_open(is_pal))
-            ret = false;
-#else
-         ret = false;
-#endif
-         break;
-   }
-
-   if (!ret)
+   if (!software_selected && rsx_vulkan_open(is_pal))
    {
-      if (rsx_fallback_type == rsx_type) // We're screwed.
-         return false;
-
-      // Try the fallback type.
-      rsx_type = rsx_fallback_type;
-      rsx_fallback_type = RSX_SOFTWARE; // This shouldn't ever fail.
-      return rsx_intf_open(is_pal);
+      rsx_type       = RSX_VULKAN;
+      vk_initialized = true;
+      goto end;
    }
-
-#if defined(RSX_DUMP)
-   const char *env = getenv("RSX_DUMP");
-   if (env)
-      rsx_dump_init(env);
 #endif
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   if (!software_selected && rsx_gl_open(is_pal))
+   {
+      rsx_type       = RSX_OPENGL;
+      gl_initialized = true;
+      goto end;
+   }
+#endif
+
+   if (rsx_soft_open(is_pal))
+      goto end;
+
+   rsx_type          = RSX_SOFTWARE;
+   return rsx_intf_open(is_pal);
+
+end:
+#if defined(RSX_DUMP)
+   {
+      const char *env = getenv("RSX_DUMP");
+      if (env)
+         rsx_dump_init(env);
+   }
+#endif
    return true;
 }
 
@@ -160,21 +153,21 @@ void rsx_intf_close(void)
    rsx_dump_deinit();
 #endif
 
-   switch (rsx_type)
-   {
-      case RSX_SOFTWARE:
-         break;
-      case RSX_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_close();
-#endif
-         break;
-      case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_close();
-#endif
-         break;
+   if (rsx_type != RSX_SOFTWARE && vk_initialized)
+   {
+      rsx_vulkan_close();
+      return;
    }
+#endif
+
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   if (rsx_type != RSX_SOFTWARE && gl_initialized)
+   {
+      rsx_gl_close();
+      return;
+   }
+#endif
 }
 
 void rsx_intf_refresh_variables(void)
