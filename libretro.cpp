@@ -3789,6 +3789,9 @@ void retro_set_environment(retro_environment_t cb)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
       { BEETLE_OPT(renderer), "Renderer (restart); hardware|software"},
       { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled|disabled" },
+#else
+      { BEETLE_OPT(renderer), "Renderer; software"},
+      { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled" },
 #endif
 #ifdef HAVE_VULKAN
       { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
