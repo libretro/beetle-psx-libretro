@@ -1541,13 +1541,15 @@ static int32_t NCLIP(uint32_t instr)
    int32_t sum    = a + b + c;
 
    if (PGXP_enabled() &&
-       PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2])))
-	   sum = PGXP_NCLIP();
-
-   check_mac_overflow(sum);
-
-   MAC[0] = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
+       PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2]))) {
+      sum = PGXP_NCLIP();
+   } else {
+      sum = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
          );
+      check_mac_overflow(sum);
+   }
+
+   MAC[0] = sum;
 
    return(8);
 }
