@@ -53,7 +53,8 @@
 #include <time.h>
 #endif
 
-#if defined(VITA) || defined(BSD)
+#if defined(VITA) || defined(__FreeBSD__) || defined(__DragonFly__) || \
+  defined(__OpenBSD__) || defined(__NetBSD__)
 #include <sys/time.h>
 #endif
 
