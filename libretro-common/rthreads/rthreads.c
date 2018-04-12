@@ -21,7 +21,9 @@
  */
 
 #ifdef __unix__
+#ifndef __sun__
 #define _POSIX_C_SOURCE 199309
+#endif
 #endif
 
 #include <stdlib.h>
@@ -45,6 +47,8 @@
 #endif
 #elif defined(GEKKO)
 #include "gx_pthread.h"
+#elif defined(_3DS)
+#include "ctr_pthread.h"
 #elif defined(__CELLOS_LV2__)
 #include <pthread.h>
 #include <sys/sys_time.h>
@@ -73,6 +77,7 @@ struct sthread
 {
 #ifdef USE_WIN32_THREADS
    HANDLE thread;
+   DWORD id;
 #else
    pthread_t id;
 #endif
@@ -158,9 +163,7 @@ sthread_t *sthread_create(void (*thread_func)(void*), void *userdata)
    bool thread_created      = false;
    struct thread_data *data = NULL;
    sthread_t *thread        = (sthread_t*)calloc(1, sizeof(*thread));
-#if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x0410
-   DWORD thread_id          = 0;
-#endif
+
    if (!thread)
       return NULL;
 
@@ -172,11 +175,7 @@ sthread_t *sthread_create(void (*thread_func)(void*), void *userdata)
    data->userdata = userdata;
 
 #ifdef USE_WIN32_THREADS
-#if defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x0410
-   thread->thread = CreateThread(NULL, 0, thread_wrap, data, 0, &thread_id);
-#else
-   thread->thread = CreateThread(NULL, 0, thread_wrap, data, 0, NULL);
-#endif
+   thread->thread = CreateThread(NULL, 0, thread_wrap, data, 0, &thread->id);
    thread_created = !!thread->thread;
 #else
 #if defined(VITA)
@@ -256,10 +255,11 @@ void sthread_join(sthread_t *thread)
 bool sthread_isself(sthread_t *thread)
 {
   /* This thread can't possibly be a null thread */
-  if (!thread) return false;
+  if (!thread)
+     return false;
 
 #ifdef USE_WIN32_THREADS
-   return GetCurrentThread() == thread->thread;
+   return GetCurrentThreadId() == thread->id;
 #else
    return pthread_equal(pthread_self(),thread->id);
 #endif
@@ -800,7 +800,7 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    sys_time_get_current_time(&s, &n);
    now.tv_sec  = s;
    now.tv_nsec = n;
-#elif defined(__mips__) || defined(VITA)
+#elif defined(__mips__) || defined(VITA) || defined(_3DS)
    struct timeval tm;
 
    gettimeofday(&tm, NULL);

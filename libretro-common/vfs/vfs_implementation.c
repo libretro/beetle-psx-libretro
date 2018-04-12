@@ -123,6 +123,8 @@ int64_t retro_vfs_file_seek_internal(libretro_vfs_implementation_file *stream, i
 /* VC2005 and up have a special 64-bit fseek */
 #ifdef ATLEAST_VC2005
       return _fseeki64(stream->fp, offset, whence);
+#elif defined(__CELLOS_LV2__) || defined(_MSC_VER) && _MSC_VER <= 1310
+      return fseek(stream->fp, (long)offset, whence);
 #else
       return fseeko(stream->fp, (off_t)offset, whence);
 #endif
@@ -262,7 +264,7 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(const char *path, uns
 
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
-      FILE   *fp = fopen_utf8(path, mode_str);
+      FILE   *fp = (FILE*)fopen_utf8(path, mode_str);
 
       if (!fp)
          goto error;

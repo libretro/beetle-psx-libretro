@@ -1834,7 +1834,7 @@ static int Load(const char *name, RFILE *fp)
 
    if(size >= 0x800)
    {
-      ssize_t len     = size;
+      int64_t len     = size;
       uint8_t *header = (uint8_t*)malloc(len * sizeof(uint8_t));
 
       filestream_read_file(name, (void**)&header, &len);
