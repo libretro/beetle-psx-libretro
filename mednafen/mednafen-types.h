@@ -255,6 +255,10 @@ template<typename T> typename std::remove_all_extents<T>::type* MDAP(T* v) { ret
 #endif
 #endif /* NOT_LIBRETRO */
 
+#ifndef _MSC_VER
 #define MDFN_ALIGN(n)        __attribute__ ((aligned (n)))
+#else
+#define MDFN_ALIGN(n)        __declspec(align(n))
+#endif
 
 #endif

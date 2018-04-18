@@ -194,7 +194,7 @@ static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)
      uint32_t gro = fbtex_y * 1024U + fbtex_x;
 
      PS_GPU::TexCache_t *TexCache = &g->TexCache[0];
-     PS_GPU::TexCache_t *c;
+     PS_GPU::TexCache_t *c = NULL;  //assigned to NULL to suppress potentially uninitialized variable error
 
      switch(TexMode_TA)
      {
