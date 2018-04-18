@@ -144,7 +144,7 @@ static uint32_t CalcNextEvent(void)
       const uint32_t target = ((Timers[i].Mode & 0x18) && (Timers[i].Counter < Timers[i].Target)) ? Timers[i].Target : 0x10000;
       const uint32_t count_delta = target - Timers[i].Counter;
       uint32_t tmp_clocks;
-         
+
       if((i == 0x2) && (Timers[i].Mode & 0x200))
          tmp_clocks = (count_delta * 8) - Timers[i].Div8Counter;
       else
@@ -159,7 +159,7 @@ static uint32_t CalcNextEvent(void)
    return(next_event);
 }
 
-static MDFN_FASTCALL bool TimerMatch(unsigned i)
+static bool MDFN_FASTCALL TimerMatch(unsigned i)
 {
    bool irq_exact = false;
 
@@ -190,7 +190,7 @@ static MDFN_FASTCALL bool TimerMatch(unsigned i)
    return irq_exact;
 }
 
-static MDFN_FASTCALL bool TimerOverflow(unsigned i)
+static bool MDFN_FASTCALL TimerOverflow(unsigned i)
 {
    bool irq_exact = false;
 
@@ -215,7 +215,7 @@ static MDFN_FASTCALL bool TimerOverflow(unsigned i)
    return irq_exact;
 }
 
-static MDFN_FASTCALL void ClockTimer(int i, uint32_t clocks)
+static void MDFN_FASTCALL ClockTimer(int i, uint32_t clocks)
 {
    int32_t before = Timers[i].Counter;
    int32_t target = 0x10000;
@@ -270,7 +270,7 @@ static MDFN_FASTCALL void ClockTimer(int i, uint32_t clocks)
    }
 }
 
-MDFN_FASTCALL void TIMER_SetVBlank(bool status)
+void MDFN_FASTCALL TIMER_SetVBlank(bool status)
 {
    switch(Timers[1].Mode & 0x7)
    {
@@ -313,7 +313,7 @@ MDFN_FASTCALL void TIMER_SetVBlank(bool status)
    vblank = status;
 }
 
-MDFN_FASTCALL void TIMER_SetHRetrace(bool status)
+void MDFN_FASTCALL TIMER_SetHRetrace(bool status)
 {
    if(hretrace && !status)
    {
@@ -329,7 +329,7 @@ MDFN_FASTCALL void TIMER_SetHRetrace(bool status)
    hretrace = status;
 }
 
-MDFN_FASTCALL void TIMER_AddDotClocks(uint32_t count)
+void MDFN_FASTCALL TIMER_AddDotClocks(uint32_t count)
 {
    if(Timers[0].Mode & 0x100)
       ClockTimer(0, count);
@@ -341,7 +341,7 @@ void TIMER_ClockHRetrace(void)
       ClockTimer(1, 1);
 }
 
-MDFN_FASTCALL int32_t TIMER_Update(const int32_t timestamp)
+int32_t MDFN_FASTCALL TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
 
@@ -361,7 +361,7 @@ MDFN_FASTCALL int32_t TIMER_Update(const int32_t timestamp)
    return(timestamp + CalcNextEvent());
 }
 
-static MDFN_FASTCALL void CalcCountingStart(unsigned which)
+static void MDFN_FASTCALL CalcCountingStart(unsigned which)
 {
    Timers[which].DoZeCounting = true;
 
@@ -395,8 +395,8 @@ void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 
    V <<= (A & 3) * 8;
 
-   /* 
-   PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V); 
+   /*
+   PSX_DBGINFO("[TIMER] Write: %08x %04x\n", A, V);
    */
 
    if(which >= 3)
@@ -428,7 +428,7 @@ void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
    PSX_SetEventNT(PSX_EVENT_TIMER, timestamp + CalcNextEvent());
 }
 
-MDFN_FASTCALL uint16_t TIMER_Read(const int32_t timestamp, uint32_t A)
+uint16_t MDFN_FASTCALL TIMER_Read(const int32_t timestamp, uint32_t A)
 {
    uint16_t ret = 0;
    int which = (A >> 4) & 0x3;

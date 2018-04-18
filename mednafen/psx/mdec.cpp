@@ -36,7 +36,7 @@
 
      // This condition when InFIFO.CanWrite() != 0 is a bit buggy on real hardware, decoding loop *seems* to be reading too
      // much and pulling garbage from the FIFO.
-     if(InCounter == 0xFFFF)	
+     if(InCounter == 0xFFFF)
       InFIFOReady = true;
     }
 
@@ -87,12 +87,12 @@ static bool InCommand;
 static uint8 QMatrix[2][64];
 static uint32 QMIndex;
 
-static int16 IDCTMatrix[64] MDFN_ALIGN(16);
+MDFN_ALIGN(16) static int16 IDCTMatrix[64];
 static uint32 IDCTMIndex;
 
 static uint8 QScale;
 
-static int16 Coeff[64] MDFN_ALIGN(16);
+MDFN_ALIGN(16) static int16 Coeff[64];
 static uint32 CoeffIndex;
 static uint32 DecodeWB;
 
@@ -113,14 +113,14 @@ static uint8 RAMOffsetWWS;
 
 static const uint8 ZigZag[64] =
 {
- 0x00, 0x08, 0x01, 0x02, 0x09, 0x10, 0x18, 0x11, 
- 0x0a, 0x03, 0x04, 0x0b, 0x12, 0x19, 0x20, 0x28, 
- 0x21, 0x1a, 0x13, 0x0c, 0x05, 0x06, 0x0d, 0x14, 
- 0x1b, 0x22, 0x29, 0x30, 0x38, 0x31, 0x2a, 0x23, 
- 0x1c, 0x15, 0x0e, 0x07, 0x0f, 0x16, 0x1d, 0x24, 
- 0x2b, 0x32, 0x39, 0x3a, 0x33, 0x2c, 0x25, 0x1e, 
- 0x17, 0x1f, 0x26, 0x2d, 0x34, 0x3b, 0x3c, 0x35, 
- 0x2e, 0x27, 0x2f, 0x36, 0x3d, 0x3e, 0x37, 0x3f, 
+ 0x00, 0x08, 0x01, 0x02, 0x09, 0x10, 0x18, 0x11,
+ 0x0a, 0x03, 0x04, 0x0b, 0x12, 0x19, 0x20, 0x28,
+ 0x21, 0x1a, 0x13, 0x0c, 0x05, 0x06, 0x0d, 0x14,
+ 0x1b, 0x22, 0x29, 0x30, 0x38, 0x31, 0x2a, 0x23,
+ 0x1c, 0x15, 0x0e, 0x07, 0x0f, 0x16, 0x1d, 0x24,
+ 0x2b, 0x32, 0x39, 0x3a, 0x33, 0x2c, 0x25, 0x1e,
+ 0x17, 0x1f, 0x26, 0x2d, 0x34, 0x3b, 0x3c, 0x35,
+ 0x2e, 0x27, 0x2f, 0x36, 0x3d, 0x3e, 0x37, 0x3f,
 };
 
 void MDEC_Power(void)
@@ -251,7 +251,7 @@ static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
       for( x = 0; x < 8; x++)
       {
 #ifdef __SSE2__
-         int32 tmp[4] MDFN_ALIGN(16);
+         MDFN_ALIGN(16) int32 tmp[4];
          __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
          __m128i sum = _mm_madd_epi16(m, c);
          sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
@@ -281,7 +281,7 @@ static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
 
 static void IDCT(int16 *in_coeff, int8 *out_coeff)
 {
-   int16 tmpbuf[64] MDFN_ALIGN(16);
+   MDFN_ALIGN(16) int16 tmpbuf[64];
 
    IDCT_1D_Multi<int16>(in_coeff, tmpbuf);
    IDCT_1D_Multi<int8>(tmpbuf, out_coeff);
@@ -505,10 +505,10 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
          case 5:
             IDCT(Coeff, &block_y[0][0]);
             break;
-      }   
+      }
 
       // Timing in the actual PS1 MDEC is complex due to (apparent) pipelining, but the average when decoding a large number of blocks is
-      // about 512.  
+      // about 512.
       *eat_cycles += 512;
 
       if(DecodeWB >= 2)
