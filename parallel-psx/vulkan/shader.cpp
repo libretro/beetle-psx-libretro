@@ -2,6 +2,10 @@
 #include "device.hpp"
 #include "spirv_cross.hpp"
 
+#include <algorithm>
+using std::min;
+using std::max;
+
 using namespace std;
 using namespace spirv_cross;
 

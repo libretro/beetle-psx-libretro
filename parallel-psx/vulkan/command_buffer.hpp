@@ -410,8 +410,11 @@ private:
 	{
 		float blend_constants[4];
 	} potential_static_state = {};
+#ifndef _MSC_VER
+	//suppress compiler error on MSVC by ommitting this check
 	static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
 	              "Hashable pipeline state is not large enough!");
+#endif
 
 	struct DynamicState
 	{

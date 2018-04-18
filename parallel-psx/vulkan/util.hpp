@@ -9,7 +9,27 @@ namespace Vulkan
 #define trailing_zeroes(x) ((x) == 0 ? 32 : __builtin_ctz(x))
 #define trailing_ones(x) __builtin_ctz(~(x))
 #else
+#ifdef _MSC_VER
+#include <intrin.h>
+static __inline uint32_t leading_zeroes(uint32_t x)
+{
+	if (x == 0) return 32;
+	return __lzcnt(x);
+}
+static __inline uint32_t trailing_zeroes(uint32_t x)
+{
+	if (x == 0) return 32;
+	unsigned long index = 0;
+	_BitScanForward(&index, x);
+	return (uint32_t)index;
+}
+static __inline uint32_t trailing_ones(uint32_t x)
+{
+	return trailing_zeroes(~x);
+}
+#else
 #error "Implement me."
+#endif
 #endif
 
 template <typename T>

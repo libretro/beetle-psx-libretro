@@ -176,7 +176,6 @@ typedef uint64_t uint64;
   //
   // Begin MSVC
   //
-  #pragma message("Compiling with MSVC, untested")
 
   #define INLINE __forceinline
   #define NO_INLINE __declspec(noinline)
