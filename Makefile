@@ -514,6 +514,17 @@ FLAGS += $(ENDIANNESS_DEFINES) \
          -D_FILE_OFFSET_BITS=64 \
          -D__STDC_CONSTANT_MACROS
 
+ifneq (,$(findstring windows_msvc2017,$(platform)))
+FLAGS += -D_CRT_SECURE_NO_WARNINGS \
+	 -D_CRT_NONSTDC_NO_DEPRECATE \
+	 -D__ORDER_LITTLE_ENDIAN__ \
+	 -D__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__ \
+	 -DNOMINMAX \
+	 //utf-8 \
+	 //std:c++17
+LDFLAGS += "opengl32.lib"
+endif
+
 ifeq ($(HAVE_VULKAN),1)
    FLAGS += -DHAVE_VULKAN
 endif
