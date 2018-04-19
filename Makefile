@@ -486,10 +486,38 @@ all: $(TARGET)
 
 -include $(DEPS)
 
-ifeq ($(DEBUG),0)
-   FLAGS += -O2 -DNDEBUG $(EXTRA_GCC_FLAGS)
+ifeq ($(DEBUG), 1)
+ifneq (,$(findstring msvc,$(platform)))
+	ifeq ($(STATIC_LINKING),1)
+	CFLAGS += -MTd
+	CXXFLAGS += -MTd
 else
-   FLAGS += -O0 -g -DDEBUG
+	CFLAGS += -MDd
+	CXXFLAGS += -MDd
+endif
+
+CFLAGS += -Od -Zi -DDEBUG -D_DEBUG
+CXXFLAGS += -Od -Zi -DDEBUG -D_DEBUG
+	else
+	CFLAGS += -O0 -g -DDEBUG
+	CXXFLAGS += -O0 -g -DDEBUG
+endif
+else
+ifneq (,$(findstring msvc,$(platform)))
+ifeq ($(STATIC_LINKING),1)
+	CFLAGS += -MT
+	CXXFLAGS += -MT
+else
+	CFLAGS += -MD
+	CXXFLAGS += -MD
+endif
+
+CFLAGS += -O2 -DNDEBUG
+CXXFLAGS += -O2 -DNDEBUG
+else
+	CFLAGS += -O3 -DNDEBUG
+	CXXFLAGS += -O3 -DNDEBUG
+endif
 endif
 
 LDFLAGS += $(fpic) $(SHARED)
