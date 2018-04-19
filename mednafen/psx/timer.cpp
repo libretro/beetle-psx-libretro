@@ -387,7 +387,7 @@ static void MDFN_FASTCALL CalcCountingStart(unsigned which)
 
 }
 
-void TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
+void MDFN_FASTCALL TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 {
    TIMER_Update(timestamp);
 
