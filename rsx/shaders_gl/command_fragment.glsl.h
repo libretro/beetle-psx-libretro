@@ -1,19 +1,22 @@
 #include "shaders_common.h"
 
+#undef command_fragment_name_
+
 #ifdef FILTER_SABR
-static const char * command_fragment_sabr = GLSL(
+#define command_fragment_name_ command_fragment_sabr
 #elif defined(FILTER_XBR)
-static const char * command_fragment_xbr = GLSL(
+#define command_fragment_name_ command_fragment_xbr
 #elif defined(FILTER_BILINEAR)
-static const char * command_fragment_bilinear = GLSL(
+#define command_fragment_name_ command_fragment_bilinear
 #elif defined(FILTER_3POINT)
-static const char * command_fragment_3point = GLSL(
+#define command_fragment_name_ command_fragment_3point
 #elif defined(FILTER_JINC2)
-static const char * command_fragment_jinc2 = GLSL(
+#define command_fragment_name_ command_fragment_jinc2
 #else
-static const char * command_fragment = GLSL(
+#define command_fragment_name_ command_fragment
 #endif
 
+static const char * command_fragment_name_ = GLSL(
 uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
@@ -149,8 +152,10 @@ vec4 sample_texel(vec2 coords) {
    }
    return texel;
 }
+)
 
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
+STRINGIZE(
 in vec2 tc;
 in vec4 xyp_1_2_3;
 in vec4 xyp_6_7_8;
@@ -166,9 +171,11 @@ float c_df(vec3 c1, vec3 c2) {
 }
 
 const float coef = 2.0;
+)
 #endif
 
 #ifdef FILTER_SABR
+STRINGIZE(
 // constants and functions for sabr
 const  vec4 Ai  = vec4( 1.0, -1.0, -1.0,  1.0);
 const  vec4 B45 = vec4( 1.0,  1.0, -1.0, -1.0);
@@ -289,10 +296,11 @@ vec4 get_texel_sabr()
 
    return texel;
 }
+)
 #endif
 
 #ifdef FILTER_XBR
-
+STRINGIZE(
 // constants and functions for xbr
 const   vec3  rgbw          = vec3(14.352, 28.176, 5.472);
 const   vec4  eq_threshold  = vec4(15.0, 15.0, 15.0, 15.0);
@@ -457,9 +465,11 @@ vec4 get_texel_xbr()
 
     return vec4(res, texel_alpha);
 }
+)
 #endif
 
 #ifdef FILTER_3POINT
+STRINGIZE(
 vec4 get_texel_3point()
 {
   float x = frag_texture_coord.x;
@@ -491,9 +501,11 @@ vec4 get_texel_3point()
 
    return texel;
 }
+)
 #endif
 
 #ifdef FILTER_BILINEAR
+STRINGIZE(
 // Bilinear filtering
 vec4 get_texel_bilinear()
 {
@@ -515,9 +527,11 @@ vec4 get_texel_bilinear()
 
    return texel;
 }
+)
 #endif
 
 #ifdef FILTER_JINC2
+STRINGIZE(
 const float JINC2_WINDOW_SINC = 0.44;
 const float JINC2_SINC = 0.82;
 const float JINC2_AR_STRENGTH = 0.8;
@@ -622,9 +636,9 @@ vec4 get_texel_jinc2()
     vec4 texel = vec4(color, 1.0);
     return texel;
 }
-
+)
 #endif
-
+STRINGIZE(
 void main() {
    vec4 color;
 
@@ -637,21 +651,33 @@ void main() {
          vec4 texel;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
-
+)
 #if defined(FILTER_SABR)
-         texel = get_texel_sabr();
+STRINGIZE(
+		texel = get_texel_sabr();
+)
 #elif defined(FILTER_XBR)
+STRINGIZE(
          texel = get_texel_xbr();
+)
 #elif defined(FILTER_BILINEAR)
+STRINGIZE(
          texel = get_texel_bilinear();
+)
 #elif defined(FILTER_3POINT)
+STRINGIZE(
          texel = get_texel_3point();
+)
 #elif defined(FILTER_JINC2)
+STRINGIZE(
          texel = get_texel_jinc2();
+)
 #else
+STRINGIZE(
          texel = texel0; //use nearest if nothing else is chosen
+)
 #endif
-
+STRINGIZE(
 	 // texel color 0x0000 is always fully transparent (even for opaque
          // draw commands)
          if (is_transparent(texel0)) {
@@ -699,3 +725,5 @@ void main() {
    frag_color = color + vec4(dither, dither, dither, 0.);
 }
 );
+
+#undef command_fragment_name_

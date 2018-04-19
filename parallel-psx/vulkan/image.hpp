@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "cookie.hpp"
 #include "format.hpp"
 #include "intrusive.hpp"

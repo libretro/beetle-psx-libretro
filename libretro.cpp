@@ -94,7 +94,7 @@ static bool firmware_is_present(unsigned region)
    char bios_path[4096];
    static const size_t list_size = 10;
    const char *bios_name_list[list_size];
-   const char *bios_sha1;
+   const char *bios_sha1 = NULL;
 
    log_cb(RETRO_LOG_INFO, "Checking if required firmware is present.\n");
 
