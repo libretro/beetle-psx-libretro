@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (rthreads.c).
@@ -57,8 +57,7 @@
 #include <time.h>
 #endif
 
-#if defined(VITA) || defined(__FreeBSD__) || defined(__DragonFly__) || \
-  defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(VITA) || defined(BSD)
 #include <sys/time.h>
 #endif
 
