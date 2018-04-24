@@ -27,6 +27,10 @@
 #include <vector>
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
 
+//Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
+extern bool FastSaveStates;
+const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
+
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
@@ -3432,6 +3436,17 @@ static uint64_t video_frames, audio_frames;
 void retro_run(void)
 {
    bool updated = false;
+   //code to implement audio and video disable is not yet implemented
+   //bool disableVideo = false;
+   //bool disableAudio = false;
+   //bool hardDisableAudio = false;
+   //int flags = 3;
+   //if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags))
+   //{
+   //   disableVideo = !(flags & 1);
+   //   disableAudio = !(flags & 2);
+   //   hardDisableAudio = !!(flags & 8);
+   //}
 
    rsx_intf_prepare_frame();
 
@@ -3538,6 +3553,11 @@ void retro_run(void)
    spec.SoundBufSize = 0;
    spec.VideoFormatChanged = false;
    spec.SoundFormatChanged = false;
+
+   //if (disableVideo)
+   //{
+   //   spec.skip = true;
+   //}
 
    EmulateSpecStruct *espec = (EmulateSpecStruct*)&spec;
    /* start of Emulate */
@@ -3901,41 +3921,74 @@ size_t retro_serialize_size(void)
       return serialize_size = st.len;
    }
 
-   return serialize_size = 16777216; // 16MB
+   return serialize_size = DEFAULT_STATE_SIZE; // 16MB
+}
+
+bool UsingFastSavestates()
+{
+   int flags;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags))
+   {
+      return flags & 4;
+   }
+   return false;
 }
 
 bool retro_serialize(void *data, size_t size)
 {
-   /* it seems that mednafen can realloc pointers sent to it?
-      since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
-   static bool logged;
-   StateMem st;
-   bool ret          = false;
-   uint8_t *_dat     = (uint8_t*)malloc(size);
-
-   if (!_dat)
-      return false;
-
-   st.data           = _dat;
-   st.loc            = 0;
-   st.len            = 0;
-   st.malloced       = size;
-   st.initial_malloc = 0;
-
-   /* there are still some errors with the save states, 
-    * the size seems to change on some games for now 
-    * just log when this happens */
-   if (!logged && st.len != size)
+   if (size == DEFAULT_STATE_SIZE)  //16MB buffer reserved
    {
-      log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
-      logged = true;
+      //actual size is around 3.75MB (3.67MB for fast savestates) rather than 16MB, so 16MB will hold a savestate without worrying about realloc
+
+      //save state in place
+      StateMem st;
+      st.data = (uint8_t*)data;
+      st.len = 0;
+      st.loc = 0;
+      st.malloced = size;
+      st.initial_malloc = 0;
+
+      //fast save states are at least 20% faster
+      FastSaveStates = UsingFastSavestates();
+      bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
+      FastSaveStates = false;
+      return ret;
    }
+   else
+   {
+      /* it seems that mednafen can realloc pointers sent to it?
+         since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
+      static bool logged;
+      StateMem st;
+      bool ret = false;
+      uint8_t *_dat = (uint8_t*)malloc(size);
 
-   ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
+      if (!_dat)
+         return false;
 
-   memcpy(data,st.data,size);
-   free(st.data);
-   return ret;
+      st.data = _dat;
+      st.loc = 0;
+      st.len = 0;
+      st.malloced = size;
+      st.initial_malloc = 0;
+
+      /* there are still some errors with the save states,
+       * the size seems to change on some games for now
+       * just log when this happens */
+      if (!logged && st.len != size)
+      {
+         log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
+         logged = true;
+      }
+
+      FastSaveStates = UsingFastSavestates();
+      ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
+      FastSaveStates = false;
+
+      memcpy(data, st.data, size);
+      free(st.data);
+      return ret;
+   }
 }
 
 bool retro_unserialize(const void *data, size_t size)
@@ -3948,7 +4001,11 @@ bool retro_unserialize(const void *data, size_t size)
    st.malloced       = 0;
    st.initial_malloc = 0;
 
-   return MDFNSS_LoadSM(&st, 0, 0);
+   //fast save states are at least 20% faster
+   FastSaveStates = UsingFastSavestates();
+   bool okay = MDFNSS_LoadSM(&st, 0, 0);
+   FastSaveStates = false;
+   return okay;
 }
 
 void *retro_get_memory_data(unsigned type)

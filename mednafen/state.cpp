@@ -28,6 +28,10 @@
 
 #define RLSB 		MDFNSTATE_RLSB	//0x80000000
 
+//Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
+//Only used for internal savestates which will not be written to a file.
+bool FastSaveStates = false;
+
 int32_t smem_read(StateMem *st, void *buffer, uint32_t len)
 {
    if ((len + st->loc) > st->len)
@@ -134,19 +138,33 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 
       int32_t bytesize = sf->size;
 
-      char nameo[1 + 256];
-      int slen;
-
-      slen = snprintf(nameo + 1, 256, "%s%s", name_prefix ? name_prefix : "", sf->name);
-      nameo[0] = slen;
-
-      if(slen >= 255)
+      //exclude text labels from fast savestates
+      if (!FastSaveStates)
       {
-         printf("Warning:  state variable name possibly too long: %s %s %s %d\n", sf->name, name_prefix, nameo, slen);
-         slen = 255;
-      }
+         char nameo[1 + 256];
+         int slen;
 
-      smem_write(st, nameo, 1 + nameo[0]);
+         //Replace snprintf with strncpy for most cases
+         if (name_prefix != NULL)
+         {
+            slen = snprintf(nameo + 1, 256, "%s%s", name_prefix ? name_prefix : "", sf->name);
+         }
+         else
+         {
+            slen = strlen(sf->name);
+            strncpy(nameo + 1, sf->name, 255);
+            nameo[256] = 0;
+         }
+         nameo[0] = slen;
+
+         if (slen >= 255)
+         {
+            printf("Warning:  state variable name possibly too long: %s %s %s %d\n", sf->name, name_prefix, nameo, slen);
+            slen = 255;
+         }
+
+         smem_write(st, nameo, 1 + nameo[0]);
+      }
       smem_write32le(st, bytesize);
 
 #ifdef MSB_FIRST
@@ -250,6 +268,11 @@ static SFORMAT *FindSF(const char *name, SFORMAT *sf)
       }
       else
       {
+         //for fast savestates, we no longer have the text label in the state, and need to assume that it is the correct one.
+         if (FastSaveStates)
+         {
+            return sf;
+         }
          assert(sf->name);
          if (!strcmp(sf->name, name))
             return sf;
@@ -297,28 +320,39 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 {
    int temp = st->loc;
 
+   uint32_t recorded_size;  // In bytes
+   uint8_t toa[1 + 256];    // Don't change to char unless cast toa[0] to unsigned to smem_read() and other places.
+   toa[0] = 0;
+   toa[1] = 0;
+
    while (st->loc < (temp + size))
    {
-      uint32_t recorded_size;	// In bytes
-      uint8_t toa[1 + 256];	// Don't change to char unless cast toa[0] to unsigned to smem_read() and other places.
-
-      if(smem_read(st, toa, 1) != 1)
+      //exclude text labels from fast savestates
+      if (!FastSaveStates)
       {
-         puts("Unexpected EOF");
-         return(0);
-      }
+         if (smem_read(st, toa, 1) != 1)
+         {
+            puts("Unexpected EOF");
+            return(0);
+         }
 
-      if(smem_read(st, toa + 1, toa[0]) != toa[0])
-      {
-         puts("Unexpected EOF?");
-         return 0;
-      }
+         if (smem_read(st, toa + 1, toa[0]) != toa[0])
+         {
+            puts("Unexpected EOF?");
+            return 0;
+         }
 
-      toa[1 + toa[0]] = 0;
+         toa[1 + toa[0]] = 0;
+      }
 
       smem_read32le(st, &recorded_size);
 
       SFORMAT *tmp = FindSF((char*)toa + 1, sf);
+      //Fix for unnecessary name checks, when we find it in the first slot, don't recheck that slot again.  Also necessary for fast savestates to work.
+      if (tmp == sf)
+      {
+         sf++;
+      }
 
       if(tmp)
       {
