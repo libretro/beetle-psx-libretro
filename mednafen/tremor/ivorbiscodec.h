@@ -60,8 +60,8 @@ typedef struct vorbis_dsp_state{
   int analysisp;
   vorbis_info *vi;
 
-  ogg_int32_t **pcm;
-  ogg_int32_t **pcmret;
+  int32_t **pcm;
+  int32_t **pcmret;
   int      pcm_storage;
   int      pcm_current;
   int      pcm_returned;
@@ -74,15 +74,15 @@ typedef struct vorbis_dsp_state{
   long nW;
   long centerW;
 
-  ogg_int64_t granulepos;
-  ogg_int64_t sequence;
+  int64_t granulepos;
+  int64_t sequence;
 
   void       *backend_state;
 } vorbis_dsp_state;
 
 typedef struct vorbis_block{
   /* necessary stream state for linking to the framing abstraction */
-  ogg_int32_t  **pcm;       /* this is a pointer into local storage */ 
+  int32_t  **pcm;       /* this is a pointer into local storage */ 
   oggpack_buffer opb;
   
   long  lW;
@@ -92,8 +92,8 @@ typedef struct vorbis_block{
   int   mode;
 
   int         eofflag;
-  ogg_int64_t granulepos;
-  ogg_int64_t sequence;
+  int64_t granulepos;
+  int64_t sequence;
   vorbis_dsp_state *vd; /* For read-only access of configuration */
 
   /* local storage to avoid remallocing; it's up to the mapping to
@@ -174,7 +174,7 @@ extern int      vorbis_synthesis_restart(vorbis_dsp_state *v);
 extern int      vorbis_synthesis(vorbis_block *vb,ogg_packet *op);
 extern int      vorbis_synthesis_trackonly(vorbis_block *vb,ogg_packet *op);
 extern int      vorbis_synthesis_blockin(vorbis_dsp_state *v,vorbis_block *vb);
-extern int      vorbis_synthesis_pcmout(vorbis_dsp_state *v,ogg_int32_t ***pcm);
+extern int      vorbis_synthesis_pcmout(vorbis_dsp_state *v,int32_t ***pcm);
 extern int      vorbis_synthesis_read(vorbis_dsp_state *v,int samples);
 extern long     vorbis_packet_blocksize(vorbis_info *vi,ogg_packet *op);
 

@@ -35,7 +35,7 @@ typedef struct {
   int *linearmap;
 
   vorbis_info_floor0 *vi;
-  ogg_int32_t *lsp_look;
+  int32_t *lsp_look;
 
 } vorbis_look_floor0;
 
@@ -48,7 +48,7 @@ typedef struct {
    returns in m.8 format */
 
 static long ADJUST_SQRT2[2]={8192,5792};
-STIN ogg_int32_t vorbis_invsqlook_i(long a,long e){
+static INLINE int32_t vorbis_invsqlook_i(long a,long e){
   long i=(a&0x7fff)>>(INVSQ_LOOKUP_I_SHIFT-1); 
   long d=a&INVSQ_LOOKUP_I_MASK;                              /*  0.10 */
   long val=INVSQ_LOOKUP_I[i]-                                /*  1.16 */
@@ -60,7 +60,7 @@ STIN ogg_int32_t vorbis_invsqlook_i(long a,long e){
 
 /* interpolated lookup based fromdB function, domain -140dB to 0dB only */
 /* a is in n.12 format */
-STIN ogg_int32_t vorbis_fromdBlook_i(long a){
+static INLINE int32_t vorbis_fromdBlook_i(long a){
   int i=(-a)>>(12-FROMdB2_SHIFT);
   if(i<0) return 0x7fffffff;
   if(i>=(FROMdB_LOOKUP_SZ<<FROMdB_SHIFT))return 0;
@@ -70,7 +70,7 @@ STIN ogg_int32_t vorbis_fromdBlook_i(long a){
 
 /* interpolated lookup based cos function, domain 0 to PI only */
 /* a is in 0.16 format, where 0==0, 2^^16-1==PI, return 0.14 */
-STIN ogg_int32_t vorbis_coslook_i(long a){
+static INLINE int32_t vorbis_coslook_i(long a){
   int i=a>>COS_LOOKUP_I_SHIFT;
   int d=a&COS_LOOKUP_I_MASK;
   return COS_LOOKUP_I[i]- ((d*(COS_LOOKUP_I[i]-COS_LOOKUP_I[i+1]))>>
@@ -79,7 +79,7 @@ STIN ogg_int32_t vorbis_coslook_i(long a){
 
 /* interpolated lookup based cos function */
 /* a is in 0.16 format, where 0==0, 2^^16==PI, return .LSP_FRACBITS */
-STIN ogg_int32_t vorbis_coslook2_i(long a){
+static INLINE int32_t vorbis_coslook2_i(long a){
   a=a&0x1ffff;
 
   if(a>0x10000)a=0x20000-a;
@@ -102,7 +102,7 @@ static const int barklook[28]={
 };
 
 /* used in init only; interpolate the long way */
-STIN ogg_int32_t toBARK(int n){
+static INLINE int32_t toBARK(int n){
   int i;
   for(i=0;i<27;i++) 
     if(n>=barklook[i] && n<barklook[i+1])break;
@@ -133,11 +133,11 @@ static const unsigned char MLOOP_2[64]={
 
 static const unsigned char MLOOP_3[8]={0,1,2,2,3,3,3,3};
 
-void vorbis_lsp_to_curve(ogg_int32_t *curve,int *map,int n,int ln,
-			 ogg_int32_t *lsp,int m,
-			 ogg_int32_t amp,
-			 ogg_int32_t ampoffset,
-			 ogg_int32_t *icos){
+void vorbis_lsp_to_curve(int32_t *curve,int *map,int n,int ln,
+			 int32_t *lsp,int m,
+			 int32_t amp,
+			 int32_t ampoffset,
+			 int32_t *icos){
 
   /* 0 <= m < 256 */
 
@@ -145,13 +145,13 @@ void vorbis_lsp_to_curve(ogg_int32_t *curve,int *map,int n,int ln,
   int i;
   int ampoffseti=ampoffset*4096;
   int ampi=amp;
-  ogg_int32_t *ilsp=(ogg_int32_t *)alloca(m*sizeof(*ilsp));
+  int32_t *ilsp=(int32_t *)alloca(m*sizeof(*ilsp));
   /* lsp is in 8.24, range 0 to PI; coslook wants it in .16 0 to 1*/
   for(i=0;i<m;i++){
 #ifndef _LOW_ACCURACY_
-    ogg_int32_t val=MULT32(lsp[i],0x517cc2);
+    int32_t val=MULT32(lsp[i],0x517cc2);
 #else
-    ogg_int32_t val=((lsp[i]>>10)*0x517d)>>14;
+    int32_t val=((lsp[i]>>10)*0x517d)>>14;
 #endif
 
     /* safeguard against a malicious stream */
@@ -166,10 +166,10 @@ void vorbis_lsp_to_curve(ogg_int32_t *curve,int *map,int n,int ln,
   i=0;
   while(i<n){
     int j,k=map[i];
-    ogg_uint32_t pi=46341; /* 2**-.5 in 0.16 */
-    ogg_uint32_t qi=46341;
-    ogg_int32_t qexp=0,shift;
-    ogg_int32_t wi=icos[k];
+    uint32_t pi=46341; /* 2**-.5 in 0.16 */
+    uint32_t qi=46341;
+    int32_t qexp=0,shift;
+    int32_t wi=icos[k];
 
 #ifdef _V_LSP_MATH_ASM
     lsp_loop_asm(&qi,&pi,&qexp,ilsp,wi,m);
@@ -292,7 +292,7 @@ static void floor0_free_info(vorbis_info_floor *i){
   vorbis_info_floor0 *info=(vorbis_info_floor0 *)i;
   if(info){
     memset(info,0,sizeof(*info));
-    _ogg_free(info);
+    free(info);
   }
 }
 
@@ -300,10 +300,12 @@ static void floor0_free_look(vorbis_look_floor *i){
   vorbis_look_floor0 *look=(vorbis_look_floor0 *)i;
   if(look){
 
-    if(look->linearmap)_ogg_free(look->linearmap);
-    if(look->lsp_look)_ogg_free(look->lsp_look);
+    if(look->linearmap)
+       free(look->linearmap);
+    if(look->lsp_look)
+       free(look->lsp_look);
     memset(look,0,sizeof(*look));
-    _ogg_free(look);
+    free(look);
   }
 }
 
@@ -311,7 +313,7 @@ static vorbis_info_floor *floor0_unpack (vorbis_info *vi,oggpack_buffer *opb){
   codec_setup_info     *ci=(codec_setup_info *)vi->codec_setup;
   int j;
 
-  vorbis_info_floor0 *info=(vorbis_info_floor0 *)_ogg_malloc(sizeof(*info));
+  vorbis_info_floor0 *info=(vorbis_info_floor0 *)malloc(sizeof(*info));
   info->order=oggpack_read(opb,8);
   info->rate=oggpack_read(opb,16);
   info->barkmap=oggpack_read(opb,16);
@@ -351,7 +353,7 @@ static vorbis_look_floor *floor0_look (vorbis_dsp_state *vd,vorbis_info_mode *mi
   vorbis_info        *vi=vd->vi;
   codec_setup_info   *ci=(codec_setup_info *)vi->codec_setup;
   vorbis_info_floor0 *info=(vorbis_info_floor0 *)i;
-  vorbis_look_floor0 *look=(vorbis_look_floor0 *)_ogg_calloc(1,sizeof(*look));
+  vorbis_look_floor0 *look=(vorbis_look_floor0 *)calloc(1,sizeof(*look));
   look->m=info->order;
   look->n=ci->blocksizes[mi->blockflag]/2;
   look->ln=info->barkmap;
@@ -363,7 +365,7 @@ static vorbis_look_floor *floor0_look (vorbis_dsp_state *vd,vorbis_info_mode *mi
      the encoder may do what it wishes in filling them.  They're
      necessary in some mapping combinations to keep the scale spacing
      accurate */
-  look->linearmap=(int *)_ogg_malloc((look->n+1)*sizeof(*look->linearmap));
+  look->linearmap=(int *)malloc((look->n+1)*sizeof(*look->linearmap));
   for(j=0;j<look->n;j++){
 
     int val=(look->ln*
@@ -374,7 +376,7 @@ static vorbis_look_floor *floor0_look (vorbis_dsp_state *vd,vorbis_info_mode *mi
   }
   look->linearmap[j]=-1;
 
-  look->lsp_look=(ogg_int32_t *)_ogg_malloc(look->ln*sizeof(*look->lsp_look));
+  look->lsp_look=(int32_t *)malloc(look->ln*sizeof(*look->lsp_look));
   for(j=0;j<look->ln;j++)
     look->lsp_look[j]=vorbis_coslook2_i(0x10000*j/look->ln);
 
@@ -390,13 +392,13 @@ static void *floor0_inverse1(vorbis_block *vb,vorbis_look_floor *i){
   if(ampraw>0){ /* also handles the -1 out of data case */
     long maxval=(1<<info->ampbits)-1;
     int amp=((ampraw*info->ampdB)<<4)/maxval;
-    int booknum=oggpack_read(&vb->opb, ilog(info->numbooks));
+    int booknum=oggpack_read(&vb->opb,_ilog(info->numbooks));
     
     if(booknum!=-1 && booknum<info->numbooks){ /* be paranoid */
       codec_setup_info  *ci=(codec_setup_info *)vb->vd->vi->codec_setup;
       codebook *b=ci->fullbooks+info->books[booknum];
-      ogg_int32_t last=0;
-      ogg_int32_t *lsp=(ogg_int32_t *)_vorbis_block_alloc(vb,sizeof(*lsp)*(look->m+1));
+      int32_t last=0;
+      int32_t *lsp=(int32_t *)_vorbis_block_alloc(vb,sizeof(*lsp)*(look->m+1));
             
       if(vorbis_book_decodev_set(b,lsp,&vb->opb,look->m,-24)==-1)goto eop;
       for(j=0;j<look->m;){
@@ -413,13 +415,13 @@ static void *floor0_inverse1(vorbis_block *vb,vorbis_look_floor *i){
 }
 
 static int floor0_inverse2(vorbis_block *vb,vorbis_look_floor *i,
-			   void *memo,ogg_int32_t *out){
+			   void *memo,int32_t *out){
   vorbis_look_floor0 *look=(vorbis_look_floor0 *)i;
   vorbis_info_floor0 *info=look->vi;
   
   if(memo){
-    ogg_int32_t *lsp=(ogg_int32_t *)memo;
-    ogg_int32_t amp=lsp[look->m];
+    int32_t *lsp=(int32_t *)memo;
+    int32_t amp=lsp[look->m];
 
     /* take the coefficients back to a spectral envelope curve */
     vorbis_lsp_to_curve(out,look->linearmap,look->n,look->ln,

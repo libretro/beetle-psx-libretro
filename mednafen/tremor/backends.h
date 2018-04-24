@@ -39,7 +39,7 @@ typedef struct{
   void (*free_look) (vorbis_look_floor *);
   void *(*inverse1)  (struct vorbis_block *,vorbis_look_floor *);
   int   (*inverse2)  (struct vorbis_block *,vorbis_look_floor *,
-		     void *buffer,ogg_int32_t *);
+		     void *buffer,int32_t *);
 } vorbis_func_floor;
 
 typedef struct{
@@ -81,7 +81,7 @@ typedef struct{
   void (*free_info)    (vorbis_info_residue *);
   void (*free_look)    (vorbis_look_residue *);
   int  (*inverse)      (struct vorbis_block *,vorbis_look_residue *,
-			ogg_int32_t **,int *,int);
+			int32_t **,int *,int);
 } vorbis_func_residue;
 
 typedef struct vorbis_info_residue0{

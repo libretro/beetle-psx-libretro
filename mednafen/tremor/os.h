@@ -17,20 +17,10 @@
 
  ********************************************************************/
 
+#include <stdint.h>
 #include <math.h>
-#include "os_types.h"
 
-#ifndef _V_IFDEFJAIL_H_
-#  define _V_IFDEFJAIL_H_
-
-#  ifdef __GNUC__
-#    define STIN static __inline__
-#  elif _WIN32
-#    define STIN static __inline
-#  endif
-#else
-#  define STIN static
-#endif
+#include <retro_inline.h>
 
 #ifndef M_PI
 #  define M_PI (3.1415926536f)
@@ -41,7 +31,6 @@
 #  define rint(x)   (floor((x)+0.5f)) 
 #  define NO_FLOAT_MATH_LIB
 #  define FAST_HYPOT(a, b) sqrt((a)*(a) + (b)*(b))
-#  define LITTLE_ENDIAN 1
 #endif
 
 #ifdef HAVE_ALLOCA_H
@@ -50,14 +39,6 @@
 
 #ifdef USE_MEMORY_H
 #  include <memory.h>
-#endif
-
-#ifndef min
-#  define min(x,y)  ((x)>(y)?(y):(x))
-#endif
-
-#ifndef max
-#  define max(x,y)  ((x)<(y)?(y):(x))
 #endif
 
 #endif /* _OS_H */

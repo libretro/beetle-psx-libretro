@@ -42,9 +42,9 @@ int ogg_page_eos(const ogg_page *og){
   return((int)(og->header[5]&0x04));
 }
 
-ogg_int64_t ogg_page_granulepos(const ogg_page *og){
+int64_t ogg_page_granulepos(const ogg_page *og){
   unsigned char *page=og->header;
-  ogg_int64_t granulepos=page[13]&(0xff);
+  int64_t granulepos=page[13]&(0xff);
   granulepos= (granulepos<<8)|(page[12]&0xff);
   granulepos= (granulepos<<8)|(page[11]&0xff);
   granulepos= (granulepos<<8)|(page[10]&0xff);
@@ -96,7 +96,7 @@ int ogg_page_packets(const ogg_page *og){
 }
 
 
-static const ogg_uint32_t crc_lookup[256]={
+static const uint32_t crc_lookup[256]={
   0x00000000,0x04c11db7,0x09823b6e,0x0d4326d9,
   0x130476dc,0x17c56b6b,0x1a864db2,0x1e475005,
   0x2608edb8,0x22c9f00f,0x2f8ad6d6,0x2b4bcb61,
@@ -170,9 +170,9 @@ int ogg_stream_init(ogg_stream_state *os,int serialno){
     os->body_storage=16*1024;
     os->lacing_storage=1024;
 
-    os->body_data=_ogg_malloc(os->body_storage*sizeof(*os->body_data));
-    os->lacing_vals=_ogg_malloc(os->lacing_storage*sizeof(*os->lacing_vals));
-    os->granule_vals=_ogg_malloc(os->lacing_storage*sizeof(*os->granule_vals));
+    os->body_data=malloc(os->body_storage*sizeof(*os->body_data));
+    os->lacing_vals=malloc(os->lacing_storage*sizeof(*os->lacing_vals));
+    os->granule_vals=malloc(os->lacing_storage*sizeof(*os->granule_vals));
 
     if(!os->body_data || !os->lacing_vals || !os->granule_vals){
       ogg_stream_clear(os);
@@ -195,9 +195,12 @@ int ogg_stream_check(ogg_stream_state *os){
 /* _clear does not free os, only the non-flat storage within */
 int ogg_stream_clear(ogg_stream_state *os){
   if(os){
-    if(os->body_data)_ogg_free(os->body_data);
-    if(os->lacing_vals)_ogg_free(os->lacing_vals);
-    if(os->granule_vals)_ogg_free(os->granule_vals);
+    if(os->body_data)
+       free(os->body_data);
+    if(os->lacing_vals)
+       free(os->lacing_vals);
+    if(os->granule_vals)
+       free(os->granule_vals);
 
     memset(os,0,sizeof(*os));
   }
@@ -207,7 +210,7 @@ int ogg_stream_clear(ogg_stream_state *os){
 int ogg_stream_destroy(ogg_stream_state *os){
   if(os){
     ogg_stream_clear(os);
-    _ogg_free(os);
+    free(os);
   }
   return(0);
 }
@@ -217,8 +220,7 @@ int ogg_stream_destroy(ogg_stream_state *os){
 
 static int _os_body_expand(ogg_stream_state *os,int needed){
   if(os->body_storage<=os->body_fill+needed){
-    void *ret;
-    ret=_ogg_realloc(os->body_data,(os->body_storage+needed+1024)*
+    void *ret=realloc(os->body_data,(os->body_storage+needed+1024)*
                      sizeof(*os->body_data));
     if(!ret){
       ogg_stream_clear(os);
@@ -232,15 +234,14 @@ static int _os_body_expand(ogg_stream_state *os,int needed){
 
 static int _os_lacing_expand(ogg_stream_state *os,int needed){
   if(os->lacing_storage<=os->lacing_fill+needed){
-    void *ret;
-    ret=_ogg_realloc(os->lacing_vals,(os->lacing_storage+needed+32)*
+    void *ret=realloc(os->lacing_vals,(os->lacing_storage+needed+32)*
                      sizeof(*os->lacing_vals));
     if(!ret){
       ogg_stream_clear(os);
       return -1;
     }
     os->lacing_vals=ret;
-    ret=_ogg_realloc(os->granule_vals,(os->lacing_storage+needed+32)*
+    ret=realloc(os->granule_vals,(os->lacing_storage+needed+32)*
                      sizeof(*os->granule_vals));
     if(!ret){
       ogg_stream_clear(os);
@@ -258,7 +259,7 @@ static int _os_lacing_expand(ogg_stream_state *os,int needed){
 
 void ogg_page_checksum_set(ogg_page *og){
   if(og){
-    ogg_uint32_t crc_reg=0;
+    uint32_t crc_reg=0;
     int i;
 
     /* safety; needed for API behavior, but not framing code */
@@ -281,7 +282,7 @@ void ogg_page_checksum_set(ogg_page *og){
 
 /* submit data to the internal buffer of the framing engine */
 int ogg_stream_iovecin(ogg_stream_state *os, ogg_iovec_t *iov, int count,
-                       long e_o_s, ogg_int64_t granulepos){
+                       long e_o_s, int64_t granulepos){
 
   int bytes = 0, lacing_vals, i;
 
@@ -354,7 +355,7 @@ static int ogg_stream_flush_i(ogg_stream_state *os,ogg_page *og, int force, int 
   int maxvals=(os->lacing_fill>255?255:os->lacing_fill);
   int bytes=0;
   long acc=0;
-  ogg_int64_t granule_pos=-1;
+  int64_t granule_pos=-1;
 
   if(ogg_stream_check(os)) return(0);
   if(maxvals==0) return(0);
@@ -567,7 +568,8 @@ int ogg_sync_init(ogg_sync_state *oy){
 /* clear non-flat storage within */
 int ogg_sync_clear(ogg_sync_state *oy){
   if(oy){
-    if(oy->data)_ogg_free(oy->data);
+    if(oy->data)
+       free(oy->data);
     memset(oy,0,sizeof(*oy));
   }
   return(0);
@@ -576,7 +578,7 @@ int ogg_sync_clear(ogg_sync_state *oy){
 int ogg_sync_destroy(ogg_sync_state *oy){
   if(oy){
     ogg_sync_clear(oy);
-    _ogg_free(oy);
+    free(oy);
   }
   return(0);
 }
@@ -603,9 +605,9 @@ char *ogg_sync_buffer(ogg_sync_state *oy, long size){
     void *ret;
 
     if(oy->data)
-      ret=_ogg_realloc(oy->data,newsize);
+      ret=realloc(oy->data,newsize);
     else
-      ret=_ogg_malloc(newsize);
+      ret=malloc(newsize);
     if(!ret){
       ogg_sync_clear(oy);
       return NULL;
@@ -776,7 +778,7 @@ int ogg_stream_pagein(ogg_stream_state *os, ogg_page *og){
   int continued=ogg_page_continued(og);
   int bos=ogg_page_bos(og);
   int eos=ogg_page_eos(og);
-  ogg_int64_t granulepos=ogg_page_granulepos(og);
+  int64_t granulepos=ogg_page_granulepos(og);
   int serialno=ogg_page_serialno(og);
   long pageno=ogg_page_pageno(og);
   int segments=header[26];
@@ -999,7 +1001,7 @@ int ogg_stream_packetpeek(ogg_stream_state *os,ogg_packet *op){
 }
 
 void ogg_packet_clear(ogg_packet *op) {
-  _ogg_free(op->packet);
+  free(op->packet);
   memset(op, 0, sizeof(*op));
 }
 
@@ -1101,18 +1103,18 @@ void print_header(ogg_page *og){
 }
 
 void copy_page(ogg_page *og){
-  unsigned char *temp=_ogg_malloc(og->header_len);
+  unsigned char *temp=malloc(og->header_len);
   memcpy(temp,og->header,og->header_len);
   og->header=temp;
 
-  temp=_ogg_malloc(og->body_len);
+  temp=malloc(og->body_len);
   memcpy(temp,og->body,og->body_len);
   og->body=temp;
 }
 
 void free_page(ogg_page *og){
-  _ogg_free (og->header);
-  _ogg_free (og->body);
+  free (og->header);
+  free (og->body);
 }
 
 void error(void){
@@ -1455,7 +1457,7 @@ const int head3_7[] = {0x4f,0x67,0x67,0x53,0,0x05,
 
 void test_pack(const int *pl, const int **headers, int byteskip,
                int pageskip, int packetskip){
-  unsigned char *data=_ogg_malloc(1024*1024); /* for scripted test cases only */
+  unsigned char *data=malloc(1024*1024); /* for scripted test cases only */
   long inptr=0;
   long outptr=0;
   long deptr=0;
@@ -1604,7 +1606,7 @@ void test_pack(const int *pl, const int **headers, int byteskip,
       }
     }
   }
-  _ogg_free(data);
+  free(data);
   if(headers[pageno]!=NULL){
     fprintf(stderr,"did not write last page!\n");
     exit(1);
@@ -1769,7 +1771,7 @@ int main(void){
 
   {
     /* build a bunch of pages for testing */
-    unsigned char *data=_ogg_malloc(1024*1024);
+    unsigned char *data=malloc(1024*1024);
     int pl[]={0, 1,1,98,4079, 1,1,2954,2057, 76,34,912,0,234,1000,1000, 1000,300,-1};
     int inptr=0,i,j;
     ogg_page og[5];
@@ -1789,7 +1791,7 @@ int main(void){
       ogg_stream_packetin(&os_en,&op);
     }
 
-    _ogg_free(data);
+    free(data);
 
     /* retrieve finished pages */
     for(i=0;i<5;i++){

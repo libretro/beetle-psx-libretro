@@ -25,7 +25,6 @@
 #include "codebook.h"
 #include "misc.h"
 #include "block.h"
-#include "tremor_shared.h"
 
 #define floor1_rangedB 140 /* floor 1 fixed at -140dB to 0dB range */
 
@@ -48,7 +47,7 @@ static void floor1_free_info(vorbis_info_floor *i){
   vorbis_info_floor1 *info=(vorbis_info_floor1 *)i;
   if(info){
     memset(info,0,sizeof(*info));
-    _ogg_free(info);
+    free(info);
   }
 }
 
@@ -56,8 +55,17 @@ static void floor1_free_look(vorbis_look_floor *i){
   vorbis_look_floor1 *look=(vorbis_look_floor1 *)i;
   if(look){
     memset(look,0,sizeof(*look));
-    _ogg_free(look);
+    free(look);
   }
+}
+
+static int ilog(unsigned int v){
+  int ret=0;
+  while(v){
+    ret++;
+    v>>=1;
+  }
+  return(ret);
 }
 
 static int icomp(const void *a,const void *b){
@@ -68,7 +76,7 @@ static vorbis_info_floor *floor1_unpack (vorbis_info *vi,oggpack_buffer *opb){
   codec_setup_info     *ci=(codec_setup_info *)vi->codec_setup;
   int j,k,count=0,maxclass=-1,rangebits;
 
-  vorbis_info_floor1 *info=(vorbis_info_floor1 *)_ogg_calloc(1,sizeof(*info));
+  vorbis_info_floor1 *info=(vorbis_info_floor1 *)calloc(1,sizeof(*info));
   /* read partitions */
   info->partitions=oggpack_read(opb,5); /* only 0 to 31 legal */
   for(j=0;j<info->partitions;j++){
@@ -133,7 +141,7 @@ static vorbis_look_floor *floor1_look(vorbis_dsp_state *vd,vorbis_info_mode *mi,
 
   int *sortpointer[VIF_POSIT+2];
   vorbis_info_floor1 *info=(vorbis_info_floor1 *)in;
-  vorbis_look_floor1 *look=(vorbis_look_floor1 *)_ogg_calloc(1,sizeof(*look));
+  vorbis_look_floor1 *look=(vorbis_look_floor1 *)calloc(1,sizeof(*look));
   int i,j,n=0;
 
   look->vi=info;
@@ -221,7 +229,7 @@ static int render_point(int x0,int x1,int y0,int y1,int x){
 #  define XdB(n) (n)
 #endif
 
-static const ogg_int32_t FLOOR_fromdB_LOOKUP[256]={
+static const int32_t FLOOR_fromdB_LOOKUP[256]={
   XdB(0x000000e5), XdB(0x000000f4), XdB(0x00000103), XdB(0x00000114),
   XdB(0x00000126), XdB(0x00000139), XdB(0x0000014e), XdB(0x00000163),
   XdB(0x0000017a), XdB(0x00000193), XdB(0x000001ad), XdB(0x000001c9),
@@ -288,7 +296,7 @@ static const ogg_int32_t FLOOR_fromdB_LOOKUP[256]={
   XdB(0x69f80e9a), XdB(0x70dafda8), XdB(0x78307d76), XdB(0x7fffffff),
 };
   
-static void render_line(int n, int x0,int x1,int y0,int y1,ogg_int32_t *d){
+static void render_line(int n, int x0,int x1,int y0,int y1,int32_t *d){
   int dy=y1-y0;
   int adx=x1-x0;
   int ady=abs(dy);
@@ -404,7 +412,7 @@ static void *floor1_inverse1(vorbis_block *vb,vorbis_look_floor *in){
 }
 
 static int floor1_inverse2(vorbis_block *vb,vorbis_look_floor *in,void *memo,
-			  ogg_int32_t *out){
+			  int32_t *out){
   vorbis_look_floor1 *look=(vorbis_look_floor1 *)in;
   vorbis_info_floor1 *info=look->vi;
 

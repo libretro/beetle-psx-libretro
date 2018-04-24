@@ -73,9 +73,9 @@ static int _vorbis_synthesis1(vorbis_block *vb,ogg_packet *op,int decodep){
   if(decodep){
     /* alloc pcm passback storage */
     vb->pcmend=ci->blocksizes[vb->W];
-    vb->pcm=(ogg_int32_t **)_vorbis_block_alloc(vb,sizeof(*vb->pcm)*vi->channels);
+    vb->pcm=(int32_t **)_vorbis_block_alloc(vb,sizeof(*vb->pcm)*vi->channels);
     for(i=0;i<vi->channels;i++)
-      vb->pcm[i]=(ogg_int32_t *)_vorbis_block_alloc(vb,vb->pcmend*sizeof(*vb->pcm[i]));
+      vb->pcm[i]=(int32_t *)_vorbis_block_alloc(vb,vb->pcmend*sizeof(*vb->pcm[i]));
     
     /* unpack_header enforces range checking */
     type=ci->map_type[ci->mode_param[mode]->mapping];

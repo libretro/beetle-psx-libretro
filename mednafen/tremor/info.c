@@ -94,11 +94,14 @@ void vorbis_comment_clear(vorbis_comment *vc){
     long i;
     if(vc->user_comments){
       for(i=0;i<vc->comments;i++)
-        if(vc->user_comments[i])_ogg_free(vc->user_comments[i]);
-      _ogg_free(vc->user_comments);
+        if(vc->user_comments[i])
+           free(vc->user_comments[i]);
+      free(vc->user_comments);
     }
-    if(vc->comment_lengths)_ogg_free(vc->comment_lengths);
-    if(vc->vendor)_ogg_free(vc->vendor);
+    if(vc->comment_lengths)
+       free(vc->comment_lengths);
+    if(vc->vendor)
+       free(vc->vendor);
     memset(vc,0,sizeof(*vc));
   }
 }
@@ -113,7 +116,7 @@ int vorbis_info_blocksize(vorbis_info *vi,int zo){
 /* used by synthesis, which has a full, alloced vi */
 void vorbis_info_init(vorbis_info *vi){
   memset(vi,0,sizeof(*vi));
-  vi->codec_setup=(codec_setup_info *)_ogg_calloc(1,sizeof(codec_setup_info));
+  vi->codec_setup=(codec_setup_info *)calloc(1,sizeof(codec_setup_info));
 }
 
 void vorbis_info_clear(vorbis_info *vi){
@@ -123,7 +126,8 @@ void vorbis_info_clear(vorbis_info *vi){
   if(ci){
 
     for(i=0;i<ci->modes;i++)
-      if(ci->mode_param[i])_ogg_free(ci->mode_param[i]);
+      if(ci->mode_param[i])
+         free(ci->mode_param[i]);
 
     for(i=0;i<ci->maps;i++) /* unpack does the range checking */
       if(ci->map_param[i])
@@ -146,9 +150,9 @@ void vorbis_info_clear(vorbis_info *vi){
 	vorbis_book_clear(ci->fullbooks+i);
     }
     if(ci->fullbooks)
-	_ogg_free(ci->fullbooks);
+	free(ci->fullbooks);
     
-    _ogg_free(ci);
+    free(ci);
   }
 
   memset(vi,0,sizeof(*vi));
@@ -193,13 +197,13 @@ static int _vorbis_unpack_comment(vorbis_comment *vc,oggpack_buffer *opb){
   vendorlen=oggpack_read(opb,32);
   if(vendorlen<0)goto err_out;
   if(vendorlen>opb->storage-oggpack_bytes(opb))goto err_out;
-  vc->vendor=(char *)_ogg_calloc(vendorlen+1,1);
+  vc->vendor=(char *)calloc(vendorlen+1,1);
   if(vc->vendor==NULL)goto err_out;
   _v_readstring(opb,vc->vendor,vendorlen);
   i=oggpack_read(opb,32);
   if(i<0||i>=INT_MAX||i>(opb->storage-oggpack_bytes(opb))>>2)goto err_out;
-  vc->user_comments=(char **)_ogg_calloc(i+1,sizeof(*vc->user_comments));
-  vc->comment_lengths=(int *)_ogg_calloc(i+1, sizeof(*vc->comment_lengths));
+  vc->user_comments=(char **)calloc(i+1,sizeof(*vc->user_comments));
+  vc->comment_lengths=(int *)calloc(i+1, sizeof(*vc->comment_lengths));
   if(vc->user_comments==NULL||vc->comment_lengths==NULL)goto err_out;
   vc->comments=i;
 
@@ -207,7 +211,7 @@ static int _vorbis_unpack_comment(vorbis_comment *vc,oggpack_buffer *opb){
     int len=oggpack_read(opb,32);
     if(len<0||len>opb->storage-oggpack_bytes(opb))goto err_out;
     vc->comment_lengths[i]=len;
-    vc->user_comments[i]=(char *)_ogg_calloc(len+1,1);
+    vc->user_comments[i]=(char *)calloc(len+1,1);
     if(vc->user_comments[i]==NULL){
       vc->comments=i;
       goto err_out;
@@ -282,7 +286,7 @@ static int _vorbis_unpack_books(vorbis_info *vi,oggpack_buffer *opb){
   ci->modes=oggpack_read(opb,6)+1;
   if(ci->modes<=0)goto err_out;
   for(i=0;i<ci->modes;i++){
-    ci->mode_param[i]=(vorbis_info_mode *)_ogg_calloc(1,sizeof(*ci->mode_param[i]));
+    ci->mode_param[i]=(vorbis_info_mode *)calloc(1,sizeof(*ci->mode_param[i]));
     ci->mode_param[i]->blockflag=oggpack_read(opb,1);
     ci->mode_param[i]->windowtype=oggpack_read(opb,16);
     ci->mode_param[i]->transformtype=oggpack_read(opb,16);

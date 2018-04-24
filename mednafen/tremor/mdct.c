@@ -40,7 +40,7 @@
 
 
 /* 8 point butterfly (in place) */
-STIN void mdct_butterfly_8(DATA_TYPE *x){
+static INLINE void mdct_butterfly_8(DATA_TYPE *x){
 
   REG_TYPE r0   = x[4] + x[0];
   REG_TYPE r1   = x[4] - x[0];
@@ -63,7 +63,7 @@ STIN void mdct_butterfly_8(DATA_TYPE *x){
 }
 
 /* 16 point butterfly (in place, 4 register) */
-STIN void mdct_butterfly_16(DATA_TYPE *x){
+static INLINE void mdct_butterfly_16(DATA_TYPE *x){
 
   REG_TYPE r0, r1;
 
@@ -94,7 +94,7 @@ STIN void mdct_butterfly_16(DATA_TYPE *x){
 }
 
 /* 32 point butterfly (in place, 4 register) */
-STIN void mdct_butterfly_32(DATA_TYPE *x){
+static INLINE void mdct_butterfly_32(DATA_TYPE *x){
 
   REG_TYPE r0, r1;
 
@@ -145,7 +145,7 @@ STIN void mdct_butterfly_32(DATA_TYPE *x){
 }
 
 /* N/stage point generic N stage butterfly (in place, 2 register) */
-STIN void mdct_butterfly_generic(DATA_TYPE *x,int points,int step){
+static INLINE void mdct_butterfly_generic(DATA_TYPE *x,int points,int step){
 
   LOOKUP_T *T   = sincos_lookup0;
   DATA_TYPE *x1        = x + points      - 8;
@@ -231,7 +231,7 @@ STIN void mdct_butterfly_generic(DATA_TYPE *x,int points,int step){
   }while(T>sincos_lookup0);
 }
 
-STIN void mdct_butterflies(DATA_TYPE *x,int points,int shift){
+static INLINE void mdct_butterflies(DATA_TYPE *x,int points,int shift){
 
   int stages=8-shift;
   int i,j;
@@ -248,11 +248,11 @@ STIN void mdct_butterflies(DATA_TYPE *x,int points,int shift){
 
 static unsigned char bitrev[16]={0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15};
 
-STIN int bitrev12(int x){
+static INLINE int bitrev12(int x){
   return bitrev[x>>8]|(bitrev[(x&0x0f0)>>4]<<4)|(((int)bitrev[x&0x00f])<<8);
 }
 
-STIN void mdct_bitreverse(DATA_TYPE *x,int n,int step,int shift){
+static INLINE void mdct_bitreverse(DATA_TYPE *x,int n,int step,int shift){
 
   int          bit   = 0;
   DATA_TYPE   *w0    = x;

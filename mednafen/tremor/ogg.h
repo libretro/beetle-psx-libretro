@@ -21,8 +21,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
 #include <stddef.h>
-#include "os_types.h"
 
 typedef struct {
   void *iov_base;
@@ -58,7 +58,7 @@ typedef struct {
 
 
   int     *lacing_vals;      /* The values that will go to the segment table */
-  ogg_int64_t *granule_vals; /* granulepos values for headers. Not compact
+  int64_t *granule_vals; /* granulepos values for headers. Not compact
                                 this way, but it is simple coupled to the
                                 lacing fifo */
   long    lacing_storage;
@@ -75,12 +75,12 @@ typedef struct {
                              of a logical bitstream */
   long    serialno;
   long    pageno;
-  ogg_int64_t  packetno;  /* sequence number for decode; the framing
+  int64_t  packetno;  /* sequence number for decode; the framing
                              knows where there's a hole in the data,
                              but we need coupling so that the codec
                              (which is in a separate abstraction
                              layer) also knows about the gap */
-  ogg_int64_t   granulepos;
+  int64_t   granulepos;
 
 } ogg_stream_state;
 
@@ -93,9 +93,9 @@ typedef struct {
   long  b_o_s;
   long  e_o_s;
 
-  ogg_int64_t  granulepos;
+  int64_t  granulepos;
 
-  ogg_int64_t  packetno;     /* sequence number for decode; the framing
+  int64_t  packetno;     /* sequence number for decode; the framing
                                 knows where there's a hole in the data,
                                 but we need coupling so that the codec
                                 (which is in a separate abstraction
@@ -157,7 +157,7 @@ extern unsigned char *oggpackB_get_buffer(oggpack_buffer *b);
 
 extern int      ogg_stream_packetin(ogg_stream_state *os, ogg_packet *op);
 extern int      ogg_stream_iovecin(ogg_stream_state *os, ogg_iovec_t *iov,
-                                   int count, long e_o_s, ogg_int64_t granulepos);
+                                   int count, long e_o_s, int64_t granulepos);
 extern int      ogg_stream_pageout(ogg_stream_state *os, ogg_page *og);
 extern int      ogg_stream_pageout_fill(ogg_stream_state *os, ogg_page *og, int nfill);
 extern int      ogg_stream_flush(ogg_stream_state *os, ogg_page *og);
@@ -195,7 +195,7 @@ extern int      ogg_page_version(const ogg_page *og);
 extern int      ogg_page_continued(const ogg_page *og);
 extern int      ogg_page_bos(const ogg_page *og);
 extern int      ogg_page_eos(const ogg_page *og);
-extern ogg_int64_t  ogg_page_granulepos(const ogg_page *og);
+extern int64_t  ogg_page_granulepos(const ogg_page *og);
 extern int      ogg_page_serialno(const ogg_page *og);
 extern long     ogg_page_pageno(const ogg_page *og);
 extern int      ogg_page_packets(const ogg_page *og);

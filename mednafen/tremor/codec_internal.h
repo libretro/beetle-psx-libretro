@@ -45,7 +45,7 @@ typedef struct private_state {
   int                     modebits;
   vorbis_look_mapping   **mode;
 
-  ogg_int64_t sample_count;
+  int64_t sample_count;
 
 } private_state;
 
