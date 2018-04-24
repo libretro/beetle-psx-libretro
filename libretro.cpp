@@ -3981,7 +3981,9 @@ bool retro_serialize(void *data, size_t size)
          logged = true;
       }
 
+      FastSaveStates = UsingFastSavestates();
       ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
+      FastSaveStates = false;
 
       memcpy(data, st.data, size);
       free(st.data);
