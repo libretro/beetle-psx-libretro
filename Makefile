@@ -550,9 +550,7 @@ FLAGS += -D_CRT_SECURE_NO_WARNINGS \
 	 -DNOMINMAX \
 	 //utf-8 \
 	 //std:c++17
-    ifneq (,$(findstring windows_msvc2017_desktop,$(platform)))
-        LDFLAGS += "opengl32.lib"
-    endif
+LDFLAGS += "opengl32.lib"
 endif
 
 ifeq ($(HAVE_VULKAN),1)
