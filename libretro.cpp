@@ -172,16 +172,18 @@ static bool firmware_is_present(unsigned region)
    {
       char s[4096];
 
-      s[4095] = '\0';
-
       log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
+#ifndef HAVE_HW
+      s[4095] = '\0';
 
       snprintf(s, sizeof(s), "Firmware is missing:\n\n%s", bios_name_list[0]);
 
       gui_set_message(s);
       gui_show = true;
-
       return true;
+#else
+      return false;
+#endif
    }
 
    char obtained_sha1[41];
@@ -3464,11 +3466,13 @@ void retro_run(void)
    //   hardDisableAudio = !!(flags & 8);
    //}
 
+#ifndef HAVE_HW
    if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
    {
       gui_draw();
       video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
    }
+#endif
 
    rsx_intf_prepare_frame();
 
@@ -3760,7 +3764,7 @@ void retro_run(void)
    }
 
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-
+#ifndef HAVE_HW
    if (gui_show)
    {
       if (!gui_inited)
@@ -3781,6 +3785,7 @@ void retro_run(void)
       }
    }
    else
+#endif
    {
       rsx_intf_finalize_frame(fb, width, height,
             MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
