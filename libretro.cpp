@@ -13,6 +13,7 @@
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <rhash.h>
+#include "ugui_tools.h"
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 #include "libretro_options.h"
@@ -48,6 +49,11 @@ static unsigned image_crop = 0;
 static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_variable_serialization_size = false;
+static int frame_width = 0;
+static int frame_height = 0;
+static bool gui_inited = false;
+static bool gui_show = false;
+
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
 bool cd_warned_slow = false;
@@ -164,8 +170,18 @@ static bool firmware_is_present(unsigned region)
 
    if (!found)
    {
+      char s[4096];
+
+      s[4095] = '\0';
+
       log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
-      return false;
+
+      snprintf(s, sizeof(s), "Firmware is missing:\n\n%s", bios_name_list[0]);
+
+      gui_set_message(s);
+      gui_show = true;
+
+      return true;
    }
 
    char obtained_sha1[41];
@@ -3436,6 +3452,8 @@ static uint64_t video_frames, audio_frames;
 void retro_run(void)
 {
    bool updated = false;
+   printf("retro_run\n");
+   fflush(stdout);
    //code to implement audio and video disable is not yet implemented
    //bool disableVideo = false;
    //bool disableAudio = false;
@@ -3447,6 +3465,14 @@ void retro_run(void)
    //   disableAudio = !(flags & 2);
    //   hardDisableAudio = !!(flags & 8);
    //}
+
+   if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
+   {
+      printf("gui_cb\n");
+      fflush(stdout);
+      gui_draw();
+      video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
+   }
 
    rsx_intf_prepare_frame();
 
@@ -3537,7 +3563,7 @@ void retro_run(void)
 
    input_poll_cb();
 
-	input_update( input_state_cb );
+   input_update( input_state_cb );
 
    static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    rects[0] = ~0;
@@ -3739,8 +3765,30 @@ void retro_run(void)
 
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
 
-   rsx_intf_finalize_frame(fb, width, height,
-         MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+   if (gui_show)
+   {
+      if (!gui_inited)
+      {
+         frame_width = width;
+         frame_height = height;
+
+         gui_init(frame_width, frame_height, sizeof(unsigned));
+         gui_set_window_title("Error");
+         gui_inited = true;
+      }
+
+      if (width != frame_width || height != frame_height)
+      {
+        frame_width = width;
+        frame_height = height;
+        gui_window_resize(0, 0, frame_width, frame_height);
+      }
+   }
+   else
+   {
+      rsx_intf_finalize_frame(fb, width, height,
+            MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+   }
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
