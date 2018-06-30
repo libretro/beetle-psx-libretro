@@ -3452,8 +3452,6 @@ static uint64_t video_frames, audio_frames;
 void retro_run(void)
 {
    bool updated = false;
-   printf("retro_run\n");
-   fflush(stdout);
    //code to implement audio and video disable is not yet implemented
    //bool disableVideo = false;
    //bool disableAudio = false;
@@ -3468,8 +3466,6 @@ void retro_run(void)
 
    if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
    {
-      printf("gui_cb\n");
-      fflush(stdout);
       gui_draw();
       video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
    }
