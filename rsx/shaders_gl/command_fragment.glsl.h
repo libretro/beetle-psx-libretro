@@ -45,6 +45,8 @@ flat in uint frag_dither;
 flat in uint frag_semi_transparent;
 // Texture window: [ X mask, X or, Y mask, Y or ]
 flat in uvec4 frag_texture_window;
+// Texture limits: [Umin, Vmin, Umax, Vmax]
+flat in uvec4 frag_texture_limits;
 
 out vec4 frag_color;
 
@@ -93,14 +95,16 @@ const int dither_pattern[16] =
            3, -1,  2, -2);
 
 vec4 sample_texel(vec2 coords) {
-   coords.x += 0.5 / 1024;
-   coords.y += 0.5 / 512;
    // Number of texel per VRAM 16bit "pixel" for the current depth
    uint pix_per_hw = 1U << frag_depth_shift;
 
    // Texture pages are limited to 256x256 pixels
    uint tex_x = clamp(uint(coords.x), 0x0U, 0xffU);
    uint tex_y = clamp(uint(coords.y), 0x0U, 0xffU);
+
+   // Clamp to primitive limits
+   tex_x = clamp(tex_x, frag_texture_limits[0], frag_texture_limits[2] - 1u);
+   tex_y = clamp(tex_y, frag_texture_limits[1], frag_texture_limits[3] - 1u);
 
    // Texture window adjustments
    tex_x = (tex_x & frag_texture_window[0]) | frag_texture_window[1];

@@ -19,6 +19,7 @@ in uint depth_shift;
 in uint dither;
 in uint semi_transparent;
 in uvec4 texture_window;
+in uvec4 texture_limits;
 
 // Drawing offset
 uniform ivec2 offset;
@@ -32,6 +33,7 @@ flat out uint frag_depth_shift;
 flat out uint frag_dither;
 flat out uint frag_semi_transparent;
 flat out uvec4 frag_texture_window;
+flat out uvec4 frag_texture_limits;
 )
 
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
@@ -76,6 +78,7 @@ void main() {
    frag_dither = dither;
    frag_semi_transparent = semi_transparent;
    frag_texture_window = texture_window;
+   frag_texture_limits = texture_limits;
 )
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
 STRINGIZE(
