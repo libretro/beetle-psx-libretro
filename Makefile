@@ -526,7 +526,6 @@ endif
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS   += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS   += $(INCFLAGS)
-EXTRA_INCLUDES += -Ideps/ugui
 
 FLAGS += $(ENDIANNESS_DEFINES) \
          -DSIZEOF_DOUBLE=8 \

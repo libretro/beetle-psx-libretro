@@ -37,7 +37,8 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(MEDNAFEN_DIR)/hw_cpu \
             -I$(MEDNAFEN_DIR)/hw_misc \
             -I$(LIBRETRO_DIR)/include \
-            -I$(DEPS_DIR)/zlib
+            -I$(DEPS_DIR)/zlib \
+					  -I$(DEPS_DIR)/ugui
 
 ifneq (,$(findstring msvc,$(platform)))
 INCFLAGS += -I$(CORE_DIR)/msvc
@@ -58,7 +59,7 @@ SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
                $(DEPS_DIR)/zlib/uncompr.c \
                $(DEPS_DIR)/zlib/zutil.c \
                $(DEPS_DIR)/ugui/ugui.c \
-               ugui_tools.c
+               $(CORE_DIR)/ugui_tools.c
 
 ifeq ($(HAVE_GRIFFIN),1)
    SOURCES_CXX += beetle_psx_griffin.cpp \
