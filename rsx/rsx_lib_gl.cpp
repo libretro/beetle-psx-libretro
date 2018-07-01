@@ -19,6 +19,7 @@
 
 #include <map>
 #include <string>
+#include <algorithm>
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
@@ -164,6 +165,8 @@ struct CommandVertex {
    uint8_t semi_transparent;
    /* Texture window mask/OR values */
    uint8_t texture_window[4];
+   /* Texture limits of primtive */
+   uint16_t texture_limits[4];
 
    static std::vector<Attribute> attributes();
 };
@@ -1706,6 +1709,22 @@ static void vertex_preprocessing(
    int16_t z = renderer->primitive_ordering;
    renderer->primitive_ordering += 1;
 
+   uint16_t umin=2048, vmin=2048, umax=0, vmax=0;
+   for (unsigned i = 0; i < count; i++)
+   {
+	   umin = std::min(v[i].texture_coord[0], umin);
+	   vmin = std::min(v[i].texture_coord[1], vmin);
+	   umax = std::max(v[i].texture_coord[0], umax);
+	   vmax = std::max(v[i].texture_coord[1], vmax);
+   }
+   for (unsigned i = 0; i < count; i++)
+   {
+	   v[i].texture_limits[0] = umin;
+	   v[i].texture_limits[1] = vmin;
+	   v[i].texture_limits[2] = umax;
+	   v[i].texture_limits[3] = vmax;
+   }
+
    for (unsigned i = 0; i < count; i++)
    {
       v[i].position[2] = z;
@@ -1853,6 +1872,13 @@ std::vector<Attribute> CommandVertex::attributes()
    strcpy(attr.name, "texture_window");
    attr.offset     = offsetof(CommandVertex, texture_window);
    attr.type       = GL_UNSIGNED_BYTE;
+   attr.components = 4;
+
+   result.push_back(attr);
+
+   strcpy(attr.name, "texture_limits");
+   attr.offset     = offsetof(CommandVertex, texture_limits);
+   attr.type       = GL_UNSIGNED_SHORT;
    attr.components = 4;
 
    result.push_back(attr);

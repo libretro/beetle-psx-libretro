@@ -235,7 +235,7 @@ int PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVerte
 			pOutput->y = vert->y + yOffs;
 			pOutput->z = 0.95f;
 			pOutput->w = vert->z;
-			pOutput->valid_w = 1;
+			pOutput->valid_w = 0;	// iCB: Getting the wrong w component causes too great an error when using perspective correction so disable it
 		}
 		else
 		{
