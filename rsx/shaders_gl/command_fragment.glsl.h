@@ -103,8 +103,8 @@ vec4 sample_texel(vec2 coords) {
    uint tex_y = clamp(uint(coords.y), 0x0U, 0xffU);
 
    // Clamp to primitive limits
-   tex_x = clamp(tex_x, frag_texture_limits[0], frag_texture_limits[2] - 1u);
-   tex_y = clamp(tex_y, frag_texture_limits[1], frag_texture_limits[3] - 1u);
+   tex_x = clamp(tex_x, frag_texture_limits[0], frag_texture_limits[2]);
+   tex_y = clamp(tex_y, frag_texture_limits[1], frag_texture_limits[3]);
 
    // Texture window adjustments
    tex_x = (tex_x & frag_texture_window[0]) | frag_texture_window[1];
