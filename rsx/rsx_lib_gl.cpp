@@ -1806,6 +1806,14 @@ static void texCoord_preprocessing(
 			if ((max_v & 0xff00) == (min_v & 0xff00))
 				max_v &= 0xff;
 		}
+		else
+		{
+			// texture window so don't clamp texture
+			min_u = 0;
+			max_u = UINT16_MAX;
+			min_v = 0;
+			max_v = UINT16_MAX;
+		}
 	}
 
 	for (unsigned i = 0; i < count; i++)
