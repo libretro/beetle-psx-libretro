@@ -24,7 +24,7 @@
 #ifdef _MSC_VER
 
 #include <retro_common.h>
-#if _MSC_VER >= 1900
+#if _MSC_VER >= 1800
 #include <stdio.h> /* added for _vsnprintf_s and _vscprintf on VS2015 and VS2017 */
 #endif
 #include <stdarg.h>
@@ -55,12 +55,18 @@ int c99_vsnprintf_retro__(char *outBuf, size_t size, const char *format, va_list
 
    if (size != 0)
 #if (_MSC_VER <= 1310)
-       count = _vsnprintf(outBuf, size, format, ap);
+       count = _vsnprintf(outBuf, size - 1, format, ap);
 #else
-       count = _vsnprintf_s(outBuf, size, _TRUNCATE, format, ap);
+       count = _vsnprintf_s(outBuf, size, size - 1, format, ap);
 #endif
    if (count == -1)
        count = _vscprintf(format, ap);
+
+   if (count == size)
+   {
+      /* there was no room for a NULL, so truncate the last character */
+      outBuf[size - 1] = '\0';
+   }
 
    return count;
 }
