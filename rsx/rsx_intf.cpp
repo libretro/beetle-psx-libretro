@@ -268,10 +268,6 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
       case RSX_SOFTWARE:
          break;
       case RSX_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         /* We'll do it like Vulkan and...not do it all */
-         //rsx_gl_set_mask_setting(mask_set_or, mask_eval_and);
-#endif
          break;
       case RSX_VULKAN:
          /* TODO/FIXME */
@@ -395,7 +391,7 @@ void rsx_intf_push_triangle(
                texture_blend_mode,
                depth_shift,
                dither,
-               blend_mode, mask_test, set_mask);
+               blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_VULKAN:
@@ -458,7 +454,7 @@ void rsx_intf_push_quad(
 			texture_blend_mode,
 			depth_shift,
 			dither,
-			blend_mode, mask_test, set_mask);
+			blend_mode, mask_test != 0, set_mask != 0);
 #endif
 		break;
    case RSX_VULKAN:
@@ -498,7 +494,7 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
+         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_VULKAN:

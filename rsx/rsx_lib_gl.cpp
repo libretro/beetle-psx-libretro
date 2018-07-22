@@ -211,11 +211,17 @@ struct Framebuffer
    struct Texture _color_texture;
 };
 
-
-struct TransparencyIndex {
+struct PrimitiveBatch {
    SemiTransparencyMode transparency_mode;
-   unsigned last_index;
+	/* GL_TRIANGLES or GL_LINES */
    GLenum draw_mode;
+   bool opaque;
+   bool set_mask;
+   bool mask_test;
+   /* First index */
+   unsigned first;
+   /* Count of indices */
+   unsigned count;
 };
 
 template<typename T>
@@ -249,18 +255,16 @@ struct GlRenderer {
    /* Buffer used to copy textures from 'fb_texture' to 'fb_out' */
    DrawBuffer<ImageLoadVertex>* image_load_buffer;
 
-   GLushort opaque_triangle_indices[INDEX_BUFFER_LEN];
-   GLushort opaque_line_indices[INDEX_BUFFER_LEN];
-   GLushort semi_transparent_indices[INDEX_BUFFER_LEN];
+   GLushort vertex_indices[INDEX_BUFFER_LEN];
    /* Primitive type for the vertices in the command buffers
     * (TRIANGLES or LINES) */
    GLenum command_draw_mode;
-   unsigned opaque_triangle_index_pos;
-   unsigned opaque_line_index_pos;
-   unsigned semi_transparent_index_pos;
+   unsigned vertex_index_pos;
+   std::vector<PrimitiveBatch> batches;
+   /* Whether we're currently pushing opaque primitives or not */
+   bool opaque;
    /* Current semi-transparency mode */
    SemiTransparencyMode semi_transparency_mode;
-   std::vector<TransparencyIndex> transparency_mode_index;
    /* Polygon mode (for wireframe) */
    GLenum command_polygon_mode;
    /* Texture used to store the VRAM for texture mapping */
@@ -286,8 +290,8 @@ struct GlRenderer {
    uint8_t tex_y_mask;
    uint8_t tex_y_or;
 
-   uint32_t mask_set_or;
-   uint32_t mask_eval_and;
+   bool set_mask;
+   bool mask_test;
 
    uint8_t filter_type;
 
@@ -967,18 +971,14 @@ static void GlRenderer_draw(GlRenderer *renderer)
    Framebuffer_init(&_fb, &renderer->fb_out);
 
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
-         GL_DEPTH_ATTACHMENT,
-         renderer->fb_out_depth.id,
+		 GL_DEPTH_STENCIL_ATTACHMENT,
+		 renderer->fb_out_depth.id,
          0);
 
    glClear(GL_DEPTH_BUFFER_BIT);
 
-   /* First we draw the opaque vertices */
-   glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
-   glDisable(GL_BLEND);
-
-   if (renderer->command_buffer->program)
-      glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 0);
+   glStencilMask(1);
+   glEnable(GL_STENCIL_TEST);
 
    /* Bind and unmap the command buffer */
    glBindBuffer(GL_ARRAY_BUFFER, renderer->command_buffer->id);
@@ -990,126 +990,94 @@ static void GlRenderer_draw(GlRenderer *renderer)
 
    renderer->command_buffer->map = NULL;
 
-   GLushort *opaque_triangle_indices =
-      renderer->opaque_triangle_indices + renderer->opaque_triangle_index_pos + 1;
-   GLsizei opaque_triangle_len =
-      INDEX_BUFFER_LEN - renderer->opaque_triangle_index_pos - 1;
+   if (!renderer->batches.empty())
+	  renderer->batches.back().count = renderer->vertex_index_pos
+		 - renderer->batches.back().first;
 
-   if (opaque_triangle_len)
+   for (std::vector<PrimitiveBatch>::iterator it =
+		  renderer->batches.begin();
+		  it != renderer->batches.end();
+		  ++it)
    {
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      {
-         /* This method doesn't call prepare_draw/finalize_draw itself, it
-          * must be handled by the caller. This is because this command
-          * can be called several times on the same buffer (i.e. multiple
-          * draw calls between the prepare/finalize) */
-         glDrawElements(GL_TRIANGLES, opaque_triangle_len, GL_UNSIGNED_SHORT, opaque_triangle_indices);
-      }
+	  /* Mask bits */
+	  if (it->set_mask)
+		 glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	  else
+		 glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+
+	  if (it->mask_test)
+		 glStencilFunc(GL_NOTEQUAL, 1, 1);
+	  else
+		 glStencilFunc(GL_ALWAYS, 1, 1);
+
+	  /* Blending */
+	  bool opaque = it->opaque;
+	  if (renderer->command_buffer->program)
+		 glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], !opaque);
+	  if (opaque)
+		 glDisable(GL_BLEND);
+	  else
+	  {
+		 glEnable(GL_BLEND);
+
+		 GLenum blend_func = GL_FUNC_ADD;
+		 GLenum blend_src = GL_CONSTANT_ALPHA;
+		 GLenum blend_dst = GL_CONSTANT_ALPHA;
+
+		 switch (it->transparency_mode) {
+			/* 0.5xB + 0.5 x F */
+			case SemiTransparencyMode_Average:
+			   blend_func = GL_FUNC_ADD;
+			   /* Set to 0.5 with glBlendColor */
+			   blend_src = GL_CONSTANT_ALPHA;
+			   blend_dst = GL_CONSTANT_ALPHA;
+			   break;
+			/* 1.0xB + 1.0 x F */
+			case SemiTransparencyMode_Add:
+			   blend_func = GL_FUNC_ADD;
+			   blend_src = GL_ONE;
+			   blend_dst = GL_ONE;
+			   break;
+			/* 1.0xB - 1.0 x F */
+			case SemiTransparencyMode_SubtractSource:
+			   blend_func = GL_FUNC_REVERSE_SUBTRACT;
+			   blend_src = GL_ONE;
+			   blend_dst = GL_ONE;
+			   break;
+			case SemiTransparencyMode_AddQuarterSource:
+			   blend_func = GL_FUNC_ADD;
+			   blend_src = GL_CONSTANT_COLOR;
+			   blend_dst = GL_ONE;
+			   break;
+		 }
+
+		 glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+		 glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+	  }
+
+	  /* Drawing */
+	  if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+	  {
+		 /* This method doesn't call prepare_draw/finalize_draw itself, it
+		  * must be handled by the caller. This is because this command
+		  * can be called several times on the same buffer (i.e. multiple
+		  * draw calls between the prepare/finalize) */
+		 glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT, &renderer->vertex_indices[it->first]);
+	  }
    }
 
-   GLushort *opaque_line_indices =
-      renderer->opaque_line_indices + renderer->opaque_line_index_pos + 1;
-   GLsizei opaque_line_len =
-      INDEX_BUFFER_LEN - renderer->opaque_line_index_pos - 1;
-
-   if (opaque_line_len)
-   {
-      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      {
-         /* This method doesn't call prepare_draw/finalize_draw itself, it
-          * must be handled by the caller. This is because this command
-          * can be called several times on the same buffer (i.e. multiple
-          * draw calls between the prepare/finalize) */
-         glDrawElements(GL_LINES, opaque_line_len, GL_UNSIGNED_SHORT, opaque_line_indices);
-      }
-   }
-
-   if (renderer->semi_transparent_index_pos > 0)
-   {
-      TransparencyIndex ti;
-      /* Semi-transparency pass */
-
-      /* Push the current semi-transparency mode */
-      ti.transparency_mode = renderer->semi_transparency_mode;
-      ti.last_index        = renderer->semi_transparent_index_pos;
-      ti.draw_mode         = renderer->command_draw_mode;
-
-      renderer->transparency_mode_index.push_back(ti);
-
-      glEnable(GL_BLEND);
-
-      if (renderer->command_buffer->program)
-         glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], 1);
-
-      unsigned cur_index = 0;
-
-      for (std::vector<TransparencyIndex>::iterator it =
-            renderer->transparency_mode_index.begin();
-            it != renderer->transparency_mode_index.end();
-            ++it) {
-
-         if (it->last_index == cur_index)
-            continue;
-
-         GLenum blend_func = GL_FUNC_ADD;
-         GLenum blend_src = GL_CONSTANT_ALPHA;
-         GLenum blend_dst = GL_CONSTANT_ALPHA;
-
-         switch (it->transparency_mode) {
-            /* 0.5xB + 0.5 x F */
-            case SemiTransparencyMode_Average:
-               blend_func = GL_FUNC_ADD;
-               /* Set to 0.5 with glBlendColor */
-               blend_src = GL_CONSTANT_ALPHA;
-               blend_dst = GL_CONSTANT_ALPHA;
-               break;
-               /* 1.0xB + 1.0 x F */
-            case SemiTransparencyMode_Add:
-               blend_func = GL_FUNC_ADD;
-               blend_src = GL_ONE;
-               blend_dst = GL_ONE;
-               break;
-               /* 1.0xB - 1.0 x F */
-            case SemiTransparencyMode_SubtractSource:
-               blend_func = GL_FUNC_REVERSE_SUBTRACT;
-               blend_src = GL_ONE;
-               blend_dst = GL_ONE;
-               break;
-            case SemiTransparencyMode_AddQuarterSource:
-               blend_func = GL_FUNC_ADD;
-               blend_src = GL_CONSTANT_COLOR;
-               blend_dst = GL_ONE;
-               break;
-         }
-
-         glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-         glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
-
-         unsigned len = it->last_index - cur_index;
-         GLushort *indices = renderer->semi_transparent_indices + cur_index;
-
-         if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-         {
-            /* This method doesn't call prepare_draw/finalize_draw itself, it
-             * must be handled by the caller. This is because this command
-             * can be called several times on the same buffer (i.e. multiple
-             * draw calls between the prepare/finalize) */
-            glDrawElements(it->draw_mode, len, GL_UNSIGNED_SHORT, indices);
-         }
-
-         cur_index = it->last_index;
-      }
-   }
+   glDisable(GL_STENCIL_TEST);
 
    renderer->command_buffer->map_start += renderer->command_buffer->map_index;
    renderer->command_buffer->map_index  = 0;
    DrawBuffer_map__no_bind(renderer->command_buffer);
 
    renderer->primitive_ordering = 0;
-   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->semi_transparent_index_pos = 0;
-   renderer->transparency_mode_index.clear();
+   renderer->batches.clear();
+   renderer->opaque = false;
+   renderer->vertex_index_pos = 0;
+   renderer->mask_test = false;
+   renderer->set_mask = false;
 
    glDeleteFramebuffers(1, &_fb.id);
 }
@@ -1377,13 +1345,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          &renderer->fb_out_depth,
          renderer->fb_out.width,
          renderer->fb_out.height,
-         GL_DEPTH_COMPONENT32F);
+			GL_DEPTH24_STENCIL8);
 
    renderer->filter_type = filter;
    renderer->command_buffer = command_buffer;
-   renderer->opaque_triangle_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->opaque_line_index_pos = INDEX_BUFFER_LEN - 1;
-   renderer->semi_transparent_index_pos = 0;
+   renderer->vertex_index_pos = 0;
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
    renderer->command_polygon_mode = command_draw_mode;
@@ -1400,8 +1366,8 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->tex_y_mask = 0;
    renderer->tex_y_or = 0;
    renderer->display_vram = display_vram;
-   renderer->mask_set_or  = 0;
-   renderer->mask_eval_and = 0;
+   renderer->set_mask  = false;
+   renderer->mask_test = false;
 
    GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
@@ -1451,11 +1417,7 @@ static void GlRenderer_free(GlRenderer *renderer)
 
    unsigned i;
    for (i = 0; i < INDEX_BUFFER_LEN; i++)
-   {
-      renderer->opaque_triangle_indices[i]   = 0;
-      renderer->opaque_line_indices[i]       = 0;
-      renderer->semi_transparent_indices[i]  = 0;
-   }
+	  renderer->vertex_indices[i] = 0;
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -1656,7 +1618,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       renderer->fb_out_depth.id     = 0;
       renderer->fb_out_depth.width  = 0;
       renderer->fb_out_depth.height = 0;
-      Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH_COMPONENT32F);
+      Texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH24_STENCIL8);
    }
 
    if (renderer->command_buffer->program)
@@ -1834,12 +1796,22 @@ static void vertex_preprocessing(
       CommandVertex *v,
       unsigned count,
       GLenum mode,
-      SemiTransparencyMode stm)
+      SemiTransparencyMode stm,
+	  bool mask_test,
+	  bool set_mask)
 {
    if (!renderer)
       return;
 
    bool is_semi_transparent = v[0].semi_transparent == 1;
+   bool is_textured         = v[0].texture_blend_mode != 0;
+   /* Textured semi-transparent polys can contain opaque texels (when
+    * bit 15 of the color is set to 0). Therefore they're drawn twice,
+    * once for the opaque texels and once for the semi-transparent
+    * ones. Only untextured semi-transparent triangles don't need to be
+    * drawn as opaque. */
+   bool is_opaque = !is_semi_transparent || is_textured;
+
    bool buffer_full         = DRAWBUFFER_REMAINING_CAPACITY(renderer->command_buffer) < count;
 
    if (buffer_full)
@@ -1862,19 +1834,57 @@ static void vertex_preprocessing(
       v[i].texture_window[3] = renderer->tex_y_or;
    }
 
-   if (is_semi_transparent &&
-         (stm != renderer->semi_transparency_mode ||
-          mode != renderer->command_draw_mode))
+   if (renderer->batches.empty()
+		 || mode != renderer->command_draw_mode
+		 || is_opaque != renderer->opaque
+		 || (is_semi_transparent &&
+			   stm != renderer->semi_transparency_mode)
+		 || renderer->set_mask != set_mask
+		 || renderer->mask_test != mask_test)
    {
-      /* We're changing the transparency mode */
-      TransparencyIndex ti;
-      ti.transparency_mode = renderer->semi_transparency_mode;
-      ti.last_index        = renderer->semi_transparent_index_pos;
-      ti.draw_mode         = renderer->command_draw_mode;
+	  if (!renderer->batches.empty())
+	  {
+		 PrimitiveBatch& last_batch = renderer->batches.back();
+		 last_batch.count = renderer->vertex_index_pos - last_batch.first;
+	  }
+	  PrimitiveBatch batch;
+	  batch.opaque = is_opaque;
+	  batch.draw_mode = mode;
+	  batch.transparency_mode = stm;
+	  batch.set_mask = set_mask;
+	  batch.mask_test = mask_test;
+	  batch.first = renderer->vertex_index_pos;
+	  batch.count = 0;
+	  renderer->batches.push_back(batch);
 
-      renderer->transparency_mode_index.push_back(ti);
-      renderer->semi_transparency_mode = stm;
-      renderer->command_draw_mode = mode;
+	  renderer->semi_transparency_mode = stm;
+	  renderer->command_draw_mode = mode;
+	  renderer->opaque = is_opaque;
+	  renderer->set_mask = set_mask;
+	  renderer->mask_test = mask_test;
+   }
+}
+
+static void vertex_add_blended_pass(
+	  GlRenderer *renderer, int vertex_index)
+{
+   if (!renderer->batches.empty())
+   {
+	  PrimitiveBatch& last_batch = renderer->batches.back();
+	  last_batch.count = renderer->vertex_index_pos - last_batch.first;
+
+	  PrimitiveBatch batch;
+	  batch.opaque = false;
+	  batch.draw_mode = last_batch.draw_mode;
+	  batch.transparency_mode = last_batch.transparency_mode;
+	  batch.set_mask = true;
+	  batch.mask_test = last_batch.mask_test;
+	  batch.first = vertex_index;
+	  batch.count = 0;
+	  renderer->batches.push_back(batch);
+
+	  renderer->opaque = false;
+	  renderer->set_mask = true;
    }
 }
 
@@ -1883,48 +1893,27 @@ static void push_primitive(
       CommandVertex *v,
       unsigned count,
       GLenum mode,
-      SemiTransparencyMode stm)
+      SemiTransparencyMode stm,
+	  bool mask_test,
+	  bool set_mask)
 {
    if (!renderer)
       return;
 
    bool is_semi_transparent = v[0].semi_transparent   == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
-   /* Textured semi-transparent polys can contain opaque texels (when
-    * bit 15 of the color is set to 0). Therefore they're drawn twice,
-    * once for the opaque texels and once for the semi-transparent
-    * ones. Only untextured semi-transparent triangles don't need to be
-    * drawn as opaque. */
-   bool is_opaque = !is_semi_transparent || is_textured;
 
-   vertex_preprocessing(renderer, v, count, mode, stm);
+   vertex_preprocessing(renderer, v, count, mode, stm, mask_test, set_mask);
 
    unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
+   unsigned index_pos = renderer->vertex_index_pos;
 
    for (unsigned i = 0; i < count; i++)
-   {
-      if (is_opaque)
-      {
-         if (mode == GL_TRIANGLES)
-         {
-            renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
-               index;
-         }
-         else
-         {
-            renderer->opaque_line_indices[renderer->opaque_line_index_pos--] =
-               index;
-         }
-      }
+	  renderer->vertex_indices[renderer->vertex_index_pos++] = index + i;
 
-      if (is_semi_transparent)
-      {
-         renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
-            = index;
-      }
-
-      index++;
-   }
+   /* Add transparent pass if needed */
+   if (is_semi_transparent && is_textured)
+	  vertex_add_blended_pass(renderer, index_pos);
 
    DrawBuffer_push_slice(renderer->command_buffer, v, count);
 }
@@ -2446,23 +2435,6 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 
 /* Draw commands */
 
-void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
-{
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
-
-   /* Finish drawing anything with the current offset */
-   if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-      GlRenderer_draw(renderer);
-
-   renderer->mask_set_or   = mask_set_or;
-   renderer->mask_eval_and = mask_eval_and;
-}
-
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
 {
    if (static_renderer.state == GlState_Invalid)
@@ -2553,7 +2525,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
                         uint8_t depth_shift,
                         bool dither,
                         int blend_mode,
-                        uint32_t mask_eval_and, uint32_t mask_set_or)
+						bool mask_test, bool set_mask)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -2640,31 +2612,17 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
    bool is_semi_transparent = v[0].semi_transparent == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
 
-   /* Textured semi-transparent polys can contain opaque texels (when
-    * bit 15 of the color is set to 0). Therefore they're drawn twice,
-    * once for the opaque texels and once for the semi-transparent
-    * ones. Only untextured semi-transparent triangles don't need to be
-    * drawn as opaque. */
-   bool is_opaque           = !is_semi_transparent || is_textured;
-
-   vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode);
+   vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
 
    unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
+   unsigned index_pos = renderer->vertex_index_pos;
 
    for (unsigned i = 0; i < 6; i++)
-   {
-      if (is_opaque)
-      {
-         renderer->opaque_triangle_indices[renderer->opaque_triangle_index_pos--] =
-            index + indices[i];
-      }
+	  renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
 
-      if (is_semi_transparent)
-      {
-         renderer->semi_transparent_indices[renderer->semi_transparent_index_pos++]
-            = index + indices[i];
-      }
-   }
+   /* Add transparent pass if needed */
+   if (is_semi_transparent && is_textured)
+	  vertex_add_blended_pass(renderer, index_pos);
 
    DrawBuffer_push_slice(renderer->command_buffer, v, 4);
 }
@@ -2681,7 +2639,7 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
                            uint8_t texture_blend_mode,
                            uint8_t depth_shift,
                            bool dither,
-                           int blend_mode, uint32_t mask_eval_and, uint32_t mask_set_or)
+                           int blend_mode, bool mask_test, bool set_mask)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -2689,9 +2647,6 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-
-   renderer->mask_set_or   = mask_set_or;
-   renderer->mask_eval_and = mask_eval_and;
 
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
@@ -2757,7 +2712,7 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
       }
    };
 
-      push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode);
+      push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
 }
 
 void rsx_gl_fill_rect(  uint32_t color,
@@ -2805,13 +2760,20 @@ void rsx_gl_fill_rect(  uint32_t color,
       Framebuffer _fb;
       Framebuffer_init(&_fb, &renderer->fb_out);
 
+      glFramebufferTexture(GL_DRAW_FRAMEBUFFER,
+    		GL_DEPTH_STENCIL_ATTACHMENT,
+            renderer->fb_out_depth.id,
+            0);
+
       glClearColor(   (float) col[0] / 255.0,
             (float) col[1] / 255.0,
             (float) col[2] / 255.0,
             /* TODO - XXX Not entirely sure what happens to
                the mask bit in fill_rect commands */
             0.0);
-      glClear(GL_COLOR_BUFFER_BIT);
+      glStencilMask(1);
+      glClearStencil(0);
+      glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
       glDeleteFramebuffers(1, &_fb.id);
    }
@@ -2828,7 +2790,7 @@ void rsx_gl_fill_rect(  uint32_t color,
 void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
                         uint16_t w, uint16_t h,
-                        uint32_t mask_eval_and, uint32_t mask_set_or)
+						uint32_t mask_eval_and, uint32_t mask_set_or) /* TODO use mask for copy. See software renderer */
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -2837,8 +2799,11 @@ void rsx_gl_copy_rect(  uint16_t src_x, uint16_t src_y,
    if (!renderer)
       return;
 
-   renderer->mask_set_or   = mask_set_or;
-   renderer->mask_eval_and = mask_eval_and;
+   if (src_x == dst_x && src_y == dst_y)
+	  return;
+
+   renderer->set_mask  = mask_set_or != 0;
+   renderer->mask_test = mask_eval_and != 0;
 
    uint16_t source_top_left[2] = {src_x, src_y};
    uint16_t target_top_left[2] = {dst_x, dst_y};
@@ -2910,7 +2875,7 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
                         uint32_t c0, uint32_t c1,
                         bool dither,
                         int blend_mode,
-                        uint32_t mask_eval_and, uint32_t mask_set_or)
+						bool mask_test, bool set_mask)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -2918,9 +2883,6 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-
-   renderer->mask_set_or   = mask_set_or;
-   renderer->mask_eval_and = mask_eval_and;
 
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
@@ -2976,7 +2938,7 @@ void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
       }
    };
 
-   push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode);
+   push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode, mask_test, set_mask);
 }
 
 void rsx_gl_load_image( uint16_t x, uint16_t y,
@@ -2991,8 +2953,8 @@ void rsx_gl_load_image( uint16_t x, uint16_t y,
    if (!renderer)
       return;
 
-   renderer->mask_set_or   = mask_set_or;
-   renderer->mask_eval_and = mask_eval_and;
+   renderer->set_mask  = mask_set_or != 0;
+   renderer->mask_test = mask_eval_and != 0;
 
    Framebuffer _fb;
    uint16_t top_left[2];
