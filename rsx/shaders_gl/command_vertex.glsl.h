@@ -69,7 +69,7 @@ void main() {
    frag_shading_color = vec3(color) / 255.;
 
    // Let OpenGL interpolate the texel position
-   frag_texture_coord = vec2(texture_coord);
+   frag_texture_coord = vec2(texture_coord) + vec2(0.001, 0.001);
 
    frag_texture_page = texture_page;
    frag_clut = clut;

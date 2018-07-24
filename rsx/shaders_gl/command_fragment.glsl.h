@@ -95,9 +95,12 @@ const int dither_pattern[16] =
            3, -1,  2, -2);
 
 vec4 sample_texel(vec2 coords) {
+		
    // Number of texel per VRAM 16bit "pixel" for the current depth
    uint pix_per_hw = 1U << frag_depth_shift;
-
+   
+   //coords += vec2(0.001, 0.001);
+   
    // Texture pages are limited to 256x256 pixels
    uint tex_x = clamp(uint(coords.x), 0x0U, 0xffU);
    uint tex_y = clamp(uint(coords.y), 0x0U, 0xffU);
@@ -511,23 +514,42 @@ vec4 get_texel_3point()
 #ifdef FILTER_BILINEAR
 STRINGIZE(
 // Bilinear filtering
-vec4 get_texel_bilinear()
+vec4 get_texel_bilinear(out float opacity)
 {
   float x = frag_texture_coord.x;
   float y = frag_texture_coord.y;
 
-  float u_frac = fract(x);
-  float v_frac = fract(y);
+  // interpolate from centre of texel
+  vec2 uv_frac = fract(vec2(x, y)) - vec2(0.5, 0.5);
+  vec2 uv_offs = sign(uv_frac);
+  uv_frac = abs(uv_frac);
 
+  // sample 4 nearest texels
   vec4 texel_00 = sample_texel(vec2(x + 0, y + 0));
-  vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
-  vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
-  vec4 texel_11 = sample_texel(vec2(x + 1, y + 1));
-
-   vec4 texel = texel_00 * (1. - u_frac) * (1. - v_frac)
-     + texel_10 * u_frac * (1. - v_frac)
-     + texel_01 * (1. - u_frac) * v_frac
-     + texel_11 * u_frac * v_frac;
+  vec4 texel_10 = sample_texel(vec2(x + uv_offs.x, y + 0));
+  vec4 texel_01 = sample_texel(vec2(x + 0, y + uv_offs.y));
+  vec4 texel_11 = sample_texel(vec2(x + uv_offs.x, y + uv_offs.y));
+  
+  // test for fully transparent texel
+  float opacity00 = 1. - float(is_transparent(texel_00));
+  float opacity10 = 1. - float(is_transparent(texel_10));
+  float opacity01 = 1. - float(is_transparent(texel_01));
+  float opacity11 = 1. - float(is_transparent(texel_11));
+  
+  // average opacity of texels
+  opacity = opacity00 * (1. - uv_frac.x) * (1. - uv_frac.y)
+     + opacity10 * uv_frac.x * (1. - uv_frac.y)
+     + opacity01 * (1. - uv_frac.x) * uv_frac.y
+     + opacity11 * uv_frac.x * uv_frac.y; 
+	 
+   // average samples
+   vec4 texel = texel_00 * (1. - uv_frac.x) * (1. - uv_frac.y)
+     + texel_10 * uv_frac.x * (1. - uv_frac.y)
+     + texel_01 * (1. - uv_frac.x) * uv_frac.y
+     + texel_11 * uv_frac.x * uv_frac.y;
+	
+   // adjust colour to account for black transparent samples (assume rgb would be average of other pixels)
+   texel.rgb = texel.rgb * (1./opacity);
 
    return texel;
 }
@@ -645,7 +667,8 @@ vec4 get_texel_jinc2()
 STRINGIZE(
 void main() {
    vec4 color;
-
+   float opacity=1;
+   
       if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
       {
          color = vec4(frag_shading_color, 0.);
@@ -655,6 +678,8 @@ void main() {
          vec4 texel;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
+				  
+		 opacity = float(!is_transparent(texel0));
 )
 #if defined(FILTER_SABR)
 STRINGIZE(
@@ -666,7 +691,8 @@ STRINGIZE(
 )
 #elif defined(FILTER_BILINEAR)
 STRINGIZE(
-         texel = get_texel_bilinear();
+         texel = get_texel_bilinear(opacity);
+		 texel0 = texel; // use bilinear lookup for all tests to smooth edges
 )
 #elif defined(FILTER_3POINT)
 STRINGIZE(
@@ -684,7 +710,8 @@ STRINGIZE(
 STRINGIZE(
 	 // texel color 0x0000 is always fully transparent (even for opaque
          // draw commands)
-         if (is_transparent(texel0)) {
+      //   if (is_transparent(texel0)) {
+		  if(opacity < 0.5) {
 	   // Fully transparent texel, discard
 	   discard;
          }
