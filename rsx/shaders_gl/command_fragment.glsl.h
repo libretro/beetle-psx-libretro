@@ -477,34 +477,47 @@ vec4 get_texel_xbr()
 
 #ifdef FILTER_3POINT
 STRINGIZE(
-vec4 get_texel_3point()
+vec4 get_texel_3point(out float opacity)
 {
   float x = frag_texture_coord.x;
   float y = frag_texture_coord.y;
-
-  float u_frac = fract(x);
-  float v_frac = fract(y);
+  
+  // interpolate from centre of texel
+  vec2 uv_frac = fract(vec2(x, y)) - vec2(0.5, 0.5);
+  vec2 uv_offs = sign(uv_frac);
+  uv_frac = abs(uv_frac);
 
   vec4 texel_00;
 
-  if (u_frac + v_frac < 1.0) {
+  if (uv_frac.x + uv_frac.y < 1.0) {
     // Use bottom-left
-    texel_00 = sample_texel(vec2(x + 0, y + 0));
+    texel_00 = sample_texel(frag_texture_coord.xy);
   } else {
     // Use top-right
-    texel_00 = sample_texel(vec2(x + 1, y + 1));
+    texel_00 = sample_texel(vec2(x + uv_offs.x, y + uv_offs.y));
 
-    float tmp = 1 - v_frac;
-    v_frac = 1 - u_frac;
-    u_frac = tmp;
+    float tmp = 1. - uv_frac.y;
+    uv_frac.y = 1. - uv_frac.x;
+    uv_frac.x = tmp;
   }
 
-   vec4 texel_10 = sample_texel(vec2(x + 1, y + 0));
-   vec4 texel_01 = sample_texel(vec2(x + 0, y + 1));
+   vec4 texel_10 = sample_texel(vec2(x + uv_offs.x, y));
+   vec4 texel_01 = sample_texel(vec2(x, y + uv_offs.y));
+   
+   float opacity_00 = 1. - float(is_transparent(texel_00));
+   float opacity_10 = 1. - float(is_transparent(texel_10));
+   float opacity_01 = 1. - float(is_transparent(texel_01));
 
    vec4 texel = texel_00
-     + u_frac * (texel_10 - texel_00)
-     + v_frac * (texel_01 - texel_00);
+     + uv_frac.x * (texel_10 - texel_00)
+     + uv_frac.y * (texel_01 - texel_00);
+     
+   opacity = opacity_00
+     + uv_frac.x * (opacity_10 - opacity_00)
+     + uv_frac.y * (opacity_01 - opacity_00);
+	
+   // adjust colour to account for black transparent samples (assume rgb would be average of other pixels)
+   texel.rgb = texel.rgb * (1./opacity);
 
    return texel;
 }
@@ -696,7 +709,8 @@ STRINGIZE(
 )
 #elif defined(FILTER_3POINT)
 STRINGIZE(
-         texel = get_texel_3point();
+         texel = get_texel_3point(opacity);
+       texel0 = texel;
 )
 #elif defined(FILTER_JINC2)
 STRINGIZE(
