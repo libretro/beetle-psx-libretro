@@ -490,6 +490,154 @@ if(vertices[1].y == vertices[0].y)
 #endif
 }
 
+
+// iCB: Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles
+bool Hack_MakeQuad(PS_GPU *gpu, tri_vertex* vertices)
+{
+	tri_vertex newVertices[3];						// vertices for second triangle in quad
+
+	bool isHorizontal = false;						// orientation of quad
+
+	int32 pxWidth = 1 << gpu->upscale_shift;		// width of a single pixel
+
+	int32 ABx, ACx, BCx, ABy, ACy, BCy;				// length of triangle sides on each axis
+	uint8 Axi, Ayi, Bxi, Byi, Cxi, Cyi, Dxi, Dyi;	// corner indices of each vertex in quad
+
+	uint8 cornerIdx[2][2] = { { 3, 3 },{ 3, 3 } };	// reverse lookup corner indices
+
+	ABx = vertices[1].x - vertices[0].x;
+	ACx = vertices[2].x - vertices[0].x;
+	BCx = vertices[2].x - vertices[1].x;
+	ABy = vertices[1].y - vertices[0].y;
+	ACy = vertices[2].y - vertices[0].y;
+	BCy = vertices[2].y - vertices[1].y;
+
+	int32 dx, dy = 0;
+	if (ABx == 0) // AB is parallel to y axis
+	{
+		dy = abs(ABy);	// AB is height of quad
+		dx = abs(ACx);	// AC/BC should be equal length of quad
+
+		if (BCx != ACx)
+			return false;
+
+		Axi = Bxi = (ACx < 0) ? 1 : 0;	// find X coord of AB relative to C
+		Dxi = Cxi = 1 - Axi;			// C and D are on opposite side
+
+		Ayi = (ABy < 0) ? 1 : 0;		// determine which end of AB each point is on
+		Byi = 1 - Ayi;
+		Cyi = (ACy == ABy) ? Byi : Ayi;	// determine which end of CD each point is on
+		Dyi = 1 - Cyi;
+
+		// Make sure remaining vertical edges are either 0 length or equal to quad height
+		if ((Ayi == Cyi) ? ((ACy != 0) || (dy != abs(BCy))) : ((BCy != 0) || (dy != abs(ACy))))
+			return false;
+	}
+	else if (ACx == 0)	// line AC is parallel to y axis
+	{
+		dy = abs(ACy);	// AC is height of quad
+		dx = abs(ABx);	// AB/BC should be equal length of quad
+
+		if (BCx != -ABx)
+			return false;
+
+		Axi = Cxi = (ABx < 0) ? 1 : 0;	  // find X coord of AC relative to B
+		Dxi = Bxi = 1 - Axi;			  // B and D are on opposite side
+
+		Ayi = (ACy < 0) ? 1 : 0;		  // determine which end of AC each point is on
+		Cyi = 1 - Ayi;
+		Byi = (ABy == ACy) ? Cyi : Ayi;	  // determine which end of BD each point is on
+		Dyi = 1 - Byi;
+
+		// Make sure remaining vertical edges are either 0 length or equal to quad height
+		if ((Ayi == Byi) ? ((ABy != 0) || (dy != abs(BCy))) : ((BCy != 0) || (dy != abs(ABy))))
+			return false;
+	}
+	else if (BCx == 0) // line BC is parallel to y axis
+	{
+		dy = abs(BCy);	// AC is height of quad
+		dx = abs(ACx);	// AC/AB should be equal length of quad
+
+		if (ACx != ABx)
+			return false;
+
+		Axi = Dxi = (ABx < 0) ? 1 : 0;	  // find X coord of AD relative to B
+		Bxi = Cxi = 1 - Axi;			  // B and C are on opposite side
+
+		Byi = (BCy < 0) ? 1 : 0;		  // determine which end of BC each point is on
+		Cyi = 1 - Byi;
+		Ayi = (ACy == BCy) ? Byi : Cyi;	  // determine which end of AD each point is on
+		Dyi = 1 - Ayi;
+
+		// Make sure remaining vertical edges are either 0 length or equal to quad height
+		if ((Byi == Ayi) ? ((ABy != 0) || (dy != abs(ACy))) : ((ACy != 0) || (dy != abs(ABy))))
+			return false;
+	}
+	else // not axis aligned right angle triangle
+		return false;
+
+	if ((dy == 0) || (dx == 0))	// ABC is degenerate
+		return false;
+
+	if (dy == pxWidth)
+		isHorizontal = true;
+	else if (dx == pxWidth)
+		isHorizontal = false;
+	else
+		return false;
+
+	// reject 3D elements
+	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
+		(vertices[1].precise[2] != vertices[2].precise[2]))
+		return false;
+
+	// reject small triangles (3 pixels long)
+	if (isHorizontal)
+	{
+		if (dx <= pxWidth * 3)
+			return false;
+	}
+	else
+		if (dy <= pxWidth * 3)
+			return false;
+
+	cornerIdx[Axi][Ayi] = 0;
+	cornerIdx[Bxi][Byi] = 1;
+	cornerIdx[Cxi][Cyi] = 2;
+	cornerIdx[Dxi][Dyi] = 3;
+
+	// assign other triangle corners to existing vertices
+	if (Dxi == Dyi)
+	{
+		newVertices[1] = vertices[cornerIdx[1 - Dxi][Dyi]];
+		newVertices[2] = vertices[cornerIdx[Dxi][1 - Dyi]];
+	}
+	else
+	{
+		newVertices[1] = vertices[cornerIdx[Dxi][1 - Dyi]];
+		newVertices[2] = vertices[cornerIdx[1 - Dxi][Dyi]];
+	}
+
+	// copy nearest vertex attributes and offset from furthest corner
+	if (isHorizontal)
+	{
+		newVertices[0]				= vertices[cornerIdx[Dxi][1 - Dyi]];
+		newVertices[0].y			= vertices[cornerIdx[1 - Dxi][Dyi]].y;
+		newVertices[0].precise[1]	= vertices[cornerIdx[1 - Dxi][Dyi]].precise[1];
+	}
+	else
+	{
+		newVertices[0]				= vertices[cornerIdx[1 - Dxi][Dyi]];
+		newVertices[0].x			= vertices[cornerIdx[Dxi][1 - Dyi]].x;
+		newVertices[0].precise[0]	= vertices[cornerIdx[Dxi][1 - Dyi]].precise[0];
+	}
+
+	// copy new vertices over old
+	memcpy(vertices, newVertices, sizeof(newVertices));
+
+	return true;
+}
+
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 {
@@ -665,102 +813,114 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;
 
+	bool makeQuad = false;	// iCB: Used to loop drawing code to avoid multiple inline draw calls
+	do
+	{
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-   enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
+		enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
 
-   if (textured)
-   {
-      if (TexMult)
-         blend_mode = BLEND_MODE_SUBTRACT;
-      else
-         blend_mode = BLEND_MODE_ADD;
-   }
+		if (textured)
+		{
+			if (TexMult)
+				blend_mode = BLEND_MODE_SUBTRACT;
+			else
+				blend_mode = BLEND_MODE_ADD;
+		}
 
-   if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
-   {
-      if (numvertices == 4)
-      {
-         if (gpu->InCmd == INCMD_NONE)
-         {
-            // We have 4 quad vertices, we can push that at once
-            tri_vertex *first = &gpu->InQuad_F3Vertices[0];
+		if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
+		{
+			if (numvertices == 4)
+			{
+				if (gpu->InCmd == INCMD_NONE)
+				{
+					// We have 4 quad vertices, we can push that at once
+					tri_vertex *first = &gpu->InQuad_F3Vertices[0];
 
-            rsx_intf_push_quad(  first->precise[0],
-                  first->precise[1],
-                  first->precise[2],
-                  vertices[0].precise[0],
-                  vertices[0].precise[1],
-                  vertices[0].precise[2],
-                  vertices[1].precise[0],
-                  vertices[1].precise[1],
-                  vertices[1].precise[2],
-                  vertices[2].precise[0],
-                  vertices[2].precise[1],
-                  vertices[2].precise[2],
-                  ((uint32_t)first->r) |
-                  ((uint32_t)first->g << 8) |
-                  ((uint32_t)first->b << 16),
-                  ((uint32_t)vertices[0].r) |
-                  ((uint32_t)vertices[0].g << 8) |
-                  ((uint32_t)vertices[0].b << 16),
-                  ((uint32_t)vertices[1].r) |
-                  ((uint32_t)vertices[1].g << 8) |
-                  ((uint32_t)vertices[1].b << 16),
-                  ((uint32_t)vertices[2].r) |
-                     ((uint32_t)vertices[2].g << 8) |
-                     ((uint32_t)vertices[2].b << 16),
-                  first->u, first->v,
-                  vertices[0].u, vertices[0].v,
-                  vertices[1].u, vertices[1].v,
-                  vertices[2].u, vertices[2].v,
-                  gpu->TexPageX, gpu->TexPageY,
-                  clut_x, clut_y,
-                  blend_mode,
-                  2 - TexMode_TA,
-                  DitherEnabled(gpu),
-                  BlendMode,
-                  MaskEval_TA,
-                  gpu->MaskSetOR);
-         }
-      }
-      else
-      {
-         // Push a single triangle
-         rsx_intf_push_triangle( vertices[0].precise[0],
-               vertices[0].precise[1],
-               vertices[0].precise[2],
-               vertices[1].precise[0],
-               vertices[1].precise[1],
-               vertices[1].precise[2],
-               vertices[2].precise[0],
-               vertices[2].precise[1],
-               vertices[2].precise[2],
-               ((uint32_t)vertices[0].r) |
-               ((uint32_t)vertices[0].g << 8) |
-               ((uint32_t)vertices[0].b << 16),
-               ((uint32_t)vertices[1].r) |
-               ((uint32_t)vertices[1].g << 8) |
-               ((uint32_t)vertices[1].b << 16),
-               ((uint32_t)vertices[2].r) |
-               ((uint32_t)vertices[2].g << 8) |
-               ((uint32_t)vertices[2].b << 16),
-               vertices[0].u, vertices[0].v,
-               vertices[1].u, vertices[1].v,
-               vertices[2].u, vertices[2].v,
-               gpu->TexPageX, gpu->TexPageY,
-               clut_x, clut_y,
-               blend_mode,
-               2 - TexMode_TA,
-               DitherEnabled(gpu),
-               BlendMode,
-               MaskEval_TA,
-               gpu->MaskSetOR);
-      }
-   }
+					rsx_intf_push_quad(first->precise[0],
+						first->precise[1],
+						first->precise[2],
+						vertices[0].precise[0],
+						vertices[0].precise[1],
+						vertices[0].precise[2],
+						vertices[1].precise[0],
+						vertices[1].precise[1],
+						vertices[1].precise[2],
+						vertices[2].precise[0],
+						vertices[2].precise[1],
+						vertices[2].precise[2],
+						((uint32_t)first->r) |
+						((uint32_t)first->g << 8) |
+						((uint32_t)first->b << 16),
+						((uint32_t)vertices[0].r) |
+						((uint32_t)vertices[0].g << 8) |
+						((uint32_t)vertices[0].b << 16),
+						((uint32_t)vertices[1].r) |
+						((uint32_t)vertices[1].g << 8) |
+						((uint32_t)vertices[1].b << 16),
+						((uint32_t)vertices[2].r) |
+						((uint32_t)vertices[2].g << 8) |
+						((uint32_t)vertices[2].b << 16),
+						first->u, first->v,
+						vertices[0].u, vertices[0].v,
+						vertices[1].u, vertices[1].v,
+						vertices[2].u, vertices[2].v,
+						gpu->TexPageX, gpu->TexPageY,
+						clut_x, clut_y,
+						blend_mode,
+						2 - TexMode_TA,
+						DitherEnabled(gpu),
+						BlendMode,
+						MaskEval_TA,
+						gpu->MaskSetOR);
+				}
+			}
+			else
+			{
+				// Push a single triangle
+				rsx_intf_push_triangle(vertices[0].precise[0],
+					vertices[0].precise[1],
+					vertices[0].precise[2],
+					vertices[1].precise[0],
+					vertices[1].precise[1],
+					vertices[1].precise[2],
+					vertices[2].precise[0],
+					vertices[2].precise[1],
+					vertices[2].precise[2],
+					((uint32_t)vertices[0].r) |
+					((uint32_t)vertices[0].g << 8) |
+					((uint32_t)vertices[0].b << 16),
+					((uint32_t)vertices[1].r) |
+					((uint32_t)vertices[1].g << 8) |
+					((uint32_t)vertices[1].b << 16),
+					((uint32_t)vertices[2].r) |
+					((uint32_t)vertices[2].g << 8) |
+					((uint32_t)vertices[2].b << 16),
+					vertices[0].u, vertices[0].v,
+					vertices[1].u, vertices[1].v,
+					vertices[2].u, vertices[2].v,
+					gpu->TexPageX, gpu->TexPageY,
+					clut_x, clut_y,
+					blend_mode,
+					2 - TexMode_TA,
+					DitherEnabled(gpu),
+					BlendMode,
+					MaskEval_TA,
+					gpu->MaskSetOR);
+			}
+		}
 #endif
 
-   if (rsx_intf_has_software_renderer())
-      DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
+		if (rsx_intf_has_software_renderer())
+			DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
+
+		// iCB: Hack to turn pixel wide triangles into quads so they render correctly at higher resolutions
+		if ((!makeQuad) && (numvertices == 3) && (textured))
+			makeQuad = Hack_MakeQuad(gpu, vertices);
+		else
+			makeQuad = false;
+
+	} while (makeQuad);
 }
 
 #undef COORD_POST_PADDING
