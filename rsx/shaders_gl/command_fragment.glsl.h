@@ -308,169 +308,267 @@ vec4 get_texel_sabr()
 
 #ifdef FILTER_XBR
 STRINGIZE(
-// constants and functions for xbr
-const   vec3  rgbw          = vec3(14.352, 28.176, 5.472);
-const   vec4  eq_threshold  = vec4(15.0, 15.0, 15.0, 15.0);
+const int BLEND_NONE = 0;
+const int BLEND_NORMAL = 1;
+const int BLEND_DOMINANT = 2;
+const float LUMINANCE_WEIGHT = 1.0;
+const float EQUAL_COLOR_TOLERANCE = 0.1176470588235294;
+const float STEEP_DIRECTION_THRESHOLD = 2.2;
+const float DOMINANT_DIRECTION_THRESHOLD = 3.6;
+const vec4 w = vec4(0.2627, 0.6780, 0.0593, 0.5);
 
-const vec4 delta   = vec4(1.0/4., 1.0/4., 1.0/4., 1.0/4.);
-const vec4 delta_l = vec4(0.5/4., 1.0/4., 0.5/4., 1.0/4.);
-const vec4 delta_u = delta_l.yxwz;
-
-const  vec4 Ao = vec4( 1.0, -1.0, -1.0, 1.0 );
-const  vec4 Bo = vec4( 1.0,  1.0, -1.0,-1.0 );
-const  vec4 Co = vec4( 1.5,  0.5, -0.5, 0.5 );
-const  vec4 Ax = vec4( 1.0, -1.0, -1.0, 1.0 );
-const  vec4 Bx = vec4( 0.5,  2.0, -0.5,-2.0 );
-const  vec4 Cx = vec4( 1.0,  1.0, -0.5, 0.0 );
-const  vec4 Ay = vec4( 1.0, -1.0, -1.0, 1.0 );
-const  vec4 By = vec4( 2.0,  0.5, -2.0,-0.5 );
-const  vec4 Cy = vec4( 2.0,  0.0, -1.0, 0.5 );
-const  vec4 Ci = vec4(0.25, 0.25, 0.25, 0.25);
-
-// Difference between vector components.
-vec4 df(vec4 A, vec4 B)
+float DistYCbCr(vec4 pixA, vec4 pixB)
 {
-    return vec4(abs(A-B));
+  const float scaleB = 0.5 / (1.0 - w.b);
+  const float scaleR = 0.5 / (1.0 - w.r);
+  vec4 diff = pixA - pixB;
+  float Y = dot(diff, w);
+  float Cb = scaleB * (diff.b - Y);
+  float Cr = scaleR * (diff.r - Y);
+
+  return sqrt(((LUMINANCE_WEIGHT * Y) * (LUMINANCE_WEIGHT * Y)) + (Cb * Cb) + (Cr * Cr));
 }
 
-// Compare two vectors and return their components are different.
-vec4 diff(vec4 A, vec4 B)
+bool IsPixEqual(const vec4 pixA, const vec4 pixB)
 {
-    return vec4(notEqual(A, B));
+  return (DistYCbCr(pixA, pixB) < EQUAL_COLOR_TOLERANCE);
 }
 
-// Determine if two vector components are equal based on a threshold.
-vec4 eq(vec4 A, vec4 B)
+float get_left_ratio(vec2 center, vec2 origin, vec2 direction, vec2 scale)
 {
-    return (step(df(A, B), vec4(15.)));
+  vec2 P0 = center - origin;
+  vec2 proj = direction * (dot(P0, direction) / dot(direction, direction));
+  vec2 distv = P0 - proj;
+  vec2 orth = vec2(-direction.y, direction.x);
+  float side = sign(dot(P0, orth));
+  float v = side * length(distv * scale);
+
+//  return step(0, v);
+  return smoothstep(-sqrt(2.0)/2.0, sqrt(2.0)/2.0, v);
 }
 
-// Determine if two vector components are NOT equal based on a threshold.
-vec4 neq(vec4 A, vec4 B)
-{
-    return (vec4(1.0, 1.0, 1.0, 1.0) - eq(A, B));
+bool eq(vec4 a, vec4 b){
+   return (a == b);
 }
 
-// Weighted distance.
-vec4 wd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h)
-{
-    return (df(a,b) + df(a,c) + df(d,e) + df(d,f) + 4.0*df(g,h));
+bool neq(vec4 a, vec4 b){
+   return (a != b);
 }
 
-vec4 get_texel_xbr()
+vec4 P(vec2 coord, int x, int y){
+   return sample_texel(coord + vec2(x, y));
+}
+
+vec4 get_texel_xbr(out float opacity)
 {
-    vec4 edri;
-    vec4 edr;
-    vec4 edr_l;
-    vec4 edr_u;
-    vec4 px; // px = pixel, edr = edge detection rule
-    vec4 irlv0;
-    vec4 irlv1;
-    vec4 irlv2l;
-    vec4 irlv2u;
-    vec4 block_3d;
-    vec4 fx;
-    vec4 fx_l;
-    vec4 fx_u; // inequations of straight lines.
+  //---------------------------------------
+  // Input Pixel Mapping:  -|x|x|x|-
+  //                       x|A|B|C|x
+  //                       x|D|E|F|x
+  //                       x|G|H|I|x
+  //                       -|x|x|x|-
 
-    vec2 fp  = fract(tc);
+  vec2 scale = vec2(8.0);
+  vec2 pos = fract(frag_texture_coord.xy) - vec2(0.5, 0.5);
+  vec2 coord = frag_texture_coord.xy - pos;
 
-    vec3 A1 = sample_texel(xyp_1_2_3.xw    ).xyz;
-    vec3 B1 = sample_texel(xyp_1_2_3.yw    ).xyz;
-    vec3 C1 = sample_texel(xyp_1_2_3.zw    ).xyz;
-    vec3 A  = sample_texel(xyp_6_7_8.xw    ).xyz;
-    vec3 B  = sample_texel(xyp_6_7_8.yw    ).xyz;
-    vec3 C  = sample_texel(xyp_6_7_8.zw    ).xyz;
-    vec3 D  = sample_texel(xyp_11_12_13.xw ).xyz;
-    vec3 E  = sample_texel(xyp_11_12_13.yw ).xyz;
-    vec3 F  = sample_texel(xyp_11_12_13.zw ).xyz;
-    vec3 G  = sample_texel(xyp_16_17_18.xw ).xyz;
-    vec3 H  = sample_texel(xyp_16_17_18.yw ).xyz;
-    vec3 I  = sample_texel(xyp_16_17_18.zw ).xyz;
-    vec3 G5 = sample_texel(xyp_21_22_23.xw ).xyz;
-    vec3 H5 = sample_texel(xyp_21_22_23.yw ).xyz;
-    vec3 I5 = sample_texel(xyp_21_22_23.zw ).xyz;
-    vec3 A0 = sample_texel(xyp_5_10_15.xy  ).xyz;
-    vec3 D0 = sample_texel(xyp_5_10_15.xz  ).xyz;
-    vec3 G0 = sample_texel(xyp_5_10_15.xw  ).xyz;
-    vec3 C4 = sample_texel(xyp_9_14_9.xy   ).xyz;
-    vec3 F4 = sample_texel(xyp_9_14_9.xz   ).xyz;
-    vec3 I4 = sample_texel(xyp_9_14_9.xw   ).xyz;
+  vec4 A = P(coord, -1,-1);
+  A.w = 1. - float(is_transparent(A));
+  vec4 B = P(coord,  0,-1);
+  B.w = 1. - float(is_transparent(B));
+  vec4 C = P(coord,  1,-1);
+  C.w = 1. - float(is_transparent(C));
+  vec4 D = P(coord, -1, 0);
+  D.w = 1. - float(is_transparent(D));
+  vec4 E = P(coord,  0, 0);
+  E.w = 1. - float(is_transparent(E));
+  vec4 F = P(coord,  1, 0);
+  F.w = 1. - float(is_transparent(F));
+  vec4 G = P(coord, -1, 1);
+  G.w = 1. - float(is_transparent(G));
+  vec4 H = P(coord,  0, 1);
+  H.w = 1. - float(is_transparent(H));
+  vec4 I = P(coord,  1, 1);
+  I.w = 1. - float(is_transparent(I));
 
-    vec4 b  = vec4(dot(B ,rgbw), dot(D ,rgbw), dot(H ,rgbw), dot(F ,rgbw));
-    vec4 c  = vec4(dot(C ,rgbw), dot(A ,rgbw), dot(G ,rgbw), dot(I ,rgbw));
-    vec4 d  = b.yzwx;
-    vec4 e  = vec4(dot(E,rgbw));
-    vec4 f  = b.wxyz;
-    vec4 g  = c.zwxy;
-    vec4 h  = b.zwxy;
-    vec4 i  = c.wxyz;
-    vec4 i4 = vec4(dot(I4,rgbw), dot(C1,rgbw), dot(A0,rgbw), dot(G5,rgbw));
-    vec4 i5 = vec4(dot(I5,rgbw), dot(C4,rgbw), dot(A1,rgbw), dot(G0,rgbw));
-    vec4 h5 = vec4(dot(H5,rgbw), dot(F4,rgbw), dot(B1,rgbw), dot(D0,rgbw));
-    vec4 f4 = h5.yzwx;
+  // blendResult Mapping: x|y|
+  //                      w|z|
+  ivec4 blendResult = ivec4(BLEND_NONE,BLEND_NONE,BLEND_NONE,BLEND_NONE);
 
-    // These inequations define the line below which interpolation occurs.
-    fx   = (Ao*fp.y+Bo*fp.x);
-    fx_l = (Ax*fp.y+Bx*fp.x);
-    fx_u = (Ay*fp.y+By*fp.x);
+  // Preprocess corners
+  // Pixel Tap Mapping: -|-|-|-|-
+  //                    -|-|B|C|-
+  //                    -|D|E|F|x
+  //                    -|G|H|I|x
+  //                    -|-|x|x|-
+  if (!((eq(E,F) && eq(H,I)) || (eq(E,H) && eq(F,I))))
+  {
+    float dist_H_F = DistYCbCr(G, E) + DistYCbCr(E, C) + DistYCbCr(P(coord, 0,2), I) + DistYCbCr(I, P(coord, 2,0)) + (4.0 * DistYCbCr(H, F));
+    float dist_E_I = DistYCbCr(D, H) + DistYCbCr(H, P(coord, 1,2)) + DistYCbCr(B, F) + DistYCbCr(F, P(coord, 2,1)) + (4.0 * DistYCbCr(E, I));
+    bool dominantGradient = (DOMINANT_DIRECTION_THRESHOLD * dist_H_F) < dist_E_I;
+    blendResult.z = ((dist_H_F < dist_E_I) && neq(E,F) && neq(E,H)) ? ((dominantGradient) ? BLEND_DOMINANT : BLEND_NORMAL) : BLEND_NONE;
+  }
 
-    irlv1 = irlv0 = diff(e,f) * diff(e,h);
 
-//#ifdef CORNER_B
-//    irlv1      = (irlv0 * ( neq(f,b) * neq(h,d) + eq(e,i) * neq(f,i4) * neq(h,i5) + eq(e,g) + eq(e,c) ) );
-//#endif
-//#ifdef CORNER_D
-//    vec4 c1 = i4.yzwx;
-//    vec4 g0 = i5.wxyz;
-//    irlv1     = (irlv0  *  ( neq(f,b) * neq(h,d) + eq(e,i) * neq(f,i4) * neq(h,i5) + eq(e,g) + eq(e,c) ) * (diff(f,f4) * diff(f,i) + diff(h,h5) * diff(h,i) + diff(h,g) + diff(f,c) + eq(b,c1) * eq(d,g0)));
-//#endif
-//#ifdef CORNER_C
-    irlv1     = (irlv0  * ( neq(f,b) * neq(f,c) + neq(h,d) * neq(h,g) + eq(e,i) * (neq(f,f4) * neq(f,i4) + neq(h,h5) * neq(h,i5)) + eq(e,g) + eq(e,c)) );
-//#endif
+  // Pixel Tap Mapping: -|-|-|-|-
+  //                    -|A|B|-|-
+  //                    x|D|E|F|-
+  //                    x|G|H|I|-
+  //                    -|x|x|-|-
+  if (!((eq(D,E) && eq(G,H)) || (eq(D,G) && eq(E,H))))
+  {
+    float dist_G_E = DistYCbCr(P(coord, -2,1)  , D) + DistYCbCr(D, B) + DistYCbCr(P(coord, -1,2), H) + DistYCbCr(H, F) + (4.0 * DistYCbCr(G, E));
+    float dist_D_H = DistYCbCr(P(coord, -2,0)  , G) + DistYCbCr(G, P(coord, 0,2)) + DistYCbCr(A, E) + DistYCbCr(E, I) + (4.0 * DistYCbCr(D, H));
+    bool dominantGradient = (DOMINANT_DIRECTION_THRESHOLD * dist_D_H) < dist_G_E;
+    blendResult.w = ((dist_G_E > dist_D_H) && neq(E,D) && neq(E,H)) ? ((dominantGradient) ? BLEND_DOMINANT : BLEND_NORMAL) : BLEND_NONE;
+  }
 
-    irlv2l = diff(e,g) * diff(d,g);
-    irlv2u = diff(e,c) * diff(b,c);
+  // Pixel Tap Mapping: -|-|x|x|-
+  //                    -|A|B|C|x
+  //                    -|D|E|F|x
+  //                    -|-|H|I|-
+  //                    -|-|-|-|-
+  if (!((eq(B,C) && eq(E,F)) || (eq(B,E) && eq(C,F))))
+  {
+    float dist_E_C = DistYCbCr(D, B) + DistYCbCr(B, P(coord, 1,-2)) + DistYCbCr(H, F) + DistYCbCr(F, P(coord, 2,-1)) + (4.0 * DistYCbCr(E, C));
+    float dist_B_F = DistYCbCr(A, E) + DistYCbCr(E, I) + DistYCbCr(P(coord, 0,-2), C) + DistYCbCr(C, P(coord, 2,0)) + (4.0 * DistYCbCr(B, F));
+    bool dominantGradient = (DOMINANT_DIRECTION_THRESHOLD * dist_B_F) < dist_E_C;
+    blendResult.y = ((dist_E_C > dist_B_F) && neq(E,B) && neq(E,F)) ? ((dominantGradient) ? BLEND_DOMINANT : BLEND_NORMAL) : BLEND_NONE;
+  }
 
-    vec4 fx45i = clamp((fx   + delta   -Co - Ci)/(2.0*delta  ), 0.0, 1.0);
-    vec4 fx45  = clamp((fx   + delta   -Co     )/(2.0*delta  ), 0.0, 1.0);
-    vec4 fx30  = clamp((fx_l + delta_l -Cx     )/(2.0*delta_l), 0.0, 1.0);
-    vec4 fx60  = clamp((fx_u + delta_u -Cy     )/(2.0*delta_u), 0.0, 1.0);
+  // Pixel Tap Mapping: -|x|x|-|-
+  //                    x|A|B|C|-
+  //                    x|D|E|F|-
+  //                    -|G|H|-|-
+  //                    -|-|-|-|-
+  if (!((eq(A,B) && eq(D,E)) || (eq(A,D) && eq(B,E))))
+  {
+    float dist_D_B = DistYCbCr(P(coord, -2,0), A) + DistYCbCr(A, P(coord, 0,-2)) + DistYCbCr(G, E) + DistYCbCr(E, C) + (4.0 * DistYCbCr(D, B));
+    float dist_A_E = DistYCbCr(P(coord, -2,-1), D) + DistYCbCr(D, H) + DistYCbCr(P(coord, -1,-2), B) + DistYCbCr(B, F) + (4.0 * DistYCbCr(A, E));
+    bool dominantGradient = (DOMINANT_DIRECTION_THRESHOLD * dist_D_B) < dist_A_E;
+    blendResult.x = ((dist_D_B < dist_A_E) && neq(E,D) && neq(E,B)) ? ((dominantGradient) ? BLEND_DOMINANT : BLEND_NORMAL) : BLEND_NONE;
+  }
 
-    vec4 wd1 = wd( e, c,  g, i, h5, f4, h, f);
-    vec4 wd2 = wd( h, d, i5, f, i4,  b, e, i);
+  vec4 res = E;
 
-    edri  = step(wd1, wd2) * irlv0;
-    edr   = step(wd1 + vec4(0.1, 0.1, 0.1, 0.1), wd2) * step(vec4(0.5, 0.5, 0.5, 0.5), irlv1);
-    edr_l = step( 2.*df(f,g), df(h,c) ) * irlv2l * edr;
-    edr_u = step( 2.*df(h,c), df(f,g) ) * irlv2u * edr;
+  // Pixel Tap Mapping: -|-|-|-|-
+  //                    -|-|B|C|-
+  //                    -|D|E|F|x
+  //                    -|G|H|I|x
+  //                    -|-|x|x|-
+  if(blendResult.z != BLEND_NONE)
+  {
+    float dist_F_G = DistYCbCr(F, G);
+    float dist_H_C = DistYCbCr(H, C);
+    bool doLineBlend = (blendResult.z == BLEND_DOMINANT ||
+                !((blendResult.y != BLEND_NONE && !IsPixEqual(E, G)) || (blendResult.w != BLEND_NONE && !IsPixEqual(E, C)) ||
+                  (IsPixEqual(G, H) && IsPixEqual(H, I) && IsPixEqual(I, F) && IsPixEqual(F, C) && !IsPixEqual(E, I))));
 
-    fx45  = edr   * fx45;
-    fx30  = edr_l * fx30;
-    fx60  = edr_u * fx60;
-    fx45i = edri  * fx45i;
+    vec2 origin = vec2(0.0, 1.0 / sqrt(2.0));
+    vec2 direction = vec2(1.0, -1.0);
+    if(doLineBlend)
+    {
+      bool haveShallowLine = (STEEP_DIRECTION_THRESHOLD * dist_F_G <= dist_H_C) && neq(E,G) && neq(D,G);
+      bool haveSteepLine = (STEEP_DIRECTION_THRESHOLD * dist_H_C <= dist_F_G) && neq(E,C) && neq(B,C);
+      origin = haveShallowLine? vec2(0.0, 0.25) : vec2(0.0, 0.5);
+      direction.x += haveShallowLine? 1.0: 0.0;
+      direction.y -= haveSteepLine? 1.0: 0.0;
+    }
 
-    px = step(df(e,f), df(e,h));
+    vec4 blendPix = mix(H,F, step(DistYCbCr(E, F), DistYCbCr(E, H)));
+    res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
+  }
 
-//#ifdef SMOOTH_TIPS
-    vec4 maximos = max(max(fx30, fx60), max(fx45, fx45i));
-//#endif
-//#ifndef SMOOTH_TIPS
-//    vec4 maximos = max(max(fx30, fx60), fx45);
-//#endif
+  // Pixel Tap Mapping: -|-|-|-|-
+  //                    -|A|B|-|-
+  //                    x|D|E|F|-
+  //                    x|G|H|I|-
+  //                    -|x|x|-|-
+  if(blendResult.w != BLEND_NONE)
+  {
+    float dist_H_A = DistYCbCr(H, A);
+    float dist_D_I = DistYCbCr(D, I);
+    bool doLineBlend = (blendResult.w == BLEND_DOMINANT ||
+                !((blendResult.z != BLEND_NONE && !IsPixEqual(E, A)) || (blendResult.x != BLEND_NONE && !IsPixEqual(E, I)) ||
+                  (IsPixEqual(A, D) && IsPixEqual(D, G) && IsPixEqual(G, H) && IsPixEqual(H, I) && !IsPixEqual(E, G))));
 
-    vec3 res1 = E;
-    res1 = mix(res1, mix(H, F, px.x), maximos.x);
-    res1 = mix(res1, mix(B, D, px.z), maximos.z);
+    vec2 origin = vec2(-1.0 / sqrt(2.0), 0.0);
+    vec2 direction = vec2(1.0, 1.0);
+    if(doLineBlend)
+    {
+      bool haveShallowLine = (STEEP_DIRECTION_THRESHOLD * dist_H_A <= dist_D_I) && neq(E,A) && neq(B,A);
+      bool haveSteepLine  = (STEEP_DIRECTION_THRESHOLD * dist_D_I <= dist_H_A) && neq(E,I) && neq(F,I);
+      origin = haveShallowLine? vec2(-0.25, 0.0) : vec2(-0.5, 0.0);
+      direction.y += haveShallowLine? 1.0: 0.0;
+      direction.x += haveSteepLine? 1.0: 0.0;
+    }
+    origin = origin;
+    direction = direction;
 
-    vec3 res2 = E;
-    res2 = mix(res2, mix(F, B, px.y), maximos.y);
-    res2 = mix(res2, mix(D, H, px.w), maximos.w);
+    vec4 blendPix = mix(H,D, step(DistYCbCr(E, D), DistYCbCr(E, H)));
+    res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
+  }
 
-    vec3 res = mix(res1, res2, step(c_df(E, res1), c_df(E, res2)));
-    float texel_alpha = sample_texel(tc).a;
+  // Pixel Tap Mapping: -|-|x|x|-
+  //                    -|A|B|C|x
+  //                    -|D|E|F|x
+  //                    -|-|H|I|-
+  //                    -|-|-|-|-
+  if(blendResult.y != BLEND_NONE)
+  {
+    float dist_B_I = DistYCbCr(B, I);
+    float dist_F_A = DistYCbCr(F, A);
+    bool doLineBlend = (blendResult.y == BLEND_DOMINANT ||
+                !((blendResult.x != BLEND_NONE && !IsPixEqual(E, I)) || (blendResult.z != BLEND_NONE && !IsPixEqual(E, A)) ||
+                  (IsPixEqual(I, F) && IsPixEqual(F, C) && IsPixEqual(C, B) && IsPixEqual(B, A) && !IsPixEqual(E, C))));
 
-    return vec4(res, texel_alpha);
+    vec2 origin = vec2(1.0 / sqrt(2.0), 0.0);
+    vec2 direction = vec2(-1.0, -1.0);
+
+    if(doLineBlend)
+    {
+      bool haveShallowLine = (STEEP_DIRECTION_THRESHOLD * dist_B_I <= dist_F_A) && neq(E,I) && neq(H,I);
+      bool haveSteepLine  = (STEEP_DIRECTION_THRESHOLD * dist_F_A <= dist_B_I) && neq(E,A) && neq(D,A);
+      origin = haveShallowLine? vec2(0.25, 0.0) : vec2(0.5, 0.0);
+      direction.y -= haveShallowLine? 1.0: 0.0;
+      direction.x -= haveSteepLine? 1.0: 0.0;
+    }
+
+    vec4 blendPix = mix(F,B, step(DistYCbCr(E, B), DistYCbCr(E, F)));
+    res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
+  }
+
+  // Pixel Tap Mapping: -|x|x|-|-
+  //                    x|A|B|C|-
+  //                    x|D|E|F|-
+  //                    -|G|H|-|-
+  //                    -|-|-|-|-
+  if(blendResult.x != BLEND_NONE)
+  {
+    float dist_D_C = DistYCbCr(D, C);
+    float dist_B_G = DistYCbCr(B, G);
+    bool doLineBlend = (blendResult.x == BLEND_DOMINANT ||
+                !((blendResult.w != BLEND_NONE && !IsPixEqual(E, C)) || (blendResult.y != BLEND_NONE && !IsPixEqual(E, G)) ||
+                  (IsPixEqual(C, B) && IsPixEqual(B, A) && IsPixEqual(A, D) && IsPixEqual(D, G) && !IsPixEqual(E, A))));
+
+    vec2 origin = vec2(0.0, -1.0 / sqrt(2.0));
+    vec2 direction = vec2(-1.0, 1.0);
+    if(doLineBlend)
+    {
+      bool haveShallowLine = (STEEP_DIRECTION_THRESHOLD * dist_D_C <= dist_B_G) && neq(E,C) && neq(F,C);
+      bool haveSteepLine  = (STEEP_DIRECTION_THRESHOLD * dist_B_G <= dist_D_C) && neq(E,G) && neq(H,G);
+      origin = haveShallowLine? vec2(0.0, -0.25) : vec2(0.0, -0.5);
+      direction.x -= haveShallowLine? 1.0: 0.0;
+      direction.y += haveSteepLine? 1.0: 0.0;
+    }
+
+    vec4 blendPix = mix(D,B, step(DistYCbCr(E, B), DistYCbCr(E, D)));
+    res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
+  }
+     
+    opacity = res.w;
+    res.xyz = res.xyz * (1./opacity);
+    return vec4(res);
 }
 )
 #endif
@@ -587,12 +685,12 @@ float d(vec2 pt1, vec2 pt2)
   return sqrt(dot(v,v));
 }
 
-vec3 min4(vec3 a, vec3 b, vec3 c, vec3 d)
+vec4 min4(vec4 a, vec4 b, vec4 c, vec4 d)
 {
     return min(a, min(b, min(c, d)));
 }
 
-vec3 max4(vec3 a, vec3 b, vec3 c, vec3 d)
+vec4 max4(vec4 a, vec4 b, vec4 c, vec4 d)
 {
     return max(a, max(b, max(c, d)));
 }
@@ -606,9 +704,9 @@ vec4 resampler(vec4 x)
    return res;
 }
 
-vec4 get_texel_jinc2()
+vec4 get_texel_jinc2(out float opacity)
 {
-    vec3 color;
+    vec4 color;
     vec4 weights[4];
 
     vec2 dx = vec2(1.0, 0.0);
@@ -627,52 +725,60 @@ vec4 get_texel_jinc2()
     dy = dy;
     tc = tc;
 
-    vec3 c00 = sample_texel(tc    -dx    -dy).xyz;
-    vec3 c10 = sample_texel(tc           -dy).xyz;
-    vec3 c20 = sample_texel(tc    +dx    -dy).xyz;
-    vec3 c30 = sample_texel(tc+2.0*dx    -dy).xyz;
-    vec3 c01 = sample_texel(tc    -dx       ).xyz;
-    vec3 c11 = sample_texel(tc              ).xyz;
-    vec3 c21 = sample_texel(tc    +dx       ).xyz;
-    vec3 c31 = sample_texel(tc+2.0*dx       ).xyz;
-    vec3 c02 = sample_texel(tc    -dx    +dy).xyz;
-    vec3 c12 = sample_texel(tc           +dy).xyz;
-    vec3 c22 = sample_texel(tc    +dx    +dy).xyz;
-    vec3 c32 = sample_texel(tc+2.0*dx    +dy).xyz;
-    vec3 c03 = sample_texel(tc    -dx+2.0*dy).xyz;
-    vec3 c13 = sample_texel(tc       +2.0*dy).xyz;
-    vec3 c23 = sample_texel(tc    +dx+2.0*dy).xyz;
-    vec3 c33 = sample_texel(tc+2.0*dx+2.0*dy).xyz;
+    vec4 c00 = sample_texel(tc    -dx    -dy);
+    c00.w = 1. - float(is_transparent(c00));
+    vec4 c10 = sample_texel(tc           -dy);
+    c10.w = 1. - float(is_transparent(c10));
+    vec4 c20 = sample_texel(tc    +dx    -dy);
+    c20.w = 1. - float(is_transparent(c20));
+    vec4 c30 = sample_texel(tc+2.0*dx    -dy);
+    c30.w = 1. - float(is_transparent(c30));
+    vec4 c01 = sample_texel(tc    -dx       );
+    c01.w = 1. - float(is_transparent(c01));
+    vec4 c11 = sample_texel(tc              );
+    c11.w = 1. - float(is_transparent(c11));
+    vec4 c21 = sample_texel(tc    +dx       );
+    c21.w = 1. - float(is_transparent(c21));
+    vec4 c31 = sample_texel(tc+2.0*dx       );
+    c31.w = 1. - float(is_transparent(c31));
+    vec4 c02 = sample_texel(tc    -dx    +dy);
+    c02.w = 1. - float(is_transparent(c02));
+    vec4 c12 = sample_texel(tc           +dy);
+    c12.w = 1. - float(is_transparent(c12));
+    vec4 c22 = sample_texel(tc    +dx    +dy);
+    c22.w = 1. - float(is_transparent(c22));
+    vec4 c32 = sample_texel(tc+2.0*dx    +dy);
+    c32.w = 1. - float(is_transparent(c32));
+    vec4 c03 = sample_texel(tc    -dx+2.0*dy);
+    c03.w = 1. - float(is_transparent(c03));
+    vec4 c13 = sample_texel(tc       +2.0*dy);
+    c13.w = 1. - float(is_transparent(c13));
+    vec4 c23 = sample_texel(tc    +dx+2.0*dy);
+    c23.w = 1. - float(is_transparent(c23));
+    vec4 c33 = sample_texel(tc+2.0*dx+2.0*dy);
+    c33.w = 1. - float(is_transparent(c33));
 
-    color = sample_texel(frag_texture_coord.xy).xyz;
+    color = sample_texel(frag_texture_coord.xy);
 
     //  Get min/max samples
-    vec3 min_sample = min4(c11, c21, c12, c22);
-    vec3 max_sample = max4(c11, c21, c12, c22);
-/*
-      color = mat4x3(c00, c10, c20, c30) * weights[0];
-      color+= mat4x3(c01, c11, c21, c31) * weights[1];
-      color+= mat4x3(c02, c12, c22, c32) * weights[2];
-      color+= mat4x3(c03, c13, c23, c33) * weights[3];
-      mat4 wgts = mat4(weights[0], weights[1], weights[2], weights[3]);
-      vec4 wsum = wgts * vec4(1.0,1.0,1.0,1.0);
-      color = color/(dot(wsum, vec4(1.0,1.0,1.0,1.0)));
-*/
+    vec4 min_sample = min4(c11, c21, c12, c22);
+    vec4 max_sample = max4(c11, c21, c12, c22);
 
-
-    color = vec3(dot(weights[0], vec4(c00.x, c10.x, c20.x, c30.x)), dot(weights[0], vec4(c00.y, c10.y, c20.y, c30.y)), dot(weights[0], vec4(c00.z, c10.z, c20.z, c30.z)));
-    color+= vec3(dot(weights[1], vec4(c01.x, c11.x, c21.x, c31.x)), dot(weights[1], vec4(c01.y, c11.y, c21.y, c31.y)), dot(weights[1], vec4(c01.z, c11.z, c21.z, c31.z)));
-    color+= vec3(dot(weights[2], vec4(c02.x, c12.x, c22.x, c32.x)), dot(weights[2], vec4(c02.y, c12.y, c22.y, c32.y)), dot(weights[2], vec4(c02.z, c12.z, c22.z, c32.z)));
-    color+= vec3(dot(weights[3], vec4(c03.x, c13.x, c23.x, c33.x)), dot(weights[3], vec4(c03.y, c13.y, c23.y, c33.y)), dot(weights[3], vec4(c03.z, c13.z, c23.z, c33.z)));
+    color = vec4(dot(weights[0], vec4(c00.x, c10.x, c20.x, c30.x)), dot(weights[0], vec4(c00.y, c10.y, c20.y, c30.y)), dot(weights[0], vec4(c00.z, c10.z, c20.z, c30.z)), dot(weights[0], vec4(c00.w, c10.w, c20.w, c30.w)));
+    color+= vec4(dot(weights[1], vec4(c01.x, c11.x, c21.x, c31.x)), dot(weights[1], vec4(c01.y, c11.y, c21.y, c31.y)), dot(weights[1], vec4(c01.z, c11.z, c21.z, c31.z)), dot(weights[1], vec4(c01.w, c11.w, c21.w, c31.w)));
+    color+= vec4(dot(weights[2], vec4(c02.x, c12.x, c22.x, c32.x)), dot(weights[2], vec4(c02.y, c12.y, c22.y, c32.y)), dot(weights[2], vec4(c02.z, c12.z, c22.z, c32.z)), dot(weights[2], vec4(c02.w, c12.w, c22.w, c32.w)));
+    color+= vec4(dot(weights[3], vec4(c03.x, c13.x, c23.x, c33.x)), dot(weights[3], vec4(c03.y, c13.y, c23.y, c33.y)), dot(weights[3], vec4(c03.z, c13.z, c23.z, c33.z)), dot(weights[3], vec4(c03.w, c13.w, c23.w, c33.w)));
     color = color/(dot(weights[0], vec4(1,1,1,1)) + dot(weights[1], vec4(1,1,1,1)) + dot(weights[2], vec4(1,1,1,1)) + dot(weights[3], vec4(1,1,1,1)));
 
     // Anti-ringing
-    vec3 aux = color;
+    vec4 aux = color;
     color = clamp(color, min_sample, max_sample);
     color = mix(aux, color, JINC2_AR_STRENGTH);
 
     // final sum and weight normalization
-    vec4 texel = vec4(color, 1.0);
+    vec4 texel = vec4(color);
+    opacity = texel.w;
+    texel.rgb = texel.rgb * (1./opacity);
     return texel;
 }
 )
@@ -700,7 +806,7 @@ STRINGIZE(
 )
 #elif defined(FILTER_XBR)
 STRINGIZE(
-         texel = get_texel_xbr();
+         texel = get_texel_xbr(opacity);
 )
 #elif defined(FILTER_BILINEAR)
 STRINGIZE(
@@ -714,7 +820,7 @@ STRINGIZE(
 )
 #elif defined(FILTER_JINC2)
 STRINGIZE(
-         texel = get_texel_jinc2();
+         texel = get_texel_jinc2(opacity);
 )
 #else
 STRINGIZE(
