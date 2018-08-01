@@ -315,7 +315,7 @@ const float LUMINANCE_WEIGHT = 1.0;
 const float EQUAL_COLOR_TOLERANCE = 0.1176470588235294;
 const float STEEP_DIRECTION_THRESHOLD = 2.2;
 const float DOMINANT_DIRECTION_THRESHOLD = 3.6;
-const vec4 w = vec4(0.2627, 0.6780, 0.0593, 1.0);
+const vec4 w = vec4(0.2627, 0.6780, 0.0593, 0.5);
 
 float DistYCbCr(vec4 pixA, vec4 pixB)
 {
@@ -565,6 +565,7 @@ vec4 get_texel_xbr(out float opacity)
     vec4 blendPix = mix(D,B, step(DistYCbCr(E, B), DistYCbCr(E, D)));
     res = mix(res, blendPix, get_left_ratio(pos, origin, direction, scale));
   }
+     
     opacity = res.w;
     res.xyz = res.xyz * (1./opacity);
     return vec4(res);
@@ -684,12 +685,12 @@ float d(vec2 pt1, vec2 pt2)
   return sqrt(dot(v,v));
 }
 
-vec3 min4(vec3 a, vec3 b, vec3 c, vec3 d)
+vec4 min4(vec4 a, vec4 b, vec4 c, vec4 d)
 {
     return min(a, min(b, min(c, d)));
 }
 
-vec3 max4(vec3 a, vec3 b, vec3 c, vec3 d)
+vec4 max4(vec4 a, vec4 b, vec4 c, vec4 d)
 {
     return max(a, max(b, max(c, d)));
 }
@@ -703,9 +704,9 @@ vec4 resampler(vec4 x)
    return res;
 }
 
-vec4 get_texel_jinc2()
+vec4 get_texel_jinc2(out float opacity)
 {
-    vec3 color;
+    vec4 color;
     vec4 weights[4];
 
     vec2 dx = vec2(1.0, 0.0);
@@ -724,52 +725,60 @@ vec4 get_texel_jinc2()
     dy = dy;
     tc = tc;
 
-    vec3 c00 = sample_texel(tc    -dx    -dy).xyz;
-    vec3 c10 = sample_texel(tc           -dy).xyz;
-    vec3 c20 = sample_texel(tc    +dx    -dy).xyz;
-    vec3 c30 = sample_texel(tc+2.0*dx    -dy).xyz;
-    vec3 c01 = sample_texel(tc    -dx       ).xyz;
-    vec3 c11 = sample_texel(tc              ).xyz;
-    vec3 c21 = sample_texel(tc    +dx       ).xyz;
-    vec3 c31 = sample_texel(tc+2.0*dx       ).xyz;
-    vec3 c02 = sample_texel(tc    -dx    +dy).xyz;
-    vec3 c12 = sample_texel(tc           +dy).xyz;
-    vec3 c22 = sample_texel(tc    +dx    +dy).xyz;
-    vec3 c32 = sample_texel(tc+2.0*dx    +dy).xyz;
-    vec3 c03 = sample_texel(tc    -dx+2.0*dy).xyz;
-    vec3 c13 = sample_texel(tc       +2.0*dy).xyz;
-    vec3 c23 = sample_texel(tc    +dx+2.0*dy).xyz;
-    vec3 c33 = sample_texel(tc+2.0*dx+2.0*dy).xyz;
+    vec4 c00 = sample_texel(tc    -dx    -dy);
+    c00.w = 1. - float(is_transparent(c00));
+    vec4 c10 = sample_texel(tc           -dy);
+    c10.w = 1. - float(is_transparent(c10));
+    vec4 c20 = sample_texel(tc    +dx    -dy);
+    c20.w = 1. - float(is_transparent(c20));
+    vec4 c30 = sample_texel(tc+2.0*dx    -dy);
+    c30.w = 1. - float(is_transparent(c30));
+    vec4 c01 = sample_texel(tc    -dx       );
+    c01.w = 1. - float(is_transparent(c01));
+    vec4 c11 = sample_texel(tc              );
+    c11.w = 1. - float(is_transparent(c11));
+    vec4 c21 = sample_texel(tc    +dx       );
+    c21.w = 1. - float(is_transparent(c21));
+    vec4 c31 = sample_texel(tc+2.0*dx       );
+    c31.w = 1. - float(is_transparent(c31));
+    vec4 c02 = sample_texel(tc    -dx    +dy);
+    c02.w = 1. - float(is_transparent(c02));
+    vec4 c12 = sample_texel(tc           +dy);
+    c12.w = 1. - float(is_transparent(c12));
+    vec4 c22 = sample_texel(tc    +dx    +dy);
+    c22.w = 1. - float(is_transparent(c22));
+    vec4 c32 = sample_texel(tc+2.0*dx    +dy);
+    c32.w = 1. - float(is_transparent(c32));
+    vec4 c03 = sample_texel(tc    -dx+2.0*dy);
+    c03.w = 1. - float(is_transparent(c03));
+    vec4 c13 = sample_texel(tc       +2.0*dy);
+    c13.w = 1. - float(is_transparent(c13));
+    vec4 c23 = sample_texel(tc    +dx+2.0*dy);
+    c23.w = 1. - float(is_transparent(c23));
+    vec4 c33 = sample_texel(tc+2.0*dx+2.0*dy);
+    c33.w = 1. - float(is_transparent(c33));
 
-    color = sample_texel(frag_texture_coord.xy).xyz;
+    color = sample_texel(frag_texture_coord.xy);
 
     //  Get min/max samples
-    vec3 min_sample = min4(c11, c21, c12, c22);
-    vec3 max_sample = max4(c11, c21, c12, c22);
-/*
-      color = mat4x3(c00, c10, c20, c30) * weights[0];
-      color+= mat4x3(c01, c11, c21, c31) * weights[1];
-      color+= mat4x3(c02, c12, c22, c32) * weights[2];
-      color+= mat4x3(c03, c13, c23, c33) * weights[3];
-      mat4 wgts = mat4(weights[0], weights[1], weights[2], weights[3]);
-      vec4 wsum = wgts * vec4(1.0,1.0,1.0,1.0);
-      color = color/(dot(wsum, vec4(1.0,1.0,1.0,1.0)));
-*/
+    vec4 min_sample = min4(c11, c21, c12, c22);
+    vec4 max_sample = max4(c11, c21, c12, c22);
 
-
-    color = vec3(dot(weights[0], vec4(c00.x, c10.x, c20.x, c30.x)), dot(weights[0], vec4(c00.y, c10.y, c20.y, c30.y)), dot(weights[0], vec4(c00.z, c10.z, c20.z, c30.z)));
-    color+= vec3(dot(weights[1], vec4(c01.x, c11.x, c21.x, c31.x)), dot(weights[1], vec4(c01.y, c11.y, c21.y, c31.y)), dot(weights[1], vec4(c01.z, c11.z, c21.z, c31.z)));
-    color+= vec3(dot(weights[2], vec4(c02.x, c12.x, c22.x, c32.x)), dot(weights[2], vec4(c02.y, c12.y, c22.y, c32.y)), dot(weights[2], vec4(c02.z, c12.z, c22.z, c32.z)));
-    color+= vec3(dot(weights[3], vec4(c03.x, c13.x, c23.x, c33.x)), dot(weights[3], vec4(c03.y, c13.y, c23.y, c33.y)), dot(weights[3], vec4(c03.z, c13.z, c23.z, c33.z)));
+    color = vec4(dot(weights[0], vec4(c00.x, c10.x, c20.x, c30.x)), dot(weights[0], vec4(c00.y, c10.y, c20.y, c30.y)), dot(weights[0], vec4(c00.z, c10.z, c20.z, c30.z)), dot(weights[0], vec4(c00.w, c10.w, c20.w, c30.w)));
+    color+= vec4(dot(weights[1], vec4(c01.x, c11.x, c21.x, c31.x)), dot(weights[1], vec4(c01.y, c11.y, c21.y, c31.y)), dot(weights[1], vec4(c01.z, c11.z, c21.z, c31.z)), dot(weights[1], vec4(c01.w, c11.w, c21.w, c31.w)));
+    color+= vec4(dot(weights[2], vec4(c02.x, c12.x, c22.x, c32.x)), dot(weights[2], vec4(c02.y, c12.y, c22.y, c32.y)), dot(weights[2], vec4(c02.z, c12.z, c22.z, c32.z)), dot(weights[2], vec4(c02.w, c12.w, c22.w, c32.w)));
+    color+= vec4(dot(weights[3], vec4(c03.x, c13.x, c23.x, c33.x)), dot(weights[3], vec4(c03.y, c13.y, c23.y, c33.y)), dot(weights[3], vec4(c03.z, c13.z, c23.z, c33.z)), dot(weights[3], vec4(c03.w, c13.w, c23.w, c33.w)));
     color = color/(dot(weights[0], vec4(1,1,1,1)) + dot(weights[1], vec4(1,1,1,1)) + dot(weights[2], vec4(1,1,1,1)) + dot(weights[3], vec4(1,1,1,1)));
 
     // Anti-ringing
-    vec3 aux = color;
+    vec4 aux = color;
     color = clamp(color, min_sample, max_sample);
     color = mix(aux, color, JINC2_AR_STRENGTH);
 
     // final sum and weight normalization
-    vec4 texel = vec4(color, 1.0);
+    vec4 texel = vec4(color);
+    opacity = texel.w;
+    texel.rgb = texel.rgb * (1./opacity);
     return texel;
 }
 )
@@ -798,7 +807,6 @@ STRINGIZE(
 #elif defined(FILTER_XBR)
 STRINGIZE(
          texel = get_texel_xbr(opacity);
-       texel0 = texel;
 )
 #elif defined(FILTER_BILINEAR)
 STRINGIZE(
@@ -812,7 +820,7 @@ STRINGIZE(
 )
 #elif defined(FILTER_JINC2)
 STRINGIZE(
-         texel = get_texel_jinc2();
+         texel = get_texel_jinc2(opacity);
 )
 #else
 STRINGIZE(
