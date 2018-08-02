@@ -490,150 +490,71 @@ if(vertices[1].y == vertices[0].y)
 #endif
 }
 
-
-// iCB: Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles
+// Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles
 bool Hack_MakeQuad(PS_GPU *gpu, tri_vertex* vertices)
 {
-	tri_vertex newVertices[3];						// vertices for second triangle in quad
-
-	bool isHorizontal = false;						// orientation of quad
-
-	int32 pxWidth = 1 << gpu->upscale_shift;		// width of a single pixel
-
-	int32 ABx, ACx, BCx, ABy, ACy, BCy;				// length of triangle sides on each axis
-	uint8 Axi, Ayi, Bxi, Byi, Cxi, Cyi, Dxi, Dyi;	// corner indices of each vertex in quad
-
-	uint8 cornerIdx[2][2] = { { 3, 3 },{ 3, 3 } };	// reverse lookup corner indices
-
-	ABx = vertices[1].x - vertices[0].x;
-	ACx = vertices[2].x - vertices[0].x;
-	BCx = vertices[2].x - vertices[1].x;
-	ABy = vertices[1].y - vertices[0].y;
-	ACy = vertices[2].y - vertices[0].y;
-	BCy = vertices[2].y - vertices[1].y;
-
-	int32 dx, dy = 0;
-	if (ABx == 0) // AB is parallel to y axis
-	{
-		dy = abs(ABy);	// AB is height of quad
-		dx = abs(ACx);	// AC/BC should be equal length of quad
-
-		if (BCx != ACx)
-			return false;
-
-		Axi = Bxi = (ACx < 0) ? 1 : 0;	// find X coord of AB relative to C
-		Dxi = Cxi = 1 - Axi;			// C and D are on opposite side
-
-		Ayi = (ABy < 0) ? 1 : 0;		// determine which end of AB each point is on
-		Byi = 1 - Ayi;
-		Cyi = (ACy == ABy) ? Byi : Ayi;	// determine which end of CD each point is on
-		Dyi = 1 - Cyi;
-
-		// Make sure remaining vertical edges are either 0 length or equal to quad height
-		if ((Ayi == Cyi) ? ((ACy != 0) || (dy != abs(BCy))) : ((BCy != 0) || (dy != abs(ACy))))
-			return false;
-	}
-	else if (ACx == 0)	// line AC is parallel to y axis
-	{
-		dy = abs(ACy);	// AC is height of quad
-		dx = abs(ABx);	// AB/BC should be equal length of quad
-
-		if (BCx != -ABx)
-			return false;
-
-		Axi = Cxi = (ABx < 0) ? 1 : 0;	  // find X coord of AC relative to B
-		Dxi = Bxi = 1 - Axi;			  // B and D are on opposite side
-
-		Ayi = (ACy < 0) ? 1 : 0;		  // determine which end of AC each point is on
-		Cyi = 1 - Ayi;
-		Byi = (ABy == ACy) ? Cyi : Ayi;	  // determine which end of BD each point is on
-		Dyi = 1 - Byi;
-
-		// Make sure remaining vertical edges are either 0 length or equal to quad height
-		if ((Ayi == Byi) ? ((ABy != 0) || (dy != abs(BCy))) : ((BCy != 0) || (dy != abs(ABy))))
-			return false;
-	}
-	else if (BCx == 0) // line BC is parallel to y axis
-	{
-		dy = abs(BCy);	// AC is height of quad
-		dx = abs(ACx);	// AC/AB should be equal length of quad
-
-		if (ACx != ABx)
-			return false;
-
-		Axi = Dxi = (ABx < 0) ? 1 : 0;	  // find X coord of AD relative to B
-		Bxi = Cxi = 1 - Axi;			  // B and C are on opposite side
-
-		Byi = (BCy < 0) ? 1 : 0;		  // determine which end of BC each point is on
-		Cyi = 1 - Byi;
-		Ayi = (ACy == BCy) ? Byi : Cyi;	  // determine which end of AD each point is on
-		Dyi = 1 - Ayi;
-
-		// Make sure remaining vertical edges are either 0 length or equal to quad height
-		if ((Byi == Ayi) ? ((ABy != 0) || (dy != abs(ACy))) : ((ACy != 0) || (dy != abs(ABy))))
-			return false;
-	}
-	else // not axis aligned right angle triangle
-		return false;
-
-	if ((dy == 0) || (dx == 0))	// ABC is degenerate
-		return false;
-
-	if (dy == pxWidth)
-		isHorizontal = true;
-	else if (dx == pxWidth)
-		isHorizontal = false;
-	else
-		return false;
+	int32 pxWidth = 1 << gpu->upscale_shift;	// width of a single pixel
+	uint8 cornerIdx, shortIdx, longIdx; 
+	bool isHorizontal;
 
 	// reject 3D elements
 	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
 		(vertices[1].precise[2] != vertices[2].precise[2]))
 		return false;
 
-	// reject small triangles (3 pixels long)
-	if (isHorizontal)
+	// find short side of triangle / end of line with 2 vertices (guess which vertex is the right angle)
+	if ((vertices[0].u == vertices[1].u) && (vertices[0].v == vertices[1].v))
+		cornerIdx = 0;
+	else if ((vertices[1].u == vertices[2].u) && (vertices[1].v == vertices[2].v))
+		cornerIdx = 1;
+	else if ((vertices[2].u == vertices[0].u) && (vertices[2].v == vertices[0].v))
+		cornerIdx = 2;
+	else
+		return false;
+
+	// assign other indices to remaining vertices
+	shortIdx = (cornerIdx + 1) % 3;
+	longIdx = (shortIdx + 1) % 3;
+
+	// determine line orientation and check width
+	if ((vertices[cornerIdx].x == vertices[shortIdx].x) && (abs(vertices[cornerIdx].y - vertices[shortIdx].y) == pxWidth))
 	{
-		if (dx <= pxWidth * 3)
+		// line is horizontal
+		// determine which is truly the corner by checking against the long side, while making sure it is axis aligned
+		if (vertices[shortIdx].y == vertices[longIdx].y)
+		{	
+			uint8 tempIdx = shortIdx;
+			shortIdx = cornerIdx;
+			cornerIdx = tempIdx;
+		}
+		else if (vertices[cornerIdx].y != vertices[longIdx].y)
 			return false;
+
+		// flip corner index to other side of quad
+		vertices[cornerIdx] = vertices[longIdx];
+		vertices[cornerIdx].y = vertices[shortIdx].y;
+		vertices[cornerIdx].precise[1] = vertices[shortIdx].precise[1];
 	}
-	else
-		if (dy <= pxWidth * 3)
+	else if ((vertices[cornerIdx].y == vertices[shortIdx].y) && (abs(vertices[cornerIdx].x - vertices[shortIdx].x) == pxWidth))
+	{
+		// line is vertical
+		// determine which is truly the corner by checking against the long side, while making sure it is axis aligned
+		if (vertices[shortIdx].x == vertices[longIdx].x)
+		{
+			uint8 tempIdx = shortIdx;
+			shortIdx = cornerIdx;
+			cornerIdx = tempIdx;
+		}
+		else if (vertices[cornerIdx].x != vertices[longIdx].x)
 			return false;
 
-	cornerIdx[Axi][Ayi] = 0;
-	cornerIdx[Bxi][Byi] = 1;
-	cornerIdx[Cxi][Cyi] = 2;
-	cornerIdx[Dxi][Dyi] = 3;
-
-	// assign other triangle corners to existing vertices
-	if (Dxi == Dyi)
-	{
-		newVertices[1] = vertices[cornerIdx[1 - Dxi][Dyi]];
-		newVertices[2] = vertices[cornerIdx[Dxi][1 - Dyi]];
+		// flip corner index to other side of quad
+		vertices[cornerIdx] = vertices[longIdx];
+		vertices[cornerIdx].x = vertices[shortIdx].x;
+		vertices[cornerIdx].precise[0] = vertices[shortIdx].precise[0];
 	}
 	else
-	{
-		newVertices[1] = vertices[cornerIdx[Dxi][1 - Dyi]];
-		newVertices[2] = vertices[cornerIdx[1 - Dxi][Dyi]];
-	}
-
-	// copy nearest vertex attributes and offset from furthest corner
-	if (isHorizontal)
-	{
-		newVertices[0]				= vertices[cornerIdx[Dxi][1 - Dyi]];
-		newVertices[0].y			= vertices[cornerIdx[1 - Dxi][Dyi]].y;
-		newVertices[0].precise[1]	= vertices[cornerIdx[1 - Dxi][Dyi]].precise[1];
-	}
-	else
-	{
-		newVertices[0]				= vertices[cornerIdx[1 - Dxi][Dyi]];
-		newVertices[0].x			= vertices[cornerIdx[Dxi][1 - Dyi]].x;
-		newVertices[0].precise[0]	= vertices[cornerIdx[Dxi][1 - Dyi]].precise[0];
-	}
-
-	// copy new vertices over old
-	memcpy(vertices, newVertices, sizeof(newVertices));
+		return false;
 
 	return true;
 }
