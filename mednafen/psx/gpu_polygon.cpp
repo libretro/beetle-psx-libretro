@@ -490,12 +490,17 @@ if(vertices[1].y == vertices[0].y)
 #endif
 }
 
-// Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles
-bool Hack_MakeQuad(PS_GPU *gpu, tri_vertex* vertices)
+int32 lineRenderMode = 2;
+// 0 = disabled
+// 1 = enabled (default mode) 
+// 2 = enabled (aggressive mode)
+
+// Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles with UVs that describe a line
+// Suitable for games like Soul Blade, Doom and Hexen
+bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 {
 	int32 pxWidth = 1 << gpu->upscale_shift;	// width of a single pixel
-	uint8 cornerIdx, shortIdx, longIdx; 
-	bool isHorizontal;
+	uint8 cornerIdx, shortIdx, longIdx;
 
 	// reject 3D elements
 	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
@@ -531,9 +536,9 @@ bool Hack_MakeQuad(PS_GPU *gpu, tri_vertex* vertices)
 			return false;
 
 		// flip corner index to other side of quad
-		vertices[cornerIdx] = vertices[longIdx];
-		vertices[cornerIdx].y = vertices[shortIdx].y;
-		vertices[cornerIdx].precise[1] = vertices[shortIdx].precise[1];
+		outVertices[cornerIdx] = vertices[longIdx];
+		outVertices[cornerIdx].y = vertices[shortIdx].y;
+		outVertices[cornerIdx].precise[1] = vertices[shortIdx].precise[1];
 	}
 	else if ((vertices[cornerIdx].y == vertices[shortIdx].y) && (abs(vertices[cornerIdx].x - vertices[shortIdx].x) == pxWidth))
 	{
@@ -549,15 +554,92 @@ bool Hack_MakeQuad(PS_GPU *gpu, tri_vertex* vertices)
 			return false;
 
 		// flip corner index to other side of quad
-		vertices[cornerIdx] = vertices[longIdx];
-		vertices[cornerIdx].x = vertices[shortIdx].x;
-		vertices[cornerIdx].precise[0] = vertices[shortIdx].precise[0];
+		outVertices[cornerIdx] = vertices[longIdx];
+		outVertices[cornerIdx].x = vertices[shortIdx].x;
+		outVertices[cornerIdx].precise[0] = vertices[shortIdx].precise[0];
 	}
 	else
 		return false;
 
+	outVertices[shortIdx] = vertices[shortIdx];
+	outVertices[longIdx] = vertices[longIdx];
+
 	return true;
 }
+
+// Hack to deal with PS1 games rendering axis aligned lines using 1 pixel wide triangles and force UVs to describe a line
+// Required for games like Dark Forces and Duke Nukem
+bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
+{
+	int32 pxWidth = 1 << gpu->upscale_shift;	// width of a single pixel
+	uint8 cornerIdx, shortIdx, longIdx;
+
+	// reject 3D elements
+	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
+		(vertices[1].precise[2] != vertices[2].precise[2]))
+		return false;
+
+	// find vertical AB
+	uint8 A, B, C;
+	if (vertices[0].x == vertices[1].x)
+		A = 0;
+	else if (vertices[1].x == vertices[2].x)
+		A = 1;
+	else if (vertices[2].x == vertices[0].x)
+		A = 2;
+	else
+		return false;
+
+	// assign other indices to remaining vertices
+	B = (A + 1) % 3;
+	C = (B + 1) % 3;
+
+	// find horizontal AC or BC
+	if (vertices[A].y == vertices[C].y)
+		cornerIdx = A;
+	else if (vertices[B].y == vertices[C].y)
+		cornerIdx = B;
+	else
+		return false;
+
+	// determine lengths of sides
+	if (abs(vertices[A].y - vertices[B].y) == pxWidth)
+	{
+		// is Horizontal
+		shortIdx = (cornerIdx == A) ? B : A;
+		longIdx = C;
+
+		// flip corner index to other side of quad
+		outVertices[cornerIdx] = vertices[longIdx];
+		outVertices[cornerIdx].y = vertices[shortIdx].y;
+		outVertices[cornerIdx].precise[1] = vertices[shortIdx].precise[1];
+	}
+	else if (abs(vertices[A].x - vertices[C].x) == pxWidth)
+	{
+		// is Vertical
+		shortIdx = C;
+		longIdx = (cornerIdx == A) ? B : A;
+
+		// flip corner index to other side of quad
+		outVertices[cornerIdx] = vertices[longIdx];
+		outVertices[cornerIdx].x = vertices[shortIdx].x;
+		outVertices[cornerIdx].precise[0] = vertices[shortIdx].precise[0];
+	}
+	else
+		return false;
+
+	// force UVs into a line along the upper or left most edge of the triangle
+	// Otherwise the wrong UVs will be sampled on second triangle and by hardware renderers
+	vertices[shortIdx].u = vertices[cornerIdx].u;
+	vertices[shortIdx].v = vertices[cornerIdx].v;
+
+	// copy other two vertices
+	outVertices[shortIdx] = vertices[shortIdx];
+	outVertices[longIdx] = vertices[longIdx];
+
+	return true;
+}
+
 
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
@@ -734,7 +816,8 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
    uint16_t clut_x = (clut & (0x3f << 4));
    uint16_t clut_y = (clut >> 10) & 0x1ff;
 
-	bool makeQuad = false;	// iCB: Used to loop drawing code to avoid multiple inline draw calls
+   tri_vertex lineVertices[3];	// Line Render: store second triangle vertices (software renderer modifies originals)
+	bool lineFound = false;		// Used to loop drawing code to draw second triangle (avoids second inline call)
 	do
 	{
 
@@ -748,6 +831,19 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 			else
 				blend_mode = BLEND_MODE_ADD;
 		}
+
+		// Line Renderer: Detect triangles that would resolve as lines at x1 scale and create second triangle to make quad
+		if ((lineRenderMode != 0) && (!lineFound) && (numvertices == 3) && (textured))
+		{
+			if(lineRenderMode == 1)
+				lineFound = Hack_FindLine(gpu, vertices, lineVertices);		// Default enabled
+			else if (lineRenderMode == 2)
+				lineFound = Hack_ForceLine(gpu, vertices, lineVertices);	// Aggressive mode enabled (causes more artifacts)
+			else
+				lineFound = false;
+		}
+		else
+			lineFound = false;
 
 		if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
 		{
@@ -832,16 +928,24 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 		}
 #endif
 
+		//if (pgxp)
+		//{
+		//	for (uint32 i = 0; i < 3; ++i)
+		//	{
+		//		vertices[i].x = vertices[i].precise[0];
+		//		vertices[i].y = vertices[i].precise[1];
+		//	}
+		//}
+
+
 		if (rsx_intf_has_software_renderer())
 			DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
 
-		// iCB: Hack to turn pixel wide triangles into quads so they render correctly at higher resolutions
-		if ((!makeQuad) && (numvertices == 3) && (textured))
-			makeQuad = Hack_MakeQuad(gpu, vertices);
-		else
-			makeQuad = false;
+		// Line Render: Overwrite vertices with those of the second triangle
+		if ((lineFound) && (numvertices == 3) && (textured))
+			memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex));
 
-	} while (makeQuad);
+	} while (lineFound);
 }
 
 #undef COORD_POST_PADDING
