@@ -928,15 +928,17 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 		}
 #endif
 
-		//if (pgxp)
-		//{
-		//	for (uint32 i = 0; i < 3; ++i)
-		//	{
-		//		vertices[i].x = vertices[i].precise[0];
-		//		vertices[i].y = vertices[i].precise[1];
-		//	}
-		//}
-
+      if (rsx_intf_is_type() == RSX_SOFTWARE)
+      {
+         if (pgxp)
+         {
+            for (uint32 i = 0; i < 3; ++i)
+            {
+               vertices[i].x = vertices[i].precise[0];
+               vertices[i].y = vertices[i].precise[1];
+            }
+         }
+      }
 
 		if (rsx_intf_has_software_renderer())
 			DrawTriangle<goraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
