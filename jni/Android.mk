@@ -13,7 +13,7 @@ NEED_TREMOR              := 1
 GLES                     := 0
 HAVE_OPENGL              := 0
 HAVE_VULKAN              := 0
-HAVE_CHD                 := 0
+HAVE_CHD                 := 1
 IS_X86                   := 0
 FLAGS                    :=
 
