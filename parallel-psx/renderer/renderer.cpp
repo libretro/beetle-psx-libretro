@@ -7,6 +7,8 @@
 using namespace Vulkan;
 using namespace std;
 
+const uint filter_mode = 5;
+
 namespace PSX
 {
 Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
@@ -162,62 +164,74 @@ void Renderer::init_pipelines()
 	    device.create_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 	pipelines.blit_vram_cached_scaled_masked =
 	    device.create_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
-#define FILTER_3POINT
-#if defined(FILTER_XBR)
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
-#elif defined(FILTER_SABR)
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
-#elif defined(FILTER_BILINEAR)
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
-#elif defined(FILTER_3POINT)
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_3point_frag, sizeof(semitrans_3point_frag));
-#elif defined(FILTER_JINC2)
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
-#else
-	pipelines.opaque_flat =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
-	pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                  opaque_textured_frag, sizeof(opaque_textured_frag));
-	pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                          opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
-	pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                   semitrans_frag, sizeof(semitrans_frag));
-#endif
+
+   if(filter_mode == 1)
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
+   }
+   else if(filter_mode == 2)
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
+   }
+   else if(filter_mode == 3)
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
+   }
+   else if(filter_mode == 4)
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_3point_frag, sizeof(semitrans_3point_frag));
+   }
+   else if(filter_mode == 5)
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
+   }
+   else // (filter_mode == 0) Nearest Neighbor
+   {
+	   pipelines.opaque_flat =
+	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
+	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                     opaque_textured_frag, sizeof(opaque_textured_frag));
+	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                             opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
+	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+	                                                      semitrans_frag, sizeof(semitrans_frag));
+   }
+
 	pipelines.semi_transparent_masked_add = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
 	                                                              feedback_add_frag, sizeof(feedback_add_frag));
 	pipelines.semi_transparent_masked_average = device.create_program(

@@ -10,21 +10,7 @@ void main()
    float opacity = 1.;
 #ifdef TEXTURED
    vec4 NNColor = sample_vram_atlas(vec2(vUV));
-
-// texture filtering
-#if defined(FILTER_XBR)
-   NNColor = sample_vram_xbr(opacity);
-#elif defined(FILTER_BILINEAR)
-   NNColor = sample_vram_bilinear(opacity);
-#elif defined(FILTER_SABR)
-   NNColor = sample_vram_sabr(opacity);
-#elif defined(FILTER_JINC2)
-   NNColor = sample_vram_jinc2(opacity);
-#elif defined(FILTER_3POINT)
-   NNColor = sample_vram_3point(opacity);
-#endif
-   if(opacity < 0.5) discard;
-
+   
    // Even for opaque draw calls, this pixel is transparent.
    // Sample in NN space since we need to do an exact test against 0.0.
    // Doing it in a filtered domain is a bit awkward.
@@ -35,6 +21,7 @@ void main()
 #elif defined(OPAQUE) || defined(SEMI_TRANS)
    if (all(equal(NNColor, vec4(0.0))))
       discard;
+
 #else
 #error "Invalid defines."
 #endif
@@ -48,6 +35,20 @@ void main()
    vec4 color = NNColor;
 
 #endif
+// texture filtering
+#if defined(FILTER_XBR)
+   color = sample_vram_xbr(opacity);
+#elif defined(FILTER_BILINEAR)
+   color = sample_vram_bilinear(opacity);
+#elif defined(FILTER_SABR)
+   color = sample_vram_sabr(opacity);
+#elif defined(FILTER_JINC2)
+   color = sample_vram_jinc2(opacity);
+#elif defined(FILTER_3POINT)
+   color = sample_vram_3point(opacity);
+#endif
+   if(opacity < 0.5) discard;
+   
    vec3 shaded = color.rgb * vColor.rgb * (255.0 / 128.0);
    FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
