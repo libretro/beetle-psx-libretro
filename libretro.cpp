@@ -3868,12 +3868,12 @@ void retro_set_environment(retro_environment_t cb)
       { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x|32x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
-      { BEETLE_OPT(filter), "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
       { BEETLE_OPT(depth), "Internal color depth; dithered 16bpp (native)|32bpp" },
       { BEETLE_OPT(wireframe), "Wireframe mode; disabled|enabled" },
       { BEETLE_OPT(display_vram), "Display full VRAM; disabled|enabled" },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+      { BEETLE_OPT(filter), "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
       { BEETLE_OPT(pgxp_mode), "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
       { BEETLE_OPT(pgxp_vertex), "PGXP vertex cache; disabled|enabled" },
       { BEETLE_OPT(pgxp_texture), "PGXP perspective correct texturing; disabled|enabled" },
