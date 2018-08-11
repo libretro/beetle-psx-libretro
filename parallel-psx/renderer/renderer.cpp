@@ -4,10 +4,20 @@
 #include <math.h>
 #include <string.h>
 
+#include <libretro.h>
+#include <libretro_options.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+   extern retro_environment_t environ_cb;
+#ifdef __cplusplus
+}
+#endif
+
 using namespace Vulkan;
 using namespace std;
-
-const uint filter_mode = 5;
 
 namespace PSX
 {
@@ -138,6 +148,26 @@ void Renderer::init_pipelines()
 		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_2, sizeof(resolve_to_unscaled_2));
 		break;
 	}
+	
+   struct retro_variable var = {0};
+	
+	var.key = BEETLE_OPT(filter);
+   uint8_t filter_mode = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "nearest"))
+         filter_mode = 0;
+      else if (!strcmp(var.value, "xBR"))
+         filter_mode = 1;
+      else if (!strcmp(var.value, "SABR"))
+         filter_mode = 2;
+      else if (!strcmp(var.value, "bilinear"))
+         filter_mode = 3;
+      else if (!strcmp(var.value, "3-point"))
+         filter_mode = 4;
+      else if (!strcmp(var.value, "JINC2"))
+         filter_mode = 5;
+   }
 
 	pipelines.scaled_quad_blitter =
 	    device.create_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
