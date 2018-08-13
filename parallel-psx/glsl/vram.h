@@ -5,6 +5,7 @@ layout(location = 1) in mediump vec2 vUV;
 layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
+layout(location = 5) flat in mediump vec4 frag_texture_limits;
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 
 // Nearest neighbor
