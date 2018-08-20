@@ -5,7 +5,7 @@ layout(location = 1) in mediump vec2 vUV;
 layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
-layout(location = 5) flat in mediump vec4 frag_texture_limits;
+layout(location = 5) flat in mediump ivec4 vTexLimits;
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 
 // Nearest neighbor
@@ -56,6 +56,10 @@ bool is_transparent(vec4 texel) {
   return rebuild_psx_color(texel) == 0U;
 }
 
+vec2 clamp_coord(vec2 coord){
+   return clamp(coord.xy, vec2(vTexLimits.xy), vec2(vTexLimits.zw));
+}
+
 #ifdef FILTER_BILINEAR
 vec4 sample_vram_bilinear(out float opacity)
 {
@@ -69,9 +73,9 @@ vec4 sample_vram_bilinear(out float opacity)
 
   // sample 4 nearest texels
   vec4 texel_00 = sample_vram_atlas(vec2(x + 0., y + 0.));
-  vec4 texel_10 = sample_vram_atlas(vec2(x + uv_offs.x, y + 0.));
-  vec4 texel_01 = sample_vram_atlas(vec2(x + 0., y + uv_offs.y));
-  vec4 texel_11 = sample_vram_atlas(vec2(x + uv_offs.x, y + uv_offs.y));
+  vec4 texel_10 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y + 0.)));
+  vec4 texel_01 = sample_vram_atlas(clamp_coord(vec2(x + 0., y + uv_offs.y)));
+  vec4 texel_11 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y + uv_offs.y)));
   
   // test for fully transparent texel
   texel_00.w = 1. - float(is_transparent(texel_00));
@@ -84,51 +88,6 @@ vec4 sample_vram_bilinear(out float opacity)
      + texel_10 * uv_frac.x * (1. - uv_frac.y)
      + texel_01 * (1. - uv_frac.x) * uv_frac.y
      + texel_11 * uv_frac.x * uv_frac.y;
-     
-   opacity = texel.w;
-	
-   // adjust colour to account for black transparent samples (assume rgb would be average of other pixels)
-   texel.rgb = texel.rgb * (1./opacity);
-
-   return texel;
-}
-#endif
-
-#ifdef FILTER_3POINT
-vec4 sample_vram_3point(in vec4 NNColor, out float opacity)
-{
-  float x = vUV.x;
-  float y = vUV.y;
-  
-  // interpolate from centre of texel
-  vec2 uv_frac = fract(vec2(x, y)) - vec2(0.5, 0.5);
-  vec2 uv_offs = sign(uv_frac);
-  uv_frac = abs(uv_frac);
-
-  vec4 texel_00;
-
-  if (uv_frac.x + uv_frac.y < 1.0) {
-    // Use bottom-left
-    texel_00 = sample_vram_atlas(vUV.xy);
-  } else {
-    // Use top-right
-    texel_00 = sample_vram_atlas(vec2(x + uv_offs.x, y + uv_offs.y));
-
-    float tmp = 1. - uv_frac.y;
-    uv_frac.y = 1. - uv_frac.x;
-    uv_frac.x = tmp;
-  }
-
-   vec4 texel_10 = sample_vram_atlas(vec2(x + uv_offs.x, y));
-   vec4 texel_01 = sample_vram_atlas(vec2(x, y + uv_offs.y));
-   
-   texel_00.w = 1. - float(is_transparent(texel_00));
-   texel_10.w = 1. - float(is_transparent(texel_10));
-   texel_01.w = 1. - float(is_transparent(texel_01));
-
-   vec4 texel = texel_00
-     + uv_frac.x * (texel_10 - texel_00)
-     + uv_frac.y * (texel_01 - texel_00);
      
    opacity = texel.w;
 	
@@ -618,37 +577,37 @@ vec4 sample_vram_jinc2(out float opacity)
     dy = dy;
     tc = tc;
 
-    vec4 c00 = sample_vram_atlas(tc    -dx    -dy);
+    vec4 c00 = sample_vram_atlas(clamp_coord(tc    -dx    -dy));
     c00.w = 1. - float(is_transparent(c00));
-    vec4 c10 = sample_vram_atlas(tc           -dy);
+    vec4 c10 = sample_vram_atlas(clamp_coord(tc           -dy));
     c10.w = 1. - float(is_transparent(c10));
-    vec4 c20 = sample_vram_atlas(tc    +dx    -dy);
+    vec4 c20 = sample_vram_atlas(clamp_coord(tc    +dx    -dy));
     c20.w = 1. - float(is_transparent(c20));
-    vec4 c30 = sample_vram_atlas(tc+2.0*dx    -dy);
+    vec4 c30 = sample_vram_atlas(clamp_coord(tc+2.0*dx    -dy));
     c30.w = 1. - float(is_transparent(c30));
-    vec4 c01 = sample_vram_atlas(tc    -dx       );
+    vec4 c01 = sample_vram_atlas(clamp_coord(tc    -dx       ));
     c01.w = 1. - float(is_transparent(c01));
-    vec4 c11 = sample_vram_atlas(tc              );
+    vec4 c11 = sample_vram_atlas(clamp_coord(tc              ));
     c11.w = 1. - float(is_transparent(c11));
-    vec4 c21 = sample_vram_atlas(tc    +dx       );
+    vec4 c21 = sample_vram_atlas(clamp_coord(tc    +dx       ));
     c21.w = 1. - float(is_transparent(c21));
-    vec4 c31 = sample_vram_atlas(tc+2.0*dx       );
+    vec4 c31 = sample_vram_atlas(clamp_coord(tc+2.0*dx       ));
     c31.w = 1. - float(is_transparent(c31));
-    vec4 c02 = sample_vram_atlas(tc    -dx    +dy);
+    vec4 c02 = sample_vram_atlas(clamp_coord(tc    -dx    +dy));
     c02.w = 1. - float(is_transparent(c02));
-    vec4 c12 = sample_vram_atlas(tc           +dy);
+    vec4 c12 = sample_vram_atlas(clamp_coord(tc           +dy));
     c12.w = 1. - float(is_transparent(c12));
-    vec4 c22 = sample_vram_atlas(tc    +dx    +dy);
+    vec4 c22 = sample_vram_atlas(clamp_coord(tc    +dx    +dy));
     c22.w = 1. - float(is_transparent(c22));
-    vec4 c32 = sample_vram_atlas(tc+2.0*dx    +dy);
+    vec4 c32 = sample_vram_atlas(clamp_coord(tc+2.0*dx    +dy));
     c32.w = 1. - float(is_transparent(c32));
-    vec4 c03 = sample_vram_atlas(tc    -dx+2.0*dy);
+    vec4 c03 = sample_vram_atlas(clamp_coord(tc    -dx+2.0*dy));
     c03.w = 1. - float(is_transparent(c03));
-    vec4 c13 = sample_vram_atlas(tc       +2.0*dy);
+    vec4 c13 = sample_vram_atlas(clamp_coord(tc       +2.0*dy));
     c13.w = 1. - float(is_transparent(c13));
-    vec4 c23 = sample_vram_atlas(tc    +dx+2.0*dy);
+    vec4 c23 = sample_vram_atlas(clamp_coord(tc    +dx+2.0*dy));
     c23.w = 1. - float(is_transparent(c23));
-    vec4 c33 = sample_vram_atlas(tc+2.0*dx+2.0*dy);
+    vec4 c33 = sample_vram_atlas(clamp_coord(tc+2.0*dx+2.0*dy));
     c33.w = 1. - float(is_transparent(c33));
 
     color = sample_vram_atlas(vUV.xy);
@@ -694,15 +653,15 @@ vec4 sample_vram_3point(out float opacity)
     texel_00 = sample_vram_atlas(vUV.xy);
   } else {
     // Use top-right
-    texel_00 = sample_vram_atlas(vec2(x + uv_offs.x, y + uv_offs.y));
+    texel_00 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y + uv_offs.y)));
 
     float tmp = 1. - uv_frac.y;
     uv_frac.y = 1. - uv_frac.x;
     uv_frac.x = tmp;
   }
 
-   vec4 texel_10 = sample_vram_atlas(vec2(x + uv_offs.x, y));
-   vec4 texel_01 = sample_vram_atlas(vec2(x, y + uv_offs.y));
+   vec4 texel_10 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y)));
+   vec4 texel_01 = sample_vram_atlas(clamp_coord(vec2(x, y + uv_offs.y)));
    
    texel_00.w = 1. - float(is_transparent(texel_00));
    texel_10.w = 1. - float(is_transparent(texel_10));

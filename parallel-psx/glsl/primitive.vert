@@ -5,14 +5,20 @@ layout(location = 1) in vec4 Color;
 layout(location = 2) in mediump uvec4 Window;
 layout(location = 3) in mediump ivec3 Param;
 layout(location = 4) in ivec4 UV;
+layout(location = 5) in mediump float min_u;
+layout(location = 6) in mediump float min_v;
+layout(location = 7) in mediump float max_u;
+layout(location = 8) in mediump float max_v;
 layout(location = 1) out mediump vec2 vUV;
 layout(location = 2) flat out mediump ivec3 vParam;
 layout(location = 3) flat out mediump ivec2 vBaseUV;
 layout(location = 4) flat out mediump ivec4 vWindow;
+layout(location = 5) flat out mediump ivec4 vTexLimits;
 #endif
 layout(location = 0) out mediump vec4 vColor;
 
 const vec2 FB_SIZE = vec2(1024.0, 512.0);
+//const vec4 texture_limits = vec4(0.0, 0.0, 1024.0, 1024.0);
 
 void main()
 {
@@ -24,5 +30,6 @@ void main()
    vParam = Param;
    vBaseUV = UV.zw;
    vWindow = ivec4(Window);
+   vTexLimits = ivec4(min_u, min_v, max_u, max_v);
 #endif
 }
