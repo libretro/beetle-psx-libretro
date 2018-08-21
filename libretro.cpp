@@ -81,6 +81,8 @@ unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 // \iCB
 
+#define NEGCON_RANGE 0x7FFF
+
 char retro_save_directory[4096];
 char retro_base_directory[4096];
 static char retro_cd_base_directory[4096];
@@ -2954,6 +2956,24 @@ static void check_variables(bool startup)
 			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
 		}
 	}
+	
+	var.key = BEETLE_OPT(negcon_deadzone);
+	var.value = NULL;
+	input_set_negcon_deadzone(0);
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
+		input_set_negcon_deadzone( (int)(atoi(var.value) * 0.01f * NEGCON_RANGE) );
+	}
+	
+	var.key = BEETLE_OPT(negcon_response);
+	var.value = NULL;
+	input_set_negcon_linearity(1);
+	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
+		if (strcmp(var.value, "quadratic") == 0) {
+        input_set_negcon_linearity(2);
+      } else if (strcmp(var.value, "cubic") == 0) {
+         input_set_negcon_linearity(3);
+      }
+	}
 
         var.key = BEETLE_OPT(initial_scanline);
 
@@ -3901,6 +3921,8 @@ void retro_set_environment(retro_environment_t cb)
       { BEETLE_OPT(enable_multitap_port2), "Port 2: Multitap enable; disabled|enabled" },
       { BEETLE_OPT(gun_cursor), "Gun Cursor; Cross|Dot|Off" },
       { BEETLE_OPT(mouse_sensitivity), "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
+      { BEETLE_OPT(negcon_deadzone), "NegCon Twist Deadzone (percent); 0|5|10|15|20|25|30" },
+      { BEETLE_OPT(negcon_response), "NegCon Twist Response; linear|quadratic|cubic" },
 #ifndef EMSCRIPTEN
       { BEETLE_OPT(cd_access_method), "CD Access Method (restart); sync|async|precache" },
 #endif

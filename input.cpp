@@ -23,6 +23,25 @@ static bool enable_analog_calibration = false;
 static float mouse_sensitivity = 1.0f;
 static int gun_cursor = FrontIO::SETTING_GUN_CROSSHAIR_CROSS;
 
+// NegCon adjustment parameters
+// > The NegCon 'twist' action is somewhat awkward when mapped
+//   to a standard analog stick -> user should be able to tweak
+//   response/deadzone for comfort
+// > When response is linear, 'additional' deadzone (set here)
+//   may be left at zero, since this is normally handled via in-game
+//   options menus
+// > When response is non-linear, deadzone should be set to match the
+//   controller being used (otherwise precision may be lost)
+// > negcon_linearity:
+//   - 1: Response is linear - recommended when using racing wheel
+//        peripherals, not recommended for standard gamepads
+//   - 2: Response is quadratic - optimal setting for gamepads
+//   - 3: Response is cubic - enables precise fine control, but
+//        difficult to use...
+#define NEGCON_RANGE 0x7FFF
+static int negcon_deadzone = 0;
+static int negcon_linearity = 1;
+
 typedef union
 {
 	uint8_t u8[ 10 * sizeof( uint32_t ) ];
@@ -451,6 +470,16 @@ void input_set_gun_cursor( int cursor )
 	}
 }
 
+void input_set_negcon_deadzone( int deadzone )
+{
+	negcon_deadzone = deadzone;
+}
+
+void input_set_negcon_linearity( int linearity )
+{
+	negcon_linearity = linearity;
+}
+
 unsigned input_get_player_count()
 {
 	return players;
@@ -617,32 +646,45 @@ void input_update( retro_input_state_t input_state_cb )
 			{
 				int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
 					RETRO_DEVICE_ID_ANALOG_X);
-
-      			struct analog_calibration *calibration = &analog_calibration[ iplayer ];
-
-				uint32_t twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
-				uint32_t twist_right = analog_left_x > 0 ?  analog_left_x : 0;
-
+				
+				// Account for deadzone
+				if (analog_left_x > negcon_deadzone){
+					analog_left_x = analog_left_x - negcon_deadzone;
+				} else if (analog_left_x < -negcon_deadzone){
+					analog_left_x = analog_left_x + negcon_deadzone;
+				} else {
+					analog_left_x = 0;
+				}
+				
+				// Convert to an 'amplitude' [-1.0,1.0]
+				float analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
+				
+				// Handle 'analog self-calibration'...
+				// NB: This seems pointless, since all it does is arbitrarily
+				// reduce the precision of 'twist' input (making games rather
+				// unplayable). Someone, however, must have thought it was a
+				// good idea at some point, so we'll leave the basic functionality
+				// in place...
+				struct analog_calibration *calibration = &analog_calibration[ iplayer ];
 				if ( enable_analog_calibration )
 				{
 					// Compute the current stick deflection
-					float twist = analog_deflection(analog_left_x);
-
+					float twist = fabsf(analog_left_x_amplitude);
+					
 					// We recalibrate when we find a new max value for the sticks
 					if ( twist > analog_calibration->twist ) {
 						analog_calibration->twist = twist;
 						log_cb(RETRO_LOG_DEBUG, "Recalibrating twist, deflection: %f\n", twist);
 					}
-
+					
 					// NOTE: This value was copied from the DualShock code below. Needs confirmation.
 					static const float neGcon_analog_deflection = 1.35f;
-
+					
 					// Now compute the scaling factor to apply to convert the
 					// emulator's controller coordinates to a native neGcon range.
 					float twist_scaling = neGcon_analog_deflection / analog_calibration->twist;
-
-					analog_scale(&twist_left, twist_scaling);
-					analog_scale(&twist_right, twist_scaling);
+					
+					analog_left_x_amplitude = analog_left_x_amplitude * twist_scaling;
 				}
 				else
 				{
@@ -651,7 +693,30 @@ void input_update( retro_input_state_t input_state_cb )
 					// small value.
 					analog_calibration->twist = 0.7;
 				}
-
+				
+				// Safety check
+				// (also fixes range when above 'analog self-calibration' twist_scaling
+				// is applied)
+				analog_left_x_amplitude = analog_left_x_amplitude < -1.0f ? -1.0f : analog_left_x_amplitude;
+				analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
+				
+				// Adjust response
+				if (negcon_linearity == 2) {
+					if (analog_left_x_amplitude < 0.0) {
+						analog_left_x_amplitude = -(analog_left_x_amplitude * analog_left_x_amplitude);
+					} else {
+						analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude;
+					}
+				} else if (negcon_linearity == 3) {
+					analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
+				}
+				
+				// Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF]
+				analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
+				
+				uint32_t twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
+				uint32_t twist_right = analog_left_x > 0 ?  analog_left_x : 0;
+				
 				p_input->u32[ 1 ] = twist_right; // Twist Right
 				p_input->u32[ 2 ] = twist_left; // Twist Left
 			}
