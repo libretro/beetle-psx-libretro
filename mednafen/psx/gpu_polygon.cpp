@@ -832,6 +832,20 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 				blend_mode = BLEND_MODE_ADD;
 		}
 
+		struct retro_variable var = {0};
+	
+		var.key = BEETLE_OPT(lineRender);
+		uint8_t filter_mode = 0;
+		if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+		{
+			if (!strcmp(var.value, "disabled"))
+				lineRenderMode = 0;
+			else if (!strcmp(var.value, "default"))
+				lineRenderMode = 1;
+			else if (!strcmp(var.value, "agressive"))
+				lineRenderMode = 2;
+		}
+
 		// Line Renderer: Detect triangles that would resolve as lines at x1 scale and create second triangle to make quad
 		if ((lineRenderMode != 0) && (!lineFound) && (numvertices == 3) && (textured))
 		{
