@@ -1,4 +1,5 @@
 #include <math.h>
+#include "libretro_cbs.h"
 
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
@@ -490,7 +491,6 @@ if(vertices[1].y == vertices[0].y)
 #endif
 }
 
-int32 lineRenderMode = 2;
 // 0 = disabled
 // 1 = enabled (default mode) 
 // 2 = enabled (aggressive mode)
