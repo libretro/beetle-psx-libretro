@@ -12,6 +12,7 @@ extern retro_video_refresh_t video_cb;
 extern retro_environment_t environ_cb;
 extern uint8_t widescreen_hack;
 extern uint8_t psx_gpu_upscale_shift;
+extern int lineRenderMode;
 
 #ifdef __cplusplus
 }

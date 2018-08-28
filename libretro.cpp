@@ -2898,6 +2898,18 @@ static void check_variables(bool startup)
    else
       psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
+	
+   var.key = BEETLE_OPT(lineRender);
+   
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "disabled"))
+         lineRenderMode = 0;
+      else if (!strcmp(var.value, "default"))
+         lineRenderMode = 1;
+      else if (!strcmp(var.value, "aggressive"))
+         lineRenderMode = 2;
+   }
 
    var.key = BEETLE_OPT(analog_toggle);
 
@@ -3898,7 +3910,7 @@ void retro_set_environment(retro_environment_t cb)
       { BEETLE_OPT(pgxp_vertex), "PGXP vertex cache; disabled|enabled" },
       { BEETLE_OPT(pgxp_texture), "PGXP perspective correct texturing; disabled|enabled" },
 #endif
-      { BEETLE_OPT(lineRender), "Line-to-quad hack (restart); default|aggressive|disabled" },
+      { BEETLE_OPT(lineRender), "Line-to-quad hack; default|aggressive|disabled" },
       { BEETLE_OPT(widescreen_hack), "Widescreen mode hack; disabled|enabled" },
       { BEETLE_OPT(frame_duping), "Frame duping (speedup); disabled|enabled" },
       { BEETLE_OPT(cpu_freq_scale), "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
