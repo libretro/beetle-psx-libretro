@@ -7,3 +7,6 @@ retro_environment_t environ_cb;
 uint8_t widescreen_hack;
 uint8_t psx_gpu_upscale_shift;
 int lineRenderMode;
+int filter_mode;
+bool opaque_check;
+bool semitrans_check;

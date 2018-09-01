@@ -6,6 +6,7 @@
 
 #include <libretro.h>
 #include <libretro_options.h>
+#include <libretro_cbs.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -148,26 +149,6 @@ void Renderer::init_pipelines()
 		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_2, sizeof(resolve_to_unscaled_2));
 		break;
 	}
-	
-   struct retro_variable var = {0};
-	
-	var.key = BEETLE_OPT(filter);
-   uint8_t filter_mode = 0;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "nearest"))
-         filter_mode = 0;
-      else if (!strcmp(var.value, "xBR"))
-         filter_mode = 1;
-      else if (!strcmp(var.value, "SABR"))
-         filter_mode = 2;
-      else if (!strcmp(var.value, "bilinear"))
-         filter_mode = 3;
-      else if (!strcmp(var.value, "3-point"))
-         filter_mode = 4;
-      else if (!strcmp(var.value, "JINC2"))
-         filter_mode = 5;
-   }
 
 	pipelines.scaled_quad_blitter =
 	    device.create_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
@@ -1378,9 +1359,11 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	if(opaque_check) init_pipelines();
 	cmd->set_program(*pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
+	opaque_check = false;
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -1415,6 +1398,9 @@ void Renderer::render_semi_transparent_primitives()
 
 	const auto set_state = [&](const SemiTransparentState &state) {
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
+		
+		if((state.textured) && (semitrans_check)) init_pipelines();
+	   
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
 		else
@@ -1554,6 +1540,7 @@ void Renderer::render_semi_transparent_primitives()
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+	semitrans_check = false;
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()

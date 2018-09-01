@@ -2910,6 +2910,32 @@ static void check_variables(bool startup)
       else if (!strcmp(var.value, "aggressive"))
          lineRenderMode = 2;
    }
+   
+   var.key = BEETLE_OPT(filter);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int old_filter_mode = filter_mode;
+      if (!strcmp(var.value, "nearest"))
+         filter_mode = 0;
+      else if (!strcmp(var.value, "xBR"))
+         filter_mode = 1;
+      else if (!strcmp(var.value, "SABR"))
+         filter_mode = 2;
+      else if (!strcmp(var.value, "bilinear"))
+         filter_mode = 3;
+      else if (!strcmp(var.value, "3-point"))
+         filter_mode = 4;
+      else if (!strcmp(var.value, "JINC2"))
+         filter_mode = 5;
+         
+      if(filter_mode != old_filter_mode)
+      {
+         opaque_check = true;
+         semitrans_check = true;
+         old_filter_mode = filter_mode;
+      }
+   }
 
    var.key = BEETLE_OPT(analog_toggle);
 
