@@ -53,6 +53,7 @@ static int frame_width = 0;
 static int frame_height = 0;
 static bool gui_inited = false;
 static bool gui_show = false;
+static int old_filter_mode;
 
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
@@ -2916,40 +2917,23 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "nearest"))
-      {
-         filter_mode = 0;
-         opaque_check = true;
-         semitrans_check = true;
-      }
+         old_filter_mode = 0;
       else if (!strcmp(var.value, "xBR"))
-      {
-         filter_mode = 1;
-         opaque_check = true;
-         semitrans_check = true;
-      }
+         old_filter_mode = 1;
       else if (!strcmp(var.value, "SABR"))
-      {
-         filter_mode = 2;
-         opaque_check = true;
-         semitrans_check = true;
-      }
+         old_filter_mode = 2;
       else if (!strcmp(var.value, "bilinear"))
-      {
-         filter_mode = 3;
-         opaque_check = true;
-         semitrans_check = true;
-      }
+         old_filter_mode = 3;
       else if (!strcmp(var.value, "3-point"))
-      {
-         filter_mode = 4;
-         opaque_check = true;
-         semitrans_check = true;
-      }
+         old_filter_mode = 4;
       else if (!strcmp(var.value, "JINC2"))
+         old_filter_mode = 5;
+         
+      if(filter_mode != old_filter_mode)
       {
-         filter_mode = 5;
          opaque_check = true;
          semitrans_check = true;
+         filter_mode = old_filter_mode;
       }
    }
 
