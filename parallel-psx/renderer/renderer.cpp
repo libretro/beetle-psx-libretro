@@ -8,6 +8,9 @@
 #include <libretro_options.h>
 #include <libretro_cbs.h>
 
+bool opaque_check = false;
+bool semitrans_check = false;
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -1359,10 +1362,11 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	init_pipelines();
+	if(opaque_check) init_pipelines();
 	cmd->set_program(*pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
+	opaque_check = false;
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -1397,6 +1401,9 @@ void Renderer::render_semi_transparent_primitives()
 
 	const auto set_state = [&](const SemiTransparentState &state) {
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
+		
+		if((state.textured) && (semitrans_check)) init_pipelines();
+	   
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
 		else
@@ -1408,7 +1415,6 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			// For opaque primitives which are just masked, we can make use of fixed function blending.
 			cmd->set_blend_enable(true);
-			if(state.textured) init_pipelines();
 			cmd->set_program(state.textured ? *pipelines.opaque_textured : *pipelines.opaque_flat);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
@@ -1419,7 +1425,6 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add : *pipelines.flat_masked_add);
 				cmd->pixel_barrier();
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1430,7 +1435,6 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1443,7 +1447,6 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_average :
 				                                  *pipelines.flat_masked_average);
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1456,7 +1459,6 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
@@ -1470,7 +1472,6 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_sub : *pipelines.flat_masked_sub);
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
 				cmd->pixel_barrier();
@@ -1481,7 +1482,6 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
@@ -1494,7 +1494,6 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add_quarter :
 				                                  *pipelines.flat_masked_add_quarter);
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1507,7 +1506,6 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
@@ -1545,6 +1543,7 @@ void Renderer::render_semi_transparent_primitives()
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+	semitrans_check = false;
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()

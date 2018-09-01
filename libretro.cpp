@@ -2916,17 +2916,41 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "nearest"))
+      {
          filter_mode = 0;
+         opaque_check = true;
+         semitrans_check = true;
+      }
       else if (!strcmp(var.value, "xBR"))
+      {
          filter_mode = 1;
+         opaque_check = true;
+         semitrans_check = true;
+      }
       else if (!strcmp(var.value, "SABR"))
+      {
          filter_mode = 2;
+         opaque_check = true;
+         semitrans_check = true;
+      }
       else if (!strcmp(var.value, "bilinear"))
+      {
          filter_mode = 3;
+         opaque_check = true;
+         semitrans_check = true;
+      }
       else if (!strcmp(var.value, "3-point"))
+      {
          filter_mode = 4;
+         opaque_check = true;
+         semitrans_check = true;
+      }
       else if (!strcmp(var.value, "JINC2"))
+      {
          filter_mode = 5;
+         opaque_check = true;
+         semitrans_check = true;
+      }
    }
 
    var.key = BEETLE_OPT(analog_toggle);
