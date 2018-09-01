@@ -53,7 +53,6 @@ static int frame_width = 0;
 static int frame_height = 0;
 static bool gui_inited = false;
 static bool gui_show = false;
-static int old_filter_mode;
 
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
@@ -2916,6 +2915,7 @@ static void check_variables(bool startup)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
+      int old_filter_mode = filter_mode;
       if (!strcmp(var.value, "nearest"))
          filter_mode = 0;
       else if (!strcmp(var.value, "xBR"))
