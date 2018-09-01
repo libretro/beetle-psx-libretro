@@ -2917,23 +2917,23 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "nearest"))
-         old_filter_mode = 0;
+         filter_mode = 0;
       else if (!strcmp(var.value, "xBR"))
-         old_filter_mode = 1;
+         filter_mode = 1;
       else if (!strcmp(var.value, "SABR"))
-         old_filter_mode = 2;
+         filter_mode = 2;
       else if (!strcmp(var.value, "bilinear"))
-         old_filter_mode = 3;
+         filter_mode = 3;
       else if (!strcmp(var.value, "3-point"))
-         old_filter_mode = 4;
+         filter_mode = 4;
       else if (!strcmp(var.value, "JINC2"))
-         old_filter_mode = 5;
+         filter_mode = 5;
          
       if(filter_mode != old_filter_mode)
       {
          opaque_check = true;
          semitrans_check = true;
-         filter_mode = old_filter_mode;
+         old_filter_mode = filter_mode;
       }
    }
 
