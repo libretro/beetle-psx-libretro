@@ -8,9 +8,6 @@
 #include <libretro_options.h>
 #include <libretro_cbs.h>
 
-bool opaque_check = false;
-bool semitrans_check = false;
-
 #ifdef __cplusplus
 extern "C"
 {
