@@ -13,6 +13,7 @@ extern retro_environment_t environ_cb;
 extern uint8_t widescreen_hack;
 extern uint8_t psx_gpu_upscale_shift;
 extern int lineRenderMode;
+extern int filter_mode;
 
 #ifdef __cplusplus
 }

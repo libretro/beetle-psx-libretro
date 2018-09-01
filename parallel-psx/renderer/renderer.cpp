@@ -6,6 +6,7 @@
 
 #include <libretro.h>
 #include <libretro_options.h>
+#include <libretro_cbs.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -148,26 +149,6 @@ void Renderer::init_pipelines()
 		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_2, sizeof(resolve_to_unscaled_2));
 		break;
 	}
-	
-   struct retro_variable var = {0};
-	
-	var.key = BEETLE_OPT(filter);
-   uint8_t filter_mode = 0;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "nearest"))
-         filter_mode = 0;
-      else if (!strcmp(var.value, "xBR"))
-         filter_mode = 1;
-      else if (!strcmp(var.value, "SABR"))
-         filter_mode = 2;
-      else if (!strcmp(var.value, "bilinear"))
-         filter_mode = 3;
-      else if (!strcmp(var.value, "3-point"))
-         filter_mode = 4;
-      else if (!strcmp(var.value, "JINC2"))
-         filter_mode = 5;
-   }
 
 	pipelines.scaled_quad_blitter =
 	    device.create_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
@@ -1378,6 +1359,7 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	init_pipelines();
 	cmd->set_program(*pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
@@ -1426,6 +1408,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			// For opaque primitives which are just masked, we can make use of fixed function blending.
 			cmd->set_blend_enable(true);
+			init_pipelines();
 			cmd->set_program(state.textured ? *pipelines.opaque_textured : *pipelines.opaque_flat);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
@@ -1436,6 +1419,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
+				init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add : *pipelines.flat_masked_add);
 				cmd->pixel_barrier();
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1446,6 +1430,7 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
+				init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1458,6 +1443,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
+				init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_average :
 				                                  *pipelines.flat_masked_average);
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1470,6 +1456,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
+				init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
@@ -1493,6 +1480,7 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
+				if(state.textured == false) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
@@ -1505,6 +1493,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
+				if(state.textured) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add_quarter :
 				                                  *pipelines.flat_masked_add_quarter);
 				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
@@ -1517,6 +1506,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+				if(state.textured == false) init_pipelines();
 				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
