@@ -59,7 +59,7 @@ ifeq ($(HAVE_HW), 1)
    SET_HAVE_HW = 1
 endif
 
-ifeq ($(VULKAN), 1)
+ifeq ($(HAVE_VULKAN), 1)
    SET_HAVE_HW = 1
 endif
 
