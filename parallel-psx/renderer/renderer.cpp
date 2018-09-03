@@ -1399,7 +1399,7 @@ void Renderer::render_semi_transparent_primitives()
 	const auto set_state = [&](const SemiTransparentState &state) {
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
 		
-		if((state.textured) && (semitrans_check)) init_pipelines();
+		if (semitrans_check) init_pipelines();
 	   
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
