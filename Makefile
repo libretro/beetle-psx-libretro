@@ -469,6 +469,7 @@ ifeq ($(IS_X86),1)
 endif
 
 WARNINGS := -Wall \
+            -Wvla \
             -Wno-sign-compare \
             -Wno-unused-variable \
             -Wno-unused-function \
@@ -595,16 +596,23 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(GL_LIB) $(LIBS)
+	@$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(GL_LIB) $(LIBS)
+	@echo "LD $(TARGET)"
 endif
 
 %.o: %.cpp
-	$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
+	@$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
+	@echo "CXX $<"
 
 %.o: %.c
-	$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
+	@$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
+	@echo "CC $<"
 
 clean:
-	rm -f $(TARGET) $(OBJECTS) $(DEPS)
-
+	@rm -f $(OBJECTS)
+	@echo rm -f *.o
+	@rm -f $(DEPS)
+	@echo rm -f *.d
+	rm -f $(TARGET)
+	
 .PHONY: clean
