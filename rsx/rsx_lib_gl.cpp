@@ -2192,6 +2192,9 @@ bool rsx_gl_open(bool is_pal)
    params.stencil               = false;
    params.imm_vbo_draw          = NULL;
    params.imm_vbo_disable       = NULL;
+   params.context_type          = RETRO_HW_CONTEXT_OPENGL_CORE;
+   params.major                 = 3;
+   params.minor                 = 3;
 
    if ( !glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params) )
       return false;
