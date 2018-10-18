@@ -3290,6 +3290,9 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 #else
          CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
 #endif
+         if (!success)
+            return(0);
+
          CDInterfaces.push_back(image);
       }
    }
