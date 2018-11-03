@@ -1305,11 +1305,14 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
     * textures. */
    Texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
-   if (depth > 16 || dither_mode == DITHER_OFF)
+   if (dither_mode == DITHER_OFF)
    {
       /* Dithering is superfluous when we increase the internal
-       * color depth */
+       * color depth, but users asked for it */
       DrawBuffer_disable_attribute(command_buffer, "dither");
+   } else
+   {
+      DrawBuffer_enable_attribute(command_buffer, "dither");
    }
 
    GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
@@ -1555,10 +1558,22 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (!strcmp(var.value, "internal resolution"))
+      if (!strcmp(var.value, "1x(native)"))
+      {
+         dither_mode = DITHER_NATIVE;
+         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+      }
+
+      else if (!strcmp(var.value, "internal resolution"))
+      {
          dither_mode = DITHER_UPSCALED;
+         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+      }
       else if (!strcmp(var.value, "disabled"))
+      {
          dither_mode  = DITHER_OFF;
+         DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
+      }
    }
 
    var.key = BEETLE_OPT(wireframe);
@@ -1575,7 +1590,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    if (rebuild_fb_out)
    {
-      if (depth > 16 || dither_mode == DITHER_OFF)
+      if (dither_mode == DITHER_OFF)
          DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
       else
          DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
@@ -1662,7 +1677,7 @@ static void texCoord_preprocessing(
 
 	uint16_t off_u = 0;
 	uint16_t off_v = 0;
-	
+
 	if (vertices[0].texture_blend_mode != 0)
 	{
 		// For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
@@ -1694,10 +1709,10 @@ static void texCoord_preprocessing(
 			float dudy = +abx * float(vertices[2].texture_coord[0]) + bcx * float(vertices[0].texture_coord[0]) + cax * float(vertices[1].texture_coord[0]);
 			float dvdy = +abx * float(vertices[2].texture_coord[1]) + bcx * float(vertices[0].texture_coord[1]) + cax * float(vertices[1].texture_coord[1]);
 			float area = bcx * cay - bcy * cax;
-			
+
 			// iCB: Detect and reject any triangles with 0 size texture area
 			float texArea = (vertices[1].texture_coord[0] - vertices[0].texture_coord[0]) * (vertices[2].texture_coord[1] - vertices[0].texture_coord[1]) - (vertices[2].texture_coord[0] - vertices[0].texture_coord[0]) * (vertices[1].texture_coord[1] - vertices[0].texture_coord[1]);
-			
+
 			// Shouldn't matter as degenerate primitives will be culled anyways.
 			if ((area != 0.0f) && (texArea != 0.0f))
 			{
@@ -1738,7 +1753,7 @@ static void texCoord_preprocessing(
 					off_v++;
 			}
 		}
-		
+
 		if (renderer->tex_x_mask == 0xffu && renderer->tex_y_mask == 0xffu)
 		{
 			// If we're not using texture window, we're likely accessing a small subset of the texture.
@@ -1782,7 +1797,7 @@ static void texCoord_preprocessing(
 	{
 		vertices[i].texture_coord[0] += off_u;
 		vertices[i].texture_coord[1] += off_v;
-		
+
 		vertices[i].texture_limits[0] = min_u;
 		vertices[i].texture_limits[1] = min_v;
 		vertices[i].texture_limits[2] = max_u;
@@ -1822,7 +1837,7 @@ static void vertex_preprocessing(
 
    int16_t z = renderer->primitive_ordering;
    renderer->primitive_ordering += 1;
-   
+
    texCoord_preprocessing(renderer, v, count);
 
    for (unsigned i = 0; i < count; i++)

@@ -1583,7 +1583,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
 
    CDC->SetDisc(true, NULL, NULL);
    SetDiscWrapper(CD_TrayOpen);
-   
+
 
    BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
    PIOMem  = NULL;
@@ -1628,7 +1628,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
       abort();
 
    {
-      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE, 
+      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
             0, MDFN_GetSettingS(biospath_sname).c_str());
       RFILE *BIOSFile      = filestream_open(biospath,
             RETRO_VFS_FILE_ACCESS_READ,
@@ -2849,12 +2849,12 @@ static void check_variables(bool startup)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-     if (strcmp(var.value, "1x(native)") == 0)
+      if (strcmp(var.value, "1x(native)") == 0)
          psx_gpu_dither_mode = DITHER_NATIVE;
-     else if (strcmp(var.value, "internal resolution") == 0)
+      else if (strcmp(var.value, "internal resolution") == 0)
          psx_gpu_dither_mode = DITHER_UPSCALED;
-     else if (strcmp(var.value, "disabled") == 0)
-       psx_gpu_dither_mode = DITHER_OFF;
+      else if (strcmp(var.value, "disabled") == 0)
+         psx_gpu_dither_mode = DITHER_OFF;
    }
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
@@ -2898,9 +2898,9 @@ static void check_variables(bool startup)
    else
       psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
-	
+
    var.key = BEETLE_OPT(lineRender);
-   
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "disabled"))
@@ -2910,7 +2910,7 @@ static void check_variables(bool startup)
       else if (!strcmp(var.value, "aggressive"))
          lineRenderMode = 2;
    }
-   
+
    var.key = BEETLE_OPT(filter);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2928,7 +2928,7 @@ static void check_variables(bool startup)
          filter_mode = 4;
       else if (!strcmp(var.value, "JINC2"))
          filter_mode = 5;
-         
+
       if(filter_mode != old_filter_mode)
       {
          opaque_check = true;
@@ -2994,14 +2994,14 @@ static void check_variables(bool startup)
 			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
 		}
 	}
-	
+
 	var.key = BEETLE_OPT(negcon_deadzone);
 	var.value = NULL;
 	input_set_negcon_deadzone(0);
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
 		input_set_negcon_deadzone( (int)(atoi(var.value) * 0.01f * NEGCON_RANGE) );
 	}
-	
+
 	var.key = BEETLE_OPT(negcon_response);
 	var.value = NULL;
 	input_set_negcon_linearity(1);
