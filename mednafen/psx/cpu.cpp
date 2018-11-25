@@ -2131,6 +2131,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	uint32 result = GPR[rs] - GPR[rt];
 	bool ep = (((GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SUB(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	if(MDFN_UNLIKELY(ep))
@@ -2156,6 +2159,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] - GPR[rt];
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_SUBU(instr, result, GPR[rs], GPR[rt]);
 
 	DO_LDS();
 
@@ -2188,6 +2194,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
 	uint32 result = GPR[rs] ^ GPR[rt];
 
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_XOR(instr, result, GPR[rs], GPR[rt]);
+
 	DO_LDS();
 
 	GPR[rd] = result;
@@ -2206,6 +2215,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	GPR_DEPRES_END
 
 	uint32 result = GPR[rs] ^ immediate;
+
+	if (PGXP_GetModes() & PGXP_MODE_CPU)
+		PGXP_CPU_XORI(instr, result, GPR[rs]);
 
 	DO_LDS();
 
@@ -2235,6 +2247,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
 	LDWhich = rt;
 	LDValue = (int32)ReadMemory<int8>(timestamp, address);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LB(instr, LDValue, address);
     END_OPF;
 
     //
@@ -2404,6 +2419,9 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	}
 	else
 	 WriteMemory<uint16>(timestamp, address, GPR[rt]);
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SH(instr, GPR[rt], address);
 
 	DO_LDS();
     END_OPF;
