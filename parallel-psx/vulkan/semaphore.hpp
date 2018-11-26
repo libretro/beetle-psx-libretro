@@ -37,7 +37,6 @@ public:
 	{
 		auto ret = semaphore;
 		VK_ASSERT(semaphore);
-		VK_ASSERT(signalled);
 		semaphore = VK_NULL_HANDLE;
 		signalled = false;
 		return ret;
