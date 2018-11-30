@@ -361,6 +361,8 @@ void rsx_vulkan_push_quad(
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
       uint16_t t3x, uint16_t t3y,
+	  uint16_t min_u, uint16_t min_v,
+	  uint16_t max_u, uint16_t max_v,
       uint16_t texpage_x, uint16_t texpage_y,
       uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
@@ -377,6 +379,7 @@ void rsx_vulkan_push_quad(
    renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
+   renderer->set_UV_limits(min_u, min_v, max_u, max_v);
    if (texture_blend_mode != 0)
    {
       switch (depth_shift)
@@ -436,6 +439,8 @@ void rsx_vulkan_push_triangle(
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
+	  uint16_t min_u, uint16_t min_v,
+	  uint16_t max_u, uint16_t max_v,
       uint16_t texpage_x, uint16_t texpage_y,
       uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
@@ -452,6 +457,7 @@ void rsx_vulkan_push_triangle(
    renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
+   renderer->set_UV_limits(min_u, min_v, max_u, max_v);
    if (texture_blend_mode != 0)
    {
       switch (depth_shift)

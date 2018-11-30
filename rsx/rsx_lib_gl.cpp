@@ -163,10 +163,11 @@ struct CommandVertex {
    uint8_t dither;
    /* 0: primitive is opaque, 1: primitive is semi-transparent */
    uint8_t semi_transparent;
-   /* Texture window mask/OR values */
-   uint8_t texture_window[4];
    /* Texture limits of primtive */
    uint16_t texture_limits[4];
+   /* Texture window mask/OR values */
+   uint8_t texture_window[4];
+
 
    static std::vector<Attribute> attributes();
 };
@@ -1308,11 +1309,11 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    if (dither_mode == DITHER_OFF)
    {
       /* Dithering is superfluous when we increase the internal
-       * color depth, but users asked for it */
-      DrawBuffer_disable_attribute(command_buffer, "dither");
+      * color depth, but users asked for it */
+	   DrawBuffer_disable_attribute(command_buffer, "dither");
    } else
    {
-      DrawBuffer_enable_attribute(command_buffer, "dither");
+	   DrawBuffer_enable_attribute(command_buffer, "dither");
    }
 
    GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
@@ -1558,22 +1559,22 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (!strcmp(var.value, "1x(native)"))
-      {
-         dither_mode = DITHER_NATIVE;
-         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
-      }
+	   if (!strcmp(var.value, "1x(native)"))
+	   {
+		   dither_mode = DITHER_NATIVE;
+		   DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+	   }
 
-      else if (!strcmp(var.value, "internal resolution"))
-      {
-         dither_mode = DITHER_UPSCALED;
-         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
-      }
-      else if (!strcmp(var.value, "disabled"))
-      {
-         dither_mode  = DITHER_OFF;
-         DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
-      }
+	   else if (!strcmp(var.value, "internal resolution"))
+	   {
+		   dither_mode = DITHER_UPSCALED;
+		   DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+	   }
+	   else if (!strcmp(var.value, "disabled"))
+	   {
+		   dither_mode  = DITHER_OFF;
+		   DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
+	   }
    }
 
    var.key = BEETLE_OPT(wireframe);
@@ -1590,7 +1591,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    if (rebuild_fb_out)
    {
-      if (dither_mode == DITHER_OFF)
+	  if (dither_mode == DITHER_OFF)
          DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
       else
          DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
@@ -1664,147 +1665,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    return reconfigure_frontend;
 }
 
-static void texCoord_preprocessing(
-		GlRenderer *renderer,
-		CommandVertex *vertices,
-		unsigned count)
-{
-	// iCB: Just borrowing this from \parallel-psx\renderer\renderer.cpp
-	uint16_t min_u = UINT16_MAX;
-	uint16_t max_u = 0;
-	uint16_t min_v = UINT16_MAX;
-	uint16_t max_v = 0;
 
-	uint16_t off_u = 0;
-	uint16_t off_v = 0;
-
-	if (vertices[0].texture_blend_mode != 0)
-	{
-		// For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
-		// If U or V is decreasing in X or Y, and we use the provided U/V as is, we will sample the wrong texel as interpolation
-		// covers an entire pixel, while PSX samples its interpolation essentially in the top-left corner and splats that interpolant across the entire pixel.
-		// While we could emulate this reasonably well in native resolution by shifting our vertex coords by 0.5,
-		// this breaks in upscaling scenarios, because we have several samples per native sample and we need NN rules to hit the same UV every time.
-		// One approach here is to use interpolate at offset or similar tricks to generalize the PSX interpolation patterns,
-		// but the problem is that vertices sharing an edge will no longer see the same UV (due to different plane derivatives),
-		// we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
-		// or similar which should not share edges, which leads to this unfortunate code below.
-		//
-		// Only apply this workaround for quads.
-		if (count == 4)
-		{
-			// It might be faster to do more direct checking here, but the code below handles primitives in any order
-			// and orientation, and is far more SIMD-friendly if needed.
-			float abx = vertices[1].position[0] - vertices[0].position[0];
-			float aby = vertices[1].position[1] - vertices[0].position[1];
-			float bcx = vertices[2].position[0] - vertices[1].position[0];
-			float bcy = vertices[2].position[1] - vertices[1].position[1];
-			float cax = vertices[0].position[0] - vertices[2].position[0];
-			float cay = vertices[0].position[1] - vertices[2].position[1];
-
-			// Compute static derivatives, just assume W is uniform across the primitive
-			// and that the plane equation remains the same across the quad.
-			float dudx = -aby * float(vertices[2].texture_coord[0]) - bcy * float(vertices[0].texture_coord[0]) - cay * float(vertices[1].texture_coord[0]);
-			float dvdx = -aby * float(vertices[2].texture_coord[1]) - bcy * float(vertices[0].texture_coord[1]) - cay * float(vertices[1].texture_coord[1]);
-			float dudy = +abx * float(vertices[2].texture_coord[0]) + bcx * float(vertices[0].texture_coord[0]) + cax * float(vertices[1].texture_coord[0]);
-			float dvdy = +abx * float(vertices[2].texture_coord[1]) + bcx * float(vertices[0].texture_coord[1]) + cax * float(vertices[1].texture_coord[1]);
-			float area = bcx * cay - bcy * cax;
-
-			// iCB: Detect and reject any triangles with 0 size texture area
-			float texArea = (vertices[1].texture_coord[0] - vertices[0].texture_coord[0]) * (vertices[2].texture_coord[1] - vertices[0].texture_coord[1]) - (vertices[2].texture_coord[0] - vertices[0].texture_coord[0]) * (vertices[1].texture_coord[1] - vertices[0].texture_coord[1]);
-
-			// Shouldn't matter as degenerate primitives will be culled anyways.
-			if ((area != 0.0f) && (texArea != 0.0f))
-			{
-				float inv_area = 1.0f / area;
-				dudx *= inv_area;
-				dudy *= inv_area;
-				dvdx *= inv_area;
-				dvdy *= inv_area;
-
-				bool neg_dudx = dudx < 0.0f;
-				bool neg_dudy = dudy < 0.0f;
-				bool neg_dvdx = dvdx < 0.0f;
-				bool neg_dvdy = dvdy < 0.0f;
-				bool zero_dudx = dudx == 0.0f;
-				bool zero_dudy = dudy == 0.0f;
-				bool zero_dvdx = dvdx == 0.0f;
-				bool zero_dvdy = dvdy == 0.0f;
-
-				// If we have negative dU or dV in any direction, increment the U or V to work properly with nearest-neighbor in this impl.
-				// If we don't have 1:1 pixel correspondence, this creates a slight "shift" in the sprite, but we guarantee that we don't sample garbage at least.
-				// Overall, this is kinda hacky because there can be legitimate, rare cases where 3D meshes hit this scenario, and a single texel offset can pop in, but
-				// this is way better than having borked 2D overall.
-				// TODO: Try to figure out if this can be generalized.
-				//
-				// TODO: If perf becomes an issue, we can probably SIMD the 8 comparisons above,
-				// create an 8-bit code, and use a LUT to get the offsets.
-				// Case 1: U is decreasing in X, but no change in Y.
-				// Case 2: U is decreasing in Y, but no change in X.
-				// Case 3: V is decreasing in X, but no change in Y.
-				// Case 4: V is decreasing in Y, but no change in X.
-				if (neg_dudx && zero_dudy)
-					off_u++;
-				else if (neg_dudy && zero_dudx)
-					off_u++;
-				if (neg_dvdx && zero_dvdy)
-					off_v++;
-				else if (neg_dvdy && zero_dvdx)
-					off_v++;
-			}
-		}
-
-		if (renderer->tex_x_mask == 0xffu && renderer->tex_y_mask == 0xffu)
-		{
-			// If we're not using texture window, we're likely accessing a small subset of the texture.
-			for (unsigned i = 0; i < count; i++)
-			{
-				min_u = std::min(min_u, vertices[i].texture_coord[0]);
-				max_u = std::max(max_u, vertices[i].texture_coord[0]);
-				min_v = std::min(min_v, vertices[i].texture_coord[1]);
-				max_v = std::max(max_v, vertices[i].texture_coord[1]);
-			}
-
-			min_u += off_u;
-			max_u += off_u;
-			min_v += off_v;
-			max_v += off_v;
-
-			// In nearest neighbor, we'll get *very* close to this UV, but not close enough to actually sample it.
-			// If du/dx or dv/dx are negative, we probably need to invert this though ...
-			if (max_u > min_u)
-				max_u--;
-			if (max_v > min_v)
-				max_v--;
-
-			// If there's no wrapping, we can prewrap and avoid fallback.
-			if ((max_u & 0xff00) == (min_u & 0xff00))
-				max_u &= 0xff;
-			if ((max_v & 0xff00) == (min_v & 0xff00))
-				max_v &= 0xff;
-		}
-		else
-		{
-			// texture window so don't clamp texture
-			min_u = 0;
-			max_u = UINT16_MAX;
-			min_v = 0;
-			max_v = UINT16_MAX;
-		}
-	}
-
-	for (unsigned i = 0; i < count; i++)
-	{
-		vertices[i].texture_coord[0] += off_u;
-		vertices[i].texture_coord[1] += off_v;
-
-		vertices[i].texture_limits[0] = min_u;
-		vertices[i].texture_limits[1] = min_v;
-		vertices[i].texture_limits[2] = max_u;
-		vertices[i].texture_limits[3] = max_v;
-	}
-
-}
 
 static void vertex_preprocessing(
       GlRenderer *renderer,
@@ -1837,8 +1698,7 @@ static void vertex_preprocessing(
 
    int16_t z = renderer->primitive_ordering;
    renderer->primitive_ordering += 1;
-
-   texCoord_preprocessing(renderer, v, count);
+   
 
    for (unsigned i = 0; i < count; i++)
    {
@@ -2537,6 +2397,8 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
                         uint16_t t1x, uint16_t t1y,
                         uint16_t t2x, uint16_t t2y,
                         uint16_t t3x, uint16_t t3y,
+	                    uint16_t min_u, uint16_t min_v,
+                     	uint16_t max_u, uint16_t max_v,
                         uint16_t texpage_x, uint16_t texpage_y,
                         uint16_t clut_x, uint16_t clut_y,
                         uint8_t texture_blend_mode,
@@ -2591,6 +2453,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
@@ -2602,6 +2465,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
@@ -2613,6 +2477,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       },
       {
          {p3x, p3y, 0.95, p3w }, /* position */
@@ -2624,6 +2489,7 @@ void rsx_gl_push_quad(  float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 { min_u, min_v, max_u, max_v },
       },
    };
 
@@ -2652,6 +2518,8 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
                            uint16_t t0x, uint16_t t0y,
                            uint16_t t1x, uint16_t t1y,
                            uint16_t t2x, uint16_t t2y,
+						   uint16_t min_u, uint16_t min_v,
+						   uint16_t max_u, uint16_t max_v,
                            uint16_t texpage_x, uint16_t texpage_y,
                            uint16_t clut_x, uint16_t clut_y,
                            uint8_t texture_blend_mode,
@@ -2705,6 +2573,7 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
@@ -2716,6 +2585,7 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
@@ -2727,6 +2597,7 @@ void rsx_gl_push_triangle( float p0x, float p0y, float p0w,
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
+		 {min_u, min_v, max_u, max_v},
       }
    };
 
