@@ -770,12 +770,7 @@ float Renderer::allocate_depth(const Rect &rect)
 
 void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count)
 {
-	unsigned min_u = UINT16_MAX;
-   unsigned max_u = 0;
-   unsigned min_v = UINT16_MAX;
-   unsigned max_v = 0;
-   
-   unsigned texture_limits[4];
+
 	
 	unsigned shift;
 	switch (render_state.texture_mode)
@@ -791,119 +786,16 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		break;
 	}
 
-	uint16_t off_u = 0;
-	uint16_t off_v = 0;
 
 	if (render_state.texture_mode != TextureMode::None)
 	{
-		// For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
-		// If U or V is decreasing in X or Y, and we use the provided U/V as is, we will sample the wrong texel as interpolation
-		// covers an entire pixel, while PSX samples its interpolation essentially in the top-left corner and splats that interpolant across the entire pixel.
-		// While we could emulate this reasonably well in native resolution by shifting our vertex coords by 0.5,
-		// this breaks in upscaling scenarios, because we have several samples per native sample and we need NN rules to hit the same UV every time.
-		// One approach here is to use interpolate at offset or similar tricks to generalize the PSX interpolation patterns,
-		// but the problem is that vertices sharing an edge will no longer see the same UV (due to different plane derivatives),
-		// we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
-		// or similar which should not share edges, which leads to this unfortunate code below.
-		//
-		// Only apply this workaround for quads.
-		if (count == 4)
-		{
-			// It might be faster to do more direct checking here, but the code below handles primitives in any order
-			// and orientation, and is far more SIMD-friendly if needed.
-			float abx = vertices[1].x - vertices[0].x;
-			float aby = vertices[1].y - vertices[0].y;
-			float bcx = vertices[2].x - vertices[1].x;
-			float bcy = vertices[2].y - vertices[1].y;
-			float cax = vertices[0].x - vertices[2].x;
-			float cay = vertices[0].y - vertices[2].y;
-
-			// Compute static derivatives, just assume W is uniform across the primitive
-			// and that the plane equation remains the same across the quad.
-			float dudx = -aby * float(vertices[2].u) - bcy * float(vertices[0].u) - cay * float(vertices[1].u);
-			float dvdx = -aby * float(vertices[2].v) - bcy * float(vertices[0].v) - cay * float(vertices[1].v);
-			float dudy = +abx * float(vertices[2].u) + bcx * float(vertices[0].u) + cax * float(vertices[1].u);
-			float dvdy = +abx * float(vertices[2].v) + bcx * float(vertices[0].v) + cax * float(vertices[1].v);
-			float area = bcx * cay - bcy * cax;
-			
-			// iCB: Detect and reject any triangles with 0 size texture area
-			float texArea = (vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - (vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
-			
-			// Shouldn't matter as degenerate primitives will be culled anyways.
-			if ((area != 0.0f) && (texArea != 0.0f))
-			{
-				float inv_area = 1.0f / area;
-				dudx *= inv_area;
-				dudy *= inv_area;
-				dvdx *= inv_area;
-				dvdy *= inv_area;
-
-				bool neg_dudx = dudx < 0.0f;
-				bool neg_dudy = dudy < 0.0f;
-				bool neg_dvdx = dvdx < 0.0f;
-				bool neg_dvdy = dvdy < 0.0f;
-				bool zero_dudx = dudx == 0.0f;
-				bool zero_dudy = dudy == 0.0f;
-				bool zero_dvdx = dvdx == 0.0f;
-				bool zero_dvdy = dvdy == 0.0f;
-
-				// If we have negative dU or dV in any direction, increment the U or V to work properly with nearest-neighbor in this impl.
-				// If we don't have 1:1 pixel correspondence, this creates a slight "shift" in the sprite, but we guarantee that we don't sample garbage at least.
-				// Overall, this is kinda hacky because there can be legitimate, rare cases where 3D meshes hit this scenario, and a single texel offset can pop in, but
-				// this is way better than having borked 2D overall.
-				// TODO: Try to figure out if this can be generalized.
-				//
-				// TODO: If perf becomes an issue, we can probably SIMD the 8 comparisons above,
-				// create an 8-bit code, and use a LUT to get the offsets.
-				// Case 1: U is decreasing in X, but no change in Y.
-				// Case 2: U is decreasing in Y, but no change in X.
-				// Case 3: V is decreasing in X, but no change in Y.
-				// Case 4: V is decreasing in Y, but no change in X.
-				if (neg_dudx && zero_dudy)
-					off_u++;
-				else if (neg_dudy && zero_dudx)
-					off_u++;
-				if (neg_dvdx && zero_dvdy)
-					off_v++;
-				else if (neg_dvdy && zero_dvdx)
-					off_v++;
-			}
-		}
-
+		
 		if (render_state.texture_window.mask_x == 0xffu && render_state.texture_window.mask_y == 0xffu)
 		{
-			// If we're not using texture window, we're likely accessing a small subset of the texture.
-			for (unsigned i = 0; i < count; i++)
-			{
-				min_u = min<unsigned>(min_u, vertices[i].u);
-				max_u = max<unsigned>(max_u, vertices[i].u);
-				min_v = min<unsigned>(min_v, vertices[i].v);
-				max_v = max<unsigned>(max_v, vertices[i].v);
-			}
-
-			min_u += off_u;
-			max_u += off_u;
-			min_v += off_v;
-			max_v += off_v;
-
-			// In nearest neighbor, we'll get *very* close to this UV, but not close enough to actually sample it.
-			// If du/dx or dv/dx are negative, we probably need to invert this though ...
-			if (max_u > min_u)
-				max_u--;
-			if (max_v > min_v)
-				max_v--;
-
-			// If there's no wrapping, we can prewrap and avoid fallback.
-			if ((max_u & 0xff00) == (min_u & 0xff00))
-				max_u &= 0xff;
-			if ((max_v & 0xff00) == (min_v & 0xff00))
-				max_v &= 0xff;
-				
-			texture_limits[0] = min_u;
-			texture_limits[1] = min_v;
-			texture_limits[2] = max_u;
-			texture_limits[3] = max_v;
-
+			unsigned min_u = render_state.UVLimits.min_u;
+			unsigned min_v = render_state.UVLimits.min_v;
+			unsigned max_u = render_state.UVLimits.max_u;
+			unsigned max_v = render_state.UVLimits.max_v;
 			unsigned width = max_u - min_u + 1;
 			unsigned height = max_v - min_v + 1;
 
@@ -968,8 +860,8 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			int16_t(render_state.palette_offset_x),
 			int16_t(render_state.palette_offset_y),
 			int16_t(shift | (render_state.dither << 8)),
-			int16_t(vertices[i].u + off_u),
-			int16_t(vertices[i].v + off_v),
+			int16_t(vertices[i].u),
+			int16_t(vertices[i].v),
 			int16_t(render_state.texture_offset_x),
 			int16_t(render_state.texture_offset_y),
 		};
@@ -979,10 +871,10 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 
 		output[i].color |= render_state.force_mask_bit ? 0xff000000u : 0u;
 		
-		output[i].min_u = float(texture_limits[0]);
-		output[i].min_v = float(texture_limits[1]);
-		output[i].max_u = float(texture_limits[2]);
-		output[i].max_v = float(texture_limits[3]);
+		output[i].min_u = float(render_state.UVLimits.min_u);
+		output[i].min_v = float(render_state.UVLimits.min_v);
+		output[i].max_u = float(render_state.UVLimits.max_u);
+		output[i].max_v = float(render_state.UVLimits.max_v);
 	}
 }
 

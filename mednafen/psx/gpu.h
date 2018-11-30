@@ -148,6 +148,11 @@ struct PS_GPU
    uint32 InQuad_clut;
    bool InQuad_invalidW;
 
+   // primitive UV offsets (used to correct flipped sprites)
+   uint16_t off_u, off_v;
+   // primitive UV limits (used to clamp texture sampling)
+   uint16_t min_u, min_v, max_u, max_v;
+
    line_point InPLine_PrevPoint;
 
    uint32 FBRW_X;

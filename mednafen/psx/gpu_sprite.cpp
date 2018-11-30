@@ -36,8 +36,8 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
       //else
       // u = (u + 1) & ~1;
 
-      if(FlipY)
-         v_inc = -1;
+	  if(FlipY)
+		  v_inc = -1;
    }
 
    if(x_start < gpu->ClipX0)
@@ -212,6 +212,10 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
                            v + h,            /* t2y */
                            u + w,            /* t5x */
                            v + h,            /* t5y */
+						   u,
+		                   v,
+		                   u + w - 1,	// clamp UVs 1 pixel from edge (sampling should not quite reach it)
+		                   v + h - 1,
                            gpu->TexPageX,
                            gpu->TexPageY,
                            clut_x,

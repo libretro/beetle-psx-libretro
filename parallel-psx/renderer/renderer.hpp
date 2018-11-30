@@ -25,6 +25,11 @@ struct TextureWindow
 	uint8_t mask_x, mask_y, or_x, or_y;
 };
 
+struct UVRect
+{
+	uint16_t min_u, min_v, max_u, max_v;
+};
+
 enum class SemiTransparentMode
 {
 	None,
@@ -59,6 +64,8 @@ public:
 		bool bpp24 = false;
 		bool dither = false;
 		bool adaptive_smoothing = true;
+
+		UVRect UVLimits;
 	};
 
 	struct SaveState
@@ -160,6 +167,14 @@ public:
 	inline void set_texture_color_modulate(bool enable)
 	{
 		render_state.texture_color_modulate = enable;
+	}
+
+	inline void set_UV_limits(uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
+	{
+		render_state.UVLimits.min_u = min_u;
+		render_state.UVLimits.min_v = min_v;
+		render_state.UVLimits.max_u = max_u;
+		render_state.UVLimits.max_v = max_v;
 	}
 
 	// Draw commands
