@@ -114,7 +114,12 @@ else ifeq ($(platform), osx)
 
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
-   TARGET  := $(TARGET_NAME)_libretro_ios.dylib
+   ifeq ($(platform),$(filter $(platform),ios-arm64))
+   iarch := arm64
+   else
+   iarch := armv7
+   endif
+   TARGET  := $(TARGET_NAME)_libretro_ios-$(iarch).dylib
    fpic    := -fPIC
    SHARED  := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
@@ -125,8 +130,9 @@ else ifneq (,$(findstring ios,$(platform)))
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -framework OpenGLES
    endif
-   CC = cc -arch armv7 -isysroot $(IOSSDK)
-   CXX = c++ -arch armv7 -isysroot $(IOSSDK)
+   
+   CC = cc -arch $(iarch) -isysroot $(IOSSDK)
+   CXX = c++ -arch $(iarch) -isysroot $(IOSSDK)
    IPHONEMINVER :=
    ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
       IPHONEMINVER = -miphoneos-version-min=8.0

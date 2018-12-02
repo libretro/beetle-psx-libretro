@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string/stdstring.h>
 #include <ugui.h>
+#include <stdio.h>
 
 #define UGUI_MAX_OBJECTS 2
 static UG_GUI gui;
