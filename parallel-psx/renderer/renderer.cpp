@@ -1276,10 +1276,10 @@ void Renderer::render_semi_transparent_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
+	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
+	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
+	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	auto size = queue.semi_transparent.size() * sizeof(BufferVertex);
@@ -1452,10 +1452,10 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
+	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
+	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
+	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
@@ -1478,10 +1478,10 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
+	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
+	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
+	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
