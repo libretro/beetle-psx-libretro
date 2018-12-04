@@ -11,7 +11,7 @@ ChainAllocator::ChainAllocator(Device *device, VkDeviceSize block_size, VkDevice
     , usage(usage)
 {
 	buffers.push_back(device->create_buffer({ BufferDomain::Host, block_size, usage }, nullptr));
-	host = static_cast<uint8_t *>(device->map_host_buffer(*buffers.back(), MEMORY_ACCESS_WRITE));
+	hostPtrs.push_back(static_cast<uint8_t *>(device->map_host_buffer(*buffers.back(), MEMORY_ACCESS_WRITE)));
 }
 
 ChainAllocator::~ChainAllocator()
@@ -22,6 +22,7 @@ ChainAllocator::~ChainAllocator()
 void ChainAllocator::reset()
 {
 	buffers.clear();
+	hostPtrs.clear();
 	large_buffers.clear();
 	offset = 0;
 	chain_index = 0;
@@ -51,11 +52,11 @@ ChainDataAllocation ChainAllocator::allocate(VkDeviceSize size)
 	if (chain_index >= buffers.size())
 	{
 		buffers.push_back(device->create_buffer({ BufferDomain::Host, block_size, usage }, nullptr));
-		host = static_cast<uint8_t *>(device->map_host_buffer(*buffers.back(), MEMORY_ACCESS_WRITE));
+		hostPtrs.push_back(static_cast<uint8_t *>(device->map_host_buffer(*buffers.back(), MEMORY_ACCESS_WRITE)));
 	}
 
 	ChainDataAllocation alloc = {};
-	alloc.data = host + offset;
+	alloc.data = hostPtrs[chain_index] + offset;
 	alloc.offset = offset;
 	alloc.buffer = buffers[chain_index].get();
 	offset += size;
