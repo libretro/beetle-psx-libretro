@@ -1165,9 +1165,6 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
          {
             *upscaling  = (var.value[0] - '0') * 10;
             *upscaling += var.value[1] - '0';
-
-            if (*upscaling == 32) /* Too high for GL */
-               *upscaling = 16;
          }
       }
    }
@@ -1664,8 +1661,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    return reconfigure_frontend;
 }
-
-
 
 static void vertex_preprocessing(
       GlRenderer *renderer,
