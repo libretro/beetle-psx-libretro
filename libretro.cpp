@@ -3926,7 +3926,7 @@ void retro_set_environment(retro_environment_t cb)
 #ifdef HAVE_VULKAN
       { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
 #endif
-      { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x|32x" },
+      { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       // Only used in GL renderer for now.
       { BEETLE_OPT(depth), "Internal color depth; dithered 16bpp (native)|32bpp" },
