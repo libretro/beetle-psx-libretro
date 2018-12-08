@@ -646,6 +646,8 @@ void GPU_Init(bool pal_clock_and_tv,
 
    GPU.upscale_shift = upscale_shift;
    GPU.dither_upscale_shift = 0;
+
+   GPU.killQuadPart = 0;
 }
 
 void GPU_RecalcClockRatio(void) {
