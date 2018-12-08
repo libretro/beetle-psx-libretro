@@ -533,8 +533,11 @@ void Calc_UVOffsets(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 		// iCB: Detect and reject any triangles with 0 size texture area
 		float texArea = (vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - (vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
 
+		// Leverage PGXP to further avoid 3D polygons that just happen to align this way after projection
+		bool is3D = ((vertices[0].precise[2] != vertices[1].precise[2]) || (vertices[1].precise[2] != vertices[2].precise[2]));
+		
 		// Shouldn't matter as degenerate primitives will be culled anyways.
-		if ((area != 0.0f) && (texArea != 0.0f))
+		if ((area != 0.0f) && (texArea != 0.0f) && !is3D)
 		{
 			float inv_area = 1.0f / area;
 			dudx *= inv_area;
