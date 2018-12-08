@@ -533,8 +533,11 @@ void Calc_UVOffsets(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 		// iCB: Detect and reject any triangles with 0 size texture area
 		float texArea = (vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - (vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
 
+		// Leverage PGXP to further avoid 3D polygons that just happen to align this way after projection
+		bool is3D = ((vertices[0].precise[2] != vertices[1].precise[2]) || (vertices[1].precise[2] != vertices[2].precise[2]));
+		
 		// Shouldn't matter as degenerate primitives will be culled anyways.
-		if ((area != 0.0f) && (texArea != 0.0f))
+		if ((area != 0.0f) && (texArea != 0.0f) && !is3D)
 		{
 			float inv_area = 1.0f / area;
 			dudx *= inv_area;
@@ -882,6 +885,10 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
    else if(textured)
       gpu->DrawTimeAvail -= 60 * 3;
 
+   // if entire previous quad was rejected reset flags
+   if (gpu->killQuadPart == 3)
+	   gpu->killQuadPart = 0;
+
    if(numvertices == 4)
    {
       if(gpu->InCmd == INCMD_QUAD)
@@ -990,7 +997,12 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       abs(vertices[1].y - vertices[0].y) >= (512 << gpu->upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
-       return;
+		 if (numvertices == 4)
+			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
+     
+		 // hardware renderer still needs to render first triangle
+		 if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2))
+			 return;
      }
 
    if(abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) ||
@@ -998,7 +1010,12 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       abs(vertices[1].x - vertices[0].x) >= (1024 << gpu->upscale_shift))
      {
        //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
-       return;
+		 if (numvertices == 4)
+			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
+		 
+		 // hardware renderer still needs to render first triangle
+		 if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2))
+			return;
      }
 
    uint16_t clut_x = (clut & (0x3f << 4));
@@ -1037,7 +1054,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 		{
 			Reset_UVLimits(gpu);
 
-			if (numvertices == 4)
+			if ((numvertices == 4) && (!gpu->killQuadPart))
 			{
 				if (gpu->InCmd == INCMD_NONE)
 				{
@@ -1090,31 +1107,39 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 			}
 			else
 			{
-				Extend_UVLimits(gpu, vertices, 3);
+				tri_vertex *verts;
+
+				// Only need to render first triangle that we skipped
+				if (gpu->killQuadPart == 2)
+					verts = &gpu->InQuad_F3Vertices[0];
+				else
+					verts = &vertices[0];
+
+				Extend_UVLimits(gpu, verts, 3);
 				Finalise_UVLimits(gpu);
 
 				// Push a single triangle
-				rsx_intf_push_triangle(vertices[0].precise[0],
-					vertices[0].precise[1],
-					vertices[0].precise[2],
-					vertices[1].precise[0],
-					vertices[1].precise[1],
-					vertices[1].precise[2],
-					vertices[2].precise[0],
-					vertices[2].precise[1],
-					vertices[2].precise[2],
-					((uint32_t)vertices[0].r) |
-					((uint32_t)vertices[0].g << 8) |
-					((uint32_t)vertices[0].b << 16),
-					((uint32_t)vertices[1].r) |
-					((uint32_t)vertices[1].g << 8) |
-					((uint32_t)vertices[1].b << 16),
-					((uint32_t)vertices[2].r) |
-					((uint32_t)vertices[2].g << 8) |
-					((uint32_t)vertices[2].b << 16),
-					vertices[0].u, vertices[0].v,
-					vertices[1].u, vertices[1].v,
-					vertices[2].u, vertices[2].v,
+				rsx_intf_push_triangle(verts[0].precise[0],
+					verts[0].precise[1],
+					verts[0].precise[2],
+					verts[1].precise[0],
+					verts[1].precise[1],
+					verts[1].precise[2],
+					verts[2].precise[0],
+					verts[2].precise[1],
+					verts[2].precise[2],
+					((uint32_t)verts[0].r) |
+					((uint32_t)verts[0].g << 8) |
+					((uint32_t)verts[0].b << 16),
+					((uint32_t)verts[1].r) |
+					((uint32_t)verts[1].g << 8) |
+					((uint32_t)verts[1].b << 16),
+					((uint32_t)verts[2].r) |
+					((uint32_t)verts[2].g << 8) |
+					((uint32_t)verts[2].b << 16),
+					verts[0].u, verts[0].v,
+					verts[1].u, verts[1].v,
+					verts[2].u, verts[2].v,
 					gpu->min_u, gpu->min_v,
 					gpu->max_u, gpu->max_v,
 					gpu->TexPageX, gpu->TexPageY,
@@ -1125,6 +1150,14 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 					BlendMode,
 					MaskEval_TA,
 					gpu->MaskSetOR);
+
+				if (gpu->killQuadPart == 2)
+				{
+					gpu->killQuadPart = 0;
+					return;
+				}
+
+				gpu->killQuadPart = 0;
 			}
 		}
 #endif
