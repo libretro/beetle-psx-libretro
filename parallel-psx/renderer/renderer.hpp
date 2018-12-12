@@ -277,7 +277,7 @@ private:
 		TextureWindow window;
 		int16_t pal_x, pal_y, params;
 		int16_t u, v, base_uv_x, base_uv_y;
-		float min_u, min_v, max_u, max_v;
+		uint16_t min_u, min_v, max_u, max_v;
 	};
 
 	struct BlitInfo

@@ -782,8 +782,6 @@ float Renderer::allocate_depth(const Rect &rect)
 
 void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count)
 {
-
-	
 	unsigned shift;
 	switch (render_state.texture_mode)
 	{
@@ -798,10 +796,8 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		break;
 	}
 
-
 	if (render_state.texture_mode != TextureMode::None)
 	{
-		
 		if (render_state.texture_window.mask_x == 0xffu && render_state.texture_window.mask_y == 0xffu)
 		{
 			unsigned min_u = render_state.UVLimits.min_u;
@@ -876,17 +872,16 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			int16_t(vertices[i].v),
 			int16_t(render_state.texture_offset_x),
 			int16_t(render_state.texture_offset_y),
+			render_state.UVLimits.min_u,
+			render_state.UVLimits.min_v,
+			render_state.UVLimits.max_u,
+			render_state.UVLimits.max_v,
 		};
 
 		if (render_state.texture_mode != TextureMode::None && !render_state.texture_color_modulate)
 			output[i].color = 0x808080;
 
 		output[i].color |= render_state.force_mask_bit ? 0xff000000u : 0u;
-		
-		output[i].min_u = float(render_state.UVLimits.min_u);
-		output[i].min_v = float(render_state.UVLimits.min_v);
-		output[i].max_u = float(render_state.UVLimits.max_u);
-		output[i].max_v = float(render_state.UVLimits.max_v);
 	}
 }
 
@@ -1298,10 +1293,7 @@ void Renderer::render_semi_transparent_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	auto size = queue.semi_transparent.size() * sizeof(BufferVertex);
@@ -1474,10 +1466,7 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
@@ -1500,10 +1489,7 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_u));
-	cmd->set_vertex_attrib(6, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, min_v));
-	cmd->set_vertex_attrib(7, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_u));
-	cmd->set_vertex_attrib(8, 0, VK_FORMAT_R32_SFLOAT, offsetof(BufferVertex, max_v));
+	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 	cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
