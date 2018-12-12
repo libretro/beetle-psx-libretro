@@ -187,7 +187,7 @@ public:
 
 	void reset_counters()
 	{
-		memset(&counters, 0, sizeof(counters));
+		counters = {};
 	}
 
 	void flush()
@@ -229,38 +229,38 @@ private:
 
 	struct
 	{
-		Vulkan::ProgramHandle copy_to_vram;
-		Vulkan::ProgramHandle copy_to_vram_masked;
-		Vulkan::ProgramHandle unscaled_quad_blitter;
-		Vulkan::ProgramHandle scaled_quad_blitter;
-		Vulkan::ProgramHandle bpp24_quad_blitter;
-		Vulkan::ProgramHandle resolve_to_scaled;
-		Vulkan::ProgramHandle resolve_to_unscaled;
-		Vulkan::ProgramHandle blit_vram_unscaled;
-		Vulkan::ProgramHandle blit_vram_scaled;
-		Vulkan::ProgramHandle blit_vram_unscaled_masked;
-		Vulkan::ProgramHandle blit_vram_scaled_masked;
-		Vulkan::ProgramHandle blit_vram_cached_unscaled;
-		Vulkan::ProgramHandle blit_vram_cached_scaled;
-		Vulkan::ProgramHandle blit_vram_cached_unscaled_masked;
-		Vulkan::ProgramHandle blit_vram_cached_scaled_masked;
-		Vulkan::ProgramHandle opaque_flat;
-		Vulkan::ProgramHandle opaque_textured;
-		Vulkan::ProgramHandle opaque_semi_transparent;
-		Vulkan::ProgramHandle semi_transparent;
-		Vulkan::ProgramHandle semi_transparent_masked_add;
-		Vulkan::ProgramHandle semi_transparent_masked_average;
-		Vulkan::ProgramHandle semi_transparent_masked_sub;
-		Vulkan::ProgramHandle semi_transparent_masked_add_quarter;
-		Vulkan::ProgramHandle flat_masked_add;
-		Vulkan::ProgramHandle flat_masked_average;
-		Vulkan::ProgramHandle flat_masked_sub;
-		Vulkan::ProgramHandle flat_masked_add_quarter;
+		Vulkan::Program *copy_to_vram;
+		Vulkan::Program *copy_to_vram_masked;
+		Vulkan::Program *unscaled_quad_blitter;
+		Vulkan::Program *scaled_quad_blitter;
+		Vulkan::Program *bpp24_quad_blitter;
+		Vulkan::Program *resolve_to_scaled;
+		Vulkan::Program *resolve_to_unscaled;
+		Vulkan::Program *blit_vram_unscaled;
+		Vulkan::Program *blit_vram_scaled;
+		Vulkan::Program *blit_vram_unscaled_masked;
+		Vulkan::Program *blit_vram_scaled_masked;
+		Vulkan::Program *blit_vram_cached_unscaled;
+		Vulkan::Program *blit_vram_cached_scaled;
+		Vulkan::Program *blit_vram_cached_unscaled_masked;
+		Vulkan::Program *blit_vram_cached_scaled_masked;
+		Vulkan::Program *opaque_flat;
+		Vulkan::Program *opaque_textured;
+		Vulkan::Program *opaque_semi_transparent;
+		Vulkan::Program *semi_transparent;
+		Vulkan::Program *semi_transparent_masked_add;
+		Vulkan::Program *semi_transparent_masked_average;
+		Vulkan::Program *semi_transparent_masked_sub;
+		Vulkan::Program *semi_transparent_masked_add_quarter;
+		Vulkan::Program *flat_masked_add;
+		Vulkan::Program *flat_masked_average;
+		Vulkan::Program *flat_masked_sub;
+		Vulkan::Program *flat_masked_add_quarter;
 
-		Vulkan::ProgramHandle mipmap_resolve;
-		Vulkan::ProgramHandle mipmap_energy_first;
-		Vulkan::ProgramHandle mipmap_energy;
-		Vulkan::ProgramHandle mipmap_energy_blur;
+		Vulkan::Program *mipmap_resolve;
+		Vulkan::Program *mipmap_energy_first;
+		Vulkan::Program *mipmap_energy;
+		Vulkan::Program *mipmap_energy_blur;
 	} pipelines;
 
 	Vulkan::ImageHandle dither_lut;
@@ -277,7 +277,7 @@ private:
 		TextureWindow window;
 		int16_t pal_x, pal_y, params;
 		int16_t u, v, base_uv_x, base_uv_y;
-		float min_u, min_v, max_u, max_v;
+		uint16_t min_u, min_v, max_u, max_v;
 	};
 
 	struct BlitInfo

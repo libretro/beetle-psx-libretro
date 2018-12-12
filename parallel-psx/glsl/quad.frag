@@ -1,5 +1,6 @@
-#version 310 es
-precision mediump float;
+#version 450
+precision highp float;
+precision highp int;
 
 #include "common.h"
 

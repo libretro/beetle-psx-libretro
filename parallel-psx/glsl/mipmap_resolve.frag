@@ -1,5 +1,6 @@
-#version 310 es
-precision mediump float;
+#version 450
+precision highp float;
+precision highp int;
 
 layout(location = 0) out vec4 FragColor;
 layout(set = 0, binding = 0) uniform sampler2D uTexture;

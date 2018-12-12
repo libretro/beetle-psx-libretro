@@ -1,14 +1,13 @@
-#version 310 es
+#version 450
+
 layout(location = 0) in vec4 Position;
 layout(location = 1) in vec4 Color;
 #ifdef TEXTURED
 layout(location = 2) in mediump uvec4 Window;
 layout(location = 3) in mediump ivec3 Param;
 layout(location = 4) in ivec4 UV;
-layout(location = 5) in mediump float min_u;
-layout(location = 6) in mediump float min_v;
-layout(location = 7) in mediump float max_u;
-layout(location = 8) in mediump float max_v;
+layout(location = 5) in mediump uvec4 UVRange;
+
 layout(location = 1) out mediump vec2 vUV;
 layout(location = 2) flat out mediump ivec3 vParam;
 layout(location = 3) flat out mediump ivec2 vBaseUV;
@@ -30,6 +29,6 @@ void main()
    vParam = Param;
    vBaseUV = UV.zw;
    vWindow = ivec4(Window);
-   vTexLimits = ivec4(min_u, min_v, max_u, max_v);
+   vTexLimits = ivec4(UVRange);
 #endif
 }
