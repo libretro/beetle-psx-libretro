@@ -1,57 +1,53 @@
+/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #include "shader.hpp"
 #include "device.hpp"
 #include "spirv_cross.hpp"
 
-#include <algorithm>
-using std::min;
-using std::max;
+#ifdef GRANITE_SPIRV_DUMP
+#include "filesystem.hpp"
+#endif
 
 using namespace std;
 using namespace spirv_cross;
+using namespace Util;
 
 namespace Vulkan
 {
-PipelineLayout::PipelineLayout(Device *device, const CombinedResourceLayout &layout)
-    : Cookie(device)
-    , device(device)
-    , layout(layout)
+PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
+	: IntrusiveHashMapEnabled<PipelineLayout>(hash)
+	, device(device)
+	, layout(layout)
 {
 	VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 	unsigned num_sets = 0;
 	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
 	{
-		set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i]);
+		set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
 		layouts[i] = set_allocators[i]->get_layout();
 		if (layout.descriptor_set_mask & (1u << i))
 			num_sets = i + 1;
 	}
-
-	unsigned num_ranges = 0;
-	VkPushConstantRange ranges[static_cast<unsigned>(ShaderStage::Count)];
-
-	for (auto &range : layout.ranges)
-	{
-		if (range.size != 0)
-		{
-			bool unique = true;
-			for (unsigned i = 0; i < num_ranges; i++)
-			{
-				// Try to merge equivalent ranges for multiple stages.
-				if (ranges[i].offset == range.offset && ranges[i].size == range.size)
-				{
-					unique = false;
-					ranges[i].stageFlags |= range.stageFlags;
-					break;
-				}
-			}
-
-			if (unique)
-				ranges[num_ranges++] = range;
-		}
-	}
-
-	memcpy(this->layout.ranges, ranges, num_ranges * sizeof(ranges[0]));
-	this->layout.num_ranges = num_ranges;
 
 	VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	if (num_sets)
@@ -60,14 +56,21 @@ PipelineLayout::PipelineLayout(Device *device, const CombinedResourceLayout &lay
 		info.pSetLayouts = layouts;
 	}
 
-	if (num_ranges)
+	if (layout.push_constant_range.stageFlags != 0)
 	{
-		info.pushConstantRangeCount = num_ranges;
-		info.pPushConstantRanges = ranges;
+		info.pushConstantRangeCount = 1;
+		info.pPushConstantRanges = &layout.push_constant_range;
 	}
 
+#ifdef GRANITE_VULKAN_FOSSILIZE
+	unsigned layout_index = device->register_pipeline_layout(get_hash(), info);
+#endif
+	LOGI("Creating pipeline layout.\n");
 	if (vkCreatePipelineLayout(device->get_device(), &info, nullptr, &pipe_layout) != VK_SUCCESS)
-		LOG("Failed to create pipeline layout.\n");
+		LOGE("Failed to create pipeline layout.\n");
+#ifdef GRANITE_VULKAN_FOSSILIZE
+	device->set_pipeline_layout_handle(layout_index, pipe_layout);
+#endif
 }
 
 PipelineLayout::~PipelineLayout()
@@ -76,19 +79,75 @@ PipelineLayout::~PipelineLayout()
 		vkDestroyPipelineLayout(device->get_device(), pipe_layout, nullptr);
 }
 
-Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t size)
-    : device(device)
-    , stage(stage)
+const char *Shader::stage_to_name(ShaderStage stage)
 {
+	switch (stage)
+	{
+	case ShaderStage::Compute:
+		return "compute";
+	case ShaderStage::Vertex:
+		return "vertex";
+	case ShaderStage::Fragment:
+		return "fragment";
+	case ShaderStage::Geometry:
+		return "geometry";
+	case ShaderStage::TessControl:
+		return "tess_control";
+	case ShaderStage::TessEvaluation:
+		return "tess_evaluation";
+	default:
+		return "unknown";
+	}
+}
+
+static bool get_stock_sampler(StockSampler &sampler, const string &name)
+{
+	if (name.find("NearestClamp") != string::npos)
+		sampler = StockSampler::NearestClamp;
+	else if (name.find("LinearClamp") != string::npos)
+		sampler = StockSampler::LinearClamp;
+	else if (name.find("TrilinearClamp") != string::npos)
+		sampler = StockSampler::TrilinearClamp;
+	else if (name.find("NearestWrap") != string::npos)
+		sampler = StockSampler::NearestWrap;
+	else if (name.find("LinearWrap") != string::npos)
+		sampler = StockSampler::LinearWrap;
+	else if (name.find("TrilinearWrap") != string::npos)
+		sampler = StockSampler::TrilinearWrap;
+	else if (name.find("NearestShadow") != string::npos)
+		sampler = StockSampler::NearestShadow;
+	else if (name.find("LinearShadow") != string::npos)
+		sampler = StockSampler::LinearShadow;
+	else
+		return false;
+
+	return true;
+}
+
+Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
+	: IntrusiveHashMapEnabled<Shader>(hash)
+	, device(device)
+{
+#ifdef GRANITE_SPIRV_DUMP
+	if (!Granite::Filesystem::get().write_buffer_to_file(string("cache://spirv/") + to_string(hash) + ".spv", data, size))
+		LOGE("Failed to dump shader to file.\n");
+#endif
+
 	VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
 	info.codeSize = size;
 	info.pCode = data;
 
-	if (vkCreateShaderModule(device, &info, nullptr, &module) != VK_SUCCESS)
-		LOG("Failed to create shader module.\n");
+#ifdef GRANITE_VULKAN_FOSSILIZE
+	unsigned module_index = device->register_shader_module(get_hash(), info);
+#endif
+	LOGI("Creating shader module.\n");
+	if (vkCreateShaderModule(device->get_device(), &info, nullptr, &module) != VK_SUCCESS)
+		LOGE("Failed to create shader module.\n");
+#ifdef GRANITE_VULKAN_FOSSILIZE
+	device->set_shader_module_handle(module_index, module);
+#endif
 
-	vector<uint32_t> code(data, data + size / sizeof(uint32_t));
-	Compiler compiler(move(code));
+	Compiler compiler(data, size / sizeof(uint32_t));
 
 	auto resources = compiler.get_shader_resources();
 	for (auto &image : resources.sampled_images)
@@ -100,7 +159,22 @@ Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t 
 			layout.sets[set].sampled_buffer_mask |= 1u << binding;
 		else
 			layout.sets[set].sampled_image_mask |= 1u << binding;
-		layout.sets[set].stages |= 1u << static_cast<unsigned>(stage);
+
+		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+			layout.sets[set].fp_mask |= 1u << binding;
+
+		const string &name = image.name;
+		StockSampler sampler;
+		if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, name))
+		{
+			if (has_immutable_sampler(layout.sets[set], binding))
+			{
+				if (sampler != get_immutable_sampler(layout.sets[set], binding))
+					LOGE("Immutable sampler mismatch detected!\n");
+			}
+			else
+				set_immutable_sampler(layout.sets[set], binding, sampler);
+		}
 	}
 
 	for (auto &image : resources.subpass_inputs)
@@ -108,7 +182,45 @@ Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t 
 		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
 		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].input_attachment_mask |= 1u << binding;
-		layout.sets[set].stages |= 1u << static_cast<unsigned>(stage);
+
+		auto &type = compiler.get_type(image.base_type_id);
+		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+			layout.sets[set].fp_mask |= 1u << binding;
+	}
+
+	for (auto &image : resources.separate_images)
+	{
+		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+
+		auto &type = compiler.get_type(image.base_type_id);
+		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+			layout.sets[set].fp_mask |= 1u << binding;
+
+		if (type.image.dim == spv::DimBuffer)
+			layout.sets[set].sampled_buffer_mask |= 1u << binding;
+		else
+			layout.sets[set].separate_image_mask |= 1u << binding;
+	}
+
+	for (auto &image : resources.separate_samplers)
+	{
+		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		layout.sets[set].sampler_mask |= 1u << binding;
+
+		const string &name = image.name;
+		StockSampler sampler;
+		if (get_stock_sampler(sampler, name))
+		{
+			if (has_immutable_sampler(layout.sets[set], binding))
+			{
+				if (sampler != get_immutable_sampler(layout.sets[set], binding))
+					LOGE("Immutable sampler mismatch detected!\n");
+			}
+			else
+				set_immutable_sampler(layout.sets[set], binding, sampler);
+		}
 	}
 
 	for (auto &image : resources.storage_images)
@@ -116,7 +228,10 @@ Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t 
 		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
 		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].storage_image_mask |= 1u << binding;
-		layout.sets[set].stages |= 1u << static_cast<unsigned>(stage);
+
+		auto &type = compiler.get_type(image.base_type_id);
+		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+			layout.sets[set].fp_mask |= 1u << binding;
 	}
 
 	for (auto &buffer : resources.uniform_buffers)
@@ -124,7 +239,6 @@ Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t 
 		auto set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
 		auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 		layout.sets[set].uniform_buffer_mask |= 1u << binding;
-		layout.sets[set].stages |= 1u << static_cast<unsigned>(stage);
 	}
 
 	for (auto &buffer : resources.storage_buffers)
@@ -132,82 +246,88 @@ Shader::Shader(VkDevice device, ShaderStage stage, const uint32_t *data, size_t 
 		auto set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
 		auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 		layout.sets[set].storage_buffer_mask |= 1u << binding;
-		layout.sets[set].stages |= 1u << static_cast<unsigned>(stage);
 	}
 
-	if (stage == ShaderStage::Vertex)
+	for (auto &attrib : resources.stage_inputs)
 	{
-		for (auto &attrib : resources.stage_inputs)
-		{
-			auto location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
-			layout.attribute_mask |= 1u << location;
-		}
+		auto location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+		layout.input_mask |= 1u << location;
+	}
+
+	for (auto &attrib : resources.stage_outputs)
+	{
+		auto location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+		layout.output_mask |= 1u << location;
 	}
 
 	if (!resources.push_constant_buffers.empty())
 	{
-#ifdef VULKAN_DEBUG
-		// The validation layers are too conservative here, but this is just a performance pessimization.
-		size_t size =
+		// Don't bother trying to extract which part of a push constant block we're using.
+		// Just assume we're accessing everything. At least on older validation layers,
+		// it did not do a static analysis to determine similar information, so we got a lot
+		// of false positives.
+		layout.push_constant_size =
 		    compiler.get_declared_struct_size(compiler.get_type(resources.push_constant_buffers.front().base_type_id));
-		layout.push_constant_offset = 0;
-		layout.push_constant_range = size;
-#else
-		auto ranges = compiler.get_active_buffer_ranges(resources.push_constant_buffers.front().id);
-		size_t minimum = ~0u;
-		size_t maximum = 0;
-		if (!ranges.empty())
+	}
+
+	auto spec_constants = compiler.get_specialization_constants();
+	for (auto &c : spec_constants)
+	{
+		if (c.constant_id >= VULKAN_NUM_SPEC_CONSTANTS)
 		{
-			for (auto &range : ranges)
-			{
-				minimum = min(minimum, range.offset);
-				maximum = max(maximum, range.offset + range.range);
-			}
-			layout.push_constant_offset = minimum;
-			layout.push_constant_range = maximum - minimum;
+			LOGE("Spec constant ID: %u is out of range, will be ignored.\n", c.constant_id);
+			continue;
 		}
-#endif
+
+		layout.spec_constant_mask |= 1u << c.constant_id;
 	}
 }
 
 Shader::~Shader()
 {
 	if (module)
-		vkDestroyShaderModule(device, module, nullptr);
+		vkDestroyShaderModule(device->get_device(), module, nullptr);
 }
 
-void Program::set_shader(ShaderHandle handle)
+void Program::set_shader(ShaderStage stage, Shader *handle)
 {
-	shaders[static_cast<unsigned>(handle->get_stage())] = handle;
+	shaders[Util::ecast(stage)] = handle;
 }
 
-Program::Program(Device *device)
-    : Cookie(device)
-    , device(device)
+Program::Program(Device *device, Shader *vertex, Shader *fragment)
+    : device(device)
 {
+	set_shader(ShaderStage::Vertex, vertex);
+	set_shader(ShaderStage::Fragment, fragment);
+	device->bake_program(*this);
 }
 
-VkPipeline Program::get_graphics_pipeline(Hash hash) const
+Program::Program(Device *device, Shader *compute)
+    : device(device)
 {
-	auto itr = graphics_pipelines.find(hash);
-	if (itr != end(graphics_pipelines))
-		return itr->second;
-	else
-		return VK_NULL_HANDLE;
+	set_shader(ShaderStage::Compute, compute);
+	device->bake_program(*this);
 }
 
-void Program::add_graphics_pipeline(Hash hash, VkPipeline pipeline)
+VkPipeline Program::get_pipeline(Hash hash) const
 {
-	VK_ASSERT(graphics_pipelines[hash] == VK_NULL_HANDLE);
-	graphics_pipelines[hash] = pipeline;
+	auto *ret = pipelines.find(hash);
+	return ret ? ret->get() : VK_NULL_HANDLE;
+}
+
+VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
+{
+	return pipelines.emplace_yield(hash, pipeline)->get();
 }
 
 Program::~Program()
 {
-	if (compute_pipeline != VK_NULL_HANDLE)
-		device->destroy_pipeline(compute_pipeline);
-
-	for (auto &pipe : graphics_pipelines)
-		device->destroy_pipeline(pipe.second);
+	for (auto &pipe : pipelines)
+	{
+		if (internal_sync)
+			device->destroy_pipeline_nolock(pipe.get());
+		else
+			device->destroy_pipeline(pipe.get());
+	}
 }
 }

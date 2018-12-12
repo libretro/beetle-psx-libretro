@@ -23,8 +23,7 @@ static unsigned scaling = 4;
 
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
-static vector<retro_vulkan_image> swapchain_images;
-static unsigned swapchain_index;
+static retro_vulkan_image swapchain_image;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
@@ -69,14 +68,6 @@ static void context_reset(void)
    device = new Device;
    device->set_context(*context);
 
-   unsigned num_images = 0;
-   uint32_t mask = vulkan->get_sync_index_mask(vulkan->handle);
-   for (unsigned i = 0; i < 32; i++)
-      if (mask & (1u << i))
-         num_images = i + 1;
-
-   device->init_virtual_swapchain(num_images);
-   swapchain_images.resize(num_images);
    renderer = new Renderer(*device, scaling, save_state.vram.empty() ? nullptr : &save_state);
 
    for (auto &func : defer)
@@ -194,24 +185,10 @@ bool rsx_vulkan_has_software_renderer(void)
 void rsx_vulkan_prepare_frame(void)
 {
    inside_frame = true;
-   unsigned num_images = 0;
-   uint32_t mask = vulkan->get_sync_index_mask(vulkan->handle);
-   for (unsigned i = 0; i < 32; i++)
-      if (mask & (1u << i))
-         num_images = i + 1;
-
    device->flush_frame();
-
-   if (device->get_num_swapchain_images() != num_images)
-   {
-      device->init_virtual_swapchain(num_images);
-      swapchain_images.resize(num_images);
-   }
-
    vulkan->wait_sync_index(vulkan->handle);
    unsigned index = vulkan->get_sync_index(vulkan->handle);
-   swapchain_index = index;
-   device->begin_frame(index);
+   device->next_frame_context();
    renderer->reset_counters();
 }
 
@@ -226,7 +203,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    auto scanout = renderer->scanout_to_texture();
 
-   auto &image = swapchain_images[swapchain_index];
+   auto &image = swapchain_image;
    image.create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
    image.create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
    image.create_info.format = scanout->get_format();
@@ -240,7 +217,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    image.create_info.components.b = VK_COMPONENT_SWIZZLE_B;
    image.create_info.components.a = VK_COMPONENT_SWIZZLE_A;
    image.create_info.image = scanout->get_image();
-   image.image_layout = scanout->get_layout();
+   image.image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
    image.image_view = scanout->get_view().get_view();
 
    vulkan->set_image(vulkan->handle, &image, 0, nullptr, VK_QUEUE_FAMILY_IGNORED);
@@ -248,6 +225,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
 
    auto semaphore = device->request_semaphore();
    vulkan->set_signal_semaphore(vulkan->handle, semaphore->get_semaphore());
+   semaphore->signal_external();
    renderer->set_scanout_semaphore(semaphore);
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, scanout->get_width(), scanout->get_height(), 0);
    inside_frame = false;

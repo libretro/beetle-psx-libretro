@@ -46,6 +46,7 @@ Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
 		state ? state->vram.data() : nullptr, 0, 0,
 	};
 	framebuffer = device.create_image(info, state ? &initial_vram : nullptr);
+	framebuffer->set_layout(Layout::General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -62,6 +63,7 @@ Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	scaled_framebuffer = device.create_image(info);
+	scaled_framebuffer->set_layout(Layout::General);
 
 	{
 		auto view_info = scaled_framebuffer->get_view().get_create_info();
@@ -100,8 +102,12 @@ Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
 	static const int8_t quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
 	};
-	quad =
-	    device.create_buffer({ BufferDomain::Device, sizeof(quad_data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }, quad_data);
+
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::Device;
+	buffer_create_info.size = sizeof(quad_data);
+	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	quad = device.create_buffer(buffer_create_info, quad_data);
 
 	flush();
 	reset_scissor_queue();
@@ -114,8 +120,12 @@ void Renderer::set_scanout_semaphore(Semaphore semaphore)
 
 Renderer::SaveState Renderer::save_vram_state()
 {
-	auto buffer =
-	    device.create_buffer({ BufferDomain::CachedHost, FB_WIDTH * FB_HEIGHT * sizeof(uint32_t), 0 }, nullptr);
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
+	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
 	atlas.read_transfer(Domain::Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
@@ -126,10 +136,10 @@ Renderer::SaveState Renderer::save_vram_state()
 	flush();
 
 	device.wait_idle();
-	void *ptr = device.map_host_buffer(*buffer, MEMORY_ACCESS_READ);
+	void *ptr = device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	std::vector<uint32_t> vram(FB_WIDTH * FB_HEIGHT);
 	memcpy(vram.data(), ptr, FB_WIDTH * FB_HEIGHT * sizeof(uint32_t));
-	device.unmap_host_buffer(*buffer);
+	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	return { move(vram), render_state };
 }
 
@@ -138,139 +148,139 @@ void Renderer::init_pipelines()
 	switch (scaling)
 	{
 	case 8:
-		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_8, sizeof(resolve_to_unscaled_8));
+		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_8, sizeof(resolve_to_unscaled_8));
 		break;
 
 	case 4:
-		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_4, sizeof(resolve_to_unscaled_4));
+		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_4, sizeof(resolve_to_unscaled_4));
 		break;
 
 	default:
-		pipelines.resolve_to_unscaled = device.create_program(resolve_to_unscaled_2, sizeof(resolve_to_unscaled_2));
+		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_2, sizeof(resolve_to_unscaled_2));
 		break;
 	}
 
 	pipelines.scaled_quad_blitter =
-	    device.create_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
 	pipelines.bpp24_quad_blitter =
-	    device.create_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+		device.request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
 	pipelines.unscaled_quad_blitter =
-	    device.create_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
-	pipelines.copy_to_vram = device.create_program(copy_vram_comp, sizeof(copy_vram_comp));
-	pipelines.copy_to_vram_masked = device.create_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
-	pipelines.resolve_to_scaled = device.create_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+		device.request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
+	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+	pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
 
-	pipelines.blit_vram_unscaled = device.create_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
-	pipelines.blit_vram_scaled = device.create_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
+	pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
 	pipelines.blit_vram_unscaled_masked =
-	    device.create_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
+		device.request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
 	pipelines.blit_vram_scaled_masked =
-	    device.create_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+		device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
 
 	pipelines.blit_vram_cached_unscaled =
-	    device.create_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+		device.request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
 	pipelines.blit_vram_cached_scaled =
-	    device.create_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+		device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
 	pipelines.blit_vram_cached_unscaled_masked =
-	    device.create_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
+		device.request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 	pipelines.blit_vram_cached_scaled_masked =
-	    device.create_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-   if(filter_mode == 1)
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
-   }
-   else if(filter_mode == 2)
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
-   }
-   else if(filter_mode == 3)
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
-   }
-   else if(filter_mode == 4)
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_3point_frag, sizeof(semitrans_3point_frag));
-   }
-   else if(filter_mode == 5)
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
-   }
-   else // (filter_mode == 0) Nearest Neighbor
-   {
-	   pipelines.opaque_flat =
-	       device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
-	   pipelines.opaque_textured = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                     opaque_textured_frag, sizeof(opaque_textured_frag));
-	   pipelines.opaque_semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                             opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
-	   pipelines.semi_transparent = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                      semitrans_frag, sizeof(semitrans_frag));
-   }
+	if (filter_mode == 1)
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
+	}
+	else if (filter_mode == 2)
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
+	}
+	else if (filter_mode == 3)
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
+	}
+	else if (filter_mode == 4)
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_3point_frag, sizeof(semitrans_3point_frag));
+	}
+	else if (filter_mode == 5)
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
+	}
+	else // (filter_mode == 0) Nearest Neighbor
+	{
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_frag, sizeof(opaque_textured_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_frag, sizeof(semitrans_frag));
+	}
 
-	pipelines.semi_transparent_masked_add = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                              feedback_add_frag, sizeof(feedback_add_frag));
-	pipelines.semi_transparent_masked_average = device.create_program(
-	    opaque_textured_vert, sizeof(opaque_textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
-	pipelines.semi_transparent_masked_sub = device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-	                                                              feedback_sub_frag, sizeof(feedback_sub_frag));
+	pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+			feedback_add_frag, sizeof(feedback_add_frag));
+	pipelines.semi_transparent_masked_average = device.request_program(
+			opaque_textured_vert, sizeof(opaque_textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
+	pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+			feedback_sub_frag, sizeof(feedback_sub_frag));
 	pipelines.semi_transparent_masked_add_quarter =
-	    device.create_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_add_quarter_frag,
-	                          sizeof(feedback_add_quarter_frag));
+		device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_add_quarter_frag,
+				sizeof(feedback_add_quarter_frag));
 
-	pipelines.flat_masked_add = device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-	                                                  feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
-	pipelines.flat_masked_average = device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-	                                                      feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
-	pipelines.flat_masked_sub = device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-	                                                  feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
+	pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+			feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
+	pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+			feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
+	pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+			feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
 	pipelines.flat_masked_add_quarter =
-	    device.create_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_flat_add_quarter_frag,
-	                          sizeof(feedback_flat_add_quarter_frag));
+		device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_flat_add_quarter_frag,
+				sizeof(feedback_flat_add_quarter_frag));
 
 	pipelines.mipmap_resolve =
-	    device.create_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
-	pipelines.mipmap_energy = device.create_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
-	                                                mipmap_energy_frag, sizeof(mipmap_energy_frag));
-	pipelines.mipmap_energy_first = device.create_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
-	                                                      mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
-	pipelines.mipmap_energy_blur = device.create_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
-	                                                     mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
+		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+	pipelines.mipmap_energy = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+			mipmap_energy_frag, sizeof(mipmap_energy_frag));
+	pipelines.mipmap_energy_first = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
+	pipelines.mipmap_energy_blur = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
 }
 
 void Renderer::set_draw_rect(const Rect &rect)
@@ -317,8 +327,12 @@ BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
 	atlas.read_transfer(Domain::Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 
-	auto buffer =
-	    device.create_buffer({ BufferDomain::CachedHost, scaling * scaling * FB_WIDTH * FB_HEIGHT * 4, 0 }, nullptr);
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.size = scaling * scaling * FB_WIDTH * FB_HEIGHT * 4;
+	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
 	cmd->copy_image_to_buffer(*buffer, *scaled_framebuffer, 0, { 0, 0, 0 },
 	                          { scaling * FB_WIDTH, scaling * FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -337,15 +351,19 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 {
 	auto &rect = draw_area ? render_state.draw_rect : render_state.display_mode;
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
-		return nullptr;
+		return BufferHandle(nullptr);
 
 	atlas.flush_render_pass();
 
 	atlas.read_transfer(Domain::Scaled, rect);
 	ensure_command_buffer();
 
-	auto buffer = device.create_buffer(
-	    { BufferDomain::CachedHost, scaling * scaling * rect.width * rect.height * 4, 0 }, nullptr);
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.size = scaling * scaling * rect.width * rect.height * 4;
+	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
 	cmd->copy_image_to_buffer(*buffer, *scaled_framebuffer, 0, { int(scaling * rect.x), int(scaling * rect.y), 0 },
 	                          { scaling * rect.width, scaling * rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -375,17 +393,15 @@ void Renderer::mipmap_framebuffer()
 			rp.color_attachments[0] = scaled_views[i].get();
 
 		rp.num_color_attachments = 1;
-		rp.op_flags = RENDER_PASS_OP_STORE_COLOR_BIT;
+		rp.store_attachments = 1;
 		rp.render_area = { { int(rect.x * current_scale), int(rect.y * current_scale) },
 			               { rect.width * current_scale, rect.height * current_scale } };
 
 		if (i == levels)
 		{
-			rp.op_flags |= RENDER_PASS_OP_COLOR_OPTIMAL_BIT;
 			cmd->image_barrier(*bias_framebuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-			bias_framebuffer->set_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
 		cmd->begin_render_pass(rp);
@@ -428,14 +444,14 @@ void Renderer::mipmap_framebuffer()
 		if (i == levels)
 		{
 			cmd->image_barrier(*bias_framebuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
-			bias_framebuffer->set_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 		else
 		{
-			cmd->image_barrier(*scaled_framebuffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			cmd->image_barrier(*scaled_framebuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
 		}
@@ -473,13 +489,12 @@ ImageHandle Renderer::scanout_to_texture()
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &reuseable_scanout->get_view();
 		rp.num_color_attachments = 1;
-		rp.op_flags =
-		    RENDER_PASS_OP_COLOR_OPTIMAL_BIT | RENDER_PASS_OP_CLEAR_COLOR_BIT | RENDER_PASS_OP_STORE_COLOR_BIT;
+		rp.clear_attachments = 1;
+		rp.store_attachments = 1;
 
 		cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-		reuseable_scanout->set_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		cmd->begin_render_pass(rp);
 		cmd->end_render_pass();
@@ -489,7 +504,6 @@ ImageHandle Renderer::scanout_to_texture()
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		                   VK_ACCESS_SHADER_READ_BIT);
 
-		reuseable_scanout->set_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		last_scanout = reuseable_scanout;
 		return reuseable_scanout;
 	}
@@ -513,7 +527,7 @@ ImageHandle Renderer::scanout_to_texture()
 	{
 		flush();
 		// We only need to wait in the scanout pass.
-		device.add_wait_semaphore(scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		device.add_wait_semaphore(CommandBuffer::Type::Generic, scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, true);
 		scanout_semaphore.reset();
 	}
 
@@ -534,12 +548,11 @@ ImageHandle Renderer::scanout_to_texture()
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
 	rp.num_color_attachments = 1;
-	rp.op_flags = RENDER_PASS_OP_COLOR_OPTIMAL_BIT | RENDER_PASS_OP_STORE_COLOR_BIT;
+	rp.store_attachments = 1;
 
 	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-	reuseable_scanout->set_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
@@ -590,7 +603,6 @@ ImageHandle Renderer::scanout_to_texture()
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	                   VK_ACCESS_SHADER_READ_BIT);
 
-	reuseable_scanout->set_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	last_scanout = reuseable_scanout;
 
 	return reuseable_scanout;
@@ -1150,23 +1162,31 @@ void Renderer::flush_render_pass(const Rect &rect)
 	info.color_attachments[0] = scaled_views.front().get();
 	info.depth_stencil = &depth->get_view();
 	info.num_color_attachments = 1;
+	info.store_attachments = 1;
+	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT | RENDER_PASS_OP_STORE_COLOR_BIT |
-	                RENDER_PASS_OP_DEPTH_STENCIL_OPTIMAL_BIT;
+	RenderPassInfo::Subpass subpass;
+	info.num_subpasses = 1;
+	info.subpasses = &subpass;
 
+	subpass.num_color_attachments = 1;
+	subpass.color_attachments[0] = 0;
 	if (render_pass_is_feedback)
-		info.op_flags |= RENDER_PASS_OP_COLOR_FEEDBACK_BIT;
+	{
+		subpass.num_input_attachments = 1;
+		subpass.input_attachments[0] = 0;
+	}
 
 	auto *clear_candidate = find_clear_candidate(rect);
 	if (clear_candidate)
 	{
 		info.clear_depth_stencil.depth = clear_candidate->z;
 		fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color);
-		info.op_flags |= RENDER_PASS_OP_CLEAR_COLOR_BIT;
+		info.clear_attachments = 1;
 	}
 	else
 	{
-		info.op_flags |= RENDER_PASS_OP_LOAD_COLOR_BIT;
+		info.load_attachments = 1;
 		counters.fragment_readback_pixels += rect.width * rect.height * scaling * scaling;
 	}
 	counters.fragment_writeout_pixels += rect.width * rect.height * scaling * scaling;
@@ -1188,10 +1208,12 @@ void Renderer::flush_render_pass(const Rect &rect)
 	cmd->end_render_pass();
 
 	// Render passes are implicitly synchronized.
-	cmd->image_barrier(*scaled_framebuffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-	                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-	                   VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-	                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+	cmd->image_barrier(*scaled_framebuffer,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT);
 
 	reset_queue();
 }
@@ -1316,7 +1338,7 @@ void Renderer::render_semi_transparent_primitives()
 			{
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add : *pipelines.flat_masked_add);
 				cmd->pixel_barrier();
-				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
+				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -1338,7 +1360,7 @@ void Renderer::render_semi_transparent_primitives()
 			{
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_average :
 				                                  *pipelines.flat_masked_average);
-				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
+				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1362,7 +1384,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (state.masked)
 			{
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_sub : *pipelines.flat_masked_sub);
-				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
+				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1385,7 +1407,7 @@ void Renderer::render_semi_transparent_primitives()
 			{
 				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add_quarter :
 				                                  *pipelines.flat_masked_add_quarter);
-				cmd->set_input_attachment(0, 3, scaled_framebuffer->get_view());
+				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1609,12 +1631,12 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 
 uint16_t *Renderer::begin_copy(BufferHandle handle)
 {
-	return static_cast<uint16_t *>(device.map_host_buffer(*handle, MEMORY_ACCESS_WRITE));
+	return static_cast<uint16_t *>(device.map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
 }
 
 void Renderer::end_copy(BufferHandle handle)
 {
-	device.unmap_host_buffer(*handle);
+	device.unmap_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT);
 }
 
 BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
@@ -1624,7 +1646,11 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	VkDeviceSize size = rect.width * rect.height * sizeof(uint16_t);
 
 	// TODO: Chain allocate this.
-	auto buffer = device.create_buffer({ BufferDomain::Host, size, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT }, nullptr);
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::Host;
+	buffer_create_info.size = size;
+	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = buffer.get();

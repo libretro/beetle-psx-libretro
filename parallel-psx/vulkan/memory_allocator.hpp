@@ -1,15 +1,41 @@
+/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #ifndef FRAMEWORK_MEMORY_ALLOCATOR_HPP
 #define FRAMEWORK_MEMORY_ALLOCATOR_HPP
 
 #include "intrusive.hpp"
 #include "object_pool.hpp"
+#include "intrusive_list.hpp"
 #include "vulkan.hpp"
 #include <assert.h>
 #include <memory>
-#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <vector>
+
+#ifdef GRANITE_VULKAN_MT
+#include <mutex>
+#endif
 
 namespace Vulkan
 {
@@ -37,9 +63,9 @@ enum AllocationTiling
 
 enum MemoryAccessFlag
 {
-	MEMORY_ACCESS_WRITE = 1,
-	MEMORY_ACCESS_READ = 2,
-	MEMORY_ACCESS_READ_WRITE = MEMORY_ACCESS_WRITE | MEMORY_ACCESS_READ
+	MEMORY_ACCESS_WRITE_BIT = 1,
+	MEMORY_ACCESS_READ_BIT = 2,
+	MEMORY_ACCESS_READ_WRITE_BIT = MEMORY_ACCESS_WRITE_BIT | MEMORY_ACCESS_READ_BIT
 };
 using MemoryAccessFlags = uint32_t;
 
@@ -68,7 +94,7 @@ public:
 	~Block()
 	{
 		if (free_blocks[0] != AllFree)
-			LOG("Memory leak in block detected.\n");
+			LOGE("Memory leak in block detected.\n");
 	}
 
 	inline bool full() const
@@ -147,18 +173,19 @@ public:
 	void free_immediate();
 	void free_immediate(DeviceAllocator &allocator);
 
+	static DeviceAllocation make_imported_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type);
+
 private:
 	VkDeviceMemory base = VK_NULL_HANDLE;
 	uint8_t *host_base = nullptr;
 	ClassAllocator *alloc = nullptr;
-	IntrusiveList<MiniHeap>::Iterator heap = {};
+	Util::IntrusiveList<MiniHeap>::Iterator heap = {};
 	uint32_t offset = 0;
 	uint32_t mask = 0;
 	uint32_t size = 0;
 
 	uint8_t tiling = 0;
 	uint8_t memory_type = 0;
-	uint8_t access_flags = 0;
 	bool hierarchical = false;
 
 	void free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type);
@@ -169,7 +196,7 @@ private:
 	}
 };
 
-struct MiniHeap : IntrusiveListEnabled<MiniHeap>
+struct MiniHeap : Util::IntrusiveListEnabled<MiniHeap>
 {
 	DeviceAllocation allocation;
 	Block heap;
@@ -201,18 +228,21 @@ private:
 	ClassAllocator() = default;
 	struct AllocationTilingHeaps
 	{
-		IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
-		IntrusiveList<MiniHeap> full_heaps;
+		Util::IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
+		Util::IntrusiveList<MiniHeap> full_heaps;
 		uint32_t heap_availability_mask = 0;
 	};
 	ClassAllocator *parent = nullptr;
 	AllocationTilingHeaps tiling_modes[ALLOCATION_TILING_COUNT];
-	ObjectPool<MiniHeap> object_pool;
+	Util::ObjectPool<MiniHeap> object_pool;
 
 	uint32_t sub_block_size = 1;
 	uint32_t sub_block_size_log2 = 0;
 	uint32_t tiling_mask = ~0u;
 	uint32_t memory_type = 0;
+#ifdef GRANITE_VULKAN_MT
+	std::mutex lock;
+#endif
 	DeviceAllocator *global_allocator = nullptr;
 
 	void set_global_allocator(DeviceAllocator *allocator)
@@ -243,6 +273,7 @@ public:
 
 	bool allocate(uint32_t size, uint32_t alignment, AllocationTiling tiling, DeviceAllocation *alloc);
 	bool allocate_global(uint32_t size, DeviceAllocation *alloc);
+	bool allocate_dedicated(uint32_t size, DeviceAllocation *alloc, VkImage image);
 	inline ClassAllocator &get_class_allocator(MemoryClass clazz)
 	{
 		return classes[static_cast<unsigned>(clazz)];
@@ -277,19 +308,25 @@ class DeviceAllocator
 {
 public:
 	void init(VkPhysicalDevice gpu, VkDevice device);
+	void set_supports_dedicated_allocation(bool enable)
+	{
+		use_dedicated = enable;
+	}
 
 	~DeviceAllocator();
 
 	bool allocate(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
 	              DeviceAllocation *alloc);
+	bool allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
+	                           DeviceAllocation *alloc, VkImage image);
 
 	bool allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc);
 
 	void garbage_collect();
-	void *map_memory(DeviceAllocation *alloc, MemoryAccessFlags flags);
-	void unmap_memory(const DeviceAllocation &alloc);
+	void *map_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags);
+	void unmap_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags);
 
-	bool allocate(uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory);
+	bool allocate(uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory, VkImage dedicated_image);
 	void free(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
 	void free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
 
@@ -298,6 +335,10 @@ private:
 	VkDevice device = VK_NULL_HANDLE;
 	VkPhysicalDeviceMemoryProperties mem_props;
 	VkDeviceSize atom_alignment = 1;
+#ifdef GRANITE_VULKAN_MT
+	std::mutex lock;
+#endif
+	bool use_dedicated = false;
 
 	struct Allocation
 	{
