@@ -1,4 +1,5 @@
-#version 310 es
+#version 450
+
 layout(location = 0) in vec4 Position;
 layout(location = 1) in vec4 Color;
 #ifdef TEXTURED
