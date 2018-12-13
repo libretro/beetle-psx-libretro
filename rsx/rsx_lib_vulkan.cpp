@@ -10,6 +10,9 @@
 #include <vector>
 #include <functional>
 
+#include "mednafen/mednafen.h"
+#include "mednafen/psx/gpu.h"
+
 #include "../libretro_cbs.h"
 
 using namespace Vulkan;
@@ -31,6 +34,7 @@ static bool adaptive_smoothing;
 static bool super_sampling;
 static bool mdec_yuv;
 static vector<function<void ()>> defer;
+static dither_mode dither_mode = DITHER_NATIVE;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -175,6 +179,16 @@ void rsx_vulkan_refresh_variables(void)
          mdec_yuv = false;
    }
 
+   var.key = BEETLE_OPT(dither_mode);
+   dither_mode = DITHER_NATIVE;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "internal resolution"))
+         dither_mode = DITHER_UPSCALED;
+      else if (!strcmp(var.value, "disabled"))
+         dither_mode = DITHER_OFF;
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -223,11 +237,13 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    (void)pitch;
 
    renderer->set_adaptive_smoothing(adaptive_smoothing);
+   renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
 
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
       renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
    else
       renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
+
    auto scanout = renderer->scanout_to_texture();
 
    auto &image = swapchain_image;
@@ -346,8 +362,10 @@ static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
 {
    if (bpp24)
       return Renderer::ScanoutMode::BGR24;
+   else if (dither_mode != DITHER_OFF)
+      return Renderer::ScanoutMode::ABGR1555_Dither;
    else
-      return Renderer::ScanoutMode::ABGR1555;
+      return Renderer::ScanoutMode::ABGR1555_555;
 }
 
 void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
@@ -389,7 +407,7 @@ void rsx_vulkan_push_quad(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -467,7 +485,7 @@ void rsx_vulkan_push_triangle(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -576,7 +594,7 @@ void rsx_vulkan_push_line(int16_t p0x, int16_t p0y,
       { float(p0x), float(p0y), 1.0f, c0, 0, 0 },
       { float(p1x), float(p1y), 1.0f, c1, 0, 0 },
    };
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_texture_color_modulate(false);
    renderer->draw_line(vertices);
 }

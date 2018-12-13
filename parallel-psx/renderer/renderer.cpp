@@ -243,12 +243,17 @@ void Renderer::init_pipelines()
 
 	pipelines.scaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+	pipelines.scaled_dither_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
 	pipelines.bpp24_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
 	pipelines.bpp24_yuv_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
 	pipelines.unscaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+	pipelines.unscaled_dither_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+
 	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
 	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 	pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
@@ -292,6 +297,9 @@ void Renderer::init_pipelines()
 
 	pipelines.mipmap_resolve =
 		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+	pipelines.mipmap_dither_resolve =
+		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+
 	pipelines.mipmap_energy = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_frag, sizeof(mipmap_energy_frag));
 	pipelines.mipmap_energy_first = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
@@ -557,12 +565,18 @@ ImageHandle Renderer::scanout_to_texture()
 	}
 
 	ensure_command_buffer();
-	auto info =
-	    ImageCreateInfo::render_target(rect.width * ((bpp24 || ssaa) ? 1 : scaling),
-	                                   rect.height * ((bpp24 || ssaa) ? 1 : scaling), VK_FORMAT_R8G8B8A8_UNORM);
 
-	if (!reuseable_scanout || reuseable_scanout->get_create_info().width != info.width ||
-	    reuseable_scanout->get_create_info().height != info.height)
+	bool scaled = !bpp24 && !ssaa;
+
+	auto info = ImageCreateInfo::render_target(
+			rect.width * (scaled ? scaling : 1),
+			rect.height * (scaled ? scaling : 1),
+			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
+
+	if (!reuseable_scanout ||
+			reuseable_scanout->get_create_info().width != info.width ||
+			reuseable_scanout->get_create_info().height != info.height ||
+			reuseable_scanout->get_create_info().format != info.format)
 	{
 		//LOG("Creating new scanout image.\n");
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -582,6 +596,8 @@ ImageHandle Renderer::scanout_to_texture()
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
 
+	bool dither = render_state.scanout_mode == ScanoutMode::ABGR1555_Dither;
+
 	if (bpp24)
 	{
 		if (render_state.scanout_filter == ScanoutFilter::MDEC_YUV)
@@ -592,19 +608,63 @@ ImageHandle Renderer::scanout_to_texture()
 	}
 	else if (ssaa)
 	{
-		cmd->set_program(*pipelines.unscaled_quad_blitter);
+		if (dither)
+			cmd->set_program(*pipelines.unscaled_dither_quad_blitter);
+		else
+			cmd->set_program(*pipelines.unscaled_quad_blitter);
+
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
-		cmd->set_program(*pipelines.scaled_quad_blitter);
+		if (dither)
+			cmd->set_program(*pipelines.scaled_dither_quad_blitter);
+		else
+			cmd->set_program(*pipelines.scaled_quad_blitter);
+
 		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
 	}
 	else
 	{
-		cmd->set_program(*pipelines.mipmap_resolve);
+		if (dither)
+			cmd->set_program(*pipelines.mipmap_dither_resolve);
+		else
+			cmd->set_program(*pipelines.mipmap_resolve);
+
 		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearClamp);
 		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearClamp);
+	}
+
+	if (dither)
+	{
+		cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
+		struct DitherData
+		{
+			float range;
+			float inv_range;
+			float dither_scale;
+			int32_t dither_shift;
+		};
+		auto *dither = cmd->allocate_typed_constant_data<DitherData>(0, 3, 1);
+		dither->range = 31.0f;
+		dither->inv_range = 1.0f / 31.0f;
+		dither->dither_scale = 1.0f;
+
+		if (render_state.dither_native_resolution && scaled)
+		{
+			int32_t shift = 0;
+			unsigned tmp = scaling >> 1;
+			while (tmp)
+			{
+				shift++;
+				tmp >>= 1;
+			}
+			dither->dither_shift = shift;
+		}
+		else
+		{
+			dither->dither_shift = 0;
+		}
 	}
 
 	cmd->set_vertex_binding(0, *quad, 0, 2);
@@ -900,7 +960,11 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			render_state.texture_window,
 			int16_t(render_state.palette_offset_x),
 			int16_t(render_state.palette_offset_y),
+#if 0
 			int16_t(shift | (render_state.dither << 8)),
+#else
+			int16_t(shift),
+#endif
 			int16_t(vertices[i].u),
 			int16_t(vertices[i].v),
 			int16_t(render_state.texture_offset_x),

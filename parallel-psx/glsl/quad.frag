@@ -3,6 +3,9 @@ precision highp float;
 precision highp int;
 
 #include "common.h"
+#if defined(DITHER)
+#include "dither.h"
+#endif
 
 layout(location = 0) in highp vec2 vUV;
 
@@ -92,7 +95,11 @@ mediump vec3 sample_bpp24_yuv(ivec2 coord)
 void main()
 {
 #if defined(SCALED)
-	FragColor = vec4(textureLod(uTexture, vUV, 0.0).rgb, 1.0);
+	mediump vec3 rgb = textureLod(uTexture, vUV, 0.0).rgb;
+	#if defined(DITHER)
+		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
+	#endif
+	FragColor = vec4(rgb, 1.0);
 #elif defined(UNSCALED)
 	#if defined(BPP24)
 		ivec2 coord = ivec2((vUV - registers.offset) * vec2(1024.0, 512.0));
@@ -104,7 +111,11 @@ void main()
 		FragColor = vec4(rgb, 1.0);
 	#else
 		uint value = textureLod(uTexture, vUV, 0.0).x;
-		FragColor = vec4(abgr1555(value).rgb, 1.0);
+		mediump vec3 rgb = abgr1555(value).rgb;
+		#if defined(DITHER)
+			rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
+		#endif
+		FragColor = vec4(rgb, 1.0);
 	#endif
 #endif
 }
