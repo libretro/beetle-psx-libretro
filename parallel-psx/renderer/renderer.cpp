@@ -228,6 +228,7 @@ void Renderer::init_pipelines()
 {
 	switch (scaling)
 	{
+	case 16: // Not quite correct, but a 256-tap downsampler, really? :V
 	case 8:
 		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_8, sizeof(resolve_to_unscaled_8));
 		break;
