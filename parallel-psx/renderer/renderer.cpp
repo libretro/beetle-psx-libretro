@@ -245,6 +245,8 @@ void Renderer::init_pipelines()
 		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
 	pipelines.bpp24_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+	pipelines.bpp24_yuv_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
 	pipelines.unscaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
 	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
@@ -582,7 +584,10 @@ ImageHandle Renderer::scanout_to_texture()
 
 	if (bpp24)
 	{
-		cmd->set_program(*pipelines.bpp24_quad_blitter);
+		if (render_state.scanout_filter == ScanoutFilter::MDEC_YUV)
+			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
+		else
+			cmd->set_program(*pipelines.bpp24_quad_blitter);
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else if (ssaa)

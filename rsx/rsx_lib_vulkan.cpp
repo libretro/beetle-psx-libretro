@@ -29,6 +29,7 @@ static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
 static bool super_sampling;
+static bool mdec_yuv;
 static vector<function<void ()>> defer;
 
 static retro_video_refresh_t video_refresh_cb;
@@ -165,6 +166,15 @@ void rsx_vulkan_refresh_variables(void)
          super_sampling = false;
    }
 
+   var.key = BEETLE_OPT(mdec_yuv);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         mdec_yuv = true;
+      else
+         mdec_yuv = false;
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -213,7 +223,11 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    (void)pitch;
 
    renderer->set_adaptive_smoothing(adaptive_smoothing);
-   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
+
+   if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
+      renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
+   else
+      renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
    auto scanout = renderer->scanout_to_texture();
 
    auto &image = swapchain_image;

@@ -11,6 +11,9 @@ static const uint32_t scaled_quad_frag[] =
 static const uint32_t bpp24_quad_frag[] =
 #include "bpp24.quad.frag.inc"
     ;
+static const uint32_t bpp24_yuv_quad_frag[] =
+#include "bpp24.yuv.quad.frag.inc"
+    ;
 static const uint32_t unscaled_quad_frag[] =
 #include "unscaled.quad.frag.inc"
     ;

@@ -51,7 +51,8 @@ public:
 	enum class ScanoutFilter
 	{
 		None,
-		SSAA
+		SSAA,
+		MDEC_YUV
 	};
 
 	struct RenderState
@@ -236,6 +237,10 @@ public:
 	};
 
 	void set_filter_mode(FilterMode mode);
+	ScanoutMode get_scanout_mode() const
+	{
+		return render_state.scanout_mode;
+	}
 
 private:
 	Vulkan::Device &device;
@@ -264,6 +269,7 @@ private:
 		Vulkan::Program *unscaled_quad_blitter;
 		Vulkan::Program *scaled_quad_blitter;
 		Vulkan::Program *bpp24_quad_blitter;
+		Vulkan::Program *bpp24_yuv_quad_blitter;
 		Vulkan::Program *resolve_to_scaled;
 		Vulkan::Program *resolve_to_unscaled;
 		Vulkan::Program *blit_vram_unscaled;

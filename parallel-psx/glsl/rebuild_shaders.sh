@@ -72,6 +72,7 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/unscaled.quad.frag.inc -mfmt=c -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/scaled.quad.frag.inc -mfmt=c -DSCALED quad.frag
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
+"$GLSLC" -o prebuilt/bpp24.yuv.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
