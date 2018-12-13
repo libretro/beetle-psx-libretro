@@ -140,6 +140,8 @@ void rsx_vulkan_refresh_variables(void)
    }
 
    unsigned old_scaling = scaling;
+   bool old_super_sampling = super_sampling;
+
    var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -198,7 +200,7 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
-   if (old_scaling != scaling && renderer)
+   if ((old_scaling != scaling || old_super_sampling != super_sampling) && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
@@ -294,8 +296,8 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * scaling;
-   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * scaling;
+   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
+   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->timing.sample_rate   = SOUND_FREQUENCY;
 
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
