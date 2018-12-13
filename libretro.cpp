@@ -3925,6 +3925,8 @@ void retro_set_environment(retro_environment_t cb)
 #endif
 #ifdef HAVE_VULKAN
       { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
+      { BEETLE_OPT(super_sampling), "Super sampling (downsample from internal upscale); disabled|enabled" },
+      { BEETLE_OPT(mdec_yuv), "MDEC YUV Chroma filter; disabled|enabled" },
 #endif
       { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x" },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)

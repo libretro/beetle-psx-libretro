@@ -42,6 +42,24 @@ enum class SemiTransparentMode
 class Renderer : private HazardListener
 {
 public:
+	enum class ScanoutMode
+	{
+		// Use extra precision bits.
+		ABGR1555_555,
+		// Use extra precision bits to dither down to a native ABGR1555 image.
+		// The dither happens in the wrong place, but should be "good" enough to feel authentic.
+		ABGR1555_Dither,
+		// MDEC
+		BGR24
+	};
+
+	enum class ScanoutFilter
+	{
+		None,
+		SSAA,
+		MDEC_YUV
+	};
+
 	struct RenderState
 	{
 		Rect display_mode;
@@ -57,12 +75,14 @@ public:
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
+		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
+		ScanoutFilter scanout_filter = ScanoutFilter::None;
+		bool dither_native_resolution = false;
 		bool force_mask_bit = false;
 		bool texture_color_modulate = false;
 		bool mask_test = false;
 		bool display_on = false;
-		bool bpp24 = false;
-		bool dither = false;
+		//bool dither = false;
 		bool adaptive_smoothing = true;
 
 		UVRect UVLimits;
@@ -114,14 +134,18 @@ public:
 	void end_copy(Vulkan::BufferHandle handle);
 
 	void blit_vram(const Rect &dst, const Rect &src);
-
-	void set_display_mode(const Rect &rect, bool bpp24)
+	void set_display_mode(const Rect &rect, ScanoutMode mode)
 	{
-		if (rect != render_state.display_mode || bpp24 != render_state.bpp24)
+		if (rect != render_state.display_mode || render_state.scanout_mode != mode)
 			last_scanout.reset();
 
 		render_state.display_mode = rect;
-		render_state.bpp24 = bpp24;
+		render_state.scanout_mode = mode;
+	}
+
+	void set_display_filter(ScanoutFilter filter)
+	{
+		render_state.scanout_filter = filter;
 	}
 
 	void toggle_display(bool enable)
@@ -132,9 +156,16 @@ public:
 		render_state.display_on = enable;
 	}
 
+#if 0
 	void set_dither(bool dither)
 	{
 		render_state.dither = dither;
+	}
+#endif
+
+	void set_dither_native_resolution(bool enable)
+	{
+		render_state.dither_native_resolution = enable;
 	}
 
 	void set_scanout_semaphore(Vulkan::Semaphore semaphore);
@@ -208,9 +239,26 @@ public:
 		unsigned native_draw_calls = 0;
 	} counters;
 
+	enum class FilterMode
+	{
+		NearestNeighbor = 0,
+		XBR = 1,
+		SABR = 2,
+		Bilinear = 3,
+		Bilinear3Point = 4,
+		JINC2 = 5
+	};
+
+	void set_filter_mode(FilterMode mode);
+	ScanoutMode get_scanout_mode() const
+	{
+		return render_state.scanout_mode;
+	}
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
+	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	Vulkan::ImageHandle scaled_framebuffer;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
@@ -233,7 +281,10 @@ private:
 		Vulkan::Program *copy_to_vram_masked;
 		Vulkan::Program *unscaled_quad_blitter;
 		Vulkan::Program *scaled_quad_blitter;
+		Vulkan::Program *unscaled_dither_quad_blitter;
+		Vulkan::Program *scaled_dither_quad_blitter;
 		Vulkan::Program *bpp24_quad_blitter;
+		Vulkan::Program *bpp24_yuv_quad_blitter;
 		Vulkan::Program *resolve_to_scaled;
 		Vulkan::Program *resolve_to_unscaled;
 		Vulkan::Program *blit_vram_unscaled;
@@ -258,6 +309,7 @@ private:
 		Vulkan::Program *flat_masked_add_quarter;
 
 		Vulkan::Program *mipmap_resolve;
+		Vulkan::Program *mipmap_dither_resolve;
 		Vulkan::Program *mipmap_energy_first;
 		Vulkan::Program *mipmap_energy;
 		Vulkan::Program *mipmap_energy_blur;
@@ -266,6 +318,7 @@ private:
 	Vulkan::ImageHandle dither_lut;
 
 	void init_pipelines();
+	void init_primitive_pipelines();
 	void ensure_command_buffer();
 
 	RenderState render_state;

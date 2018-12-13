@@ -10,6 +10,9 @@
 #include <vector>
 #include <functional>
 
+#include "mednafen/mednafen.h"
+#include "mednafen/psx/gpu.h"
+
 #include "../libretro_cbs.h"
 
 using namespace Vulkan;
@@ -28,7 +31,10 @@ static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
+static bool super_sampling;
+static bool mdec_yuv;
 static vector<function<void ()>> defer;
+static dither_mode dither_mode = DITHER_NATIVE;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -134,6 +140,8 @@ void rsx_vulkan_refresh_variables(void)
    }
 
    unsigned old_scaling = scaling;
+   bool old_super_sampling = super_sampling;
+
    var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -155,6 +163,34 @@ void rsx_vulkan_refresh_variables(void)
          adaptive_smoothing = false;
    }
 
+   var.key = BEETLE_OPT(super_sampling);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         super_sampling = true;
+      else
+         super_sampling = false;
+   }
+
+   var.key = BEETLE_OPT(mdec_yuv);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         mdec_yuv = true;
+      else
+         mdec_yuv = false;
+   }
+
+   var.key = BEETLE_OPT(dither_mode);
+   dither_mode = DITHER_NATIVE;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "internal resolution"))
+         dither_mode = DITHER_UPSCALED;
+      else if (!strcmp(var.value, "disabled"))
+         dither_mode = DITHER_OFF;
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -164,7 +200,7 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
-   if (old_scaling != scaling && renderer)
+   if ((old_scaling != scaling || old_super_sampling != super_sampling) && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
@@ -190,6 +226,8 @@ void rsx_vulkan_prepare_frame(void)
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
    renderer->reset_counters();
+
+   renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
 }
 
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
@@ -201,6 +239,13 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    (void)pitch;
 
    renderer->set_adaptive_smoothing(adaptive_smoothing);
+   renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
+
+   if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
+      renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
+   else
+      renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
+
    auto scanout = renderer->scanout_to_texture();
 
    auto &image = swapchain_image;
@@ -251,8 +296,8 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
    info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * scaling;
-   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * scaling;
+   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
+   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->timing.sample_rate   = SOUND_FREQUENCY;
 
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
@@ -315,16 +360,26 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
+static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
+{
+   if (bpp24)
+      return Renderer::ScanoutMode::BGR24;
+   else if (dither_mode != DITHER_OFF)
+      return Renderer::ScanoutMode::ABGR1555_Dither;
+   else
+      return Renderer::ScanoutMode::ABGR1555_555;
+}
+
 void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
                                  uint16_t w, uint16_t h,
                                  bool depth_24bpp)
 {
    if (renderer)
-      renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+      renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
    else
    {
       defer.push_back([=]() {
-            renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
       });
    }
 }
@@ -354,7 +409,7 @@ void rsx_vulkan_push_quad(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -432,7 +487,7 @@ void rsx_vulkan_push_triangle(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -541,7 +596,7 @@ void rsx_vulkan_push_line(int16_t p0x, int16_t p0y,
       { float(p0x), float(p0y), 1.0f, c0, 0, 0 },
       { float(p1x), float(p1y), 1.0f, c1, 0, 0 },
    };
-   renderer->set_dither(dither);
+   //renderer->set_dither(dither);
    renderer->set_texture_color_modulate(false);
    renderer->draw_line(vertices);
 }

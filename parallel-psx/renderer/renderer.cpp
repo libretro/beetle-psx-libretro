@@ -143,6 +143,87 @@ Renderer::SaveState Renderer::save_vram_state()
 	return { move(vram), render_state };
 }
 
+void Renderer::set_filter_mode(FilterMode mode)
+{
+	if (mode != primitive_filter_mode)
+	{
+		primitive_filter_mode = mode;
+		init_primitive_pipelines();
+	}
+}
+
+void Renderer::init_primitive_pipelines()
+{
+	switch (primitive_filter_mode)
+	{
+	case FilterMode::XBR:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
+		break;
+
+	case FilterMode::SABR:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
+		break;
+
+	case FilterMode::Bilinear:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
+		break;
+
+	case FilterMode::Bilinear3Point:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_3point_frag, sizeof(semitrans_3point_frag));
+		break;
+
+	case FilterMode::JINC2:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
+		break;
+
+	default:
+		pipelines.opaque_flat =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
+		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_textured_frag, sizeof(opaque_textured_frag));
+		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
+		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				semitrans_frag, sizeof(semitrans_frag));
+		break;
+	}
+}
+
 void Renderer::init_pipelines()
 {
 	switch (scaling)
@@ -162,10 +243,17 @@ void Renderer::init_pipelines()
 
 	pipelines.scaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+	pipelines.scaled_dither_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
 	pipelines.bpp24_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+	pipelines.bpp24_yuv_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
 	pipelines.unscaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+	pipelines.unscaled_dither_quad_blitter =
+		device.request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+
 	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
 	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 	pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
@@ -186,73 +274,7 @@ void Renderer::init_pipelines()
 	pipelines.blit_vram_cached_scaled_masked =
 		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-	if (filter_mode == 1)
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
-	}
-	else if (filter_mode == 2)
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
-	}
-	else if (filter_mode == 3)
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
-	}
-	else if (filter_mode == 4)
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_3point_frag, sizeof(semitrans_3point_frag));
-	}
-	else if (filter_mode == 5)
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
-	}
-	else // (filter_mode == 0) Nearest Neighbor
-	{
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_frag, sizeof(opaque_textured_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_frag, sizeof(semitrans_frag));
-	}
-
+	// TODO: The masked pipelines do not have filter options.
 	pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
 			feedback_add_frag, sizeof(feedback_add_frag));
 	pipelines.semi_transparent_masked_average = device.request_program(
@@ -275,12 +297,17 @@ void Renderer::init_pipelines()
 
 	pipelines.mipmap_resolve =
 		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+	pipelines.mipmap_dither_resolve =
+		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+
 	pipelines.mipmap_energy = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_frag, sizeof(mipmap_energy_frag));
 	pipelines.mipmap_energy_first = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
 	pipelines.mipmap_energy_blur = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
+
+	init_primitive_pipelines();
 }
 
 void Renderer::set_draw_rect(const Rect &rect)
@@ -508,11 +535,17 @@ ImageHandle Renderer::scanout_to_texture()
 		return reuseable_scanout;
 	}
 
-	if (render_state.bpp24)
+	bool bpp24 = render_state.scanout_mode == ScanoutMode::BGR24;
+	bool ssaa = render_state.scanout_filter == ScanoutFilter::SSAA && scaling != 1;
+
+	if (bpp24 || ssaa)
 	{
 		auto tmp = rect;
-		tmp.width = (tmp.width * 3 + 1) / 2;
-		tmp.width = min(tmp.width, FB_WIDTH - tmp.x);
+		if (bpp24)
+		{
+			tmp.width = (tmp.width * 3 + 1) / 2;
+			tmp.width = min(tmp.width, FB_WIDTH - tmp.x);
+		}
 		atlas.read_fragment(Domain::Unscaled, tmp);
 	}
 	else
@@ -520,7 +553,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	ensure_command_buffer();
 
-	if (render_state.adaptive_smoothing && (!render_state.bpp24 && scaling != 1))
+	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
 		mipmap_framebuffer();
 
 	if (scanout_semaphore)
@@ -532,12 +565,18 @@ ImageHandle Renderer::scanout_to_texture()
 	}
 
 	ensure_command_buffer();
-	auto info =
-	    ImageCreateInfo::render_target(rect.width * (render_state.bpp24 ? 1 : scaling),
-	                                   rect.height * (render_state.bpp24 ? 1 : scaling), VK_FORMAT_R8G8B8A8_UNORM);
 
-	if (!reuseable_scanout || reuseable_scanout->get_create_info().width != info.width ||
-	    reuseable_scanout->get_create_info().height != info.height)
+	bool scaled = !bpp24 && !ssaa;
+
+	auto info = ImageCreateInfo::render_target(
+			rect.width * (scaled ? scaling : 1),
+			rect.height * (scaled ? scaling : 1),
+			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
+
+	if (!reuseable_scanout ||
+			reuseable_scanout->get_create_info().width != info.width ||
+			reuseable_scanout->get_create_info().height != info.height ||
+			reuseable_scanout->get_create_info().format != info.format)
 	{
 		//LOG("Creating new scanout image.\n");
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -557,21 +596,75 @@ ImageHandle Renderer::scanout_to_texture()
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
 
-	if (render_state.bpp24)
+	bool dither = render_state.scanout_mode == ScanoutMode::ABGR1555_Dither;
+
+	if (bpp24)
 	{
-		cmd->set_program(*pipelines.bpp24_quad_blitter);
+		if (render_state.scanout_filter == ScanoutFilter::MDEC_YUV)
+			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
+		else
+			cmd->set_program(*pipelines.bpp24_quad_blitter);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+	}
+	else if (ssaa)
+	{
+		if (dither)
+			cmd->set_program(*pipelines.unscaled_dither_quad_blitter);
+		else
+			cmd->set_program(*pipelines.unscaled_quad_blitter);
+
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
-		cmd->set_program(*pipelines.scaled_quad_blitter);
+		if (dither)
+			cmd->set_program(*pipelines.scaled_dither_quad_blitter);
+		else
+			cmd->set_program(*pipelines.scaled_quad_blitter);
+
 		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
 	}
 	else
 	{
-		cmd->set_program(*pipelines.mipmap_resolve);
+		if (dither)
+			cmd->set_program(*pipelines.mipmap_dither_resolve);
+		else
+			cmd->set_program(*pipelines.mipmap_resolve);
+
 		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearClamp);
 		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearClamp);
+	}
+
+	if (dither)
+	{
+		cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
+		struct DitherData
+		{
+			float range;
+			float inv_range;
+			float dither_scale;
+			int32_t dither_shift;
+		};
+		auto *dither = cmd->allocate_typed_constant_data<DitherData>(0, 3, 1);
+		dither->range = 31.0f;
+		dither->inv_range = 1.0f / 31.0f;
+		dither->dither_scale = 1.0f;
+
+		if (render_state.dither_native_resolution && scaled)
+		{
+			int32_t shift = 0;
+			unsigned tmp = scaling >> 1;
+			while (tmp)
+			{
+				shift++;
+				tmp >>= 1;
+			}
+			dither->dither_shift = shift;
+		}
+		else
+		{
+			dither->dither_shift = 0;
+		}
 	}
 
 	cmd->set_vertex_binding(0, *quad, 0, 2);
@@ -867,7 +960,11 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			render_state.texture_window,
 			int16_t(render_state.palette_offset_x),
 			int16_t(render_state.palette_offset_y),
+#if 0
 			int16_t(shift | (render_state.dither << 8)),
+#else
+			int16_t(shift),
+#endif
 			int16_t(vertices[i].u),
 			int16_t(vertices[i].v),
 			int16_t(render_state.texture_offset_x),
@@ -1268,11 +1365,9 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	if(opaque_check) init_pipelines();
 	cmd->set_program(*pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
-	opaque_check = false;
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -1305,8 +1400,6 @@ void Renderer::render_semi_transparent_primitives()
 	const auto set_state = [&](const SemiTransparentState &state) {
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
 		
-		if (semitrans_check) init_pipelines();
-	   
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
 		else
@@ -1446,7 +1539,6 @@ void Renderer::render_semi_transparent_primitives()
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
-	semitrans_check = false;
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()

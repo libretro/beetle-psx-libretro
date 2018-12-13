@@ -8,11 +8,20 @@ static const uint32_t quad_vert[] =
 static const uint32_t scaled_quad_frag[] =
 #include "scaled.quad.frag.inc"
     ;
+static const uint32_t scaled_dither_quad_frag[] =
+#include "scaled.dither.quad.frag.inc"
+    ;
 static const uint32_t bpp24_quad_frag[] =
 #include "bpp24.quad.frag.inc"
     ;
+static const uint32_t bpp24_yuv_quad_frag[] =
+#include "bpp24.yuv.quad.frag.inc"
+    ;
 static const uint32_t unscaled_quad_frag[] =
 #include "unscaled.quad.frag.inc"
+    ;
+static const uint32_t unscaled_dither_quad_frag[] =
+#include "unscaled.dither.quad.frag.inc"
     ;
 static const uint32_t copy_vram_comp[] =
 #include "copy_vram.comp.inc"
@@ -171,6 +180,9 @@ static const uint32_t mipmap_energy_first_frag[] =
     ;
 static const uint32_t mipmap_resolve_frag[] =
 #include "mipmap.resolve.frag.inc"
+    ;
+static const uint32_t mipmap_dither_resolve_frag[] =
+#include "mipmap.dither.resolve.frag.inc"
     ;
 static const uint32_t mipmap_energy_frag[] =
 #include "mipmap.energy.frag.inc"

@@ -64,14 +64,17 @@ mkdir -p prebuilt
 # Resolve shaders
 "$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp -DSCALED
 "$GLSLC" -o prebuilt/resolve.unscaled.2.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.4.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.8.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
+"$GLSLC" -o prebuilt/resolve.unscaled.4.comp.inc -mfmt=c -DUNSCALED -DSCALE=4 resolve.comp
+"$GLSLC" -o prebuilt/resolve.unscaled.8.comp.inc -mfmt=c -DUNSCALED -DSCALE=8 resolve.comp
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
 "$GLSLC" -o prebuilt/unscaled.quad.frag.inc -mfmt=c -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/scaled.quad.frag.inc -mfmt=c -DSCALED quad.frag
+"$GLSLC" -o prebuilt/unscaled.dither.quad.frag.inc -mfmt=c -DDITHER -DUNSCALED quad.frag
+"$GLSLC" -o prebuilt/scaled.dither.quad.frag.inc -mfmt=c -DDITHER -DSCALED quad.frag
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
+"$GLSLC" -o prebuilt/bpp24.yuv.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
@@ -91,6 +94,7 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/mipmap.vert.inc -mfmt=c mipmap.vert
 "$GLSLC" -o prebuilt/mipmap.shifted.vert.inc -mfmt=c -DSHIFT_QUAD mipmap.vert
 "$GLSLC" -o prebuilt/mipmap.resolve.frag.inc -mfmt=c mipmap_resolve.frag
+"$GLSLC" -o prebuilt/mipmap.dither.resolve.frag.inc -mfmt=c -DDITHER mipmap_resolve.frag
 "$GLSLC" -o prebuilt/mipmap.energy.first.frag.inc -mfmt=c -DFIRST_PASS mipmap_energy.frag
 "$GLSLC" -o prebuilt/mipmap.energy.frag.inc -mfmt=c mipmap_energy.frag
 "$GLSLC" -o prebuilt/mipmap.energy.blur.frag.inc -mfmt=c mipmap_blur.frag
