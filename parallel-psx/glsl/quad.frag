@@ -37,7 +37,7 @@ void main()
     FragColor = vec4(rgb, 1.0);
 #else
     uint value = textureLod(uTexture, vUV, 0.0).x;
-    FragColor = abgr1555(value);
+    FragColor = vec4(abgr1555(value).rgb, 1.0);
 #endif
 #endif
 }

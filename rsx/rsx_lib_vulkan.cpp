@@ -28,6 +28,7 @@ static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
+static bool super_sampling;
 static vector<function<void ()>> defer;
 
 static retro_video_refresh_t video_refresh_cb;
@@ -155,6 +156,15 @@ void rsx_vulkan_refresh_variables(void)
          adaptive_smoothing = false;
    }
 
+   var.key = BEETLE_OPT(super_sampling);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         super_sampling = true;
+      else
+         super_sampling = false;
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -190,6 +200,8 @@ void rsx_vulkan_prepare_frame(void)
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
    renderer->reset_counters();
+
+   renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
 }
 
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
@@ -201,6 +213,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    (void)pitch;
 
    renderer->set_adaptive_smoothing(adaptive_smoothing);
+   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
    auto scanout = renderer->scanout_to_texture();
 
    auto &image = swapchain_image;
@@ -315,16 +328,24 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
+static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
+{
+   if (bpp24)
+      return Renderer::ScanoutMode::BGR24;
+   else
+      return Renderer::ScanoutMode::ABGR1555;
+}
+
 void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
                                  uint16_t w, uint16_t h,
                                  bool depth_24bpp)
 {
    if (renderer)
-      renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+      renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
    else
    {
       defer.push_back([=]() {
-            renderer->set_display_mode({ x, y, w, h }, depth_24bpp);
+            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
       });
    }
 }
