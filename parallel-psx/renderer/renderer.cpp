@@ -1,5 +1,6 @@
 #include "renderer.hpp"
 #include "renderer_pipelines.hpp"
+#include "timer.hpp"
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -373,6 +374,49 @@ BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
 	width = FB_WIDTH * scaling;
 	height = FB_HEIGHT * scaling;
 	return buffer;
+}
+
+void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
+{
+	if (rect.x + rect.width > FB_WIDTH || rect.y + rect.height > FB_HEIGHT)
+	{
+	   LOGI("copy_vram_to_cpu_synchronous: TODO: handle wraparound case.\n");
+	   return;
+	}
+
+	Util::Timer timer;
+	timer.start();
+
+	atlas.read_transfer(Domain::Unscaled, rect);
+	ensure_command_buffer();
+
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.size = rect.width * rect.height * 4;
+	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
+	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(rect.x), int(rect.y), 0 },
+	                          { rect.width, rect.height, 1 }, 0, 0,
+	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
+
+	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
+
+	auto fence = flush_and_signal();
+	fence->wait();
+
+	auto *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+
+	for (uint16_t y = 0; y < rect.height; y++)
+	   for (uint16_t x = 0; x < rect.width; x++)
+		  vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
+
+	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+
+	double readback_time = timer.end();
+	LOGI("copy_vram_to_cpu_synchronous() took %.3f ms!\n",
+			readback_time * 1e3);
 }
 
 BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)

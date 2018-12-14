@@ -130,6 +130,7 @@ public:
 	}
 
 	Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
+	void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 	uint16_t *begin_copy(Vulkan::BufferHandle handle);
 	void end_copy(Vulkan::BufferHandle handle);
 
@@ -227,6 +228,16 @@ public:
 			device.submit(cmd);
 		cmd.reset();
 		device.flush_frame();
+	}
+
+	Vulkan::Fence flush_and_signal()
+	{
+		Vulkan::Fence fence;
+		if (cmd)
+			device.submit(cmd, &fence);
+		cmd.reset();
+		device.flush_frame();
+		return fence;
 	}
 
 	struct

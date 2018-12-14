@@ -605,6 +605,15 @@ void rsx_vulkan_push_line(int16_t p0x, int16_t p0y,
    renderer->draw_line(vertices);
 }
 
+bool rsx_vulkan_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
+{
+   if (!renderer)
+      return false;
+
+   renderer->copy_vram_to_cpu_synchronous({ x, y, w, h }, vram);
+   return true;
+}
+
 void rsx_vulkan_load_image(uint16_t x, uint16_t y,
                            uint16_t w, uint16_t h,
                            uint16_t *vram, bool mask_test, bool set_mask)
