@@ -14,7 +14,7 @@ layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpass
 void main()
 {
 #ifdef TEXTURED
-	vec4 NNColor = sample_vram_atlas(vUV);
+	vec4 NNColor = sample_vram_atlas(clamp_coord(vUV));
 	if (all(equal(NNColor, vec4(0.0))))
 		discard;
 

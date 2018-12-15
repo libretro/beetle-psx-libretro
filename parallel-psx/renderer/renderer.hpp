@@ -72,7 +72,7 @@ public:
 		unsigned palette_offset_y = 0;
 		unsigned texture_offset_x = 0;
 		unsigned texture_offset_y = 0;
-		unsigned msaa = 1;
+		unsigned msaa = 4;
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;

@@ -1436,6 +1436,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 		cmd->set_vertex_binding(0, *quad, 0, 2);
 		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
 		cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+		cmd->draw(4);
 	}
 
 	render_opaque_primitives();
