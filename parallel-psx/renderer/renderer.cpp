@@ -23,11 +23,39 @@ using namespace std;
 
 namespace PSX
 {
-Renderer::Renderer(Device &device, unsigned scaling, unsigned msaa_, const SaveState *state)
+Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const SaveState *state)
     : device(device)
-    , scaling(scaling)
+    , scaling(scaling_)
     , msaa(msaa_)
 {
+	// Verify we can actually render at our target scaling factor.
+	// Some devices only support 8K textures, which means max 8x scale.
+	VkImageFormatProperties props;
+	if (device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+				VK_IMAGE_USAGE_STORAGE_BIT |
+				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+				VK_IMAGE_USAGE_SAMPLED_BIT,
+				0,
+				&props))
+	{
+		unsigned max_scaling = std::min(props.maxExtent.width / FB_WIDTH, props.maxExtent.height / FB_HEIGHT);
+		unsigned new_scale = scaling;
+		while (new_scale > max_scaling)
+			new_scale >>= 1;
+
+		if (new_scale != scaling)
+		{
+			LOGI("[Vulkan]: Internal resolution scale of %ux was chosen, but this is not supported, using %ux instead.\n",
+					scaling, new_scale);
+			scaling = new_scale;
+		}
+	}
+	else
+	{
+		throw std::runtime_error("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+	}
+
 	auto info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
@@ -80,7 +108,6 @@ Renderer::Renderer(Device &device, unsigned scaling, unsigned msaa_, const SaveS
 	// Check for support.
 	if (msaa > 1)
 	{
-		VkImageFormatProperties props;
 		if (!device.get_device_features().enabled_features.sampleRateShading)
 		{
 			msaa = 1;
