@@ -24,6 +24,12 @@ static Device *device;
 static Renderer *renderer;
 static unsigned scaling = 4;
 
+extern retro_log_printf_t log_cb;
+namespace Granite
+{
+retro_log_printf_t libretro_log;
+}
+
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 static retro_vulkan_image swapchain_image;
@@ -140,6 +146,7 @@ static bool libretro_create_device(
 
 bool rsx_vulkan_open(bool is_pal)
 {
+   Granite::libretro_log = log_cb;
    content_is_pal = is_pal;
 
    hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;

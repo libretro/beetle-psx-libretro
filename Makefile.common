@@ -237,7 +237,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                         -I$(CORE_DIR)/parallel-psx/volk \
                         -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
 
-      CXXFLAGS += -std=c++11
+      CXXFLAGS += -std=c++11 -DHAVE_LIBRETRO
       ifneq ($(VULKAN_DEBUG),)
          FLAGS += -DVULKAN_DEBUG
       endif

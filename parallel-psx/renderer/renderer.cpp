@@ -28,6 +28,18 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
     , scaling(scaling_)
     , msaa(msaa_)
 {
+	// Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
+	if (scaling == 16 && msaa > 1)
+	{
+		LOGI("[Vulkan]: Internal resolution scale of 16x is used, limiting MSAA to 1x for memory reasons.\n");
+		msaa = 1;
+	}
+	else if (scaling == 8 && msaa > 4)
+	{
+		LOGI("[Vulkan]: Internal resolution scale of 8x is used, limiting MSAA to 4x for memory reasons.\n");
+		msaa = 4;
+	}
+
 	// Verify we can actually render at our target scaling factor.
 	// Some devices only support 8K textures, which means max 8x scale.
 	VkImageFormatProperties props;
