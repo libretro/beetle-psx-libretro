@@ -2,7 +2,11 @@
 layout(local_size_x = 128) in;
 
 #if defined(SCALED)
+#if defined(MSAA)
+layout(set = 0, binding = 0, rgba8) uniform image2DMS uFramebuffer;
+#else
 layout(set = 0, binding = 0, rgba8) uniform image2D uFramebuffer;
+#endif
 #elif defined(UNSCALED)
 layout(set = 0, binding = 0, r32ui) uniform uimage2D uFramebuffer;
 #else
@@ -54,7 +58,11 @@ void main()
          if (local_x < registers.extent.x)
          {
             ivec2 coord = (registers.scaling * ivec2(src_x + local_x, registers.src.y + y) + offset) & mask;
-            cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+			#ifdef MSAA
+				cache = imageLoad(uFramebuffer, coord, int(gl_WorkGroupID.z)).LOAD_SWIZZLE;
+			#else
+				cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+			#endif
          }
 
          // Write-after-read hazard, just execution barrier here.
@@ -66,11 +74,25 @@ void main()
             ivec2 coord = (registers.scaling * ivec2(dst_x + local_x, registers.dst.y + y) + offset) & mask;
 #ifdef MASKED
             DECL_MASK_CACHE;
-            mask_cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+			#ifdef MSAA
+				mask_cache = imageLoad(uFramebuffer, coord, int(gl_WorkGroupID.z)).LOAD_SWIZZLE;
+			#else
+				mask_cache = imageLoad(uFramebuffer, coord).LOAD_SWIZZLE;
+			#endif
             if (TEST_CACHE(mask_cache))
-               imageStore(uFramebuffer, coord, STORE_CACHE);
+			{
+				#ifdef MSAA
+					imageStore(uFramebuffer, coord, int(gl_WorkGroupID.z), STORE_CACHE);
+				#else
+					imageStore(uFramebuffer, coord, STORE_CACHE);
+				#endif
+		    }
 #else
-            imageStore(uFramebuffer, coord, STORE_CACHE);
+			#ifdef MSAA
+				imageStore(uFramebuffer, coord, int(gl_WorkGroupID.z), STORE_CACHE);
+			#else
+				imageStore(uFramebuffer, coord, STORE_CACHE);
+			#endif
 #endif
          }
 

@@ -301,6 +301,19 @@ static void Command_FBRead(PS_GPU* g, const uint32 *cb)
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBREAD;
+
+   if (!rsx_intf_has_software_renderer())
+   {
+	   //fprintf(stderr, "Hard GPU readback (X: %d, Y: %d, W: %d, H: %d)\n", g->FBRW_X, g->FBRW_Y, g->FBRW_W, g->FBRW_H);
+       /* Need a hard readback from GPU renderer. */
+       bool supported = rsx_intf_read_vram(
+               g->FBRW_X, g->FBRW_Y,
+               g->FBRW_W, g->FBRW_H,
+               g->vram);
+
+       //if (!supported)
+       //    fprintf(stderr, "Game is trying to reading back from VRAM, but SW rendering is not enabled, and RSX backend does not support it.\n");
+   }
 }
 
 static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
@@ -944,6 +957,7 @@ static void ProcessFIFO(uint32_t in_count)
    uint32_t cc            = GPU.InCmd_CC;
    const CTEntry *command = &Commands[cc];
    bool read_fifo         = false;
+   bool sw                = rsx_intf_has_software_renderer();
 
    switch (GPU.InCmd)
    {
@@ -955,7 +969,11 @@ static void ProcessFIFO(uint32_t in_count)
 
          for(i = 0; i < 2; i++)
          {
-            bool fetch = texel_fetch(&GPU, GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511) & GPU.MaskEvalAND;
+            /* Cannot rely on mask bit if we don't have SW renderer, HW renderer will
+             * perform masking. */
+            bool fetch = false;
+            if (sw)
+                fetch = texel_fetch(&GPU, GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511) & GPU.MaskEvalAND;
 
             if (!fetch)
                texel_put(GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511, InData | GPU.MaskSetOR);

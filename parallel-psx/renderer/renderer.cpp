@@ -1,5 +1,8 @@
 #include "renderer.hpp"
 #include "renderer_pipelines.hpp"
+#ifndef NDEBUG
+#include "timer.hpp"
+#endif
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -22,10 +25,51 @@ using namespace std;
 
 namespace PSX
 {
-Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
+Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const SaveState *state)
     : device(device)
-    , scaling(scaling)
+    , scaling(scaling_)
+    , msaa(msaa_)
 {
+	// Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
+	if (scaling == 16 && msaa > 1)
+	{
+		LOGI("[Vulkan]: Internal resolution scale of 16x is used, limiting MSAA to 1x for memory reasons.\n");
+		msaa = 1;
+	}
+	else if (scaling == 8 && msaa > 4)
+	{
+		LOGI("[Vulkan]: Internal resolution scale of 8x is used, limiting MSAA to 4x for memory reasons.\n");
+		msaa = 4;
+	}
+
+	// Verify we can actually render at our target scaling factor.
+	// Some devices only support 8K textures, which means max 8x scale.
+	VkImageFormatProperties props;
+	if (device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+				VK_IMAGE_USAGE_STORAGE_BIT |
+				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+				VK_IMAGE_USAGE_SAMPLED_BIT,
+				0,
+				&props))
+	{
+		unsigned max_scaling = std::min(props.maxExtent.width / FB_WIDTH, props.maxExtent.height / FB_HEIGHT);
+		unsigned new_scale = scaling;
+		while (new_scale > max_scaling)
+			new_scale >>= 1;
+
+		if (new_scale != scaling)
+		{
+			LOGI("[Vulkan]: Internal resolution scale of %ux was chosen, but this is not supported, using %ux instead.\n",
+					scaling, new_scale);
+			scaling = new_scale;
+		}
+	}
+	else
+	{
+		throw std::runtime_error("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+	}
+
 	auto info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
@@ -75,12 +119,58 @@ Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
 		}
 	}
 
-	info.format = device.get_default_depth_format();
-	info.levels = 1;
-	info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	info.domain = ImageDomain::Transient;
-	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depth = device.create_image(info);
+	// Check for support.
+	if (msaa > 1)
+	{
+		if (!device.get_device_features().enabled_features.sampleRateShading)
+		{
+			msaa = 1;
+			LOGI("[Vulkan]: sampleRateShading is not supported by this implementation. Cannot use MSAA.\n");
+		}
+		else if (!device.get_device_features().enabled_features.shaderStorageImageMultisample)
+		{
+			msaa = 1;
+			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by this implementation. Cannot use MSAA.\n");
+		}
+		else if (!device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+					VK_IMAGE_USAGE_STORAGE_BIT |
+					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+					VK_IMAGE_USAGE_SAMPLED_BIT,
+					0,
+					&props))
+		{
+			LOGI("[Vulkan]: Cannot use multisampling with this device.\n");
+			msaa = 1;
+		}
+		else if ((msaa & props.sampleCounts) == 0)
+		{
+			unsigned new_msaa = msaa >> 1;
+			while (new_msaa)
+			{
+				if (new_msaa & props.sampleCounts)
+				{
+					LOGI("[Vulkan]: MSAA sample count of %u is not supported, falling back to %u.\n",
+							msaa, new_msaa);
+					msaa = new_msaa;
+					break;
+				}
+			}
+
+			if (msaa == 0)
+				msaa = 1;
+		}
+	}
+
+	if (msaa > 1)
+	{
+		info.levels = 1;
+		info.samples = static_cast<VkSampleCountFlagBits>(msaa);
+		scaled_framebuffer_msaa = device.create_image(info);
+		scaled_framebuffer_msaa->set_layout(Layout::General);
+		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
+		// The expectation is that this will be used with a lower scaling factor to compensate.
+	}
 
 	atlas.set_hazard_listener(this);
 
@@ -224,11 +314,64 @@ void Renderer::init_primitive_pipelines()
 	}
 }
 
+void Renderer::init_primitive_feedback_pipelines()
+{
+	if (msaa > 1)
+	{
+		// TODO: The masked pipelines do not have filter options.
+		pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				feedback_msaa_add_frag, sizeof(feedback_msaa_add_frag));
+		pipelines.semi_transparent_masked_average = device.request_program(
+				opaque_textured_vert, sizeof(opaque_textured_vert), feedback_msaa_avg_frag, sizeof(feedback_msaa_avg_frag));
+		pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				feedback_msaa_sub_frag, sizeof(feedback_msaa_sub_frag));
+		pipelines.semi_transparent_masked_add_quarter =
+			device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_msaa_add_quarter_frag,
+					sizeof(feedback_msaa_add_quarter_frag));
+
+		pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_msaa_flat_add_frag, sizeof(feedback_msaa_flat_add_frag));
+		pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_msaa_flat_avg_frag, sizeof(feedback_msaa_flat_avg_frag));
+		pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_msaa_flat_sub_frag, sizeof(feedback_msaa_flat_sub_frag));
+		pipelines.flat_masked_add_quarter =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_msaa_flat_add_quarter_frag,
+					sizeof(feedback_msaa_flat_add_quarter_frag));
+	}
+	else
+	{
+		// TODO: The masked pipelines do not have filter options.
+		pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				feedback_add_frag, sizeof(feedback_add_frag));
+		pipelines.semi_transparent_masked_average = device.request_program(
+				opaque_textured_vert, sizeof(opaque_textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
+		pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				feedback_sub_frag, sizeof(feedback_sub_frag));
+		pipelines.semi_transparent_masked_add_quarter =
+			device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_add_quarter_frag,
+					sizeof(feedback_add_quarter_frag));
+
+		pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
+		pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
+		pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+				feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
+		pipelines.flat_masked_add_quarter =
+			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_flat_add_quarter_frag,
+					sizeof(feedback_flat_add_quarter_frag));
+	}
+}
+
 void Renderer::init_pipelines()
 {
 	switch (scaling)
 	{
-	case 16: // Not quite correct, but a 256-tap downsampler, really? :V
+	case 16:
+		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_16, sizeof(resolve_to_unscaled_16));
+		break;
+
 	case 8:
 		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled_8, sizeof(resolve_to_unscaled_8));
 		break;
@@ -257,44 +400,42 @@ void Renderer::init_pipelines()
 
 	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
 	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
-	pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
 
-	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
-	pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
-	pipelines.blit_vram_unscaled_masked =
-		device.request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
-	pipelines.blit_vram_scaled_masked =
-		device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+	if (msaa > 1)
+	{
+		pipelines.resolve_to_scaled =
+			device.request_program(resolve_msaa_to_scaled, sizeof(resolve_msaa_to_scaled));
 
-	pipelines.blit_vram_cached_unscaled =
-		device.request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+		pipelines.blit_vram_scaled =
+			device.request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+		pipelines.blit_vram_scaled_masked =
+			device.request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+		pipelines.blit_vram_msaa_cached_scaled =
+			device.request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+		pipelines.blit_vram_msaa_cached_scaled_masked =
+			device.request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+	}
+	else
+	{
+		pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+
+		pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+		pipelines.blit_vram_scaled_masked =
+			device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+	}
+
 	pipelines.blit_vram_cached_scaled =
 		device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
-	pipelines.blit_vram_cached_unscaled_masked =
-		device.request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 	pipelines.blit_vram_cached_scaled_masked =
 		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-	// TODO: The masked pipelines do not have filter options.
-	pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-			feedback_add_frag, sizeof(feedback_add_frag));
-	pipelines.semi_transparent_masked_average = device.request_program(
-			opaque_textured_vert, sizeof(opaque_textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
-	pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-			feedback_sub_frag, sizeof(feedback_sub_frag));
-	pipelines.semi_transparent_masked_add_quarter =
-		device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_add_quarter_frag,
-				sizeof(feedback_add_quarter_frag));
-
-	pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-			feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
-	pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-			feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
-	pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
-			feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
-	pipelines.flat_masked_add_quarter =
-		device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_flat_add_quarter_frag,
-				sizeof(feedback_flat_add_quarter_frag));
+	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
+	pipelines.blit_vram_unscaled_masked =
+		device.request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
+	pipelines.blit_vram_cached_unscaled =
+		device.request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+	pipelines.blit_vram_cached_unscaled_masked =
+		device.request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 
 	pipelines.mipmap_resolve =
 		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
@@ -309,6 +450,7 @@ void Renderer::init_pipelines()
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
 
 	init_primitive_pipelines();
+	init_primitive_feedback_pipelines();
 }
 
 void Renderer::set_draw_rect(const Rect &rect)
@@ -373,6 +515,53 @@ BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
 	width = FB_WIDTH * scaling;
 	height = FB_HEIGHT * scaling;
 	return buffer;
+}
+
+void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
+{
+	if (rect.x + rect.width > FB_WIDTH || rect.y + rect.height > FB_HEIGHT)
+	{
+	   LOGI("copy_vram_to_cpu_synchronous: TODO: handle wraparound case.\n");
+	   return;
+	}
+
+#ifndef NDEBUG
+	Util::Timer timer;
+	timer.start();
+#endif
+
+	atlas.read_transfer(Domain::Unscaled, rect);
+	ensure_command_buffer();
+
+	BufferCreateInfo buffer_create_info;
+	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.size = rect.width * rect.height * 4;
+	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	auto buffer = device.create_buffer(buffer_create_info, nullptr);
+	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(rect.x), int(rect.y), 0 },
+	                          { rect.width, rect.height, 1 }, 0, 0,
+	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
+
+	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
+
+	auto fence = flush_and_signal();
+	fence->wait();
+
+	auto *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+
+	for (uint16_t y = 0; y < rect.height; y++)
+	   for (uint16_t x = 0; x < rect.width; x++)
+		  vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
+
+	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+
+#ifndef NDEBUG
+	double readback_time = timer.end();
+	LOGI("copy_vram_to_cpu_synchronous() took %.3f ms!\n",
+			readback_time * 1e3);
+#endif
 }
 
 BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)
@@ -807,8 +996,11 @@ void Renderer::flush_resolves()
 	{
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
+
 		cmd->set_storage_texture(0, 0, *scaled_views[0]);
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
+		if (msaa > 1)
+			cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
 
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1253,16 +1445,28 @@ void Renderer::flush_render_pass(const Rect &rect)
 	RenderPassInfo info = {};
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.color_attachments[0] = scaled_views.front().get();
-	info.depth_stencil = &depth->get_view();
+	info.depth_stencil =
+		&device.get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
+		                                 device.get_default_depth_format(), 0, msaa, 1);
 	info.num_color_attachments = 1;
-	info.store_attachments = 1;
+	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
+
+	if (msaa > 1)
+	{
+		info.num_color_attachments = 2;
+		info.color_attachments[1] = info.color_attachments[0];
+		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
+		info.store_attachments |= 1 << 1;
+	}
 
 	RenderPassInfo::Subpass subpass;
 	info.num_subpasses = 1;
 	info.subpasses = &subpass;
-
 	subpass.num_color_attachments = 1;
+
+	auto *clear_candidate = find_clear_candidate(rect);
+
 	subpass.color_attachments[0] = 0;
 	if (render_pass_is_feedback)
 	{
@@ -1270,18 +1474,24 @@ void Renderer::flush_render_pass(const Rect &rect)
 		subpass.input_attachments[0] = 0;
 	}
 
-	auto *clear_candidate = find_clear_candidate(rect);
+	if (msaa > 1)
+	{
+		subpass.resolve_attachments[0] = 1;
+		subpass.num_resolve_attachments = 1;
+	}
+
 	if (clear_candidate)
 	{
 		info.clear_depth_stencil.depth = clear_candidate->z;
 		fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color);
-		info.clear_attachments = 1;
+		info.clear_attachments = 1 << 0;
 	}
 	else
 	{
-		info.load_attachments = 1;
+		info.load_attachments = 1 << 0;
 		counters.fragment_readback_pixels += rect.width * rect.height * scaling * scaling;
 	}
+
 	counters.fragment_writeout_pixels += rect.width * rect.height * scaling * scaling;
 
 	info.render_area.offset = { int(rect.x * scaling), int(rect.y * scaling) };
@@ -1426,6 +1636,11 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->pixel_barrier();
 				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
+				if (msaa > 1)
+				{
+					// Need to blend per-sample.
+					cmd->set_multisample_state(false, false, true);
+				}
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 				                       VK_BLEND_FACTOR_ONE);
@@ -1449,6 +1664,11 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
+				if (msaa > 1)
+				{
+					// Need to blend per-sample.
+					cmd->set_multisample_state(false, false, true);
+				}
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 				                       VK_BLEND_FACTOR_ONE);
@@ -1473,6 +1693,11 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
+				if (msaa > 1)
+				{
+					// Need to blend per-sample.
+					cmd->set_multisample_state(false, false, true);
+				}
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 				                       VK_BLEND_FACTOR_ONE);
@@ -1496,6 +1721,11 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
+				if (msaa > 1)
+				{
+					// Need to blend per-sample.
+					cmd->set_multisample_state(false, false, true);
+				}
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 				                       VK_BLEND_FACTOR_ONE);
@@ -1529,6 +1759,8 @@ void Renderer::render_semi_transparent_primitives()
 			counters.draw_calls++;
 			counters.vertices += to_draw * 3;
 			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+			if (msaa > 1)
+				cmd->set_multisample_state(false);
 			last_draw_offset = i;
 
 			last_state = queue.semi_transparent_state[i];
@@ -1540,6 +1772,8 @@ void Renderer::render_semi_transparent_primitives()
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+	if (msaa > 1)
+		cmd->set_multisample_state(false);
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
@@ -1601,6 +1835,11 @@ void Renderer::flush_blits()
 		{
 			cmd->set_storage_texture(0, 0, *scaled_views[0]);
 			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			if (msaa > 1)
+			{
+				cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
+				cmd->set_texture(0, 3, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			}
 		}
 		else
 		{
@@ -1672,6 +1911,15 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 
 		cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
 		cmd->dispatch(factor, factor, 1);
+
+		if (msaa > 1 && domain == Domain::Scaled)
+		{
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+			cmd->set_program(render_state.mask_test ?
+					*pipelines.blit_vram_msaa_cached_scaled_masked :
+					*pipelines.blit_vram_msaa_cached_scaled);
+			cmd->dispatch(factor, factor, msaa);
+		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
 	}
@@ -1684,12 +1932,13 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					q.push_back({
-					    { (x + src.x) * scaling, (y + src.y) * scaling },
-					    { (x + dst.x) * scaling, (y + dst.y) * scaling },
-					    { min(BLOCK_WIDTH, width - x) * scaling, min(BLOCK_HEIGHT, height - y) * scaling },
-					    { render_state.force_mask_bit ? 0x8000u : 0u, 0 },
-					});
+					for (unsigned s = 0; s < msaa; s++)
+						q.push_back({
+							{ (x + src.x) * scaling, (y + src.y) * scaling },
+							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
+							{ min(BLOCK_WIDTH, width - x) * scaling, min(BLOCK_HEIGHT, height - y) * scaling },
+							render_state.force_mask_bit ? 0x8000u : 0u, s,
+						});
 		}
 		else
 		{
@@ -1702,7 +1951,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
 					    { min(BLOCK_WIDTH, width - x), min(BLOCK_HEIGHT, height - y) },
-					    { render_state.force_mask_bit ? 0x8000u : 0u, 0 },
+						render_state.force_mask_bit ? 0x8000u : 0u, 0,
 					});
 		}
 	}

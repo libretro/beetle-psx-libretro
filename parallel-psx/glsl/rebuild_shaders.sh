@@ -61,11 +61,22 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/feedback.flat.sub.frag.inc -mfmt=c -DBLEND_SUB primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER primitive_feedback.frag
 
+"$GLSLC" -o prebuilt/feedback.msaa.add.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.avg.frag.inc -mfmt=c -DTEXTURED -DBLEND_AVG -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.sub.frag.inc -mfmt=c -DTEXTURED -DBLEND_SUB -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.add_quarter.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.add.frag.inc -mfmt=c -DBLEND_ADD -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.avg.frag.inc -mfmt=c -DBLEND_AVG -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.sub.frag.inc -mfmt=c -DBLEND_SUB -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
+
 # Resolve shaders
-"$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp -DSCALED
+"$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp
+"$GLSLC" -o prebuilt/resolve.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA resolve.comp
 "$GLSLC" -o prebuilt/resolve.unscaled.2.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
 "$GLSLC" -o prebuilt/resolve.unscaled.4.comp.inc -mfmt=c -DUNSCALED -DSCALE=4 resolve.comp
 "$GLSLC" -o prebuilt/resolve.unscaled.8.comp.inc -mfmt=c -DUNSCALED -DSCALE=8 resolve.comp
+"$GLSLC" -o prebuilt/resolve.unscaled.16.comp.inc -mfmt=c -DUNSCALED -DSCALE=16 resolve.comp
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
@@ -82,12 +93,18 @@ mkdir -p prebuilt
 
 # Blit VRAM shaders
 "$GLSLC" -o prebuilt/blit_vram.scaled.comp.inc -mfmt=c -DSCALED blit_vram.comp
-"$GLSLC" -o prebuilt/blit_vram.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.masked.scaled.comp.inc -mfmt=c -DSCALED -DMASKED blit_vram.comp
-"$GLSLC" -o prebuilt/blit_vram.masked.unscaled.comp.inc -mfmt=c -DUNSCALED -DMASKED blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.cached.scaled.comp.inc -mfmt=c -DSCALED blit_vram_cached.comp
-"$GLSLC" -o prebuilt/blit_vram.cached.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram_cached.comp
 "$GLSLC" -o prebuilt/blit_vram.cached.masked.scaled.comp.inc -mfmt=c -DSCALED -DMASKED blit_vram_cached.comp
+
+"$GLSLC" -o prebuilt/blit_vram.msaa.scaled.comp.inc -mfmt=c -DMSAA -DSCALED blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.msaa.masked.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DMASKED blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.msaa.cached.scaled.comp.inc -mfmt=c -DMSAA -DSCALED blit_vram_cached.comp
+"$GLSLC" -o prebuilt/blit_vram.msaa.cached.masked.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DMASKED blit_vram_cached.comp
+
+"$GLSLC" -o prebuilt/blit_vram.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.masked.unscaled.comp.inc -mfmt=c -DUNSCALED -DMASKED blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.cached.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram_cached.comp
 "$GLSLC" -o prebuilt/blit_vram.cached.masked.unscaled.comp.inc -mfmt=c -DUNSCALED -DMASKED blit_vram_cached.comp
 
 # Mipmap shaders

@@ -71,6 +71,8 @@ void rsx_vulkan_load_image(uint16_t x, uint16_t y,
                            uint16_t w, uint16_t h,
                            uint16_t *vram, bool mask_test, bool set_mask);
 
+bool rsx_vulkan_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram);
+
 void rsx_vulkan_fill_rect(uint32_t color,
                           uint16_t x, uint16_t y,
                           uint16_t w, uint16_t h);

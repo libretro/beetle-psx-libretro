@@ -8,6 +8,11 @@ layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in mediump ivec4 vTexLimits;
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 
+vec2 clamp_coord(vec2 coord)
+{
+	return clamp(coord.xy, vec2(vTexLimits.xy), vec2(vTexLimits.zw));
+}
+
 // Nearest neighbor
 vec4 sample_vram_atlas(vec2 uvv)
 {
@@ -52,12 +57,9 @@ uint rebuild_psx_color(vec4 color) {
 // a fully transparent texel (even for opaque draw commands). If you
 // want black you have to use an opaque draw command and use `0x8000`
 // instead.
-bool is_transparent(vec4 texel) {
-  return rebuild_psx_color(texel) == 0U;
-}
-
-vec2 clamp_coord(vec2 coord){
-   return clamp(coord.xy, vec2(vTexLimits.xy), vec2(vTexLimits.zw));
+bool is_transparent(vec4 texel)
+{
+	return rebuild_psx_color(texel) == 0U;
 }
 
 #ifdef FILTER_BILINEAR
@@ -72,7 +74,7 @@ vec4 sample_vram_bilinear(out float opacity)
   uv_frac = abs(uv_frac);
 
   // sample 4 nearest texels
-  vec4 texel_00 = sample_vram_atlas(vec2(x + 0., y + 0.));
+  vec4 texel_00 = sample_vram_atlas(clamp_coord(vec2(x + 0., y + 0.)));
   vec4 texel_10 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y + 0.)));
   vec4 texel_01 = sample_vram_atlas(clamp_coord(vec2(x + 0., y + uv_offs.y)));
   vec4 texel_11 = sample_vram_atlas(clamp_coord(vec2(x + uv_offs.x, y + uv_offs.y)));

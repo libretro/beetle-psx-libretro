@@ -9,7 +9,7 @@ void main()
 {
 	float opacity = 1.0;
 #ifdef TEXTURED
-	vec4 NNColor = sample_vram_atlas(vUV);
+	vec4 NNColor = sample_vram_atlas(clamp_coord(vUV));
 
 	// Even for opaque draw calls, this pixel is transparent.
 	// Sample in NN space since we need to do an exact test against 0.0.

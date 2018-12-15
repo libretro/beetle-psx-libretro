@@ -94,7 +94,7 @@ public:
 		RenderState state;
 	};
 
-	Renderer(Vulkan::Device &device, unsigned scaling, const SaveState *save_state);
+	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 	~Renderer();
 
 	void set_adaptive_smoothing(bool enable)
@@ -130,6 +130,7 @@ public:
 	}
 
 	Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
+	void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 	uint16_t *begin_copy(Vulkan::BufferHandle handle);
 	void end_copy(Vulkan::BufferHandle handle);
 
@@ -229,6 +230,16 @@ public:
 		device.flush_frame();
 	}
 
+	Vulkan::Fence flush_and_signal()
+	{
+		Vulkan::Fence fence;
+		if (cmd)
+			device.submit(cmd, &fence);
+		cmd.reset();
+		device.flush_frame();
+		return fence;
+	}
+
 	struct
 	{
 		unsigned render_passes = 0;
@@ -258,11 +269,12 @@ public:
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
+	unsigned msaa;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	Vulkan::ImageHandle scaled_framebuffer;
+	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
-	Vulkan::ImageHandle depth;
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
@@ -287,14 +299,20 @@ private:
 		Vulkan::Program *bpp24_yuv_quad_blitter;
 		Vulkan::Program *resolve_to_scaled;
 		Vulkan::Program *resolve_to_unscaled;
-		Vulkan::Program *blit_vram_unscaled;
+
 		Vulkan::Program *blit_vram_scaled;
-		Vulkan::Program *blit_vram_unscaled_masked;
 		Vulkan::Program *blit_vram_scaled_masked;
-		Vulkan::Program *blit_vram_cached_unscaled;
+
 		Vulkan::Program *blit_vram_cached_scaled;
-		Vulkan::Program *blit_vram_cached_unscaled_masked;
 		Vulkan::Program *blit_vram_cached_scaled_masked;
+		Vulkan::Program *blit_vram_msaa_cached_scaled;
+		Vulkan::Program *blit_vram_msaa_cached_scaled_masked;
+
+		Vulkan::Program *blit_vram_unscaled;
+		Vulkan::Program *blit_vram_unscaled_masked;
+		Vulkan::Program *blit_vram_cached_unscaled;
+		Vulkan::Program *blit_vram_cached_unscaled_masked;
+
 		Vulkan::Program *opaque_flat;
 		Vulkan::Program *opaque_textured;
 		Vulkan::Program *opaque_semi_transparent;
@@ -319,6 +337,7 @@ private:
 
 	void init_pipelines();
 	void init_primitive_pipelines();
+	void init_primitive_feedback_pipelines();
 	void ensure_command_buffer();
 
 	RenderState render_state;
@@ -338,7 +357,8 @@ private:
 		uint32_t src_offset[2];
 		uint32_t dst_offset[2];
 		uint32_t extent[2];
-		uint32_t padding[2];
+		uint32_t mask;
+		uint32_t sample;
 	};
 
 	struct SemiTransparentState

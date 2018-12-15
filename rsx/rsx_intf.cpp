@@ -513,6 +513,21 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
    }
 }
 
+bool rsx_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
+{
+   switch (rsx_type)
+   {
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         return rsx_vulkan_read_vram(x, y, w, h, vram);
+#else
+         return false;
+#endif
+      default:
+         return false;
+   }
+}
+
 void rsx_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram, uint32_t mask_test, uint32_t set_mask)

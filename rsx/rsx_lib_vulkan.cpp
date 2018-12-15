@@ -24,6 +24,12 @@ static Device *device;
 static Renderer *renderer;
 static unsigned scaling = 4;
 
+extern retro_log_printf_t log_cb;
+namespace Granite
+{
+retro_log_printf_t libretro_log;
+}
+
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 static retro_vulkan_image swapchain_image;
@@ -32,6 +38,7 @@ static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
 static bool super_sampling;
+static unsigned msaa = 1;
 static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
@@ -69,12 +76,11 @@ static void context_reset(void)
       return;
    }
 
-   Context::init_loader(vulkan->get_instance_proc_addr);
-   context = new Context(vulkan->instance, vulkan->gpu, vulkan->device, vulkan->queue, vulkan->queue_index);
+   assert(context);
    device = new Device;
    device->set_context(*context);
 
-   renderer = new Renderer(*device, scaling, save_state.vram.empty() ? nullptr : &save_state);
+   renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
 
    for (auto &func : defer)
       func();
@@ -96,8 +102,51 @@ static void context_destroy(void)
    context = nullptr;
 }
 
+static bool libretro_create_device(
+      struct retro_vulkan_context *libretro_context,
+      VkInstance instance,
+      VkPhysicalDevice gpu,
+      VkSurfaceKHR surface,
+      PFN_vkGetInstanceProcAddr get_instance_proc_addr,
+      const char **required_device_extensions,
+      unsigned num_required_device_extensions,
+      const char **required_device_layers,
+      unsigned num_required_device_layers,
+      const VkPhysicalDeviceFeatures *required_features)
+{
+   if (!Vulkan::Context::init_loader(get_instance_proc_addr))
+      return false;
+
+   if (context)
+   {
+      delete context;
+      context = nullptr;
+   }
+
+   try
+   {
+      context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+                                    required_device_layers, num_required_device_layers,
+                                    required_features);
+   }
+   catch (const std::exception &)
+   {
+      return false;
+   }
+
+   context->release_device();
+   libretro_context->gpu = context->get_gpu();
+   libretro_context->device = context->get_device();
+   libretro_context->presentation_queue = context->get_graphics_queue();
+   libretro_context->presentation_queue_family_index = context->get_graphics_queue_family();
+   libretro_context->queue = context->get_graphics_queue();
+   libretro_context->queue_family_index = context->get_graphics_queue_family();
+   return true;
+}
+
 bool rsx_vulkan_open(bool is_pal)
 {
+   Granite::libretro_log = log_cb;
    content_is_pal = is_pal;
 
    hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
@@ -114,6 +163,7 @@ bool rsx_vulkan_open(bool is_pal)
       RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
 
       get_application_info,
+      libretro_create_device,
       nullptr,
    };
 
@@ -140,6 +190,7 @@ void rsx_vulkan_refresh_variables(void)
    }
 
    unsigned old_scaling = scaling;
+   unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
 
    var.key = BEETLE_OPT(internal_resolution);
@@ -172,6 +223,12 @@ void rsx_vulkan_refresh_variables(void)
          super_sampling = false;
    }
 
+   var.key = BEETLE_OPT(msaa);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	  msaa = strtoul(var.value, nullptr, 0);
+   }
+
    var.key = BEETLE_OPT(mdec_yuv);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -200,11 +257,7 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
-   // There is no correct resolve shader for 16x IR yet, so 8x looks better.
-   if (super_sampling && scaling > 8)
-      scaling = 8;
-
-   if ((old_scaling != scaling || old_super_sampling != super_sampling) && renderer)
+   if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
@@ -603,6 +656,15 @@ void rsx_vulkan_push_line(int16_t p0x, int16_t p0y,
    //renderer->set_dither(dither);
    renderer->set_texture_color_modulate(false);
    renderer->draw_line(vertices);
+}
+
+bool rsx_vulkan_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
+{
+   if (!renderer)
+      return false;
+
+   renderer->copy_vram_to_cpu_synchronous({ x, y, w, h }, vram);
+   return true;
 }
 
 void rsx_vulkan_load_image(uint16_t x, uint16_t y,
