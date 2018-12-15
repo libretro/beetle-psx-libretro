@@ -1831,15 +1831,12 @@ void Renderer::flush_blits()
 
 		if (scaled)
 		{
+			cmd->set_storage_texture(0, 0, *scaled_views[0]);
+			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
 			if (msaa > 1)
 			{
-				cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-				cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-			}
-			else
-			{
-				cmd->set_storage_texture(0, 0, *scaled_views[0]);
-				cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+				cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
+				cmd->set_texture(0, 3, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 			}
 		}
 		else
