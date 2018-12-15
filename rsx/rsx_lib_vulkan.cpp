@@ -257,10 +257,6 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
-   // There is no correct resolve shader for 16x IR yet, so 8x looks better.
-   if (super_sampling && scaling > 8)
-      scaling = 8;
-
    if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
       retro_system_av_info info;

@@ -73,6 +73,14 @@ void main()
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 6));
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 6));
     value /= 16.0;
+#elif SCALE == 16
+	// Batshit insanity :D Should probably split this shader up and use LDS to do final mip, but ... eh.
+	mediump vec4 value = vec4(0.0);
+    uv -= vec2(0.4375 / 1024.0, 0.4375 / 512.0);
+	for (int y = 0; y < 8; y++)
+		for (int x = 0; x < 8; x++)
+			value += textureLod(uScaled, uv + vec2(x, y) * vec2(1.0 / 8192.0, 1.0 / 4096.0), 0.0);
+    value /= 64.0;
 #endif
 
     uint packed_color = pack_abgr1555(value);
