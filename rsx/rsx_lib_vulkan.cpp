@@ -32,6 +32,7 @@ static bool inside_frame;
 static bool has_software_fb;
 static bool adaptive_smoothing;
 static bool super_sampling;
+static unsigned msaa = 1;
 static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
@@ -73,7 +74,7 @@ static void context_reset(void)
    device = new Device;
    device->set_context(*context);
 
-   renderer = new Renderer(*device, scaling, 4, save_state.vram.empty() ? nullptr : &save_state);
+   renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
 
    for (auto &func : defer)
       func();
@@ -182,6 +183,7 @@ void rsx_vulkan_refresh_variables(void)
    }
 
    unsigned old_scaling = scaling;
+   unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
 
    var.key = BEETLE_OPT(internal_resolution);
@@ -212,6 +214,12 @@ void rsx_vulkan_refresh_variables(void)
          super_sampling = true;
       else
          super_sampling = false;
+   }
+
+   var.key = BEETLE_OPT(msaa);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	  msaa = strtoul(var.value, nullptr, 0);
    }
 
    var.key = BEETLE_OPT(mdec_yuv);
@@ -246,7 +254,7 @@ void rsx_vulkan_refresh_variables(void)
    if (super_sampling && scaling > 8)
       scaling = 8;
 
-   if ((old_scaling != scaling || old_super_sampling != super_sampling) && renderer)
+   if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
