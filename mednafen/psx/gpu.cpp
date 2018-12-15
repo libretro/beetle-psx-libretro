@@ -304,15 +304,15 @@ static void Command_FBRead(PS_GPU* g, const uint32 *cb)
 
    if (!rsx_intf_has_software_renderer())
    {
-	   fprintf(stderr, "Hard GPU readback (X: %d, Y: %d, W: %d, H: %d)\n", g->FBRW_X, g->FBRW_Y, g->FBRW_W, g->FBRW_H);
+	   //fprintf(stderr, "Hard GPU readback (X: %d, Y: %d, W: %d, H: %d)\n", g->FBRW_X, g->FBRW_Y, g->FBRW_W, g->FBRW_H);
        /* Need a hard readback from GPU renderer. */
        bool supported = rsx_intf_read_vram(
                g->FBRW_X, g->FBRW_Y,
                g->FBRW_W, g->FBRW_H,
                g->vram);
 
-       if (!supported)
-           fprintf(stderr, "Game is trying to reading back from VRAM, but SW rendering is not enabled, and RSX backend does not support it.\n");
+       //if (!supported)
+       //    fprintf(stderr, "Game is trying to reading back from VRAM, but SW rendering is not enabled, and RSX backend does not support it.\n");
    }
 }
 

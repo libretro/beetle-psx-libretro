@@ -1,6 +1,8 @@
 #include "renderer.hpp"
 #include "renderer_pipelines.hpp"
+#ifndef NDEBUG
 #include "timer.hpp"
+#endif
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -420,10 +422,6 @@ void Renderer::init_pipelines()
 		pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
 		pipelines.blit_vram_scaled_masked =
 			device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
-		pipelines.blit_vram_cached_scaled =
-			device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
-		pipelines.blit_vram_cached_scaled_masked =
-			device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 	}
 
 	pipelines.blit_vram_cached_scaled =
@@ -527,8 +525,10 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	   return;
 	}
 
+#ifndef NDEBUG
 	Util::Timer timer;
 	timer.start();
+#endif
 
 	atlas.read_transfer(Domain::Unscaled, rect);
 	ensure_command_buffer();
@@ -557,9 +557,11 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 
+#ifndef NDEBUG
 	double readback_time = timer.end();
 	LOGI("copy_vram_to_cpu_synchronous() took %.3f ms!\n",
 			readback_time * 1e3);
+#endif
 }
 
 BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)
