@@ -3,12 +3,11 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 #if defined(SCALED)
 #if defined(MSAA)
-layout(set = 0, binding = 0, rgba8) uniform writeonly image2DMS uFramebuffer;
-layout(set = 0, binding = 1) uniform sampler2DMS uImage;
-#else
+layout(set = 0, binding = 0, rgba8) uniform writeonly image2DMS uFramebufferMS;
+layout(set = 0, binding = 1) uniform sampler2DMS uImageMS;
+#endif
 layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uFramebuffer;
 layout(set = 0, binding = 1) uniform sampler2D uImage;
-#endif
 #elif defined(UNSCALED)
 layout(set = 0, binding = 0, r32ui) uniform writeonly uimage2D uFramebuffer;
 layout(set = 0, binding = 1) uniform usampler2D uImage;
@@ -38,17 +37,19 @@ void main()
         uvec2 src_coord = (gl_GlobalInvocationID.xy + offsets.xy) & mask;
         uvec2 dst_coord = (gl_GlobalInvocationID.xy + offsets.zw) & mask;
 #if defined(SCALED)
+		int sample_id = rects[gl_WorkGroupID.z].sample_id;
 		#if defined(MSAA)
-			int sample_id = rects[gl_WorkGroupID.z].sample_id;
-			vec4 value = texelFetch(uImage, ivec2(src_coord), sample_id);
+			vec4 value = texelFetch(uImageMS, ivec2(src_coord), sample_id);
 			#ifdef MASKED
-				float fbalpha = texelFetch(uImage, ivec2(dst_coord), sample_id).a;
+				float fbalpha = texelFetch(uImageMS, ivec2(dst_coord), sample_id).a;
 				if (fbalpha < 0.5)
-					imageStore(uFramebuffer, ivec2(dst_coord), sample_id, value);
+					imageStore(uFramebufferMS, ivec2(dst_coord), sample_id, value);
 			#else
-				imageStore(uFramebuffer, ivec2(dst_coord), sample_id, value);
+				imageStore(uFramebufferMS, ivec2(dst_coord), sample_id, value);
 			#endif
-		#else
+		#endif
+		if (sample_id == 0)
+		{
 			vec4 value = texelFetch(uImage, ivec2(src_coord), 0);
 			#ifdef MASKED
 				float fbalpha = texelFetch(uImage, ivec2(dst_coord), 0).a;
@@ -57,7 +58,7 @@ void main()
 			#else
 				imageStore(uFramebuffer, ivec2(dst_coord), value);
 			#endif
-		#endif
+		}
 #elif defined(UNSCALED)
         uint value = texelFetch(uImage, ivec2(src_coord), 0).x;
 		#ifdef MASKED

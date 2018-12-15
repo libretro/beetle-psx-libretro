@@ -366,9 +366,9 @@ void Renderer::init_pipelines()
 			device.request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
 		pipelines.blit_vram_scaled_masked =
 			device.request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
-		pipelines.blit_vram_cached_scaled =
+		pipelines.blit_vram_msaa_cached_scaled =
 			device.request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
-		pipelines.blit_vram_cached_scaled_masked =
+		pipelines.blit_vram_msaa_cached_scaled_masked =
 			device.request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
 	}
 	else
@@ -383,6 +383,11 @@ void Renderer::init_pipelines()
 		pipelines.blit_vram_cached_scaled_masked =
 			device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 	}
+
+	pipelines.blit_vram_cached_scaled =
+		device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+	pipelines.blit_vram_cached_scaled_masked =
+		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
 	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
 	pipelines.blit_vram_unscaled_masked =
@@ -948,12 +953,10 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
 
-		if (msaa > 1)
-			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-		else
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
-
+		cmd->set_storage_texture(0, 0, *scaled_views[0]);
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
+		if (msaa > 1)
+			cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
 
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1865,12 +1868,17 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		                     (render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 		                                               *pipelines.blit_vram_cached_unscaled));
 
-		if (domain == Domain::Scaled && msaa > 1)
-			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-		else
-			cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
+		cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
+		cmd->dispatch(factor, factor, 1);
 
-		cmd->dispatch(factor, factor, msaa);
+		if (msaa > 1 && domain == Domain::Scaled)
+		{
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+			cmd->set_program(render_state.mask_test ?
+					*pipelines.blit_vram_msaa_cached_scaled_masked :
+					*pipelines.blit_vram_msaa_cached_scaled);
+			cmd->dispatch(factor, factor, msaa);
+		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
 	}

@@ -302,8 +302,11 @@ private:
 
 		Vulkan::Program *blit_vram_scaled;
 		Vulkan::Program *blit_vram_scaled_masked;
+
 		Vulkan::Program *blit_vram_cached_scaled;
 		Vulkan::Program *blit_vram_cached_scaled_masked;
+		Vulkan::Program *blit_vram_msaa_cached_scaled;
+		Vulkan::Program *blit_vram_msaa_cached_scaled_masked;
 
 		Vulkan::Program *blit_vram_unscaled;
 		Vulkan::Program *blit_vram_unscaled_masked;
