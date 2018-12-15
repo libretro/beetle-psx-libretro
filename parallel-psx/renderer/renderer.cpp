@@ -23,9 +23,10 @@ using namespace std;
 
 namespace PSX
 {
-Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
+Renderer::Renderer(Device &device, unsigned scaling, unsigned msaa_, const SaveState *state)
     : device(device)
     , scaling(scaling)
+    , msaa(msaa_)
 {
 	auto info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -74,6 +75,60 @@ Renderer::Renderer(Device &device, unsigned scaling, const SaveState *state)
 			view_info.levels = 1;
 			scaled_views.push_back(device.create_image_view(view_info));
 		}
+	}
+
+	// Check for support.
+	if (msaa > 1)
+	{
+		VkImageFormatProperties props;
+		if (!device.get_device_features().enabled_features.sampleRateShading)
+		{
+			msaa = 1;
+			LOGI("[Vulkan]: sampleRateShading is not supported by this implementation. Cannot use MSAA.\n");
+		}
+		else if (!device.get_device_features().enabled_features.shaderStorageImageMultisample)
+		{
+			msaa = 1;
+			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by this implementation. Cannot use MSAA.\n");
+		}
+		else if (device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+					VK_IMAGE_USAGE_STORAGE_BIT |
+					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+					VK_IMAGE_USAGE_SAMPLED_BIT,
+					0,
+					&props))
+		{
+			LOGI("[Vulkan]: Cannot use multisampling with this device.\n");
+			msaa = 1;
+		}
+		else if ((msaa & props.sampleCounts) == 0)
+		{
+			unsigned new_msaa = msaa >> 1;
+			while (new_msaa)
+			{
+				if (new_msaa & props.sampleCounts)
+				{
+					LOGI("[Vulkan]: MSAA sample count of %u is not supported, falling back to %u.\n",
+							msaa, new_msaa);
+					msaa = new_msaa;
+					break;
+				}
+			}
+
+			if (msaa == 0)
+				msaa = 1;
+		}
+	}
+
+	if (msaa > 1)
+	{
+		info.levels = 1;
+		info.samples = static_cast<VkSampleCountFlagBits>(msaa);
+		scaled_framebuffer_msaa = device.create_image(info);
+		scaled_framebuffer_msaa->set_layout(Layout::General);
+		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
+		// The expectation is that this will be used with a lower scaling factor to compensate.
 	}
 
 	atlas.set_hazard_listener(this);
@@ -143,15 +198,6 @@ void Renderer::set_filter_mode(FilterMode mode)
 	{
 		primitive_filter_mode = mode;
 		init_primitive_pipelines();
-	}
-}
-
-void Renderer::set_msaa(unsigned samples)
-{
-	if (render_state.msaa != samples)
-	{
-		render_state.msaa = samples;
-		init_primitive_feedback_pipelines();
 	}
 }
 
@@ -229,7 +275,7 @@ void Renderer::init_primitive_pipelines()
 
 void Renderer::init_primitive_feedback_pipelines()
 {
-	if (render_state.msaa > 1)
+	if (msaa > 1)
 	{
 		// TODO: The masked pipelines do not have filter options.
 		pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
@@ -310,23 +356,41 @@ void Renderer::init_pipelines()
 
 	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
 	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
-	pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+
+	if (msaa > 1)
+	{
+		pipelines.resolve_to_scaled =
+			device.request_program(resolve_msaa_to_scaled, sizeof(resolve_msaa_to_scaled));
+
+		pipelines.blit_vram_scaled =
+			device.request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+		pipelines.blit_vram_scaled_masked =
+			device.request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+		pipelines.blit_vram_cached_scaled =
+			device.request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+		pipelines.blit_vram_cached_scaled_masked =
+			device.request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+	}
+	else
+	{
+		pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+
+		pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+		pipelines.blit_vram_scaled_masked =
+			device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+		pipelines.blit_vram_cached_scaled =
+			device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+		pipelines.blit_vram_cached_scaled_masked =
+			device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+	}
 
 	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
-	pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
 	pipelines.blit_vram_unscaled_masked =
 		device.request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
-	pipelines.blit_vram_scaled_masked =
-		device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
-
 	pipelines.blit_vram_cached_unscaled =
 		device.request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
-	pipelines.blit_vram_cached_scaled =
-		device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
 	pipelines.blit_vram_cached_unscaled_masked =
 		device.request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
-	pipelines.blit_vram_cached_scaled_masked =
-		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
 	pipelines.mipmap_resolve =
 		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
@@ -339,11 +403,6 @@ void Renderer::init_pipelines()
 			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
 	pipelines.mipmap_energy_blur = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
-
-	pipelines.msaa_readback_attachment_0 = device.request_program(quad_vert, sizeof(quad_vert),
-			msaa_readback_attachment_0_frag, sizeof(msaa_readback_attachment_0_frag));
-	pipelines.msaa_readback_attachment_1 = device.request_program(quad_vert, sizeof(quad_vert),
-			msaa_readback_attachment_1_frag, sizeof(msaa_readback_attachment_1_frag));
 
 	init_primitive_pipelines();
 	init_primitive_feedback_pipelines();
@@ -888,7 +947,12 @@ void Renderer::flush_resolves()
 	{
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
-		cmd->set_storage_texture(0, 0, *scaled_views[0]);
+
+		if (msaa > 1)
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+		else
+			cmd->set_storage_texture(0, 0, *scaled_views[0]);
+
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
 
 		unsigned size = queue.scaled_resolves.size();
@@ -1336,17 +1400,17 @@ void Renderer::flush_render_pass(const Rect &rect)
 	info.color_attachments[0] = scaled_views.front().get();
 	info.depth_stencil =
 		&device.get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
-		                                 device.get_default_depth_format(), 0, render_state.msaa, 1);
+		                                 device.get_default_depth_format(), 0, msaa, 1);
 	info.num_color_attachments = 1;
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-	if (render_state.msaa > 1)
+	if (msaa > 1)
 	{
-		info.num_color_attachments++;
-		info.color_attachments[1] =
-			&device.get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
-					                         VK_FORMAT_R8G8B8A8_UNORM, 0, render_state.msaa, 1);
+		info.num_color_attachments = 2;
+		info.color_attachments[1] = info.color_attachments[0];
+		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
+		info.store_attachments |= 1 << 1;
 	}
 
 	RenderPassInfo::Subpass subpass;
@@ -1356,63 +1420,29 @@ void Renderer::flush_render_pass(const Rect &rect)
 
 	auto *clear_candidate = find_clear_candidate(rect);
 
-	if (render_state.msaa > 1)
+	subpass.color_attachments[0] = 0;
+	if (render_pass_is_feedback)
 	{
-		// This gets really intense.
-		// We might need to load from the non-MSAA up to MSAA, then render on top of MSAA, and resolve results back again.
-		// If we have incremental rendering, we won't preserve the MSAA output as it's way too intense for mobile.
+		subpass.num_input_attachments = 1;
+		subpass.input_attachments[0] = 0;
+	}
 
-		subpass.color_attachments[0] = 1; // Render to MSAA.
+	if (msaa > 1)
+	{
+		subpass.resolve_attachments[0] = 1;
 		subpass.num_resolve_attachments = 1;
-		subpass.resolve_attachments[0] = 0; // Resolve to non-MSAA on end of render pass.
+	}
 
-		if (render_pass_is_feedback && !clear_candidate)
-		{
-			subpass.num_input_attachments = 2;
-			subpass.input_attachments[0] = 1;
-			subpass.input_attachments[1] = 0; // Only need this attachment once to load it into all MSAA samples.
-			info.load_attachments = 1 << 0;
-		}
-		else if (render_pass_is_feedback)
-		{
-			subpass.num_input_attachments = 1;
-			subpass.input_attachments[0] = 1;
-		}
-		else if (!clear_candidate)
-		{
-			subpass.num_input_attachments = 1;
-			subpass.input_attachments[0] = 0;
-			info.load_attachments = 1 << 0;
-		}
-
-		if (clear_candidate)
-		{
-			info.clear_depth_stencil.depth = clear_candidate->z;
-			fbcolor_to_rgba32f(info.clear_color[1].float32, clear_candidate->color);
-			// Clear the MSAA attachment, not normal one.
-			info.clear_attachments = 1 << 1;
-		}
+	if (clear_candidate)
+	{
+		info.clear_depth_stencil.depth = clear_candidate->z;
+		fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color);
+		info.clear_attachments = 1 << 0;
 	}
 	else
 	{
-		subpass.color_attachments[0] = 0;
-		if (render_pass_is_feedback)
-		{
-			subpass.num_input_attachments = 1;
-			subpass.input_attachments[0] = 0;
-		}
-
-		if (clear_candidate)
-		{
-			info.clear_depth_stencil.depth = clear_candidate->z;
-			fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color);
-			info.clear_attachments = 1 << 0;
-		}
-		else
-		{
-			info.load_attachments = 1 << 0;
-			counters.fragment_readback_pixels += rect.width * rect.height * scaling * scaling;
-		}
+		info.load_attachments = 1 << 0;
+		counters.fragment_readback_pixels += rect.width * rect.height * scaling * scaling;
 	}
 
 	counters.fragment_writeout_pixels += rect.width * rect.height * scaling * scaling;
@@ -1425,19 +1455,6 @@ void Renderer::flush_render_pass(const Rect &rect)
 	cmd->set_scissor(info.render_area);
 	queue.default_scissor = info.render_area;
 	cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
-
-	if (render_state.msaa > 1 && !clear_candidate)
-	{
-		// Input attachments are bound in order of declaration in the subpass.
-		// We want the non-MSAA attachment to be bound at binding 1.
-		cmd->set_quad_state();
-		cmd->set_input_attachments(0, 0);
-		cmd->set_program(render_pass_is_feedback ? *pipelines.msaa_readback_attachment_1 : *pipelines.msaa_readback_attachment_0);
-		cmd->set_vertex_binding(0, *quad, 0, 2);
-		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
-		cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		cmd->draw(4);
-	}
 
 	render_opaque_primitives();
 	render_opaque_texture_primitives();
@@ -1572,7 +1589,7 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->pixel_barrier();
 				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
-				if (render_state.msaa > 1)
+				if (msaa > 1)
 				{
 					// Need to blend per-sample.
 					cmd->set_multisample_state(false, false, true);
@@ -1600,7 +1617,7 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
-				if (render_state.msaa > 1)
+				if (msaa > 1)
 				{
 					// Need to blend per-sample.
 					cmd->set_multisample_state(false, false, true);
@@ -1629,7 +1646,7 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
-				if (render_state.msaa > 1)
+				if (msaa > 1)
 				{
 					// Need to blend per-sample.
 					cmd->set_multisample_state(false, false, true);
@@ -1657,7 +1674,7 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
-				if (render_state.msaa > 1)
+				if (msaa > 1)
 				{
 					// Need to blend per-sample.
 					cmd->set_multisample_state(false, false, true);
@@ -1695,7 +1712,7 @@ void Renderer::render_semi_transparent_primitives()
 			counters.draw_calls++;
 			counters.vertices += to_draw * 3;
 			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
-			if (render_state.msaa > 1)
+			if (msaa > 1)
 				cmd->set_multisample_state(false);
 			last_draw_offset = i;
 
@@ -1708,7 +1725,7 @@ void Renderer::render_semi_transparent_primitives()
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
-	if (render_state.msaa > 1)
+	if (msaa > 1)
 		cmd->set_multisample_state(false);
 }
 
@@ -1769,8 +1786,16 @@ void Renderer::flush_blits()
 
 		if (scaled)
 		{
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			if (msaa > 1)
+			{
+				cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+				cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			}
+			else
+			{
+				cmd->set_storage_texture(0, 0, *scaled_views[0]);
+				cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			}
 		}
 		else
 		{
@@ -1840,8 +1865,12 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		                     (render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 		                                               *pipelines.blit_vram_cached_unscaled));
 
-		cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
-		cmd->dispatch(factor, factor, 1);
+		if (domain == Domain::Scaled && msaa > 1)
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+		else
+			cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
+
+		cmd->dispatch(factor, factor, msaa);
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
 	}
@@ -1854,12 +1883,13 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					q.push_back({
-					    { (x + src.x) * scaling, (y + src.y) * scaling },
-					    { (x + dst.x) * scaling, (y + dst.y) * scaling },
-					    { min(BLOCK_WIDTH, width - x) * scaling, min(BLOCK_HEIGHT, height - y) * scaling },
-					    { render_state.force_mask_bit ? 0x8000u : 0u, 0 },
-					});
+					for (unsigned s = 0; s < msaa; s++)
+						q.push_back({
+							{ (x + src.x) * scaling, (y + src.y) * scaling },
+							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
+							{ min(BLOCK_WIDTH, width - x) * scaling, min(BLOCK_HEIGHT, height - y) * scaling },
+							render_state.force_mask_bit ? 0x8000u : 0u, s,
+						});
 		}
 		else
 		{
@@ -1872,7 +1902,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
 					    { min(BLOCK_WIDTH, width - x), min(BLOCK_HEIGHT, height - y) },
-					    { render_state.force_mask_bit ? 0x8000u : 0u, 0 },
+						render_state.force_mask_bit ? 0x8000u : 0u, 0,
 					});
 		}
 	}

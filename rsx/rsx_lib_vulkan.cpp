@@ -73,7 +73,7 @@ static void context_reset(void)
    device = new Device;
    device->set_context(*context);
 
-   renderer = new Renderer(*device, scaling, save_state.vram.empty() ? nullptr : &save_state);
+   renderer = new Renderer(*device, scaling, 4, save_state.vram.empty() ? nullptr : &save_state);
 
    for (auto &func : defer)
       func();

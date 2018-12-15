@@ -32,6 +32,9 @@ static const uint32_t copy_vram_masked_comp[] =
 static const uint32_t resolve_to_scaled[] =
 #include "resolve.scaled.comp.inc"
     ;
+static const uint32_t resolve_msaa_to_scaled[] =
+#include "resolve.msaa.scaled.comp.inc"
+    ;
 static const uint32_t resolve_to_unscaled_2[] =
 #include "resolve.unscaled.2.comp.inc"
     ;
@@ -119,30 +122,45 @@ static const uint32_t semitrans_3point_frag[] =
 static const uint32_t semitrans_jinc2_frag[] =
 #include "semitrans.trans.textured.jinc2.frag.inc"
     ;
-static const uint32_t blit_vram_unscaled_comp[] =
-#include "blit_vram.unscaled.comp.inc"
-    ;
+
 static const uint32_t blit_vram_scaled_comp[] =
 #include "blit_vram.scaled.comp.inc"
     ;
-static const uint32_t blit_vram_unscaled_masked_comp[] =
-#include "blit_vram.masked.unscaled.comp.inc"
-    ;
 static const uint32_t blit_vram_scaled_masked_comp[] =
 #include "blit_vram.masked.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_cached_scaled_comp[] =
+#include "blit_vram.cached.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_cached_scaled_masked_comp[] =
+#include "blit_vram.cached.masked.scaled.comp.inc"
+    ;
+
+static const uint32_t blit_vram_msaa_scaled_comp[] =
+#include "blit_vram.msaa.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_scaled_masked_comp[] =
+#include "blit_vram.msaa.masked.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_cached_scaled_comp[] =
+#include "blit_vram.msaa.cached.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_cached_scaled_masked_comp[] =
+#include "blit_vram.msaa.cached.masked.scaled.comp.inc"
+    ;
+
+static const uint32_t blit_vram_unscaled_comp[] =
+#include "blit_vram.unscaled.comp.inc"
+    ;
+static const uint32_t blit_vram_unscaled_masked_comp[] =
+#include "blit_vram.masked.unscaled.comp.inc"
     ;
 
 static const uint32_t blit_vram_cached_unscaled_comp[] =
 #include "blit_vram.cached.unscaled.comp.inc"
     ;
-static const uint32_t blit_vram_cached_scaled_comp[] =
-#include "blit_vram.cached.scaled.comp.inc"
-    ;
 static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
 #include "blit_vram.cached.masked.unscaled.comp.inc"
-    ;
-static const uint32_t blit_vram_cached_scaled_masked_comp[] =
-#include "blit_vram.cached.masked.scaled.comp.inc"
     ;
 
 static const uint32_t feedback_add_frag[] =
@@ -194,13 +212,6 @@ static const uint32_t feedback_msaa_flat_sub_frag[] =
 static const uint32_t feedback_msaa_flat_add_quarter_frag[] =
 #include "feedback.msaa.flat.add_quarter.frag.inc"
     ;
-
-static const uint32_t msaa_readback_attachment_0_frag[] =
-#include "msaa.readback.attachment.0.frag.inc"
-	;
-static const uint32_t msaa_readback_attachment_1_frag[] =
-#include "msaa.readback.attachment.1.frag.inc"
-	;
 
 static const uint32_t mipmap_vert[] =
 #include "mipmap.vert.inc"

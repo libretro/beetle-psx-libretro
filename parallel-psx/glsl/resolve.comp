@@ -4,7 +4,11 @@ layout(local_size_x = 8, local_size_y = 8) in;
 #include "common.h"
 
 #if defined(SCALED)
+#if defined(MSAA)
+layout(set = 0, binding = 0, rgba8) uniform writeonly mediump image2DMS uScaled;
+#else
 layout(set = 0, binding = 0, rgba8) uniform writeonly mediump image2D uScaled;
+#endif
 layout(set = 0, binding = 1) uniform mediump usampler2D uUnscaled;
 #elif defined(UNSCALED)
 layout(set = 0, binding = 0, r32ui) uniform writeonly mediump uimage2D uUnscaled;
@@ -30,7 +34,13 @@ void main()
     vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
     uint value = textureLod(uUnscaled, uv, 0.0).x;
     vec4 unorm = abgr1555(value);
-    imageStore(uScaled, ivec2(coord), unorm);
+	#if defined(MSAA)
+		int samples = imageSamples(uScaled);
+		for (int i = 0; i < samples; i++)
+			imageStore(uScaled, ivec2(coord), i, unorm);
+	#else
+		imageStore(uScaled, ivec2(coord), unorm);
+	#endif
 #elif defined(UNSCALED)
     uvec2 coord = gl_GlobalInvocationID.xy + offsets[gl_WorkGroupID.z].xy;
     vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;

@@ -72,7 +72,6 @@ public:
 		unsigned palette_offset_y = 0;
 		unsigned texture_offset_x = 0;
 		unsigned texture_offset_y = 0;
-		unsigned msaa = 4;
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
@@ -95,7 +94,7 @@ public:
 		RenderState state;
 	};
 
-	Renderer(Vulkan::Device &device, unsigned scaling, const SaveState *save_state);
+	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 	~Renderer();
 
 	void set_adaptive_smoothing(bool enable)
@@ -267,13 +266,13 @@ public:
 		return render_state.scanout_mode;
 	}
 
-	void set_msaa(unsigned samples);
-
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
+	unsigned msaa;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	Vulkan::ImageHandle scaled_framebuffer;
+	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
 	Vulkan::Semaphore scanout_semaphore;
@@ -300,14 +299,17 @@ private:
 		Vulkan::Program *bpp24_yuv_quad_blitter;
 		Vulkan::Program *resolve_to_scaled;
 		Vulkan::Program *resolve_to_unscaled;
-		Vulkan::Program *blit_vram_unscaled;
+
 		Vulkan::Program *blit_vram_scaled;
-		Vulkan::Program *blit_vram_unscaled_masked;
 		Vulkan::Program *blit_vram_scaled_masked;
-		Vulkan::Program *blit_vram_cached_unscaled;
 		Vulkan::Program *blit_vram_cached_scaled;
-		Vulkan::Program *blit_vram_cached_unscaled_masked;
 		Vulkan::Program *blit_vram_cached_scaled_masked;
+
+		Vulkan::Program *blit_vram_unscaled;
+		Vulkan::Program *blit_vram_unscaled_masked;
+		Vulkan::Program *blit_vram_cached_unscaled;
+		Vulkan::Program *blit_vram_cached_unscaled_masked;
+
 		Vulkan::Program *opaque_flat;
 		Vulkan::Program *opaque_textured;
 		Vulkan::Program *opaque_semi_transparent;
@@ -320,9 +322,6 @@ private:
 		Vulkan::Program *flat_masked_average;
 		Vulkan::Program *flat_masked_sub;
 		Vulkan::Program *flat_masked_add_quarter;
-
-		Vulkan::Program *msaa_readback_attachment_0;
-		Vulkan::Program *msaa_readback_attachment_1;
 
 		Vulkan::Program *mipmap_resolve;
 		Vulkan::Program *mipmap_dither_resolve;
@@ -355,7 +354,8 @@ private:
 		uint32_t src_offset[2];
 		uint32_t dst_offset[2];
 		uint32_t extent[2];
-		uint32_t padding[2];
+		uint32_t mask;
+		uint32_t sample;
 	};
 
 	struct SemiTransparentState
