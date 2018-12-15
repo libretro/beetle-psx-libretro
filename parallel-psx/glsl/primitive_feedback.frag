@@ -5,7 +5,11 @@ precision highp int;
 #include "common.h"
 #include "primitive.h"
 
+#ifdef MSAA
+layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpassInputMS uFeedbackFramebuffer;
+#else
 layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpassInput uFeedbackFramebuffer;
+#endif
 
 void main()
 {
@@ -23,7 +27,12 @@ void main()
 	const float blend_amt = 1.0;
 #endif
 
+#ifdef MSAA
+	// Need to be render per-sample here.
+	vec4 fbcolor = subpassLoad(uFeedbackFramebuffer, gl_SampleID);
+#else
 	vec4 fbcolor = subpassLoad(uFeedbackFramebuffer);
+#endif
 
 	if (fbcolor.a > 0.5)
 		discard;

@@ -72,6 +72,7 @@ public:
 		unsigned palette_offset_y = 0;
 		unsigned texture_offset_x = 0;
 		unsigned texture_offset_y = 0;
+		unsigned msaa = 1;
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
@@ -266,6 +267,8 @@ public:
 		return render_state.scanout_mode;
 	}
 
+	void set_msaa(unsigned samples);
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
@@ -273,7 +276,6 @@ private:
 	Vulkan::ImageHandle scaled_framebuffer;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
-	Vulkan::ImageHandle depth;
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
@@ -319,6 +321,9 @@ private:
 		Vulkan::Program *flat_masked_sub;
 		Vulkan::Program *flat_masked_add_quarter;
 
+		Vulkan::Program *msaa_readback_attachment_0;
+		Vulkan::Program *msaa_readback_attachment_1;
+
 		Vulkan::Program *mipmap_resolve;
 		Vulkan::Program *mipmap_dither_resolve;
 		Vulkan::Program *mipmap_energy_first;
@@ -330,6 +335,7 @@ private:
 
 	void init_pipelines();
 	void init_primitive_pipelines();
+	void init_primitive_feedback_pipelines();
 	void ensure_command_buffer();
 
 	RenderState render_state;

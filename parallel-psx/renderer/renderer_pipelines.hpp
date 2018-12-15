@@ -169,6 +169,39 @@ static const uint32_t feedback_flat_sub_frag[] =
 static const uint32_t feedback_flat_add_quarter_frag[] =
 #include "feedback.flat.add_quarter.frag.inc"
     ;
+
+static const uint32_t feedback_msaa_add_frag[] =
+#include "feedback.msaa.add.frag.inc"
+    ;
+static const uint32_t feedback_msaa_avg_frag[] =
+#include "feedback.msaa.avg.frag.inc"
+    ;
+static const uint32_t feedback_msaa_sub_frag[] =
+#include "feedback.msaa.sub.frag.inc"
+    ;
+static const uint32_t feedback_msaa_add_quarter_frag[] =
+#include "feedback.msaa.add_quarter.frag.inc"
+    ;
+static const uint32_t feedback_msaa_flat_add_frag[] =
+#include "feedback.msaa.flat.add.frag.inc"
+    ;
+static const uint32_t feedback_msaa_flat_avg_frag[] =
+#include "feedback.msaa.flat.avg.frag.inc"
+    ;
+static const uint32_t feedback_msaa_flat_sub_frag[] =
+#include "feedback.msaa.flat.sub.frag.inc"
+    ;
+static const uint32_t feedback_msaa_flat_add_quarter_frag[] =
+#include "feedback.msaa.flat.add_quarter.frag.inc"
+    ;
+
+static const uint32_t msaa_readback_attachment_0_frag[] =
+#include "msaa.readback.attachment.0.frag.inc"
+	;
+static const uint32_t msaa_readback_attachment_1_frag[] =
+#include "msaa.readback.attachment.1.frag.inc"
+	;
+
 static const uint32_t mipmap_vert[] =
 #include "mipmap.vert.inc"
     ;
