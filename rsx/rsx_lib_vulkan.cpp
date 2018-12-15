@@ -69,8 +69,7 @@ static void context_reset(void)
       return;
    }
 
-   Context::init_loader(vulkan->get_instance_proc_addr);
-   context = new Context(vulkan->instance, vulkan->gpu, vulkan->device, vulkan->queue, vulkan->queue_index);
+   assert(context);
    device = new Device;
    device->set_context(*context);
 
@@ -96,6 +95,48 @@ static void context_destroy(void)
    context = nullptr;
 }
 
+static bool libretro_create_device(
+      struct retro_vulkan_context *libretro_context,
+      VkInstance instance,
+      VkPhysicalDevice gpu,
+      VkSurfaceKHR surface,
+      PFN_vkGetInstanceProcAddr get_instance_proc_addr,
+      const char **required_device_extensions,
+      unsigned num_required_device_extensions,
+      const char **required_device_layers,
+      unsigned num_required_device_layers,
+      const VkPhysicalDeviceFeatures *required_features)
+{
+   if (!Vulkan::Context::init_loader(get_instance_proc_addr))
+      return false;
+
+   if (context)
+   {
+      delete context;
+      context = nullptr;
+   }
+
+   try
+   {
+      context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+                                    required_device_layers, num_required_device_layers,
+                                    required_features);
+   }
+   catch (const std::exception &)
+   {
+      return false;
+   }
+
+   context->release_device();
+   libretro_context->gpu = context->get_gpu();
+   libretro_context->device = context->get_device();
+   libretro_context->presentation_queue = context->get_graphics_queue();
+   libretro_context->presentation_queue_family_index = context->get_graphics_queue_family();
+   libretro_context->queue = context->get_graphics_queue();
+   libretro_context->queue_family_index = context->get_graphics_queue_family();
+   return true;
+}
+
 bool rsx_vulkan_open(bool is_pal)
 {
    content_is_pal = is_pal;
@@ -114,6 +155,7 @@ bool rsx_vulkan_open(bool is_pal)
       RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
 
       get_application_info,
+      libretro_create_device,
       nullptr,
    };
 
