@@ -91,7 +91,7 @@ Renderer::Renderer(Device &device, unsigned scaling, unsigned msaa_, const SaveS
 			msaa = 1;
 			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by this implementation. Cannot use MSAA.\n");
 		}
-		else if (device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+		else if (!device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 					VK_IMAGE_USAGE_STORAGE_BIT |
 					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
