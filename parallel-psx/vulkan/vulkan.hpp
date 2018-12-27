@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "volk.h"
+#include <volk.h>
 
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 // Workaround silly Xlib headers that define macros for these globally :(
