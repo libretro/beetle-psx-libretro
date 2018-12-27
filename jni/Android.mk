@@ -35,7 +35,17 @@ endif
 include $(CORE_DIR)/Makefile.common
 
 ifeq ($(HAVE_HW),1)
-  INCFLAGS += -I$(CORE_DIR)/parallel-psx -I$(CORE_DIR)/parallel-psx/atlas -I$(CORE_DIR)/parallel-psx/vulkan -I$(CORE_DIR)/parallel-psx/renderer -I$(CORE_DIR)/parallel-psx/khronos/include -I$(CORE_DIR)/parallel-psx/glsl/prebuilt -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/include -I$(CORE_DIR)/parallel-psx/util -I$(CORE_DIR)/parallel-psx/volk
+  INCFLAGS += -I$(CORE_DIR)/parallel-psx \
+				  -I$(CORE_DIR)/parallel-psx/atlas \
+				  -I$(CORE_DIR)/parallel-psx/vulkan \
+				  -I$(CORE_DIR)/parallel-psx/renderer \
+				  -I$(CORE_DIR)/parallel-psx/khronos/include \
+				  -I$(CORE_DIR)/parallel-psx/glsl/prebuilt \
+				  -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
+				  -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross \
+				  -I$(CORE_DIR)/parallel-psx/vulkan/SPIRV-Cross/include \
+				  -I$(CORE_DIR)/parallel-psx/util \
+				  -I$(CORE_DIR)/parallel-psx/volk
 endif
 
 COREFLAGS := -funroll-loops $(INCFLAGS) -DMEDNAFEN_VERSION=\"0.9.26\" -DMEDNAFEN_VERSION_NUMERIC=926 -DPSS_STYLE=1 -D__LIBRETRO__ -D_LOW_ACCURACY_ -DINLINE="inline" $(FLAGS)
