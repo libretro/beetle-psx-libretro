@@ -22,7 +22,7 @@
 
 #include "shader.hpp"
 #include "device.hpp"
-#include "spirv_cross.hpp"
+#include <spirv_cross.hpp>
 
 #ifdef GRANITE_SPIRV_DUMP
 #include "filesystem.hpp"
