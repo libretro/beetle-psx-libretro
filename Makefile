@@ -445,7 +445,8 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
     
 	export INCLUDE := $(INCLUDE);$(WindowsSDKSharedIncludeDir);$(WindowsSDKUCRTIncludeDir);$(WindowsSDKUMIncludeDir)
 	export LIB := $(LIB);$(WindowsSDKUCRTLibDir);$(WindowsSDKUMLibDir)
-	TARGET := $(TARGET_NAME)_libretro.dll $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
+	TARGET := $(TARGET_NAME)_libretro.dll
+	TARGET_TMP := $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
 	PSS_STYLE :=2
 	LDFLAGS += -DLL
 
@@ -619,6 +620,6 @@ clean:
 	@echo rm -f *.o
 	@rm -f $(DEPS)
 	@echo rm -f *.d
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(TARGET_TMP)
 	
 .PHONY: clean
