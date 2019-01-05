@@ -70,6 +70,9 @@
     <Filter Include="libretro-common\vfs">
       <UniqueIdentifier>{b2c8ed6d-a8b0-4db4-98bc-bb9dc77672f2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="deps\ugui">
+      <UniqueIdentifier>{3ed17401-65a1-4526-b353-862683e6e283}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\libretro-common\rthreads\rthreads.c">
@@ -503,6 +506,10 @@
     </ClCompile>
     <ClCompile Include="..\mednafen\mednafen-endian.cpp">
       <Filter>mednafen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ugui_tools.c" />
+    <ClCompile Include="..\deps\ugui\ugui.c">
+      <Filter>deps\ugui</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

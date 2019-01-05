@@ -639,7 +639,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             TmpTrack.fp = new FileStream(efn.c_str(), MODE_READ);
             TmpTrack.FirstFileInstance = 1;
 
-            if (TmpTrack.fp->tell() == UINT64_C(-1))
+            if (TmpTrack.fp->tell() == (uint64_t)-1)
                return false;
 
             if(image_memcache)
