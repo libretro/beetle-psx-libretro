@@ -97,6 +97,7 @@
     <ClCompile Include="..\deps\lzma-16.04\C\LzmaEnc.c" />
     <ClCompile Include="..\deps\lzma-16.04\C\LzmaLib.c" />
     <ClCompile Include="..\deps\lzma-16.04\C\Sort.c" />
+    <ClCompile Include="..\deps\ugui\ugui.c" />
     <ClCompile Include="..\deps\zlib\adler32.c" />
     <ClCompile Include="..\deps\zlib\compress.c" />
     <ClCompile Include="..\deps\zlib\crc32.c" />
@@ -205,6 +206,7 @@
     <ClCompile Include="..\pgxp\pgxp_value.c" />
     <ClCompile Include="..\rsx\rsx_intf.cpp" />
     <ClCompile Include="..\rsx\rsx_lib_soft.c" />
+    <ClCompile Include="..\ugui_tools.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -279,7 +281,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/ugui;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE__MKDIR;HAVE_PBP;WANT_THREADING;HAVE_THREADS;NEED_DEINTERLACER;ARCH_X86;WANT_32BPP;WANT_NEW_API;FRONTEND_SUPPORTS_RGB565;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_STDLIB_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;NEED_TREMOR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.38.6";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;PSS_STYLE=1;MPC_FIXED_POINT;WANT_PSX_EMU;STDC_HEADERS;__STDC_LIMIT_MACROS;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -290,7 +292,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/ugui;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE__MKDIR;HAVE_PBP;WANT_THREADING;HAVE_THREADS;NEED_DEINTERLACER;ARCH_X86;WANT_32BPP;WANT_NEW_API;FRONTEND_SUPPORTS_RGB565;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_STDLIB_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;NEED_TREMOR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.38.6";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;PSS_STYLE=1;MPC_FIXED_POINT;WANT_PSX_EMU;STDC_HEADERS;__STDC_LIMIT_MACROS;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -303,7 +305,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/ugui;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE__MKDIR;HAVE_PBP;WANT_THREADING;HAVE_THREADS;NEED_DEINTERLACER;ARCH_X86;WANT_32BPP;WANT_NEW_API;FRONTEND_SUPPORTS_RGB565;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_STDLIB_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;NEED_TREMOR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.38.6";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;PSS_STYLE=1;MPC_FIXED_POINT;WANT_PSX_EMU;STDC_HEADERS;__STDC_LIMIT_MACROS;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -320,7 +322,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/ugui;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE__MKDIR;HAVE_PBP;WANT_THREADING;HAVE_THREADS;NEED_DEINTERLACER;ARCH_X86;WANT_32BPP;WANT_NEW_API;FRONTEND_SUPPORTS_RGB565;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_STDLIB_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;NEED_TREMOR;SIZEOF_DOUBLE=8;MEDNAFEN_VERSION="0.9.38.6";PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;PSS_STYLE=1;MPC_FIXED_POINT;WANT_PSX_EMU;STDC_HEADERS;__STDC_LIMIT_MACROS;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

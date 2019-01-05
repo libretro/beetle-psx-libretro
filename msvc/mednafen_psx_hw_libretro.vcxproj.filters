@@ -106,8 +106,14 @@
     <Filter Include="parallel-psx\renderer">
       <UniqueIdentifier>{856e1122-cfd8-47d5-a8f0-a22962339f13}</UniqueIdentifier>
     </Filter>
-    <Filter Include="parallel-psx\vulkan\SPIRV-Cross">
+    <Filter Include="parallel-psx\volk">
+      <UniqueIdentifier>{34df19c1-aa3a-420d-bd11-e5b40e22fa6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="parallel-psx\SPIRV-Cross">
       <UniqueIdentifier>{1206038d-6a45-4f62-97d2-90ed16bcd5f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="parallel-psx\util">
+      <UniqueIdentifier>{03c57f09-0f49-4391-950f-924f976de6a5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -561,9 +567,6 @@
     <ClCompile Include="..\parallel-psx\vulkan\buffer.cpp">
       <Filter>parallel-psx\vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\parallel-psx\vulkan\chain_allocator.cpp">
-      <Filter>parallel-psx\vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="..\parallel-psx\vulkan\command_buffer.cpp">
       <Filter>parallel-psx\vulkan</Filter>
     </ClCompile>
@@ -600,9 +603,6 @@
     <ClCompile Include="..\parallel-psx\vulkan\sampler.cpp">
       <Filter>parallel-psx\vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\parallel-psx\vulkan\SPIRV-Cross\spirv_cross.cpp">
-      <Filter>parallel-psx\vulkan\SPIRV-Cross</Filter>
-    </ClCompile>
     <ClCompile Include="..\parallel-psx\vulkan\semaphore.cpp">
       <Filter>parallel-psx\vulkan</Filter>
     </ClCompile>
@@ -615,8 +615,56 @@
     <ClCompile Include="..\parallel-psx\vulkan\vulkan.cpp">
       <Filter>parallel-psx\vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\parallel-psx\vulkan\vulkan_symbol_wrapper.cpp">
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cfg.cpp">
+      <Filter>parallel-psx\SPIRV-Cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cross.cpp">
+      <Filter>parallel-psx\SPIRV-Cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cross_parsed_ir.cpp">
+      <Filter>parallel-psx\SPIRV-Cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_parser.cpp">
+      <Filter>parallel-psx\SPIRV-Cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\volk\volk.c">
+      <Filter>parallel-psx\volk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\wsi_timing.cpp">
       <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\buffer_pool.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\event_manager.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\fence.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\pipeline_event.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\query_pool.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\texture_format.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\vulkan\wsi.cpp">
+      <Filter>parallel-psx\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\util\cli_parser.cpp">
+      <Filter>parallel-psx\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\util\timer.cpp">
+      <Filter>parallel-psx\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\util\dynamic_library.cpp">
+      <Filter>parallel-psx\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parallel-psx\util\util.cpp">
+      <Filter>parallel-psx\util</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

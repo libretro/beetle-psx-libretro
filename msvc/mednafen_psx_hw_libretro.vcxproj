@@ -173,7 +173,12 @@
     <ClCompile Include="..\mednafen\psx\mdec.cpp" />
     <ClCompile Include="..\mednafen\psx\sio.cpp" />
     <ClCompile Include="..\mednafen\psx\spu.cpp" />
-    <ClCompile Include="..\mednafen\psx\timer.cpp" />
+    <ClCompile Include="..\mednafen\psx\timer.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)mednafen\psx\</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)mednafen\psx\</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)mednafen\psx\</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)mednafen\psx\</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\mednafen\settings.cpp" />
     <ClCompile Include="..\mednafen\state.cpp" />
     <ClCompile Include="..\mednafen\Stream.cpp" />
@@ -201,24 +206,38 @@
     <ClCompile Include="..\mednafen\video\surface.cpp" />
     <ClCompile Include="..\parallel-psx\atlas\atlas.cpp" />
     <ClCompile Include="..\parallel-psx\renderer\renderer.cpp" />
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cfg.cpp" />
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cross.cpp" />
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_cross_parsed_ir.cpp" />
+    <ClCompile Include="..\parallel-psx\SPIRV-Cross\spirv_parser.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\buffer.cpp" />
-    <ClCompile Include="..\parallel-psx\vulkan\chain_allocator.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\buffer_pool.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\command_buffer.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\command_pool.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\cookie.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\descriptor_set.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\device.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\event_manager.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\fence.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\fence_manager.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\image.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\memory_allocator.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\pipeline_event.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\query_pool.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\render_pass.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\sampler.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\semaphore.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\semaphore_manager.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\shader.cpp" />
-    <ClCompile Include="..\parallel-psx\vulkan\SPIRV-Cross\spirv_cross.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\texture_format.cpp" />
     <ClCompile Include="..\parallel-psx\vulkan\vulkan.cpp" />
-    <ClCompile Include="..\parallel-psx\vulkan\vulkan_symbol_wrapper.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\wsi.cpp" />
+    <ClCompile Include="..\parallel-psx\vulkan\wsi_timing.cpp" />
+    <ClCompile Include="..\parallel-psx\volk\volk.c" />
+    <ClCompile Include="..\parallel-psx\util\cli_parser.cpp" />
+    <ClCompile Include="..\parallel-psx\util\dynamic_library.cpp" />
+    <ClCompile Include="..\parallel-psx\util\timer.cpp" />
+    <ClCompile Include="..\parallel-psx\util\util.cpp" />
     <ClCompile Include="..\pgxp\pgxp_cpu.c" />
     <ClCompile Include="..\pgxp\pgxp_debug.c" />
     <ClCompile Include="..\pgxp\pgxp_gpu.c" />
@@ -304,7 +323,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/vulkan/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/util;$(ProjectDir)../parallel-psx/volk;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_OPENGL;CORE;HAVE_HW;HAVE_PBP;HAVE_THREADS;NEED_DEINTERLACER;WANT_32BPP;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;HAVE_VULKAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -319,7 +338,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/vulkan/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/util;$(ProjectDir)../parallel-psx/volk;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_OPENGL;CORE;HAVE_HW;HAVE_PBP;HAVE_THREADS;NEED_DEINTERLACER;WANT_32BPP;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;HAVE_VULKAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -336,7 +355,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/vulkan/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/util;$(ProjectDir)../parallel-psx/volk;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_OPENGL;CORE;HAVE_HW;HAVE_PBP;HAVE_THREADS;NEED_DEINTERLACER;WANT_32BPP;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;HAVE_VULKAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -355,7 +374,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/vulkan/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)../;$(ProjectDir)../mednafen;$(ProjectDir)../mednafen/include;$(ProjectDir)../mednafen/intl;$(ProjectDir)../mednafen/hw_sound;$(ProjectDir)../mednafen/hw_cpu;$(ProjectDir)../mednafen/hw_misc;$(ProjectDir)../libretro-common/include;$(ProjectDir)../deps/zlib;$(ProjectDir)../deps/crypto;$(ProjectDir)../deps/flac-1.3.2/include;$(ProjectDir)../deps/flac-1.3.2/src/libFLAC/include;$(ProjectDir)../deps/lzma-16.04/C;$(ProjectDir)../deps/libchdr;$(ProjectDir);$(ProjectDir)../parallel-psx/SPIRV-Cross;$(ProjectDir)../parallel-psx/renderer;$(ProjectDir)../parallel-psx/util;$(ProjectDir)../parallel-psx/volk;$(ProjectDir)../parallel-psx/khronos/include;$(ProjectDir)../parallel-psx/atlas;$(ProjectDir)../parallel-psx/glsl/prebuilt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_OPENGL;CORE;HAVE_HW;HAVE_PBP;HAVE_THREADS;NEED_DEINTERLACER;WANT_32BPP;NEED_CD;HAVE_CHD;_7ZIP_ST;PACKAGE_VERSION="1.3.2";FLAC_API_EXPORTS;FLAC__HAS_OGG=0;HAVE_LROUND;HAVE_STDINT_H;HAVE_SYS_PARAM_H;HAVE_FSEEKO;PACKAGE="mednafen";MEDNAFEN_VERSION_NUMERIC=9386;__LIBRETRO__;_LOW_ACCURACY_;_FILE_OFFSET_BITS=64;__STDC_CONSTANT_MACROS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__ORDER_LITTLE_ENDIAN__;__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__;HAVE_VULKAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
