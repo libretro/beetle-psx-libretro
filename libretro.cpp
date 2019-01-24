@@ -1266,6 +1266,8 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    fp = c->MakeStream(0, ~0U);
    fp->seek(0x8000, SEEK_SET);
 
+   try // Added this back to fix audio-cd loading issue
+   {
    do
    {
       if((pvd_search_count++) == 32)
@@ -1377,6 +1379,15 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
          //puts("ASOFKOASDFKO");
       }
    }
+   } // try
+   catch(std::exception &e)
+   {
+      //
+   }
+      catch(...)
+   {
+   }
+       
 
 Breakout:
    if(fp)
