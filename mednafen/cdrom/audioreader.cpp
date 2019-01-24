@@ -125,8 +125,7 @@ OggVorbisReader::OggVorbisReader(Stream *fp)
    cb.tell_func = iov_tell_func;
 
    fp->seek(0, SEEK_SET);
-   if(ov_open_callbacks(fp, &ovfile, NULL, 0, cb))
-      throw(0);
+   ov_open_callbacks(fp, &ovfile, NULL, 0, cb);
 }
 
 OggVorbisReader::~OggVorbisReader()

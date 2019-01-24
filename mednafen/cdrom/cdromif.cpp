@@ -447,7 +447,8 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba, int64 timeout_us)
    // to read past the last "real" sector of the disc.
    if(lba >= disc_toc.tracks[100].lba)
    {
-      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      if(disc_toc.tracks[100].lba != 0)
+         printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       return(false);
    }
 
@@ -751,10 +752,13 @@ uint64 CDIF_Stream_Thing::read(void *data, uint64 count, bool error_on_eos)
 
    for(rp = position; rp < (position + count); rp = (rp &~ 2047) + 2048)
    {
-      uint8_t buf[2048];  
+      uint8_t buf[2048];
 
       if(!cdintf->ReadSector(buf, start_lba + (rp / 2048), 1))
-         throw MDFN_Error(ErrnoHolder(EIO));
+      {
+         // ignore read errors for now
+         //throw MDFN_Error(ErrnoHolder(EIO));
+      }
 
       memcpy((uint8_t*)data + (rp - position),
             buf + (rp & 2047),
