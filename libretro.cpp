@@ -3055,7 +3055,7 @@ static void check_variables(bool startup)
    if(setting_psx_multitap_port_1 && setting_psx_multitap_port_2)
       input_set_player_count( 8 );
    else if (setting_psx_multitap_port_1 || setting_psx_multitap_port_2)
-      input_set_player_count( 4 );
+      input_set_player_count( 5 );
    else
       input_set_player_count( 2 );
 

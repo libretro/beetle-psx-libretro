@@ -11,7 +11,7 @@
 // Locals
 //------------------------------------------------------------------------------
 
-static retro_environment_t environ_cb; // cached during input_set_env
+static retro_environment_t environ_cb; // cached during input_init_env
 static retro_rumble_interface rumble; // acquired during input_init_env
 
 static FrontIO* FIO; // cached in input_set_fio
@@ -95,6 +95,35 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
 	{ NULL, 0 },
 };
 
+static const struct retro_controller_info ports8[ 8 + 1 ] =
+{
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ 0 },
+};
+
+static const struct retro_controller_info ports5[ 5 + 1 ] =
+{
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ 0 },
+};
+
+static const struct retro_controller_info ports2[ 2 + 1 ] =
+{
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
+	{ 0 },
+};
 
 
 //------------------------------------------------------------------------------
@@ -400,20 +429,23 @@ void input_init_env( retro_environment_t _environ_cb )
 
 void input_set_env( retro_environment_t environ_cb )
 {
-	static const struct retro_controller_info ports[ MAX_CONTROLLERS + 1 ] =
+	switch ( players )
 	{
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-		{ 0 },
-	};
-
-	environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports );
+		
+	case 8:
+		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports8 );
+		break;
+	
+	case 5:
+		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports5 );
+		break;
+		
+	default:
+	case 2:
+		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports2 );
+		break;
+		
+	} /* switch ( players ) */
 }
 
 void input_init()
@@ -450,6 +482,8 @@ void input_enable_calibration( bool enable )
 void input_set_player_count( unsigned _players )
 {
 	players = _players;
+	
+	input_set_env( environ_cb );
 }
 
 void input_set_mouse_sensitivity( int percent )
