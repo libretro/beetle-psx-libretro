@@ -43,7 +43,7 @@ uint64_t MDFN_GetSettingUI(const char *name)
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
       return 4;
 
-   fprintf(stderr, "unhandled setting UI: %s\n", name);
+   //fprintf(stderr, "unhandled setting UI: %s\n", name);
    return 0;
 }
 
@@ -59,7 +59,7 @@ int64 MDFN_GetSettingI(const char *name)
       return setting_last_scanline;
    if (!strcmp("psx.slendp", name))
       return setting_last_scanline_pal;
-   fprintf(stderr, "unhandled setting I: %s\n", name);
+   //fprintf(stderr, "unhandled setting I: %s\n", name);
    return 0;
 }
 
@@ -104,7 +104,7 @@ bool MDFN_GetSettingB(const char *name)
       return 0;
    if (!strcmp("filesys.disablesavegz", name))
       return 1;
-   fprintf(stderr, "unhandled setting B: %s\n", name);
+   //fprintf(stderr, "unhandled setting B: %s\n", name);
    return 0;
 }
 
@@ -137,7 +137,7 @@ std::string MDFN_GetSettingS(const char *name)
       snprintf(fullpath, sizeof(fullpath), "%s.bsv", retro_cd_base_name);
       return std::string(fullpath);
    }
-   fprintf(stderr, "unhandled setting S: %s\n", name);
+   //fprintf(stderr, "unhandled setting S: %s\n", name);
    return 0;
 }
 
