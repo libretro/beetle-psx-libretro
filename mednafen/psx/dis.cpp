@@ -95,7 +95,7 @@ static OpEntry ops[] =
  MK_OP_REGIMM("bgez",	0x01, 0x01),
  MK_OP_REGIMM("bltz",	0x00, 0x00),
 
- 
+
  MK_OP("j",	"P", 2, 0, 0),
  MK_OP("jal",	"P", 3, 0, 0),
 
@@ -239,7 +239,7 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
       "LR1LR2", "LR3LG1", "LG2LG3", "LB1LB2", "LB3", "RFC", "GFC", "BFC", "OFX", "OFY", "H", "DQA", "DQB", "ZSF3", "ZSF4", "FLAG"
    };
 
-   static const char *gte_dr_names[32] = 
+   static const char *gte_dr_names[32] =
    {
       "VXY0", "VZ0", "VXY1", "VZ1", "VXY2", "VZ2", "RGB", "OTZ", "IR0", "IR1", "IR2", "IR3", "SXY0", "SXY1", "SXY2", "SXYP",
       "SZ0", "SZ1", "SZ2", "SZ3", "RGB0", "RGB1", "RGB2", "RES1", "MAC0", "MAC1", "MAC2", "MAC3", "IRGB", "ORGB", "LZCS", "LZCR"
@@ -293,7 +293,7 @@ std::string DisassembleMIPS(uint32 PC, uint32 instr)
          snprintf(s_c, sizeof(s_c), "CPR%d", rd);
          snprintf(s_C, sizeof(s_C), "CCR%d", rd);
 
-         ret = std::string(op->mnemonic);
+         ret = op->mnemonic;
          ret.append(10 - ret.size(), ' ');
 
          for(unsigned int i = 0; i < strlen(op->format); i++)

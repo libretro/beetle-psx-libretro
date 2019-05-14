@@ -1,3 +1,24 @@
+/******************************************************************************/
+/* Mednafen Sony PS1 Emulation Module                                         */
+/******************************************************************************/
+/* cdc.h:
+**  Copyright (C) 2011-2018 Mednafen Team
+**
+** This program is free software; you can redistribute it and/or
+** modify it under the terms of the GNU General Public License
+** as published by the Free Software Foundation; either version 2
+** of the License, or (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software Foundation, Inc.,
+** 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+
 #ifndef __MDFN_PSX_CDC_H
 #define __MDFN_PSX_CDC_H
 
@@ -20,7 +41,7 @@ class PS_CDC
       PS_CDC();
       ~PS_CDC();
 
-      void SetDisc(bool tray_open, CDIF *cdif, const char disc_id[4]);
+      void SetDisc(bool tray_open, CDIF* cdif, const char disc_id[4]);
 
       void Power(void);
       int StateAction(StateMem *sm, int load, int data_only);
@@ -42,7 +63,7 @@ class PS_CDC
       CD_Audio_Buffer AudioBuffer;
 
    private:
-      CDIF *Cur_CDIF;
+      CDIF* Cur_CDIF;
       bool DiscChanged;
       int32 DiscStartupDelay;
 
@@ -147,10 +168,11 @@ class PS_CDC
          DS_STOPPED = 0,
          DS_SEEKING,
          DS_SEEKING_LOGICAL,
+         DS_SEEKING_LOGICAL2,
          DS_PLAY_SEEKING,
          DS_PLAYING,
          DS_READING,
-         DS_RESETTING
+         //DS_RESETTING
       };
       int DriveStatus;
       int StatusAfterSeek;
@@ -161,6 +183,8 @@ class PS_CDC
       int32 PlayTrackMatch;
 
       int32 PSRCounter;
+
+      bool HoldLogicalPos;
 
       int32 CurSector;
       uint32 SectorsRead;	// Reset to 0 on Read*/Play command start; used in the rough simulation of PS1 SetLoc->Read->Pause->Read behavior.
@@ -179,6 +203,7 @@ class PS_CDC
 
       int32 SeekTarget;
       uint32 SeekRetryCounter;
+      int SeekFinished;
 
       int32_t lastts;
 
@@ -192,7 +217,6 @@ class PS_CDC
       uint8 MakeStatus(bool cmd_error = false);
       bool DecodeSubQ(uint8 *subpw);
       bool CommandCheckDiscPresent(void);
-      void DMForceStop();
 
       void EnbufferizeCDDASector(const uint8 *buf);
       bool XA_Test(const uint8 *sdata);
@@ -203,6 +227,7 @@ class PS_CDC
       uint8 xa_cur_chan;
 
       uint8 ReportLastF;
+      int32 ReportStartupDelay;
 
       void HandlePlayRead(void);
 
@@ -229,7 +254,7 @@ class PS_CDC
       int32 Command_Standby(const int arg_count, const uint8 *args);
       int32 Command_Standby_Part2(void);
       int32 Command_Stop(const int arg_count, const uint8 *args);
-      int32 Command_Stop_Part2(void); 
+      int32 Command_Stop_Part2(void);
       int32 Command_Pause(const int arg_count, const uint8 *args);
       int32 Command_Pause_Part2(void);
       int32 Command_Reset(const int arg_count, const uint8 *args);
