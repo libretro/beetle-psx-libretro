@@ -99,7 +99,7 @@ enum rsx_renderer_type rsx_intf_is_type(void)
    return rsx_type;
 }
 
-bool rsx_intf_open(bool is_pal)
+bool rsx_intf_open(bool is_pal, bool force_software)
 {
    struct retro_variable var = {0};
    bool software_selected    = false;
@@ -109,7 +109,7 @@ bool rsx_intf_open(bool is_pal)
    var.key                   = BEETLE_OPT(renderer);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      if (!strcmp(var.value, "software"))
+      if (!strcmp(var.value, "software") || force_software)
          software_selected = true;
 
 #if defined(HAVE_VULKAN)
@@ -134,7 +134,7 @@ bool rsx_intf_open(bool is_pal)
       goto end;
 
    rsx_type          = RSX_SOFTWARE;
-   return rsx_intf_open(is_pal);
+   return rsx_intf_open(is_pal, force_software);
 
 end:
 #if defined(RSX_DUMP)

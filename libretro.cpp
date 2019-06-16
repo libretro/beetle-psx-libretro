@@ -175,17 +175,14 @@ static bool firmware_is_present(unsigned region)
       char s[4096];
 
       log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
-#ifndef HAVE_HW
       s[4095] = '\0';
 
       snprintf(s, sizeof(s), "Firmware is missing:\n\n%s", bios_name_list[0]);
 
       gui_set_message(s);
       gui_show = true;
-      return true;
-#else
+
       return false;
-#endif
    }
 
    char obtained_sha1[41];
@@ -3470,16 +3467,6 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
    }
 
-   /* MDFNI_LoadGame() has been called, we can now query the game's region to deduce
-   which firmware version is needed.
-   In case the file is missing, we log error messages and make this function fail in order
-   to prevent the core and the frontend hanging in a black screen */
-   if ( !firmware_is_present(CalcDiscSCEx()) )
-   {
-      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
-      return false;
-   }
-
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
@@ -3500,9 +3487,21 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   ret = rsx_intf_open(is_pal);
+   /* MDFNI_LoadGame() has been called, we can now query the disc's region to deduce
+   which firmware version is needed. */
+   unsigned disc_region = CalcDiscSCEx(); 
+   bool force_software_renderer = false;
+   if (!firmware_is_present(disc_region))
+   {
+      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
 
-   return ret;
+      /* TODO - We're forcing the sw renderer to show the ugui error message. Figure out
+      how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
+      so we don't have to force this anymore. */
+      force_software_renderer = true;
+   } 
+   
+   return rsx_intf_open(is_pal, force_software_renderer);
 }
 
 void retro_unload_game(void)
@@ -3547,13 +3546,11 @@ void retro_run(void)
    //   hardDisableAudio = !!(flags & 8);
    //}
 
-#ifndef HAVE_HW
    if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
    {
       gui_draw();
       video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
    }
-#endif
 
    rsx_intf_prepare_frame();
 
@@ -3845,7 +3842,7 @@ void retro_run(void)
    }
 
    int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-#ifndef HAVE_HW
+
    if (gui_show)
    {
       if (!gui_inited)
@@ -3866,7 +3863,6 @@ void retro_run(void)
       }
    }
    else
-#endif
    {
       rsx_intf_finalize_frame(fb, width, height,
             MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));

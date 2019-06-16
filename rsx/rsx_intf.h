@@ -31,7 +31,7 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info);
 
 void rsx_intf_init(enum rsx_renderer_type type);
-bool rsx_intf_open(bool is_pal);
+bool rsx_intf_open(bool is_pal, bool force_software);
 void rsx_intf_close(void);
 void rsx_intf_refresh_variables(void);
 void rsx_intf_prepare_frame(void);
