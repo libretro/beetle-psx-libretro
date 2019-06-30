@@ -20,3 +20,5 @@ nul
 /msvc/.vs/msvc-2010/v14/*.suo
 /msvc/.vs/msvc-2015/v14/*.suo
 /msvc/msvc-2015.VC.VC.opendb
+
+/vscode/ipch/*

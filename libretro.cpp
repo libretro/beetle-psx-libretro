@@ -13,7 +13,7 @@
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <rhash.h>
-#include "ugui_tools.h"
+#include "deps/ugui/ugui_tools.h"
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 #include "libretro_options.h"

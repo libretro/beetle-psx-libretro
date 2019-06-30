@@ -43,9 +43,8 @@ ifneq (,$(findstring msvc,$(platform)))
 INCFLAGS += -I$(CORE_DIR)/msvc
 endif
 
-SOURCES_C +=   $(wildcard $(DEPS_DIR)/zlib/*.c) \
-               $(DEPS_DIR)/ugui/ugui.c \
-               $(CORE_DIR)/ugui_tools.c
+SOURCES_C += $(wildcard $(DEPS_DIR)/zlib/*.c) \
+             $(wildcard $(DEPS_DIR)/ugui/*.c)
 
 ifeq ($(HAVE_GRIFFIN),1)
    SOURCES_CXX += beetle_psx_griffin.cpp \
