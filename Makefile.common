@@ -209,6 +209,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
    ifneq ($(STATIC_LINKING), 1)
       SOURCES_C +=   $(LIBRETRO_DIR)/streams/file_stream.c \
                      $(LIBRETRO_DIR)/streams/file_stream_transforms.c \
+                     $(LIBRETRO_DIR)/file/file_path.c \
                      $(LIBRETRO_DIR)/vfs/vfs_implementation.c \
                      $(LIBRETRO_DIR)/string/stdstring.c \
                      $(LIBRETRO_DIR)/compat/compat_strl.c \
@@ -217,6 +218,18 @@ ifneq ($(HAVE_GRIFFIN), 1)
                      $(LIBRETRO_DIR)/compat/compat_posix_string.c \
                      $(LIBRETRO_DIR)/encodings/encoding_utf.c \
                      $(LIBRETRO_DIR)/hash/rhash.c
+
+      ifeq ($(HAVE_CDROM), 1)
+				 CFLAGS += -DHAVE_CDROM
+				 CXXFLAGS += -DHAVE_CDROM
+         SOURCES_C += $(LIBRETRO_DIR)/cdrom/cdrom.c \
+         							$(LIBRETRO_DIR)/vfs/vfs_implementation_cdrom.c
+
+         ifeq ($(CDROM_DEBUG), 1)
+				    CFLAGS += -DCDROM_DEBUG
+				    CXXFLAGS += -DCDROM_DEBUG
+				 endif
+      endif
 
       ifeq ($(NEED_THREADING), 1)
          SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
