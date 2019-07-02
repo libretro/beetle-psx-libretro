@@ -3926,6 +3926,9 @@ void retro_set_environment(retro_environment_t cb)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
       { BEETLE_OPT(renderer), "Renderer (restart); hardware|software"},
       { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled|disabled" },
+#else
+      { BEETLE_OPT(renderer), "Renderer; software"},
+      { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled" },
 #endif
 #ifdef HAVE_VULKAN
       { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
@@ -3945,8 +3948,8 @@ void retro_set_environment(retro_environment_t cb)
       { BEETLE_OPT(pgxp_mode), "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
       { BEETLE_OPT(pgxp_vertex), "PGXP vertex cache; disabled|enabled" },
       { BEETLE_OPT(pgxp_texture), "PGXP perspective correct texturing; disabled|enabled" },
-      { BEETLE_OPT(lineRender), "Line-to-quad hack; default|aggressive|disabled" },
 #endif
+      { BEETLE_OPT(lineRender), "Line-to-quad hack; default|aggressive|disabled" },
       { BEETLE_OPT(widescreen_hack), "Widescreen mode hack; disabled|enabled" },
       { BEETLE_OPT(frame_duping), "Frame duping (speedup); disabled|enabled" },
       { BEETLE_OPT(cpu_freq_scale), "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
