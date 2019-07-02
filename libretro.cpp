@@ -1252,7 +1252,7 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
    return(true);
 }
 
-static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF* c, unsigned *rr)
+static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
    uint8_t pvd[2048];
    uint32_t rdel, rdel_len;
@@ -1331,56 +1331,47 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF* c, unsigned *rr)
          fp->seek(file_lba * 2048, SEEK_SET);
          fp->read(fb, 2048);
 
-         if((bootpos = strstr((char*)fb, "BOOT")))
+         bootpos = strstr((char*)fb, "BOOT") + 4;
+         while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
+         if(*bootpos == '=')
          {
-            bootpos += 4;
+            bootpos++;
             while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-            if(*bootpos == '=')
+            if(!strncasecmp(bootpos, "cdrom:\\", 7))
             {
-               bootpos++;
-               while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-               if(!strncasecmp(bootpos, "cdrom:", 6))
+               bootpos += 7;
+               char *tmp;
+
+               if((tmp = strchr(bootpos, '_'))) *tmp = 0;
+               if((tmp = strchr(bootpos, '.'))) *tmp = 0;
+               if((tmp = strchr(bootpos, ';'))) *tmp = 0;
+               //puts(bootpos);
+
+               if(strlen(bootpos) == 4 && bootpos[0] == 'S' && (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
                {
-                  char* tmp;
-
-                  bootpos += 6;
-
-                  // strrchr() way will pick up Tekken 3, but only enable if needed due to possibility of regressions.
-                  //if((tmp = strrchr(bootpos, '\\')))
-                  // bootpos = tmp + 1;
-                  while(*bootpos == '\\')
-                     bootpos++;
-
-                  if((tmp = strchr(bootpos, '_'))) *tmp = 0;
-                  if((tmp = strchr(bootpos, '.'))) *tmp = 0;
-                  if((tmp = strchr(bootpos, ';'))) *tmp = 0;
-                  //puts(bootpos);
-
-                  if(strlen(bootpos) == 4 && bootpos[0] == 'S' && (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
+                  switch(bootpos[2])
                   {
-                     switch(bootpos[2])
-                     {
-                        case 'E': if(rr)
-                                     *rr = REGION_EU;
-                                  ret = "SCEE";
-                                  goto Breakout;
+                     case 'E': if(rr)
+                                  *rr = REGION_EU;
+                               ret = "SCEE";
+                               goto Breakout;
 
-                        case 'U': if(rr)
-                                     *rr = REGION_NA;
-                                  ret = "SCEA";
-                                  goto Breakout;
+                     case 'U': if(rr)
+                                  *rr = REGION_NA;
+                               ret = "SCEA";
+                               goto Breakout;
 
-                        case 'K':   // Korea?
-                        case 'B':
-                        case 'P': if(rr)
-                                     *rr = REGION_JP;
-                                  ret = "SCEI";
-                                  goto Breakout;
-                     }
+                     case 'K':   // Korea?
+                     case 'B':
+                     case 'P': if(rr)
+                                  *rr = REGION_JP;
+                               ret = "SCEI";
+                               goto Breakout;
                   }
                }
             }
          }
+
          //puts((char*)fb);
          //puts("ASOFKOASDFKO");
       }
@@ -1393,7 +1384,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF* c, unsigned *rr)
       catch(...)
    {
    }
-
+       
 
 Breakout:
    if(fp)
@@ -1497,7 +1488,7 @@ static unsigned CalcDiscSCEx(void)
 }
 
 static void SetDiscWrapper(const bool CD_TrayOpen) {
-    CDIF* cdif = NULL;
+    CDIF *cdif = NULL;
     const char *disc_id = NULL;
     if (CD_SelectedDisc >= 0 && !CD_TrayOpen) {
         // only allow one pbp file to be loaded (at index 0)
@@ -2488,7 +2479,7 @@ static bool disk_set_image_index(unsigned index)
 
 // Mednafen PSX really doesn't support adding disk images on the fly ...
 // Hack around this.
-static void mednafen_update_md5_checksum(CDIF* iface)
+static void mednafen_update_md5_checksum(CDIF *iface)
 {
    uint8 LayoutMD5[16];
    md5_context layout_md5;
