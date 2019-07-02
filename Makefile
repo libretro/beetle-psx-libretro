@@ -359,96 +359,96 @@ else ifeq ($(platform), emscripten)
 
 # Windows MSVC 2017 all architectures
 else ifneq (,$(findstring windows_msvc2017,$(platform)))
-   NO_GCC := 1
 
-   PlatformSuffix = $(subst windows_msvc2017_,,$(platform))
-   ifneq (,$(findstring desktop,$(PlatformSuffix)))
-      WinPartition = desktop
-      MSVC2017CompileFlags = -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP -FS
-      LDFLAGS += -MANIFEST -LTCG:incremental -NXCOMPAT -DYNAMICBASE -DEBUG -OPT:REF -INCREMENTAL:NO -SUBSYSTEM:WINDOWS -MANIFESTUAC:"level='asInvoker' uiAccess='false'" -OPT:ICF -ERRORREPORT:PROMPT -NOLOGO -TLBID:1
-      LIBS    += kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib
-   else ifneq (,$(findstring uwp,$(PlatformSuffix)))
-      WinPartition = uwp
-      MSVC2017CompileFlags = -DWINAPI_FAMILY=WINAPI_FAMILY_APP -D_WINDLL -D_UNICODE -DUNICODE -D__WRL_NO_DEFAULT_LIB__ -EHsc -FS
-      LDFLAGS += -APPCONTAINER -NXCOMPAT -DYNAMICBASE -MANIFEST:NO -LTCG -OPT:REF -SUBSYSTEM:CONSOLE -MANIFESTUAC:NO -OPT:ICF -ERRORREPORT:PROMPT -NOLOGO -TLBID:1 -DEBUG:FULL -WINMD:NO
-      LIBS += WindowsApp.lib
-   endif
+    NO_GCC := 1
 
-   CFLAGS += $(MSVC2017CompileFlags)
-   CXXFLAGS += $(MSVC2017CompileFlags)
+	PlatformSuffix = $(subst windows_msvc2017_,,$(platform))
+	ifneq (,$(findstring desktop,$(PlatformSuffix)))
+		WinPartition = desktop
+		MSVC2017CompileFlags = -DWINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP -FS
+		LDFLAGS += -MANIFEST -LTCG:incremental -NXCOMPAT -DYNAMICBASE -DEBUG -OPT:REF -INCREMENTAL:NO -SUBSYSTEM:WINDOWS -MANIFESTUAC:"level='asInvoker' uiAccess='false'" -OPT:ICF -ERRORREPORT:PROMPT -NOLOGO -TLBID:1
+		LIBS += kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib
+	else ifneq (,$(findstring uwp,$(PlatformSuffix)))
+		WinPartition = uwp
+		MSVC2017CompileFlags = -DWINAPI_FAMILY=WINAPI_FAMILY_APP -D_WINDLL -D_UNICODE -DUNICODE -D__WRL_NO_DEFAULT_LIB__ -EHsc -FS
+		LDFLAGS += -APPCONTAINER -NXCOMPAT -DYNAMICBASE -MANIFEST:NO -LTCG -OPT:REF -SUBSYSTEM:CONSOLE -MANIFESTUAC:NO -OPT:ICF -ERRORREPORT:PROMPT -NOLOGO -TLBID:1 -DEBUG:FULL -WINMD:NO
+		LIBS += WindowsApp.lib
+	endif
 
-   TargetArchMoniker = $(subst $(WinPartition)_,,$(PlatformSuffix))
-   CC  = cl.exe
-   CXX = cl.exe
-   LD  = link.exe
+	CFLAGS += $(MSVC2017CompileFlags)
+	CXXFLAGS += $(MSVC2017CompileFlags)
 
-   reg_query = $(call filter_out2,$(subst $2,,$(shell reg query "$2" -v "$1" 2>nul)))
-   fix_path  = $(subst $(SPACE),\ ,$(subst \,/,$1))
+	TargetArchMoniker = $(subst $(WinPartition)_,,$(PlatformSuffix))
 
-   ProgramFiles86w := $(shell cmd /c "echo %PROGRAMFILES(x86)%")
-   ProgramFiles86  := $(shell cygpath "$(ProgramFiles86w)")
+	CC  = cl.exe
+	CXX = cl.exe
+	LD = link.exe
 
-   WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0)
-   WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_CURRENT_USER\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0)
-   WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0)
-   WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_CURRENT_USER\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0)
-   WindowsSdkDir := $(WindowsSdkDir)
+	reg_query = $(call filter_out2,$(subst $2,,$(shell reg query "$2" -v "$1" 2>nul)))
+	fix_path = $(subst $(SPACE),\ ,$(subst \,/,$1))
 
-   WindowsSDKVersion ?= $(firstword $(foreach folder,$(subst $(subst \,/,$(WindowsSdkDir)Include/),,$(wildcard $(call fix_path,$(WindowsSdkDir)Include\*))),$(if $(wildcard $(call fix_path,$(WindowsSdkDir)Include/$(folder)/um/Windows.h)),$(folder),)))$(BACKSLASH)
-   WindowsSDKVersion := $(WindowsSDKVersion)
+	ProgramFiles86w := $(shell cmd /c "echo %PROGRAMFILES(x86)%")
+	ProgramFiles86 := $(shell cygpath "$(ProgramFiles86w)")
 
-   VsInstallBuildTools   = $(ProgramFiles86)/Microsoft Visual Studio/2017/BuildTools
-   VsInstallEnterprise   = $(ProgramFiles86)/Microsoft Visual Studio/2017/Enterprise
-   VsInstallProfessional = $(ProgramFiles86)/Microsoft Visual Studio/2017/Professional
-   VsInstallCommunity    = $(ProgramFiles86)/Microsoft Visual Studio/2017/Community
+	WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0)
+	WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_CURRENT_USER\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0)
+	WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0)
+	WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_CURRENT_USER\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0)
+	WindowsSdkDir := $(WindowsSdkDir)
 
-   VsInstallRoot ?= $(shell if [ -d "$(VsInstallBuildTools)" ]; then echo "$(VsInstallBuildTools)"; fi)
-   ifeq ($(VsInstallRoot), )
-      VsInstallRoot = $(shell if [ -d "$(VsInstallEnterprise)" ]; then echo "$(VsInstallEnterprise)"; fi)
-   endif
-   
-   ifeq ($(VsInstallRoot), )
-      VsInstallRoot = $(shell if [ -d "$(VsInstallProfessional)" ]; then echo "$(VsInstallProfessional)"; fi)
-   endif
-   
-   ifeq ($(VsInstallRoot), )
-      VsInstallRoot = $(shell if [ -d "$(VsInstallCommunity)" ]; then echo "$(VsInstallCommunity)"; fi)
-   endif
-   VsInstallRoot := $(VsInstallRoot)
+	WindowsSDKVersion ?= $(firstword $(foreach folder,$(subst $(subst \,/,$(WindowsSdkDir)Include/),,$(wildcard $(call fix_path,$(WindowsSdkDir)Include\*))),$(if $(wildcard $(call fix_path,$(WindowsSdkDir)Include/$(folder)/um/Windows.h)),$(folder),)))$(BACKSLASH)
+	WindowsSDKVersion := $(WindowsSDKVersion)
 
-   VcCompilerToolsVer := $(shell cat "$(VsInstallRoot)/VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt" | grep -o '[0-9\.]*')
-   VcCompilerToolsDir := $(VsInstallRoot)/VC/Tools/MSVC/$(VcCompilerToolsVer)
+	VsInstallBuildTools = $(ProgramFiles86)/Microsoft Visual Studio/2017/BuildTools
+	VsInstallEnterprise = $(ProgramFiles86)/Microsoft Visual Studio/2017/Enterprise
+	VsInstallProfessional = $(ProgramFiles86)/Microsoft Visual Studio/2017/Professional
+	VsInstallCommunity = $(ProgramFiles86)/Microsoft Visual Studio/2017/Community
 
-   WindowsSDKSharedIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\shared")
-   WindowsSDKUCRTIncludeDir   := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\ucrt")
-   WindowsSDKUMIncludeDir     := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\um")
-   WindowsSDKUCRTLibDir       := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\ucrt\$(TargetArchMoniker)")
-   WindowsSDKUMLibDir         := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\um\$(TargetArchMoniker)")
+	VsInstallRoot ?= $(shell if [ -d "$(VsInstallBuildTools)" ]; then echo "$(VsInstallBuildTools)"; fi)
+	ifeq ($(VsInstallRoot), )
+		VsInstallRoot = $(shell if [ -d "$(VsInstallEnterprise)" ]; then echo "$(VsInstallEnterprise)"; fi)
+	endif
+	ifeq ($(VsInstallRoot), )
+		VsInstallRoot = $(shell if [ -d "$(VsInstallProfessional)" ]; then echo "$(VsInstallProfessional)"; fi)
+	endif
+	ifeq ($(VsInstallRoot), )
+		VsInstallRoot = $(shell if [ -d "$(VsInstallCommunity)" ]; then echo "$(VsInstallCommunity)"; fi)
+	endif
+	VsInstallRoot := $(VsInstallRoot)
+
+	VcCompilerToolsVer := $(shell cat "$(VsInstallRoot)/VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt" | grep -o '[0-9\.]*')
+	VcCompilerToolsDir := $(VsInstallRoot)/VC/Tools/MSVC/$(VcCompilerToolsVer)
+
+	WindowsSDKSharedIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\shared")
+	WindowsSDKUCRTIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\ucrt")
+	WindowsSDKUMIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\um")
+	WindowsSDKUCRTLibDir := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\ucrt\$(TargetArchMoniker)")
+	WindowsSDKUMLibDir := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\um\$(TargetArchMoniker)")
 
 	# For some reason the HostX86 compiler doesn't like compiling for x64
 	# ("no such file" opening a shared library), and vice-versa.
 	# Work around it for now by using the strictly x86 compiler for x86, and x64 for x64.
 	# NOTE: What about ARM?
-   ifneq (,$(findstring x64,$(TargetArchMoniker)))
-      VCCompilerToolsBinDir := $(VcCompilerToolsDir)\bin\HostX64
+	ifneq (,$(findstring x64,$(TargetArchMoniker)))
+		VCCompilerToolsBinDir := $(VcCompilerToolsDir)\bin\HostX64
 	else
-      VCCompilerToolsBinDir := $(VcCompilerToolsDir)\bin\HostX86
+		VCCompilerToolsBinDir := $(VcCompilerToolsDir)\bin\HostX86
 	endif
 
-   PATH    := $(shell IFS=$$'\n'; cygpath "$(VCCompilerToolsBinDir)/$(TargetArchMoniker)"):$(PATH)
-   PATH    := $(PATH):$(shell IFS=$$'\n'; cygpath "$(VsInstallRoot)/Common7/IDE")
-   INCLUDE := $(shell IFS=$$'\n'; cygpath -w "$(VcCompilerToolsDir)/include")
-   LIB     := $(shell IFS=$$'\n'; cygpath -w "$(VcCompilerToolsDir)/lib/$(TargetArchMoniker)")
-   ifneq (,$(findstring uwp,$(PlatformSuffix)))
-      LIB := $(shell IFS=$$'\n'; cygpath -w "$(LIB)/store")
-   endif
+	PATH := $(shell IFS=$$'\n'; cygpath "$(VCCompilerToolsBinDir)/$(TargetArchMoniker)"):$(PATH)
+	PATH := $(PATH):$(shell IFS=$$'\n'; cygpath "$(VsInstallRoot)/Common7/IDE")
+	INCLUDE := $(shell IFS=$$'\n'; cygpath -w "$(VcCompilerToolsDir)/include")
+	LIB := $(shell IFS=$$'\n'; cygpath -w "$(VcCompilerToolsDir)/lib/$(TargetArchMoniker)")
+	ifneq (,$(findstring uwp,$(PlatformSuffix)))
+		LIB := $(shell IFS=$$'\n'; cygpath -w "$(LIB)/store")
+	endif
     
-   export INCLUDE := $(INCLUDE);$(WindowsSDKSharedIncludeDir);$(WindowsSDKUCRTIncludeDir);$(WindowsSDKUMIncludeDir)
-   export LIB := $(LIB);$(WindowsSDKUCRTLibDir);$(WindowsSDKUMLibDir)
-   TARGET     := $(TARGET_NAME)_libretro.dll
-   TARGET_TMP := $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
-   PSS_STYLE  :=2
-   LDFLAGS    += -DLL
+	export INCLUDE := $(INCLUDE);$(WindowsSDKSharedIncludeDir);$(WindowsSDKUCRTIncludeDir);$(WindowsSDKUMIncludeDir)
+	export LIB := $(LIB);$(WindowsSDKUCRTLibDir);$(WindowsSDKUMLibDir)
+	TARGET := $(TARGET_NAME)_libretro.dll
+	TARGET_TMP := $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
+	PSS_STYLE :=2
+	LDFLAGS += -DLL
 
 # Windows
 else
@@ -498,38 +498,38 @@ all: $(TARGET)
 -include $(DEPS)
 
 ifeq ($(DEBUG), 1)
-   ifneq (,$(findstring msvc,$(platform)))
-      ifeq ($(STATIC_LINKING),1)
-         CFLAGS   += -MTd
-         CXXFLAGS += -MTd
-      else
-         CFLAGS   += -MDd
-         CXXFLAGS += -MDd
-      endif
-
-      CFLAGS   += -Od -Zi -DDEBUG -D_DEBUG
-      CXXFLAGS += -Od -Zi -DDEBUG -D_DEBUG
-   else
-      CFLAGS   += -O0 -g -DDEBUG
-      CXXFLAGS += -O0 -g -DDEBUG
-   endif
-
-else ifneq (,$(findstring msvc,$(platform)))
-   ifeq ($(STATIC_LINKING),1)
-      CFLAGS   += -MT
-      CXXFLAGS += -MT
-   else
-      CFLAGS   += -MD
-      CXXFLAGS += -MD
-   endif
-
-   CFLAGS   += -O2 -DNDEBUG
-   CXXFLAGS += -O2 -DNDEBUG 
+ifneq (,$(findstring msvc,$(platform)))
+	ifeq ($(STATIC_LINKING),1)
+	CFLAGS += -MTd
+	CXXFLAGS += -MTd
 else
-   CFLAGS   += -O3 -DNDEBUG
-   CXXFLAGS += -O3 -DNDEBUG
+	CFLAGS += -MDd
+	CXXFLAGS += -MDd
 endif
 
+CFLAGS += -Od -Zi -DDEBUG -D_DEBUG
+CXXFLAGS += -Od -Zi -DDEBUG -D_DEBUG
+	else
+	CFLAGS += -O0 -g -DDEBUG
+	CXXFLAGS += -O0 -g -DDEBUG
+endif
+else
+ifneq (,$(findstring msvc,$(platform)))
+ifeq ($(STATIC_LINKING),1)
+	CFLAGS += -MT
+	CXXFLAGS += -MT
+else
+	CFLAGS += -MD
+	CXXFLAGS += -MD
+endif
+
+CFLAGS += -O2 -DNDEBUG
+CXXFLAGS += -O2 -DNDEBUG
+else
+	CFLAGS += -O3 -DNDEBUG
+	CXXFLAGS += -O3 -DNDEBUG
+endif
+endif
 
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS   += $(fpic) $(NEW_GCC_FLAGS)
@@ -554,17 +554,16 @@ FLAGS += $(ENDIANNESS_DEFINES) \
          -D__STDC_CONSTANT_MACROS
 
 ifneq (,$(findstring windows_msvc2017,$(platform)))
-   FLAGS += -D_CRT_SECURE_NO_WARNINGS \
-            -D_CRT_NONSTDC_NO_DEPRECATE \
-            -D__ORDER_LITTLE_ENDIAN__ \
-            -D__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__ \
-            -DNOMINMAX \
-            //utf-8 \
-            //std:c++17
-	 
-   ifeq (,$(findstring windows_msvc2017_uwp,$(platform)))
-      LDFLAGS += opengl32.lib
-   endif
+FLAGS += -D_CRT_SECURE_NO_WARNINGS \
+	 -D_CRT_NONSTDC_NO_DEPRECATE \
+	 -D__ORDER_LITTLE_ENDIAN__ \
+	 -D__BYTE_ORDER__=__ORDER_LITTLE_ENDIAN__ \
+	 -DNOMINMAX \
+	 //utf-8 \
+	 //std:c++17
+	 ifeq (,$(findstring windows_msvc2017_uwp,$(platform)))
+	 	 LDFLAGS += opengl32.lib
+	 endif
 endif
 
 ifeq ($(HAVE_VULKAN),1)
@@ -588,16 +587,16 @@ OBJOUT   = -o
 LINKOUT  = -o
 
 ifneq (,$(findstring msvc,$(platform)))
-   OBJOUT = -Fo
-   LINKOUT = -out:
-   ifeq ($(STATIC_LINKING),1)
-      LD ?= lib.exe
-      STATIC_LINKING = 0
-   else
-      LD = link.exe
-   endif
+	OBJOUT = -Fo
+	LINKOUT = -out:
+ifeq ($(STATIC_LINKING),1)
+	LD ?= lib.exe
+	STATIC_LINKING=0
 else
-   LD = $(CXX)
+	LD = link.exe
+endif
+else
+	LD = $(CXX)
 endif
 
 $(TARGET): $(OBJECTS)
