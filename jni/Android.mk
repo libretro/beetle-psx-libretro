@@ -30,7 +30,6 @@ ifeq ($(HAVE_HW),1)
     HAVE_VULKAN := 1
     FLAGS       += -DHAVE_VULKAN
   endif
-  FLAGS += -DHAVE_HW
 endif
 
 include $(CORE_DIR)/Makefile.common
