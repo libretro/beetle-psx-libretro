@@ -1,59 +1,41 @@
-/******************************************************************************/
-/* Mednafen Sony PS1 Emulation Module                                         */
-/******************************************************************************/
-/* cdc.cpp:
-**  Copyright (C) 2011-2018 Mednafen Team
-**
-** This program is free software; you can redistribute it and/or
-** modify it under the terms of the GNU General Public License
-** as published by the Free Software Foundation; either version 2
-** of the License, or (at your option) any later version.
-**
-** This program is distributed in the hope that it will be useful,
-** but WITHOUT ANY WARRANTY; without even the implied warranty of
-** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-** GNU General Public License for more details.
-**
-** You should have received a copy of the GNU General Public License
-** along with this program; if not, write to the Free Software Foundation, Inc.,
-** 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-*/
-
-// TODO: Test seekl to CD-DA, and seekl to beyond end of disc.
-
-// TODO: Rewrite command processing to use switch() state machine madness, to handle some commands(like 0x0A) whose timing
-//       characteristics cannot be handled well with the current way.  Be sure to test interruptability(with a new command) of the commands, too.
+/* Mednafen - Multi-system Emulator
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
 /*
   Games to test after changing code affecting CD reading and buffering:
-   Bedlam (massive graphics corruption)
-   Rise 2 (massive graphics corruption)
+		Bedlam
+		Rise 2
 
-   Captain Commando (boss graphics corruption on first stage)
-   Gran Turismo (missing music; GetLocL must be valid and sector data must be ready simultaneous with clearing of status seek bit and setting of reading bit)
-   Harukanaru Toki no Naka de - Banjou Yuugi (needs GetLocL to reflect dancing around target seek position after seek completes; otherwise hangs on voice acting)
-   Incredible Crisis (needs GetLocL to be valid after a SeekL; otherwise hangs without music near start of "Etsuko and the Golden Pig")
-   Tomb Raider(needs GetLocP to reflect dancing around target seek position after seek completes; otherwise, CD-DA tracks at M:S:F=x:x:0 fail to play and game hangs)
-   Vib Ribbon, with extra audio CD
-   Mortal Kombat Trilogy, music resumption after pause.
-
-  Nightmare Creatures hangs during startup for some CD timing alignments/windows, and it spams command 0x0A without properly waiting for it to complete.
 */
 
 // TODO: async command counter and async command phase?
 /*
 
  TODO:
-   Implement missing commands.
+	Implement missing commands.
 
-   SPU CD-DA and CD-XA streaming semantics.
+	SPU CD-DA and CD-XA streaming semantics.
 */
 
 /*
  After eject(doesn't appear to occur when drive is in STOP state):
-   * Does not appear to occur in STOP state.
-   * Does not appear to occur in PAUSE state.
-   * DOES appear to occur in STANDBY state. (TODO: retest)
+	* Does not appear to occur in STOP state.
+	* Does not appear to occur in PAUSE state.
+	* DOES appear to occur in STANDBY state. (TODO: retest)
 
 % Result 0: 16
 % Result 1: 08
@@ -61,9 +43,9 @@
 % 19 e0
 
  Command abortion tests(NOP tested):
-   Does not appear to occur when in STOP or PAUSE states(STOP or PAUSE command just executed).
+	Does not appear to occur when in STOP or PAUSE states(STOP or PAUSE command just executed).
 
-   DOES occur after a ReadTOC completes, if ReadTOC is not followed by a STOP or PAUSE.  Odd.
+	DOES occur after a ReadTOC completes, if ReadTOC is not followed by a STOP or PAUSE.  Odd.
 */
 
 #include "psx.h"
@@ -96,7 +78,25 @@ PS_CDC::~PS_CDC()
 
 }
 
-void PS_CDC::SetDisc(bool tray_open, CDIF* cdif, const char *disc_id)
+void PS_CDC::DMForceStop(void)
+{
+   PSRCounter = 0;
+
+   if((DriveStatus != DS_PAUSED && DriveStatus != DS_STOPPED) || PendingCommandPhase >= 2)
+   {
+      PendingCommand = 0x00;
+      PendingCommandCounter = 0;
+      PendingCommandPhase = 0;
+   }
+
+   HeaderBufValid = false;
+   DriveStatus = DS_STOPPED;
+   ClearAIP();
+   SectorPipe_Pos = SectorPipe_In = 0;
+   SectorsRead = 0;
+}
+
+void PS_CDC::SetDisc(bool tray_open, CDIF *cdif, const char *disc_id)
 {
    if(tray_open)
       cdif = NULL;
@@ -105,7 +105,11 @@ void PS_CDC::SetDisc(bool tray_open, CDIF* cdif, const char *disc_id)
    IsPSXDisc = false;
    memset(DiscID, 0, sizeof(DiscID));
 
-   if(Cur_CDIF)
+   if(!Cur_CDIF)
+   {
+      DMForceStop();
+   }
+   else
    {
       HeaderBufValid = false;
       DiscStartupDelay = (int64)1000 * 33868800 / 1000;
@@ -195,7 +199,6 @@ void PS_CDC::SoftReset(void)
    Mode = 0x20;
 
    HeaderBufValid = false;
-   SeekFinished = -1;
    DriveStatus = DS_STOPPED;
    ClearAIP();
    StatusAfterSeek = DS_STOPPED;
@@ -318,8 +321,6 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 
       SFVAR(PSRCounter),
 
-      SFVAR(HoldLogicalPos),
-
       SFVAR(CurSector),
       SFVAR(SectorsRead),
 
@@ -330,7 +331,6 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 
       SFVAR(SeekTarget),
       SFVAR(SeekRetryCounter),
-      SFVAR(SeekFinished),
 
       // FIXME: Save TOC stuff?
 #if 0
@@ -339,17 +339,16 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
       uint8 DiscID[4];
 #endif
       SFVAR(CommandLoc),
-      SFVAR(CommandLoc_Dirty),
-      SFARRAY16(&xa_previous[0][0], sizeof(xa_previous) / sizeof(xa_previous[0][0])),
+         SFVAR(CommandLoc_Dirty),
+         SFARRAY16(&xa_previous[0][0], sizeof(xa_previous) / sizeof(xa_previous[0][0])),
 
-      SFVAR(xa_cur_set),
-      SFVAR(xa_cur_file),
-      SFVAR(xa_cur_chan),
+         SFVAR(xa_cur_set),
+         SFVAR(xa_cur_file),
+         SFVAR(xa_cur_chan),
 
-      SFVAR(ReportLastF),
-      SFVAR(ReportStartupDelay),
+         SFVAR(ReportLastF),
 
-      SFEND
+         SFEND
    };
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "CDC");
@@ -371,8 +370,12 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
 
       ADPCM_ResampCurPos &= 0x1F;
       ADPCM_ResampCurPhase %= 7;
-   }
 
+      //
+      // Handle pre-0.9.37 state loading, and maliciously-constructed/corrupted save states.
+      if(!Cur_CDIF)
+         DMForceStop();
+   }
    return(ret);
 }
 
@@ -440,16 +443,28 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
 {
    uint8 ret = 0;
 
-   // Are these bit positions right?
+   /* Are these bit positions right? */
 
-   if(DriveStatus == DS_PLAYING)
-      ret |= 0x80;
-
-   if(DriveStatus == DS_READING)
-      ret |= 0x20;
-
-   if(DriveStatus == DS_SEEKING || DriveStatus == DS_SEEKING_LOGICAL || DriveStatus == DS_SEEKING_LOGICAL2)
-      ret |= 0x40;
+   switch (DriveStatus)
+   {
+      case DS_PLAYING:
+         ret |= 0x80;
+         break;
+      case DS_READING:
+         /* Probably will want to be careful with this HeaderBufValid 
+          * versus seek/read bit business in the future as it is a bit fragile;
+          * "Gran Turismo 1"'s music is a good test case. */
+         if(HeaderBufValid)
+         {
+            ret |= 0x20;
+            break;
+         }
+         /* fall-through */
+      case DS_SEEKING:
+      case DS_SEEKING_LOGICAL:
+         ret |= 0x40;
+         break;
+   }
 
    if(!Cur_CDIF || DiscChanged)
       ret |= 0x10;
@@ -460,7 +475,7 @@ uint8 PS_CDC::MakeStatus(bool cmd_error)
    if(cmd_error)
       ret |= 0x01;
 
-   DiscChanged = false;   // FIXME: Only do it on NOP command execution?
+   DiscChanged = false; // FIXME: Only do it on NOP command execution? 
 
    return(ret);
 }
@@ -527,7 +542,7 @@ INLINE void PS_CDC::ApplyVolume(int32 samples[2])
    samples[1] = right_out;
 }
 
-// This function must always set samples[0] and samples[1], even if just to 0;
+// This function must always set samples[0] and samples[1], even if just to 0; 
 // range of samples[n] shall be restricted to -32768 through 32767.
 void PS_CDC::GetCDAudio(int32 samples[2], const unsigned freq)
 {
@@ -571,14 +586,14 @@ void PS_CDC::GetCDAudio(int32 samples[2], const unsigned freq)
 
          for(unsigned i = 0; i < 2; i++)
          {
-            ADPCM_ResampBuf[i][ADPCM_ResampCurPos +  0] =
+            ADPCM_ResampBuf[i][ADPCM_ResampCurPos +  0] = 
                ADPCM_ResampBuf[i][ADPCM_ResampCurPos + 32] = raw[i];
          }
          ADPCM_ResampCurPos = (ADPCM_ResampCurPos + 1) & 0x1F;
       }
    }
 
-   // Algorithmically, volume is applied after resampling for CD-XA ADPCM playback,
+   // Algorithmically, volume is applied after resampling for CD-XA ADPCM playback, 
    // per PS1 tests(though when "mute" is applied wasn't tested).
    ApplyVolume(samples);
 }
@@ -680,7 +695,7 @@ void PS_CDC::ClearAudioBuffers(void)
 // output should be readable at -2 and -1
 static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shift, const unsigned weight)
 {
-   // Weights copied over from SPU channel ADPCM playback code,
+   // Weights copied over from SPU channel ADPCM playback code, 
    // may not be entirely the same for CD-XA ADPCM, we need to run tests.
    static const int32 Weights[16][2] =
    {
@@ -884,7 +899,6 @@ void PS_CDC::HandlePlayRead(void)
    if(CurSector >= ((int32)toc.tracks[100].lba + 300) && CurSector >= (75 * 60 * 75 - 150))
    {
       PSX_WARNING("[CDC] Read/Play position waaay too far out(%u), forcing STOP", CurSector);
-      SeekFinished = -1;
       DriveStatus = DS_STOPPED;
       SectorPipe_Pos = SectorPipe_In = 0;
       SectorsRead = 0;
@@ -921,14 +935,13 @@ void PS_CDC::HandlePlayRead(void)
 
    DecodeSubQ(read_buf + 2352);
 
-   if(SubQBuf_Safe[1] == 0xAA && (DriveStatus == DS_PLAYING || (DriveStatus == DS_READING && !(SubQBuf_Safe[0] & 0x40) && (Mode & MODE_CDDA))))
+   if(SubQBuf_Safe[1] == 0xAA && (DriveStatus == DS_PLAYING || (!(SubQBuf_Safe[0] & 0x40) && (Mode & MODE_CDDA))))
    {
       HeaderBufValid = false;
 
       PSX_WARNING("[CDC] CD-DA leadout reached: %u", CurSector);
 
       // Status in this end-of-disc context here should be generated after we're in the pause state.
-      SeekTarget = CurSector;
       DriveStatus = DS_PAUSED;
       SectorPipe_Pos = SectorPipe_In = 0;
       SectorsRead = 0;
@@ -939,37 +952,35 @@ void PS_CDC::HandlePlayRead(void)
 
    if(DriveStatus == DS_PLAYING)
    {
-      if(Mode & MODE_AUTOPAUSE)
+      // Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause).
+      if(PlayTrackMatch == -1 && SubQChecksumOK)
+         PlayTrackMatch = SubQBuf_Safe[0x1];
+
+      if((Mode & MODE_AUTOPAUSE) && PlayTrackMatch != -1 && SubQBuf_Safe[0x1] != PlayTrackMatch)
       {
-         // Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause).
-         // Pitball enables autopause a while after playing starts.
-         //
-         if(PlayTrackMatch == -1 && SubQChecksumOK)
-            PlayTrackMatch = SubQBuf_Safe[0x1];
+         // Status needs to be taken before we're paused(IE it should still report playing).
+         SetAIP(CDCIRQ_DATA_END, MakeStatus());
 
-         if(PlayTrackMatch != -1 && SubQBuf_Safe[0x1] != PlayTrackMatch)
-         {
-            // Status needs to be taken before we're paused(IE it should still report playing).
-            SetAIP(CDCIRQ_DATA_END, MakeStatus());
-
-            SeekTarget = CurSector;
-            DriveStatus = DS_PAUSED;
-            SectorPipe_Pos = SectorPipe_In = 0;
-            SectorsRead = 0;
-            PSRCounter = 0;
-            return;
-         }
+         DriveStatus = DS_PAUSED;
+         SectorPipe_Pos = SectorPipe_In = 0;
+         SectorsRead = 0;
+         PSRCounter = 0;
+         return;
       }
 
-      if((Mode & MODE_REPORT) && ReportStartupDelay <= 0 && (((SubQBuf_Safe[0x9] >> 4) != ReportLastF) || Forward || Backward) && SubQChecksumOK)
+      if((Mode & MODE_REPORT) && (((SubQBuf_Safe[0x9] >> 4) != ReportLastF) || Forward || Backward) && SubQChecksumOK)
       {
          uint8 tr[8];
+#if 1
          uint16 abs_lev_max = 0;
          bool abs_lev_chselect = SubQBuf_Safe[0x8] & 0x01;
 
          for(int i = 0; i < 588; i++)
             abs_lev_max = std::max<uint16>(abs_lev_max, std::min<int>(abs((int16)MDFN_de16lsb<false>(&read_buf[i * 4 + (abs_lev_chselect * 2)])), 32767));
          abs_lev_max |= abs_lev_chselect << 15;
+#endif
+
+         ReportLastF = SubQBuf_Safe[0x9] >> 4;
 
          tr[0] = MakeStatus();
          tr[1] = SubQBuf_Safe[0x1];	// Track
@@ -981,7 +992,7 @@ void PS_CDC::HandlePlayRead(void)
             tr[4] = SubQBuf_Safe[0x4] | 0x80;	// R S
             tr[5] = SubQBuf_Safe[0x5];		// R F
          }
-         else
+         else	
          {
             tr[3] = SubQBuf_Safe[0x7];	// A M
             tr[4] = SubQBuf_Safe[0x8];	// A S
@@ -993,7 +1004,6 @@ void PS_CDC::HandlePlayRead(void)
 
          SetAIP(CDCIRQ_DATA_READY, 8, tr);
       }
-      ReportLastF = SubQBuf_Safe[0x9] >> 4;
    }
 
    if(SectorPipe_In >= SectorPipe_Count)
@@ -1001,42 +1011,12 @@ void PS_CDC::HandlePlayRead(void)
       uint8* buf = SectorPipe[SectorPipe_Pos];
       SectorPipe_In--;
 
-      if(SubQBuf_Safe[0] & 0x40) // Data sector
+      if(DriveStatus == DS_READING)
       {
-         if(DriveStatus == DS_SEEKING_LOGICAL2 || DriveStatus == DS_READING || (HoldLogicalPos && (DriveStatus == DS_PAUSED || DriveStatus == DS_STANDBY)))
+         if(SubQBuf_Safe[0] & 0x40) //) || !(Mode & MODE_CDDA))
          {
             memcpy(HeaderBuf, buf + 12, 12);
             HeaderBufValid = true;
-
-            if(DriveStatus == DS_SEEKING_LOGICAL2)
-            {
-               if(AMSF_to_LBA(BCD_to_U8(HeaderBuf[0]), BCD_to_U8(HeaderBuf[1]), BCD_to_U8(HeaderBuf[2])) == SeekTarget)
-               {
-                  //puts("Logical2 seek finished");
-                  DriveStatus = StatusAfterSeek;
-                  SeekFinished = true;
-                  ReportStartupDelay = 24000000;
-               }
-               else
-               {
-               if(!SeekRetryCounter)
-               {
-                  HoldLogicalPos = false;
-                  DriveStatus = DS_STANDBY;
-                  SeekFinished = -1;
-               }
-               else
-                  SeekRetryCounter--;
-               }
-            }
-         }
-         //
-         //
-         //
-         //printf("%d, %02x:%02x:%02x --- %d %d\n", DriveStatus, HeaderBuf[0], HeaderBuf[1], HeaderBuf[2], SeekTarget, AMSF_to_LBA(BCD_to_U8(HeaderBuf[0]), BCD_to_U8(HeaderBuf[1]), BCD_to_U8(HeaderBuf[2])));
-
-         if(DriveStatus == DS_READING)
-         {
 
             if((Mode & MODE_STRSND) && (buf[12 + 3] == 0x2) && ((buf[12 + 6] & 0x64) == 0x64))
             {
@@ -1082,41 +1062,15 @@ void PS_CDC::HandlePlayRead(void)
          }
       }
 
-      else // CD-DA sector
+      if(!(SubQBuf_Safe[0] & 0x40) && ((Mode & MODE_CDDA) || DriveStatus == DS_PLAYING))
       {
-         if(DriveStatus == DS_SEEKING_LOGICAL2)
+         if(AudioBuffer.ReadPos < AudioBuffer.Size)
          {
-            if(Mode & MODE_CDDA)
-            {
-               DriveStatus = StatusAfterSeek;
-               SeekFinished = true;
-               ReportStartupDelay = 24000000;
-            }
-            else
-            {
-               if(!SeekRetryCounter)
-               {
-                  HoldLogicalPos = false;
-                  DriveStatus = DS_STANDBY;
-                  SeekFinished = -1;
-               }
-               else
-                  SeekRetryCounter--;
-            }
+            PSX_WARNING("[CDC] BUG CDDA buffer full");
          }
-         //
-         //
-         //
-         if((DriveStatus == DS_READING && (Mode & MODE_CDDA)) || DriveStatus == DS_PLAYING)
+         else
          {
-            if(AudioBuffer.ReadPos < AudioBuffer.Size)
-            {
-               PSX_WARNING("[CDC] BUG CDDA buffer full");
-            }
-            else
-            {
-               EnbufferizeCDDASector(buf);
-            }
+            EnbufferizeCDDASector(buf);
          }
       }
    }
@@ -1163,13 +1117,7 @@ void PS_CDC::HandlePlayRead(void)
    else
       CurSector++;
 
-   if(DriveStatus == DS_PAUSED || DriveStatus == DS_STANDBY) // || DriveStatus == DS_SEEKING_LOGICAL2)
-   {
-      if(CurSector >= (SeekTarget + 2))
-         CurSector = std::max<int32>(-150, CurSector - 9);
-   }
-   else
-      SectorsRead++;
+   SectorsRead++;
 }
 
 int32_t PS_CDC::Update(const int32_t timestamp)
@@ -1178,33 +1126,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
    overclock_cpu_to_device(clocks);
 
-   if(!Cur_CDIF)
-   {
-      if(DriveStatus != DS_STOPPED || (PendingCommandCounter > 0 && PendingCommandPhase >= 2))
-      {
-         SetAIP(CDCIRQ_DISC_ERROR, (MakeStatus() & ~0xE0) | 0x04, 0x08);
-
-         SectorPipe_Pos = SectorPipe_In = 0;
-         SectorsRead = 0;
-         HeaderBufValid = false;
-         SeekFinished = -1;
-
-         DriveStatus = DS_STOPPED;
-         PSRCounter = 0;
-
-         if(PendingCommandPhase >= 2)
-         {
-            PendingCommand = 0x00;
-            PendingCommandCounter = 0;
-            PendingCommandPhase = 0;
-         }
-      }
-
-      DiscStartupDelay = 0;
-   }
-   //
-   //
-   //
+   //doom_ts = timestamp;
 
    while(clocks > 0)
    {
@@ -1227,11 +1149,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
          DiscStartupDelay -= chunk_clocks;
 
          if(DiscStartupDelay <= 0)
-         {
-            SeekTarget = CurSector;
-            HoldLogicalPos = false;
             DriveStatus = DS_PAUSED;	// or is it supposed to be DS_STANDBY?
-         }
       }
 
       //MDFN_DispMessage("%02x %d -- %d %d -- %02x", IRQBuffer, CDCReadyReceiveCounter, PSRCounter, PendingCommandCounter, PendingCommand);
@@ -1252,35 +1170,81 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
          PSRCounter -= chunk_clocks;
 
-         if(ReportStartupDelay > 0)
-            ReportStartupDelay -= chunk_clocks;
-
-         if(PSRCounter <= 0)
+         if(PSRCounter <= 0) 
          {
-            if(DriveStatus == DS_SEEKING)
+            switch (DriveStatus)
             {
-               CurSector = SeekTarget;
+               case DS_RESETTING:
+                  SetAIP(CDCIRQ_COMPLETE, MakeStatus());
 
-               HoldLogicalPos = false;
-               DriveStatus = StatusAfterSeek;
-               SeekFinished = true;
-               ReportStartupDelay = 24000000;
+                  Muted = false; // Does it get reset here?
+                  ClearAudioBuffers();
 
-               PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
-            }
-            else if(DriveStatus == DS_SEEKING_LOGICAL)
-            {
-               CurSector = SeekTarget;
+                  SB_In          = 0;
+                  SectorPipe_Pos = 0;
+                  SectorPipe_In  = 0;
+                  SectorsRead    = 0;
+                  Mode           = 0x20; /* Confirmed (and see "This Is Football 2"). */
+                  CurSector      = 0;
+                  CommandLoc     = 0;
 
-               HoldLogicalPos = true;
-               DriveStatus = DS_SEEKING_LOGICAL2;
-            }
-            //
-            //
-            //
-            if(DriveStatus == DS_PAUSED || DriveStatus == DS_STANDBY || DriveStatus == DS_READING || DriveStatus == DS_PLAYING || DriveStatus == DS_SEEKING_LOGICAL2)
-            {
-               HandlePlayRead();
+                  DriveStatus    = DS_PAUSED;	// or DS_STANDBY?
+                  ClearAIP();
+                  break;
+               case DS_SEEKING:
+                  {
+                     int x;
+                     CurSector = SeekTarget;
+
+                     // CurSector + x for "Tomb Raider"'s sake, as it relies on behavior that we can't emulate very well without a more accurate CD drive
+                     // emulation model.
+                     for(x = -1; x >= -16; x--)
+                     {
+                        uint8 pwbuf[96];
+                        Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector + x, false);
+                        if(DecodeSubQ(pwbuf))
+                           break;
+                     }
+
+                     DriveStatus = StatusAfterSeek;
+
+                     if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+                        PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
+                  }
+                  break;
+               case DS_SEEKING_LOGICAL:
+                  {
+                     uint8 pwbuf[96];
+                     CurSector = SeekTarget;
+                     Cur_CDIF->ReadRawSectorPWOnly(pwbuf, CurSector, false);
+                     DecodeSubQ(pwbuf);
+
+                     if(!(Mode & MODE_CDDA) && !(SubQBuf_Safe[0] & 0x40))
+                     {
+                        if(!SeekRetryCounter)
+                        {
+                           DriveStatus = DS_STANDBY;
+                           SetAIP(CDCIRQ_DISC_ERROR, MakeStatus() | 0x04, 0x04);
+                        }
+                        else
+                        {
+                           SeekRetryCounter--;
+                           PSRCounter = 33868800 / 75;
+                        }
+                     }
+                     else
+                     {
+                        DriveStatus = StatusAfterSeek;
+
+                        if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+                           PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
+                     }
+                  }
+                  break;
+               case DS_READING:
+               case DS_PLAYING:
+                  HandlePlayRead();
+                  break;
             }
          }
       }
@@ -1301,39 +1265,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
          {
             int32 next_time = 0;
 
-            if(PendingCommandPhase == -1)
-            {
-               if(ArgsRP != ArgsWP)
-               {
-                  ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
-                  ArgsRP = (ArgsRP + 1) & 0x1F;
-                  PendingCommandPhase += 1;
-                  next_time = 1815;
-               }
-               else
-               {
-                  PendingCommandPhase += 2;
-                  next_time = 8500;
-               }
-            }
-            else if(PendingCommandPhase == 0)  // Command phase 0
-            {
-               if(ArgsReceiveIn < 32)
-                  ArgsReceiveBuf[ArgsReceiveIn++] = ArgsReceiveLatch;
-
-               if(ArgsRP != ArgsWP)
-               {
-                  ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
-                  ArgsRP = (ArgsRP + 1) & 0x1F;
-                  next_time = 1815;
-               }
-               else
-               {
-                  PendingCommandPhase++;
-                  next_time = 8500;
-               }
-            }
-            else if(PendingCommandPhase >= 2)  // Command phase 2+
+            if(PendingCommandPhase >= 2)	// Command phase 2+
             {
                BeginResults();
 
@@ -1341,47 +1273,78 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
                next_time = (this->*(command->func2))();
             }
-            else // Command phase 1
+            else switch (PendingCommandPhase)
             {
-               if(PendingCommand >= 0x20 || !Commands[PendingCommand].func)
-               {
-                  BeginResults();
+               case -1:
+                  if(ArgsRP != ArgsWP)
+                  {
+                     ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
+                     ArgsRP = (ArgsRP + 1) & 0x1F;
+                     PendingCommandPhase += 1;
+                     next_time = 1815;
+                  }
+                  else
+                  {
+                     PendingCommandPhase += 2;
+                     next_time = 8500;
+                  }
+                  break;
+               case 0: /* Command phase 0 */
+                  if(ArgsReceiveIn < 32)
+                     ArgsReceiveBuf[ArgsReceiveIn++] = ArgsReceiveLatch;
 
-                  PSX_WARNING("[CDC] Unknown command: 0x%02x", PendingCommand);
+                  if(ArgsRP != ArgsWP)
+                  {
+                     ArgsReceiveLatch = ArgsBuf[ArgsRP & 0x0F];
+                     ArgsRP = (ArgsRP + 1) & 0x1F;
+                     next_time = 1815;
+                  }
+                  else
+                  {
+                     PendingCommandPhase++;
+                     next_time = 8500;
+                  }
+                  break;
+               default: /* Command phase 1 */
+                  {
+                     BeginResults();
 
-                  WriteResult(MakeStatus(true));
-                  WriteResult(ERRCODE_BAD_COMMAND);
-                  WriteIRQ(CDCIRQ_DISC_ERROR);
-               }
-               else if(ArgsReceiveIn < Commands[PendingCommand].args_min || ArgsReceiveIn > Commands[PendingCommand].args_max)
-               {
-                  BeginResults();
+                     if(PendingCommand >= 0x20 || !Commands[PendingCommand].func)
+                     {
+                        PSX_WARNING("[CDC] Unknown command: 0x%02x", PendingCommand);
 
-                  PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
-                  for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                     PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
-                  PSX_DBG(PSX_DBG_WARNING, "\n");
+                        WriteResult(MakeStatus(true));
+                        WriteResult(ERRCODE_BAD_COMMAND);
+                        WriteIRQ(CDCIRQ_DISC_ERROR);
+                     }
+                     else if(ArgsReceiveIn < Commands[PendingCommand].args_min || 
+                           ArgsReceiveIn > Commands[PendingCommand].args_max)
+                     {
+                        PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
+                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
+                           PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
+                        PSX_DBG(PSX_DBG_WARNING, "\n");
 
-                  WriteResult(MakeStatus(true));
-                  WriteResult(ERRCODE_BAD_NUMARGS);
-                  WriteIRQ(CDCIRQ_DISC_ERROR);
-               }
-               else
-               {
-                  BeginResults();
+                        WriteResult(MakeStatus(true));
+                        WriteResult(ERRCODE_BAD_NUMARGS);
+                        WriteIRQ(CDCIRQ_DISC_ERROR);
+                     }
+                     else
+                     {
+                        const CDC_CTEntry *command = &Commands[PendingCommand];
 
-                  const CDC_CTEntry *command = &Commands[PendingCommand];
+                        PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
+                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
+                           PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
+                        PSX_DBG(PSX_DBG_SPARSE, "\n");
 
-                  PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
-                  for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                     PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
-                  PSX_DBG(PSX_DBG_SPARSE, "\n");
-
-                  next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
-                  PendingCommandPhase = 2;
-               }
-               ArgsReceiveIn = 0;
-            } // end command phase 1
+                        next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
+                        PendingCommandPhase = 2;
+                     }
+                     ArgsReceiveIn = 0;
+                  }
+                  break;
+            }
 
             if(!next_time)
                PendingCommandCounter = 0;
@@ -1682,18 +1645,16 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
       ret += 33868800;
    }
 
-   const int32 abs_diff = abs(initial - target);
+   ret += std::max<int64>((int64)abs(initial - target) * 33868800 * 1000 / (72 * 60 * 75) / 1000, 20000);
 
-   ret += std::max<int64>((int64)abs_diff * 33868800 * 1000 / (72 * 60 * 75) / 1000, 20000);
-
-   if(abs_diff >= 2250)
+   if(abs(initial - target) >= 2250)
       ret += (int64)33868800 * 300 / 1000;
    else if(paused)
    {
       // The delay to restart from a Pause state is...very....WEIRD.  The time it takes is related to the amount of time that has passed since the pause, and
       // where on the disc the laser head is, with generally more time passed = longer to resume, except that there's a window of time where it takes a
       // ridiculous amount of time when not much time has passed.
-      //
+      // 
       // What we have here will be EXTREMELY simplified.
 
       //
@@ -1705,11 +1666,13 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
       //else
       {
          // Take twice as long for 1x mode.
-         ret += 1237952 * ((Mode & MODE_SPEED) ? 1 : 2);
+         if (Mode & MODE_SPEED) {
+            ret += 1237952 / cd_2x_speedup;
+         } else {
+            ret += 1237952 * 2;
+         }
       }
    }
-   else if(abs_diff >= 3 && abs_diff < 12)
-      ret += 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1)) * 4;
    //else if(target < initial)
    // ret += 1000000;
 
@@ -1781,7 +1744,8 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
       HeaderBufValid = false;
       PreSeekHack(SeekTarget);
 
-      SeekFinished = false;
+      ReportLastF = 0xFF;
+
       DriveStatus = DS_SEEKING;
       StatusAfterSeek = DS_PLAYING;
    }
@@ -1802,7 +1766,8 @@ int32 PS_CDC::Command_Play(const int arg_count, const uint8 *args)
       HeaderBufValid = false;
       PreSeekHack(SeekTarget);
 
-      SeekFinished = false;
+      ReportLastF = 0xFF;
+
       DriveStatus = DS_SEEKING;
       StatusAfterSeek = DS_PLAYING;
    }
@@ -1854,7 +1819,7 @@ void PS_CDC::ReadBase(void)
    WriteResult(MakeStatus());
    WriteIRQ(CDCIRQ_ACKNOWLEDGE);
 
-   if((DriveStatus == DS_SEEKING_LOGICAL || DriveStatus == DS_SEEKING_LOGICAL2) && SeekTarget == CommandLoc && StatusAfterSeek == DS_READING)
+   if(DriveStatus == DS_SEEKING_LOGICAL && SeekTarget == CommandLoc && StatusAfterSeek == DS_READING)
    {
       CommandLoc_Dirty = false;
       return;
@@ -1873,14 +1838,13 @@ void PS_CDC::ReadBase(void)
 
       if(CommandLoc_Dirty)
          SeekTarget = CommandLoc;
-      else if(DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
+      else
          SeekTarget = CurSector;
 
-      PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1)) + CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
+      PSRCounter = /*903168 * 1.5 +*/ CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
       HeaderBufValid = false;
       PreSeekHack(SeekTarget);
 
-      SeekFinished = false;
       DriveStatus = DS_SEEKING_LOGICAL;
       StatusAfterSeek = DS_READING;
    }
@@ -1955,8 +1919,6 @@ int32 PS_CDC::Command_Standby(const int arg_count, const uint8 *args)
    SectorPipe_Pos = SectorPipe_In = 0;
    SectorsRead = 0;
 
-   SeekTarget = CurSector;   // FIXME?  CurSector = 0?
-   HoldLogicalPos = false;
    DriveStatus = DS_STANDBY;
 
    return((int64)33868800 * 100 / 1000);	// No idea, FIXME.
@@ -1975,13 +1937,13 @@ int32 PS_CDC::Command_Standby_Part2(void)
 int32 PS_CDC::Command_Pause(const int arg_count, const uint8 *args)
 {
    if(!CommandCheckDiscPresent())
-      return 0;
+      return(0);
 
    WriteResult(MakeStatus());
    WriteIRQ(CDCIRQ_ACKNOWLEDGE);
 
    if(DriveStatus == DS_PAUSED || DriveStatus == DS_STOPPED)
-      return 5000;
+      return(5000);
 
    CurSector -= std::min<uint32>(4, SectorsRead);	// See: Bedlam, Rise 2
    SectorsRead = 0;
@@ -1990,12 +1952,10 @@ int32 PS_CDC::Command_Pause(const int arg_count, const uint8 *args)
    //ClearAudioBuffers();
    SectorPipe_Pos = SectorPipe_In = 0;
    ClearAIP();
-   SeekTarget = CurSector;
    DriveStatus = DS_PAUSED;
-   PSRCounter = 33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1));
 
    // An approximation.
-   return (1124584 + ((int64)CurSector * 42596 / (75 * 60))) * ((Mode & MODE_SPEED) ? 1 : 2) + PSX_GetRandU32(0, 100000);
+   return((1124584 + ((int64)CurSector * 42596 / (75 * 60))) * ((Mode & MODE_SPEED) ? 1 : 2));
 }
 
 int32 PS_CDC::Command_Pause_Part2(void)
@@ -2005,7 +1965,7 @@ int32 PS_CDC::Command_Pause_Part2(void)
    WriteResult(MakeStatus());
    WriteIRQ(CDCIRQ_COMPLETE);
 
-   return 0;
+   return(0);
 }
 
 int32 PS_CDC::Command_Reset(const int arg_count, const uint8 *args)
@@ -2013,44 +1973,14 @@ int32 PS_CDC::Command_Reset(const int arg_count, const uint8 *args)
    WriteResult(MakeStatus());
    WriteIRQ(CDCIRQ_ACKNOWLEDGE);
 
-   Muted = false; // Does it get reset here?
-   Mode = 0x20;  // Confirmed(and see "This Is Football 2").
-   CommandLoc = 0;
-   //
-   //
-   //
-   // printf("DriveStatus: %d %d %d\n", DriveStatus, StatusAfterSeek, SeekTarget);
-   if(Cur_CDIF && DiscStartupDelay <= 0)
+   if(DriveStatus != DS_RESETTING)
    {
-      if((DriveStatus == DS_SEEKING_LOGICAL || DriveStatus == DS_SEEKING) && StatusAfterSeek == DS_PAUSED && SeekTarget == 0)
-      {
-         //puts("HRMPH");
-         return 256;
-      }
-      else
-      {
-         ClearAudioBuffers();
-
-         SB_In = 0;
-         SectorPipe_Pos = SectorPipe_In = 0;
-         SectorsRead = 0;
-
-         SeekTarget = 0;
-         PSRCounter = std::max<int32>(PSX_GetRandU32(0, 3250000), CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED));
-         PreSeekHack(SeekTarget);
-         SeekFinished = false;
-         DriveStatus = HoldLogicalPos ? DS_SEEKING_LOGICAL : DS_SEEKING;
-         StatusAfterSeek = DS_PAUSED;
-         ClearAIP();
-
-         return 4100000;
-      }
+      HeaderBufValid = false;
+      DriveStatus = DS_RESETTING;
+      PSRCounter = 1136000;
    }
-   else
-   {
-      SeekFinished = true;
-      return 70000;
-   }
+
+   return(0);
 }
 
 int32 PS_CDC::Command_Mute(const int arg_count, const uint8 *args)
@@ -2230,14 +2160,9 @@ int32 PS_CDC::Command_SeekL(const int arg_count, const uint8 *args)
 
    SeekTarget = CommandLoc;
 
-#if 1
-   SectorsRead = 0;
-   SectorPipe_Pos = SectorPipe_In = 0;
-#endif
    PSRCounter = (33868800 / (75 * ((Mode & MODE_SPEED) ? 2 : 1))) + CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
-   //HeaderBufValid = false;
+   HeaderBufValid = false;
    PreSeekHack(SeekTarget);
-   SeekFinished = false;
    DriveStatus = DS_SEEKING_LOGICAL;
    StatusAfterSeek = DS_STANDBY;
    ClearAIP();
@@ -2258,7 +2183,6 @@ int32 PS_CDC::Command_SeekP(const int arg_count, const uint8 *args)
    PSRCounter = CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
    HeaderBufValid = false;
    PreSeekHack(SeekTarget);
-   SeekFinished = false;
    DriveStatus = DS_SEEKING;
    StatusAfterSeek = DS_STANDBY;
    ClearAIP();
@@ -2266,38 +2190,18 @@ int32 PS_CDC::Command_SeekP(const int arg_count, const uint8 *args)
    return(PSRCounter);
 }
 
-// Used with Command_Reset(), too.
 int32 PS_CDC::Command_Seek_PartN(void)
 {
-   if(DriveStatus != DS_SEEKING && DriveStatus != DS_SEEKING_LOGICAL && DriveStatus != DS_SEEKING_LOGICAL2)
+   if(DriveStatus == DS_STANDBY)
    {
-      if(SeekFinished)
-      {
-         BeginResults();
+      BeginResults();
+      WriteResult(MakeStatus());
+      WriteIRQ(CDCIRQ_COMPLETE);
 
-         if(SeekFinished < 0)
-         {
-            WriteResult(MakeStatus() | 0x04);
-            WriteResult(0x04);
-            WriteIRQ(CDCIRQ_DISC_ERROR);
-         }
-         else
-         {
-            WriteResult(MakeStatus());
-            WriteIRQ(CDCIRQ_COMPLETE);
-         }
-      }
-      else
-      {
-         PSX_WARNING("[CDC] DriveStatus no longer seeking, but SeekFinished is still 0.");
-      }
+      return(0);
+   }
 
-      return 0;
-   }
-   else
-   {
-      return std::max<int32>(PSRCounter, 256);
-   }
+   return(std::max<int32>(PSRCounter, 256));
 }
 
 int32 PS_CDC::Command_Test(const int arg_count, const uint8 *args)
@@ -2342,7 +2246,7 @@ int32 PS_CDC::Command_Test(const int arg_count, const uint8 *args)
          WriteResult(0x00);
          break;
 
-         //
+         // 
          // SCEx counters not reset by command 0x0A.
          //
 
@@ -2479,15 +2383,13 @@ int32 PS_CDC::Command_ReadTOC(const int arg_count, const uint8 *args)
 
 
 
-   // A gross approximation.
+   // A gross approximation.  
    // The penalty for the drive being stopped seems to be rather high(higher than what CalcSeekTime() currently introduces), although
    // that should be investigated further.
    //
    // ...and not to mention the time taken varies from disc to disc even!
    ret_time = 30000000 + CalcSeekTime(CurSector, 0, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
 
-   SeekTarget = 0;
-   HoldLogicalPos = false;
    DriveStatus = DS_PAUSED;	// Ends up in a pause state when the command is finished.  Maybe we should add DS_READTOC or something...
    ClearAIP();
 
@@ -2524,7 +2426,7 @@ PS_CDC::CDC_CTEntry PS_CDC::Commands[0x20] =
    { /* 0x07, */ 0, 0, "Standby", &PS_CDC::Command_Standby, &PS_CDC::Command_Standby_Part2 },
    { /* 0x08, */ 0, 0, "Stop", &PS_CDC::Command_Stop, &PS_CDC::Command_Stop_Part2 },
    { /* 0x09, */ 0, 0, "Pause", &PS_CDC::Command_Pause, &PS_CDC::Command_Pause_Part2 },
-   { /* 0x0A, */ 0, 0, "Reset", &PS_CDC::Command_Reset, &PS_CDC::Command_Seek_PartN },
+   { /* 0x0A, */ 0, 0, "Reset", &PS_CDC::Command_Reset, NULL },
    { /* 0x0B, */ 0, 0, "Mute", &PS_CDC::Command_Mute, NULL },
    { /* 0x0C, */ 0, 0, "Demute", &PS_CDC::Command_Demute, NULL },
    { /* 0x0D, */ 2, 2, "Setfilter", &PS_CDC::Command_Setfilter, NULL },
