@@ -3003,6 +3003,18 @@ static void check_variables(bool startup)
 		}
 	}
 
+   var.key = BEETLE_OPT(gun_input_mode);
+   var.value = NULL;
+
+   if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+   {
+      if ( !strcmp(var.value, "Touchscreen" ) ) {
+         gun_input_mode = SETTING_GUN_INPUT_POINTER;
+      } else {
+         gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
+      }
+   }
+
 	var.key = BEETLE_OPT(negcon_deadzone);
 	var.value = NULL;
 	input_set_negcon_deadzone(0);
@@ -3972,6 +3984,7 @@ void retro_set_environment(retro_environment_t cb)
       { BEETLE_OPT(enable_multitap_port1), "Port 1: Multitap enable; disabled|enabled" },
       { BEETLE_OPT(enable_multitap_port2), "Port 2: Multitap enable; disabled|enabled" },
       { BEETLE_OPT(gun_cursor), "Gun Cursor; Cross|Dot|Off" },
+      { BEETLE_OPT(gun_input_mode), "Gun Input Mode; Lightgun|Touchscreen" },
       { BEETLE_OPT(mouse_sensitivity), "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
       { BEETLE_OPT(negcon_deadzone), "NegCon Twist Deadzone (percent); 0|5|10|15|20|25|30" },
       { BEETLE_OPT(negcon_response), "NegCon Twist Response; linear|quadratic|cubic" },

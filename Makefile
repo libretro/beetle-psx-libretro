@@ -119,7 +119,7 @@ else ifneq (,$(findstring ios,$(platform)))
    else
    iarch := armv7
    endif
-   TARGET  := $(TARGET_NAME)_libretro_ios-$(iarch).dylib
+   TARGET  := $(TARGET_NAME)_libretro_ios.dylib
    fpic    := -fPIC
    SHARED  := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
