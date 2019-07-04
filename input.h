@@ -30,4 +30,11 @@ extern unsigned input_get_player_count();
 
 extern void input_update( retro_input_state_t input_state_cb );
 
+enum
+{
+	SETTING_GUN_INPUT_LIGHTGUN,
+	SETTING_GUN_INPUT_POINTER,
+};
+extern int gun_input_mode;
+
 #endif

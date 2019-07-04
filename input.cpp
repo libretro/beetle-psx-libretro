@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"
+#include "input.h"
 
 //------------------------------------------------------------------------------
 // Locals
@@ -22,6 +23,15 @@ static unsigned players = 2;
 static bool enable_analog_calibration = false;
 static float mouse_sensitivity = 1.0f;
 static int gun_cursor = FrontIO::SETTING_GUN_CROSSHAIR_CROSS;
+
+int gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
+
+// Touchscreen Lightgun Sensitivity
+static int pointer_pressed = 0;
+static const int POINTER_PRESSED_CYCLES = 4;
+static int pointer_cycles_after_released = 0;
+static int pointer_pressed_last_x = 0;
+static int pointer_pressed_last_y = 0;
 
 // NegCon adjustment parameters
 // > The NegCon 'twist' action is somewhat awkward when mapped
@@ -519,6 +529,179 @@ unsigned input_get_player_count()
 	return players;
 }
 
+void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
+{
+	int gun_x, gun_y, gun_x_raw, gun_y_raw;
+	gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+	gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+
+	// .. scale into screen space:
+	// NOTE: the scaling here is semi-guesswork, need to re-write.
+	// TODO: Test with PAL games.
+
+	const int scale_x = 2800;
+	const int scale_y = 240;
+
+	gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+	gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+
+	int is_offscreen = 0;
+	// Handle offscreen by checking corrected x and y values
+	if ( gun_x == 0 || gun_y == 0 )
+	{
+		is_offscreen = 1;
+		gun_x = -16384; // magic position to disable cross-hair drawing.
+		gun_y = -16384;
+	}
+
+	// Touch sensitivity: Keep the gun position held for a fixed number of cycles after touch is released
+	// because a very light touch can result in a misfire
+	if ( pointer_cycles_after_released > 0 && pointer_cycles_after_released < POINTER_PRESSED_CYCLES ) {
+		pointer_cycles_after_released++;
+		p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
+		p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
+		return;
+	}
+
+	// trigger
+	if ( input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED ) )
+	{
+		pointer_pressed = 1;
+		pointer_cycles_after_released = 0;
+		pointer_pressed_last_x = gun_x;
+		pointer_pressed_last_y = gun_y;
+	} else if ( pointer_pressed ) {
+		pointer_cycles_after_released++;
+		pointer_pressed = 0;
+		p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
+		p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
+		p_input->u8[4] &= ~0x1;
+		return;
+	}
+
+	// position
+	p_input->gun_pos[ 0 ] = gun_x;
+	p_input->gun_pos[ 1 ] = gun_y;
+
+	// buttons
+	p_input->u8[ 4 ] = 0;
+
+	// use multi-touch to support different button inputs:
+	// 3-finger touch: START button
+	// 2-finger touch: Reload
+	// offscreen touch: Reload
+	int touch_count = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT );
+	if ( touch_count == 1 ) {
+		p_input->u8[ 4 ] |= 0x1;
+	}
+
+	if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+	{
+		// Justifier 'Aux'
+		if ( touch_count == 2 ) {
+			p_input->u8[ 4 ] |= 0x2;
+		}
+
+		// Justifier 'Start'
+		if ( touch_count == 3 ) {
+			p_input->u8[ 4 ] |= 0x4;
+		}
+	}
+	else
+	{
+		// Guncon 'A'
+		if ( touch_count == 2 ) {
+			p_input->u8[ 4 ] |= 0x2;
+		}
+
+		// Guncon 'B'
+		if ( touch_count == 3 ) {
+			p_input->u8[ 4 ] |= 0x4;
+		}
+
+		// Guncon 'A' + 'B'
+		if ( touch_count == 4 ) {
+			p_input->u8[ 4 ] |= 0x2;
+			p_input->u8[ 4 ] |= 0x4;
+		}
+	}
+
+}
+
+void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
+{
+	uint8_t shot_type;
+	int gun_x, gun_y;
+	int forced_reload;
+
+	forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
+
+	// off-screen?
+	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
+	{
+		shot_type = 0x8; // off-screen shot
+
+		gun_x = -16384; // magic position to disable cross-hair drawing.
+		gun_y = -16384;
+	}
+	else
+	{
+		shot_type = 0x1; // on-screen shot
+
+		int gun_x_raw, gun_y_raw;
+		gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
+		gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
+
+		// .. scale into screen space:
+		// NOTE: the scaling here is semi-guesswork, need to re-write.
+		// TODO: Test with PAL games.
+
+		const int scale_x = 2800;
+		const int scale_y = 240;
+
+		gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+		gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+	}
+
+	// position
+	p_input->gun_pos[ 0 ] = gun_x;
+	p_input->gun_pos[ 1 ] = gun_y;
+
+	// buttons
+	p_input->u8[ 4 ] = 0;
+
+	// trigger
+	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload ) {
+		p_input->u8[ 4 ] |= shot_type;
+	}
+
+	if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+	{
+		// Justifier 'Aux'
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+			p_input->u8[ 4 ] |= 0x2;
+		}
+
+		// Justifier 'Start'
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) ) {
+			p_input->u8[ 4 ] |= 0x4;
+		}
+	}
+	else
+	{
+		// Guncon 'A'
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+			p_input->u8[ 4 ] |= 0x2;
+		}
+
+		// Guncon 'B'
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) ) {
+			p_input->u8[ 4 ] |= 0x4;
+		}
+	}
+
+}
+
 void input_update( retro_input_state_t input_state_cb )
 {
 	// For each player (logical controller)
@@ -554,74 +737,23 @@ void input_update( retro_input_state_t input_state_cb )
 		case RETRO_DEVICE_PS_JUSTIFIER:
 
 			{
-				uint8_t shot_type;
-				int gun_x, gun_y;
-				int forced_reload;
-
-				forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
-
-				// off-screen?
-				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
-				{
-					shot_type = 0x8; // off-screen shot
-
-					gun_x = -16384; // magic position to disable cross-hair drawing.
-					gun_y = -16384;
-				}
-				else
-				{
-					shot_type = 0x1; // on-screen shot
-
-					int gun_x_raw, gun_y_raw;
-					gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
-					gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
-
-					// .. scale into screen space:
-					// NOTE: the scaling here is semi-guesswork, need to re-write.
-					// TODO: Test with PAL games.
-
-					const int scale_x = 2800;
-					const int scale_y = 240;
-
-					gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-					gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+				if ( gun_input_mode == SETTING_GUN_INPUT_POINTER ) {
+					input_handle_lightgun_touchscreen( p_input, iplayer, input_state_cb );
+				} else {
+					// RETRO_DEVICE_LIGHTGUN is default
+					input_handle_lightgun( p_input, iplayer, input_state_cb );
 				}
 
-				// position
-				p_input->gun_pos[ 0 ] = gun_x;
-				p_input->gun_pos[ 1 ] = gun_y;
-
-				// buttons
-				p_input->u8[ 4 ] = 0;
-
-				// trigger
-				if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload ) {
-					p_input->u8[ 4 ] |= shot_type;
-				}
-
-				if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
-				{
-					// Justifier 'Aux'
-					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
-						p_input->u8[ 4 ] |= 0x2;
-					}
-
-					// Justifier 'Start'
-					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) ) {
-						p_input->u8[ 4 ] |= 0x4;
-					}
-				}
-				else
+				// allow guncon buttons to be pressed by gamepad while using lightgun
+				// Joypad L/R/A buttons are mapped to Guncon 'A'
+				// The idea is to be able to use the controller in tandem with some games
+				// like Time Crisis where you need to hold a button down and fire
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) ||
+				     input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) ||
+				     input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
 				{
 					// Guncon 'A'
-					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
-						p_input->u8[ 4 ] |= 0x2;
-					}
-
-					// Guncon 'B'
-					if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) ) {
-						p_input->u8[ 4 ] |= 0x4;
-					}
+					p_input->u8[ 4 ] |= 0x2;
 				}
 			}
 
