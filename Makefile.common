@@ -247,7 +247,10 @@ ifneq ($(HAVE_GRIFFIN), 1)
       SOURCES_C +=   $(LIBRETRO_DIR)/streams/file_stream.c \
                      $(LIBRETRO_DIR)/streams/file_stream_transforms.c \
                      $(LIBRETRO_DIR)/file/file_path.c \
+                     $(LIBRETRO_DIR)/file/retro_dirent.c \
                      $(LIBRETRO_DIR)/vfs/vfs_implementation.c \
+                     $(LIBRETRO_DIR)/lists/dir_list.c \
+                     $(LIBRETRO_DIR)/lists/string_list.c \
                      $(LIBRETRO_DIR)/string/stdstring.c \
                      $(LIBRETRO_DIR)/compat/compat_strl.c \
                      $(LIBRETRO_DIR)/compat/fopen_utf8.c \

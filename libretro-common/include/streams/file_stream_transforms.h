@@ -30,6 +30,8 @@
 
 RETRO_BEGIN_DECLS
 
+#ifndef SKIP_STDIO_REDEFINES
+
 #define FILE RFILE
 
 #undef fopen
@@ -41,9 +43,11 @@ RETRO_BEGIN_DECLS
 #undef fgetc
 #undef fwrite
 #undef fputc
+#undef fflush
 #undef fprintf
 #undef ferror
 #undef feof
+#undef fscanf
 
 #define fopen rfopen
 #define fclose rfclose
@@ -54,9 +58,13 @@ RETRO_BEGIN_DECLS
 #define fgetc rfgetc
 #define fwrite rfwrite
 #define fputc rfputc
+#define fflush rfflush
 #define fprintf rfprintf
 #define ferror rferror
 #define feof rfeof
+#define fscanf rfscanf
+
+#endif
 
 RFILE* rfopen(const char *path, const char *mode);
 
@@ -78,11 +86,15 @@ int64_t rfwrite(void const* buffer,
 
 int rfputc(int character, RFILE * stream);
 
+int64_t rfflush(RFILE * stream);
+
 int rfprintf(RFILE * stream, const char * format, ...);
 
 int rferror(RFILE* stream);
 
 int rfeof(RFILE* stream);
+
+int rfscanf(RFILE * stream, const char * format, ...);
 
 RETRO_END_DECLS
 
