@@ -82,6 +82,10 @@ char *string_replace_substring(const char *in,
 
    outlen          = strlen(in) - pattern_len*numhits + replacement_len*numhits;
    out             = (char *)malloc(outlen+1);
+
+   if (!out)
+      return NULL;
+
    outat           = out;
    inat            = in;
    inprev          = in;
@@ -105,18 +109,17 @@ char *string_trim_whitespace_left(char *const s)
 {
    if(s && *s)
    {
-      size_t len = strlen(s);
-      char *cur  = s;
+      size_t len     = strlen(s);
+      char *current  = s;
 
-      while(*cur && isspace((unsigned char)*cur))
+      while(*current && isspace((unsigned char)*current))
       {
-         ++cur;
+         ++current;
          --len;
       }
 
-      if(s != cur)
-         memmove(s, cur, len + 1);
-
+      if(s != current)
+         memmove(s, current, len + 1);
    }
 
    return s;
@@ -127,16 +130,16 @@ char *string_trim_whitespace_right(char *const s)
 {
    if(s && *s)
    {
-      size_t len = strlen(s);
-      char  *cur = s + len - 1;
+      size_t len     = strlen(s);
+      char  *current = s + len - 1;
 
-      while(cur != s && isspace((unsigned char)*cur))
+      while(current != s && isspace((unsigned char)*current))
       {
-         --cur;
+         --current;
          --len;
       }
 
-      cur[isspace((unsigned char)*cur) ? 0 : 1] = '\0';
+      current[isspace((unsigned char)*current) ? 0 : 1] = '\0';
    }
 
    return s;
@@ -151,14 +154,16 @@ char *string_trim_whitespace(char *const s)
    return s;
 }
 
-char *word_wrap(char* buffer, const char *string, int line_width, bool unicode)
+char *word_wrap(char* buffer, const char *string, int line_width, bool unicode, unsigned max_lines)
 {
-   unsigned i   = 0;
-   unsigned len = (unsigned)strlen(string);
+   unsigned i     = 0;
+   unsigned len   = (unsigned)strlen(string);
+   unsigned lines = 1;
 
    while (i < len)
    {
       unsigned counter;
+      int pos = (int)(&buffer[i] - buffer);
 
       /* copy string until the end of the line is reached */
       for (counter = 1; counter <= (unsigned)line_width; counter++)
@@ -190,14 +195,21 @@ char *word_wrap(char* buffer, const char *string, int line_width, bool unicode)
          /* check for newlines embedded in the original input
           * and reset the index */
          if (buffer[j] == '\n')
+         {
+            lines++;
             counter = 1;
+         }
       }
 
       /* check for whitespace */
       if (string[i] == ' ')
       {
-         buffer[i] = '\n';
-         i++;
+         if ((max_lines == 0 || lines < max_lines))
+         {
+            buffer[i] = '\n';
+            i++;
+            lines++;
+         }
       }
       else
       {
@@ -206,14 +218,18 @@ char *word_wrap(char* buffer, const char *string, int line_width, bool unicode)
          /* check for nearest whitespace back in string */
          for (k = i; k > 0; k--)
          {
-            if (string[k] != ' ')
+            if (string[k] != ' ' || (max_lines != 0 && lines >= max_lines))
                continue;
 
             buffer[k] = '\n';
             /* set string index back to character after this one */
             i         = k + 1;
+            lines++;
             break;
          }
+
+         if (&buffer[i] - buffer == pos)
+            return buffer;
       }
    }
 
