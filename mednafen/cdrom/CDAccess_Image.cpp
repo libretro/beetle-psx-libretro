@@ -635,7 +635,13 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                return false;
             }
 
-            std::string efn = MDFN_EvalFIP(base_dir, args[0]);
+            std::string efn;
+
+            if(args[0].find("cdrom://") == std::string::npos)
+               efn = MDFN_EvalFIP(base_dir, args[0]);
+            else
+               efn = args[0];
+
             TmpTrack.fp = new FileStream(efn.c_str(), MODE_READ);
             TmpTrack.FirstFileInstance = 1;
 
