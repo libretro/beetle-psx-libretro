@@ -439,23 +439,22 @@ void input_init_env( retro_environment_t _environ_cb )
 
 void input_set_env( retro_environment_t environ_cb )
 {
-	switch ( players )
-	{
-		
-	case 8:
-		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports8 );
-		break;
-	
-	case 5:
-		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports5 );
-		break;
-		
-	default:
-	case 2:
-		environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports2 );
-		break;
-		
-	} /* switch ( players ) */
+   switch ( players )
+   {
+      case 8:
+         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports8 );
+         break;
+
+      case 5:
+         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports5 );
+         break;
+
+      default:
+      case 2:
+         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports2 );
+         break;
+
+   } /* switch ( players ) */
 }
 
 void input_init()
@@ -498,19 +497,18 @@ void input_set_player_count( unsigned _players )
 
 void input_set_mouse_sensitivity( int percent )
 {
-	if ( percent > 0 && percent <= 200 ) {
+	if ( percent > 0 && percent <= 200 )
 		mouse_sensitivity = (float)percent / 100.0f;
-	}
 }
 
 void input_set_gun_cursor( int cursor )
 {
 	gun_cursor = cursor;
-	if ( FIO ) {
+	if ( FIO )
+   {
 		// todo -- support multiple guns.
-		for ( int port = 0; port < 8; ++port ) {
+		for ( int port = 0; port < 8; ++port )
 			FIO->SetCrosshairsCursor( port, gun_cursor );
-		}
 	}
 }
 
@@ -531,9 +529,8 @@ unsigned input_get_player_count()
 
 void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
 {
-	int gun_x, gun_y, gun_x_raw, gun_y_raw;
-	gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
-	gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+	int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+	int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
 
 	// .. scale into screen space:
 	// NOTE: the scaling here is semi-guesswork, need to re-write.
@@ -542,14 +539,20 @@ void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_
 	const int scale_x = 2800;
 	const int scale_y = 240;
 
-	gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-	gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+	int gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+	int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
 
+#if 0
 	int is_offscreen = 0;
+#endif
+
 	// Handle offscreen by checking corrected x and y values
 	if ( gun_x == 0 || gun_y == 0 )
 	{
+#if 0
 		is_offscreen = 1;
+#endif
+
 		gun_x = -16384; // magic position to disable cross-hair drawing.
 		gun_y = -16384;
 	}
@@ -632,9 +635,7 @@ void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_
 {
 	uint8_t shot_type;
 	int gun_x, gun_y;
-	int forced_reload;
-
-	forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
+	int forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
 
 	// off-screen?
 	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
@@ -648,9 +649,8 @@ void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_
 	{
 		shot_type = 0x1; // on-screen shot
 
-		int gun_x_raw, gun_y_raw;
-		gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
-		gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
+		int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
+		int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
 
 		// .. scale into screen space:
 		// NOTE: the scaling here is semi-guesswork, need to re-write.
@@ -671,33 +671,28 @@ void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_
 	p_input->u8[ 4 ] = 0;
 
 	// trigger
-	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload ) {
+	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload )
 		p_input->u8[ 4 ] |= shot_type;
-	}
 
 	if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
 	{
 		// Justifier 'Aux'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
 			p_input->u8[ 4 ] |= 0x2;
-		}
 
 		// Justifier 'Start'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) ) {
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) )
 			p_input->u8[ 4 ] |= 0x4;
-		}
 	}
 	else
 	{
 		// Guncon 'A'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) ) {
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
 			p_input->u8[ 4 ] |= 0x2;
-		}
 
 		// Guncon 'B'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) ) {
+		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) )
 			p_input->u8[ 4 ] |= 0x4;
-		}
 	}
 
 }
@@ -737,12 +732,11 @@ void input_update( retro_input_state_t input_state_cb )
 		case RETRO_DEVICE_PS_JUSTIFIER:
 
 			{
-				if ( gun_input_mode == SETTING_GUN_INPUT_POINTER ) {
+				if ( gun_input_mode == SETTING_GUN_INPUT_POINTER )
 					input_handle_lightgun_touchscreen( p_input, iplayer, input_state_cb );
-				} else {
+				else
 					// RETRO_DEVICE_LIGHTGUN is default
 					input_handle_lightgun( p_input, iplayer, input_state_cb );
-				}
 
 				// allow guncon buttons to be pressed by gamepad while using lightgun
 				// Joypad L/R/A buttons are mapped to Guncon 'A'
@@ -764,12 +758,10 @@ void input_update( retro_input_state_t input_state_cb )
 			// Simple two-button mouse.
 			{
 				p_input->u32[ 2 ] = 0;
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT ) )
 					p_input->u32[ 2 ] |= ( 1 << 1 ); // Left
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) )
 					p_input->u32[ 2 ] |= ( 1 << 0 ); // Right
-				}
 			}
 
 			// Relative input.
@@ -814,13 +806,12 @@ void input_update( retro_input_state_t input_state_cb )
 					RETRO_DEVICE_ID_ANALOG_X);
 				
 				// Account for deadzone
-				if (analog_left_x > negcon_deadzone){
+				if (analog_left_x > negcon_deadzone)
 					analog_left_x = analog_left_x - negcon_deadzone;
-				} else if (analog_left_x < -negcon_deadzone){
+				else if (analog_left_x < -negcon_deadzone)
 					analog_left_x = analog_left_x + negcon_deadzone;
-				} else {
+				else
 					analog_left_x = 0;
-				}
 				
 				// Convert to an 'amplitude' [-1.0,1.0]
 				float analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
@@ -867,15 +858,15 @@ void input_update( retro_input_state_t input_state_cb )
 				analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
 				
 				// Adjust response
-				if (negcon_linearity == 2) {
-					if (analog_left_x_amplitude < 0.0) {
+				if (negcon_linearity == 2)
+            {
+					if (analog_left_x_amplitude < 0.0)
 						analog_left_x_amplitude = -(analog_left_x_amplitude * analog_left_x_amplitude);
-					} else {
+					else
 						analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude;
-					}
-				} else if (negcon_linearity == 3) {
-					analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
 				}
+            else if (negcon_linearity == 3)
+					analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
 				
 				// Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF]
 				analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
@@ -891,42 +882,34 @@ void input_update( retro_input_state_t input_state_cb )
 			{
 				p_input->u8[ 0 ] = 0;
 
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP ) )
 					p_input->u8[ 0 ] |= ( 1 << 4 ); // Pad-Up
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT ) )
 					p_input->u8[ 0 ] |= ( 1 << 5 ); // Pad-Right
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) )
 					p_input->u8[ 0 ] |= ( 1 << 6 ); // Pad-Down
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) )
 					p_input->u8[ 0 ] |= ( 1 << 7 ); // Pad-Left
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) )
 					p_input->u8[ 0 ] |= ( 1 << 3 ); // Start
-				}
 
 				p_input->u8[ 1 ] = 0;
 
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) )
 					p_input->u8[ 1 ] |= ( 1 << 5 ); // neGcon A
-				}
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X ) ) {
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X ) )
 					p_input->u8[ 1 ] |= ( 1 << 4 ); // neGcon B
-				}
-				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) ) {
+				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) )
 					p_input->u8[ 1 ] |= ( 1 << 2 ); // neGcon L shoulder (digital - non-standard?)
-				}*/
-				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) ) {
+				*/
+				if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
 					p_input->u8[ 1 ] |= ( 1 << 3 ); // neGcon R shoulder (digital)
-				}
-				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2 ) ) {
+				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2 ) )
 					p_input->u8[ 1 ] |= ( 1 << 0 ); // neGcon L2 (non-standard?)
-				}*/
-				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2 ) ) {
+				*/
+				/*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2 ) )
 					p_input->u8[ 1 ] |= ( 1 << 1 ); // neGcon R2 (non-standard?)
-				}*/
+				*/
 			}
 
 			break;
@@ -957,7 +940,7 @@ void input_update( retro_input_state_t input_state_cb )
 				int analog_right_y = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
 					RETRO_DEVICE_ID_ANALOG_Y);
 
-      			struct analog_calibration *calibration = &analog_calibration[ iplayer ];
+            struct analog_calibration *calibration = &analog_calibration[ iplayer ];
 
 				uint32_t r_right = analog_right_x > 0 ?  analog_right_x : 0;
 				uint32_t r_left  = analog_right_x < 0 ? -analog_right_x : 0;
@@ -977,12 +960,14 @@ void input_update( retro_input_state_t input_state_cb )
 					float r = analog_radius(analog_right_x, analog_right_y);
 
 					// We recalibrate when we find a new max value for the sticks
-					if ( l > analog_calibration->left ) {
+					if ( l > analog_calibration->left )
+               {
 						analog_calibration->left = l;
 						log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius: %f\n", l);
 					}
 
-					if ( r > analog_calibration->right ) {
+					if ( r > analog_calibration->right )
+               {
 						analog_calibration->right = r;
 						log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
 					}
