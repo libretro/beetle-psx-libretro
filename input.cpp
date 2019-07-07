@@ -697,7 +697,7 @@ void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_
 
 }
 
-void input_update( retro_input_state_t input_state_cb )
+void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_state_cb )
 {
 	// For each player (logical controller)
 	for ( unsigned iplayer = 0; iplayer < players; ++iplayer )
@@ -719,11 +719,21 @@ void input_update( retro_input_state_t input_state_cb )
 
             // Use fixed lookup table to map RetroPad inputs to PlayStation input bitmap.
             p_input->buttons = 0;
-            for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+            if (libretro_supports_bitmasks)
             {
-               p_input->buttons |=
-                  input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, input_map_controller[ i ] )
-                  ? ( 1 << i ) : 0;
+               int16_t ret = input_state_cb(iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+               for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+                  p_input->buttons |= (ret & (1 << input_map_controller[ i ] ))
+                     ? ( 1 << i ) : 0;
+            }
+            else
+            {
+               for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+               {
+                  p_input->buttons |=
+                     input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, input_map_controller[ i ] )
+                     ? ( 1 << i ) : 0;
+               }
             }
 
             break;
@@ -743,10 +753,8 @@ void input_update( retro_input_state_t input_state_cb )
             if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) ||
                   input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) ||
                   input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
-            {
                // Guncon 'A'
                p_input->u8[ 4 ] |= 0x2;
-            }
 
             break;
 

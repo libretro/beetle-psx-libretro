@@ -32,6 +32,8 @@
 extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
+static bool libretro_supports_bitmasks = false;
+
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
 retro_log_printf_t log_cb;
@@ -2632,6 +2634,9 @@ void retro_init(void)
    setting_initial_scanline_pal = 0;
    setting_last_scanline_pal = 287;
 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
+      libretro_supports_bitmasks = true;
+
    check_system_specs();
 }
 
@@ -3644,7 +3649,7 @@ void retro_run(void)
 
    input_poll_cb();
 
-   input_update( input_state_cb );
+   input_update(libretro_supports_bitmasks, input_state_cb );
 
    static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    rects[0] = ~0;
@@ -3915,6 +3920,8 @@ void retro_deinit(void)
          MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
    log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
+
+   libretro_supports_bitmasks = false;
 }
 
 unsigned retro_get_region(void)
