@@ -39,7 +39,6 @@ void rsx_intf_set_environment(retro_environment_t cb)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_soft_set_environment(cb);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -59,7 +58,6 @@ void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_soft_set_video_refresh(cb);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -79,7 +77,14 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_soft_get_system_av_info(info);
+         memset(info, 0, sizeof(*info));
+         info->timing.fps            = content_is_pal ? FPS_PAL : FPS_NTSC;
+         info->timing.sample_rate    = SOUND_FREQUENCY;
+         info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+         info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+         info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
+         info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
+         info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -222,7 +227,7 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         rsx_soft_finalize_frame(fb, width, height, pitch);
+         video_cb(fb, width, height, pitch);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
