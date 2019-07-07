@@ -444,16 +444,6 @@ static bool Shader_init(
    return true;
 }
 
-static void Shader_free(struct Shader *shader)
-{
-   if (shader)
-   {
-      glDeleteShader(shader->id);
-      if (shader->info_log)
-         free(shader->info_log);
-   }
-}
-
 static void get_program_info_log(Program *pg, GLuint id)
 {
    GLsizei len;
@@ -696,9 +686,6 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 template<typename T>
 static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
 {
-   if (!drawbuffer)
-      return;
-
    /* Unmap the active buffer */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
    glUnmapBuffer(GL_ARRAY_BUFFER);
@@ -806,8 +793,12 @@ static void DrawBuffer_new(DrawBuffer<T> *drawbuffer,
       return;
 
    /* Program owns the two pointers, so we clean them up now */
-   Shader_free(&fs);
-   Shader_free(&vs);
+   glDeleteShader(fs.id);
+   glDeleteShader(vs.id);
+   if (fs.info_log)
+      free(fs.info_log);
+   if (vs.info_log)
+      free(vs.info_log);
 
    glGenVertexArrays(1, &id);
 
@@ -893,27 +884,6 @@ static void Texture_init(
    tex->height = height;
 }
 
-static void Texture_set_sub_image(
-      struct Texture *tex,
-      uint16_t top_left[2],
-      uint16_t resolution[2],
-      GLenum format,
-      GLenum ty,
-      uint16_t* data)
-{
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glBindTexture(GL_TEXTURE_2D, tex->id);
-   glTexSubImage2D(  GL_TEXTURE_2D,
-                     0,
-                     (GLint) top_left[0],
-                     (GLint) top_left[1],
-                     (GLsizei) resolution[0],
-                     (GLsizei) resolution[1],
-                     format,
-                     ty,
-                     (void*) data);
-}
-
 static void Texture_set_sub_image_window(
       struct Texture *tex,
       uint16_t top_left[2],
@@ -932,7 +902,17 @@ static void Texture_set_sub_image_window(
    uint16_t* sub_data = &( data[index] );
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
-   Texture_set_sub_image(tex, top_left, resolution, format, ty, sub_data);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glBindTexture(GL_TEXTURE_2D, tex->id);
+   glTexSubImage2D(  GL_TEXTURE_2D,
+                     0,
+                     (GLint) top_left[0],
+                     (GLint) top_left[1],
+                     (GLsizei) resolution[0],
+                     (GLsizei) resolution[1],
+                     format,
+                     ty,
+                     (void*)sub_data);
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
@@ -1095,13 +1075,17 @@ static void GlRenderer_upload_textures(
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
 
-   Texture_set_sub_image(
-         &renderer->fb_texture,
-         top_left,
-         dimensions,
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
+   glTexSubImage2D(  GL_TEXTURE_2D,
+         0,
+         (GLint) top_left[0],
+         (GLint) top_left[1],
+         (GLsizei) dimensions[0],
+         (GLsizei) dimensions[1],
          GL_RGBA,
          GL_UNSIGNED_SHORT_1_5_5_5_REV,
-         pixel_buffer);
+         (void*)pixel_buffer);
 
    uint16_t x_start    = top_left[0];
    uint16_t x_end      = x_start + dimensions[0];
@@ -1423,9 +1407,6 @@ static void GlRenderer_free(GlRenderer *renderer)
 
 static inline void apply_scissor(GlRenderer *renderer)
 {
-   if (!renderer)
-      return;
-
    uint16_t _x = renderer->config.draw_area_top_left[0];
    uint16_t _y = renderer->config.draw_area_top_left[1];
    int _w      = renderer->config.draw_area_bot_right[0] - _x;
