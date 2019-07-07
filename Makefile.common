@@ -25,8 +25,6 @@ ifeq ($(HAVE_OPENGL), 1)
 
    SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
                 $(LIBRETRO_DIR)/glsym/rglgen.c
-
-   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
 endif
 
 INCFLAGS := -I$(CORE_DIR) \
@@ -205,12 +203,10 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(MEDNAFEN_DIR)/video/surface.cpp \
                   $(CORE_DIR)/libretro.cpp \
 						$(MEDNAFEN_DIR)/mednafen-endian.cpp \
-                  $(CORE_DIR)/input.cpp
+                  $(CORE_DIR)/input.cpp \
+						$(CORE_DIR)/rsx/rsx_intf.cpp
 
-   SOURCES_C +=   $(CORE_DIR)/rsx/rsx_lib_soft.c \
-                  $(MEDNAFEN_DIR)/md5.c
-
-   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_intf.cpp
+   SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c
 
    ifneq ($(RSX_DUMP),)
       SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp
