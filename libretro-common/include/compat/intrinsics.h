@@ -41,7 +41,7 @@ RETRO_BEGIN_DECLS
 /* Count Leading Zero, unsigned 16bit input value */
 static INLINE unsigned compat_clz_u16(uint16_t val)
 {
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(PS2)
    return __builtin_clz(val << 16 | 0x8000);
 #else
    unsigned ret = 0;
@@ -61,7 +61,7 @@ static INLINE int compat_ctz(unsigned x)
 {
 #if defined(__GNUC__) && !defined(RARCH_CONSOLE)
    return __builtin_ctz(x);
-#elif _MSC_VER >= 1400 && !defined(_XBOX)
+#elif _MSC_VER >= 1400 && !defined(_XBOX) && !defined(__WINRT__)
    unsigned long r = 0;
    _BitScanReverse((unsigned long*)&r, x);
    return (int)r;

@@ -31,9 +31,15 @@
 #elif defined(HAVE_OPENGLES3)
 #include "glsym_es3.h"
 #else
+#ifdef HAVE_LIBNX
+#include "switch/nx_glsym.h"
+#endif
 #include "glsym_gl.h"
 #endif
 #endif
 
+#ifdef HAVE_GLSYM_PRIVATE
+#include "glsym_private.h"
 #endif
 
+#endif
