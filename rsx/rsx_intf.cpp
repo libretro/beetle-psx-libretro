@@ -627,21 +627,17 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
    glDisableVertexAttribArray(index);
 }
 
-   template<typename T>
-static void DrawBuffer_push_slice(DrawBuffer<T> *drawbuffer, T slice[], size_t n)
-{
-   if (!drawbuffer)
-      return;
-
-   assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer));
-   assert(drawbuffer->map != NULL);
-
-   memcpy(  drawbuffer->map + drawbuffer->map_index,
-            slice,
-            n * sizeof(T));
-
+#ifdef DEBUG
+#define DrawBuffer_push_slice(drawbuffer, slice, n, len) \
+   assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer)); \
+   assert(drawbuffer->map != NULL); \
+   memcpy(  drawbuffer->map + drawbuffer->map_index, slice, n * len); \
    drawbuffer->map_index += n;
-}
+#else
+#define DrawBuffer_push_slice(drawbuffer, slice, n, len) \
+   memcpy(  drawbuffer->map + drawbuffer->map_index, slice, n * len); \
+   drawbuffer->map_index += n;
+#endif
 
    template<typename T>
 static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
@@ -954,10 +950,8 @@ static void GlRenderer_draw(GlRenderer *renderer)
    y = renderer->config.draw_offset[1];
 
    if (renderer->command_buffer->program)
-      glUseProgram(renderer->command_buffer->program->id);
-
-   if (renderer->command_buffer->program)
    {
+      glUseProgram(renderer->command_buffer->program->id);
       glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
       /* We use texture unit 0 */
       glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
@@ -1020,32 +1014,33 @@ static void GlRenderer_draw(GlRenderer *renderer)
 		 GLenum blend_src = GL_CONSTANT_ALPHA;
 		 GLenum blend_dst = GL_CONSTANT_ALPHA;
 
-		 switch (it->transparency_mode) {
-			/* 0.5xB + 0.5 x F */
-			case SemiTransparencyMode_Average:
-			   blend_func = GL_FUNC_ADD;
-			   /* Set to 0.5 with glBlendColor */
-			   blend_src = GL_CONSTANT_ALPHA;
-			   blend_dst = GL_CONSTANT_ALPHA;
-			   break;
-			/* 1.0xB + 1.0 x F */
-			case SemiTransparencyMode_Add:
-			   blend_func = GL_FUNC_ADD;
-			   blend_src = GL_ONE;
-			   blend_dst = GL_ONE;
-			   break;
-			/* 1.0xB - 1.0 x F */
-			case SemiTransparencyMode_SubtractSource:
-			   blend_func = GL_FUNC_REVERSE_SUBTRACT;
-			   blend_src = GL_ONE;
-			   blend_dst = GL_ONE;
-			   break;
-			case SemiTransparencyMode_AddQuarterSource:
-			   blend_func = GL_FUNC_ADD;
-			   blend_src = GL_CONSTANT_COLOR;
-			   blend_dst = GL_ONE;
-			   break;
-		 }
+		 switch (it->transparency_mode)
+       {
+          /* 0.5xB + 0.5 x F */
+          case SemiTransparencyMode_Average:
+             blend_func = GL_FUNC_ADD;
+             /* Set to 0.5 with glBlendColor */
+             blend_src = GL_CONSTANT_ALPHA;
+             blend_dst = GL_CONSTANT_ALPHA;
+             break;
+             /* 1.0xB + 1.0 x F */
+          case SemiTransparencyMode_Add:
+             blend_func = GL_FUNC_ADD;
+             blend_src = GL_ONE;
+             blend_dst = GL_ONE;
+             break;
+             /* 1.0xB - 1.0 x F */
+          case SemiTransparencyMode_SubtractSource:
+             blend_func = GL_FUNC_REVERSE_SUBTRACT;
+             blend_src = GL_ONE;
+             blend_dst = GL_ONE;
+             break;
+          case SemiTransparencyMode_AddQuarterSource:
+             blend_func = GL_FUNC_ADD;
+             blend_src = GL_CONSTANT_COLOR;
+             blend_dst = GL_ONE;
+             break;
+       }
 
 		 glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
 		 glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
@@ -1107,8 +1102,7 @@ static void GlRenderer_upload_textures(
    uint16_t y_start    = top_left[1];
    uint16_t y_end      = y_start + dimensions[1];
 
-   const size_t slice_len = 4;
-   ImageLoadVertex slice[slice_len] =
+   ImageLoadVertex slice[4] =
    {
       {   {x_start,   y_start }   },
       {   {x_end,     y_start }   },
@@ -1116,17 +1110,21 @@ static void GlRenderer_upload_textures(
       {   {x_end,     y_end   }   }
    };
 
-   DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
-
-   if (renderer->image_load_buffer->program)
+   if (renderer->image_load_buffer)
    {
-      /* fb_texture is always at 1x */
-      glUseProgram(renderer->image_load_buffer->program->id);
-      glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
-      glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      DrawBuffer_push_slice(renderer->image_load_buffer, &slice, 4,
+            sizeof(ImageLoadVertex));
 
-      glUseProgram(renderer->command_buffer->program->id);
-      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+      if (renderer->image_load_buffer->program)
+      {
+         /* fb_texture is always at 1x */
+         glUseProgram(renderer->image_load_buffer->program->id);
+         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
+         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+
+         glUseProgram(renderer->command_buffer->program->id);
+         glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+      }
    }
 
    glDisable(GL_SCISSOR_TEST);
@@ -1171,7 +1169,8 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
    if (display_vram)
    {
       var.key = BEETLE_OPT(display_vram);
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
          if (!strcmp(var.value, "enabled"))
             *display_vram = true;
          else
@@ -1323,7 +1322,8 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    }
 
    GLenum texture_storage = GL_RGB5_A1;
-   switch (depth) {
+   switch (depth)
+   {
       case 16:
          texture_storage = GL_RGB5_A1;
          break;
@@ -1447,30 +1447,24 @@ static inline void apply_scissor(GlRenderer *renderer)
 
 static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
-   if (!renderer)
-      return;
-
    GLuint fbo;
-   uint32_t f_w = renderer->frontend_resolution[0];
-   uint32_t f_h = renderer->frontend_resolution[1];
-   uint16_t _w;
-   uint16_t _h;
-   uint32_t w, h, upscale;
-   float    aspect_ratio;
+   uint32_t w, h;
+   uint32_t upscale   = renderer->internal_upscaling;
+   uint32_t f_w       = renderer->frontend_resolution[0];
+   uint32_t f_h       = renderer->frontend_resolution[1];
+   uint16_t _w        = renderer->config.display_resolution[0];
+   uint16_t _h        = renderer->config.display_resolution[1];
+   float aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 
+      MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
    if (renderer->display_vram)
    {
-      _w = VRAM_WIDTH_PIXELS;
-      _h = VRAM_HEIGHT;
+      _w           = VRAM_WIDTH_PIXELS;
+      _h           = VRAM_HEIGHT;
       /* Is this accurate? */
       aspect_ratio = 2.0 / 1.0;
-   } else {
-      _w = renderer->config.display_resolution[0];
-      _h = renderer->config.display_resolution[1];
-      aspect_ratio = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
    }
 
-   upscale = renderer->internal_upscaling;
    w       = (uint32_t) _w * upscale;
    h       = (uint32_t) _h * upscale;
 
@@ -1487,8 +1481,6 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
       geometry.aspect_ratio = aspect_ratio;
 
-      log_cb(RETRO_LOG_INFO, "Target framebuffer size: %dx%d\n", w, h);
-
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
       renderer->frontend_resolution[0] = w;
@@ -1503,11 +1495,9 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
 static bool retro_refresh_variables(GlRenderer *renderer)
 {
-   if (!renderer)
-      return false;
-
-   uint8_t upscaling = 1;
-   bool display_vram = false;
+   uint8_t filter            = FILTER_MODE_NEAREST;
+   uint8_t upscaling         = 1;
+   bool display_vram         = false;
    struct retro_variable var = {0};
 
    var.key = BEETLE_OPT(renderer_software_fb);
@@ -1523,7 +1513,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    get_variables(&upscaling, &display_vram);
 
    var.key = BEETLE_OPT(filter);
-   uint8_t filter = FILTER_MODE_NEAREST;
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "nearest"))
@@ -1542,6 +1532,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = BEETLE_OPT(depth);
    uint8_t depth = 16;
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "32bpp"))
@@ -1596,7 +1587,8 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       uint32_t h = native_height * upscaling;
 
       GLenum texture_storage = GL_RGB5_A1;
-      switch (depth) {
+      switch (depth)
+      {
          case 16:
             texture_storage = GL_RGB5_A1;
             break;
@@ -1771,17 +1763,19 @@ static void push_primitive(
 
    vertex_preprocessing(renderer, v, count, mode, stm, mask_test, set_mask);
 
-   unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
+   unsigned index     = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
    unsigned index_pos = renderer->vertex_index_pos;
 
    for (unsigned i = 0; i < count; i++)
-	  renderer->vertex_indices[renderer->vertex_index_pos++] = index + i;
+      renderer->vertex_indices[renderer->vertex_index_pos++] = index + i;
 
    /* Add transparent pass if needed */
    if (is_semi_transparent && is_textured)
-	  vertex_add_blended_pass(renderer, index_pos);
+      vertex_add_blended_pass(renderer, index_pos);
 
-   DrawBuffer_push_slice(renderer->command_buffer, v, count);
+   DrawBuffer_push_slice(renderer->command_buffer, v, count,
+         sizeof(CommandVertex)
+         );
 }
 
 std::vector<Attribute> CommandVertex::attributes()
@@ -2074,46 +2068,40 @@ static void rsx_gl_refresh_variables(void)
    switch (static_renderer.state)
    {
       case GlState_Valid:
-         renderer = static_renderer.state_data;
+         if (!(renderer = static_renderer.state_data))
+            return;
          break;
       case GlState_Invalid:
          /* Nothing to be done if we don't have a GL context */
          return;
    }
 
-   bool reconfigure_frontend = retro_refresh_variables(renderer);
-
-   if (reconfigure_frontend)
+   if (retro_refresh_variables(renderer))
    {
       /* The resolution has changed, we must tell the frontend
        * to change its format */
-      struct retro_variable var = {0};
-
-      struct retro_system_av_info av_info = get_av_info(static_renderer.video_clock);
+      struct retro_variable           var = {0};
+      struct retro_system_av_info av_info = 
+         get_av_info(static_renderer.video_clock);
 
       /* This call can potentially (but not necessarily) call
        * 'context_destroy' and 'context_reset' to reinitialize */
-      bool ok = environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
+      bool ok                             = 
+         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 
       if (!ok)
       {
-         log_cb(RETRO_LOG_WARN, "Couldn't change frontend resolution\n");
-         log_cb(RETRO_LOG_INFO, "Try resetting to enable the new configuration\n");
+         log_cb(RETRO_LOG_WARN,
+               "Couldn't change frontend resolution\n");
+         log_cb(RETRO_LOG_INFO,
+               "Try resetting to enable the new configuration\n");
       }
    }
 }
 
 static void rsx_gl_prepare_frame(void)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
    GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-   {
-      log_cb(RETRO_LOG_ERROR, "[rsx_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
-      return;
-   }
 
    /* In case we're upscaling we need to increase the line width
     * proportionally */
@@ -2132,17 +2120,11 @@ static void rsx_gl_prepare_frame(void)
 }
 
 static void rsx_gl_finalize_frame(const void *fb, unsigned width,
-                           unsigned height, unsigned pitch)
+      unsigned height, unsigned pitch)
 {
+   GlRenderer *renderer = static_renderer.state_data;
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
-
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
 
    /* Draw pending commands */
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2197,21 +2179,25 @@ static void rsx_gl_finalize_frame(const void *fb, unsigned width,
             { { 1.0,  1.0}, {fb_width,  0} }
          };
 
-         DrawBuffer_push_slice(renderer->output_buffer, slice, 4);
-
-         if (renderer->output_buffer->program)
+         if (renderer->output_buffer)
          {
-            glUseProgram(renderer->output_buffer->program->id);
-            glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
-            glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
+            DrawBuffer_push_slice(renderer->output_buffer, &slice, 4,
+                  sizeof(OutputVertex));
 
-            glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
+            if (renderer->output_buffer->program)
+            {
+               glUseProgram(renderer->output_buffer->program->id);
+               glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
+               glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
 
-            glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+               glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
+
+               glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+            }
+
+            if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
+               DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
          }
-
-         if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
-            DrawBuffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
       }
    }
 
@@ -2228,12 +2214,16 @@ static void rsx_gl_finalize_frame(const void *fb, unsigned width,
          {   {1023, 511   }   },
       };
 
-      DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4);
-
-      if (renderer->image_load_buffer->program)
+      if (renderer->image_load_buffer)
       {
-         glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+         DrawBuffer_push_slice(renderer->image_load_buffer, &slice, 4,
+               sizeof(ImageLoadVertex));
+
+         if (renderer->image_load_buffer->program)
+         {
+            glUseProgram(renderer->image_load_buffer->program->id);
+            glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+         }
       }
 
       glDisable(GL_SCISSOR_TEST);
@@ -2264,18 +2254,6 @@ static void rsx_gl_finalize_frame(const void *fb, unsigned width,
          renderer->frontend_resolution[1], 0);
 }
 
-static void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
-{
-   /* TODO/FIXME - This definition seems very backwards and duplicating work */
-
-   /* This will possibly trigger the frontend to reconfigure itself */
-   if (static_renderer.inited)
-      rsx_gl_refresh_variables();
-
-   struct retro_system_av_info result = get_av_info(static_renderer.video_clock);
-   memcpy(info, &result, sizeof(result));
-}
-
 /* Draw commands */
 
 static void rsx_gl_push_quad(
@@ -2298,45 +2276,46 @@ static void rsx_gl_push_quad(
       int blend_mode,
       bool mask_test, bool set_mask)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
+   GlRenderer *renderer      = static_renderer.state_data;
+   SemiTransparencyMode 
+      semi_transparency_mode = SemiTransparencyMode_Add;
+   bool semi_transparent     = false;
 
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
-
-   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
-   bool semi_transparent = false;
-   switch (blend_mode) {
+   switch (blend_mode)
+   {
       case -1:
-         semi_transparent = false;
+         semi_transparent       = false;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 0:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Average;
          break;
       case 1:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 2:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_SubtractSource;
          break;
       case 3:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
          break;
       default:
-         exit(EXIT_FAILURE);
+         break;
    }
 
    CommandVertex v[4] =
    {
       {
          {p0x, p0y, 0.95, p0w},   /* position */
-         {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+         {
+            (uint8_t) c0,
+            (uint8_t) (c0 >> 8),
+            (uint8_t) (c0 >> 16)
+         }, /* color */
          {t0x, t0y},   /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2348,7 +2327,11 @@ static void rsx_gl_push_quad(
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
-         {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+         {
+            (uint8_t) c1,
+            (uint8_t) (c1 >> 8),
+            (uint8_t) (c1 >> 16)
+         }, /* color */
          {t1x, t1y}, /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2360,7 +2343,11 @@ static void rsx_gl_push_quad(
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
-         {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
+         {
+            (uint8_t) c2,
+            (uint8_t) (c2 >> 8),
+            (uint8_t) (c2 >> 16)
+         }, /* color */
          {t2x, t2y}, /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2372,7 +2359,11 @@ static void rsx_gl_push_quad(
       },
       {
          {p3x, p3y, 0.95, p3w }, /* position */
-         {(uint8_t) c3, (uint8_t) (c3 >> 8), (uint8_t) (c3 >> 16)}, /* color */
+         {
+            (uint8_t) c3,
+            (uint8_t) (c3 >> 8),
+            (uint8_t) (c3 >> 16)
+         }, /* color */
          {t3x, t3y}, /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2387,9 +2378,10 @@ static void rsx_gl_push_quad(
    bool is_semi_transparent = v[0].semi_transparent == 1;
    bool is_textured         = v[0].texture_blend_mode != 0;
 
-   vertex_preprocessing(renderer, v, 4, GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
+   vertex_preprocessing(renderer, v, 4,
+         GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
 
-   unsigned index = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
+   unsigned index     = DRAWBUFFER_NEXT_INDEX(renderer->command_buffer);
    unsigned index_pos = renderer->vertex_index_pos;
 
    for (unsigned i = 0; i < 6; i++)
@@ -2399,7 +2391,8 @@ static void rsx_gl_push_quad(
    if (is_semi_transparent && is_textured)
 	  vertex_add_blended_pass(renderer, index_pos);
 
-   DrawBuffer_push_slice(renderer->command_buffer, v, 4);
+   DrawBuffer_push_slice(renderer->command_buffer, v, 4,
+         sizeof(CommandVertex));
 }
 
 static void rsx_gl_push_triangle(
@@ -2428,7 +2421,9 @@ static void rsx_gl_push_triangle(
 
    SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent = false;
-   switch (blend_mode) {
+
+   switch (blend_mode)
+   {
       case -1:
          semi_transparent = false;
          semi_transparency_mode = SemiTransparencyMode_Add;
@@ -2766,8 +2761,7 @@ static void rsx_gl_load_image(
    uint16_t y_start    = top_left[1];
    uint16_t y_end      = y_start + dimensions[1];
 
-   const size_t slice_len = 4;
-   ImageLoadVertex slice[slice_len] =
+   ImageLoadVertex slice[4] =
    {
       {   {x_start,   y_start }   },
       {   {x_end,     y_start }   },
@@ -2775,14 +2769,18 @@ static void rsx_gl_load_image(
       {   {x_end,     y_end   }   }
    };
 
-   DrawBuffer_push_slice(renderer->image_load_buffer, slice, slice_len);
-
-   if (renderer->image_load_buffer->program)
+   if (renderer->image_load_buffer)
    {
-      glUseProgram(renderer->image_load_buffer->program->id);
-      glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
-      /* fb_texture is always at 1x */
-      glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      DrawBuffer_push_slice(renderer->image_load_buffer, slice, 4,
+            sizeof(ImageLoadVertex));
+
+      if (renderer->image_load_buffer->program)
+      {
+         glUseProgram(renderer->image_load_buffer->program->id);
+         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
+         /* fb_texture is always at 1x */
+         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+      }
    }
 
    glDisable(GL_SCISSOR_TEST);
@@ -2863,7 +2861,16 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_get_system_av_info(info);
+         {
+            /* TODO/FIXME - This definition seems very backwards and duplicating work */
+
+            /* This will possibly trigger the frontend to reconfigure itself */
+            if (static_renderer.inited)
+               rsx_gl_refresh_variables();
+
+            struct retro_system_av_info result = get_av_info(static_renderer.video_clock);
+            memcpy(info, &result, sizeof(result));
+         }
 #endif
          break;
       case RSX_VULKAN:
@@ -2983,7 +2990,9 @@ void rsx_intf_prepare_frame(void)
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_prepare_frame();
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_prepare_frame();
 #endif
          break;
       case RSX_VULKAN:
@@ -3008,7 +3017,9 @@ void rsx_intf_finalize_frame(const void *fb, unsigned width,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_finalize_frame(fb, width, height, pitch);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_finalize_frame(fb, width, height, pitch);
 #endif
          break;
       case RSX_VULKAN:
@@ -3286,15 +3297,17 @@ void rsx_intf_push_quad(
 		break;
 	case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-		rsx_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-			c0, c1, c2, c3,
-			t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
-			min_u, min_v, max_u, max_v,
-			texpage_x, texpage_y, clut_x, clut_y,
-			texture_blend_mode,
-			depth_shift,
-			dither,
-			blend_mode, mask_test != 0, set_mask != 0);
+      if (static_renderer.state != GlState_Invalid
+            && static_renderer.state_data)
+         rsx_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
+               c0, c1, c2, c3,
+               t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
+               min_u, min_v, max_u, max_v,
+               texpage_x, texpage_y, clut_x, clut_y,
+               texture_blend_mode,
+               depth_shift,
+               dither,
+               blend_mode, mask_test != 0, set_mask != 0);
 #endif
 		break;
    case RSX_VULKAN:
