@@ -356,10 +356,9 @@ extern "C"
 #endif
 
 
+#ifdef DEBUG
 static void get_error(const char *msg)
 {
-#ifdef DEBUG
-
    GLenum error = glGetError();
    switch (error)
    {
@@ -396,9 +395,8 @@ static void get_error(const char *msg)
     * it returns GL_NO_ERROR, if all error flags are to be reset. */
    while (error != GL_NO_ERROR)
       error = glGetError();
-
-#endif
 }
+#endif
 
 static bool Shader_init(
       struct Shader *shader,
@@ -944,10 +942,8 @@ static void GlRenderer_draw(GlRenderer *renderer)
       return;
 
    Framebuffer _fb;
-   int16_t x, y;
-
-   x = renderer->config.draw_offset[0];
-   y = renderer->config.draw_offset[1];
+   int16_t x = renderer->config.draw_offset[0];
+   int16_t y = renderer->config.draw_offset[1];
 
    if (renderer->command_buffer->program)
    {
@@ -1079,8 +1075,7 @@ static void GlRenderer_upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
-   if (!renderer)
-      return;
+   Framebuffer _fb;
 
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
@@ -1132,8 +1127,6 @@ static void GlRenderer_upload_textures(
    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
    /* Bind the output framebuffer */
-   /* let _fb = Framebuffer::new(&self.fb_out); */
-   Framebuffer _fb;
    Framebuffer_init(&_fb, &renderer->fb_out);
 
    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
@@ -1142,7 +1135,9 @@ static void GlRenderer_upload_textures(
    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
    glEnable(GL_SCISSOR_TEST);
 
+#ifdef DEBUG
    get_error("GlRenderer_upload_textures");
+#endif
    glDeleteFramebuffers(1, &_fb.id);
 }
 
@@ -1182,11 +1177,12 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
    DrawBuffer<CommandVertex>* command_buffer;
-   uint8_t upscaling = 1;
-   bool display_vram = false;
+   uint8_t upscaling         = 1;
+   bool display_vram         = false;
    struct retro_variable var = {0};
-   uint16_t top_left[2] = {0, 0};
-   uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
+   uint16_t top_left[2]      = {0, 0};
+   uint16_t dimensions[2]    = {
+      (uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
    if (!renderer)
       return false;
@@ -1369,7 +1365,8 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->set_mask  = false;
    renderer->mask_test = false;
 
-   GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+   if (renderer)
+      GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
    return true;
 }
@@ -1613,7 +1610,8 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       uint16_t top_left[2]   = {0, 0};
       uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-      GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+      if (renderer)
+         GlRenderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
       glDeleteTextures(1, &renderer->fb_out_depth.id);
       renderer->fb_out_depth.id     = 0;
@@ -1939,7 +1937,9 @@ static void gl_context_reset(void)
       GPU_RestoreStateP1(true);
       GPU_RestoreStateP2(true);
       GPU_RestoreStateP3();
-   } else {
+   }
+   else
+   {
       log_cb(RETRO_LOG_WARN, "[gl_context_reset] GlRenderer_new failed. State will be invalid.\n");
    }
 }
@@ -2412,47 +2412,46 @@ static void rsx_gl_push_triangle(
       bool dither,
       int blend_mode, bool mask_test, bool set_mask)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
-
-   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
-   bool semi_transparent = false;
+   GlRenderer *renderer         = static_renderer.state_data;
+   SemiTransparencyMode 
+      semi_transparency_mode    = SemiTransparencyMode_Add;
+   bool semi_transparent        = false;
 
    switch (blend_mode)
    {
       case -1:
-         semi_transparent = false;
+         semi_transparent       = false;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 0:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Average;
          break;
       case 1:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 2:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_SubtractSource;
          break;
       case 3:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
          break;
       default:
-         exit(EXIT_FAILURE);
+         break;
    }
 
    CommandVertex v[3] =
    {
       {
          {p0x, p0y, 0.95, p0w},   /* position */
-         {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+         {
+            (uint8_t) c0,
+            (uint8_t) (c0 >> 8),
+            (uint8_t) (c0 >> 16)
+         }, /* color */
          {t0x, t0y},   /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2464,7 +2463,11 @@ static void rsx_gl_push_triangle(
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
-         {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+         {
+            (uint8_t) c1,
+            (uint8_t) (c1 >> 8),
+            (uint8_t) (c1 >> 16)
+         }, /* color */
          {t1x, t1y}, /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2476,7 +2479,11 @@ static void rsx_gl_push_triangle(
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
-         {(uint8_t) c2, (uint8_t) (c2 >> 8), (uint8_t) (c2 >> 16)}, /* color */
+         {
+            (uint8_t) c2,
+            (uint8_t) (c2 >> 8),
+            (uint8_t) (c2 >> 16)
+         }, /* color */
          {t2x, t2y}, /* texture_coord */
          {texpage_x, texpage_y},
          {clut_x, clut_y},
@@ -2488,7 +2495,8 @@ static void rsx_gl_push_triangle(
       }
    };
 
-      push_primitive(renderer, v, 3, GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
+   push_primitive(renderer, v, 3, GL_TRIANGLES,
+         semi_transparency_mode, mask_test, set_mask);
 }
 
 static void rsx_gl_fill_rect(
@@ -2496,17 +2504,12 @@ static void rsx_gl_fill_rect(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
+   Framebuffer _fb;
+   GlRenderer *renderer   = static_renderer.state_data;
 
    uint16_t top_left[2]   = {x, y};
    uint16_t dimensions[2] = {w, h};
-   uint8_t col[3] = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};
-
+   uint8_t col[3]         = {(uint8_t) color, (uint8_t) (color >> 8), (uint8_t) (color >> 16)};
 
    /* Draw pending commands */
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2531,29 +2534,25 @@ static void rsx_gl_fill_rect(
 
    apply_scissor(renderer);
 
-   /* This scope is intentional, just like in the Rust version */
-   {
-      /* Bind the out framebuffer */
-      Framebuffer _fb;
-      Framebuffer_init(&_fb, &renderer->fb_out);
+   /* Bind the out framebuffer */
+   Framebuffer_init(&_fb, &renderer->fb_out);
 
-      glFramebufferTexture(GL_DRAW_FRAMEBUFFER,
-    		GL_DEPTH_STENCIL_ATTACHMENT,
-            renderer->fb_out_depth.id,
-            0);
+   glFramebufferTexture(GL_DRAW_FRAMEBUFFER,
+         GL_DEPTH_STENCIL_ATTACHMENT,
+         renderer->fb_out_depth.id,
+         0);
 
-      glClearColor(   (float) col[0] / 255.0,
-            (float) col[1] / 255.0,
-            (float) col[2] / 255.0,
-            /* TODO - XXX Not entirely sure what happens to
-               the mask bit in fill_rect commands */
-            0.0);
-      glStencilMask(1);
-      glClearStencil(0);
-      glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+   glClearColor(   (float) col[0] / 255.0,
+         (float) col[1] / 255.0,
+         (float) col[2] / 255.0,
+         /* TODO - XXX Not entirely sure what happens to
+            the mask bit in fill_rect commands */
+         0.0);
+   glStencilMask(1);
+   glClearStencil(0);
+   glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-      glDeleteFramebuffers(1, &_fb.id);
-   }
+   glDeleteFramebuffers(1, &_fb.id);
 
    /* Reconfigure the draw area */
    renderer->config.draw_area_top_left[0]    = draw_area_top_left[0];
@@ -2570,18 +2569,13 @@ static void rsx_gl_copy_rect(
       uint16_t w, uint16_t h,
       uint32_t mask_eval_and, uint32_t mask_set_or) /* TODO use mask for copy. See software renderer */
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
    GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
 
    if (src_x == dst_x && src_y == dst_y)
 	  return;
 
-   renderer->set_mask  = mask_set_or != 0;
-   renderer->mask_test = mask_eval_and != 0;
+   renderer->set_mask          = mask_set_or != 0;
+   renderer->mask_test         = mask_eval_and != 0;
 
    uint16_t source_top_left[2] = {src_x, src_y};
    uint16_t target_top_left[2] = {dst_x, dst_y};
@@ -2645,7 +2639,9 @@ static void rsx_gl_copy_rect(
                         new_w, new_h, 1 );
 #endif
 
+#ifdef DEBUG
    get_error("rsx_gl_copy_rect");
+#endif
 }
 
 static void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
@@ -2655,46 +2651,45 @@ static void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
                         int blend_mode,
 						bool mask_test, bool set_mask)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
-
-   SemiTransparencyMode semi_transparency_mode = SemiTransparencyMode_Add;
-   bool semi_transparent = false;
+   GlRenderer *renderer      = static_renderer.state_data;
+   SemiTransparencyMode 
+      semi_transparency_mode = SemiTransparencyMode_Add;
+   bool semi_transparent     = false;
 
    switch (blend_mode)
    {
       case -1:
-         semi_transparent = false;
+         semi_transparent       = false;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 0:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Average;
          break;
       case 1:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_Add;
          break;
       case 2:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_SubtractSource;
          break;
       case 3:
-         semi_transparent = true;
+         semi_transparent       = true;
          semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
          break;
       default:
-         exit(EXIT_FAILURE);
+         break;
    }
 
    CommandVertex v[2] = {
       {
          {(float)p0x, (float)p0y, 0., 1.0}, /* position */
-         {(uint8_t) c0, (uint8_t) (c0 >> 8), (uint8_t) (c0 >> 16)}, /* color */
+         {
+            (uint8_t) c0,
+            (uint8_t) (c0 >> 8),
+            (uint8_t) (c0 >> 16)
+         }, /* color */
          {0, 0}, /* texture_coord */
          {0, 0}, /* texture_page */
          {0, 0}, /* clut */
@@ -2705,7 +2700,11 @@ static void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
       },
       {
          {(float)p1x, (float)p1y, 0., 1.0}, /* position */
-         {(uint8_t) c1, (uint8_t) (c1 >> 8), (uint8_t) (c1 >> 16)}, /* color */
+         {
+            (uint8_t) c1,
+            (uint8_t) (c1 >> 8),
+            (uint8_t) (c1 >> 16)
+         }, /* color */
          {0, 0}, /* texture_coord */
          {0, 0}, /* texture_page */
          {0, 0}, /* clut */
@@ -2716,7 +2715,8 @@ static void rsx_gl_push_line(  int16_t p0x, int16_t p0y,
       }
    };
 
-   push_primitive(renderer, v, 2, GL_LINES, semi_transparency_mode, mask_test, set_mask);
+   push_primitive(renderer, v, 2,
+         GL_LINES, semi_transparency_mode, mask_test, set_mask);
 }
 
 static void rsx_gl_load_image(
@@ -2725,19 +2725,13 @@ static void rsx_gl_load_image(
       uint16_t *vram,
       uint32_t mask_eval_and, uint32_t mask_set_or)
 {
-   if (static_renderer.state == GlState_Invalid)
-      return;
-
-   GlRenderer *renderer = static_renderer.state_data;
-   if (!renderer)
-      return;
-
-   renderer->set_mask  = mask_set_or != 0;
-   renderer->mask_test = mask_eval_and != 0;
-
    Framebuffer _fb;
    uint16_t top_left[2];
    uint16_t dimensions[2];
+   GlRenderer *renderer   = static_renderer.state_data;
+
+   renderer->set_mask     = mask_set_or != 0;
+   renderer->mask_test    = mask_eval_and != 0;
 
    top_left[0]            = x;
    top_left[1]            = y;
@@ -2796,7 +2790,9 @@ static void rsx_gl_load_image(
    glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
    glEnable(GL_SCISSOR_TEST);
 
+#ifdef DEBUG
    get_error("rsx_gl_load_image");
+#endif
 
    glDeleteFramebuffers(1, &_fb.id);
 }
@@ -3231,14 +3227,16 @@ void rsx_intf_push_triangle(
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
-               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
-			   min_u, min_v, max_u, max_v,
-               texpage_x, texpage_y, clut_x, clut_y,
-               texture_blend_mode,
-               depth_shift,
-               dither,
-               blend_mode, mask_test != 0, set_mask != 0);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
+                  c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
+                  min_u, min_v, max_u, max_v,
+                  texpage_x, texpage_y, clut_x, clut_y,
+                  texture_blend_mode,
+                  depth_shift,
+                  dither,
+                  blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_VULKAN:
@@ -3348,7 +3346,9 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test != 0, set_mask != 0);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test != 0, set_mask != 0);
 #endif
          break;
       case RSX_VULKAN:
@@ -3388,7 +3388,9 @@ void rsx_intf_load_image(uint16_t x, uint16_t y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:
@@ -3413,7 +3415,9 @@ void rsx_intf_fill_rect(uint32_t color,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_fill_rect(color, x, y, w, h);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_fill_rect(color, x, y, w, h);
 #endif
          break;
       case RSX_VULKAN:
@@ -3439,8 +3443,10 @@ void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_copy_rect(src_x, src_y, dst_x, dst_y,
-               w, h, mask_test, set_mask);
+         if (static_renderer.state != GlState_Invalid
+               && static_renderer.state_data)
+            rsx_gl_copy_rect(src_x, src_y, dst_x, dst_y,
+                  w, h, mask_test, set_mask);
 #endif
          break;
       case RSX_VULKAN:
