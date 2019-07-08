@@ -66,9 +66,7 @@ static const VkApplicationInfo *get_application_info(void)
 static void context_reset(void)
 {
    if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void**)&vulkan) || !vulkan)
-   {
       return;
-   }
 
    if (vulkan->interface_version != RETRO_HW_RENDER_INTERFACE_VULKAN_VERSION)
    {
@@ -290,11 +288,6 @@ void rsx_vulkan_prepare_frame(void)
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
-   (void)fb;
-   (void)width;
-   (void)height;
-   (void)pitch;
-
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
 
@@ -305,24 +298,29 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
 
    auto scanout = renderer->scanout_to_texture();
 
-   auto &image = swapchain_image;
-   image.create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-   image.create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-   image.create_info.format = scanout->get_format();
-   image.create_info.subresourceRange.baseMipLevel = 0;
-   image.create_info.subresourceRange.baseArrayLayer = 0;
-   image.create_info.subresourceRange.levelCount = 1;
-   image.create_info.subresourceRange.layerCount = 1;
-   image.create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-   image.create_info.components.r = VK_COMPONENT_SWIZZLE_R;
-   image.create_info.components.g = VK_COMPONENT_SWIZZLE_G;
-   image.create_info.components.b = VK_COMPONENT_SWIZZLE_B;
-   image.create_info.components.a = VK_COMPONENT_SWIZZLE_A;
-   image.create_info.image = scanout->get_image();
-   image.image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-   image.image_view = scanout->get_view().get_view();
+   retro_vulkan_image *image                          = &swapchain_image;
 
-   vulkan->set_image(vulkan->handle, &image, 0, nullptr, VK_QUEUE_FAMILY_IGNORED);
+   image->create_info.sType                           = 
+      VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+   image->create_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+   image->create_info.format                          = scanout->get_format();
+   image->create_info.subresourceRange.baseMipLevel   = 0;
+   image->create_info.subresourceRange.baseArrayLayer = 0;
+   image->create_info.subresourceRange.levelCount     = 1;
+   image->create_info.subresourceRange.layerCount     = 1;
+   image->create_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+   image->create_info.components.r                    = VK_COMPONENT_SWIZZLE_R;
+   image->create_info.components.g                    = VK_COMPONENT_SWIZZLE_G;
+   image->create_info.components.b                    = VK_COMPONENT_SWIZZLE_B;
+   image->create_info.components.a                    = VK_COMPONENT_SWIZZLE_A;
+   image->create_info.image                           = scanout->get_image();
+   image->image_layout                                = 
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   image->image_view                                  = 
+      scanout->get_view().get_view();
+
+   vulkan->set_image(vulkan->handle, image, 0,
+         nullptr, VK_QUEUE_FAMILY_IGNORED);
    renderer->flush();
 
    auto semaphore = device->request_semaphore();
@@ -381,17 +379,17 @@ void rsx_vulkan_set_draw_offset(int16_t x, int16_t y)
 void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
       uint8_t twx, uint8_t twy)
 {
-   auto tex_x_mask = ~(tww << 3);
-   auto tex_y_mask = ~(twh << 3);
-   auto tex_x_or = (twx & tww) << 3;
-   auto tex_y_or = (twy & twh) << 3;
+   uint8_t tex_x_mask = ~(tww << 3);
+   uint8_t tex_y_mask = ~(twh << 3);
+   uint8_t tex_x_or   = (twx & tww) << 3;
+   uint8_t tex_y_or   = (twy & twh) << 3;
 
    if (renderer)
-      renderer->set_texture_window({ uint8_t(tex_x_mask), uint8_t(tex_y_mask), uint8_t(tex_x_or), uint8_t(tex_y_or) });
+      renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
    else
    {
       defer.push_back([=]() {
-            renderer->set_texture_window({ uint8_t(tex_x_mask), uint8_t(tex_y_mask), uint8_t(tex_x_or), uint8_t(tex_y_or) });
+            renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or});
       });
    }
 }
@@ -683,7 +681,7 @@ void rsx_vulkan_load_image(uint16_t x, uint16_t y,
    bool dual_copy = x + w > FB_WIDTH; // Check if we need to handle wrap-around in X.
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
-   auto handle = renderer->copy_cpu_to_vram({ x, y, w, h });
+   auto handle   = renderer->copy_cpu_to_vram({ x, y, w, h });
    uint16_t *tmp = renderer->begin_copy(handle);
    for (unsigned off_y = 0; off_y < h; off_y++)
    {
