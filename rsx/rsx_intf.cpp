@@ -21,9 +21,12 @@
 
 
 #ifdef RSX_DUMP
-   #include "rsx_dump.h"
-#include <stdlib.h>
+#include "rsx_dump.h"
 #endif
+
+static bool has_software_fb = false;
+
+extern "C" unsigned char widescreen_hack;
 
 #ifdef __cplusplus
 extern "C"
@@ -344,11 +347,6 @@ static DrawConfig persistent_config = {
 };
 
 static RetroGl static_renderer;
-
-static bool has_software_fb = false;
-
-extern "C" unsigned char widescreen_hack;
-
 
 #ifdef __cplusplus
 extern "C"
