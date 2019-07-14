@@ -440,21 +440,21 @@ void input_init_env( retro_environment_t _environ_cb )
 		log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 }
 
-void input_set_env( retro_environment_t environ_cb )
+void input_set_env( retro_environment_t _environ_cb )
 {
    switch ( players )
    {
       case 8:
-         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports8 );
+         _environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports8 );
          break;
 
       case 5:
-         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports5 );
+         _environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports5 );
          break;
 
       default:
       case 2:
-         environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports2 );
+         _environ_cb( RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports2 );
          break;
 
    } /* switch ( players ) */

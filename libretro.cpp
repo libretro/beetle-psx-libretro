@@ -1206,7 +1206,7 @@ static bool TestMagic(const char *name, RFILE *fp, int64_t size)
    return(true);
 }
 
-static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
+static bool TestMagicCD(std::vector<CDIF *> *_CDInterfaces)
 {
    uint8_t buf[2048];
    TOC toc;
@@ -1216,7 +1216,7 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
    TOC_Clear(&toc);
 #endif
 
-   (*CDInterfaces)[0]->ReadTOC(&toc);
+   (*_CDInterfaces)[0]->ReadTOC(&toc);
 
 #ifdef HAVE_CDROM_NEW
    dt = toc.FindTrackByLBA(4);
@@ -1227,7 +1227,7 @@ static bool TestMagicCD(std::vector<CDIF *> *CDInterfaces)
    if(dt > 0 && !(toc.tracks[dt].control & 0x4))
       return(false);
 
-   if((*CDInterfaces)[0]->ReadSector(buf, 4, 1) != 0x2)
+   if((*_CDInterfaces)[0]->ReadSector(buf, 4, 1) != 0x2)
       return(false);
 
    if(strncmp((char *)buf + 10, "Licensed  by", strlen("Licensed  by")))
@@ -1506,7 +1506,7 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
     CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
 }
 
-static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
+static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
 {
    unsigned region, i;
    bool emulate_memcard[8];
@@ -1531,7 +1531,7 @@ static void InitCommon(std::vector<CDIF *> *CDInterfaces, const bool EmulateMemc
    emulate_multitap[0] = setting_psx_multitap_port_1;
    emulate_multitap[1] = setting_psx_multitap_port_2;
 
-   cdifs = CDInterfaces;
+   cdifs  = _CDInterfaces;
    region = CalcDiscSCEx();
 
    if(!MDFN_GetSettingB("psx.region_autodetect"))
@@ -1884,9 +1884,9 @@ static int Load(const char *name, RFILE *fp)
    return(1);
 }
 
-static int LoadCD(std::vector<CDIF *> *CDInterfaces)
+static int LoadCD(std::vector<CDIF *> *_CDInterfaces)
 {
-   InitCommon(CDInterfaces);
+   InitCommon(_CDInterfaces);
 
    if (psx_skipbios == 1)
    BIOSROM->WriteU32(0x6990, 0);
