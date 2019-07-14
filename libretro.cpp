@@ -341,10 +341,10 @@ extern int PBP_DiscCount;
 static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
 
-PS_CPU *CPU = NULL;
-PS_SPU *SPU = NULL;
-PS_CDC *CDC = NULL;
-FrontIO *FIO = NULL;
+PS_CPU *PSX_CPU = NULL;
+PS_SPU *PSX_SPU = NULL;
+PS_CDC *PSX_CDC = NULL;
+FrontIO *PSX_FIO = NULL;
 
 static MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
 static MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
@@ -446,7 +446,7 @@ static void RebaseTS(const int32_t timestamp)
       events[i].event_time -= timestamp;
    }
 
-   CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   PSX_CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp)
@@ -496,22 +496,22 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
       e->event_time = next_timestamp;
    }
 
-   CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+   PSX_CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
 }
 
 // Called from debug.cpp too.
 void ForceEventUpdates(const int32_t timestamp)
 {
    PSX_SetEventNT(PSX_EVENT_GPU, GPU_Update(timestamp));
-   PSX_SetEventNT(PSX_EVENT_CDC, CDC->Update(timestamp));
+   PSX_SetEventNT(PSX_EVENT_CDC, PSX_CDC->Update(timestamp));
 
    PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(timestamp));
 
    PSX_SetEventNT(PSX_EVENT_DMA, DMA_Update(timestamp));
 
-   PSX_SetEventNT(PSX_EVENT_FIO, FIO->Update(timestamp));
+   PSX_SetEventNT(PSX_EVENT_FIO, PSX_FIO->Update(timestamp));
 
-   CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   PSX_CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
 
 bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
@@ -531,7 +531,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = GPU_Update(e->event_time);
             break;
          case PSX_EVENT_CDC:
-            nt = CDC->Update(e->event_time);
+            nt = PSX_CDC->Update(e->event_time);
             break;
          case PSX_EVENT_TIMER:
             nt = TIMER_Update(e->event_time);
@@ -540,7 +540,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = DMA_Update(e->event_time);
             break;
          case PSX_EVENT_FIO:
-            nt = FIO->Update(e->event_time);
+            nt = PSX_FIO->Update(e->event_time);
             break;
       }
 
@@ -557,7 +557,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
 void PSX_RequestMLExit(void)
 {
    Running = 0;
-   CPU->SetEventNT(0);
+   PSX_CPU->SetEventNT(0);
 }
 
 
@@ -648,8 +648,8 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                //if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                // PSX_EventHandler(timestamp);
 
-               SPU->Write(timestamp, A | 0, V);
-               SPU->Write(timestamp, A | 2, V >> 16);
+               PSX_SPU->Write(timestamp, A | 0, V);
+               PSX_SPU->Write(timestamp, A | 2, V >> 16);
             }
             else
             {
@@ -658,7 +658,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                   PSX_EventHandler(timestamp);
 
-               V = SPU->Read(timestamp, A) | (SPU->Read(timestamp, A | 2) << 16);
+               V = PSX_SPU->Read(timestamp, A) | (PSX_SPU->Read(timestamp, A | 2) << 16);
             }
          }
          else
@@ -670,7 +670,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                //if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                // PSX_EventHandler(timestamp);
 
-               SPU->Write(timestamp, A & ~1, V);
+               PSX_SPU->Write(timestamp, A & ~1, V);
             }
             else
             {
@@ -679,7 +679,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                   PSX_EventHandler(timestamp);
 
-               V = SPU->Read(timestamp, A & ~1);
+               V = PSX_SPU->Read(timestamp, A & ~1);
             }
          }
          return;
@@ -695,9 +695,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          }
 
          if(IsWrite)
-            CDC->Write(timestamp, A & 0x3, V);
+            PSX_CDC->Write(timestamp, A & 0x3, V);
          else
-            V = CDC->Read(timestamp, A & 0x3);
+            V = PSX_CDC->Read(timestamp, A & 0x3);
 
          return;
       }
@@ -757,9 +757,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
             timestamp++;
 
          if(IsWrite)
-            FIO->Write(timestamp, A, V);
+            PSX_FIO->Write(timestamp, A, V);
          else
-            V = FIO->Read(timestamp, A);
+            V = PSX_FIO->Read(timestamp, A);
          return;
       }
 
@@ -879,9 +879,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
    if(A == 0xFFFE0130) // Per tests on PS1, ignores the access(sort of, on reads the value is forced to 0 if not aligned) if not aligned to 4-bytes.
    {
       if(!IsWrite)
-         V = CPU->GetBIU();
+         V = PSX_CPU->GetBIU();
       else
-         CPU->SetBIU(V);
+         PSX_CPU->SetBIU(V);
 
       return;
    }
@@ -1065,7 +1065,7 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
    }
 
    if(A == 0xFFFE0130)
-      return CPU->GetBIU();
+      return PSX_CPU->GetBIU();
 
    return(0);
 }
@@ -1103,7 +1103,7 @@ static void PSX_Power(void)
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
 
-   CPU->Power();
+   PSX_CPU->Power();
 
    EventReset();
 
@@ -1111,11 +1111,11 @@ static void PSX_Power(void)
 
    DMA_Power();
 
-   FIO->Power();
+   PSX_FIO->Power();
    SIO_Power();
 
    MDEC_Power();
-   CDC->Power();
+   PSX_CDC->Power();
    GPU_Power();
    //SPU->Power();   // Called from CDC->Power()
    IRQ_Power();
@@ -1157,7 +1157,7 @@ template<typename T, bool Access24> static INLINE void MemPoke(pscpu_timestamp_t
 
    if(A == 0xFFFE0130)
    {
-      CPU->SetBIU(V);
+      PSX_CPU->SetBIU(V);
       return;
    }
 }
@@ -1179,7 +1179,7 @@ void PSX_MemPoke32(uint32 A, uint32 V)
 
 void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
 {
-   FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
+   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
 }
 
 static bool TestMagic(const char *name, RFILE *fp, int64_t size)
@@ -1503,7 +1503,7 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
         }
     }
 
-    CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
+    PSX_CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
 }
 
 static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
@@ -1547,22 +1547,22 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       sle = tmp;
    }
 
-   CPU = new PS_CPU();
-   SPU = new PS_SPU();
+   PSX_CPU = new PS_CPU();
+   PSX_SPU = new PS_SPU();
 
    GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
 
-   CDC = new PS_CDC();
-   FIO = new FrontIO(emulate_memcard, emulate_multitap);
-   FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
+   PSX_CDC = new PS_CDC();
+   PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
+   PSX_FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
    for(unsigned i = 0; i < 8; i++)
    {
       char buf[64];
       snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
-      FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
+      PSX_FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
    }
 
-	input_set_fio( FIO );
+	input_set_fio( PSX_FIO );
 
    DMA_Init();
 
@@ -1591,7 +1591,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       CD_SelectedDisc = 0;
    }
 
-   CDC->SetDisc(true, NULL, NULL);
+   PSX_CDC->SetDisc(true, NULL, NULL);
    SetDiscWrapper(CD_TrayOpen);
 
 
@@ -1603,20 +1603,20 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
    {
-      CPU->SetFastMap(MainRAM.data32, 0x00000000 + ma, 2048 * 1024);
-      CPU->SetFastMap(MainRAM.data32, 0x80000000 + ma, 2048 * 1024);
-      CPU->SetFastMap(MainRAM.data32, 0xA0000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM.data32, 0x00000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM.data32, 0x80000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM.data32, 0xA0000000 + ma, 2048 * 1024);
    }
 
-   CPU->SetFastMap(BIOSROM->data32, 0x1FC00000, 512 * 1024);
-   CPU->SetFastMap(BIOSROM->data32, 0x9FC00000, 512 * 1024);
-   CPU->SetFastMap(BIOSROM->data32, 0xBFC00000, 512 * 1024);
+   PSX_CPU->SetFastMap(BIOSROM->data32, 0x1FC00000, 512 * 1024);
+   PSX_CPU->SetFastMap(BIOSROM->data32, 0x9FC00000, 512 * 1024);
+   PSX_CPU->SetFastMap(BIOSROM->data32, 0xBFC00000, 512 * 1024);
 
    if(PIOMem)
    {
-      CPU->SetFastMap(PIOMem->data32, 0x1F000000, 65536);
-      CPU->SetFastMap(PIOMem->data32, 0x9F000000, 65536);
-      CPU->SetFastMap(PIOMem->data32, 0xBF000000, 65536);
+      PSX_CPU->SetFastMap(PIOMem->data32, 0x1F000000, 65536);
+      PSX_CPU->SetFastMap(PIOMem->data32, 0x9F000000, 65536);
+      PSX_CPU->SetFastMap(PIOMem->data32, 0xBF000000, 65536);
    }
 
 
@@ -1655,7 +1655,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    if (!use_mednafen_memcard0_method)
    {
-      FIO->LoadMemcard(0);
+      PSX_FIO->LoadMemcard(0);
       i = 1;
    }
 
@@ -1665,12 +1665,12 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       const char *memcard = NULL;
       snprintf(ext, sizeof(ext), "%d.mcr", i);
       memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
-      FIO->LoadMemcard(i, memcard);
+      PSX_FIO->LoadMemcard(i, memcard);
    }
 
    for(i = 0; i < 8; i++)
    {
-      Memcard_PrevDC[i] = FIO->GetMemcardDirtyCount(i);
+      Memcard_PrevDC[i] = PSX_FIO->GetMemcardDirtyCount(i);
       Memcard_SaveDelay[i] = -1;
    }
 
@@ -1900,24 +1900,23 @@ static void Cleanup(void)
 {
    TextMem.resize(0);
 
+   if(PSX_CDC)
+      delete PSX_CDC;
+   PSX_CDC = NULL;
 
-   if(CDC)
-      delete CDC;
-   CDC = NULL;
-
-   if(SPU)
-      delete SPU;
-   SPU = NULL;
+   if(PSX_SPU)
+      delete PSX_SPU;
+   PSX_SPU = NULL;
 
    GPU_Destroy();
 
-   if(CPU)
-      delete CPU;
-   CPU = NULL;
+   if(PSX_CPU)
+      delete PSX_CPU;
+   PSX_CPU = NULL;
 
-   if(FIO)
-      delete FIO;
-   FIO = NULL;
+   if(PSX_FIO)
+      delete PSX_FIO;
+   PSX_FIO = NULL;
    input_set_fio(NULL);
 
    DMA_Kill();
@@ -1943,7 +1942,7 @@ static void CloseGame(void)
       {
          if (i == 0 && !use_mednafen_memcard0_method)
          {
-            FIO->SaveMemcard(i);
+            PSX_FIO->SaveMemcard(i);
             continue;
          }
 
@@ -1955,7 +1954,7 @@ static void CloseGame(void)
             const char *memcard = NULL;
             snprintf(ext, sizeof(ext), "%d.mcr", i);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
-            FIO->SaveMemcard(i, memcard);
+            PSX_FIO->SaveMemcard(i, memcard);
          }
          catch(std::exception &e)
          {
@@ -2053,17 +2052,17 @@ int StateAction(StateMem *sm, int load, int data_only)
 
    // TODO: Remember to increment dirty count in memory card state loading routine.
 
-   ret &= CPU->StateAction(sm, load, data_only);
+   ret &= PSX_CPU->StateAction(sm, load, data_only);
    ret &= DMA_StateAction(sm, load, data_only);
    ret &= TIMER_StateAction(sm, load, data_only);
    ret &= SIO_StateAction(sm, load, data_only);
 
-   ret &= CDC->StateAction(sm, load, data_only);
+   ret &= PSX_CDC->StateAction(sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
    ret &= GPU_StateAction(sm, load, data_only);
-   ret &= SPU->StateAction(sm, load, data_only);
+   ret &= PSX_SPU->StateAction(sm, load, data_only);
 
-   ret &= FIO->StateAction(sm, load, data_only);
+   ret &= PSX_FIO->StateAction(sm, load, data_only);
 
    ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
 
@@ -3643,7 +3642,7 @@ void retro_run(void)
 
    if (setting_apply_analog_toggle)
    {
-      FIO->SetAMCT(setting_psx_analog_toggle);
+      PSX_FIO->SetAMCT(setting_psx_analog_toggle);
       setting_apply_analog_toggle = false;
    }
 
@@ -3683,11 +3682,11 @@ void retro_run(void)
    espec->MasterCycles = 0;
    espec->SoundBufSize = 0;
 
-   FIO->UpdateInput();
+   PSX_FIO->UpdateInput();
    GPU_StartFrame(espec);
 
    Running = -1;
-   timestamp = CPU->Run(timestamp, false, false);
+   timestamp = PSX_CPU->Run(timestamp, false, false);
 
    assert(timestamp);
 
@@ -3702,11 +3701,11 @@ void retro_run(void)
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
 
-   CDC->ResetTS();
+   PSX_CDC->ResetTS();
    TIMER_ResetTS();
    DMA_ResetTS();
    GPU_ResetTS();
-   FIO->ResetTS();
+   PSX_FIO->ResetTS();
 
    RebaseTS(timestamp);
 
@@ -3716,7 +3715,7 @@ void retro_run(void)
    unsigned players = input_get_player_count();
    for(int i = 0; i < players; i++)
    {
-      uint64_t new_dc = FIO->GetMemcardDirtyCount(i);
+      uint64_t new_dc = PSX_FIO->GetMemcardDirtyCount(i);
 
       if(new_dc > Memcard_PrevDC[i])
       {
@@ -3736,7 +3735,7 @@ void retro_run(void)
 
             if (i == 0 && !use_mednafen_memcard0_method)
             {
-               FIO->SaveMemcard(i);
+               PSX_FIO->SaveMemcard(i);
                Memcard_SaveDelay[i] = -1;
                Memcard_PrevDC[i] = 0;
                continue;
@@ -3744,7 +3743,7 @@ void retro_run(void)
 
             snprintf(ext, sizeof(ext), "%d.mcr", i);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
-            FIO->SaveMemcard(i, memcard);
+            PSX_FIO->SaveMemcard(i, memcard);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }
@@ -4162,7 +4161,7 @@ void *retro_get_memory_data(unsigned type)
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
             return NULL;
-         return FIO->GetMemcardDevice(0)->GetNVData();
+         return PSX_FIO->GetMemcardDevice(0)->GetNVData();
       default:
          break;
    }

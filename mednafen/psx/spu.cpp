@@ -996,12 +996,12 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
       {
          int32 cda_raw[2];
          int32 cdav[2];
-         const unsigned freq = (CDC->AudioBuffer.ReadPos < CDC->AudioBuffer.Size) ? CDC->AudioBuffer.Freq : 0;
+         const unsigned freq = (PSX_CDC->AudioBuffer.ReadPos < PSX_CDC->AudioBuffer.Size) ? PSX_CDC->AudioBuffer.Freq : 0;
 
          cda_raw[0] = cda_raw[1] = 0;
 
          if (freq)
-            CDC->GetCDAudio(cda_raw, freq);	// PS_CDC::GetCDAudio() guarantees the variables passed by reference will be set to 0,
+            PSX_CDC->GetCDAudio(cda_raw, freq);	// PS_CDC::GetCDAudio() guarantees the variables passed by reference will be set to 0,
          // and that their range shall be -32768 through 32767.
 
          WriteSPURAM(CWA | 0x000, cda_raw[0]);

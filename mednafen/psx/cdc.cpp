@@ -226,13 +226,13 @@ void PS_CDC::SoftReset(void)
 
 void PS_CDC::Power(void)
 {
-   SPU->Power();
+   PSX_SPU->Power();
 
    SoftReset();
 
    DiscStartupDelay = 0;
 
-   SPUCounter = SPU->UpdateFromCDC(0);
+   SPUCounter = PSX_SPU->UpdateFromCDC(0);
    lastts = 0;
 }
 
@@ -1353,7 +1353,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
          }
       }
 
-      SPUCounter = SPU->UpdateFromCDC(chunk_clocks);
+      SPUCounter = PSX_SPU->UpdateFromCDC(chunk_clocks);
 
       clocks -= chunk_clocks;
    } // end while(clocks > 0)

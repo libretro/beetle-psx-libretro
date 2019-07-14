@@ -186,7 +186,7 @@ static void RecalcHalt(void)
 
    PSX_SetDMACycleSteal(tmp);
 
-   CPU->SetHalt(Halt);
+   PSX_CPU->SetHalt(Halt);
 }
 
 
@@ -243,7 +243,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          else
          {
             extra_cyc_overhead = 8;	// FIXME: Test.
-            *V = CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
+            *V = PSX_CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
          }
          break;
 
@@ -266,9 +266,9 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          extra_cyc_overhead = 47;	// Should be closer to 69, average, but actual timing is...complicated.
 
          if(CRModeCache & 0x1)
-            SPU->WriteDMA(*V);
+            PSX_SPU->WriteDMA(*V);
          else
-            *V = SPU->ReadDMA();
+            *V = PSX_SPU->ReadDMA();
          break;
 
       case CH_FIVE:
