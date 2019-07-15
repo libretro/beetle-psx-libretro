@@ -3,7 +3,7 @@ FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_OPENGL = 0
 HAVE_VULKAN = 0
 HAVE_JIT = 0
-HAVE_CHD = 1
+HAVE_CHD = 0
 HAVE_CDROM = 0
 
 CORE_DIR := .
@@ -23,15 +23,15 @@ endif
 
 ifeq ($(platform),)
    platform = unix
-   ifeq ($(shell uname -a),)
+   ifeq ($(shell uname -s),)
       platform = win
-   else ifneq ($(findstring Darwin,$(shell uname -a)),)
+   else ifneq ($(findstring Darwin,$(shell uname -s)),)
       platform = osx
       arch     = intel
       ifeq ($(shell uname -p),powerpc)
          arch = ppc
       endif
-   else ifneq ($(findstring MINGW,$(shell uname -a)),)
+   else ifneq ($(findstring MINGW,$(shell uname -s)),)
       platform = win
    endif
 else ifneq (,$(findstring armv,$(platform)))
@@ -39,7 +39,7 @@ else ifneq (,$(findstring armv,$(platform)))
 endif
 
 ifneq ($(platform), osx)
-   ifeq ($(findstring Haiku,$(shell uname -a)),)
+   ifeq ($(findstring Haiku,$(shell uname -s)),)
       PTHREAD_FLAGS = -lpthread
    endif
 endif
@@ -92,7 +92,10 @@ ifneq (,$(findstring unix,$(platform)))
          GL_LIB := -L/usr/local/lib -lGL
       endif
    endif
+
+ifneq ($(findstring Linux,$(shell uname -s)),)
 	HAVE_CDROM = 1
+endif
 
 # OS X
 else ifeq ($(platform), osx)
