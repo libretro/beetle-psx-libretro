@@ -4307,18 +4307,20 @@ void MDFND_DispMessage(unsigned char *str)
 
 void MDFN_DispMessage(const char *format, ...)
 {
-   char *str = (char*)malloc(4096 * sizeof(char));
-   struct retro_message msg;
    va_list ap;
-   va_start(ap,format);
+   struct retro_message msg;
    const char *strc = NULL;
+   char *str        = (char*)malloc(4096 * sizeof(char));
+
+   va_start(ap,format);
 
    vsnprintf(str, 4096, format, ap);
    va_end(ap);
-   strc = str;
+   strc       = str;
 
    msg.frames = 180;
-   msg.msg = strc;
+   msg.msg    = strc;
 
    environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   free(str);
 }
