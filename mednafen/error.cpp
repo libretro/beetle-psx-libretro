@@ -29,7 +29,7 @@ MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...)
 
    va_list ap;
    va_start(ap, format);
-   error_message = new char[4096];
+   error_message = (char*)malloc(4096 * sizeof(char));
    vsnprintf(error_message, 4096, format, ap);
    va_end(ap);
 
@@ -48,10 +48,8 @@ MDFN_Error::MDFN_Error(const ErrnoHolder &enh)
 MDFN_Error::~MDFN_Error()
 {
    if(error_message)
-   {
-      delete [] error_message;
-      error_message = NULL;
-   }
+      free(error_message);
+   error_message = NULL;
 }
 
 MDFN_Error::MDFN_Error(const MDFN_Error &ze_error)
