@@ -3935,75 +3935,14 @@ unsigned retro_api_version(void)
    return RETRO_API_VERSION;
 }
 
+#include "libretro_core_options.h"
+
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
    environ_cb = cb;
 
-   static const struct retro_variable vars[] = {
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { BEETLE_OPT(renderer), "Renderer (restart); hardware|software"},
-      { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled|disabled" },
-#else
-      { BEETLE_OPT(renderer), "Renderer; software"},
-      { BEETLE_OPT(renderer_software_fb), "Software framebuffer; enabled" },
-#endif
-#ifdef HAVE_VULKAN
-      { BEETLE_OPT(adaptive_smoothing), "Adaptive smoothing; enabled|disabled" },
-      { BEETLE_OPT(super_sampling), "Super sampling (downsample from internal upscale); disabled|enabled" },
-      { BEETLE_OPT(msaa), "MSAA; 1x|2x|4x|8x|16x" },
-      { BEETLE_OPT(mdec_yuv), "MDEC YUV Chroma filter; disabled|enabled" },
-#endif
-      { BEETLE_OPT(internal_resolution), "Internal GPU resolution; 1x(native)|2x|4x|8x|16x" },
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-      // Only used in GL renderer for now.
-      { BEETLE_OPT(depth), "Internal color depth; dithered 16bpp (native)|32bpp" },
-      { BEETLE_OPT(wireframe), "Wireframe mode; disabled|enabled" },
-      { BEETLE_OPT(display_vram), "Display full VRAM; disabled|enabled" },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-      { BEETLE_OPT(filter), "Texture filtering; nearest|SABR|xBR|bilinear|3-point|JINC2" },
-      { BEETLE_OPT(pgxp_mode), "PGXP operation mode; disabled|memory only|memory + CPU" },  //iCB:PGXP mode options
-      { BEETLE_OPT(pgxp_vertex), "PGXP vertex cache; disabled|enabled" },
-      { BEETLE_OPT(pgxp_texture), "PGXP perspective correct texturing; disabled|enabled" },
-#endif
-      { BEETLE_OPT(lineRender), "Line-to-quad hack; default|aggressive|disabled" },
-      { BEETLE_OPT(widescreen_hack), "Widescreen mode hack; disabled|enabled" },
-      { BEETLE_OPT(frame_duping), "Frame duping (speedup); disabled|enabled" },
-      { BEETLE_OPT(cpu_freq_scale), "CPU frequency scaling (overclock); 100% (native)|110%|120%|130%|140%|150%|160%|170%|180%|190%|200%|210%|220%|230%|240%|250%|260%|265%|270%|280%|290%|300%|310%|320%|330%|340%|350%|360%|370%|380%|390%|400%|410%|420%|430%|440%|450%|460%|470%|480%|490%|500%|50%|60%|70%|80%|90%" },
-      { BEETLE_OPT(gte_overclock), "GTE Overclock; disabled|enabled" },
-      { BEETLE_OPT(gpu_overclock), "GPU rasterizer overclock; 1x(native)|2x|4x|8x|16x|32x" },
-      { BEETLE_OPT(skip_bios), "Skip BIOS; disabled|enabled" },
-      { BEETLE_OPT(dither_mode), "Dithering pattern; 1x(native)|internal resolution|disabled" },
-      { BEETLE_OPT(display_internal_fps), "Display internal FPS; disabled|enabled" },
-
-      { BEETLE_OPT(initial_scanline), "Initial scanline; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { BEETLE_OPT(last_scanline), "Last scanline; 239|238|237|236|235|234|232|231|230|229|228|227|226|225|224|223|222|221|220|219|218|217|216|215|214|213|212|211|210" },
-      { BEETLE_OPT(initial_scanline_pal), "Initial scanline PAL; 0|1|2|3|4|5|6|7|8|9|10|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40" },
-      { BEETLE_OPT(last_scanline_pal), "Last scanline PAL; 287|286|285|284|283|283|282|281|280|279|278|277|276|275|274|273|272|271|270|269|268|267|266|265|264|263|262|261|260" },
-      { BEETLE_OPT(crop_overscan), "Crop Overscan; enabled|disabled" },
-      { BEETLE_OPT(image_crop), "Additional Cropping; disabled|1 px|2 px|3 px|4 px|5 px|6 px|7 px|8 px" },
-      { BEETLE_OPT(image_offset), "Offset Cropped Image; disabled|1 px|2 px|3 px|4 px|-4 px|-3 px|-2 px|-1 px" },
-
-      { BEETLE_OPT(analog_calibration), "Analog self-calibration; disabled|enabled" },
-      { BEETLE_OPT(analog_toggle), "DualShock Analog button toggle; disabled|enabled" },
-      { BEETLE_OPT(enable_multitap_port1), "Port 1: Multitap enable; disabled|enabled" },
-      { BEETLE_OPT(enable_multitap_port2), "Port 2: Multitap enable; disabled|enabled" },
-      { BEETLE_OPT(gun_cursor), "Gun Cursor; Cross|Dot|Off" },
-      { BEETLE_OPT(gun_input_mode), "Gun Input Mode; Lightgun|Touchscreen" },
-      { BEETLE_OPT(mouse_sensitivity), "Mouse Sensitivity; 100%|105%|110%|115%|120%|125%|130%|135%|140%|145%|150%|155%|160%|165%|170%|175%|180%|185%|190%|195%|200%|5%|10%|15%|20%|25%|30%|35%|40%|45%|50%|55%|60%|65%|70%|75%|80%|85%|90%|95%" },
-      { BEETLE_OPT(negcon_deadzone), "NegCon Twist Deadzone (percent); 0|5|10|15|20|25|30" },
-      { BEETLE_OPT(negcon_response), "NegCon Twist Response; linear|quadratic|cubic" },
-#ifndef EMSCRIPTEN
-      { BEETLE_OPT(cd_access_method), "CD Access Method (restart); sync|async|precache" },
-#endif
-      { BEETLE_OPT(use_mednafen_memcard0_method), "Memcard 0 method; libretro|mednafen" },
-      { BEETLE_OPT(enable_memcard1), "Enable memory card 1; enabled|disabled" },
-      { BEETLE_OPT(shared_memory_cards), "Shared memcards (restart); disabled|enabled" },
-      { BEETLE_OPT(cd_fastload), "Increase CD loading speed; 2x (native)|4x|6x|8x|10x|12x|14x" },
-      { NULL, NULL },
-   };
-   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+   libretro_set_core_options(environ_cb);
 
    vfs_iface_info.required_interface_version = 1;
    vfs_iface_info.iface                      = NULL;
