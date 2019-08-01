@@ -31,7 +31,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer),
       "Renderer (restart)",
-      "",
+      "Choose which video renderer will be used. Software is the most accurate renderer. However, it is also the most demanding renderer at higher resolutions than native. So in case you want to increase the internal resolution and you have a capable GPU, it's highly recommended you use the 'hardware' option instead. The OpenGL and Vulkan renderers are less accurate at the moment but will enable and/or speedup enhancements like upscaling and texture filtering. By setting this to 'hardware', depending on which video driver has been selected in RetroArch, it will automatically switch to either the OpenGL renderer or the Vulkan renderer. Also important to keep in mind is shader support. The Vulkan renderer supports Slang shaders, while the OpenGL renderer supports GLSL shaders.",
       {
          { "hardware",   "Hardware" },
          { "software",      "Software" },
@@ -42,7 +42,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer_software_fb),
       "Software framebuffer",
-      "",
+      "If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.",
       {
          { "enabled",   NULL },
          { "disabled",  NULL },
@@ -54,7 +54,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer),
       "Renderer (restart)",
-      "",
+      "Choose which video renderer will be used. Software is the most accurate renderer. However, it is also the most demanding renderer at higher resolutions than native",
       {
          { "software",      "Software" },
          { NULL, NULL },
@@ -64,7 +64,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer_software_fb),
       "Software framebuffer",
-      "",
+      "If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.",
       {
          { "enabled",   NULL },
          { NULL, NULL },
@@ -76,7 +76,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(adaptive_smoothing),
       "Adaptive smoothing",
-      "",
+      "When upscaling, smooths out 2D elements while keeping 3D elements sharp. Only for the Vulkan renderer at the moment.",
       {
          { "enabled",       NULL },
          { "disabled",       NULL },
@@ -87,7 +87,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(super_sampling),
       "Super sampling (downsample from internal upscale)",
-      "",
+      "Awaiting explanation.",
       {
          { "disabled",       NULL },
          { "enabled",       NULL },
@@ -98,7 +98,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(msaa),
       "Multi-Sampled Anti Aliasing",
-      "",
+      "Apply Multi-Sampled Anti Aliasing (OpenGL and Vulkan-exclusive)",
       {
          { "1x",       NULL },
          { "2x",       NULL },
@@ -112,7 +112,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(mdec_yuv),
       "MDEC YUV Chroma filter",
-      "",
+      "Awaiting explanation.",
       {
          { "disabled",       NULL },
          { "enabled",       NULL },
@@ -124,7 +124,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(internal_resolution),
       "Internal GPU resolution",
-      "",
+      "Modify the resolution.",
       {
          { "1x(native)", "1x (Native)" },
          { "2x",       NULL },
@@ -139,7 +139,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(depth),
       "Internal color depth",
-      "",
+      "PSX had 16bpp depth, Beetle PSX HW can go up to 32bpp. Only for the OpenGL and Vulkan renderers at the moment. The Vulkan renderer always uses 32bpp.",
       {
          { "dithered 16bpp (native)", "Dithered 16bpp (Native)" },
          { "32bpp",       NULL },
@@ -150,7 +150,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(wireframe),
       "Wireframe mode",
-      "",
+      "Shows only the outlines of polygons. Only for the OpenGL renderer. For debug use.",
       {
          { "disabled", NULL},
          { "enabled",  NULL },
@@ -161,7 +161,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(display_vram),
       "Display full VRAM",
-      "",
+      "Everything in VRAM is drawn on screen. For debug use.",
       {
          { "disabled", NULL},
          { "enabled",  NULL },
@@ -174,7 +174,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(filter),
       "Texture filtering",
-      "",
+      "Per-texture filtering. Only for the OpenGL and Vulkan renderers.",
       {
          { "nearest", NULL},
          { "SABR",  NULL },
@@ -189,7 +189,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(pgxp_mode),
       "PGXP operation mode",
-      "",
+      "When on, floating point coordinates will be used for vertex positions, to avoid the PSX polygon jitter. 'memory + CPU' mode can further reduce jitter at the cost of performance and geometry glitches. It is recommended that you use 'Memory only' for the best compatibility with PGXP.",
       {
          { "disabled", NULL},
          { "memory only",  "Memory Only" },
@@ -201,7 +201,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(pgxp_vertex),
       "PGXP vertex cache",
-      "",
+      "Maintains a cache for vertices. May result in better performance but can result in graphics glitches in most games. Is best left disabled from a compatibility perspective on average.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -212,7 +212,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(pgxp_texture),
       "PGXP perspective correct texturing",
-      "",
+      "Original PSX did affine texture mapping, resulting in e.g. crooked lines across walls. This fixes it.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -224,7 +224,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(lineRender),
       "Line-to-quad hack",
-      "",
+      "Awaiting explanation.",
       {
          { "default", NULL},
          { "aggressive", NULL},
@@ -236,7 +236,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(widescreen_hack),
       "Widescreen mode hack",
-      "",
+      "If on, renders in 16:9. Works best on 3D games.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -247,7 +247,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(frame_duping),
       "Frame duping (speedup)",
-      "",
+      "Redraws/reuses the last frame if there was no new data.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -258,7 +258,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(cpu_freq_scale),
       "CPU frequency scaling (overclock)",
-      "",
+      "Overclock the emulated PSX's CPU.",
       {
          { "50%", NULL},
          { "60%", NULL},
@@ -313,7 +313,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(gte_overclock),
       "GTE Overclock",
-      "",
+      "Can greatly help in reducing framerate slowdowns in games that are GTE-bound, and making frametimes/framerates more stable.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -324,7 +324,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(gpu_overclock),
       "GPU rasterizer Overclock",
-      "",
+      "Overclock the emulated PSX's GPU rasterizer. Doesn't really do much.",
       {
          { "1x(native)", NULL},
          { "2x", NULL},
@@ -339,7 +339,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(skip_bios),
       "Skip BIOS",
-      "",
+      "Skips the PSX BIOS screen when starting a game. Some games have issues when this core option is enabled (Saga Frontier, PAL copy protected games, etc).",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -350,7 +350,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(dither_mode),
       "Dithering pattern",
-      "",
+      "If off, disables the dithering pattern the PSX applies to combat color banding. Only for the OpenGL and Software renderers. Vulkan always disables the pattern.",
       {
          { "1x(native)", NULL},
          { "internal resolution", NULL},
@@ -362,7 +362,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(display_internal_fps),
       "Display internal FPS",
-      "",
+      "Shows the frame rate at which the emulated PSX is drawing at. Onscreen Notifications must be enabled in the RetroArch Onscreen Display Settings.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -373,7 +373,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
-      "",
+      "Crop out the potentially random glitchy video output that would have been hidden by the bezel around the edge of a standard-definition television screen.",
       {
          { "enabled", NULL},
          { "disabled", NULL},
@@ -384,7 +384,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_crop),
       "Additional Cropping",
-      "",
+      "Self-explanatory.",
       {
          { "disabled", NULL},
          { "1 px", NULL},
@@ -402,7 +402,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_offset),
       "Offset Cropped Image",
-      "",
+      "Self-explanatory.",
       {
          { "disabled", NULL},
          { "-4 px", NULL},
@@ -420,7 +420,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(analog_calibration),
       "Analog self-calibration",
-      "",
+      "When enabled, monitors the max values reached by the input, using it as a calibration heuristic which then scales the analog coordinates sent to the emulator accordingly. For best results, rotate the sticks at max amplitude for the algorithm to get a good estimate of the scaling factor, otherwise it will adjust while playing.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -431,7 +431,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(analog_toggle),
       "DualShock Analog button toggle",
-      "",
+      "Toggles the Analog button from DualShock controllers, if disabled analogs are always on, if enabled you can toggle their state by pressing and holding START+SELECT+L1+L2+R1+R2.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -442,7 +442,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(enable_multitap_port1),
       "Port 1: Multitap enable",
-      "",
+      "Enables/Disables multitap functionality on port 1.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -453,7 +453,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(enable_multitap_port2),
       "Port 2: Multitap enable",
-      "",
+      "Enables/Disables multitap functionality on port 2.",
       {
          { "disabled", NULL},
          { "enabled", NULL},
@@ -464,7 +464,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(gun_cursor),
       "Gun Cursor",
-      "",
+      "Choose the cursor for the 'Guncon / G-Con 45' and 'Justifier' Device Types. Setting it to off disables the crosshair.",
       {
          { "Cross", NULL},
          { "Dot", NULL},
@@ -476,7 +476,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(gun_input_mode),
       "Gun Input Mode",
-      "",
+      "Awaiting explanation.",
       {
          { "Lightgun", NULL},
          { "Touchscreen", NULL},
@@ -487,7 +487,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(mouse_sensitivity),
       "Mouse Sensitivity",
-      "",
+      "Configure the 'Mouse' Device Type's sensitivity.",
       {
          { "5%", NULL},
          { "10%", NULL},
@@ -536,7 +536,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(negcon_deadzone),
       "NegCon Twist Deadzone (percent)",
-      "",
+      "Sets the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated neGcon Controllers. Used to eliminate drift/unwanted input.  Most (all?) negCon compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any analog stick drift should instead be accounted for by configuring the 'NegCon Twist Deadzone' core option. This is particularly important when 'NegCon Twist Response' is set to 'quadratic' or 'cubic'. Xbox gamepads typically require a deadzone of 15-20%. Many Android-compatible bluetooth gamepads have an internal 'hardware' deadzone, allowing the deadzone value here to be set to 0%.",
       {
          { "0", NULL},
          { "5", NULL},
@@ -552,7 +552,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(negcon_response),
       "NegCon Twist Response",
-      "",
+      "Specifies the analog response when using a RetroPad left analog stick to simulate the 'twist' action of emulated neGcon Controllers. 'linear': Analog stick displacement is mapped linearly to negCon rotation angle. 'quadratic': Analog stick displacement is mapped quadratically to negCon rotation angle. This allows for greater precision when making small movements with the analog stick. 'cubic': Analog stick displacement is mapped cubically to negCon rotation angle. This allows for even greater precision when making small movements with the analog stick, but 'exaggerates' larger movements. A linear response is not recommended when using standard gamepad devices. The negCon 'twist' mechanism is substantially different from conventional analog sticks; linear mapping over-amplifies small displacements of the stick, impairing fine control. A linear response is only appropriate when using racing wheel peripherals. In most cases, the 'quadratic' option should be selected. This provides effective compensation for the physical differences between real/emulated hardware, enabling smooth/precise analog input.",
       {
          { "linear",    "Linear"},
          { "quadratic", "Quadratic"},
@@ -565,7 +565,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(cd_access_method),
       "CD Access Method (Restart)",
-      "",
+      "The precache setting loads the complete image in memory at startup. Can potentially decrease loading times at the cost of increased startup time.",
       {
          { "sync",       NULL },
          { "async",       NULL },
@@ -578,7 +578,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
       "Memory Card 0 Method",
-      "",
+      "Choose the savedata format used for Memcard 0 (libretro or mednafen).",
       {
          { "libretro",       NULL },
          { "mednafen",       NULL },
@@ -589,7 +589,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(enable_memcard1),
       "Enable memory card 1",
-      "",
+      "Enable or disables Memcard slot 1. When disabled, games cannot save/load to Memcard slot 1.",
       {
          { "enabled",       NULL },
          { "disabled",       NULL },
@@ -600,7 +600,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(shared_memory_cards),
       "Shared memcards (restart)",
-      "",
+      "Games will share and save/load to the same memory cards. The 'Memcard 0 method' core option needs to be set to 'mednafen' for the 'Shared memcards' core option to function properly",
       {
          { "disabled",       NULL },
          { "enabled",       NULL },
@@ -611,7 +611,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(cd_fastload),
       "Increase CD loading speed",
-      "",
+      "Can greatly reduce the loading times in games. May not work correctly in all games. Some games may break if you set them past a certain speed.",
       {
          { "2x (native)",       NULL },
          { "4x",       NULL },
