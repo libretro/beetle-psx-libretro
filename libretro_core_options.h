@@ -87,7 +87,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(super_sampling),
       "Super sampling (downsample from internal upscale)",
-      "Awaiting explanation.",
+      "Renders internally at high resolution, but downsamples in scanout to get native 240p output, but super-anti-aliased 3D.",
       {
          { "disabled",       NULL },
          { "enabled",       NULL },
@@ -112,7 +112,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(mdec_yuv),
       "MDEC YUV Chroma filter",
-      "Awaiting explanation.",
+      "Improves video quality of FMV scenes. When converting YcBcR to RGB, the chroma channel will be smoothed. Exclusive to Vulkan.",
       {
          { "disabled",       NULL },
          { "enabled",       NULL },
