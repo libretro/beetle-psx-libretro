@@ -59,7 +59,8 @@ SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
                $(DEPS_DIR)/zlib/uncompr.c \
                $(DEPS_DIR)/zlib/zutil.c \
                $(DEPS_DIR)/ugui/ugui.c \
-               $(CORE_DIR)/ugui_tools.c
+               $(CORE_DIR)/ugui_tools.c \
+               $(wildcard $(DEPS_DIR)/ugui/*.c)
 
 ifeq ($(HAVE_GRIFFIN),1)
    SOURCES_CXX += beetle_psx_griffin.cpp \
