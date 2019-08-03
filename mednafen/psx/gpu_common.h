@@ -26,6 +26,9 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
    /* Efficient 15bpp pixel math algorithms from blargg */
    switch(BlendMode)
    {
+      default:  // to silence clang
+        break;
+
       /* 0.5 x B + 0.5 x F */
       case BLEND_MODE_AVERAGE:
          bg_pix   |= 0x8000;
