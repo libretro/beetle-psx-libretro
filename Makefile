@@ -97,9 +97,9 @@ ifneq (,$(findstring unix,$(platform)))
       endif
    endif
 
-ifneq ($(findstring Linux,$(shell uname -s)),)
-   HAVE_CDROM = 1
-endif
+   ifneq ($(findstring Linux,$(shell uname -s)),)
+      HAVE_CDROM = 1
+   endif
 
 # OS X
 else ifeq ($(platform), osx)
@@ -124,9 +124,9 @@ else ifeq ($(platform), osx)
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
    ifeq ($(platform),$(filter $(platform),ios-arm64))
-   iarch := arm64
+      iarch := arm64
    else
-   iarch := armv7
+      iarch := armv7
    endif
    TARGET  := $(TARGET_NAME)_libretro_ios.dylib
    fpic    := -fPIC
@@ -395,7 +395,7 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
       LIBS += WindowsApp.lib
    endif
 
-   CFLAGS += $(MSVC2017CompileFlags)
+   CFLAGS   += $(MSVC2017CompileFlags)
    CXXFLAGS += $(MSVC2017CompileFlags)
 
    TargetArchMoniker = $(subst $(WinPartition)_,,$(PlatformSuffix))
@@ -440,10 +440,10 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
    VcCompilerToolsDir := $(VsInstallRoot)/VC/Tools/MSVC/$(VcCompilerToolsVer)
 
    WindowsSDKSharedIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\shared")
-   WindowsSDKUCRTIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\ucrt")
-   WindowsSDKUMIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\um")
-   WindowsSDKUCRTLibDir := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\ucrt\$(TargetArchMoniker)")
-   WindowsSDKUMLibDir := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\um\$(TargetArchMoniker)")
+   WindowsSDKUCRTIncludeDir   := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\ucrt")
+   WindowsSDKUMIncludeDir     := $(shell cygpath -w "$(WindowsSdkDir)\Include\$(WindowsSDKVersion)\um")
+   WindowsSDKUCRTLibDir       := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\ucrt\$(TargetArchMoniker)")
+   WindowsSDKUMLibDir         := $(shell cygpath -w "$(WindowsSdkDir)\Lib\$(WindowsSDKVersion)\um\$(TargetArchMoniker)")
 
    # For some reason the HostX86 compiler doesn't like compiling for x64
    # ("no such file" opening a shared library), and vice-versa.
@@ -480,7 +480,6 @@ else
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
    FLAGS   += -DHAVE__MKDIR
    HAVE_CDROM = 1
-
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -lopengl32
    endif
@@ -518,6 +517,7 @@ all: $(TARGET)
 
 -include $(DEPS)
 
+# Debug flags
 ifeq ($(DEBUG), 1)
    ifneq (,$(findstring msvc,$(platform)))
       ifeq ($(STATIC_LINKING),1)
@@ -610,12 +610,12 @@ LINKOUT = -o
 ifneq (,$(findstring msvc,$(platform)))
    OBJOUT = -Fo
    LINKOUT = -out:
-ifeq ($(STATIC_LINKING),1)
-   LD ?= lib.exe
-   STATIC_LINKING=0
-else
-   LD = link.exe
-endif
+   ifeq ($(STATIC_LINKING),1)
+      LD ?= lib.exe
+      STATIC_LINKING=0
+   else
+      LD = link.exe
+   endif
 else
    LD = $(CXX)
 endif

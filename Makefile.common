@@ -6,7 +6,6 @@ LIBRETRO_DIR := $(CORE_DIR)/libretro-common
 LIBKIRK_DIR  := $(DEPS_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
-RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 
 ifeq ($(HAVE_OPENGL), 1)
@@ -41,7 +40,7 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(DEPS_DIR)/ugui
 
 ifneq (,$(findstring msvc,$(platform)))
-INCFLAGS += -I$(CORE_DIR)/msvc
+   INCFLAGS += -I$(CORE_DIR)/msvc
 endif
 
 SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
@@ -58,8 +57,6 @@ SOURCES_C +=   $(DEPS_DIR)/zlib/adler32.c \
                $(DEPS_DIR)/zlib/trees.c \
                $(DEPS_DIR)/zlib/uncompr.c \
                $(DEPS_DIR)/zlib/zutil.c \
-               $(DEPS_DIR)/ugui/ugui.c \
-               $(CORE_DIR)/ugui_tools.c \
                $(wildcard $(DEPS_DIR)/ugui/*.c)
 
 ifeq ($(HAVE_GRIFFIN),1)
@@ -267,7 +264,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                       $(LIBRETRO_DIR)/vfs/vfs_implementation_cdrom.c
 
          ifeq ($(CDROM_DEBUG), 1)
-            CFLAGS += -DCDROM_DEBUG
+            CFLAGS   += -DCDROM_DEBUG
             CXXFLAGS += -DCDROM_DEBUG
          endif
       endif
