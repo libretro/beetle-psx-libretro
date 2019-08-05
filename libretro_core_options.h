@@ -50,27 +50,6 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "enabled"
    },
-#else
-   {
-      BEETLE_OPT(renderer),
-      "Renderer (restart)",
-      "Choose which video renderer will be used. Software is the most accurate renderer. However, it is also the most demanding renderer at higher resolutions than native",
-      {
-         { "software",      "Software" },
-         { NULL, NULL },
-      },
-      "software"
-   },
-   {
-      BEETLE_OPT(renderer_software_fb),
-      "Software framebuffer",
-      "If off, the software renderer will skip some steps. Potential speedup. Causes bad graphics when doing framebuffer readbacks.",
-      {
-         { "enabled",   NULL },
-         { NULL, NULL },
-      },
-      "enabled"
-   },
 #endif
 #ifdef HAVE_VULKAN
    {
