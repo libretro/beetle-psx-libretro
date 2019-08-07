@@ -1509,6 +1509,10 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       else
          has_software_fb = false;
    }
+   else
+      /* If 'BEETLE_OPT(renderer_software_fb)' option is not found, then
+       * we are running in software mode */
+      has_software_fb = true;
 
    get_variables(&upscaling, &display_vram);
 
@@ -2967,6 +2971,10 @@ static void rsx_vulkan_refresh_variables(void)
       else
          has_software_fb = false;
    }
+   else
+      /* If 'BEETLE_OPT(renderer_software_fb)' option is not found, then
+       * we are running in software mode */
+      has_software_fb = true;
 
    unsigned old_scaling = scaling;
    unsigned old_msaa = msaa;
@@ -3411,8 +3419,14 @@ bool rsx_intf_open(bool is_pal, bool force_software)
    var.key                   = BEETLE_OPT(renderer);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
       if (!strcmp(var.value, "software") || force_software)
          software_selected = true;
+   }
+   else
+      /* If 'BEETLE_OPT(renderer)' option is not found, then
+       * we are running in software mode */
+      software_selected = true;
 
 #if defined(HAVE_VULKAN)
    if (!software_selected && rsx_vulkan_open(is_pal))
