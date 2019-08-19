@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,9 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <algorithm>
 #include <stdlib.h>
+#include "aligned_alloc.hpp"
 
 //#define OBJECT_POOL_DEBUG
 
@@ -42,7 +44,8 @@ public:
 		if (vacants.empty())
 		{
 			unsigned num_objects = 64u << memory.size();
-			T *ptr = static_cast<T *>(malloc(num_objects * sizeof(T)));
+			T *ptr = static_cast<T *>(memalign_alloc(std::max(size_t(64), alignof(T)),
+			                                         num_objects * sizeof(T)));
 			if (!ptr)
 				return nullptr;
 
@@ -87,7 +90,7 @@ protected:
 	{
 		void operator()(T *ptr)
 		{
-			::free(ptr);
+			memalign_free(ptr);
 		}
 	};
 

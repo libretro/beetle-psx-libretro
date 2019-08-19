@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +25,9 @@
 #include "hash.hpp"
 #include "object_pool.hpp"
 #include "temporary_hashmap.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "sampler.hpp"
+#include "limits.hpp"
 #include <utility>
 #include <vector>
 #include "cookie.hpp"
@@ -47,6 +48,7 @@ struct DescriptorSetLayout
 	uint32_t fp_mask = 0;
 	uint32_t immutable_sampler_mask = 0;
 	uint64_t immutable_samplers = 0;
+	uint8_t array_size[VULKAN_NUM_BINDINGS] = {};
 };
 
 // Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
@@ -92,8 +94,8 @@ public:
 private:
 	struct DescriptorSetNode : Util::TemporaryHashmapEnabled<DescriptorSetNode>, Util::IntrusiveListEnabled<DescriptorSetNode>
 	{
-		DescriptorSetNode(VkDescriptorSet set)
-		    : set(set)
+		explicit DescriptorSetNode(VkDescriptorSet set_)
+		    : set(set_)
 		{
 		}
 
@@ -101,6 +103,7 @@ private:
 	};
 
 	Device *device;
+	const VolkDeviceTable &table;
 	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
 
 	struct PerThread

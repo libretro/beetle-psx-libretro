@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@
 #pragma once
 
 #include "vulkan_common.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "object_pool.hpp"
 
 namespace Vulkan
@@ -50,12 +50,14 @@ public:
 
 private:
 	friend class Util::ObjectPool<FenceHolder>;
-	FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
+	FenceHolder(Device *device_, VkFence fence_)
+		: device(device_), fence(fence_)
 	{
 	}
 
 	Device *device;
 	VkFence fence;
+	bool observed_wait = false;
 };
 
 using Fence = Util::IntrusivePtr<FenceHolder>;

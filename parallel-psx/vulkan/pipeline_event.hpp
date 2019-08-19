@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "vulkan_common.hpp"
 #include "cookie.hpp"
 #include "object_pool.hpp"
@@ -55,16 +55,16 @@ public:
 		return stages;
 	}
 
-	void set_stages(VkPipelineStageFlags stages)
+	void set_stages(VkPipelineStageFlags stages_)
 	{
-		this->stages = stages;
+		stages = stages_;
 	}
 
 private:
 	friend class Util::ObjectPool<EventHolder>;
-	EventHolder(Device *device, VkEvent event)
-			: device(device)
-			, event(event)
+	EventHolder(Device *device_, VkEvent event_)
+		: device(device_)
+		, event(event_)
 	{
 	}
 

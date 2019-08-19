@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "vulkan_common.hpp"
 #include "object_pool.hpp"
 
@@ -41,9 +41,9 @@ class QueryPoolResult : public Util::IntrusivePtrEnabled<QueryPoolResult, QueryP
 public:
 	friend struct QueryPoolResultDeleter;
 
-	void signal_timestamp(double timestamp)
+	void signal_timestamp(double timestamp_)
 	{
-		this->timestamp = timestamp;
+		timestamp = timestamp_;
 		has_timestamp = true;
 	}
 
@@ -59,7 +59,8 @@ public:
 
 private:
 	friend class Util::ObjectPool<QueryPoolResult>;
-	QueryPoolResult(Device *device) : device(device)
+	explicit QueryPoolResult(Device *device_)
+		: device(device_)
 	{}
 
 	Device *device;
@@ -71,7 +72,7 @@ using QueryPoolHandle = Util::IntrusivePtr<QueryPoolResult>;
 class QueryPool
 {
 public:
-	QueryPool(Device *device);
+	explicit QueryPool(Device *device);
 	~QueryPool();
 
 	void begin();
@@ -79,6 +80,7 @@ public:
 
 private:
 	Device *device;
+	const VolkDeviceTable &table;
 
 	struct Pool
 	{
@@ -93,7 +95,6 @@ private:
 	double query_period = 0.0;
 
 	void add_pool();
-	void flush_callbacks();
 	bool supports_timestamp = false;
 };
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@
 #pragma once
 
 #include "vulkan_common.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "cookie.hpp"
 #include "object_pool.hpp"
 
@@ -102,10 +102,10 @@ public:
 
 private:
 	friend class Util::ObjectPool<SemaphoreHolder>;
-	SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
-	    : device(device)
-	    , semaphore(semaphore)
-	    , signalled(signalled)
+	SemaphoreHolder(Device *device_, VkSemaphore semaphore_, bool signalled_)
+	    : device(device_)
+	    , semaphore(semaphore_)
+	    , signalled(signalled_)
 	{
 	}
 

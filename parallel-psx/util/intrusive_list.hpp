@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,8 +44,8 @@ public:
 	{
 	public:
 		friend class IntrusiveList<T>;
-		Iterator(IntrusiveListEnabled<T> *node)
-		    : node(node)
+		Iterator(IntrusiveListEnabled<T> *node_)
+		    : node(node_)
 		{
 		}
 

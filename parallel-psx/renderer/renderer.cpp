@@ -613,11 +613,11 @@ void Renderer::mipmap_framebuffer()
 		cmd->begin_render_pass(rp);
 
 		if (i == levels)
-			cmd->set_program(*pipelines.mipmap_energy_blur);
+			cmd->set_program(pipelines.mipmap_energy_blur);
 		else if (i == 1)
-			cmd->set_program(*pipelines.mipmap_energy_first);
+			cmd->set_program(pipelines.mipmap_energy_first);
 		else
-			cmd->set_program(*pipelines.mipmap_energy);
+			cmd->set_program(pipelines.mipmap_energy);
 
 		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler::LinearClamp);
 
@@ -824,7 +824,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
 
-	cmd->set_program(*pipelines.scaled_quad_blitter);
+	cmd->set_program(pipelines.scaled_quad_blitter);
 	cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
 
 	cmd->set_vertex_binding(0, *quad, 0, 2);
@@ -997,35 +997,35 @@ ImageHandle Renderer::scanout_to_texture()
 	if (bpp24)
 	{
 		if (render_state.scanout_mdec_filter == ScanoutFilter::MDEC_YUV)
-			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
+			cmd->set_program(pipelines.bpp24_yuv_quad_blitter);
 		else
-			cmd->set_program(*pipelines.bpp24_quad_blitter);
+			cmd->set_program(pipelines.bpp24_quad_blitter);
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else if (ssaa)
 	{
 		if (dither)
-			cmd->set_program(*pipelines.unscaled_dither_quad_blitter);
+			cmd->set_program(pipelines.unscaled_dither_quad_blitter);
 		else
-			cmd->set_program(*pipelines.unscaled_quad_blitter);
+			cmd->set_program(pipelines.unscaled_quad_blitter);
 
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
 		if (dither)
-			cmd->set_program(*pipelines.scaled_dither_quad_blitter);
+			cmd->set_program(pipelines.scaled_dither_quad_blitter);
 		else
-			cmd->set_program(*pipelines.scaled_quad_blitter);
+			cmd->set_program(pipelines.scaled_quad_blitter);
 
 		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
 	}
 	else
 	{
 		if (dither)
-			cmd->set_program(*pipelines.mipmap_dither_resolve);
+			cmd->set_program(pipelines.mipmap_dither_resolve);
 		else
-			cmd->set_program(*pipelines.mipmap_resolve);
+			cmd->set_program(pipelines.mipmap_resolve);
 
 		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearClamp);
 		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearClamp);
@@ -1104,7 +1104,7 @@ void Renderer::scanout()
 	ensure_command_buffer();
 	cmd->begin_render_pass(device.get_swapchain_render_pass(SwapchainRenderPass::ColorOnly));
 	cmd->set_quad_state();
-	cmd->set_program(*pipelines.scaled_quad_blitter);
+	cmd->set_program(pipelines.scaled_quad_blitter);
 	cmd->set_texture(0, 0, image->get_view(), StockSampler::LinearClamp);
 
 	cmd->set_vertex_binding(0, *quad, 0, 2);
@@ -1201,7 +1201,7 @@ void Renderer::flush_resolves()
 	if (!queue.scaled_resolves.empty())
 	{
 		ensure_command_buffer();
-		cmd->set_program(*pipelines.resolve_to_scaled);
+		cmd->set_program(pipelines.resolve_to_scaled);
 
 		cmd->set_storage_texture(0, 0, *scaled_views[0]);
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -1224,7 +1224,7 @@ void Renderer::flush_resolves()
 	if (!queue.unscaled_resolves.empty())
 	{
 		ensure_command_buffer();
-		cmd->set_program(*pipelines.resolve_to_unscaled);
+		cmd->set_program(pipelines.resolve_to_unscaled);
 		cmd->set_storage_texture(0, 0, framebuffer->get_view());
 		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
 
@@ -1782,7 +1782,7 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cmd->set_program(*pipelines.opaque_flat);
+	cmd->set_program(pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
 }
@@ -1828,7 +1828,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			// For opaque primitives which are just masked, we can make use of fixed function blending.
 			cmd->set_blend_enable(true);
-			cmd->set_program(state.textured ? *pipelines.opaque_textured : *pipelines.opaque_flat);
+			cmd->set_program(state.textured ? pipelines.opaque_textured : pipelines.opaque_flat);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 			                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
@@ -1838,7 +1838,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add : *pipelines.flat_masked_add);
+				cmd->set_program(state.textured ? pipelines.semi_transparent_masked_add : pipelines.flat_masked_add);
 				cmd->pixel_barrier();
 				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
@@ -1853,7 +1853,7 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_program(state.textured ? pipelines.semi_transparent : pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -1865,8 +1865,8 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_average :
-				                                  *pipelines.flat_masked_average);
+				cmd->set_program(state.textured ? pipelines.semi_transparent_masked_average :
+				                                  pipelines.flat_masked_average);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -1882,7 +1882,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_program(state.textured ? pipelines.semi_transparent : pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1895,7 +1895,7 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_sub : *pipelines.flat_masked_sub);
+				cmd->set_program(state.textured ? pipelines.semi_transparent_masked_sub : pipelines.flat_masked_sub);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -1910,7 +1910,7 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_program(state.textured ? pipelines.semi_transparent : pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -1922,8 +1922,8 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add_quarter :
-				                                  *pipelines.flat_masked_add_quarter);
+				cmd->set_program(state.textured ? pipelines.semi_transparent_masked_add_quarter :
+				                                  pipelines.flat_masked_add_quarter);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -1939,7 +1939,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_program(state.textured ? pipelines.semi_transparent : pipelines.opaque_flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -1992,7 +1992,7 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_program(*pipelines.opaque_semi_transparent);
+	cmd->set_program(pipelines.opaque_semi_transparent);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
@@ -2015,7 +2015,7 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_program(*pipelines.opaque_textured);
+	cmd->set_program(pipelines.opaque_textured);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
@@ -2031,7 +2031,7 @@ void Renderer::render_opaque_texture_primitives()
 void Renderer::flush_blits()
 {
 	ensure_command_buffer();
-	const auto blit = [&](const std::vector<BlitInfo> &infos, Program &program, bool scaled) {
+	const auto blit = [&](const std::vector<BlitInfo> &infos, Program *program, bool scaled) {
 		if (infos.empty())
 			return;
 
@@ -2064,10 +2064,10 @@ void Renderer::flush_blits()
 		}
 	};
 
-	blit(queue.scaled_blits, *pipelines.blit_vram_scaled, true);
-	blit(queue.scaled_masked_blits, *pipelines.blit_vram_scaled_masked, true);
-	blit(queue.unscaled_blits, *pipelines.blit_vram_unscaled, false);
-	blit(queue.unscaled_masked_blits, *pipelines.blit_vram_unscaled_masked, false);
+	blit(queue.scaled_blits, pipelines.blit_vram_scaled, true);
+	blit(queue.scaled_masked_blits, pipelines.blit_vram_scaled_masked, true);
+	blit(queue.unscaled_blits, pipelines.blit_vram_unscaled, false);
+	blit(queue.unscaled_masked_blits, pipelines.blit_vram_unscaled_masked, false);
 	queue.scaled_blits.clear();
 	queue.scaled_masked_blits.clear();
 	queue.unscaled_blits.clear();
@@ -2110,10 +2110,10 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		};
 		cmd->push_constants(&push, 0, sizeof(push));
 		cmd->set_program(domain == Domain::Scaled ?
-		                     (render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
-		                                               *pipelines.blit_vram_cached_scaled) :
-		                     (render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
-		                                               *pipelines.blit_vram_cached_unscaled));
+		                     (render_state.mask_test ? pipelines.blit_vram_cached_scaled_masked :
+		                                               pipelines.blit_vram_cached_scaled) :
+		                     (render_state.mask_test ? pipelines.blit_vram_cached_unscaled_masked :
+		                                               pipelines.blit_vram_cached_unscaled));
 
 		cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
 		cmd->dispatch(factor, factor, 1);
@@ -2122,8 +2122,8 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		{
 			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
 			cmd->set_program(render_state.mask_test ?
-					*pipelines.blit_vram_msaa_cached_scaled_masked :
-					*pipelines.blit_vram_msaa_cached_scaled);
+					pipelines.blit_vram_msaa_cached_scaled_masked :
+					pipelines.blit_vram_msaa_cached_scaled);
 			cmd->dispatch(factor, factor, msaa);
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
@@ -2197,7 +2197,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	};
 
 	ensure_command_buffer();
-	cmd->set_program(render_state.mask_test ? *pipelines.copy_to_vram_masked : *pipelines.copy_to_vram);
+	cmd->set_program(render_state.mask_test ? pipelines.copy_to_vram_masked : pipelines.copy_to_vram);
 	cmd->set_storage_texture(0, 0, framebuffer->get_view());
 
 	// Vulkan minimum limit, for large buffer views, split up the work.

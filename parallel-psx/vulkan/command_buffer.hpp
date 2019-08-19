@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,15 +23,15 @@
 #pragma once
 
 #include "buffer.hpp"
+#include "buffer_pool.hpp"
+#include "vulkan_headers.hpp"
 #include "image.hpp"
-#include "vulkan_common.hpp"
+#include "pipeline_event.hpp"
+#include "query_pool.hpp"
 #include "render_pass.hpp"
 #include "sampler.hpp"
 #include "shader.hpp"
-#include "vulkan.hpp"
-#include "pipeline_event.hpp"
-#include "query_pool.hpp"
-#include "buffer_pool.hpp"
+#include "vulkan_common.hpp"
 #include <string.h>
 
 namespace Vulkan
@@ -101,8 +101,6 @@ union PipelineState {
 		unsigned topology : 4;
 
 		unsigned wireframe : 1;
-		unsigned spec_constant_mask : 8;
-
 		uint32_t write_mask;
 	} state;
 	uint32_t words[4];
@@ -112,6 +110,7 @@ struct PotentialState
 {
 	float blend_constants[4];
 	uint32_t spec_constants[VULKAN_NUM_SPEC_CONSTANTS];
+	uint8_t spec_constant_mask;
 };
 
 struct DynamicState
@@ -234,9 +233,9 @@ public:
 		return uses_swapchain;
 	}
 
-	void set_thread_index(unsigned index)
+	void set_thread_index(unsigned index_)
 	{
-		thread_index = index;
+		thread_index = index_;
 	}
 
 	unsigned get_thread_index() const
@@ -334,7 +333,7 @@ public:
 	static Util::IntrusivePtr<CommandBuffer> request_secondary_command_buffer(Device &device,
 	                                                                          const RenderPassInfo &rp, unsigned thread_index, unsigned subpass);
 
-	void set_program(Program &program);
+	void set_program(Program *program);
 
 #ifdef GRANITE_VULKAN_FILESYSTEM
 	// Convenience functions for one-off shader binds.
@@ -549,7 +548,7 @@ public:
 	inline void set_specialization_constant_mask(uint32_t spec_constant_mask)
 	{
 		VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
-		SET_STATIC_STATE(spec_constant_mask);
+		SET_POTENTIALLY_STATIC_STATE(spec_constant_mask);
 	}
 
 	template <typename T>
@@ -560,7 +559,7 @@ public:
 		if (memcmp(&potential_static_state.spec_constants[index], &value, sizeof(value)))
 		{
 			memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
-			if (static_state.state.spec_constant_mask & (1u << index))
+			if (potential_static_state.spec_constant_mask & (1u << index))
 				set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 		}
 	}
@@ -608,6 +607,8 @@ public:
 	}
 
 	QueryPoolHandle write_timestamp(VkPipelineStageFlagBits stage);
+	void add_checkpoint(const char *tag);
+	void set_backtrace_checkpoint();
 
 	void end();
 
@@ -616,6 +617,7 @@ private:
 	CommandBuffer(Device *device, VkCommandBuffer cmd, VkPipelineCache cache, Type type);
 
 	Device *device;
+	const VolkDeviceTable &table;
 	VkCommandBuffer cmd;
 	VkPipelineCache cache;
 	Type type;
@@ -623,9 +625,10 @@ private:
 	const Framebuffer *framebuffer = nullptr;
 	const RenderPass *actual_render_pass = nullptr;
 	const RenderPass *compatible_render_pass = nullptr;
+	const Vulkan::ImageView *framebuffer_attachments[VULKAN_NUM_ATTACHMENTS + 1] = {};
 
 	VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS] = {};
-	IndexState index = {};
+	IndexState index_state = {};
 	VertexBindingState vbo = {};
 	ResourceBindings bindings;
 
@@ -668,7 +671,10 @@ private:
 	              "Hashable pipeline state is not large enough!");
 #endif
 
-	void flush_render_state();
+	bool flush_render_state();
+	bool flush_compute_state();
+	void clear_render_state();
+
 	VkPipeline build_graphics_pipeline(Util::Hash hash);
 	VkPipeline build_compute_pipeline(Util::Hash hash);
 	void flush_graphics_pipeline();
@@ -678,8 +684,6 @@ private:
 	void flush_descriptor_set(uint32_t set);
 	void begin_compute();
 	void begin_context();
-
-	void flush_compute_state();
 
 	BufferBlock vbo_block;
 	BufferBlock ibo_block;

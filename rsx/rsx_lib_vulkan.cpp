@@ -138,14 +138,13 @@ static bool libretro_create_device(
       context = nullptr;
    }
 
-   try
+   context = new Vulkan::Context();
+   if (!context->init_device_from_instance(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+                                           required_device_layers, num_required_device_layers,
+                                           required_features))
    {
-      context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
-                                    required_device_layers, num_required_device_layers,
-                                    required_features);
-   }
-   catch (const std::exception &)
-   {
+      delete context;
+      context = nullptr;
       return false;
    }
 

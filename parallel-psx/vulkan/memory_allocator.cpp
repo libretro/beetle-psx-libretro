@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,6 +21,7 @@
  */
 
 #include "memory_allocator.hpp"
+#include "device.hpp"
 #include <algorithm>
 
 using namespace std;
@@ -57,11 +58,11 @@ void DeviceAllocation::free_immediate(DeviceAllocator &allocator)
 	}
 }
 
-void DeviceAllocation::free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type)
+void DeviceAllocation::free_global(DeviceAllocator &allocator, uint32_t size_, uint32_t memory_type_)
 {
 	if (base)
 	{
-		allocator.free(size, memory_type, base, host_base);
+		allocator.free(size_, memory_type_, base, host_base);
 		base = VK_NULL_HANDLE;
 		mask = 0;
 		offset = 0;
@@ -99,7 +100,7 @@ void Block::free(uint32_t mask)
 	update_longest_run();
 }
 
-void ClassAllocator::suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, MiniHeap &heap,
+void ClassAllocator::suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t memory_type_, MiniHeap &heap,
                                  DeviceAllocation *alloc)
 {
 	heap.heap.allocate(num_blocks, alloc);
@@ -111,7 +112,7 @@ void ClassAllocator::suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t 
 
 	alloc->offset += heap.allocation.offset;
 	alloc->tiling = tiling;
-	alloc->memory_type = memory_type;
+	alloc->memory_type = memory_type_;
 	alloc->alloc = this;
 	alloc->size = num_blocks << sub_block_size_log2;
 }
@@ -350,19 +351,19 @@ Allocator::Allocator()
 	    .set_sub_block_size(64 * Block::NumSubBlocks * Block::NumSubBlocks * Block::NumSubBlocks); // 2M
 }
 
-void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
+void DeviceAllocator::init(Device *device_)
 {
-	device = vkdevice;
-	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
-
-	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(gpu, &props);
+	device = device_;
+	table = &device->get_device_table();
+	mem_props = device->get_memory_properties();
+	const auto &props = device->get_gpu_properties();
 	atom_alignment = props.limits.nonCoherentAtomSize;
 
 	heaps.clear();
 	allocators.clear();
 
 	heaps.resize(mem_props.memoryHeapCount);
+	allocators.reserve(mem_props.memoryTypeCount);
 	for (unsigned i = 0; i < mem_props.memoryTypeCount; i++)
 	{
 		allocators.emplace_back(new Allocator);
@@ -389,7 +390,7 @@ bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, u
 	VkMemoryDedicatedRequirementsKHR dedicated_req = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS_KHR };
 	VkMemoryRequirements2KHR mem_req = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR };
 	mem_req.pNext = &dedicated_req;
-	vkGetImageMemoryRequirements2KHR(device, &info, &mem_req);
+	table->vkGetImageMemoryRequirements2KHR(device->get_device(), &info, &mem_req);
 
 	if (dedicated_req.prefersDedicatedAllocation || dedicated_req.requiresDedicatedAllocation)
 		return allocators[memory_type]->allocate_dedicated(size, alloc, image);
@@ -402,13 +403,14 @@ bool DeviceAllocator::allocate_global(uint32_t size, uint32_t memory_type, Devic
 	return allocators[memory_type]->allocate_global(size, alloc);
 }
 
-void DeviceAllocator::Heap::garbage_collect(VkDevice device)
+void DeviceAllocator::Heap::garbage_collect(Device *device_)
 {
+	auto &table_ = device_->get_device_table();
 	for (auto &block : blocks)
 	{
 		if (block.host_memory)
-			vkUnmapMemory(device, block.memory);
-		vkFreeMemory(device, block.memory, nullptr);
+			table_.vkUnmapMemory(device_->get_device(), block.memory);
+		table_.vkFreeMemory(device_->get_device(), block.memory, nullptr);
 		size -= block.size;
 	}
 }
@@ -431,8 +433,8 @@ void DeviceAllocator::free_no_recycle(uint32_t size, uint32_t memory_type, VkDev
 	ALLOCATOR_LOCK();
 	auto &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 	if (host_memory)
-		vkUnmapMemory(device, memory);
-	vkFreeMemory(device, memory, nullptr);
+		table->vkUnmapMemory(device->get_device(), memory);
+	table->vkFreeMemory(device->get_device(), memory, nullptr);
 	heap.size -= size;
 }
 
@@ -459,7 +461,7 @@ void *DeviceAllocator::map_memory(const DeviceAllocation &alloc, MemoryAccessFla
 		const VkMappedMemoryRange range = {
 			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr, alloc.base, offset, size,
 		};
-		vkInvalidateMappedMemoryRanges(device, 1, &range);
+		table->vkInvalidateMappedMemoryRanges(device->get_device(), 1, &range);
 	}
 
 	return alloc.host_base;
@@ -481,7 +483,7 @@ void DeviceAllocator::unmap_memory(const DeviceAllocation &alloc, MemoryAccessFl
 		const VkMappedMemoryRange range = {
 			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr, alloc.base, offset, size,
 		};
-		vkFlushMappedMemoryRanges(device, 1, &range);
+		table->vkFlushMappedMemoryRanges(device->get_device(), 1, &range);
 	}
 }
 
@@ -492,8 +494,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	auto &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
-	auto itr = find_if(begin(heap.blocks), end(heap.blocks),
-	                   [=](const Allocation &alloc) { return size == alloc.size && memory_type == alloc.type; });
+	auto itr = end(heap.blocks);
+	if (dedicated_image == VK_NULL_HANDLE)
+	{
+		itr = find_if(begin(heap.blocks), end(heap.blocks),
+		              [=](const Allocation &alloc) { return size == alloc.size && memory_type == alloc.type; });
+	}
 
 	bool host_visible = (mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
@@ -515,7 +521,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	VkDeviceMemory device_memory;
-	VkResult res = vkAllocateMemory(device, &info, nullptr, &device_memory);
+	VkResult res = table->vkAllocateMemory(device->get_device(), &info, nullptr, &device_memory);
 
 	if (res == VK_SUCCESS)
 	{
@@ -524,7 +530,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (host_visible)
 		{
-			if (vkMapMemory(device, device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) != VK_SUCCESS)
+			if (table->vkMapMemory(device->get_device(), device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) != VK_SUCCESS)
 				return false;
 		}
 
@@ -533,18 +539,18 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	else
 	{
 		// Look through our heap and see if there are blocks of other types we can free.
-		auto itr = begin(heap.blocks);
+		auto block_itr = begin(heap.blocks);
 		while (res != VK_SUCCESS && itr != end(heap.blocks))
 		{
-			if (itr->host_memory)
-				vkUnmapMemory(device, itr->memory);
-			vkFreeMemory(device, itr->memory, nullptr);
-			heap.size -= itr->size;
-			res = vkAllocateMemory(device, &info, nullptr, &device_memory);
-			++itr;
+			if (block_itr->host_memory)
+				table->vkUnmapMemory(device->get_device(), block_itr->memory);
+			table->vkFreeMemory(device->get_device(), block_itr->memory, nullptr);
+			heap.size -= block_itr->size;
+			res = table->vkAllocateMemory(device->get_device(), &info, nullptr, &device_memory);
+			++block_itr;
 		}
 
-		heap.blocks.erase(begin(heap.blocks), itr);
+		heap.blocks.erase(begin(heap.blocks), block_itr);
 
 		if (res == VK_SUCCESS)
 		{
@@ -553,10 +559,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			if (host_visible)
 			{
-				if (vkMapMemory(device, device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) !=
+				if (table->vkMapMemory(device->get_device(), device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) !=
 				    VK_SUCCESS)
 				{
-					vkFreeMemory(device, device_memory, nullptr);
+					table->vkFreeMemory(device->get_device(), device_memory, nullptr);
 					return false;
 				}
 			}

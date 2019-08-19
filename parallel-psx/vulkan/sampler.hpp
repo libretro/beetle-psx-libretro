@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,7 @@
 
 #include "cookie.hpp"
 #include "vulkan_common.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "object_pool.hpp"
 
 namespace Vulkan

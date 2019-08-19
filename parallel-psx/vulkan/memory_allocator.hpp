@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,12 +26,13 @@
 #include "intrusive.hpp"
 #include "object_pool.hpp"
 #include "intrusive_list.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include <assert.h>
 #include <memory>
 #include <stddef.h>
 #include <stdint.h>
 #include <vector>
+#include "util.hpp"
 
 #ifdef GRANITE_VULKAN_MT
 #include <mutex>
@@ -39,6 +40,8 @@
 
 namespace Vulkan
 {
+class Device;
+
 static inline uint32_t log2_integer(uint32_t v)
 {
 	v--;
@@ -136,6 +139,7 @@ struct MiniHeap;
 class ClassAllocator;
 class DeviceAllocator;
 class Allocator;
+class Device;
 
 struct DeviceAllocation
 {
@@ -143,6 +147,7 @@ struct DeviceAllocation
 	friend class Allocator;
 	friend class Block;
 	friend class DeviceAllocator;
+	friend class Device;
 
 public:
 	inline VkDeviceMemory get_memory() const
@@ -284,11 +289,11 @@ public:
 		alloc->free_immediate();
 	}
 
-	void set_memory_type(uint32_t memory_type)
+	void set_memory_type(uint32_t memory_type_)
 	{
+		memory_type = memory_type_;
 		for (auto &sub : classes)
 			sub.set_memory_type(memory_type);
-		this->memory_type = memory_type;
 	}
 
 	void set_global_allocator(DeviceAllocator *allocator)
@@ -307,7 +312,7 @@ private:
 class DeviceAllocator
 {
 public:
-	void init(VkPhysicalDevice gpu, VkDevice device);
+	void init(Device *device);
 	void set_supports_dedicated_allocation(bool enable)
 	{
 		use_dedicated = enable;
@@ -332,7 +337,8 @@ public:
 
 private:
 	std::vector<std::unique_ptr<Allocator>> allocators;
-	VkDevice device = VK_NULL_HANDLE;
+	Device *device = nullptr;
+	const VolkDeviceTable *table = nullptr;
 	VkPhysicalDeviceMemoryProperties mem_props;
 	VkDeviceSize atom_alignment = 1;
 #ifdef GRANITE_VULKAN_MT
@@ -352,7 +358,7 @@ private:
 	{
 		uint64_t size = 0;
 		std::vector<Allocation> blocks;
-		void garbage_collect(VkDevice device);
+		void garbage_collect(Device *device);
 	};
 
 	std::vector<Heap> heaps;

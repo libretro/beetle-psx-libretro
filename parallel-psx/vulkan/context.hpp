@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,56 +22,11 @@
 
 #pragma once
 
-#include <volk.h>
-
-#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-// Workaround silly Xlib headers that define macros for these globally :(
-#undef None
-#undef Bool
-#endif
-
+#include "vulkan_headers.hpp"
 #include "util.hpp"
 #include <memory>
-#include <stdexcept>
 #include <functional>
 #include "util.hpp"
-
-#define V_S(x) #x
-#define V_S_(x) V_S(x)
-#define S__LINE__ V_S_(__LINE__)
-
-#define V(x)                                                                                           \
-	do                                                                                                 \
-	{                                                                                                  \
-		VkResult err = x;                                                                              \
-		if (err != VK_SUCCESS && err != VK_INCOMPLETE)                                                 \
-			throw std::runtime_error("Vulkan call failed at " __FILE__ ":" S__LINE__ ".\n"); \
-	} while (0)
-
-
-#ifdef VULKAN_DEBUG
-#define VK_ASSERT(x)                                             \
-	do                                                           \
-	{                                                            \
-		if (!bool(x))                                            \
-		{                                                        \
-			LOGE("Vulkan error at %s:%d.\n", __FILE__, __LINE__); \
-			std::abort();                                        \
-		}                                                        \
-	} while (0)
-#else
-#define VK_ASSERT(x) ((void)0)
-#endif
-
-namespace Vulkan
-{
-struct NoCopyNoMove
-{
-	NoCopyNoMove() = default;
-	NoCopyNoMove(const NoCopyNoMove &) = delete;
-	void operator=(const NoCopyNoMove &) = delete;
-};
-}
 
 namespace Vulkan
 {
@@ -85,13 +40,20 @@ struct DeviceFeatures
 	bool supports_debug_utils = false;
 	bool supports_mirror_clamp_to_edge = false;
 	bool supports_google_display_timing = false;
+	bool supports_nv_device_diagnostic_checkpoints = false;
 	bool supports_vulkan_11_instance = false;
 	bool supports_vulkan_11_device = false;
+	bool supports_external_memory_host = false;
+	bool supports_surface_capabilities2 = false;
+	bool supports_full_screen_exclusive = false;
 	VkPhysicalDeviceSubgroupProperties subgroup_properties = {};
 	VkPhysicalDevice8BitStorageFeaturesKHR storage_8bit_features = {};
 	VkPhysicalDevice16BitStorageFeaturesKHR storage_16bit_features = {};
 	VkPhysicalDeviceFloat16Int8FeaturesKHR float16_int8_features = {};
 	VkPhysicalDeviceFeatures enabled_features = {};
+	VkPhysicalDeviceExternalMemoryHostPropertiesEXT host_memory_properties = {};
+	VkPhysicalDeviceMultiviewFeaturesKHR multiview_features = {};
+	VkPhysicalDeviceImagelessFramebufferFeaturesKHR imageless_features = {};
 };
 
 enum VendorID
@@ -99,18 +61,20 @@ enum VendorID
 	VENDOR_ID_AMD = 0x1002,
 	VENDOR_ID_NVIDIA = 0x10de,
 	VENDOR_ID_INTEL = 0x8086,
-	VENDOR_ID_ARM = 0x13b5
+	VENDOR_ID_ARM = 0x13b5,
+	VENDOR_ID_QCOM = 0x5143
 };
 
 class Context
 {
 public:
-	Context(const char **instance_ext, uint32_t instance_ext_count, const char **device_ext, uint32_t device_ext_count);
-	Context(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VkQueue queue, uint32_t queue_family);
-	Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-	        unsigned num_required_device_extensions, const char **required_device_layers,
-	        unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
+	bool init_instance_and_device(const char **instance_ext, uint32_t instance_ext_count, const char **device_ext, uint32_t device_ext_count);
+	bool init_from_instance_and_device(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VkQueue queue, uint32_t queue_family);
+	bool init_device_from_instance(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+	                               unsigned num_required_device_extensions, const char **required_device_layers,
+	                               unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
 
+	Context() = default;
 	Context(const Context &) = delete;
 	void operator=(const Context &) = delete;
 	static bool init_loader(PFN_vkGetInstanceProcAddr addr);
@@ -192,10 +156,26 @@ public:
 	void notify_validation_error(const char *msg);
 	void set_notification_callback(std::function<void (const char *)> func);
 
+	void set_num_thread_indices(unsigned indices)
+	{
+		num_thread_indices = indices;
+	}
+
+	unsigned get_num_thread_indices() const
+	{
+		return num_thread_indices;
+	}
+
+	const VolkDeviceTable &get_device_table() const
+	{
+		return device_table;
+	}
+
 private:
 	VkDevice device = VK_NULL_HANDLE;
 	VkInstance instance = VK_NULL_HANDLE;
 	VkPhysicalDevice gpu = VK_NULL_HANDLE;
+	VolkDeviceTable device_table;
 
 	VkPhysicalDeviceProperties gpu_props;
 	VkPhysicalDeviceMemoryProperties mem_props;
@@ -206,6 +186,7 @@ private:
 	uint32_t graphics_queue_family = VK_QUEUE_FAMILY_IGNORED;
 	uint32_t compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
 	uint32_t transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
+	unsigned num_thread_indices = 1;
 
 	bool create_instance(const char **instance_ext, uint32_t instance_ext_count);
 	bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,

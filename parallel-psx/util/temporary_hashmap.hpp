@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,14 +34,14 @@ template <typename T>
 class TemporaryHashmapEnabled
 {
 public:
-	void set_hash(Hash hash)
+	void set_hash(Hash hash_)
 	{
-		this->hash = hash;
+		hash = hash_;
 	}
 
-	void set_index(unsigned index)
+	void set_index(unsigned index_)
 	{
-		this->index = index;
+		index = index_;
 	}
 
 	Hash get_hash()

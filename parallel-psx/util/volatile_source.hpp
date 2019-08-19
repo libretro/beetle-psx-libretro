@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,8 +35,8 @@ template <typename T>
 class VolatileSource : public IntrusivePtrEnabled<VolatileSource<T>>
 {
 public:
-	VolatileSource(const std::string &path)
-		: path(Granite::Path::enforce_protocol(path))
+	explicit VolatileSource(const std::string &path_)
+		: path(Granite::Path::enforce_protocol(path_))
 	{
 	}
 
@@ -57,16 +57,16 @@ protected:
 		notify_handle = -1;
 	}
 
-	void init()
+	bool init()
 	{
 		if (path.empty())
-			return;
+			return false;
 
 		auto file = Granite::Global::filesystem()->open(path);
 		if (!file)
 		{
 			LOGE("Failed to open volatile file: %s\n", path.c_str());
-			throw std::runtime_error("file open error");
+			return false;
 		}
 
 		auto *self = static_cast<T *>(this);
@@ -85,11 +85,11 @@ protected:
 
 				try
 				{
-					auto file = Granite::Global::filesystem()->open(info.path);
+					auto f = Granite::Global::filesystem()->open(info.path);
 					if (!file)
 						return;
-					auto *self = static_cast<T *>(this);
-					self->update(std::move(file));
+					auto *s = static_cast<T *>(this);
+					s->update(std::move(f));
 				}
 				catch (const std::exception &e)
 				{
@@ -97,6 +97,8 @@ protected:
 				}
 			});
 		}
+
+		return true;
 	}
 
 private:

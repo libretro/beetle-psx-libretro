@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,9 +20,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "vulkan.hpp"
-#include <stdexcept>
+#include "context.hpp"
 #include <vector>
+#include <mutex>
 #include <algorithm>
 #include <string.h>
 
@@ -39,27 +39,40 @@ using namespace std;
 
 namespace Vulkan
 {
-Context::Context(const char **instance_ext, uint32_t instance_ext_count, const char **device_ext,
-                 uint32_t device_ext_count)
-    : owned_instance(true)
-    , owned_device(true)
+bool Context::init_instance_and_device(const char **instance_ext, uint32_t instance_ext_count, const char **device_ext,
+                                       uint32_t device_ext_count)
 {
+	destroy();
+
+	owned_instance = true;
+	owned_device = true;
 	if (!create_instance(instance_ext, instance_ext_count))
 	{
 		destroy();
-		throw runtime_error("Failed to create Vulkan instance.");
+		LOGE("Failed to create Vulkan instance.\n");
+		return false;
 	}
 
 	VkPhysicalDeviceFeatures features = {};
 	if (!create_device(VK_NULL_HANDLE, VK_NULL_HANDLE, device_ext, device_ext_count, nullptr, 0, &features))
 	{
 		destroy();
-		throw runtime_error("Failed to create Vulkan device.");
+		LOGE("Failed to create Vulkan device.\n");
+		return false;
 	}
+
+	return true;
 }
+
+static mutex loader_init_lock;
+static bool loader_init_once;
 
 bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
 {
+	lock_guard<mutex> holder(loader_init_lock);
+	if (loader_init_once)
+		return true;
+
 	if (!addr)
 	{
 #ifndef _WIN32
@@ -69,10 +82,15 @@ bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
 			const char *vulkan_path = getenv("GRANITE_VULKAN_LIBRARY");
 			if (vulkan_path)
 				module = dlopen(vulkan_path, RTLD_LOCAL | RTLD_LAZY);
+#ifdef __APPLE__
+			if (!module)
+				module = dlopen("libvulkan.1.dylib", RTLD_LOCAL | RTLD_LAZY);
+#else
 			if (!module)
 				module = dlopen("libvulkan.so.1", RTLD_LOCAL | RTLD_LAZY);
 			if (!module)
 				module = dlopen("libvulkan.so", RTLD_LOCAL | RTLD_LAZY);
+#endif
 			if (!module)
 				return false;
 		}
@@ -96,59 +114,72 @@ bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
 	}
 
 	volkInitializeCustom(addr);
+	loader_init_once = true;
 	return true;
 }
 
-Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VkQueue queue, uint32_t queue_family)
-    : device(device)
-    , instance(instance)
-    , gpu(gpu)
-    , graphics_queue(queue)
-    , compute_queue(queue)
-    , transfer_queue(queue)
-    , graphics_queue_family(queue_family)
-    , compute_queue_family(queue_family)
-    , transfer_queue_family(queue_family)
-    , owned_instance(false)
-    , owned_device(false)
+bool Context::init_from_instance_and_device(VkInstance instance_, VkPhysicalDevice gpu_, VkDevice device_, VkQueue queue_, uint32_t queue_family_)
 {
+	destroy();
+
+	device = device_;
+	instance = instance_;
+	gpu = gpu_;
+	graphics_queue = queue_;
+	compute_queue = queue_;
+	transfer_queue = queue_;
+	graphics_queue_family = queue_family_;
+	compute_queue_family = queue_family_;
+	transfer_queue_family = queue_family_;
+	owned_instance = false;
+	owned_device = true;
+
 	volkLoadInstance(instance);
-	volkLoadDevice(device);
+	volkLoadDeviceTable(&device_table, device);
 	vkGetPhysicalDeviceProperties(gpu, &gpu_props);
 	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
+	return true;
 }
 
-Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
-                 const char **required_device_extensions, unsigned num_required_device_extensions,
-                 const char **required_device_layers, unsigned num_required_device_layers,
-                 const VkPhysicalDeviceFeatures *required_features)
-    : instance(instance)
-    , owned_instance(false)
-    , owned_device(true)
+bool Context::init_device_from_instance(VkInstance instance_, VkPhysicalDevice gpu_, VkSurfaceKHR surface,
+                                        const char **required_device_extensions, unsigned num_required_device_extensions,
+                                        const char **required_device_layers, unsigned num_required_device_layers,
+                                        const VkPhysicalDeviceFeatures *required_features)
 {
+	destroy();
+
+	instance = instance_;
+	owned_instance = false;
+	owned_device = true;
 	volkLoadInstance(instance);
-	if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
+
+	if (!create_device(gpu_, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
 	                   num_required_device_layers, required_features))
 	{
 		destroy();
-		throw runtime_error("Failed to create Vulkan device.");
+		LOGE("Failed to create Vulkan device.\n");
+		return false;
 	}
+
+	return true;
 }
 
 void Context::destroy()
 {
 	if (device != VK_NULL_HANDLE)
-		vkDeviceWaitIdle(device);
+		device_table.vkDeviceWaitIdle(device);
 
 #ifdef VULKAN_DEBUG
 	if (debug_callback)
 		vkDestroyDebugReportCallbackEXT(instance, debug_callback, nullptr);
 	if (debug_messenger)
 		vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
+	debug_callback = VK_NULL_HANDLE;
+	debug_messenger = VK_NULL_HANDLE;
 #endif
 
 	if (owned_device && device != VK_NULL_HANDLE)
-		vkDestroyDevice(device, nullptr);
+		device_table.vkDestroyDevice(device, nullptr);
 	if (owned_instance && instance != VK_NULL_HANDLE)
 		vkDestroyInstance(instance, nullptr);
 }
@@ -204,9 +235,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_messenger_cb(
 
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
 		if (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
-			LOGE("[Vulkan]: Validation Warning: %s\n", pCallbackData->pMessage);
+			LOGW("[Vulkan]: Validation Warning: %s\n", pCallbackData->pMessage);
 		else
-			LOGE("[Vulkan]: Other Warning: %s\n", pCallbackData->pMessage);
+			LOGW("[Vulkan]: Other Warning: %s\n", pCallbackData->pMessage);
 		break;
 
 #if 0
@@ -268,15 +299,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_cb(VkDebugReportFlagsEXT flag
 	}
 	else if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT)
 	{
-		LOGE("[Vulkan]: Warning: %s: %s\n", pLayerPrefix, pMessage);
+		LOGW("[Vulkan]: Warning: %s: %s\n", pLayerPrefix, pMessage);
 	}
 	else if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)
 	{
-		//LOGE("[Vulkan]: Performance warning: %s: %s\n", pLayerPrefix, pMessage);
+		//LOGW("[Vulkan]: Performance warning: %s: %s\n", pLayerPrefix, pMessage);
 	}
 	else
 	{
-		LOGE("[Vulkan]: Information: %s: %s\n", pLayerPrefix, pMessage);
+		LOGI("[Vulkan]: Information: %s: %s\n", pLayerPrefix, pMessage);
 	}
 
 	return VK_FALSE;
@@ -340,12 +371,23 @@ bool Context::create_instance(const char **instance_ext, uint32_t instance_ext_c
 		ext.supports_debug_utils = true;
 	}
 
+	auto itr = find_if(instance_ext, instance_ext + instance_ext_count, [](const char *name) {
+		return strcmp(name, VK_KHR_SURFACE_EXTENSION_NAME) == 0;
+	});
+	bool has_surface_extension = itr != (instance_ext + instance_ext_count);
+
+	if (has_surface_extension && has_extension(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME))
+	{
+		instance_exts.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+		ext.supports_surface_capabilities2 = true;
+	}
+
 #ifdef VULKAN_DEBUG
 	const auto has_layer = [&](const char *name) -> bool {
-		auto itr = find_if(begin(queried_layers), end(queried_layers), [name](const VkLayerProperties &e) -> bool {
+		auto layer_itr = find_if(begin(queried_layers), end(queried_layers), [name](const VkLayerProperties &e) -> bool {
 			return strcmp(e.layerName, name) == 0;
 		});
-		return itr != end(queried_layers);
+		return layer_itr != end(queried_layers);
 	};
 
 	if (!ext.supports_debug_utils && has_extension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
@@ -371,52 +413,55 @@ bool Context::create_instance(const char **instance_ext, uint32_t instance_ext_c
 #ifdef VULKAN_DEBUG
 	if (ext.supports_debug_utils)
 	{
-		VkDebugUtilsMessengerCreateInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-		info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-		                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-		                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-		                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-		info.pfnUserCallback = vulkan_messenger_cb;
-		info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-		                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-		                   VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
-		info.pUserData = this;
+		VkDebugUtilsMessengerCreateInfoEXT debug_info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
+		debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+		                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+		                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+		                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+		debug_info.pfnUserCallback = vulkan_messenger_cb;
+		debug_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+		                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+		                         VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
+		debug_info.pUserData = this;
 
-		vkCreateDebugUtilsMessengerEXT(instance, &info, nullptr, &debug_messenger);
+		vkCreateDebugUtilsMessengerEXT(instance, &debug_info, nullptr, &debug_messenger);
 	}
 	else if (has_extension(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
 	{
-		VkDebugReportCallbackCreateInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
-		info.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT |
-		             VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-		info.pfnCallback = vulkan_debug_cb;
-		info.pUserData = this;
-		vkCreateDebugReportCallbackEXT(instance, &info, nullptr, &debug_callback);
+		VkDebugReportCallbackCreateInfoEXT debug_info = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
+		debug_info.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT |
+		                   VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+		debug_info.pfnCallback = vulkan_debug_cb;
+		debug_info.pUserData = this;
+		vkCreateDebugReportCallbackEXT(instance, &debug_info, nullptr, &debug_callback);
 	}
 #endif
 
 	return true;
 }
 
-bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface, const char **required_device_extensions,
                             unsigned num_required_device_extensions, const char **required_device_layers,
                             unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
 {
+	gpu = gpu_;
 	if (gpu == VK_NULL_HANDLE)
 	{
 		uint32_t gpu_count = 0;
-		V(vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr));
+		if (vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr) != VK_SUCCESS)
+			return false;
 
 		if (gpu_count == 0)
 			return false;
 
 		vector<VkPhysicalDevice> gpus(gpu_count);
-		V(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()));
+		if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()) != VK_SUCCESS)
+			return false;
 
-		for (auto &gpu : gpus)
+		for (auto &g : gpus)
 		{
 			VkPhysicalDeviceProperties props;
-			vkGetPhysicalDeviceProperties(gpu, &props);
+			vkGetPhysicalDeviceProperties(g, &props);
 			LOGI("Found Vulkan GPU: %s\n", props.deviceName);
 			LOGI("    API: %u.%u.%u\n",
 			     VK_VERSION_MAJOR(props.apiVersion),
@@ -474,7 +519,6 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		if (!has_layer(required_device_layers[i]))
 			return false;
 
-	this->gpu = gpu;
 	vkGetPhysicalDeviceProperties(gpu, &gpu_props);
 	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
 
@@ -490,20 +534,6 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		ext.supports_vulkan_11_device = false;
 		LOGI("GPU supports Vulkan 1.0.\n");
 	}
-
-	// Only need GetPhysicalDeviceProperties2 for Vulkan 1.1-only code, so don't bother getting KHR variant.
-	ext.subgroup_properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES };
-	VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-	void **ppNext = &props.pNext;
-
-	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
-	{
-		*ppNext = &ext.subgroup_properties;
-		ppNext = &ext.subgroup_properties.pNext;
-	}
-
-	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
-		vkGetPhysicalDeviceProperties2(gpu, &props);
 
 	uint32_t queue_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
@@ -661,6 +691,22 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	}
 
 #ifdef _WIN32
+	if (ext.supports_surface_capabilities2 && has_extension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
+	{
+		ext.supports_full_screen_exclusive = true;
+		enabled_extensions.push_back(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
+	}
+#endif
+
+#ifdef VULKAN_DEBUG
+	if (has_extension(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME))
+	{
+		ext.supports_nv_device_diagnostic_checkpoints = true;
+		enabled_extensions.push_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+	}
+#endif
+
+#ifdef _WIN32
 	ext.supports_external = false;
 #else
 	if (ext.supports_external && ext.supports_dedicated &&
@@ -683,7 +729,9 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	ext.storage_8bit_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES_KHR };
 	ext.storage_16bit_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR };
 	ext.float16_int8_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
-	ppNext = &features.pNext;
+	ext.multiview_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR };
+	ext.imageless_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES_KHR };
+	void **ppNext = &features.pNext;
 
 	if (has_extension(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
 		enabled_extensions.push_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
@@ -707,6 +755,20 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		enabled_extensions.push_back(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
 		*ppNext = &ext.float16_int8_features;
 		ppNext = &ext.float16_int8_features.pNext;
+	}
+
+	if (ext.supports_physical_device_properties2 && has_extension(VK_KHR_MULTIVIEW_EXTENSION_NAME))
+	{
+		enabled_extensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+		*ppNext = &ext.multiview_features;
+		ppNext = &ext.multiview_features.pNext;
+	}
+
+	if (ext.supports_physical_device_properties2 && has_extension(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME))
+	{
+		enabled_extensions.push_back(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
+		*ppNext = &ext.imageless_features;
+		ppNext = &ext.imageless_features.pNext;
 	}
 
 	if (ext.supports_physical_device_properties2)
@@ -741,6 +803,19 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 			enabled_features.shaderStorageImageMultisample = VK_TRUE;
 		if (features.features.largePoints)
 			enabled_features.largePoints = VK_TRUE;
+		if (features.features.shaderInt16)
+			enabled_features.shaderInt16 = VK_TRUE;
+		if (features.features.shaderInt64)
+			enabled_features.shaderInt64 = VK_TRUE;
+
+		if (features.features.shaderSampledImageArrayDynamicIndexing)
+			enabled_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+		if (features.features.shaderUniformBufferArrayDynamicIndexing)
+			enabled_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
+		if (features.features.shaderStorageBufferArrayDynamicIndexing)
+			enabled_features.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
+		if (features.features.shaderStorageImageArrayDynamicIndexing)
+			enabled_features.shaderStorageImageArrayDynamicIndexing = VK_TRUE;
 
 		features.features = enabled_features;
 		ext.enabled_features = enabled_features;
@@ -762,6 +837,33 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	}
 #endif
 
+	if (ext.supports_external && has_extension(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME))
+	{
+		ext.supports_external_memory_host = true;
+		enabled_extensions.push_back(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+	}
+
+	// Only need GetPhysicalDeviceProperties2 for Vulkan 1.1-only code, so don't bother getting KHR variant.
+	ext.subgroup_properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES };
+	ext.host_memory_properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT };
+	VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	ppNext = &props.pNext;
+
+	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
+	{
+		*ppNext = &ext.subgroup_properties;
+		ppNext = &ext.subgroup_properties.pNext;
+	}
+
+	if (ext.supports_external_memory_host)
+	{
+		*ppNext = &ext.host_memory_properties;
+		ppNext = &ext.host_memory_properties.pNext;
+	}
+
+	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
+		vkGetPhysicalDeviceProperties2(gpu, &props);
+
 	device_info.enabledExtensionCount = enabled_extensions.size();
 	device_info.ppEnabledExtensionNames = enabled_extensions.empty() ? nullptr : enabled_extensions.data();
 	device_info.enabledLayerCount = enabled_layers.size();
@@ -770,10 +872,10 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	if (vkCreateDevice(gpu, &device_info, nullptr, &device) != VK_SUCCESS)
 		return false;
 
-	volkLoadDevice(device);
-	vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
-	vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
-	vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
+	volkLoadDeviceTable(&device_table, device);
+	device_table.vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
+	device_table.vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
+	device_table.vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
 
 	return true;
 }

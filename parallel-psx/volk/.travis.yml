@@ -1,0 +1,11 @@
+language: cpp
+os:
+  - linux
+  - osx
+  - windows
+
+script:
+  - git clone https://github.com/KhronosGroup/Vulkan-Headers
+  - export VULKAN_SDK=./Vulkan-Headers
+  - cmake .
+  - cmake --build .

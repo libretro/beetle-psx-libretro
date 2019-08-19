@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "volk.h"
+#include "vulkan_headers.hpp"
 #include <vector>
 #include <stddef.h>
 #include <assert.h>
@@ -106,6 +106,22 @@ public:
 		slice += y * mip_info.block_row_length;
 		slice += x;
 		return slice;
+	}
+
+	inline void *data_opaque(uint32_t x, uint32_t y, uint32_t slice_index, uint32_t mip = 0) const
+	{
+		auto &mip_info = mips[mip];
+		uint8_t *slice = buffer + mip_info.offset;
+		size_t off = slice_index * mip_info.block_row_length * mip_info.block_image_height;
+		off += y * mip_info.block_row_length;
+		off += x;
+		return slice + off * block_stride;
+	}
+
+	template <typename T>
+	inline T *data_generic() const
+	{
+		return data_generic<T>(0, 0, 0, 0);
 	}
 
 	template <typename T>

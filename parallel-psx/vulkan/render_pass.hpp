@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@
 #include "limits.hpp"
 #include "object_pool.hpp"
 #include "temporary_hashmap.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 
 namespace Vulkan
 {
@@ -54,7 +54,8 @@ struct RenderPassInfo
 	uint32_t clear_attachments = 0;
 	uint32_t load_attachments = 0;
 	uint32_t store_attachments = 0;
-	uint32_t layer = 0;
+	uint32_t base_layer = 0;
+	uint32_t num_layers = 1;
 
 	// Render area will be clipped to the actual framebuffer.
 	VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
@@ -104,7 +105,7 @@ public:
 
 	unsigned get_num_subpasses() const
 	{
-		return unsigned(subpasses.size());
+		return unsigned(subpasses_info.size());
 	}
 
 	VkRenderPass get_render_pass() const
@@ -114,47 +115,47 @@ public:
 
 	uint32_t get_sample_count(unsigned subpass) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].samples;
+		VK_ASSERT(subpass < subpasses_info.size());
+		return subpasses_info[subpass].samples;
 	}
 
 	unsigned get_num_color_attachments(unsigned subpass) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].num_color_attachments;
+		VK_ASSERT(subpass < subpasses_info.size());
+		return subpasses_info[subpass].num_color_attachments;
 	}
 
 	unsigned get_num_input_attachments(unsigned subpass) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].num_input_attachments;
+		VK_ASSERT(subpass < subpasses_info.size());
+		return subpasses_info[subpass].num_input_attachments;
 	}
 
 	const VkAttachmentReference &get_color_attachment(unsigned subpass, unsigned index) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		VK_ASSERT(index < subpasses[subpass].num_color_attachments);
-		return subpasses[subpass].color_attachments[index];
+		VK_ASSERT(subpass < subpasses_info.size());
+		VK_ASSERT(index < subpasses_info[subpass].num_color_attachments);
+		return subpasses_info[subpass].color_attachments[index];
 	}
 
 	const VkAttachmentReference &get_input_attachment(unsigned subpass, unsigned index) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		VK_ASSERT(index < subpasses[subpass].num_input_attachments);
-		return subpasses[subpass].input_attachments[index];
+		VK_ASSERT(subpass < subpasses_info.size());
+		VK_ASSERT(index < subpasses_info[subpass].num_input_attachments);
+		return subpasses_info[subpass].input_attachments[index];
 	}
 
 	bool has_depth(unsigned subpass) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
+		VK_ASSERT(subpass < subpasses_info.size());
+		return subpasses_info[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
 		       format_has_depth_aspect(depth_stencil);
 	}
 
 	bool has_stencil(unsigned subpass) const
 	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
+		VK_ASSERT(subpass < subpasses_info.size());
+		return subpasses_info[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
 		       format_has_stencil_aspect(depth_stencil);
 	}
 
@@ -164,11 +165,11 @@ private:
 
 	VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS] = {};
 	VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
-	std::vector<SubpassInfo> subpasses;
+	std::vector<SubpassInfo> subpasses_info;
 
 	void setup_subpasses(const VkRenderPassCreateInfo &create_info);
 
-	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
+	void fixup_render_pass_workaround(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 	void fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 };
 
@@ -183,11 +184,9 @@ public:
 		return framebuffer;
 	}
 
-	ImageView *get_attachment(unsigned index) const
-	{
-		assert(index < attachments.size());
-		return attachments[index];
-	}
+	static unsigned setup_raw_views(VkImageView *views, const RenderPassInfo &info);
+	static void compute_dimensions(const RenderPassInfo &info, uint32_t &width, uint32_t &height);
+	static void compute_attachment_dimensions(const RenderPassInfo &info, unsigned index, uint32_t &width, uint32_t &height);
 
 	uint32_t get_width() const
 	{
@@ -211,15 +210,13 @@ private:
 	RenderPassInfo info;
 	uint32_t width = 0;
 	uint32_t height = 0;
-
-	std::vector<ImageView *> attachments;
 };
 
 static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
 class FramebufferAllocator
 {
 public:
-	FramebufferAllocator(Device *device);
+	explicit FramebufferAllocator(Device *device);
 	Framebuffer &request_framebuffer(const RenderPassInfo &info);
 
 	void begin_frame();
@@ -230,8 +227,8 @@ private:
 	                         Util::IntrusiveListEnabled<FramebufferNode>,
 	                         Framebuffer
 	{
-		FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-		    : Framebuffer(device, rp, info)
+		FramebufferNode(Device *device_, const RenderPass &rp, const RenderPassInfo &info_)
+		    : Framebuffer(device_, rp, info_)
 		{
 			set_internal_sync_object();
 		}
@@ -247,8 +244,8 @@ private:
 class AttachmentAllocator
 {
 public:
-	AttachmentAllocator(Device *device, bool transient)
-		: device(device), transient(transient)
+	AttachmentAllocator(Device *device_, bool transient_)
+		: device(device_), transient(transient_)
 	{
 	}
 
@@ -261,8 +258,8 @@ public:
 private:
 	struct TransientNode : Util::TemporaryHashmapEnabled<TransientNode>, Util::IntrusiveListEnabled<TransientNode>
 	{
-		TransientNode(ImageHandle handle)
-		    : handle(handle)
+		explicit TransientNode(ImageHandle handle_)
+		    : handle(std::move(handle_))
 		{
 		}
 
@@ -280,8 +277,8 @@ private:
 class TransientAttachmentAllocator : public AttachmentAllocator
 {
 public:
-	TransientAttachmentAllocator(Device *device)
-		: AttachmentAllocator(device, true)
+	explicit TransientAttachmentAllocator(Device *device_)
+		: AttachmentAllocator(device_, true)
 	{
 	}
 };
@@ -289,8 +286,8 @@ public:
 class PhysicalAttachmentAllocator : public AttachmentAllocator
 {
 public:
-	PhysicalAttachmentAllocator(Device *device)
-		: AttachmentAllocator(device, false)
+	explicit PhysicalAttachmentAllocator(Device *device_)
+		: AttachmentAllocator(device_, false)
 	{
 	}
 };

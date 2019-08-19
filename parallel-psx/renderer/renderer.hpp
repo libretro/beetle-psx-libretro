@@ -1,11 +1,13 @@
 #pragma once
 
 #include "../atlas/atlas.hpp"
-#include "../vulkan/device.hpp"
-#include "../vulkan/vulkan.hpp"
 
-#ifdef VULKAN_WSI
-#include "wsi.hpp"
+#ifdef PARALLEL_PSX_EXTERNAL_VULKAN
+#include "device.hpp"
+#include "context.hpp"
+#else
+#include "../vulkan/device.hpp"
+#include "../vulkan/context.hpp"
 #endif
 
 #include <string.h>

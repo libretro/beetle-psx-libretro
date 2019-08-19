@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,7 +22,8 @@
 
 #pragma once
 
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
+#include <vector>
 
 namespace Vulkan
 {
@@ -42,11 +43,12 @@ struct WSITimingOptions
 };
 
 class WSIPlatform;
+class Device;
 
 class WSITiming
 {
 public:
-	void init(WSIPlatform *platform, VkDevice device, VkSwapchainKHR swapchain, const WSITimingOptions &options = {});
+	void init(WSIPlatform *platform, Device *device, VkSwapchainKHR swapchain, const WSITimingOptions &options = {});
 	void begin_frame(double &frame_time, double &elapsed_time);
 
 	bool fill_present_info_timing(VkPresentTimeGOOGLE &time);
@@ -64,6 +66,7 @@ public:
 private:
 	WSIPlatform *platform = nullptr;
 	VkDevice device = VK_NULL_HANDLE;
+	const VolkDeviceTable *table = nullptr;
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 	WSITimingOptions options;
 
@@ -72,7 +75,7 @@ private:
 	struct Serial
 	{
 		uint32_t serial = 0;
-	} serial;
+	} serial_info;
 
 	enum class TimingResult
 	{

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@
 #include "semaphore_manager.hpp"
 #include "event_manager.hpp"
 #include "shader.hpp"
-#include "vulkan.hpp"
+#include "context.hpp"
 #include "query_pool.hpp"
 #include "buffer_pool.hpp"
 #include <memory>
@@ -52,11 +52,11 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include "thread_group.hpp"
 #endif
 
 #ifdef GRANITE_VULKAN_FOSSILIZE
 #include "fossilize.hpp"
+#include "thread_group.hpp"
 #endif
 
 #include "quirks.hpp"
@@ -143,6 +143,7 @@ public:
 	void init_swapchain(const std::vector<VkImage> &swapchain_images, unsigned width, unsigned height, VkFormat format);
 	void init_external_swapchain(const std::vector<ImageHandle> &swapchain_images);
 	void init_frame_contexts(unsigned count);
+	const VolkDeviceTable &get_device_table() const;
 
 	ImageView &get_swapchain_view();
 	ImageView &get_swapchain_view(unsigned index);
@@ -196,6 +197,7 @@ public:
 
 	// Create buffers and images.
 	BufferHandle create_buffer(const BufferCreateInfo &info, const void *initial = nullptr);
+	BufferHandle create_imported_host_buffer(const BufferCreateInfo &info, VkExternalMemoryHandleTypeFlagBits type, void *host_buffer);
 	ImageHandle create_image(const ImageCreateInfo &info, const ImageInitialData *initial = nullptr);
 	ImageHandle create_image_from_staging_buffer(const ImageCreateInfo &info, const InitialImageBuffer *buffer);
 	LinearHostImageHandle create_linear_host_image(const LinearHostImageCreateInfo &info);
@@ -281,9 +283,11 @@ private:
 	VkInstance instance = VK_NULL_HANDLE;
 	VkPhysicalDevice gpu = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
+	const VolkDeviceTable *table = nullptr;
 	VkQueue graphics_queue = VK_NULL_HANDLE;
 	VkQueue compute_queue = VK_NULL_HANDLE;
 	VkQueue transfer_queue = VK_NULL_HANDLE;
+	unsigned num_thread_indices = 1;
 
 #ifdef GRANITE_VULKAN_MT
 	std::atomic<uint64_t> cookie;
@@ -341,14 +345,15 @@ private:
 
 	struct PerFrame
 	{
-		PerFrame(Device *device);
+		explicit PerFrame(Device *device);
 		~PerFrame();
 		void operator=(const PerFrame &) = delete;
 		PerFrame(const PerFrame &) = delete;
 
 		void begin();
 
-		VkDevice device;
+		Device &device;
+		const VolkDeviceTable &table;
 		Managers &managers;
 		std::vector<CommandPool> graphics_cmd_pool;
 		std::vector<CommandPool> compute_cmd_pool;
@@ -477,7 +482,7 @@ private:
 	void recycle_semaphore(VkSemaphore semaphore);
 	void destroy_event(VkEvent event);
 	void free_memory(const DeviceAllocation &alloc);
-	void reset_fence(VkFence fence);
+	void reset_fence(VkFence fence, bool observed_wait);
 	void keep_handle_alive(ImageHandle handle);
 
 	void destroy_buffer_nolock(VkBuffer buffer);
@@ -528,29 +533,24 @@ private:
 
 #ifdef GRANITE_VULKAN_FOSSILIZE
 	Fossilize::StateRecorder state_recorder;
-	std::mutex state_recorder_lock;
-	bool enqueue_create_sampler(Fossilize::Hash hash, unsigned index, const VkSamplerCreateInfo *create_info, VkSampler *sampler) override;
-	bool enqueue_create_descriptor_set_layout(Fossilize::Hash hash, unsigned index, const VkDescriptorSetLayoutCreateInfo *create_info, VkDescriptorSetLayout *layout) override;
-	bool enqueue_create_pipeline_layout(Fossilize::Hash hash, unsigned index, const VkPipelineLayoutCreateInfo *create_info, VkPipelineLayout *layout) override;
-	bool enqueue_create_shader_module(Fossilize::Hash hash, unsigned index, const VkShaderModuleCreateInfo *create_info, VkShaderModule *module) override;
-	bool enqueue_create_render_pass(Fossilize::Hash hash, unsigned index, const VkRenderPassCreateInfo *create_info, VkRenderPass *render_pass) override;
-	bool enqueue_create_compute_pipeline(Fossilize::Hash hash, unsigned index, const VkComputePipelineCreateInfo *create_info, VkPipeline *pipeline) override;
-	bool enqueue_create_graphics_pipeline(Fossilize::Hash hash, unsigned index, const VkGraphicsPipelineCreateInfo *create_info, VkPipeline *pipeline) override;
-	void wait_enqueue() override;
+	bool enqueue_create_sampler(Fossilize::Hash hash, const VkSamplerCreateInfo *create_info, VkSampler *sampler) override;
+	bool enqueue_create_descriptor_set_layout(Fossilize::Hash hash, const VkDescriptorSetLayoutCreateInfo *create_info, VkDescriptorSetLayout *layout) override;
+	bool enqueue_create_pipeline_layout(Fossilize::Hash hash, const VkPipelineLayoutCreateInfo *create_info, VkPipelineLayout *layout) override;
+	bool enqueue_create_shader_module(Fossilize::Hash hash, const VkShaderModuleCreateInfo *create_info, VkShaderModule *module) override;
+	bool enqueue_create_render_pass(Fossilize::Hash hash, const VkRenderPassCreateInfo *create_info, VkRenderPass *render_pass) override;
+	bool enqueue_create_compute_pipeline(Fossilize::Hash hash, const VkComputePipelineCreateInfo *create_info, VkPipeline *pipeline) override;
+	bool enqueue_create_graphics_pipeline(Fossilize::Hash hash, const VkGraphicsPipelineCreateInfo *create_info, VkPipeline *pipeline) override;
+	void notify_replayed_resources_for_type() override;
 	VkPipeline fossilize_create_graphics_pipeline(Fossilize::Hash hash, VkGraphicsPipelineCreateInfo &info);
 	VkPipeline fossilize_create_compute_pipeline(Fossilize::Hash hash, VkComputePipelineCreateInfo &info);
 
-	unsigned register_graphics_pipeline(Fossilize::Hash hash, const VkGraphicsPipelineCreateInfo &info);
-	unsigned register_compute_pipeline(Fossilize::Hash hash, const VkComputePipelineCreateInfo &info);
-	unsigned register_render_pass(Fossilize::Hash hash, const VkRenderPassCreateInfo &info);
-	unsigned register_descriptor_set_layout(Fossilize::Hash hash, const VkDescriptorSetLayoutCreateInfo &info);
-	unsigned register_pipeline_layout(Fossilize::Hash hash, const VkPipelineLayoutCreateInfo &info);
-	unsigned register_shader_module(Fossilize::Hash hash, const VkShaderModuleCreateInfo &info);
-
-	void set_render_pass_handle(unsigned index, VkRenderPass render_pass);
-	void set_descriptor_set_layout_handle(unsigned index, VkDescriptorSetLayout set_layout);
-	void set_pipeline_layout_handle(unsigned index, VkPipelineLayout layout);
-	void set_shader_module_handle(unsigned index, VkShaderModule module);
+	void register_graphics_pipeline(Fossilize::Hash hash, const VkGraphicsPipelineCreateInfo &info);
+	void register_compute_pipeline(Fossilize::Hash hash, const VkComputePipelineCreateInfo &info);
+	void register_render_pass(VkRenderPass render_pass, Fossilize::Hash hash, const VkRenderPassCreateInfo &info);
+	void register_descriptor_set_layout(VkDescriptorSetLayout layout, Fossilize::Hash hash, const VkDescriptorSetLayoutCreateInfo &info);
+	void register_pipeline_layout(VkPipelineLayout layout, Fossilize::Hash hash, const VkPipelineLayoutCreateInfo &info);
+	void register_shader_module(VkShaderModule module, Fossilize::Hash hash, const VkShaderModuleCreateInfo &info);
+	void register_sampler(VkSampler sampler, Fossilize::Hash hash, const VkSamplerCreateInfo &info);
 
 	struct
 	{
@@ -567,5 +567,8 @@ private:
 
 	ImplementationWorkarounds workarounds;
 	void init_workarounds();
+	void report_checkpoints();
+
+	void fill_buffer_sharing_indices(VkBufferCreateInfo &create_info, uint32_t *sharing_indices);
 };
 }

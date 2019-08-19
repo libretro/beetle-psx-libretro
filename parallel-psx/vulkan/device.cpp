@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,22 +29,21 @@
 #include <string.h>
 
 #ifdef GRANITE_VULKAN_MT
-#include "thread_group.hpp"
+#include "thread_id.hpp"
+static unsigned get_thread_index()
+{
+	return Vulkan::get_current_thread_index();
+}
 #define LOCK() std::lock_guard<std::mutex> holder__{lock.lock}
 #define DRAIN_FRAME_LOCK() \
 	std::unique_lock<std::mutex> holder__{lock.lock}; \
 	lock.cond.wait(holder__, [&]() { \
 		return lock.counter == 0; \
 	})
-
-static inline unsigned get_current_thread_index()
-{
-	return Granite::ThreadGroup::get_current_thread_index();
-}
 #else
 #define LOCK() ((void)0)
 #define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
-static inline unsigned get_current_thread_index()
+static unsigned get_thread_index()
 {
 	return 0;
 }
@@ -108,7 +107,7 @@ Semaphore Device::request_imported_semaphore(int fd, VkExternalSemaphoreHandleTy
 	import.flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR;
 	Semaphore ptr(handle_pool.semaphores.allocate(this, semaphore, false));
 
-	if (vkImportSemaphoreFdKHR(device, &import) != VK_SUCCESS)
+	if (table->vkImportSemaphoreFdKHR(device, &import) != VK_SUCCESS)
 		return Semaphore(nullptr);
 
 	ptr->signal_external();
@@ -262,26 +261,35 @@ Shader *Device::request_shader_by_hash(Hash hash)
 	return shaders.find(hash);
 }
 
-Program *Device::request_program(Vulkan::Shader *compute)
+Program *Device::request_program(Vulkan::Shader *compute_shader)
 {
+	if (!compute_shader)
+		return nullptr;
+
 	Util::Hasher hasher;
-	hasher.u64(compute->get_hash());
+	hasher.u64(compute_shader->get_hash());
 
 	auto hash = hasher.get();
 	auto *ret = programs.find(hash);
 	if (!ret)
-		ret = programs.emplace_yield(hash, this, compute);
+		ret = programs.emplace_yield(hash, this, compute_shader);
 	return ret;
 }
 
 Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
 {
-	auto *compute = request_shader(compute_data, compute_size);
-	return request_program(compute);
+	if (!compute_size)
+		return nullptr;
+
+	auto *compute_shader = request_shader(compute_data, compute_size);
+	return request_program(compute_shader);
 }
 
 Program *Device::request_program(Shader *vertex, Shader *fragment)
 {
+	if (!vertex || !fragment)
+		return nullptr;
+
 	Util::Hasher hasher;
 	hasher.u64(vertex->get_hash());
 	hasher.u64(fragment->get_hash());
@@ -297,6 +305,9 @@ Program *Device::request_program(Shader *vertex, Shader *fragment)
 Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
                                  size_t fragment_size)
 {
+	if (!vertex_size || !fragment_size)
+		return nullptr;
+
 	auto *vertex = request_shader(vertex_data, vertex_size);
 	auto *fragment = request_shader(fragment_data, fragment_size);
 	return request_program(vertex, fragment);
@@ -392,6 +403,13 @@ void Device::bake_program(Program &program)
 
 			for_each_bit(active_binds, [&](uint32_t bit) {
 				layout.stages_for_bindings[set][bit] |= stage_mask;
+
+				auto &combined_size = layout.sets[set].array_size[bit];
+				auto &shader_size = shader_layout.sets[set].array_size[bit];
+				if (combined_size && combined_size != shader_size)
+					LOGE("Mismatch between array sizes in different shaders.\n");
+				else
+					combined_size = shader_size;
 			});
 		}
 
@@ -408,10 +426,32 @@ void Device::bake_program(Program &program)
 		layout.combined_spec_constant_mask |= shader_layout.spec_constant_mask;
 	}
 
-	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+	for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 	{
-		if (layout.stages_for_sets[i] != 0)
-			layout.descriptor_set_mask |= 1u << i;
+		if (layout.stages_for_sets[set] != 0)
+		{
+			layout.descriptor_set_mask |= 1u << set;
+
+			for (unsigned binding = 0; binding < VULKAN_NUM_BINDINGS; binding++)
+			{
+				auto &array_size = layout.sets[set].array_size[binding];
+				if (array_size == 0)
+				{
+					array_size = 1;
+				}
+				else
+				{
+					for (unsigned i = 1; i < array_size; i++)
+					{
+						if (layout.stages_for_bindings[set][binding + i] != 0)
+						{
+							LOGE("Detected binding aliasing for (%u, %u). Binding array with %u elements starting at (%u, %u) overlaps.\n",
+							     set, binding + i, array_size, set, binding);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	Hasher h;
@@ -442,9 +482,9 @@ bool Device::init_pipeline_cache(const uint8_t *data, size_t size)
 	}
 
 	if (pipeline_cache != VK_NULL_HANDLE)
-		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
+		table->vkDestroyPipelineCache(device, pipeline_cache, nullptr);
 	pipeline_cache = VK_NULL_HANDLE;
-	return vkCreatePipelineCache(device, &info, nullptr, &pipeline_cache) == VK_SUCCESS;
+	return table->vkCreatePipelineCache(device, &info, nullptr, &pipeline_cache) == VK_SUCCESS;
 }
 
 static inline char to_hex(uint8_t v)
@@ -493,7 +533,7 @@ size_t Device::get_pipeline_cache_size()
 
 	static const auto uuid_size = sizeof(gpu_props.pipelineCacheUUID);
 	size_t size = 0;
-	if (vkGetPipelineCacheData(device, pipeline_cache, &size, nullptr) != VK_SUCCESS)
+	if (table->vkGetPipelineCacheData(device, pipeline_cache, &size, nullptr) != VK_SUCCESS)
 	{
 		LOGE("Failed to get pipeline cache data.\n");
 		return 0;
@@ -515,7 +555,7 @@ bool Device::get_pipeline_cache_data(uint8_t *data, size_t size)
 	memcpy(data, gpu_props.pipelineCacheUUID, uuid_size);
 	data += uuid_size;
 
-	if (vkGetPipelineCacheData(device, pipeline_cache, &size, data) != VK_SUCCESS)
+	if (table->vkGetPipelineCacheData(device, pipeline_cache, &size, data) != VK_SUCCESS)
 	{
 		LOGE("Failed to get pipeline cache data.\n");
 		return false;
@@ -559,27 +599,59 @@ void Device::flush_pipeline_cache()
 
 void Device::init_workarounds()
 {
-#if 0
-	workarounds.wsi_acquire_barrier_is_expensive = true;
+	workarounds = {};
+
+#ifdef __APPLE__
+	// Events are not supported in MoltenVK.
 	workarounds.emulate_event_as_pipeline_barrier = true;
-	workarounds.optimize_all_graphics_barrier = true;
+	LOGW("Emulating events as pipeline barriers on Metal emulation.\n");
 #else
+	if (gpu_props.vendorID == VENDOR_ID_NVIDIA &&
+#ifdef _WIN32
+	    VK_VERSION_MAJOR(gpu_props.driverVersion) < 417)
+#else
+	    VK_VERSION_MAJOR(gpu_props.driverVersion) < 415)
+#endif
+	{
+		workarounds.force_store_in_render_pass = true;
+		LOGW("Detected workaround for render pass STORE_OP_STORE.\n");
+	}
+
+	if (gpu_props.vendorID == VENDOR_ID_QCOM)
+	{
+		// Apparently, we need to use STORE_OP_STORE in all render passes no matter what ...
+		workarounds.force_store_in_render_pass = true;
+		workarounds.broken_color_write_mask = true;
+		LOGW("Detected workaround for render pass STORE_OP_STORE.\n");
+		LOGW("Detected workaround for broken color write masks.\n");
+	}
+
 	// UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL stalls, so need to acquire async.
-	workarounds.wsi_acquire_barrier_is_expensive = gpu_props.vendorID == VENDOR_ID_ARM;
+	if (gpu_props.vendorID == VENDOR_ID_ARM)
+	{
+		LOGW("Workaround applied: Acquiring WSI images early on Mali.\n");
+		LOGW("Workaround applied: Emulating events as pipeline barriers.\n");
+		LOGW("Workaround applied: Optimize ALL_GRAPHICS_BIT barriers.\n");
 
-	// VkEvent is suboptimal in some cases or not supported (MoltenVK later?).
-	workarounds.emulate_event_as_pipeline_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
-
-	// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
-	workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
+		// All performance related workarounds.
+		workarounds.wsi_acquire_barrier_is_expensive = true;
+		workarounds.emulate_event_as_pipeline_barrier = true;
+		workarounds.optimize_all_graphics_barrier = true;
+	}
 #endif
 }
 
 void Device::set_context(const Context &context)
 {
+	table = &context.get_device_table();
+
+#ifdef GRANITE_VULKAN_MT
+	register_thread_index(0);
+#endif
 	instance = context.get_instance();
 	gpu = context.get_gpu();
 	device = context.get_device();
+	num_thread_indices = context.get_num_thread_indices();
 
 	graphics_queue_family_index = context.get_graphics_queue_family();
 	graphics_queue = context.get_graphics_queue();
@@ -610,10 +682,10 @@ void Device::set_context(const Context &context)
 
 	ext = context.get_enabled_device_features();
 
-	managers.memory.init(gpu, device);
+	managers.memory.init(this);
 	managers.memory.set_supports_dedicated_allocation(ext.supports_dedicated);
-	managers.semaphore.init(device);
-	managers.fence.init(device);
+	managers.semaphore.init(this);
+	managers.fence.init(this);
 	managers.event.init(this);
 	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	                  ImplementationQuirks::get().staging_need_device_local);
@@ -905,23 +977,20 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	if (cleared_fence)
 		LOGI("Signalling Fence: %llx\n", reinterpret_cast<unsigned long long>(cleared_fence));
 #endif
-	VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
+	VkResult result = table->vkQueueSubmit(queue, 1, &submit, cleared_fence);
 	if (ImplementationQuirks::get().queue_wait_on_submission)
-		vkQueueWaitIdle(queue);
+		table->vkQueueWaitIdle(queue);
 	if (queue_unlock_callback)
 		queue_unlock_callback();
 
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+	if (result == VK_ERROR_DEVICE_LOST)
+		report_checkpoints();
 
 	if (fence)
-	{
-		frame().wait_fences.push_back(cleared_fence);
 		*fence = cleared_fence;
-		data.need_fence = false;
-	}
-	else
-		data.need_fence = true;
+	data.need_fence = true;
 
 #if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
 	const char *queue_name = nullptr;
@@ -1198,23 +1267,20 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	if (cleared_fence)
 		LOGI("Signalling fence: %llx\n", reinterpret_cast<unsigned long long>(cleared_fence));
 #endif
-	VkResult result = vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
+	VkResult result = table->vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
 	if (ImplementationQuirks::get().queue_wait_on_submission)
-		vkQueueWaitIdle(queue);
+		table->vkQueueWaitIdle(queue);
 	if (queue_unlock_callback)
 		queue_unlock_callback();
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+	if (result == VK_ERROR_DEVICE_LOST)
+		report_checkpoints();
 	submissions.clear();
 
 	if (fence)
-	{
-		frame().wait_fences.push_back(cleared_fence);
 		*fence = cleared_fence;
-		data.need_fence = false;
-	}
-	else
-		data.need_fence = true;
+	data.need_fence = true;
 
 #if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
 	const char *queue_name = nullptr;
@@ -1268,7 +1334,7 @@ void Device::sync_buffer_blocks()
 
 	VkBufferUsageFlags usage = 0;
 
-	auto cmd = request_command_buffer_nolock(get_current_thread_index(), CommandBuffer::Type::AsyncTransfer);
+	auto cmd = request_command_buffer_nolock(get_thread_index(), CommandBuffer::Type::AsyncTransfer);
 
 	cmd->begin_region("buffer-block-sync");
 
@@ -1326,6 +1392,7 @@ void Device::end_frame_nolock()
 	if (transfer.need_fence || !frame().transfer_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::AsyncTransfer, &fence, 0, nullptr);
+		frame().wait_fences.push_back(fence);
 		frame().recycle_fences.push_back(fence);
 		transfer.need_fence = false;
 	}
@@ -1333,6 +1400,7 @@ void Device::end_frame_nolock()
 	if (graphics.need_fence || !frame().graphics_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::Generic, &fence, 0, nullptr);
+		frame().wait_fences.push_back(fence);
 		frame().recycle_fences.push_back(fence);
 		graphics.need_fence = false;
 	}
@@ -1340,6 +1408,7 @@ void Device::end_frame_nolock()
 	if (compute.need_fence || !frame().compute_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::AsyncCompute, &fence, 0, nullptr);
+		frame().wait_fences.push_back(fence);
 		frame().recycle_fences.push_back(fence);
 		compute.need_fence = false;
 	}
@@ -1402,7 +1471,7 @@ vector<CommandBufferHandle> &Device::get_queue_submissions(CommandBuffer::Type t
 
 CommandBufferHandle Device::request_command_buffer(CommandBuffer::Type type)
 {
-	return request_command_buffer_for_thread(get_current_thread_index(), type);
+	return request_command_buffer_for_thread(get_thread_index(), type);
 }
 
 CommandBufferHandle Device::request_command_buffer_for_thread(unsigned thread_index, CommandBuffer::Type type)
@@ -1420,7 +1489,7 @@ CommandBufferHandle Device::request_command_buffer_nolock(unsigned thread_index,
 
 	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	vkBeginCommandBuffer(cmd, &info);
+	table->vkBeginCommandBuffer(cmd, &info);
 	add_frame_counter_nolock();
 	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, pipeline_cache, type));
 	handle->set_thread_index(thread_index);
@@ -1442,7 +1511,7 @@ void Device::submit_secondary(CommandBuffer &primary, CommandBuffer &secondary)
 	}
 
 	VkCommandBuffer secondary_cmd = secondary.get_command_buffer();
-	vkCmdExecuteCommands(primary.get_command_buffer(), 1, &secondary_cmd);
+	table->vkCmdExecuteCommands(primary.get_command_buffer(), 1, &secondary_cmd);
 }
 
 CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned thread_index,
@@ -1456,13 +1525,13 @@ CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned
 	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 
-	inherit.framebuffer = framebuffer->get_framebuffer();
+	inherit.framebuffer = VK_NULL_HANDLE;
 	inherit.renderPass = framebuffer->get_compatible_render_pass().get_render_pass();
 	inherit.subpass = subpass;
 	info.pInheritanceInfo = &inherit;
 	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
 
-	vkBeginCommandBuffer(cmd, &info);
+	table->vkBeginCommandBuffer(cmd, &info);
 	add_frame_counter_nolock();
 	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, pipeline_cache, type));
 	handle->set_thread_index(thread_index);
@@ -1503,9 +1572,6 @@ bool Device::swapchain_touched() const
 
 Device::~Device()
 {
-#ifdef GRANITE_VULKAN_MT
-	Granite::Global::thread_group()->wait_idle();
-#endif
 	wait_idle();
 
 	wsi.acquire.reset();
@@ -1515,7 +1581,7 @@ Device::~Device()
 	if (pipeline_cache != VK_NULL_HANDLE)
 	{
 		flush_pipeline_cache();
-		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
+		table->vkDestroyPipelineCache(device, pipeline_cache, nullptr);
 	}
 
 #ifdef GRANITE_VULKAN_FILESYSTEM
@@ -1597,10 +1663,10 @@ void Device::init_swapchain(const vector<VkImage> &swapchain_images, unsigned wi
 		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
 		VkImageView image_view;
-		if (vkCreateImageView(device, &view_info, nullptr, &image_view) != VK_SUCCESS)
+		if (table->vkCreateImageView(device, &view_info, nullptr, &image_view) != VK_SUCCESS)
 			LOGE("Failed to create view for backbuffer.");
 
-		auto backbuffer = ImageHandle(handle_pool.images.allocate(this, image, image_view, DeviceAllocation{}, info));
+		auto backbuffer = ImageHandle(handle_pool.images.allocate(this, image, image_view, DeviceAllocation{}, info, VK_IMAGE_VIEW_TYPE_2D));
 		backbuffer->set_internal_sync_object();
 		backbuffer->get_view().set_internal_sync_object();
 		wsi.swapchain.push_back(backbuffer);
@@ -1609,22 +1675,21 @@ void Device::init_swapchain(const vector<VkImage> &swapchain_images, unsigned wi
 	}
 }
 
-Device::PerFrame::PerFrame(Device *device)
-    : device(device->get_device())
-    , managers(device->managers)
-    , query_pool(device)
+Device::PerFrame::PerFrame(Device *device_)
+    : device(*device_)
+    , table(device_->get_device_table())
+    , managers(device_->managers)
+    , query_pool(device_)
 {
-#ifdef GRANITE_VULKAN_MT
-	unsigned count = Granite::Global::thread_group()->get_num_threads() + 1;
-#else
-	unsigned count = 1;
-#endif
-
+	unsigned count = device_->num_thread_indices;
+	graphics_cmd_pool.reserve(count);
+	compute_cmd_pool.reserve(count);
+	transfer_cmd_pool.reserve(count);
 	for (unsigned i = 0; i < count; i++)
 	{
-		graphics_cmd_pool.emplace_back(device->get_device(), device->graphics_queue_family_index);
-		compute_cmd_pool.emplace_back(device->get_device(), device->compute_queue_family_index);
-		transfer_cmd_pool.emplace_back(device->get_device(), device->transfer_queue_family_index);
+		graphics_cmd_pool.emplace_back(device_, device_->graphics_queue_family_index);
+		compute_cmd_pool.emplace_back(device_, device_->compute_queue_family_index);
+		transfer_cmd_pool.emplace_back(device_, device_->transfer_queue_family_index);
 	}
 }
 
@@ -1655,10 +1720,15 @@ void Device::destroy_pipeline(VkPipeline pipeline)
 	destroy_pipeline_nolock(pipeline);
 }
 
-void Device::reset_fence(VkFence fence)
+void Device::reset_fence(VkFence fence, bool observed_wait)
 {
+	if (observed_wait)
+		table->vkResetFences(device, 1, &fence);
 	LOCK();
-	frame().recycle_fences.push_back(fence);
+	if (observed_wait)
+		managers.fence.recycle_fence(fence);
+	else
+		frame().recycle_fences.push_back(fence);
 }
 
 void Device::destroy_buffer(VkBuffer buffer)
@@ -1788,11 +1858,11 @@ void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
 void Device::clear_wait_semaphores()
 {
 	for (auto &sem : graphics.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
+		table->vkDestroySemaphore(device, sem->consume(), nullptr);
 	for (auto &sem : compute.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
+		table->vkDestroySemaphore(device, sem->consume(), nullptr);
 	for (auto &sem : transfer.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
+		table->vkDestroySemaphore(device, sem->consume(), nullptr);
 
 	graphics.wait_semaphores.clear();
 	graphics.wait_stages.clear();
@@ -1817,7 +1887,11 @@ void Device::wait_idle_nolock()
 	{
 		if (queue_lock_callback)
 			queue_lock_callback();
-		vkDeviceWaitIdle(device);
+		auto result = table->vkDeviceWaitIdle(device);
+		if (result != VK_SUCCESS)
+			LOGE("vkDeviceWaitIdle failed with code: %d\n", result);
+		if (result == VK_ERROR_DEVICE_LOST)
+			report_checkpoints();
 		if (queue_unlock_callback)
 			queue_unlock_callback();
 	}
@@ -1904,13 +1978,14 @@ void Device::decrement_frame_counter_nolock()
 
 void Device::PerFrame::begin()
 {
+	VkDevice vkdevice = device.get_device();
 	if (!wait_fences.empty())
 	{
 #if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
 		for (auto &fence : wait_fences)
 			LOGI("Waiting for Fence: %llx\n", reinterpret_cast<unsigned long long>(fence));
 #endif
-		vkWaitForFences(device, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
+		table.vkWaitForFences(vkdevice, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
 		wait_fences.clear();
 	}
 
@@ -1920,7 +1995,7 @@ void Device::PerFrame::begin()
 		for (auto &fence : recycle_fences)
 			LOGI("Recycling Fence: %llx\n", reinterpret_cast<unsigned long long>(fence));
 #endif
-		vkResetFences(device, recycle_fences.size(), recycle_fences.data());
+		table.vkResetFences(vkdevice, recycle_fences.size(), recycle_fences.data());
 		for (auto &fence : recycle_fences)
 			managers.fence.recycle_fence(fence);
 		recycle_fences.clear();
@@ -1935,21 +2010,21 @@ void Device::PerFrame::begin()
 	query_pool.begin();
 
 	for (auto &framebuffer : destroyed_framebuffers)
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
+		table.vkDestroyFramebuffer(vkdevice, framebuffer, nullptr);
 	for (auto &sampler : destroyed_samplers)
-		vkDestroySampler(device, sampler, nullptr);
+		table.vkDestroySampler(vkdevice, sampler, nullptr);
 	for (auto &pipeline : destroyed_pipelines)
-		vkDestroyPipeline(device, pipeline, nullptr);
+		table.vkDestroyPipeline(vkdevice, pipeline, nullptr);
 	for (auto &view : destroyed_image_views)
-		vkDestroyImageView(device, view, nullptr);
+		table.vkDestroyImageView(vkdevice, view, nullptr);
 	for (auto &view : destroyed_buffer_views)
-		vkDestroyBufferView(device, view, nullptr);
+		table.vkDestroyBufferView(vkdevice, view, nullptr);
 	for (auto &image : destroyed_images)
-		vkDestroyImage(device, image, nullptr);
+		table.vkDestroyImage(vkdevice, image, nullptr);
 	for (auto &buffer : destroyed_buffers)
-		vkDestroyBuffer(device, buffer, nullptr);
+		table.vkDestroyBuffer(vkdevice, buffer, nullptr);
 	for (auto &semaphore : destroyed_semaphores)
-		vkDestroySemaphore(device, semaphore, nullptr);
+		table.vkDestroySemaphore(vkdevice, semaphore, nullptr);
 	for (auto &semaphore : recycled_semaphores)
 	{
 #if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
@@ -2039,7 +2114,7 @@ uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	return UINT32_MAX;
 }
 
 uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
@@ -2088,7 +2163,7 @@ uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	return UINT32_MAX;
 }
 
 static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const ImageViewCreateInfo *view)
@@ -2158,7 +2233,7 @@ BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_inf
 	info.range = view_info.range;
 
 	VkBufferView view;
-	auto res = vkCreateBufferView(device, &info, nullptr, &view);
+	auto res = table->vkCreateBufferView(device, &info, nullptr, &view);
 	if (res != VK_SUCCESS)
 		return BufferViewHandle(nullptr);
 
@@ -2168,8 +2243,9 @@ BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_inf
 class ImageResourceHolder
 {
 public:
-	ImageResourceHolder(VkDevice device)
-		: device(device)
+	explicit ImageResourceHolder(Device *device_)
+		: device(device_)
+		, table(device_->get_device_table())
 	{
 	}
 
@@ -2179,7 +2255,8 @@ public:
 			cleanup();
 	}
 
-	VkDevice device;
+	Device *device;
+	const VolkDeviceTable &table;
 
 	VkImage image = VK_NULL_HANDLE;
 	VkDeviceMemory memory = VK_NULL_HANDLE;
@@ -2188,14 +2265,22 @@ public:
 	VkImageView stencil_view = VK_NULL_HANDLE;
 	VkImageView unorm_view = VK_NULL_HANDLE;
 	VkImageView srgb_view = VK_NULL_HANDLE;
+	VkImageViewType default_view_type = VK_IMAGE_VIEW_TYPE_RANGE_SIZE;
 	vector<VkImageView> rt_views;
 	DeviceAllocation allocation;
 	DeviceAllocator *allocator = nullptr;
 	bool owned = true;
 
+	VkImageViewType get_default_view_type() const
+	{
+		return default_view_type;
+	}
+
 	bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info,
 	                          bool create_unorm_srgb_views = false, const VkFormat *view_formats = nullptr)
 	{
+		VkDevice vkdevice = device->get_device();
+
 		if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 		                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
 		{
@@ -2216,6 +2301,8 @@ public:
 			default_view_info.subresourceRange.levelCount = create_info.levels;
 			default_view_info.subresourceRange.layerCount = create_info.layers;
 			view_info = &default_view_info;
+
+			default_view_type = default_view_info.viewType;
 		}
 
 		if (!create_alt_views(create_info, *view_info))
@@ -2232,11 +2319,11 @@ public:
 			auto info = *view_info;
 
 			info.format = view_formats[0];
-			if (vkCreateImageView(device, &info, nullptr, &unorm_view) != VK_SUCCESS)
+			if (table.vkCreateImageView(vkdevice, &info, nullptr, &unorm_view) != VK_SUCCESS)
 				return false;
 
 			info.format = view_formats[1];
-			if (vkCreateImageView(device, &info, nullptr, &srgb_view) != VK_SUCCESS)
+			if (table.vkCreateImageView(vkdevice, &info, nullptr, &srgb_view) != VK_SUCCESS)
 				return false;
 		}
 
@@ -2266,7 +2353,7 @@ private:
 				view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
 
 				VkImageView rt_view;
-				if (vkCreateImageView(device, &view_info, nullptr, &rt_view) != VK_SUCCESS)
+				if (table.vkCreateImageView(device->get_device(), &view_info, nullptr, &rt_view) != VK_SUCCESS)
 					return false;
 
 				rt_views.push_back(rt_view);
@@ -2284,6 +2371,8 @@ private:
 		{
 			return true;
 		}
+
+		VkDevice vkdevice = device->get_device();
 
 		if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
 		{
@@ -2306,11 +2395,11 @@ private:
 
 				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
 				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-				if (vkCreateImageView(device, &view_info, nullptr, &depth_view) != VK_SUCCESS)
+				if (table.vkCreateImageView(vkdevice, &view_info, nullptr, &depth_view) != VK_SUCCESS)
 					return false;
 
 				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-				if (vkCreateImageView(device, &view_info, nullptr, &stencil_view) != VK_SUCCESS)
+				if (table.vkCreateImageView(vkdevice, &view_info, nullptr, &stencil_view) != VK_SUCCESS)
 					return false;
 			}
 		}
@@ -2320,8 +2409,10 @@ private:
 
 	bool create_default_view(const VkImageViewCreateInfo &info)
 	{
+		VkDevice vkdevice = device->get_device();
+
 		// Create the normal image view. This one contains every subresource.
-		if (vkCreateImageView(device, &info, nullptr, &image_view) != VK_SUCCESS)
+		if (table.vkCreateImageView(vkdevice, &info, nullptr, &image_view) != VK_SUCCESS)
 			return false;
 
 		return true;
@@ -2329,23 +2420,25 @@ private:
 
 	void cleanup()
 	{
+		VkDevice vkdevice = device->get_device();
+
 		if (image_view)
-			vkDestroyImageView(device, image_view, nullptr);
+			table.vkDestroyImageView(vkdevice, image_view, nullptr);
 		if (depth_view)
-			vkDestroyImageView(device, depth_view, nullptr);
+			table.vkDestroyImageView(vkdevice, depth_view, nullptr);
 		if (stencil_view)
-			vkDestroyImageView(device, stencil_view, nullptr);
+			table.vkDestroyImageView(vkdevice, stencil_view, nullptr);
 		if (unorm_view)
-			vkDestroyImageView(device, unorm_view, nullptr);
+			table.vkDestroyImageView(vkdevice, unorm_view, nullptr);
 		if (srgb_view)
-			vkDestroyImageView(device, srgb_view, nullptr);
+			table.vkDestroyImageView(vkdevice, srgb_view, nullptr);
 		for (auto &view : rt_views)
-			vkDestroyImageView(device, view, nullptr);
+			table.vkDestroyImageView(vkdevice, view, nullptr);
 
 		if (image)
-			vkDestroyImage(device, image, nullptr);
+			table.vkDestroyImage(vkdevice, image, nullptr);
 		if (memory)
-			vkFreeMemory(device, memory, nullptr);
+			table.vkFreeMemory(vkdevice, memory, nullptr);
 		if (allocator)
 			allocation.free_immediate(*allocator);
 	}
@@ -2353,7 +2446,7 @@ private:
 
 ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
 {
-	ImageResourceHolder holder(device);
+	ImageResourceHolder holder(this);
 	auto &image_create_info = create_info.image->get_create_info();
 
 	VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
@@ -2367,7 +2460,11 @@ ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info
 	view_info.subresourceRange.baseArrayLayer = create_info.base_layer;
 	view_info.subresourceRange.levelCount = create_info.levels;
 	view_info.subresourceRange.layerCount = create_info.layers;
-	view_info.viewType = get_image_view_type(image_create_info, &create_info);
+
+	if (create_info.view_type == VK_IMAGE_VIEW_TYPE_RANGE_SIZE)
+		view_info.viewType = get_image_view_type(image_create_info, &create_info);
+	else
+		view_info.viewType = create_info.view_type;
 
 	unsigned num_levels;
 	if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
@@ -2409,7 +2506,7 @@ ImageHandle Device::create_imported_image(int fd, VkDeviceSize size, uint32_t me
 	if (!ext.supports_external)
 		return {};
 
-	ImageResourceHolder holder(device);
+	ImageResourceHolder holder(this);
 
 	VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 	info.format = create_info.format;
@@ -2433,7 +2530,7 @@ ImageHandle Device::create_imported_image(int fd, VkDeviceSize size, uint32_t me
 
 	VK_ASSERT(image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling));
 
-	if (vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
+	if (table->vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
 		return ImageHandle(nullptr);
 
 	VkMemoryAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
@@ -2450,30 +2547,32 @@ ImageHandle Device::create_imported_image(int fd, VkDeviceSize size, uint32_t me
 	dedicated_info.pNext = &fd_info;
 
 	VkMemoryRequirements reqs;
-	vkGetImageMemoryRequirements(device, holder.image, &reqs);
+	table->vkGetImageMemoryRequirements(device, holder.image, &reqs);
 	if (reqs.size > size)
 		return ImageHandle(nullptr);
 
 	if (((1u << memory_type) & reqs.memoryTypeBits) == 0)
 		return ImageHandle(nullptr);
 
-	if (vkAllocateMemory(device, &alloc_info, nullptr, &holder.memory) != VK_SUCCESS)
+	if (table->vkAllocateMemory(device, &alloc_info, nullptr, &holder.memory) != VK_SUCCESS)
 		return ImageHandle(nullptr);
 
-	if (vkBindImageMemory(device, holder.image, holder.memory, 0) != VK_SUCCESS)
+	if (table->vkBindImageMemory(device, holder.image, holder.memory, 0) != VK_SUCCESS)
 		return ImageHandle(nullptr);
 
 	// Create default image views.
 	// App could of course to this on its own, but it's very handy to have these being created automatically for you.
+	VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_RANGE_SIZE;
 	if (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 	                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT))
 	{
 		if (!holder.create_default_views(create_info, nullptr))
 			return ImageHandle(nullptr);
+		view_type = holder.get_default_view_type();
 	}
 
 	auto allocation = DeviceAllocation::make_imported_allocation(holder.memory, size, memory_type);
-	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, allocation, create_info));
+	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, allocation, create_info, view_type));
 	if (handle)
 	{
 		holder.owned = false;
@@ -2582,33 +2681,6 @@ InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &in
 	return result;
 }
 
-static bool fill_image_format_list(VkFormat *formats, VkFormat format)
-{
-	switch (format)
-	{
-	case VK_FORMAT_R8G8B8A8_UNORM:
-	case VK_FORMAT_R8G8B8A8_SRGB:
-		formats[0] = VK_FORMAT_R8G8B8A8_UNORM;
-		formats[1] = VK_FORMAT_R8G8B8A8_SRGB;
-		return true;
-
-	case VK_FORMAT_B8G8R8A8_UNORM:
-	case VK_FORMAT_B8G8R8A8_SRGB:
-		formats[0] = VK_FORMAT_B8G8R8A8_UNORM;
-		formats[1] = VK_FORMAT_B8G8R8A8_SRGB;
-		return true;
-
-	case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-	case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
-		formats[0] = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-		formats[1] = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
-		return true;
-
-	default:
-		return false;
-	}
-}
-
 ImageHandle Device::create_image(const ImageCreateInfo &create_info, const ImageInitialData *initial)
 {
 	if (initial)
@@ -2623,7 +2695,7 @@ ImageHandle Device::create_image(const ImageCreateInfo &create_info, const Image
 ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &create_info,
                                                      const InitialImageBuffer *staging_buffer)
 {
-	ImageResourceHolder holder(device);
+	ImageResourceHolder holder(this);
 	VkMemoryRequirements reqs;
 
 	VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
@@ -2667,7 +2739,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 
 	if (create_info.misc & IMAGE_MISC_MUTABLE_SRGB_BIT)
 	{
-		if (fill_image_format_list(view_formats, info.format))
+		format_info.viewFormatCount = ImageCreateInfo::compute_view_formats(create_info, view_formats);
+		if (format_info.viewFormatCount != 0)
 		{
 			create_unorm_srgb_views = true;
 			if (ext.supports_image_format_list)
@@ -2759,14 +2832,19 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		return ImageHandle(nullptr);
 	}
 
-	if (vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
+	if (table->vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
 	{
 		LOGE("Failed to create image in vkCreateImage.\n");
 		return ImageHandle(nullptr);
 	}
 
-	vkGetImageMemoryRequirements(device, holder.image, &reqs);
+	table->vkGetImageMemoryRequirements(device, holder.image, &reqs);
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+	{
+		LOGE("Failed to find memory type.\n");
+		return ImageHandle(nullptr);
+	}
 
 	if (info.tiling == VK_IMAGE_TILING_LINEAR &&
 	    (create_info.misc & IMAGE_MISC_LINEAR_IMAGE_IGNORE_DEVICE_LOCAL_BIT) == 0)
@@ -2784,7 +2862,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		return ImageHandle(nullptr);
 	}
 
-	if (vkBindImageMemory(device, holder.image, holder.allocation.get_memory(), holder.allocation.get_offset()) != VK_SUCCESS)
+	if (table->vkBindImageMemory(device, holder.image, holder.allocation.get_memory(), holder.allocation.get_offset()) != VK_SUCCESS)
 	{
 		LOGE("Failed to bind image memory.\n");
 		return ImageHandle(nullptr);
@@ -2792,17 +2870,21 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 
 	auto tmpinfo = create_info;
 	tmpinfo.usage = info.usage;
+	tmpinfo.flags = info.flags;
 	tmpinfo.levels = info.mipLevels;
 
 	bool has_view = (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 	                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
+
+	VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_RANGE_SIZE;
 	if (has_view)
 	{
 		if (!holder.create_default_views(tmpinfo, nullptr, create_unorm_srgb_views, view_formats))
 			return ImageHandle(nullptr);
+		view_type = holder.get_default_view_type();
 	}
 
-	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
+	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, holder.allocation, tmpinfo, view_type));
 	if (handle)
 	{
 		holder.owned = false;
@@ -3006,16 +3088,13 @@ SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, Stoc
 	auto info = fill_vk_sampler_info(sampler_info);
 	VkSampler sampler;
 
+
+	if (table->vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
+		return SamplerHandle(nullptr);
 #ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned index = state_recorder.register_sampler(Fossilize::Hash(stock_sampler), info);
+	register_sampler(sampler, Fossilize::Hash(stock_sampler) | 0x10000, info);
 #else
 	(void)stock_sampler;
-#endif
-	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
-		return SamplerHandle(nullptr);
-
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	state_recorder.set_sampler_handle(index, sampler);
 #endif
 	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
 }
@@ -3024,9 +3103,121 @@ SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info)
 {
 	auto info = fill_vk_sampler_info(sampler_info);
 	VkSampler sampler;
-	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
+	if (table->vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
 		return SamplerHandle(nullptr);
 	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
+}
+
+void Device::fill_buffer_sharing_indices(VkBufferCreateInfo &info, uint32_t *sharing_indices)
+{
+	if (graphics_queue_family_index != compute_queue_family_index ||
+	    graphics_queue_family_index != transfer_queue_family_index)
+	{
+		// For buffers, always just use CONCURRENT access modes,
+		// so we don't have to deal with acquire/release barriers in async compute.
+		info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+
+		sharing_indices[info.queueFamilyIndexCount++] = graphics_queue_family_index;
+
+		if (graphics_queue_family_index != compute_queue_family_index)
+			sharing_indices[info.queueFamilyIndexCount++] = compute_queue_family_index;
+
+		if (graphics_queue_family_index != transfer_queue_family_index &&
+		    compute_queue_family_index != transfer_queue_family_index)
+		{
+			sharing_indices[info.queueFamilyIndexCount++] = transfer_queue_family_index;
+		}
+
+		info.pQueueFamilyIndices = sharing_indices;
+	}
+}
+
+BufferHandle Device::create_imported_host_buffer(const BufferCreateInfo &create_info, VkExternalMemoryHandleTypeFlagBits type, void *host_buffer)
+{
+	if (create_info.domain != BufferDomain::Host && create_info.domain != BufferDomain::CachedHost)
+		return BufferHandle{};
+
+	if (!ext.supports_external_memory_host)
+		return BufferHandle{};
+
+	if ((reinterpret_cast<uintptr_t>(host_buffer) & (ext.host_memory_properties.minImportedHostPointerAlignment - 1)) != 0)
+	{
+		LOGE("Host buffer is not aligned appropriately.\n");
+		return BufferHandle{};
+	}
+
+	VkMemoryHostPointerPropertiesEXT host_pointer_props = { VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT };
+	if (table->vkGetMemoryHostPointerPropertiesEXT(device, type, host_buffer, &host_pointer_props) != VK_SUCCESS)
+	{
+		LOGE("Host pointer is not importable.\n");
+		return BufferHandle{};
+	}
+
+	VkBufferCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	info.size = create_info.size;
+	info.usage = create_info.usage;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	uint32_t sharing_indices[3];
+	fill_buffer_sharing_indices(info, sharing_indices);
+
+	VkBuffer buffer;
+	VkMemoryRequirements reqs;
+	if (table->vkCreateBuffer(device, &info, nullptr, &buffer) != VK_SUCCESS)
+		return BufferHandle{};
+
+	table->vkGetBufferMemoryRequirements(device, buffer, &reqs);
+
+	reqs.memoryTypeBits &= host_pointer_props.memoryTypeBits;
+	if (reqs.memoryTypeBits == 0)
+	{
+		LOGE("No compatible host pointer types are available.\n");
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle{};
+	}
+
+	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+	{
+		LOGE("Failed to find memory type.\n");
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle{};
+	}
+
+	VkMemoryAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	alloc_info.allocationSize = (create_info.size + ext.host_memory_properties.minImportedHostPointerAlignment - 1) &
+	                            ~(ext.host_memory_properties.minImportedHostPointerAlignment - 1);
+	alloc_info.memoryTypeIndex = memory_type;
+
+	VkImportMemoryHostPointerInfoEXT import = { VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT };
+	import.handleType = type;
+	import.pHostPointer = host_buffer;
+	alloc_info.pNext = &import;
+
+	VkDeviceMemory memory;
+	if (table->vkAllocateMemory(device, &alloc_info, nullptr, &memory) != VK_SUCCESS)
+	{
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle{};
+	}
+
+	auto allocation = DeviceAllocation::make_imported_allocation(memory, info.size, memory_type);
+	if (table->vkMapMemory(device, memory, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void **>(&allocation.host_base)) != VK_SUCCESS)
+	{
+		allocation.free_immediate(managers.memory);
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle{};
+	}
+
+	if (table->vkBindBufferMemory(device, buffer, memory, 0) != VK_SUCCESS)
+	{
+		allocation.free_immediate(managers.memory);
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle{};
+	}
+
+	BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, create_info));
+	return handle;
 }
 
 BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
@@ -3048,44 +3239,31 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	uint32_t sharing_indices[3];
-	if (graphics_queue_family_index != compute_queue_family_index ||
-	    graphics_queue_family_index != transfer_queue_family_index)
-	{
-		// For buffers, always just use CONCURRENT access modes,
-		// so we don't have to deal with acquire/release barriers in async compute.
-		info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+	fill_buffer_sharing_indices(info, sharing_indices);
 
-		sharing_indices[info.queueFamilyIndexCount++] = graphics_queue_family_index;
-
-		if (graphics_queue_family_index != compute_queue_family_index)
-			sharing_indices[info.queueFamilyIndexCount++] = compute_queue_family_index;
-
-		if (graphics_queue_family_index != transfer_queue_family_index &&
-		    compute_queue_family_index != transfer_queue_family_index)
-		{
-			sharing_indices[info.queueFamilyIndexCount++] = transfer_queue_family_index;
-		}
-
-		info.pQueueFamilyIndices = sharing_indices;
-	}
-
-	if (vkCreateBuffer(device, &info, nullptr, &buffer) != VK_SUCCESS)
+	if (table->vkCreateBuffer(device, &info, nullptr, &buffer) != VK_SUCCESS)
 		return BufferHandle(nullptr);
 
-	vkGetBufferMemoryRequirements(device, buffer, &reqs);
+	table->vkGetBufferMemoryRequirements(device, buffer, &reqs);
 
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+	{
+		LOGE("Failed to find memory type.\n");
+		table->vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle(nullptr);
+	}
 
 	if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 	{
-		vkDestroyBuffer(device, buffer, nullptr);
+		table->vkDestroyBuffer(device, buffer, nullptr);
 		return BufferHandle(nullptr);
 	}
 
-	if (vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
+	if (table->vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
 	{
 		allocation.free_immediate(managers.memory);
-		vkDestroyBuffer(device, buffer, nullptr);
+		table->vkDestroyBuffer(device, buffer, nullptr);
 		return BufferHandle(nullptr);
 	}
 
@@ -3228,6 +3406,18 @@ const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool c
 			optimal |= 1u << info.num_color_attachments;
 	}
 
+	// For multiview, base layer is encoded into the view mask.
+	if (info.num_layers > 1)
+	{
+		h.u32(info.base_layer);
+		h.u32(info.num_layers);
+	}
+	else
+	{
+		h.u32(0);
+		h.u32(info.num_layers);
+	}
+
 	h.u32(info.num_subpasses);
 	for (unsigned i = 0; i < info.num_subpasses; i++)
 	{
@@ -3360,8 +3550,8 @@ void Device::set_name(const Buffer &buffer, const char *name)
 		info.objectType = VK_OBJECT_TYPE_BUFFER;
 		info.objectHandle = (uint64_t)buffer.get_buffer();
 		info.pObjectName = name;
-		if (vkSetDebugUtilsObjectNameEXT)
-			vkSetDebugUtilsObjectNameEXT(device, &info);
+		if (table->vkSetDebugUtilsObjectNameEXT)
+			table->vkSetDebugUtilsObjectNameEXT(device, &info);
 	}
 	else if (ext.supports_debug_marker)
 	{
@@ -3369,7 +3559,7 @@ void Device::set_name(const Buffer &buffer, const char *name)
 		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
 		info.object = (uint64_t)buffer.get_buffer();
 		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
+		table->vkDebugMarkerSetObjectNameEXT(device, &info);
 	}
 }
 
@@ -3381,8 +3571,8 @@ void Device::set_name(const Image &image, const char *name)
 		info.objectType = VK_OBJECT_TYPE_IMAGE;
 		info.objectHandle = (uint64_t)image.get_image();
 		info.pObjectName = name;
-		if (vkSetDebugUtilsObjectNameEXT)
-			vkSetDebugUtilsObjectNameEXT(device, &info);
+		if (table->vkSetDebugUtilsObjectNameEXT)
+			table->vkSetDebugUtilsObjectNameEXT(device, &info);
 	}
 	else if (ext.supports_debug_marker)
 	{
@@ -3390,7 +3580,7 @@ void Device::set_name(const Image &image, const char *name)
 		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
 		info.object = (uint64_t)image.get_image();
 		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
+		table->vkDebugMarkerSetObjectNameEXT(device, &info);
 	}
 }
 
@@ -3402,8 +3592,8 @@ void Device::set_name(const CommandBuffer &cmd, const char *name)
 		info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
 		info.objectHandle = (uint64_t)cmd.get_command_buffer();
 		info.pObjectName = name;
-		if (vkSetDebugUtilsObjectNameEXT)
-			vkSetDebugUtilsObjectNameEXT(device, &info);
+		if (table->vkSetDebugUtilsObjectNameEXT)
+			table->vkSetDebugUtilsObjectNameEXT(device, &info);
 	}
 	else if (ext.supports_debug_marker)
 	{
@@ -3411,7 +3601,55 @@ void Device::set_name(const CommandBuffer &cmd, const char *name)
 		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT;
 		info.object = (uint64_t)cmd.get_command_buffer();
 		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
+		table->vkDebugMarkerSetObjectNameEXT(device, &info);
+	}
+}
+
+void Device::report_checkpoints()
+{
+	if (!ext.supports_nv_device_diagnostic_checkpoints)
+		return;
+
+	uint32_t graphics_count;
+	table->vkGetQueueCheckpointDataNV(graphics_queue, &graphics_count, nullptr);
+	vector<VkCheckpointDataNV> graphics_data(graphics_count);
+	for (auto &g : graphics_data)
+		g.sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
+	table->vkGetQueueCheckpointDataNV(graphics_queue, &graphics_count, graphics_data.data());
+
+	uint32_t compute_count;
+	table->vkGetQueueCheckpointDataNV(compute_queue, &compute_count, nullptr);
+	vector<VkCheckpointDataNV> compute_data(compute_count);
+	for (auto &g : compute_data)
+		g.sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
+	table->vkGetQueueCheckpointDataNV(compute_queue, &compute_count, compute_data.data());
+
+	uint32_t transfer_count;
+	table->vkGetQueueCheckpointDataNV(transfer_queue, &transfer_count, nullptr);
+	vector<VkCheckpointDataNV> transfer_data(compute_count);
+	for (auto &g : transfer_data)
+		g.sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
+	table->vkGetQueueCheckpointDataNV(transfer_queue, &transfer_count, transfer_data.data());
+
+	if (!graphics_data.empty())
+	{
+		LOGI("Checkpoints for graphics queue:\n");
+		for (auto &g : graphics_data)
+			LOGI("Stage %u:\n%s\n", g.stage, static_cast<const char *>(g.pCheckpointMarker));
+	}
+
+	if (!compute_data.empty())
+	{
+		LOGI("Checkpoints for compute queue:\n");
+		for (auto &g : compute_data)
+			LOGI("    Stage %u:\n%s\n", g.stage, static_cast<const char *>(g.pCheckpointMarker));
+	}
+
+	if (!transfer_data.empty())
+	{
+		LOGI("Checkpoints for transfer queue:\n");
+		for (auto &g : transfer_data)
+			LOGI("    Stage %u:\n%s\n", g.stage, static_cast<const char *>(g.pCheckpointMarker));
 	}
 }
 
@@ -3440,5 +3678,10 @@ void Device::flush_shader_manager_cache()
 	shader_manager.save_shader_cache("cache://shader_cache.json");
 }
 #endif
+
+const VolkDeviceTable &Device::get_device_table() const
+{
+	return *table;
+}
 
 }

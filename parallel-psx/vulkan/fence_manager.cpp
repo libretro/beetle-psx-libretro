@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,12 +21,14 @@
  */
 
 #include "fence_manager.hpp"
+#include "device.hpp"
 
 namespace Vulkan
 {
-void FenceManager::init(VkDevice device)
+void FenceManager::init(Device *device_)
 {
-	this->device = device;
+	device = device_;
+	table = &device->get_device_table();
 }
 
 VkFence FenceManager::request_cleared_fence()
@@ -41,7 +43,7 @@ VkFence FenceManager::request_cleared_fence()
 	{
 		VkFence fence;
 		VkFenceCreateInfo info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-		vkCreateFence(device, &info, nullptr, &fence);
+		table->vkCreateFence(device->get_device(), &info, nullptr, &fence);
 		return fence;
 	}
 }
@@ -54,6 +56,6 @@ void FenceManager::recycle_fence(VkFence fence)
 FenceManager::~FenceManager()
 {
 	for (auto &fence : fences)
-		vkDestroyFence(device, fence, nullptr);
+		table->vkDestroyFence(device->get_device(), fence, nullptr);
 }
 }

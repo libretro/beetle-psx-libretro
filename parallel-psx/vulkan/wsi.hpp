@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,7 @@
 
 #include "device.hpp"
 #include "semaphore_manager.hpp"
-#include "vulkan.hpp"
+#include "vulkan_headers.hpp"
 #include "timer.hpp"
 #include "wsi_timing.hpp"
 #include <memory>
@@ -85,19 +85,21 @@ public:
 	{
 	}
 
-	virtual void event_device_created(Device *device) = 0;
-	virtual void event_device_destroyed() = 0;
+	virtual void event_device_created(Device *device);
+	virtual void event_device_destroyed();
 	virtual void event_swapchain_created(Device *device, unsigned width, unsigned height,
-	                                     float aspect_ratio, size_t num_swapchain_images, VkFormat format) = 0;
-	virtual void event_swapchain_destroyed() = 0;
-	virtual void event_frame_tick(double frame, double elapsed) = 0;
-	virtual void event_swapchain_index(Device *device, unsigned index) = 0;
+	                                     float aspect_ratio, size_t num_swapchain_images, VkFormat format, VkSurfaceTransformFlagBitsKHR pre_rotate);
+	virtual void event_swapchain_destroyed();
+	virtual void event_frame_tick(double frame, double elapsed);
+	virtual void event_swapchain_index(Device *device, unsigned index);
 	virtual void event_display_timing_stutter(uint32_t current_serial, uint32_t observed_serial,
-	                                          unsigned dropped_frames) = 0;
+	                                          unsigned dropped_frames);
 
 	virtual float get_estimated_frame_presentation_duration();
 
 	virtual void set_window_title(const std::string &title);
+
+	virtual uintptr_t get_fullscreen_monitor();
 
 protected:
 	bool resize = false;
@@ -118,13 +120,21 @@ public:
 	WSI();
 	void set_platform(WSIPlatform *platform);
 	void set_present_mode(PresentMode mode);
+	void set_backbuffer_srgb(bool enable);
+	void set_support_prerotate(bool enable);
+	VkSurfaceTransformFlagBitsKHR get_current_prerotate() const;
+
 	PresentMode get_present_mode() const
 	{
 		return present_mode;
 	}
 
-	bool init();
+	bool get_backbuffer_srgb() const
+	{
+		return srgb_backbuffer_enable;
+	}
 
+	bool init(unsigned num_thread_indices);
 	bool init_external_context(std::unique_ptr<Vulkan::Context> context);
 	bool init_external_swapchain(std::vector<Vulkan::ImageHandle> external_images);
 	void deinit_external();
@@ -168,6 +178,8 @@ public:
 		return timing;
 	}
 
+	static void build_prerotate_matrix_2x2(VkSurfaceTransformFlagBitsKHR pre_rotate, float mat[4]);
+
 private:
 	void update_framebuffer(unsigned width, unsigned height);
 
@@ -176,11 +188,12 @@ private:
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 	std::vector<VkImage> swapchain_images;
 	std::unique_ptr<Device> device;
+	const VolkDeviceTable *table = nullptr;
 
-	unsigned width = 0;
-	unsigned height = 0;
-	float aspect_ratio = 1.0f;
-	VkFormat format = VK_FORMAT_UNDEFINED;
+	unsigned swapchain_width = 0;
+	unsigned swapchain_height = 0;
+	float swapchain_aspect_ratio = 1.0f;
+	VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
 	PresentMode current_present_mode = PresentMode::SyncToVBlank;
 	PresentMode present_mode = PresentMode::SyncToVBlank;
 
@@ -205,6 +218,11 @@ private:
 	Vulkan::Semaphore external_release;
 	bool frame_is_external = false;
 	bool using_display_timing = false;
+	bool srgb_backbuffer_enable = true;
+	bool current_srgb_backbuffer_enable = true;
+	bool support_prerotate = false;
+	VkSurfaceTransformFlagBitsKHR swapchain_current_prerotate = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+
 	bool begin_frame_external();
 	double external_frame_time = 0.0;
 

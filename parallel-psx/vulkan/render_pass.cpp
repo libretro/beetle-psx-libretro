@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen
+/* Copyright (c) 2017-2019 Hans-Kristian Arntzen
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,12 +57,12 @@ void RenderPass::setup_subpasses(const VkRenderPassCreateInfo &create_info)
 		       subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
 
 		unsigned samples = 0;
-		for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
+		for (unsigned att = 0; att < subpass_info.num_color_attachments; att++)
 		{
-			if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
+			if (subpass_info.color_attachments[att].attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
-			unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
+			unsigned samp = attachments[subpass_info.color_attachments[att].attachment].samples;
 			if (samples && (samp != samples))
 				VK_ASSERT(samp == samples);
 			samples = samp;
@@ -78,14 +78,15 @@ void RenderPass::setup_subpasses(const VkRenderPassCreateInfo &create_info)
 
 		VK_ASSERT(samples > 0);
 		subpass_info.samples = samples;
-		this->subpasses.push_back(subpass_info);
+		subpasses_info.push_back(subpass_info);
 	}
 }
 
-RenderPass::RenderPass(Hash hash, Device *device, const VkRenderPassCreateInfo &create_info)
+RenderPass::RenderPass(Hash hash, Device *device_, const VkRenderPassCreateInfo &create_info)
 	: IntrusiveHashMapEnabled<RenderPass>(hash)
-	, device(device)
+	, device(device_)
 {
+	auto &table = device->get_device_table();
 	unsigned num_color_attachments = 0;
 	if (create_info.attachmentCount > 0)
 	{
@@ -105,28 +106,25 @@ RenderPass::RenderPass(Hash hash, Device *device, const VkRenderPassCreateInfo &
 	// Store the important subpass information for later.
 	setup_subpasses(create_info);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), create_info);
-#endif
-
 	// Fixup after, we want the Fossilize render pass to be generic.
 	auto info = create_info;
 	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-	fixup_render_pass_nvidia(info, fixup_attachments);
+	fixup_render_pass_workaround(info, fixup_attachments);
 	if (device->get_workarounds().wsi_acquire_barrier_is_expensive)
 		fixup_wsi_barrier(info, fixup_attachments);
 
 	LOGI("Creating render pass.\n");
-	if (vkCreateRenderPass(device->get_device(), &info, nullptr, &render_pass) != VK_SUCCESS)
+	if (table.vkCreateRenderPass(device->get_device(), &info, nullptr, &render_pass) != VK_SUCCESS)
 		LOGE("Failed to create render pass.");
+
 #ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
+	device->register_render_pass(render_pass, get_hash(), create_info);
 #endif
 }
 
-RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
+RenderPass::RenderPass(Hash hash, Device *device_, const RenderPassInfo &info)
 	: IntrusiveHashMapEnabled<RenderPass>(hash)
-	, device(device)
+	, device(device_)
 {
 	fill(begin(color_attachments), end(color_attachments), VK_FORMAT_UNDEFINED);
 
@@ -135,6 +133,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	// Want to make load/store to transient a very explicit thing to do, since it will kill performance.
 	bool enable_transient_store = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
 	bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
+	bool multiview = info.num_layers > 1;
 
 	// Set up default subpass info structure if we don't have it.
 	auto *subpass_infos = info.subpasses;
@@ -718,6 +717,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 		dep.srcSubpass = subpass;
 		dep.dstSubpass = subpass;
 		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		if (multiview)
+			dep.dependencyFlags |= VK_DEPENDENCY_VIEW_LOCAL_BIT_KHR;
 
 		if (color_self_dependencies & (1u << subpass))
 		{
@@ -743,6 +744,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 		dep.srcSubpass = subpass - 1;
 		dep.dstSubpass = subpass;
 		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		if (multiview)
+			dep.dependencyFlags |= VK_DEPENDENCY_VIEW_LOCAL_BIT_KHR;
 
 		if (color_attachment_read_write & (1u << (subpass - 1)))
 		{
@@ -790,21 +793,33 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	// Store the important subpass information for later.
 	setup_subpasses(rp_info);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), rp_info);
-#endif
+	VkRenderPassMultiviewCreateInfoKHR multiview_info = { VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO_KHR };
+	vector<uint32_t> multiview_view_mask;
+	if (multiview && device->get_device_features().multiview_features.multiview)
+	{
+		multiview_view_mask.resize(num_subpasses);
+		multiview_info.subpassCount = num_subpasses;
+		for (auto &mask : multiview_view_mask)
+			mask = ((1u << info.num_layers) - 1u) << info.base_layer;
+		multiview_info.pViewMasks = multiview_view_mask.data();
+		rp_info.pNext = &multiview_info;
+	}
+	else if (multiview)
+		LOGE("Multiview not supported. Predending render pass is not multiview.");
 
 	// Fixup after, we want the Fossilize render pass to be generic.
 	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-	fixup_render_pass_nvidia(rp_info, fixup_attachments);
+	fixup_render_pass_workaround(rp_info, fixup_attachments);
 	if (device->get_workarounds().wsi_acquire_barrier_is_expensive)
 		fixup_wsi_barrier(rp_info, fixup_attachments);
 
 	LOGI("Creating render pass.\n");
-	if (vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
+	auto &table = device->get_device_table();
+	if (table.vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
 		LOGE("Failed to create render pass.");
+
 #ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
+	device->register_render_pass(render_pass, get_hash(), rp_info);
 #endif
 }
 
@@ -826,14 +841,9 @@ void RenderPass::fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttach
 	}
 }
 
-void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
+void RenderPass::fixup_render_pass_workaround(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
 {
-	if (device->get_gpu_properties().vendorID == VENDOR_ID_NVIDIA &&
-#ifdef _WIN32
-	    VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 417)
-#else
-	    VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 415)
-#endif
+	if (device->get_workarounds().force_store_in_render_pass)
 	{
 		// Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
 		// Force STORE_OP_STORE for all attachments.
@@ -857,21 +867,59 @@ void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, V
 
 RenderPass::~RenderPass()
 {
+	auto &table = device->get_device_table();
 	if (render_pass != VK_NULL_HANDLE)
-		vkDestroyRenderPass(device->get_device(), render_pass, nullptr);
+		table.vkDestroyRenderPass(device->get_device(), render_pass, nullptr);
 }
 
-Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-    : Cookie(device)
-    , device(device)
-    , render_pass(rp)
-    , info(info)
+unsigned Framebuffer::setup_raw_views(VkImageView *views, const RenderPassInfo &info)
+{
+	unsigned num_views = 0;
+	for (unsigned i = 0; i < info.num_color_attachments; i++)
+	{
+		VK_ASSERT(info.color_attachments[i]);
+
+		// For multiview, we use view indices to pick right layers.
+		if (info.num_layers > 1)
+			views[num_views++] = info.color_attachments[i]->get_view();
+		else
+			views[num_views++] = info.color_attachments[i]->get_render_target_view(info.base_layer);
+	}
+
+	if (info.depth_stencil)
+	{
+		// For multiview, we use view indices to pick right layers.
+		if (info.num_layers > 1)
+			views[num_views++] = info.depth_stencil->get_view();
+		else
+			views[num_views++] = info.depth_stencil->get_render_target_view(info.base_layer);
+	}
+
+	return num_views;
+}
+
+static const ImageView *get_image_view(const RenderPassInfo &info, unsigned index)
+{
+	if (index < info.num_color_attachments)
+		return info.color_attachments[index];
+	else
+		return info.depth_stencil;
+}
+
+void Framebuffer::compute_attachment_dimensions(const RenderPassInfo &info, unsigned index,
+                                                uint32_t &width, uint32_t &height)
+{
+	auto *view = get_image_view(info, index);
+	VK_ASSERT(view);
+	unsigned lod = view->get_create_info().base_level;
+	width = view->get_image().get_width(lod);
+	height = view->get_image().get_height(lod);
+}
+
+void Framebuffer::compute_dimensions(const RenderPassInfo &info, uint32_t &width, uint32_t &height)
 {
 	width = UINT32_MAX;
 	height = UINT32_MAX;
-	VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
-	unsigned num_views = 0;
-
 	VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
 	for (unsigned i = 0; i < info.num_color_attachments; i++)
@@ -880,8 +928,6 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 		unsigned lod = info.color_attachments[i]->get_create_info().base_level;
 		width = min(width, info.color_attachments[i]->get_image().get_width(lod));
 		height = min(height, info.color_attachments[i]->get_image().get_height(lod));
-		views[num_views++] = info.color_attachments[i]->get_render_target_view(info.layer);
-		attachments.push_back(info.color_attachments[i]);
 	}
 
 	if (info.depth_stencil)
@@ -889,19 +935,85 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 		unsigned lod = info.depth_stencil->get_create_info().base_level;
 		width = min(width, info.depth_stencil->get_image().get_width(lod));
 		height = min(height, info.depth_stencil->get_image().get_height(lod));
-		views[num_views++] = info.depth_stencil->get_render_target_view(info.layer);
-		attachments.push_back(info.depth_stencil);
 	}
+}
+
+static VkImageUsageFlags get_attachment_usage(const RenderPassInfo &info, unsigned index)
+{
+	auto *view = get_image_view(info, index);
+	VK_ASSERT(view);
+	return view->get_image().get_create_info().usage;
+}
+
+static VkImageCreateFlags get_attachment_flags(const RenderPassInfo &info, unsigned index)
+{
+	auto *view = get_image_view(info, index);
+	VK_ASSERT(view);
+	return view->get_image().get_create_info().flags;
+}
+
+static uint32_t compute_view_formats(const RenderPassInfo &info, unsigned index, VkFormat *formats)
+{
+	auto *view = get_image_view(info, index);
+	VK_ASSERT(view);
+	return ImageCreateInfo::compute_view_formats(view->get_image().get_create_info(), formats);
+}
+
+Framebuffer::Framebuffer(Device *device_, const RenderPass &rp, const RenderPassInfo &info_)
+    : Cookie(device_)
+    , device(device_)
+    , render_pass(rp)
+    , info(info_)
+{
+	compute_dimensions(info_, width, height);
+	VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
+	unsigned num_views = 0;
+
+	auto &features = device->get_device_features();
+	bool imageless = features.imageless_features.imagelessFramebuffer == VK_TRUE;
+
+	if (!imageless)
+		num_views = setup_raw_views(views, info_);
+	else
+		num_views = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
 
 	VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+	VkFramebufferAttachmentsCreateInfoKHR attachments_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO_KHR };
 	fb_info.renderPass = rp.get_render_pass();
 	fb_info.attachmentCount = num_views;
-	fb_info.pAttachments = views;
+
+	unsigned num_layers = info.num_layers > 1 ? (info.num_layers + info.base_layer) : 1;
+	VkFormat view_formats[VULKAN_NUM_ATTACHMENTS][2];
+	VkFramebufferAttachmentImageInfoKHR image_infos[VULKAN_NUM_ATTACHMENTS + 1];
+
+	if (imageless)
+	{
+		// Got to provide all this useless information, le sigh ...
+		fb_info.pNext = &attachments_info;
+		fb_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT_KHR;
+		attachments_info.attachmentImageInfoCount = num_views;
+		attachments_info.pAttachmentImageInfos = image_infos;
+		for (unsigned view = 0; view < num_views; view++)
+		{
+			auto &image_info = image_infos[view];
+			image_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO_KHR };
+			compute_attachment_dimensions(info_, view, image_info.width, image_info.height);
+			image_info.layerCount = num_layers;
+			image_info.usage = get_attachment_usage(info_, view);
+			image_info.flags = get_attachment_flags(info_, view);
+			image_info.viewFormatCount = compute_view_formats(info_, view, view_formats[view]);
+			image_info.pViewFormats = view_formats[view];
+		}
+	}
+	else
+		fb_info.pAttachments = views;
+
 	fb_info.width = width;
 	fb_info.height = height;
-	fb_info.layers = 1;
+	fb_info.layers = num_layers;
 
-	if (vkCreateFramebuffer(device->get_device(), &fb_info, nullptr, &framebuffer) != VK_SUCCESS)
+	auto &table = device->get_device_table();
+	if (table.vkCreateFramebuffer(device->get_device(), &fb_info, nullptr, &framebuffer) != VK_SUCCESS)
 		LOGE("Failed to create framebuffer.");
 }
 
@@ -916,8 +1028,8 @@ Framebuffer::~Framebuffer()
 	}
 }
 
-FramebufferAllocator::FramebufferAllocator(Device *device)
-    : device(device)
+FramebufferAllocator::FramebufferAllocator(Device *device_)
+    : device(device_)
 {
 }
 
@@ -937,14 +1049,43 @@ Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &inf
 	Hasher h;
 	h.u64(rp.get_hash());
 
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
-		if (info.color_attachments[i])
+	auto &features = device->get_device_features();
+	bool imageless = features.imageless_features.imagelessFramebuffer == VK_TRUE;
+
+	if (imageless)
+	{
+		unsigned num_views = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
+		for (unsigned i = 0; i < num_views; i++)
+		{
+			auto *view = get_image_view(info, i);
+			VK_ASSERT(view);
+			auto &image_info = view->get_image().get_create_info();
+			uint32_t width, height;
+			Framebuffer::compute_attachment_dimensions(info, i, width, height);
+			h.u32(width);
+			h.u32(height);
+			h.u32(image_info.flags);
+			h.u32(image_info.usage);
+			h.u32(image_info.misc & IMAGE_MISC_MUTABLE_SRGB_BIT);
+		}
+	}
+	else
+	{
+		for (unsigned i = 0; i < info.num_color_attachments; i++)
+		{
+			VK_ASSERT(info.color_attachments[i]);
 			h.u64(info.color_attachments[i]->get_cookie());
+		}
 
-	if (info.depth_stencil)
-		h.u64(info.depth_stencil->get_cookie());
+		if (info.depth_stencil)
+			h.u64(info.depth_stencil->get_cookie());
+	}
 
-	h.u32(info.layer);
+	// For multiview we bind the whole attachment, and base layer is encoded in the render pass.
+	if (info.num_layers > 1)
+		h.u32(0);
+	else
+		h.u32(info.base_layer);
 
 	auto hash = h.get();
 
