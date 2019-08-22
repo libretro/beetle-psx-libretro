@@ -28,6 +28,8 @@
 #include <vector>
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
 
+static std::string biospath;
+
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
 extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
@@ -77,6 +79,8 @@ bool psx_gte_overclock;
 static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
 
+static bool using_fallback_fw = false;
+
 //iCB: PGXP options
 unsigned int psx_pgxp_mode;
 unsigned int psx_pgxp_vertex_caching;
@@ -103,12 +107,19 @@ enum
    REGION_EU = 2,
 };
 
-static bool firmware_is_present(unsigned region)
+
+/**
+ * Checks if the required firmware for the specified region exists in 'retro_base_directory'.
+ * If it was not found, checks if the fallback firmware exists instead.
+ * This function will print info, warn and error log messages.
+ * Returns the path to the firmware if it was found or the string "NULL" if not.
+ */
+static std::string get_firmware_path(unsigned region)
 {
-   char bios_path[4096];
+   char fw_path[4096];
    static const size_t list_size = 10;
-   const char *bios_name_list[list_size];
-   const char *bios_sha1 = NULL;
+   const char *fw_names[list_size];
+   const char *fw_sha1;
 
    log_cb(RETRO_LOG_INFO, "Checking if required firmware is present.\n");
 
@@ -116,92 +127,116 @@ static bool firmware_is_present(unsigned region)
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
    if (region == REGION_JP)
    {
-      bios_name_list[0] = "scph5500.bin";
-      bios_name_list[1] = "SCPH5500.bin";
-      bios_name_list[2] = "SCPH-5500.bin";
-      bios_name_list[3] = NULL;
-      bios_name_list[4] = NULL;
-      bios_name_list[5] = NULL;
-      bios_name_list[6] = NULL;
-      bios_name_list[7] = NULL;
-      bios_name_list[8] = NULL;
-      bios_name_list[9] = NULL;
-      bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
+      fw_names[0] = "scph5500.bin"; fw_names[1] = "SCPH5500.bin"; fw_names[2] = "SCPH-5500.bin";
+      fw_names[3] = NULL;
+      fw_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    }
    else if (region == REGION_NA)
    {
-      bios_name_list[0] = "scph5501.bin";
-      bios_name_list[1] = "SCPH5501.bin";
-      bios_name_list[2] = "SCPH-5501.bin";
-      bios_name_list[3] = "scph5503.bin";
-      bios_name_list[4] = "SCPH5503.bin";
-      bios_name_list[5] = "SCPH-5503.bin";
-      bios_name_list[6] = "scph7003.bin";
-      bios_name_list[7] = "SCPH7003.bin";
-      bios_name_list[8] = "SCPH-7003.bin";
-      bios_name_list[9] = NULL;
-      bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
+      fw_names[0] = "scph5501.bin"; fw_names[1] = "SCPH5501.bin"; fw_names[2] = "SCPH-5501.bin";
+      fw_names[3] = "scph5503.bin"; fw_names[4] = "SCPH5503.bin"; fw_names[5] = "SCPH-5503.bin";
+      fw_names[6] = "scph7003.bin"; fw_names[7] = "SCPH7003.bin"; fw_names[8] = "SCPH-7003.bin";
+      fw_names[9] = NULL;
+      fw_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    }
    else if (region == REGION_EU)
    {
-      bios_name_list[0] = "scph5502.bin";
-      bios_name_list[1] = "SCPH5502.bin";
-      bios_name_list[2] = "SCPH-5502.bin";
-      bios_name_list[3] = "scph5552.bin";
-      bios_name_list[4] = "SCPH5552.bin";
-      bios_name_list[5] = "SCPH-5552.bin";
-      bios_name_list[6] = NULL;
-      bios_name_list[7] = NULL;
-      bios_name_list[8] = NULL;
-      bios_name_list[9] = NULL;
-      bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
+      fw_names[0] = "scph5502.bin"; fw_names[1] = "SCPH5502.bin"; fw_names[2] = "SCPH-5502.bin";
+      fw_names[3] = "scph5552.bin"; fw_names[4] = "SCPH5552.bin"; fw_names[5] = "SCPH-5552.bin";
+      fw_names[6] = NULL;
+      fw_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
    bool found = false;
    size_t i;
    for (i = 0; i < list_size; ++i)
    {
-      if (!bios_name_list[i])
+      if (!fw_names[i])
          break;
 
-      snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
-      if (filestream_exists(bios_path))
+      snprintf(fw_path, sizeof(fw_path), "%s%c%s", retro_base_directory, retro_slash, fw_names[i]);
+      if (filestream_exists(fw_path))
       {
          found = true;
          break;
       }
    }
 
-   if (!found)
+   if (found)
    {
-      char s[4096];
+      char obtained_sha1[41];
+      sha1_calculate(fw_path, obtained_sha1);
+      if (strcmp(obtained_sha1, fw_sha1))
+      {
+         log_cb(RETRO_LOG_WARN, "Firmware found but has invalid SHA1: %s\n"
+            "\tExpected SHA1: %s\n"
+            "\tObtained SHA1: %s\n"
+            "\tUnsupported firmware may cause emulation glitches.\n",
+            fw_path, fw_sha1, obtained_sha1);
+      }
 
-      log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
-      s[4095] = '\0';
-
-      snprintf(s, sizeof(s), "Firmware is missing:\n\n%s", bios_name_list[0]);
-
-      gui_set_message(s);
-      gui_show = true;
-
-      return false;
+      else
+      {
+         log_cb(RETRO_LOG_INFO, "Required firmware found: %s\n", fw_path);
+         log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", obtained_sha1);
+      }
+      return std::string(fw_path);
    }
 
-   char obtained_sha1[41];
-   sha1_calculate(bios_path, obtained_sha1);
-   if (strcmp(obtained_sha1, bios_sha1))
+   /* Supported firmware wasn't found, so we'll try to fallback to the pops BIOS.
+   Upstream doesn't support it but it is region-free, faster and does not have
+   the Sony/PlayStation splashscreens */
+   log_cb(RETRO_LOG_WARN, "Required firmware not found: %s\n", fw_names[0]);
+   log_cb(RETRO_LOG_INFO, "Checking if fallback firmware is present.\n");
+   
+   const char *fallback_fw_names[list_size] = { "psxonpsp660.bin","PSXONPSP660.bin", NULL };
+   const char *fallback_fw_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
+   for (i = 0; i < list_size; ++i)
    {
-      log_cb(RETRO_LOG_WARN, "Firmware found but has invalid SHA1: %s\n", bios_path);
-      log_cb(RETRO_LOG_WARN, "Expected SHA1: %s\n", bios_sha1);
-      log_cb(RETRO_LOG_WARN, "Obtained SHA1: %s\n", obtained_sha1);
-      log_cb(RETRO_LOG_WARN, "Unsupported firmware may cause emulation glitches.\n");
-      return true;
+      if (!fallback_fw_names[i])
+         break;
+
+      snprintf(fw_path, sizeof(fw_path), "%s%c%s", retro_base_directory, retro_slash, fallback_fw_names[i]);
+      if (filestream_exists(fw_path))
+      {
+         found = true;
+         break;
+      }
    }
 
-   log_cb(RETRO_LOG_INFO, "Firmware found: %s\n", bios_path);
-   log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", obtained_sha1);
+   if (found)
+   {
+      char obtained_sha1[41];
+      sha1_calculate(fw_path, obtained_sha1);
+      if (strcmp(obtained_sha1, fallback_fw_sha1))
+      {
+         log_cb(RETRO_LOG_WARN, "Fallback firmware found but has invalid SHA1: %s\n"
+            "\tExpected SHA1: %s\n"
+            "\tObtained SHA1: %s\n",
+            fw_path, fallback_fw_sha1, obtained_sha1);
+      }
 
-   return true;
+      else
+      {
+         log_cb(RETRO_LOG_INFO, "Fallback firmware found: %s\n", fallback_fw_names[i]);
+         log_cb(RETRO_LOG_INFO, "Firmware SHA1: %s\n", obtained_sha1);
+      }
+
+      return std::string(fw_path);
+   }
+
+   /* If both recommended and fallback firmware are not found, show error screen */
+   char s[4096];
+
+   log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s, %s\n", fw_names[0], fallback_fw_names[0]);
+   s[4095] = '\0';
+
+   snprintf(s, sizeof(s), "Firmware is missing:\n\n%s\n\n%s", fw_names[0], fallback_fw_names[0]);
+
+   gui_set_message(s);
+   gui_show = true;
+
+   return std::string("NULL");
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
@@ -1626,6 +1661,9 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
 #endif
 
+/* We're bypassing the MDFN_MakeFName/MDFN_GetSettingsS way of fetching
+the path for the bios; we will only use get_bios_path() from libretro.cpp */
+#if 0
    const char *biospath_sname;
 
    if(region == REGION_JP)
@@ -1641,6 +1679,20 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
             0, MDFN_GetSettingS(biospath_sname).c_str());
       RFILE *BIOSFile      = filestream_open(biospath,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+
+      if (BIOSFile)
+      {
+         filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
+         filestream_close(BIOSFile);
+      }
+   }
+#endif
+   {      
+      biospath = get_firmware_path(region);
+      RFILE *BIOSFile      = filestream_open(
+            biospath.c_str(),
             RETRO_VFS_FILE_ACCESS_READ,
             RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
@@ -1889,7 +1941,7 @@ static int LoadCD(std::vector<CDIF *> *_CDInterfaces)
    InitCommon(_CDInterfaces);
 
    if (psx_skipbios == 1)
-   BIOSROM->WriteU32(0x6990, 0);
+      BIOSROM->WriteU32(0x6990, 0);
 
    MDFNGameInfo->GameType = GMT_CDROM;
 
@@ -2348,6 +2400,7 @@ static MDFNSetting PSXSettings[] =
    { "psx.bios_jp", MDFNSF_EMU_STATE, "Path to the Japan SCPH-5500 ROM BIOS", NULL, MDFNST_STRING, "scph5500.bin" },
    { "psx.bios_na", MDFNSF_EMU_STATE, "Path to the North America SCPH-5501 ROM BIOS", "SHA1 0555c6fae8906f3f09baf5988f00e55f88e9f30b", MDFNST_STRING, "scph5501.bin" },
    { "psx.bios_eu", MDFNSF_EMU_STATE, "Path to the Europe SCPH-5502 ROM BIOS", NULL, MDFNST_STRING, "scph5502.bin" },
+   { "psx.bios_pops", MDFNSF_EMU_STATE, "Path to the PSP 6.60 POPS ROM BIOS", NULL, MDFNST_STRING, "psxonpsp660.bin" },
 
    { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, "SPU output resampler quality.",
    "0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors.", MDFNST_UINT, "5", "0", "10" },
@@ -3484,8 +3537,20 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   is_pal = (CalcDiscSCEx() == REGION_EU);
-   content_is_pal = is_pal;
+   unsigned disc_region = CalcDiscSCEx();
+   content_is_pal = (disc_region == REGION_EU);
+    
+   bool force_software_renderer = false;
+   if (!biospath.compare("NULL"))
+   {
+      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
+
+      /* TODO - We're forcing the sw renderer to show the ugui error message. Figure out
+      how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
+      so we don't have to force this anymore. */
+      force_software_renderer = true;
+   } 
+ 
 
    alloc_surface();
 
@@ -3500,21 +3565,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    frame_count = 0;
    internal_frame_count = 0;
-
-   /* MDFNI_LoadGame() has been called, we can now query the disc's region to deduce
-   which firmware version is needed. */
-   unsigned disc_region = CalcDiscSCEx(); 
-   bool force_software_renderer = false;
-   if (!firmware_is_present(disc_region))
-   {
-      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
-
-      /* TODO - We're forcing the sw renderer to show the ugui error message. Figure out
-      how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
-      so we don't have to force this anymore. */
-      force_software_renderer = true;
-   } 
-   
+  
    return rsx_intf_open(is_pal, force_software_renderer);
 }
 
