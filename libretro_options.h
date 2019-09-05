@@ -1,3 +1,6 @@
+#ifndef LIBRETRO_OPTIONS_H__
+#define LIBRETRO_OPTIONS_H__
+
 #define MEDNAFEN_CORE_NAME_MODULE "psx"
 #ifdef HAVE_HW
 #define MEDNAFEN_CORE_NAME "Beetle PSX HW"
@@ -16,4 +19,6 @@
 #define BEETLE_OPT(_o) ("beetle_psx_hw_" # _o)
 #else
 #define BEETLE_OPT(_o) ("beetle_psx_" # _o)
+#endif
+
 #endif
