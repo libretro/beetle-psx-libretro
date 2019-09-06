@@ -239,7 +239,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(widescreen_hack),
       "Widescreen Mode Hack",
-      "When enabled, forces content to be rendered with an aspect ration of 16:9. Produces best results with fully 3D games. 2D artwork will be stretched horizontally.",
+      "When enabled, forces content to be rendered with an aspect ratio of 16:9. Produces best results with fully 3D games. 2D artwork will be stretched horizontally.",
       {
          { "disabled", NULL },
          { "enabled",  NULL },
