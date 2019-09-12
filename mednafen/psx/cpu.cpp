@@ -508,9 +508,15 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
   {
    instr = MDFN_de32lsb<true>((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
 
+/* TODO/FIXME - For some reason, skipping this timestamp increment will cause the BIOS's PS logo screen to hang.
+   For now, we're working around the hang by always incrementing even when the libretro core option 'GTE Overclock' is on */
+#if 0
    if (!psx_gte_overclock) {
       timestamp += 4;	// Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
    }
+#else
+   timestamp += 4;
+#endif
   }
   else
   {
