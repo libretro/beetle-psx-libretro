@@ -55,7 +55,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer),
       "Renderer (Restart)",
-      "Choose video renderer. 'Software' is the most accurate but has the highest performance requirements when running at increased internal GPU resolutions. 'Hardware' selects automatically the 'OpenGL' or 'Vulkan' renderer, depending upon the current RetroArch video driver setting. While less accurate, these renderers improve performance and enable various enhancements such as texture filtering and perspective correction. Core will automatically fall back to the software renderer if 'Hardware' is selected but the RetroArch video driver is not set to Vulkan or an OpenGL 3.3-compatible driver.",
+      "Choose video renderer. 'Software' is the most accurate but has the highest performance requirements when running at increased internal GPU resolutions. 'Hardware' automatically selects the 'Vulkan' or 'OpenGL' renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer. While less accurate, the hardware renderers improve performance and enable various enhancements such as texture filtering and perspective correction.",
       {
          { "hardware", "Hardware" },
          { "software", "Software" },
@@ -405,7 +405,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_offset),
       "Offset Cropped Image",
-      "When 'Crop Overscan' is enabled, allows the resultant cropped image to be offset horizontally to the right by the specified number of pixels. May be used to correct alignment issues. As with 'Crop Overscan', currently only supported by the software renderer.",
+      "When 'Crop Overscan' is enabled, allows the resultant cropped image to be offset horizontally to the right (positive) or left (negative) by the specified number of pixels. May be used to correct alignment issues. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
          { "-4 px",    NULL },
