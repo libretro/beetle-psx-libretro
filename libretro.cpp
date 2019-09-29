@@ -3863,11 +3863,12 @@ void retro_run(void)
 
       if (crop_overscan)
       {
-         // 320 width -> 350 width.
-         // 364 width -> 400 width.
-         // 256 width -> 280 width.
+         // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
+         // 280 width -> 256 width.
+         // 350 width -> 320 width.
+         // 400 width -> 364 width.
          // 560 width -> 512 width.
-         // 640 width -> 700 width.
+         // 700 width -> 640 width.
          // Rectify this.
          switch (width)
          {

@@ -55,7 +55,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer),
       "Renderer (Restart)",
-      "Choose video renderer. 'Software' is the most accurate but has the highest performance requirements when running at increased internal GPU resolutions. 'Hardware' selects automatically the 'OpenGL' or 'Vulkan' renderer, depending upon the current RetroArch video driver setting. While less accurate, these renderers improve performance and enable various enhancements such as texture filtering and perspective correction.",
+      "Choose video renderer. 'Software' is the most accurate but has the highest performance requirements when running at increased internal GPU resolutions. 'Hardware' automatically selects the 'Vulkan' or 'OpenGL' renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer. While less accurate, the hardware renderers improve performance and enable various enhancements such as texture filtering and perspective correction.",
       {
          { "hardware", "Hardware" },
          { "software", "Software" },
@@ -261,7 +261,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(cpu_freq_scale),
       "CPU Frequency Scaling (Overclock)",
-      "Enable overclocking (or underclocking) of the emulated PSX's central processing unit. The default frequency of the MIPS R3000A-compatible 32-bit RISC CPU is 33.8688 MHz; running at higher frequencies can eliminate slowdown and improve frame rates in certain games at the expense of increased performance requirements. Note that some games have an internal frame rate limiter, and may not benefit from overclocking.",
+      "Enable overclocking (or underclocking) of the emulated PSX's central processing unit. The default frequency of the MIPS R3000A-compatible 32-bit RISC CPU is 33.8688 MHz; running at higher frequencies can eliminate slowdown and improve frame rates in certain games at the expense of increased performance requirements. Note that some games have an internal frame rate limiter, and may not benefit from overclocking. May cause certain effects to animate faster than intended in some titles when overclocked.",
       {
          { "50%",           NULL },
          { "60%",           NULL },
@@ -376,7 +376,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
-      "By default, the core adds horizontal padding (black bars or 'pillarboxes' either side of the screen) to simulate the horizontal overscan region of the NTSC or PAL broadcast signal (this is normally hidden by the bezel around the edge of a standard-definition television). It does not, however, add padding to simulate *vertical* overscan. This means video output is horizontally compressed, and thus presented with an incorrect aspect ratio. When 'Crop Overscan' is enabled, the horizontal padding is automatically removed, ensuring correct display dimensions.",
+      "By default, the software renderer adds horizontal padding (black bars or 'pillarboxes' on either side of the screen) to emulate the same black bars generated in analog video output by real PSX hardware. Enabling 'Crop Overscan' will remove horizontal padding and stretch the remaining output to the full window width. This option does not affect vertical overscan. Currently only supported by the software renderer, as the hardware renderers will always output without pillarboxing.",
       {
          { "enabled",  NULL },
          { "disabled", NULL },
@@ -387,7 +387,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_crop),
       "Additional Cropping",
-      "When 'Crop Overscan' is enabled, further reduces the width of the cropped image by the specified number of pixels. Note: This can have unintended consequences. While the absolute width is reduced, the resultant video is still scaled to the currently set aspect ratio. Enabling 'Additional Cropping' may therefore cause horizontal stretching.",
+      "When 'Crop Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels. Note: This can have unintended consequences. While the absolute width is reduced, the resultant video is still scaled to the currently set aspect ratio. Enabling 'Additional Cropping' may therefore cause horizontal stretching. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
          { "1 px",     NULL },
@@ -405,7 +405,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_offset),
       "Offset Cropped Image",
-      "When 'Crop Overscan' is enabled, allows the resultant cropped image to be offset horizontally by the specified number of pixels. May be used to correct alignment issues.",
+      "When 'Crop Overscan' is enabled, allows the resultant cropped image to be offset horizontally to the right (positive) or left (negative) by the specified number of pixels. May be used to correct alignment issues. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
          { "-4 px",    NULL },
