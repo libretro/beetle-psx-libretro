@@ -1571,10 +1571,10 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    switch (psx_gpu_dither_mode)
    {
       case DITHER_NATIVE:
-         GPU_set_dither_upscale_shift(0);
+         GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
          break;
       case DITHER_UPSCALED:
-         GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+         GPU_set_dither_upscale_shift(0);
          break;
       case DITHER_OFF:
          break;
@@ -3675,10 +3675,10 @@ void retro_run(void)
       switch (psx_gpu_dither_mode)
       {
          case DITHER_NATIVE:
-            GPU_set_dither_upscale_shift(0);
+            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
             break;
          case DITHER_UPSCALED:
-            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+            GPU_set_dither_upscale_shift(0);
             break;
          case DITHER_OFF:
             break;
