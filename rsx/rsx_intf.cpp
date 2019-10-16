@@ -3434,7 +3434,7 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       environ_cb(RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER, &preferred);
 
 #if defined(HAVE_VULKAN)
-      if (preferred != RETRO_HW_CONTEXT_OPENGL_CORE && rsx_vulkan_open(is_pal))
+      if (preferred != RETRO_HW_CONTEXT_OPENGL_CORE && preferred != RETRO_HW_CONTEXT_OPENGL && rsx_vulkan_open(is_pal))
       {
          rsx_type       = RSX_VULKAN;
          vk_initialized = true;
