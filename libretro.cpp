@@ -3854,8 +3854,8 @@ void retro_run(void)
       width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
       height = spec.DisplayRect.h;
       //fprintf(stderr, "(%u x %u)\n", width, height);
-      // PSX core inserts padding on left and right (overscan). Optionally crop this.
 
+      // PSX core inserts padding on left and right (overscan). Optionally crop this.
       const uint32_t *pix = surf->pixels;
       unsigned pix_offset = 0;
 
@@ -3864,35 +3864,35 @@ void retro_run(void)
          // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
          // 280 width -> 256 width.
          // 350 width -> 320 width.
-         // 400 width -> 364 width.
+         // 400 width -> 366 width.
          // 560 width -> 512 width.
          // 700 width -> 640 width.
-         // Rectify this.
          switch (width)
          {
-            // The shifts are not simply (padded_width - real_width) / 2.
             case 280:
-               pix_offset += 10 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 12 + (image_offset + floor(0.5 * image_crop));
                width = 256 - image_crop;
                break;
 
             case 350:
-               pix_offset += 14 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
                width = 320 - image_crop;
                break;
 
+            /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
+               Adjust in future if there are issues. */
             case 400:
-               pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
-               width = 364 - image_crop;
+               pix_offset += 17 + (image_offset + floor(0.5 * image_crop));
+               width = 366 - image_crop;
                break;
 
             case 560:
-               pix_offset += 26 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 24 + (image_offset + floor(0.5 * image_crop));
                width = 512 - image_crop;
                break;
 
             case 700:
-               pix_offset += 33 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 30 + (image_offset + floor(0.5 * image_crop));
                width = 640 - image_crop;
                break;
 
@@ -3900,6 +3900,7 @@ void retro_run(void)
                // This shouldn't happen.
                break;
          }
+
 
          if (is_pal)
          {
