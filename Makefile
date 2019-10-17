@@ -82,7 +82,11 @@ ifneq (,$(findstring unix,$(platform)))
    ifneq ($(shell uname -p | grep -E '((i.|x)86|amd64)'),)
       IS_X86 = 1
    endif
-   LDFLAGS += $(PTHREAD_FLAGS) -ldl
+   ifneq (,$(findstring Haiku,$(shell uname -s)))
+     LDFLAGS += $(PTHREAD_FLAGS) -lroot
+   else
+     LDFLAGS += $(PTHREAD_FLAGS) -ldl
+   endif
    FLAGS   +=
    ifeq ($(HAVE_OPENGL),1)
       ifneq (,$(findstring gles,$(platform)))
