@@ -541,9 +541,17 @@ static void UpdateDisplayMode(void)
 
    uint16_t yres = GPU.VertEnd - GPU.VertStart;
 
+   bool is_pal_mode = false;
+   if((GPU.DisplayMode & DISP_PAL) == DISP_PAL)
+      is_pal_mode = true;
+
    // Both 2nd bit and 5th bit have to be enabled to use interlacing properly.
+   bool is_480i_mode = false;
    if((GPU.DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
+   {
       yres *= 2;
+      is_480i_mode = true;
+   }
 
    unsigned pixelclock_divider;
 
@@ -588,7 +596,9 @@ static void UpdateDisplayMode(void)
          GPU.DisplayFB_XStart,
          GPU.DisplayFB_YStart,
          xres, yres,
-         depth_24bpp);
+         depth_24bpp,
+         is_pal_mode, 
+         is_480i_mode);
 }
 
 /* Forward decls */
@@ -1150,6 +1160,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x07:
             GPU.VertStart = V & 0x3FF;
             GPU.VertEnd = (V >> 10) & 0x3FF;
+            rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd);
             break;
 
          case 0x08:
@@ -1853,6 +1864,8 @@ void GPU_RestoreStateP3(void)
    rsx_intf_load_image( 0,    0,
                         1024, 512,
                         GPU.vram, false, false);
+
+   rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd);
 
    UpdateDisplayMode();
 }
