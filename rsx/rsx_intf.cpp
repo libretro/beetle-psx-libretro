@@ -3784,8 +3784,9 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
 
 void rsx_intf_set_display_range(uint16_t y1, uint16_t y2)
 {
-   /* No corresponding rsx_dump at the moment,
-      implement rsx_dump_set_display_range */
+#ifdef RSX_DUMP
+   rsx_dump_set_display_range(y1, y2);
+#endif
 
    switch (rsx_type)
    {
@@ -3818,7 +3819,7 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                                bool is_480i)
 {
 #ifdef RSX_DUMP
-   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp);
+   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i);
 #endif
 
    switch (rsx_type)
