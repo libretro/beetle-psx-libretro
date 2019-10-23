@@ -1122,6 +1122,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU_SoftReset();
              rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
                                     GPU.ClipX1, GPU.ClipY1);
+             rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd); //0x10, 0x100 set by GPU_SoftReset()
              UpdateDisplayMode();
             break;
 

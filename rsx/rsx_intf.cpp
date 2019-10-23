@@ -347,7 +347,7 @@ static DrawConfig persistent_config = {
    {0, 0},         /* draw_area_top_left */
    {0, 0},         /* draw_area_dimensions */
    {0, 0},         /* draw_offset */
-   {0, 0},         /* display_area_yrange (verify if these values are appropriate)*/ 
+   {0x10, 0x100},  /* display_area_yrange (hardware reset values)*/ 
    false,          /* is_pal */
    false,          /* is_480i */
 };
