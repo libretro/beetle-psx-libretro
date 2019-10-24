@@ -3900,16 +3900,6 @@ void retro_run(void)
                // This shouldn't happen.
                break;
          }
-
-
-         if (is_pal)
-         {
-            // Attempt to remove black bars.
-            // These numbers are arbitrary since the bars differ some by game.
-            // Changes aspect ratio in the process.
-            height -= 36;
-            pix_offset += 5 * (MEDNAFEN_CORE_GEOMETRY_MAX_W << 2);
-         }
       }
 
 
