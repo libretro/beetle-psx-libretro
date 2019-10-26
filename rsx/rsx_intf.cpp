@@ -224,6 +224,9 @@ struct DrawConfig
    int16_t  draw_offset[2];
    uint16_t draw_area_top_left[2];
    uint16_t draw_area_bot_right[2];
+   uint16_t display_area_yrange[2];
+   bool     is_pal;
+   bool     is_480i;
 };
 
 struct Texture
@@ -344,6 +347,9 @@ static DrawConfig persistent_config = {
    {0, 0},         /* draw_area_top_left */
    {0, 0},         /* draw_area_dimensions */
    {0, 0},         /* draw_offset */
+   {0x10, 0x100},  /* display_area_yrange (hardware reset values)*/ 
+   false,          /* is_pal */
+   false,          /* is_480i */
 };
 
 static RetroGl static_renderer;
@@ -1457,6 +1463,11 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    float aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 
       MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
+   /* Padding vars */
+   uint32_t unpadded_h;
+   uint32_t top_pad = 0;
+   uint32_t bottom_pad = 0;
+
    if (renderer->display_vram)
    {
       _w           = VRAM_WIDTH_PIXELS;
@@ -1464,9 +1475,41 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       /* Is this accurate? */
       aspect_ratio = 2.0 / 1.0;
    }
+   else
+   {
+      /* Height padding for non-standard framebuffer heights 
+       *
+       * We check the config.is_pal set by UpdateDisplayMode 
+       * instead of querying content_is_pal since config.is_pal
+       * is a runtime GPU value while content_is_pal is only set
+       * at load time */
+
+      uint16_t first_line = renderer->config.is_pal ? 20 : 16;
+      uint16_t last_line = renderer->config.is_pal ? 308 : 256; //non-inclusive bound
+
+      if (renderer->config.display_area_yrange[0] > first_line) //check bounds
+         top_pad = (uint32_t) (renderer->config.display_area_yrange[0] - first_line);
+      if (renderer->config.display_area_yrange[1] < last_line)
+         bottom_pad = (uint32_t) (last_line - renderer->config.display_area_yrange[1]);
+
+      if (renderer->config.is_480i) //double padding if 480-line mode
+      {
+         top_pad *= 2;
+         bottom_pad *= 2;
+      }
+   }
 
    w       = (uint32_t) _w * upscale;
    h       = (uint32_t) _h * upscale;
+
+   //printf("VertStart = %3u, VertEnd = %3u\n", renderer->config.display_area_yrange[0], renderer->config.display_area_yrange[1]);
+   //printf("_w = %3u, _h = %3u, top_pad = %3u, bottom_pad = %3u\n", _w, _h, top_pad, bottom_pad);
+
+   /* Scale pad heights up and add to scaled height */
+   unpadded_h = h;
+   top_pad     *= upscale;
+   bottom_pad  *= upscale;
+   h += (top_pad + bottom_pad);
 
    if (w != f_w || h != f_h)
    {
@@ -1490,7 +1533,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    /* Bind the output framebuffer provided by the frontend */
    fbo = glsm_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-   glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+   glViewport(0, (GLsizei) bottom_pad, (GLsizei) w, (GLsizei) unpadded_h);
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
@@ -2144,6 +2187,12 @@ static void rsx_gl_finalize_frame(const void *fb, unsigned width,
    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
    glDisable(GL_DEPTH_TEST);
    glDisable(GL_BLEND);
+
+   /* Clear the screen no matter what: prevents possible leftover 
+      pixels from previous frame when loading save state for any 
+      games not using standard framebuffer heights */
+   glClearColor(0.0, 0.0, 0.0, 0.0);
+   glClear(GL_COLOR_BUFFER_BIT);
 
    /* If the display is off, just clear the screen */
    if (renderer->config.display_off && !renderer->display_vram)
@@ -3733,12 +3782,44 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
-void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
-                               uint16_t w, uint16_t h,
-                               bool depth_24bpp)
+void rsx_intf_set_display_range(uint16_t y1, uint16_t y2)
 {
 #ifdef RSX_DUMP
-   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp);
+   rsx_dump_set_display_range(y1, y2);
+#endif
+
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         break;
+      case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         {
+            GlRenderer *renderer = static_renderer.state_data;
+            if (static_renderer.state != GlState_Invalid
+                  && renderer)
+            {
+               renderer->config.display_area_yrange[0] = y1;
+               renderer->config.display_area_yrange[1] = y2;
+            }
+         }
+#endif
+         break;
+      case RSX_VULKAN:
+         //implement me for Vulkan and set HAVE_VULKAN define check
+         break;
+   }
+}
+
+
+void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
+                               uint16_t w, uint16_t h,
+                               bool depth_24bpp,
+                               bool is_pal, 
+                               bool is_480i)
+{
+#ifdef RSX_DUMP
+   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i);
 #endif
 
    switch (rsx_type)
@@ -3758,6 +3839,9 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                renderer->config.display_resolution[0] = w;
                renderer->config.display_resolution[1] = h;
                renderer->config.display_24bpp         = depth_24bpp;
+
+               renderer->config.is_pal  = is_pal;
+               renderer->config.is_480i = is_480i;
             }
          }
 #endif

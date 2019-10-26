@@ -45,9 +45,12 @@ void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
 void rsx_intf_set_draw_offset(int16_t x, int16_t y);
 void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
                             uint16_t x1, uint16_t y1);
+void rsx_intf_set_display_range(uint16_t y1, uint16_t y2);
 void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,
-                               bool depth_24bpp);
+                               bool depth_24bpp,
+                               bool is_pal,
+                               bool is_480i);
 
 void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                             float p1x, float p1y, float p1w,
