@@ -330,6 +330,9 @@ struct GlRenderer {
     * the visible area */
    bool display_vram;
 
+   /* When true we perform no horizontal padding */
+   bool crop_overscan;
+
    int32_t initial_scanline;
    int32_t initial_scanline_pal;
    int32_t last_scanline;
@@ -1214,6 +1217,16 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    get_variables(&upscaling, &display_vram);
 
+   var.key = BEETLE_OPT(crop_overscan);
+   bool crop_overscan = true;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         crop_overscan = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         crop_overscan = false;
+   }
+
    int32_t initial_scanline = 0;
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -1409,6 +1422,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->frontend_resolution[1] = 0;
    renderer->internal_upscaling = upscaling;
    renderer->internal_color_depth = depth;
+   renderer->crop_overscan = crop_overscan;
    renderer->initial_scanline = initial_scanline;
    renderer->last_scanline = last_scanline;
    renderer->initial_scanline_pal = initial_scanline_pal;
@@ -1512,9 +1526,11 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
    /* Padding vars */
+   uint32_t unpadded_w;
    uint32_t unpadded_h;
    int32_t top_pad = 0;
    int32_t bottom_pad = 0;
+   uint32_t left_pad = 0;
 
    if (renderer->display_vram)
    {
@@ -1548,6 +1564,43 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
          top_pad *= 2;
          bottom_pad *= 2;
       }
+
+      /* Overscan cropping code
+       * Centers PAL games, but on real hardware PAL games are often times miscentered.
+       * Need to use horizontal display range if we want real miscentered behavior, but
+       * real behavior might be undesired for emulation. */
+      if (!renderer->crop_overscan) //reverse case of software renderer: here we calculate how much padding to add, rather than how much to remove
+      {
+         switch (_w)
+         {
+            case 256:
+               left_pad = 12;
+               break;
+
+            case 320:
+               left_pad = 15;
+               break;
+
+            /* The unusual case: 368px mode. Width is 364 for
+             * typical 368 mode games. Technically should have
+             * something like 1.7 blank pixels more on the
+             * right-hand side but not super important for
+             * emulation. Some games using this mode might bug
+             * out or not get padded at all, needs further 
+             * testing.*/
+            case 364:
+               left_pad = 16;
+               break;
+
+            case 512:
+               left_pad = 24;
+               break;
+
+            case 640:
+               left_pad = 30;
+               break;
+         }
+      }
    }
 
    w       = (uint32_t) _w * upscale;
@@ -1561,6 +1614,11 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    top_pad     *= upscale;
    bottom_pad  *= upscale;
    h += (top_pad + bottom_pad);
+
+   /* Scale horizontal padding up and add to scaled width */
+   unpadded_w = w;
+   left_pad *= upscale;
+   w += (2 * left_pad);
 
    if (w != f_w || h != f_h)
    {
@@ -1584,7 +1642,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    /* Bind the output framebuffer provided by the frontend */
    fbo = glsm_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-   glViewport(0, (GLsizei) bottom_pad, (GLsizei) w, (GLsizei) unpadded_h);
+   glViewport((GLsizei) left_pad, (GLsizei) bottom_pad, (GLsizei) unpadded_w, (GLsizei) unpadded_h);
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
@@ -1609,6 +1667,16 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       has_software_fb = true;
 
    get_variables(&upscaling, &display_vram);
+
+   var.key = BEETLE_OPT(crop_overscan);
+   bool crop_overscan = true;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         crop_overscan = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         crop_overscan = false;
+   }
 
    int32_t initial_scanline = 0;
    var.key = BEETLE_OPT(initial_scanline);
@@ -1773,6 +1841,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    renderer->display_vram           = display_vram;
    renderer->internal_color_depth   = depth;
    renderer->filter_type            = filter;
+   renderer->crop_overscan          = crop_overscan;
    renderer->initial_scanline       = initial_scanline;
    renderer->last_scanline          = last_scanline;
    renderer->initial_scanline_pal   = initial_scanline_pal;
