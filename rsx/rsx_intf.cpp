@@ -329,6 +329,11 @@ struct GlRenderer {
    /* When true we display the entire VRAM buffer instead of just
     * the visible area */
    bool display_vram;
+
+   int32_t initial_scanline;
+   int32_t initial_scanline_pal;
+   int32_t last_scanline;
+   int32_t last_scanline_pal;
 };
 
 struct RetroGl
@@ -1209,6 +1214,34 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    get_variables(&upscaling, &display_vram);
 
+   int32_t initial_scanline = 0;
+   var.key = BEETLE_OPT(initial_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline = atoi(var.value);
+   }
+
+   int32_t last_scanline = 239;
+   var.key = BEETLE_OPT(last_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline = atoi(var.value);
+   }
+
+   int32_t initial_scanline_pal = 0;
+   var.key = BEETLE_OPT(initial_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline_pal = atoi(var.value);
+   }
+
+   int32_t last_scanline_pal = 287;
+   var.key = BEETLE_OPT(last_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline_pal = atoi(var.value);
+   }
+
    var.key = BEETLE_OPT(filter);
    uint8_t filter = FILTER_MODE_NEAREST;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -1376,6 +1409,10 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->frontend_resolution[1] = 0;
    renderer->internal_upscaling = upscaling;
    renderer->internal_color_depth = depth;
+   renderer->initial_scanline = initial_scanline;
+   renderer->last_scanline = last_scanline;
+   renderer->initial_scanline_pal = initial_scanline_pal;
+   renderer->last_scanline_pal = last_scanline_pal;
    renderer->primitive_ordering = 0;
    renderer->tex_x_mask = 0;
    renderer->tex_x_or = 0;
@@ -1476,8 +1513,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
 
    /* Padding vars */
    uint32_t unpadded_h;
-   uint32_t top_pad = 0;
-   uint32_t bottom_pad = 0;
+   int32_t top_pad = 0;
+   int32_t bottom_pad = 0;
 
    if (renderer->display_vram)
    {
@@ -1499,9 +1536,12 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       uint16_t last_line = renderer->config.is_pal ? 308 : 256; //non-inclusive bound
 
       if (renderer->config.display_area_yrange[0] > first_line) //check bounds
-         top_pad = (uint32_t) (renderer->config.display_area_yrange[0] - first_line);
+         top_pad = (int32_t) (renderer->config.display_area_yrange[0] - first_line);
       if (renderer->config.display_area_yrange[1] < last_line)
-         bottom_pad = (uint32_t) (last_line - renderer->config.display_area_yrange[1]);
+         bottom_pad = (int32_t) (last_line - renderer->config.display_area_yrange[1]);
+
+      top_pad -= (renderer->config.is_pal ? renderer->initial_scanline_pal : renderer->initial_scanline);
+      bottom_pad -= (renderer->config.is_pal ? 287 - renderer->last_scanline_pal : 239 - renderer->last_scanline);
 
       if (renderer->config.is_480i) //double padding if 480-line mode
       {
@@ -1514,7 +1554,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    h       = (uint32_t) _h * upscale;
 
    //printf("VertStart = %3u, VertEnd = %3u\n", renderer->config.display_area_yrange[0], renderer->config.display_area_yrange[1]);
-   //printf("_w = %3u, _h = %3u, top_pad = %3u, bottom_pad = %3u\n", _w, _h, top_pad, bottom_pad);
+   //printf("_w = %3d, _h = %3d, top_pad = %3d, bottom_pad = %3d\n", _w, _h, top_pad, bottom_pad);
 
    /* Scale pad heights up and add to scaled height */
    unpadded_h = h;
@@ -1569,6 +1609,34 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       has_software_fb = true;
 
    get_variables(&upscaling, &display_vram);
+
+   int32_t initial_scanline = 0;
+   var.key = BEETLE_OPT(initial_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline = atoi(var.value);
+   }
+
+   int32_t last_scanline = 239;
+   var.key = BEETLE_OPT(last_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline = atoi(var.value);
+   }
+
+   int32_t initial_scanline_pal = 0;
+   var.key = BEETLE_OPT(initial_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline_pal = atoi(var.value);
+   }
+
+   int32_t last_scanline_pal = 287;
+   var.key = BEETLE_OPT(last_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline_pal = atoi(var.value);
+   }
 
    var.key = BEETLE_OPT(filter);
 
@@ -1705,6 +1773,10 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    renderer->display_vram           = display_vram;
    renderer->internal_color_depth   = depth;
    renderer->filter_type            = filter;
+   renderer->initial_scanline       = initial_scanline;
+   renderer->last_scanline          = last_scanline;
+   renderer->initial_scanline_pal   = initial_scanline_pal;
+   renderer->last_scanline_pal      = last_scanline_pal;
 
    return reconfigure_frontend;
 }
