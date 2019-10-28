@@ -1196,6 +1196,17 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    if (!renderer)
       return false;
 
+   var.key = BEETLE_OPT(renderer_software_fb);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         has_software_fb = true;
+      else
+         has_software_fb = false;
+   }
+   else
+      has_software_fb = true;
+
    get_variables(&upscaling, &display_vram);
 
    var.key = BEETLE_OPT(filter);
