@@ -1551,10 +1551,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       uint16_t first_line = renderer->config.is_pal ? 20 : 16;
       uint16_t last_line = renderer->config.is_pal ? 308 : 256; //non-inclusive bound
 
-      if (renderer->config.display_area_yrange[0] > first_line) //check bounds
-         top_pad = (int32_t) (renderer->config.display_area_yrange[0] - first_line);
-      if (renderer->config.display_area_yrange[1] < last_line)
-         bottom_pad = (int32_t) (last_line - renderer->config.display_area_yrange[1]);
+      top_pad = (int32_t) (renderer->config.display_area_yrange[0] - first_line);
+      bottom_pad = (int32_t) (last_line - renderer->config.display_area_yrange[1]);
 
       top_pad -= (renderer->config.is_pal ? renderer->initial_scanline_pal : renderer->initial_scanline);
       bottom_pad -= (renderer->config.is_pal ? 287 - renderer->last_scanline_pal : 239 - renderer->last_scanline);
