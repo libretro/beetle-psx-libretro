@@ -16,8 +16,9 @@ void rsx_dump_finalize_frame(void);
 void rsx_dump_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy);
 void rsx_dump_set_draw_offset(int16_t x, int16_t y);
 void rsx_dump_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
-void rsx_dump_set_display_range(uint16_t y1, uint16_t y2);
-void rsx_dump_set_display_mode(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool depth_24bpp, bool is_pal, bool is_480i);
+void rsx_dump_set_horizontal_display_range(uint16_t x1, uint16_t x2);
+void rsx_dump_set_vertical_display_range(uint16_t y1, uint16_t y2);
+void rsx_dump_set_display_mode(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool depth_24bpp, bool is_pal, bool is_480i, int width_mode);
 
 struct rsx_dump_vertex
 {
