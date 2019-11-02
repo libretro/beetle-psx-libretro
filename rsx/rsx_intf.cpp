@@ -224,7 +224,8 @@ struct DrawConfig
    int16_t  draw_offset[2];
    uint16_t draw_area_top_left[2];
    uint16_t draw_area_bot_right[2];
-   uint16_t display_area_yrange[2];
+   uint16_t display_area_hrange[2];
+   uint16_t display_area_vrange[2];
    bool     is_pal;
    bool     is_480i;
 };
@@ -330,9 +331,13 @@ struct GlRenderer {
     * the visible area */
    bool display_vram;
 
+   /* Display Mode - GP1(08h) */
+   enum width_modes curr_width_mode;
+
    /* When true we perform no horizontal padding */
    bool crop_overscan;
 
+   /* Scanline core options */
    int32_t initial_scanline;
    int32_t initial_scanline_pal;
    int32_t last_scanline;
@@ -355,7 +360,8 @@ static DrawConfig persistent_config = {
    {0, 0},         /* draw_area_top_left */
    {0, 0},         /* draw_area_dimensions */
    {0, 0},         /* draw_offset */
-   {0x10, 0x100},  /* display_area_yrange (hardware reset values)*/ 
+   {0x200, 0xC00}, /* display_area_hrange (hardware reset values)*/
+   {0x10, 0x100},  /* display_area_vrange (hardware reset values)*/ 
    false,          /* is_pal */
    false,          /* is_480i */
 };
@@ -1423,6 +1429,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->internal_upscaling = upscaling;
    renderer->internal_color_depth = depth;
    renderer->crop_overscan = crop_overscan;
+   renderer->curr_width_mode = WIDTH_MODE_320;
    renderer->initial_scanline = initial_scanline;
    renderer->last_scanline = last_scanline;
    renderer->initial_scanline_pal = initial_scanline_pal;
@@ -1530,7 +1537,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    uint32_t unpadded_h;
    int32_t top_pad = 0;
    int32_t bottom_pad = 0;
-   uint32_t left_pad = 0;
+   int32_t left_pad = 0;
+   int32_t right_pad = 0;
 
    if (renderer->display_vram)
    {
@@ -1551,10 +1559,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       uint16_t first_line = renderer->config.is_pal ? 20 : 16;
       uint16_t last_line = renderer->config.is_pal ? 308 : 256; //non-inclusive bound
 
-      if (renderer->config.display_area_yrange[0] > first_line) //check bounds
-         top_pad = (int32_t) (renderer->config.display_area_yrange[0] - first_line);
-      if (renderer->config.display_area_yrange[1] < last_line)
-         bottom_pad = (int32_t) (last_line - renderer->config.display_area_yrange[1]);
+      top_pad = (int32_t) (renderer->config.display_area_vrange[0] - first_line);
+      bottom_pad = (int32_t) (last_line - renderer->config.display_area_vrange[1]);
 
       top_pad -= (renderer->config.is_pal ? renderer->initial_scanline_pal : renderer->initial_scanline);
       bottom_pad -= (renderer->config.is_pal ? 287 - renderer->last_scanline_pal : 239 - renderer->last_scanline);
@@ -1565,49 +1571,52 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
          bottom_pad *= 2;
       }
 
-      /* Overscan cropping code
-       * Centers PAL games, but on real hardware PAL games are often times miscentered.
-       * Need to use horizontal display range if we want real miscentered behavior, but
-       * real behavior might be undesired for emulation. */
+      /* Overscan cropping code */
       if (!renderer->crop_overscan) //reverse case of software renderer: here we calculate how much padding to add, rather than how much to remove
       {
-         switch (_w)
+         int32_t pix_clk;
+         switch (renderer->curr_width_mode)
          {
-            case 256:
-               left_pad = 12;
+            case WIDTH_MODE_256:
+               pix_clk = 10;
                break;
 
-            case 320:
-               left_pad = 15;
+            case WIDTH_MODE_320:
+               pix_clk = 8;
                break;
 
-            /* The unusual case: 368px mode. Width is 364 for
-             * typical 368 mode games. Technically should have
-             * something like 1.7 blank pixels more on the
-             * right-hand side but not super important for
-             * emulation. Some games using this mode might bug
-             * out or not get padded at all, needs further 
-             * testing.*/
-            case 364:
-               left_pad = 16;
+            case WIDTH_MODE_512:
+               pix_clk = 5;
                break;
 
-            case 512:
-               left_pad = 24;
+            case WIDTH_MODE_640:
+               pix_clk = 4;
                break;
 
-            case 640:
-               left_pad = 30;
+            /* The unusual case: 368px mode. Width is 364 px for
+             * typical 368 mode games but often times something
+             * different, which necessitates checking width mode 
+             * rather than calculated pixel width */
+            case WIDTH_MODE_368:
+               pix_clk = 7;
+               break;
+
+            default: //should never be here -- if we're here, something is terribly wrong
                break;
          }
+         int32_t line_width = 2800 / pix_clk; //width of line measured in pixels outputted by psx
+         left_pad = (renderer->config.display_area_hrange[0] - 488) / pix_clk;
+         right_pad = line_width - ((renderer->config.display_area_hrange[1] - 488) / pix_clk);
       }
    }
 
    w       = (uint32_t) _w * upscale;
    h       = (uint32_t) _h * upscale;
 
-   //printf("VertStart = %3u, VertEnd = %3u\n", renderer->config.display_area_yrange[0], renderer->config.display_area_yrange[1]);
+   //printf("VertStart = %3u, VertEnd = %3u\n", renderer->config.display_area_vrange[0], renderer->config.display_area_vrange[1]);
    //printf("_w = %3d, _h = %3d, top_pad = %3d, bottom_pad = %3d\n", _w, _h, top_pad, bottom_pad);
+   //printf("HorizStart = %4u, HorizEnd = %4u\n", renderer->config.display_area_hrange[0], renderer->config.display_area_hrange[1]);
+   //printf("_w = %3d, left_pad = %3d, right_pad = %3d\n", _w, left_pad, right_pad);
 
    /* Scale pad heights up and add to scaled height */
    unpadded_h = h;
@@ -1618,7 +1627,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    /* Scale horizontal padding up and add to scaled width */
    unpadded_w = w;
    left_pad *= upscale;
-   w += (2 * left_pad);
+   right_pad *= upscale;
+   w += (left_pad + right_pad);
 
    if (w != f_w || h != f_h)
    {
@@ -3934,10 +3944,10 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
-void rsx_intf_set_display_range(uint16_t y1, uint16_t y2)
+void rsx_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
 #ifdef RSX_DUMP
-   rsx_dump_set_display_range(y1, y2);
+   rsx_dump_set_horizontal_display_range(x1, x2);
 #endif
 
    switch (rsx_type)
@@ -3951,8 +3961,37 @@ void rsx_intf_set_display_range(uint16_t y1, uint16_t y2)
             if (static_renderer.state != GlState_Invalid
                   && renderer)
             {
-               renderer->config.display_area_yrange[0] = y1;
-               renderer->config.display_area_yrange[1] = y2;
+               renderer->config.display_area_hrange[0] = x1;
+               renderer->config.display_area_hrange[1] = x2;
+            }
+         }
+#endif
+         break;
+      case RSX_VULKAN:
+         //implement me for Vulkan and set HAVE_VULKAN define check
+         break;
+   }
+}
+
+void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
+{
+#ifdef RSX_DUMP
+   rsx_dump_set_vertical_display_range(y1, y2);
+#endif
+
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         break;
+      case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         {
+            GlRenderer *renderer = static_renderer.state_data;
+            if (static_renderer.state != GlState_Invalid
+                  && renderer)
+            {
+               renderer->config.display_area_vrange[0] = y1;
+               renderer->config.display_area_vrange[1] = y2;
             }
          }
 #endif
@@ -3968,10 +4007,11 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,
                                bool depth_24bpp,
                                bool is_pal, 
-                               bool is_480i)
+                               bool is_480i,
+                               int width_mode)
 {
 #ifdef RSX_DUMP
-   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i);
+   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
    switch (rsx_type)
@@ -3994,6 +4034,8 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
 
                renderer->config.is_pal  = is_pal;
                renderer->config.is_480i = is_480i;
+
+               renderer->curr_width_mode = (enum width_modes) width_mode;
             }
          }
 #endif

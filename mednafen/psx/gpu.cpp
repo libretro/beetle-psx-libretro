@@ -555,10 +555,13 @@ static void UpdateDisplayMode(void)
 
    unsigned pixelclock_divider;
 
+   enum width_modes curr_width_mode;
+
    if ((GPU.DisplayMode >> 6) & 1)
    {
       // HRes ~ 368pixels
       pixelclock_divider = 7;
+      curr_width_mode = WIDTH_MODE_368;
    }
    else
    {
@@ -567,18 +570,22 @@ static void UpdateDisplayMode(void)
          case 0:
             // Hres ~ 256pixels
             pixelclock_divider = 10;
+            curr_width_mode = WIDTH_MODE_256;
             break;
          case 1:
             // Hres ~ 320pixels
             pixelclock_divider = 8;
+            curr_width_mode = WIDTH_MODE_320;
             break;
          case 2:
             // Hres ~ 512pixels
             pixelclock_divider = 5;
+            curr_width_mode = WIDTH_MODE_512;
             break;
          default:
             // Hres ~ 640pixels
             pixelclock_divider = 4;
+            curr_width_mode = WIDTH_MODE_640;
             break;
       }
    }
@@ -598,7 +605,8 @@ static void UpdateDisplayMode(void)
          xres, yres,
          depth_24bpp,
          is_pal_mode, 
-         is_480i_mode);
+         is_480i_mode,
+         curr_width_mode);
 }
 
 /* Forward decls */
@@ -1122,7 +1130,8 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU_SoftReset();
              rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
                                     GPU.ClipX1, GPU.ClipY1);
-             rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd); //0x10, 0x100 set by GPU_SoftReset()
+             rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); //0x200, 0xC00 set by GPU_SoftReset()
+             rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); //0x10, 0x100 set by GPU_SoftReset()
              UpdateDisplayMode();
             break;
 
@@ -1156,12 +1165,13 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x06:  // Horizontal display range
             GPU.HorizStart = V & 0xFFF;
             GPU.HorizEnd = (V >> 12) & 0xFFF;
+            rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
             break;
 
          case 0x07:
             GPU.VertStart = V & 0x3FF;
             GPU.VertEnd = (V >> 10) & 0x3FF;
-            rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd);
+            rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
             break;
 
          case 0x08:
@@ -1866,7 +1876,8 @@ void GPU_RestoreStateP3(void)
                         1024, 512,
                         GPU.vram, false, false);
 
-   rsx_intf_set_display_range(GPU.VertStart, GPU.VertEnd);
+   rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
+   rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
 
    UpdateDisplayMode();
 }
