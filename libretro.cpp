@@ -2661,7 +2661,7 @@ static bool boot = true;
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
-static bool has_new_geometry = false;
+bool has_new_geometry = false;
 
 static void check_variables(bool startup)
 {
@@ -3671,24 +3671,13 @@ void retro_run(void)
             // apply the change immediately
             GPU_Rescale(psx_gpu_upscale_shift);
             alloc_surface();
-            has_new_geometry = false;
+            has_new_geometry = false; /* New AV info also updates geometry */
          }
          else
          {
-            // Failed, we have to postpone the upscaling change
+            /* Failed, we have to postpone the upscaling change */
             psx_gpu_upscale_shift = GPU_get_upscale_shift();
          }
-      }
-
-      /* Widescreen hack changed, need to call SET_GEOMETRY to change aspect ratio */
-      if (has_new_geometry)
-      {
-         retro_get_system_av_info(&new_av_info);
-         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info))
-         {
-            has_new_geometry = false;
-         }
-
       }
 
       switch (psx_gpu_dither_mode)
@@ -3704,6 +3693,14 @@ void retro_run(void)
       }
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
+   }
+
+   if (has_new_geometry)
+   {
+      struct retro_system_av_info new_av_info;
+      retro_get_system_av_info(&new_av_info);
+      if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info))
+         has_new_geometry = false;
    }
 
    /* We only start counting after the first frame we encounter. This
@@ -3743,7 +3740,7 @@ void retro_run(void)
 
    input_poll_cb();
 
-   input_update(libretro_supports_bitmasks, input_state_cb );
+   input_update(libretro_supports_bitmasks, input_state_cb);
 
    static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    rects[0] = ~0;

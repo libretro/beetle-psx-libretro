@@ -368,6 +368,11 @@ static DrawConfig persistent_config = {
 
 static RetroGl static_renderer;
 
+/* Used to keep track of software renderer's width and height */
+/* Updated when rsx_intf_set_display_mode is called */
+static uint16_t sw_cur_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+static uint16_t sw_cur_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -3574,8 +3579,8 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          memset(info, 0, sizeof(*info));
          info->timing.fps            = content_is_pal ? FPS_PAL : FPS_NTSC;
          info->timing.sample_rate    = SOUND_FREQUENCY;
-         info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
-         info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+         info->geometry.base_width   = sw_cur_width  << psx_gpu_upscale_shift;
+         info->geometry.base_height  = sw_cur_height << psx_gpu_upscale_shift;
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
          info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
@@ -4017,27 +4022,34 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
+         if (w != sw_cur_width || h != sw_cur_height)
+         {
+            has_new_geometry = true;
+            sw_cur_width  = w;
+            sw_cur_height = h;
+         }
+
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+      {
+         GlRenderer *renderer = static_renderer.state_data;
+         if (static_renderer.state != GlState_Invalid
+               && renderer)
          {
-            GlRenderer *renderer = static_renderer.state_data;
-            if (static_renderer.state != GlState_Invalid
-                  && renderer)
-            {
-               renderer->config.display_top_left[0]   = x;
-               renderer->config.display_top_left[1]   = y;
+            renderer->config.display_top_left[0]   = x;
+            renderer->config.display_top_left[1]   = y;
 
-               renderer->config.display_resolution[0] = w;
-               renderer->config.display_resolution[1] = h;
-               renderer->config.display_24bpp         = depth_24bpp;
+            renderer->config.display_resolution[0] = w;
+            renderer->config.display_resolution[1] = h;
+            renderer->config.display_24bpp         = depth_24bpp;
 
-               renderer->config.is_pal  = is_pal;
-               renderer->config.is_480i = is_480i;
+            renderer->config.is_pal  = is_pal;
+            renderer->config.is_480i = is_480i;
 
-               renderer->curr_width_mode = (enum width_modes) width_mode;
-            }
+            renderer->curr_width_mode = (enum width_modes) width_mode;
          }
+      }
 #endif
          break;
       case RSX_VULKAN:
@@ -4065,8 +4077,8 @@ void rsx_intf_push_triangle(
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
-	  uint16_t min_u, uint16_t min_v,
-	  uint16_t max_u, uint16_t max_v,
+      uint16_t min_u, uint16_t min_v,
+      uint16_t max_u, uint16_t max_v,
       uint16_t texpage_x, uint16_t texpage_y,
       uint16_t clut_x, uint16_t clut_y,
       uint8_t texture_blend_mode,
@@ -4124,23 +4136,23 @@ void rsx_intf_push_triangle(
 }
 
 void rsx_intf_push_quad(
-	float p0x, float p0y, float p0w,
-	float p1x, float p1y, float p1w,
-	float p2x, float p2y, float p2w,
-	float p3x, float p3y, float p3w,
-	uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
-	uint16_t t0x, uint16_t t0y,
-	uint16_t t1x, uint16_t t1y,
-	uint16_t t2x, uint16_t t2y,
-	uint16_t t3x, uint16_t t3y,
-	uint16_t min_u, uint16_t min_v,
-	uint16_t max_u, uint16_t max_v,
-	uint16_t texpage_x, uint16_t texpage_y,
-	uint16_t clut_x, uint16_t clut_y,
-	uint8_t texture_blend_mode,
-	uint8_t depth_shift,
-	bool dither,
-	int blend_mode,
+   float p0x, float p0y, float p0w,
+   float p1x, float p1y, float p1w,
+   float p2x, float p2y, float p2w,
+   float p3x, float p3y, float p3w,
+   uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+   uint16_t t0x, uint16_t t0y,
+   uint16_t t1x, uint16_t t1y,
+   uint16_t t2x, uint16_t t2y,
+   uint16_t t3x, uint16_t t3y,
+   uint16_t min_u, uint16_t min_v,
+   uint16_t max_u, uint16_t max_v,
+   uint16_t texpage_x, uint16_t texpage_y,
+   uint16_t clut_x, uint16_t clut_y,
+   uint8_t texture_blend_mode,
+   uint8_t depth_shift,
+   bool dither,
+   int blend_mode,
    uint32_t mask_test,
    uint32_t set_mask)
 {
@@ -4158,11 +4170,11 @@ void rsx_intf_push_quad(
    rsx_dump_quad(vertices, &state);
 #endif
 
-	switch (rsx_type)
-	{
-	case RSX_SOFTWARE:
-		break;
-	case RSX_OPENGL:
+   switch (rsx_type)
+   {
+   case RSX_SOFTWARE:
+      break;
+   case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       if (static_renderer.state != GlState_Invalid
             && static_renderer.state_data)
@@ -4176,22 +4188,22 @@ void rsx_intf_push_quad(
                dither,
                blend_mode, mask_test != 0, set_mask != 0);
 #endif
-		break;
+      break;
    case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
       if (renderer)
          rsx_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-			c0, c1, c2, c3,
-			t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
-			min_u, min_v, max_u, max_v,
-			texpage_x, texpage_y, clut_x, clut_y,
-			texture_blend_mode,
-			depth_shift,
-			dither,
-			blend_mode, mask_test != 0, set_mask != 0);
+         c0, c1, c2, c3,
+         t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
+         min_u, min_v, max_u, max_v,
+         texpage_x, texpage_y, clut_x, clut_y,
+         texture_blend_mode,
+         depth_shift,
+         dither,
+         blend_mode, mask_test != 0, set_mask != 0);
 #endif
       break;
-	}
+   }
 }
 
 void rsx_intf_push_line(int16_t p0x, int16_t p0y,

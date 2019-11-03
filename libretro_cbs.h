@@ -16,6 +16,7 @@ extern int lineRenderMode;
 extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
+extern bool has_new_geometry;
 
 #ifdef __cplusplus
 }
