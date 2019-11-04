@@ -2936,11 +2936,11 @@ static void check_variables(void)
 
 	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
 	{
-		if ( !strcmp(var.value, "Off") ) {
+		if ( !strcmp(var.value, "off") ) {
 			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_OFF );
-		} else if ( !strcmp(var.value, "Cross") ) {
+		} else if ( !strcmp(var.value, "cross") ) {
 			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS );
-		} else if ( !strcmp(var.value, "Dot") ) {
+		} else if ( !strcmp(var.value, "dot") ) {
 			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
 		}
 	}
@@ -2950,12 +2950,14 @@ static void check_variables(void)
 
    if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
    {
-      if ( !strcmp(var.value, "Touchscreen" ) ) {
-         gun_input_mode = SETTING_GUN_INPUT_POINTER;
-      } else {
+      if ( !strcmp(var.value, "lightgun" ) ) {
          gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
       }
-   }
+      else if ( !strcmp(var.value, "touchscreen" ) ) {
+         gun_input_mode = SETTING_GUN_INPUT_POINTER;
+      }
+   } else
+      gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
 
 	var.key = BEETLE_OPT(negcon_deadzone);
 	var.value = NULL;
@@ -3054,22 +3056,8 @@ static void check_variables(void)
    {
       if (strcmp(var.value, "disabled") == 0)
          image_offset = 0;
-      else if (strcmp(var.value, "1 px") == 0)
-         image_offset = -1;
-      else if (strcmp(var.value, "-1 px") == 0)
-         image_offset = 1;
-      else if (strcmp(var.value, "2 px") == 0)
-         image_offset = -2;
-      else if (strcmp(var.value, "-2 px") == 0)
-         image_offset = 2;
-      else if (strcmp(var.value, "3 px") == 0)
-         image_offset = -3;
-      else if (strcmp(var.value, "-3 px") == 0)
-         image_offset = 3;
-      else if (strcmp(var.value, "4 px") == 0)
-         image_offset = -4;
-      else if (strcmp(var.value, "-4 px") == 0)
-         image_offset = 4;
+      else
+         image_offset = atoi(var.value);
    }
 
    var.key = BEETLE_OPT(image_crop);
@@ -3078,22 +3066,8 @@ static void check_variables(void)
    {
       if (strcmp(var.value, "disabled") == 0)
          image_crop = 0;
-      else if (strcmp(var.value, "1 px") == 0)
-         image_crop = 1;
-      else if (strcmp(var.value, "2 px") == 0)
-         image_crop = 2;
-      else if (strcmp(var.value, "3 px") == 0)
-         image_crop = 3;
-      else if (strcmp(var.value, "4 px") == 0)
-         image_crop = 4;
-      else if (strcmp(var.value, "5 px") == 0)
-         image_crop = 5;
-      else if (strcmp(var.value, "6 px") == 0)
-         image_crop = 6;
-      else if (strcmp(var.value, "7 px") == 0)
-         image_crop = 7;
-      else if (strcmp(var.value, "8 px") == 0)
-         image_crop = 8;
+      else
+         image_crop = atoi(var.value);
    }
 
    var.key = BEETLE_OPT(cd_fastload);

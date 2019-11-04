@@ -103,7 +103,7 @@ struct retro_core_option_definition option_defs_us[] = {
       "Multi-Sampled Anti Aliasing",
       "Apply multi-sample anti-aliasing (MSAA) to rendered content. This is a type of spatial anti-aliasing similar to supersampling, but of somewhat lower quality and with (correspondingly) lower performance requirements. Improves the appearance of 3D objects. Only supported by the Vulkan renderer.",
       {
-         { "1x",  NULL },
+         { "1x",  "1x (Default)" },
          { "2x",  NULL },
          { "4x",  NULL },
          { "8x",  NULL },
@@ -144,11 +144,11 @@ struct retro_core_option_definition option_defs_us[] = {
       "Internal Color Depth",
       "The PSX has a limited color depth of 16 bits per pixel (bpp). This leads to 'banding' effects (uneven color gradients) which are 'smoothed out' by original hardware through the use of a dithering pattern. The 'Dithered 16bpp (Native)' setting emulates this behaviour. Selecting '32 bpp' increases the color depth such that smooth gradients can be achieved without dithering, allowing for a 'cleaner' output image. Only the OpenGL renderer supports this choice (the Software renderer forces 16 bpp, while the Vulkan renderer forces 32 bpp). Note: the 'Dithering Pattern' option should be disabled when using increased color depth.",
       {
-         { "dithered 16bpp (native)", "Dithered 16 bpp (Native)" },
-         { "32bpp",                   "32 bpp" },
+         { "16bpp(native)", "16 bpp (Native)" },
+         { "32bpp",         "32 bpp" },
          { NULL, NULL },
       },
-      "dithered 16bpp (native)"
+      "16bpp(native)"
    },
    {
       BEETLE_OPT(wireframe),
@@ -270,7 +270,7 @@ struct retro_core_option_definition option_defs_us[] = {
          { "70%",           NULL },
          { "80%",           NULL },
          { "90%",           NULL },
-         { "100% (native)", "100% (Native)" },
+         { "100%(native)", "100% (Native)" },
          { "110%",          NULL },
          { "120%",          NULL },
          { "130%",          NULL },
@@ -313,7 +313,7 @@ struct retro_core_option_definition option_defs_us[] = {
          { "500%",          NULL },
          { NULL, NULL },
       },
-      "100% (native)"
+      "100%(native)"
    },
    {
       BEETLE_OPT(gte_overclock),
@@ -392,14 +392,14 @@ struct retro_core_option_definition option_defs_us[] = {
       "When 'Crop Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels. Note: This can have unintended consequences. While the absolute width is reduced, the resultant video is still scaled to the currently set aspect ratio. Enabling 'Additional Cropping' may therefore cause horizontal stretching. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
-         { "1 px",     NULL },
-         { "2 px",     NULL },
-         { "3 px",     NULL },
-         { "4 px",     NULL },
-         { "5 px",     NULL },
-         { "6 px",     NULL },
-         { "7 px",     NULL },
-         { "8 px",     NULL },
+         { "1px",     NULL },
+         { "2px",     NULL },
+         { "3px",     NULL },
+         { "4px",     NULL },
+         { "5px",     NULL },
+         { "6px",     NULL },
+         { "7px",     NULL },
+         { "8px",     NULL },
          { NULL, NULL },
       },
       "disabled"
@@ -410,14 +410,14 @@ struct retro_core_option_definition option_defs_us[] = {
       "When 'Crop Overscan' is enabled, allows the resultant cropped image to be offset horizontally to the right (positive) or left (negative) by the specified number of pixels. May be used to correct alignment issues. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
-         { "-4 px",    NULL },
-         { "-3 px",    NULL },
-         { "-2 px",    NULL },
-         { "-1 px",    NULL },
-         { "1 px",     NULL },
-         { "2 px",     NULL },
-         { "3 px",     NULL },
-         { "4 px",     NULL },
+         { "-4px",    NULL },
+         { "-3px",    NULL },
+         { "-2px",    NULL },
+         { "-1px",    NULL },
+         { "+1px",     NULL },
+         { "+2px",     NULL },
+         { "+3px",     NULL },
+         { "+4px",     NULL },
          { NULL, NULL },
       },
       "disabled"
@@ -531,23 +531,23 @@ struct retro_core_option_definition option_defs_us[] = {
       "Gun Cursor",
       "Select the gun cursor to be displayed on screen while using the the 'Guncon / G-Con 45' and 'Justifier' input device types. When disabled, cross hairs are always hidden.",
       {
-         { "Cross", NULL },
-         { "Dot",   NULL },
-         { "Off",   "disabled" },
+         { "cross", "Cross" },
+         { "dot",   "Dot" },
+         { "off",   "disabled" },
          { NULL, NULL },
       },
-      "Cross"
+      "cross"
    },
    {
       BEETLE_OPT(gun_input_mode),
       "Gun Input Mode",
       "When device type is set to 'Guncon / G-Con 45' or 'Justifier', specify whether to use a mouse-controlled 'Light Gun' or 'Touchscreen' input.",
       {
-         { "Lightgun",    "Light Gun" },
-         { "Touchscreen", NULL },
+         { "lightgun",    "Light Gun" },
+         { "touchscreen", "Touchscreen" },
          { NULL, NULL },
       },
-      "Lightgun"
+      "lightgun"
    },
    {
       BEETLE_OPT(mouse_sensitivity),
@@ -600,19 +600,19 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(negcon_deadzone),
-      "NegCon Twist Deadzone (Percent)",
+      "NegCon Twist Deadzone",
       "Sets the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most negCon-compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any required adjustments should *only* be applied via this core option. This is particularly important when 'NegCon Twist Response' is set to 'Quadratic' or 'Cubic'.",
       {
-         { "0",  NULL },
-         { "5",  NULL },
-         { "10", NULL },
-         { "15", NULL },
-         { "20", NULL },
-         { "25", NULL },
-         { "30", NULL },
+         { "0%",  NULL },
+         { "5%",  NULL },
+         { "10%", NULL },
+         { "15%", NULL },
+         { "20%", NULL },
+         { "25%", NULL },
+         { "30%", NULL },
          { NULL, NULL },
       },
-      "0"
+      "0%"
    },
    {
       BEETLE_OPT(negcon_response),
@@ -678,7 +678,7 @@ struct retro_core_option_definition option_defs_us[] = {
       "Increase CD Loading Speed",
       "Select disk access speed multiplier. Setting this higher than '2x (Native)' can greatly reduce in-game loading times, but may introduce errors/timing glitches. Some games break entirely if the loading speed is increased above a certain value.",
       {
-         { "2x (native)", "2x (Native)" },
+         { "2x(native)", "2x (Native)" },
          { "4x",          NULL },
          { "6x",          NULL },
          { "8x",          NULL },
@@ -687,7 +687,7 @@ struct retro_core_option_definition option_defs_us[] = {
          { "14x",         NULL },
          { NULL, NULL },
       },
-      "2x (native)"
+      "2x(native)"
    },
    {
       BEETLE_OPT(initial_scanline),
