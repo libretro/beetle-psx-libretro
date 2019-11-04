@@ -189,6 +189,7 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "nearest"
    },
+#endif
    {
       BEETLE_OPT(pgxp_mode),
       "PGXP Operation Mode",
@@ -201,6 +202,7 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "disabled"
    },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(pgxp_vertex),
       "PGXP Vertex Cache",
