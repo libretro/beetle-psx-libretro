@@ -368,11 +368,6 @@ static DrawConfig persistent_config = {
 
 static RetroGl static_renderer;
 
-/* Used to keep track of software renderer's width and height */
-/* Updated when rsx_intf_set_display_mode is called */
-static uint16_t sw_cur_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
-static uint16_t sw_cur_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -3587,16 +3582,16 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         {
-            /* TODO/FIXME - This definition seems very backwards and duplicating work */
+      {
+         /* TODO/FIXME - This definition seems very backwards and duplicating work */
 
-            /* This will possibly trigger the frontend to reconfigure itself */
-            if (static_renderer.inited)
-               rsx_gl_refresh_variables();
+         /* This will possibly trigger the frontend to reconfigure itself */
+         if (static_renderer.inited)
+            rsx_gl_refresh_variables();
 
-            struct retro_system_av_info result = get_av_info(static_renderer.video_clock);
-            memcpy(info, &result, sizeof(result));
-         }
+         struct retro_system_av_info result = get_av_info(static_renderer.video_clock);
+         memcpy(info, &result, sizeof(result));
+      }
 #endif
          break;
       case RSX_VULKAN:

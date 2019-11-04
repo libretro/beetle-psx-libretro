@@ -7,8 +7,9 @@
 #include "rsx.h"
 
 #define SOUND_FREQUENCY 44100
-#define FPS_NTSC 59.941
-#define FPS_PAL 49.76
+
+#define FPS_NTSC 59.29286256195557357 /* 53222400/263/3413 */
+#define FPS_PAL  49.76455935759674759 /* 53222400/314/3406 */
 
 enum rsx_renderer_type
 {
@@ -28,12 +29,17 @@ enum blending_modes
 
 enum width_modes
 {
-    WIDTH_MODE_256 = 0,
-    WIDTH_MODE_320,
-    WIDTH_MODE_512,
-    WIDTH_MODE_640,
-    WIDTH_MODE_368
+   WIDTH_MODE_256 = 0,
+   WIDTH_MODE_320,
+   WIDTH_MODE_512,
+   WIDTH_MODE_640,
+   WIDTH_MODE_368
 };
+
+/* Used to keep track of software renderer's width and height */
+/* Updated when rsx_intf_set_display_mode is called */
+static uint16_t sw_cur_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+static uint16_t sw_cur_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
 
 void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
