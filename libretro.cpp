@@ -3017,9 +3017,8 @@ static void check_variables(void)
       if (!strcmp(var.value, "enabled"))
       {
          bool can_dupe = false;
-
          if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &can_dupe))
-            allow_frame_duping = true;
+            allow_frame_duping = can_dupe;
       }
       else if (!strcmp(var.value, "disabled"))
          allow_frame_duping = false;
@@ -3479,6 +3478,9 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.key = BEETLE_OPT(image_crop);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
+         option_display.key = BEETLE_OPT(frame_duping);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+
          break;
       }
       case RSX_VULKAN:
@@ -3496,6 +3498,9 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.key = BEETLE_OPT(image_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(image_crop);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+
+         option_display.key = BEETLE_OPT(frame_duping);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
          break;
