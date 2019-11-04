@@ -354,7 +354,7 @@ struct RetroGl
 
 static DrawConfig persistent_config = {
    {0, 0},         /* display_top_left */
-   {MEDNAFEN_CORE_GEOMETRY_MAX_W, MEDNAFEN_CORE_GEOMETRY_MAX_H}, /* display_resolution */
+   {MEDNAFEN_CORE_GEOMETRY_MAX_W, MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL}, /* display_resolution */
    false,          /* display_24bpp */
    true,           /* display_off */
    {0, 0},         /* draw_area_top_left */
@@ -1638,8 +1638,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
 
       /* Max parameters are ignored by this call */
-      geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
-      geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
+      geometry.max_width  = 0;
+      geometry.max_height = 0;
 
       geometry.aspect_ratio = aspect_ratio;
 
@@ -2206,7 +2206,8 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    else
    {
       max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-      max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H;
+      max_height = std == VideoClock_Pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL
+                  : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC;
    }
 
    memset(&info, 0, sizeof(info));
@@ -2233,10 +2234,10 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    switch (std)
    {
       case VideoClock_Ntsc:
-         info.timing.fps = FPS_NTSC;
+         info.timing.fps = MEDNAFEN_CORE_TIMING_FPS_NTSC;
          break;
       case VideoClock_Pal:
-         info.timing.fps = FPS_PAL;
+         info.timing.fps = MEDNAFEN_CORE_TIMING_FPS_PAL;
          break;
    }
 
@@ -3572,12 +3573,13 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    {
       case RSX_SOFTWARE:
          memset(info, 0, sizeof(*info));
-         info->timing.fps            = content_is_pal ? FPS_PAL : FPS_NTSC;
+         info->timing.fps            = content_is_pal ? MEDNAFEN_CORE_TIMING_FPS_PAL : MEDNAFEN_CORE_TIMING_FPS_NTSC;
          info->timing.sample_rate    = SOUND_FREQUENCY;
          info->geometry.base_width   = sw_cur_width  << psx_gpu_upscale_shift;
          info->geometry.base_height  = sw_cur_height << psx_gpu_upscale_shift;
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
-         info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
+         info->geometry.max_height   = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL   << psx_gpu_upscale_shift
+                                                      : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC  << psx_gpu_upscale_shift;
          info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
          break;
       case RSX_OPENGL:
@@ -3602,14 +3604,15 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
          info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
          info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
-         info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
+         info->geometry.max_height  = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL * (super_sampling ? 1 : scaling)
+                                      : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC * (super_sampling ? 1 : scaling);
          info->timing.sample_rate   = SOUND_FREQUENCY;
 
          info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
          if (content_is_pal)
-            info->timing.fps = FPS_PAL;
+            info->timing.fps = MEDNAFEN_CORE_TIMING_FPS_PAL;
          else
-            info->timing.fps = FPS_NTSC;
+            info->timing.fps = MEDNAFEN_CORE_TIMING_FPS_NTSC;
 #endif
          break;
    }

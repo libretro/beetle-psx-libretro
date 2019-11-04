@@ -74,7 +74,6 @@ unsigned psx_gpu_overclock_shift = 0;
 static int psx_skipbios;
 
 bool psx_gte_overclock;
-static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
 
 //iCB: PGXP options
@@ -2417,7 +2416,7 @@ static void alloc_surface(void)
 {
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-   uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+   uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC;
 
    width  <<= GPU_get_upscale_shift();
    height <<= GPU_get_upscale_shift();
@@ -3484,8 +3483,7 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   is_pal = (CalcDiscSCEx() == REGION_EU);
-   content_is_pal = is_pal;
+   content_is_pal = (CalcDiscSCEx() == REGION_EU);
 
    alloc_surface();
 
@@ -3515,7 +3513,7 @@ bool retro_load_game(const struct retro_game_info *info)
       force_software_renderer = true;
    } 
 
-   ret = rsx_intf_open(is_pal, force_software_renderer);
+   ret = rsx_intf_open(content_is_pal, force_software_renderer);
 
    /* Hide irrelevant core options */
    switch (rsx_intf_is_type())
@@ -3714,7 +3712,7 @@ void retro_run(void)
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
          char msg_buffer[64];
-         float fps = is_pal ? FPS_PAL : FPS_NTSC;
+         float fps = content_is_pal ? MEDNAFEN_CORE_TIMING_FPS_PAL : MEDNAFEN_CORE_TIMING_FPS_NTSC;
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
          snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
@@ -3742,14 +3740,17 @@ void retro_run(void)
 
    input_update(libretro_supports_bitmasks, input_state_cb);
 
-   static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
-   rects[0] = ~0;
+   /* TODO - Declaring static arrays like this is bad. Find a better way */
+   static int32 rects_pal[MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL];
+   static int32 rects_ntsc[MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC];
+   rects_pal[0]  = ~0;
+   rects_ntsc[0] = ~0;
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
    spec.SoundRate = 44100;
    spec.SoundBuf = NULL;
-   spec.LineWidths = rects;
+   spec.LineWidths = content_is_pal ? rects_pal : rects_ntsc;
    spec.SoundBufMaxSize = 0;
    spec.SoundVolume = 1.0;
    spec.soundmultiplier = 1.0;
@@ -3845,7 +3846,7 @@ void retro_run(void)
    /* end of Emulate */
 
    const void *fb        = NULL;
-   unsigned width        = rects[0];
+   unsigned width        = content_is_pal ? rects_pal[0] : rects_ntsc[0];
    unsigned height       = spec.DisplayRect.h;
    uint8_t upscale_shift = GPU_get_upscale_shift();
 
@@ -3869,7 +3870,7 @@ void retro_run(void)
 #endif
       // PSX is rather special, and needs specific handling ...
 
-      width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
+      width  = content_is_pal ? rects_pal[0] : rects_ntsc[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
       height = spec.DisplayRect.h;
       //fprintf(stderr, "(%u x %u)\n", width, height);
 
@@ -4009,7 +4010,7 @@ void retro_deinit(void)
 
 unsigned retro_get_region(void)
 {
-   if (is_pal)
+   if (content_is_pal)
       return RETRO_REGION_PAL;
    return RETRO_REGION_NTSC;
 }
