@@ -3846,7 +3846,7 @@ void retro_run(void)
    /* end of Emulate */
 
    const void *fb        = NULL;
-   unsigned width        = content_is_pal ? rects_pal[0] : rects_ntsc[0];
+   unsigned width        = spec.LineWidths[0];
    unsigned height       = spec.DisplayRect.h;
    uint8_t upscale_shift = GPU_get_upscale_shift();
 
@@ -3869,8 +3869,9 @@ void retro_run(void)
          PrevInterlaced = false;
 #endif
       // PSX is rather special, and needs specific handling ...
-
-      width  = content_is_pal ? rects_pal[0] : rects_ntsc[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
+      /* PSX module writes meaningful widths to spec.LineWidths and
+       * several times, zero to spec.DisplayRect.w */
+      width  = spec.LineWidths[0];
       height = spec.DisplayRect.h;
       //fprintf(stderr, "(%u x %u)\n", width, height);
 

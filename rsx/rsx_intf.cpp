@@ -245,7 +245,7 @@ struct Framebuffer
 
 struct PrimitiveBatch {
    SemiTransparencyMode transparency_mode;
-	/* GL_TRIANGLES or GL_LINES */
+   /* GL_TRIANGLES or GL_LINES */
    GLenum draw_mode;
    bool opaque;
    bool set_mask;
@@ -980,8 +980,8 @@ static void GlRenderer_draw(GlRenderer *renderer)
    Framebuffer_init(&_fb, &renderer->fb_out);
 
    glFramebufferTexture(   GL_DRAW_FRAMEBUFFER,
-		 GL_DEPTH_STENCIL_ATTACHMENT,
-		 renderer->fb_out_depth.id,
+         GL_DEPTH_STENCIL_ATTACHMENT,
+         renderer->fb_out_depth.id,
          0);
 
    glClear(GL_DEPTH_BUFFER_BIT);
@@ -1000,80 +1000,80 @@ static void GlRenderer_draw(GlRenderer *renderer)
    renderer->command_buffer->map = NULL;
 
    if (!renderer->batches.empty())
-	  renderer->batches.back().count = renderer->vertex_index_pos
-		 - renderer->batches.back().first;
+      renderer->batches.back().count = renderer->vertex_index_pos
+         - renderer->batches.back().first;
 
    for (std::vector<PrimitiveBatch>::iterator it =
-		  renderer->batches.begin();
-		  it != renderer->batches.end();
-		  ++it)
+         renderer->batches.begin();
+         it != renderer->batches.end();
+         ++it)
    {
-	  /* Mask bits */
-	  if (it->set_mask)
-		 glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	  else
-		 glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+      /* Mask bits */
+      if (it->set_mask)
+         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+      else
+         glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
 
-	  if (it->mask_test)
-		 glStencilFunc(GL_NOTEQUAL, 1, 1);
-	  else
-		 glStencilFunc(GL_ALWAYS, 1, 1);
+      if (it->mask_test)
+         glStencilFunc(GL_NOTEQUAL, 1, 1);
+      else
+         glStencilFunc(GL_ALWAYS, 1, 1);
 
-	  /* Blending */
-	  bool opaque = it->opaque;
-	  if (renderer->command_buffer->program)
-		 glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], !opaque);
-	  if (opaque)
-		 glDisable(GL_BLEND);
-	  else
-	  {
-		 glEnable(GL_BLEND);
+      /* Blending */
+      bool opaque = it->opaque;
+      if (renderer->command_buffer->program)
+         glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], !opaque);
+      if (opaque)
+         glDisable(GL_BLEND);
+      else
+      {
+         glEnable(GL_BLEND);
 
-		 GLenum blend_func = GL_FUNC_ADD;
-		 GLenum blend_src = GL_CONSTANT_ALPHA;
-		 GLenum blend_dst = GL_CONSTANT_ALPHA;
+         GLenum blend_func = GL_FUNC_ADD;
+         GLenum blend_src = GL_CONSTANT_ALPHA;
+         GLenum blend_dst = GL_CONSTANT_ALPHA;
 
-		 switch (it->transparency_mode)
-       {
-          /* 0.5xB + 0.5 x F */
-          case SemiTransparencyMode_Average:
-             blend_func = GL_FUNC_ADD;
-             /* Set to 0.5 with glBlendColor */
-             blend_src = GL_CONSTANT_ALPHA;
-             blend_dst = GL_CONSTANT_ALPHA;
-             break;
-             /* 1.0xB + 1.0 x F */
-          case SemiTransparencyMode_Add:
-             blend_func = GL_FUNC_ADD;
-             blend_src = GL_ONE;
-             blend_dst = GL_ONE;
-             break;
-             /* 1.0xB - 1.0 x F */
-          case SemiTransparencyMode_SubtractSource:
-             blend_func = GL_FUNC_REVERSE_SUBTRACT;
-             blend_src = GL_ONE;
-             blend_dst = GL_ONE;
-             break;
-          case SemiTransparencyMode_AddQuarterSource:
-             blend_func = GL_FUNC_ADD;
-             blend_src = GL_CONSTANT_COLOR;
-             blend_dst = GL_ONE;
-             break;
-       }
+         switch (it->transparency_mode)
+         {
+            /* 0.5xB + 0.5 x F */
+            case SemiTransparencyMode_Average:
+               blend_func = GL_FUNC_ADD;
+               /* Set to 0.5 with glBlendColor */
+               blend_src = GL_CONSTANT_ALPHA;
+               blend_dst = GL_CONSTANT_ALPHA;
+               break;
+               /* 1.0xB + 1.0 x F */
+            case SemiTransparencyMode_Add:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+               /* 1.0xB - 1.0 x F */
+            case SemiTransparencyMode_SubtractSource:
+               blend_func = GL_FUNC_REVERSE_SUBTRACT;
+               blend_src = GL_ONE;
+               blend_dst = GL_ONE;
+               break;
+            case SemiTransparencyMode_AddQuarterSource:
+               blend_func = GL_FUNC_ADD;
+               blend_src = GL_CONSTANT_COLOR;
+               blend_dst = GL_ONE;
+               break;
+         }
 
-		 glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-		 glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
-	  }
+         glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+         glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+      }
 
-	  /* Drawing */
-	  if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
-	  {
-		 /* This method doesn't call prepare_draw/finalize_draw itself, it
-		  * must be handled by the caller. This is because this command
-		  * can be called several times on the same buffer (i.e. multiple
-		  * draw calls between the prepare/finalize) */
-		 glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT, &renderer->vertex_indices[it->first]);
-	  }
+      /* Drawing */
+      if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
+      {
+         /* This method doesn't call prepare_draw/finalize_draw itself, it
+         * must be handled by the caller. This is because this command
+         * can be called several times on the same buffer (i.e. multiple
+         * draw calls between the prepare/finalize) */
+         glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT, &renderer->vertex_indices[it->first]);
+      }
    }
 
    glDisable(GL_STENCIL_TEST);
@@ -1373,10 +1373,10 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    {
       /* Dithering is superfluous when we increase the internal
       * color depth, but users asked for it */
-	   DrawBuffer_disable_attribute(command_buffer, "dither");
+      DrawBuffer_disable_attribute(command_buffer, "dither");
    } else
    {
-	   DrawBuffer_enable_attribute(command_buffer, "dither");
+      DrawBuffer_enable_attribute(command_buffer, "dither");
    }
 
    GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
@@ -1413,7 +1413,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          &renderer->fb_out_depth,
          renderer->fb_out.width,
          renderer->fb_out.height,
-			GL_DEPTH24_STENCIL8);
+         GL_DEPTH24_STENCIL8);
 
    renderer->filter_type = filter;
    renderer->command_buffer = command_buffer;
@@ -1492,7 +1492,7 @@ static void GlRenderer_free(GlRenderer *renderer)
 
    unsigned i;
    for (i = 0; i < INDEX_BUFFER_LEN; i++)
-	  renderer->vertex_indices[i] = 0;
+      renderer->vertex_indices[i] = 0;
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -1747,22 +1747,22 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    dither_mode dither_mode = DITHER_NATIVE;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	   if (!strcmp(var.value, "1x(native)"))
-	   {
-		   dither_mode = DITHER_NATIVE;
-		   DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
-	   }
+      if (!strcmp(var.value, "1x(native)"))
+      {
+         dither_mode = DITHER_NATIVE;
+         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+      }
 
-	   else if (!strcmp(var.value, "internal resolution"))
-	   {
-		   dither_mode = DITHER_UPSCALED;
-		   DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
-	   }
-	   else if (!strcmp(var.value, "disabled"))
-	   {
-		   dither_mode  = DITHER_OFF;
-		   DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
-	   }
+      else if (!strcmp(var.value, "internal resolution"))
+      {
+         dither_mode = DITHER_UPSCALED;
+         DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
+      }
+      else if (!strcmp(var.value, "disabled"))
+      {
+         dither_mode  = DITHER_OFF;
+         DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
+      }
    }
 
    var.key = BEETLE_OPT(wireframe);
@@ -1779,7 +1779,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    if (rebuild_fb_out)
    {
-	  if (dither_mode == DITHER_OFF)
+      if (dither_mode == DITHER_OFF)
          DrawBuffer_disable_attribute(renderer->command_buffer, "dither");
       else
          DrawBuffer_enable_attribute(renderer->command_buffer, "dither");
@@ -1866,8 +1866,8 @@ static void vertex_preprocessing(
       unsigned count,
       GLenum mode,
       SemiTransparencyMode stm,
-	  bool mask_test,
-	  bool set_mask)
+      bool mask_test,
+      bool set_mask)
 {
    if (!renderer)
       return;
@@ -1903,56 +1903,56 @@ static void vertex_preprocessing(
    }
 
    if (renderer->batches.empty()
-		 || mode != renderer->command_draw_mode
-		 || is_opaque != renderer->opaque
-		 || (is_semi_transparent &&
-			   stm != renderer->semi_transparency_mode)
-		 || renderer->set_mask != set_mask
-		 || renderer->mask_test != mask_test)
+         || mode != renderer->command_draw_mode
+         || is_opaque != renderer->opaque
+         || (is_semi_transparent &&
+            stm != renderer->semi_transparency_mode)
+         || renderer->set_mask != set_mask
+         || renderer->mask_test != mask_test)
    {
-	  if (!renderer->batches.empty())
-	  {
-		 PrimitiveBatch& last_batch = renderer->batches.back();
-		 last_batch.count = renderer->vertex_index_pos - last_batch.first;
-	  }
-	  PrimitiveBatch batch;
-	  batch.opaque = is_opaque;
-	  batch.draw_mode = mode;
-	  batch.transparency_mode = stm;
-	  batch.set_mask = set_mask;
-	  batch.mask_test = mask_test;
-	  batch.first = renderer->vertex_index_pos;
-	  batch.count = 0;
-	  renderer->batches.push_back(batch);
+      if (!renderer->batches.empty())
+      {
+         PrimitiveBatch& last_batch = renderer->batches.back();
+         last_batch.count = renderer->vertex_index_pos - last_batch.first;
+      }
+      PrimitiveBatch batch;
+      batch.opaque = is_opaque;
+      batch.draw_mode = mode;
+      batch.transparency_mode = stm;
+      batch.set_mask = set_mask;
+      batch.mask_test = mask_test;
+      batch.first = renderer->vertex_index_pos;
+      batch.count = 0;
+      renderer->batches.push_back(batch);
 
-	  renderer->semi_transparency_mode = stm;
-	  renderer->command_draw_mode = mode;
-	  renderer->opaque = is_opaque;
-	  renderer->set_mask = set_mask;
-	  renderer->mask_test = mask_test;
+      renderer->semi_transparency_mode = stm;
+      renderer->command_draw_mode = mode;
+      renderer->opaque = is_opaque;
+      renderer->set_mask = set_mask;
+      renderer->mask_test = mask_test;
    }
 }
 
 static void vertex_add_blended_pass(
-	  GlRenderer *renderer, int vertex_index)
+      GlRenderer *renderer, int vertex_index)
 {
    if (!renderer->batches.empty())
    {
-	  PrimitiveBatch& last_batch = renderer->batches.back();
-	  last_batch.count = renderer->vertex_index_pos - last_batch.first;
+      PrimitiveBatch& last_batch = renderer->batches.back();
+      last_batch.count = renderer->vertex_index_pos - last_batch.first;
 
-	  PrimitiveBatch batch;
-	  batch.opaque = false;
-	  batch.draw_mode = last_batch.draw_mode;
-	  batch.transparency_mode = last_batch.transparency_mode;
-	  batch.set_mask = true;
-	  batch.mask_test = last_batch.mask_test;
-	  batch.first = vertex_index;
-	  batch.count = 0;
-	  renderer->batches.push_back(batch);
+      PrimitiveBatch batch;
+      batch.opaque = false;
+      batch.draw_mode = last_batch.draw_mode;
+      batch.transparency_mode = last_batch.transparency_mode;
+      batch.set_mask = true;
+      batch.mask_test = last_batch.mask_test;
+      batch.first = vertex_index;
+      batch.count = 0;
+      renderer->batches.push_back(batch);
 
-	  renderer->opaque = false;
-	  renderer->set_mask = true;
+      renderer->opaque = false;
+      renderer->set_mask = true;
    }
 }
 
@@ -1962,8 +1962,8 @@ static void push_primitive(
       unsigned count,
       GLenum mode,
       SemiTransparencyMode stm,
-	  bool mask_test,
-	  bool set_mask)
+      bool mask_test,
+      bool set_mask)
 {
    if (!renderer)
       return;
@@ -2224,7 +2224,7 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    if (display_vram)
       info.geometry.aspect_ratio = 2./1.;
 
-   info.timing.sample_rate     = SOUND_FREQUENCY;
+   info.timing.sample_rate     = MEDNAFEN_CORE_TIMING_SAMPLERATE;
 
    /* Precise FPS values for the video output for the given
     * VideoClock. It's actually possible to configure the PlayStation GPU
@@ -2500,30 +2500,15 @@ static void rsx_gl_push_quad(
       semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent     = false;
 
-   switch (blend_mode)
+   if (blend_mode == -1)
    {
-      case -1:
-         semi_transparent       = false;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 0:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Average;
-         break;
-      case 1:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 2:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-         break;
-      case 3:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-         break;
-      default:
-         break;
+      semi_transparent       = false; /* opaque */
+      semi_transparency_mode = SemiTransparencyMode_Add;
+   }
+   else
+   {
+      semi_transparent       = true;
+      semi_transparency_mode = (SemiTransparencyMode)blend_mode;
    }
 
    CommandVertex v[4] =
@@ -2542,7 +2527,7 @@ static void rsx_gl_push_quad(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
@@ -2558,7 +2543,7 @@ static void rsx_gl_push_quad(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
@@ -2574,7 +2559,7 @@ static void rsx_gl_push_quad(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       },
       {
          {p3x, p3y, 0.95, p3w }, /* position */
@@ -2590,7 +2575,7 @@ static void rsx_gl_push_quad(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 { min_u, min_v, max_u, max_v },
+         { min_u, min_v, max_u, max_v },
       },
    };
 
@@ -2604,11 +2589,11 @@ static void rsx_gl_push_quad(
    unsigned index_pos = renderer->vertex_index_pos;
 
    for (unsigned i = 0; i < 6; i++)
-	  renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
+      renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
 
    /* Add transparent pass if needed */
    if (is_semi_transparent && is_textured)
-	  vertex_add_blended_pass(renderer, index_pos);
+      vertex_add_blended_pass(renderer, index_pos);
 
    DrawBuffer_push_slice(renderer->command_buffer, v, 4,
          sizeof(CommandVertex));
@@ -2636,30 +2621,15 @@ static void rsx_gl_push_triangle(
       semi_transparency_mode    = SemiTransparencyMode_Add;
    bool semi_transparent        = false;
 
-   switch (blend_mode)
+   if (blend_mode == -1)
    {
-      case -1:
-         semi_transparent       = false;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 0:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Average;
-         break;
-      case 1:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 2:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-         break;
-      case 3:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-         break;
-      default:
-         break;
+      semi_transparent       = false;
+      semi_transparency_mode = SemiTransparencyMode_Add;
+   }
+   else
+   {
+      semi_transparent       = true;
+      semi_transparency_mode = (SemiTransparencyMode)blend_mode;
    }
 
    CommandVertex v[3] =
@@ -2678,7 +2648,7 @@ static void rsx_gl_push_triangle(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       },
       {
          {p1x, p1y, 0.95, p1w }, /* position */
@@ -2694,7 +2664,7 @@ static void rsx_gl_push_triangle(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       },
       {
          {p2x, p2y, 0.95, p2w }, /* position */
@@ -2710,7 +2680,7 @@ static void rsx_gl_push_triangle(
          depth_shift,
          (uint8_t) dither,
          semi_transparent,
-		 {min_u, min_v, max_u, max_v},
+         {min_u, min_v, max_u, max_v},
       }
    };
 
@@ -2791,7 +2761,7 @@ static void rsx_gl_copy_rect(
    GlRenderer *renderer = static_renderer.state_data;
 
    if (src_x == dst_x && src_y == dst_y)
-	  return;
+      return;
 
    renderer->set_mask          = mask_set_or != 0;
    renderer->mask_test         = mask_eval_and != 0;
@@ -2876,30 +2846,15 @@ static void rsx_gl_push_line(
       semi_transparency_mode = SemiTransparencyMode_Add;
    bool semi_transparent     = false;
 
-   switch (blend_mode)
+   if (blend_mode == -1)
    {
-      case -1:
-         semi_transparent       = false;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 0:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Average;
-         break;
-      case 1:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_Add;
-         break;
-      case 2:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_SubtractSource;
-         break;
-      case 3:
-         semi_transparent       = true;
-         semi_transparency_mode = SemiTransparencyMode_AddQuarterSource;
-         break;
-      default:
-         break;
+      semi_transparent       = false;
+      semi_transparency_mode = SemiTransparencyMode_Add;
+   }
+   else
+   {
+      semi_transparent       = true;
+      semi_transparency_mode = (SemiTransparencyMode)blend_mode;
    }
 
    CommandVertex v[2] = {
@@ -3225,7 +3180,7 @@ static void rsx_vulkan_refresh_variables(void)
    var.key = BEETLE_OPT(msaa);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-	  msaa = strtoul(var.value, nullptr, 0);
+      msaa = strtoul(var.value, nullptr, 0);
    }
 
    var.key = BEETLE_OPT(mdec_yuv);
@@ -3574,7 +3529,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
       case RSX_SOFTWARE:
          memset(info, 0, sizeof(*info));
          info->timing.fps            = content_is_pal ? MEDNAFEN_CORE_TIMING_FPS_PAL : MEDNAFEN_CORE_TIMING_FPS_NTSC;
-         info->timing.sample_rate    = SOUND_FREQUENCY;
+         info->timing.sample_rate    = MEDNAFEN_CORE_TIMING_SAMPLERATE;
          info->geometry.base_width   = sw_cur_width  << psx_gpu_upscale_shift;
          info->geometry.base_height  = sw_cur_height << psx_gpu_upscale_shift;
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
@@ -3606,7 +3561,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
          info->geometry.max_height  = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL * (super_sampling ? 1 : scaling)
                                       : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC * (super_sampling ? 1 : scaling);
-         info->timing.sample_rate   = SOUND_FREQUENCY;
+         info->timing.sample_rate   = MEDNAFEN_CORE_TIMING_SAMPLERATE;
 
          info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
          if (content_is_pal)
@@ -3890,7 +3845,7 @@ void rsx_intf_set_draw_offset(int16_t x, int16_t y)
 }
 
 void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
-			                   uint16_t x1, uint16_t y1)
+                           uint16_t x1, uint16_t y1)
 {
 #ifdef RSX_DUMP
    rsx_dump_set_draw_area(x0, y0, x1, y1);

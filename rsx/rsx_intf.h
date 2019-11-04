@@ -6,8 +6,6 @@
 
 #include "rsx.h"
 
-#define SOUND_FREQUENCY 44100
-
 enum rsx_renderer_type
 {
    RSX_SOFTWARE = 0,
@@ -72,8 +70,8 @@ void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                             uint32_t c0, uint32_t c1, uint32_t c2,
                             uint16_t t0x, uint16_t t0y,
                             uint16_t t1x, uint16_t t1y,
-	                        uint16_t min_u, uint16_t min_v,
-	                        uint16_t max_u, uint16_t max_v,
+                            uint16_t min_u, uint16_t min_v,
+                            uint16_t max_u, uint16_t max_v,
                             uint16_t t2x, uint16_t t2y,
                             uint16_t texpage_x, uint16_t texpage_y,
                             uint16_t clut_x, uint16_t clut_y,
@@ -99,8 +97,8 @@ void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         uint16_t t1x, uint16_t t1y,
                         uint16_t t2x, uint16_t t2y,
                         uint16_t t3x, uint16_t t3y,
-	                    uint16_t min_u, uint16_t min_v,
-	                    uint16_t max_u, uint16_t max_v,
+                        uint16_t min_u, uint16_t min_v,
+                        uint16_t max_u, uint16_t max_v,
                         uint16_t texpage_x, uint16_t texpage_y,
                         uint16_t clut_x, uint16_t clut_y,
                         uint8_t texture_blend_mode,

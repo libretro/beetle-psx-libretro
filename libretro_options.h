@@ -24,6 +24,7 @@
 /* gi->fps is the real fps multiplied by 256 and 65536 */
 #define MEDNAFEN_CORE_TIMING_FPS_NTSC 59.94099885225296
 #define MEDNAFEN_CORE_TIMING_FPS_PAL  49.84158742427826
+#define MEDNAFEN_CORE_TIMING_SAMPLERATE 44100.0
 
 #ifdef HAVE_HW
 #define BEETLE_OPT(_o) ("beetle_psx_hw_" # _o)
