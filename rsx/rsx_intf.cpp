@@ -4022,14 +4022,41 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-         if (w != sw_cur_width || h != sw_cur_height)
+      {
+         uint16_t new_w = 0;
+         uint16_t new_h = 0;
+
+         switch (width_mode)
+         {
+         case WIDTH_MODE_256:
+            new_w = 256;
+            break;
+         default:
+         case WIDTH_MODE_320:
+            new_w = 320;
+            break;
+         case WIDTH_MODE_368:
+            new_w = 368;
+            break;
+         case WIDTH_MODE_512:
+            new_w = 512;
+            break;
+         case WIDTH_MODE_640:
+            new_w = 640;
+            break;
+         }
+
+         new_h = is_480i ? 480 : 240;
+
+         if (new_w != sw_cur_width || new_h != sw_cur_height)
          {
             has_new_geometry = true;
-            sw_cur_width  = w;
-            sw_cur_height = h;
+            sw_cur_width  = new_w;
+            sw_cur_height = new_h;
          }
 
          break;
+      }
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       {
