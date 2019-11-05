@@ -35,7 +35,6 @@
 
 extern bool psx_gte_overclock;
 
-
 #if 0
  #define EXP_ILL_CHECK(n) {n;}
 #else
@@ -495,129 +494,126 @@ INLINE void PS_CPU::WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, ui
 //
 INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address)
 {
- uint32 instr;
+   uint32 instr;
 
- instr = ICache[(address & 0xFFC) >> 2].Data;
+   bool psx_instr_read_overclock = psx_gte_overclock;
+   //psx_instr_read_overclock = false;
 
- if(ICache[(address & 0xFFC) >> 2].TV != address)
- {
-  ReadAbsorb[ReadAbsorbWhich] = 0;
-  ReadAbsorbWhich = 0;
-
-  if(address >= 0xA0000000 || !(BIU & 0x800))
-  {
-   instr = MDFN_de32lsb<true>((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
-
-/* TODO/FIXME - For some reason, skipping this timestamp increment will cause the BIOS's PS logo screen to hang.
-   For now, we're working around the hang by always incrementing even when the libretro core option 'GTE Overclock' is on */
-#if 0
-   if (!psx_gte_overclock) {
-      timestamp += 4;	// Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
-   }
-#else
-   timestamp += 4;
-#endif
-  }
-  else
-  {
-   __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
-   const uint8 *FMP = (uint8*)(FastMap[(address & 0xFFFFFFF0) >> FAST_MAP_SHIFT] + (address & 0xFFFFFFF0));
-
-   // | 0x2 to simulate (in)validity bits.
-   ICI[0x00].TV = (address & 0xFFFFFFF0) | 0x0 | 0x2;
-   ICI[0x01].TV = (address & 0xFFFFFFF0) | 0x4 | 0x2;
-   ICI[0x02].TV = (address & 0xFFFFFFF0) | 0x8 | 0x2;
-   ICI[0x03].TV = (address & 0xFFFFFFF0) | 0xC | 0x2;
-
-   if (!psx_gte_overclock) {
-      timestamp += 3;
-   }
-
-   switch(address & 0xC)
-   {
-    case 0x0:
-        if (!psx_gte_overclock) {
-           timestamp++;
-        }
-        ICI[0x00].TV &= ~0x2;
-	ICI[0x00].Data = MDFN_de32lsb<true>(&FMP[0x0]);
-    case 0x4:
-        if (!psx_gte_overclock) {
-           timestamp++;
-        }
-        ICI[0x01].TV &= ~0x2;
-	ICI[0x01].Data = MDFN_de32lsb<true>(&FMP[0x4]);
-    case 0x8:
-        if (!psx_gte_overclock) {
-           timestamp++;
-        }
-        ICI[0x02].TV &= ~0x2;
-	ICI[0x02].Data = MDFN_de32lsb<true>(&FMP[0x8]);
-    case 0xC:
-        if (!psx_gte_overclock) {
-           timestamp++;
-        }
-        ICI[0x03].TV &= ~0x2;
-	ICI[0x03].Data = MDFN_de32lsb<true>(&FMP[0xC]);
-	break;
-   }
    instr = ICache[(address & 0xFFC) >> 2].Data;
-  }
- }
 
- return instr;
+   if(ICache[(address & 0xFFC) >> 2].TV != address)
+   {
+      ReadAbsorb[ReadAbsorbWhich] = 0;
+      ReadAbsorbWhich = 0;
+
+      if(address >= 0xA0000000 || !(BIU & 0x800))
+      {
+         instr = MDFN_de32lsb<true>((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
+
+         /* Overclock: Reduce instr read latency to 1 cycle  */
+         if (psx_instr_read_overclock)
+            timestamp += 1;
+         else
+            timestamp += 4; // Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
+      }
+      else
+      {
+         __ICache *ICI = &ICache[((address & 0xFF0) >> 2)];
+         const uint8 *FMP = (uint8*)(FastMap[(address & 0xFFFFFFF0) >> FAST_MAP_SHIFT] + (address & 0xFFFFFFF0));
+
+         // | 0x2 to simulate (in)validity bits.
+         ICI[0x00].TV = (address & 0xFFFFFFF0) | 0x0 | 0x2;
+         ICI[0x01].TV = (address & 0xFFFFFFF0) | 0x4 | 0x2;
+         ICI[0x02].TV = (address & 0xFFFFFFF0) | 0x8 | 0x2;
+         ICI[0x03].TV = (address & 0xFFFFFFF0) | 0xC | 0x2;
+
+         if (psx_instr_read_overclock)
+            timestamp += 1;
+         else
+            timestamp += 3;
+         
+         unsigned ts_incr = 0;
+         switch(address & 0xC)
+         {
+            case 0x0:
+               ts_incr++;
+               ICI[0x00].TV &= ~0x2;
+               ICI[0x00].Data = MDFN_de32lsb<true>(&FMP[0x0]);
+            case 0x4:
+               ts_incr++;
+               ICI[0x01].TV &= ~0x2;
+            ICI[0x01].Data = MDFN_de32lsb<true>(&FMP[0x4]);
+            case 0x8:
+               ts_incr++;
+               ICI[0x02].TV &= ~0x2;
+               ICI[0x02].Data = MDFN_de32lsb<true>(&FMP[0x8]);
+            case 0xC:
+               ts_incr++;
+               ICI[0x03].TV &= ~0x2;
+               ICI[0x03].Data = MDFN_de32lsb<true>(&FMP[0xC]);
+               break;
+         }
+
+         if (!psx_instr_read_overclock)
+            timestamp += ts_incr;
+         
+         instr = ICache[(address & 0xFFC) >> 2].Data;
+      }
+   }
+
+   return instr;
 }
 
 uint32 NO_INLINE PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NP, const uint32 instr)
 {
- uint32 handler = 0x80000080;
+   uint32 handler = 0x80000080;
 
- assert(code < 16);
+   assert(code < 16);
 
 #ifdef DEBUG
- if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
- {
-  static const char* exmne[16] =
-  {
-   "INT", "MOD", "TLBL", "TLBS", "ADEL", "ADES", "IBE", "DBE", "SYSCALL", "BP", "RI", "COPU", "OV", NULL, NULL, NULL
-  };
+   if(code != EXCEPTION_INT && code != EXCEPTION_BP && code != EXCEPTION_SYSCALL)
+   {
+      static const char* exmne[16] =
+      {
+         "INT", "MOD", "TLBL", "TLBS", "ADEL", "ADES", "IBE", "DBE", "SYSCALL", "BP", "RI", "COPU", "OV", NULL, NULL, NULL
+      };
 
-  PSX_DBG(PSX_DBG_WARNING, "[CPU] Exception %s(0x%02x) @ PC=0x%08x(NP=0x%08x, BDBT=0x%02x), Instr=0x%08x, IPCache=0x%02x, CAUSE=0x%08x, SR=0x%08x, IRQC_Status=0x%04x, IRQC_Mask=0x%04x\n",
-	exmne[code], code, PC, NP, BDBT, instr, IPCache, CP0.CAUSE, CP0.SR, IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
- }
+      PSX_DBG(PSX_DBG_WARNING, "[CPU] Exception %s(0x%02x) @ PC=0x%08x(NP=0x%08x, BDBT=0x%02x), Instr=0x%08x, IPCache=0x%02x, CAUSE=0x%08x, SR=0x%08x, IRQC_Status=0x%04x, IRQC_Mask=0x%04x\n",
+      exmne[code], code, PC, NP, BDBT, instr, IPCache, CP0.CAUSE, CP0.SR, IRQ_GetRegister(IRQ_GSREG_STATUS, NULL, 0), IRQ_GetRegister(IRQ_GSREG_MASK, NULL, 0));
+   }
 #endif
 
- if(CP0.SR & (1 << 22))	// BEV
-  handler = 0xBFC00180;
+   if(CP0.SR & (1 << 22))	// BEV
+   handler = 0xBFC00180;
 
- CP0.EPC = PC;
- if(BDBT & 2)
- {
-  CP0.EPC -= 4;
-  CP0.TAR = NP;
- }
+   CP0.EPC = PC;
+   if(BDBT & 2)
+   {
+      CP0.EPC -= 4;
+      CP0.TAR = NP;
+   }
 
- if(ADDBT)
-  ADDBT(PC, handler, true);
+   if(ADDBT)
+   ADDBT(PC, handler, true);
 
- // "Push" IEc and KUc(so that the new IEc and KUc are 0)
- CP0.SR = (CP0.SR & ~0x3F) | ((CP0.SR << 2) & 0x3F);
+   // "Push" IEc and KUc(so that the new IEc and KUc are 0)
+   CP0.SR = (CP0.SR & ~0x3F) | ((CP0.SR << 2) & 0x3F);
 
- // Setup cause register
- CP0.CAUSE &= 0x0000FF00;
- CP0.CAUSE |= code << 2;
+   // Setup cause register
+   CP0.CAUSE &= 0x0000FF00;
+   CP0.CAUSE |= code << 2;
 
- CP0.CAUSE |= BDBT << 30;
- CP0.CAUSE |= (instr << 2) & (0x3 << 28);	// CE
+   CP0.CAUSE |= BDBT << 30;
+   CP0.CAUSE |= (instr << 2) & (0x3 << 28);	// CE
 
- //
- //
- //
- RecalcIPCache();
+   //
+   //
+   //
+   RecalcIPCache();
 
- BDBT = 0;
+   BDBT = 0;
 
- return(handler);
+   return(handler);
 }
 
 #define BACKING_TO_ACTIVE			\

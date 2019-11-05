@@ -84,31 +84,31 @@ static uint32_t CR[32];
 
 typedef union
 {
- gtematrix All[4];
- int32_t Raw[4][5];	// Don't read from this(Raw[][]), only write(and when writing, if running on a big-endian platform, swap the upper 16-bits with the lower 16-bits)
- int16_t Raw16[4][10];
+   gtematrix All[4];
+   int32_t Raw[4][5];   // Don't read from this(Raw[][]), only write(and when writing, if running on a big-endian platform, swap the upper 16-bits with the lower 16-bits)
+   int16_t Raw16[4][10];
 
- struct
- {
-  gtematrix Rot;
-  gtematrix Light;
-  gtematrix Color;
-  gtematrix AbbyNormal;
- };
+   struct
+   {
+      gtematrix Rot;
+      gtematrix Light;
+      gtematrix Color;
+      gtematrix AbbyNormal;
+   };
 } Matrices_t;
 
 
 static union
 {
- int32_t All[4][4];	// Really only [4][3], but [4] to ease address calculation.
-  
- struct
- {
-  int32_t T[4];
-  int32_t B[4];
-  int32_t FC[4];
-  int32_t Null[4];
- };
+   int32_t All[4][4];	// Really only [4][3], but [4] to ease address calculation.
+
+   struct
+   {
+      int32_t T[4];
+      int32_t B[4];
+      int32_t FC[4];
+      int32_t Null[4];
+   };
 } CRVectors;
 
 /* Control registers */
@@ -117,7 +117,7 @@ static int32_t OFY;     /* Screen offset Y: signed 16.16 */
 static uint16_t H;      /* Projection plane distance */
 static int16_t DQA;     /* Depth queing coefficient: signed 8.8 */
 static int32_t DQB;     /* Depth queing offset: signed 8.24 */
- 
+
 static int16_t ZSF3;    /* Scale factor when computing the average of 3 Z values
                          * (triangle): signed 4.12 */
 static int16_t ZSF4;    /* Scale factor when computing the average of 4 Z values
@@ -177,13 +177,13 @@ static INLINE uint8_t Sat5(int16_t cc)
 // Newton-Raphson division table.  (Initialized at startup; do NOT save in save states!)
 //
 static uint8_t DivTable[0x100 + 1];
-static INLINE int32_t CalcRecip(uint16 divisor)
+static INLINE int32_t CalcRecip(uint16_t divisor)
 {
- int32_t x = (0x101 + DivTable[(((divisor & 0x7FFF) + 0x40) >> 7)]);
- int32_t tmp = (((int32_t)divisor * -x) + 0x80) >> 8;
- int32_t tmp2 = ((x * (131072 + tmp)) + 0x80) >> 8;
+   int32_t x = (0x101 + DivTable[(((divisor & 0x7FFF) + 0x40) >> 7)]);
+   int32_t tmp = (((int32_t)divisor * -x) + 0x80) >> 8;
+   int32_t tmp2 = ((x * (131072 + tmp)) + 0x80) >> 8;
 
- return(tmp2);
+   return(tmp2);
 }
 
 void GTE_Init(void)
@@ -385,7 +385,7 @@ uint32_t GTE_ReadCR(unsigned int which)
       default:
          ret = CR[which];
          if(which == 4 || which == 12 || which == 20)
-            ret = (int16)ret;
+            ret = (int16_t)ret;
          break;
 
       case 24:
@@ -397,11 +397,11 @@ uint32_t GTE_ReadCR(unsigned int which)
          break;
 
       case 26:
-         ret = (int16)H;
+         ret = (int16_t)H;
          break;
 
       case 27:
-         ret = (int16)DQA;
+         ret = (int16_t)DQA;
          break;
 
       case 28:
@@ -409,11 +409,11 @@ uint32_t GTE_ReadCR(unsigned int which)
          break;
 
       case 29:
-         ret = (int16)ZSF3;
+         ret = (int16_t)ZSF3;
          break;
 
       case 30:
-         ret = (int16)ZSF4;
+         ret = (int16_t)ZSF4;
          break;
 
       case 31:
@@ -575,9 +575,8 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
          break;
 
       case 30:
-
          LZCS = value;
-		 LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
+         LZCR = MDFN_lzcount32(value ^ ((int32_t)value >> 31));
          break;
 
       case 31:	// Read-only
@@ -732,6 +731,16 @@ static INLINE int64_t A_MV(unsigned which, int64_t value)
    return sign_x_to_s64(44, value);
 }
 
+/**
+ * int64_t F(int64_t value)
+ * 
+ * Checks if signed 32-bit overflow occurred in MAC0 by using a
+ * signed 64-bit representation, @value.
+ * 
+ * Sets the appropriate bits in FLAGS if overflow occurred.
+ * 
+ * Returns @value
+ * */
 static INLINE int64_t F(int64_t value)
 {
    if(value < -2147483648LL)
@@ -747,7 +756,6 @@ static INLINE int64_t F(int64_t value)
    }
    return(value);
 }
-
 
 /* Truncate i64 value to only keep the low 43 bits + sign and
  * update the flags if an overflow occurs */
@@ -1093,7 +1101,7 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
    IR1 = Lm_B(0, MAC[1], lm);
    IR2 = Lm_B(1, MAC[2], lm);
-   //printf("FTV: %08x %08x\n", crv[2], (uint32)(tmp[2] >> 12));
+   //printf("FTV: %08x %08x\n", crv[2], (uint32_t)(tmp[2] >> 12));
    IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
 
    Z_FIFO[0] = Z_FIFO[1];
@@ -1103,12 +1111,12 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 }
 
 #define DECODE_FIELDS							\
- const uint32 sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
- const uint32 mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
- const uint32 v_i = (instr >> 15) & 0x3;				\
- const int32* cv MDFN_NOWARN_UNUSED = CRVectors.All[(instr >> 13) & 0x3];	\
+ const uint32_t sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
+ const uint32_t mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
+ const uint32_t v_i = (instr >> 15) & 0x3;				\
+ const int32_t* cv MDFN_NOWARN_UNUSED = CRVectors.All[(instr >> 13) & 0x3];	\
  const int lm MDFN_NOWARN_UNUSED = (instr >> 10) & 1;			\
- int16 v[3] MDFN_NOWARN_UNUSED;					\
+ int16_t v[3] MDFN_NOWARN_UNUSED;					\
  if(v_i == 3)							\
  {								\
   v[0] = IR1;							\
@@ -1125,16 +1133,13 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
-   DECODE_FIELDS;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
 
    /* PSX GTE test fails with this code */
-   unsigned i;
-
-   for (i = 1; i < 4; i++)
-   {
-      int32_t ir = IR[i];
-      MAC[i]     = (ir * ir) >> sf;
-   }
+   MAC[1] = ((IR1 * IR1) >> sf);
+   MAC[2] = ((IR2 * IR2) >> sf);
+   MAC[3] = ((IR3 * IR3) >> sf);
 
    MAC_to_IR(lm);
 
@@ -1162,7 +1167,7 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
       dividend <<= shift_bias;
       divisor <<= shift_bias;
 
-      return std::min<uint32>(0x1FFFF, ((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
+      return std::min<uint32_t>(0x1FFFF, ((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
    }
 
    /* If the Z coordinate is smaller than or equal to half the 
@@ -1172,17 +1177,8 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
    return 0x1FFFF;
 }
 
-static INLINE void check_mac_overflow(int64_t value)
-{
-   if(value < -2147483648LL)
-      FLAGS |= 1 << 15;
-   if(value > 2147483647LL)
-      FLAGS |= 1 << 16;
-}
-
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float precise_z)
 {
-
    MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
    XY_FIFO[3].X = Lm_G(0, MAC[0]);
 
@@ -1207,7 +1203,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
-   uint32 value = *((uint32*)&XY_FIFO[3]);
+   uint32_t value = *((uint32_t*)&XY_FIFO[3]);
 
    /* Clamp precision values to valid range */
    precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
@@ -1216,56 +1212,62 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    PGXP_pushSXYZ2f(precise_x, precise_y, precise_z, value);
 }
 
-
+/* Perform depth queuing calculations */
 static INLINE void TransformDQ(int64_t h_div_sz)
 {
    MAC[0] = F((int64_t)DQB + DQA * h_div_sz);
    IR0 = Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12);
 }
 
-static INLINE int32 RTPS(uint32 instr)
+static INLINE int32_t RTPS(uint32_t instr)
 {
- DECODE_FIELDS;
- int64 h_div_sz;
- float precise_z;
- float precise_h_div_sz;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
+   int64_t h_div_sz;
 
- MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
- h_div_sz = Divide(H, Z_FIFO[3]);
+   /* PGXP */
+   float precise_z;
+   float precise_h_div_sz;
 
- precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
- precise_h_div_sz  = (float)H / precise_z;
+   MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
+   h_div_sz = Divide(H, Z_FIFO[3]);
 
- TransformXY(h_div_sz, precise_h_div_sz, precise_z);
- TransformDQ(h_div_sz);
+   precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
+   precise_h_div_sz  = (float)H / precise_z;
 
- return(15);
+   TransformXY(h_div_sz, precise_h_div_sz, precise_z);
+   TransformDQ(h_div_sz);
+
+   return(15);
 }
 
-static INLINE int32 RTPT(uint32 instr)
+static INLINE int32_t RTPT(uint32_t instr)
 {
- DECODE_FIELDS;
- int i;
+   const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
+   const int      lm = (instr >> 10) & 1;
+   int i;
 
- for(i = 0; i < 3; i++)
- {
-  int64 h_div_sz;
-  float precise_z;
-  float precise_h_div_sz;
+   for(i = 0; i < 3; i++)
+   {
+      int64_t h_div_sz;
 
-  MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
-  h_div_sz = Divide(H, Z_FIFO[3]);
+      /* PGXP */
+      float precise_z;
+      float precise_h_div_sz;
 
-  precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
-  precise_h_div_sz  = (float)H / precise_z;
+      MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
+      h_div_sz = Divide(H, Z_FIFO[3]);
 
-  TransformXY(h_div_sz, precise_h_div_sz, precise_z);
+      precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
+      precise_h_div_sz  = (float)H / precise_z;
 
-  if(i == 2)
-   TransformDQ(h_div_sz);
- }
+      TransformXY(h_div_sz, precise_h_div_sz, precise_z);
 
- return(23);
+      if(i == 2)
+         TransformDQ(h_div_sz);
+   }
+
+   return(23);
 }
 
 static INLINE void NormColor(uint32_t sf, int lm, uint32_t v)
@@ -1292,7 +1294,6 @@ static int32_t NCS(uint32_t instr)
 
 static int32_t NCT(uint32_t instr)
 {
-   unsigned i;
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
@@ -1303,12 +1304,11 @@ static int32_t NCT(uint32_t instr)
    return(30);
 }
 
-/* NCC - Normal Color Color */
-static INLINE void NCC(uint32_t vector_index, uint32_t sf, int lm)
+static INLINE void NormColorColor(uint32_t v, uint32_t sf, int lm)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[vector_index], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
    MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
@@ -1326,7 +1326,7 @@ static int32_t NCCS(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NCC(0, sf, lm);
+   NormColorColor(0, sf, lm);
    return(17);
 }
 
@@ -1336,9 +1336,9 @@ static int32_t NCCT(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   NCC(0, sf, lm);
-   NCC(1, sf, lm);
-   NCC(2, sf, lm);
+   NormColorColor(0, sf, lm);
+   NormColorColor(1, sf, lm);
+   NormColorColor(2, sf, lm);
 
    return(39);
 }
@@ -1356,7 +1356,7 @@ static INLINE void DPC(uint32_t instr)
 
    for(i = 0; i < 3; i++)
    {
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32_t)((uint32_t)RGB_temp[i] << 12))) >> sf;
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
@@ -1408,7 +1408,7 @@ static int32_t DPCS(uint32_t instr)
 
    for(i = 0; i < 3; i++)
    {
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32_t)((uint32_t)RGB_temp[i] << 12))) >> sf;
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
@@ -1438,9 +1438,9 @@ static int32_t INTPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
-   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
-   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32_t)((uint32_t)(int32_t)IR1 << 12))) >> sf;
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32_t)((uint32_t)(int32_t)IR2 << 12))) >> sf;
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32_t)((uint32_t)(int32_t)IR3 << 12))) >> sf;
 
    MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC[1], false)) >> sf);
    MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC[2], false)) >> sf);
@@ -1529,27 +1529,22 @@ static int32_t CDP(uint32_t instr)
 /* Normal Clipping */
 static int32_t NCLIP(uint32_t instr)
 {
-   int16_t x0     = XY_FIFO[0].X;
-   int16_t y0     = XY_FIFO[0].Y;
-   int16_t x1     = XY_FIFO[1].X;
-   int16_t y1     = XY_FIFO[1].Y;
-   int16_t x2     = XY_FIFO[2].X;
-   int16_t y2     = XY_FIFO[2].Y;
-   int64_t a      = x0 * (y1 - y2);
-   int64_t b      = x1 * (y2 - y0);
-   int64_t c      = x2 * (y0 - y1);
-   int32_t sum    = a + b + c;
-
    if (PGXP_enabled() &&
-       PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2]))) {
-      sum = PGXP_NCLIP();
-   } else {
-      sum = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
-         );
-      check_mac_overflow(sum);
+       PGXP_NLCIP_valid(*((uint32_t*)&XY_FIFO[0]), *((uint32_t*)&XY_FIFO[1]), *((uint32_t*)&XY_FIFO[2])))
+   {
+      MAC[0] = PGXP_NCLIP();
    }
+   else
+   {
+      int16_t x0 = XY_FIFO[0].X;
+      int16_t y0 = XY_FIFO[0].Y;
+      int16_t x1 = XY_FIFO[1].X;
+      int16_t y1 = XY_FIFO[1].Y;
+      int16_t x2 = XY_FIFO[2].X;
+      int16_t y2 = XY_FIFO[2].Y;
 
-   MAC[0] = sum;
+      MAC[0] = F( (int64_t)(x0 * (y1 - y2)) + (x1 * (y2 - y0)) + (x2 * (y0 - y1)) );
+   }
 
    return(8);
 }
@@ -1557,20 +1552,16 @@ static int32_t NCLIP(uint32_t instr)
 /* Average three Z Values */
 static int32_t AVSZ3(uint32_t instr)
 {
-   uint32_t z1     = Z_FIFO[1];
-   uint32_t z2     = Z_FIFO[2];
-   uint32_t z3     = Z_FIFO[3];
-   uint64_t sum    = z1 + z2 + z3;
+   uint16_t z1     = Z_FIFO[1];
+   uint16_t z2     = Z_FIFO[2];
+   uint16_t z3     = Z_FIFO[3];
    /* The average factor should generally be set to 1/3th of 
     * the ordering table size. So for instance, for a table of
     * 1024 entries, it should be set at 341 to use the full
     * table granularity. */
-   int64_t zsf3    = ZSF3;
-   int64_t average = zsf3 * sum;
+   int64_t average = ((int64_t)ZSF3 * (z1 + z2 + z3));
 
-   check_mac_overflow(average);
-
-   MAC[0] = (int32_t)average;
+   MAC[0] = F(average);
    OTZ    = i64_to_otz(MAC[0], false);
 
    return(5);
@@ -1579,21 +1570,18 @@ static int32_t AVSZ3(uint32_t instr)
 /* Average four Z values */
 static int32_t AVSZ4(uint32_t instr)
 {
-   uint32_t z0     = Z_FIFO[0];
-   uint32_t z1     = Z_FIFO[1];
-   uint32_t z2     = Z_FIFO[2];
-   uint32_t z3     = Z_FIFO[3];
-   uint64_t sum    = z0 + z1 + z2 + z3;
+   uint16_t z0 = Z_FIFO[0];
+   uint16_t z1 = Z_FIFO[1];
+   uint16_t z2 = Z_FIFO[2];
+   uint16_t z3 = Z_FIFO[3];
    /* The average factor should generally be set to 1/4th of 
     * the ordering table size. So for instance, for a table of
     * 1024 entries, it should be set at 256 to use the full
     * table granularity. */
-   int64_t zsf4    = ZSF4;
-   int64_t average = zsf4 * sum;
+   int64_t average = ((int64_t)ZSF4 * (z0 + z1 + z2 + z3));
 
-   check_mac_overflow(average);
 
-   MAC[0] = (int32_t)average;
+   MAC[0] = F(average);
    OTZ    = i64_to_otz(MAC[0], false);
 
    return(5);
@@ -1601,21 +1589,19 @@ static int32_t AVSZ4(uint32_t instr)
 
 
 // -32768 * -32768 - 32767 * -32768 = 2147450880
-// (2 ^ 31) - 1 =		      2147483647
+// (2 ^ 31) - 1 =                     2147483647
 static int32_t OP(uint32_t instr)
 {
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
-   int32_t       ir1 = IR1;
-   int32_t       ir2 = IR2;
-   int32_t       ir3 = IR3;
-   int32_t        r0 = Matrices.Rot.MX[0][0];
-   int32_t        r1 = Matrices.Rot.MX[1][1];
-   int32_t        r2 = Matrices.Rot.MX[2][2];
 
-   MAC[1] = (r1 * ir3 - r2 * ir2) >> sf;
-   MAC[2] = (r2 * ir1 - r0 * ir3) >> sf;
-   MAC[3] = (r0 * ir2 - r1 * ir1) >> sf;
+   int16_t        r0 = Matrices.Rot.MX[0][0];
+   int16_t        r1 = Matrices.Rot.MX[1][1];
+   int16_t        r2 = Matrices.Rot.MX[2][2];
+
+   MAC[1] = (r1 * IR3 - r2 * IR2) >> sf;
+   MAC[2] = (r2 * IR1 - r0 * IR3) >> sf;
+   MAC[3] = (r0 * IR2 - r1 * IR1) >> sf;
 
    MAC_to_IR(lm);
 

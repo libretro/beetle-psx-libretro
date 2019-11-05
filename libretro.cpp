@@ -576,6 +576,10 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       printf("Read%d: %08x(orig=%08x)\n", (int)(sizeof(T) * 8), A & mask[A >> 29], A);
 #endif
 
+   bool psx_memaccess_overclock = psx_gte_overclock;
+   // psx_memaccess_overclock = false;
+
+
    if(!IsWrite)
       timestamp += DMACycleSteal;
 
@@ -590,9 +594,11 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       }
       else
       {
-         // Overclock: get rid of memory access latency
-         if (!psx_gte_overclock)
-            timestamp += 3;
+         // Overclock: Force memory access latency to 1 cycle
+         if (psx_memaccess_overclock)
+            timestamp += 1;
+         else
+            timestamp += 3; 
       }
 
       if(Access24)
@@ -674,7 +680,10 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
             }
             else
             {
-               timestamp += 16; // Just a guess, need to test.
+               if (psx_memaccess_overclock)
+                  timestamp += 1;
+               else
+                  timestamp += 16; // Just a guess, need to test.
 
                if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                   PSX_EventHandler(timestamp);
@@ -691,7 +700,10 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       {
          if(!IsWrite)
          {
-            timestamp += 6 * sizeof(T); //24;
+            if (psx_memaccess_overclock)
+               timestamp += 1;
+            else
+               timestamp += 6 * sizeof(T); //24;
          }
 
          if(IsWrite)
