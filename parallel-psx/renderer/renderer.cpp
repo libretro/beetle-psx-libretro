@@ -675,6 +675,49 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
+Renderer::DisplayRect Renderer::compute_display_rect()
+{
+	unsigned display_width;
+	unsigned display_height = (render_state.is_pal ? 288 : 240) * (render_state.is_480i ? 2 : 1);
+
+	int left_offset = 0;
+	unsigned clock_div = 10;
+	switch (render_state.width_mode)
+	{
+	case WidthMode::WIDTH_MODE_256:
+		clock_div = 10;
+		break;
+	case WidthMode::WIDTH_MODE_320:
+		clock_div = 8;
+		break;
+	case WidthMode::WIDTH_MODE_512:
+		clock_div = 5;
+		break;
+	case WidthMode::WIDTH_MODE_640:
+		clock_div = 4;
+		break;
+	case WidthMode::WIDTH_MODE_368:
+		clock_div = 7;
+		break;
+	}
+
+	if (render_state.crop_overscan)
+	{
+		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
+		display_width = 2560/clock_div;
+		left_offset = (render_state.horiz_start - 608) / (int) clock_div;
+	}
+	else
+	{
+		display_width = 2800/clock_div;
+		left_offset = (render_state.horiz_start - 488) / (int) clock_div;
+	}
+
+	int upper_offset = (render_state.vert_start - (render_state.is_pal ? 20 : 16)) * (render_state.is_480i ? 2 : 1);
+
+	return DisplayRect(left_offset, upper_offset, display_width, display_height);
+}
+
 ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
@@ -758,9 +801,13 @@ ImageHandle Renderer::scanout_to_texture()
 
 	bool scaled = !bpp24 && !ssaa;
 
+	unsigned render_scale = scaled ? scaling : 1;
+
+	auto display_rect = compute_display_rect();
+
 	auto info = ImageCreateInfo::render_target(
-			rect.width * (scaled ? scaling : 1),
-			rect.height * (scaled ? scaling : 1),
+			display_rect.width * render_scale,
+			display_rect.height * render_scale,
 			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
 
 	if (!reuseable_scanout ||
@@ -779,12 +826,26 @@ ImageHandle Renderer::scanout_to_texture()
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
 
+	rp.clear_color[0] = {0, 0, 0, 0};
+	//rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0};
+	rp.clear_attachments = 1;
+
 	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
+
+	auto old_vp = cmd->get_viewport();
+	VkViewport new_vp = {display_rect.x * (float) render_scale,
+	                     display_rect.y * (float) render_scale,
+	                     rect.width * (float) render_scale,
+	                     rect.height * (float) render_scale,
+	                     old_vp.minDepth,
+	                     old_vp.maxDepth};
+
+	cmd->set_viewport(new_vp);
 
 	bool dither = render_state.scanout_mode == ScanoutMode::ABGR1555_Dither;
 
