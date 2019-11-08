@@ -3101,7 +3101,6 @@ static bool libretro_create_device(
 static bool rsx_vulkan_open(bool is_pal)
 {
    Granite::libretro_log = log_cb;
-   content_is_pal = is_pal;
 
    hw_render.context_type    = RETRO_HW_CONTEXT_VULKAN;
    hw_render.version_major   = VK_MAKE_VERSION(1, 0, 32);
@@ -3486,7 +3485,6 @@ static bool vk_initialized                      = false;
 
 static bool rsx_soft_open(bool is_pal)
 {
-   content_is_pal = is_pal;
    return true;
 }
 
@@ -3527,16 +3525,94 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
+      {
          memset(info, 0, sizeof(*info));
+
+         unsigned int uncropped_w = sw_cur_displaymode_w;
+         unsigned int uncropped_h = sw_cur_displaymode_h;
+
+         /* This block was moved from retro_run() and now the width checks are in reverse:
+            We determine the uncropped width based on the current displaymode
+            and calculate how much to crop afterwards.
+            This may fail if the width/height returned by Mednafen's EmulateSpecStruct
+            is something entirely different from 240/480 height or the width values
+            present here. */
+         // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
+         // 280 width -> 256 width.
+         // 350 width -> 320 width.
+         // 400 width -> 366 width.
+         // 560 width -> 512 width.
+         // 700 width -> 640 width.
+         switch (sw_cur_displaymode_w)
+         {
+         case 256:
+            uncropped_w = 280;
+            pix_offset = 12 + (image_offset + floor(0.5 * image_crop));
+            total_width_crop = uncropped_w - sw_cur_displaymode_w - image_crop;
+            break;
+         case 320:
+            uncropped_w = 350;
+            pix_offset = 15 + (image_offset + floor(0.5 * image_crop));
+            total_width_crop = uncropped_w - sw_cur_displaymode_w - image_crop;
+            break;
+         /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
+            Adjust in future if there are issues. */
+         case 368:
+            uncropped_w = 400;
+            pix_offset = 17 + (image_offset + floor(0.5 * image_crop));
+            total_width_crop = uncropped_w - sw_cur_displaymode_w - image_crop + 2;
+            break;
+         case 512:
+            uncropped_w = 560;
+            pix_offset = 24 + (image_offset + floor(0.5 * image_crop));
+            total_width_crop = uncropped_w - sw_cur_displaymode_w - image_crop;
+            break;
+         case 640:
+            uncropped_w = 700;
+            pix_offset = 30 + (image_offset + floor(0.5 * image_crop));
+            total_width_crop = uncropped_w - sw_cur_displaymode_w - image_crop;
+            break;
+         default:
+            // This shouldn't happen.
+            break;
+         }
+
+         /* Compensate the display aspect ratio due to the change in content's width/height
+         *
+         * The idea here is that uncropped content on a 4:3 (or 16:9 if widescreen hack is on) display aspect ratio (DAR)
+         * is the "correct" look due to the *ratio* between 4:3 DAR and uncropped content width/height (PAR)
+         * 
+         * We restore that ratio by changing DAR (geometry.aspect_ratio) such that
+         * 
+         * correct ratio = current DAR / uncropped PAR  # all known variables
+         * 
+         * correct ratio = compensated DAR / cropped PAR     # solve for compensated DAR
+         * <=> compensated DAR = correct ratio * cropped PAR
+         * 
+         * */
+         double current_dar = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+         double uncropped_par   = (uncropped_w / (double)uncropped_h);
+         double cropped_par     = (sw_cur_displaymode_w / (double)sw_cur_displaymode_h);
+         double correct_ratio   = current_dar / uncropped_par;
+         double compensated_dar = correct_ratio * cropped_par;
+
          info->timing.fps            = content_is_pal ? MEDNAFEN_CORE_TIMING_FPS_PAL : MEDNAFEN_CORE_TIMING_FPS_NTSC;
          info->timing.sample_rate    = MEDNAFEN_CORE_TIMING_SAMPLERATE;
-         info->geometry.base_width   = sw_cur_width  << psx_gpu_upscale_shift;
-         info->geometry.base_height  = sw_cur_height << psx_gpu_upscale_shift;
+         info->geometry.base_width   = crop_overscan ? (uncropped_w - total_width_crop) << psx_gpu_upscale_shift
+                                       : uncropped_w << psx_gpu_upscale_shift;
+
+         info->geometry.base_height  = crop_overscan ? sw_cur_displaymode_h << psx_gpu_upscale_shift
+                                       : uncropped_h << psx_gpu_upscale_shift;
+
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
-         info->geometry.max_height   = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL   << psx_gpu_upscale_shift
-                                                      : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC  << psx_gpu_upscale_shift;
-         info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
+         info->geometry.max_height   = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL << psx_gpu_upscale_shift
+                                       : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC << psx_gpu_upscale_shift;
+
+         /* TODO - Maybe implement "aspect ratio correction" core option? */
+         info->geometry.aspect_ratio = crop_overscan ? compensated_dar : current_dar;
+
          break;
+      }
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       {
@@ -4001,11 +4077,11 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
 
          new_h = is_480i ? 480 : 240;
 
-         if (new_w != sw_cur_width || new_h != sw_cur_height)
+         if (new_w != sw_cur_displaymode_w || new_h != sw_cur_displaymode_h)
          {
             has_new_geometry = true;
-            sw_cur_width  = new_w;
-            sw_cur_height = new_h;
+            sw_cur_displaymode_w = new_w;
+            sw_cur_displaymode_h = new_h;
          }
 
          break;

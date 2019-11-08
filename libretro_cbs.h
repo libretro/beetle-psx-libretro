@@ -17,6 +17,11 @@ extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
 extern bool has_new_geometry;
+extern bool crop_overscan;
+extern unsigned pix_offset;
+extern unsigned image_offset;
+extern unsigned image_crop;
+extern unsigned total_width_crop;
 
 #ifdef __cplusplus
 }

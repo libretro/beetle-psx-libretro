@@ -10,3 +10,10 @@ int lineRenderMode;
 int filter_mode;
 bool opaque_check;
 bool semitrans_check;
+bool has_new_geometry = false;
+bool crop_overscan = false;
+unsigned pix_offset = 0;
+unsigned image_offset = 0;
+unsigned image_crop = 0;
+unsigned total_width_crop = 0;
+

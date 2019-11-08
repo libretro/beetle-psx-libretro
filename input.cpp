@@ -1,4 +1,3 @@
-
 #include "libretro.h"
 #include "mednafen/mednafen-types.h"
 #include <math.h>
@@ -54,10 +53,10 @@ static int negcon_linearity = 1;
 
 typedef union
 {
-	uint8_t u8[ 10 * sizeof( uint32_t ) ];
-	uint32_t u32[ 10 ]; /* 1 + 8 + 1 */
-	uint16_t gun_pos[ 2 ];
-	uint16_t buttons;
+   uint8_t u8[ 10 * sizeof( uint32_t ) ];
+   uint32_t u32[ 10 ]; /* 1 + 8 + 1 */
+   uint16_t gun_pos[ 2 ];
+   uint16_t buttons;
 }
 INPUT_DATA;
 
@@ -66,9 +65,9 @@ static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {0};
 
 struct analog_calibration
 {
-	float left;
-	float right;
-	float twist;
+   float left;
+   float right;
+   float twist;
 };
 
 static struct analog_calibration analog_calibration[MAX_CONTROLLERS];
@@ -94,45 +93,45 @@ enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 8 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
-	{ "PlayStation Controller", RETRO_DEVICE_JOYPAD },
-	{ "DualShock", RETRO_DEVICE_PS_DUALSHOCK },
-	{ "Analog Controller", RETRO_DEVICE_PS_ANALOG },
-	{ "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
-	{ "Guncon / G-Con 45", RETRO_DEVICE_PS_GUNCON },
-	{ "Justifier", RETRO_DEVICE_PS_JUSTIFIER },
-	{ "Mouse", RETRO_DEVICE_PS_MOUSE },
-	{ "neGcon", RETRO_DEVICE_PS_NEGCON },
-	{ NULL, 0 },
+   { "PlayStation Controller", RETRO_DEVICE_JOYPAD },
+   { "DualShock", RETRO_DEVICE_PS_DUALSHOCK },
+   { "Analog Controller", RETRO_DEVICE_PS_ANALOG },
+   { "Analog Joystick", RETRO_DEVICE_PS_ANALOG_JOYSTICK },
+   { "Guncon / G-Con 45", RETRO_DEVICE_PS_GUNCON },
+   { "Justifier", RETRO_DEVICE_PS_JUSTIFIER },
+   { "Mouse", RETRO_DEVICE_PS_MOUSE },
+   { "neGcon", RETRO_DEVICE_PS_NEGCON },
+   { NULL, 0 },
 };
 
 static const struct retro_controller_info ports8[ 8 + 1 ] =
 {
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ 0 },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { 0 },
 };
 
 static const struct retro_controller_info ports5[ 5 + 1 ] =
 {
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ 0 },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { 0 },
 };
 
 static const struct retro_controller_info ports2[ 2 + 1 ] =
 {
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ input_device_types, INPUT_DEVICE_TYPES_COUNT },
-	{ 0 },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { input_device_types, INPUT_DEVICE_TYPES_COUNT },
+   { 0 },
 };
 
 
@@ -144,42 +143,42 @@ static const struct retro_controller_info ports2[ 2 + 1 ] =
 enum { INPUT_MAP_CONTROLLER_SIZE = 16 };
 static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
 {
-	// libretro input				 at position	|| maps to PS1			on bit
-	//-----------------------------------------------------------------------------
+   // libretro input				 at position	|| maps to PS1			on bit
+   //-----------------------------------------------------------------------------
 #ifdef MSB_FIRST
-	RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2
-	RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2
-	RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1
-	RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1
-	RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle
-	RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle
-	RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross
-	RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square
-	RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select
-	RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3
-	RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3
-	RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start
-	RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up
-	RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Right	-> Pad-Right
-	RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Down		-> Pad-Down
-	RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Left		-> Pad-Left
+   RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2
+   RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2
+   RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1
+   RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1
+   RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle
+   RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle
+   RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross
+   RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square
+   RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select
+   RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3
+   RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3
+   RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start
+   RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up
+   RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Right	-> Pad-Right
+   RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Down		-> Pad-Down
+   RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Left		-> Pad-Left
 #else
-	RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select				0
-	RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3					1
-	RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3					2
-	RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start				3
-	RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up				4
-	RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Right	-> Pad-Right			5
-	RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Down		-> Pad-Down				6
-	RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Left		-> Pad-Left				7
-	RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2					8
-	RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2					9
-	RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1					10
-	RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1					11
-	RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle				12
-	RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle				13
-	RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross				14
-	RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square				15
+   RETRO_DEVICE_ID_JOYPAD_SELECT,	// Select		-> Select				0
+   RETRO_DEVICE_ID_JOYPAD_L3,		// L-thumb		-> L3					1
+   RETRO_DEVICE_ID_JOYPAD_R3,		// R-thumb		-> R3					2
+   RETRO_DEVICE_ID_JOYPAD_START,	// Start		-> Start				3
+   RETRO_DEVICE_ID_JOYPAD_UP,		// Pad-Up		-> Pad-Up				4
+   RETRO_DEVICE_ID_JOYPAD_RIGHT,	// Pad-Right	-> Pad-Right			5
+   RETRO_DEVICE_ID_JOYPAD_DOWN,	// Pad-Down		-> Pad-Down				6
+   RETRO_DEVICE_ID_JOYPAD_LEFT,	// Pad-Left		-> Pad-Left				7
+   RETRO_DEVICE_ID_JOYPAD_L2,		// L-trigger	-> L2					8
+   RETRO_DEVICE_ID_JOYPAD_R2,		// R-trigger	-> R2					9
+   RETRO_DEVICE_ID_JOYPAD_L,		// L-shoulder	-> L1					10
+   RETRO_DEVICE_ID_JOYPAD_R,		// R-shoulder	-> R1					11
+   RETRO_DEVICE_ID_JOYPAD_X,		// X(top)		-> Triangle				12
+   RETRO_DEVICE_ID_JOYPAD_A,		// A(right)		-> Circle				13
+   RETRO_DEVICE_ID_JOYPAD_B,		// B(down)		-> Cross				14
+   RETRO_DEVICE_ID_JOYPAD_Y,		// Y(left)		-> Square				15
 #endif
 };
 
@@ -219,35 +218,35 @@ static void SetInput(int port, const char *type, void *ptr)
 }
 
 static uint16_t get_analog_button( retro_input_state_t input_state_cb,
-								   int player_index,
-								   int id )
+                           int player_index,
+                           int id )
 {
-	uint16_t button;
+   uint16_t button;
 
-	// NOTE: Analog buttons were added Nov 2017. Not all front-ends support this
-	// feature (or pre-date it) so we need to handle this in a graceful way.
+   // NOTE: Analog buttons were added Nov 2017. Not all front-ends support this
+   // feature (or pre-date it) so we need to handle this in a graceful way.
 
-	// First, try and get an analog value using the new libretro API constant
-	button = input_state_cb( player_index,
-							 RETRO_DEVICE_ANALOG,
-							 RETRO_DEVICE_INDEX_ANALOG_BUTTON,
-							 id );
+   // First, try and get an analog value using the new libretro API constant
+   button = input_state_cb( player_index,
+                      RETRO_DEVICE_ANALOG,
+                      RETRO_DEVICE_INDEX_ANALOG_BUTTON,
+                      id );
 
-	if ( button == 0 )
-	{
-		// If we got exactly zero, we're either not pressing the button, or the front-end
-		// is not reporting analog values. We need to do a second check using the classic
-		// digital API method, to at least get some response - better than nothing.
+   if ( button == 0 )
+   {
+      // If we got exactly zero, we're either not pressing the button, or the front-end
+      // is not reporting analog values. We need to do a second check using the classic
+      // digital API method, to at least get some response - better than nothing.
 
-		// NOTE: If we're really just not holding the button, we're still going to get zero.
+      // NOTE: If we're really just not holding the button, we're still going to get zero.
 
-		button = input_state_cb( player_index,
-								 RETRO_DEVICE_JOYPAD,
-								 0,
-								 id ) ? 0x7FFF : 0;
-	}
+      button = input_state_cb( player_index,
+                         RETRO_DEVICE_JOYPAD,
+                         0,
+                         id ) ? 0x7FFF : 0;
+   }
 
-	return button;
+   return button;
 }
 
 
@@ -257,187 +256,187 @@ static uint16_t get_analog_button( retro_input_state_t input_state_cb,
 
 void input_init_env( retro_environment_t _environ_cb )
 {
-	// Cache this
-	environ_cb = _environ_cb;
+   // Cache this
+   environ_cb = _environ_cb;
 
-	struct retro_input_descriptor desc[] =
-	{
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+   struct retro_input_descriptor desc[] =
+   {
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
 
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 4, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 4, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 5, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 5, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 6, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 6, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
-		{ 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
-		{ 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
-		{ 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
-		{ 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
-		{ 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Cross" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Circle" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Triangle" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Square" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "L1" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,    "L2" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,    "L3" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "R1" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,    "R2" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,    "R3" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Select" },
+      { 7, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
+      { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+      { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+      { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+      { 7, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
 
-		{ 0 },
-	};
+      { 0 },
+   };
 
-	environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
+   environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
 
-	if ( environ_cb( RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble ) && log_cb )
-		log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
+   if ( environ_cb( RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble ) && log_cb )
+      log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
 }
 
 void input_set_env( retro_environment_t _environ_cb )
@@ -462,245 +461,244 @@ void input_set_env( retro_environment_t _environ_cb )
 
 void input_init()
 {
-	// Initialise to default and bind input buffers to PS1 emulation.
-	for ( unsigned i = 0; i < MAX_CONTROLLERS; ++i )
-	{
-		input_type[ i ] = RETRO_DEVICE_JOYPAD;
+   // Initialise to default and bind input buffers to PS1 emulation.
+   for ( unsigned i = 0; i < MAX_CONTROLLERS; ++i )
+   {
+      input_type[ i ] = RETRO_DEVICE_JOYPAD;
 
-		SetInput( i, "gamepad", (uint8*)&input_data[ i ] );
-	}
+      SetInput( i, "gamepad", (uint8*)&input_data[ i ] );
+   }
 }
 
 void input_set_fio( FrontIO* fio )
 {
-	FIO = fio;
+   FIO = fio;
 }
 
 void input_init_calibration()
 {
-	for ( unsigned i = 0; i < MAX_CONTROLLERS; i++ )
-	{
-		analog_calibration[ i ].left = 0.7f;
-		analog_calibration[ i ].right = 0.7f;
-		analog_calibration[ i ].twist = 0.7f;
-	}
+   for ( unsigned i = 0; i < MAX_CONTROLLERS; i++ )
+   {
+      analog_calibration[ i ].left = 0.7f;
+      analog_calibration[ i ].right = 0.7f;
+      analog_calibration[ i ].twist = 0.7f;
+   }
 }
 
 void input_enable_calibration( bool enable )
 {
-	enable_analog_calibration = enable;
+   enable_analog_calibration = enable;
 }
 
 void input_set_player_count( unsigned _players )
 {
-	players = _players;
-	
-	input_set_env( environ_cb );
+   players = _players;
+
+   input_set_env( environ_cb );
 }
 
 void input_set_mouse_sensitivity( int percent )
 {
-	if ( percent > 0 && percent <= 200 )
-		mouse_sensitivity = (float)percent / 100.0f;
+   if ( percent > 0 && percent <= 200 )
+      mouse_sensitivity = (float)percent / 100.0f;
 }
 
 void input_set_gun_cursor( int cursor )
 {
-	gun_cursor = cursor;
-	if ( FIO )
+   gun_cursor = cursor;
+   if ( FIO )
    {
-		// todo -- support multiple guns.
-		for ( int port = 0; port < 8; ++port )
-			FIO->SetCrosshairsCursor( port, gun_cursor );
-	}
+      // todo -- support multiple guns.
+      for ( int port = 0; port < 8; ++port )
+         FIO->SetCrosshairsCursor( port, gun_cursor );
+   }
 }
 
 void input_set_negcon_deadzone( int deadzone )
 {
-	negcon_deadzone = deadzone;
+   negcon_deadzone = deadzone;
 }
 
 void input_set_negcon_linearity( int linearity )
 {
-	negcon_linearity = linearity;
+   negcon_linearity = linearity;
 }
 
 unsigned input_get_player_count()
 {
-	return players;
+   return players;
 }
 
 void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
 {
-	int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
-	int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+   int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+   int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
 
-	// .. scale into screen space:
-	// NOTE: the scaling here is semi-guesswork, need to re-write.
-	// TODO: Test with PAL games.
+   // .. scale into screen space:
+   // NOTE: the scaling here is semi-guesswork, need to re-write.
+   // TODO: Test with PAL games.
 
-	const int scale_x = 2800;
-	const int scale_y = 240;
+   const int scale_x = 2800;
+   const int scale_y = 240;
 
-	int gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-	int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+   int gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+   int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
 
-#if 0
-	int is_offscreen = 0;
-#endif
+   #if 0
+   int is_offscreen = 0;
+   #endif
 
-	// Handle offscreen by checking corrected x and y values
-	if ( gun_x == 0 || gun_y == 0 )
-	{
-#if 0
-		is_offscreen = 1;
-#endif
-
-		gun_x = -16384; // magic position to disable cross-hair drawing.
-		gun_y = -16384;
-	}
-
-	// Touch sensitivity: Keep the gun position held for a fixed number of cycles after touch is released
-	// because a very light touch can result in a misfire
-	if ( pointer_cycles_after_released > 0 && pointer_cycles_after_released < POINTER_PRESSED_CYCLES )
+   // Handle offscreen by checking corrected x and y values
+   if ( gun_x == 0 || gun_y == 0 )
    {
-		pointer_cycles_after_released++;
-		p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
-		p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
-		return;
-	}
+   #if 0
+      is_offscreen = 1;
+   #endif
 
-	// trigger
-	if ( input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED ) )
-	{
-		pointer_pressed = 1;
-		pointer_cycles_after_released = 0;
-		pointer_pressed_last_x = gun_x;
-		pointer_pressed_last_y = gun_y;
-	} else if ( pointer_pressed ) {
-		pointer_cycles_after_released++;
-		pointer_pressed = 0;
-		p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
-		p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
-		p_input->u8[4] &= ~0x1;
-		return;
-	}
+      gun_x = -16384; // magic position to disable cross-hair drawing.
+      gun_y = -16384;
+   }
 
-	// position
-	p_input->gun_pos[ 0 ] = gun_x;
-	p_input->gun_pos[ 1 ] = gun_y;
+   // Touch sensitivity: Keep the gun position held for a fixed number of cycles after touch is released
+   // because a very light touch can result in a misfire
+   if ( pointer_cycles_after_released > 0 && pointer_cycles_after_released < POINTER_PRESSED_CYCLES )
+   {
+      pointer_cycles_after_released++;
+      p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
+      p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
+      return;
+   }
 
-	// buttons
-	p_input->u8[ 4 ] = 0;
+   // trigger
+   if ( input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED ) )
+   {
+      pointer_pressed = 1;
+      pointer_cycles_after_released = 0;
+      pointer_pressed_last_x = gun_x;
+      pointer_pressed_last_y = gun_y;
+   } else if ( pointer_pressed ) {
+      pointer_cycles_after_released++;
+      pointer_pressed = 0;
+      p_input->gun_pos[ 0 ] = pointer_pressed_last_x;
+      p_input->gun_pos[ 1 ] = pointer_pressed_last_y;
+      p_input->u8[4] &= ~0x1;
+      return;
+   }
 
-	// use multi-touch to support different button inputs:
-	// 3-finger touch: START button
-	// 2-finger touch: Reload
-	// offscreen touch: Reload
-	int touch_count = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT );
-	if ( touch_count == 1 )
-		p_input->u8[ 4 ] |= 0x1;
+   // position
+   p_input->gun_pos[ 0 ] = gun_x;
+   p_input->gun_pos[ 1 ] = gun_y;
 
-	if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
-	{
-		// Justifier 'Aux'
-		if ( touch_count == 2 )
-			p_input->u8[ 4 ] |= 0x2;
+   // buttons
+   p_input->u8[ 4 ] = 0;
 
-		// Justifier 'Start'
-		if ( touch_count == 3 )
-			p_input->u8[ 4 ] |= 0x4;
-	}
-	else
-	{
-		// Guncon 'A'
-		if ( touch_count == 2 )
-			p_input->u8[ 4 ] |= 0x2;
+   // use multi-touch to support different button inputs:
+   // 3-finger touch: START button
+   // 2-finger touch: Reload
+   // offscreen touch: Reload
+   int touch_count = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT );
+   if ( touch_count == 1 )
+      p_input->u8[ 4 ] |= 0x1;
 
-		// Guncon 'B'
-		if ( touch_count == 3 )
-			p_input->u8[ 4 ] |= 0x4;
+   if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+   {
+      // Justifier 'Aux'
+      if ( touch_count == 2 )
+         p_input->u8[ 4 ] |= 0x2;
 
-		// Guncon 'A' + 'B'
-		if ( touch_count == 4 )
+      // Justifier 'Start'
+      if ( touch_count == 3 )
+         p_input->u8[ 4 ] |= 0x4;
+   }
+   else
+   {
+      // Guncon 'A'
+      if ( touch_count == 2 )
+         p_input->u8[ 4 ] |= 0x2;
+
+      // Guncon 'B'
+      if ( touch_count == 3 )
+         p_input->u8[ 4 ] |= 0x4;
+
+      // Guncon 'A' + 'B'
+      if ( touch_count == 4 )
       {
-			p_input->u8[ 4 ] |= 0x2;
-			p_input->u8[ 4 ] |= 0x4;
-		}
-	}
-
+         p_input->u8[ 4 ] |= 0x2;
+         p_input->u8[ 4 ] |= 0x4;
+      }
+   }
 }
 
 void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
 {
-	uint8_t shot_type;
-	int gun_x, gun_y;
-	int forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
+   uint8_t shot_type;
+   int gun_x, gun_y;
+   int forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
 
-	// off-screen?
-	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
-	{
-		shot_type = 0x8; // off-screen shot
+   // off-screen?
+   if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
+   {
+      shot_type = 0x8; // off-screen shot
 
-		gun_x = -16384; // magic position to disable cross-hair drawing.
-		gun_y = -16384;
-	}
-	else
-	{
-		shot_type = 0x1; // on-screen shot
+      gun_x = -16384; // magic position to disable cross-hair drawing.
+      gun_y = -16384;
+   }
+   else
+   {
+      shot_type = 0x1; // on-screen shot
 
-		int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
-		int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
+      int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
+      int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
 
-		// .. scale into screen space:
-		// NOTE: the scaling here is semi-guesswork, need to re-write.
-		// TODO: Test with PAL games.
+      // .. scale into screen space:
+      // NOTE: the scaling here is semi-guesswork, need to re-write.
+      // TODO: Test with PAL games.
 
-		const int scale_x = 2800;
-		const int scale_y = 240;
+      const int scale_x = 2800;
+      const int scale_y = 240;
 
-		gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-		gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
-	}
+      gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
+      gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+   }
 
-	// position
-	p_input->gun_pos[ 0 ] = gun_x;
-	p_input->gun_pos[ 1 ] = gun_y;
+   // position
+   p_input->gun_pos[ 0 ] = gun_x;
+   p_input->gun_pos[ 1 ] = gun_y;
 
-	// buttons
-	p_input->u8[ 4 ] = 0;
+   // buttons
+   p_input->u8[ 4 ] = 0;
 
-	// trigger
-	if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload )
-		p_input->u8[ 4 ] |= shot_type;
+   // trigger
+   if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload )
+      p_input->u8[ 4 ] |= shot_type;
 
-	if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
-	{
-		// Justifier 'Aux'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
-			p_input->u8[ 4 ] |= 0x2;
+   if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
+   {
+      // Justifier 'Aux'
+      if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
+         p_input->u8[ 4 ] |= 0x2;
 
-		// Justifier 'Start'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) )
-			p_input->u8[ 4 ] |= 0x4;
-	}
-	else
-	{
-		// Guncon 'A'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
-			p_input->u8[ 4 ] |= 0x2;
+      // Justifier 'Start'
+      if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) )
+         p_input->u8[ 4 ] |= 0x4;
+   }
+   else
+   {
+      // Guncon 'A'
+      if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
+         p_input->u8[ 4 ] |= 0x2;
 
-		// Guncon 'B'
-		if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) )
-			p_input->u8[ 4 ] |= 0x4;
-	}
+      // Guncon 'B'
+      if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) )
+         p_input->u8[ 4 ] |= 0x4;
+   }
 
 }
 
 void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_state_cb )
 {
-	// For each player (logical controller)
-	for ( unsigned iplayer = 0; iplayer < players; ++iplayer )
+   // For each player (logical controller)
+   for ( unsigned iplayer = 0; iplayer < players; ++iplayer )
    {
       INPUT_DATA* p_input = &(input_data[ iplayer ]);
 
@@ -1056,12 +1054,12 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
 void retro_set_controller_port_device( unsigned in_port, unsigned device )
 {
-	if ( in_port < MAX_CONTROLLERS )
-	{
-		// Store input type
-		input_type[ in_port ] = device;
+   if ( in_port < MAX_CONTROLLERS )
+   {
+      // Store input type
+      input_type[ in_port ] = device;
 
-		switch ( device )
+      switch ( device )
       {
 
          case RETRO_DEVICE_NONE:
@@ -1121,15 +1119,15 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
 
       } // switch ( device )
 
-		// Clear rumble.
-		if ( rumble.set_rumble_state )
-		{
-			rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
-			rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
-		}
-		input_data[ in_port ].u32[ 9 ] = 0;
+      // Clear rumble.
+      if ( rumble.set_rumble_state )
+      {
+         rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
+         rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
+      }
+      input_data[ in_port ].u32[ 9 ] = 0;
 
-	} // valid port?
+   } // valid port?
 }
 
 //==============================================================================

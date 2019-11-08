@@ -46,9 +46,6 @@ static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool allow_frame_duping = false;
 static bool failed_init = false;
-static unsigned image_offset = 0;
-static unsigned image_crop = 0;
-static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_variable_serialization_size = false;
 static int frame_width = 0;
@@ -1531,13 +1528,17 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    emulate_multitap[1] = setting_psx_multitap_port_2;
 
    cdifs  = _CDInterfaces;
-   region = CalcDiscSCEx();
 
    if(!MDFN_GetSettingB("psx.region_autodetect"))
       region = MDFN_GetSettingI("psx.region_default");
+   else
+      region = CalcDiscSCEx();
 
-   sls = MDFN_GetSettingI((region == REGION_EU) ? "psx.slstartp" : "psx.slstart");
-   sle = MDFN_GetSettingI((region == REGION_EU) ? "psx.slendp" : "psx.slend");
+   /* This is where the PSX core first determines the disc's region */
+   content_is_pal = region == REGION_EU ? true : false;
+
+   sls = MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart");
+   sle = MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend");
 
    if(sls > sle)
    {
@@ -1549,7 +1550,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    PSX_CPU = new PS_CPU();
    PSX_SPU = new PS_SPU();
 
-   GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
+   GPU_Init(content_is_pal, sls, sle, psx_gpu_upscale_shift);
 
    PSX_CDC = new PS_CDC();
    PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
@@ -1561,7 +1562,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       PSX_FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
    }
 
-	input_set_fio( PSX_FIO );
+   input_set_fio( PSX_FIO );
 
    DMA_Init();
 
@@ -1673,7 +1674,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       Memcard_SaveDelay[i] = -1;
    }
 
-	input_init_calibration();
+   input_init_calibration();
 
 #ifdef WANT_DEBUGGER
    DBG_Init();
@@ -2660,8 +2661,6 @@ static bool boot = true;
 static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
-bool has_new_geometry = false;
-
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
@@ -2994,24 +2993,24 @@ static void check_variables(bool startup)
    }
 
    var.key = BEETLE_OPT(mouse_sensitivity);
-	var.value = NULL;
+   var.value = NULL;
 
-	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
-		input_set_mouse_sensitivity( atoi( var.value ) );
+   if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+      input_set_mouse_sensitivity( atoi( var.value ) );
 
-	var.key = BEETLE_OPT(gun_cursor);
-	var.value = NULL;
+   var.key = BEETLE_OPT(gun_cursor);
+   var.value = NULL;
 
-	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
-	{
-		if ( !strcmp(var.value, "Off") ) {
-			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_OFF );
-		} else if ( !strcmp(var.value, "Cross") ) {
-			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS );
-		} else if ( !strcmp(var.value, "Dot") ) {
-			input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
-		}
-	}
+   if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value )
+   {
+      if ( !strcmp(var.value, "Off") ) {
+         input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_OFF );
+      } else if ( !strcmp(var.value, "Cross") ) {
+         input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_CROSS );
+      } else if ( !strcmp(var.value, "Dot") ) {
+         input_set_gun_cursor( FrontIO::SETTING_GUN_CROSSHAIR_DOT );
+      }
+   }
 
    var.key = BEETLE_OPT(gun_input_mode);
    var.value = NULL;
@@ -3025,23 +3024,23 @@ static void check_variables(bool startup)
       }
    }
 
-	var.key = BEETLE_OPT(negcon_deadzone);
-	var.value = NULL;
-	input_set_negcon_deadzone(0);
-	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
-		input_set_negcon_deadzone( (int)(atoi(var.value) * 0.01f * NEGCON_RANGE) );
-	}
+   var.key = BEETLE_OPT(negcon_deadzone);
+   var.value = NULL;
+   input_set_negcon_deadzone(0);
+   if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
+      input_set_negcon_deadzone( (int)(atoi(var.value) * 0.01f * NEGCON_RANGE) );
+   }
 
-	var.key = BEETLE_OPT(negcon_response);
-	var.value = NULL;
-	input_set_negcon_linearity(1);
-	if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
-		if (strcmp(var.value, "quadratic") == 0) {
-        input_set_negcon_linearity(2);
+   var.key = BEETLE_OPT(negcon_response);
+   var.value = NULL;
+   input_set_negcon_linearity(1);
+   if ( environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value ) {
+      if (strcmp(var.value, "quadratic") == 0) {
+         input_set_negcon_linearity(2);
       } else if (strcmp(var.value, "cubic") == 0) {
          input_set_negcon_linearity(3);
       }
-	}
+   }
 
         var.key = BEETLE_OPT(initial_scanline);
 
@@ -3127,7 +3126,7 @@ static void check_variables(bool startup)
          bool can_dupe = false;
 
          if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &can_dupe))
-            allow_frame_duping = true;
+            allow_frame_duping = can_dupe;
       }
       else if (!strcmp(var.value, "disabled"))
          allow_frame_duping = false;
@@ -3138,29 +3137,35 @@ static void check_variables(bool startup)
    var.key = BEETLE_OPT(display_internal_fps);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-     {
-       if (strcmp(var.value, "enabled") == 0)
-         display_internal_framerate = true;
-       else if (strcmp(var.value, "disabled") == 0)
-         display_internal_framerate = false;
-     }
+   {
+      if (strcmp(var.value, "enabled") == 0)
+      display_internal_framerate = true;
+      else if (strcmp(var.value, "disabled") == 0)
+      display_internal_framerate = false;
+   }
    else
-     display_internal_framerate = false;
+      display_internal_framerate = false;
 
    var.key = BEETLE_OPT(crop_overscan);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-     {
-       if (strcmp(var.value, "enabled") == 0)
+   {
+      bool old_setting = crop_overscan;
+
+      if (strcmp(var.value, "enabled") == 0)
          crop_overscan = true;
-       else if (strcmp(var.value, "disabled") == 0)
+      else if (strcmp(var.value, "disabled") == 0)
          crop_overscan = false;
-     }
+
+      if (old_setting != crop_overscan) has_new_geometry = true;
+   }
 
    var.key = BEETLE_OPT(image_offset);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
+      unsigned old_image_offset = image_offset;
+
       if (strcmp(var.value, "disabled") == 0)
          image_offset = 0;
       else if (strcmp(var.value, "1 px") == 0)
@@ -3179,12 +3184,15 @@ static void check_variables(bool startup)
          image_offset = -4;
       else if (strcmp(var.value, "-4 px") == 0)
          image_offset = 4;
+
+      if (old_image_offset != image_offset) has_new_geometry = true;
    }
 
    var.key = BEETLE_OPT(image_crop);
-
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
+      unsigned old_image_crop = image_crop;
+
       if (strcmp(var.value, "disabled") == 0)
          image_crop = 0;
       else if (strcmp(var.value, "1 px") == 0)
@@ -3203,6 +3211,8 @@ static void check_variables(bool startup)
          image_crop = 7;
       else if (strcmp(var.value, "8 px") == 0)
          image_crop = 8;
+
+      if (old_image_crop != image_crop) has_new_geometry = true;
    }
 
    var.key = BEETLE_OPT(cd_fastload);
@@ -3454,7 +3464,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (failed_init)
       return false;
 
-	input_init_env( environ_cb );
+   input_init_env( environ_cb );
 
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
@@ -3471,6 +3481,7 @@ bool retro_load_game(const struct retro_game_info *info)
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
 
    check_variables(true);
+
    //make sure shared memory cards and save states are enabled only at startup
    shared_memorycards = shared_memorycards_toggle;
 
@@ -3483,8 +3494,6 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   content_is_pal = (CalcDiscSCEx() == REGION_EU);
-
    alloc_surface();
 
 #ifdef NEED_DEINTERLACER
@@ -3492,7 +3501,7 @@ bool retro_load_game(const struct retro_game_info *info)
    deint.ClearState();
 #endif
 
-	input_init();
+   input_init();
 
    boot = false;
 
@@ -3501,7 +3510,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    /* MDFNI_LoadGame() has been called, we can now query the disc's region to deduce
    which firmware version is needed. */
-   unsigned disc_region = CalcDiscSCEx(); 
+   unsigned disc_region = CalcDiscSCEx();
    bool force_software_renderer = false;
    if (!firmware_is_present(disc_region))
    {
@@ -3875,57 +3884,19 @@ void retro_run(void)
       height = spec.DisplayRect.h;
       //fprintf(stderr, "(%u x %u)\n", width, height);
 
-      // PSX core inserts padding on left and right (overscan). Optionally crop this.
       const uint32_t *pix = surf->pixels;
-      unsigned pix_offset = 0;
-
+      /* PSX core inserts padding on left and right (overscan). Optionally crop this. */
       if (crop_overscan)
       {
-         // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
-         // 280 width -> 256 width.
-         // 350 width -> 320 width.
-         // 400 width -> 366 width.
-         // 560 width -> 512 width.
-         // 700 width -> 640 width.
-         switch (width)
-         {
-            case 280:
-               pix_offset += 12 + (image_offset + floor(0.5 * image_crop));
-               width = 256 - image_crop;
-               break;
+         /* New width without horizontal overscan */
+         width -= total_width_crop;
 
-            case 350:
-               pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
-               width = 320 - image_crop;
-               break;
-
-            /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
-               Adjust in future if there are issues. */
-            case 400:
-               pix_offset += 17 + (image_offset + floor(0.5 * image_crop));
-               width = 366 - image_crop;
-               break;
-
-            case 560:
-               pix_offset += 24 + (image_offset + floor(0.5 * image_crop));
-               width = 512 - image_crop;
-               break;
-
-            case 700:
-               pix_offset += 30 + (image_offset + floor(0.5 * image_crop));
-               width = 640 - image_crop;
-               break;
-
-            default:
-               // This shouldn't happen.
-               break;
-         }
+         /* Add offset to the fb pointer so it points to the first non-horizontal overscan pixel */
+         pix  += pix_offset;
       }
-
 
       width  <<= upscale_shift;
       height <<= upscale_shift;
-      pix     += pix_offset << upscale_shift;
 
       if (GPU_get_display_change_count() != 0)
          fb = pix;
@@ -4033,9 +4004,9 @@ void retro_set_environment(retro_environment_t cb)
    vfs_iface_info.required_interface_version = 1;
    vfs_iface_info.iface                      = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
-	   filestream_vfs_init(&vfs_iface_info);
+      filestream_vfs_init(&vfs_iface_info);
 
-	input_set_env( cb );
+   input_set_env( cb );
 
    rsx_intf_set_environment(cb);
 }

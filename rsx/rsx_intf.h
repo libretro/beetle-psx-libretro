@@ -31,10 +31,10 @@ enum width_modes
    WIDTH_MODE_368
 };
 
-/* Used to keep track of software renderer's width and height */
+/* Used to keep track of software renderer's 'display mode' width and height */
 /* Updated when rsx_intf_set_display_mode is called */
-static uint16_t sw_cur_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
-static uint16_t sw_cur_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+static uint16_t sw_cur_displaymode_w  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+static uint16_t sw_cur_displaymode_h  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
 
 void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
