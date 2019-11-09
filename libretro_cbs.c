@@ -16,4 +16,3 @@ unsigned pix_offset = 0;
 unsigned image_offset = 0;
 unsigned image_crop = 0;
 unsigned total_width_crop = 0;
-

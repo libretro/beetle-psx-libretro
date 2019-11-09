@@ -3577,6 +3577,8 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
             break;
          }
 
+         /* TODO - Vertical cropping logic for PAL content, maybe? */
+
          /* Compensate the display aspect ratio due to the change in content's width/height
          *
          * The idea here is that uncropped content on a 4:3 (or 16:9 if widescreen hack is on) display aspect ratio (DAR)
@@ -3592,7 +3594,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          * */
          double current_dar = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
          double uncropped_par   = (uncropped_w / (double)uncropped_h);
-         double cropped_par     = (sw_cur_displaymode_w / (double)sw_cur_displaymode_h);
+         double cropped_par     = ((uncropped_w - total_width_crop) / (double)sw_cur_displaymode_h);
          double correct_ratio   = current_dar / uncropped_par;
          double compensated_dar = correct_ratio * cropped_par;
 
@@ -3611,6 +3613,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          /* TODO - Maybe implement "aspect ratio correction" core option? */
          info->geometry.aspect_ratio = crop_overscan ? compensated_dar : current_dar;
 
+         //printf("uncropped_w = %d | uncropped_h = %d | cropped_w = %d | cropped_h = %d\n", uncropped_w, uncropped_h, uncropped_w - total_width_crop, sw_cur_displaymode_h);
          break;
       }
       case RSX_OPENGL:
@@ -4075,7 +4078,14 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
             break;
          }
 
-         new_h = is_480i ? 480 : 240;
+         /* GPU_Update() will double the DisplayRect height if
+         the interlace bit is on so checking for 480i mode isn't enough.
+
+         TODO - Fix RSX interface's interlace detection. */
+         if (is_pal)
+            new_h = is_480i ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL : 288;
+         else
+            new_h = is_480i ? MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC : 240;
 
          if (new_w != sw_cur_displaymode_w || new_h != sw_cur_displaymode_h)
          {

@@ -3139,9 +3139,9 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
-      display_internal_framerate = true;
+         display_internal_framerate = true;
       else if (strcmp(var.value, "disabled") == 0)
-      display_internal_framerate = false;
+         display_internal_framerate = false;
    }
    else
       display_internal_framerate = false;
