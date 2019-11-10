@@ -2087,3 +2087,9 @@ int32_t GPU_GetScanlineNum(void)
 {
    return GPU.scanline;
 }
+
+void GPU_SetVisibleLines(int sls, int sle)
+{
+   GPU.LineVisFirst = sls;
+   GPU.LineVisLast  = sle;
+}

@@ -283,4 +283,6 @@ int32_t GPU_GetScanlineNum(void);
 
 void texel_put(uint32 x, uint32 y, uint16 v);
 
+void GPU_SetVisibleLines(int sls, int sle);
+
 #endif

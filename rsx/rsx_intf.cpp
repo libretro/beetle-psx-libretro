@@ -3577,24 +3577,54 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
             break;
          }
 
-         /* TODO - Vertical cropping logic for PAL content, maybe? */
+         /* Vertical overscan "cropping"
+          * The Mednafen DisplayRect height will change according to the initial/last scanline variables.
+          * We track that here and update base geometry accordingly.
+         */
+         int total_visible_scanlines = 0;
+         bool different_start_end_scanlines = false;
+         if (content_is_pal)
+         {
+            total_visible_scanlines = last_scanline_pal + 1 - initial_scanline_pal;
+            if (sw_cur_displaymode_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL)
+               total_visible_scanlines *= 2;
+
+            GPU_SetVisibleLines(initial_scanline_pal, last_scanline_pal);
+         }
+         else
+         {
+            total_visible_scanlines = last_scanline + 1 - initial_scanline;
+            if (sw_cur_displaymode_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC)
+               total_visible_scanlines *= 2;
+
+            GPU_SetVisibleLines(initial_scanline, last_scanline);
+         }
+         total_height_crop = sw_cur_displaymode_h - total_visible_scanlines;
 
          /* Compensate the display aspect ratio due to the change in content's width/height
          *
          * The idea here is that uncropped content on a 4:3 (or 16:9 if widescreen hack is on) display aspect ratio (DAR)
          * is the "correct" look due to the *ratio* between 4:3 DAR and uncropped content width/height (PAR)
-         * 
+         *
          * We restore that ratio by changing DAR (geometry.aspect_ratio) such that
-         * 
+         *
          * correct ratio = current DAR / uncropped PAR  # all known variables
-         * 
+         *
          * correct ratio = compensated DAR / cropped PAR     # solve for compensated DAR
          * <=> compensated DAR = correct ratio * cropped PAR
-         * 
+         *
+         * NOTE: This also applies to PAL content, which is generally 'squished' compared to NTSC content.
+         * This may be undesirable to some, but it seems to be accurate.
          * */
-         double current_dar = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
-         double uncropped_par   = (uncropped_w / (double)uncropped_h);
-         double cropped_par     = ((uncropped_w - total_width_crop) / (double)sw_cur_displaymode_h);
+         double current_dar   = widescreen_hack ? 16.0 / 9.0 : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+         double uncropped_par = (uncropped_w / (double)uncropped_h);
+         double cropped_par   = 0.0;
+
+         if (crop_overscan)
+            cropped_par = ((uncropped_w - total_width_crop) / (double)(sw_cur_displaymode_h - total_height_crop));
+         else
+            cropped_par = (uncropped_w / (double)(sw_cur_displaymode_h - total_height_crop));
+
          double correct_ratio   = current_dar / uncropped_par;
          double compensated_dar = correct_ratio * cropped_par;
 
@@ -3603,17 +3633,16 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.base_width   = crop_overscan ? (uncropped_w - total_width_crop) << psx_gpu_upscale_shift
                                        : uncropped_w << psx_gpu_upscale_shift;
 
-         info->geometry.base_height  = crop_overscan ? sw_cur_displaymode_h << psx_gpu_upscale_shift
-                                       : uncropped_h << psx_gpu_upscale_shift;
+         info->geometry.base_height  = (sw_cur_displaymode_h - total_height_crop) << psx_gpu_upscale_shift;
 
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL << psx_gpu_upscale_shift
                                        : MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC << psx_gpu_upscale_shift;
 
          /* TODO - Maybe implement "aspect ratio correction" core option? */
-         info->geometry.aspect_ratio = crop_overscan ? compensated_dar : current_dar;
+         info->geometry.aspect_ratio = compensated_dar;
 
-         //printf("uncropped_w = %d | uncropped_h = %d | cropped_w = %d | cropped_h = %d\n", uncropped_w, uncropped_h, uncropped_w - total_width_crop, sw_cur_displaymode_h);
+         //printf("uncropped_w = %d | uncropped_h = %d | cropped_w = %d | cropped_h = %d\n", uncropped_w, uncropped_h, uncropped_w - total_width_crop, uncropped_h - total_height_crop);
          break;
       }
       case RSX_OPENGL:

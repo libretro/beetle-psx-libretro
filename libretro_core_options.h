@@ -376,7 +376,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
-      "By default, the software renderer adds horizontal padding (black bars or 'pillarboxes' on either side of the screen) to emulate the same black bars generated in analog video output by real PSX hardware. Enabling 'Crop Overscan' will remove horizontal padding and stretch the remaining output to the full window width. This option does not affect vertical overscan. Currently only supported by the software renderer, as the hardware renderers will always output without pillarboxing.",
+      "By default, the software renderer adds horizontal padding (black bars or 'pillarboxes' on either side of the screen) to emulate the same black bars generated in analog video output by real PSX hardware. Enabling 'Crop Overscan' will remove horizontal padding. This option does not affect vertical overscan. Currently only supported by the software renderer, as the hardware renderers will always output without pillarboxing.",
       {
          { "enabled",  NULL },
          { "disabled", NULL },
@@ -387,7 +387,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(image_crop),
       "Additional Cropping",
-      "When 'Crop Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels. Note: This can have unintended consequences. While the absolute width is reduced, the resultant video is still scaled to the currently set aspect ratio. Enabling 'Additional Cropping' may therefore cause horizontal stretching. As with 'Crop Overscan', currently only supported by the software renderer.",
+      "When 'Crop Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels. As with 'Crop Overscan', currently only supported by the software renderer.",
       {
          { "disabled", NULL },
          { "1 px",     NULL },
@@ -629,8 +629,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(initial_scanline),
-      "Initial Scanline - NTSC (Restart)",
-      "Select the first displayed scanline when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing. Note: This can have unintended consequences. While the absolute height is reduced, the resultant video is still scaled to the currently set aspect ratio. Non-zero values may therefore cause vertical stretching.",
+      "Initial Scanline - NTSC",
+      "Select the first displayed scanline when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       {
          { "0",  NULL },
          { "1",  NULL },
@@ -679,8 +679,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(last_scanline),
-      "Last Scanline - NTSC (Restart)",
-      "Select the last displayed scanline when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing. Note: This can have unintended consequences. While the absolute height is reduced, the resultant video is still scaled to the currently set aspect ratio. Values less than 239 may therefore cause vertical stretching.",
+      "Last Scanline - NTSC",
+      "Select the last displayed scanline when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       {
          { "210", NULL },
          { "211", NULL },
@@ -718,8 +718,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(initial_scanline_pal),
-      "Initial Scanline - PAL (Restart)",
-      "Select the first displayed scanline when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing. Note: This can have unintended consequences. While the absolute height is reduced, the resultant video is still scaled to the currently set aspect ratio. Non-zero values may therefore cause vertical stretching.",
+      "Initial Scanline - PAL",
+      "Select the first displayed scanline when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       {
          { "0",  NULL },
          { "1",  NULL },
@@ -768,8 +768,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(last_scanline_pal),
-      "Last Scanline - PAL (Restart)",
-      "Select the last displayed scanline when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing. Note: This can have unintended consequences. While the absolute height is reduced, the resultant video is still scaled to the currently set aspect ratio. Values less than 287 may therefore cause vertical stretching.",
+      "Last Scanline - PAL",
+      "Select the last displayed scanline when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing. ",
       {
          { "230", NULL },
          { "231", NULL },

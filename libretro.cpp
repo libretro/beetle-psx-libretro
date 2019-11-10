@@ -1537,8 +1537,8 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    /* This is where the PSX core first determines the disc's region */
    content_is_pal = region == REGION_EU ? true : false;
 
-   sls = MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart");
-   sle = MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend");
+   sls = content_is_pal ? initial_scanline_pal : initial_scanline;
+   sle = content_is_pal ? last_scanline_pal : last_scanline;
 
    if(sls > sle)
    {
@@ -2352,12 +2352,13 @@ static MDFNSetting PSXSettings[] =
    { "psx.spu.resamp_quality", MDFNSF_NOFLAGS, "SPU output resampler quality.",
    "0 is lowest quality and CPU usage, 10 is highest quality and CPU usage.  The resampler that this setting refers to is used for converting from 44.1KHz to the sampling rate of the host audio device Mednafen is using.  Changing Mednafen's output rate, via the \"sound.rate\" setting, to \"44100\" will bypass the resampler, which will decrease CPU usage by Mednafen, and can increase or decrease audio quality, depending on various operating system and hardware factors.", MDFNST_UINT, "5", "0", "10" },
 
-
+/*
    { "psx.slstart", MDFNSF_NOFLAGS, "First displayed scanline in NTSC mode.", NULL, MDFNST_INT, "0", "0", "239" },
    { "psx.slend", MDFNSF_NOFLAGS, "Last displayed scanline in NTSC mode.", NULL, MDFNST_INT, "239", "0", "239" },
 
    { "psx.slstartp", MDFNSF_NOFLAGS, "First displayed scanline in PAL mode.", NULL, MDFNST_INT, "0", "0", "287" },
    { "psx.slendp", MDFNSF_NOFLAGS, "Last displayed scanline in PAL mode.", NULL, MDFNST_INT, "287", "0", "287" },
+*/
 
 #if PSX_DBGPRINT_ENABLE
    { "psx.dbg_level", MDFNSF_NOFLAGS, "Debug printf verbosity level.", NULL, MDFNST_UINT, "0", "0", "4" },
@@ -2627,11 +2628,6 @@ void retro_init(void)
    if (environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &serialization_quirks) &&
        (serialization_quirks & RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE))
       enable_variable_serialization_size = true;
-
-   setting_initial_scanline = 0;
-   setting_last_scanline = 239;
-   setting_initial_scanline_pal = 0;
-   setting_last_scanline_pal = 287;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
@@ -3046,28 +3042,36 @@ static void check_variables(bool startup)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_initial_scanline = atoi(var.value);
+      int old_initial_scanline = initial_scanline;
+      initial_scanline = atoi(var.value);
+      if (old_initial_scanline != initial_scanline) has_new_geometry = true;
    }
 
    var.key = BEETLE_OPT(last_scanline);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_last_scanline = atoi(var.value);
+      int old_last_scanline = last_scanline;
+      last_scanline = atoi(var.value);
+      if (old_last_scanline != last_scanline) has_new_geometry = true;
    }
 
    var.key = BEETLE_OPT(initial_scanline_pal);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_initial_scanline_pal = atoi(var.value);
+      int old_initial_scanline_pal = initial_scanline_pal;
+      initial_scanline_pal = atoi(var.value);
+      if (old_initial_scanline_pal != initial_scanline_pal) has_new_geometry = true;
    }
 
    var.key = BEETLE_OPT(last_scanline_pal);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_last_scanline_pal = atoi(var.value);
+      int old_last_scanline_pal = last_scanline_pal;
+      last_scanline_pal = atoi(var.value);
+      if (old_last_scanline_pal != last_scanline_pal) has_new_geometry = true;
    }
 
    if(setting_psx_multitap_port_1 && setting_psx_multitap_port_2)
@@ -3894,6 +3898,9 @@ void retro_run(void)
          /* Add offset to the fb pointer so it points to the first non-horizontal overscan pixel */
          pix  += pix_offset;
       }
+
+      /* NOTE: This isn't needed. DisplayRect.h already took initial/last scanlines into account */
+      /* height -= total_height_crop; */
 
       width  <<= upscale_shift;
       height <<= upscale_shift;

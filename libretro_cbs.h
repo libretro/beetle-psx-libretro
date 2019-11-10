@@ -22,6 +22,11 @@ extern unsigned pix_offset;
 extern unsigned image_offset;
 extern unsigned image_crop;
 extern unsigned total_width_crop;
+extern unsigned total_height_crop; /* TODO - Only used by the SW renderer in the RSX intf... */
+extern int initial_scanline;
+extern int initial_scanline_pal;
+extern int last_scanline;
+extern int last_scanline_pal;
 
 #ifdef __cplusplus
 }
