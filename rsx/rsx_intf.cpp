@@ -1184,7 +1184,6 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
    struct retro_variable var = {0};
 
    var.key = BEETLE_OPT(internal_resolution);
-
    if (upscaling)
    {
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -1242,9 +1241,9 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    bool crop_overscan = true;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (strcmp(var.value, "enabled") == 0)
+      if (!strcmp(var.value, "enabled"))
          crop_overscan = true;
-      else if (strcmp(var.value, "disabled") == 0)
+      else if (!strcmp(var.value, "disabled"))
          crop_overscan = false;
    }
 
@@ -1710,9 +1709,9 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    bool crop_overscan = true;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (strcmp(var.value, "enabled") == 0)
+      if (!strcmp(var.value, "enabled"))
          crop_overscan = true;
-      else if (strcmp(var.value, "disabled") == 0)
+      else if (!strcmp(var.value, "disabled"))
          crop_overscan = false;
    }
 
@@ -1770,7 +1769,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
 
    var.key = BEETLE_OPT(depth);
    uint8_t depth = 16;
-
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "32bpp"))
@@ -3214,8 +3212,8 @@ static bool rsx_vulkan_open(bool is_pal)
 static void rsx_vulkan_refresh_variables(void)
 {
    struct retro_variable var = {0};
-   var.key = BEETLE_OPT(renderer_software_fb);
 
+   var.key = BEETLE_OPT(renderer_software_fb);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
