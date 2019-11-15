@@ -580,7 +580,7 @@ struct retro_core_option_definition option_defs_us[] = {
 #endif
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
-      "Memory Card 0 Method",
+      "Memory Card 0 Method (Restart)",
       "Choose the save data format used for memory card 0. 'Libretro' is recommended. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen.",
       {
          { "libretro", "Libretro" },

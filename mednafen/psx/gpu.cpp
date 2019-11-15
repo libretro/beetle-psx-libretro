@@ -631,7 +631,7 @@ static uint16_t *VRAM_Alloc(uint8 upscale_shift)
 void GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift)
 {
-   
+   GPU_set_upscale_shift(upscale_shift);
    GPU.vram = VRAM_Alloc(upscale_shift);
 
    int x, y, v;
@@ -724,7 +724,8 @@ void GPU_Rescale(uint8 ushift)
       }
 
       /* Cleanup the old VRAM */
-      delete [] GPU.vram;
+      if (GPU.vram)
+         delete [] GPU.vram;
    }
 
    GPU.vram = NULL;

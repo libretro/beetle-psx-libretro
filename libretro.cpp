@@ -1550,6 +1550,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    PSX_CPU = new PS_CPU();
    PSX_SPU = new PS_SPU();
 
+   /* check_variables() has been previously called, we can now use psx_gpu_upscale_shift */
    GPU_Init(content_is_pal, sls, sle, psx_gpu_upscale_shift);
 
    PSX_CDC = new PS_CDC();
@@ -1571,7 +1572,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    switch (psx_gpu_dither_mode)
    {
       case DITHER_NATIVE:
-         GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+         GPU_set_dither_upscale_shift(GPU_get_upscale_shift());
          break;
       case DITHER_UPSCALED:
          GPU_set_dither_upscale_shift(0);
@@ -2651,13 +2652,11 @@ static bool old_cdimagecache = true;
 static bool old_cdimagecache = false;
 #endif
 
-static bool boot = true;
-
 // shared memory cards support
 static bool shared_memorycards = false;
-static bool shared_memorycards_toggle = false;
 
-static void check_variables(bool startup)
+
+static void check_variables(void)
 {
    struct retro_variable var = {0};
 
@@ -2719,21 +2718,21 @@ static void check_variables(bool startup)
    var.key = BEETLE_OPT(gpu_overclock);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      unsigned val = atoi(var.value);
+
+      // Upscale must be a power of two
+      assert((val & (val - 1)) == 0);
+
+      // Crappy "ffs" implementation since the standard function is not
+      // widely supported by libc in the wild
+      uint8_t n;
+      for (n = 0; (val & 1) == 0; ++n)
       {
-         unsigned val = atoi(var.value);
-
-         // Upscale must be a power of two
-         assert((val & (val - 1)) == 0);
-
-         // Crappy "ffs" implementation since the standard function is not
-         // widely supported by libc in the wild
-         uint8_t n;
-         for (n = 0; (val & 1) == 0; ++n)
-            {
-               val >>= 1;
-            }
-         psx_gpu_overclock_shift = n;
+         val >>= 1;
       }
+      psx_gpu_overclock_shift = n;
+   }
    else
       psx_gpu_overclock_shift = 0;
 
@@ -2789,74 +2788,7 @@ static void check_variables(bool startup)
    else
       input_enable_calibration( false );
 
-   if (startup)
-   {
-      var.key = BEETLE_OPT(renderer);
-
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      {
-         if (!strcmp(var.value, "software"))
-         {
-            var.key = BEETLE_OPT(internal_resolution);
-
-            if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-            {
-               uint8_t new_upscale_shift;
-               uint8_t val = atoi(var.value);
-
-               // Upscale must be a power of two
-               assert((val & (val - 1)) == 0);
-
-               // Crappy "ffs" implementation since the standard function is not
-               // widely supported by libc in the wild
-               for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
-                  val >>= 1;
-               psx_gpu_upscale_shift = new_upscale_shift;
-            }
-            else
-               psx_gpu_upscale_shift = 0;
-         }
-         else
-            psx_gpu_upscale_shift = 0;
-      }
-      else
-         /* If 'BEETLE_OPT(renderer)' option is not found, then
-          * we are running in software mode */
-         psx_gpu_upscale_shift = 0;
-   }
-   else
-   {
-      rsx_intf_refresh_variables();
-
-      switch (rsx_intf_is_type())
-      {
-         case RSX_SOFTWARE:
-            var.key = BEETLE_OPT(internal_resolution);
-
-            if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-            {
-               uint8_t new_upscale_shift;
-               uint8_t val = atoi(var.value);
-
-               // Upscale must be a power of two
-               assert((val & (val - 1)) == 0);
-
-               // Crappy "ffs" implementation since the standard function is not
-               // widely supported by libc in the wild
-               for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
-                  val >>= 1;
-               psx_gpu_upscale_shift = new_upscale_shift;
-            }
-            else
-               psx_gpu_upscale_shift = 0;
-
-            break;
-         case RSX_OPENGL:
-         case RSX_VULKAN:
-            psx_gpu_upscale_shift = 0;
-            break;
-      }
-   }
+   rsx_intf_refresh_variables();
 
    var.key = BEETLE_OPT(dither_mode);
 
@@ -3080,46 +3012,6 @@ static void check_variables(bool startup)
       input_set_player_count( 5 );
    else
       input_set_player_count( 2 );
-
-   var.key = BEETLE_OPT(use_mednafen_memcard0_method);
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "libretro") == 0)
-         use_mednafen_memcard0_method = false;
-      else if (strcmp(var.value, "mednafen") == 0)
-         use_mednafen_memcard0_method = true;
-   }
-
-   //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
-   var.key = BEETLE_OPT(shared_memory_cards);
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-
-     if (strcmp(var.value, "enabled") == 0)
-     {
-         if(boot)
-         {
-            if(use_mednafen_memcard0_method)
-               shared_memorycards_toggle = true;
-         }
-         else
-         {
-            if(use_mednafen_memcard0_method)
-               shared_memorycards_toggle = true;
-         }
-     }
-     else if (strcmp(var.value, "disabled") == 0)
-     {
-         if(boot)
-            shared_memorycards_toggle = false;
-         else
-         {
-            shared_memorycards = false;
-         }
-     }
-   }
 
    var.key = BEETLE_OPT(frame_duping);
 
@@ -3464,6 +3356,7 @@ bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
    bool ret = false;
+   is_startup = true;
 
    if (failed_init)
       return false;
@@ -3484,10 +3377,26 @@ bool retro_load_game(const struct retro_game_info *info)
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
 
-   check_variables(true);
+   /* make sure shared memory cards and save states are enabled only at startup */
+   struct retro_variable var = {0};
+   var.key = BEETLE_OPT(use_mednafen_memcard0_method);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "libretro") == 0)
+         use_mednafen_memcard0_method = false;
+      else if (strcmp(var.value, "mednafen") == 0)
+         use_mednafen_memcard0_method = true;
+   }
 
-   //make sure shared memory cards and save states are enabled only at startup
-   shared_memorycards = shared_memorycards_toggle;
+   /* this option depends on use_mednafen_memcard0_method being **enabled** */
+   var.key = BEETLE_OPT(shared_memory_cards);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0 && use_mednafen_memcard0_method)
+         shared_memorycards = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         shared_memorycards = false;
+   }
 
    if (!MDFNI_LoadGame(retro_cd_path))
    {
@@ -3498,16 +3407,7 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   alloc_surface();
-
-#ifdef NEED_DEINTERLACER
-   PrevInterlaced = false;
-   deint.ClearState();
-#endif
-
-   input_init();
-
-   boot = false;
+	 input_init();
 
    frame_count = 0;
    internal_frame_count = 0;
@@ -3524,9 +3424,16 @@ bool retro_load_game(const struct retro_game_info *info)
       how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
       so we don't have to force this anymore. */
       force_software_renderer = true;
-   } 
+   }
+
+#ifdef NEED_DEINTERLACER
+   PrevInterlaced = false;
+   deint.ClearState();
+#endif
 
    ret = rsx_intf_open(content_is_pal, force_software_renderer);
+   check_variables();
+   alloc_surface();
 
    /* Hide irrelevant core options */
    switch (rsx_intf_is_type())
@@ -3594,8 +3501,6 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.key = BEETLE_OPT(display_vram);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
-         option_display.key = BEETLE_OPT(crop_overscan);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(image_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(image_crop);
@@ -3667,34 +3572,24 @@ void retro_run(void)
 
    rsx_intf_prepare_frame();
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+   if (is_startup || environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
-      check_variables(false);
-      struct retro_system_av_info new_av_info;
+      /* Startup ends here */
+      is_startup = false;
+      check_variables();
 
-      /* Max width/height changed, need to call SET_SYSTEM_AV_INFO */
-      if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
+      /* Software renderer changed its upscale, the static MDFN_Surface needs to be recreated */
+      if (need_new_surface)
       {
-         retro_get_system_av_info(&new_av_info);
-         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
-         {
-            // We successfully changed the frontend's resolution, we can
-            // apply the change immediately
-            GPU_Rescale(psx_gpu_upscale_shift);
-            alloc_surface();
-            has_new_geometry = false; /* New AV info also updates geometry */
-         }
-         else
-         {
-            /* Failed, we have to postpone the upscaling change */
-            psx_gpu_upscale_shift = GPU_get_upscale_shift();
-         }
+         alloc_surface();
+         need_new_surface = false;
       }
+      struct retro_system_av_info new_av_info;
 
       switch (psx_gpu_dither_mode)
       {
          case DITHER_NATIVE:
-            GPU_set_dither_upscale_shift(psx_gpu_upscale_shift);
+            GPU_set_dither_upscale_shift(GPU_get_upscale_shift());
             break;
          case DITHER_UPSCALED:
             GPU_set_dither_upscale_shift(0);

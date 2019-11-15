@@ -27,6 +27,13 @@ extern int initial_scanline;
 extern int initial_scanline_pal;
 extern int last_scanline;
 extern int last_scanline_pal;
+  
+/* Warns the libretro implementation that it needs to update its static MDFN_Surface object  */
+extern bool need_new_surface; 
+
+/* Whether or not the libretro core is starting up i.e. not in retro_run()
+ * Prevents HW renderers from calling SET_SYSTEM_AV_INFO */
+extern bool is_startup;
 
 #ifdef __cplusplus
 }

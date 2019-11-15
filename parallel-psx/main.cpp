@@ -443,8 +443,12 @@ static bool read_command(const CLIArguments &args, FILE *file, Device &device, R
 		auto w = read_u32(file);
 		auto h = read_u32(file);
 		auto depth_24bpp = read_u32(file);
+		auto is_pal = readu32(file);
+		auto is_480i = readu32(file);
+		auto width_mode = readu32(file);
 
-		renderer.set_display_mode({ x, y, w, h }, depth_24bpp != 0);
+		renderer.set_display_mode({ x, y, w, h }, depth_24bpp != 0, is_pal != 0, is_480i != 0,
+		                          static_cast<Renderer::WidthMode>(width_mode));
 		break;
 	}
 

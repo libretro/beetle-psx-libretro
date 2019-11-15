@@ -2289,6 +2289,9 @@ static void rsx_gl_refresh_variables(void)
          return;
    }
 
+   if (is_startup)
+      return;
+
    if (retro_refresh_variables(renderer))
    {
       /* The resolution has changed, we must tell the frontend
@@ -3002,6 +3005,7 @@ static unsigned msaa = 1;
 static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
+static bool crop_overscan;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -3201,6 +3205,15 @@ static void rsx_vulkan_refresh_variables(void)
          dither_mode = DITHER_OFF;
    }
 
+   var.key = BEETLE_OPT(crop_overscan);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         crop_overscan = true;
+      else
+         crop_overscan = false;
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3210,6 +3223,10 @@ static void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
+   if (is_startup)
+      return;
+
+   // Changing crop_overscan will likely need to be included here in future geometry fixes
    if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
       retro_system_av_info info;
@@ -3228,6 +3245,7 @@ static void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
 {
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
+   renderer->set_horizontal_overscan_cropping(crop_overscan);
 
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
       renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
@@ -3772,7 +3790,54 @@ void rsx_intf_refresh_variables(void)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
+      {
+         struct retro_variable var = {0};
+         var.key = BEETLE_OPT(internal_resolution);
+         uint8_t old_psx_gpu_upscale_shift = GPU_get_upscale_shift();
+
+         if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         {
+            uint8_t new_upscale_shift;
+            uint8_t val = atoi(var.value);
+
+            // Upscale must be a power of two
+            assert((val & (val - 1)) == 0);
+
+            // Crappy "ffs" implementation since the standard function is not
+            // widely supported by libc in the wild
+            for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
+               val >>= 1;
+            psx_gpu_upscale_shift = new_upscale_shift;
+         }
+         else
+            psx_gpu_upscale_shift = 0;
+
+         /* According to the libretro spec, can't call set_av_info when not in retro_run() */
+         if (is_startup)
+            GPU_Rescale(psx_gpu_upscale_shift);
+
+         /* Max width/height changed, need to call SET_SYSTEM_AV_INFO */
+         else if (old_psx_gpu_upscale_shift != psx_gpu_upscale_shift)
+         {
+            retro_system_av_info info;
+            rsx_intf_get_system_av_info(&info);
+
+            if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
+            {
+               /* We successfully changed the frontend's resolution, we can
+                  apply the change immediately */
+               GPU_Rescale(psx_gpu_upscale_shift);
+               need_new_surface = true;
+            }
+            else
+            {
+               /* Failed, we have to postpone the upscaling change */
+               psx_gpu_upscale_shift = GPU_get_upscale_shift();
+            }
+
+         }
          break;
+      }
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          if (static_renderer.inited)
@@ -4034,7 +4099,16 @@ void rsx_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 #endif
          break;
       case RSX_VULKAN:
-         //implement me for Vulkan and set HAVE_VULKAN define check
+#if defined(HAVE_VULKAN)
+         if (renderer)
+            renderer->set_horizontal_display_range(x1, x2);
+         else
+         {
+            defer.push_back([=]() {
+               renderer->set_horizontal_display_range(x1, x2);
+            });
+         }
+#endif
          break;
    }
 }
@@ -4063,7 +4137,16 @@ void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
 #endif
          break;
       case RSX_VULKAN:
-         //implement me for Vulkan and set HAVE_VULKAN define check
+#if defined(HAVE_VULKAN)
+         if (renderer)
+            renderer->set_vertical_display_range(y1, y2);
+         else
+         {
+            defer.push_back([=]() {
+               renderer->set_vertical_display_range(y1, y2);
+            });
+         }
+#endif
          break;
    }
 }
@@ -4150,11 +4233,13 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
          if (renderer)
-            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
+            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+                                       is_480i, static_cast<Renderer::WidthMode>(width_mode));
          else
          {
             defer.push_back([=]() {
-                  renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp));
+                  renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+                                             is_480i, static_cast<Renderer::WidthMode>(width_mode));
                   });
          }
 #endif
