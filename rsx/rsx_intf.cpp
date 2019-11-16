@@ -3593,15 +3593,18 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
             break;
          }
 
+         /* If this option isn't on, total width crop is zero */
+         if (!crop_overscan)
+            total_width_crop = 0;
+
          /* Vertical overscan "cropping"
           * The Mednafen DisplayRect height will change according to the initial/last scanline variables.
-          * We track that here and update base geometry accordingly.
-         */
+          * We track that here and update base geometry accordingly. */
          unsigned int total_visible_scanlines = 0;
          if (content_is_pal)
          {
             total_visible_scanlines = last_scanline_pal + 1 - initial_scanline_pal;
-            if (sw_cur_displaymode_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL)
+            if (uncropped_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL)
                total_visible_scanlines *= 2;
 
             GPU_SetVisibleLines(initial_scanline_pal, last_scanline_pal);
@@ -3609,19 +3612,17 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          else
          {
             total_visible_scanlines = last_scanline + 1 - initial_scanline;
-            if (sw_cur_displaymode_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC)
+            if (uncropped_h == MEDNAFEN_CORE_GEOMETRY_MAX_H_NTSC)
                total_visible_scanlines *= 2;
 
             GPU_SetVisibleLines(initial_scanline, last_scanline);
          }
-         total_height_crop = sw_cur_displaymode_h - total_visible_scanlines;
+         total_height_crop = uncropped_h - total_visible_scanlines;
 
          info->timing.fps            = content_is_pal ? MEDNAFEN_CORE_TIMING_FPS_PAL : MEDNAFEN_CORE_TIMING_FPS_NTSC;
          info->timing.sample_rate    = MEDNAFEN_CORE_TIMING_SAMPLERATE;
-         info->geometry.base_width   = crop_overscan ? (uncropped_w - total_width_crop) << psx_gpu_upscale_shift
-                                       : uncropped_w << psx_gpu_upscale_shift;
-
-         info->geometry.base_height  = (sw_cur_displaymode_h - total_height_crop) << psx_gpu_upscale_shift;
+         info->geometry.base_width   = (uncropped_w - total_width_crop) << psx_gpu_upscale_shift;
+         info->geometry.base_height  = (uncropped_h - total_height_crop) << psx_gpu_upscale_shift;
 
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H_PAL << psx_gpu_upscale_shift
@@ -4617,9 +4618,11 @@ double compute_aspect_ratio(
                   unsigned int uncropped_width, unsigned int uncropped_height,
                   unsigned int   cropped_width, unsigned int   cropped_height)
 {
-   double compensated_dar = 0.0;
-
    double current_dar   = widescreen_hack ? (16.0 / 9.0) : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+   if (uncropped_width == cropped_width && uncropped_height == cropped_height)
+      return current_dar;
+
+   double compensated_dar = 0.0;
    double uncropped_par = uncropped_width / (double)uncropped_height;
    double cropped_par   = cropped_width   / (double)cropped_height;
    double correct_ratio = current_dar / uncropped_par;
