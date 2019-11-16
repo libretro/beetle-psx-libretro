@@ -144,6 +144,10 @@ void rsx_intf_toggle_display(bool status);
 
 bool rsx_intf_has_software_renderer(void);
 
+double compute_aspect_ratio(
+                  unsigned int uncropped_width, unsigned int uncropped_height,
+                  unsigned int   cropped_width, unsigned int   cropped_height);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -378,38 +378,6 @@ extern "C"
 }
 #endif
 
-/* Compensate the display aspect ratio due to cropping the content's width/height
-*
-* The idea here is that uncropped content on a 4:3 (or 16:9 if widescreen hack is on) display aspect ratio (DAR)
-* is the "correct" look due to the *ratio* between 4:3 DAR and uncropped content width/height (PAR)
-*
-* That ratio may be lost when e.g. cropping overscan.
-*
-* We restore that ratio by changing DAR (geometry.aspect_ratio) such that:
-*
-*     correct ratio = current DAR / uncropped PAR  # all known variables
-*
-*     correct ratio = compensated DAR / cropped PAR     # solve for compensated DAR
-* <=> compensated DAR = correct ratio * cropped PAR
-*
-* NOTE: This also applies to PAL content, which is generally 'squished' compared to NTSC content.
-* This may be undesirable to some, but it seems to be accurate.
-* */
-double compute_aspect_ratio(
-                  unsigned int uncropped_width, unsigned int uncropped_height,
-                  unsigned int   cropped_width, unsigned int   cropped_height)
-{
-   double compensated_dar = 0.0;
-
-   double current_dar   = widescreen_hack ? (16.0 / 9.0) : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
-   double uncropped_par = uncropped_width / (double)uncropped_height;
-   double cropped_par   = cropped_width   / (double)cropped_height;
-   double correct_ratio = current_dar / uncropped_par;
-
-   compensated_dar = correct_ratio * cropped_par;
-   return compensated_dar;
-}
-
 #ifdef DEBUG
 static void get_error(const char *msg)
 {
@@ -4626,4 +4594,36 @@ void rsx_intf_toggle_display(bool status)
 #endif
         break;
     }
+}
+
+/* Compensate the display aspect ratio due to cropping the content's width/height
+*
+* The idea here is that uncropped content on a 4:3 (or 16:9 if widescreen hack is on) display aspect ratio (DAR)
+* is the "correct" look due to the *ratio* between 4:3 DAR and uncropped content width/height (PAR)
+*
+* That ratio may be lost when e.g. cropping overscan.
+*
+* We restore that ratio by changing DAR (geometry.aspect_ratio) such that:
+*
+*     correct ratio = current DAR / uncropped PAR  # all known variables
+*
+*     correct ratio = compensated DAR / cropped PAR     # solve for compensated DAR
+* <=> compensated DAR = correct ratio * cropped PAR
+*
+* NOTE: This also applies to PAL content, which is generally 'squished' compared to NTSC content.
+* This may be undesirable to some, but it seems to be accurate.
+* */
+double compute_aspect_ratio(
+                  unsigned int uncropped_width, unsigned int uncropped_height,
+                  unsigned int   cropped_width, unsigned int   cropped_height)
+{
+   double compensated_dar = 0.0;
+
+   double current_dar   = widescreen_hack ? (16.0 / 9.0) : MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+   double uncropped_par = uncropped_width / (double)uncropped_height;
+   double cropped_par   = cropped_width   / (double)cropped_height;
+   double correct_ratio = current_dar / uncropped_par;
+
+   compensated_dar = correct_ratio * cropped_par;
+   return compensated_dar;
 }
