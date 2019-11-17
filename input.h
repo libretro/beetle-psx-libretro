@@ -33,8 +33,8 @@ void input_update(bool supports_bitmasks, retro_input_state_t input_state_cb );
 
 enum
 {
-	SETTING_GUN_INPUT_LIGHTGUN,
-	SETTING_GUN_INPUT_POINTER,
+   SETTING_GUN_INPUT_LIGHTGUN,
+   SETTING_GUN_INPUT_POINTER,
 };
 extern int gun_input_mode;
 
