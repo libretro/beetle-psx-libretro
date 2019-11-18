@@ -3495,15 +3495,6 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.key = BEETLE_OPT(image_crop);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
-         option_display.key = BEETLE_OPT(initial_scanline);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(last_scanline);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(initial_scanline_pal);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(last_scanline_pal);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-
          break;
       }
    }

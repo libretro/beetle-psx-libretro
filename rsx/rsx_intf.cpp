@@ -3050,6 +3050,10 @@ static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
 static bool crop_overscan;
+static int initial_scanline;
+static int last_scanline;
+static int initial_scanline_pal;
+static int last_scanline_pal;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -3259,6 +3263,30 @@ static void rsx_vulkan_refresh_variables(void)
          crop_overscan = false;
    }
 
+   var.key = BEETLE_OPT(initial_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(last_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(initial_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline_pal = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(last_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline_pal = atoi(var.value);
+   }
+
    var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3271,7 +3299,7 @@ static void rsx_vulkan_refresh_variables(void)
    if (is_startup)
       return;
 
-   // Changing crop_overscan will likely need to be included here in future geometry fixes
+   // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
    if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
       retro_system_av_info info;
@@ -3291,6 +3319,7 @@ static void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
    renderer->set_horizontal_overscan_cropping(crop_overscan);
+   renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
 
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
       renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);

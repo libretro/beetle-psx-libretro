@@ -677,11 +677,7 @@ void Renderer::mipmap_framebuffer()
 
 Renderer::DisplayRect Renderer::compute_display_rect()
 {
-	unsigned display_width;
-	unsigned display_height = (render_state.is_pal ? 288 : 240) * (render_state.is_480i ? 2 : 1);
-
-	int left_offset = 0;
-	unsigned clock_div = 10;
+	unsigned clock_div;
 	switch (render_state.width_mode)
 	{
 	case WidthMode::WIDTH_MODE_256:
@@ -701,6 +697,8 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 		break;
 	}
 
+	unsigned display_width;
+	int left_offset;
 	if (render_state.crop_overscan)
 	{
 		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
@@ -713,7 +711,20 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 		left_offset = (render_state.horiz_start - 488) / (int) clock_div;
 	}
 
-	int upper_offset = (render_state.vert_start - (render_state.is_pal ? 20 : 16)) * (render_state.is_480i ? 2 : 1);
+	unsigned display_height;
+	int upper_offset;
+	if (render_state.is_pal)
+	{
+		display_height = render_state.slend_pal - render_state.slstart_pal + 1;
+		upper_offset = render_state.vert_start - 20 - render_state.slstart_pal;
+	}
+	else
+	{
+		display_height = render_state.slend - render_state.slstart + 1;
+		upper_offset = render_state.vert_start - 16 - render_state.slstart;
+	}
+	display_height *= (render_state.is_480i ? 2 : 1);
+	upper_offset *= (render_state.is_480i ? 2 : 1);
 
 	return DisplayRect(left_offset, upper_offset, display_width, display_height);
 }

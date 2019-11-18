@@ -110,6 +110,12 @@ public:
 		WidthMode width_mode = WidthMode::WIDTH_MODE_320;
 		bool crop_overscan = false;
 
+		int slstart = 0;
+		int slend = 239;
+
+		int slstart_pal = 0;
+		int slend_pal = 287;
+
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
 		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
@@ -201,6 +207,15 @@ public:
 	void set_horizontal_overscan_cropping(bool crop_overscan)
 	{
 		render_state.crop_overscan = crop_overscan;
+	}
+
+	void set_visible_scanlines(int slstart, int slend, int slstart_pal, int slend_pal)
+	{
+		// May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
+		render_state.slstart = slstart;
+		render_state.slend = slend;
+		render_state.slstart_pal = slstart_pal;
+		render_state.slend_pal = slend_pal;
 	}
 
 	void set_display_filter(ScanoutFilter filter)
