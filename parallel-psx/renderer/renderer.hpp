@@ -110,6 +110,9 @@ public:
 		WidthMode width_mode = WidthMode::WIDTH_MODE_320;
 		bool crop_overscan = false;
 
+		// Experimental horizontal offset feature
+		int offset_cycles = 0;
+
 		int slstart = 0;
 		int slend = 239;
 
@@ -207,6 +210,11 @@ public:
 	void set_horizontal_overscan_cropping(bool crop_overscan)
 	{
 		render_state.crop_overscan = crop_overscan;
+	}
+
+	void set_horizontal_offset_cycles(int offset_cycles)
+	{
+		render_state.offset_cycles = offset_cycles;
 	}
 
 	void set_visible_scanlines(int slstart, int slend, int slstart_pal, int slend_pal)

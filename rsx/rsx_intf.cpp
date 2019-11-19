@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <boolean.h>
 #include <libretro.h>
@@ -347,6 +348,9 @@ struct GlRenderer {
 
    /* When true we perform no horizontal padding */
    bool crop_overscan;
+
+   /* Experimental offset feature */
+   int32_t image_offset_cycles;
 
    /* Scanline core options */
    int32_t initial_scanline;
@@ -1244,6 +1248,13 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          crop_overscan = false;
    }
 
+   int32_t image_offset_cycles = 0;
+   var.key = BEETLE_OPT(image_offset_cycles);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      image_offset_cycles = atoi(var.value);
+   }
+
    int32_t initial_scanline = 0;
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -1441,6 +1452,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->internal_upscaling = upscaling;
    renderer->internal_color_depth = depth;
    renderer->crop_overscan = crop_overscan;
+   renderer->image_offset_cycles = image_offset_cycles;
    renderer->curr_width_mode = WIDTH_MODE_320;
    renderer->initial_scanline = initial_scanline;
    renderer->last_scanline = last_scanline;
@@ -1572,12 +1584,16 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
    if (renderer->crop_overscan)
    {
       width = (uint32_t) (2560/clock_div);
-      x = ((int32_t) renderer->config.display_area_hrange[0] - 608) / clock_div;
+      int32_t offset_cycles = renderer->image_offset_cycles;
+      int32_t h_start = (int32_t) renderer->config.display_area_hrange[0];
+      x = floor((h_start - 608 + offset_cycles) / (double) clock_div);
    }
    else
    {
       width = (uint32_t) (2800/clock_div);
-      x = ((int32_t) renderer->config.display_area_hrange[0] - 488) / clock_div;
+      int32_t offset_cycles = renderer->image_offset_cycles;
+      int32_t h_start = (int32_t) renderer->config.display_area_hrange[0];
+      x = floor((h_start - 488 + offset_cycles) / (double) clock_div);
    }
 
    uint32_t height;
@@ -1698,6 +1714,13 @@ static bool retro_refresh_variables(GlRenderer *renderer)
          crop_overscan = true;
       else if (strcmp(var.value, "disabled") == 0)
          crop_overscan = false;
+   }
+
+   int32_t image_offset_cycles;
+   var.key = BEETLE_OPT(image_offset_cycles);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      image_offset_cycles = atoi(var.value);
    }
 
    int32_t initial_scanline = 0;
@@ -1862,6 +1885,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
    renderer->internal_color_depth   = depth;
    renderer->filter_type            = filter;
    renderer->crop_overscan          = crop_overscan;
+   renderer->image_offset_cycles    = image_offset_cycles;
    renderer->initial_scanline       = initial_scanline;
    renderer->last_scanline          = last_scanline;
    renderer->initial_scanline_pal   = initial_scanline_pal;
@@ -3058,6 +3082,7 @@ static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
 static bool crop_overscan;
+static int image_offset_cycles;
 static int initial_scanline;
 static int last_scanline;
 static int initial_scanline_pal;
@@ -3271,6 +3296,12 @@ static void rsx_vulkan_refresh_variables(void)
          crop_overscan = false;
    }
 
+   var.key = BEETLE_OPT(image_offset_cycles);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      image_offset_cycles = atoi(var.value);
+   }
+
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -3327,6 +3358,7 @@ static void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
    renderer->set_horizontal_overscan_cropping(crop_overscan);
+   renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
 
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)

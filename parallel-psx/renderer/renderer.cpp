@@ -703,12 +703,12 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	{
 		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
 		display_width = 2560/clock_div;
-		left_offset = (render_state.horiz_start - 608) / (int) clock_div;
+		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div);
 	}
 	else
 	{
 		display_width = 2800/clock_div;
-		left_offset = (render_state.horiz_start - 488) / (int) clock_div;
+		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 488) / (double) clock_div);
 	}
 
 	unsigned display_height;
