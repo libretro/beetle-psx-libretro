@@ -215,6 +215,17 @@ struct ImageLoadVertex {
    static std::vector<Attribute> attributes();
 };
 
+struct GlDisplayRect
+{
+   /* Analogous to DisplayRect in the Vulkan
+    * renderer,but specified in native unscaled
+    * glViewport coordinates. */
+   int32_t x;
+   int32_t y;
+   uint32_t width;
+   uint32_t height;
+};
+
 struct DrawConfig
 {
    uint16_t display_top_left[2];
@@ -1521,6 +1532,74 @@ static inline void apply_scissor(GlRenderer *renderer)
    glScissor(x, y, w, h);
 }
 
+static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
+{
+   /* Current function logic mostly backported from Vulkan renderer */
+
+   int32_t clock_div;
+   switch (renderer->curr_width_mode)
+   {
+      case WIDTH_MODE_256:
+         clock_div = 10;
+         break;
+
+      case WIDTH_MODE_320:
+         clock_div = 8;
+         break;
+
+      case WIDTH_MODE_512:
+         clock_div = 5;
+         break;
+
+      case WIDTH_MODE_640:
+         clock_div = 4;
+         break;
+
+      /* The unusual case: 368px mode. Width is 364 px for
+       * typical 368 mode games but often times something
+       * different, which necessitates checking width mode 
+       * rather than calculated pixel width */
+      case WIDTH_MODE_368:
+         clock_div = 7;
+         break;
+
+      default: //should never be here -- if we're here, something is terribly wrong
+         break;
+   }
+
+   uint32_t width;
+   int32_t x;
+   if (renderer->crop_overscan)
+   {
+      width = (uint32_t) (2560/clock_div);
+      x = ((int32_t) renderer->config.display_area_hrange[0] - 608) / clock_div;
+   }
+   else
+   {
+      width = (uint32_t) (2800/clock_div);
+      x = ((int32_t) renderer->config.display_area_hrange[0] - 488) / clock_div;
+   }
+
+   uint32_t height;
+   int32_t y;
+   if (renderer->config.is_pal)
+   {
+      int h = renderer->last_scanline_pal - renderer->initial_scanline_pal + 1;
+      height = (h < 0 ? 0 : (uint32_t) h);
+      y = (308 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline_pal - 287);
+   }
+   else
+   {
+      int h = renderer->last_scanline - renderer->initial_scanline + 1;
+      height = (h < 0 ? 0 : (uint32_t) h);
+      y = (256 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline - 239);
+   }
+   height *= (renderer->config.is_480i ? 2 : 1);
+   y *= (renderer->config.is_480i ? 2 : 1);
+
+   return {x, y, width, height};
+}
+
 static void bind_libretro_framebuffer(GlRenderer *renderer)
 {
    GLuint fbo;
@@ -1528,21 +1607,23 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    uint32_t upscale   = renderer->internal_upscaling;
    uint32_t f_w       = renderer->frontend_resolution[0];
    uint32_t f_h       = renderer->frontend_resolution[1];
-   uint16_t _w        = renderer->config.display_resolution[0];
-   uint16_t _h        = renderer->config.display_resolution[1];
+   uint32_t _w        = renderer->config.display_resolution[0];
+   uint32_t _h        = renderer->config.display_resolution[1];
    float aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 
       MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
-   /* Padding vars */
-   uint32_t unpadded_w;
-   uint32_t unpadded_h;
-   int32_t top_pad = 0;
-   int32_t bottom_pad = 0;
-   int32_t left_pad = 0;
-   int32_t right_pad = 0;
+   /* vp_w and vp_h currently contingent on rsx_intf_set_display_mode behavior... */
+   uint32_t vp_w = renderer->config.display_resolution[0] * upscale;
+   uint32_t vp_h = renderer->config.display_resolution[1] * upscale;
+
+   int32_t x, y;
+   int32_t _x = 0;
+   int32_t _y = 0;
 
    if (renderer->display_vram)
    {
+      _x           = 0;
+      _y           = 0;
       _w           = VRAM_WIDTH_PIXELS;
       _h           = VRAM_HEIGHT;
       /* Is this accurate? */
@@ -1550,86 +1631,17 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    }
    else
    {
-      /* Height padding for non-standard framebuffer heights 
-       *
-       * We check the config.is_pal set by UpdateDisplayMode 
-       * instead of querying content_is_pal since config.is_pal
-       * is a runtime GPU value while content_is_pal is only set
-       * at load time */
-
-      uint16_t first_line = renderer->config.is_pal ? 20 : 16;
-      uint16_t last_line = renderer->config.is_pal ? 308 : 256; //non-inclusive bound
-
-      top_pad = (int32_t) (renderer->config.display_area_vrange[0] - first_line);
-      bottom_pad = (int32_t) (last_line - renderer->config.display_area_vrange[1]);
-
-      top_pad -= (renderer->config.is_pal ? renderer->initial_scanline_pal : renderer->initial_scanline);
-      bottom_pad -= (renderer->config.is_pal ? 287 - renderer->last_scanline_pal : 239 - renderer->last_scanline);
-
-      if (renderer->config.is_480i) //double padding if 480-line mode
-      {
-         top_pad *= 2;
-         bottom_pad *= 2;
-      }
-
-      /* Overscan cropping code */
-      if (!renderer->crop_overscan) //reverse case of software renderer: here we calculate how much padding to add, rather than how much to remove
-      {
-         int32_t pix_clk;
-         switch (renderer->curr_width_mode)
-         {
-            case WIDTH_MODE_256:
-               pix_clk = 10;
-               break;
-
-            case WIDTH_MODE_320:
-               pix_clk = 8;
-               break;
-
-            case WIDTH_MODE_512:
-               pix_clk = 5;
-               break;
-
-            case WIDTH_MODE_640:
-               pix_clk = 4;
-               break;
-
-            /* The unusual case: 368px mode. Width is 364 px for
-             * typical 368 mode games but often times something
-             * different, which necessitates checking width mode 
-             * rather than calculated pixel width */
-            case WIDTH_MODE_368:
-               pix_clk = 7;
-               break;
-
-            default: //should never be here -- if we're here, something is terribly wrong
-               break;
-         }
-         int32_t line_width = 2800 / pix_clk; //width of line measured in pixels outputted by psx
-         left_pad = (renderer->config.display_area_hrange[0] - 488) / pix_clk;
-         right_pad = line_width - ((renderer->config.display_area_hrange[1] - 488) / pix_clk);
-      }
+      GlDisplayRect disp_rect = compute_gl_display_rect(renderer);
+      _x = disp_rect.x;
+      _y = disp_rect.y;
+      _w = disp_rect.width;
+      _h = disp_rect.height;
    }
 
+   x       = _x * (int32_t) upscale;
+   y       = _y * (int32_t) upscale;
    w       = (uint32_t) _w * upscale;
    h       = (uint32_t) _h * upscale;
-
-   //printf("VertStart = %3u, VertEnd = %3u\n", renderer->config.display_area_vrange[0], renderer->config.display_area_vrange[1]);
-   //printf("_w = %3d, _h = %3d, top_pad = %3d, bottom_pad = %3d\n", _w, _h, top_pad, bottom_pad);
-   //printf("HorizStart = %4u, HorizEnd = %4u\n", renderer->config.display_area_hrange[0], renderer->config.display_area_hrange[1]);
-   //printf("_w = %3d, left_pad = %3d, right_pad = %3d\n", _w, left_pad, right_pad);
-
-   /* Scale pad heights up and add to scaled height */
-   unpadded_h = h;
-   top_pad     *= upscale;
-   bottom_pad  *= upscale;
-   h += (top_pad + bottom_pad);
-
-   /* Scale horizontal padding up and add to scaled width */
-   unpadded_w = w;
-   left_pad *= upscale;
-   right_pad *= upscale;
-   w += (left_pad + right_pad);
 
    if (w != f_w || h != f_h)
    {
@@ -1653,7 +1665,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    /* Bind the output framebuffer provided by the frontend */
    fbo = glsm_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-   glViewport((GLsizei) left_pad, (GLsizei) bottom_pad, (GLsizei) unpadded_w, (GLsizei) unpadded_h);
+   glViewport((GLsizei) x, (GLsizei) y, (GLsizei) vp_w, (GLsizei) vp_h);
 }
 
 static bool retro_refresh_variables(GlRenderer *renderer)
