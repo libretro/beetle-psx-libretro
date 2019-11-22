@@ -151,6 +151,7 @@ struct CLIArguments
 
 #define BREAKPOINT __builtin_trap
 
+// This enum should always be kept equivalent to the enum in rsx_dump.cpp
 enum
 {
 	RSX_END = 0,
@@ -159,6 +160,8 @@ enum
 	RSX_TEX_WINDOW,
 	RSX_DRAW_OFFSET,
 	RSX_DRAW_AREA,
+	RSX_HORIZONTAL_RANGE,
+	RSX_VERTICAL_RANGE,
 	RSX_DISPLAY_MODE,
 	RSX_TRIANGLE,
 	RSX_QUAD,
@@ -433,6 +436,24 @@ static bool read_command(const CLIArguments &args, FILE *file, Device &device, R
 		width = min(width, int(FB_WIDTH - x0));
 		height = min(height, int(FB_HEIGHT - y0));
 		renderer.set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+		break;
+	}
+
+	case RSX_HORIZONTAL_RANGE:
+	{
+		auto x1 = read_u32(file);
+		auto x2 = read_u32(file);
+
+		renderer.set_horizontal_display_range(x1, x2);
+		break;
+	}
+
+	case RSX_VERTICAL_RANGE:
+	{
+		auto y1 = read_u32(file);
+		auto y2 = read_u32(file);
+
+		renderer.set_vertical_display_range(y1, y2);
 		break;
 	}
 

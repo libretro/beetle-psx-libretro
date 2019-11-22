@@ -11,6 +11,8 @@ enum
    RSX_TEX_WINDOW,
    RSX_DRAW_OFFSET,
    RSX_DRAW_AREA,
+   RSX_HORIZONTAL_RANGE,
+   RSX_VERTICAL_RANGE,
    RSX_DISPLAY_MODE,
    RSX_TRIANGLE,
    RSX_QUAD,
@@ -134,6 +136,7 @@ void rsx_dump_set_horizontal_display_range(uint16_t x1, uint16_t x2);
 {
    if (!file)
       return;
+   write_u32(RSX_HORIZONTAL_RANGE);
    write_u32(x1);
    write_u32(x2);
 }
@@ -142,6 +145,7 @@ void rsx_dump_set_vertical_display_range(uint16_t y1, uint16_t y2);
 {
    if (!file)
       return;
+   write_u32(RSX_VERTICAL_RANGE);
    write_u32(y1);
    write_u32(y2);
 }
