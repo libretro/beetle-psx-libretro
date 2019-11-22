@@ -1628,8 +1628,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
    /* vp_w and vp_h currently contingent on rsx_intf_set_display_mode behavior... */
-   uint32_t vp_w = renderer->config.display_resolution[0] * upscale;
-   uint32_t vp_h = renderer->config.display_resolution[1] * upscale;
+   uint32_t vp_w = renderer->config.display_resolution[0];
+   uint32_t vp_h = renderer->config.display_resolution[1];
 
    int32_t x, y;
    int32_t _x = 0;
@@ -1641,6 +1641,11 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       _y           = 0;
       _w           = VRAM_WIDTH_PIXELS;
       _h           = VRAM_HEIGHT;
+
+      //override vram fb dimensions for viewport
+      vp_w = _w;
+      vp_h = _h;
+
       /* Is this accurate? */
       aspect_ratio = 2.0 / 1.0;
    }
@@ -1657,6 +1662,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    y       = _y * (int32_t) upscale;
    w       = (uint32_t) _w * upscale;
    h       = (uint32_t) _h * upscale;
+   vp_w   *= upscale;
+   vp_h   *= upscale;
 
    if (w != f_w || h != f_h)
    {
