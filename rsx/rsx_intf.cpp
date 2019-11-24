@@ -2326,9 +2326,6 @@ static void rsx_gl_refresh_variables(void)
          return;
    }
 
-   if (is_startup)
-      return;
-
    if (retro_refresh_variables(renderer))
    {
       /* The resolution has changed, we must tell the frontend
@@ -3340,9 +3337,6 @@ static void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
-   if (is_startup)
-      return;
-
    // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
    if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
@@ -3798,54 +3792,7 @@ void rsx_intf_refresh_variables(void)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
-      {
-         struct retro_variable var = {0};
-         var.key = BEETLE_OPT(internal_resolution);
-         uint8_t old_psx_gpu_upscale_shift = GPU_get_upscale_shift();
-
-         if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-         {
-            uint8_t new_upscale_shift;
-            uint8_t val = atoi(var.value);
-
-            // Upscale must be a power of two
-            assert((val & (val - 1)) == 0);
-
-            // Crappy "ffs" implementation since the standard function is not
-            // widely supported by libc in the wild
-            for (new_upscale_shift = 0; (val & 1) == 0; ++new_upscale_shift)
-               val >>= 1;
-            psx_gpu_upscale_shift = new_upscale_shift;
-         }
-         else
-            psx_gpu_upscale_shift = 0;
-
-         /* According to the libretro spec, can't call set_av_info when not in retro_run() */
-         if (is_startup)
-            GPU_Rescale(psx_gpu_upscale_shift);
-
-         /* Max width/height changed, need to call SET_SYSTEM_AV_INFO */
-         else if (old_psx_gpu_upscale_shift != psx_gpu_upscale_shift)
-         {
-            retro_system_av_info info;
-            rsx_intf_get_system_av_info(&info);
-
-            if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
-            {
-               /* We successfully changed the frontend's resolution, we can
-                  apply the change immediately */
-               GPU_Rescale(psx_gpu_upscale_shift);
-               need_new_surface = true;
-            }
-            else
-            {
-               /* Failed, we have to postpone the upscaling change */
-               psx_gpu_upscale_shift = GPU_get_upscale_shift();
-            }
-
-         }
          break;
-      }
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          if (static_renderer.inited)

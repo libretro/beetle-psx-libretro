@@ -16,12 +16,6 @@ extern int lineRenderMode;
 extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
-/* Warns the libretro implementation that it needs to update its static MDFN_Surface object  */
-extern bool need_new_surface; 
-
-/* Whether or not the libretro core is starting up i.e. not in retro_run()
- * Prevents HW renderers from calling SET_SYSTEM_AV_INFO */
-extern bool is_startup;
 
 #ifdef __cplusplus
 }
