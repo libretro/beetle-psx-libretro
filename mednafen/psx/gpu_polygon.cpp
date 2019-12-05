@@ -1026,7 +1026,6 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 	do
 	{
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
 		enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
 
 		if (textured)
@@ -1160,7 +1159,6 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 				gpu->killQuadPart = 0;
 			}
 		}
-#endif
 
       if (rsx_intf_is_type() == RSX_SOFTWARE)
       {
