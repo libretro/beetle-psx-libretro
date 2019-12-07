@@ -531,8 +531,8 @@ ifeq ($(DEBUG), 1)
       CFLAGS   += -Od -Zi -DDEBUG -D_DEBUG
       CXXFLAGS += -Od -Zi -DDEBUG -D_DEBUG
    else
-      CFLAGS   += -O0 -g -DDEBUG
-      CXXFLAGS += -O0 -g -DDEBUG
+      CFLAGS   += -O0 -g -DDEBUG -MMD
+      CXXFLAGS += -O0 -g -DDEBUG -MMD
    endif
 else
    ifneq (,$(findstring msvc,$(platform)))
@@ -547,8 +547,8 @@ else
       CFLAGS   += -O2 -DNDEBUG
       CXXFLAGS += -O2 -DNDEBUG
    else
-      CFLAGS   += -O3 -DNDEBUG
-      CXXFLAGS += -O3 -DNDEBUG
+      CFLAGS   += -O3 -DNDEBUG -MMD
+      CXXFLAGS += -O3 -DNDEBUG -MMD
    endif
 endif
 
