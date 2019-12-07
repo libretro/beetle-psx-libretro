@@ -177,19 +177,19 @@ ifneq ($(HAVE_GRIFFIN), 1)
    endif
 
    SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
-		  $(CDROM_DIR)/CDAccess_Image.cpp \
-		  $(CDROM_DIR)/CDAccess_CCD.cpp \
-		  $(CDROM_DIR)/CDAccess_PBP.cpp \
-		  $(CDROM_DIR)/audioreader.cpp \
-		  $(CDROM_DIR)/misc.cpp \
-		  $(CDROM_DIR)/cdromif.cpp
+                  $(CDROM_DIR)/CDAccess_Image.cpp \
+                  $(CDROM_DIR)/CDAccess_CCD.cpp \
+                  $(CDROM_DIR)/CDAccess_PBP.cpp \
+                  $(CDROM_DIR)/audioreader.cpp \
+                  $(CDROM_DIR)/misc.cpp \
+                  $(CDROM_DIR)/cdromif.cpp
 
    SOURCES_C +=   $(CDROM_DIR)/CDUtility.c \
-		  $(CDROM_DIR)/galois.c \
-		  $(CDROM_DIR)/l-ec.c \
-		  $(CDROM_DIR)/lec.c \
-		  $(CDROM_DIR)/recover-raw.c \
-		  $(CDROM_DIR)/edc_crc32.c
+                  $(CDROM_DIR)/galois.c \
+                  $(CDROM_DIR)/l-ec.c \
+                  $(CDROM_DIR)/lec.c \
+                  $(CDROM_DIR)/recover-raw.c \
+                  $(CDROM_DIR)/edc_crc32.c
 
    SOURCES_CXX += $(MEDNAFEN_DIR)/error.cpp \
                   $(MEDNAFEN_DIR)/settings.cpp \
@@ -202,9 +202,9 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
                   $(MEDNAFEN_DIR)/video/surface.cpp \
                   $(CORE_DIR)/libretro.cpp \
-						$(MEDNAFEN_DIR)/mednafen-endian.cpp \
+                  $(MEDNAFEN_DIR)/mednafen-endian.cpp \
                   $(CORE_DIR)/input.cpp \
-						$(CORE_DIR)/rsx/rsx_intf.cpp
+                  $(CORE_DIR)/rsx/rsx_intf.cpp
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c
 
@@ -256,15 +256,15 @@ ifneq ($(HAVE_GRIFFIN), 1)
                      $(LIBRETRO_DIR)/hash/rhash.c
 
       ifeq ($(HAVE_CDROM), 1)
-				 CFLAGS += -DHAVE_CDROM
-				 CXXFLAGS += -DHAVE_CDROM
+         CFLAGS    += -DHAVE_CDROM
+         CXXFLAGS  += -DHAVE_CDROM
          SOURCES_C += $(LIBRETRO_DIR)/cdrom/cdrom.c \
-         							$(LIBRETRO_DIR)/vfs/vfs_implementation_cdrom.c
+                      $(LIBRETRO_DIR)/vfs/vfs_implementation_cdrom.c
 
          ifeq ($(CDROM_DEBUG), 1)
-				    CFLAGS += -DCDROM_DEBUG
-				    CXXFLAGS += -DCDROM_DEBUG
-				 endif
+            CFLAGS += -DCDROM_DEBUG
+            CXXFLAGS += -DCDROM_DEBUG
+         endif
       endif
 
       ifeq ($(NEED_THREADING), 1)
