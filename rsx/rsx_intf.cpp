@@ -19,6 +19,7 @@
 #include "rsx_intf.h"
 #include "rsx.h"
 #include "../libretro_cbs.h"
+#include "../beetle_psx_globals.h"
 
 
 #ifdef RSX_DUMP

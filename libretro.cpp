@@ -16,6 +16,7 @@
 #include "ugui_tools.h"
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
+#include "beetle_psx_globals.h"
 #include "libretro_options.h"
 #include "input.h"
 
@@ -2911,11 +2912,11 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "disabled") == 0)
-         lineRenderMode = 0;
+         line_render_mode = 0;
       else if (strcmp(var.value, "default") == 0)
-         lineRenderMode = 1;
+         line_render_mode = 1;
       else if (strcmp(var.value, "aggressive") == 0)
-         lineRenderMode = 2;
+         line_render_mode = 2;
    }
 
    var.key = BEETLE_OPT(filter);
