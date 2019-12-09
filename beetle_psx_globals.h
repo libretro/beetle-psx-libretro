@@ -21,6 +21,7 @@ extern int line_render_mode;
 extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
+extern bool crop_overscan;
 
 #ifdef __cplusplus
 }

@@ -49,7 +49,6 @@ static bool allow_frame_duping = false;
 static bool failed_init = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
-static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_variable_serialization_size = false;
 static int frame_width = 0;

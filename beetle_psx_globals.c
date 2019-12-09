@@ -8,3 +8,4 @@ int line_render_mode;
 int filter_mode;
 bool opaque_check;
 bool semitrans_check;
+bool crop_overscan = false;
