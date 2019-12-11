@@ -1,26 +1,24 @@
-#include <stdio.h>
+#include "rsx/rsx_intf.h"
+
+#include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-
-#include <boolean.h>
-#include <libretro.h>
-
-#include <vector>
 
 #ifdef HAVE_VULKAN
 #include <functional>
 #endif
+#include <vector>
 
+#include "boolean.h"
+#include "libretro.h"
+
+#include "beetle_psx_globals.h"
+#include "libretro_cbs.h"
+#include "libretro_options.h"
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
-
-#include "rsx_intf.h"
-#include "rsx.h"
-#include "../libretro_cbs.h"
-#include "../beetle_psx_globals.h"
-
 
 #ifdef RSX_DUMP
 #include "rsx_dump.h"
@@ -31,14 +29,12 @@ static bool has_software_fb = false;
 extern "C" unsigned char widescreen_hack;
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
    extern retro_environment_t environ_cb;
 #ifdef __cplusplus
 }
 #endif
-
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsm/glsmsym.h>

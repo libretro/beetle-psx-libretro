@@ -2,9 +2,6 @@
 #define __RSX_INTF_H__
 
 #include "libretro.h"
-#include "libretro_options.h"
-
-#include "rsx.h"
 
 #define SOUND_FREQUENCY 44100
 #define FPS_NTSC 59.941
@@ -146,7 +143,7 @@ bool rsx_intf_has_software_renderer(void);
 #ifdef __cplusplus
 extern "C" {
 #endif
-  extern retro_environment_t environ_cb;
+   extern retro_environment_t environ_cb;
 #ifdef __cplusplus
 }
 #endif
