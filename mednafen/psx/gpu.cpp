@@ -1721,6 +1721,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                      for(x = udx_end; x < udmw; x++)
                         dest[x] = 0;
                   }
+
+                  //reset dest back to i=0 for PSX_GPULineHook call
+                  dest = GPU.surface->pixels + ((dest_line << GPU.upscale_shift) * GPU.surface->pitch32);
                }
 
                //if(GPU.scanline == 64)
@@ -1730,16 +1733,30 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                pix_clock_offset = (488 - 146) / DotClockRatios[dmc];
                pix_clock = (GPU.HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
                pix_clock_div = DotClockRatios[dmc];
+
+               PSX_GPULineHook(sys_timestamp,
+                               sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio,
+                               GPU.scanline == 0,
+                               dest,
+                               &GPU.surface->format,
+                               dmw_width,
+                               pix_clock_offset,
+                               pix_clock,
+                               pix_clock_div,
+                               GPU.surface->pitch32,
+                               (1 << GPU.upscale_shift));
             }
-            // XXX fixme when upscaling is active
-            PSX_GPULineHook(sys_timestamp,
-                  sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio, GPU.scanline == 0,
-                  dest,
-                  &GPU.surface->format,
-                  dmw_width,
-                  pix_clock_offset,
-                  pix_clock,
-                  pix_clock_div);
+            else
+            {
+               PSX_GPULineHook(sys_timestamp,
+                               sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio,
+                               GPU.scanline == 0,
+                               NULL,
+                               &GPU.surface->format,
+                               0, 0, 0, 0,
+                               GPU.surface->pitch32,
+                               (1 << GPU.upscale_shift));
+            }
 
             if(!GPU.InVBlank)
                GPU.DisplayFB_CurYOffset = (GPU.DisplayFB_CurYOffset + 1) & 0x1FF;

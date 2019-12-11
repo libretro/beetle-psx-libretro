@@ -16,6 +16,7 @@
 #include "ugui_tools.h"
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
+#include "beetle_psx_globals.h"
 #include "libretro_options.h"
 #include "input.h"
 
@@ -48,7 +49,6 @@ static bool allow_frame_duping = false;
 static bool failed_init = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
-static bool crop_overscan = false;
 static bool enable_memcard1 = false;
 static bool enable_variable_serialization_size = false;
 static int frame_width = 0;
@@ -1177,9 +1177,9 @@ void PSX_MemPoke32(uint32 A, uint32 V)
    MemPoke<uint32, false>(0, A, V);
 }
 
-void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
-   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
+   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 }
 
 static bool TestMagic(const char *name, RFILE *fp, int64_t size)
@@ -2911,11 +2911,11 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "disabled") == 0)
-         lineRenderMode = 0;
+         line_render_mode = 0;
       else if (strcmp(var.value, "default") == 0)
-         lineRenderMode = 1;
+         line_render_mode = 1;
       else if (strcmp(var.value, "aggressive") == 0)
-         lineRenderMode = 2;
+         line_render_mode = 2;
    }
 
    var.key = BEETLE_OPT(filter);

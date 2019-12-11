@@ -126,7 +126,7 @@ static void crosshair_plot( uint32 *pixels,
 	pixels[x] = MAKECOLOR(nr, ng, nb, a);
 }
 
-INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock)
+INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
 	switch ( chair_cursor )
 	{
@@ -147,12 +147,15 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 				ic = 0;
 			}
 
-			x_start = std::max<int32>(0, chair_x - ic);
-			x_bound = std::min<int32>(width, chair_x + ic + 1);
+			x_start = std::max<int32>(0, (chair_x - ic) * upscale_factor);
+			x_bound = std::min<int32>(width * upscale_factor, (chair_x + ic + 1) * upscale_factor);
 
 			for ( int32 x = x_start; x < x_bound; x++ )
 			{
-				crosshair_plot( pixels, x, format, chair_r, chair_g, chair_b );
+            for (int row = 0; row < upscale_factor; row++)
+            {
+               crosshair_plot( pixels, x + (row * surf_pitchinpix), format, chair_r, chair_g, chair_b );
+            }
 			}
 		}
 
@@ -167,12 +170,15 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 
 			ic = pix_clock / ( 762925 * 6 );
 
-			x_start = std::max<int32>(0, chair_x - ic);
-			x_bound = std::min<int32>(width, chair_x + ic);
+			x_start = std::max<int32>(0, (chair_x - ic) * upscale_factor);
+			x_bound = std::min<int32>(width * upscale_factor, (chair_x + ic) * upscale_factor);
 
 			for ( int32 x = x_start; x < x_bound; x++ )
 			{
-				crosshair_plot( pixels, x, format, chair_r, chair_g, chair_b );
+            for (int row = 0; row < upscale_factor; row++)
+            {
+               crosshair_plot( pixels, x + (row * surf_pitchinpix), format, chair_r, chair_g, chair_b );
+            }
 			}
 		}
 
@@ -254,7 +260,7 @@ bool InputDevice::RequireNoFrameskip(void)
  return false;
 }
 
-int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
  return(PSX_EVENT_MAXTS);
 }
@@ -1016,13 +1022,13 @@ bool FrontIO::RequireNoFrameskip(void)
    return(false);
 }
 
-void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider)
+void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    Update(timestamp);
 
    for(unsigned i = 0; i < 8; i++)
    {
-      int32_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider);
+      int32_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 
       if(i < 2)
       {
@@ -1044,7 +1050,7 @@ void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp,
    {
       for(unsigned i = 0; i < 8; i++)
       {
-         Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock);
+         Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock, surf_pitchinpix, upscale_factor);
       }
    }
 

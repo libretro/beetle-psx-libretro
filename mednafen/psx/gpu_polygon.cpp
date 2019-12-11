@@ -1,6 +1,6 @@
 #include <math.h>
 #include <algorithm>
-#include "libretro_cbs.h"
+#include "beetle_psx_globals.h"
 
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
@@ -1037,11 +1037,11 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 		}
 
 		// Line Renderer: Detect triangles that would resolve as lines at x1 scale and create second triangle to make quad
-		if ((lineRenderMode != 0) && (!lineFound) && (numvertices == 3) && (textured))
+		if ((line_render_mode != 0) && (!lineFound) && (numvertices == 3) && (textured))
 		{
-			if(lineRenderMode == 1)
+			if(line_render_mode == 1)
 				lineFound = Hack_FindLine(gpu, vertices, lineVertices);		// Default enabled
-			else if (lineRenderMode == 2)
+			else if (line_render_mode == 2)
 				lineFound = Hack_ForceLine(gpu, vertices, lineVertices);	// Aggressive mode enabled (causes more artifacts)
 			else
 				lineFound = false;

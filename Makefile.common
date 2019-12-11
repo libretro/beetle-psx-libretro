@@ -170,7 +170,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
       SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
    endif
 
-   SOURCES_C += $(CORE_DIR)/libretro_cbs.c
+   SOURCES_C += $(CORE_DIR)/libretro_cbs.c \
+                $(CORE_DIR)/beetle_psx_globals.c
 
    ifeq ($(NEED_TREMOR), 1)
       SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))

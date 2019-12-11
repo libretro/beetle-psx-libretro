@@ -6,6 +6,7 @@
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"
 #include "input.h"
+#include "beetle_psx_globals.h"
 
 //------------------------------------------------------------------------------
 // Locals
@@ -533,15 +534,17 @@ void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_
    int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
    int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
 
+   // Comments by hiddenasbestos
    // .. scale into screen space:
    // NOTE: the scaling here is semi-guesswork, need to re-write.
    // TODO: Test with PAL games.
+   // Can also implement scaling with initial/last scanline
 
-   const int scale_x = 2800;
-   const int scale_y = 240;
+   const int scale_x = (crop_overscan ? 2560 : 2800);
+   const int scale_y = (content_is_pal ? 288 : 240);
 
-   int gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-   int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+   int gun_x = (( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1)) + (crop_overscan ? 120 : 0);
+   int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1) + (content_is_pal ? 4 : 0);
 
 #if 0
    int is_offscreen = 0;
@@ -649,15 +652,17 @@ void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input_state_
       int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
       int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
 
+      // Comments by hiddenasbestos
       // .. scale into screen space:
       // NOTE: the scaling here is semi-guesswork, need to re-write.
       // TODO: Test with PAL games.
+      // Can also implement scaling with initial/last scanline
 
-      const int scale_x = 2800;
-      const int scale_y = 240;
+      const int scale_x = (crop_overscan ? 2560 : 2800);
+      const int scale_y = (content_is_pal ? 288 : 240);
 
-      gun_x = ( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1);
-      gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1);
+      gun_x = (( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1)) + (crop_overscan ? 120 : 0);
+      gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1) + (content_is_pal ? 4 : 0);
    }
 
    // position
