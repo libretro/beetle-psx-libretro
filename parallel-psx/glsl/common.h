@@ -29,7 +29,9 @@ uint pack_abgr1555(vec4 value)
    // We keep the msb/lsb separate to support palettes correctly as the msbs should be reinterpreted as 4x4 or 2x8 bits.
    // Overall, we get 10 bits of precision for RGB, weee! :3
 #define INV_SCALING (4.0 * 255.0)
-   uvec4 rgba = uvec4(clamp(value, vec4(0.0), vec4(1.0)) * vec4(INV_SCALING, INV_SCALING, INV_SCALING, 1.0));
+
+   // Need to make sure that we round so we can get a stable roundtrip with abgr1555 -> pack_abgr1555.
+   uvec4 rgba = uvec4(round(clamp(value, vec4(0.0), vec4(1.0)) * vec4(INV_SCALING, INV_SCALING, INV_SCALING, 1.0)));
    uvec3 msb = rgba.rgb >> 5u;
    uvec3 lsb = rgba.rgb & 31u;
    return (msb.r << 0u) | (msb.g << 5u) | (msb.b << 10u) | (rgba.a << 15u) | (lsb.r << 16u) | (lsb.g << 21u) | (lsb.b << 26u);
