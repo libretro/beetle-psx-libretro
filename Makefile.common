@@ -25,6 +25,8 @@ ifeq ($(HAVE_OPENGL), 1)
 
    SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
                 $(LIBRETRO_DIR)/glsym/rglgen.c
+
+   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
 endif
 
 INCFLAGS := -I$(CORE_DIR) \
@@ -220,7 +222,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
                      $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
-                     $(CORE_DIR)/parallel-psx/util/timer.cpp
+                     $(CORE_DIR)/parallel-psx/util/timer.cpp \
+                     $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
 
       SOURCES_C += $(wildcard $(CORE_DIR)/parallel-psx/volk/*.c)
 

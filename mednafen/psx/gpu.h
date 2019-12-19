@@ -14,8 +14,6 @@
 #include <glsm/glsmsym.h>
 #endif
 
-#include "../../rsx/rsx.h"
-
 #define INCMD_NONE     0
 #define INCMD_PLINE    1
 #define INCMD_QUAD     2

@@ -2,9 +2,6 @@
 #define __RSX_INTF_H__
 
 #include "libretro.h"
-#include "libretro_options.h"
-
-#include "rsx.h"
 
 #define SOUND_FREQUENCY 44100
 #define FPS_NTSC 59.941
@@ -39,12 +36,11 @@ void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info);
 
-void rsx_intf_init(enum rsx_renderer_type type);
 bool rsx_intf_open(bool is_pal, bool force_software);
 void rsx_intf_close(void);
 void rsx_intf_refresh_variables(void);
 void rsx_intf_prepare_frame(void);
-void rsx_intf_finalize_frame(const void *data, unsigned width,
+void rsx_intf_finalize_frame(const void *fb, unsigned width,
                              unsigned height, unsigned pitch);
 
 void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
@@ -69,9 +65,9 @@ void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                             uint32_t c0, uint32_t c1, uint32_t c2,
                             uint16_t t0x, uint16_t t0y,
                             uint16_t t1x, uint16_t t1y,
+                            uint16_t t2x, uint16_t t2y,
                             uint16_t min_u, uint16_t min_v,
                             uint16_t max_u, uint16_t max_v,
-                            uint16_t t2x, uint16_t t2y,
                             uint16_t texpage_x, uint16_t texpage_y,
                             uint16_t clut_x, uint16_t clut_y,
                             uint8_t texture_blend_mode,
@@ -142,13 +138,5 @@ enum rsx_renderer_type rsx_intf_is_type(void);
 void rsx_intf_toggle_display(bool status);
 
 bool rsx_intf_has_software_renderer(void);
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-  extern retro_environment_t environ_cb;
-#ifdef __cplusplus
-}
-#endif
 
 #endif /*__RSX_H__ */
