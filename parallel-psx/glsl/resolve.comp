@@ -5,13 +5,13 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 #if defined(SCALED)
 #if defined(MSAA)
-layout(set = 0, binding = 2, rgba8) uniform writeonly mediump image2DMS uScaledMS;
+layout(set = 0, binding = 2, rgba8) uniform writeonly image2DMS uScaledMS;
 #endif
-layout(set = 0, binding = 0, rgba8) uniform writeonly mediump image2D uScaled;
-layout(set = 0, binding = 1) uniform mediump usampler2D uUnscaled;
+layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uScaled;
+layout(set = 0, binding = 1) uniform usampler2D uUnscaled;
 #elif defined(UNSCALED)
-layout(set = 0, binding = 0, r32ui) uniform writeonly mediump uimage2D uUnscaled;
-layout(set = 0, binding = 1) uniform mediump sampler2D uScaled;
+layout(set = 0, binding = 0, r32ui) uniform writeonly uimage2D uUnscaled;
+layout(set = 0, binding = 1) uniform sampler2D uScaled;
 #endif
 
 layout(set = 1, binding = 0, std140) uniform Rects
@@ -44,11 +44,11 @@ void main()
     vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
 #if SCALE == 2
     // Grabs 4 texels and averages them box-style.
-    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+    vec4 value = textureLod(uScaled, uv, 0.0);
 #elif SCALE == 4
     // Grabs 16 texels and averages them box-style.
     uv -= vec2(0.25 / 1024.0, 0.25 / 512.0);
-    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+    vec4 value = textureLod(uScaled, uv, 0.0);
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 2));
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 2));
@@ -56,7 +56,7 @@ void main()
 #elif SCALE == 8
     // Kinda crazy, grabs 64 texels and averages them.
     uv -= vec2(0.375 / 1024.0, 0.375 / 512.0);
-    mediump vec4 value = textureLod(uScaled, uv, 0.0);
+    vec4 value = textureLod(uScaled, uv, 0.0);
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 0));
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 0));
@@ -74,12 +74,12 @@ void main()
     value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 6));
     value /= 16.0;
 #elif SCALE == 16
-	// Batshit insanity :D Should probably split this shader up and use LDS to do final mip, but ... eh.
-	mediump vec4 value = vec4(0.0);
+    // Batshit insanity :D Should probably split this shader up and use LDS to do final mip, but ... eh.
+    vec4 value = vec4(0.0);
     uv -= vec2(0.4375 / 1024.0, 0.4375 / 512.0);
-	for (int y = 0; y < 8; y++)
-		for (int x = 0; x < 8; x++)
-			value += textureLod(uScaled, uv + vec2(x, y) * vec2(1.0 / 8192.0, 1.0 / 4096.0), 0.0);
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+            value += textureLod(uScaled, uv + vec2(x, y) * vec2(1.0 / 8192.0, 1.0 / 4096.0), 0.0);
     value /= 64.0;
 #endif
 
