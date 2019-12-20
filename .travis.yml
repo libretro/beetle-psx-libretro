@@ -30,3 +30,9 @@ script:
   - git clone --depth=50 https://github.com/libretro/libretro-super
   - cd libretro-super/travis
   - ./build.sh
+deploy:
+  provider: bitballoon
+  site-id:
+    secure: 85fb76a5-b9e0-43ff-8efd-c8602a066c43
+  access-token:
+    secure: "YOUR ENCRYPTED ACCESS TOKEN"
