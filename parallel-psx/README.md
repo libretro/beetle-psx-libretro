@@ -5,13 +5,14 @@ The aim is to be best-in-class for visual quality as well as accuracy for a HW r
 
 Main features:
 
- - Internal up-scaling.
- - Adaptive smoothing, which aims to make 2D elements smooth, and 3D elements crisp and sharp.
+ - Internal upscaling
+ - Multisample anti-aliasing
+ - Adaptive smoothing, which aims to make 2D elements smooth, and 3D elements crisp and sharp
  - Full mask bit emulation
  - Full framebuffer emulation
- - Standalone API for easy integration in other emulators.
- - RSX dump playback support (can be dumped from Beetle PSX).
- - PGXP integration (sub-pixel precision and perspective correctness).
+ - Standalone API for easy integration in other emulators
+ - RSX dump playback support (can be dumped from Beetle PSX)
+ - PGXP integration (sub-pixel precision and perspective correctness)
 
 ## Hardware and drivers tested on
 
@@ -58,4 +59,3 @@ make -j8
 
 This renderer would not have existed without the excellent Mednafen PSX emulator as well as Rustation PSX renderer.
 Otherwise, all code sans submodules in this repository is by Tiny Tiger.
-

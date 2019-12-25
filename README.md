@@ -10,8 +10,18 @@ Notable additions in this fork are:
 * Software renderer internal resolution upscaling, implemented by simias;
 * An OpenGL 3.3 renderer, developed by simias;
 * A Vulkan renderer, developed by TinyTiger;
-* PGXP perspectve correct texturing and subpixel precision, developed by iCatButler;
+* PGXP perspective correct texturing and subpixel precision, developed by iCatButler;
+
+## Building
+
+Beetle PSX can be built with `make`. To build with hardware renderer support, run `make HAVE_HW=1`. `make clean` is required when switching between HW and non-HW builds.
+
+## Coding Style
+
+The preferred coding style for Beetle PSX is the libretro coding style. See: https://docs.libretro.com/development/coding-standards/. Preexisting Mednafen code and various subdirectories may adhere to different styles; in those instances the preexisting style is preferred.
 
 ## Documentation
+
+https://docs.libretro.com/library/beetle_psx/
 
 https://docs.libretro.com/library/beetle_psx_hw/
