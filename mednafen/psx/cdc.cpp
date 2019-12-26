@@ -1838,7 +1838,7 @@ void PS_CDC::ReadBase(void)
 
       if(CommandLoc_Dirty)
          SeekTarget = CommandLoc;
-      else
+      else if (DriveStatus != DS_PAUSED && DriveStatus != DS_STANDBY)
          SeekTarget = CurSector;
 
       PSRCounter = /*903168 * 1.5 +*/ CalcSeekTime(CurSector, SeekTarget, DriveStatus != DS_STOPPED, DriveStatus == DS_PAUSED);
