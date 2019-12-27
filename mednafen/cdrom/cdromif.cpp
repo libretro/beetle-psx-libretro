@@ -447,7 +447,7 @@ bool CDIF_MT::ReadRawSector(uint8 *buf, uint32 lba, int64 timeout_us)
    // to read past the last "real" sector of the disc.
    if(lba >= disc_toc.tracks[100].lba)
    {
-      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      log_cb(RETRO_LOG_WARN, "Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       return(false);
    }
 
@@ -501,7 +501,7 @@ bool CDIF_MT::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
    // to read past the last "real" sector of the disc.
    if(lba >= disc_toc.tracks[100].lba)
    {
-      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      log_cb(RETRO_LOG_WARN, "Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       memset(buf, 0, 96);
       return(false);
    }
@@ -585,7 +585,7 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
             memcpy(pBuf, &tmpbuf[12 + 4 + 8], 2048);
             break;
          default:
-            printf("CDIF_ReadSector() invalid sector type at LBA=%u\n", (unsigned int)lba);
+            log_cb(RETRO_LOG_ERROR, "CDIF_ReadSector() invalid sector type at LBA=%u\n", (unsigned int)lba);
             return(false);
       }
 
@@ -650,7 +650,7 @@ bool CDIF_ST::ReadRawSectorPWOnly(uint8 *buf, uint32 lba, bool hint_fullread)
    // to read past the last "real" sector of the disc.
    if(lba >= disc_toc.tracks[100].lba)
    {
-      printf("Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
+      log_cb(RETRO_LOG_WARN, "Attempt to read LBA %d, >= LBA %d\n", lba, disc_toc.tracks[100].lba);
       memset(buf, 0, 96);
       return(false);
    }
