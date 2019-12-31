@@ -57,6 +57,9 @@ static int initial_scanline;
 static int last_scanline;
 static int initial_scanline_pal;
 static int last_scanline_pal;
+static bool frame_duping_enabled = false;
+static uint32_t prev_frame_width = 320;
+static uint32_t prev_frame_height = 240;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -333,6 +336,23 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
+   var.key = BEETLE_OPT(frame_duping);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+      {
+         bool frontend_can_dupe = false;
+         if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &frontend_can_dupe))
+         {
+            frame_duping_enabled = frontend_can_dupe;
+            if (!frontend_can_dupe)
+               log_cb(RETRO_LOG_INFO, "Frontend does not support frame duping. Frame duping will be disabled.\n");
+         }
+      }
+      else
+         frame_duping_enabled = false;
+   }
+
    // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
    if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
    {
@@ -372,6 +392,18 @@ static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
+   if (frame_duping_enabled && !GPU_get_display_change_count())
+   {
+      /* Any visual core option changes will be deferred to next non-duped frame */
+
+      //printf("No PSX GPU display update; duping frame\n");
+      renderer->flush();
+      video_refresh_cb(NULL, prev_frame_width, prev_frame_height, 0);
+
+      inside_frame = false;
+      return;
+   }
+
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
    renderer->set_horizontal_overscan_cropping(crop_overscan);
@@ -416,6 +448,9 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_scanout_semaphore(semaphore);
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, scanout->get_width(), scanout->get_height(), 0);
    inside_frame = false;
+
+   prev_frame_width = scanout->get_width();
+   prev_frame_height = scanout ->get_height();
 
    //fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
    //      renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
