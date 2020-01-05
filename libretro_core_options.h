@@ -357,6 +357,17 @@ struct retro_core_option_definition option_defs_us[] = {
       "1x(native)"
    },
    {
+      BEETLE_OPT(icache_emulation),
+      "Enable I-cache emulation",
+      "Enables emulation of instruction cache behavior like tag tests, validity bits and cache miss effects. Disabling this will result in a speed increase at the cost of reducing game compatibility.",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(skip_bios),
       "Skip BIOS",
       "Skips the PlayStation BIOS boot animation normally displayed when loading content. Note: Enabling this causes compatibility issues with a number of games (PAL copy protected games, Saga Frontier, etc).",

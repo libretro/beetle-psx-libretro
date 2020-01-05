@@ -2738,6 +2738,15 @@ static void check_variables(bool startup)
    else
       psx_gpu_overclock_shift = 0;
 
+   var.key = BEETLE_OPT(icache_emulation);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         icache_emulation = true;
+      else
+         icache_emulation = false;
+   }
+
    var.key = BEETLE_OPT(skip_bios);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {

@@ -22,6 +22,7 @@ extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
 extern bool crop_overscan;
+extern bool icache_emulation;
 
 #ifdef __cplusplus
 }

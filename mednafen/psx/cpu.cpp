@@ -35,6 +35,7 @@
 
 extern bool psx_gte_overclock;
 
+#include "beetle_psx_globals.h"
 
 #if 0
  #define EXP_ILL_CHECK(n) {n;}
@@ -504,7 +505,7 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
   ReadAbsorb[ReadAbsorbWhich] = 0;
   ReadAbsorbWhich = 0;
 
-  if(address >= 0xA0000000 || !(BIU & 0x800))
+  if(!icache_emulation || address >= 0xA0000000 || !(BIU & 0x800))
   {
    instr = MDFN_de32lsb<true>((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
 
