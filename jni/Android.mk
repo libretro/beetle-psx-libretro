@@ -16,6 +16,7 @@ HAVE_VULKAN              := 0
 HAVE_CHD                 := 1
 IS_X86                   := 0
 FLAGS                    :=
+HAVE_LIGHTREC            := 0
 
 ifeq ($(TARGET_ARCH),x86)
   IS_X86 := 1
@@ -31,6 +32,10 @@ ifeq ($(HAVE_HW),1)
     FLAGS       += -DHAVE_VULKAN
   endif
   FLAGS += -DHAVE_HW
+endif
+
+ifeq ($(HAVE_LIGHTREC),1)
+  FLAGS += -DHAVE_ASHMEM
 endif
 
 include $(CORE_DIR)/Makefile.common
