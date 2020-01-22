@@ -146,6 +146,24 @@ ifeq ($(NEED_TREMOR), 1)
    FLAGS += -DNEED_TREMOR
 endif
 
+ifeq ($(HAVE_LIGHTREC), 1)
+   FLAGS += -DHAVE_LIGHTREC
+
+   ifeq ($(DEBUG), 0)
+       FLAGS += -DENABLE_THREADED_COMPILER=1
+   else
+       FLAGS += -DENABLE_THREADED_COMPILER=0
+   endif
+
+   ifneq (,$(findstring win,$(platform)))
+       FLAGS += -DLIGHTREC_STATIC=1
+       INCFLAGS += -isystem$(DEPS_DIR)/mman
+   endif
+
+   INCFLAGS += -I$(DEPS_DIR)/lightning/include \
+               -I$(DEPS_DIR)/lightrec
+endif
+
 ifneq ($(HAVE_GRIFFIN), 1)
    SOURCES_CXX += $(CORE_EMU_DIR)/irq.cpp \
                   $(CORE_EMU_DIR)/timer.cpp \
@@ -342,3 +360,30 @@ ifeq ($(HAVE_CHD), 1)
 
    SOURCES_CXX += $(CDROM_DIR)/CDAccess_CHD.cpp
 endif ## ifeq ($(HAVE_CHD), 1)
+
+ifeq ($(HAVE_LIGHTREC), 1)
+   SOURCES_C +=   $(DEPS_DIR)/lightning/lib/jit_disasm.c \
+                  $(DEPS_DIR)/lightning/lib/jit_memory.c \
+                  $(DEPS_DIR)/lightning/lib/jit_names.c \
+                  $(DEPS_DIR)/lightning/lib/jit_note.c \
+                  $(DEPS_DIR)/lightning/lib/jit_print.c \
+                  $(DEPS_DIR)/lightning/lib/jit_size.c \
+                  $(DEPS_DIR)/lightning/lib/lightning.c \
+                  $(DEPS_DIR)/lightrec/blockcache.c \
+                  $(DEPS_DIR)/lightrec/disassembler.c \
+                  $(DEPS_DIR)/lightrec/emitter.c \
+                  $(DEPS_DIR)/lightrec/interpreter.c \
+                  $(DEPS_DIR)/lightrec/lightrec.c \
+                  $(DEPS_DIR)/lightrec/memmanager.c \
+                  $(DEPS_DIR)/lightrec/optimizer.c \
+                  $(DEPS_DIR)/lightrec/regcache.c
+
+   ifeq ($(DEBUG), 0)
+       SOURCES_C +=   $(DEPS_DIR)/lightrec/recompiler.c
+   endif
+
+   ifneq (,$(findstring win,$(platform)))
+       SOURCES_C +=   $(DEPS_DIR)/mman/sys/mman.c
+   endif
+
+endif ##ifeq ($(HAVE_LIGHTREC), 1)

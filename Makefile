@@ -5,6 +5,8 @@ HAVE_VULKAN = 0
 HAVE_JIT = 0
 HAVE_CHD = 1
 HAVE_CDROM = 0
+HAVE_LIGHTREC = 0
+LIGHTREC_DEBUG = 0
 
 CORE_DIR := .
 HAVE_GRIFFIN = 0
@@ -73,6 +75,13 @@ ifeq ($(SET_HAVE_HW), 1)
    TARGET_NAME := mednafen_psx_hw
 endif
 
+ifneq ($(LIGHTREC_DEBUG), 0)
+   DEBUG = 1
+   FLAGS += -DLIGHTREC_DEBUG
+   ifeq ($(LIGHTREC_DEBUG), 2)
+      FLAGS += -DLIGHTREC_VERY_DEBUG
+   endif
+endif
 
 # Unix
 ifneq (,$(findstring unix,$(platform)))
@@ -86,6 +95,10 @@ ifneq (,$(findstring unix,$(platform)))
      LDFLAGS += $(PTHREAD_FLAGS) -lroot
    else
      LDFLAGS += $(PTHREAD_FLAGS) -ldl
+   endif
+   ifeq ($(HAVE_LIGHTREC), 1)
+      LDFLAGS += -lrt
+      FLAGS += -DHAVE_SHM
    endif
    FLAGS   +=
    ifeq ($(HAVE_OPENGL),1)
@@ -483,6 +496,10 @@ else
 
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -lopengl32
+   endif
+
+   ifeq ($(HAVE_LIGHTREC), 1)
+      FLAGS += -DHAVE_WIN_SHM
    endif
 endif
 

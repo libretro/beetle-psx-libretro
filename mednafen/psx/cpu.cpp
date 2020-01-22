@@ -33,8 +33,24 @@
 #include "../pgxp/pgxp_main.h"
 // int pgxpMode = PGXP_GetModes();
 
-extern bool psx_gte_overclock;
+#ifdef HAVE_LIGHTREC
+ #include <lightrec.h>
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <signal.h>
 
+enum DYNAREC prev_dynarec;
+extern bool psx_dynarec_invalidate;
+static struct lightrec_state *lightrec_state;
+#endif
+
+extern bool psx_gte_overclock;
+pscpu_timestamp_t PS_CPU::next_event_ts;
+uint32 PS_CPU::IPCache;
+uint32 PS_CPU::BIU;
+bool PS_CPU::Halted;
+struct PS_CPU::CP0 PS_CPU::CP0;
+char PS_CPU::cache_buf[64 * 1024];
 
 #if 0
  #define EXP_ILL_CHECK(n) {n;}
@@ -99,7 +115,10 @@ PS_CPU::PS_CPU()
 
 PS_CPU::~PS_CPU()
 {
-
+#ifdef HAVE_LIGHTREC
+ if (lightrec_state)
+  lightrec_plugin_shutdown();
+#endif
 
 }
 
@@ -130,6 +149,8 @@ void PS_CPU::SetHalt(bool status)
  Halted = status;
  RecalcIPCache();
 }
+
+const uint8_t *PSX_LoadExpansion1(void);
 
 void PS_CPU::Power(void)
 {
@@ -164,7 +185,13 @@ void PS_CPU::Power(void)
 
  BIU = 0;
 
- memset(ScratchRAM.data8, 0, 1024);
+ memset(ScratchRAM->data8, 0, 1024);
+
+#ifdef HAVE_LIGHTREC
+ prev_dynarec = psx_dynarec;
+ if(psx_dynarec != DYNAREC_DISABLED)
+  lightrec_plugin_init();
+#endif
 
  PGXP_Init();
 
@@ -212,7 +239,7 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
   SFVAR(ReadAbsorbWhich),
   SFVAR(ReadFudge),
 
-  SFARRAY(ScratchRAM.data8, 1024),
+  SFARRAY(ScratchRAM->data8, 1024),
 
   SFEND
  };
@@ -222,6 +249,14 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
 
  if(load)
  {
+#ifdef HAVE_LIGHTREC
+  if(psx_dynarec != DYNAREC_DISABLED) {
+   if(lightrec_state)
+    lightrec_invalidate_all(lightrec_state);
+   else
+    lightrec_plugin_init();
+  }
+#endif
   if(load < 0x939)
   {
    //
@@ -293,7 +328,7 @@ INLINE T PS_CPU::PeekMemory(uint32 address)
  address &= addr_mask[address >> 29];
 
  if(address >= 0x1F800000 && address <= 0x1F8003FF)
-  return ScratchRAM.Read<T>(address & 0x3FF);
+  return ScratchRAM->Read<T>(address & 0x3FF);
 
  //assert(!(CP0.SR & 0x10000));
 
@@ -313,7 +348,7 @@ void PS_CPU::PokeMemory(uint32 address, T value)
  address &= addr_mask[address >> 29];
 
  if(address >= 0x1F800000 && address <= 0x1F8003FF)
-  return ScratchRAM.Write<T>(address & 0x3FF, value);
+  return ScratchRAM->Write<T>(address & 0x3FF, value);
 
  if(sizeof(T) == 1)
   PSX_MemPoke8(address, value);
@@ -378,9 +413,9 @@ INLINE T PS_CPU::ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool D
   LDAbsorb = 0;
 
   if(DS24)
-   return ScratchRAM.ReadU24(address & 0x3FF);
+   return ScratchRAM->ReadU24(address & 0x3FF);
   else
-   return ScratchRAM.Read<T>(address & 0x3FF);
+   return ScratchRAM->Read<T>(address & 0x3FF);
  }
 
  timestamp += (ReadFudge >> 4) & 2;
@@ -422,9 +457,9 @@ INLINE void PS_CPU::WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, ui
   if(address >= 0x1F800000 && address <= 0x1F8003FF)
   {
    if(DS24)
-    ScratchRAM.WriteU24(address & 0x3FF, value);
+    ScratchRAM->WriteU24(address & 0x3FF, value);
    else
-    ScratchRAM.Write<T>(address & 0x3FF, value);
+    ScratchRAM->Write<T>(address & 0x3FF, value);
 
    return;
   }
@@ -465,9 +500,9 @@ INLINE void PS_CPU::WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, ui
   if((BIU & 0x081) == 0x080)	// Writes to the scratchpad(TODO test)
   {
    if(DS24)
-    ScratchRAM.WriteU24(address & 0x3FF, value);
+    ScratchRAM->WriteU24(address & 0x3FF, value);
    else
-    ScratchRAM.Write<T>(address & 0x3FF, value);
+    ScratchRAM->Write<T>(address & 0x3FF, value);
   }
   //printf("IsC WRITE%d 0x%08x 0x%08x -- CP0.SR=0x%08x\n", (int)sizeof(T), address, value, CP0.SR);
  }
@@ -650,6 +685,10 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
  muldiv_ts_done += timestamp;
 
  BACKING_TO_ACTIVE;
+
+#if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
+ u32 oldpc = PC;
+#endif
 
  do
  {
@@ -2641,6 +2680,10 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
    //printf("\n");
   }
+#if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
+  if (timestamp >= 0 && PC != oldpc)
+     print_for_big_ass_debugger(timestamp, PC);
+#endif
  } while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
 
  if(gte_ts_done > 0)
@@ -2656,6 +2699,20 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 
 pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode)
 {
+#ifdef HAVE_LIGHTREC
+ if(psx_dynarec != prev_dynarec) {
+  //init lightrec when changing dynarec option, cleans entire state if already running
+  if(psx_dynarec != DYNAREC_DISABLED)
+   lightrec_plugin_init();
+  prev_dynarec = psx_dynarec;
+ }
+
+ if(lightrec_state)
+  lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
+
+ if(psx_dynarec != DYNAREC_DISABLED)
+  return(lightrec_plugin_execute(timestamp_in));
+#endif
  if(CPUHook || ADDBT)
   return(RunReal<true, true, false>(timestamp_in));
 #ifdef DEBUG
@@ -3023,6 +3080,473 @@ void PS_CPU::CheckBreakpoints(void (*callback)(bool write, uint32 address, unsig
 
  }
 }
+
+#ifdef HAVE_LIGHTREC
+#define ARRAY_SIZE(x) (sizeof(x) ? sizeof(x) / sizeof((x)[0]) : 0)
+
+static char *name = (char*) "beetle_psx_libretro";
+
+#ifdef LIGHTREC_DEBUG
+u32 lightrec_begin_cycles = 0;
+
+u32 hash_calculate(const void *buffer, u32 count)
+{
+	unsigned int i;
+	u32 *data = (u32 *) buffer;
+	u32 hash = 0xffffffff;
+
+	count /= 4;
+	for(i = 0; i < count; ++i) {
+		hash += data[i];
+		hash += (hash << 10);
+		hash ^= (hash >> 6);
+	}
+
+	hash += (hash << 3);
+	hash ^= (hash >> 11);
+	hash += (hash << 15);
+	return hash;
+}
+
+void PS_CPU::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
+{
+	uint8_t *psxM = (uint8_t *) MainRAM->data8;
+	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
+	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
+
+	unsigned int i;
+
+	printf("CYCLE 0x%08x PC 0x%08x", timestamp, PC);
+
+#ifdef LIGHTREC_VERY_DEBUG
+	printf(" RAM 0x%08x SCRATCH 0x%08x",
+		hash_calculate(psxM, 0x200000),
+		hash_calculate(psxH, 0x400));
+#endif
+
+	printf(" CP0 0x%08x",
+		hash_calculate(&CP0.Regs,
+			sizeof(CP0.Regs)));
+
+#ifdef LIGHTREC_VERY_DEBUG
+	for (i = 0; i < 32; i++)
+		printf(" GPR[%i] 0x%08x", i, GPR[i]);
+	printf(" LO 0x%08x", LO);
+	printf(" HI 0x%08x", HI);
+#else
+	printf(" GPR 0x%08x", hash_calculate(&GPR, 32*sizeof(uint32_t)));
+#endif
+	printf("\n");
+}
+#endif /* LIGHTREC_DEBUG */
+
+u32 PS_CPU::cop_mfc(struct lightrec_state *state, u8 reg)
+{
+	return CP0.Regs[reg];
+}
+
+u32 PS_CPU::cop_cfc(struct lightrec_state *state, u8 reg)
+{
+	return CP0.Regs[reg];
+}
+
+u32 PS_CPU::cop2_mfc(struct lightrec_state *state, u8 reg)
+{
+	return GTE_ReadDR(reg);
+}
+
+u32 PS_CPU::cop2_cfc(struct lightrec_state *state, u8 reg)
+{
+	return GTE_ReadCR(reg);
+}
+
+void PS_CPU::cop_mtc_ctc(struct lightrec_state *state,
+		u8 reg, u32 value)
+{
+	switch (reg) {
+		case 1:
+		case 4:
+		case 8:
+		case 14:
+		case 15:
+			/* Those registers are read-only */
+			break;
+		case 12: /* Status */
+			if ((CP0.SR & ~value) & (1 << 16)) {
+				memcpy(MainRAM->data8, cache_buf, sizeof(cache_buf));
+				lightrec_invalidate_all(state);
+			} else if ((~CP0.SR & value) & (1 << 16)) {
+				memcpy(cache_buf, MainRAM->data8, sizeof(cache_buf));
+			}
+
+			CP0.SR = value & ~( (0x3 << 26) | (0x3 << 23) | (0x3 << 6));
+			RecalcIPCache();
+			lightrec_set_exit_flags(state,
+					LIGHTREC_EXIT_CHECK_INTERRUPT);
+			break;
+		case 13: /* Cause */
+			CP0.CAUSE &= ~0x0300;
+			CP0.CAUSE |= value & 0x0300;
+			RecalcIPCache();
+			lightrec_set_exit_flags(state,
+					LIGHTREC_EXIT_CHECK_INTERRUPT);
+			break;
+		default:
+			CP0.Regs[reg] = value;
+			break;
+	}
+}
+
+void PS_CPU::cop_mtc(struct lightrec_state *state, u8 reg, u32 value)
+{
+	cop_mtc_ctc(state, reg, value);
+}
+
+void PS_CPU::cop_ctc(struct lightrec_state *state, u8 reg, u32 value)
+{
+	cop_mtc_ctc(state, reg, value);
+}
+
+void PS_CPU::cop2_mtc(struct lightrec_state *state, u8 reg, u32 value)
+{
+	GTE_WriteDR(reg, value);
+}
+
+void PS_CPU::cop2_ctc(struct lightrec_state *state, u8 reg, u32 value)
+{
+	GTE_WriteCR(reg, value);
+}
+
+static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
+                             1,1,1,1,1,0,1,0,0,0,0,1,1,0,1,0,
+                             1,0,0,0,0,0,0,0,1,1,1,0,0,1,1,0,
+                             1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1};
+
+static void cop_op(struct lightrec_state *state, u32 func)
+{
+	fprintf(stderr, "Access to invalid co-processor 0\n");
+}
+
+static void cop2_op(struct lightrec_state *state, u32 func){
+	if (MDFN_UNLIKELY(!cp2_ops[func & 0x3f]))
+                fprintf(stderr, "Invalid CP2 function %u\n", func);
+        else
+                GTE_Instruction(func);
+}
+
+void PS_CPU::reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp){
+	if (timestamp >= next_event_ts)
+		lightrec_set_exit_flags(state, LIGHTREC_EXIT_CHECK_INTERRUPT);
+}
+
+void PS_CPU::hw_write_byte(struct lightrec_state *state,
+		u32 mem, u8 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	PSX_MemWrite8(timestamp, mem, val);
+
+	reset_target_cycle_count(state, timestamp);
+}
+
+void PS_CPU::hw_write_half(struct lightrec_state *state,
+		u32 mem, u16 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	PSX_MemWrite16(timestamp, mem, val);
+
+	reset_target_cycle_count(state, timestamp);
+}
+
+void PS_CPU::hw_write_word(struct lightrec_state *state,
+		u32 mem, u32 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	PSX_MemWrite32(timestamp, mem, val);
+
+	reset_target_cycle_count(state, timestamp);
+}
+
+u8 PS_CPU::hw_read_byte(struct lightrec_state *state,
+		u32 mem)
+{
+	u8 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	val = PSX_MemRead8(timestamp,mem);
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
+u16 PS_CPU::hw_read_half(struct lightrec_state *state,
+		u32 mem)
+{
+	u16 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	val = PSX_MemRead16(timestamp, mem);
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
+u32 PS_CPU::hw_read_word(struct lightrec_state *state,
+		u32 mem)
+{
+	u32 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	val = PSX_MemRead32(timestamp, mem);
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
+struct lightrec_mem_map_ops PS_CPU::hw_regs_ops = {
+	.sb = hw_write_byte,
+	.sh = hw_write_half,
+	.sw = hw_write_word,
+	.lb = hw_read_byte,
+	.lh = hw_read_half,
+	.lw = hw_read_word,
+};
+
+u32 PS_CPU::cache_ctrl_read_word(struct lightrec_state *state,
+		u32 mem)
+{
+	return BIU;
+}
+
+void PS_CPU::cache_ctrl_write_word(struct lightrec_state *state,
+		u32 mem, u32 val)
+{
+	BIU = val;
+}
+
+struct lightrec_mem_map_ops PS_CPU::cache_ctrl_ops = {
+	.sb = NULL,
+	.sh = NULL,
+	.sw = cache_ctrl_write_word,
+	.lb = NULL,
+	.lh = NULL,
+	.lw = cache_ctrl_read_word,
+};
+
+struct lightrec_mem_map PS_CPU::lightrec_map[] = {
+	[PSX_MAP_KERNEL_USER_RAM] = {
+		/* Kernel and user memory */
+		.pc = 0x00000000,
+		.length = 0x200000,
+	},
+	[PSX_MAP_BIOS] = {
+		/* BIOS */
+		.pc = 0x1fc00000,
+		.length = 0x80000,
+	},
+	[PSX_MAP_SCRATCH_PAD] = {
+		/* Scratch pad */
+		.pc = 0x1f800000,
+		.length = 0x400,
+	},
+	[PSX_MAP_PARALLEL_PORT] = {
+		/* Parallel port */
+		.pc = 0x1f000000,
+		.length = 0x800000,
+	},
+	[PSX_MAP_HW_REGISTERS] = {
+		/* Hardware registers */
+		.pc = 0x1f801000,
+		.length = 0x2000,
+		.address = NULL,
+		.ops = &hw_regs_ops,
+	},
+	[PSX_MAP_CACHE_CONTROL] = {
+		/* Cache control */
+		.pc = 0x5ffe0130,
+		.length = 4,
+		.address = NULL,
+		.ops = &cache_ctrl_ops,
+	},
+
+	/* Mirrors of the kernel/user memory */
+	{
+		.pc = 0x00200000,
+		.length = 0x200000,
+		.address = NULL,
+		.ops = NULL,
+		.mirror_of = &lightrec_map[PSX_MAP_KERNEL_USER_RAM],
+	},
+	{
+		.pc = 0x00400000,
+		.length = 0x200000,
+		.address = NULL,
+		.ops = NULL,
+		.mirror_of = &lightrec_map[PSX_MAP_KERNEL_USER_RAM],
+	},
+	{
+		.pc = 0x00600000,
+		.length = 0x200000,
+		.address = NULL,
+		.ops = NULL,
+		.mirror_of = &lightrec_map[PSX_MAP_KERNEL_USER_RAM],
+	},
+};
+
+struct lightrec_ops PS_CPU::ops = {
+	.cop0_ops = {
+		.mfc = cop_mfc,
+		.cfc = cop_cfc,
+		.mtc = cop_mtc,
+		.ctc = cop_ctc,
+		.op = cop_op,
+	},
+	.cop2_ops = {
+		.mfc = cop2_mfc,
+		.cfc = cop2_cfc,
+		.mtc = cop2_mtc,
+		.ctc = cop2_ctc,
+		.op = cop2_op,
+	},
+};
+
+int PS_CPU::lightrec_plugin_init()
+{
+	uint8_t *psxM = (uint8_t *) MainRAM->data8;
+	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
+	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
+	uint8_t *psxP = (uint8_t *) PSX_LoadExpansion1();
+
+	if(lightrec_state)
+		lightrec_destroy(lightrec_state);
+	else{
+		fprintf(stderr, "Lightrec map addresses: M=0x%lx, P=0x%lx, R=0x%lx, H=0x%lx\n",
+			(uintptr_t) psxM,
+			(uintptr_t) psxP,
+			(uintptr_t) psxR,
+			(uintptr_t) psxH);
+	}
+
+	lightrec_map[PSX_MAP_KERNEL_USER_RAM].address = psxM;
+#if defined(HAVE_SHM) || defined(HAVE_WIN_SHM) || defined(HAVE_ASHMEM)
+	lightrec_map[PSX_MAP_MIRROR1].address = psxM + 0x200000;
+	lightrec_map[PSX_MAP_MIRROR2].address = psxM + 0x400000;
+	lightrec_map[PSX_MAP_MIRROR3].address = psxM + 0x600000;
+#endif
+	lightrec_map[PSX_MAP_BIOS].address = psxR;
+	lightrec_map[PSX_MAP_SCRATCH_PAD].address = psxH;
+	lightrec_map[PSX_MAP_PARALLEL_PORT].address = psxP;
+
+	lightrec_state = lightrec_init(name,
+			lightrec_map, ARRAY_SIZE(lightrec_map),
+			&ops);
+
+	lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
+
+	return 0;
+}
+
+int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
+{
+	uint32_t GPRL[34];
+
+	uint32_t PC;
+	uint32_t new_PC;
+	uint32_t new_PC_mask;
+	uint32_t LDWhich;
+	uint32_t LDValue;
+
+	BACKING_TO_ACTIVE;
+
+	u32 flags;
+
+	do {
+#ifdef LIGHTREC_DEBUG
+		u32 oldpc = PC;
+#endif
+		memcpy(&GPRL,&GPR,32*sizeof(uint32_t));
+		GPRL[32] = LO;
+		GPRL[33] = HI;
+		lightrec_restore_registers(lightrec_state, GPRL);
+		lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+		if (psx_dynarec == DYNAREC_EXECUTE)
+			PC = lightrec_execute(lightrec_state, PC, next_event_ts);
+		else if (psx_dynarec == DYNAREC_EXECUTE_ONE)
+			PC = lightrec_execute_one(lightrec_state,PC);
+		else if (psx_dynarec == DYNAREC_RUN_INTERPRETER)
+			PC = lightrec_run_interpreter(lightrec_state,PC);
+
+		timestamp = lightrec_current_cycle_count(
+				lightrec_state);
+
+		lightrec_dump_registers(lightrec_state, GPRL);
+		memcpy(&GPR,&GPRL,32*sizeof(uint32_t));
+		LO = GPRL[32];
+		HI = GPRL[33];
+
+		flags = lightrec_exit_flags(lightrec_state);
+
+		if (flags & LIGHTREC_EXIT_SEGFAULT) {
+			fprintf(stderr, "Exiting at cycle 0x%08x\n",
+					timestamp);
+			exit(1);
+		}
+
+		if (flags & LIGHTREC_EXIT_SYSCALL)
+			PC = Exception(EXCEPTION_SYSCALL, PC, PC, 0);
+
+#ifdef LIGHTREC_DEBUG
+		if (timestamp >= lightrec_begin_cycles && PC != oldpc){
+			print_for_big_ass_debugger(timestamp, PC);
+		}
+#endif
+		if ((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)) {
+			/* Handle software interrupts */
+			PC = Exception(EXCEPTION_INT, PC, PC, 0);
+		}
+	} while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
+
+	ACTIVE_TO_BACKING;
+
+	return timestamp;
+}
+
+void PS_CPU::lightrec_plugin_clear(u32 addr, u32 size)
+{
+	if (lightrec_state)	/* size * 4: uses DMA units */
+		lightrec_invalidate(lightrec_state, addr, size * 4);
+}
+
+void PS_CPU::lightrec_plugin_shutdown(void)
+{
+	fprintf(stderr,"Lightrec memory usage: %u KiB, average IPI: %.2f\n",
+		lightrec_get_total_mem_usage()/1024,
+		lightrec_get_average_ipi());
+	lightrec_destroy(lightrec_state);
+}
+
+#endif
 
 #if NOT_LIBRETRO
 }

@@ -29,6 +29,24 @@
 #include <vector>
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
 
+#ifdef HAVE_LIGHTREC
+#include <sys/mman.h>
+#endif
+
+#ifdef HAVE_ASHMEM
+#include <sys/ioctl.h>
+#include <linux/ashmem.h>
+#define HAVE_SHM 1
+#endif
+
+#ifdef HAVE_SHM
+#include <fcntl.h>
+#endif
+
+#ifdef HAVE_WIN_SHM
+#include <windows.h>
+#endif
+
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
 extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
@@ -60,6 +78,24 @@ unsigned cd_2x_speedup = 1;
 bool cd_async = false;
 bool cd_warned_slow = false;
 int64 cd_slow_timeout = 8000; // microseconds
+
+#ifdef HAVE_LIGHTREC
+enum DYNAREC psx_dynarec;
+bool psx_dynarec_invalidate;
+uint32 EventCycles;
+uint8 *psx_mem;
+uint8 *psx_bios;
+uint8 *psx_scratch;
+#if defined(HAVE_SHM) && !defined(HAVE_ASHMEM)
+char shm_name[30];
+#endif
+#else
+uint32 EventCycles = 128;
+#endif
+
+#ifdef HAVE_ASHMEM
+int memfd;
+#endif
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
@@ -346,10 +382,42 @@ PS_SPU *PSX_SPU = NULL;
 PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
 
-static MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
-static MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
+MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
+MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
+MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = NULL;
+MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 
-MultiAccessSizeMem<2048 * 1024, uint32, false> MainRAM;
+#ifdef HAVE_LIGHTREC
+/* Size of Expansion 1 (8MB) */
+#define PSX_EXPANSION1_SIZE        0x800000U
+/* Base address of Expansion 1 */
+#define PSX_EXPANSION1_BASE        0x1F000000U
+
+/* Mednafen splits the expansion in two buffers (PIOMem and TextMem). That's not
+ * super convenient for us so I'm going to copy both of them in one contiguous
+ * buffer */
+const uint8_t *PSX_LoadExpansion1(void) {
+   static uint8_t *expansion1 = NULL;
+
+   if (PIOMem == NULL) {
+      /* No expansion loaded */
+      return NULL;
+   }
+
+   if (expansion1 == NULL) {
+      expansion1 = new uint8_t[PSX_EXPANSION1_SIZE];
+   }
+
+   /* Let's read 32bits at a time to speed things up a bit */
+   uint32_t *p = reinterpret_cast<uint32_t *>(expansion1);
+
+   for (unsigned i = 0; i < PSX_EXPANSION1_SIZE / 4; i++) {
+      p[i] = PSX_MemPeek32(PSX_EXPANSION1_BASE + i * 4);
+   }
+
+   return expansion1;
+}
+#endif
 
 static uint32_t TextMem_Start;
 static std::vector<uint8> TextMem;
@@ -598,16 +666,16 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       if(Access24)
       {
          if(IsWrite)
-            MainRAM.WriteU24(A & 0x1FFFFF, V);
+            MainRAM->WriteU24(A & 0x1FFFFF, V);
          else
-            V = MainRAM.ReadU24(A & 0x1FFFFF);
+            V = MainRAM->ReadU24(A & 0x1FFFFF);
       }
       else
       {
          if(IsWrite)
-            MainRAM.Write<T>(A & 0x1FFFFF, V);
+            MainRAM->Write<T>(A & 0x1FFFFF, V);
          else
-            V = MainRAM.Read<T>(A & 0x1FFFFF);
+            V = MainRAM->Read<T>(A & 0x1FFFFF);
       }
 
       return;
@@ -958,8 +1026,8 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
    if(A < 0x00800000)
    {
       if(Access24)
-         return(MainRAM.ReadU24(A & 0x1FFFFF));
-      return(MainRAM.Read<T>(A & 0x1FFFFF));
+         return(MainRAM->ReadU24(A & 0x1FFFFF));
+      return(MainRAM->Read<T>(A & 0x1FFFFF));
    }
 
    if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
@@ -1098,7 +1166,7 @@ static void PSX_Power(void)
 
    cd_warned_slow = false;
 
-   memset(MainRAM.data32, 0, 2048 * 1024);
+   memset(MainRAM->data32, 0, 2048 * 1024);
 
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
@@ -1128,9 +1196,9 @@ template<typename T, bool Access24> static INLINE void MemPoke(pscpu_timestamp_t
    if(A < 0x00800000)
    {
       if(Access24)
-         MainRAM.WriteU24(A & 0x1FFFFF, V);
+         MainRAM->WriteU24(A & 0x1FFFFF, V);
       else
-         MainRAM.Write<T>(A & 0x1FFFFF, V);
+         MainRAM->Write<T>(A & 0x1FFFFF, V);
 
       return;
    }
@@ -1506,6 +1574,280 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
     PSX_CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
 }
 
+#ifdef HAVE_LIGHTREC
+/* MAP_FIXED_NOREPLACE allows base 0 to work if "sysctl vm.mmap_min_addr = 0"
+ was used. Base 0 will perform better by directly mapping emulated addresses
+ to host addresses. If MAP_FIXED_NOREPLACE is not available we should not use
+ MAP_FIXED, since it can cause strange crashes by unmapping memory mappings. */
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0
+#endif
+
+static const uintptr_t supported_io_bases[] = {
+	0x00000000,
+	0x10000000,
+	0x20000000,
+	0x30000000,
+	0x40000000,
+	0x50000000,
+	0x60000000,
+	0x70000000,
+	0x80000000,
+};
+
+int lightrec_init_mmap()
+{
+#ifdef HAVE_SHM
+	unsigned int i, j;
+	uintptr_t base;
+	void *bios, *scratch;
+	int err;
+	void *map;
+
+#ifdef HAVE_ASHMEM
+	memfd = open("/dev/ashmem", O_RDWR);
+
+	ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
+	ioctl(memfd, ASHMEM_SET_SIZE, 0x280400);
+#else
+	sprintf(shm_name, "/lightrec_memfd_%d", getpid());
+	int memfd = shm_open(shm_name,
+			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	if (memfd < 0) {
+		sprintf(shm_name, "/lightrec_memfd_%d_2", getpid());
+		memfd = shm_open(shm_name,
+			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	}
+	if (memfd < 0) {
+		err = -errno;
+		fprintf(stderr, "Failed to create SHM: %d\n", err);
+		return err;
+	}
+
+	err = ftruncate(memfd, 0x280400);
+	if (err < 0) {
+		err = -errno;
+		fprintf(stderr, "Could not trim SHM: %d\n", err);
+		goto err_close_memfd;
+	}
+#endif
+
+	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
+		base = supported_io_bases[i];
+		bios = (void *)(base + 0x1fc00000);
+		scratch = (void *)(base + 0x1f800000);
+
+		for (j = 0; j < 4; j++) {
+			map = mmap((void *)(base + j * 0x200000),
+				   0x200000, PROT_READ | PROT_WRITE,
+				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0);
+			if (map == MAP_FAILED)
+				break;
+			else if (map != (void *)(base + j * 0x200000))
+			{
+				//not at expected address, reject it
+				munmap(map, 0x200000);
+				break;
+			}
+		}
+
+		/* Impossible to map using this base */
+		if (j == 0)
+			continue;
+
+		/* All mirrors mapped - we got a match! */
+		if (j == 4)
+		{
+			psx_mem = (uint8 *)base;
+
+			map = mmap(bios, 0x80000, PROT_READ | PROT_WRITE,
+				   MAP_PRIVATE, memfd, 0x200000);
+			if (map == MAP_FAILED)
+				goto err_unmap;
+
+			psx_bios = (uint8 *)map;
+
+			if (map != bios)
+				goto err_unmap_bios;
+
+			map = mmap(scratch, 0x400, PROT_READ | PROT_WRITE,
+				   MAP_PRIVATE, memfd, 0x280000);
+			if (map == MAP_FAILED)
+				goto err_unmap_bios;
+
+			psx_scratch = (uint8 *)map;
+
+			if (map != scratch)
+				goto err_unmap_scratch;
+
+#ifndef HAVE_ASHMEM
+			close(memfd);
+#endif
+			return 0;
+		}
+
+err_unmap_scratch:
+		munmap(psx_scratch, 0x400);
+err_unmap_bios:
+		munmap(psx_bios, 0x80000);
+err_unmap:
+		/* Clean up any mapped ram or mirrors and try again */
+		for (; j > 0; j--)
+			munmap((void *)(base + (j - 1) * 0x200000), 0x200000);
+	}
+
+	if (i == ARRAY_SIZE(supported_io_bases)) {
+		err = -EINVAL;
+		fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+		goto err_close_memfd;
+	}
+
+err_close_memfd:
+#ifndef HAVE_ASHMEM
+	close(memfd);
+#endif
+	return err;
+#elif defined(HAVE_WIN_SHM)
+	unsigned int i, j;
+	uintptr_t base;
+	int err;
+	HANDLE memfd;
+	void *map;
+
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 0x280400, NULL);
+	if (memfd == NULL) {
+		err = GetLastError();
+		fprintf(stderr, "Failed to create WIN_SHM: %d\n", err);
+		return err;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
+		base = supported_io_bases[i];
+
+		for (j = 0; j < 4; j++) {
+			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0, 0x200000, (void *)(base + j * 0x200000));
+			if (map == NULL)
+				break;
+			else if (map != (void *)(base + j * 0x200000))
+			{
+				//not at expected address, reject it
+				UnmapViewOfFile(map);
+				break;
+			}
+		}
+
+		/* Impossible to map using this base */
+		if (j == 0)
+			continue;
+
+		/* All mirrors mapped - we got a match! */
+		if (j == 4)
+		{
+			psx_mem = (uint8 *)base;
+
+			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0x200000, 0x80000, (void *)(base + 0x1fc00000));
+			if (map == NULL)
+				goto err_unmap;
+
+			psx_bios = (uint8 *)map;
+
+			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0x280000, 0x400, (void *)(base + 0x1f800000));
+			if (map == NULL)
+				goto err_unmap_bios;
+
+			psx_scratch = (uint8 *)map;
+
+			CloseHandle(memfd);
+			return 0;
+		}
+
+err_unmap_bios:
+		UnmapViewOfFile(psx_bios);
+err_unmap:
+		/* Clean up any mapped ram or mirrors and try again */
+		for (; j > 0; j--)
+			UnmapViewOfFile((void *)(base + (j - 1) * 0x200000));
+	}
+
+	fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+	CloseHandle(memfd);
+	return -EINVAL;
+#else
+	unsigned int i;
+	uintptr_t base;
+	void *bios, *scratch;
+	int err;
+	void *map;
+
+	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
+		base = supported_io_bases[i];
+		bios = (void *)(base + 0x1fc00000);
+		scratch = (void *)(base + 0x1f800000);
+
+		map = mmap((void *)base, 0x200000, PROT_READ | PROT_WRITE,
+			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		if (map == MAP_FAILED)
+			continue;
+
+		psx_mem = (uint8 *)map;
+
+		if (map != (void *)base) {
+			goto err_unmap;
+		}
+
+		map = mmap(bios, 0x80000, PROT_READ | PROT_WRITE,
+			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		if (map == MAP_FAILED)
+			goto err_unmap;
+
+		psx_bios = (uint8 *)map;
+
+		if (map != bios)
+			goto err_unmap_bios;
+
+		map = mmap(scratch, 0x400, PROT_READ | PROT_WRITE,
+			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		if (map == MAP_FAILED)
+			goto err_unmap_bios;
+
+		psx_scratch = (uint8 *)map;
+
+		if (map != scratch)
+			goto err_unmap_scratch;
+
+		return 0;
+
+	err_unmap_scratch:
+		munmap(psx_scratch, 0x400);
+	err_unmap_bios:
+		munmap(psx_bios, 0x80000);
+	err_unmap:
+		munmap(psx_mem, 0x200000);
+	}
+
+	fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+	return -EINVAL;
+#endif
+}
+
+void lightrec_free_mmap()
+{
+	unsigned int i = 0;
+
+	munmap(psx_scratch, 0x400);
+	munmap(psx_bios, 0x80000);
+
+#if defined(HAVE_SHM) || defined(HAVE_WIN_SHM)
+	for (i = 0; i < 4; i++)
+#endif
+		munmap((void *)((uintptr_t)psx_mem + i * 0x200000), 0x200000);
+
+#ifdef HAVE_ASHMEM
+	close(memfd);
+#endif
+}
+#endif
+
 static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
 {
    unsigned region, i;
@@ -1594,18 +1936,35 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    PSX_CDC->SetDisc(true, NULL, NULL);
    SetDiscWrapper(CD_TrayOpen);
 
+#ifdef HAVE_LIGHTREC
+   if(lightrec_init_mmap() == 0)
+   {
+      MainRAM = new(psx_mem) MultiAccessSizeMem<2048 * 1024, uint32, false>();
+      ScratchRAM = new(psx_scratch) MultiAccessSizeMem<1024, uint32, false>();
+      BIOSROM = new(psx_bios) MultiAccessSizeMem<512 * 1024, uint32, false>();
+   }
+   else
+#endif
+   {
+      MainRAM = new MultiAccessSizeMem<2048 * 1024, uint32, false>();
+      ScratchRAM = new MultiAccessSizeMem<1024, uint32, false>();
+      BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
+   }
 
-   BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
    PIOMem  = NULL;
 
+#ifdef HAVE_LIGHTREC
+   if(1)
+#else
    if(WantPIOMem)
+#endif
       PIOMem = new MultiAccessSizeMem<65536, uint32, false>();
 
    for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
    {
-      PSX_CPU->SetFastMap(MainRAM.data32, 0x00000000 + ma, 2048 * 1024);
-      PSX_CPU->SetFastMap(MainRAM.data32, 0x80000000 + ma, 2048 * 1024);
-      PSX_CPU->SetFastMap(MainRAM.data32, 0xA0000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0x00000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0x80000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0xA0000000 + ma, 2048 * 1024);
    }
 
    PSX_CPU->SetFastMap(BIOSROM->data32, 0x1FC00000, 512 * 1024);
@@ -1621,7 +1980,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
 
    MDFNMP_Init(1024, ((uint64)1 << 29) / 1024);
-   MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM.data8);
+   MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM->data8);
 #if 0
    MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
 #endif
@@ -1848,6 +2207,11 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    MDFN_en32lsb<false>(po, 0); // NOP(kinda)
    po += 4;
 
+#ifdef HAVE_LIGHTREC
+   /* Reload Expansion1 copy */
+   PSX_LoadExpansion1();
+#endif
+
    return true;
 }
 
@@ -1921,9 +2285,27 @@ static void Cleanup(void)
 
    DMA_Kill();
 
+#ifdef HAVE_LIGHTREC
+   MainRAM = NULL;
+   ScratchRAM = NULL;
+   BIOSROM = NULL;
+   lightrec_free_mmap();
+#if defined(HAVE_SHM) && !defined(HAVE_ASHMEM)
+   shm_unlink(shm_name);
+#endif
+#else
+   if(MainRAM)
+      delete MainRAM;
+   MainRAM = NULL;
+
+   if(ScratchRAM)
+      delete ScratchRAM;
+   ScratchRAM = NULL;
+
    if(BIOSROM)
       delete BIOSROM;
    BIOSROM = NULL;
+#endif
 
    if(PIOMem)
       delete PIOMem;
@@ -2019,7 +2401,7 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       SFVAR(CD_TrayOpen),
       SFVAR(CD_SelectedDisc),
-      SFARRAY(MainRAM.data8, 1024 * 2048),
+      SFARRAY(MainRAM->data8, 1024 * 2048),
       SFARRAY32(SysControl.Regs, 9),
       SFVAR(PSX_PRNG.lcgo),
       SFVAR(PSX_PRNG.x),
@@ -2689,6 +3071,45 @@ static void check_variables(bool startup)
          cd_async = false;
       }
    }
+#endif
+
+#ifdef HAVE_LIGHTREC
+   var.key = BEETLE_OPT(cpu_dynarec);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "execute") == 0)
+         psx_dynarec = DYNAREC_EXECUTE;
+      else if (strcmp(var.value, "execute_one") == 0)
+         psx_dynarec = DYNAREC_EXECUTE_ONE;
+      else if (strcmp(var.value, "run_interpreter") == 0)
+         psx_dynarec = DYNAREC_RUN_INTERPRETER;
+      else
+         psx_dynarec = DYNAREC_DISABLED;
+   }
+   else
+      psx_dynarec = DYNAREC_EXECUTE;
+
+   var.key = BEETLE_OPT(dynarec_invalidate);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "full") == 0)
+         psx_dynarec_invalidate = false;
+      else if (strcmp(var.value, "dma") == 0)
+         psx_dynarec_invalidate = true;
+   }
+   else
+      psx_dynarec_invalidate = false;
+
+   var.key = BEETLE_OPT(dynarec_eventcycles);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	EventCycles = atoi(var.value);
+   }
+   else
+      EventCycles = 128;
 #endif
 
    var.key = BEETLE_OPT(cpu_freq_scale);
@@ -3448,7 +3869,12 @@ bool retro_load_game(const struct retro_game_info *info)
       how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
       so we don't have to force this anymore. */
       force_software_renderer = true;
-   } 
+
+#ifdef HAVE_LIGHTREC
+      /* Do not run lightrec if firmware is not found, recompiling garbage is bad*/
+      psx_dynarec = DYNAREC_DISABLED;
+#endif
+   }
 
    ret = rsx_intf_open(is_pal, force_software_renderer);
 
@@ -4116,7 +4542,7 @@ void *retro_get_memory_data(unsigned type)
    switch (type)
    {
       case RETRO_MEMORY_SYSTEM_RAM:
-         return MainRAM.data8;
+         return MainRAM->data8;
       case RETRO_MEMORY_SAVE_RAM:
          if (use_mednafen_memcard0_method)
             return NULL;

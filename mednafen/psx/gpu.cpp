@@ -67,6 +67,8 @@
    Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything
    different from vs0->ve0.
    */
+extern int32 EventCycles;
+
 static const int8 dither_table[4][4] =
 {
    { -4,  0, -3,  1 },
@@ -1780,7 +1782,7 @@ TheEnd:
    next_dt = (((int64)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
    next_dt = std::max<int32>(1, next_dt);
-   next_dt = std::min<int32>(128, next_dt);
+   next_dt = std::min<int32>(EventCycles, next_dt);
 
    //printf("%d\n", next_dt);
 
