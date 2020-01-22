@@ -1580,7 +1580,11 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
  to host addresses. If MAP_FIXED_NOREPLACE is not available we should not use
  MAP_FIXED, since it can cause strange crashes by unmapping memory mappings. */
 #ifndef MAP_FIXED_NOREPLACE
+#ifdef USE_FIXED
+#define MAP_FIXED_NOREPLACE MAP_FIXED
+#else
 #define MAP_FIXED_NOREPLACE 0
+#endif
 #endif
 
 static const uintptr_t supported_io_bases[] = {
@@ -1593,6 +1597,16 @@ static const uintptr_t supported_io_bases[] = {
 	0x60000000,
 	0x70000000,
 	0x80000000,
+	0x90000000,
+	0x100000000,
+	0x200000000,
+	0x300000000,
+	0x400000000,
+	0x500000000,
+	0x600000000,
+	0x700000000,
+	0x800000000,
+	0x900000000,
 };
 
 int lightrec_init_mmap()
@@ -1661,7 +1675,7 @@ int lightrec_init_mmap()
 			psx_mem = (uint8 *)base;
 
 			map = mmap(bios, 0x80000, PROT_READ | PROT_WRITE,
-				   MAP_PRIVATE, memfd, 0x200000);
+				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0x200000);
 			if (map == MAP_FAILED)
 				goto err_unmap;
 
@@ -1671,7 +1685,7 @@ int lightrec_init_mmap()
 				goto err_unmap_bios;
 
 			map = mmap(scratch, 0x400, PROT_READ | PROT_WRITE,
-				   MAP_PRIVATE, memfd, 0x280000);
+				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0x280000);
 			if (map == MAP_FAILED)
 				goto err_unmap_bios;
 
