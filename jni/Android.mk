@@ -16,7 +16,7 @@ HAVE_VULKAN              := 0
 HAVE_CHD                 := 1
 IS_X86                   := 0
 FLAGS                    :=
-HAVE_LIGHTREC            := 1
+HAVE_LIGHTREC            := 0
 
 ifeq ($(TARGET_ARCH),x86)
   IS_X86 := 1
