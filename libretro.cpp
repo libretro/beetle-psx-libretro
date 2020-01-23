@@ -1598,6 +1598,23 @@ static const uintptr_t supported_io_bases[] = {
 	0x70000000,
 	0x80000000,
 	0x90000000,
+   /* TODO/FIXME - error - constant expression evaluates to '?' which cannot 
+    * be narrowed to type uintptr_t - this happens on ARM64 v8a on
+    * Android - only way to get it to build for now is to workaround it like this
+    *
+    * Find a more scalable solution for this so this ifdef can go away and it will
+    * compile on any platform */
+#if defined(ANDROID)
+	static_cast<uintptr_t>(0x100000000),
+	static_cast<uintptr_t>(0x200000000),
+	static_cast<uintptr_t>(0x300000000),
+	static_cast<uintptr_t>(0x400000000),
+	static_cast<uintptr_t>(0x500000000),
+	static_cast<uintptr_t>(0x600000000),
+	static_cast<uintptr_t>(0x700000000),
+	static_cast<uintptr_t>(0x800000000),
+	static_cast<uintptr_t>(0x900000000),
+#else
 	0x100000000,
 	0x200000000,
 	0x300000000,
@@ -1607,6 +1624,7 @@ static const uintptr_t supported_io_bases[] = {
 	0x700000000,
 	0x800000000,
 	0x900000000,
+#endif
 };
 
 int lightrec_init_mmap()

@@ -21,6 +21,11 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#if defined(__LIBRETRO__)
+#include <boolean.h>
+#else
+#include <stdbool.h>
+#endif
 
 #ifdef _WIN32
 #   ifdef lightrec_EXPORTS
@@ -121,7 +126,7 @@ __api u32 lightrec_run_interpreter(struct lightrec_state *state, u32 pc);
 __api void lightrec_invalidate(struct lightrec_state *state, u32 addr, u32 len);
 __api void lightrec_invalidate_all(struct lightrec_state *state);
 __api void lightrec_set_invalidate_mode(struct lightrec_state *state,
-					_Bool dma_only);
+					bool dma_only);
 
 __api void lightrec_set_exit_flags(struct lightrec_state *state, u32 flags);
 __api u32 lightrec_exit_flags(struct lightrec_state *state);
