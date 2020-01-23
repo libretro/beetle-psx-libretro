@@ -3440,7 +3440,7 @@ int PS_CPU::lightrec_plugin_init()
 	if(lightrec_state)
 		lightrec_destroy(lightrec_state);
 	else{
-		fprintf(stderr, "Lightrec map addresses: M=0x%lx, P=0x%lx, R=0x%lx, H=0x%lx\n",
+		log_cb(RETRO_LOG_INFO, "Lightrec map addresses: M=0x%lx, P=0x%lx, R=0x%lx, H=0x%lx\n",
 			(uintptr_t) psxM,
 			(uintptr_t) psxP,
 			(uintptr_t) psxR,
@@ -3508,7 +3508,7 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		flags = lightrec_exit_flags(lightrec_state);
 
 		if (flags & LIGHTREC_EXIT_SEGFAULT) {
-			fprintf(stderr, "Exiting at cycle 0x%08x\n",
+			log_cb(RETRO_LOG_ERROR, "Exiting at cycle 0x%08x\n",
 					timestamp);
 			exit(1);
 		}
@@ -3540,7 +3540,7 @@ void PS_CPU::lightrec_plugin_clear(u32 addr, u32 size)
 
 void PS_CPU::lightrec_plugin_shutdown(void)
 {
-	fprintf(stderr,"Lightrec memory usage: %u KiB, average IPI: %.2f\n",
+	log_cb(RETRO_LOG_INFO,"Lightrec memory usage: %u KiB, average IPI: %.2f\n",
 		lightrec_get_total_mem_usage()/1024,
 		lightrec_get_average_ipi());
 	lightrec_destroy(lightrec_state);
