@@ -3102,7 +3102,7 @@ static void check_variables(bool startup)
          psx_dynarec = DYNAREC_DISABLED;
    }
    else
-      psx_dynarec = DYNAREC_EXECUTE;
+      psx_dynarec = DYNAREC_DISABLED;
 
    var.key = BEETLE_OPT(dynarec_invalidate);
 
