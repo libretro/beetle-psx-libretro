@@ -1588,27 +1588,27 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #endif
 
 static const uintptr_t supported_io_bases[] = {
-	0x00000000,
-	0x10000000,
-	0x20000000,
-	0x30000000,
-	0x40000000,
-	0x50000000,
-	0x60000000,
-	0x70000000,
-	0x80000000,
-	0x90000000,
-   /* Add this only for iOS/OSX */
-#ifdef __MACH__
-	0x100000000,
-	0x200000000,
-	0x300000000,
-	0x400000000,
-	0x500000000,
-	0x600000000,
-	0x700000000,
-	0x800000000,
-	0x900000000,
+	static_cast<uintptr_t>(0x00000000),
+	static_cast<uintptr_t>(0x10000000),
+	static_cast<uintptr_t>(0x20000000),
+	static_cast<uintptr_t>(0x30000000),
+	static_cast<uintptr_t>(0x40000000),
+	static_cast<uintptr_t>(0x50000000),
+	static_cast<uintptr_t>(0x60000000),
+	static_cast<uintptr_t>(0x70000000),
+	static_cast<uintptr_t>(0x80000000),
+	static_cast<uintptr_t>(0x90000000),
+   /* Some platforms need higher address base for mmap to work */
+#if UINTPTR_MAX == UINT64_MAX
+	static_cast<uintptr_t>(0x100000000),
+	static_cast<uintptr_t>(0x200000000),
+	static_cast<uintptr_t>(0x300000000),
+	static_cast<uintptr_t>(0x400000000),
+	static_cast<uintptr_t>(0x500000000),
+	static_cast<uintptr_t>(0x600000000),
+	static_cast<uintptr_t>(0x700000000),
+	static_cast<uintptr_t>(0x800000000),
+	static_cast<uintptr_t>(0x900000000),
 #endif
 };
 
