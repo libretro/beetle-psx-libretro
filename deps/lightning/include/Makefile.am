@@ -14,7 +14,6 @@
 # License for more details.
 #
 
-include_HEADERS = lightning.h
 SUBDIRS =		\
 	lightning
 
