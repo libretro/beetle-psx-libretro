@@ -17,6 +17,7 @@ HAVE_CHD                 := 1
 IS_X86                   := 0
 FLAGS                    :=
 HAVE_LIGHTREC            := 1
+THREADED_RECOMPILER      := 1
 
 ifeq ($(TARGET_ARCH),x86)
   IS_X86 := 1
