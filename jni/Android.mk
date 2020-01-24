@@ -66,7 +66,7 @@ endif
 include $(CLEAR_VARS)
 LOCAL_MODULE       := retro
 LOCAL_SRC_FILES    := $(SOURCES_CXX) $(SOURCES_C)
-LOCAL_CFLAGS       := $(COREFLAGS) -std=c99
+LOCAL_CFLAGS       := $(COREFLAGS)
 LOCAL_CXXFLAGS     := $(COREFLAGS) -std=c++11
 LOCAL_LDFLAGS      := -Wl,-version-script=$(CORE_DIR)/link.T -ldl
 LOCAL_LDLIBS       := -llog
