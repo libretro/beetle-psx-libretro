@@ -399,11 +399,6 @@ MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 const uint8_t *PSX_LoadExpansion1(void) {
    static uint8_t *expansion1 = NULL;
 
-   if (PIOMem == NULL) {
-      /* No expansion loaded */
-      return NULL;
-   }
-
    if (expansion1 == NULL) {
       expansion1 = new uint8_t[PSX_EXPANSION1_SIZE];
    }
@@ -1970,11 +1965,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    PIOMem  = NULL;
 
-#ifdef HAVE_LIGHTREC
-   if(1)
-#else
    if(WantPIOMem)
-#endif
       PIOMem = new MultiAccessSizeMem<65536, uint32, false>();
 
    for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
