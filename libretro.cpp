@@ -82,20 +82,15 @@ int64 cd_slow_timeout = 8000; // microseconds
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
 bool psx_dynarec_invalidate;
-uint32 EventCycles;
 uint8 *psx_mem;
 uint8 *psx_bios;
 uint8 *psx_scratch;
-#if defined(HAVE_SHM) && !defined(HAVE_ASHMEM)
-char shm_name[30];
-#endif
-#else
-uint32 EventCycles = 128;
-#endif
-
-#ifdef HAVE_ASHMEM
+#if defined(HAVE_SHM)
 int memfd;
 #endif
+#endif
+
+uint32 EventCycles = 128;
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
@@ -1622,6 +1617,7 @@ int lightrec_init_mmap()
 	ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
 	ioctl(memfd, ASHMEM_SET_SIZE, 0x280400);
 #else
+	char shm_name[30];
 	sprintf(shm_name, "/lightrec_memfd_%d", getpid());
 	int memfd = shm_open(shm_name,
 			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
@@ -1640,7 +1636,7 @@ int lightrec_init_mmap()
 	if (err < 0) {
 		err = -errno;
 		fprintf(stderr, "Could not trim SHM: %d\n", err);
-		goto err_close_memfd;
+		goto err_shm_unlink;
 	}
 #endif
 
@@ -1693,7 +1689,7 @@ int lightrec_init_mmap()
 				goto err_unmap_scratch;
 
 #ifndef HAVE_ASHMEM
-			close(memfd);
+			shm_unlink(shm_name);
 #endif
 			return 0;
 		}
@@ -1711,12 +1707,12 @@ err_unmap:
 	if (i == ARRAY_SIZE(supported_io_bases)) {
 		err = -EINVAL;
 		fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
-		goto err_close_memfd;
+		goto err_shm_unlink;
 	}
 
-err_close_memfd:
+err_shm_unlink:
 #ifndef HAVE_ASHMEM
-	close(memfd);
+	shm_unlink(shm_name);
 #endif
 	return err;
 #elif defined(HAVE_WIN_SHM)
@@ -2298,8 +2294,8 @@ static void Cleanup(void)
    ScratchRAM = NULL;
    BIOSROM = NULL;
    lightrec_free_mmap();
-#if defined(HAVE_SHM) && !defined(HAVE_ASHMEM)
-   shm_unlink(shm_name);
+#if defined(HAVE_SHM)
+   close(memfd);
 #endif
 #else
    if(MainRAM)
