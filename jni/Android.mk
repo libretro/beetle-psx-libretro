@@ -17,6 +17,7 @@ HAVE_CHD                 := 1
 IS_X86                   := 0
 FLAGS                    :=
 HAVE_LIGHTREC            := 1
+THREADED_RECOMPILER      := 1
 
 ifeq ($(TARGET_ARCH),x86)
   IS_X86 := 1
@@ -65,7 +66,7 @@ endif
 include $(CLEAR_VARS)
 LOCAL_MODULE       := retro
 LOCAL_SRC_FILES    := $(SOURCES_CXX) $(SOURCES_C)
-LOCAL_CFLAGS       := $(COREFLAGS) -std=c99
+LOCAL_CFLAGS       := $(COREFLAGS)
 LOCAL_CXXFLAGS     := $(COREFLAGS) -std=c++11
 LOCAL_LDFLAGS      := -Wl,-version-script=$(CORE_DIR)/link.T -ldl
 LOCAL_LDLIBS       := -llog

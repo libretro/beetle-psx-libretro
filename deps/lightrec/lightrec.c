@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Paul Cercueil <paul@crapouillou.net>
+ * Copyright (C) 2014-2020 Paul Cercueil <paul@crapouillou.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -777,6 +777,8 @@ static struct block * lightrec_precompile_block(struct lightrec_state *state,
 		lightrec_print_disassembly(block, code, length);
 	}
 
+	pr_debug("Block size: %lu opcodes\n", block->nb_ops);
+
 	/* If the first opcode is an 'impossible' branch, never compile the
 	 * block */
 	if (list->flags & LIGHTREC_EMULATE_BRANCH)
@@ -825,6 +827,7 @@ int lightrec_compile_block(struct block *block)
 	bool op_list_freed = false, fully_tagged = false;
 	struct opcode *elm;
 	jit_state_t *_jit;
+	jit_node_t *start_of_block;
 	bool skip_next = false;
 	jit_word_t code_size;
 	unsigned int i, j;
@@ -848,6 +851,8 @@ int lightrec_compile_block(struct block *block)
 
 	jit_prolog();
 	jit_tramp(256);
+
+	start_of_block = jit_label();
 
 	for (elm = block->opcode_list; elm; elm = elm->next) {
 		next_pc = block->pc + elm->offset * sizeof(u32);
@@ -886,6 +891,11 @@ int lightrec_compile_block(struct block *block)
 
 		pr_debug("Patch local branch to offset 0x%x\n",
 			 branch->target << 2);
+
+		if (branch->target == 0) {
+			jit_patch_at(branch->branch, start_of_block);
+			continue;
+		}
 
 		for (j = 0; j < state->nb_targets; j++) {
 			if (state->targets[j].offset == branch->target) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Paul Cercueil <paul@crapouillou.net>
+ * Copyright (C) 2014-2020 Paul Cercueil <paul@crapouillou.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -134,6 +134,18 @@ bool opcode_writes_register(union code op, u8 reg)
 		case OP_CP0_CFC0:
 			return op.i.rt == reg;
 		default:
+			return false;
+		}
+	case OP_CP2:
+		if (op.r.op == OP_CP2_BASIC) {
+			switch (op.r.rs) {
+			case OP_CP2_BASIC_MFC2:
+			case OP_CP2_BASIC_CFC2:
+				return op.i.rt == reg;
+			default:
+				return false;
+			}
+		} else {
 			return false;
 		}
 	case OP_META_MOV:
@@ -525,6 +537,9 @@ static int lightrec_transform_ops(struct block *block)
 					list->i.rs = list->i.rt;
 					list->i.rt = 0;
 				}
+			} else if (list->i.rs == list->i.rt) {
+				list->i.rs = 0;
+				list->i.rt = 0;
 			}
 			break;
 		case OP_BNE:
@@ -625,11 +640,13 @@ static int lightrec_switch_delay_slots(struct block *block)
 				break;
 		case OP_BEQ:
 		case OP_BNE:
-			if (opcode_writes_register(next_op, op.i.rt))
+			if (op.i.rt && opcode_writes_register(next_op, op.i.rt))
 				continue;
 		case OP_BLEZ: /* fall-through */
 		case OP_BGTZ:
-			if (opcode_writes_register(next_op, op.i.rs))
+		case OP_META_BEQZ:
+		case OP_META_BNEZ:
+			if (op.i.rs && opcode_writes_register(next_op, op.i.rs))
 				continue;
 			break;
 		case OP_REGIMM:
@@ -641,15 +658,11 @@ static int lightrec_switch_delay_slots(struct block *block)
 					continue;
 			case OP_REGIMM_BLTZ: /* fall-through */
 			case OP_REGIMM_BGEZ:
-				if (opcode_writes_register(next_op, op.i.rs))
+				if (op.i.rs &&
+				    opcode_writes_register(next_op, op.i.rs))
 					continue;
 				break;
 			}
-			break;
-		case OP_META_BEQZ:
-		case OP_META_BNEZ:
-			if (opcode_writes_register(next_op, op.i.rs))
-				continue;
 		default: /* fall-through */
 			break;
 		}
@@ -749,15 +762,12 @@ static int lightrec_local_branches(struct block *block)
 				break;
 			}
 
-			if (!prev || prev->j.op != OP_META_SYNC) {
+			if (prev && prev->j.op != OP_META_SYNC) {
 				pr_debug("Adding sync before offset "
 					 "0x%x\n", offset << 2);
 				ret = lightrec_add_sync(block, prev);
 				if (ret)
 					return ret;
-
-				if (!prev)
-					prev = block->opcode_list;
 
 				prev->next->offset = target->offset;
 			}
