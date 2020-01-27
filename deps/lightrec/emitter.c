@@ -86,7 +86,8 @@ static void lightrec_emit_end_of_block(const struct block *block,
 		pr_debug("EOB: %u cycles\n", cycles);
 	}
 
-	state->branches[state->nb_branches++] = jit_jmpi();
+	if (op->next && ((op->flags & LIGHTREC_NO_DS) || op->next->next))
+		state->branches[state->nb_branches++] = jit_jmpi();
 }
 
 void lightrec_emit_eob(const struct block *block,
@@ -1365,15 +1366,12 @@ static void rec_meta_unload(const struct block *block,
 	struct lightrec_state *state = block->state;
 	struct regcache *reg_cache = state->reg_cache;
 	jit_state_t *_jit = block->_jit;
-	u8 reg;
 
 	jit_name(__func__);
 	jit_note(__FILE__, __LINE__);
 
-	reg = lightrec_alloc_reg_in(reg_cache, _jit, op->i.rs);
-
 	pr_debug("Unloading reg %s\n", lightrec_reg_name(op->i.rs));
-	lightrec_unload_reg(reg_cache, _jit, reg);
+	lightrec_clean_reg_if_loaded(reg_cache, _jit, op->i.rs, true);
 }
 
 static void rec_meta_BEQZ(const struct block *block,

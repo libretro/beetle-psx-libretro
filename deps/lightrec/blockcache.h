@@ -26,7 +26,7 @@ void lightrec_unregister_block(struct blockcache *cache, struct block *block);
 struct blockcache * lightrec_blockcache_init(struct lightrec_state *state);
 void lightrec_free_block_cache(struct blockcache *cache);
 
-u32 calculate_block_hash(const struct block *block);
+u32 lightrec_calculate_block_hash(const struct block *block);
 _Bool lightrec_block_is_outdated(struct block *block);
 
 void lightrec_mark_for_recompilation(struct blockcache *cache,

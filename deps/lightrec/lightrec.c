@@ -396,6 +396,7 @@ static void * get_next_block_func(struct lightrec_state *state, u32 pc)
 			if (ENABLE_THREADED_COMPILER)
 				lightrec_recompiler_remove(state->rec, block);
 
+			remove_from_code_lut(state->block_cache, block);
 			lightrec_unregister(MEM_FOR_CODE, block->code_size);
 			if (block->_jit)
 				_jit_destroy_state(block->_jit);
@@ -783,6 +784,8 @@ static struct block * lightrec_precompile_block(struct lightrec_state *state,
 	 * block */
 	if (list->flags & LIGHTREC_EMULATE_BRANCH)
 		block->flags |= BLOCK_NEVER_COMPILE;
+
+	block->hash = lightrec_calculate_block_hash(block);
 
 	return block;
 }

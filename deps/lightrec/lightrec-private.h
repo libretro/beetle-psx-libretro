@@ -73,6 +73,7 @@ struct block {
 	struct opcode *opcode_list;
 	void (*function)(void);
 	u32 pc;
+	u32 hash;
 #if ENABLE_THREADED_COMPILER
 	atomic_flag op_list_freed;
 #endif
@@ -130,6 +131,8 @@ u32 lightrec_rw(struct lightrec_state *state, union code op,
 		u32 addr, u32 data, u16 *flags);
 
 void lightrec_free_block(struct block *block);
+
+void remove_from_code_lut(struct blockcache *cache, struct block *block);
 
 static inline u32 kunseg(u32 addr)
 {

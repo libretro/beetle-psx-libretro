@@ -21,12 +21,10 @@
 #include <stdlib.h>
 
 /* Must be power of two */
-#define TINY_LUT_SIZE 0x100
 #define LUT_SIZE 0x4000
 
 struct blockcache {
 	struct lightrec_state *state;
-	struct block * tiny_lut[TINY_LUT_SIZE];
 	struct block * lut[LUT_SIZE];
 };
 
@@ -36,39 +34,36 @@ struct block * lightrec_find_block(struct blockcache *cache, u32 pc)
 
 	pc = kunseg(pc);
 
-	block = cache->tiny_lut[(pc >> 2) & (TINY_LUT_SIZE - 1)];
-	if (likely(block && kunseg(block->pc) == pc))
-		return block;
-
-	block = cache->lut[(pc >> 2) & (LUT_SIZE - 1)];
 	for (block = cache->lut[(pc >> 2) & (LUT_SIZE - 1)];
-	     block; block = block->next) {
-		if (kunseg(block->pc) == pc) {
-			cache->tiny_lut[(pc >> 2) & (TINY_LUT_SIZE - 1)] = block;
+	     block; block = block->next)
+		if (kunseg(block->pc) == pc)
 			return block;
-		}
-	}
 
 	return NULL;
 }
 
-static void remove_from_code_lut(struct blockcache *cache, struct block *block)
+void remove_from_code_lut(struct blockcache *cache, struct block *block)
 {
 	struct lightrec_state *state = block->state;
+	const struct opcode *op;
+	u32 offset = lut_offset(block->pc);
 
 	/* Use state->get_next_block in the code LUT, which basically
 	 * calls back get_next_block_func(), until the compiler
 	 * overrides this. This is required, as a NULL value in the code
 	 * LUT means an outdated block. */
-	state->code_lut[lut_offset(block->pc)] = state->get_next_block;
+	state->code_lut[offset] = state->get_next_block;
+
+	for (op = block->opcode_list; op; op = op->next)
+		if (op->c.i.op == OP_META_SYNC)
+			state->code_lut[offset + op->offset] = NULL;
+
 }
 
 void lightrec_mark_for_recompilation(struct blockcache *cache,
 				     struct block *block)
 {
 	block->flags |= BLOCK_SHOULD_RECOMPILE;
-
-	remove_from_code_lut(cache, block);
 }
 
 void lightrec_register_block(struct blockcache *cache, struct block *block)
@@ -81,7 +76,6 @@ void lightrec_register_block(struct blockcache *cache, struct block *block)
 		block->next = old;
 
 	cache->lut[(pc >> 2) & (LUT_SIZE - 1)] = block;
-	cache->tiny_lut[(pc >> 2) & (TINY_LUT_SIZE - 1)] = block;
 
 	remove_from_code_lut(cache, block);
 }
@@ -91,9 +85,7 @@ void lightrec_unregister_block(struct blockcache *cache, struct block *block)
 	u32 pc = kunseg(block->pc);
 	struct block *old = cache->lut[(pc >> 2) & (LUT_SIZE - 1)];
 
-	block->state->code_lut[lut_offset(pc)] = NULL;
-
-	cache->tiny_lut[(pc >> 2) & (TINY_LUT_SIZE - 1)] = NULL;
+	remove_from_code_lut(cache, block);
 
 	if (old == block) {
 		cache->lut[(pc >> 2) & (LUT_SIZE - 1)] = old->next;
@@ -138,7 +130,51 @@ struct blockcache * lightrec_blockcache_init(struct lightrec_state *state)
 	return cache;
 }
 
+u32 lightrec_calculate_block_hash(const struct block *block)
+{
+	const struct lightrec_mem_map *map = block->map;
+	u32 pc, hash = 0xffffffff;
+	const u32 *code;
+	unsigned int i;
+
+	pc = kunseg(block->pc) - map->pc;
+
+	while (map->mirror_of)
+		map = map->mirror_of;
+
+	code = map->address + pc;
+
+	/* Jenkins one-at-a-time hash algorithm */
+	for (i = 0; i < block->nb_ops; i++) {
+		hash += *code++;
+		hash += (hash << 10);
+		hash ^= (hash >> 6);
+	}
+
+	hash += (hash << 3);
+	hash ^= (hash >> 11);
+	hash += (hash << 15);
+
+	return hash;
+}
+
 bool lightrec_block_is_outdated(struct block *block)
 {
-	return !block->state->code_lut[lut_offset(block->pc)];
+	void **lut_entry = &block->state->code_lut[lut_offset(block->pc)];
+	bool outdated;
+
+	if (*lut_entry)
+		return false;
+
+	outdated = block->hash != lightrec_calculate_block_hash(block);
+	if (likely(!outdated)) {
+		/* The block was marked as outdated, but the content is still
+		 * the same */
+		if (block->function)
+			*lut_entry = block->function;
+		else
+			*lut_entry = block->state->get_next_block;
+	}
+
+	return outdated;
 }
