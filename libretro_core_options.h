@@ -303,17 +303,12 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(dynarec_eventcycles),
       "Dynarec DMA/GPU Event Cycles",
-      "How many cycles can pass in the CPU before a GPU or DMA Update is checked, higher number will be faster, but also more likely to cause bugs or crashes, has much less impact on beetle interpreter than dynarec",
+      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec",
       {
          { "128", "128 (Default)" },
-         { "160",  NULL },
-         { "192",  NULL },
-         { "224",  NULL },
          { "256",  NULL },
-         { "320",  NULL },
-         { "384",  NULL },
-         { "448",  NULL },
          { "512",  NULL },
+         { "1024",  NULL },
          { NULL, NULL },
       },
       "128"

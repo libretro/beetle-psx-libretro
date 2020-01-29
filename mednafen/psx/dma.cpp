@@ -637,7 +637,7 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                //
                // Also, it's needed for RecalcHalt() to work with some semblance of workiness.
                //
-               RunChannel(timestamp, 64, ch);	//std::max<int>(128 - DMACycleCounter, 1)); //64); //1); //128 - DMACycleCounter);
+               RunChannel(timestamp, EventCycles/2, ch);	//std::max<int>(128 - DMACycleCounter, 1)); //64); //1); //128 - DMACycleCounter);
             }
 
             RecalcHalt();

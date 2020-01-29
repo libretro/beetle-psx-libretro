@@ -1408,8 +1408,8 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
    GPU.DrawTimeAvail += sys_clocks << (1 + psx_gpu_overclock_shift);
 
-   if(GPU.DrawTimeAvail > (256 << psx_gpu_overclock_shift))
-      GPU.DrawTimeAvail = (256 << psx_gpu_overclock_shift);
+   if(GPU.DrawTimeAvail > (2*EventCycles << psx_gpu_overclock_shift))
+      GPU.DrawTimeAvail = (2*EventCycles << psx_gpu_overclock_shift);
 
    if(GPU_BlitterFIFO.in_count && GPU.InCmd != INCMD_FBREAD)
       ProcessFIFO(GPU_BlitterFIFO.in_count);
