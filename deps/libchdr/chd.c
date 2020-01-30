@@ -1544,15 +1544,18 @@ void chd_close(chd_file *chd)
 	/* deinit the codec */
 	if (chd->header.version < 5)
 	{
-	if (chd->codecintf[0] != NULL && chd->codecintf[0]->free != NULL)
-		(*chd->codecintf[0]->free)(&chd->zlib_codec_data);
+		if (chd->codecintf[0] != NULL && chd->codecintf[0]->free != NULL)
+			(*chd->codecintf[0]->free)(&chd->zlib_codec_data);
 	}
 	else
 	{
-      int i;
-		// Free the codecs
+		/* Free the codecs */
+		int i;
 		for (i = 0 ; i < 4 ; i++)
 		{
+			if (chd->codecintf[i] == NULL)
+				continue;
+			
 			void* codec = NULL;
 			switch (chd->codecintf[i]->compression)
 			{
@@ -1574,7 +1577,7 @@ void chd_close(chd_file *chd)
 			}
 		}
 
-		// Free the raw map
+		/* Free the raw map */
 		if (chd->header.rawmap != NULL)
 			free(chd->header.rawmap);
 	}
