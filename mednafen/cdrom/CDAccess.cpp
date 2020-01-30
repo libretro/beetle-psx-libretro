@@ -55,7 +55,7 @@ CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcac
 #endif
 #ifdef HAVE_CHD
    else if (strlen(path) >= 4 && !strcasecmp(path + strlen(path) - 4, ".chd"))
-      return new CDAccess_CHD(path, image_memcache);
+      return new CDAccess_CHD(success, path, image_memcache);
 #endif
    return new CDAccess_Image(success, path, image_memcache);
 }

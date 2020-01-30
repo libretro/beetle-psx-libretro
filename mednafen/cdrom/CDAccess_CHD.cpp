@@ -52,9 +52,19 @@ static const char *DI_CUE_Strings[7] =
 
 bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 {
+   /* Assume the game is a 'parent' */
    chd_error err = chd_open(path, CHD_OPEN_READ, NULL, &chd);
    if (err != CHDERR_NONE)
+   {
+      if (err == CHDERR_REQUIRES_PARENT)
+      {
+         log_cb(RETRO_LOG_INFO, "[CHD] File is a clone: %s\n", path);
+      }
+
+      log_cb(RETRO_LOG_ERROR, "[CHD] Could not find parent of clone: %s\n", path);
       return false;
+   }
+      
 
    if (image_memcache)
    {
@@ -209,7 +219,7 @@ void CDAccess_CHD::Cleanup(void)
       free(hunkmem);
 }
 
-CDAccess_CHD::CDAccess_CHD(const char *path, bool image_memcache)
+CDAccess_CHD::CDAccess_CHD(bool *success, const char *path, bool image_memcache)
 {
    chd = NULL;
 
@@ -223,6 +233,7 @@ CDAccess_CHD::CDAccess_CHD(const char *path, bool image_memcache)
 
    if (!ImageOpen(path, image_memcache))
    {
+      *success = false;
    }
 }
 
