@@ -1336,8 +1336,15 @@ chd_error chd_open_file(core_file *file, int mode, chd_file *parent, chd_file **
 		EARLY_EXIT(err = CHDERR_UNSUPPORTED_VERSION);
 
 	/* if we need a parent, make sure we have one */
-	if (parent == NULL && (newchd->header.flags & CHDFLAGS_HAS_PARENT))
-		EARLY_EXIT(err = CHDERR_REQUIRES_PARENT);
+	if (parent == NULL)
+	{
+		/* Detect parent requirement for versions below 5 */
+		if (newchd->header.version < 5 && newchd->header.flags & CHDFLAGS_HAS_PARENT)
+			EARLY_EXIT(err = CHDERR_REQUIRES_PARENT);
+        /* Detection for version 5 and above - if parentsha1 != 0, we have a parent */
+        else if (newchd->header.version >= 5 && memcmp(nullsha1, newchd->header.parentsha1, sizeof(newchd->header.parentsha1)) != 0)
+            EARLY_EXIT(err = CHDERR_REQUIRES_PARENT);
+	}
 
 	/* make sure we have a valid parent */
 	if (parent != NULL)
