@@ -1690,6 +1690,40 @@ const chd_header *chd_get_header(chd_file *chd)
 	return &chd->header;
 }
 
+/*-------------------------------------------------
+    chd_read_header - read CHD header data
+	from file into the pointed struct
+-------------------------------------------------*/
+chd_error chd_read_header(const char *filename, chd_header *header)
+{
+	chd_error err = CHDERR_NONE;
+	core_file *file = NULL;
+
+	/* punt if NULL */
+	if (filename == NULL || header == NULL)
+		EARLY_EXIT(err = CHDERR_INVALID_PARAMETER);
+
+	/* open the file */
+	file = core_fopen(filename);
+	if (file == NULL)
+		EARLY_EXIT(err = CHDERR_FILE_NOT_FOUND);
+
+	/* attempt to read the header */
+	err = header_read(file, header);
+	if (err != CHDERR_NONE)
+		EARLY_EXIT(err);
+
+	/* validate the header */
+	err = header_validate(header);
+	if (err != CHDERR_NONE)
+		EARLY_EXIT(err);
+
+cleanup:
+	if (file != NULL)
+		core_fclose(file);
+
+	return err;
+}
 
 
 /***************************************************************************

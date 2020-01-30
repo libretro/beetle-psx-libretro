@@ -22,6 +22,9 @@
 
 #include "CDAccess_CHD.h"
 
+#include <file/file_path.h>
+#include <retro_dirent.h>
+
 extern retro_log_printf_t log_cb;
 
 
@@ -58,11 +61,35 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
    {
       if (err == CHDERR_REQUIRES_PARENT)
       {
-         log_cb(RETRO_LOG_INFO, "[CHD] File is a clone: %s\n", path);
-      }
+         log_cb(RETRO_LOG_INFO, "[CHD] File is a clone: %s\n", path_basename(path));
 
-      log_cb(RETRO_LOG_ERROR, "[CHD] Could not find parent of clone: %s\n", path);
-      return false;
+         chd_header *clone_header = (chd_header *)malloc(sizeof(chd_header));
+         if (clone_header == NULL)
+            return false;
+         
+         /* Get the clone header so we know its parent's SHA1 */
+         chd_error err = chd_read_header(path, clone_header);
+         if (err != CHDERR_NONE)
+            return false;
+
+         
+         
+         /* Get the directory of the clone */
+         char clone_dir_path[256];
+         strncpy(clone_dir_path, path, 256);
+         path_basedir(clone_dir_path);
+
+         /* "Open" it with retro_dirent */
+         RDIR* clone_dir = retro_opendir(clone_dir_path);
+
+         /* ... */
+
+         log_cb(RETRO_LOG_ERROR, "[CHD] Could not find parent of clone: %s\n", path_basename(path));
+         return false;
+      }
+      
+      else
+         return false;
    }
       
 

@@ -368,8 +368,8 @@ const char *chd_error_string(chd_error err);
 /* return a pointer to the extracted CHD header data */
 const chd_header *chd_get_header(chd_file *chd);
 
-
-
+/* read CHD header data from file into the pointed struct */
+chd_error chd_read_header(const char *filename, chd_header *header);
 
 /* ----- core data read/write ----- */
 
