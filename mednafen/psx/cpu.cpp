@@ -239,7 +239,7 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
   SFVAR(ReadAbsorbWhich),
   SFVAR(ReadFudge),
 
-  SFARRAY(ScratchRAM->data8, 1024),
+  SFARRAYN(ScratchRAM->data8, 1024, "ScratchRAM.data8"),
 
   SFEND
  };

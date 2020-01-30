@@ -2405,7 +2405,7 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       SFVAR(CD_TrayOpen),
       SFVAR(CD_SelectedDisc),
-      SFARRAY(MainRAM->data8, 1024 * 2048),
+      SFARRAYN(MainRAM->data8, 1024 * 2048, "MainRAM.data8"),
       SFARRAY32(SysControl.Regs, 9),
       SFVAR(PSX_PRNG.lcgo),
       SFVAR(PSX_PRNG.x),
