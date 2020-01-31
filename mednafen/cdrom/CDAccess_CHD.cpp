@@ -53,46 +53,95 @@ static const char *DI_CUE_Strings[7] =
    "MODE2/2352"
 };
 
+/**
+ * find_parent_in_clone_dir
+ * Tries to find a CHD file whose header has a 'sha1' equal to
+ * @parentsha1 in the same directory as the CHD specified by @path.
+ * 
+ * Returns true and mutates @parent_path if found.
+ * Returns false if not found.
+ **/
+static bool find_parent_in_clone_dir(const char *path, uint8_t *parentsha1, char *parent_path, size_t parent_path_size)
+{
+   /* TODO - In order to use dirent in libretro, we need to change
+   the call to retro_set_environment. We need to bump the requested
+   VFS version from 1 to 3 and call dirent_vfs_init. */
+
+   /* Get the directory of the clone */
+   char clone_dir_path[256];
+   strncpy(clone_dir_path, path, 256);
+   path_basedir(clone_dir_path);
+
+   /* "Open" it with retro_dirent */
+   /* TODO */
+   
+   /* Loop through the directory, compare all CHD sha1 to parentsha1
+   and exit early if we have a match, saving the match's path to parent_path */
+   /* TODO */
+
+   return false;
+}
+
 bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 {
    /* Assume the game is a 'parent' */
    chd_error err = chd_open(path, CHD_OPEN_READ, NULL, &chd);
    if (err != CHDERR_NONE)
    {
+      /* Handle the case where the game is a 'clone' */
       if (err == CHDERR_REQUIRES_PARENT)
-      {
+      {  
          log_cb(RETRO_LOG_INFO, "[CHD] File is a clone: %s\n", path_basename(path));
-
-         chd_header *clone_header = (chd_header *)malloc(sizeof(chd_header));
-         if (clone_header == NULL)
-            return false;
          
          /* Get the clone header so we know its parent's SHA1 */
+         chd_header *clone_header = (chd_header *)malloc(sizeof(chd_header));
          chd_error err = chd_read_header(path, clone_header);
+         if (err != CHDERR_NONE)
+         {
+            if (clone_header != NULL) 
+               free(clone_header);
+            clone_header = NULL;
+            return false;
+         }
+
+         /* Extract the parents's SHA1 and free the clone header because we don't need it anymore */
+         uint8_t parentsha1[20];
+         memcpy(parentsha1, clone_header->parentsha1, 20);
+         if (clone_header != NULL) 
+            free(clone_header);
+         clone_header = NULL;
+
+         log_cb(RETRO_LOG_INFO, "[CHD] Trying to find parent of clone in its path\n");
+         char parent_path[256];
+         /*
+         if (find_parent_in_clone_dir(path, parentsha1, parent_path))
+         {
+            log_cb(RETRO_LOG_ERROR, "[CHD] Could not find parent of clone: %s\n", path_basename(path), 256);
+            return false;
+         }
+         */
+         
+         /* FIXME - This is hardcoded for testing */
+         snprintf(parent_path, 256, "...");
+         log_cb(RETRO_LOG_INFO, "[CHD] Parent of clone found: %s\n", path_basename(parent_path));
+
+         /* Open the parent CHD file */
+         err = chd_open(parent_path, CHD_OPEN_READ, NULL, &parent_chd);
          if (err != CHDERR_NONE)
             return false;
 
-         
-         
-         /* Get the directory of the clone */
-         char clone_dir_path[256];
-         strncpy(clone_dir_path, path, 256);
-         path_basedir(clone_dir_path);
+         /* Open the clone, this time with the parent CHD */
+         err = chd_open(path, CHD_OPEN_READ, parent_chd, &chd);
+         if (err != CHDERR_NONE)
+            return false;
 
-         /* "Open" it with retro_dirent */
-         RDIR* clone_dir = retro_opendir(clone_dir_path);
-
-         /* ... */
-
-         log_cb(RETRO_LOG_ERROR, "[CHD] Could not find parent of clone: %s\n", path_basename(path));
-         return false;
+         /* It's a miracle, the clone is opened */
       }
       
       else
          return false;
    }
       
-
    if (image_memcache)
    {
       err = chd_precache(chd);
@@ -239,8 +288,11 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 
 void CDAccess_CHD::Cleanup(void)
 {
-   if(chd != NULL)
+   if (chd != NULL)
       chd_close(chd);
+
+   if (parent_chd != NULL)
+      chd_close(parent_chd);
 
    if (hunkmem != NULL)
       free(hunkmem);

@@ -23,6 +23,7 @@ class CDAccess_CHD : public CDAccess
 
    private:
       chd_file *chd;
+      chd_file *parent_chd;
       /* hunk data cache */
       uint8_t *hunkmem;
       /* last hunknum read */
