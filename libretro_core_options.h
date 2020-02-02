@@ -307,7 +307,11 @@ struct retro_core_option_definition option_defs_us[] = {
       {
          { "128", "128 (Default)" },
          { "256",  NULL },
+         { "384",  NULL },
          { "512",  NULL },
+         { "640",  NULL },
+         { "768",  NULL },
+         { "896",  NULL },
          { "1024",  NULL },
          { NULL, NULL },
       },
