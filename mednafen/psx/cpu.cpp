@@ -31,7 +31,7 @@
 #include "../pgxp/pgxp_cpu.h"
 #include "../pgxp/pgxp_gte.h"
 #include "../pgxp/pgxp_main.h"
-// int pgxpMode = PGXP_GetModes();
+int pgxpMode = PGXP_GetModes();
 
 #ifdef HAVE_LIGHTREC
  #include <lightrec.h>
@@ -187,13 +187,14 @@ void PS_CPU::Power(void)
 
  memset(ScratchRAM->data8, 0, 1024);
 
+ PGXP_Init();
+
 #ifdef HAVE_LIGHTREC
  prev_dynarec = psx_dynarec;
+ pgxpMode = PGXP_GetModes();
  if(psx_dynarec != DYNAREC_DISABLED)
   lightrec_plugin_init();
 #endif
-
- PGXP_Init();
 
  // Not quite sure about these poweron/reset values:
  for(unsigned i = 0; i < 1024; i++)
@@ -2700,11 +2701,12 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode)
 {
 #ifdef HAVE_LIGHTREC
- if(psx_dynarec != prev_dynarec) {
-  //init lightrec when changing dynarec option, cleans entire state if already running
+ if(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) {
+  //init lightrec when changing dynarec or PGXP option, cleans entire state if already running
   if(psx_dynarec != DYNAREC_DISABLED)
    lightrec_plugin_init();
   prev_dynarec = psx_dynarec;
+  pgxpMode = PGXP_GetModes();
  }
 
  if(lightrec_state)

@@ -12,6 +12,10 @@
  * Lesser General Public License for more details.
  */
 
+#include "../../pgxp/pgxp_cpu.h"
+#include "../../pgxp/pgxp_gte.h"
+#include "../../pgxp/pgxp_main.h"
+
 #include "blockcache.h"
 #include "config.h"
 #include "debug.h"
@@ -53,29 +57,60 @@ static void __segfault_cb(struct lightrec_state *state, u32 addr)
 static u32 lightrec_rw_ops(struct lightrec_state *state, union code op,
 		const struct lightrec_mem_map_ops *ops, u32 addr, u32 data)
 {
+	s32 r;
+
 	switch (op.i.op) {
 	case OP_SB:
 		ops->sb(state, addr, (u8) data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SB(op.opcode, data, addr);
 		return 0;
 	case OP_SH:
 		ops->sh(state, addr, (u16) data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SH(op.opcode, data, addr);
 		return 0;
 	case OP_SWL:
+		ops->sw(state, addr, data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SWL(op.opcode, data, addr);
+		return 0;
 	case OP_SWR:
+		ops->sw(state, addr, data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SWR(op.opcode, data, addr);
+		return 0;
 	case OP_SW:
 		ops->sw(state, addr, data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SW(op.opcode, data, addr);
 		return 0;
 	case OP_LB:
-		return (s32) (s8) ops->lb(state, addr);
+		r = (s32) (s8) ops->lb(state, addr);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LB(op.opcode, r, addr);
+		return r;
 	case OP_LBU:
-		return ops->lb(state, addr);
+		r = ops->lb(state, addr);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LBU(op.opcode, r, addr);
+		return r;
 	case OP_LH:
-		return (s32) (s16) ops->lh(state, addr);
+		r = (s32) (s16) ops->lh(state, addr);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LH(op.opcode, r, addr);
+		return r;
 	case OP_LHU:
-		return ops->lh(state, addr);
+		r = ops->lh(state, addr);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LHU(op.opcode, r, addr);
+		return r;
 	case OP_LW:
 	default:
-		return ops->lw(state, addr);
+		r = ops->lw(state, addr);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LW(op.opcode, r, addr);
+		return r;
 	}
 }
 
@@ -139,11 +174,15 @@ u32 lightrec_rw(struct lightrec_state *state, union code op,
 	switch (op.i.op) {
 	case OP_SB:
 		*(u8 *) new_addr = (u8) data;
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SB(op.opcode, HTOLE32(data), addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr);
 		return 0;
 	case OP_SH:
 		*(u16 *) new_addr = HTOLE16((u16) data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SH(op.opcode, HTOLE32(data), addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr);
 		return 0;
@@ -154,6 +193,8 @@ u32 lightrec_rw(struct lightrec_state *state, union code op,
 
 		*(u32 *)(new_addr & ~3) = HTOLE32((data >> ((3 - shift) * 8))
 						  | (mem_data & mask));
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SWL(op.opcode, HTOLE32(data), addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr & ~0x3);
 		return 0;
@@ -164,46 +205,68 @@ u32 lightrec_rw(struct lightrec_state *state, union code op,
 
 		*(u32 *)(new_addr & ~3) = HTOLE32((data << (shift * 8))
 						  | (mem_data & mask));
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SWR(op.opcode, HTOLE32(data), addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr & ~0x3);
 		return 0;
 	case OP_SW:
 		*(u32 *) new_addr = HTOLE32(data);
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_SW(op.opcode, HTOLE32(data), addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr);
 		return 0;
 	case OP_SWC2:
 		*(u32 *) new_addr = HTOLE32(state->ops.cop2_ops.mfc(state,
 								    op.i.rt));
+		if (PGXP_GetModes() & PGXP_MODE_GTE)
+			PGXP_GTE_SWC2(op.opcode, *(u32 *) new_addr, addr);
 		if (!state->invalidate_from_dma_only)
 			lightrec_invalidate_map(state, map, kaddr);
 		return 0;
 	case OP_LB:
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LB(op.opcode, (s32) *(s8 *) new_addr, addr);
 		return (s32) *(s8 *) new_addr;
 	case OP_LBU:
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LBU(op.opcode, *(u8 *) new_addr, addr);
 		return *(u8 *) new_addr;
 	case OP_LH:
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LH(op.opcode, (s32)(s16) LE16TOH(*(u16 *) new_addr), addr);
 		return (s32)(s16) LE16TOH(*(u16 *) new_addr);
 	case OP_LHU:
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LHU(op.opcode, LE16TOH(*(u16 *) new_addr), addr);
 		return LE16TOH(*(u16 *) new_addr);
 	case OP_LWL:
 		shift = kaddr & 3;
 		mem_data = LE32TOH(*(u32 *)(new_addr & ~3));
 		mask = (1 << (24 - shift * 8)) - 1;
 
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LWL(op.opcode, (data & mask) | (mem_data << (24 - shift * 8)), addr);
 		return (data & mask) | (mem_data << (24 - shift * 8));
 	case OP_LWR:
 		shift = kaddr & 3;
 		mem_data = LE32TOH(*(u32 *)(new_addr & ~3));
 		mask = GENMASK(31, 32 - shift * 8);
 
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LWR(op.opcode, (data & mask) | (mem_data >> (shift * 8)), addr);
 		return (data & mask) | (mem_data >> (shift * 8));
 	case OP_LWC2:
 		state->ops.cop2_ops.mtc(state, op.i.rt,
 					LE32TOH(*(u32 *) new_addr));
+		if (PGXP_GetModes() & PGXP_MODE_GTE)
+			PGXP_GTE_LWC2(op.opcode, LE32TOH(*(u32 *) new_addr), addr);
 		return 0;
 	case OP_LW:
 	default:
+		if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+			PGXP_CPU_LW(op.opcode, LE32TOH(*(u32 *) new_addr), addr);
 		return LE32TOH(*(u32 *) new_addr);
 	}
 }
@@ -279,6 +342,22 @@ static void lightrec_mfc_cb(struct lightrec_state *state, union code op)
 		state->native_reg_cache[op.r.rt] = rt;
 }
 
+static void lightrec_pgxp_mfc_cb(struct lightrec_state *state, union code op)
+{
+	u32 rt = lightrec_mfc(state, op);
+
+	bool is_cfc = (op.i.op == OP_CP0 && op.r.rs == OP_CP0_CFC0) ||
+		      (op.i.op == OP_CP2 && op.r.rs == OP_CP2_BASIC_CFC2);
+
+	if (is_cfc)
+		PGXP_GTE_CFC2(op.opcode, rt, rt);
+	else
+		PGXP_GTE_MFC2(op.opcode, rt, rt);
+
+	if (op.r.rt)
+		state->native_reg_cache[op.r.rt] = rt;
+}
+
 void lightrec_mtc(struct lightrec_state *state, union code op, u32 data)
 {
 	bool is_ctc = (op.i.op == OP_CP0 && op.r.rs == OP_CP0_CTC0) ||
@@ -302,6 +381,21 @@ void lightrec_mtc(struct lightrec_state *state, union code op, u32 data)
 static void lightrec_mtc_cb(struct lightrec_state *state, union code op)
 {
 	lightrec_mtc(state, op, state->native_reg_cache[op.r.rt]);
+}
+
+static void lightrec_pgxp_mtc_cb(struct lightrec_state *state, union code op)
+{
+	bool is_ctc = (op.i.op == OP_CP0 && op.r.rs == OP_CP0_CTC0) ||
+		      (op.i.op == OP_CP2 && op.r.rs == OP_CP2_BASIC_CTC2);
+
+	u32 data = state->native_reg_cache[op.r.rt];
+
+	if (is_ctc)
+		PGXP_GTE_CTC2(op.opcode, data, data);
+	else
+		PGXP_GTE_MTC2(op.opcode, data, data);
+
+	lightrec_mtc(state, op, data);
 }
 
 static void lightrec_rfe_cb(struct lightrec_state *state, union code op)
@@ -1070,11 +1164,17 @@ struct lightrec_state * lightrec_init(char *argv0,
 	if (!state->rw_wrapper)
 		goto err_free_generic_rw_wrapper;
 
-	state->mfc_wrapper = generate_wrapper(state, lightrec_mfc_cb, false);
+	if (PGXP_GetModes() & PGXP_MODE_GTE)
+		state->mfc_wrapper = generate_wrapper(state, lightrec_pgxp_mfc_cb, false);
+	else
+		state->mfc_wrapper = generate_wrapper(state, lightrec_mfc_cb, false);
 	if (!state->mfc_wrapper)
 		goto err_free_rw_wrapper;
 
-	state->mtc_wrapper = generate_wrapper(state, lightrec_mtc_cb, false);
+	if (PGXP_GetModes() & PGXP_MODE_GTE)
+		state->mtc_wrapper = generate_wrapper(state, lightrec_pgxp_mtc_cb, false);
+	else
+		state->mtc_wrapper = generate_wrapper(state, lightrec_mtc_cb, false);
 	if (!state->mtc_wrapper)
 		goto err_free_mfc_wrapper;
 
