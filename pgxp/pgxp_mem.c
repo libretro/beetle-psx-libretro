@@ -65,7 +65,7 @@ u32 PGXP_ConvertAddress(u32 addr)
 	u32 memOffs = 0;
 	u32 paddr = addr;
 
-	ValidateAddress(addr);
+//	ValidateAddress(addr);
 
 	switch (paddr >> 24)
 	{
