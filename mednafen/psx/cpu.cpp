@@ -40,6 +40,7 @@ int pgxpMode = PGXP_GetModes();
  #include <signal.h>
 
 enum DYNAREC prev_dynarec;
+bool prev_invalidate;
 extern bool psx_dynarec_invalidate;
 static struct lightrec_state *lightrec_state;
 #endif
@@ -191,6 +192,7 @@ void PS_CPU::Power(void)
 
 #ifdef HAVE_LIGHTREC
  prev_dynarec = psx_dynarec;
+ prev_invalidate = psx_dynarec_invalidate;
  pgxpMode = PGXP_GetModes();
  if(psx_dynarec != DYNAREC_DISABLED)
   lightrec_plugin_init();
@@ -2701,16 +2703,19 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode)
 {
 #ifdef HAVE_LIGHTREC
- if(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) {
-  //init lightrec when changing dynarec or PGXP option, cleans entire state if already running
+//track options changing
+ if(MDFN_UNLIKELY(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) ||
+    prev_invalidate != psx_dynarec_invalidate)
+ {
+  //init lightrec when changing dynarec, invalidate, or PGXP option, cleans entire state if already running
   if(psx_dynarec != DYNAREC_DISABLED)
+  {
    lightrec_plugin_init();
+  }
   prev_dynarec = psx_dynarec;
   pgxpMode = PGXP_GetModes();
+  prev_invalidate = psx_dynarec_invalidate;
  }
-
- if(lightrec_state)
-  lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
 
  if(psx_dynarec != DYNAREC_DISABLED)
   return(lightrec_plugin_execute(timestamp_in));
