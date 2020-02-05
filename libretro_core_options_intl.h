@@ -104,10 +104,10 @@ struct retro_core_option_definition option_defs_it[] = {
    {
       BEETLE_OPT(dither_mode),
       "Dithering Pattern",
-      "Imposta la configurazione del pattern di dithering. '1x (Nativo)' emulates native low resolution dithering used by original hardware to smooth out color banding artefacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth while disabling will automatically enable output at higher color depth.",
+      "Imposta la configurazione del pattern di dithering. '1x (Nativo)' emula il dithering di risoluzione nativa bassa utilizzato da hardware originale per ammorbidire gli artefatti di color banding visibili a profondità di colore nativi. 'Risoluzione Interna' scala la granularità di dithering alla risoluzione interna configurata per risultati più puliti. E' consigliato di disabilitare questa impostazione quando si utilizza la profondità di colore a 32 bpp. Nota: In Vulkan, abilitando questa opzione forzerà downsampling a profondità di colore native mentre disabilitandola abiliterà automaticamente output a profondità di colore maggiori.",
       {
-         { "1x(native)",          "1x (Native)" },
-         { "internal resolution", "Internal Resolution" },
+         { "1x(native)",          "1x (Nativo)" },
+         { "internal resolution", "Risoluzione Interna" },
          { "disabled",            NULL },
          { NULL, NULL },
       },
@@ -144,8 +144,8 @@ struct retro_core_option_definition option_defs_it[] = {
    },
    {
       BEETLE_OPT(super_sampling),
-      "Supersampling (SSAA)",
-      "Se abilitato, sottocampiona l'immagine dalla risoluzione interna scalata alla risoluzione nativa. **When enabled, downsamples rendered content from upscaled internal resolution down to native resolution**. Combinando questa impostazione con multiplicatori di risoluzione interne maggiori permette ai giochi di essere visualizzati con oggetti 3D su cui vengono applicati l'antialiasing a risoluzione nativa minore. Produce risultati migliori quando viene applicato ai titoli che utilizzano elementi sia 2D che 3D (es: personaggi 3D su sfondi pre-rendered), e funziona bene in congiunzione con shader CRT. Questa impostazione è supportata solo dal renderer Vulkan. Nota: E' consigliato disabilitare 'Dithering Pattern' se si sta abilitando quest'impostazione.",
+      "Supersampling",
+      "Se abilitato, sottocampiona l'immagine dalla risoluzione interna scalata alla risoluzione nativa. Combinando questa impostazione con multiplicatori di risoluzione interne maggiori permette ai giochi di essere visualizzati con oggetti 3D su cui vengono applicati l'antialiasing a risoluzione nativa minore. Produce risultati migliori quando viene applicato ai titoli che utilizzano elementi sia 2D che 3D (es: personaggi 3D su sfondi pre-rendered), e funziona bene in congiunzione con shader CRT. Questa impostazione è supportata solo dal renderer Vulkan. Nota: E' consigliato disabilitare 'Dithering Pattern' se si sta abilitando quest'impostazione.",
       {
          { "disabled", NULL },
          { "enabled",  NULL },
@@ -155,7 +155,7 @@ struct retro_core_option_definition option_defs_it[] = {
    },
    {
       BEETLE_OPT(msaa),
-      "Multisampling Antialiasing (MSAA)",
+      "Multisample Anti-Aliasing (MSAA)",
       "Imposta il livello di MSAA. Migliora l'aspetto degli oggetti 3D. Questa impostazione è supportata solo dal renderer Vulkan.",
       {
          { "1x",  "1x (Predefinito)" },
@@ -273,10 +273,10 @@ struct retro_core_option_definition option_defs_it[] = {
       },
       "disabled"
    },
-   #if defined(HAVE_LIGHTREC)
+#if defined(HAVE_LIGHTREC)
    {
       BEETLE_OPT(cpu_dynarec),
-      "Ricompilazione Dinamica CPU Dynarec",
+      "Ricompilazione Dinamica CPU (Dynarec)",
       "Ricompila dinamicamente le istruzioni di CPU a istruzioni native. Molto più veloce dell'interpreter, ma i timing della CPU sono meno accurati e potrebbero avere bug.",
       {
          { "disabled", "Disabilitato (Beetle Interpreter)" },
@@ -378,6 +378,16 @@ struct retro_core_option_definition option_defs_it[] = {
          { "630%",          NULL },
          { "640%",          NULL },
          { "650%",          NULL },
+         { "660%",          NULL },
+         { "670%",          NULL },
+         { "680%",          NULL },
+         { "690%",          NULL },
+         { "700%",          NULL },
+         { "710%",          NULL },
+         { "720%",          NULL },
+         { "730%",          NULL },
+         { "740%",          NULL },
+         { "750%",          NULL },
          { NULL, NULL },
       },
       "100%(native)"
