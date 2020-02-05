@@ -1059,7 +1059,8 @@ static void ProcessFIFO(uint32_t in_count)
 
    for (i = 0; i < command_len; i++)
    {
-      PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
+      if(PGXP_enabled())
+         PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
       CB[i] = GPU_BlitterFIFO.Read();
    }
 
@@ -1100,7 +1101,8 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
       return;
    }
 
-   PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
+   if(PGXP_enabled())
+      PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
    GPU_BlitterFIFO.Write(InData);
 
    if(GPU_BlitterFIFO.in_count && GPU.InCmd != INCMD_FBREAD)
