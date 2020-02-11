@@ -268,6 +268,7 @@ public:
 	void scanout();
 	Vulkan::BufferHandle scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height);
 	Vulkan::BufferHandle scanout_vram_to_buffer(unsigned &width, unsigned &height);
+	Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
 	Vulkan::ImageHandle scanout_to_texture();
 
 	inline void set_texture_mode(TextureMode mode)

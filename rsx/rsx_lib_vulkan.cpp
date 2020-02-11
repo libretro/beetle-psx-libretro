@@ -60,6 +60,7 @@ static int last_scanline_pal;
 static bool frame_duping_enabled = false;
 static uint32_t prev_frame_width = 320;
 static uint32_t prev_frame_height = 240;
+static bool show_vram = false;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -205,7 +206,13 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->timing.sample_rate   = SOUND_FREQUENCY;
 
-   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
+   if (show_vram)
+      info->geometry.aspect_ratio = 2.0 / 1.0;
+   else if (widescreen_hack)
+      info->geometry.aspect_ratio = 16.0 / 9.0;
+   else
+      info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+
    if (content_is_pal)
       info->timing.fps = FPS_PAL_NONINTERLACED;
    else
@@ -232,6 +239,7 @@ void rsx_vulkan_refresh_variables(void)
    unsigned old_scaling = scaling;
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
+   bool old_show_vram = show_vram;
 
    var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -353,8 +361,21 @@ void rsx_vulkan_refresh_variables(void)
          frame_duping_enabled = false;
    }
 
+   var.key = BEETLE_OPT(display_vram);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         show_vram = true;
+      else
+         show_vram = false;
+   }
+
    // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
-   if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
+   if ((old_scaling != scaling ||
+        old_super_sampling != super_sampling ||
+        old_msaa != msaa ||
+        old_show_vram != show_vram)
+       && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
@@ -415,7 +436,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    else
       renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
 
-   auto scanout = renderer->scanout_to_texture();
+   auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
 
    retro_vulkan_image *image                          = &swapchain_image;
 

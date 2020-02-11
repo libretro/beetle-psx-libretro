@@ -766,6 +766,115 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	return DisplayRect(left_offset, upper_offset, display_width, display_height);
 }
 
+ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
+{
+	// Like scanout_to_texture(), but synchronizes the entire
+	// VRAM framebuffer atlas before scanout. Does not apply
+	// any scanout filters and currently outputs at 15-bit
+	// color depth. Current implementation does not reuse
+	// prior scanouts.
+
+	atlas.flush_render_pass();
+
+#if 0
+	if (last_scanout)
+		return last_scanout;
+#endif
+
+	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
+
+	if (scaled)
+		atlas.read_fragment(Domain::Scaled, vram_rect);
+	else
+		atlas.read_fragment(Domain::Unscaled, vram_rect);
+
+	ensure_command_buffer();
+
+	if (scanout_semaphore)
+	{
+		flush();
+		device.add_wait_semaphore(CommandBuffer::Type::Generic, scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, true);
+		scanout_semaphore.reset();
+	}
+
+	ensure_command_buffer();
+
+	unsigned render_scale = scaled ? scaling : 1;
+
+	auto info = ImageCreateInfo::render_target(
+			FB_WIDTH * render_scale,
+			FB_HEIGHT * render_scale,
+			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
+
+#if 0
+	if (!reuseable_scanout ||
+			reuseable_scanout->get_create_info().width != info.width ||
+			reuseable_scanout->get_create_info().height != info.height ||
+			reuseable_scanout->get_create_info().format != info.format)
+	{
+		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		reuseable_scanout = device.create_image(info);
+	}
+#else
+	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	reuseable_scanout = device.create_image(info);
+#endif
+
+	RenderPassInfo rp;
+	rp.color_attachments[0] = &reuseable_scanout->get_view();
+	rp.num_color_attachments = 1;
+	rp.store_attachments = 1;
+
+	rp.clear_color[0] = {0, 0, 0, 0};
+	rp.clear_attachments = 1;
+
+	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+	cmd->begin_render_pass(rp);
+	cmd->set_quad_state();
+
+	cmd->set_program(*pipelines.scaled_quad_blitter);
+	cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+
+	cmd->set_vertex_binding(0, *quad, 0, 2);
+	struct Push
+	{
+		float offset[2];
+		float scale[2];
+		float uv_min[2];
+		float uv_max[2];
+		float max_bias;
+	};
+
+	Push push = { { float(vram_rect.x) / FB_WIDTH, float(vram_rect.y) / FB_HEIGHT },
+		          { float(vram_rect.width) / FB_WIDTH, float(vram_rect.height) / FB_HEIGHT },
+		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
+		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
+		          float(scaled_views.size() - 1) };
+
+	cmd->push_constants(&push, 0, sizeof(push));
+	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	counters.draw_calls++;
+	counters.vertices += 4;
+	cmd->draw(4);
+
+	cmd->end_render_pass();
+
+	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+	                   VK_ACCESS_SHADER_READ_BIT);
+
+	last_scanout = reuseable_scanout;
+
+	return reuseable_scanout;
+}
+
 ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
