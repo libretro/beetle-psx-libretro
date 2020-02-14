@@ -2257,10 +2257,10 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    switch (std)
    {
       case VideoClock_Ntsc:
-         info.timing.fps = FPS_NTSC;
+         info.timing.fps = FPS_NTSC_NONINTERLACED;
          break;
       case VideoClock_Pal:
-         info.timing.fps = FPS_PAL;
+         info.timing.fps = FPS_PAL_NONINTERLACED;
          break;
    }
 

@@ -4250,7 +4250,7 @@ void retro_run(void)
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
          char msg_buffer[64];
-         float fps = is_pal ? FPS_PAL : FPS_NTSC;
+         float fps = content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED;
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
          snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
