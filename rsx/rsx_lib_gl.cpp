@@ -2412,13 +2412,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
    glClearColor(0.0, 0.0, 0.0, 0.0);
    glClear(GL_COLOR_BUFFER_BIT);
 
-   /* If the display is off, just clear the screen */
-   if (renderer->config.display_off && !renderer->display_vram)
-   {
-      glClearColor(0.0, 0.0, 0.0, 0.0);
-      glClear(GL_COLOR_BUFFER_BIT);
-   }
-   else
+   if (!renderer->config.display_off || renderer->display_vram)
    {
       /* Bind 'fb_out' to texture unit 1 */
       glActiveTexture(GL_TEXTURE1);
