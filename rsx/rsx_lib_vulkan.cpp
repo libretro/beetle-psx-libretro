@@ -207,9 +207,9 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
 
    info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
    if (content_is_pal)
-      info->timing.fps = FPS_PAL;
+      info->timing.fps = FPS_PAL_NONINTERLACED;
    else
-      info->timing.fps = FPS_NTSC;
+      info->timing.fps = FPS_NTSC_NONINTERLACED;
 }
 
 void rsx_vulkan_refresh_variables(void)

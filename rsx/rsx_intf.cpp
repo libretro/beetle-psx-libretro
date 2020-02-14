@@ -76,7 +76,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    {
       case RSX_SOFTWARE:
          memset(info, 0, sizeof(*info));
-         info->timing.fps            = content_is_pal ? FPS_PAL : FPS_NTSC;
+         info->timing.fps            = content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED;
          info->timing.sample_rate    = SOUND_FREQUENCY;
          info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
          info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
