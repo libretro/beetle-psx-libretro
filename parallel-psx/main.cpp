@@ -160,6 +160,7 @@ enum
 	RSX_TEX_WINDOW,
 	RSX_DRAW_OFFSET,
 	RSX_DRAW_AREA,
+	RSX_VRAM_COORDS,
 	RSX_HORIZONTAL_RANGE,
 	RSX_VERTICAL_RANGE,
 	RSX_DISPLAY_MODE,
@@ -177,7 +178,7 @@ static void read_tag(FILE *file)
 	char buffer[8];
 	if (fread(buffer, sizeof(buffer), 1, file) != 1)
 		throw runtime_error("Failed to read tag.");
-	if (memcmp(buffer, "RSXDUMP2", sizeof(buffer)))
+	if (memcmp(buffer, "RSXDUMP3", sizeof(buffer)))
 		throw runtime_error("Failed to read tag.");
 }
 
@@ -436,6 +437,15 @@ static bool read_command(const CLIArguments &args, FILE *file, Device &device, R
 		width = min(width, int(FB_WIDTH - x0));
 		height = min(height, int(FB_HEIGHT - y0));
 		renderer.set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+		break;
+	}
+
+	case RSX_VRAM_COORDS:
+	{
+		auto xstart = read_u32(file);
+		auto ystart = read_u32(file);
+
+		renderer.set_vram_framebuffer_coords(xstart, ystart);
 		break;
 	}
 

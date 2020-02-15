@@ -89,7 +89,8 @@ public:
 
 	struct RenderState
 	{
-		Rect display_mode;
+		//Rect display_mode;
+		Rect display_fb_rect;
 		TextureWindow texture_window;
 		Rect cached_window_rect;
 		Rect draw_rect;
@@ -118,6 +119,9 @@ public:
 
 		int slstart_pal = 0;
 		int slend_pal = 287;
+
+		unsigned display_fb_xstart = 0;
+		unsigned display_fb_ystart = 0;
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
@@ -182,6 +186,14 @@ public:
 
 	void blit_vram(const Rect &dst, const Rect &src);
 
+	void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
+	{
+		last_scanout.reset();
+
+		render_state.display_fb_xstart = xstart;
+		render_state.display_fb_ystart = ystart;
+	}
+
 	void set_horizontal_display_range(int x1, int x2)
 	{
 		render_state.horiz_start = x1;
@@ -196,10 +208,11 @@ public:
 
 	void set_display_mode(const Rect &rect, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
 	{
-		if (rect != render_state.display_mode || render_state.scanout_mode != mode)
-			last_scanout.reset();
+		//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
+		//	last_scanout.reset();
+		last_scanout.reset();
 
-		render_state.display_mode = rect;
+		//render_state.display_mode = rect;
 		render_state.scanout_mode = mode;
 
 		render_state.is_pal = is_pal;
@@ -527,6 +540,8 @@ private:
 	Vulkan::ImageHandle last_scanout;
 	Vulkan::ImageHandle reuseable_scanout;
 	DisplayRect compute_display_rect();
+
+	Rect compute_vram_framebuffer_rect();
 
 	void mipmap_framebuffer();
 	Vulkan::BufferHandle quad;

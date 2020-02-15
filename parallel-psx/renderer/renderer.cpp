@@ -566,7 +566,8 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 
 BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)
 {
-	auto &rect = draw_area ? render_state.draw_rect : render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = draw_area ? render_state.draw_rect : render_state.display_fb_rect;
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 		return BufferHandle(nullptr);
 
@@ -597,7 +598,8 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 
 void Renderer::mipmap_framebuffer()
 {
-	auto &rect = render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = render_state.display_fb_rect;
 	unsigned levels = scaled_views.size();
 	for (unsigned i = 1; i <= levels; i++)
 	{
@@ -675,6 +677,41 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
+Rect Renderer::compute_vram_framebuffer_rect()
+{
+	unsigned clock_div;
+	switch (render_state.width_mode)
+	{
+	case WidthMode::WIDTH_MODE_256:
+		clock_div = 10;
+		break;
+	case WidthMode::WIDTH_MODE_320:
+		clock_div = 8;
+		break;
+	case WidthMode::WIDTH_MODE_512:
+		clock_div = 5;
+		break;
+	case WidthMode::WIDTH_MODE_640:
+		clock_div = 4;
+		break;
+	case WidthMode::WIDTH_MODE_368:
+		clock_div = 7;
+		break;
+	}
+
+	unsigned fb_width = (unsigned) (render_state.horiz_end - render_state.horiz_start);
+	fb_width /= clock_div;
+	fb_width = (fb_width + 2) & ~3;
+
+	unsigned fb_height = (unsigned) (render_state.vert_end - render_state.vert_start);
+	fb_height *= render_state.is_480i ? 2 : 1;
+
+	return {render_state.display_fb_xstart,
+	        render_state.display_fb_ystart,
+	        fb_width,
+	        fb_height};
+}
+
 Renderer::DisplayRect Renderer::compute_display_rect()
 {
 	unsigned clock_div;
@@ -736,7 +773,8 @@ ImageHandle Renderer::scanout_to_texture()
 	if (last_scanout)
 		return last_scanout;
 
-	auto &rect = render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = render_state.display_fb_rect;
 
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 	{

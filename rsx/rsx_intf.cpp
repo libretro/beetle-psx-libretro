@@ -416,6 +416,26 @@ void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
+void rsx_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+{
+#ifdef RSX_DUMP
+   rsx_dump_set_vram_framebuffer_coords(xstart, ystart);
+#endif
+
+   switch (rsx_type)
+   {
+      case RSX_SOFTWARE:
+         break;
+      case RSX_OPENGL:
+         break;
+      case RSX_VULKAN:
+#if defined(HAVE_VULKAN)
+         rsx_vulkan_set_vram_framebuffer_coords(xstart, ystart);
+#endif
+         break;
+   }
+}
+
 void rsx_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
 #ifdef RSX_DUMP
@@ -461,7 +481,6 @@ void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
          break;
    }
 }
-
 
 void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,

@@ -510,6 +510,18 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
+void rsx_vulkan_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+{
+   if (renderer)
+      renderer->set_vram_framebuffer_coords(xstart, ystart);
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_vram_framebuffer_coords(xstart, ystart);
+      });
+   }
+}
+
 void rsx_vulkan_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
    if (renderer)

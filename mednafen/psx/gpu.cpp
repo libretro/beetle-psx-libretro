@@ -1164,6 +1164,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU.DisplayFB_XStart = V & 0x3FE; // Lower bit is apparently ignored.
             GPU.DisplayFB_YStart = (V >> 10) & 0x1FF;
             GPU.display_change_count++;
+            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
             break;
 
          case 0x06:  // Horizontal display range
