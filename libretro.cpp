@@ -3344,7 +3344,7 @@ static void check_variables(bool startup)
       bool hw_renderer = false;
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
-         if (strcmp(var.value, "hardware") == 0)
+         if (!strcmp(var.value, "hardware") || !strcmp(var.value, "hardware_gl") || !strcmp(var.value, "hardware_vk"))
          {
             hw_renderer = true;
          }
@@ -4022,7 +4022,7 @@ bool retro_load_game(const struct retro_game_info *info)
    deint.ClearState();
 #endif
 
-	input_init();
+   input_init();
 
    boot = false;
 

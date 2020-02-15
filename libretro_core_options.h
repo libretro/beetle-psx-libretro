@@ -55,10 +55,12 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(renderer),
       "Renderer (Restart)",
-      "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware' automatically selects the Vulkan or OpenGL renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer.",
+      "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer.",
       {
-         { "hardware", "Hardware" },
-         { "software", "Software" },
+         { "hardware",    "Hardware (Auto)" },
+         { "hardware_gl", "Hardware (OpenGL)" },
+         { "hardware_vk", "Hardware (Vulkan)" },
+         { "software",    "Software" },
          { NULL, NULL },
       },
       "hardware"
