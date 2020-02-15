@@ -102,6 +102,17 @@ enum rsx_renderer_type rsx_intf_is_type(void)
    return rsx_type;
 }
 
+inline void rsx_intf_dump_init(void)
+{
+#if defined(RSX_DUMP)
+   {
+      const char *env = getenv("RSX_DUMP");
+      if (env)
+         rsx_dump_init(env);
+   }
+#endif
+}
+
 bool rsx_intf_open(bool is_pal, bool force_software)
 {
    struct retro_variable var = {0};
@@ -109,12 +120,18 @@ bool rsx_intf_open(bool is_pal, bool force_software)
    vk_initialized            = false;
    gl_initialized            = false;
 
+   enum force_renderer_type force_type = AUTO;
+
    var.key                   = BEETLE_OPT(renderer);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "software") || force_software)
          software_selected = true;
+      else if (!strcmp(var.value, "hardware_gl"))
+         force_type = FORCE_OPENGL;
+      else if (!strcmp(var.value, "hardware_vk"))
+         force_type = FORCE_VULKAN;
    }
    else
    {
@@ -125,6 +142,49 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 
    if (!software_selected)
    {
+      /* Check for any hardware renderer forces before performing auto sequence */
+      if (force_type == FORCE_VULKAN)
+      {
+#if defined (HAVE_VULKAN)
+         if (rsx_vulkan_open(is_pal))
+         {
+            rsx_type = RSX_VULKAN;
+            vk_initialized = true;
+            rsx_intf_dump_init();
+            return true;
+         }
+         else
+         {
+            MDFN_DispMessage("Could not force Vulkan renderer. Falling back to software renderer.");
+            goto soft;
+         }
+#else
+         MDFN_DispMessage("Attempted to force Vulkan renderer, but core was built without it. Falling back to software renderer.");
+         goto soft;
+#endif
+      }
+      else if (force_type == FORCE_OPENGL)
+      {
+#if defined (HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         if (rsx_gl_open(is_pal))
+         {
+            rsx_type = RSX_OPENGL;
+            gl_initialized = true;
+            rsx_intf_dump_init();
+            return true;
+         }
+         else
+         {
+            MDFN_DispMessage("Could not force OpenGL renderer. Falling back to software renderer.");
+            goto soft;
+         }
+#else
+         MDFN_DispMessage("Attempted to force OpenGL renderer, but core was built without it. Falling back to software renderer.");
+         goto soft;
+#endif
+      }
+      /* End forces section */
+
       unsigned preferred = 0; // This will be set to RETRO_HW_CONTEXT_DUMMY if GET_PREFERRED_HW_RENDER is not supported by frontend
       if (!environ_cb(RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER, &preferred))
       {
@@ -140,7 +200,8 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       {
          rsx_type       = RSX_VULKAN;
          vk_initialized = true;
-         goto end;
+         rsx_intf_dump_init();
+         return true;
       }
 #endif
 
@@ -152,7 +213,8 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       {
          rsx_type       = RSX_OPENGL;
          gl_initialized = true;
-         goto end;
+         rsx_intf_dump_init();
+         return true;
       }
 #endif
 
@@ -162,22 +224,24 @@ bool rsx_intf_open(bool is_pal, bool force_software)
          MDFN_DispMessage("Unable to find or open hardware renderer for frontend preferred hardware context. Falling back to software renderer.");
    }
 
+soft:
    // rsx_soft_open(is_pal) always returns true
    if (rsx_soft_open(is_pal))
    {
       rsx_type = RSX_SOFTWARE;
-      goto end;
+      rsx_intf_dump_init();
+      return true;
    }
 
-end:
-#if defined(RSX_DUMP)
-   {
-      const char *env = getenv("RSX_DUMP");
-      if (env)
-         rsx_dump_init(env);
-   }
-#endif
-   return true;
+   /* Note: fallback will result in the software renderer running at
+    * 1x internal resolution instead of the user configured setting
+    * because of the check_variables startup sequence in libretro.cpp;
+    * this is a good thing since emulation would likely slow to a crawl
+    * if the user had >2x IR for hardware rendering and that setting was
+    * retroactively applied that to software rendering fallback
+    */
+
+   return false;
 }
 
 void rsx_intf_close(void)

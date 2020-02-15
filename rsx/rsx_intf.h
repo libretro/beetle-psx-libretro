@@ -23,6 +23,13 @@ enum rsx_renderer_type
    RSX_VULKAN
 };
 
+enum force_renderer_type
+{
+   AUTO = 0,
+   FORCE_OPENGL,
+   FORCE_VULKAN
+};
+
 enum blending_modes
 {
    BLEND_MODE_OPAQUE     = -1,
