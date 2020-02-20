@@ -431,10 +431,11 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
 
+   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
-      renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
+      renderer->set_mdec_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
    else
-      renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
+      renderer->set_mdec_filter(Renderer::ScanoutFilter::None);
 
    auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
 
@@ -473,12 +474,13 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    prev_frame_width = scanout->get_width();
    prev_frame_height = scanout ->get_height();
 
+   //printf("%d %d\n", scanout->get_width(), scanout->get_height());
+
    //fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
    //      renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
 }
 
 /* Draw commands */
-
 
 void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
                                uint8_t twx, uint8_t twy)

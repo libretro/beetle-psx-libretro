@@ -957,7 +957,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	ensure_command_buffer();
 
-	bool scaled = !bpp24 && !ssaa;
+	bool scaled = !ssaa;
 
 	unsigned render_scale = scaled ? scaling : 1;
 
@@ -1009,7 +1009,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	if (bpp24)
 	{
-		if (render_state.scanout_filter == ScanoutFilter::MDEC_YUV)
+		if (render_state.scanout_mdec_filter == ScanoutFilter::MDEC_YUV)
 			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cmd->set_program(*pipelines.bpp24_quad_blitter);

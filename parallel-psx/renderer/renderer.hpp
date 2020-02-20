@@ -127,6 +127,7 @@ public:
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
 		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
 		ScanoutFilter scanout_filter = ScanoutFilter::None;
+		ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
 		bool dither_native_resolution = false;
 		bool force_mask_bit = false;
 		bool texture_color_modulate = false;
@@ -242,6 +243,11 @@ public:
 	void set_display_filter(ScanoutFilter filter)
 	{
 		render_state.scanout_filter = filter;
+	}
+
+	void set_mdec_filter(ScanoutFilter mdec_filter)
+	{
+		render_state.scanout_mdec_filter = mdec_filter;
 	}
 
 	void toggle_display(bool enable)
