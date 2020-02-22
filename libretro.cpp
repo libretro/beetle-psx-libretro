@@ -4424,29 +4424,29 @@ void retro_run(void)
          switch (width)
          {
             case 280:
-               pix_offset += 12 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 12 - image_offset + floor(0.5 * image_crop);
                width = 256 - image_crop;
                break;
 
             case 350:
-               pix_offset += 15 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 15 - image_offset + floor(0.5 * image_crop);
                width = 320 - image_crop;
                break;
 
             /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
                Adjust in future if there are issues. */
             case 400:
-               pix_offset += 17 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 17 - image_offset + floor(0.5 * image_crop);
                width = 366 - image_crop;
                break;
 
             case 560:
-               pix_offset += 24 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 24 - image_offset + floor(0.5 * image_crop);
                width = 512 - image_crop;
                break;
 
             case 700:
-               pix_offset += 30 + (image_offset + floor(0.5 * image_crop));
+               pix_offset += 30 - image_offset + floor(0.5 * image_crop);
                width = 640 - image_crop;
                break;
 
