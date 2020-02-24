@@ -2677,9 +2677,7 @@ void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
    renderer->config.display_area_vrange[1] = y2;
 }
 
-void rsx_gl_set_display_mode(uint16_t x, uint16_t y,
-                             uint16_t w, uint16_t h,
-                             bool depth_24bpp,
+void rsx_gl_set_display_mode(bool depth_24bpp,
                              bool is_pal,
                              bool is_480i,
                              int width_mode)
@@ -2690,12 +2688,6 @@ void rsx_gl_set_display_mode(uint16_t x, uint16_t y,
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
       return;
-
-   // Deprecated parameters
-   (void) x;
-   (void) y;
-   (void) w;
-   (void) h;
 
    renderer->config.display_24bpp         = depth_24bpp;
 

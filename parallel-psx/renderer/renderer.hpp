@@ -207,7 +207,7 @@ public:
 		render_state.vert_end = y2;
 	}
 
-	void set_display_mode(const Rect &rect, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
+	void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
 	{
 		//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
 		//	last_scanout.reset();

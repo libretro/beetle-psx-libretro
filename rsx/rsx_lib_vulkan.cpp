@@ -569,20 +569,18 @@ void rsx_vulkan_set_vertical_display_range(uint16_t y1, uint16_t y2)
    }
 }
 
-void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
-                                 uint16_t w, uint16_t h,
-                                 bool depth_24bpp,
+void rsx_vulkan_set_display_mode(bool depth_24bpp,
                                  bool is_pal,
                                  bool is_480i,
                                  int width_mode)
 {
    if (renderer)
-      renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+      renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
                                  is_480i, static_cast<Renderer::WidthMode>(width_mode));
    else
    {
       defer.push_back([=]() {
-            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+            renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
                                        is_480i, static_cast<Renderer::WidthMode>(width_mode));
             });
    }

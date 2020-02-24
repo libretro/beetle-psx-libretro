@@ -160,15 +160,11 @@ void rsx_dump_set_vertical_display_range(uint16_t y1, uint16_t y2)
    write_u32(y2);
 }
 
-void rsx_dump_set_display_mode(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool depth_24bpp, bool is_pal, bool is_480i, int width_mode)
+void rsx_dump_set_display_mode(bool depth_24bpp, bool is_pal, bool is_480i, int width_mode)
 {
    if (!file)
       return;
    write_u32(RSX_DISPLAY_MODE);
-   write_u32(x);
-   write_u32(y);
-   write_u32(w);
-   write_u32(h);
    write_u32(depth_24bpp);
    write_u32(is_pal);
    write_u32(is_480i);

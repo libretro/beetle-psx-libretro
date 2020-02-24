@@ -485,15 +485,13 @@ void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
    }
 }
 
-void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
-                               uint16_t w, uint16_t h,
-                               bool depth_24bpp,
+void rsx_intf_set_display_mode(bool depth_24bpp,
                                bool is_pal, 
                                bool is_480i,
                                int width_mode)
 {
 #ifdef RSX_DUMP
-   rsx_dump_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i, width_mode);
+   rsx_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
    switch (rsx_type)
@@ -502,12 +500,12 @@ void rsx_intf_set_display_mode(uint16_t x, uint16_t y,
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i, width_mode);
+         rsx_gl_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
          break;
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_display_mode(x, y, w, h, depth_24bpp, is_pal, is_480i, width_mode);
+         rsx_vulkan_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
          break;
    }
