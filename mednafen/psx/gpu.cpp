@@ -1132,11 +1132,13 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x00:  // Reset GPU
             //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             GPU_SoftReset();
-             rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
-                                    GPU.ClipX1, GPU.ClipY1);
-             rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); //0x200, 0xC00 set by GPU_SoftReset()
-             rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); //0x10, 0x100 set by GPU_SoftReset()
-             UpdateDisplayMode();
+            rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
+                                   GPU.ClipX1, GPU.ClipY1);
+            rsx_intf_toggle_display(GPU.DisplayOff); // `true` set by GPU_SoftReset()
+            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart); // (0, 0) set by GPU_SoftReset()
+            rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); // 0x200, 0xC00 set by GPU_SoftReset()
+            rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); // 0x10, 0x100 set by GPU_SoftReset()
+            UpdateDisplayMode();
             break;
 
          case 0x01:  // Reset command buffer
@@ -1898,6 +1900,7 @@ void GPU_RestoreStateP3(void)
                         1024, 512,
                         GPU.vram, false, false);
 
+   rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
    rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
    rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
 
