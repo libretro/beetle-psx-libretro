@@ -427,6 +427,9 @@ void rsx_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
       case RSX_SOFTWARE:
          break;
       case RSX_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         rsx_gl_set_vram_framebuffer_coords(xstart, ystart);
+#endif
          break;
       case RSX_VULKAN:
 #if defined(HAVE_VULKAN)

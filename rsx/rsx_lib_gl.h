@@ -26,6 +26,8 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y);
 void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0,
                           uint16_t x1, uint16_t y1);
 
+void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart);
+
 void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2);
 
 void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2);
