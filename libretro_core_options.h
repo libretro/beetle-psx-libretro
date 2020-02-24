@@ -58,8 +58,12 @@ struct retro_core_option_definition option_defs_us[] = {
       "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer.",
       {
          { "hardware",    "Hardware (Auto)" },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          { "hardware_gl", "Hardware (OpenGL)" },
+#endif
+#if defined(HAVE_VULKAN)
          { "hardware_vk", "Hardware (Vulkan)" },
+#endif
          { "software",    "Software" },
          { NULL, NULL },
       },
