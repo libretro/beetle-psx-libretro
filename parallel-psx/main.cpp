@@ -160,6 +160,7 @@ enum
 	RSX_TEX_WINDOW,
 	RSX_DRAW_OFFSET,
 	RSX_DRAW_AREA,
+	RSX_VRAM_COORDS,
 	RSX_HORIZONTAL_RANGE,
 	RSX_VERTICAL_RANGE,
 	RSX_DISPLAY_MODE,
@@ -177,7 +178,7 @@ static void read_tag(FILE *file)
 	char buffer[8];
 	if (fread(buffer, sizeof(buffer), 1, file) != 1)
 		throw runtime_error("Failed to read tag.");
-	if (memcmp(buffer, "RSXDUMP2", sizeof(buffer)))
+	if (memcmp(buffer, "RSXDUMP3", sizeof(buffer)))
 		throw runtime_error("Failed to read tag.");
 }
 
@@ -439,6 +440,15 @@ static bool read_command(const CLIArguments &args, FILE *file, Device &device, R
 		break;
 	}
 
+	case RSX_VRAM_COORDS:
+	{
+		auto xstart = read_u32(file);
+		auto ystart = read_u32(file);
+
+		renderer.set_vram_framebuffer_coords(xstart, ystart);
+		break;
+	}
+
 	case RSX_HORIZONTAL_RANGE:
 	{
 		auto x1 = read_u32(file);
@@ -459,16 +469,12 @@ static bool read_command(const CLIArguments &args, FILE *file, Device &device, R
 
 	case RSX_DISPLAY_MODE:
 	{
-		auto x = read_u32(file);
-		auto y = read_u32(file);
-		auto w = read_u32(file);
-		auto h = read_u32(file);
 		auto depth_24bpp = read_u32(file);
 		auto is_pal = readu32(file);
 		auto is_480i = readu32(file);
 		auto width_mode = readu32(file);
 
-		renderer.set_display_mode({ x, y, w, h }, depth_24bpp != 0, is_pal != 0, is_480i != 0,
+		renderer.set_display_mode(depth_24bpp != 0, is_pal != 0, is_480i != 0,
 		                          static_cast<Renderer::WidthMode>(width_mode));
 		break;
 	}

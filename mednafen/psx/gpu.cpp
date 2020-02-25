@@ -537,11 +537,11 @@ static INLINE bool CalcFIFOReadyBit(void)
    return(true);
 }
 
-static void UpdateDisplayMode(void)
+static void RSX_UpdateDisplayMode(void)
 {
    bool depth_24bpp = !!(GPU.DisplayMode & 0x10);
 
-   uint16_t yres = GPU.VertEnd - GPU.VertStart;
+   //uint16_t yres = GPU.VertEnd - GPU.VertStart;
 
    bool is_pal_mode = false;
    if((GPU.DisplayMode & DISP_PAL) == DISP_PAL)
@@ -551,18 +551,18 @@ static void UpdateDisplayMode(void)
    bool is_480i_mode = false;
    if((GPU.DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
    {
-      yres *= 2;
+      //yres *= 2;
       is_480i_mode = true;
    }
 
-   unsigned pixelclock_divider;
+   //unsigned pixelclock_divider;
 
    enum width_modes curr_width_mode;
 
    if ((GPU.DisplayMode >> 6) & 1)
    {
       // HRes ~ 368pixels
-      pixelclock_divider = 7;
+      //pixelclock_divider = 7;
       curr_width_mode = WIDTH_MODE_368;
    }
    else
@@ -571,27 +571,28 @@ static void UpdateDisplayMode(void)
       {
          case 0:
             // Hres ~ 256pixels
-            pixelclock_divider = 10;
+            //pixelclock_divider = 10;
             curr_width_mode = WIDTH_MODE_256;
             break;
          case 1:
             // Hres ~ 320pixels
-            pixelclock_divider = 8;
+            //pixelclock_divider = 8;
             curr_width_mode = WIDTH_MODE_320;
             break;
          case 2:
             // Hres ~ 512pixels
-            pixelclock_divider = 5;
+            //pixelclock_divider = 5;
             curr_width_mode = WIDTH_MODE_512;
             break;
          default:
             // Hres ~ 640pixels
-            pixelclock_divider = 4;
+            //pixelclock_divider = 4;
             curr_width_mode = WIDTH_MODE_640;
             break;
       }
    }
 
+#if 0
    // First we get the horizontal range in number of pixel clock period
    uint16_t xres = (GPU.HorizEnd - GPU.HorizStart);
 
@@ -600,11 +601,9 @@ static void UpdateDisplayMode(void)
 
    // Then the rounding formula straight outta No$
    xres = (xres + 2) & ~3;
+#endif
 
    rsx_intf_set_display_mode(
-         GPU.DisplayFB_XStart,
-         GPU.DisplayFB_YStart,
-         xres, yres,
          depth_24bpp,
          is_pal_mode, 
          is_480i_mode,
@@ -1132,11 +1131,13 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x00:  // Reset GPU
             //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             GPU_SoftReset();
-             rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
-                                    GPU.ClipX1, GPU.ClipY1);
-             rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); //0x200, 0xC00 set by GPU_SoftReset()
-             rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); //0x10, 0x100 set by GPU_SoftReset()
-             UpdateDisplayMode();
+            rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
+                                   GPU.ClipX1, GPU.ClipY1);
+            rsx_intf_toggle_display(GPU.DisplayOff); // `true` set by GPU_SoftReset()
+            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart); // (0, 0) set by GPU_SoftReset()
+            rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); // 0x200, 0xC00 set by GPU_SoftReset()
+            rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); // 0x10, 0x100 set by GPU_SoftReset()
+            RSX_UpdateDisplayMode();
             break;
 
          case 0x01:  // Reset command buffer
@@ -1164,6 +1165,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU.DisplayFB_XStart = V & 0x3FE; // Lower bit is apparently ignored.
             GPU.DisplayFB_YStart = (V >> 10) & 0x1FF;
             GPU.display_change_count++;
+            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
             break;
 
          case 0x06:  // Horizontal display range
@@ -1181,7 +1183,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x08:
             //printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
             GPU.DisplayMode = V & 0xFF;
-            UpdateDisplayMode();
+            RSX_UpdateDisplayMode();
             break;
 
          case 0x09:
@@ -1897,10 +1899,11 @@ void GPU_RestoreStateP3(void)
                         1024, 512,
                         GPU.vram, false, false);
 
+   rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
    rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
    rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
 
-   UpdateDisplayMode();
+   RSX_UpdateDisplayMode();
 }
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)

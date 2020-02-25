@@ -2381,6 +2381,57 @@ void rsx_gl_prepare_frame(void)
    glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
 }
 
+static void compute_vram_framebuffer_dimensions(GlRenderer *renderer)
+{
+   /* Compute native PSX framebuffer dimensions for current frame
+      and store results in renderer->config.display_resolution */
+
+   if (!renderer)
+      return;
+
+   uint16_t clock_div;
+   switch (renderer->curr_width_mode)
+   {
+      case WIDTH_MODE_256:
+         clock_div = 10;
+         break;
+
+      case WIDTH_MODE_320:
+         clock_div = 8;
+         break;
+
+      case WIDTH_MODE_512:
+         clock_div = 5;
+         break;
+
+      case WIDTH_MODE_640:
+         clock_div = 4;
+         break;
+
+      case WIDTH_MODE_368:
+         clock_div = 7;
+         break;
+
+      default: // Should not be here, if we ever get here then log and crash?
+         break;
+   }
+
+   // First we get the horizontal range in number of pixel clock period
+   uint16_t fb_width = (renderer->config.display_area_hrange[1] - renderer->config.display_area_hrange[0]);
+
+   // Then we apply the divider
+   fb_width /= clock_div;
+
+   // Then the rounding formula straight outta No$
+   fb_width = (fb_width + 2) & ~3;
+
+   uint16_t fb_height = (renderer->config.display_area_vrange[1] - renderer->config.display_area_vrange[0]);
+   fb_height *= renderer->config.is_480i ? 2 : 1;
+
+   renderer->config.display_resolution[0] = fb_width;
+   renderer->config.display_resolution[1] = fb_height;
+}
+
 void rsx_gl_finalize_frame(const void *fb, unsigned width,
                            unsigned height, unsigned pitch)
 {
@@ -2397,6 +2448,10 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
    /* Draw pending commands */
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
       GlRenderer_draw(renderer);
+
+   /* Calculate native PSX framebuffer dimensions to update renderer
+      state before calling bind_libretro_framebuffer */
+   compute_vram_framebuffer_dimensions(renderer);
 
    /* We can now render to the frontend's buffer */
    bind_libretro_framebuffer(renderer);
@@ -2583,6 +2638,19 @@ void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
    apply_scissor(renderer);
 }
 
+void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+{
+   if (static_renderer.state == GlState_Invalid)
+      return;
+
+   GlRenderer *renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+
+   renderer->config.display_top_left[0] = xstart;
+   renderer->config.display_top_left[1] = ystart;
+}
+
 void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
    if (static_renderer.state == GlState_Invalid)
@@ -2609,9 +2677,7 @@ void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
    renderer->config.display_area_vrange[1] = y2;
 }
 
-void rsx_gl_set_display_mode(uint16_t x, uint16_t y,
-                             uint16_t w, uint16_t h,
-                             bool depth_24bpp,
+void rsx_gl_set_display_mode(bool depth_24bpp,
                              bool is_pal,
                              bool is_480i,
                              int width_mode)
@@ -2623,11 +2689,6 @@ void rsx_gl_set_display_mode(uint16_t x, uint16_t y,
    if (!renderer)
       return;
 
-   renderer->config.display_top_left[0]   = x;
-   renderer->config.display_top_left[1]   = y;
-
-   renderer->config.display_resolution[0] = w;
-   renderer->config.display_resolution[1] = h;
    renderer->config.display_24bpp         = depth_24bpp;
 
    renderer->config.is_pal  = is_pal;

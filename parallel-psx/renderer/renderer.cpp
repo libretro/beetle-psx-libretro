@@ -566,7 +566,8 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 
 BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)
 {
-	auto &rect = draw_area ? render_state.draw_rect : render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = draw_area ? render_state.draw_rect : render_state.display_fb_rect;
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 		return BufferHandle(nullptr);
 
@@ -597,7 +598,8 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 
 void Renderer::mipmap_framebuffer()
 {
-	auto &rect = render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = render_state.display_fb_rect;
 	unsigned levels = scaled_views.size();
 	for (unsigned i = 1; i <= levels; i++)
 	{
@@ -675,6 +677,41 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
+Rect Renderer::compute_vram_framebuffer_rect()
+{
+	unsigned clock_div;
+	switch (render_state.width_mode)
+	{
+	case WidthMode::WIDTH_MODE_256:
+		clock_div = 10;
+		break;
+	case WidthMode::WIDTH_MODE_320:
+		clock_div = 8;
+		break;
+	case WidthMode::WIDTH_MODE_512:
+		clock_div = 5;
+		break;
+	case WidthMode::WIDTH_MODE_640:
+		clock_div = 4;
+		break;
+	case WidthMode::WIDTH_MODE_368:
+		clock_div = 7;
+		break;
+	}
+
+	unsigned fb_width = (unsigned) (render_state.horiz_end - render_state.horiz_start);
+	fb_width /= clock_div;
+	fb_width = (fb_width + 2) & ~3;
+
+	unsigned fb_height = (unsigned) (render_state.vert_end - render_state.vert_start);
+	fb_height *= render_state.is_480i ? 2 : 1;
+
+	return {render_state.display_fb_xstart,
+	        render_state.display_fb_ystart,
+	        fb_width,
+	        fb_height};
+}
+
 Renderer::DisplayRect Renderer::compute_display_rect()
 {
 	unsigned clock_div;
@@ -729,6 +766,115 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	return DisplayRect(left_offset, upper_offset, display_width, display_height);
 }
 
+ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
+{
+	// Like scanout_to_texture(), but synchronizes the entire
+	// VRAM framebuffer atlas before scanout. Does not apply
+	// any scanout filters and currently outputs at 15-bit
+	// color depth. Current implementation does not reuse
+	// prior scanouts.
+
+	atlas.flush_render_pass();
+
+#if 0
+	if (last_scanout)
+		return last_scanout;
+#endif
+
+	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
+
+	if (scaled)
+		atlas.read_fragment(Domain::Scaled, vram_rect);
+	else
+		atlas.read_fragment(Domain::Unscaled, vram_rect);
+
+	ensure_command_buffer();
+
+	if (scanout_semaphore)
+	{
+		flush();
+		device.add_wait_semaphore(CommandBuffer::Type::Generic, scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, true);
+		scanout_semaphore.reset();
+	}
+
+	ensure_command_buffer();
+
+	unsigned render_scale = scaled ? scaling : 1;
+
+	auto info = ImageCreateInfo::render_target(
+			FB_WIDTH * render_scale,
+			FB_HEIGHT * render_scale,
+			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
+
+#if 0
+	if (!reuseable_scanout ||
+			reuseable_scanout->get_create_info().width != info.width ||
+			reuseable_scanout->get_create_info().height != info.height ||
+			reuseable_scanout->get_create_info().format != info.format)
+	{
+		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		reuseable_scanout = device.create_image(info);
+	}
+#else
+	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	reuseable_scanout = device.create_image(info);
+#endif
+
+	RenderPassInfo rp;
+	rp.color_attachments[0] = &reuseable_scanout->get_view();
+	rp.num_color_attachments = 1;
+	rp.store_attachments = 1;
+
+	rp.clear_color[0] = {0, 0, 0, 0};
+	rp.clear_attachments = 1;
+
+	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+	cmd->begin_render_pass(rp);
+	cmd->set_quad_state();
+
+	cmd->set_program(*pipelines.scaled_quad_blitter);
+	cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+
+	cmd->set_vertex_binding(0, *quad, 0, 2);
+	struct Push
+	{
+		float offset[2];
+		float scale[2];
+		float uv_min[2];
+		float uv_max[2];
+		float max_bias;
+	};
+
+	Push push = { { float(vram_rect.x) / FB_WIDTH, float(vram_rect.y) / FB_HEIGHT },
+		          { float(vram_rect.width) / FB_WIDTH, float(vram_rect.height) / FB_HEIGHT },
+		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
+		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
+		          float(scaled_views.size() - 1) };
+
+	cmd->push_constants(&push, 0, sizeof(push));
+	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	counters.draw_calls++;
+	counters.vertices += 4;
+	cmd->draw(4);
+
+	cmd->end_render_pass();
+
+	cmd->image_barrier(*reuseable_scanout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+	                   VK_ACCESS_SHADER_READ_BIT);
+
+	last_scanout = reuseable_scanout;
+
+	return reuseable_scanout;
+}
+
 ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
@@ -736,7 +882,8 @@ ImageHandle Renderer::scanout_to_texture()
 	if (last_scanout)
 		return last_scanout;
 
-	auto &rect = render_state.display_mode;
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = render_state.display_fb_rect;
 
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 	{
@@ -810,7 +957,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	ensure_command_buffer();
 
-	bool scaled = !bpp24 && !ssaa;
+	bool scaled = !ssaa;
 
 	unsigned render_scale = scaled ? scaling : 1;
 
@@ -862,7 +1009,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	if (bpp24)
 	{
-		if (render_state.scanout_filter == ScanoutFilter::MDEC_YUV)
+		if (render_state.scanout_mdec_filter == ScanoutFilter::MDEC_YUV)
 			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cmd->set_program(*pipelines.bpp24_quad_blitter);

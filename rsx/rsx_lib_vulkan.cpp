@@ -60,6 +60,7 @@ static int last_scanline_pal;
 static bool frame_duping_enabled = false;
 static uint32_t prev_frame_width = 320;
 static uint32_t prev_frame_height = 240;
+static bool show_vram = false;
 
 static retro_video_refresh_t video_refresh_cb;
 
@@ -205,7 +206,13 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->timing.sample_rate   = SOUND_FREQUENCY;
 
-   info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
+   if (show_vram)
+      info->geometry.aspect_ratio = 2.0 / 1.0;
+   else if (widescreen_hack)
+      info->geometry.aspect_ratio = 16.0 / 9.0;
+   else
+      info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+
    if (content_is_pal)
       info->timing.fps = FPS_PAL_NONINTERLACED;
    else
@@ -232,6 +239,7 @@ void rsx_vulkan_refresh_variables(void)
    unsigned old_scaling = scaling;
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
+   bool old_show_vram = show_vram;
 
    var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -353,8 +361,21 @@ void rsx_vulkan_refresh_variables(void)
          frame_duping_enabled = false;
    }
 
+   var.key = BEETLE_OPT(display_vram);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         show_vram = true;
+      else
+         show_vram = false;
+   }
+
    // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
-   if ((old_scaling != scaling || old_super_sampling != super_sampling || old_msaa != msaa) && renderer)
+   if ((old_scaling != scaling ||
+        old_super_sampling != super_sampling ||
+        old_msaa != msaa ||
+        old_show_vram != show_vram)
+       && renderer)
    {
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
@@ -410,12 +431,13 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
 
+   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
    if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
-      renderer->set_display_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
+      renderer->set_mdec_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
    else
-      renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
+      renderer->set_mdec_filter(Renderer::ScanoutFilter::None);
 
-   auto scanout = renderer->scanout_to_texture();
+   auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
 
    retro_vulkan_image *image                          = &swapchain_image;
 
@@ -452,12 +474,13 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    prev_frame_width = scanout->get_width();
    prev_frame_height = scanout ->get_height();
 
+   //printf("%d %d\n", scanout->get_width(), scanout->get_height());
+
    //fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
    //      renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
 }
 
 /* Draw commands */
-
 
 void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
                                uint8_t twx, uint8_t twy)
@@ -510,6 +533,18 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 }
 
+void rsx_vulkan_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+{
+   if (renderer)
+      renderer->set_vram_framebuffer_coords(xstart, ystart);
+   else
+   {
+      defer.push_back([=]() {
+            renderer->set_vram_framebuffer_coords(xstart, ystart);
+      });
+   }
+}
+
 void rsx_vulkan_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
    if (renderer)
@@ -534,20 +569,18 @@ void rsx_vulkan_set_vertical_display_range(uint16_t y1, uint16_t y2)
    }
 }
 
-void rsx_vulkan_set_display_mode(uint16_t x, uint16_t y,
-                                 uint16_t w, uint16_t h,
-                                 bool depth_24bpp,
+void rsx_vulkan_set_display_mode(bool depth_24bpp,
                                  bool is_pal,
                                  bool is_480i,
                                  int width_mode)
 {
    if (renderer)
-      renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+      renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
                                  is_480i, static_cast<Renderer::WidthMode>(width_mode));
    else
    {
       defer.push_back([=]() {
-            renderer->set_display_mode({ x, y, w, h }, get_scanout_mode(depth_24bpp), is_pal,
+            renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
                                        is_480i, static_cast<Renderer::WidthMode>(width_mode));
             });
    }

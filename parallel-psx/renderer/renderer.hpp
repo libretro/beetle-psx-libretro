@@ -89,7 +89,8 @@ public:
 
 	struct RenderState
 	{
-		Rect display_mode;
+		//Rect display_mode;
+		Rect display_fb_rect;
 		TextureWindow texture_window;
 		Rect cached_window_rect;
 		Rect draw_rect;
@@ -119,10 +120,14 @@ public:
 		int slstart_pal = 0;
 		int slend_pal = 287;
 
+		unsigned display_fb_xstart = 0;
+		unsigned display_fb_ystart = 0;
+
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
 		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
 		ScanoutFilter scanout_filter = ScanoutFilter::None;
+		ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
 		bool dither_native_resolution = false;
 		bool force_mask_bit = false;
 		bool texture_color_modulate = false;
@@ -182,6 +187,14 @@ public:
 
 	void blit_vram(const Rect &dst, const Rect &src);
 
+	void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
+	{
+		last_scanout.reset();
+
+		render_state.display_fb_xstart = xstart;
+		render_state.display_fb_ystart = ystart;
+	}
+
 	void set_horizontal_display_range(int x1, int x2)
 	{
 		render_state.horiz_start = x1;
@@ -194,12 +207,13 @@ public:
 		render_state.vert_end = y2;
 	}
 
-	void set_display_mode(const Rect &rect, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
+	void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
 	{
-		if (rect != render_state.display_mode || render_state.scanout_mode != mode)
-			last_scanout.reset();
+		//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
+		//	last_scanout.reset();
+		last_scanout.reset();
 
-		render_state.display_mode = rect;
+		//render_state.display_mode = rect;
 		render_state.scanout_mode = mode;
 
 		render_state.is_pal = is_pal;
@@ -231,6 +245,11 @@ public:
 		render_state.scanout_filter = filter;
 	}
 
+	void set_mdec_filter(ScanoutFilter mdec_filter)
+	{
+		render_state.scanout_mdec_filter = mdec_filter;
+	}
+
 	void toggle_display(bool enable)
 	{
 		if (enable != render_state.display_on)
@@ -255,6 +274,7 @@ public:
 	void scanout();
 	Vulkan::BufferHandle scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height);
 	Vulkan::BufferHandle scanout_vram_to_buffer(unsigned &width, unsigned &height);
+	Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
 	Vulkan::ImageHandle scanout_to_texture();
 
 	inline void set_texture_mode(TextureMode mode)
@@ -527,6 +547,8 @@ private:
 	Vulkan::ImageHandle last_scanout;
 	Vulkan::ImageHandle reuseable_scanout;
 	DisplayRect compute_display_rect();
+
+	Rect compute_vram_framebuffer_rect();
 
 	void mipmap_framebuffer();
 	Vulkan::BufferHandle quad;

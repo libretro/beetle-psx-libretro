@@ -26,13 +26,13 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y);
 void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0,
                           uint16_t x1, uint16_t y1);
 
+void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart);
+
 void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2);
 
 void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2);
 
-void rsx_gl_set_display_mode(uint16_t x, uint16_t y,
-                             uint16_t w, uint16_t h,
-                             bool depth_24bpp,
+void rsx_gl_set_display_mode(bool depth_24bpp,
                              bool is_pal,
                              bool is_480i,
                              int width_mode); //enum width_modes

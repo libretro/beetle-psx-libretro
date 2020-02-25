@@ -199,10 +199,12 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "disabled"
    },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(display_vram),
       "Display Full VRAM (Debug)",
-      "When enabled, visualises the entire emulated console's VRAM. Only supported by the OpenGL hardware renderer. Note: This is for debugging purposes, and should normally be disabled.",
+      "When enabled, visualises the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled.",
       {
          { "disabled", NULL },
          { "enabled",  NULL },
