@@ -281,4 +281,6 @@ int32_t GPU_GetScanlineNum(void);
 
 void texel_put(uint32 x, uint32 y, uint16 v);
 
+void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
+
 #endif

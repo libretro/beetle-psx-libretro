@@ -4221,7 +4221,6 @@ void retro_run(void)
          {
             has_new_geometry = false;
          }
-
       }
 
       switch (psx_gpu_dither_mode)
@@ -4235,6 +4234,9 @@ void retro_run(void)
          case DITHER_OFF:
             break;
       }
+
+      GPU_set_visible_scanlines(MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
+                                MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
    }

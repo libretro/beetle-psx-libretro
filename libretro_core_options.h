@@ -610,7 +610,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(initial_scanline),
       "Initial Scanline - NTSC",
-      "Select the first displayed scanline when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing. Requires restart for software renderer.",
+      "Select the first displayed scanline when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       {
          { "0",  NULL },
          { "1",  NULL },
@@ -660,7 +660,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(last_scanline),
       "Last Scanline - NTSC",
-      "Select the last displayed scanline when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing. Requires restart for software renderer.",
+      "Select the last displayed scanline when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       {
          { "210", NULL },
          { "211", NULL },
@@ -699,7 +699,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(initial_scanline_pal),
       "Initial Scanline - PAL",
-      "Select the first displayed scanline when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing. Requires restart for software renderer.",
+      "Select the first displayed scanline when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       {
          { "0",  NULL },
          { "1",  NULL },
@@ -749,7 +749,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(last_scanline_pal),
       "Last Scanline - PAL",
-      "Select the last displayed scanline when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing. Requires restart for software renderer.",
+      "Select the last displayed scanline when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       {
          { "230", NULL },
          { "231", NULL },

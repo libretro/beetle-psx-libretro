@@ -2108,3 +2108,10 @@ int32_t GPU_GetScanlineNum(void)
 {
    return GPU.scanline;
 }
+
+/* Beetle PSX addition, allows runtime configuration of visible scanlines in software renderer */
+void GPU_set_visible_scanlines(int sls, int sle)
+{
+   GPU.LineVisFirst = sls;
+   GPU.LineVisLast = sle;
+}
