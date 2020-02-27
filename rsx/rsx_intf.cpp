@@ -14,6 +14,7 @@
 #include "libretro_options.h"
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
+#include "mednafen/settings.h"
 
 #ifdef RSX_DUMP
 #include "rsx_dump.h"
@@ -31,6 +32,10 @@ static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
 
 static bool gl_initialized                      = false;
 static bool vk_initialized                      = false;
+
+// GPU reset defaults
+static int rsx_width_mode = WIDTH_MODE_256;
+static int rsx_height_mode = HEIGHT_MODE_240;
 
 static bool rsx_soft_open(bool is_pal)
 {
@@ -82,7 +87,10 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
-         info->geometry.aspect_ratio = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0 / 9.0;
+         info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
+                                          MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
+                                          MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"),
+                                          aspect_ratio_setting, false, widescreen_hack);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -501,6 +509,14 @@ void rsx_intf_set_display_mode(bool depth_24bpp,
       interlace_setting_dirty = true;
    }
 
+   // Also verify if this is accurate for 240i
+   if ((rsx_width_mode != width_mode) || (rsx_height_mode != (int)is_480i))
+   {
+      rsx_width_mode = width_mode;
+      rsx_height_mode = (int)is_480i;
+      aspect_ratio_dirty = true;
+   }
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -834,4 +850,70 @@ double rsx_common_get_timing_fps(void)
    return (content_is_pal ?
                (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
+}
+
+
+float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
+                                  int first_visible_scanline, int last_visible_scanline,
+                                  int aspect_ratio_setting, bool vram_override, bool widescreen_override)
+{
+   // Current assumptions
+   //    A fixed percentage of width is cropped when crop_overscan is true
+   //    aspect_ratio_setting is one of the following:
+   //          0 - Corrected
+   //          1 - Uncorrected (1:1 PAR)
+   //          2 - Force 4:3 (traditionally what Beetle PSX has done prior to adding in this setting)
+
+   // Aspect ratio overrides - VRAM and widescreen take precedence
+
+   if (vram_override)
+      return 2.0 / 1.0;
+
+   if (widescreen_override)
+      return 16.0 / 9.0;
+
+   float ar = (4.0 / 3.0);
+
+   if (aspect_ratio_setting == 0) // Corrected
+   {
+      // Calculate horizontal scaling in terms of gpu clock cycles
+      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
+
+      // Calculate vertical scaling in terms of visible scanline count
+      int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
+      ar *= (pal_content ? (288.0 / num_vis_scanlines) : (240.0 / num_vis_scanlines));
+
+      return ar;
+   }
+   else if (aspect_ratio_setting == 1) // Uncorrected
+   {
+      int width_base = 0;
+      switch (rsx_width_mode)
+      {
+         case WIDTH_MODE_256:
+            width_base = crop_overscan ? 256 : 280;
+            break;
+         case WIDTH_MODE_320:
+            width_base = crop_overscan ? 320 : 350;
+            break;
+         case WIDTH_MODE_512:
+            width_base = crop_overscan ? 512 : 560;
+            break;
+         case WIDTH_MODE_640:
+            width_base = crop_overscan ? 640 : 700;
+            break;
+         case WIDTH_MODE_368:
+            // Probably slightly off because of rounding, see libretro.cpp comments
+            width_base = crop_overscan ? 366 : 400;
+            break;
+      }
+
+      double height_base = (last_visible_scanline - first_visible_scanline + 1) *
+                           (rsx_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
+
+      // Calculate aspect ratio as quotient of raw native framebuffer width and height
+      return width_base / height_base;
+   }
+
+   return ar; // 4:3
 }

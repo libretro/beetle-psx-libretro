@@ -360,6 +360,8 @@ static RetroGl static_renderer;
 static bool has_software_fb = false;
 
 extern "C" unsigned char widescreen_hack;
+extern "C" bool content_is_pal;
+extern "C" int aspect_ratio_setting;
 
 #ifdef __cplusplus
 extern "C"
@@ -1610,8 +1612,6 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    uint32_t f_h       = renderer->frontend_resolution[1];
    uint32_t _w        = renderer->config.display_resolution[0];
    uint32_t _h        = renderer->config.display_resolution[1];
-   float aspect_ratio = widescreen_hack ? 16.0 / 9.0 : 
-      MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
    /* vp_w and vp_h currently contingent on rsx_intf_set_display_mode behavior... */
    uint32_t vp_w = renderer->config.display_resolution[0];
@@ -1631,9 +1631,6 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       //override vram fb dimensions for viewport
       vp_w = _w;
       vp_h = _h;
-
-      /* Is this accurate? */
-      aspect_ratio = 2.0 / 1.0;
    }
    else
    {
@@ -1662,7 +1659,12 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
       geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
       geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
 
-      geometry.aspect_ratio = aspect_ratio;
+      geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, renderer->crop_overscan,
+                                                          content_is_pal ? renderer->initial_scanline_pal :
+                                                                           renderer->initial_scanline,
+                                                          content_is_pal ? renderer->last_scanline_pal :
+                                                                           renderer->last_scanline,
+                                                          aspect_ratio_setting, renderer->display_vram, widescreen_hack);
 
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
@@ -2212,16 +2214,55 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    uint8_t upscaling         = 1;
    bool widescreen_hack      = false;
    bool display_vram         = false;
+   bool crop_overscan        = false;
+   int initial_scanline_ntsc = 0;
+   int last_scanline_ntsc    = 239;
+   int initial_scanline_pal  = 0;
+   int last_scanline_pal     = 287;
+
+   /* This function currently queries core options rather than
+      checking GlRenderer state; possible to refactor? */
 
    get_variables(&upscaling, &display_vram);
 
    struct retro_variable var = {0};
-   var.key = BEETLE_OPT(widescreen_hack);
 
+   var.key = BEETLE_OPT(widescreen_hack);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
          widescreen_hack = true;
+   }
+
+   var.key = BEETLE_OPT(crop_overscan);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         crop_overscan = true;
+   }
+
+   var.key = BEETLE_OPT(initial_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline_ntsc = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(last_scanline);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline_ntsc = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(initial_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      initial_scanline_pal = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(last_scanline_pal);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      last_scanline_pal = atoi(var.value);
    }
 
    if (display_vram)
@@ -2244,10 +2285,10 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
-   info.geometry.aspect_ratio   = !widescreen_hack ? MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO : 16.0/9.0;
-
-   if (display_vram)
-      info.geometry.aspect_ratio = 2./1.;
+   info.geometry.aspect_ratio = rsx_common_get_aspect_ratio(std, crop_overscan,
+                                                            std ? initial_scanline_pal : initial_scanline_ntsc,
+                                                            std ? last_scanline_pal : last_scanline_ntsc,
+                                                            aspect_ratio_setting, display_vram, widescreen_hack);
 
    info.timing.sample_rate     = SOUND_FREQUENCY;
 
