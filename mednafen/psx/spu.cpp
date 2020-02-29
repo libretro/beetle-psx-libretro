@@ -73,6 +73,9 @@
 
 #include "../state_helpers.h"
 
+extern "C" float cdda_volume; // Beetle CDDA core option value
+extern "C" float voices_volume; // Beetle Voices core option value
+
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
 
@@ -991,6 +994,18 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          accum_fv[0] = 0;
          accum_fv[1] = 0;
       }
+      else if (voices_volume != 1.0)
+      {
+         // Beetle PSX Voices Volume scaling:
+         //    Scale accumulated sound outputs here after ADSR and Sweep Envelopes have been processed
+         //    Calculation should be safe as long as voices_volume is not too high, as operands are right-shifted
+         //       by 15 before being accumulated
+         //    Any saturation here will be clamped after the CDDA code and will affect reverb processing as well
+         accum[0] = (int32)(accum[0] * voices_volume);
+         accum[1] = (int32)(accum[1] * voices_volume);
+         accum_fv[0] = (int32)(accum_fv[0] * voices_volume);
+         accum_fv[1] = (int32)(accum_fv[1] * voices_volume);
+      }
 
       // Get CD-DA
       {
@@ -1008,7 +1023,19 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          WriteSPURAM(CWA | 0x200, cda_raw[1]);
 
          for(unsigned i = 0; i < 2; i++)
+         {
             cdav[i] = (cda_raw[i] * CDVol[i]) >> 15;
+
+            // Beetle PSX CDDA Volume scaling:
+            //    cda_raw elements are guaranteed to be -32768 through 32767 (int16 limits), stated above
+            //    CDVol elements are also guaranteed to be -32768 through 32767 (int16 limits) due to casting in PS_SPU::Write
+
+            // cdav[i] will be in range [-32768, 32768] after previous bit shift
+            // This calculation should be safe, anything that saturates the 16-bit range here will be clamped in
+            // the code below. Any saturation here will affect reverb processing as well
+            if (cdda_volume != 1.0)
+               cdav[i] = (int32)(cdav[i] * cdda_volume);
+         }
 
          if(SPUControl & 0x0001)
          {

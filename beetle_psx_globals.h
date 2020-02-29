@@ -22,6 +22,8 @@ extern int filter_mode;
 extern bool opaque_check;
 extern bool semitrans_check;
 extern bool crop_overscan;
+extern float cdda_volume;
+extern float voices_volume;
 
 #ifdef __cplusplus
 }
