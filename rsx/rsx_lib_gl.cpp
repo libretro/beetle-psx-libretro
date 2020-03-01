@@ -2202,6 +2202,8 @@ static bool gl_context_framebuffer_lock(void* data)
    return false;
 }
 
+extern "C" bool currently_interlaced;
+
 static struct retro_system_av_info get_av_info(VideoClock std)
 {
    struct retro_system_av_info info;
@@ -2254,15 +2256,18 @@ static struct retro_system_av_info get_av_info(VideoClock std)
     * to output with NTSC timings with the PAL clock (and vice-versa)
     * which would make this code invalid but it wouldn't make a lot of
     * sense for a game to do that. */
+#if 0
    switch (std)
    {
       case VideoClock_Ntsc:
-         info.timing.fps = FPS_NTSC_NONINTERLACED;
+         info.timing.fps = (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
          break;
       case VideoClock_Pal:
-         info.timing.fps = FPS_PAL_NONINTERLACED;
+         info.timing.fps = (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED);
          break;
    }
+#endif
+   info.timing.fps = rsx_common_get_timing_fps();
 
    return info;
 }

@@ -76,7 +76,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    {
       case RSX_SOFTWARE:
          memset(info, 0, sizeof(*info));
-         info->timing.fps            = content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED;
+         info->timing.fps            = rsx_common_get_timing_fps();
          info->timing.sample_rate    = SOUND_FREQUENCY;
          info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
          info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
@@ -494,6 +494,13 @@ void rsx_intf_set_display_mode(bool depth_24bpp,
    rsx_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
+   // Is this check accurate for 240i timing? May need to be fixed later
+   if (currently_interlaced != is_480i)
+   {
+      currently_interlaced = is_480i;
+      interlace_setting_dirty = true;
+   }
+
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
@@ -813,4 +820,18 @@ void rsx_intf_toggle_display(bool status)
 #endif
         break;
     }
+}
+
+double rsx_common_get_timing_fps(void)
+{
+   if (core_timing_fps_mode == FORCE_PROGRESSIVE_TIMING)
+      return (content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED);
+
+   else if (core_timing_fps_mode == FORCE_INTERLACED_TIMING)
+      return (content_is_pal ? FPS_PAL_INTERLACED : FPS_NTSC_INTERLACED);
+
+   //else AUTO_TOGGLE_TIMING
+   return (content_is_pal ?
+               (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
+               (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
 }

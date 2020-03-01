@@ -3175,6 +3175,7 @@ static bool shared_memorycards = false;
 static bool shared_memorycards_toggle = false;
 
 static bool has_new_geometry = false;
+static bool has_new_timing = false;
 
 static void check_variables(bool startup)
 {
@@ -3337,6 +3338,32 @@ static void check_variables(bool startup)
    }
    else
       input_enable_calibration(false);
+
+   var.key = BEETLE_OPT(core_timing_fps);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "force_progressive") == 0)
+      {
+         if (!startup && core_timing_fps_mode != FORCE_PROGRESSIVE_TIMING)
+            has_new_timing = true;
+
+         core_timing_fps_mode = FORCE_PROGRESSIVE_TIMING;
+      }
+      else if (strcmp(var.value, "force_interlaced") == 0)
+      {
+         if (!startup && core_timing_fps_mode != FORCE_INTERLACED_TIMING)
+            has_new_timing = true;
+
+         core_timing_fps_mode = FORCE_INTERLACED_TIMING;
+      }
+      else // auto toggle setting, timing changes are allowed
+      {
+         if (!startup && core_timing_fps_mode != AUTO_TOGGLE_TIMING)
+            has_new_timing = true;
+
+         core_timing_fps_mode = AUTO_TOGGLE_TIMING;
+      }
+   }
 
    if (startup)
    {
@@ -4211,6 +4238,20 @@ void retro_run(void)
          }
       }
 
+      /* Core timing option changed, need to call SET_SYSTEM_AV_INFO
+       *
+       * Note: May be possible to bundle this dirty flag with the other
+       * dirty flags such as the one for widescreen hack and do a full
+       * RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO callback; should be acceptable
+       * to have video/audio reinits after changing core options
+       */
+      if (has_new_timing)
+      {
+         retro_get_system_av_info(&new_av_info);
+         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
+            has_new_timing = false;
+      }
+
       /* Widescreen hack changed, need to call SET_GEOMETRY to change aspect ratio */
       if (has_new_geometry)
       {
@@ -4250,7 +4291,10 @@ void retro_run(void)
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
          char msg_buffer[64];
-         float fps = content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED;
+         // Just report the "real-world" refresh rate here regardless of system av info reported to the frontend
+         float fps = content_is_pal ?
+                        (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
+                        (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
          snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
@@ -4379,6 +4423,20 @@ void retro_run(void)
    }
 
    /* end of Emulate */
+
+   // Check if timing needs to be changed due to display mode change on this frame
+   if ((core_timing_fps_mode == AUTO_TOGGLE_TIMING) && interlace_setting_dirty)
+   {
+      // This may cause video and audio reinit on the frontend, so it may be preferable to
+      // set the core option to force progressive or interlaced timings
+      struct retro_system_av_info new_av_info;
+      retro_get_system_av_info(&new_av_info);
+
+      if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
+         interlace_setting_dirty = false;
+
+      // If unable to change AV info here, defer to next frame and leave interlace_setting_dirty flagged
+   }
 
    const void *fb        = NULL;
    unsigned width        = rects[0];

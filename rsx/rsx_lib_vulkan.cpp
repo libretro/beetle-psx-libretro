@@ -32,6 +32,7 @@ static unsigned scaling = 4;
 extern "C" uint8_t widescreen_hack;
 extern "C" bool content_is_pal;
 extern "C" int filter_mode;
+extern "C" bool currently_interlaced;
 
 extern retro_log_printf_t log_cb;
 namespace Granite
@@ -213,10 +214,13 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    else
       info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
 
+#if 0
    if (content_is_pal)
-      info->timing.fps = FPS_PAL_NONINTERLACED;
+      info->timing.fps = (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED);
    else
-      info->timing.fps = FPS_NTSC_NONINTERLACED;
+      info->timing.fps = (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
+#endif
+   info->timing.fps = rsx_common_get_timing_fps();
 }
 
 void rsx_vulkan_refresh_variables(void)

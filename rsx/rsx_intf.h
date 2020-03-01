@@ -154,4 +154,6 @@ void rsx_intf_toggle_display(bool status);
 
 bool rsx_intf_has_software_renderer(void);
 
+double rsx_common_get_timing_fps(void);
+
 #endif /*__RSX_H__*/

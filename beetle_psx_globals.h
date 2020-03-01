@@ -23,6 +23,17 @@ extern bool opaque_check;
 extern bool semitrans_check;
 extern bool crop_overscan;
 
+enum core_timing_fps_modes
+{
+   FORCE_PROGRESSIVE_TIMING = 0,
+   FORCE_INTERLACED_TIMING,
+   AUTO_TOGGLE_TIMING
+};
+
+extern int core_timing_fps_mode;
+extern bool currently_interlaced;
+extern bool interlace_setting_dirty;
+
 #ifdef __cplusplus
 }
 #endif
