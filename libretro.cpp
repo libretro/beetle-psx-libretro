@@ -3338,18 +3338,6 @@ static void check_variables(bool startup)
    else
       input_enable_calibration(false);
 
-   var.key = BEETLE_OPT(cdda_volume);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      cdda_volume = atof(var.value)/100;
-   }
-
-   var.key = BEETLE_OPT(voices_volume);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      voices_volume = atof(var.value)/100;
-   }
-
    if (startup)
    {
       var.key = BEETLE_OPT(renderer);

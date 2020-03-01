@@ -9,5 +9,3 @@ int filter_mode;
 bool opaque_check;
 bool semitrans_check;
 bool crop_overscan = false;
-double cdda_volume = 1.0;
-double voices_volume = 1.0;
