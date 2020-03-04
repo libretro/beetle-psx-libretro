@@ -21,10 +21,11 @@
 #include "input.h"
 
 #include "mednafen/mednafen-endian.h"
+#include "mednafen/mednafen-types.h"
 #include "mednafen/psx/psx.h"
 #include "mednafen/error.h"
 
-#include "../pgxp/pgxp_main.h"
+#include "pgxp/pgxp_main.h"
 
 #include <vector>
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
@@ -4424,8 +4425,9 @@ void retro_run(void)
 
    /* end of Emulate */
 
-   // Check if timing needs to be changed due to display mode change on this frame
-   if ((core_timing_fps_mode == AUTO_TOGGLE_TIMING) && interlace_setting_dirty)
+   // Check if timing needs to be changed due to interlacing change on this frame
+   // May be possible to track interlacing via espec instead of via RSX?
+   if (MDFN_UNLIKELY((core_timing_fps_mode == AUTO_TOGGLE_TIMING) && interlace_setting_dirty))
    {
       // This may cause video and audio reinit on the frontend, so it may be preferable to
       // set the core option to force progressive or interlaced timings
