@@ -33,6 +33,7 @@ extern "C" uint8_t widescreen_hack;
 extern "C" bool content_is_pal;
 extern "C" int filter_mode;
 extern "C" bool currently_interlaced;
+extern "C" int aspect_ratio_setting;
 
 extern retro_log_printf_t log_cb;
 namespace Granite
@@ -201,18 +202,21 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    rsx_vulkan_refresh_variables();
 
    memset(info, 0, sizeof(*info));
+
+   // Set retro_game_geometry
+
    info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
    info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->timing.sample_rate   = SOUND_FREQUENCY;
 
-   if (show_vram)
-      info->geometry.aspect_ratio = 2.0 / 1.0;
-   else if (widescreen_hack)
-      info->geometry.aspect_ratio = 16.0 / 9.0;
-   else
-      info->geometry.aspect_ratio = MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO;
+   info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
+                                       content_is_pal ? initial_scanline_pal : initial_scanline,
+                                       content_is_pal ? last_scanline_pal : last_scanline,
+                                       aspect_ratio_setting, show_vram, widescreen_hack);
+
+   // Set retro_system_timing
 
 #if 0
    if (content_is_pal)
@@ -244,6 +248,9 @@ void rsx_vulkan_refresh_variables(void)
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
+   bool old_crop_overscan = crop_overscan;
+   bool old_widescreen_hack = widescreen_hack;
+   bool visible_scanlines_changed = false;
 
    var.key = BEETLE_OPT(internal_resolution);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -318,25 +325,45 @@ void rsx_vulkan_refresh_variables(void)
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      initial_scanline = atoi(var.value);
+      int new_initial_scanline = atoi(var.value);
+      if (new_initial_scanline != initial_scanline)
+      {
+         initial_scanline = new_initial_scanline;
+         visible_scanlines_changed = true;
+      }
    }
 
    var.key = BEETLE_OPT(last_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      last_scanline = atoi(var.value);
+      int new_last_scanline = atoi(var.value);
+      if (new_last_scanline != last_scanline)
+      {
+         last_scanline = new_last_scanline;
+         visible_scanlines_changed = true;
+      }
    }
 
    var.key = BEETLE_OPT(initial_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      initial_scanline_pal = atoi(var.value);
+      int new_initial_scanline_pal = atoi(var.value);
+      if (new_initial_scanline_pal != initial_scanline_pal)
+      {
+         initial_scanline_pal = new_initial_scanline_pal;
+         visible_scanlines_changed = true;
+      }
    }
 
    var.key = BEETLE_OPT(last_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      last_scanline_pal = atoi(var.value);
+      int new_last_scanline_pal = atoi(var.value);
+      if (new_last_scanline_pal != last_scanline_pal)
+      {
+         last_scanline_pal = new_last_scanline_pal;
+         visible_scanlines_changed = true;
+      }
    }
 
    var.key = BEETLE_OPT(widescreen_hack);
@@ -374,13 +401,17 @@ void rsx_vulkan_refresh_variables(void)
          show_vram = false;
    }
 
-   // Changing crop_overscan and scanlines will likely need to be included here in future geometry fixes
+   // Clean this up. Possible to categorize by order of severity, e.g. geometry dirty flag vs full system_av dirty flag
    if ((old_scaling != scaling ||
         old_super_sampling != super_sampling ||
         old_msaa != msaa ||
-        old_show_vram != show_vram)
+        old_show_vram != show_vram ||
+        old_crop_overscan != crop_overscan ||
+        visible_scanlines_changed)
        && renderer)
    {
+      // Potential bad behavior from calling rsx_vulkan_get_system_av_info() from inside
+      // rsx_vulkan_refresh_variables() since both functions call each other...
       retro_system_av_info info;
       rsx_vulkan_get_system_av_info(&info);
 

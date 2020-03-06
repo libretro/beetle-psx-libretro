@@ -3306,17 +3306,23 @@ static void check_variables(bool startup)
    {
       if (strcmp(var.value, "enabled") == 0)
       {
-         if (widescreen_hack == false) has_new_geometry = true;
+         if (widescreen_hack == false)
+            has_new_geometry = true;
          widescreen_hack = true;
       }
       else if (strcmp(var.value, "disabled") == 0)
       {
-         if (widescreen_hack == true) has_new_geometry = true;
+         if (widescreen_hack == true)
+            has_new_geometry = true;
          widescreen_hack = false;
       }
    }
    else
+   {
+      if (widescreen_hack == true)
+         has_new_geometry = true;
       widescreen_hack = false;
+   }
 
    var.key = BEETLE_OPT(enable_memcard1);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3363,6 +3369,29 @@ static void check_variables(bool startup)
             has_new_timing = true;
 
          core_timing_fps_mode = AUTO_TOGGLE_TIMING;
+      }
+   }
+
+   var.key = BEETLE_OPT(aspect_ratio);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "corrected"))
+      {
+         if (!startup && aspect_ratio_setting != 0)
+            has_new_geometry = true;
+         aspect_ratio_setting = 0;
+      }
+      else if (!strcmp(var.value, "uncorrected"))
+      {
+         if (!startup && aspect_ratio_setting != 1)
+            has_new_geometry = true;
+         aspect_ratio_setting = 1;
+      }
+      else if (!strcmp(var.value, "4:3"))
+      {
+         if (!startup && aspect_ratio_setting != 2)
+            has_new_geometry = true;
+         aspect_ratio_setting = 2;
       }
    }
 
@@ -3601,28 +3630,52 @@ static void check_variables(bool startup)
          input_set_negcon_linearity(3);
    }
 
+   // Initial scanline NTSC
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_initial_scanline = atoi(var.value);
+      int new_scanline_value = atoi(var.value);
+      if (setting_initial_scanline != new_scanline_value)
+      {
+         has_new_geometry = true;
+         setting_initial_scanline = new_scanline_value;
+      }
    }
 
+   // Last scanline NTSC
    var.key = BEETLE_OPT(last_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_last_scanline = atoi(var.value);
+      int new_scanline_value = atoi(var.value);
+      if (setting_last_scanline != new_scanline_value)
+      {
+         has_new_geometry = true;
+         setting_last_scanline = new_scanline_value;
+      }
    }
 
+   // Initial scanline PAL
    var.key = BEETLE_OPT(initial_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_initial_scanline_pal = atoi(var.value);
+      int new_scanline_value = atoi(var.value);
+      if (setting_initial_scanline_pal != new_scanline_value)
+      {
+         has_new_geometry = true;
+         setting_initial_scanline_pal = new_scanline_value;
+      }
    }
 
+   // Last scanline PAL
    var.key = BEETLE_OPT(last_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      setting_last_scanline_pal = atoi(var.value);
+      int new_scanline_value = atoi(var.value);
+      if (setting_last_scanline_pal != new_scanline_value)
+      {
+         has_new_geometry = true;
+         setting_last_scanline_pal = new_scanline_value;
+      }
    }
 
    if(setting_psx_multitap_port_1 && setting_psx_multitap_port_2)
@@ -3702,9 +3755,17 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "enabled") == 0)
+      {
+         if (crop_overscan == false)
+            has_new_geometry = true;
          crop_overscan = true;
+      }
       else if (strcmp(var.value, "disabled") == 0)
+      {
+         if (crop_overscan == true)
+            has_new_geometry = true;
          crop_overscan = false;
+      }
    }
 
    var.key = BEETLE_OPT(image_offset);
@@ -4253,7 +4314,8 @@ void retro_run(void)
             has_new_timing = false;
       }
 
-      /* Widescreen hack changed, need to call SET_GEOMETRY to change aspect ratio */
+      /* Widescreen hack, scanlines, overscan cropping, or aspect ratio setting
+         changed, need to call SET_GEOMETRY to change aspect ratio */
       if (has_new_geometry)
       {
          retro_get_system_av_info(&new_av_info);
@@ -4424,6 +4486,18 @@ void retro_run(void)
    }
 
    /* end of Emulate */
+
+   // Check if aspect ratio needs to be changed due to display mode change on this frame
+   if (MDFN_UNLIKELY((aspect_ratio_setting == 1) && aspect_ratio_dirty))
+   {
+      struct retro_system_av_info new_av_info;
+      retro_get_system_av_info(&new_av_info);
+
+      if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info.geometry))
+         aspect_ratio_dirty = false;
+
+      // If unable to change geometry here, defer to next frame and leave aspect_ratio_dirty flagged
+   }
 
    // Check if timing needs to be changed due to interlacing change on this frame
    // May be possible to track interlacing via espec instead of via RSX?

@@ -48,6 +48,12 @@ enum width_modes
    WIDTH_MODE_368
 };
 
+enum height_modes
+{
+   HEIGHT_MODE_240 = 0,
+   HEIGHT_MODE_480
+};
+
 void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info);
@@ -155,5 +161,9 @@ void rsx_intf_toggle_display(bool status);
 bool rsx_intf_has_software_renderer(void);
 
 double rsx_common_get_timing_fps(void);
+
+float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
+                                  int first_visible_scanline, int last_visible_scanline,
+                                  int aspect_ratio_setting, bool vram_override, bool widescreen_override);
 
 #endif /*__RSX_H__*/

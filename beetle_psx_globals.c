@@ -14,3 +14,6 @@ bool crop_overscan = false;
 int core_timing_fps_mode = FORCE_PROGRESSIVE_TIMING;
 bool currently_interlaced = false;
 bool interlace_setting_dirty = false;
+
+int aspect_ratio_setting = 0;
+bool aspect_ratio_dirty = false;

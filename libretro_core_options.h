@@ -455,6 +455,17 @@ struct retro_core_option_definition option_defs_us[] = {
       "force_progressive"
    },
    {
+      BEETLE_OPT(aspect_ratio),
+      "Core Aspect Ratio",
+      "Set core provided aspect ratio. This setting is ignored when the Widescreen Mode Hack or Display Full VRAM options are enabled.",
+      {
+         { "corrected", "Corrected" },
+         { "uncorrected", "Uncorrected" },
+         { "4:3",  "Force 4:3" },
+      },
+      "corrected"
+   },
+   {
       BEETLE_OPT(widescreen_hack),
       "Widescreen Mode Hack",
       "When enabled, renders 3D content anamorphically and outputs the emulated framebuffer at a widescreen aspect ratio. Produces best results with fully 3D games. 2D elements will be horizontally stretched and may be misaligned.",
