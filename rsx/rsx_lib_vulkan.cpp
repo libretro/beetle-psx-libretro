@@ -204,27 +204,18 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
 
    // Set retro_game_geometry
-
-   info->geometry.base_width  = MEDNAFEN_CORE_GEOMETRY_BASE_W;
-   info->geometry.base_height = MEDNAFEN_CORE_GEOMETRY_BASE_H;
-   info->geometry.max_width   = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
-   info->geometry.max_height  = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
-   info->timing.sample_rate   = SOUND_FREQUENCY;
-
+   info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
+   info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
+   info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
+   info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
    info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
                                        content_is_pal ? initial_scanline_pal : initial_scanline,
                                        content_is_pal ? last_scanline_pal : last_scanline,
                                        aspect_ratio_setting, show_vram, widescreen_hack);
 
    // Set retro_system_timing
-
-#if 0
-   if (content_is_pal)
-      info->timing.fps = (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED);
-   else
-      info->timing.fps = (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
-#endif
    info->timing.fps = rsx_common_get_timing_fps();
+   info->timing.sample_rate = SOUND_FREQUENCY;
 }
 
 void rsx_vulkan_refresh_variables(void)

@@ -5,16 +5,23 @@
 
 #define SOUND_FREQUENCY 44100
 
-/* NTSC content on NTSC clock, PAL content on PAL clock.
- * Note: Core currently only reports non-interlaced timings
- * to avoid possible frontend driver reinits. Core option
- * for allowing automatic reporting of timing switches is
- * to-be-implemented.
- */
+/* NTSC content on NTSC clock, PAL content on PAL clock. */
 #define FPS_NTSC_INTERLACED    59.940
 #define FPS_NTSC_NONINTERLACED 59.826
 #define FPS_PAL_INTERLACED     50.000
 #define FPS_PAL_NONINTERLACED  49.761
+
+/* Note: It is possible for the PlayStation GPU to output NTSC
+ * on PAL GPU clock and vice versa, but this is unsupported in
+ * Mednafen/Beetle PSX. The values below are provided for
+ * completion but are not guaranteed to be correct.
+ */
+#if 0
+#define FPS_NTSC_ON_PAL_INTERLACED    59.393
+#define FPS_NTSC_ON_PAL_NONINTERLACED 59.280
+#define FPS_PAL_ON_NTSC_INTERLACED    50.460
+#define FPS_PAL_ON_NTSC_NONINTERLACED 50.219
+#endif
 
 enum rsx_renderer_type
 {

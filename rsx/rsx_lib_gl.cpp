@@ -2290,25 +2290,8 @@ static struct retro_system_av_info get_av_info(VideoClock std)
                                                             std ? last_scanline_pal : last_scanline_ntsc,
                                                             aspect_ratio_setting, display_vram, widescreen_hack);
 
-   info.timing.sample_rate     = SOUND_FREQUENCY;
-
-   /* Precise FPS values for the video output for the given
-    * VideoClock. It's actually possible to configure the PlayStation GPU
-    * to output with NTSC timings with the PAL clock (and vice-versa)
-    * which would make this code invalid but it wouldn't make a lot of
-    * sense for a game to do that. */
-#if 0
-   switch (std)
-   {
-      case VideoClock_Ntsc:
-         info.timing.fps = (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
-         break;
-      case VideoClock_Pal:
-         info.timing.fps = (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED);
-         break;
-   }
-#endif
    info.timing.fps = rsx_common_get_timing_fps();
+   info.timing.sample_rate = SOUND_FREQUENCY;
 
    return info;
 }
