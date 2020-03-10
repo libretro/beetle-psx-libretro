@@ -4201,6 +4201,24 @@ bool retro_load_game(const struct retro_game_info *info)
       }
    }
 
+   /* Hide irrelevant scanline core options for current content */
+   struct retro_core_option_display option_display;
+   option_display.visible = false;
+   if (content_is_pal)
+   {
+      option_display.key = BEETLE_OPT(initial_scanline);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+      option_display.key = BEETLE_OPT(last_scanline);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   }
+   else
+   {
+      option_display.key = BEETLE_OPT(initial_scanline_pal);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+      option_display.key = BEETLE_OPT(last_scanline_pal);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   }
+
    return ret;
 }
 
