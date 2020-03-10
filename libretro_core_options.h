@@ -882,7 +882,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
       "Memory Card 0 Method (Restart)",
-      "Choose the save data format used for memory card 0. 'Libretro' is recommended. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen.",
+      "Choose the save data format used for memory card 0. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen. When used with Beetle PSX, Libretro (.srm) and Mednafen (.mcr) saves have internally identical formats and can be converted between one another via renaming.",
       {
          { "libretro", "Libretro" },
          { "mednafen", "Mednafen" },
@@ -892,8 +892,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(enable_memcard1),
-      "Enable Memory Card 1",
-      "Select whether to emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka).",
+      "Enable Memory Card 1 (Restart)",
+      "Select whether to emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka). Note: Memory Card 1 uses the Mednafen (.mcr) save format.",
       {
          { "enabled",  NULL },
          { "disabled", NULL },
@@ -903,8 +903,8 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(shared_memory_cards),
-      "Shared Memcards (Restart)",
-      "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: The 'Memory Card 0 Method' option must be set to 'Mednafen' for correct operation of shared memory cards.",
+      "Shared Memory Cards (Restart)",
+      "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: 'Memory Card 0 Method' must be set to 'Mednafen' for shared memory cards to take effect.",
       {
          { "disabled", NULL },
          { "enabled",  NULL },

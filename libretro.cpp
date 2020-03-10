@@ -3172,7 +3172,6 @@ static bool boot = true;
 
 // shared memory cards support
 static bool shared_memorycards = false;
-static bool shared_memorycards_toggle = false;
 
 static bool has_new_geometry = false;
 static bool has_new_timing = false;
@@ -3322,17 +3321,6 @@ static void check_variables(bool startup)
          has_new_geometry = true;
       widescreen_hack = false;
    }
-
-   var.key = BEETLE_OPT(enable_memcard1);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "enabled") == 0)
-         enable_memcard1 = true;
-      else if (strcmp(var.value, "disabled") == 0)
-         enable_memcard1 = false;
-   }
-   else
-      enable_memcard1 = false;
 
    var.key = BEETLE_OPT(analog_calibration);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3684,45 +3672,44 @@ static void check_variables(bool startup)
    else
       input_set_player_count(2);
 
-   var.key = BEETLE_OPT(use_mednafen_memcard0_method);
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   /* Memcards (startup only) */
+   if (startup)
    {
-      if (strcmp(var.value, "libretro") == 0)
-         use_mednafen_memcard0_method = false;
-      else if (strcmp(var.value, "mednafen") == 0)
-         use_mednafen_memcard0_method = true;
-   }
+      var.key = BEETLE_OPT(use_mednafen_memcard0_method);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "libretro"))
+            use_mednafen_memcard0_method = false;
+         else if (!strcmp(var.value, "mednafen"))
+            use_mednafen_memcard0_method = true;
+      }
 
-   //this option depends on  beetle_psx_use_mednafen_memcard0_method being disabled so it should be evaluated that
-   var.key = BEETLE_OPT(shared_memory_cards);
+      var.key = BEETLE_OPT(enable_memcard1);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "enabled"))
+            enable_memcard1 = true;
+         else if (!strcmp(var.value, "disabled"))
+            enable_memcard1 = false;
+      }
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-
-     if (strcmp(var.value, "enabled") == 0)
-     {
-         if(boot)
+      var.key = BEETLE_OPT(shared_memory_cards);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "enabled"))
          {
             if(use_mednafen_memcard0_method)
-               shared_memorycards_toggle = true;
+               shared_memorycards = true;
+            else
+               MDFN_DispMessage("Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
-         else
-         {
-            if(use_mednafen_memcard0_method)
-               shared_memorycards_toggle = true;
-         }
-     }
-     else if (strcmp(var.value, "disabled") == 0)
-     {
-         if(boot)
-            shared_memorycards_toggle = false;
-         else
+         else if (!strcmp(var.value, "disabled"))
          {
             shared_memorycards = false;
          }
-     }
+      }
    }
+   /* End Memcards */
 
    var.key = BEETLE_OPT(frame_duping);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4087,8 +4074,6 @@ bool retro_load_game(const struct retro_game_info *info)
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
 
    check_variables(true);
-   //make sure shared memory cards and save states are enabled only at startup
-   shared_memorycards = shared_memorycards_toggle;
 
    if (!MDFNI_LoadGame(retro_cd_path))
    {
@@ -4969,7 +4954,7 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
          snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
                retro_save_directory,
                retro_slash,
-               (!shared_memorycards) ? retro_cd_base_name : "mednafen_psx_libretro_shared",
+               shared_memorycards ? "mednafen_psx_libretro_shared" : retro_cd_base_name,
                cd1);
          break;
       case MDFNMKF_FIRMWARE:
