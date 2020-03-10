@@ -106,7 +106,6 @@ unsigned psx_gpu_overclock_shift = 0;
 static int psx_skipbios;
 
 bool psx_gte_overclock;
-static bool is_pal;
 enum dither_mode psx_gpu_dither_mode;
 
 //iCB: PGXP options
@@ -2849,7 +2848,7 @@ static void alloc_surface(void)
 {
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-   uint32_t height = is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+   uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
 
    width  <<= GPU_get_upscale_shift();
    height <<= GPU_get_upscale_shift();
@@ -4067,7 +4066,6 @@ error:
 bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
-   bool ret = false;
 
    if (failed_init)
       return false;
@@ -4101,8 +4099,9 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   is_pal = (CalcDiscSCEx() == REGION_EU);
-   content_is_pal = is_pal;
+   // Determine content_is_pal before calling alloc_surface()
+   unsigned disc_region = CalcDiscSCEx();
+   content_is_pal = (disc_region == REGION_EU);
 
    alloc_surface();
 
@@ -4118,9 +4117,8 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   /* MDFNI_LoadGame() has been called, we can now query the disc's region to deduce
-   which firmware version is needed. */
-   unsigned disc_region = CalcDiscSCEx(); 
+   // MDFNI_LoadGame() has been called and surface has been allocated,
+   // we can now perform firmware check
    bool force_software_renderer = false;
    if (!firmware_is_present(disc_region))
    {
@@ -4137,7 +4135,7 @@ bool retro_load_game(const struct retro_game_info *info)
 #endif
    }
 
-   ret = rsx_intf_open(is_pal, force_software_renderer);
+   bool ret = rsx_intf_open(content_is_pal, force_software_renderer);
 
    /* Hide irrelevant core options */
    switch (rsx_intf_is_type())
@@ -4679,9 +4677,7 @@ void retro_deinit(void)
 
 unsigned retro_get_region(void)
 {
-   if (is_pal)
-      return RETRO_REGION_PAL;
-   return RETRO_REGION_NTSC;
+   return content_is_pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
 }
 
 unsigned retro_api_version(void)
