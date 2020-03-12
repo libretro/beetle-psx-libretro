@@ -144,11 +144,11 @@ struct retro_core_option_definition option_defs_us[] = {
       "Adaptive Smoothing",
       "When enabled, smooths 2D artwork and UI elements without blurring 3D rendered objects. Only supported by the Vulkan renderer.",
       {
-         { "enabled",  NULL },
          { "disabled", NULL },
+         { "enabled",  NULL },
          { NULL, NULL },
       },
-      "enabled"
+      "disabled"
    },
    {
       BEETLE_OPT(super_sampling),
