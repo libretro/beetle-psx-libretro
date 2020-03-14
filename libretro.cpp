@@ -3503,7 +3503,7 @@ static void check_variables(bool startup)
       psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
 
-   var.key = BEETLE_OPT(lineRender);
+   var.key = BEETLE_OPT(line_render);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "disabled") == 0)

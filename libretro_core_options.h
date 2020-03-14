@@ -261,7 +261,7 @@ struct retro_core_option_definition option_defs_us[] = {
       "disabled"
    },
    {
-      BEETLE_OPT(lineRender),
+      BEETLE_OPT(line_render),
       "Line-to-Quad Hack",
       "Choose line-to-quad hack method. Some games (e.g. Doom, Hexen, Soul Blade, etc) draw horizontal lines by stretching single-pixel-high triangles across the screen, which are rasterized as a row of pixels on original hardware. This hack detects these small triangles and converts them to quads as required, allowing them to be displayed properly on the hardware renderers and at upscaled internal resolutions. 'Aggressive' is required for some titles (e.g. Dark Forces, Duke Nukem) but may otherwise introduce graphical glitches. Leave at 'Default' if unsure.",
       {
