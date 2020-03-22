@@ -7,19 +7,6 @@
 #include <math.h>
 #include <string.h>
 
-#include <libretro.h>
-#include <libretro_options.h>
-#include <libretro_cbs.h>
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-   extern retro_environment_t environ_cb;
-#ifdef __cplusplus
-}
-#endif
-
 using namespace Vulkan;
 using namespace std;
 
