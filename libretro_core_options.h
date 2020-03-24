@@ -477,6 +477,16 @@ struct retro_core_option_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(pal_video_override),
+      "PAL (European) video timing override",
+      "Due to different standards PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override the timings in order to attempt to run these games with the NTSC framerate.",
+      {
+         { "no_override", "Standard PAL timings" },
+         { "fast_pal",  "PAL resolution, NTSC framerate" },
+      },
+      "no_override"
+   },
+   {
       BEETLE_OPT(crop_overscan),
       "Crop Horizontal Overscan",
       "By default, the renderers add horizontal padding (pillarboxes on either side of the image) to emulate the same black bars generated in analog video output by real PSX hardware. Enabling this option removes horizontal padding.",

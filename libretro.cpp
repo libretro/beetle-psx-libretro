@@ -80,6 +80,9 @@ bool cd_async = false;
 bool cd_warned_slow = false;
 int64 cd_slow_timeout = 8000; // microseconds
 
+// If true, PAL games will run at 60fps
+bool fast_pal = false;
+
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
 bool psx_dynarec_invalidate;
@@ -3322,6 +3325,17 @@ static void check_variables(bool startup)
       widescreen_hack = false;
    }
 
+   var.key = BEETLE_OPT(pal_video_override);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      bool want_fast_pal = strcmp(var.value, "fast_pal") == 0;
+
+      if (want_fast_pal != fast_pal) {
+         fast_pal = want_fast_pal;
+         has_new_timing = true;
+      }
+   }
+
    var.key = BEETLE_OPT(analog_calibration);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -4356,7 +4370,7 @@ void retro_run(void)
       {
          char msg_buffer[64];
          // Just report the "real-world" refresh rate here regardless of system av info reported to the frontend
-         float fps = content_is_pal ?
+         float fps = (content_is_pal && !fast_pal) ?
                         (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                         (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
@@ -4680,6 +4694,9 @@ void retro_deinit(void)
 
 unsigned retro_get_region(void)
 {
+   // simias: should I override this when fast_pal is set?
+   //
+   // I'm not entirely sure what's that used for.
    return content_is_pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
 }
 
