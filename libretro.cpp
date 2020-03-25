@@ -3325,10 +3325,10 @@ static void check_variables(bool startup)
       widescreen_hack = false;
    }
 
-   var.key = BEETLE_OPT(pal_video_override);
+   var.key = BEETLE_OPT(pal_video_timing_override);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      bool want_fast_pal = strcmp(var.value, "fast_pal") == 0;
+      bool want_fast_pal = (strcmp(var.value, "enabled") == 0);
 
       if (want_fast_pal != fast_pal) {
          fast_pal = want_fast_pal;
@@ -3393,6 +3393,12 @@ static void check_variables(bool startup)
          if (!startup && aspect_ratio_setting != 2)
             has_new_geometry = true;
          aspect_ratio_setting = 2;
+      }
+      else if (!strcmp(var.value, "ntsc"))
+      {
+         if (!startup && aspect_ratio_setting != 3)
+            has_new_geometry = true;
+         aspect_ratio_setting = 3;
       }
    }
 

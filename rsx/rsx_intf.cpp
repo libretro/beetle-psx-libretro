@@ -867,6 +867,7 @@ float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
    //          0 - Corrected
    //          1 - Uncorrected (1:1 PAR)
    //          2 - Force 4:3 (traditionally what Beetle PSX has done prior to adding in this setting)
+   //          3 - Force NTSC (get corrected NTSC aspect ratio even with PAL games)
 
    // Aspect ratio overrides - VRAM and widescreen take precedence
 
@@ -917,6 +918,15 @@ float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
 
       // Calculate aspect ratio as quotient of raw native framebuffer width and height
       return width_base / height_base;
+   }
+   else if (aspect_ratio_setting == 3) // Force NTSC
+   {
+      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
+
+      int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
+      ar *= (240.0 / num_vis_scanlines);
+
+      return ar;
    }
 
    return ar; // 4:3

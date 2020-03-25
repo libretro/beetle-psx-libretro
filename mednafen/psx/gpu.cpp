@@ -1459,8 +1459,8 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          if(GPU.LinePhase)
          {
             TIMER_SetHRetrace(true);
-            if(GPU.DisplayMode & DISP_PAL && fast_pal) {
-               GPU.LineClockCounter = (200 * 25) / 30;
+            if((GPU.DisplayMode & DISP_PAL) && fast_pal) {
+               GPU.LineClockCounter = (200 * 50) / 59.94;
             } else {
                GPU.LineClockCounter = 200;
             }
@@ -1476,11 +1476,13 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             TIMER_SetHRetrace(false);
 
             if(GPU.DisplayMode & DISP_PAL)
+            {
                if (fast_pal) {
-                  GPU.LineClockCounter = ((3405 - 200) * 25) / 30;
+                  GPU.LineClockCounter = ((3405 - 200) * 50) / 59.94;
                } else {
                   GPU.LineClockCounter = 3405 - 200;
                }
+            }
             else
                GPU.LineClockCounter = 3412 + GPU.PhaseChange - 200;
 
