@@ -56,6 +56,8 @@
 
 */
 
+extern bool fast_pal;
+
 /*
    November 29, 2012 notes:
 
@@ -1457,7 +1459,11 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          if(GPU.LinePhase)
          {
             TIMER_SetHRetrace(true);
-            GPU.LineClockCounter = 200;
+            if(GPU.DisplayMode & DISP_PAL && fast_pal) {
+               GPU.LineClockCounter = (200 * 25) / 30;
+            } else {
+               GPU.LineClockCounter = 200;
+            }
             TIMER_ClockHRetrace();
          }
          else
@@ -1470,7 +1476,11 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             TIMER_SetHRetrace(false);
 
             if(GPU.DisplayMode & DISP_PAL)
-               GPU.LineClockCounter = 3405 - 200;
+               if (fast_pal) {
+                  GPU.LineClockCounter = ((3405 - 200) * 25) / 30;
+               } else {
+                  GPU.LineClockCounter = 3405 - 200;
+               }
             else
                GPU.LineClockCounter = 3412 + GPU.PhaseChange - 200;
 

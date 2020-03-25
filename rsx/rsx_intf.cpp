@@ -28,6 +28,8 @@
 #include "rsx_lib_vulkan.h"
 #endif
 
+extern bool fast_pal;
+
 static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
 
 static bool gl_initialized                      = false;
@@ -840,14 +842,16 @@ void rsx_intf_toggle_display(bool status)
 
 double rsx_common_get_timing_fps(void)
 {
+   bool pal_timings = content_is_pal && !fast_pal;
+
    if (core_timing_fps_mode == FORCE_PROGRESSIVE_TIMING)
-      return (content_is_pal ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED);
+      return (pal_timings ? FPS_PAL_NONINTERLACED : FPS_NTSC_NONINTERLACED);
 
    else if (core_timing_fps_mode == FORCE_INTERLACED_TIMING)
-      return (content_is_pal ? FPS_PAL_INTERLACED : FPS_NTSC_INTERLACED);
+      return (pal_timings ? FPS_PAL_INTERLACED : FPS_NTSC_INTERLACED);
 
    //else AUTO_TOGGLE_TIMING
-   return (content_is_pal ?
+   return (pal_timings ?
                (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
 }
