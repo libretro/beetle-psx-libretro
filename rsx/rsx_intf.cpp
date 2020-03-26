@@ -564,7 +564,7 @@ void rsx_intf_push_triangle(
       { p2x, p2y, p2w, c2, t2x, t2y },
    };
    const rsx_render_state state = {
-      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
+      texpage_x, texpage_y, clut_x, clut_y, min_u, min_v, max_u, max_v, texture_blend_mode, depth_shift, dither, blend_mode,
       mask_test, set_mask,
    };
    rsx_dump_triangle(vertices, &state);
@@ -630,7 +630,7 @@ void rsx_intf_push_quad(
       { p3x, p3y, p3w, c3, t3x, t3y },
    };
    const rsx_render_state state = {
-      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
+      texpage_x, texpage_y, clut_x, clut_y, min_u, min_v, max_u, max_v, texture_blend_mode, depth_shift, dither, blend_mode,
       mask_test, set_mask,
    };
    rsx_dump_quad(vertices, &state);

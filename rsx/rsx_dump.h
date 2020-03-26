@@ -32,6 +32,7 @@ struct rsx_render_state
 {
    uint16_t texpage_x, texpage_y;
    uint16_t clut_x, clut_y;
+   uint16_t min_u, min_v, max_u, max_v;
    uint8_t texture_blend_mode;
    uint8_t depth_shift;
    bool dither;
