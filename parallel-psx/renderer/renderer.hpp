@@ -190,7 +190,8 @@ public:
 
 	void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
 	{
-		last_scanout.reset();
+		if (render_state.display_fb_xstart != xstart || render_state.display_fb_ystart != ystart)
+			last_scanout.reset();
 
 		render_state.display_fb_xstart = xstart;
 		render_state.display_fb_ystart = ystart;
@@ -198,25 +199,31 @@ public:
 
 	void set_horizontal_display_range(int x1, int x2)
 	{
+		if (render_state.horiz_start != x1 || render_state.horiz_end != x2)
+			last_scanout.reset();
+
 		render_state.horiz_start = x1;
 		render_state.horiz_end = x2;
 	}
 
 	void set_vertical_display_range(int y1, int y2)
 	{
+		if (render_state.vert_start != y1 || render_state.vert_end != y2)
+			last_scanout.reset();
+
 		render_state.vert_start = y1;
 		render_state.vert_end = y2;
 	}
 
 	void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
 	{
-		//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
-		//	last_scanout.reset();
-		last_scanout.reset();
+		if (render_state.scanout_mode != mode || render_state.is_pal != is_pal ||
+			render_state.is_480i != is_480i || render_state.width_mode != width_mode)
+		{
+			last_scanout.reset();
+		}
 
-		//render_state.display_mode = rect;
 		render_state.scanout_mode = mode;
-
 		render_state.is_pal = is_pal;
 		render_state.is_480i = is_480i;
 		render_state.width_mode = width_mode;
@@ -253,7 +260,7 @@ public:
 
 	void toggle_display(bool enable)
 	{
-		if (enable != render_state.display_on)
+		if (render_state.display_on != enable)
 			last_scanout.reset();
 
 		render_state.display_on = enable;
