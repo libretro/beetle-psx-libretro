@@ -111,9 +111,8 @@ public:
 		bool is_pal = false;
 		bool is_480i = false;
 		WidthMode width_mode = WidthMode::WIDTH_MODE_320;
-		bool crop_overscan = false;
 
-		// Experimental horizontal offset feature
+		unsigned crop_cycles = 0;
 		int offset_cycles = 0;
 
 		int slstart = 0;
@@ -223,9 +222,9 @@ public:
 		render_state.width_mode = width_mode;
 	}
 
-	void set_horizontal_overscan_cropping(bool crop_overscan)
+	void set_horizontal_crop_cycles(unsigned crop_cycles)
 	{
-		render_state.crop_overscan = crop_overscan;
+		render_state.crop_cycles = crop_cycles;
 	}
 
 	void set_horizontal_offset_cycles(int offset_cycles)
@@ -548,6 +547,9 @@ private:
 
 	Vulkan::ImageHandle last_scanout;
 	Vulkan::ImageHandle reuseable_scanout;
+
+	unsigned get_clock_div();
+
 	DisplayRect compute_display_rect();
 
 	Rect compute_vram_framebuffer_rect();

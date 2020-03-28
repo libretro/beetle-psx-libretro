@@ -664,9 +664,10 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
-Rect Renderer::compute_vram_framebuffer_rect()
+inline unsigned Renderer::get_clock_div()
 {
 	unsigned clock_div;
+
 	switch (render_state.width_mode)
 	{
 	case WidthMode::WIDTH_MODE_256:
@@ -685,6 +686,13 @@ Rect Renderer::compute_vram_framebuffer_rect()
 		clock_div = 7;
 		break;
 	}
+
+	return clock_div;
+}
+
+Rect Renderer::compute_vram_framebuffer_rect()
+{
+	unsigned clock_div = get_clock_div();
 
 	unsigned fb_width = (unsigned) (render_state.horiz_end - render_state.horiz_start);
 	fb_width /= clock_div;
@@ -701,39 +709,14 @@ Rect Renderer::compute_vram_framebuffer_rect()
 
 Renderer::DisplayRect Renderer::compute_display_rect()
 {
-	unsigned clock_div;
-	switch (render_state.width_mode)
-	{
-	case WidthMode::WIDTH_MODE_256:
-		clock_div = 10;
-		break;
-	case WidthMode::WIDTH_MODE_320:
-		clock_div = 8;
-		break;
-	case WidthMode::WIDTH_MODE_512:
-		clock_div = 5;
-		break;
-	case WidthMode::WIDTH_MODE_640:
-		clock_div = 4;
-		break;
-	case WidthMode::WIDTH_MODE_368:
-		clock_div = 7;
-		break;
-	}
+	unsigned clock_div = get_clock_div();
 
-	unsigned display_width;
-	int left_offset;
-	if (render_state.crop_overscan)
-	{
-		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
-		display_width = 2560/clock_div;
-		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div);
-	}
-	else
-	{
-		display_width = 2800/clock_div;
-		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 488) / (double) clock_div);
-	}
+	unsigned display_width = (2800 - render_state.crop_cycles) / clock_div;
+
+	// Calculate left_offset in terms of clock cycles, then divide by clock divider
+	// Use floor(a / (double) b) to get proper behavior on negative offsets
+	int left_offset = (render_state.horiz_start - 488 + render_state.offset_cycles - (render_state.crop_cycles / 2));
+	left_offset = floor(left_offset / (double) clock_div);
 
 	unsigned display_height;
 	int upper_offset;

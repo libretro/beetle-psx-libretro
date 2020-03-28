@@ -452,7 +452,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
 
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
-   renderer->set_horizontal_overscan_cropping(crop_overscan);
+   renderer->set_horizontal_crop_cycles(crop_overscan ? 240 : 0);
    renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
 
