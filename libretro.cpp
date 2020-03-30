@@ -396,7 +396,7 @@ FrontIO *PSX_FIO = NULL;
 
 MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
 MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
-MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = NULL;
+MultiAccessSizeMem<4 * 2048 * 1024, uint32, false> *MainRAM = NULL;
 MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 
 #ifdef HAVE_LIGHTREC
@@ -673,16 +673,16 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       if(Access24)
       {
          if(IsWrite)
-            MainRAM->WriteU24(A & 0x1FFFFF, V);
+            MainRAM->WriteU24(A & 0x7FFFFF, V);
          else
-            V = MainRAM->ReadU24(A & 0x1FFFFF);
+            V = MainRAM->ReadU24(A & 0x7FFFFF);
       }
       else
       {
          if(IsWrite)
-            MainRAM->Write<T>(A & 0x1FFFFF, V);
+            MainRAM->Write<T>(A & 0x7FFFFF, V);
          else
-            V = MainRAM->Read<T>(A & 0x1FFFFF);
+            V = MainRAM->Read<T>(A & 0x7FFFFF);
       }
 
       return;
@@ -1033,8 +1033,8 @@ template<typename T, bool Access24> static INLINE uint32_t MemPeek(int32_t times
    if(A < 0x00800000)
    {
       if(Access24)
-         return(MainRAM->ReadU24(A & 0x1FFFFF));
-      return(MainRAM->Read<T>(A & 0x1FFFFF));
+         return(MainRAM->ReadU24(A & 0x7FFFFF));
+      return(MainRAM->Read<T>(A & 0x7FFFFF));
    }
 
    if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
@@ -1173,7 +1173,7 @@ static void PSX_Power(void)
 
    cd_warned_slow = false;
 
-   memset(MainRAM->data32, 0, 2048 * 1024);
+   memset(MainRAM->data32, 0, 4 * 2048 * 1024);
 
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
@@ -1203,9 +1203,9 @@ template<typename T, bool Access24> static INLINE void MemPoke(pscpu_timestamp_t
    if(A < 0x00800000)
    {
       if(Access24)
-         MainRAM->WriteU24(A & 0x1FFFFF, V);
+         MainRAM->WriteU24(A & 0x7FFFFF, V);
       else
-         MainRAM->Write<T>(A & 0x1FFFFF, V);
+         MainRAM->Write<T>(A & 0x7FFFFF, V);
 
       return;
    }
@@ -1989,14 +1989,14 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 #ifdef HAVE_LIGHTREC
    if(lightrec_init_mmap() == 0)
    {
-      MainRAM = new(psx_mem) MultiAccessSizeMem<2048 * 1024, uint32, false>();
+      MainRAM = new(psx_mem) MultiAccessSizeMem<4 * 2048 * 1024, uint32, false>();
       ScratchRAM = new(psx_scratch) MultiAccessSizeMem<1024, uint32, false>();
       BIOSROM = new(psx_bios) MultiAccessSizeMem<512 * 1024, uint32, false>();
    }
    else
 #endif
    {
-      MainRAM = new MultiAccessSizeMem<2048 * 1024, uint32, false>();
+      MainRAM = new MultiAccessSizeMem<4 * 2048 * 1024, uint32, false>();
       ScratchRAM = new MultiAccessSizeMem<1024, uint32, false>();
       BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
    }
@@ -2006,11 +2006,11 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    if(WantPIOMem)
       PIOMem = new MultiAccessSizeMem<65536, uint32, false>();
 
-   for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
+   for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 4 * 2048 * 1024)
    {
-      PSX_CPU->SetFastMap(MainRAM->data32, 0x00000000 + ma, 2048 * 1024);
-      PSX_CPU->SetFastMap(MainRAM->data32, 0x80000000 + ma, 2048 * 1024);
-      PSX_CPU->SetFastMap(MainRAM->data32, 0xA0000000 + ma, 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0x00000000 + ma, 4 * 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0x80000000 + ma, 4 * 2048 * 1024);
+      PSX_CPU->SetFastMap(MainRAM->data32, 0xA0000000 + ma, 4 * 2048 * 1024);
    }
 
    PSX_CPU->SetFastMap(BIOSROM->data32, 0x1FC00000, 512 * 1024);
@@ -2026,7 +2026,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
 
    MDFNMP_Init(1024, ((uint64)1 << 29) / 1024);
-   MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM->data8);
+   MDFNMP_AddRAM(4 * 2048 * 1024, 0x00000000, MainRAM->data8);
 #if 0
    MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
 #endif
@@ -2454,7 +2454,7 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       SFVAR(CD_TrayOpen),
       SFVAR(CD_SelectedDisc),
-      SFARRAYN(MainRAM->data8, 1024 * 2048, "MainRAM.data8"),
+      SFARRAYN(MainRAM->data8, 4 * 1024 * 2048, "MainRAM.data8"),
       SFARRAY32(SysControl.Regs, 9),
       SFVAR(PSX_PRNG.lcgo),
       SFVAR(PSX_PRNG.x),
