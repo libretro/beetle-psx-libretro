@@ -330,6 +330,12 @@ static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
    g->dtd =        (cmdw >> 9) & 1;
    g->dfe =        (cmdw >> 10) & 1;
 
+   if (g->dfe)
+   {
+      GPU.display_possibly_dirty = true;
+      //printf("Display possibly dirty this frame\n");
+   }
+
    //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
@@ -676,6 +682,7 @@ void GPU_Init(bool pal_clock_and_tv,
    GPU.LineVisFirst = sls;
    GPU.LineVisLast = sle;
 
+   GPU.display_possibly_dirty = false;
    GPU.display_change_count = 0;
 
    GPU.upscale_shift = upscale_shift;
@@ -2051,6 +2058,16 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       GPU_RestoreStateP3();
 
    return(ret);
+}
+
+bool GPU_get_display_possibly_dirty(void)
+{
+   return GPU.display_possibly_dirty;
+}
+
+void GPU_set_display_possibly_dirty(bool dirty)
+{
+   GPU.display_possibly_dirty = dirty;
 }
 
 void GPU_set_display_change_count(unsigned a)
