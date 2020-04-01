@@ -4616,10 +4616,7 @@ void retro_run(void)
       height <<= upscale_shift;
       pix     += pix_offset << upscale_shift;
 
-      if (GPU_get_display_change_count() != 0)
-         fb = pix;
-
-      if (!allow_frame_duping)
+      if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0) || !allow_frame_duping)
          fb = pix;
    }
 
@@ -4655,14 +4652,11 @@ void retro_run(void)
 
    audio_batch_cb(interbuf, spec.SoundBufSize);
 
-   if (GPU_get_display_change_count() != 0)
+   if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0))
    {
-      // For simplicity I assume that the game is using double
-      // buffering and it swaps buffers once per frame. That's
-      // obviously an oversimplification, if the game uses simple
-      // buffering it will report 0 fps.
       internal_frame_count++;
       GPU_set_display_change_count(0);
+      GPU_set_display_possibly_dirty(false);
    }
 }
 

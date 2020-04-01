@@ -170,6 +170,7 @@ struct PS_GPU
    uint32 DisplayFB_XStart;
    uint32 DisplayFB_YStart;
 
+   bool display_possibly_dirty;
    unsigned display_change_count;
 
    uint32 HorizStart;
@@ -241,6 +242,10 @@ void GPU_set_dither_upscale_shift(uint8 factor);
 uint8 GPU_get_upscale_shift(void);
 
 void GPU_set_upscale_shift(uint8 factor);
+
+bool GPU_get_display_possibly_dirty(void);
+
+void GPU_set_display_possibly_dirty(bool dirty);
 
 void GPU_set_display_change_count(unsigned a);
 
