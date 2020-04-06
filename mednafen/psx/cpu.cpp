@@ -3127,7 +3127,7 @@ void PS_CPU::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 
 #ifdef LIGHTREC_VERY_DEBUG
 	printf(" RAM 0x%08x SCRATCH 0x%08x",
-		hash_calculate(psxM, 4 * 0x200000),
+		hash_calculate(psxM, 0x200000),
 		hash_calculate(psxH, 0x400));
 #endif
 
