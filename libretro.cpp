@@ -375,6 +375,12 @@ int CD_SelectedDisc;     // -1 for no disc
 
 static bool CD_IsPBP = false;
 extern int PBP_DiscCount;
+/* The global value PBP_DiscCount is set to
+ * zero when loading single-disk PBP files.
+ * We therefore have to maintain a separate
+ * 'physical' disk count, otherwise the
+ * frontend disk control interface will fail */
+static int PBP_PhysicalDiscCount;
 
 typedef struct
 {
@@ -2434,7 +2440,7 @@ static void CDSelect(void)
 {
  if(cdifs && CD_TrayOpen)
  {
-  int disc_count = (CD_IsPBP ? PBP_DiscCount : (int)cdifs->size());
+  int disc_count = (CD_IsPBP ? PBP_PhysicalDiscCount : (int)cdifs->size());
 
   CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
 
@@ -2472,7 +2478,7 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       if(CD_IsPBP)
       {
-         if((!cdifs || CD_SelectedDisc >= PBP_DiscCount) && PBP_DiscCount > 0)
+         if(!cdifs || CD_SelectedDisc >= PBP_PhysicalDiscCount)
             CD_SelectedDisc = -1;
 
          CDEject();
@@ -2872,7 +2878,7 @@ static void check_system_specs(void)
 static unsigned disk_get_num_images(void)
 {
    if(cdifs)
-      return CD_IsPBP ? PBP_DiscCount : cdifs->size();
+      return CD_IsPBP ? PBP_PhysicalDiscCount : cdifs->size();
    return 0;
 }
 
@@ -3905,7 +3911,10 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 
          /* CDIF_Open() sets PBP_DiscCount, so we can populate
           * image_paths/image_labels here */
-         for(unsigned i = 0; i < PBP_DiscCount; i++)
+         PBP_PhysicalDiscCount = (PBP_DiscCount == 0) ?
+               1 : PBP_DiscCount;
+
+         for(unsigned i = 0; i < PBP_PhysicalDiscCount; i++)
          {
             char image_name[4096];
             char image_label[4096];
