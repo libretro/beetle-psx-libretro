@@ -975,9 +975,19 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
                   // This represents the maximal value the DualShock sticks can
                   // reach, where 1.0 would be the maximum value along the X or
-                  // Y axis. XXX I need to measure this value more precisely,
-                  // it's a rough estimate at the moment.
-                  static const float dualshock_analog_radius = 1.35;
+                  // Y axis.
+                  //
+                  // simias: With my (old and clunky) DualShock I managed to
+                  // reach x = 0x00, y = 0x05 on the left stick which give us a
+                  // radius of:
+                  //
+                  //   int left_x = 0x80 - 0x00;
+                  //   int left_y = 0x80 - 0x05;
+                  //
+                  //   sqrt(left_x * left_x + left_y * left_y) / 0x80
+                  //
+                  // Which gives the value below
+                  static const float dualshock_analog_radius = 1.387;
 
                   // Now compute the scaling factor to apply to convert the
                   // emulator's controller coordinates to a native DualShock's
