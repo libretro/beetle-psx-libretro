@@ -86,6 +86,7 @@ bool fast_pal = false;
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
 bool psx_dynarec_invalidate;
+bool psx_mmap = false;
 uint8 *psx_mem;
 uint8 *psx_bios;
 uint8 *psx_scratch;
@@ -1729,7 +1730,7 @@ err_unmap:
 
 	if (i == ARRAY_SIZE(supported_io_bases)) {
 		err = -EINVAL;
-		fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 		goto err_shm_unlink;
 	}
 
@@ -1800,7 +1801,7 @@ err_unmap:
 			UnmapViewOfFile((void *)(base + (j - 1) * 0x200000));
 	}
 
-	fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+	log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	CloseHandle(memfd);
 	return -EINVAL;
 #else
@@ -1856,7 +1857,7 @@ err_unmap:
 		munmap(psx_mem, 0x200000);
 	}
 
-	fprintf(stderr, "Unable to mmap on any base address, dynarec will be slower\n");
+	log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	return -EINVAL;
 #endif
 }
@@ -1993,7 +1994,9 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       SetDiscWrapper(CD_TrayOpen);
 
 #ifdef HAVE_LIGHTREC
-   if(lightrec_init_mmap() == 0)
+   psx_mmap = (lightrec_init_mmap() == 0);
+
+   if(psx_mmap)
    {
       MainRAM = new(psx_mem) MultiAccessSizeMem<2048 * 1024, uint32, false>();
       ScratchRAM = new(psx_scratch) MultiAccessSizeMem<1024, uint32, false>();
@@ -2348,7 +2351,8 @@ static void Cleanup(void)
    MainRAM = NULL;
    ScratchRAM = NULL;
    BIOSROM = NULL;
-   lightrec_free_mmap();
+   if(psx_mmap)
+      lightrec_free_mmap();
 #if defined(HAVE_SHM)
    close(memfd);
 #endif
