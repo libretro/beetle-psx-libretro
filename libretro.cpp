@@ -1643,7 +1643,7 @@ int lightrec_init_mmap()
 #else
 	char shm_name[30];
 	sprintf(shm_name, "/lightrec_memfd_%d", getpid());
-	int memfd = shm_open(shm_name,
+	memfd = shm_open(shm_name,
 			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 	if (memfd < 0) {
 		sprintf(shm_name, "/lightrec_memfd_%d_2", getpid());
@@ -1874,7 +1874,7 @@ void lightrec_free_mmap()
 #endif
 		munmap((void *)((uintptr_t)psx_mem + i * 0x200000), 0x200000);
 
-#ifdef HAVE_ASHMEM
+#ifdef HAVE_SHM
 	close(memfd);
 #endif
 }
