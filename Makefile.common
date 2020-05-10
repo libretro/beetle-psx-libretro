@@ -380,6 +380,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
                   $(DEPS_DIR)/lightrec/lightrec.c \
                   $(DEPS_DIR)/lightrec/memmanager.c \
                   $(DEPS_DIR)/lightrec/optimizer.c \
+                  $(DEPS_DIR)/lightrec/reaper.c \
                   $(DEPS_DIR)/lightrec/regcache.c
 
    ifeq ($(THREADED_RECOMPILER), 1)

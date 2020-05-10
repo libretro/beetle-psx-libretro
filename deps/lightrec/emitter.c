@@ -23,8 +23,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../pgxp/pgxp_main.h"
-
 typedef void (*lightrec_rec_func_t)(const struct block *,
 				    const struct opcode *, u32);
 
@@ -964,11 +962,6 @@ static void rec_store_direct(const struct block *block, const struct opcode *op,
 static void rec_store(const struct block *block, const struct opcode *op,
 		     jit_code_t code)
 {
-	if (PGXP_GetModes() & (PGXP_MODE_GTE | PGXP_MODE_MEMORY)) {
-		rec_io(block, op, true, false);
-		return;
-	}
-
 	if (op->flags & LIGHTREC_NO_INVALIDATE) {
 		rec_store_direct_no_invalidate(block, op, code);
 	} else if (op->flags & LIGHTREC_DIRECT_IO) {
@@ -1114,7 +1107,7 @@ static void rec_load_direct(const struct block *block, const struct opcode *op,
 static void rec_load(const struct block *block, const struct opcode *op,
 		    jit_code_t code)
 {
-	if (op->flags & LIGHTREC_DIRECT_IO && !(PGXP_GetModes() & (PGXP_MODE_GTE | PGXP_MODE_MEMORY)))
+	if (op->flags & LIGHTREC_DIRECT_IO)
 		rec_load_direct(block, op, code);
 	else
 		rec_io(block, op, false, true);
@@ -1434,7 +1427,7 @@ static void rec_meta_sync(const struct block *block,
 		 op->offset << 2);
 	target = &state->targets[state->nb_targets++];
 	target->offset = op->offset;
-	target->label = jit_label();
+	target->label = jit_indirect();
 }
 
 static const lightrec_rec_func_t rec_standard[64] = {

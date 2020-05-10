@@ -42,6 +42,7 @@ int pgxpMode = PGXP_GetModes();
 enum DYNAREC prev_dynarec;
 bool prev_invalidate;
 extern bool psx_dynarec_invalidate;
+extern bool psx_mmap;
 static struct lightrec_state *lightrec_state;
 #endif
 
@@ -3091,6 +3092,61 @@ void PS_CPU::CheckBreakpoints(void (*callback)(bool write, uint32 address, unsig
 #ifdef HAVE_LIGHTREC
 #define ARRAY_SIZE(x) (sizeof(x) ? sizeof(x) / sizeof((x)[0]) : 0)
 
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#	define LE32TOH(x)	__builtin_bswap32(x)
+#	define HTOLE32(x)	__builtin_bswap32(x)
+#	define LE16TOH(x)	__builtin_bswap16(x)
+#	define HTOLE16(x)	__builtin_bswap16(x)
+#else
+#	define LE32TOH(x)	(x)
+#	define HTOLE32(x)	(x)
+#	define LE16TOH(x)	(x)
+#	define HTOLE16(x)	(x)
+#endif
+
+static inline u32 kunseg(u32 addr)
+{
+	if (MDFN_UNLIKELY(addr >= 0xa0000000))
+		return addr - 0xa0000000;
+	else
+		return addr &~ 0x80000000;
+}
+
+enum opcodes {
+        OP_SPECIAL              = 0x00,
+        OP_REGIMM               = 0x01,
+        OP_J                    = 0x02,
+        OP_JAL                  = 0x03,
+        OP_BEQ                  = 0x04,
+        OP_BNE                  = 0x05,
+        OP_BLEZ                 = 0x06,
+        OP_BGTZ                 = 0x07,
+        OP_ADDI                 = 0x08,
+        OP_ADDIU                = 0x09,
+        OP_SLTI                 = 0x0a,
+        OP_SLTIU                = 0x0b,
+        OP_ANDI                 = 0x0c,
+        OP_ORI                  = 0x0d,
+        OP_XORI                 = 0x0e,
+        OP_LUI                  = 0x0f,
+        OP_CP0                  = 0x10,
+        OP_CP2                  = 0x12,
+        OP_LB                   = 0x20,
+        OP_LH                   = 0x21,
+        OP_LWL                  = 0x22,
+        OP_LW                   = 0x23,
+        OP_LBU                  = 0x24,
+        OP_LHU                  = 0x25,
+        OP_LWR                  = 0x26,
+        OP_SB                   = 0x28,
+        OP_SH                   = 0x29,
+        OP_SWL                  = 0x2a,
+        OP_SW                   = 0x2b,
+        OP_SWR                  = 0x2e,
+        OP_LWC2                 = 0x32,
+        OP_SWC2                 = 0x3a,
+};
+
 static char *name = (char*) "beetle_psx_libretro";
 
 #ifdef LIGHTREC_DEBUG
@@ -3147,24 +3203,43 @@ void PS_CPU::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 }
 #endif /* LIGHTREC_DEBUG */
 
-u32 PS_CPU::cop_mfc(struct lightrec_state *state, u8 reg)
+u32 PS_CPU::cop_mfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	return CP0.Regs[reg];
 }
 
-u32 PS_CPU::cop_cfc(struct lightrec_state *state, u8 reg)
+u32 PS_CPU::cop_cfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	return CP0.Regs[reg];
 }
 
-u32 PS_CPU::cop2_mfc(struct lightrec_state *state, u8 reg)
+u32 PS_CPU::cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	return GTE_ReadDR(reg);
 }
 
-u32 PS_CPU::cop2_cfc(struct lightrec_state *state, u8 reg)
+u32 PS_CPU::pgxp_cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
+{
+	u32 r = GTE_ReadDR(reg);
+
+	if((op >> 26) == OP_CP2)
+		PGXP_GTE_MFC2(op, r, r);
+
+	return r;
+}
+
+u32 PS_CPU::cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	return GTE_ReadCR(reg);
+}
+
+u32 PS_CPU::pgxp_cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
+{
+	u32 r = GTE_ReadCR(reg);
+
+	PGXP_GTE_CFC2(op, r, r);
+
+	return r;
 }
 
 void PS_CPU::cop_mtc_ctc(struct lightrec_state *state,
@@ -3204,24 +3279,37 @@ void PS_CPU::cop_mtc_ctc(struct lightrec_state *state,
 	}
 }
 
-void PS_CPU::cop_mtc(struct lightrec_state *state, u8 reg, u32 value)
+void PS_CPU::cop_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
 {
 	cop_mtc_ctc(state, reg, value);
 }
 
-void PS_CPU::cop_ctc(struct lightrec_state *state, u8 reg, u32 value)
+void PS_CPU::cop_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
 {
 	cop_mtc_ctc(state, reg, value);
 }
 
-void PS_CPU::cop2_mtc(struct lightrec_state *state, u8 reg, u32 value)
+void PS_CPU::cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
 {
 	GTE_WriteDR(reg, value);
 }
 
-void PS_CPU::cop2_ctc(struct lightrec_state *state, u8 reg, u32 value)
+void PS_CPU::pgxp_cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
+{
+	GTE_WriteDR(reg, value);
+	if((op >> 26) == OP_CP2)
+		PGXP_GTE_MTC2(op, value, value);
+}
+
+void PS_CPU::cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
 {
 	GTE_WriteCR(reg, value);
+}
+
+void PS_CPU::pgxp_cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
+{
+	GTE_WriteCR(reg, value);
+	PGXP_GTE_CTC2(op, value, value);
 }
 
 static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
@@ -3247,7 +3335,7 @@ void PS_CPU::reset_target_cycle_count(struct lightrec_state *state, pscpu_timest
 }
 
 void PS_CPU::hw_write_byte(struct lightrec_state *state,
-		u32 mem, u8 val)
+		u32 opcode, void *host,	u32 mem, u8 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3256,8 +3344,32 @@ void PS_CPU::hw_write_byte(struct lightrec_state *state,
 	reset_target_cycle_count(state, timestamp);
 }
 
+void PS_CPU::pgxp_nonhw_write_byte(struct lightrec_state *state,
+		u32 opcode, void *host,	u32 mem, u8 val)
+{
+	*(u8 *)host = val;
+	PGXP_CPU_SB(opcode, val, mem);
+
+	if (psx_dynarec_invalidate)
+		lightrec_invalidate(state, mem, 1);
+}
+
+void PS_CPU::pgxp_hw_write_byte(struct lightrec_state *state,
+		u32 opcode, void *host,	u32 mem, u8 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	PSX_MemWrite8(timestamp, kmem, val);
+
+	PGXP_CPU_SB(opcode, val, mem);
+
+	reset_target_cycle_count(state, timestamp);
+}
+
 void PS_CPU::hw_write_half(struct lightrec_state *state,
-		u32 mem, u16 val)
+		u32 opcode, void *host, u32 mem, u16 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3266,8 +3378,32 @@ void PS_CPU::hw_write_half(struct lightrec_state *state,
 	reset_target_cycle_count(state, timestamp);
 }
 
+void PS_CPU::pgxp_nonhw_write_half(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem, u16 val)
+{
+	*(u16 *)host = HTOLE16(val);
+	PGXP_CPU_SH(opcode, val, mem);
+
+	if (psx_dynarec_invalidate)
+		lightrec_invalidate(state, mem, 2);
+}
+
+void PS_CPU::pgxp_hw_write_half(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem, u16 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	PSX_MemWrite16(timestamp, kmem, val);
+
+	PGXP_CPU_SH(opcode, val, mem);
+
+	reset_target_cycle_count(state, timestamp);
+}
+
 void PS_CPU::hw_write_word(struct lightrec_state *state,
-		u32 mem, u32 val)
+		u32 opcode, void *host, u32 mem, u32 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3276,14 +3412,107 @@ void PS_CPU::hw_write_word(struct lightrec_state *state,
 	reset_target_cycle_count(state, timestamp);
 }
 
+void PS_CPU::pgxp_nonhw_write_word(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem, u32 val)
+{
+	*(u32 *)host = HTOLE32(val);
+
+	switch (opcode >> 26){
+		case 0x2A:
+			PGXP_CPU_SWL(opcode, val, mem + (opcode & 0x3));
+			break;
+		case 0x2B:
+			PGXP_CPU_SW(opcode, val, mem);
+			break;
+		case 0x2E:
+			PGXP_CPU_SWR(opcode, val, mem + (opcode & 0x3));
+			break;
+		case 0x3A:
+			PGXP_GTE_SWC2(opcode, val, mem);
+			break;
+		default:
+			break;
+	}
+
+	if (psx_dynarec_invalidate)
+		lightrec_invalidate(state, mem, 4);
+}
+
+void PS_CPU::pgxp_hw_write_word(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem, u32 val)
+{
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	PSX_MemWrite32(timestamp, kmem, val);
+
+	switch (opcode >> 26){
+		case OP_SWL:
+			PGXP_CPU_SWL(opcode, val, mem + (opcode & 0x3));
+			break;
+		case OP_SW:
+			PGXP_CPU_SW(opcode, val, mem);
+			break;
+		case OP_SWR:
+			PGXP_CPU_SWR(opcode, val, mem + (opcode & 0x3));
+			break;
+		case OP_SWC2:
+			PGXP_GTE_SWC2(opcode, val, mem);
+			break;
+		default:
+			break;
+	}
+
+	reset_target_cycle_count(state, timestamp);
+}
+
 u8 PS_CPU::hw_read_byte(struct lightrec_state *state,
-		u32 mem)
+		u32 opcode, void *host, u32 mem)
 {
 	u8 val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
-	val = PSX_MemRead8(timestamp,mem);
+	val = PSX_MemRead8(timestamp, mem);
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
+u8 PS_CPU::pgxp_nonhw_read_byte(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u8 val = *(u8 *)host;
+
+	if((opcode >> 26) == OP_LB)
+		PGXP_CPU_LB(opcode, val, mem);
+	else
+		PGXP_CPU_LBU(opcode, val, mem);
+
+	return val;
+}
+
+u8 PS_CPU::pgxp_hw_read_byte(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u8 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	val = PSX_MemRead8(timestamp, kmem);
+
+	if((opcode >> 26) == OP_LB)
+		PGXP_CPU_LB(opcode, val, mem);
+	else
+		PGXP_CPU_LBU(opcode, val, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
@@ -3295,7 +3524,7 @@ u8 PS_CPU::hw_read_byte(struct lightrec_state *state,
 }
 
 u16 PS_CPU::hw_read_half(struct lightrec_state *state,
-		u32 mem)
+		u32 opcode, void *host, u32 mem)
 {
 	u16 val;
 
@@ -3312,8 +3541,46 @@ u16 PS_CPU::hw_read_half(struct lightrec_state *state,
 	return val;
 }
 
+u16 PS_CPU::pgxp_nonhw_read_half(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u16 val = LE16TOH(*(u16 *)host);
+
+	if((opcode >> 26) == OP_LH)
+		PGXP_CPU_LH(opcode, val, mem);
+	else
+		PGXP_CPU_LHU(opcode, val, mem);
+
+	return val;
+}
+
+u16 PS_CPU::pgxp_hw_read_half(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u16 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	val = PSX_MemRead16(timestamp, kmem);
+
+	if((opcode >> 26) == OP_LH)
+		PGXP_CPU_LH(opcode, val, mem);
+	else
+		PGXP_CPU_LHU(opcode, val, mem);
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
 u32 PS_CPU::hw_read_word(struct lightrec_state *state,
-		u32 mem)
+		u32 opcode, void *host, u32 mem)
 {
 	u32 val;
 
@@ -3330,6 +3597,81 @@ u32 PS_CPU::hw_read_word(struct lightrec_state *state,
 	return val;
 }
 
+u32 PS_CPU::pgxp_nonhw_read_word(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u32 val = LE32TOH(*(u32 *)host);
+
+	switch (opcode >> 26){
+		case OP_LWL:
+			//TODO: OR with masked register
+			PGXP_CPU_LWL(opcode, val << (24-(opcode & 0x3)*8), mem + (opcode & 0x3));
+			break;
+		case OP_LW:
+			PGXP_CPU_LW(opcode, val, mem);
+			break;
+		case OP_LWR:
+			//TODO: OR with masked register
+			PGXP_CPU_LWR(opcode, val >> ((opcode & 0x3)*8), mem + (opcode & 0x3));
+			break;
+		case OP_LWC2:
+			PGXP_GTE_LWC2(opcode, val, mem);
+			break;
+		default:
+			break;
+	}
+
+	return val;
+}
+
+u32 PS_CPU::pgxp_hw_read_word(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u32 val;
+
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+
+	u32 kmem = kunseg(mem);
+
+	val = PSX_MemRead32(timestamp, kmem);
+
+	switch (opcode >> 26){
+		case OP_LWL:
+			//TODO: OR with masked register
+			PGXP_CPU_LWL(opcode, val << (24-(opcode & 0x3)*8), mem + (opcode & 0x3));
+			break;
+		case OP_LW:
+			PGXP_CPU_LW(opcode, val, mem);
+			break;
+		case OP_LWR:
+			//TODO: OR with masked register
+			PGXP_CPU_LWR(opcode, val >> ((opcode & 0x3)*8), mem + (opcode & 0x3));
+			break;
+		case OP_LWC2:
+			PGXP_GTE_LWC2(opcode, val, mem);
+			break;
+		default:
+			break;
+	}
+
+	/* Calling PSX_MemRead* might update timestamp - Make sure
+	 * here that state->current_cycle stays in sync. */
+	lightrec_reset_cycle_count(lightrec_state, timestamp);
+
+	reset_target_cycle_count(state, timestamp);
+
+	return val;
+}
+
+struct lightrec_mem_map_ops PS_CPU::pgxp_nonhw_regs_ops = {
+	.sb = pgxp_nonhw_write_byte,
+	.sh = pgxp_nonhw_write_half,
+	.sw = pgxp_nonhw_write_word,
+	.lb = pgxp_nonhw_read_byte,
+	.lh = pgxp_nonhw_read_half,
+	.lw = pgxp_nonhw_read_word,
+};
+
 struct lightrec_mem_map_ops PS_CPU::hw_regs_ops = {
 	.sb = hw_write_byte,
 	.sh = hw_write_half,
@@ -3340,15 +3682,21 @@ struct lightrec_mem_map_ops PS_CPU::hw_regs_ops = {
 };
 
 u32 PS_CPU::cache_ctrl_read_word(struct lightrec_state *state,
-		u32 mem)
+		u32 opcode, void *host, u32 mem)
 {
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_LW(opcode, BIU, mem);
+
 	return BIU;
 }
 
 void PS_CPU::cache_ctrl_write_word(struct lightrec_state *state,
-		u32 mem, u32 val)
+		u32 opcode, void *host, u32 mem, u32 val)
 {
 	BIU = val;
+
+	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+		PGXP_CPU_SW(opcode, BIU, mem);
 }
 
 struct lightrec_mem_map_ops PS_CPU::cache_ctrl_ops = {
@@ -3455,10 +3803,57 @@ int PS_CPU::lightrec_plugin_init()
 	}
 
 	lightrec_map[PSX_MAP_KERNEL_USER_RAM].address = psxM;
+
+	if (PGXP_GetModes() & (PGXP_MODE_MEMORY | PGXP_MODE_GTE)){
+		hw_regs_ops = {
+		.sb = pgxp_hw_write_byte,
+		.sh = pgxp_hw_write_half,
+		.sw = pgxp_hw_write_word,
+		.lb = pgxp_hw_read_byte,
+		.lh = pgxp_hw_read_half,
+		.lw = pgxp_hw_read_word,
+		};
+
+		ops.cop2_ops = {
+		.mfc = pgxp_cop2_mfc,
+		.cfc = pgxp_cop2_cfc,
+		.mtc = pgxp_cop2_mtc,
+		.ctc = pgxp_cop2_ctc,
+		.op = cop2_op,
+		};
+
+		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = &pgxp_nonhw_regs_ops;
+		lightrec_map[PSX_MAP_BIOS].ops = &pgxp_nonhw_regs_ops;
+		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = &pgxp_nonhw_regs_ops;
+	} else {
+		hw_regs_ops = {
+		.sb = hw_write_byte,
+		.sh = hw_write_half,
+		.sw = hw_write_word,
+		.lb = hw_read_byte,
+		.lh = hw_read_half,
+		.lw = hw_read_word,
+		};
+
+		ops.cop2_ops = {
+		.mfc = cop2_mfc,
+		.cfc = cop2_cfc,
+		.mtc = cop2_mtc,
+		.ctc = cop2_ctc,
+		.op = cop2_op,
+		};
+
+		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = NULL;
+		lightrec_map[PSX_MAP_BIOS].ops = NULL;
+		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = NULL;
+	}
+
 #if defined(HAVE_SHM) || defined(HAVE_WIN_SHM) || defined(HAVE_ASHMEM)
-	lightrec_map[PSX_MAP_MIRROR1].address = psxM + 0x200000;
-	lightrec_map[PSX_MAP_MIRROR2].address = psxM + 0x400000;
-	lightrec_map[PSX_MAP_MIRROR3].address = psxM + 0x600000;
+	if(psx_mmap){
+		lightrec_map[PSX_MAP_MIRROR1].address = psxM + 0x200000;
+		lightrec_map[PSX_MAP_MIRROR2].address = psxM + 0x400000;
+		lightrec_map[PSX_MAP_MIRROR3].address = psxM + 0x600000;
+	}
 #endif
 	lightrec_map[PSX_MAP_BIOS].address = psxR;
 	lightrec_map[PSX_MAP_SCRATCH_PAD].address = psxH;
