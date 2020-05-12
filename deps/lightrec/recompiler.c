@@ -76,19 +76,21 @@ static void * lightrec_recompiler_thd(void *d)
 
 	pthread_mutex_lock(&rec->mutex);
 
-	for (;;) {
+	do {
 		do {
 			pthread_cond_wait(&rec->cond, &rec->mutex);
 
-			if (rec->stop) {
-				pthread_mutex_unlock(&rec->mutex);
-				return NULL;
-			}
+			if (rec->stop)
+				goto out_unlock;
 
 		} while (slist_empty(&rec->slist));
 
 		lightrec_compile_list(rec);
-	}
+	} while (!rec->stop);
+
+out_unlock:
+	pthread_mutex_unlock(&rec->mutex);
+	return NULL;
 }
 
 struct recompiler *lightrec_recompiler_init(struct lightrec_state *state)
