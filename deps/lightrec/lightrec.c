@@ -110,7 +110,7 @@ static void lightrec_swl(struct lightrec_state *state,
 			 u32 opcode, void *host, u32 addr, u32 data)
 {
 	unsigned int shift = addr & 0x3;
-	unsigned int mask = UINT_MAX << ((shift + 1) * 8);
+	unsigned int mask = GENMASK(31, (shift + 1) * 8);
 	u32 old_data;
 
 	/* Align to 32 bits */
@@ -174,7 +174,7 @@ static u32 lightrec_lwr(struct lightrec_state *state,
 			u32 opcode, void *host, u32 addr, u32 data)
 {
 	unsigned int shift = addr & 0x3;
-	unsigned int mask = UINT_MAX << (32 - shift * 8);
+	unsigned int mask = GENMASK(31, 32 - shift * 8);
 	u32 old_data;
 
 	/* Align to 32 bits */
