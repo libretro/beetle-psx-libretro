@@ -20,6 +20,9 @@
 #include "libretro_options.h"
 #include "input.h"
 
+#include "parallel-psx/custom-textures/dbg_input_callback.h"
+retro_input_state_t dbg_input_state_cb = 0;
+
 #include "mednafen/mednafen-endian.h"
 #include "mednafen/mednafen-types.h"
 #include "mednafen/psx/psx.h"
@@ -125,7 +128,7 @@ unsigned int psx_pgxp_texture_correction;
 
 char retro_save_directory[4096];
 char retro_base_directory[4096];
-static char retro_cd_base_directory[4096];
+char retro_cd_base_directory[4096];
 static char retro_cd_path[4096];
 char retro_cd_base_name[4096];
 #ifdef _WIN32
@@ -4710,6 +4713,7 @@ void retro_set_input_poll(retro_input_poll_t cb)
 void retro_set_input_state(retro_input_state_t cb)
 {
    input_state_cb = cb;
+   dbg_input_state_cb = cb;
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)

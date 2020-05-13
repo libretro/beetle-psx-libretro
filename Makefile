@@ -575,8 +575,8 @@ else
       CFLAGS   += -O2 -DNDEBUG
       CXXFLAGS += -O2 -DNDEBUG
    else
-      CFLAGS   += -O3 -DNDEBUG -MMD
-      CXXFLAGS += -O3 -DNDEBUG -MMD
+      CFLAGS   += -O3 -g -DNDEBUG -MMD
+      CXXFLAGS += -O3 -g -DNDEBUG -MMD
    endif
 endif
 
@@ -657,18 +657,18 @@ else
 endif
 
 %.o: %.cpp
-	@$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
+	@$(CXX) -c -MMD $(OBJOUT)$@ $< $(CXXFLAGS)
 	@echo "CXX $<"
 
 %.o: %.c
-	@$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
+	@$(CC) -c -MMD $(OBJOUT)$@ $< $(CFLAGS)
 	@echo "CC $<"
 
 clean:
 	@rm -f $(OBJECTS)
-	@echo rm -f *.o
+	@echo rm -f "*.o"
 	@rm -f $(DEPS)
-	@echo rm -f *.d
+	@echo rm -f "*.d"
 	rm -f $(TARGET) $(TARGET_TMP)
 
 .PHONY: clean

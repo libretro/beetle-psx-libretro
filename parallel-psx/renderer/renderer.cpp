@@ -12,6 +12,10 @@ using namespace std;
 
 namespace PSX
 {
+uint32_t colorToRGBA8(float r, float g, float b, float a) {
+	return ((int)(a * 0xff) << 24) + ((int)(b * 0xff) << 16) + ((int)(g * 0xff) << 8) + (int)(r * 0xff);
+}
+
 Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const SaveState *state)
     : device(device)
     , scaling(scaling_)
@@ -160,6 +164,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	}
 
 	atlas.set_hazard_listener(this);
+	tracker.set_texture_uploader(this);
 
 	init_pipelines();
 
@@ -188,6 +193,10 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 
 	flush();
 	reset_scissor_queue();
+
+	if (state) {
+		tracker.load_state(state->tracker_state);
+	}
 }
 
 void Renderer::set_scanout_semaphore(Semaphore semaphore)
@@ -217,7 +226,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	std::vector<uint32_t> vram(FB_WIDTH * FB_HEIGHT);
 	memcpy(vram.data(), ptr, FB_WIDTH * FB_HEIGHT * sizeof(uint32_t));
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
-	return { move(vram), render_state };
+	return { move(vram), render_state, tracker.save_state() };
 }
 
 void Renderer::set_filter_mode(FilterMode mode)
@@ -457,6 +466,7 @@ void Renderer::set_draw_rect(const Rect &rect)
 
 void Renderer::clear_rect(const Rect &rect, FBColor color)
 {
+	tracker.clearRegion(rect);
 	last_scanout.reset();
 	atlas.clear_rect(rect, color);
 
@@ -517,6 +527,9 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	timer.start();
 #endif
 
+	TT_LOG_VERBOSE(RETRO_LOG_INFO,
+		"copy_vram_to_cpu_synchronous(rect={%i, %i, %i x %i}).\n", rect.x, rect.y, rect.width, rect.height
+	);
 	atlas.read_transfer(Domain::Unscaled, rect);
 	ensure_command_buffer();
 
@@ -541,6 +554,8 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	for (uint16_t y = 0; y < rect.height; y++)
 	   for (uint16_t x = 0; x < rect.width; x++)
 		  vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
+		
+	tracker.notifyReadback(rect, vram);
 
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 
@@ -865,6 +880,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
+	tracker.endFrame();
 
 	if (last_scanout)
 		return last_scanout;
@@ -1272,7 +1288,23 @@ float Renderer::allocate_depth(const Rect &rect)
 	//iCB: Doubled again for added safety, otherwise we get Z-fighting when drawing multi-pass blended primitives.
 }
 
-void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count)
+HdTextureHandle Renderer::get_hd_texture_index(const Rect &vram_rect, bool &fastpath_capable_out, bool &cache_hit_out) {
+	UsedMode mode = {
+		render_state.texture_mode,
+		render_state.palette_offset_x,
+		render_state.palette_offset_y
+	};
+	if (mode.mode == TextureMode::ABGR1555) {
+		// HACK: This mode doesn't use a palette, so this a hack to make the palette irrelevant for equality purposes
+		mode.palette_offset_x = 0;
+		mode.palette_offset_y = 0;
+	}
+	return tracker.get_hd_texture_index(vram_rect, mode, render_state.texture_offset_x, render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
+	// HDTODO: hd_texture_index = getHdTextureIndex(snoop);
+	// HDTODO: otherwise set hd_texture_index = last_hd_texture_index
+}
+
+void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index)
 {
 	unsigned shift;
 	switch (render_state.texture_mode)
@@ -1288,6 +1320,8 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		break;
 	}
 
+	Rect hd_texture_vram(0, 0, 0, 0);
+
 	if (render_state.texture_mode != TextureMode::None)
 	{
 		if (render_state.texture_window.mask_x == 0xffu && render_state.texture_window.mask_y == 0xffu)
@@ -1300,13 +1334,31 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			unsigned height = max_v - min_v + 1;
 
 			if (max_u > 255 || max_v > 255) // Wraparound behavior, assume the whole page is hit.
+			{
 				atlas.set_texture_window({ 0, 0, 256u >> shift, 256 });
+				hd_texture_vram = {
+					render_state.texture_offset_x,
+					render_state.texture_offset_y,
+					256u >> shift,
+					256,
+				};
+			}
 			else
 			{
 				min_u >>= shift;
 				max_u = (max_u + (1 << shift) - 1) >> shift;
 				width = max_u - min_u + 1;
 				atlas.set_texture_window({ min_u, min_v, width, height });
+
+				hd_texture_vram = {
+					render_state.texture_offset_x + min_u,
+					render_state.texture_offset_y + min_v,
+
+					// HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1
+					width - 1, // This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles)
+					
+					height,
+				};
 			}
 		}
 		else
@@ -1315,6 +1367,12 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			auto effective_rect = render_state.cached_window_rect;
 			atlas.set_texture_window(
 			    { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height });
+			hd_texture_vram = {
+				render_state.texture_offset_x + (effective_rect.x >> shift),
+				render_state.texture_offset_y + effective_rect.y,
+				effective_rect.width >> shift,
+				effective_rect.height,
+			};
 		}
 	}
 
@@ -1348,6 +1406,33 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	};
 
 	float z = allocate_depth(rect);
+
+	// Look up the hd texture index
+	// This is done here at the end of the function because the `allocate_depth`
+	// call above can call `reset_queue` which would invalidate the HdTextureHandle
+	int16_t param = int16_t(shift);
+	if (hd_texture_vram.height > 0) { // This condition is just a dumb way to check that the rect was actually set to something
+		bool fastpath_capable_out = false;
+		bool cache_hit = false;
+		hd_texture_index = get_hd_texture_index(hd_texture_vram, fastpath_capable_out, cache_hit);
+		fastpath_capable_out = false;
+		if (
+			fastpath_capable_out &&
+			render_state.texture_window.mask_x == 0xff && render_state.texture_window.mask_y == 0xff &&
+			render_state.texture_window.or_x == 0x00 && render_state.texture_window.or_y == 0x00
+		) {
+			// All UVs are within a single hd texture, and there are no & or | shenanigans. Tell the shader to use the fast path.
+			param = param | 0x100;
+		}
+		if (cache_hit) {
+			param = param | 0x400; // dbg cache hit
+		}
+	}
+	if (hd_texture_index == HdTextureHandle::make_none()) {
+		// This flag says skip hd textures
+		param = param | 0x200;
+	}
+
 	for (unsigned i = 0; i < count; i++)
 	{
 		output[i] = {
@@ -1362,7 +1447,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 #if 0
 			int16_t(shift | (render_state.dither << 8)),
 #else
-			int16_t(shift),
+			param,
 #endif
 			int16_t(vertices[i].u),
 			int16_t(vertices[i].v),
@@ -1381,7 +1466,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	}
 }
 
-std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, int scissor)
+std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture)
 {
 	// For mask testing, force primitives through the serialized blend path.
 	if (render_state.mask_test)
@@ -1393,13 +1478,13 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 		{
 			for (unsigned i = 0; i < prims; i++)
 				queue.semi_transparent_opaque_scissor.emplace_back(queue.semi_transparent_opaque_scissor.size(),
-				                                                   scissor);
+				                                                   scissor, hd_texture);
 			return &queue.semi_transparent_opaque;
 		}
 		else
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.opaque_textured_scissor.emplace_back(queue.opaque_textured_scissor.size(), scissor);
+				queue.opaque_textured_scissor.emplace_back(queue.opaque_textured_scissor.size(), scissor, hd_texture);
 			return &queue.opaque_textured;
 		}
 	}
@@ -1408,7 +1493,7 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 	else
 	{
 		for (unsigned i = 0; i < prims; i++)
-			queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), scissor);
+			queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), scissor, hd_texture);
 		return &queue.opaque;
 	}
 }
@@ -1541,9 +1626,10 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	counters.native_draw_calls++;
 
 	BufferVertex vert[3];
-	build_attribs(vert, vertices, 3);
+	HdTextureHandle hd_texture_index = HdTextureHandle::make_none();
+	build_attribs(vert, vertices, 3, hd_texture_index);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(1, scissor_index);
+	auto *out = select_pipeline(1, scissor_index, hd_texture_index);
 	if (out)
 	{
 		for (unsigned i = 0; i < 3; i++)
@@ -1554,7 +1640,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	{
 		for (unsigned i = 0; i < 3; i++)
 			queue.semi_transparent.push_back(vert[i]);
-		queue.semi_transparent_state.push_back({ scissor_index, render_state.semi_transparent,
+		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
 		                                         render_state.texture_mode != TextureMode::None,
 		                                         render_state.mask_test });
 
@@ -1573,9 +1659,15 @@ void Renderer::draw_quad(const Vertex *vertices)
 	counters.native_draw_calls++;
 
 	BufferVertex vert[4];
-	build_attribs(vert, vertices, 4);
+	// build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
+	// tracker.no_hd_texture uses a special index (-1) that is the only one valid across such events.
+	// If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
+	// to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
+	// build_attribs itself, and not out here.
+	HdTextureHandle hd_texture_index = HdTextureHandle::make_none();
+	build_attribs(vert, vertices, 4, hd_texture_index);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(2, scissor_index);
+	auto *out = select_pipeline(2, scissor_index, hd_texture_index);
 
 	if (out)
 	{
@@ -1595,10 +1687,10 @@ void Renderer::draw_quad(const Vertex *vertices)
 		queue.semi_transparent.push_back(vert[3]);
 		queue.semi_transparent.push_back(vert[2]);
 		queue.semi_transparent.push_back(vert[1]);
-		queue.semi_transparent_state.push_back({ scissor_index, render_state.semi_transparent,
+		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
 		                                         render_state.texture_mode != TextureMode::None,
 		                                         render_state.mask_test });
-		queue.semi_transparent_state.push_back({ scissor_index, render_state.semi_transparent,
+		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
 		                                         render_state.texture_mode != TextureMode::None,
 		                                         render_state.mask_test });
 
@@ -1626,8 +1718,8 @@ void Renderer::clear_quad(const Rect &rect, FBColor color, bool candidate)
 	queue.opaque.push_back(pos3);
 	queue.opaque.push_back(pos2);
 	queue.opaque.push_back(pos1);
-	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), -1);
-	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), -1);
+	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), -1, HdTextureHandle::make_none());
+	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), -1, HdTextureHandle::make_none());
 
 	if (candidate)
 		queue.clear_candidates.push_back({ rect, color, z });
@@ -1727,40 +1819,50 @@ void Renderer::flush_render_pass(const Rect &rect)
 	reset_queue();
 }
 
-void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<pair<unsigned, int>> &scissors)
+void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveInfo> &scissors)
 {
-	sort(begin(scissors), end(scissors), [](const pair<unsigned, int> &a, const pair<unsigned, int> &b) {
-		if (a.second != b.second)
-			return a.second > b.second;
-		return a.first > b.first;
+	sort(begin(scissors), end(scissors), [](const PrimitiveInfo &a, const PrimitiveInfo &b) {
+		if (a.hd_texture_index != b.hd_texture_index)
+			return a.hd_texture_index > b.hd_texture_index;
+		if (a.scissor_index != b.scissor_index)
+			return a.scissor_index > b.scissor_index;
+		return a.triangle_index > b.triangle_index;
 	});
 
 	// Render flat-shaded primitives.
 	auto *vert = static_cast<BufferVertex *>(
 	    cmd->allocate_vertex_data(0, vertices.size() * sizeof(BufferVertex), sizeof(BufferVertex)));
 
-	int scissor = scissors.front().second;
+	int scissor = scissors.front().scissor_index;
+	HdTextureHandle hd_texture = scissors.front().hd_texture_index;
 	unsigned last_draw = 0;
 	unsigned i = 1;
 	unsigned size = scissors.size();
 
+	hd_texture_uniforms(hd_texture);
 	cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
-	memcpy(vert, vertices.data() + 3 * scissors.front().first, 3 * sizeof(BufferVertex));
+	memcpy(vert, vertices.data() + 3 * scissors.front().triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
 	for (; i < size; i++, vert += 3)
 	{
-		if (scissors[i].second != scissor)
+		if (scissors[i].scissor_index != scissor || scissors[i].hd_texture_index != hd_texture)
 		{
 			unsigned to_draw = i - last_draw;
 			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			counters.draw_calls++;
 			last_draw = i;
 
-			scissor = scissors[i].second;
-			cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
+			if (scissors[i].scissor_index != scissor) {
+				scissor = scissors[i].scissor_index;
+				cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
+			}
+			if (scissors[i].hd_texture_index != hd_texture) {
+				hd_texture = scissors[i].hd_texture_index;
+				hd_texture_uniforms(hd_texture);
+			}
 		}
-		memcpy(vert, vertices.data() + 3 * scissors[i].first, 3 * sizeof(BufferVertex));
+		memcpy(vert, vertices.data() + 3 * scissors[i].triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
@@ -1785,6 +1887,28 @@ void Renderer::render_opaque_primitives()
 	cmd->set_program(*pipelines.opaque_flat);
 
 	dispatch(vertices, scissors);
+}
+
+void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
+	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
+	cmd->set_texture(0, 4, hd.texture->get_view(), StockSampler::TrilinearClamp); // Type of sampler only matters for the fast path
+	// ivec4, ivec4
+	struct HDPush {
+		int32_t vram_rect_x;
+		int32_t vram_rect_y;
+		int32_t vram_rect_width;
+		int32_t vram_rect_height;
+
+		int32_t texel_rect_x;
+		int32_t texel_rect_y;
+		int32_t texel_rect_width;
+		int32_t texel_rect_height;
+	};
+	HDPush push = {
+		hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
+		hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
+	};
+	cmd->push_constants(&push, 0, sizeof(push));
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -1816,6 +1940,7 @@ void Renderer::render_semi_transparent_primitives()
 
 	const auto set_state = [&](const SemiTransparentState &state) {
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
+		hd_texture_uniforms(state.hd_texture_index);
 		
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
@@ -2086,8 +2211,13 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	if (dst.width == 0 || dst.height == 0)
 		return;
 
+	TT_LOG_VERBOSE(RETRO_LOG_INFO,
+		"blit_vram(dst={%i, %i, %i x %i}, src={%i, %i, %i x %i}).\n", dst.x, dst.y, dst.width, dst.height, src.x, src.y, src.width, src.height
+	);
 	last_scanout.reset();
 	auto domain = atlas.blit_vram(dst, src);
+
+	tracker.blit(dst, src);
 
 	if (dst.intersects(src))
 	{
@@ -2161,6 +2291,64 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 					});
 		}
 	}
+}
+
+static inline uint32_t image_num_miplevels(const VkExtent3D &extent)
+{
+	uint32_t size = std::max(std::max(extent.width, extent.height), extent.depth);
+	uint32_t levels = 0;
+	while (size)
+	{
+		levels++;
+		size >>= 1;
+	}
+	return levels;
+}
+
+Vulkan::ImageHandle Renderer::upload_texture(std::vector<LoadedImage> &levels) {
+	ImageCreateInfo info;
+	info.width = levels[0].width;
+	info.height = levels[0].height;
+	info.depth = 1;
+	info.levels = levels.size();
+	info.format = VK_FORMAT_R8G8B8A8_UNORM;
+	info.type = VK_IMAGE_TYPE_2D;
+	info.layers = 1;
+	info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.flags = 0;
+	info.misc = 0u;
+	info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	std::vector<ImageInitialData> initial;
+	for (int i = 0; i < levels.size(); i++) {
+		initial.push_back({ levels[i].owned_data.data() });
+	}
+
+	auto image = device.create_image(info, initial.data());
+	return image;
+}
+Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) {
+	auto info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
+	info.levels = levels;
+	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	auto image = device.create_image(info, nullptr);
+	return image;
+}
+Vulkan::CommandBufferHandle &Renderer::command_buffer_hack_fixme() {
+	ensure_command_buffer();
+	return cmd;
+}
+
+void Renderer::notify_texture_upload(Rect uploadRect, uint16_t *vram) {
+	tracker.upload(uploadRect, vram);
+}
+void Renderer::set_dump_textures(bool enable) {
+	tracker.dump_enabled = enable;
+}
+void Renderer::set_replace_textures(bool enable) {
+	tracker.hd_textures_enabled = enable;
 }
 
 uint16_t *Renderer::begin_copy(BufferHandle handle)
@@ -2267,5 +2455,7 @@ void Renderer::reset_queue()
 	render_pass_is_feedback = false;
 
 	reset_scissor_queue();
+
+	tracker.on_queues_reset();
 }
 }

@@ -301,6 +301,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
 
    ifeq ($(HAVE_VULKAN), 1)
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
+                     $(wildcard $(CORE_DIR)/parallel-psx/custom-textures/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
