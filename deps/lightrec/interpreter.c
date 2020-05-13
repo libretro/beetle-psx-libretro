@@ -485,7 +485,8 @@ static u32 int_ctc(struct interpreter *inter)
 	/* If we have a MTC0 or CTC0 to CP0 register 12 (Status) or 13 (Cause),
 	 * return early so that the emulator will be able to check software
 	 * interrupt status. */
-	if (op->i.op == OP_CP0 && (op->r.rd == 12 || op->r.rd == 13))
+	if (!(inter->op->flags & LIGHTREC_NO_DS) &&
+	    op->i.op == OP_CP0 && (op->r.rd == 12 || op->r.rd == 13))
 		return inter->block->pc + (op->offset + 1) * sizeof(u32);
 	else
 		return jump_next(inter);
