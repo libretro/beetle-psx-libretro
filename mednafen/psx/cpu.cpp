@@ -3350,7 +3350,7 @@ void PS_CPU::pgxp_nonhw_write_byte(struct lightrec_state *state,
 	*(u8 *)host = val;
 	PGXP_CPU_SB(opcode, val, mem);
 
-	if (psx_dynarec_invalidate)
+	if (!psx_dynarec_invalidate)
 		lightrec_invalidate(state, mem, 1);
 }
 
@@ -3384,7 +3384,7 @@ void PS_CPU::pgxp_nonhw_write_half(struct lightrec_state *state,
 	*(u16 *)host = HTOLE16(val);
 	PGXP_CPU_SH(opcode, val, mem);
 
-	if (psx_dynarec_invalidate)
+	if (!psx_dynarec_invalidate)
 		lightrec_invalidate(state, mem, 2);
 }
 
@@ -3434,7 +3434,7 @@ void PS_CPU::pgxp_nonhw_write_word(struct lightrec_state *state,
 			break;
 	}
 
-	if (psx_dynarec_invalidate)
+	if (!psx_dynarec_invalidate)
 		lightrec_invalidate(state, mem, 4);
 }
 
