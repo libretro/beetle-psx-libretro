@@ -3672,6 +3672,15 @@ struct lightrec_mem_map_ops PS_CPU::pgxp_nonhw_regs_ops = {
 	.lw = pgxp_nonhw_read_word,
 };
 
+struct lightrec_mem_map_ops PS_CPU::pgxp_hw_regs_ops = {
+	.sb = pgxp_hw_write_byte,
+	.sh = pgxp_hw_write_half,
+	.sw = pgxp_hw_write_word,
+	.lb = pgxp_hw_read_byte,
+	.lh = pgxp_hw_read_half,
+	.lw = pgxp_hw_read_word,
+};
+
 struct lightrec_mem_map_ops PS_CPU::hw_regs_ops = {
 	.sb = hw_write_byte,
 	.sh = hw_write_half,
@@ -3733,8 +3742,6 @@ struct lightrec_mem_map PS_CPU::lightrec_map[] = {
 		/* Hardware registers */
 		.pc = 0x1f801000,
 		.length = 0x2000,
-		.address = NULL,
-		.ops = &hw_regs_ops,
 	},
 	[PSX_MAP_CACHE_CONTROL] = {
 		/* Cache control */
@@ -3785,8 +3792,26 @@ struct lightrec_ops PS_CPU::ops = {
 	},
 };
 
+struct lightrec_ops PS_CPU::pgxp_ops = {
+	.cop0_ops = {
+		.mfc = cop_mfc,
+		.cfc = cop_cfc,
+		.mtc = cop_mtc,
+		.ctc = cop_ctc,
+		.op = cop_op,
+	},
+	.cop2_ops = {
+		.mfc = pgxp_cop2_mfc,
+		.cfc = pgxp_cop2_cfc,
+		.mtc = pgxp_cop2_mtc,
+		.ctc = pgxp_cop2_ctc,
+		.op = cop2_op,
+	},
+};
+
 int PS_CPU::lightrec_plugin_init()
 {
+	struct lightrec_ops *cop_ops;
 	uint8_t *psxM = (uint8_t *) MainRAM->data8;
 	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
 	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
@@ -3804,50 +3829,6 @@ int PS_CPU::lightrec_plugin_init()
 
 	lightrec_map[PSX_MAP_KERNEL_USER_RAM].address = psxM;
 
-	if (PGXP_GetModes() & (PGXP_MODE_MEMORY | PGXP_MODE_GTE)){
-		hw_regs_ops = {
-		.sb = pgxp_hw_write_byte,
-		.sh = pgxp_hw_write_half,
-		.sw = pgxp_hw_write_word,
-		.lb = pgxp_hw_read_byte,
-		.lh = pgxp_hw_read_half,
-		.lw = pgxp_hw_read_word,
-		};
-
-		ops.cop2_ops = {
-		.mfc = pgxp_cop2_mfc,
-		.cfc = pgxp_cop2_cfc,
-		.mtc = pgxp_cop2_mtc,
-		.ctc = pgxp_cop2_ctc,
-		.op = cop2_op,
-		};
-
-		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = &pgxp_nonhw_regs_ops;
-		lightrec_map[PSX_MAP_BIOS].ops = &pgxp_nonhw_regs_ops;
-		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = &pgxp_nonhw_regs_ops;
-	} else {
-		hw_regs_ops = {
-		.sb = hw_write_byte,
-		.sh = hw_write_half,
-		.sw = hw_write_word,
-		.lb = hw_read_byte,
-		.lh = hw_read_half,
-		.lw = hw_read_word,
-		};
-
-		ops.cop2_ops = {
-		.mfc = cop2_mfc,
-		.cfc = cop2_cfc,
-		.mtc = cop2_mtc,
-		.ctc = cop2_ctc,
-		.op = cop2_op,
-		};
-
-		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = NULL;
-		lightrec_map[PSX_MAP_BIOS].ops = NULL;
-		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = NULL;
-	}
-
 #if defined(HAVE_SHM) || defined(HAVE_WIN_SHM) || defined(HAVE_ASHMEM)
 	if(psx_mmap){
 		lightrec_map[PSX_MAP_MIRROR1].address = psxM + 0x200000;
@@ -3855,13 +3836,29 @@ int PS_CPU::lightrec_plugin_init()
 		lightrec_map[PSX_MAP_MIRROR3].address = psxM + 0x600000;
 	}
 #endif
+
 	lightrec_map[PSX_MAP_BIOS].address = psxR;
 	lightrec_map[PSX_MAP_SCRATCH_PAD].address = psxH;
 	lightrec_map[PSX_MAP_PARALLEL_PORT].address = psxP;
 
+	if (PGXP_GetModes() & (PGXP_MODE_MEMORY | PGXP_MODE_GTE)){
+		lightrec_map[PSX_MAP_HW_REGISTERS].ops = &pgxp_hw_regs_ops;
+		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = &pgxp_nonhw_regs_ops;
+		lightrec_map[PSX_MAP_BIOS].ops = &pgxp_nonhw_regs_ops;
+		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = &pgxp_nonhw_regs_ops;
+
+		cop_ops = &pgxp_ops;
+	} else {
+		lightrec_map[PSX_MAP_HW_REGISTERS].ops = &hw_regs_ops;
+		lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = NULL;
+		lightrec_map[PSX_MAP_BIOS].ops = NULL;
+		lightrec_map[PSX_MAP_SCRATCH_PAD].ops = NULL;
+
+		cop_ops = &ops;
+	}
+
 	lightrec_state = lightrec_init(name,
-			lightrec_map, ARRAY_SIZE(lightrec_map),
-			&ops);
+			lightrec_map, ARRAY_SIZE(lightrec_map), cop_ops);
 
 	lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
 

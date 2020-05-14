@@ -259,6 +259,8 @@ class PS_CPU
  static void pgxp_cop2_ctc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
  static void pgxp_cop2_mtc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
  static struct lightrec_ops ops;
+ static struct lightrec_ops pgxp_ops;
+ static struct lightrec_mem_map_ops pgxp_hw_regs_ops;
  static struct lightrec_mem_map_ops pgxp_nonhw_regs_ops;
  static struct lightrec_mem_map_ops hw_regs_ops;
  static struct lightrec_mem_map_ops cache_ctrl_ops;
