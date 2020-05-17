@@ -32,21 +32,20 @@
 
 #ifdef HAVE_LIGHTREC
 #include <sys/mman.h>
-#endif
 
 #ifdef HAVE_ASHMEM
 #include <sys/ioctl.h>
 #include <linux/ashmem.h>
-#define HAVE_SHM 1
 #endif
 
-#ifdef HAVE_SHM
+#if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
 #include <fcntl.h>
 #endif
 
 #ifdef HAVE_WIN_SHM
 #include <windows.h>
 #endif
+#endif /* HAVE_LIGHTREC */
 
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
 extern bool FastSaveStates;
@@ -86,11 +85,11 @@ bool fast_pal = false;
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
 bool psx_dynarec_invalidate;
-bool psx_mmap = false;
-uint8 *psx_mem;
-uint8 *psx_bios;
-uint8 *psx_scratch;
-#if defined(HAVE_SHM)
+uint8 psx_mmap = 0;
+uint8 *psx_mem = NULL;
+uint8 *psx_bios = NULL;
+uint8 *psx_scratch = NULL;
+#if defined(HAVE_ASHMEM)
 int memfd;
 #endif
 #endif
@@ -1626,59 +1625,99 @@ static const uintptr_t supported_io_bases[] = {
 #endif
 };
 
+#define RAM_SIZE 0x200000
+#define BIOS_SIZE 0x80000
+#define SCRATCH_SIZE 0x400
+
+#ifdef HAVE_WIN_SHM
+#define MAP(addr, size, fd, offset) \
+	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS, 0, offset, size, addr)
+#define UNMAP(addr, size) UnmapViewOfFile(addr)
+#define MFAILED NULL
+#define NUM_MEM 4
+#elif defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#define MAP(addr, size, fd, offset) \
+	mmap(addr,size, PROT_READ | PROT_WRITE, \
+		MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
+#define UNMAP(addr, size) munmap(addr, size)
+#define MFAILED MAP_FAILED
+#define NUM_MEM 4
+#else
+#define MAP(addr, size, fd, offset) \
+	mmap(addr,size, PROT_READ | PROT_WRITE, \
+		MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
+#define UNMAP(addr, size) munmap(addr, size)
+#define MFAILED MAP_FAILED
+#define NUM_MEM 1
+#endif
+
 int lightrec_init_mmap()
 {
-#ifdef HAVE_SHM
-	unsigned int i, j;
+	int r = 0, i, j, err;
 	uintptr_t base;
-	void *bios, *scratch;
-	int err;
-	void *map;
+	void *bios, *scratch, *map;
 
+/* open memfd and set size */
 #ifdef HAVE_ASHMEM
 	memfd = open("/dev/ashmem", O_RDWR);
 
-	ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
-	ioctl(memfd, ASHMEM_SET_SIZE, 0x280400);
-#else
-	char shm_name[30];
-	sprintf(shm_name, "/lightrec_memfd_%d", getpid());
-	memfd = shm_open(shm_name,
-			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-	if (memfd < 0) {
-		sprintf(shm_name, "/lightrec_memfd_%d_2", getpid());
-		memfd = shm_open(shm_name,
-			 O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-	}
 	if (memfd < 0) {
 		err = -errno;
-		fprintf(stderr, "Failed to create SHM: %d\n", err);
-		return err;
+		log_cb(RETRO_LOG_ERROR, "Failed to open ASHMEM fd: %d\n", err);
+		return 0;
 	}
 
-	err = ftruncate(memfd, 0x280400);
+	ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
+	ioctl(memfd, ASHMEM_SET_SIZE, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE);
+#endif
+#ifdef HAVE_SHM
+	int memfd;
+	const char *shm_name = "/lightrec_memfd";
+
+	memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL,
+			S_IRUSR | S_IWUSR);
+
+	if (memfd < 0) {
+		err = -errno;
+		log_cb(RETRO_LOG_ERROR, "Failed to open SHM fd: %d\n", err);
+		return 0;
+	}
+
+	err = ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE);
+
 	if (err < 0) {
 		err = -errno;
-		fprintf(stderr, "Could not trim SHM: %d\n", err);
-		goto err_shm_unlink;
+		log_cb(RETRO_LOG_ERROR, "Could not set SHM size: %d\n", err);
+		goto shm_unlink_return;
+	}
+#endif
+#ifdef HAVE_WIN_SHM
+	HANDLE memfd;
+
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
+			RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
+
+	if (memfd == NULL) {
+		err = GetLastError();
+		log_cb(RETRO_LOG_ERROR, "Failed to open WIN_SHM: %d\n", err);
+		return 0;
 	}
 #endif
 
+	/* Try to map at various base addresses*/
 	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
 		base = supported_io_bases[i];
 		bios = (void *)(base + 0x1fc00000);
 		scratch = (void *)(base + 0x1f800000);
 
-		for (j = 0; j < 4; j++) {
-			map = mmap((void *)(base + j * 0x200000),
-				   0x200000, PROT_READ | PROT_WRITE,
-				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0);
-			if (map == MAP_FAILED)
+		for (j = 0; j < NUM_MEM; j++) {
+			map = MAP((void *)(base + j * RAM_SIZE), RAM_SIZE, memfd, 0);
+			if (map == MFAILED)
 				break;
-			else if (map != (void *)(base + j * 0x200000))
+			else if (map != (void *)(base + j * RAM_SIZE))
 			{
 				//not at expected address, reject it
-				munmap(map, 0x200000);
+				UNMAP(map, RAM_SIZE);
 				break;
 			}
 		}
@@ -1688,13 +1727,12 @@ int lightrec_init_mmap()
 			continue;
 
 		/* All mirrors mapped - we got a match! */
-		if (j == 4)
+		if (j == NUM_MEM)
 		{
 			psx_mem = (uint8 *)base;
 
-			map = mmap(bios, 0x80000, PROT_READ | PROT_WRITE,
-				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0x200000);
-			if (map == MAP_FAILED)
+			map = MAP(bios, BIOS_SIZE, memfd, RAM_SIZE);
+			if (map == MFAILED)
 				goto err_unmap;
 
 			psx_bios = (uint8 *)map;
@@ -1702,9 +1740,8 @@ int lightrec_init_mmap()
 			if (map != bios)
 				goto err_unmap_bios;
 
-			map = mmap(scratch, 0x400, PROT_READ | PROT_WRITE,
-				   MAP_SHARED | MAP_FIXED_NOREPLACE, memfd, 0x280000);
-			if (map == MAP_FAILED)
+			map = MAP(scratch, SCRATCH_SIZE, memfd, RAM_SIZE+BIOS_SIZE);
+			if (map == MFAILED)
 				goto err_unmap_bios;
 
 			psx_scratch = (uint8 *)map;
@@ -1712,173 +1749,58 @@ int lightrec_init_mmap()
 			if (map != scratch)
 				goto err_unmap_scratch;
 
-#ifndef HAVE_ASHMEM
-			shm_unlink(shm_name);
-#endif
-			return 0;
+			r = NUM_MEM;
+
+			goto shm_unlink_return;
 		}
 
 err_unmap_scratch:
-		munmap(psx_scratch, 0x400);
+		if(psx_scratch){
+			UNMAP(psx_scratch, SCRATCH_SIZE);
+			psx_scratch = NULL;
+		}
 err_unmap_bios:
-		munmap(psx_bios, 0x80000);
+		if(psx_bios){
+			UNMAP(psx_bios, BIOS_SIZE);
+			psx_bios = NULL;
+		}
 err_unmap:
 		/* Clean up any mapped ram or mirrors and try again */
 		for (; j > 0; j--)
-			munmap((void *)(base + (j - 1) * 0x200000), 0x200000);
+			UNMAP((void *)(base + (j - 1) * RAM_SIZE), RAM_SIZE);
+
+		psx_mem = NULL;
 	}
 
 	if (i == ARRAY_SIZE(supported_io_bases)) {
-		err = -EINVAL;
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
-		goto err_shm_unlink;
 	}
 
-err_shm_unlink:
-#ifndef HAVE_ASHMEM
+shm_unlink_return:
+#ifdef HAVE_SHM
 	shm_unlink(shm_name);
+	close(memfd);
 #endif
-	return err;
-#elif defined(HAVE_WIN_SHM)
-	unsigned int i, j;
-	uintptr_t base;
-	int err;
-	HANDLE memfd;
-	void *map;
-
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 0x280400, NULL);
-	if (memfd == NULL) {
-		err = GetLastError();
-		fprintf(stderr, "Failed to create WIN_SHM: %d\n", err);
-		return err;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
-		base = supported_io_bases[i];
-
-		for (j = 0; j < 4; j++) {
-			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0, 0x200000, (void *)(base + j * 0x200000));
-			if (map == NULL)
-				break;
-			else if (map != (void *)(base + j * 0x200000))
-			{
-				//not at expected address, reject it
-				UnmapViewOfFile(map);
-				break;
-			}
-		}
-
-		/* Impossible to map using this base */
-		if (j == 0)
-			continue;
-
-		/* All mirrors mapped - we got a match! */
-		if (j == 4)
-		{
-			psx_mem = (uint8 *)base;
-
-			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0x200000, 0x80000, (void *)(base + 0x1fc00000));
-			if (map == NULL)
-				goto err_unmap;
-
-			psx_bios = (uint8 *)map;
-
-			map = MapViewOfFileEx(memfd, FILE_MAP_ALL_ACCESS, 0, 0x280000, 0x400, (void *)(base + 0x1f800000));
-			if (map == NULL)
-				goto err_unmap_bios;
-
-			psx_scratch = (uint8 *)map;
-
-			CloseHandle(memfd);
-			return 0;
-		}
-
-err_unmap_bios:
-		UnmapViewOfFile(psx_bios);
-err_unmap:
-		/* Clean up any mapped ram or mirrors and try again */
-		for (; j > 0; j--)
-			UnmapViewOfFile((void *)(base + (j - 1) * 0x200000));
-	}
-
-	log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
+#ifdef HAVE_WIN_SHM
 	CloseHandle(memfd);
-	return -EINVAL;
-#else
-	unsigned int i;
-	uintptr_t base;
-	void *bios, *scratch;
-	int err;
-	void *map;
-
-	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
-		base = supported_io_bases[i];
-		bios = (void *)(base + 0x1fc00000);
-		scratch = (void *)(base + 0x1f800000);
-
-		map = mmap((void *)base, 0x200000, PROT_READ | PROT_WRITE,
-			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		if (map == MAP_FAILED)
-			continue;
-
-		psx_mem = (uint8 *)map;
-
-		if (map != (void *)base) {
-			goto err_unmap;
-		}
-
-		map = mmap(bios, 0x80000, PROT_READ | PROT_WRITE,
-			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		if (map == MAP_FAILED)
-			goto err_unmap;
-
-		psx_bios = (uint8 *)map;
-
-		if (map != bios)
-			goto err_unmap_bios;
-
-		map = mmap(scratch, 0x400, PROT_READ | PROT_WRITE,
-			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		if (map == MAP_FAILED)
-			goto err_unmap_bios;
-
-		psx_scratch = (uint8 *)map;
-
-		if (map != scratch)
-			goto err_unmap_scratch;
-
-		return 0;
-
-	err_unmap_scratch:
-		munmap(psx_scratch, 0x400);
-	err_unmap_bios:
-		munmap(psx_bios, 0x80000);
-	err_unmap:
-		munmap(psx_mem, 0x200000);
-	}
-
-	log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
-	return -EINVAL;
 #endif
+	return r;
 }
 
 void lightrec_free_mmap()
 {
-	unsigned int i = 0;
+	for (int i = 0; i < NUM_MEM; i++)
+		UNMAP((void *)((uintptr_t)psx_mem + i * RAM_SIZE), RAM_SIZE);
 
-	munmap(psx_scratch, 0x400);
-	munmap(psx_bios, 0x80000);
+	UNMAP(psx_bios, BIOS_SIZE);
+	UNMAP(psx_scratch, SCRATCH_SIZE);
 
-#if defined(HAVE_SHM) || defined(HAVE_WIN_SHM)
-	for (i = 0; i < 4; i++)
-#endif
-		munmap((void *)((uintptr_t)psx_mem + i * 0x200000), 0x200000);
-
-#ifdef HAVE_SHM
+#ifdef HAVE_ASHMEM
+	/* ashmem shared memory is not pinned by mmap, it dies on close */
 	close(memfd);
 #endif
 }
-#endif
+#endif /* HAVE_LIGHTREC */
 
 /* Forward declarations, required for disk control
  * 'set initial disk' functionality */
@@ -1994,13 +1916,13 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       SetDiscWrapper(CD_TrayOpen);
 
 #ifdef HAVE_LIGHTREC
-   psx_mmap = (lightrec_init_mmap() == 0);
+   psx_mmap = lightrec_init_mmap();
 
-   if(psx_mmap)
+   if(psx_mmap > 0)
    {
-      MainRAM = new(psx_mem) MultiAccessSizeMem<2048 * 1024, uint32, false>();
-      ScratchRAM = new(psx_scratch) MultiAccessSizeMem<1024, uint32, false>();
-      BIOSROM = new(psx_bios) MultiAccessSizeMem<512 * 1024, uint32, false>();
+      MainRAM = new(psx_mem) MultiAccessSizeMem<RAM_SIZE, uint32, false>();
+      ScratchRAM = new(psx_scratch) MultiAccessSizeMem<SCRATCH_SIZE, uint32, false>();
+      BIOSROM = new(psx_bios) MultiAccessSizeMem<BIOS_SIZE, uint32, false>();
    }
    else
 #endif
@@ -2351,11 +2273,8 @@ static void Cleanup(void)
    MainRAM = NULL;
    ScratchRAM = NULL;
    BIOSROM = NULL;
-   if(psx_mmap)
+   if(psx_mmap > 0)
       lightrec_free_mmap();
-#if defined(HAVE_SHM)
-   close(memfd);
-#endif
 #else
    if(MainRAM)
       delete MainRAM;
