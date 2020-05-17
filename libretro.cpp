@@ -199,7 +199,13 @@ static bool firmware_is_present(unsigned region)
       if (!bios_name_list[i])
          break;
 
-      snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
+      int r = snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
+      if (r >= 4096)
+      {
+         log_cb(RETRO_LOG_ERROR, "Firmware path longer than 4095: %s\n", bios_path);
+         break;
+      }
+
       if (filestream_exists(bios_path))
       {
          found = true;
@@ -250,7 +256,7 @@ static void extract_basename(char *buf, const char *path, size_t size)
    if (*base == '\\' || *base == '/')
       base++;
 
-   strncpy(buf, base, size - 1);
+   strncpy(buf, base, size - strlen(buf) - 1);
    buf[size - 1] = '\0';
 
    char *ext = strrchr(buf, '.');
@@ -4099,9 +4105,9 @@ bool retro_load_game(const struct retro_game_info *info)
    extract_basename(retro_cd_base_name,       info->path, sizeof(retro_cd_base_name));
    extract_directory(retro_cd_base_directory, info->path, sizeof(retro_cd_base_directory));
 
-   snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
+   int r = snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
 
-   if (filestream_exists(tocbasepath))
+   if (r >= 0 && r < 4096 && filestream_exists(tocbasepath))
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", tocbasepath);
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
@@ -4993,23 +4999,30 @@ static void sanitize_path(std::string &path)
 const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 {
    static char fullpath[4096];
+   int r = 0;
 
    fullpath[0] = '\0';
 
    switch (type)
    {
       case MDFNMKF_SAV:
-         snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
+         r = snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
                retro_save_directory,
                retro_slash,
                shared_memorycards ? "mednafen_psx_libretro_shared" : retro_cd_base_name,
                cd1);
          break;
       case MDFNMKF_FIRMWARE:
-         snprintf(fullpath, sizeof(fullpath), "%s%c%s", retro_base_directory, retro_slash, cd1);
+         r = snprintf(fullpath, sizeof(fullpath), "%s%c%s", retro_base_directory, retro_slash, cd1);
          break;
       default:
          break;
+   }
+
+   if (r > 4095)
+   {
+      log_cb(RETRO_LOG_ERROR,"MakeFName path longer than 4095\n");
+      fullpath[4095] = '\0';
    }
 
    return fullpath;

@@ -128,14 +128,26 @@ std::string MDFN_GetSettingS(const char *name)
    if (!strcmp("filesys.fname_state", name))
    {
       char fullpath[4096];
-      snprintf(fullpath, sizeof(fullpath), "%s.sav", retro_cd_base_name);
-      return std::string(fullpath);
+      int r = snprintf(fullpath, sizeof(fullpath), "%s.sav", retro_cd_base_name);
+      if (r > 4095)
+      {
+         fprintf(stderr,"Path to .sav too long");
+         return 0;
+      }
+      else
+         return std::string(fullpath);
    }
    if (!strcmp("filesys.fname_sav", name))
    {
       char fullpath[4096];
-      snprintf(fullpath, sizeof(fullpath), "%s.bsv", retro_cd_base_name);
-      return std::string(fullpath);
+      int r = snprintf(fullpath, sizeof(fullpath), "%s.bsv", retro_cd_base_name);
+      if (r > 4095)
+      {
+         fprintf(stderr,"Path to .bsv too long");
+         return 0;
+      }
+      else
+         return std::string(fullpath);
    }
    fprintf(stderr, "unhandled setting S: %s\n", name);
    return 0;

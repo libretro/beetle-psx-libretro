@@ -119,7 +119,7 @@ void PS_CDC::SetDisc(bool tray_open, CDIF *cdif, const char *disc_id)
 
       if(disc_id)
       {
-         strncpy((char *)DiscID, disc_id, 4);
+         memcpy((char *)DiscID, disc_id, 4);
          IsPSXDisc = true;
       }
    }
