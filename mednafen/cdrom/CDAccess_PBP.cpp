@@ -745,7 +745,7 @@ void CDAccess_PBP::Eject(bool eject_status)
 int CDAccess_PBP::decrypt_pgd(unsigned char* pgd_data, int pgd_size)
 {
    int result;
-   PGD_HEADER PGD[sizeof(PGD_HEADER)];
+   PGD_HEADER PGD[1];
    MAC_KEY mkey;
    CIPHER_KEY ckey;
 

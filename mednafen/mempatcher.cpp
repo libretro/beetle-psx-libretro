@@ -185,9 +185,7 @@ void MDFNMP_RemoveReadPatches(void)
 /* This function doesn't allocate any memory for "name" */
 static int AddCheatEntry(char *name, char *conditions, uint32 addr, uint64 val, uint64 compare, int status, char type, unsigned int length, bool bigendian)
 {
- CHEATF temp;
-
- memset(&temp, 0, sizeof(CHEATF));
+ CHEATF temp = CHEATF();
 
  temp.name=name;
  temp.conditions = conditions;
@@ -597,7 +595,7 @@ int MDFNI_DecodePAR(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type)
  int boo[4];
  if(strlen(str)!=8) return(0);
 
- sscanf(str,"%02p%02p%02p%02p",boo,boo+1,boo+2,boo+3);
+ sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
 
  *c = 0;
 

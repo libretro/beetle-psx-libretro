@@ -42,7 +42,7 @@ MDFN_PixelFormat::MDFN_PixelFormat(const unsigned int p_colorspace, const uint8 
 
 MDFN_Surface::MDFN_Surface()
 {
-   memset(&format, 0, sizeof(format));
+   format = MDFN_PixelFormat();
 
    pixels = NULL;
    pitchinpix = 0;
