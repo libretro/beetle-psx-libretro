@@ -88,8 +88,14 @@ endif
 ifneq (,$(findstring unix,$(platform)))
    TARGET := $(TARGET_NAME)_libretro.so
    fpic   := -fPIC
-   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   ifneq ($(shell uname -p | grep -E '((i.|x)86|amd64)'),)
+   ifneq ($(findstring SunOS,$(shell uname -a)),)
+      GREP = ggrep
+      SHARED := -shared -z defs -z gnu-version-script-compat
+   else
+      GREP = grep
+      SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   endif
+   ifneq ($(shell uname -p | $(GREP) -E '((i.|x)86|amd64)'),)
       IS_X86 = 1
    endif
    ifneq (,$(findstring Haiku,$(shell uname -s)))
