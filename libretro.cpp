@@ -1659,7 +1659,7 @@ static const uintptr_t supported_io_bases[] = {
 
 int lightrec_init_mmap()
 {
-	int r = 0, i, j, err;
+	int r = 0, i, j;
 	uintptr_t base;
 	void *bios, *scratch, *map;
 
@@ -1668,8 +1668,7 @@ int lightrec_init_mmap()
 	memfd = open("/dev/ashmem", O_RDWR);
 
 	if (memfd < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Failed to open ASHMEM fd: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create ASHMEM: %s\n", strerror(errno));
 		return 0;
 	}
 
@@ -1684,17 +1683,16 @@ int lightrec_init_mmap()
 			S_IRUSR | S_IWUSR);
 
 	if (memfd < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Failed to open SHM fd: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create SHM: %s\n", strerror(errno));
 		return 0;
 	}
 
-	err = ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE);
+	/* unlink ASAP to prevent leaving a file in shared memory if we crash */
+	shm_unlink(shm_name);
 
-	if (err < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Could not set SHM size: %d\n", err);
-		goto shm_unlink_return;
+	if (ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE) < 0) {
+		log_cb(RETRO_LOG_ERROR, "Could not truncate SHM size: %s\n", strerror(errno));
+		goto close_return;
 	}
 #endif
 #ifdef HAVE_WIN_SHM
@@ -1704,8 +1702,7 @@ int lightrec_init_mmap()
 			RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
 
 	if (memfd == NULL) {
-		err = GetLastError();
-		log_cb(RETRO_LOG_ERROR, "Failed to open WIN_SHM: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
 		return 0;
 	}
 #endif
@@ -1757,7 +1754,7 @@ int lightrec_init_mmap()
 
 			r = NUM_MEM;
 
-			goto shm_unlink_return;
+			goto close_return;
 		}
 
 err_unmap_scratch:
@@ -1782,9 +1779,8 @@ err_unmap:
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	}
 
-shm_unlink_return:
+close_return:
 #ifdef HAVE_SHM
-	shm_unlink(shm_name);
 	close(memfd);
 #endif
 #ifdef HAVE_WIN_SHM
