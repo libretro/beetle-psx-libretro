@@ -73,6 +73,8 @@ static int frame_width = 0;
 static int frame_height = 0;
 static bool gui_inited = false;
 static bool gui_show = false;
+static char bios_path[4096];
+static bool firmware_found = false;
 
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
@@ -139,7 +141,6 @@ enum
 
 static bool firmware_is_present(unsigned region)
 {
-   char bios_path[4096];
    static const size_t list_size = 10;
    const char *bios_name_list[list_size];
    const char *bios_sha1 = NULL;
@@ -191,7 +192,6 @@ static bool firmware_is_present(unsigned region)
       bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
-   bool found = false;
    size_t i;
    for (i = 0; i < list_size; ++i)
    {
@@ -207,12 +207,12 @@ static bool firmware_is_present(unsigned region)
 
       if (filestream_exists(bios_path))
       {
-         found = true;
+         firmware_found = true;
          break;
       }
    }
 
-   if (!found)
+   if (!firmware_found)
    {
       char s[4096];
 
@@ -1964,30 +1964,40 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
 #endif
 
-   const char *biospath_sname;
+   RFILE *BIOSFile;
 
-   if(region == REGION_JP)
-      biospath_sname = "psx.bios_jp";
-   else if(region == REGION_EU)
-      biospath_sname = "psx.bios_eu";
-   else if(region == REGION_NA)
-      biospath_sname = "psx.bios_na";
-   else
-      abort();
-
+   if(firmware_is_present(region))
    {
-      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
-            0, MDFN_GetSettingS(biospath_sname).c_str());
-      RFILE *BIOSFile      = filestream_open(biospath,
+      BIOSFile      = filestream_open(bios_path,
             RETRO_VFS_FILE_ACCESS_READ,
             RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   }
+   else
+   {
+      const char *biospath_sname;
+
+      if(region == REGION_JP)
+         biospath_sname = "psx.bios_jp";
+      else if(region == REGION_EU)
+         biospath_sname = "psx.bios_eu";
+      else if(region == REGION_NA)
+         biospath_sname = "psx.bios_na";
+      else
+         abort();
+
+      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
+            0, MDFN_GetSettingS(biospath_sname).c_str());
+
+      BIOSFile      = filestream_open(biospath,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   }
 
       if (BIOSFile)
       {
          filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
          filestream_close(BIOSFile);
       }
-   }
 
    i = 0;
 
@@ -4059,7 +4069,7 @@ bool retro_load_game(const struct retro_game_info *info)
    // MDFNI_LoadGame() has been called and surface has been allocated,
    // we can now perform firmware check
    bool force_software_renderer = false;
-   if (!firmware_is_present(disc_region))
+   if (!firmware_found)
    {
       log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
 
