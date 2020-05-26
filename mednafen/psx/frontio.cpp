@@ -957,7 +957,7 @@ void FrontIO::LoadMemcard(unsigned int which)
    }
 }
 
-void FrontIO::LoadMemcard(unsigned int which, const char *path)
+void FrontIO::LoadMemcard(unsigned int which, const char *path, bool force_load)
 {
  assert(which < 8);
 
@@ -967,7 +967,16 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path)
           RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
     if (!mf)
+    {
+       if (force_load)
+       {
+          //  I’m pretty sure this is not the smartest way to format the memory
+          //  card, but I can’t think of anything better.
+          delete DevicesMC[which];
+          DevicesMC[which] = Device_Memcard_Create();
+       }
        return;
+    }
 
     filestream_read(mf, DevicesMC[which]->GetNVData(), (1 << 17));
 
@@ -989,11 +998,11 @@ void FrontIO::SaveMemcard(unsigned int which)
  }
 }
 
-void FrontIO::SaveMemcard(unsigned int which, const char *path)
+void FrontIO::SaveMemcard(unsigned int which, const char *path, bool force_save)
 {
  assert(which < 8);
 
- if(DevicesMC[which]->GetNVSize() && DevicesMC[which]->GetNVDirtyCount())
+ if(DevicesMC[which]->GetNVSize() && (force_save || DevicesMC[which]->GetNVDirtyCount()))
  {
     RFILE *mf = filestream_open(path, 
           RETRO_VFS_FILE_ACCESS_WRITE,

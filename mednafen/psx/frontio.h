@@ -88,9 +88,9 @@ class FrontIO
 
       InputDevice *GetMemcardDevice(unsigned int which);
       uint64_t GetMemcardDirtyCount(unsigned int which);
-      void LoadMemcard(unsigned int which, const char *path);
+      void LoadMemcard(unsigned int which, const char *path, bool force_load = false);
       void LoadMemcard(unsigned int which);
-      void SaveMemcard(unsigned int which, const char *path); //, bool force_save = false);
+      void SaveMemcard(unsigned int which, const char *path, bool force_save = false);
       void SaveMemcard(unsigned int which);
 
       int StateAction(StateMem* sm, int load, int data_only);

@@ -74,6 +74,12 @@ static int frame_height = 0;
 static bool gui_inited = false;
 static bool gui_show = false;
 
+// Switchable memory cards
+static int memcard_left_index = 0;
+static int memcard_left_index_old;
+static int memcard_right_index = 1;
+static int memcard_right_index_old;
+
 unsigned cd_2x_speedup = 1;
 bool cd_async = false;
 bool cd_warned_slow = false;
@@ -2005,7 +2011,12 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    {
       char ext[64];
       const char *memcard = NULL;
-      snprintf(ext, sizeof(ext), "%d.mcr", i);
+      if (i == 0)
+         snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
+      else if (i == 1)
+         snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
+      else
+         snprintf(ext, sizeof(ext), "%d.mcr", i);
       memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
       PSX_FIO->LoadMemcard(i, memcard);
    }
@@ -2322,7 +2333,12 @@ static void CloseGame(void)
          {
             char ext[64];
             const char *memcard = NULL;
-            snprintf(ext, sizeof(ext), "%d.mcr", i);
+            if (i == 0)
+               snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
+            else if (i == 1)
+               snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
+            else
+               snprintf(ext, sizeof(ext), "%d.mcr", i);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
             PSX_FIO->SaveMemcard(i, memcard);
          }
@@ -3741,6 +3757,20 @@ static void check_variables(bool startup)
    }
    else
       cd_2x_speedup = 1;
+
+   var.key = BEETLE_OPT(memcard_left_index);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      memcard_left_index_old = memcard_left_index;
+      memcard_left_index     = atoi(var.value);
+   }
+
+   var.key = BEETLE_OPT(memcard_right_index);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      memcard_right_index_old = memcard_right_index;
+      memcard_right_index     = atoi(var.value);
+   }
 }
 
 #ifdef NEED_CD
@@ -4300,6 +4330,62 @@ void retro_run(void)
                                 MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
+
+      // Reload memory cards if they were changed
+      if (use_mednafen_memcard0_method &&
+          memcard_left_index_old != memcard_left_index)
+      {
+         MDFN_DispMessage(
+             "changing from memory card %d to memory card %d in left slot",
+             memcard_left_index_old, memcard_left_index);
+
+         try
+         {
+            char ext[64];
+            const char *memcard = NULL;
+
+            // Save contents of left memory card to previously selected index
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index_old);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            PSX_FIO->SaveMemcard(0, memcard, true);
+
+            // Load contents of currently selected index to left memory card
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            PSX_FIO->LoadMemcard(0, memcard, true);
+         }
+         catch (std::exception &e)
+         {
+            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+         }
+      }
+
+      if (memcard_right_index_old != memcard_right_index)
+      {
+         MDFN_DispMessage(
+             "changing from memory card %d to memory card %d in right slot",
+             memcard_right_index_old, memcard_right_index);
+
+         try
+         {
+            char ext[64];
+            const char *memcard = NULL;
+
+            // Save contents of left memory card to previously selected index
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            PSX_FIO->SaveMemcard(1, memcard, true);
+
+            // Load contents of currently selected index to left memory card
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            PSX_FIO->LoadMemcard(1, memcard, true);
+         }
+         catch (std::exception &e)
+         {
+            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
+         }
+      }
    }
 
    /* We only start counting after the first frame we encounter. This
