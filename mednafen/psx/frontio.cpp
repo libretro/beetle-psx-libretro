@@ -569,8 +569,10 @@ void FrontIO::Write(int32_t timestamp, uint32_t A, uint32_t V)
          break;
 
       case 0xa:
+#if 0
          if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
             PSX_DBG(PSX_DBG_WARNING, "FIO device selection changed during comm %04x->%04x\n", Control, V);
+#endif
 
          //printf("Control: %d, %04x\n", timestamp, V);
          Control = V & 0x3F2F;
