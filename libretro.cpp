@@ -4720,53 +4720,46 @@ size_t retro_serialize_size(void)
    return serialize_size = DEFAULT_STATE_SIZE; // 16MB
 }
 
-bool UsingFastSavestates()
+bool UsingFastSavestates(void)
 {
    int flags;
    if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags))
-   {
       return flags & 4;
-   }
    return false;
 }
 
 bool retro_serialize(void *data, size_t size)
 {
+   StateMem st;
+   bool ret          = false;
+
+   st.len            = 0;
+   st.loc            = 0;
+   st.malloced       = size;
+   st.initial_malloc = 0;
+
    if (size == DEFAULT_STATE_SIZE)  //16MB buffer reserved
    {
       //actual size is around 3.75MB (3.67MB for fast savestates) rather than 16MB, so 16MB will hold a savestate without worrying about realloc
 
       //save state in place
-      StateMem st;
-      st.data = (uint8_t*)data;
-      st.len = 0;
-      st.loc = 0;
-      st.malloced = size;
-      st.initial_malloc = 0;
+      st.data     = (uint8_t*)data;
 
       //fast save states are at least 20% faster
       FastSaveStates = UsingFastSavestates();
-      bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-      FastSaveStates = false;
-      return ret;
+      ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    }
    else
    {
       /* it seems that mednafen can realloc pointers sent to it?
          since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
       static bool logged;
-      StateMem st;
-      bool ret = false;
       uint8_t *_dat = (uint8_t*)malloc(size);
 
       if (!_dat)
          return false;
 
       st.data = _dat;
-      st.loc = 0;
-      st.len = 0;
-      st.malloced = size;
-      st.initial_malloc = 0;
 
       /* there are still some errors with the save states,
        * the size seems to change on some games for now
@@ -4779,12 +4772,14 @@ bool retro_serialize(void *data, size_t size)
 
       FastSaveStates = UsingFastSavestates();
       ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-      FastSaveStates = false;
 
       memcpy(data, st.data, size);
       free(st.data);
-      return ret;
    }
+
+   FastSaveStates = false;
+
+   return ret;
 }
 
 bool retro_unserialize(const void *data, size_t size)
@@ -4853,15 +4848,16 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
    int cursor;
    std::string part;
 
-   if (codeLine==NULL) return;
+   if (codeLine==NULL)
+      return;
 
    //Break the code into Parts
    for (cursor=0;;cursor++)
    {
       if (ISHEXDEC)
-      {
          matchLength++;
-      } else {
+      else
+      {
          if (matchLength)
          {
             part=codeLine+cursor-matchLength;
@@ -4871,9 +4867,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
          }
       }
       if (!codeLine[cursor])
-      {
          break;
-      }
    }
 
    MemoryPatch patch;
@@ -4882,9 +4876,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
    {
       part=codeParts[cursor];
       if (part.length()==8)
-      {
          part+=codeParts[++cursor];
-      }
       if (part.length()==12)
       {
          //Decode the cheat
@@ -4910,16 +4902,6 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
       }
    }
 }
-
-#ifdef _WIN32
-static void sanitize_path(std::string &path)
-{
-   size_t size = path.size();
-   for (size_t i = 0; i < size; i++)
-      if (path[i] == '/')
-         path[i] = '\\';
-}
-#endif
 
 // Use a simpler approach to make sure that things go right for libretro.
 const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
