@@ -4325,7 +4325,8 @@ void retro_run(void)
                         (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
-         snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
+         snprintf(msg_buffer, sizeof(msg_buffer),
+               "Internal FPS: %.2f", internal_fps);
 
          MDFN_DispMessage(msg_buffer);
 
@@ -4968,19 +4969,15 @@ void MDFND_DispMessage(unsigned char *str)
 void MDFN_DispMessage(const char *format, ...)
 {
    va_list ap;
-   struct retro_message msg;
-   const char *strc = NULL;
-   char *str        = (char*)malloc(4096 * sizeof(char));
+   unsigned char *strc = NULL;
+   char           *str = (char*)malloc(4096 * sizeof(char));
 
    va_start(ap,format);
 
    vsnprintf(str, 4096, format, ap);
    va_end(ap);
-   strc       = str;
+   strc             = (unsigned char*)str;
 
-   msg.frames = 180;
-   msg.msg    = strc;
-
-   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   MDFND_DispMessage(strc);
    free(str);
 }
