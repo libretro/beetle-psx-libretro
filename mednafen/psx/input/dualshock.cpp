@@ -156,7 +156,7 @@ void InputDevice_DualShock::SetAMCT(bool enabled)
    else
       analog_mode = true;
 
-   MDFN_DispMessage(_("%s: Analog button toggle is %s, sticks are %s"), gp_name.c_str(), amct_enabled ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
+   MDFN_DispMessage("%s: Analog button toggle is %s, sticks are %s", gp_name.c_str(), amct_enabled ? "ENABLED" : "DISABLED", analog_mode ? "ON" : "OFF");  
 }
 
 //
@@ -196,8 +196,8 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
       {
          if(analog_mode_locked)
          {
-            //MDFN_DispMessage(_("%s: Analog mode is  %s."), gp_name.c_str(), analog_mode ? _("on") : _("off"));
-            MDFN_DispMessage(_("%s: 2 Analog toggle is DISABLED, sticks are %s"), gp_name.c_str(), analog_mode ? _("ON") : _("OFF"));         
+            //MDFN_DispMessage("%s: Analog mode is  %s.", gp_name.c_str(), analog_mode ? "on" : "off");
+            MDFN_DispMessage("%s: 2 Analog toggle is DISABLED, sticks are %s", gp_name.c_str(), analog_mode ? "ON" : "OFF");         
          }
          else
             analog_mode = !analog_mode;
@@ -354,8 +354,8 @@ void InputDevice_DualShock::UpdateInput(const void *data)
 
    if(am_prev_info != analog_mode || aml_prev_info != analog_mode_locked)
    {
-      //MDFN_DispMessage(_("%s: Analog mode is %s(%s)."), gp_name.c_str(), analog_mode ? _("on") : _("off"), analog_mode_locked ? _("locked") : _("unlocked"));
-      MDFN_DispMessage(_("%s: Analog toggle is %s, sticks are %s"), gp_name.c_str(), amct_enabled ? _("ENABLED") : _("DISABLED"), analog_mode ? _("ON") : _("OFF"));  
+      //MDFN_DispMessage("%s: Analog mode is %s(%s).", gp_name.c_str(), analog_mode ? "on" : "off", analog_mode_locked ? "locked" : "unlocked");
+      MDFN_DispMessage("%s: Analog toggle is %s, sticks are %s", gp_name.c_str(), amct_enabled ? "ENABLED" : "DISABLED", analog_mode ? "ON" : "OFF");  
    }
    aml_prev_info = analog_mode_locked;
    am_prev_info = analog_mode;

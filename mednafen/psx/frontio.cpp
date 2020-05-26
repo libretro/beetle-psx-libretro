@@ -917,7 +917,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
    else if(!strcmp(type, "dualshock"))
    {
       char name[256];
-      snprintf(name, 256, _("DualShock on port %u"), port + 1);
+      snprintf(name, 256, "DualShock on port %u", port + 1);
       Devices[port] = Device_DualShock_Create(std::string(name));
    }
    else if(!strcmp(type, "mouse"))

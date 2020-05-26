@@ -2351,16 +2351,16 @@ static void CDInsertEject(void)
 #ifndef HAVE_CDROM_NEW
       if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
       {
-         MDFN_DispMessage(_("Eject error."));
+         MDFN_DispMessage("Eject error.");
          CD_TrayOpen = !CD_TrayOpen;
       }
 #endif
    }
 
    if(CD_TrayOpen)
-      MDFN_DispMessage(_("Virtual CD Drive Tray Open"));
+      MDFN_DispMessage("Virtual CD Drive Tray Open");
    else
-      MDFN_DispMessage(_("Virtual CD Drive Tray Closed"));
+      MDFN_DispMessage("Virtual CD Drive Tray Closed");
 
    SetDiscWrapper(CD_TrayOpen);
 }
@@ -2373,20 +2373,20 @@ static void CDEject(void)
 
 static void CDSelect(void)
 {
- if(cdifs && CD_TrayOpen)
- {
-  int disc_count = (CD_IsPBP ? PBP_PhysicalDiscCount : (int)cdifs->size());
+   if(cdifs && CD_TrayOpen)
+   {
+      int disc_count = (CD_IsPBP ? PBP_PhysicalDiscCount : (int)cdifs->size());
 
-  CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
+      CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
 
-  if(CD_SelectedDisc == disc_count)
-   CD_SelectedDisc = -1;
+      if(CD_SelectedDisc == disc_count)
+         CD_SelectedDisc = -1;
 
-  if(CD_SelectedDisc == -1)
-   MDFN_DispMessage(_("Disc absence selected."));
-  else
-   MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, disc_count);
- }
+      if(CD_SelectedDisc == -1)
+         MDFN_DispMessage("Disc absence selected.");
+      else
+         MDFN_DispMessage("Disc %d of %d selected.", CD_SelectedDisc + 1, disc_count);
+   }
 }
 
 int StateAction(StateMem *sm, int load, int data_only)
@@ -4954,7 +4954,7 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    return fullpath;
 }
 
-void MDFND_DispMessage(unsigned char *str)
+static void MDFND_DispMessage(unsigned char *str)
 {
    const char *strc = (const char*)str;
    struct retro_message msg =
