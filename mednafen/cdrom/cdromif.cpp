@@ -317,7 +317,6 @@ int CDIF_MT::ReadThreadStart()
       CDIF_Message msg;
 
       // Only do a blocking-wait for a message if we don't have any sectors to read-ahead.
-      // MDFN_DispMessage("%d %d %d\n", last_read_lba, ra_lba, ra_count);
       if(ReadThreadQueue.Read(&msg, ra_count ? false : true))
       {
          switch(msg.message)

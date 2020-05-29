@@ -437,7 +437,6 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
                break;
 
             case (2048 + 130):	// End flag
-               //MDFN_DispMessage("%02x %02x", calced_xor, write_xor);
                //printf("[MCR] Write End.  Actual_XOR=0x%02x, CW_XOR=0x%02x\n", calced_xor, write_xor);
 
                if(calced_xor != write_xor)

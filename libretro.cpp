@@ -52,6 +52,7 @@ extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
 static bool libretro_supports_bitmasks = false;
+static unsigned libretro_msg_interface_version = 0;
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -2351,16 +2352,23 @@ static void CDInsertEject(void)
 #ifndef HAVE_CDROM_NEW
       if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
       {
-         MDFN_DispMessage("Eject error.");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Eject error.");
+
          CD_TrayOpen = !CD_TrayOpen;
       }
 #endif
    }
 
    if(CD_TrayOpen)
-      MDFN_DispMessage("Virtual CD Drive Tray Open");
+      MDFND_DispMessage(0, RETRO_LOG_INFO,
+            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "Virtual CD Drive Tray Open");
    else
-      MDFN_DispMessage("Virtual CD Drive Tray Closed");
+      MDFND_DispMessage(0, RETRO_LOG_INFO,
+            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "Virtual CD Drive Tray Closed");
 
    SetDiscWrapper(CD_TrayOpen);
 }
@@ -2383,9 +2391,13 @@ static void CDSelect(void)
          CD_SelectedDisc = -1;
 
       if(CD_SelectedDisc == -1)
-         MDFN_DispMessage("Disc absence selected.");
+         MDFND_DispMessage(0, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Disc absence selected.");
       else
-         MDFN_DispMessage("Disc %d of %d selected.", CD_SelectedDisc + 1, disc_count);
+         MDFN_DispMessage(0, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Disc %d of %d selected.", CD_SelectedDisc + 1, disc_count);
    }
 }
 
@@ -3033,6 +3045,9 @@ void retro_init(void)
    else
       log_cb = fallback_log;
 
+   libretro_msg_interface_version = 0;
+   environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &libretro_msg_interface_version);
+
    CDUtility_Init();
 
    eject_state = false;
@@ -3662,7 +3677,9 @@ static void check_variables(bool startup)
             if(use_mednafen_memcard0_method)
                shared_memorycards = true;
             else
-               MDFN_DispMessage("Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
+               MDFND_DispMessage(3, RETRO_LOG_WARN,
+                     RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                     "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
          else if (!strcmp(var.value, "disabled"))
          {
@@ -4319,6 +4336,9 @@ void retro_run(void)
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
          char msg_buffer[64];
+
+         msg_buffer[0] = '\0';
+
          // Just report the "real-world" refresh rate here regardless of system av info reported to the frontend
          float fps = (content_is_pal && !fast_pal) ?
                         (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
@@ -4328,7 +4348,9 @@ void retro_run(void)
          snprintf(msg_buffer, sizeof(msg_buffer),
                "Internal FPS: %.2f", internal_fps);
 
-         MDFN_DispMessage(msg_buffer);
+         MDFND_DispMessage(1, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_STATUS,
+               msg_buffer);
 
          internal_frame_count = 0;
       }
@@ -4936,30 +4958,47 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    return fullpath;
 }
 
-static void MDFND_DispMessage(unsigned char *str)
+void MDFND_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *str)
 {
-   const char *strc = (const char*)str;
-   struct retro_message msg =
+   if (libretro_msg_interface_version >= 1)
    {
-      strc,
-      180
-   };
-
-   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+      struct retro_message_ext msg = {
+         str,
+         3000,
+         priority,
+         level,
+         target,
+         type,
+         -1
+      };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
+   }
+   else
+   {
+      struct retro_message msg =
+      {
+         str,
+         180
+      };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   }
 }
 
-void MDFN_DispMessage(const char *format, ...)
+void MDFN_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *format, ...)
 {
    va_list ap;
-   unsigned char *strc = NULL;
-   char           *str = (char*)malloc(4096 * sizeof(char));
+   char *str = (char*)malloc(4096 * sizeof(char));
 
-   va_start(ap,format);
-
+   va_start(ap, format);
    vsnprintf(str, 4096, format, ap);
    va_end(ap);
-   strc             = (unsigned char*)str;
 
-   MDFND_DispMessage(strc);
+   MDFND_DispMessage(priority, level, target, type, str);
    free(str);
 }

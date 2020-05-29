@@ -59,8 +59,12 @@ void IRQ_Assert(int which, bool status)
    uint32_t old_Asserted = Asserted;
    //PSX_WARNING("[IRQ] Assert: %d %d", which, status);
 
-   //if(which == IRQ_SPU && status && (Asserted & (1 << which)))
-   // MDFN_DispMessage("SPU IRQ glitch??");
+/*
+   if(which == IRQ_SPU && status && (Asserted & (1 << which)))
+      MDFND_DispMessage(3, RETRO_LOG_ERROR,
+            RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "SPU IRQ glitch??");
+*/
 
    Asserted &= ~(1 << which);
 

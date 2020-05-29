@@ -642,7 +642,6 @@ void FrontIO::Write(int32_t timestamp, uint32_t A, uint32_t V)
       case 0xe:
          Baudrate = V;
          //printf("%02x\n", V);
-         //MDFN_DispMessage("%02x\n", V);
          break;
    }
 
