@@ -926,9 +926,14 @@ void PS_CDC::HandlePlayRead(void)
    else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, cd_slow_timeout))
    {
       if (cd_async)
-         MDFN_DispMessage("*Really* slow CD image read detected -- consider using precache CD Access Method");
+         MDFND_DispMessage(3, RETRO_LOG_WARN,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "*Really* slow CD image read detected: consider using precache CD Access Method");
       else
-         MDFN_DispMessage("Slow CD image read detected -- consider using async or precache CD Access Method");
+         MDFND_DispMessage(3, RETRO_LOG_WARN,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Slow CD image read detected: consider using async or precache CD Access Method");
+
       cd_warned_slow = true;
       Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
    }
@@ -1039,7 +1044,9 @@ void PS_CDC::HandlePlayRead(void)
                {
                   if(!edc_lec_check_and_correct(buf, true))
                   {
-                     MDFN_DispMessage("Bad sector? - %d", CurSector);
+                     MDFN_DispMessage(3, RETRO_LOG_ERROR,
+                           RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+                           "Bad sector? - %d", CurSector);
                   }
                }
 
@@ -1151,8 +1158,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
          if(DiscStartupDelay <= 0)
             DriveStatus = DS_PAUSED;	// or is it supposed to be DS_STANDBY?
       }
-
-      //MDFN_DispMessage("%02x %d -- %d %d -- %02x", IRQBuffer, CDCReadyReceiveCounter, PSRCounter, PendingCommandCounter, PendingCommand);
 
       if(!(IRQBuffer & 0xF))
       {

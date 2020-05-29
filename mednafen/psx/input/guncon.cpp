@@ -178,8 +178,6 @@ void InputDevice_GunCon::UpdateInput(const void *data)
    if((d8[4] & 0x8) && !prev_oss && os_shot_counter == 0)
       os_shot_counter = 4;
    prev_oss = d8[4] & 0x8;
-
-   //MDFN_DispMessage("%08x %08x", nom_x, nom_y);
 }
 
 bool InputDevice_GunCon::RequireNoFrameskip(void)

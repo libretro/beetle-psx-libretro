@@ -158,8 +158,6 @@ void InputDevice_Mouse::UpdateInput(const void *data)
    button |= *((uint8 *)data + 8);
    button_post_mask = *((uint8 *)data + 8);
 
-   //if(button)
-   // MDFN_DispMessage("Button\n");
    //printf("%d %d\n", accum_xdelta, accum_ydelta);
 }
 

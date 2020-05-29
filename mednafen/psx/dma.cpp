@@ -415,7 +415,6 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
          else if(CRModeCache & 0x100) // BLARGH BLARGH FISHWHALE
          {
             //printf("LoadWC: %u(oldWC=%u)\n", DMACH[ch].BlockControl & 0xFFFF, DMACH[ch].WordCounter);
-            //MDFN_DispMessage("SPOOOON\n");
             DMACH[ch].CurAddr = DMACH[ch].BaseAddr;
             DMACH[ch].WordCounter = DMACH[ch].BlockControl & 0xFFFF;
          }
@@ -611,7 +610,9 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                RunChannel(timestamp, 1, ch);
                DMACH[ch].ClockCounter = 0;
                PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU_GetScanlineNum());
-               //MDFN_DispMessage("[DMA] Forced stop for channel %d", ch);
+               MDFND_DispMessage(3, RETRO_LOG_ERROR,
+                     RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+                     "[DMA] Forced stop for channel %d", ch);
 #endif
             }
 
