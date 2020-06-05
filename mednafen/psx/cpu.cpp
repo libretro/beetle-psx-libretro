@@ -3319,14 +3319,21 @@ static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
 
 static void cop_op(struct lightrec_state *state, u32 func)
 {
-	fprintf(stderr, "Access to invalid co-processor 0\n");
+   MDFND_DispMessage(3, RETRO_LOG_WARN,
+         RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+         "Access to invalid co-processor 0");
 }
 
-static void cop2_op(struct lightrec_state *state, u32 func){
-	if (MDFN_UNLIKELY(!cp2_ops[func & 0x3f]))
-                fprintf(stderr, "Invalid CP2 function %u\n", func);
-        else
-                GTE_Instruction(func);
+static void cop2_op(struct lightrec_state *state, u32 func)
+{
+   if (MDFN_UNLIKELY(!cp2_ops[func & 0x3f]))
+   {
+      MDFN_DispMessage(3, RETRO_LOG_WARN,
+            RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "Invalid CP2 function %u\n", func);
+   }
+   else
+      GTE_Instruction(func);
 }
 
 void PS_CPU::reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp){

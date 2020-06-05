@@ -43,7 +43,9 @@ uint64_t MDFN_GetSettingUI(const char *name)
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
       return 4;
 
-   fprintf(stderr, "unhandled setting UI: %s\n", name);
+   MDFN_DispMessage(3, RETRO_LOG_WARN,
+         RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+         "unhandled setting UI: %s\n", name);
    return 0;
 }
 
@@ -59,7 +61,9 @@ int64 MDFN_GetSettingI(const char *name)
       return setting_last_scanline;
    if (!strcmp("psx.slendp", name))
       return setting_last_scanline_pal;
-   fprintf(stderr, "unhandled setting I: %s\n", name);
+   MDFN_DispMessage(3, RETRO_LOG_WARN,
+         RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+         "unhandled setting I: %s\n", name);
    return 0;
 }
 
@@ -104,7 +108,9 @@ bool MDFN_GetSettingB(const char *name)
       return 0;
    if (!strcmp("filesys.disablesavegz", name))
       return 1;
-   fprintf(stderr, "unhandled setting B: %s\n", name);
+   MDFN_DispMessage(3, RETRO_LOG_WARN,
+         RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+         "unhandled setting B: %s\n", name);
    return 0;
 }
 
@@ -131,11 +137,13 @@ std::string MDFN_GetSettingS(const char *name)
       int r = snprintf(fullpath, sizeof(fullpath), "%s.sav", retro_cd_base_name);
       if (r > 4095)
       {
-         fprintf(stderr,"Path to .sav too long");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Path to .sav too long.");
          return 0;
       }
-      else
-         return std::string(fullpath);
+
+      return std::string(fullpath);
    }
    if (!strcmp("filesys.fname_sav", name))
    {
@@ -143,13 +151,17 @@ std::string MDFN_GetSettingS(const char *name)
       int r = snprintf(fullpath, sizeof(fullpath), "%s.bsv", retro_cd_base_name);
       if (r > 4095)
       {
-         fprintf(stderr,"Path to .bsv too long");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Path to .bsv too long.");
          return 0;
       }
-      else
-         return std::string(fullpath);
+
+      return std::string(fullpath);
    }
-   fprintf(stderr, "unhandled setting S: %s\n", name);
+   MDFN_DispMessage(3, RETRO_LOG_WARN,
+         RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
+         "unhandled setting S: %s\n", name);
    return 0;
 }
 
