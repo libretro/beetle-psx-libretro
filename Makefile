@@ -90,7 +90,7 @@ ifneq (,$(findstring unix,$(platform)))
    fpic   := -fPIC
    ifneq ($(findstring SunOS,$(shell uname -a)),)
       GREP = ggrep
-      SHARED := -shared -z defs -z gnu-version-script-compat
+      SHARED := -shared -z defs
    else
       GREP = grep
       SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
