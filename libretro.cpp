@@ -39,6 +39,7 @@
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#include <sys/stat.h>
 #include <fcntl.h>
 #endif
 
