@@ -575,8 +575,8 @@ else
       CFLAGS   += -O2 -DNDEBUG
       CXXFLAGS += -O2 -DNDEBUG
    else
-      CFLAGS   += -O3 -g -DNDEBUG -MMD
-      CXXFLAGS += -O3 -g -DNDEBUG -MMD
+      CFLAGS   += -O3 -DNDEBUG -MMD
+      CXXFLAGS += -O3 -DNDEBUG -MMD
    endif
 endif
 
@@ -657,11 +657,11 @@ else
 endif
 
 %.o: %.cpp
-	@$(CXX) -c -MMD $(OBJOUT)$@ $< $(CXXFLAGS)
+	@$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
 	@echo "CXX $<"
 
 %.o: %.c
-	@$(CC) -c -MMD $(OBJOUT)$@ $< $(CFLAGS)
+	@$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
 	@echo "CC $<"
 
 clean:
