@@ -300,6 +300,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
    endif
 
    ifeq ($(HAVE_VULKAN), 1)
+      CFLAGS      += -DTEXTURE_DUMPING_ENABLED
+      CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/custom-textures/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
