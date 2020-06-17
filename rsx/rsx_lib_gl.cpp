@@ -465,7 +465,7 @@ static bool Shader_init(
       log_cb(RETRO_LOG_ERROR, "Shader_init() - Shader compilation failed:\n%s\n", source);
 
 
-      log_cb(RETRO_LOG_INFO, "Shader info log:\n%s\n", shader->info_log);
+      log_cb(RETRO_LOG_DEBUG, "Shader info log:\n%s\n", shader->info_log);
 
       return false;
    }
@@ -597,11 +597,11 @@ static bool Program_init(
    program->id       = id;
    program->uniforms = uniforms;
 
-   log_cb(RETRO_LOG_INFO, "Binding program for first time: %d\n", id);
+   log_cb(RETRO_LOG_DEBUG, "Binding program for first time: %d\n", id);
 
    glUseProgram(id);
 
-   log_cb(RETRO_LOG_INFO, "Unbinding program for first time: %d\n", id);
+   log_cb(RETRO_LOG_DEBUG, "Unbinding program for first time: %d\n", id);
 
    glUseProgram(0);
 
@@ -1313,7 +1313,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          wireframe = true;
    }
 
-   log_cb(RETRO_LOG_INFO, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
+   log_cb(RETRO_LOG_DEBUG, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
    switch(renderer->filter_type)
    {
@@ -2159,7 +2159,7 @@ extern void GPU_RestoreStateP3(void);
 
 static void gl_context_reset(void)
 {
-   log_cb(RETRO_LOG_INFO, "gl_context_reset called.\n");
+   log_cb(RETRO_LOG_DEBUG, "gl_context_reset called.\n");
    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
 
    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
@@ -2186,7 +2186,7 @@ static void gl_context_destroy(void)
 {
    glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
 
-   log_cb(RETRO_LOG_INFO, "gl_context_destroy called.\n");
+   log_cb(RETRO_LOG_DEBUG, "gl_context_destroy called.\n");
 
    if (static_renderer.state_data)
    {
@@ -2377,7 +2377,7 @@ void rsx_gl_refresh_variables(void)
       if (!ok)
       {
          log_cb(RETRO_LOG_WARN, "Couldn't change frontend resolution\n");
-         log_cb(RETRO_LOG_INFO, "Try resetting to enable the new configuration\n");
+         log_cb(RETRO_LOG_DEBUG, "Try resetting to enable the new configuration\n");
       }
    }
 }

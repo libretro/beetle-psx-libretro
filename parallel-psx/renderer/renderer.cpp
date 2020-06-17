@@ -525,11 +525,10 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 #ifndef NDEBUG
 	Util::Timer timer;
 	timer.start();
-#endif
-
-	TT_LOG_VERBOSE(RETRO_LOG_INFO,
+	TT_LOG_VERBOSE(RETRO_LOG_DEBUG,
 		"copy_vram_to_cpu_synchronous(rect={%i, %i, %i x %i}).\n", rect.x, rect.y, rect.width, rect.height
 	);
+#endif
 	atlas.read_transfer(Domain::Unscaled, rect);
 	ensure_command_buffer();
 
@@ -2211,9 +2210,11 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	if (dst.width == 0 || dst.height == 0)
 		return;
 
+#ifndef NDEBUG
 	TT_LOG_VERBOSE(RETRO_LOG_INFO,
 		"blit_vram(dst={%i, %i, %i x %i}, src={%i, %i, %i x %i}).\n", dst.x, dst.y, dst.width, dst.height, src.x, src.y, src.width, src.height
 	);
+#endif
 	last_scanout.reset();
 	auto domain = atlas.blit_vram(dst, src);
 

@@ -150,7 +150,7 @@ static bool firmware_is_present(unsigned region)
    const char *bios_name_list[list_size];
    const char *bios_sha1 = NULL;
 
-   log_cb(RETRO_LOG_INFO, "Checking if required firmware is present.\n");
+   log_cb(RETRO_LOG_INFO, "Checking if required firmware is present...\n");
 
    /* SHA1 and alternate BIOS names sourced from
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
@@ -2043,9 +2043,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    uint32 TextSize  = MDFN_de32lsb<false>(&data[0x1C]);
 
    if(ignore_pcsp)
-      log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
+      log_cb(RETRO_LOG_DEBUG, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
    else
-      log_cb(RETRO_LOG_INFO, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
+      log_cb(RETRO_LOG_DEBUG, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
 
    TextStart &= 0x1FFFFF;
 
@@ -2898,7 +2898,7 @@ static void mednafen_update_md5_checksum(CDIF *iface)
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
 
    char *md5 = mednafen_md5_asciistr(MDFNGameInfo->MD5);
-   log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
+   log_cb(RETRO_LOG_DEBUG, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
 }
 
 // Untested ...
@@ -4458,7 +4458,9 @@ void retro_run(void)
             char ext[64];
             const char *memcard = NULL;
 
+#ifndef NDEBUG
             log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
+#endif
 
             if (i == 0 && !use_mednafen_memcard0_method)
             {
@@ -4655,9 +4657,9 @@ void retro_deinit(void)
    delete surf;
    surf = NULL;
 
-   log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
+   log_cb(RETRO_LOG_DEBUG, "[%s]: Samples / Frame: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
-   log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
+   log_cb(RETRO_LOG_DEBUG, "[%s]: Estimated FPS: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
 
    libretro_supports_bitmasks = false;

@@ -525,10 +525,12 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    prev_frame_width = scanout->get_width();
    prev_frame_height = scanout ->get_height();
 
-   //printf("%d %d\n", scanout->get_width(), scanout->get_height());
+#if 0
+   printf("%d %d\n", scanout->get_width(), scanout->get_height());
 
-   //fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
-   //      renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
+   fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
+         renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
+#endif
 }
 
 /* Draw commands */
@@ -844,7 +846,9 @@ void rsx_vulkan_load_image(
       uint16_t *vram,
       bool mask_test, bool set_mask)
 {
+#ifndef NDEBUG
    TT_LOG_VERBOSE(RETRO_LOG_INFO, "rsx_vulkan_load_image(x=%i, y=%i, w=%i, h=%i, mask_test=%i, set_mask=%i).\n", x, y, w, h, mask_test, set_mask);
+#endif
    if (!renderer)
    {
       // Generally happens if someone loads a save state before the Vulkan context is created.

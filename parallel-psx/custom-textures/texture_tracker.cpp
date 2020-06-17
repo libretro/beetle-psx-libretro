@@ -396,7 +396,7 @@ std::set<HdTextureId> read_texture_directory(const char *path) {
             }
 
             result.insert({ hash, palette_hash });
-            // TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", ent->d_name);
+            TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", ent->d_name);
         }
         retro_closedir(dir);
     }

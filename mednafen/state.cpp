@@ -159,10 +159,12 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 
          if (slen >= 255)
          {
+#ifndef NDEBUG
             if(name_prefix != NULL)
                printf("Warning:  state variable name possibly too long: %s %s %s %d\n", sf->name, name_prefix, nameo, slen);
             else
                printf("Warning:  state variable name possibly too long: %s %s %d\n", sf->name, nameo, slen);
+#endif
             slen = 255;
          }
 
@@ -231,8 +233,10 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
    memset(sname_tmp, 0, sizeof(sname_tmp));
    memcpy((char *)sname_tmp, sname, 32);
 
+#ifndef NDEBUG
    if(strlen(sname) > 32)
       printf("Warning: section name is too long: %s\n", sname);
+#endif
 
    smem_write(st, sname_tmp, 32);
 
@@ -363,7 +367,9 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 
          if(recorded_size != expected_size)
          {
+#ifndef NDEBUG
             printf("Variable in save state wrong size: %s.  Need: %d, got: %d\n", toa + 1, expected_size, recorded_size);
+#endif
             if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
             {
                puts("Seek error");
@@ -396,7 +402,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       }
       else
       {
-         printf("Unknown variable in save state: %s\n", toa + 1);
+         log_cb(RETRO_LOG_WARN, "Unknown variable in save state: %s\n", toa + 1);
          if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
          {
             puts("Seek error");
@@ -436,7 +442,8 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, SSDe
          {
             if(!ReadStateChunk(st, section->sf, tmp_size))
             {
-               printf("Error reading chunk: %s\n", section->name);
+               log_cb(RETRO_LOG_ERROR,
+                     "Error reading chunk: %s\n", section->name);
                return(0);
             }
             found = 1;
@@ -458,7 +465,8 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, SSDe
       }
       if(!found && !section->optional) // Not found.  We are sad!
       {
-         printf("Section missing:  %.32s\n", section->name);
+         log_cb(RETRO_LOG_ERROR, 
+               "Section missing:  %.32s\n", section->name);
          return(0);
       }
    }
