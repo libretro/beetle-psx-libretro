@@ -466,7 +466,9 @@ void Renderer::set_draw_rect(const Rect &rect)
 
 void Renderer::clear_rect(const Rect &rect, FBColor color)
 {
-	tracker.clearRegion(rect);
+	if (texture_tracking_enabled) {
+		tracker.clearRegion(rect);
+	}
 	last_scanout.reset();
 	atlas.clear_rect(rect, color);
 
@@ -554,7 +556,9 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	   for (uint16_t x = 0; x < rect.width; x++)
 		  vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
 		
-	tracker.notifyReadback(rect, vram);
+	if (texture_tracking_enabled) {
+		tracker.notifyReadback(rect, vram);
+	}
 
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 
@@ -879,7 +883,9 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
-	tracker.endFrame();
+	if (texture_tracking_enabled) {
+		tracker.endFrame();
+	}
 
 	if (last_scanout)
 		return last_scanout;
@@ -1298,9 +1304,11 @@ HdTextureHandle Renderer::get_hd_texture_index(const Rect &vram_rect, bool &fast
 		mode.palette_offset_x = 0;
 		mode.palette_offset_y = 0;
 	}
-	return tracker.get_hd_texture_index(vram_rect, mode, render_state.texture_offset_x, render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
-	// HDTODO: hd_texture_index = getHdTextureIndex(snoop);
-	// HDTODO: otherwise set hd_texture_index = last_hd_texture_index
+	if (texture_tracking_enabled) {
+		return tracker.get_hd_texture_index(vram_rect, mode, render_state.texture_offset_x, render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
+	} else {
+		return HdTextureHandle::make_none();
+	}
 }
 
 void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index)
@@ -2218,7 +2226,9 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	last_scanout.reset();
 	auto domain = atlas.blit_vram(dst, src);
 
-	tracker.blit(dst, src);
+	if (texture_tracking_enabled) {
+		tracker.blit(dst, src);
+	}
 
 	if (dst.intersects(src))
 	{
@@ -2343,7 +2353,12 @@ Vulkan::CommandBufferHandle &Renderer::command_buffer_hack_fixme() {
 }
 
 void Renderer::notify_texture_upload(Rect uploadRect, uint16_t *vram) {
-	tracker.upload(uploadRect, vram);
+	if (texture_tracking_enabled) {
+		tracker.upload(uploadRect, vram);
+	}
+}
+void Renderer::set_track_textures(bool enable) {
+	texture_tracking_enabled = enable;
 }
 void Renderer::set_dump_textures(bool enable) {
 	tracker.dump_enabled = enable;
@@ -2457,6 +2472,8 @@ void Renderer::reset_queue()
 
 	reset_scissor_queue();
 
-	tracker.on_queues_reset();
+	if (texture_tracking_enabled) {
+		tracker.on_queues_reset();
+	}
 }
 }
