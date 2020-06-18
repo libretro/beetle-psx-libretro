@@ -55,6 +55,7 @@ static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
+static bool track_textures = false;
 static bool crop_overscan;
 static int image_offset_cycles;
 static int initial_scanline;
@@ -370,6 +371,15 @@ void rsx_vulkan_refresh_variables(void)
       else
          widescreen_hack = false;
    }
+
+   var.key = BEETLE_OPT(track_textures);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         track_textures = true;
+      else
+         track_textures = false;
+   }
    
    var.key = BEETLE_OPT(dump_textures);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -388,6 +398,14 @@ void rsx_vulkan_refresh_variables(void)
       else
          replace_textures = false;
    }
+
+   struct retro_core_option_display option_display;
+   option_display.visible = track_textures;
+
+   option_display.key = BEETLE_OPT(dump_textures);
+   environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   option_display.key = BEETLE_OPT(replace_textures);
+   environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
    var.key = BEETLE_OPT(frame_duping);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -474,6 +492,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
       return;
    }
 
+   renderer->set_track_textures(track_textures);
    renderer->set_dump_textures(dump_textures);
    renderer->set_replace_textures(replace_textures);
    renderer->set_adaptive_smoothing(adaptive_smoothing);

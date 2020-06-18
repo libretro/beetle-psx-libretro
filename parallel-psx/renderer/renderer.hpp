@@ -150,6 +150,7 @@ public:
 	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 	~Renderer();
 
+	void set_track_textures(bool enable);
 	void set_dump_textures(bool enable);
 	void set_replace_textures(bool enable);
 
@@ -387,6 +388,7 @@ private:
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
+	bool texture_tracking_enabled = false;
 	TextureTracker tracker;
 
 	Vulkan::CommandBufferHandle cmd;
