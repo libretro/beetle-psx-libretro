@@ -468,6 +468,10 @@ void TextureTracker::clearRegion(Rect rect) {
     if (blit_log != nullptr) {
         blit_log->clear(rect);
     }
+    if (rect.width == 0 || rect.height == 0) {
+        // Some games do this, apparently.
+        return;
+    }
     tracker.clear(toSRect(rect));
     fused_pages.mark_dead(rect);
 
