@@ -70,5 +70,5 @@ LOCAL_CFLAGS       := $(COREFLAGS)
 LOCAL_CXXFLAGS     := $(COREFLAGS) -std=c++11
 LOCAL_LDFLAGS      := -Wl,-version-script=$(CORE_DIR)/link.T -ldl
 LOCAL_LDLIBS       := -llog
-LOCAL_CPP_FEATURES := exceptions
+LOCAL_CPP_FEATURES := exceptions rtti
 include $(BUILD_SHARED_LIBRARY)
