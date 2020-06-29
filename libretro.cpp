@@ -4362,9 +4362,10 @@ void retro_run(void)
       if (use_mednafen_memcard0_method &&
           memcard_left_index_old != memcard_left_index)
       {
-         MDFN_DispMessage(
-             "changing from memory card %d to memory card %d in left slot",
-             memcard_left_index_old, memcard_left_index);
+         MDFN_DispMessage(0, RETRO_LOG_INFO,
+                          RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+                          "changing from memory card %d to memory card %d in left slot",
+                          memcard_left_index_old, memcard_left_index);
 
          try
          {
@@ -4389,21 +4390,22 @@ void retro_run(void)
 
       if (memcard_right_index_old != memcard_right_index)
       {
-         MDFN_DispMessage(
-             "changing from memory card %d to memory card %d in right slot",
-             memcard_right_index_old, memcard_right_index);
+         MDFN_DispMessage(0, RETRO_LOG_INFO,
+                          RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+                          "changing from memory card %d to memory card %d in right slot",
+                          memcard_right_index_old, memcard_right_index);
 
          try
          {
             char ext[64];
             const char *memcard = NULL;
 
-            // Save contents of left memory card to previously selected index
+            // Save contents of right memory card to previously selected index
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
             PSX_FIO->SaveMemcard(1, memcard, true);
 
-            // Load contents of currently selected index to left memory card
+            // Load contents of currently selected index to right memory card
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
             PSX_FIO->LoadMemcard(1, memcard, true);
@@ -4556,7 +4558,11 @@ void retro_run(void)
                continue;
             }
 
-            snprintf(ext, sizeof(ext), "%d.mcr", i);
+            int index = i;
+            if (i == 0) index = memcard_left_index;
+            else if (i == 1) index = memcard_right_index;
+
+            snprintf(ext, sizeof(ext), "%d.mcr", index);
             memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
             PSX_FIO->SaveMemcard(i, memcard);
             Memcard_SaveDelay[i] = -1;
