@@ -20,6 +20,9 @@
 #include "libretro_options.h"
 #include "input.h"
 
+#include "parallel-psx/custom-textures/dbg_input_callback.h"
+retro_input_state_t dbg_input_state_cb = 0;
+
 #include "mednafen/mednafen-endian.h"
 #include "mednafen/mednafen-types.h"
 #include "mednafen/psx/psx.h"
@@ -39,6 +42,7 @@
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#include <sys/stat.h>
 #include <fcntl.h>
 #endif
 
@@ -52,6 +56,7 @@ extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
 static bool libretro_supports_bitmasks = false;
+static unsigned libretro_msg_interface_version = 0;
 
 struct retro_perf_callback perf_cb;
 retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
@@ -73,6 +78,8 @@ static int frame_width = 0;
 static int frame_height = 0;
 static bool gui_inited = false;
 static bool gui_show = false;
+static char bios_path[4096];
+static bool firmware_found = false;
 
 // Switchable memory cards
 static int memcard_left_index = 0;
@@ -127,7 +134,7 @@ unsigned int psx_pgxp_texture_correction;
 
 char retro_save_directory[4096];
 char retro_base_directory[4096];
-static char retro_cd_base_directory[4096];
+char retro_cd_base_directory[4096];
 static char retro_cd_path[4096];
 char retro_cd_base_name[4096];
 #ifdef _WIN32
@@ -145,12 +152,11 @@ enum
 
 static bool firmware_is_present(unsigned region)
 {
-   char bios_path[4096];
    static const size_t list_size = 10;
    const char *bios_name_list[list_size];
    const char *bios_sha1 = NULL;
 
-   log_cb(RETRO_LOG_INFO, "Checking if required firmware is present.\n");
+   log_cb(RETRO_LOG_INFO, "Checking if required firmware is present...\n");
 
    /* SHA1 and alternate BIOS names sourced from
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
@@ -197,7 +203,6 @@ static bool firmware_is_present(unsigned region)
       bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
-   bool found = false;
    size_t i;
    for (i = 0; i < list_size; ++i)
    {
@@ -213,12 +218,12 @@ static bool firmware_is_present(unsigned region)
 
       if (filestream_exists(bios_path))
       {
-         found = true;
+         firmware_found = true;
          break;
       }
    }
 
-   if (!found)
+   if (!firmware_found)
    {
       char s[4096];
 
@@ -1665,7 +1670,7 @@ static const uintptr_t supported_io_bases[] = {
 
 int lightrec_init_mmap()
 {
-	int r = 0, i, j, err;
+	int r = 0, i, j;
 	uintptr_t base;
 	void *bios, *scratch, *map;
 
@@ -1674,8 +1679,7 @@ int lightrec_init_mmap()
 	memfd = open("/dev/ashmem", O_RDWR);
 
 	if (memfd < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Failed to open ASHMEM fd: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create ASHMEM: %s\n", strerror(errno));
 		return 0;
 	}
 
@@ -1690,17 +1694,16 @@ int lightrec_init_mmap()
 			S_IRUSR | S_IWUSR);
 
 	if (memfd < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Failed to open SHM fd: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create SHM: %s\n", strerror(errno));
 		return 0;
 	}
 
-	err = ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE);
+	/* unlink ASAP to prevent leaving a file in shared memory if we crash */
+	shm_unlink(shm_name);
 
-	if (err < 0) {
-		err = -errno;
-		log_cb(RETRO_LOG_ERROR, "Could not set SHM size: %d\n", err);
-		goto shm_unlink_return;
+	if (ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE) < 0) {
+		log_cb(RETRO_LOG_ERROR, "Could not truncate SHM size: %s\n", strerror(errno));
+		goto close_return;
 	}
 #endif
 #ifdef HAVE_WIN_SHM
@@ -1710,8 +1713,7 @@ int lightrec_init_mmap()
 			RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
 
 	if (memfd == NULL) {
-		err = GetLastError();
-		log_cb(RETRO_LOG_ERROR, "Failed to open WIN_SHM: %d\n", err);
+		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
 		return 0;
 	}
 #endif
@@ -1763,7 +1765,7 @@ int lightrec_init_mmap()
 
 			r = NUM_MEM;
 
-			goto shm_unlink_return;
+			goto close_return;
 		}
 
 err_unmap_scratch:
@@ -1788,9 +1790,8 @@ err_unmap:
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	}
 
-shm_unlink_return:
+close_return:
 #ifdef HAVE_SHM
-	shm_unlink(shm_name);
 	close(memfd);
 #endif
 #ifdef HAVE_WIN_SHM
@@ -1974,30 +1975,40 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
 #endif
 
-   const char *biospath_sname;
+   RFILE *BIOSFile;
 
-   if(region == REGION_JP)
-      biospath_sname = "psx.bios_jp";
-   else if(region == REGION_EU)
-      biospath_sname = "psx.bios_eu";
-   else if(region == REGION_NA)
-      biospath_sname = "psx.bios_na";
-   else
-      abort();
-
+   if(firmware_is_present(region))
    {
-      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
-            0, MDFN_GetSettingS(biospath_sname).c_str());
-      RFILE *BIOSFile      = filestream_open(biospath,
+      BIOSFile      = filestream_open(bios_path,
             RETRO_VFS_FILE_ACCESS_READ,
             RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   }
+   else
+   {
+      const char *biospath_sname;
+
+      if(region == REGION_JP)
+         biospath_sname = "psx.bios_jp";
+      else if(region == REGION_EU)
+         biospath_sname = "psx.bios_eu";
+      else if(region == REGION_NA)
+         biospath_sname = "psx.bios_na";
+      else
+         abort();
+
+      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
+            0, MDFN_GetSettingS(biospath_sname).c_str());
+
+      BIOSFile      = filestream_open(biospath,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   }
 
       if (BIOSFile)
       {
          filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
          filestream_close(BIOSFile);
       }
-   }
 
    i = 0;
 
@@ -2043,9 +2054,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    uint32 TextSize  = MDFN_de32lsb<false>(&data[0x1C]);
 
    if(ignore_pcsp)
-      log_cb(RETRO_LOG_INFO, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
+      log_cb(RETRO_LOG_DEBUG, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
    else
-      log_cb(RETRO_LOG_INFO, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
+      log_cb(RETRO_LOG_DEBUG, "PC=0x%08x\nSP=0x%08x\nTextStart=0x%08x\nTextSize=0x%08x\n", PC, SP, TextStart, TextSize);
 
    TextStart &= 0x1FFFFF;
 
@@ -2361,16 +2372,23 @@ static void CDInsertEject(void)
 #ifndef HAVE_CDROM_NEW
       if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
       {
-         MDFN_DispMessage(_("Eject error."));
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Eject error.");
+
          CD_TrayOpen = !CD_TrayOpen;
       }
 #endif
    }
 
    if(CD_TrayOpen)
-      MDFN_DispMessage(_("Virtual CD Drive Tray Open"));
+      MDFND_DispMessage(0, RETRO_LOG_INFO,
+            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "Virtual CD Drive Tray Open");
    else
-      MDFN_DispMessage(_("Virtual CD Drive Tray Closed"));
+      MDFND_DispMessage(0, RETRO_LOG_INFO,
+            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "Virtual CD Drive Tray Closed");
 
    SetDiscWrapper(CD_TrayOpen);
 }
@@ -2383,20 +2401,24 @@ static void CDEject(void)
 
 static void CDSelect(void)
 {
- if(cdifs && CD_TrayOpen)
- {
-  int disc_count = (CD_IsPBP ? PBP_PhysicalDiscCount : (int)cdifs->size());
+   if(cdifs && CD_TrayOpen)
+   {
+      int disc_count = (CD_IsPBP ? PBP_PhysicalDiscCount : (int)cdifs->size());
 
-  CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
+      CD_SelectedDisc = (CD_SelectedDisc + 1) % (disc_count + 1);
 
-  if(CD_SelectedDisc == disc_count)
-   CD_SelectedDisc = -1;
+      if(CD_SelectedDisc == disc_count)
+         CD_SelectedDisc = -1;
 
-  if(CD_SelectedDisc == -1)
-   MDFN_DispMessage(_("Disc absence selected."));
-  else
-   MDFN_DispMessage(_("Disc %d of %d selected."), CD_SelectedDisc + 1, disc_count);
- }
+      if(CD_SelectedDisc == -1)
+         MDFND_DispMessage(0, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Disc absence selected.");
+      else
+         MDFN_DispMessage(0, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+               "Disc %d of %d selected.", CD_SelectedDisc + 1, disc_count);
+   }
 }
 
 int StateAction(StateMem *sm, int load, int data_only)
@@ -2892,7 +2914,7 @@ static void mednafen_update_md5_checksum(CDIF *iface)
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
 
    char *md5 = mednafen_md5_asciistr(MDFNGameInfo->MD5);
-   log_cb(RETRO_LOG_INFO, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
+   log_cb(RETRO_LOG_DEBUG, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
 }
 
 // Untested ...
@@ -3042,6 +3064,9 @@ void retro_init(void)
       log_cb = log.log;
    else
       log_cb = fallback_log;
+
+   libretro_msg_interface_version = 0;
+   environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &libretro_msg_interface_version);
 
    CDUtility_Init();
 
@@ -3672,7 +3697,9 @@ static void check_variables(bool startup)
             if(use_mednafen_memcard0_method)
                shared_memorycards = true;
             else
-               MDFN_DispMessage("Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
+               MDFND_DispMessage(3, RETRO_LOG_WARN,
+                     RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                     "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
          else if (!strcmp(var.value, "disabled"))
          {
@@ -4093,7 +4120,7 @@ bool retro_load_game(const struct retro_game_info *info)
    // MDFNI_LoadGame() has been called and surface has been allocated,
    // we can now perform firmware check
    bool force_software_renderer = false;
-   if (!firmware_is_present(disc_region))
+   if (!firmware_found)
    {
       log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
 
@@ -4399,15 +4426,21 @@ void retro_run(void)
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
          char msg_buffer[64];
+
+         msg_buffer[0] = '\0';
+
          // Just report the "real-world" refresh rate here regardless of system av info reported to the frontend
          float fps = (content_is_pal && !fast_pal) ?
                         (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                         (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED);
          float internal_fps = (internal_frame_count * fps) / INTERNAL_FPS_SAMPLE_PERIOD;
 
-         snprintf(msg_buffer, sizeof(msg_buffer), _("Internal FPS: %.2f"), internal_fps);
+         snprintf(msg_buffer, sizeof(msg_buffer),
+               "Internal FPS: %.2f", internal_fps);
 
-         MDFN_DispMessage(msg_buffer);
+         MDFND_DispMessage(1, RETRO_LOG_INFO,
+               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_STATUS,
+               msg_buffer);
 
          internal_frame_count = 0;
       }
@@ -4511,7 +4544,9 @@ void retro_run(void)
             char ext[64];
             const char *memcard = NULL;
 
+#ifndef NDEBUG
             log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
+#endif
 
             if (i == 0 && !use_mednafen_memcard0_method)
             {
@@ -4708,9 +4743,9 @@ void retro_deinit(void)
    delete surf;
    surf = NULL;
 
-   log_cb(RETRO_LOG_INFO, "[%s]: Samples / Frame: %.5f\n",
+   log_cb(RETRO_LOG_DEBUG, "[%s]: Samples / Frame: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
-   log_cb(RETRO_LOG_INFO, "[%s]: Estimated FPS: %.5f\n",
+   log_cb(RETRO_LOG_DEBUG, "[%s]: Estimated FPS: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
 
    libretro_supports_bitmasks = false;
@@ -4766,6 +4801,7 @@ void retro_set_input_poll(retro_input_poll_t cb)
 void retro_set_input_state(retro_input_state_t cb)
 {
    input_state_cb = cb;
+   dbg_input_state_cb = cb;
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
@@ -4799,53 +4835,46 @@ size_t retro_serialize_size(void)
    return serialize_size = DEFAULT_STATE_SIZE; // 16MB
 }
 
-bool UsingFastSavestates()
+bool UsingFastSavestates(void)
 {
    int flags;
    if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags))
-   {
       return flags & 4;
-   }
    return false;
 }
 
 bool retro_serialize(void *data, size_t size)
 {
+   StateMem st;
+   bool ret          = false;
+
+   st.len            = 0;
+   st.loc            = 0;
+   st.malloced       = size;
+   st.initial_malloc = 0;
+
    if (size == DEFAULT_STATE_SIZE)  //16MB buffer reserved
    {
       //actual size is around 3.75MB (3.67MB for fast savestates) rather than 16MB, so 16MB will hold a savestate without worrying about realloc
 
       //save state in place
-      StateMem st;
-      st.data = (uint8_t*)data;
-      st.len = 0;
-      st.loc = 0;
-      st.malloced = size;
-      st.initial_malloc = 0;
+      st.data     = (uint8_t*)data;
 
       //fast save states are at least 20% faster
       FastSaveStates = UsingFastSavestates();
-      bool ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-      FastSaveStates = false;
-      return ret;
+      ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    }
    else
    {
       /* it seems that mednafen can realloc pointers sent to it?
          since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
       static bool logged;
-      StateMem st;
-      bool ret = false;
       uint8_t *_dat = (uint8_t*)malloc(size);
 
       if (!_dat)
          return false;
 
       st.data = _dat;
-      st.loc = 0;
-      st.len = 0;
-      st.malloced = size;
-      st.initial_malloc = 0;
 
       /* there are still some errors with the save states,
        * the size seems to change on some games for now
@@ -4858,12 +4887,14 @@ bool retro_serialize(void *data, size_t size)
 
       FastSaveStates = UsingFastSavestates();
       ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-      FastSaveStates = false;
 
       memcpy(data, st.data, size);
       free(st.data);
-      return ret;
    }
+
+   FastSaveStates = false;
+
+   return ret;
 }
 
 bool retro_unserialize(const void *data, size_t size)
@@ -4932,15 +4963,16 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
    int cursor;
    std::string part;
 
-   if (codeLine==NULL) return;
+   if (codeLine==NULL)
+      return;
 
    //Break the code into Parts
    for (cursor=0;;cursor++)
    {
       if (ISHEXDEC)
-      {
          matchLength++;
-      } else {
+      else
+      {
          if (matchLength)
          {
             part=codeLine+cursor-matchLength;
@@ -4950,9 +4982,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
          }
       }
       if (!codeLine[cursor])
-      {
          break;
-      }
    }
 
    MemoryPatch patch;
@@ -4961,9 +4991,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
    {
       part=codeParts[cursor];
       if (part.length()==8)
-      {
          part+=codeParts[++cursor];
-      }
       if (part.length()==12)
       {
          //Decode the cheat
@@ -4989,16 +5017,6 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
       }
    }
 }
-
-#ifdef _WIN32
-static void sanitize_path(std::string &path)
-{
-   size_t size = path.size();
-   for (size_t i = 0; i < size; i++)
-      if (path[i] == '/')
-         path[i] = '\\';
-}
-#endif
 
 // Use a simpler approach to make sure that things go right for libretro.
 const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
@@ -5033,34 +5051,47 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
    return fullpath;
 }
 
-void MDFND_DispMessage(unsigned char *str)
+void MDFND_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *str)
 {
-   const char *strc = (const char*)str;
-   struct retro_message msg =
+   if (libretro_msg_interface_version >= 1)
    {
-      strc,
-      180
-   };
-
-   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+      struct retro_message_ext msg = {
+         str,
+         3000,
+         priority,
+         level,
+         target,
+         type,
+         -1
+      };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
+   }
+   else
+   {
+      struct retro_message msg =
+      {
+         str,
+         180
+      };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   }
 }
 
-void MDFN_DispMessage(const char *format, ...)
+void MDFN_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *format, ...)
 {
    va_list ap;
-   struct retro_message msg;
-   const char *strc = NULL;
-   char *str        = (char*)malloc(4096 * sizeof(char));
+   char *str = (char*)malloc(4096 * sizeof(char));
 
-   va_start(ap,format);
-
+   va_start(ap, format);
    vsnprintf(str, 4096, format, ap);
    va_end(ap);
-   strc       = str;
 
-   msg.frames = 180;
-   msg.msg    = strc;
-
-   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   MDFND_DispMessage(priority, level, target, type, str);
    free(str);
 }

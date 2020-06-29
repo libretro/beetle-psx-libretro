@@ -48,7 +48,6 @@
 			throw std::runtime_error("Vulkan call failed at " __FILE__ ":" S__LINE__ ".\n"); \
 	} while (0)
 
-
 #ifdef VULKAN_DEBUG
 #define VK_ASSERT(x)                                             \
 	do                                                           \

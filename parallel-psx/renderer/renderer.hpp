@@ -3,6 +3,7 @@
 #include "../atlas/atlas.hpp"
 #include "../vulkan/device.hpp"
 #include "../vulkan/vulkan.hpp"
+#include "../custom-textures/texture_tracker.hpp"
 
 #ifdef VULKAN_WSI
 #include "wsi.hpp"
@@ -39,7 +40,7 @@ enum class SemiTransparentMode
 	AddQuarter
 };
 
-class Renderer : private HazardListener
+class Renderer : private HazardListener, private TextureUploader
 {
 public:
 	enum class ScanoutMode
@@ -143,10 +144,15 @@ public:
 	{
 		std::vector<uint32_t> vram;
 		RenderState state;
+		TextureTrackerSaveState tracker_state;
 	};
 
 	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 	~Renderer();
+
+	void set_track_textures(bool enable);
+	void set_dump_textures(bool enable);
+	void set_replace_textures(bool enable);
 
 	void set_adaptive_smoothing(bool enable)
 	{
@@ -184,6 +190,8 @@ public:
 	void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 	uint16_t *begin_copy(Vulkan::BufferHandle handle);
 	void end_copy(Vulkan::BufferHandle handle);
+
+	void notify_texture_upload(Rect rect, uint16_t *vram);
 
 	void blit_vram(const Rect &dst, const Rect &src);
 
@@ -380,14 +388,27 @@ private:
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
+	bool texture_tracking_enabled = false;
+	TextureTracker tracker;
 
 	Vulkan::CommandBufferHandle cmd;
 
+	// HazardListener
 	void hazard(StatusFlags flags) override;
 	void resolve(Domain target_domain, unsigned x, unsigned y) override;
 	void flush_render_pass(const Rect &rect) override;
 	void discard_render_pass() override;
 	void clear_quad(const Rect &rect, FBColor color, bool candidate) override;
+
+	// TextureUploader
+	Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image) override;
+	Vulkan::ImageHandle create_texture(int width, int height, int levels) override;
+	Vulkan::CommandBufferHandle &command_buffer_hack_fixme() override;
+
+	void hd_texture_uniforms(HdTextureHandle hd_texture_index);
+	void update_hd_texture(const Rect &imageRect, const Rect &dstRect, const void *pixels);
+	void update_hd_textures();
+	HdTextureHandle get_hd_texture_index(const Rect &uvlimits, bool &fastpath_capable_out, bool &cache_hit_out);
 
 	struct
 	{
@@ -466,14 +487,15 @@ private:
 	struct SemiTransparentState
 	{
 		int scissor_index;
+		HdTextureHandle hd_texture_index;
 		SemiTransparentMode semi_transparent;
 		bool textured;
 		bool masked;
 
 		bool operator==(const SemiTransparentState &other) const
 		{
-			return scissor_index == other.scissor_index && semi_transparent == other.semi_transparent &&
-			       textured == other.textured && masked == other.masked;
+			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
+			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked;
 		}
 
 		bool operator!=(const SemiTransparentState &other) const
@@ -489,19 +511,32 @@ private:
 		float z;
 	};
 
+	struct PrimitiveInfo {
+		unsigned triangle_index;
+		int scissor_index;
+		HdTextureHandle hd_texture_index;
+
+		// needed for emplace_back
+		PrimitiveInfo(unsigned triangle_index, int scissor_index, HdTextureHandle hd_texture_index)
+			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index)
+		{
+
+		}
+	};
+
 	struct OpaqueQueue
 	{
 		// Non-textured primitives.
 		std::vector<BufferVertex> opaque;
-		std::vector<std::pair<unsigned, int>> opaque_scissor;
+		std::vector<PrimitiveInfo> opaque_scissor;
 
 		// Textured primitives, no semi-transparency.
 		std::vector<BufferVertex> opaque_textured;
-		std::vector<std::pair<unsigned, int>> opaque_textured_scissor;
+		std::vector<PrimitiveInfo> opaque_textured_scissor;
 
 		// Textured primitives, semi-transparency enabled.
 		std::vector<BufferVertex> semi_transparent_opaque;
-		std::vector<std::pair<unsigned, int>> semi_transparent_opaque_scissor;
+		std::vector<PrimitiveInfo> semi_transparent_opaque_scissor;
 
 		std::vector<BufferVertex> semi_transparent;
 		std::vector<SemiTransparentState> semi_transparent_state;
@@ -524,7 +559,7 @@ private:
 	bool render_pass_is_feedback = false;
 	float last_uv_scale_x, last_uv_scale_y;
 
-	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<std::pair<unsigned, int>> &scissors);
+	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors);
 	void render_opaque_primitives();
 	void render_opaque_texture_primitives();
 	void render_semi_transparent_opaque_texture_primitives();
@@ -533,9 +568,9 @@ private:
 
 	float allocate_depth(const Rect &rect);
 
-	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count);
+	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index);
 	void build_line_quad(Vertex *quad, const Vertex *line);
-	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor);
+	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture);
 
 	void flush_resolves();
 	void flush_blits();

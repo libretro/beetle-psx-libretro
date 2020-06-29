@@ -42,7 +42,7 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
    {
       if(have_defval)
          return defval;
-      throw MDFN_Error(0, _("Missing property: %s"), propname.c_str());
+      throw MDFN_Error(0, "Missing property: %s", propname.c_str());
    }
 
    const std::string &v = zit->second;
@@ -61,7 +61,7 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
       ret = strtoul(vp, &ep, scan_base);
 
    if(!vp[0] || ep[0])
-      throw MDFN_Error(0, _("Property %s: Malformed integer: %s"), propname.c_str(), v.c_str());
+      throw MDFN_Error(0, "Property %s: Malformed integer: %s", propname.c_str(), v.c_str());
 
    return ret;
 }
@@ -139,7 +139,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
       {
          if(linebuf.length() < 3 || linebuf[linebuf.length() - 1] != ']')
          {
-            MDFN_Error(0, _("Malformed section specifier: %s"), linebuf.c_str());
+            MDFN_Error(0, "Malformed section specifier: %s", linebuf.c_str());
             return false;
          }
 
@@ -154,7 +154,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
          if(feqpos == std::string::npos || feqpos != leqpos)
          {
-            MDFN_Error(0, _("Malformed value pair specifier: %s"), linebuf.c_str());
+            MDFN_Error(0, "Malformed value pair specifier: %s", linebuf.c_str());
             return false;
          }
 
@@ -179,13 +179,13 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
       if(num_sessions != 1)
       {
-         MDFN_Error(0, _("Unsupported number of sessions: %u"), num_sessions);
+         MDFN_Error(0, "Unsupported number of sessions: %u", num_sessions);
          return false;
       }
 
       if(data_tracks_scrambled)
       {
-         MDFN_Error(0, _("Scrambled CCD data tracks currently not supported."));
+         MDFN_Error(0, "Scrambled CCD data tracks currently not supported.");
          return false;
       }
 
@@ -260,7 +260,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
       if(ss % 2352)
       {
-         MDFN_Error(0, _("CCD image size is not evenly divisible by 2352."));
+         MDFN_Error(0, "CCD image size is not evenly divisible by 2352.");
          return false;
       }
 
@@ -279,7 +279,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
       if(sub_stream->size() != (int64)img_numsectors * 96)
       {
-         MDFN_Error(0, _("CCD SUB file size mismatch."));
+         MDFN_Error(0, "CCD SUB file size mismatch.");
          return false;
       }
    }
@@ -347,7 +347,7 @@ bool CDAccess_CCD::CheckSubQSanity(void)
                !BCD_is_valid(am_bcd) || !BCD_is_valid(as_bcd) || !BCD_is_valid(af_bcd) ||
                rs_bcd > 0x59 || rf_bcd > 0x74 || as_bcd > 0x59 || af_bcd > 0x74)
          {
-            MDFN_Error(0, _("Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x"), rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
+            MDFN_Error(0, "Garbage subchannel Q data detected(bad BCD/out of range): %02x:%02x:%02x %02x:%02x:%02x", rm_bcd, rs_bcd, rf_bcd, am_bcd, as_bcd, af_bcd);
             return false;
          }
 
@@ -358,7 +358,7 @@ bool CDAccess_CCD::CheckSubQSanity(void)
 
          if(track < prev_track)
          {
-            MDFN_Error(0, _("Garbage subchannel Q data detected(bad track number)"));
+            MDFN_Error(0, "Garbage subchannel Q data detected(bad track number)");
             return false;
          }
 
@@ -398,7 +398,7 @@ bool CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
 
    if(lba < 0 || (size_t)lba >= img_numsectors)
    {
-      MDFN_Error(0, _("LBA out of range."));
+      MDFN_Error(0, "LBA out of range.");
       return false;
    }
 
@@ -419,7 +419,7 @@ bool CDAccess_CCD::Read_Raw_PW(uint8_t *buf, int32_t lba)
 
    if(lba < 0 || (size_t)lba >= img_numsectors)
    {
-      MDFN_Error(0, _("LBA out of range."));
+      MDFN_Error(0, "LBA out of range.");
       return false;
    }
 

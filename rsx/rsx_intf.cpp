@@ -165,11 +165,17 @@ bool rsx_intf_open(bool is_pal, bool force_software)
          }
          else
          {
-            MDFN_DispMessage("Could not force Vulkan renderer. Falling back to software renderer.");
+            MDFND_DispMessage(3, RETRO_LOG_ERROR,
+                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                  "Could not force Vulkan renderer. Falling back to software renderer.");
+
             goto soft;
          }
 #else
-         MDFN_DispMessage("Attempted to force Vulkan renderer, but core was built without it. Falling back to software renderer.");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Attempted to force Vulkan renderer, but core was built without it. Falling back to software renderer.");
+
          goto soft;
 #endif
       }
@@ -185,11 +191,17 @@ bool rsx_intf_open(bool is_pal, bool force_software)
          }
          else
          {
-            MDFN_DispMessage("Could not force OpenGL renderer. Falling back to software renderer.");
+            MDFND_DispMessage(3, RETRO_LOG_ERROR,
+                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                  "Could not force OpenGL renderer. Falling back to software renderer.");
+
             goto soft;
          }
 #else
-         MDFN_DispMessage("Attempted to force OpenGL renderer, but core was built without it. Falling back to software renderer.");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Attempted to force OpenGL renderer, but core was built without it. Falling back to software renderer.");
+
          goto soft;
 #endif
       }
@@ -229,9 +241,13 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 #endif
 
       if (preferred == RETRO_HW_CONTEXT_DUMMY)
-         MDFN_DispMessage("No hardware renderers could be opened. Falling back to software renderer.");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "No hardware renderers could be opened. Falling back to software renderer.");
       else
-         MDFN_DispMessage("Unable to find or open hardware renderer for frontend preferred hardware context. Falling back to software renderer.");
+         MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Unable to find or open hardware renderer for frontend preferred hardware context. Falling back to software renderer.");
    }
 
 soft:

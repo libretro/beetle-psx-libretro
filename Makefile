@@ -90,7 +90,7 @@ ifneq (,$(findstring unix,$(platform)))
    fpic   := -fPIC
    ifneq ($(findstring SunOS,$(shell uname -a)),)
       GREP = ggrep
-      SHARED := -shared -z defs -z gnu-version-script-compat
+      SHARED := -shared -z defs
    else
       GREP = grep
       SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
@@ -666,9 +666,9 @@ endif
 
 clean:
 	@rm -f $(OBJECTS)
-	@echo rm -f *.o
+	@echo rm -f "*.o"
 	@rm -f $(DEPS)
-	@echo rm -f *.d
+	@echo rm -f "*.d"
 	rm -f $(TARGET) $(TARGET_TMP)
 
 .PHONY: clean

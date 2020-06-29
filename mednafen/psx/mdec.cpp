@@ -524,8 +524,6 @@ void MDEC_Run(int32 clocks)
 {
    static const unsigned MDRPhaseBias = 0 + 1;
 
-   //MDFN_DispMessage("%u", OutFIFO.in_count);
-
    ClockCounter += clocks;
 
    if(ClockCounter > 128)

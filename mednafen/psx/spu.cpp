@@ -372,9 +372,8 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
          if(voice->DecodeFlags & 0x4)
          {
             if(!voice->IgnoreSampLA)
-            {
                voice->LoopAddr = voice->CurAddr;
-            }
+#if 0
             else
             {
                if(voice->LoopAddr != voice->CurAddr)
@@ -382,6 +381,7 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
                   PSX_DBG(PSX_DBG_FLOOD, "[SPU] Ignore: LoopAddr=0x%08x, SampLA=0x%08x\n", voice->LoopAddr, voice->CurAddr);
                }
             }
+#endif
          }
          voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
       }
@@ -1256,7 +1256,8 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
                     CheckIRQAddr(RWAddr);
                     break;
 
-         case 0x2C: PSX_WARNING("[SPU] Global reg 0x2c set: 0x%04x", V);
+         case 0x2C: 
+                    //PSX_WARNING("[SPU] Global reg 0x2c set: 0x%04x", V);
                     break;
 
          case 0x30: CDVol[0] = (int16_t)V;
@@ -1284,7 +1285,7 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
 {
    A &= 0x3FF;
 
-   PSX_DBGINFO("[SPU] Read: %08x", A);
+   //PSX_DBGINFO("[SPU] Read: %08x", A);
 
    if(A >= 0x200)
    {

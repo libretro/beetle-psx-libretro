@@ -53,6 +53,9 @@ static unsigned msaa = 1;
 static bool mdec_yuv;
 static vector<function<void ()>> defer;
 static dither_mode dither_mode = DITHER_NATIVE;
+static bool dump_textures = false;
+static bool replace_textures = false;
+static bool track_textures = false;
 static bool crop_overscan;
 static int image_offset_cycles;
 static int initial_scanline;
@@ -149,6 +152,9 @@ static bool libretro_create_device(
       return false;
    }
 
+   context->set_notification_callback([](const char* message) {
+      printf("Vulkan Validation Layer Says: %s\n", message);
+   });
    context->release_device();
    libretro_context->gpu = context->get_gpu();
    libretro_context->device = context->get_device();
@@ -366,6 +372,41 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
+   var.key = BEETLE_OPT(track_textures);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         track_textures = true;
+      else
+         track_textures = false;
+   }
+   
+   var.key = BEETLE_OPT(dump_textures);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         dump_textures = true;
+      else
+         dump_textures = false;
+   }
+
+   var.key = BEETLE_OPT(replace_textures);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         replace_textures = true;
+      else
+         replace_textures = false;
+   }
+
+   struct retro_core_option_display option_display;
+   option_display.visible = track_textures;
+
+   option_display.key = BEETLE_OPT(dump_textures);
+   environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   option_display.key = BEETLE_OPT(replace_textures);
+   environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+
    var.key = BEETLE_OPT(frame_duping);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -451,6 +492,9 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
       return;
    }
 
+   renderer->set_track_textures(track_textures);
+   renderer->set_dump_textures(dump_textures);
+   renderer->set_replace_textures(replace_textures);
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
    renderer->set_horizontal_overscan_cropping(crop_overscan);
@@ -500,10 +544,12 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    prev_frame_width = scanout->get_width();
    prev_frame_height = scanout ->get_height();
 
-   //printf("%d %d\n", scanout->get_width(), scanout->get_height());
+#if 0
+   printf("%d %d\n", scanout->get_width(), scanout->get_height());
 
-   //fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
-   //      renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
+   fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
+         renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
+#endif
 }
 
 /* Draw commands */
@@ -819,6 +865,9 @@ void rsx_vulkan_load_image(
       uint16_t *vram,
       bool mask_test, bool set_mask)
 {
+#ifndef NDEBUG
+   TT_LOG_VERBOSE(RETRO_LOG_INFO, "rsx_vulkan_load_image(x=%i, y=%i, w=%i, h=%i, mask_test=%i, set_mask=%i).\n", x, y, w, h, mask_test, set_mask);
+#endif
    if (!renderer)
    {
       // Generally happens if someone loads a save state before the Vulkan context is created.
@@ -828,6 +877,7 @@ void rsx_vulkan_load_image(
       return;
    }
 
+   renderer->notify_texture_upload(PSX::Rect { x, y, w, h }, vram);
    bool dual_copy = x + w > FB_WIDTH; // Check if we need to handle wrap-around in X.
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);

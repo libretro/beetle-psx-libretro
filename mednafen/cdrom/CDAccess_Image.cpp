@@ -305,7 +305,7 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
       if(tmp_long > sectors)
       {
-         MDFN_Error(0, _("Length specified in TOC file for track %d is too large by %ld sectors!\n"), tracknum, (long)(tmp_long - sectors));
+         MDFN_Error(0, "Length specified in TOC file for track %d is too large by %ld sectors!\n", tracknum, (long)(tmp_long - sectors));
          return false;
       }
       sectors = tmp_long;
@@ -354,7 +354,7 @@ int CDAccess_Image::LoadSBI(const char* sbi_path)
       memcpy(SubQReplaceMap[aba].data, tmpq, 12);
    }
 
-   //MDFN_printf(_("Loaded Q subchannel replacements for %zu sectors.\n"), SubQReplaceMap.size());
+   //MDFN_printf("Loaded Q subchannel replacements for %zu sectors.\n", SubQReplaceMap.size());
    log_cb(RETRO_LOG_INFO, "[Image] Loaded SBI file %s\n", sbi_path);
    filestream_close(sbis);
    return 0;
@@ -457,7 +457,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
             if(AutoTrackInc > 99)
             {
-               MDFN_Error(0, _("Invalid track number: %d"), AutoTrackInc);
+               MDFN_Error(0, "Invalid track number: %d", AutoTrackInc);
                return false;
             }
 
@@ -479,7 +479,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
             if(format_lookup == _DI_FORMAT_COUNT)
             {
-               MDFN_Error(0, _("Invalid track format: %s"), args[0].c_str());
+               MDFN_Error(0, "Invalid track format: %s", args[0].c_str());
                return false;
             }
 
@@ -489,7 +489,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(!strcasecmp(args[1].c_str(), "RW"))
             {
                TmpTrack.SubchannelMode = CDRF_SUBM_RW;
-               MDFN_Error(0, _("\"RW\" format subchannel data not supported, only \"RW_RAW\" is!"));
+               MDFN_Error(0, "\"RW\" format subchannel data not supported, only \"RW_RAW\" is!");
                return false;
             }
             else if(!strcasecmp(args[1].c_str(), "RW_RAW"))
@@ -498,15 +498,15 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          } // end to TRACK
          else if(cmdbuf == "SILENCE")
          {
-            //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+            //throw MDFN_Error(0, "Unsupported directive: %s", cmdbuf.c_str());
          }
          else if(cmdbuf == "ZERO")
          {
-            //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+            //throw MDFN_Error(0, "Unsupported directive: %s", cmdbuf.c_str());
          }
          else if(cmdbuf == "FIFO")
          {
-            MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+            MDFN_Error(0, "Unsupported directive: %s", cmdbuf.c_str());
             return false;
          }
          else if(cmdbuf == "FILE" || cmdbuf == "AUDIOFILE")
@@ -552,7 +552,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          {
             if(active_track < 0)
             {
-               MDFN_Error(0, _("Command %s is outside of a TRACK definition!\n"), cmdbuf.c_str());
+               MDFN_Error(0, "Command %s is outside of a TRACK definition!\n", cmdbuf.c_str());
                return false;
             }
             int m,s,f;
@@ -563,7 +563,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          {
             if(active_track < 0)
             {
-               MDFN_Error(0, _("Command %s is outside of a TRACK definition!\n"), cmdbuf.c_str());
+               MDFN_Error(0, "Command %s is outside of a TRACK definition!\n", cmdbuf.c_str());
                return false;
             }
             int m,s,f;
@@ -592,7 +592,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             }
             else
             {
-               MDFN_Error(0, _("Unsupported argument to \"NO\" directive: %s"), args[0].c_str());
+               MDFN_Error(0, "Unsupported argument to \"NO\" directive: %s", args[0].c_str());
                return false;
             }
          }
@@ -613,7 +613,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             disc_type = DISC_TYPE_CD_XA;
          else
          {
-            //throw MDFN_Error(0, _("Unsupported directive: %s"), cmdbuf.c_str());
+            //throw MDFN_Error(0, "Unsupported directive: %s", cmdbuf.c_str());
          }
          // TODO: CATALOG
 
@@ -631,7 +631,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
             if(!MDFN_IsFIROPSafe(args[0]))
             {
-               MDFN_Error(0, _("Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n"), args[0].c_str());
+               MDFN_Error(0, "Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n", args[0].c_str());
                return false;
             }
 
@@ -665,13 +665,13 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
                if(!TmpTrack.AReader)
                {
-                  MDFN_Error(0, _("Unsupported audio track file format: %s\n"), args[0].c_str());
+                  MDFN_Error(0, "Unsupported audio track file format: %s\n", args[0].c_str());
                   return false;
                }
             }
             else
             {
-               MDFN_Error(0, _("Unsupported track format: %s\n"), args[1].c_str());
+               MDFN_Error(0, "Unsupported track format: %s\n", args[1].c_str());
                return false;
             }
          }
@@ -706,13 +706,13 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
             if(format_lookup == _DI_FORMAT_COUNT)
             {
-               MDFN_Error(0, _("Invalid track format: %s\n"), args[1].c_str());
+               MDFN_Error(0, "Invalid track format: %s\n", args[1].c_str());
                return false;
             }
 
             if(active_track < 0 || active_track > 99)
             {
-               MDFN_Error(0, _("Invalid track number: %d\n"), active_track);
+               MDFN_Error(0, "Invalid track number: %d\n", active_track);
                return false;
             }
          }
@@ -724,7 +724,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
                if(sscanf(args[1].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
-                  MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
+                  MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
                   return false;
                }
 
@@ -742,7 +742,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
                if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
-                  MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
+                  MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
                   return false;
                }
 
@@ -757,7 +757,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
                if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
-                  MDFN_Error(0, _("Malformed m:s:f time in \"%s\" directive: %s"), cmdbuf.c_str(), args[0].c_str());
+                  MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
                   return false;
                }      
 
@@ -792,7 +792,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                }
                else
                {
-                  MDFN_Error(0, _("Unknown CUE sheet \"FLAGS\" directive flag \"%s\".\n"), args[i].c_str());
+                  MDFN_Error(0, "Unknown CUE sheet \"FLAGS\" directive flag \"%s\".\n", args[i].c_str());
                   return false;
                }
             }
@@ -802,7 +802,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             log_cb(RETRO_LOG_ERROR, "Unsupported CUE sheet directive: \"%s\".\n", cmdbuf.c_str());
          else
          {
-            MDFN_Error(0, _("Unknown CUE sheet directive \"%s\".\n"), cmdbuf.c_str());
+            MDFN_Error(0, "Unknown CUE sheet directive \"%s\".\n", cmdbuf.c_str());
             return false;
          }
       } // end of CUE sheet handling
@@ -813,7 +813,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 
    if(FirstTrack > LastTrack)
    {
-      MDFN_Error(0, _("No tracks found!\n"));
+      MDFN_Error(0, "No tracks found!\n");
       return false;
    }
 
@@ -1079,7 +1079,7 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
 
    if(!TrackFound)
    {
-      MDFN_Error(0, _("Could not find track for sector %u!"), lba);
+      MDFN_Error(0, "Could not find track for sector %u!", lba);
       return false;
    }
 

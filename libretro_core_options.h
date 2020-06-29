@@ -186,6 +186,41 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(track_textures),
+      "Track Textures",
+      "Prerequisite for texture dumping and replacement.  Will probably crash in most games.",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#ifdef TEXTURE_DUMPING_ENABLED
+   {
+      BEETLE_OPT(dump_textures),
+      "Dump Textures",
+      "Dumps used textures to <cd>-texture-dump/",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(replace_textures),
+      "Replace Textures",
+      "Replaces textures using hd versions from <cd>-texture-replacements/",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {

@@ -1,6 +1,8 @@
 #ifndef _MEDNAFEN_H
 #define _MEDNAFEN_H
 
+#include <libretro.h>
+
 #include "mednafen-types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +32,15 @@ extern MDFNGI *MDFNGameInfo;
 
 #include "settings.h"
 
-void MDFN_DispMessage(const char *format, ...);
+void MDFND_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *msg);
+
+void MDFN_DispMessage(
+      unsigned priority, enum retro_log_level level,
+      enum retro_message_target target, enum retro_message_type type,
+      const char *format, ...);
 
 void MDFN_LoadGameCheats(void *override);
 void MDFN_FlushGameCheats(int nosave);

@@ -173,7 +173,7 @@ static bool MDFN_FASTCALL TimerMatch(unsigned i)
       if(Timers[i].Counter == 0 || Timers[i].Counter == Timers[i].Target)
          irq_exact = true;
 
-#if 1
+#if 0
       {
          const uint16_t lateness = (Timers[i].Mode & 0x008) ? Timers[i].Counter : (Timers[i].Counter - Timers[i].Target);
 
@@ -202,7 +202,7 @@ static bool MDFN_FASTCALL TimerOverflow(unsigned i)
       if(Timers[i].Counter == 0)
          irq_exact = true;
 
-#if 1
+#if 0
       if(Timers[i].Counter > ((i == 1 && (Timers[i].Mode & 0x100)) ? 0 : 3))
          PSX_DBG(PSX_DBG_WARNING, "[TIMER] Timer %d overflow IRQ trigger late: %u\n", i, Timers[i].Counter);
 #endif
@@ -435,7 +435,7 @@ uint16_t MDFN_FASTCALL TIMER_Read(const int32_t timestamp, uint32_t A)
 
    if(which >= 3)
    {
-      PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
+      //PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
 
       return(ret >> ((A & 3) * 8));
    }
