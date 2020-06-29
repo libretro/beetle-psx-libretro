@@ -8,6 +8,7 @@
 #include "../vulkan/device.hpp"
 #include <fstream>
 #include "config_parser.h"
+#include "libretro.h"
 
 extern retro_log_printf_t log_cb;
 
