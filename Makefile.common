@@ -2,7 +2,7 @@ SOURCES_CXX :=
 SOURCES_C   :=
 
 DEPS_DIR     := $(CORE_DIR)/deps
-LIBRETRO_DIR := $(CORE_DIR)/libretro-common
+LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro-common
 LIBKIRK_DIR  := $(DEPS_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
@@ -77,16 +77,16 @@ ifeq ($(HAVE_OPENGL), 1)
       CFLAGS   += $(GLFLAGS)
       CXXFLAGS += $(GLFLAGS)
 
-      SOURCES_C += $(LIBRETRO_DIR)/glsym/glsym_es2.c
+      SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_es2.c
    else
       GLFLAGS   := -DHAVE_OPENGL -DCORE
       CFLAGS    += $(GLFLAGS)
       CXXFLAGS  += $(GLFLAGS)
-      SOURCES_C += $(LIBRETRO_DIR)/glsym/glsym_gl.c
+      SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
    endif
 
-   SOURCES_C += $(LIBRETRO_DIR)/glsm/glsm.c \
-                $(LIBRETRO_DIR)/glsym/rglgen.c
+   SOURCES_C += $(LIBRETRO_COMM_DIR)/glsm/glsm.c \
+                $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 
    SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
 endif
@@ -98,7 +98,7 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(MEDNAFEN_DIR)/hw_sound \
             -I$(MEDNAFEN_DIR)/hw_cpu \
             -I$(MEDNAFEN_DIR)/hw_misc \
-            -I$(LIBRETRO_DIR)/include \
+            -I$(LIBRETRO_COMM_DIR)/include \
             -I$(DEPS_DIR)/ugui
 
 ifneq (,$(findstring msvc,$(platform)))
@@ -328,27 +328,28 @@ ifneq ($(HAVE_GRIFFIN), 1)
    endif
 
    ifneq ($(STATIC_LINKING), 1)
-      SOURCES_C +=   $(LIBRETRO_DIR)/streams/file_stream.c \
-                     $(LIBRETRO_DIR)/streams/file_stream_transforms.c \
-                     $(LIBRETRO_DIR)/file/file_path.c \
-                     $(LIBRETRO_DIR)/file/retro_dirent.c \
-                     $(LIBRETRO_DIR)/vfs/vfs_implementation.c \
-                     $(LIBRETRO_DIR)/lists/dir_list.c \
-                     $(LIBRETRO_DIR)/lists/string_list.c \
-                     $(LIBRETRO_DIR)/string/stdstring.c \
-                     $(LIBRETRO_DIR)/compat/compat_strl.c \
-                     $(LIBRETRO_DIR)/compat/fopen_utf8.c \
-                     $(LIBRETRO_DIR)/compat/compat_strcasestr.c \
-                     $(LIBRETRO_DIR)/compat/compat_posix_string.c \
-                     $(LIBRETRO_DIR)/encodings/encoding_utf.c \
-                     $(LIBRETRO_DIR)/memmap/memalign.c \
-                     $(LIBRETRO_DIR)/hash/rhash.c
+      SOURCES_C +=   $(LIBRETRO_COMM_DIR)/streams/file_stream.c \
+                     $(LIBRETRO_COMM_DIR)/streams/file_stream_transforms.c \
+                     $(LIBRETRO_COMM_DIR)/file/file_path.c \
+                     $(LIBRETRO_COMM_DIR)/file/retro_dirent.c \
+                     $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
+                     $(LIBRETRO_COMM_DIR)/lists/dir_list.c \
+                     $(LIBRETRO_COMM_DIR)/lists/string_list.c \
+                     $(LIBRETRO_COMM_DIR)/string/stdstring.c \
+                     $(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
+                     $(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c \
+                     $(LIBRETRO_COMM_DIR)/compat/compat_strcasestr.c \
+                     $(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
+                     $(LIBRETRO_COMM_DIR)/memmap/memalign.c \
+                     $(LIBRETRO_COMM_DIR)/time/rtime.c \
+                     $(LIBRETRO_COMM_DIR)/hash/rhash.c
 
       ifeq ($(HAVE_CDROM), 1)
          CFLAGS    += -DHAVE_CDROM
          CXXFLAGS  += -DHAVE_CDROM
-         SOURCES_C += $(LIBRETRO_DIR)/cdrom/cdrom.c \
-                      $(LIBRETRO_DIR)/vfs/vfs_implementation_cdrom.c
+         SOURCES_C += $(LIBRETRO_COMM_DIR)/cdrom/cdrom.c \
+                      $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation_cdrom.c
 
          ifeq ($(CDROM_DEBUG), 1)
             CFLAGS += -DCDROM_DEBUG
@@ -357,7 +358,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
       endif
 
       ifeq ($(NEED_THREADING), 1)
-         SOURCES_C += $(LIBRETRO_DIR)/rthreads/rthreads.c
+         SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
       endif
 
    endif
