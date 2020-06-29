@@ -971,10 +971,7 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path, bool force_load)
     {
        if (force_load)
        {
-          //  I’m pretty sure this is not the smartest way to format the memory
-          //  card, but I can’t think of anything better.
-          delete DevicesMC[which];
-          DevicesMC[which] = Device_Memcard_Create();
+         Device_Memcard_Format(DevicesMC[which]);
        }
        return;
     }
