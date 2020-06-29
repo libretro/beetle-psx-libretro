@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2019 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (stdstring.h).
@@ -45,30 +45,39 @@ static INLINE bool string_is_equal(const char *a, const char *b)
    return (a && b) ? !strcmp(a, b) : false;
 }
 
+static INLINE bool string_starts_with_size(const char *str, const char *prefix,
+      size_t size)
+{
+   return (str && prefix) ? !strncmp(prefix, str, size) : false;
+}
+
+static INLINE bool string_starts_with(const char *str, const char *prefix)
+{
+   return (str && prefix) ? !strncmp(prefix, str, strlen(prefix)) : false;
+}
+
+static INLINE bool string_ends_with_size(const char *str, const char *suffix,
+      size_t str_len, size_t suffix_len)
+{
+   return (str_len < suffix_len) ? false :
+         !memcmp(suffix, str + (str_len - suffix_len), suffix_len);
+}
+
+static INLINE bool string_ends_with(const char *str, const char *suffix)
+{
+   if (!str || !suffix)
+      return false;
+   return string_ends_with_size(str, suffix, strlen(str), strlen(suffix));
+}
+
+
+
 #define STRLEN_CONST(x)                   ((sizeof((x))-1))
 
 #define string_is_not_equal(a, b)         !string_is_equal((a), (b))
 
-#define string_add_pair_open(s, size)     strlcat((s), " (", (size))
-#define string_add_pair_close(s, size)    strlcat((s), ")",  (size))
-#define string_add_bracket_open(s, size)  strlcat((s), "{",  (size))
-#define string_add_bracket_close(s, size) strlcat((s), "}",  (size))
-#define string_add_single_quote(s, size)  strlcat((s), "'",  (size))
-#define string_add_quote(s, size)         strlcat((s), "\"",  (size))
-#define string_add_colon(s, size)         strlcat((s), ":",  (size))
-#define string_add_glob_open(s, size)     strlcat((s), "glob('*",  (size))
-#define string_add_glob_close(s, size)    strlcat((s), "*')",  (size))
-
 #define string_is_not_equal_fast(a, b, size) (memcmp(a, b, size) != 0)
 #define string_is_equal_fast(a, b, size)     (memcmp(a, b, size) == 0)
-
-static INLINE void string_add_between_pairs(char *s, const char *str,
-      size_t size)
-{
-   string_add_pair_open(s, size);
-   strlcat(s, str,  size);
-   string_add_pair_close(s, size);
-}
 
 static INLINE bool string_is_equal_case_insensitive(const char *a,
       const char *b)
@@ -128,6 +137,45 @@ char *string_trim_whitespace(char *const s);
 /* max_lines == 0 means no limit */
 char *word_wrap(char *buffer, const char *string,
       int line_width, bool unicode, unsigned max_lines);
+
+/* Splits string into tokens seperated by 'delim'
+ * > Returned token string must be free()'d
+ * > Returns NULL if token is not found
+ * > After each call, 'str' is set to the position after the
+ *   last found token
+ * > Tokens *include* empty strings
+ * Usage example:
+ *    char *str      = "1,2,3,4,5,6,7,,,10,";
+ *    char **str_ptr = &str;
+ *    char *token    = NULL;
+ *    while ((token = string_tokenize(str_ptr, ",")))
+ *    {
+ *        printf("%s\n", token);
+ *        free(token);
+ *        token = NULL;
+ *    }
+ */
+char* string_tokenize(char **str, const char *delim);
+
+/* Removes every instance of character 'c' from 'str' */
+void string_remove_all_chars(char *str, char c);
+
+/* Replaces every instance of character 'find' in 'str'
+ * with character 'replace' */
+void string_replace_all_chars(char *str, char find, char replace);
+
+/* Converts string to unsigned integer.
+ * Returns 0 if string is invalid  */
+unsigned string_to_unsigned(const char *str);
+
+/* Converts hexadecimal string to unsigned integer.
+ * Handles optional leading '0x'.
+ * Returns 0 if string is invalid  */
+unsigned string_hex_to_unsigned(const char *str);
+
+char *string_init(const char *src);
+
+void string_set(char **string, const char *src);
 
 RETRO_END_DECLS
 
