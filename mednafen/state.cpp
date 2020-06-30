@@ -145,10 +145,8 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
          int slen;
 
          //Replace snprintf with strncpy for most cases
-         if (name_prefix != NULL)
-         {
+         if (name_prefix)
             slen = snprintf(nameo + 1, 256, "%s%s", name_prefix ? name_prefix : "", sf->name);
-         }
          else
          {
             slen = strlen(sf->name);
@@ -156,17 +154,6 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
             nameo[256] = 0;
          }
          nameo[0] = slen;
-
-         if (slen >= 255)
-         {
-#ifndef NDEBUG
-            if(name_prefix != NULL)
-               printf("Warning:  state variable name possibly too long: %s %s %s %d\n", sf->name, name_prefix, nameo, slen);
-            else
-               printf("Warning:  state variable name possibly too long: %s %s %d\n", sf->name, nameo, slen);
-#endif
-            slen = 255;
-         }
 
          smem_write(st, nameo, 1 + nameo[0]);
       }
