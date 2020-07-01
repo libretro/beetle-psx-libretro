@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2018 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (rthreads.c).
@@ -191,12 +191,12 @@ sthread_t *sthread_create_with_priority(void (*thread_func)(void*), void *userda
 #endif
    bool thread_created      = false;
    struct thread_data *data = NULL;
-   sthread_t *thread        = (sthread_t*)calloc(1, sizeof(*thread));
+   sthread_t *thread        = (sthread_t*)malloc(sizeof(*thread));
 
    if (!thread)
       return NULL;
 
-   data                     = (struct thread_data*)calloc(1, sizeof(*data));
+   data                     = (struct thread_data*)malloc(sizeof(*data));
    if (!data)
       goto error;
 
@@ -204,14 +204,17 @@ sthread_t *sthread_create_with_priority(void (*thread_func)(void*), void *userda
    data->userdata           = userdata;
 
 #ifdef USE_WIN32_THREADS
-   thread->thread           = CreateThread(NULL, 0, thread_wrap, data, 0, &thread->id);
+   thread->id               = 0;
+   thread->thread           = CreateThread(NULL, 0, thread_wrap,
+         data, 0, &thread->id);
    thread_created           = !!thread->thread;
 #else
+   thread->id               = 0;
 
 #ifdef HAVE_THREAD_ATTR
    pthread_attr_init(&thread_attr);
 
-   if ( (thread_priority >= 1) && (thread_priority <= 100) )
+   if ((thread_priority >= 1) && (thread_priority <= 100))
    {
       struct sched_param sp;
       memset(&sp, 0, sizeof(struct sched_param));
@@ -268,7 +271,9 @@ int sthread_detach(sthread_t *thread)
    free(thread);
    return 0;
 #else
-   return pthread_detach(thread->id);
+   int ret = pthread_detach(thread->id);
+   free(thread);
+   return ret;
 #endif
 }
 
@@ -330,11 +335,12 @@ slock_t *slock_new(void)
    if (!lock)
       return NULL;
 
+
 #ifdef USE_WIN32_THREADS
    InitializeCriticalSection(&lock->lock);
-   mutex_created = true;
+   mutex_created             = true;
 #else
-   mutex_created = (pthread_mutex_init(&lock->lock, NULL) == 0);
+   mutex_created             = (pthread_mutex_init(&lock->lock, NULL) == 0);
 #endif
 
    if (!mutex_created)
@@ -386,6 +392,24 @@ void slock_lock(slock_t *lock)
 }
 
 /**
+ * slock_try_lock:
+ * @lock                    : pointer to mutex object
+ *
+ * Attempts to lock a mutex. If a mutex is already locked by
+ * another thread, return false.  If the lock is acquired, return true.
+**/
+bool slock_try_lock(slock_t *lock)
+{
+   if (!lock)
+      return false;
+#ifdef USE_WIN32_THREADS
+   return TryEnterCriticalSection(&lock->lock);
+#else
+   return pthread_mutex_trylock(&lock->lock)==0;
+#endif
+}
+
+/**
  * slock_unlock:
  * @lock                    : pointer to mutex object
  *
@@ -419,7 +443,6 @@ scond_t *scond_new(void)
       return NULL;
 
 #ifdef USE_WIN32_THREADS
-
    /* This is very complex because recreating condition variable semantics
     * with Win32 parts is not easy.
     *
@@ -445,9 +468,10 @@ scond_t *scond_new(void)
     *
     * Note: We might could simplify this using vista+ condition variables,
     * but we wanted an XP compatible solution. */
-   cond->event = CreateEvent(NULL, FALSE, FALSE, NULL);
-   if (!cond->event) goto error;
-   cond->hot_potato = CreateEvent(NULL, FALSE, FALSE, NULL);
+   cond->event             = CreateEvent(NULL, FALSE, FALSE, NULL);
+   if (!cond->event)
+      goto error;
+   cond->hot_potato        = CreateEvent(NULL, FALSE, FALSE, NULL);
    if (!cond->hot_potato)
    {
       CloseHandle(cond->event);
@@ -455,9 +479,6 @@ scond_t *scond_new(void)
    }
 
    InitializeCriticalSection(&cond->cs);
-   cond->waiters = cond->wakens = 0;
-   cond->head = NULL;
-
 #else
    if (pthread_cond_init(&cond->cond, NULL) != 0)
       goto error;
@@ -851,7 +872,7 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    now.tv_sec  = s;
    now.tv_nsec = n;
 #elif defined(PS2)
-   int tickms = clock();
+   int tickms = ps2_clock();
    now.tv_sec = tickms/1000;
    now.tv_nsec = tickms * 1000;
 #elif defined(__mips__) || defined(VITA) || defined(_3DS)
@@ -921,3 +942,19 @@ bool sthread_tls_set(sthread_tls_t *tls, const void *data)
 #endif
 }
 #endif
+
+uintptr_t sthread_get_thread_id(sthread_t *thread)
+{
+   if (!thread)
+      return 0;
+   return (uintptr_t)thread->id;
+}
+
+uintptr_t sthread_get_current_thread_id(void)
+{
+#ifdef USE_WIN32_THREADS
+   return (uintptr_t)GetCurrentThreadId();
+#else
+   return (uintptr_t)pthread_self();
+#endif
+}

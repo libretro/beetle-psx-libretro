@@ -820,7 +820,10 @@ static void DrawBuffer_new(DrawBuffer<T> *drawbuffer,
    Shader_init(&fs, fragment_shader, GL_FRAGMENT_SHADER);
 
    if (!Program_init(program, &vs, &fs))
+   {
+      delete program;
       return;
+   }
 
    /* Program owns the two pointers, so we clean them up now */
    glDeleteShader(fs.id);

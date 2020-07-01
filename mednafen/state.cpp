@@ -20,6 +20,7 @@
 #include <boolean.h>
 
 #include <compat/msvc.h>
+#include <compat/strl.h>
 
 #include "mednafen.h"
 #include "state.h"
@@ -67,32 +68,38 @@ int32_t smem_putc(StateMem *st, int value)
 {
    uint8_t tmpval = value;
    if(smem_write(st, &tmpval, 1) != 1)
-      return(-1);
-   return(1);
+      return -1;
+   return 1;
 }
 
 int32_t smem_seek(StateMem *st, uint32_t offset, int whence)
 {
    switch(whence)
    {
-      case SEEK_SET: st->loc = offset; break;
-      case SEEK_END: st->loc = st->len - offset; break;
-      case SEEK_CUR: st->loc += offset; break;
+      case SEEK_SET:
+         st->loc = offset;
+         break;
+      case SEEK_END:
+         st->loc = st->len - offset;
+         break;
+      case SEEK_CUR:
+         st->loc += offset;
+         break;
    }
 
    if(st->loc > st->len)
    {
       st->loc = st->len;
-      return(-1);
+      return -1;
    }
 
    if(st->loc < 0)
    {
       st->loc = 0;
-      return(-1);
+      return -1;
    }
 
-   return(0);
+   return 0;
 }
 
 int smem_write32le(StateMem *st, uint32_t b)
@@ -117,7 +124,7 @@ int smem_read32le(StateMem *st, uint32_t *b)
    return(4);
 }
 
-static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
+static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix)
 {
    while(sf->size || sf->name)	// Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct.
    {
@@ -144,29 +151,15 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
          char nameo[1 + 256];
          int slen;
 
-         //Replace snprintf with strncpy for most cases
-         if (name_prefix != NULL)
-         {
-            slen = snprintf(nameo + 1, 256, "%s%s", name_prefix ? name_prefix : "", sf->name);
-         }
+         if (name_prefix)
+            slen       = snprintf(
+                  nameo + 1, 256, "%s%s", name_prefix, sf->name);
          else
          {
-            slen = strlen(sf->name);
-            strncpy(nameo + 1, sf->name, 255);
+            slen       = strlcpy(nameo + 1, sf->name, 255);
             nameo[256] = 0;
          }
-         nameo[0] = slen;
-
-         if (slen >= 255)
-         {
-#ifndef NDEBUG
-            if(name_prefix != NULL)
-               printf("Warning:  state variable name possibly too long: %s %s %s %d\n", sf->name, name_prefix, nameo, slen);
-            else
-               printf("Warning:  state variable name possibly too long: %s %s %d\n", sf->name, nameo, slen);
-#endif
-            slen = 255;
-         }
+         nameo[0]      = slen;
 
          smem_write(st, nameo, 1 + nameo[0]);
       }
@@ -174,10 +167,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 
 #ifdef MSB_FIRST
       /* Flip the byte order... */
-      if(sf->flags & MDFNSTATE_BOOL)
-      {
-
-      }
+      if(sf->flags & MDFNSTATE_BOOL) { }
       else if(sf->flags & MDFNSTATE_RLSB64)
          Endian_A64_Swap(sf->v, bytesize / sizeof(uint64_t));
       else if(sf->flags & MDFNSTATE_RLSB32)
@@ -204,10 +194,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf, const char *name_prefix = NULL)
 
 #ifdef MSB_FIRST
       /* Now restore the original byte order. */
-      if(sf->flags & MDFNSTATE_BOOL)
-      {
-
-      }
+      if(sf->flags & MDFNSTATE_BOOL) { }
       else if(sf->flags & MDFNSTATE_RLSB64)
          Endian_A64_LE_to_NE(sf->v, bytesize / sizeof(uint64_t));
       else if(sf->flags & MDFNSTATE_RLSB32)
@@ -246,7 +233,7 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
 
    data_start_pos = st->loc;
 
-   if(!SubWrite(st, sf))
+   if(!SubWrite(st, sf, NULL))
       return(0);
 
    end_pos = st->loc;
@@ -279,9 +266,7 @@ static SFORMAT *FindSF(const char *name, SFORMAT *sf)
       {
          //for fast savestates, we no longer have the text label in the state, and need to assume that it is the correct one.
          if (FastSaveStates)
-         {
             return sf;
-         }
          assert(sf->name);
          if (!strcmp(sf->name, name))
             return sf;
@@ -359,9 +344,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       SFORMAT *tmp = FindSF((char*)toa + 1, sf);
       //Fix for unnecessary name checks, when we find it in the first slot, don't recheck that slot again.  Also necessary for fast savestates to work.
       if (tmp == sf)
-      {
          sf++;
-      }
 
       if(tmp)
       {
@@ -384,11 +367,10 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 
             if(tmp->flags & MDFNSTATE_BOOL)
             {
+               int32_t bool_monster;
                // Converting downwards is necessary for the case of sizeof(bool) > 1
-               for(int32_t bool_monster = expected_size - 1; bool_monster >= 0; bool_monster--)
-               {
+               for(bool_monster = expected_size - 1; bool_monster >= 0; bool_monster--)
                   ((bool *)tmp->v)[bool_monster] = ((uint8_t *)tmp->v)[bool_monster];
-               }
             }
 #ifdef MSB_FIRST
             if(tmp->flags & MDFNSTATE_RLSB64)
@@ -416,8 +398,6 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
    assert(st->loc == (temp + size));
    return 1;
 }
-
-static int CurrentState = 0;
 
 /* This function is called by the game driver(NES, GB, GBA) to save a state. */
 static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, SSDescriptor *section)

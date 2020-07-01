@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (retro_assert.h).
+ * The following license statement only applies to this file (rtime.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,18 +20,29 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __RETRO_ASSERT_H
-#define __RETRO_ASSERT_H
+#ifndef __LIBRETRO_SDK_RTIME_H__
+#define __LIBRETRO_SDK_RTIME_H__
 
-#include <assert.h>
+#include <retro_common_api.h>
 
-#ifdef RARCH_INTERNAL
-#include <stdio.h>
-#define retro_assert(cond) do { \
-   if (!(cond)) { printf("Assertion failed at %s:%d.\n", __FILE__, __LINE__); abort(); } \
-} while(0)
-#else
-#define retro_assert(cond) assert(cond)
-#endif
+#include <stdint.h>
+#include <stddef.h>
+#include <time.h>
+
+RETRO_BEGIN_DECLS
+
+/* TODO/FIXME: Move all generic time handling functions
+ * to this file */
+
+/* Must be called before using rtime_localtime() */
+void rtime_init(void);
+
+/* Must be called upon program termination */
+void rtime_deinit(void);
+
+/* Thread-safe wrapper for localtime() */
+struct tm *rtime_localtime(const time_t *timep, struct tm *result);
+
+RETRO_END_DECLS
 
 #endif

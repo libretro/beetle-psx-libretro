@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2018 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (intrinsics.h).
@@ -41,7 +41,7 @@ RETRO_BEGIN_DECLS
 /* Count Leading Zero, unsigned 16bit input value */
 static INLINE unsigned compat_clz_u16(uint16_t val)
 {
-#if defined(__GNUC__) && !defined(PS2)
+#if defined(__GNUC__)
    return __builtin_clz(val << 16 | 0x8000);
 #else
    unsigned ret = 0;
