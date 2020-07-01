@@ -282,7 +282,6 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(MEDNAFEN_DIR)/FileStream.cpp \
                   $(MEDNAFEN_DIR)/MemoryStream.cpp \
                   $(MEDNAFEN_DIR)/Stream.cpp \
-                  $(MEDNAFEN_DIR)/state.cpp \
                   $(MEDNAFEN_DIR)/mempatcher.cpp \
                   $(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
                   $(MEDNAFEN_DIR)/video/surface.cpp \
@@ -291,7 +290,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_DIR)/input.cpp \
                   $(CORE_DIR)/rsx/rsx_intf.cpp
 
-   SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c
+   SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c \
+                  $(MEDNAFEN_DIR)/state.c
 
    ifneq ($(RSX_DUMP),)
       SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp

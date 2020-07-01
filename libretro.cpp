@@ -2405,7 +2405,7 @@ static void CDSelect(void)
    }
 }
 
-int StateAction(StateMem *sm, int load, int data_only)
+extern "C" int StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
