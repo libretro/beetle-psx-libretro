@@ -971,7 +971,7 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path, bool force_load)
     {
        if (force_load)
        {
-         Device_Memcard_Format(DevicesMC[which]);
+         Device_Memcard_Reset(DevicesMC[which]);
        }
        return;
     }

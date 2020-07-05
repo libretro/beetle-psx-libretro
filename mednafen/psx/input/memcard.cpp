@@ -530,8 +530,11 @@ InputDevice *Device_Memcard_Create(void)
    return new InputDevice_Memcard();
 }
 
-void Device_Memcard_Format(InputDevice *device)
+void Device_Memcard_Reset(InputDevice *device)
 {
    if (InputDevice_Memcard* memcard = dynamic_cast<InputDevice_Memcard*>(device))
+   {
+      memcard->Power();
       memcard->Format();
+   }
 }
