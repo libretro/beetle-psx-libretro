@@ -971,10 +971,13 @@ void FrontIO::LoadMemcard(unsigned int which, const char *path, bool force_load)
     {
        if (force_load)
        {
-         Device_Memcard_Reset(DevicesMC[which]);
+          Device_Memcard_Power(DevicesMC[which]);
+          Device_Memcard_Format(DevicesMC[which]);
        }
        return;
     }
+
+    Device_Memcard_Power(DevicesMC[which]);
 
     filestream_read(mf, DevicesMC[which]->GetNVData(), (1 << 17));
 
