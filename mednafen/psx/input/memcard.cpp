@@ -48,9 +48,9 @@ class InputDevice_Memcard : public InputDevice
       virtual uint64 GetNVDirtyCount(void);
       virtual void ResetNVDirtyCount(void);
 
-   private:
-
       void Format(void);
+
+   private:
 
       bool presence_new;
 
@@ -528,4 +528,16 @@ void InputDevice_Memcard::ResetNVDirtyCount(void)
 InputDevice *Device_Memcard_Create(void)
 {
    return new InputDevice_Memcard();
+}
+
+void Device_Memcard_Power(InputDevice *device)
+{
+   if (InputDevice_Memcard* memcard = dynamic_cast<InputDevice_Memcard*>(device))
+      memcard->Power();
+}
+
+void Device_Memcard_Format(InputDevice *device)
+{
+   if (InputDevice_Memcard* memcard = dynamic_cast<InputDevice_Memcard*>(device))
+      memcard->Format();
 }
