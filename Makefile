@@ -93,13 +93,13 @@ ifneq (,$(findstring unix,$(platform)))
       IS_X86 = 1
    endif
    ifneq (,$(findstring Haiku,$(shell uname -s)))
-     LDFLAGS += $(PTHREAD_FLAGS) -lroot
+      LDFLAGS += $(PTHREAD_FLAGS) -lroot
    else
-     LDFLAGS += $(PTHREAD_FLAGS) -ldl
-   endif
-   ifeq ($(HAVE_LIGHTREC), 1)
-      LDFLAGS += -lrt
-      FLAGS += -DHAVE_SHM
+      LDFLAGS += $(PTHREAD_FLAGS) -ldl
+      ifeq ($(HAVE_LIGHTREC), 1)
+         LDFLAGS += -lrt
+         FLAGS += -DHAVE_SHM
+      endif
    endif
    FLAGS   +=
    ifeq ($(HAVE_OPENGL),1)
