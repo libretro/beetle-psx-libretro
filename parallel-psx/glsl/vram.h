@@ -149,7 +149,7 @@ bool neq(vec4 a, vec4 b){
 }
 
 vec4 P(vec2 coord, int x, int y){
-   return sample_vram_atlas(coord + vec2(x, y));
+   return sample_vram_atlas(clamp_coord(coord + vec2(x, y)));
 }
 
 vec4 sample_vram_xbr(out float opacity)
@@ -405,6 +405,10 @@ float c_df(vec4 c1, vec4 c2) {
 	return df.r + df.g + df.b;
 }
 
+vec4 P(vec2 coord){
+   return sample_vram_atlas(clamp_coord(coord));
+}
+
 //sabr
 vec4 sample_vram_sabr(out float opacity)
 {
@@ -418,53 +422,53 @@ vec4 sample_vram_sabr(out float opacity)
    vec4 xyp_9_14_9   = tc.xyyy + vec4( 2, -1, 0,  1);
    
 	// Store mask values
-	vec4 P1  = sample_vram_atlas(xyp_1_2_3.xw   );
+	vec4 P1  = P(xyp_1_2_3.xw   );
 	P1.w = 1. - float(is_transparent(P1));
-	vec4 P2  = sample_vram_atlas(xyp_1_2_3.yw   );
+	vec4 P2  = P(xyp_1_2_3.yw   );
 	P2.w = 1. - float(is_transparent(P2));
-	vec4 P3  = sample_vram_atlas(xyp_1_2_3.zw   );
+	vec4 P3  = P(xyp_1_2_3.zw   );
 	P3.w = 1. - float(is_transparent(P3));
 
-	vec4 P6  = sample_vram_atlas(xyp_6_7_8.xw   );
+	vec4 P6  = P(xyp_6_7_8.xw   );
 	P6.w = 1. - float(is_transparent(P6));
-	vec4 P7  = sample_vram_atlas(xyp_6_7_8.yw   );
+	vec4 P7  = P(xyp_6_7_8.yw   );
 	P7.w = 1. - float(is_transparent(P7));
-	vec4 P8  = sample_vram_atlas(xyp_6_7_8.zw   );
+	vec4 P8  = P(xyp_6_7_8.zw   );
 	P8.w = 1. - float(is_transparent(P8));
 
-	vec4 P11 = sample_vram_atlas(xyp_11_12_13.xw);
+	vec4 P11 = P(xyp_11_12_13.xw);
 	P11.w = 1. - float(is_transparent(P11));
-	vec4 P12 = sample_vram_atlas(xyp_11_12_13.yw);
+	vec4 P12 = P(xyp_11_12_13.yw);
 	P12.w = 1. - float(is_transparent(P12));
-	vec4 P13 = sample_vram_atlas(xyp_11_12_13.zw);
+	vec4 P13 = P(xyp_11_12_13.zw);
 	P13.w = 1. - float(is_transparent(P13));
 
-	vec4 P16 = sample_vram_atlas(xyp_16_17_18.xw);
+	vec4 P16 = P(xyp_16_17_18.xw);
 	P16.w = 1. - float(is_transparent(P16));
-	vec4 P17 = sample_vram_atlas(xyp_16_17_18.yw);
+	vec4 P17 = P(xyp_16_17_18.yw);
 	P17.w = 1. - float(is_transparent(P17));
-	vec4 P18 = sample_vram_atlas(xyp_16_17_18.zw);
+	vec4 P18 = P(xyp_16_17_18.zw);
 	P18.w = 1. - float(is_transparent(P18));
 
-	vec4 P21 = sample_vram_atlas(xyp_21_22_23.xw);
+	vec4 P21 = P(xyp_21_22_23.xw);
 	P21.w = 1. - float(is_transparent(P21));
-	vec4 P22 = sample_vram_atlas(xyp_21_22_23.yw);
+	vec4 P22 = P(xyp_21_22_23.yw);
 	P22.w = 1. - float(is_transparent(P22));
-	vec4 P23 = sample_vram_atlas(xyp_21_22_23.zw);
+	vec4 P23 = P(xyp_21_22_23.zw);
 	P23.w = 1. - float(is_transparent(P23));
 
-	vec4 P5  = sample_vram_atlas(xyp_5_10_15.xy );
+	vec4 P5  = P(xyp_5_10_15.xy );
 	P5.w = 1. - float(is_transparent(P5));
-	vec4 P10 = sample_vram_atlas(xyp_5_10_15.xz );
+	vec4 P10 = P(xyp_5_10_15.xz );
 	P10.w = 1. - float(is_transparent(P10));
-	vec4 P15 = sample_vram_atlas(xyp_5_10_15.xw );
+	vec4 P15 = P(xyp_5_10_15.xw );
 	P15.w = 1. - float(is_transparent(P15));
 
-	vec4 P9  = sample_vram_atlas(xyp_9_14_9.xy  );
+	vec4 P9  = P(xyp_9_14_9.xy  );
 	P9.w = 1. - float(is_transparent(P9));
-	vec4 P14 = sample_vram_atlas(xyp_9_14_9.xz  );
+	vec4 P14 = P(xyp_9_14_9.xz  );
 	P14.w = 1. - float(is_transparent(P14));
-	vec4 P19 = sample_vram_atlas(xyp_9_14_9.xw  );
+	vec4 P19 = P(xyp_9_14_9.xw  );
 	P19.w = 1. - float(is_transparent(P19));
 
 // Store luminance values of each point
