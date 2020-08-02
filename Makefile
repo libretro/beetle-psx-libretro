@@ -657,12 +657,10 @@ else
 endif
 
 %.o: %.cpp
-	@$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
-	@echo "CXX $<"
+	$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
 
 %.o: %.c
-	@$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
-	@echo "CC $<"
+	$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
 
 clean:
 	@rm -f $(OBJECTS)
