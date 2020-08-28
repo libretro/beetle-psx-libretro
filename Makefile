@@ -113,7 +113,7 @@ ifneq (,$(findstring unix,$(platform)))
          GLES = 1
          GL_LIB := -lGLESv2
       else
-         GL_LIB := -L/usr/local/lib -lGL
+         GL_LIB := -lGL
       endif
    endif
 
