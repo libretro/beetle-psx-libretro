@@ -101,54 +101,18 @@ static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
 #include "blit_vram.cached.masked.unscaled.comp.inc"
     ;
 
-static const uint32_t feedback_add_frag[] =
-#include "feedback.add.frag.inc"
+static const uint32_t feedback_frag[] =
+#include "feedback.frag.inc"
     ;
-static const uint32_t feedback_avg_frag[] =
-#include "feedback.avg.frag.inc"
-    ;
-static const uint32_t feedback_sub_frag[] =
-#include "feedback.sub.frag.inc"
-    ;
-static const uint32_t feedback_add_quarter_frag[] =
-#include "feedback.add_quarter.frag.inc"
-    ;
-static const uint32_t feedback_flat_add_frag[] =
-#include "feedback.flat.add.frag.inc"
-    ;
-static const uint32_t feedback_flat_avg_frag[] =
-#include "feedback.flat.avg.frag.inc"
-    ;
-static const uint32_t feedback_flat_sub_frag[] =
-#include "feedback.flat.sub.frag.inc"
-    ;
-static const uint32_t feedback_flat_add_quarter_frag[] =
-#include "feedback.flat.add_quarter.frag.inc"
+static const uint32_t feedback_flat_frag[] =
+#include "feedback.flat.frag.inc"
     ;
 
-static const uint32_t feedback_msaa_add_frag[] =
-#include "feedback.msaa.add.frag.inc"
+static const uint32_t feedback_msaa_frag[] =
+#include "feedback.msaa.frag.inc"
     ;
-static const uint32_t feedback_msaa_avg_frag[] =
-#include "feedback.msaa.avg.frag.inc"
-    ;
-static const uint32_t feedback_msaa_sub_frag[] =
-#include "feedback.msaa.sub.frag.inc"
-    ;
-static const uint32_t feedback_msaa_add_quarter_frag[] =
-#include "feedback.msaa.add_quarter.frag.inc"
-    ;
-static const uint32_t feedback_msaa_flat_add_frag[] =
-#include "feedback.msaa.flat.add.frag.inc"
-    ;
-static const uint32_t feedback_msaa_flat_avg_frag[] =
-#include "feedback.msaa.flat.avg.frag.inc"
-    ;
-static const uint32_t feedback_msaa_flat_sub_frag[] =
-#include "feedback.msaa.flat.sub.frag.inc"
-    ;
-static const uint32_t feedback_msaa_flat_add_quarter_frag[] =
-#include "feedback.msaa.flat.add_quarter.frag.inc"
+static const uint32_t feedback_msaa_flat_frag[] =
+#include "feedback.msaa.flat.frag.inc"
     ;
 
 static const uint32_t mipmap_vert[] =

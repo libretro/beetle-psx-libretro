@@ -11,30 +11,17 @@ set -x
 
 mkdir -p prebuilt
 
-# nearest
+# Primitives shaders
 "$GLSLC" -o prebuilt/flat.vert.inc -mfmt=c primitive.vert
 "$GLSLC" -o prebuilt/flat.frag.inc -mfmt=c primitive.frag
 "$GLSLC" -o prebuilt/textured.vert.inc -mfmt=c -DTEXTURED primitive.vert
 "$GLSLC" -o prebuilt/textured.frag.inc -mfmt=c -DTEXTURED primitive.frag
 
 # Feedback shaders
-"$GLSLC" -o prebuilt/feedback.add.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.avg.frag.inc -mfmt=c -DTEXTURED -DBLEND_AVG primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.sub.frag.inc -mfmt=c -DTEXTURED -DBLEND_SUB primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.add_quarter.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD_QUARTER primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.add.frag.inc -mfmt=c -DBLEND_ADD primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.avg.frag.inc -mfmt=c -DBLEND_AVG primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.sub.frag.inc -mfmt=c -DBLEND_SUB primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER primitive_feedback.frag
-
-"$GLSLC" -o prebuilt/feedback.msaa.add.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.avg.frag.inc -mfmt=c -DTEXTURED -DBLEND_AVG -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.sub.frag.inc -mfmt=c -DTEXTURED -DBLEND_SUB -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.add_quarter.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.add.frag.inc -mfmt=c -DBLEND_ADD -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.avg.frag.inc -mfmt=c -DBLEND_AVG -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.sub.frag.inc -mfmt=c -DBLEND_SUB -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.frag.inc -mfmt=c -DTEXTURED primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.flat.frag.inc -mfmt=c primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.frag.inc -mfmt=c -DMSAA primitive_feedback.frag
 
 # Resolve shaders
 "$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp

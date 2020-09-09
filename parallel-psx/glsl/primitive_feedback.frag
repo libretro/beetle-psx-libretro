@@ -11,6 +11,12 @@ layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpass
 layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpassInput uFeedbackFramebuffer;
 #endif
 
+const int BLEND_ADD = 0;
+const int BLEND_AVG = 1;
+const int BLEND_SUB = 2;
+const int BLEND_ADD_QUARTER = 3;
+layout(constant_id = 2) const int BLEND_MODE = BLEND_ADD;
+
 void main()
 {
 #ifdef TEXTURED
@@ -37,17 +43,15 @@ void main()
 	if (fbcolor.a > 0.5)
 		discard;
 
-#if defined(BLEND_ADD)
-	vec3 blended = mix(shaded, shaded + fbcolor.rgb, blend_amt);
-#elif defined(BLEND_AVG)
-	vec3 blended = mix(shaded, 0.5 * (clamp(shaded, 0.0, 1.0) + fbcolor.rgb), blend_amt);
-#elif defined(BLEND_SUB)
-	vec3 blended = mix(shaded, fbcolor.rgb - shaded, blend_amt);
-#elif defined(BLEND_ADD_QUARTER)
-	vec3 blended = mix(shaded, clamp(shaded, 0.0, 1.0) * 0.25 + fbcolor.rgb, blend_amt);
-#else
-#error "Invalid defines!"
-#endif
+	vec3 blended;
+	if (BLEND_MODE == BLEND_ADD)
+		blended = mix(shaded, shaded + fbcolor.rgb, blend_amt);
+	if (BLEND_MODE == BLEND_AVG)
+		blended = mix(shaded, 0.5 * (clamp(shaded, 0.0, 1.0) + fbcolor.rgb), blend_amt);
+	if (BLEND_MODE == BLEND_SUB)
+		blended = mix(shaded, fbcolor.rgb - shaded, blend_amt);
+	if (BLEND_MODE == BLEND_ADD_QUARTER)
+		blended = mix(shaded, clamp(shaded, 0.0, 1.0) * 0.25 + fbcolor.rgb, blend_amt);
 
 #ifdef TEXTURED
 	FragColor = vec4(blended, NNColor.a + vColor.a);

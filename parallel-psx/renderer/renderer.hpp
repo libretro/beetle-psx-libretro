@@ -377,6 +377,14 @@ public:
 		SemiTransOpaque = 2
 	};
 
+	enum class BlendMode : uint32_t
+	{
+		BlendAdd = 0,
+		BlendAvg = 1,
+		BlendSub = 2,
+		BlendAddQuarter = 3
+	};
+
 	void set_filter_mode(FilterMode mode);
 	ScanoutMode get_scanout_mode() const
 	{
@@ -445,14 +453,8 @@ private:
 
 		Vulkan::Program *flat;
 		Vulkan::Program *textured;
-		Vulkan::Program *semi_transparent_masked_add;
-		Vulkan::Program *semi_transparent_masked_average;
-		Vulkan::Program *semi_transparent_masked_sub;
-		Vulkan::Program *semi_transparent_masked_add_quarter;
-		Vulkan::Program *flat_masked_add;
-		Vulkan::Program *flat_masked_average;
-		Vulkan::Program *flat_masked_sub;
-		Vulkan::Program *flat_masked_add_quarter;
+		Vulkan::Program *masked;
+		Vulkan::Program *flat_masked;
 
 		Vulkan::Program *mipmap_resolve;
 		Vulkan::Program *mipmap_dither_resolve;

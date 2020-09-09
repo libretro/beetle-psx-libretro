@@ -248,48 +248,19 @@ void Renderer::init_primitive_feedback_pipelines()
 	if (msaa > 1)
 	{
 		// TODO: The masked pipelines do not have filter options.
-		pipelines.semi_transparent_masked_add = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_msaa_add_frag, sizeof(feedback_msaa_add_frag));
-		pipelines.semi_transparent_masked_average = device.request_program(
-				textured_vert, sizeof(textured_vert), feedback_msaa_avg_frag, sizeof(feedback_msaa_avg_frag));
-		pipelines.semi_transparent_masked_sub = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_msaa_sub_frag, sizeof(feedback_msaa_sub_frag));
-		pipelines.semi_transparent_masked_add_quarter =
-			device.request_program(textured_vert, sizeof(textured_vert), feedback_msaa_add_quarter_frag,
-					sizeof(feedback_msaa_add_quarter_frag));
-
-		pipelines.flat_masked_add = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_msaa_flat_add_frag, sizeof(feedback_msaa_flat_add_frag));
-		pipelines.flat_masked_average = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_msaa_flat_avg_frag, sizeof(feedback_msaa_flat_avg_frag));
-		pipelines.flat_masked_sub = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_msaa_flat_sub_frag, sizeof(feedback_msaa_flat_sub_frag));
-		pipelines.flat_masked_add_quarter =
-			device.request_program(flat_vert, sizeof(flat_vert), feedback_msaa_flat_add_quarter_frag,
-					sizeof(feedback_msaa_flat_add_quarter_frag));
+		pipelines.masked = device.request_program(textured_vert, sizeof(textured_vert),
+				feedback_msaa_frag, sizeof(feedback_msaa_frag));
+		pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
+				feedback_msaa_flat_frag, sizeof(feedback_msaa_flat_frag));
 	}
 	else
 	{
 		// TODO: The masked pipelines do not have filter options.
-		pipelines.semi_transparent_masked_add = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_add_frag, sizeof(feedback_add_frag));
-		pipelines.semi_transparent_masked_average = device.request_program(
-				textured_vert, sizeof(textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
-		pipelines.semi_transparent_masked_sub = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_sub_frag, sizeof(feedback_sub_frag));
-		pipelines.semi_transparent_masked_add_quarter =
-			device.request_program(textured_vert, sizeof(textured_vert), feedback_add_quarter_frag,
-					sizeof(feedback_add_quarter_frag));
+		pipelines.masked = device.request_program(textured_vert, sizeof(textured_vert),
+				feedback_frag, sizeof(feedback_frag));
 
-		pipelines.flat_masked_add = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
-		pipelines.flat_masked_average = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
-		pipelines.flat_masked_sub = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
-		pipelines.flat_masked_add_quarter =
-			device.request_program(flat_vert, sizeof(flat_vert), feedback_flat_add_quarter_frag,
-					sizeof(feedback_flat_add_quarter_frag));
+		pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
+				feedback_flat_frag, sizeof(feedback_flat_frag));
 	}
 }
 
@@ -1792,7 +1763,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 		if (scissors[i].scissor_index != scissor || scissors[i].hd_texture_index != hd_texture)
 		{
 			unsigned to_draw = i - last_draw;
-			cmd->set_specialization_constant_mask(3);
+			cmd->set_specialization_constant_mask(-1);
 			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			counters.draw_calls++;
 			last_draw = i;
@@ -1810,7 +1781,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	}
 
 	unsigned to_draw = size - last_draw;
-	cmd->set_specialization_constant_mask(3);
+	cmd->set_specialization_constant_mask(-1);
 	cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 	counters.draw_calls++;
 	counters.vertices += vertices.size();
@@ -1909,7 +1880,8 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add : *pipelines.flat_masked_add);
+				cmd->set_specialization_constant(2, BlendMode::BlendAdd);
+				cmd->set_program(state.textured ? *pipelines.masked : *pipelines.flat_masked);
 				cmd->pixel_barrier();
 				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
@@ -1937,8 +1909,9 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_average :
-				                                  *pipelines.flat_masked_average);
+				cmd->set_specialization_constant(2, BlendMode::BlendAvg);
+				cmd->set_program(state.textured ? *pipelines.masked :
+				                                  *pipelines.flat_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -1968,7 +1941,8 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_sub : *pipelines.flat_masked_sub);
+				cmd->set_specialization_constant(2, BlendMode::BlendSub);
+				cmd->set_program(state.textured ? *pipelines.masked : *pipelines.flat_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -1996,8 +1970,9 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			if (state.masked)
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent_masked_add_quarter :
-				                                  *pipelines.flat_masked_add_quarter);
+				cmd->set_specialization_constant(2, BlendMode::BlendAddQuarter);
+				cmd->set_program(state.textured ? *pipelines.masked :
+				                                  *pipelines.flat_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -2039,7 +2014,7 @@ void Renderer::render_semi_transparent_primitives()
 			unsigned to_draw = i - last_draw_offset;
 			counters.draw_calls++;
 			counters.vertices += to_draw * 3;
-			cmd->set_specialization_constant_mask(3);
+			cmd->set_specialization_constant_mask(-1);
 			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
 				cmd->set_multisample_state(false);
@@ -2053,7 +2028,7 @@ void Renderer::render_semi_transparent_primitives()
 	unsigned to_draw = prims - last_draw_offset;
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
-	cmd->set_specialization_constant_mask(3);
+	cmd->set_specialization_constant_mask(-1);
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)
 		cmd->set_multisample_state(false);
