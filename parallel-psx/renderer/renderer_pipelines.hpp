@@ -48,83 +48,17 @@ static const uint32_t resolve_to_unscaled_16[] =
 #include "resolve.unscaled.16.comp.inc"
     ;
 
-static const uint32_t opaque_flat_vert[] =
-#include "opaque.flat.vert.inc"
+static const uint32_t flat_vert[] =
+#include "flat.vert.inc"
     ;
-static const uint32_t opaque_flat_frag[] =
-#include "opaque.flat.frag.inc"
+static const uint32_t flat_frag[] =
+#include "flat.frag.inc"
     ;
-static const uint32_t opaque_flat_xbr_frag[] =
-#include "opaque.flat.xbr.frag.inc"
+static const uint32_t textured_vert[] =
+#include "textured.vert.inc"
     ;
-static const uint32_t opaque_flat_sabr_frag[] =
-#include "opaque.flat.sabr.frag.inc"
-    ;
-static const uint32_t opaque_flat_bilinear_frag[] =
-#include "opaque.flat.bilinear.frag.inc"
-    ;
-static const uint32_t opaque_flat_3point_frag[] =
-#include "opaque.flat.3point.frag.inc"
-    ;
-static const uint32_t opaque_flat_jinc2_frag[] =
-#include "opaque.flat.jinc2.frag.inc"
-    ;
-static const uint32_t opaque_textured_vert[] =
-#include "opaque.textured.vert.inc"
-    ;
-static const uint32_t opaque_textured_frag[] =
-#include "opaque.textured.frag.inc"
-    ;
-static const uint32_t opaque_textured_xbr_frag[] =
-#include "opaque.textured.xbr.frag.inc"
-    ;
-static const uint32_t opaque_textured_sabr_frag[] =
-#include "opaque.textured.sabr.frag.inc"
-    ;
-static const uint32_t opaque_textured_bilinear_frag[] =
-#include "opaque.textured.bilinear.frag.inc"
-    ;
-static const uint32_t opaque_textured_3point_frag[] =
-#include "opaque.textured.3point.frag.inc"
-    ;
-static const uint32_t opaque_textured_jinc2_frag[] =
-#include "opaque.textured.jinc2.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_frag[] =
-#include "semitrans.opaque.textured.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_xbr_frag[] =
-#include "semitrans.opaque.textured.xbr.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_sabr_frag[] =
-#include "semitrans.opaque.textured.sabr.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_bilinear_frag[] =
-#include "semitrans.opaque.textured.bilinear.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_3point_frag[] =
-#include "semitrans.opaque.textured.3point.frag.inc"
-    ;
-static const uint32_t opaque_semitrans_jinc2_frag[] =
-#include "semitrans.opaque.textured.jinc2.frag.inc"
-    ;
-static const uint32_t semitrans_frag[] =
-#include "semitrans.trans.textured.frag.inc"
-    ;
-static const uint32_t semitrans_xbr_frag[] =
-#include "semitrans.trans.textured.xbr.frag.inc"
-    ;
-static const uint32_t semitrans_sabr_frag[] =
-#include "semitrans.trans.textured.sabr.frag.inc"
-    ;
-static const uint32_t semitrans_bilinear_frag[] =
-#include "semitrans.trans.textured.bilinear.frag.inc"
-    ;
-static const uint32_t semitrans_3point_frag[] =
-#include "semitrans.trans.textured.3point.frag.inc"
-    ;
-static const uint32_t semitrans_jinc2_frag[] =
-#include "semitrans.trans.textured.jinc2.frag.inc"
+static const uint32_t textured_frag[] =
+#include "textured.frag.inc"
     ;
 
 static const uint32_t blit_vram_scaled_comp[] =

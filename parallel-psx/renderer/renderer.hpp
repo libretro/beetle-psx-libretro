@@ -360,7 +360,7 @@ public:
 		unsigned native_draw_calls = 0;
 	} counters;
 
-	enum class FilterMode
+	enum class FilterMode : uint32_t
 	{
 		NearestNeighbor = 0,
 		XBR = 1,
@@ -368,6 +368,13 @@ public:
 		Bilinear = 3,
 		Bilinear3Point = 4,
 		JINC2 = 5
+	};
+
+	enum class TransMode : uint32_t
+	{
+		Opaque = 0,
+		SemiTrans = 1,
+		SemiTransOpaque = 2
 	};
 
 	void set_filter_mode(FilterMode mode);
@@ -436,10 +443,8 @@ private:
 		Vulkan::Program *blit_vram_cached_unscaled;
 		Vulkan::Program *blit_vram_cached_unscaled_masked;
 
-		Vulkan::Program *opaque_flat;
-		Vulkan::Program *opaque_textured;
-		Vulkan::Program *opaque_semi_transparent;
-		Vulkan::Program *semi_transparent;
+		Vulkan::Program *flat;
+		Vulkan::Program *textured;
 		Vulkan::Program *semi_transparent_masked_add;
 		Vulkan::Program *semi_transparent_masked_average;
 		Vulkan::Program *semi_transparent_masked_sub;

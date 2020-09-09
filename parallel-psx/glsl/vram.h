@@ -62,7 +62,7 @@ bool is_transparent(vec4 texel)
 	return rebuild_psx_color(texel) == 0U;
 }
 
-#ifdef FILTER_BILINEAR
+#ifdef FILTERS
 vec4 sample_vram_bilinear(out float opacity)
 {
   float x = vUV.x;
@@ -98,9 +98,7 @@ vec4 sample_vram_bilinear(out float opacity)
 
    return texel;
 }
-#endif
 
-#ifdef FILTER_XBR
 const int BLEND_NONE = 0;
 const int BLEND_NORMAL = 1;
 const int BLEND_DOMINANT = 2;
@@ -363,9 +361,7 @@ vec4 sample_vram_xbr(out float opacity)
     res.xyz = res.xyz * (1./opacity);
     return vec4(res);
 }
-#endif
 
-#ifdef FILTER_SABR
 // constants and functions for sabr
 const  vec4 Ai  = vec4( 1.0, -1.0, -1.0,  1.0);
 const  vec4 B45 = vec4( 1.0,  1.0, -1.0, -1.0);
@@ -524,9 +520,7 @@ vec4 sample_vram_sabr(out float opacity)
 
    return texel;
 }
-#endif
 
-#ifdef FILTER_JINC2
 const float JINC2_WINDOW_SINC = 0.44;
 const float JINC2_SINC = 0.82;
 const float JINC2_AR_STRENGTH = 0.8;
@@ -640,9 +634,7 @@ vec4 sample_vram_jinc2(out float opacity)
     texel.rgb = texel.rgb * (1./opacity);
     return texel;
 }
-#endif
 
-#ifdef FILTER_3POINT
 vec4 sample_vram_3point(out float opacity)
 {
   float x = vUV.x;

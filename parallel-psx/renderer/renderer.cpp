@@ -234,80 +234,13 @@ void Renderer::set_filter_mode(FilterMode mode)
 	if (mode != primitive_filter_mode)
 	{
 		primitive_filter_mode = mode;
-		init_primitive_pipelines();
 	}
 }
 
 void Renderer::init_primitive_pipelines()
 {
-	switch (primitive_filter_mode)
-	{
-	case FilterMode::XBR:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_xbr_frag, sizeof(opaque_flat_xbr_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_xbr_frag, sizeof(opaque_textured_xbr_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_xbr_frag, sizeof(opaque_semitrans_xbr_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_xbr_frag, sizeof(semitrans_xbr_frag));
-		break;
-
-	case FilterMode::SABR:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_sabr_frag, sizeof(opaque_flat_sabr_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_sabr_frag, sizeof(opaque_textured_sabr_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_sabr_frag, sizeof(opaque_semitrans_sabr_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_sabr_frag, sizeof(semitrans_sabr_frag));
-		break;
-
-	case FilterMode::Bilinear:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_bilinear_frag, sizeof(opaque_flat_bilinear_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_bilinear_frag, sizeof(opaque_textured_bilinear_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_bilinear_frag, sizeof(opaque_semitrans_bilinear_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_bilinear_frag, sizeof(semitrans_bilinear_frag));
-		break;
-
-	case FilterMode::Bilinear3Point:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_3point_frag, sizeof(opaque_flat_3point_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_3point_frag, sizeof(opaque_textured_3point_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_3point_frag, sizeof(opaque_semitrans_3point_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_3point_frag, sizeof(semitrans_3point_frag));
-		break;
-
-	case FilterMode::JINC2:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_jinc2_frag, sizeof(opaque_flat_jinc2_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_jinc2_frag, sizeof(opaque_textured_jinc2_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_jinc2_frag, sizeof(opaque_semitrans_jinc2_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_jinc2_frag, sizeof(semitrans_jinc2_frag));
-		break;
-
-	default:
-		pipelines.opaque_flat =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), opaque_flat_frag, sizeof(opaque_flat_frag));
-		pipelines.opaque_textured = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_textured_frag, sizeof(opaque_textured_frag));
-		pipelines.opaque_semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				opaque_semitrans_frag, sizeof(opaque_semitrans_frag));
-		pipelines.semi_transparent = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
-				semitrans_frag, sizeof(semitrans_frag));
-		break;
-	}
+	pipelines.flat = device.request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+	pipelines.textured = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
 }
 
 void Renderer::init_primitive_feedback_pipelines()
@@ -315,47 +248,47 @@ void Renderer::init_primitive_feedback_pipelines()
 	if (msaa > 1)
 	{
 		// TODO: The masked pipelines do not have filter options.
-		pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+		pipelines.semi_transparent_masked_add = device.request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_add_frag, sizeof(feedback_msaa_add_frag));
 		pipelines.semi_transparent_masked_average = device.request_program(
-				opaque_textured_vert, sizeof(opaque_textured_vert), feedback_msaa_avg_frag, sizeof(feedback_msaa_avg_frag));
-		pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				textured_vert, sizeof(textured_vert), feedback_msaa_avg_frag, sizeof(feedback_msaa_avg_frag));
+		pipelines.semi_transparent_masked_sub = device.request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_sub_frag, sizeof(feedback_msaa_sub_frag));
 		pipelines.semi_transparent_masked_add_quarter =
-			device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_msaa_add_quarter_frag,
+			device.request_program(textured_vert, sizeof(textured_vert), feedback_msaa_add_quarter_frag,
 					sizeof(feedback_msaa_add_quarter_frag));
 
-		pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_add = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_add_frag, sizeof(feedback_msaa_flat_add_frag));
-		pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_average = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_avg_frag, sizeof(feedback_msaa_flat_avg_frag));
-		pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_sub = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_sub_frag, sizeof(feedback_msaa_flat_sub_frag));
 		pipelines.flat_masked_add_quarter =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_msaa_flat_add_quarter_frag,
+			device.request_program(flat_vert, sizeof(flat_vert), feedback_msaa_flat_add_quarter_frag,
 					sizeof(feedback_msaa_flat_add_quarter_frag));
 	}
 	else
 	{
 		// TODO: The masked pipelines do not have filter options.
-		pipelines.semi_transparent_masked_add = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+		pipelines.semi_transparent_masked_add = device.request_program(textured_vert, sizeof(textured_vert),
 				feedback_add_frag, sizeof(feedback_add_frag));
 		pipelines.semi_transparent_masked_average = device.request_program(
-				opaque_textured_vert, sizeof(opaque_textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
-		pipelines.semi_transparent_masked_sub = device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert),
+				textured_vert, sizeof(textured_vert), feedback_avg_frag, sizeof(feedback_avg_frag));
+		pipelines.semi_transparent_masked_sub = device.request_program(textured_vert, sizeof(textured_vert),
 				feedback_sub_frag, sizeof(feedback_sub_frag));
 		pipelines.semi_transparent_masked_add_quarter =
-			device.request_program(opaque_textured_vert, sizeof(opaque_textured_vert), feedback_add_quarter_frag,
+			device.request_program(textured_vert, sizeof(textured_vert), feedback_add_quarter_frag,
 					sizeof(feedback_add_quarter_frag));
 
-		pipelines.flat_masked_add = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_add = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_flat_add_frag, sizeof(feedback_flat_add_frag));
-		pipelines.flat_masked_average = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_average = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_flat_avg_frag, sizeof(feedback_flat_avg_frag));
-		pipelines.flat_masked_sub = device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert),
+		pipelines.flat_masked_sub = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_flat_sub_frag, sizeof(feedback_flat_sub_frag));
 		pipelines.flat_masked_add_quarter =
-			device.request_program(opaque_flat_vert, sizeof(opaque_flat_vert), feedback_flat_add_quarter_frag,
+			device.request_program(flat_vert, sizeof(flat_vert), feedback_flat_add_quarter_frag,
 					sizeof(feedback_flat_add_quarter_frag));
 	}
 }
@@ -1808,7 +1741,10 @@ void Renderer::flush_render_pass(const Rect &rect)
 	queue.default_scissor = info.render_area;
 	cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
 
+	// Flat
 	render_opaque_primitives();
+	// Textured
+	cmd->set_specialization_constant(1, primitive_filter_mode);
 	render_opaque_texture_primitives();
 	render_semi_transparent_opaque_texture_primitives();
 	render_semi_transparent_primitives();
@@ -1856,6 +1792,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 		if (scissors[i].scissor_index != scissor || scissors[i].hd_texture_index != hd_texture)
 		{
 			unsigned to_draw = i - last_draw;
+			cmd->set_specialization_constant_mask(3);
 			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			counters.draw_calls++;
 			last_draw = i;
@@ -1873,6 +1810,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	}
 
 	unsigned to_draw = size - last_draw;
+	cmd->set_specialization_constant_mask(3);
 	cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 	counters.draw_calls++;
 	counters.vertices += vertices.size();
@@ -1891,7 +1829,7 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cmd->set_program(*pipelines.opaque_flat);
+	cmd->set_program(*pipelines.flat);
 
 	dispatch(vertices, scissors);
 }
@@ -1960,7 +1898,8 @@ void Renderer::render_semi_transparent_primitives()
 		{
 			// For opaque primitives which are just masked, we can make use of fixed function blending.
 			cmd->set_blend_enable(true);
-			cmd->set_program(state.textured ? *pipelines.opaque_textured : *pipelines.opaque_flat);
+			cmd->set_specialization_constant(0, TransMode::Opaque);
+			cmd->set_program(state.textured ? *pipelines.textured : *pipelines.flat);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 			                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
@@ -1985,7 +1924,8 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_specialization_constant(0, TransMode::SemiTrans);
+				cmd->set_program(state.textured ? *pipelines.textured : *pipelines.flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -2014,7 +1954,8 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_specialization_constant(0, TransMode::SemiTrans);
+				cmd->set_program(state.textured ? *pipelines.textured : *pipelines.flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -2042,7 +1983,8 @@ void Renderer::render_semi_transparent_primitives()
 			}
 			else
 			{
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_specialization_constant(0, TransMode::SemiTrans);
+				cmd->set_program(state.textured ? *pipelines.textured : *pipelines.flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -2071,7 +2013,8 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-				cmd->set_program(state.textured ? *pipelines.semi_transparent : *pipelines.opaque_flat);
+				cmd->set_specialization_constant(0, TransMode::SemiTrans);
+				cmd->set_program(state.textured ? *pipelines.textured : *pipelines.flat);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -2096,6 +2039,7 @@ void Renderer::render_semi_transparent_primitives()
 			unsigned to_draw = i - last_draw_offset;
 			counters.draw_calls++;
 			counters.vertices += to_draw * 3;
+			cmd->set_specialization_constant_mask(3);
 			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
 				cmd->set_multisample_state(false);
@@ -2109,6 +2053,7 @@ void Renderer::render_semi_transparent_primitives()
 	unsigned to_draw = prims - last_draw_offset;
 	counters.draw_calls++;
 	counters.vertices += to_draw * 3;
+	cmd->set_specialization_constant_mask(3);
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)
 		cmd->set_multisample_state(false);
@@ -2124,7 +2069,8 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_program(*pipelines.opaque_semi_transparent);
+	cmd->set_specialization_constant(0, TransMode::SemiTransOpaque);
+	cmd->set_program(*pipelines.textured);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
@@ -2147,7 +2093,8 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_program(*pipelines.opaque_textured);
+	cmd->set_specialization_constant(0, TransMode::Opaque);
+	cmd->set_program(*pipelines.textured);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
