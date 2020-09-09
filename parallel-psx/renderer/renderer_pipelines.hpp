@@ -35,17 +35,8 @@ static const uint32_t resolve_to_scaled[] =
 static const uint32_t resolve_msaa_to_scaled[] =
 #include "resolve.msaa.scaled.comp.inc"
     ;
-static const uint32_t resolve_to_unscaled_2[] =
-#include "resolve.unscaled.2.comp.inc"
-    ;
-static const uint32_t resolve_to_unscaled_4[] =
-#include "resolve.unscaled.4.comp.inc"
-    ;
-static const uint32_t resolve_to_unscaled_8[] =
-#include "resolve.unscaled.8.comp.inc"
-    ;
-static const uint32_t resolve_to_unscaled_16[] =
-#include "resolve.unscaled.16.comp.inc"
+static const uint32_t resolve_to_unscaled[] =
+#include "resolve.unscaled.comp.inc"
     ;
 
 static const uint32_t flat_vert[] =

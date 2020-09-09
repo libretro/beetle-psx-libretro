@@ -26,10 +26,7 @@ mkdir -p prebuilt
 # Resolve shaders
 "$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp
 "$GLSLC" -o prebuilt/resolve.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.2.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.4.comp.inc -mfmt=c -DUNSCALED -DSCALE=4 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.8.comp.inc -mfmt=c -DUNSCALED -DSCALE=8 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.16.comp.inc -mfmt=c -DUNSCALED -DSCALE=16 resolve.comp
+"$GLSLC" -o prebuilt/resolve.unscaled.comp.inc -mfmt=c -DUNSCALED resolve.comp
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
