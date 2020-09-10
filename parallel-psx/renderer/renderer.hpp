@@ -408,6 +408,7 @@ private:
 	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
+	Vulkan::ImageHandle framebuffer_ssaa;
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
@@ -601,6 +602,7 @@ private:
 	Rect compute_vram_framebuffer_rect();
 
 	void mipmap_framebuffer();
+	void ssaa_framebuffer();
 	Vulkan::BufferHandle quad;
 };
 }

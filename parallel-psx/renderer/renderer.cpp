@@ -82,6 +82,8 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	};
 	framebuffer = device.create_image(info, state ? &initial_vram : nullptr);
 	framebuffer->set_layout(Layout::General);
+	framebuffer_ssaa = device.create_image(info);
+	framebuffer_ssaa->set_layout(Layout::General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -568,6 +570,49 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
+void Renderer::ssaa_framebuffer()
+{
+	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto &rect = render_state.display_fb_rect;
+	unsigned left = rect.x / BLOCK_WIDTH;
+	unsigned top = rect.y / BLOCK_HEIGHT;
+	unsigned right = (rect.x + rect.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
+	unsigned bottom = (rect.y + rect.height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
+
+	std::vector<VkRect2D> resolves_ssaa;
+	for (unsigned y = top; y < bottom; y++)
+		for (unsigned x = left; x < right; x++)
+			resolves_ssaa.push_back({
+				{ int(x * BLOCK_WIDTH), int(y * BLOCK_HEIGHT) },
+				{ BLOCK_WIDTH, BLOCK_HEIGHT }
+			});
+
+	ensure_command_buffer();
+
+	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cmd->set_program(*pipelines.resolve_to_unscaled);
+	cmd->set_storage_texture(0, 0, framebuffer_ssaa->get_view());
+	cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
+
+	struct Push
+	{
+		float inv_size[2];
+		uint32_t scale;
+	};
+	unsigned size = resolves_ssaa.size();
+	for (unsigned i = 0; i < size; i += 1024)
+	{
+		unsigned to_run = min(size - i, 1024u);
+
+		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
+		cmd->push_constants(&push, 0, sizeof(push));
+		void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+		memcpy(ptr, resolves_ssaa.data() + i, to_run * sizeof(VkRect2D));
+		cmd->set_specialization_constant_mask(-1);
+		cmd->dispatch(1, 1, to_run);
+	}
+}
+
 Rect Renderer::compute_vram_framebuffer_rect()
 {
 	unsigned clock_div;
@@ -823,7 +868,7 @@ ImageHandle Renderer::scanout_to_texture()
 	bool bpp24 = render_state.scanout_mode == ScanoutMode::BGR24;
 	bool ssaa = render_state.scanout_filter == ScanoutFilter::SSAA && scaling != 1;
 
-	if (bpp24 || ssaa)
+	if (bpp24)
 	{
 		auto tmp = rect;
 		if (bpp24)
@@ -833,6 +878,8 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 		atlas.read_fragment(Domain::Unscaled, tmp);
 	}
+	else if (ssaa)
+		atlas.read_compute(Domain::Scaled, rect);
 	else
 		atlas.read_fragment(Domain::Scaled, rect);
 
@@ -840,6 +887,9 @@ ImageHandle Renderer::scanout_to_texture()
 
 	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
 		mipmap_framebuffer();
+
+	if (!bpp24 && ssaa)
+		ssaa_framebuffer();
 
 	if (scanout_semaphore)
 	{
@@ -916,7 +966,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.unscaled_quad_blitter);
 
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 0, framebuffer_ssaa->get_view(), StockSampler::NearestClamp);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
@@ -1131,10 +1181,12 @@ void Renderer::flush_resolves()
 	if (!queue.unscaled_resolves.empty())
 	{
 		ensure_command_buffer();
-		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
+		// Supersampling will use a separate pass for downsampling
+		cmd->set_specialization_constant(SpecConstIndex_Scaling, 2);
 		cmd->set_program(*pipelines.resolve_to_unscaled);
 		cmd->set_storage_texture(0, 0, framebuffer->get_view());
-		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
 
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
