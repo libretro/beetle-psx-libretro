@@ -242,7 +242,10 @@ void Renderer::set_filter_mode(FilterMode mode)
 void Renderer::init_primitive_pipelines()
 {
 	pipelines.flat = device.request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
-	pipelines.textured = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
+	if (msaa > 1)
+		pipelines.textured = device.request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
+	else
+		pipelines.textured = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
 }
 
 void Renderer::init_primitive_feedback_pipelines()
@@ -1941,7 +1944,6 @@ void Renderer::render_semi_transparent_primitives()
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-	cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 
 	auto size = queue.semi_transparent.size() * sizeof(BufferVertex);
 	void *verts = cmd->allocate_vertex_data(0, size, sizeof(BufferVertex));
@@ -1950,9 +1952,13 @@ void Renderer::render_semi_transparent_primitives()
 	auto last_state = queue.semi_transparent_state[0];
 
 	const auto set_state = [&](const SemiTransparentState &state) {
-		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestWrap);
+		if (msaa > 1)
+			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		else
+			cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 		hd_texture_uniforms(state.hd_texture_index);
 		cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
+		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);
@@ -2141,6 +2147,7 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
 	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTransOpaque);
+	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_program(*pipelines.textured);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
@@ -2149,7 +2156,10 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-	cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
+	if (msaa > 1)
+		cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+	else
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
 }
@@ -2165,6 +2175,7 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
 	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
+	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_program(*pipelines.textured);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
@@ -2173,7 +2184,10 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-	cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
+	if (msaa > 1)
+		cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+	else
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 
 	dispatch(vertices, scissors);
 }

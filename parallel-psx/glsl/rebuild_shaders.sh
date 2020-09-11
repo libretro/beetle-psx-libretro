@@ -16,6 +16,7 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/flat.frag.inc -mfmt=c primitive.frag
 "$GLSLC" -o prebuilt/textured.vert.inc -mfmt=c -DTEXTURED primitive.vert
 "$GLSLC" -o prebuilt/textured.frag.inc -mfmt=c -DTEXTURED primitive.frag
+"$GLSLC" -o prebuilt/textured.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive.frag
 
 # Feedback shaders
 "$GLSLC" -o prebuilt/feedback.frag.inc -mfmt=c -DTEXTURED primitive_feedback.frag

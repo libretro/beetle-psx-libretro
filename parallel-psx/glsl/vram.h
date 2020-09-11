@@ -6,7 +6,12 @@ layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in mediump ivec4 vTexLimits;
+#ifdef MSAA
+layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
+layout(constant_id = 3) const int SCALE = 1;
+#else
 layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
+#endif
 
 vec2 clamp_coord(vec2 coord)
 {
@@ -29,7 +34,11 @@ vec4 sample_vram_atlas(vec2 uvv)
         int align = bpp * phase;
         uv.x >>= shift;
         uv = ivec2(mod((vBaseUV + uv), FB_SIZE));
+#ifdef MSAA
+        int value = int(pack_abgr1555(texelFetch(uFramebufferMS, uv * SCALE, gl_SampleID)));
+#else
         int value = int(pack_abgr1555(textureLod(uFramebuffer, uv / FB_SIZE, 0)));
+#endif
         int mask = (1 << bpp) - 1;
         value = (value >> align) & mask;
 
@@ -39,7 +48,11 @@ vec4 sample_vram_atlas(vec2 uvv)
     else
         coord = vBaseUV + uvv;
 
+#ifdef MSAA
+    return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
+#else
     return textureLod(uFramebuffer, mod(coord, FB_SIZE) / FB_SIZE, 0);
+#endif
 }
 
 // Take a normalized color and convert it into a 16bit 1555 ABGR

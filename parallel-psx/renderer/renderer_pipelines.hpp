@@ -51,6 +51,9 @@ static const uint32_t textured_vert[] =
 static const uint32_t textured_frag[] =
 #include "textured.frag.inc"
     ;
+static const uint32_t textured_msaa_frag[] =
+#include "textured.msaa.frag.inc"
+    ;
 
 static const uint32_t blit_vram_scaled_comp[] =
 #include "blit_vram.scaled.comp.inc"
