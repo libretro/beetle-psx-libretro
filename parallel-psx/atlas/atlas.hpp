@@ -148,6 +148,9 @@ enum StatusFlag
 	// This flag is added in combination with FRAGMENT_FB_READ.
 	STATUS_TEXTURE_READ = 1 << 14,
 
+	// For determining if a texture read is from a loaded image or previous rendered content
+	STATUS_TEXTURE_LOADED = 1 << 15,
+
 	STATUS_FB_READ = STATUS_COMPUTE_FB_READ | STATUS_TRANSFER_FB_READ | STATUS_FRAGMENT_FB_READ,
 	STATUS_FB_WRITE = STATUS_COMPUTE_FB_WRITE | STATUS_TRANSFER_FB_WRITE | STATUS_FRAGMENT_FB_WRITE,
 	STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
@@ -186,6 +189,8 @@ public:
 	void write_transfer(Domain domain, const Rect &rect);
 	void read_fragment(Domain domain, const Rect &rect);
 	Domain blit_vram(const Rect &dst, const Rect &src);
+	void load_image(const Rect &rect);
+	bool texture_loaded(const Rect &rect);
 
 	void write_fragment(const Rect &rect);
 	void clear_rect(const Rect &rect, FBColor color);

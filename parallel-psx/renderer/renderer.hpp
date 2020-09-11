@@ -507,11 +507,13 @@ private:
 		SemiTransparentMode semi_transparent;
 		bool textured;
 		bool masked;
+		bool filtering;
 
 		bool operator==(const SemiTransparentState &other) const
 		{
 			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
-			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked;
+			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
+				   filtering == other.filtering;
 		}
 
 		bool operator!=(const SemiTransparentState &other) const
@@ -531,10 +533,16 @@ private:
 		unsigned triangle_index;
 		int scissor_index;
 		HdTextureHandle hd_texture_index;
+		bool filtering;
 
 		// needed for emplace_back
-		PrimitiveInfo(unsigned triangle_index, int scissor_index, HdTextureHandle hd_texture_index)
-			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index)
+		PrimitiveInfo(
+			unsigned triangle_index,
+			int scissor_index = -1,
+			HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
+			bool filtering = false
+		)
+			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index), filtering(filtering)
 		{
 
 		}
@@ -584,9 +592,9 @@ private:
 
 	float allocate_depth(const Rect &rect);
 
-	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index);
+	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index, bool &filtering);
 	void build_line_quad(Vertex *quad, const Vertex *line);
-	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture);
+	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture, bool filtering);
 
 	void flush_resolves();
 	void flush_blits();
