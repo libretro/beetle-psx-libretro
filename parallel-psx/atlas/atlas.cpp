@@ -34,11 +34,13 @@ bool FBAtlas::texture_loaded(const Rect &rect)
 	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 	unsigned ybegin = rect.y / BLOCK_HEIGHT;
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
+	// Ignore first/last row/column which tend to be different
+	// Otherwise transition screen in Silent Hill gets wonky
+	for (unsigned y = ybegin + 1; y <= yend - 1; y++)
+		for (unsigned x = xbegin + 1; x <= xend - 1; x++)
 			if (info(x, y) & STATUS_TEXTURE_LOADED)
-				ret++;
-	return ret > (yend - ybegin + 1) * (xend - xbegin + 1) / 2; // Dumb heuristic due to impreciseness
+				return true;
+	return false;
 }
 
 Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
