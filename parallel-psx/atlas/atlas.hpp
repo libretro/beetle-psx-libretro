@@ -192,7 +192,7 @@ public:
 	void load_image(const Rect &rect);
 	bool texture_loaded(const Rect &rect);
 
-	void write_fragment(const Rect &rect);
+	void write_fragment(Domain domain, const Rect &rect);
 	void clear_rect(const Rect &rect, FBColor color);
 	void set_draw_rect(const Rect &rect);
 	void set_texture_window(const Rect &rect);
@@ -226,7 +226,7 @@ private:
 	void read_domain(Domain domain, Stage stage, const Rect &rect);
 	bool write_domain(Domain domain, Stage stage, const Rect &rect);
 	void sync_domain(Domain domain, const Rect &rect);
-	void read_texture();
+	void read_texture(Domain domain);
 	Domain find_suitable_domain(const Rect &rect);
 
 	struct

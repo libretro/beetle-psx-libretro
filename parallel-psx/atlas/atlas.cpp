@@ -115,7 +115,7 @@ void FBAtlas::write_transfer(Domain domain, const Rect &rect)
 	write_domain(domain, Stage::Transfer, rect);
 }
 
-void FBAtlas::read_texture()
+void FBAtlas::read_texture(Domain domain)
 {
 	auto shifted = renderpass.texture_window;
 	bool palette;
@@ -134,7 +134,6 @@ void FBAtlas::read_texture()
 	shifted.y += renderpass.texture_offset_y;
 
 	//auto domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
-	auto domain = Domain::Scaled;
 	sync_domain(domain, shifted);
 
 	Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
@@ -470,7 +469,7 @@ void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
 	}
 }
 
-void FBAtlas::write_fragment(const Rect &rect)
+void FBAtlas::write_fragment(Domain domain, const Rect &rect)
 {
 	bool reads_window = renderpass.texture_mode != TextureMode::None;
 	if (reads_window)
@@ -502,7 +501,7 @@ void FBAtlas::write_fragment(const Rect &rect)
 		else if (inside_render_pass(shifted))
 			flush_render_pass();
 
-		read_texture();
+		read_texture(domain);
 	}
 
 	extend_render_pass(rect, true);

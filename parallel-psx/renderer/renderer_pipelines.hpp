@@ -54,8 +54,14 @@ static const uint32_t textured_vert[] =
 static const uint32_t textured_frag[] =
 #include "textured.frag.inc"
     ;
+static const uint32_t textured_unscaled_frag[] =
+#include "textured.unscaled.frag.inc"
+    ;
 static const uint32_t textured_msaa_frag[] =
 #include "textured.msaa.frag.inc"
+    ;
+static const uint32_t textured_msaa_unscaled_frag[] =
+#include "textured.msaa.unscaled.frag.inc"
     ;
 
 static const uint32_t blit_vram_scaled_comp[] =
@@ -101,12 +107,18 @@ static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
 static const uint32_t feedback_frag[] =
 #include "feedback.frag.inc"
     ;
+static const uint32_t feedback_unscaled_frag[] =
+#include "feedback.unscaled.frag.inc"
+    ;
 static const uint32_t feedback_flat_frag[] =
 #include "feedback.flat.frag.inc"
     ;
 
 static const uint32_t feedback_msaa_frag[] =
 #include "feedback.msaa.frag.inc"
+    ;
+static const uint32_t feedback_msaa_unscaled_frag[] =
+#include "feedback.msaa.unscaled.frag.inc"
     ;
 static const uint32_t feedback_msaa_flat_frag[] =
 #include "feedback.msaa.flat.frag.inc"
