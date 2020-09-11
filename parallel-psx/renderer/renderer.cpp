@@ -399,6 +399,22 @@ BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
 	atlas.read_transfer(Domain::Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 
+	if (msaa > 1)
+	{
+		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		VkOffset3D offset = { 0, 0, 0 };
+		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
+		VkImageResolve region = { subres, offset, subres, offset, extent };
+		vkCmdResolveImage(cmd->get_command_buffer(),
+			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			1, &region);
+
+		cmd->barrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+	}
+
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain::CachedHost;
 	buffer_create_info.size = scaling * scaling * FB_WIDTH * FB_HEIGHT * 4;
@@ -483,6 +499,22 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 
 	atlas.read_transfer(Domain::Scaled, rect);
 	ensure_command_buffer();
+
+	if (msaa > 1)
+	{
+		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		VkOffset3D offset = { int(scaling * rect.x), int(scaling * rect.y), 0 };
+		VkExtent3D extent = { scaling * rect.width, scaling * rect.height, 1 };
+		VkImageResolve region = { subres, offset, subres, offset, extent };
+		vkCmdResolveImage(cmd->get_command_buffer(),
+			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			1, &region);
+
+		cmd->barrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+	}
 
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain::CachedHost;
@@ -755,6 +787,22 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 
 	ensure_command_buffer();
 
+	if (scaled && msaa > 1)
+	{
+		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		VkOffset3D offset = { 0, 0, 0 };
+		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
+		VkImageResolve region = { subres, offset, subres, offset, extent };
+		vkCmdResolveImage(cmd->get_command_buffer(),
+			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			1, &region);
+
+		cmd->barrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+	}
+
 	unsigned render_scale = scaled ? scaling : 1;
 
 	auto info = ImageCreateInfo::render_target(
@@ -793,8 +841,16 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
 
-	cmd->set_program(*pipelines.scaled_quad_blitter);
-	cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+	if (scaled)
+	{
+		cmd->set_program(*pipelines.scaled_quad_blitter);
+		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+	}
+	else
+	{
+		cmd->set_program(*pipelines.unscaled_quad_blitter);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::LinearClamp);
+	}
 
 	cmd->set_vertex_binding(0, *quad, 0, 2);
 	struct Push
@@ -917,6 +973,10 @@ ImageHandle Renderer::scanout_to_texture()
 			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
+
+		cmd->barrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
 	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
