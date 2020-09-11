@@ -1426,12 +1426,15 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			min_u = min(min_u, FB_WIDTH - 1);
 			min_v = min(min_v, FB_HEIGHT - 1);
 
+			// max_u and max_v are meant to be exclusive due to last one being skipped by renderer
+			// assuming uv ranges are greater than or equal to xy ranges (prolly overkill to check this specifically)
 			const Rect uv_rect = {
-				min_u, min_v, max_u - min_u + 1, max_v - min_v + 1,
+				min_u, min_v, max_u - min_u, max_v - min_v,
 			};
+			// true: loaded texture; false: something else (e.g. previously drawn content)
 			bool texture_loaded = atlas.texture_loaded(uv_rect);
-			filtering = texture_loaded;
-			scaled_read = !texture_loaded; // Only read from scaled when it's drawn vram instead of loaded texture
+			filtering = texture_loaded; // Only use texture filtering when it's loaded texture instead of drawn vram
+			scaled_read = !texture_loaded; // Do not read from scaled when it's texture
 		}
 		else
 		{
@@ -1897,7 +1900,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 		if (msaa > 1)
 			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 		else
-			cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
 	}
 	else
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -1944,7 +1947,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 					if (msaa > 1)
 						cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 					else
-						cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
+						cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
 				}
 				else
 					cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -2043,7 +2046,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (msaa > 1)
 				cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 			else
-				cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
+				cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
 		}
 		else
 			cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
