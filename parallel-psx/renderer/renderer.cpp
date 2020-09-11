@@ -2056,6 +2056,11 @@ void Renderer::render_semi_transparent_primitives()
 		else
 			cmd->set_scissor(queue.scissors[state.scissor_index]);
 
+		auto &textured = state.textured ? state.scaled_read ?
+			*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat;
+		auto &textured_masked = state.textured ? state.scaled_read ?
+			*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked;
+
 		switch (state.semi_transparent)
 		{
 		case SemiTransparentMode::None:
@@ -2063,8 +2068,7 @@ void Renderer::render_semi_transparent_primitives()
 			// For opaque primitives which are just masked, we can make use of fixed function blending.
 			cmd->set_blend_enable(true);
 			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
-			cmd->set_program(state.textured ? state.scaled_read ?
-				*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat);
+			cmd->set_program(textured);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 			                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
@@ -2075,8 +2079,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (state.masked)
 			{
 				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAdd);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked);
+				cmd->set_program(textured_masked);
 				cmd->pixel_barrier();
 				cmd->set_input_attachments(0, 3);
 				cmd->set_blend_enable(false);
@@ -2092,8 +2095,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat);
+				cmd->set_program(textured);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -2106,8 +2108,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (state.masked)
 			{
 				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAvg);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked);
+				cmd->set_program(textured_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -2124,8 +2125,7 @@ void Renderer::render_semi_transparent_primitives()
 			{
 				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
 				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat);
+				cmd->set_program(textured);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -2139,8 +2139,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (state.masked)
 			{
 				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendSub);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked);
+				cmd->set_program(textured_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -2156,8 +2155,7 @@ void Renderer::render_semi_transparent_primitives()
 			else
 			{
 				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat);
+				cmd->set_program(textured);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
 				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
@@ -2170,8 +2168,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (state.masked)
 			{
 				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAddQuarter);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked);
+				cmd->set_program(textured_masked);
 				cmd->set_input_attachments(0, 3);
 				cmd->pixel_barrier();
 				cmd->set_blend_enable(false);
@@ -2188,8 +2185,7 @@ void Renderer::render_semi_transparent_primitives()
 			{
 				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
 				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(state.textured ? state.scaled_read ?
-					*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat);
+				cmd->set_program(textured);
 				cmd->set_blend_enable(true);
 				cmd->set_blend_constants(rgba);
 				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
