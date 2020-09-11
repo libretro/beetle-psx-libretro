@@ -2,11 +2,12 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 
 #if defined(SCALED)
+#if defined(MSAA)
+layout(set = 0, binding = 0, rgba8) uniform writeonly image2DMS uFramebufferMS;
+layout(set = 0, binding = 1) uniform sampler2DMS uImageMS;
+#else
 layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uFramebuffer;
 layout(set = 0, binding = 1) uniform sampler2D uImage;
-#if defined(MSAA)
-layout(set = 0, binding = 2, rgba8) uniform writeonly image2DMS uFramebufferMS;
-layout(set = 0, binding = 3) uniform sampler2DMS uImageMS;
 #endif
 #elif defined(UNSCALED)
 layout(set = 0, binding = 0, r32ui) uniform writeonly uimage2D uFramebuffer;
@@ -17,25 +18,25 @@ layout(set = 0, binding = 1) uniform usampler2D uImage;
 
 struct Rect
 {
-    uvec4 offsets;
-    uvec2 extent;
-    uint mask_or;
-    int sample_id;
+	uvec4 offsets;
+	uvec2 extent;
+	uint mask_or;
+	int sample_id;
 };
 
 layout(set = 1, binding = 0, std140) uniform Rects
 {
-    Rect rects[512];
+	Rect rects[512];
 };
 
 void main()
 {
-    if (all(lessThan(gl_GlobalInvocationID.xy, rects[gl_WorkGroupID.z].extent)))
-    {
-        uvec4 offsets = rects[gl_WorkGroupID.z].offsets;
-        uvec2 mask = uvec2(1024u, 512u) * gl_NumWorkGroups.xy - 1u;
-        uvec2 src_coord = (gl_GlobalInvocationID.xy + offsets.xy) & mask;
-        uvec2 dst_coord = (gl_GlobalInvocationID.xy + offsets.zw) & mask;
+	if (all(lessThan(gl_GlobalInvocationID.xy, rects[gl_WorkGroupID.z].extent)))
+	{
+		uvec4 offsets = rects[gl_WorkGroupID.z].offsets;
+		uvec2 mask = uvec2(1024u, 512u) * gl_NumWorkGroups.xy - 1u;
+		uvec2 src_coord = (gl_GlobalInvocationID.xy + offsets.xy) & mask;
+		uvec2 dst_coord = (gl_GlobalInvocationID.xy + offsets.zw) & mask;
 #if defined(SCALED)
 		int sample_id = rects[gl_WorkGroupID.z].sample_id;
 		#if defined(MSAA)
@@ -47,9 +48,7 @@ void main()
 			#else
 				imageStore(uFramebufferMS, ivec2(dst_coord), sample_id, value);
 			#endif
-		#endif
-		if (sample_id == 0)
-		{
+		#else
 			vec4 value = texelFetch(uImage, ivec2(src_coord), 0);
 			#ifdef MASKED
 				float fbalpha = texelFetch(uImage, ivec2(dst_coord), 0).a;
@@ -58,9 +57,9 @@ void main()
 			#else
 				imageStore(uFramebuffer, ivec2(dst_coord), value);
 			#endif
-		}
+		#endif
 #elif defined(UNSCALED)
-        uint value = texelFetch(uImage, ivec2(src_coord), 0).x;
+		uint value = texelFetch(uImage, ivec2(src_coord), 0).x;
 		#ifdef MASKED
 			uint fbvalue = texelFetch(uImage, ivec2(dst_coord), 0).x;
 			if ((fbvalue & 0x8000u) == 0u)
@@ -69,5 +68,5 @@ void main()
 			imageStore(uFramebuffer, ivec2(dst_coord), uvec4(value | rects[gl_WorkGroupID.z].mask_or));
 		#endif
 #endif
-    }
+	}
 }

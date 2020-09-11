@@ -365,7 +365,8 @@ public:
 		SpecConstIndex_TransMode = 0,
 		SpecConstIndex_FilterMode = 1,
 		SpecConstIndex_BlendMode = 2,
-		SpecConstIndex_Scaling = 3
+		SpecConstIndex_Scaling = 3,
+		SpecConstIndex_Samples = 0,
 	};
 
 	enum class FilterMode : uint32_t

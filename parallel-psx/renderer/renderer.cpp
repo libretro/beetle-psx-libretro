@@ -271,7 +271,11 @@ void Renderer::init_primitive_feedback_pipelines()
 
 void Renderer::init_pipelines()
 {
-	pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
+	if (msaa > 1)
+		pipelines.resolve_to_unscaled = device.request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
+	else
+		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
+
 	pipelines.scaled_quad_blitter =
 		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
 	pipelines.scaled_dither_quad_blitter =
@@ -291,7 +295,7 @@ void Renderer::init_pipelines()
 	if (msaa > 1)
 	{
 		pipelines.resolve_to_scaled =
-			device.request_program(resolve_msaa_to_scaled, sizeof(resolve_msaa_to_scaled));
+			device.request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
 
 		pipelines.blit_vram_scaled =
 			device.request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
@@ -592,10 +596,15 @@ void Renderer::ssaa_framebuffer()
 
 	ensure_command_buffer();
 
+	cmd->set_specialization_constant(SpecConstIndex_Samples, msaa);
+	cmd->set_specialization_constant(SpecConstIndex_FilterMode, 1);
 	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_program(*pipelines.resolve_to_unscaled);
 	cmd->set_storage_texture(0, 0, framebuffer_ssaa->get_view());
-	cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
+	if (msaa > 1)
+		cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+	else
+		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
 
 	struct Push
 	{
@@ -888,11 +897,22 @@ ImageHandle Renderer::scanout_to_texture()
 
 	ensure_command_buffer();
 
-	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
-		mipmap_framebuffer();
-
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
+	else if (msaa > 1)
+	{
+		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		VkOffset3D offset = { int(rect.x * scaling), int(rect.y * scaling), 0 };
+		VkExtent3D extent = { rect.width * scaling, rect.height * scaling, 1 };
+		VkImageResolve region = { subres, offset, subres, offset, extent };
+		vkCmdResolveImage(cmd->get_command_buffer(),
+			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			1, &region);
+	}
+
+	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
+		mipmap_framebuffer();
 
 	if (scanout_semaphore)
 	{
@@ -1163,10 +1183,11 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
 
-		cmd->set_storage_texture(0, 0, *scaled_views[0]);
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
 		if (msaa > 1)
-			cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+		else
+			cmd->set_storage_texture(0, 0, *scaled_views[0]);
 
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1186,10 +1207,15 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
 		// Supersampling will use a separate pass for downsampling
-		cmd->set_specialization_constant(SpecConstIndex_Scaling, 2);
+		cmd->set_specialization_constant(SpecConstIndex_Samples, msaa);
+		cmd->set_specialization_constant(SpecConstIndex_FilterMode, 0);
+		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 		cmd->set_program(*pipelines.resolve_to_unscaled);
 		cmd->set_storage_texture(0, 0, framebuffer->get_view());
-		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+		if (msaa > 1)
+			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		else
+			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
 
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1745,22 +1771,19 @@ void Renderer::flush_render_pass(const Rect &rect)
 	ensure_command_buffer();
 
 	RenderPassInfo info = {};
+
+	if (msaa > 1)
+		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
+	else
+		info.color_attachments[0] = scaled_views.front().get();
+
 	info.clear_depth_stencil = { 1.0f, 0 };
-	info.color_attachments[0] = scaled_views.front().get();
 	info.depth_stencil =
 		&device.get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
 		                                 device.get_default_depth_format(), 0, msaa, 1);
 	info.num_color_attachments = 1;
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
-
-	if (msaa > 1)
-	{
-		info.num_color_attachments = 2;
-		info.color_attachments[1] = info.color_attachments[0];
-		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
-		info.store_attachments |= 1 << 1;
-	}
 
 	RenderPassInfo::Subpass subpass;
 	info.num_subpasses = 1;
@@ -1774,12 +1797,6 @@ void Renderer::flush_render_pass(const Rect &rect)
 	{
 		subpass.num_input_attachments = 1;
 		subpass.input_attachments[0] = 0;
-	}
-
-	if (msaa > 1)
-	{
-		subpass.resolve_attachments[0] = 1;
-		subpass.num_resolve_attachments = 1;
 	}
 
 	if (clear_candidate)
@@ -1813,7 +1830,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	cmd->end_render_pass();
 
 	// Render passes are implicitly synchronized.
-	cmd->image_barrier(*scaled_framebuffer,
+	cmd->image_barrier(msaa > 1 ? *scaled_framebuffer_msaa : *scaled_framebuffer,
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2203,12 +2220,15 @@ void Renderer::flush_blits()
 
 		if (scaled)
 		{
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
 			if (msaa > 1)
 			{
-				cmd->set_storage_texture(0, 2, scaled_framebuffer_msaa->get_view());
-				cmd->set_texture(0, 3, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+				cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+				cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			}
+			else
+			{
+				cmd->set_storage_texture(0, 0, *scaled_views[0]);
+				cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
 			}
 		}
 		else
@@ -2282,22 +2302,31 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			{ src.x, src.y }, { dst.x, dst.y }, { dst.width, dst.height }, int(factor),
 		};
 		cmd->push_constants(&push, 0, sizeof(push));
-		cmd->set_program(domain == Domain::Scaled ?
-		                     (render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
-		                                               *pipelines.blit_vram_cached_scaled) :
-		                     (render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
-		                                               *pipelines.blit_vram_cached_unscaled));
 
-		cmd->set_storage_texture(0, 0, domain == Domain::Scaled ? *scaled_views[0] : framebuffer->get_view());
-		cmd->dispatch(factor, factor, 1);
-
-		if (msaa > 1 && domain == Domain::Scaled)
+		if (domain == Domain::Scaled)
 		{
-			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-			cmd->set_program(render_state.mask_test ?
-					*pipelines.blit_vram_msaa_cached_scaled_masked :
-					*pipelines.blit_vram_msaa_cached_scaled);
-			cmd->dispatch(factor, factor, msaa);
+			if (msaa > 1)
+			{
+				cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+				cmd->set_program(render_state.mask_test ?
+						*pipelines.blit_vram_msaa_cached_scaled_masked :
+						*pipelines.blit_vram_msaa_cached_scaled);
+				cmd->dispatch(factor, factor, msaa);
+			}
+			else
+			{
+				cmd->set_storage_texture(0, 0, *scaled_views[0]);
+				cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
+														*pipelines.blit_vram_cached_scaled);
+				cmd->dispatch(factor, factor, 1);
+			}
+		}
+		else
+		{
+			cmd->set_storage_texture(0, 0, framebuffer->get_view());
+			cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
+													*pipelines.blit_vram_cached_unscaled);
+			cmd->dispatch(factor, factor, 1);
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);

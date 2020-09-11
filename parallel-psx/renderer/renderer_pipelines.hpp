@@ -32,11 +32,14 @@ static const uint32_t copy_vram_masked_comp[] =
 static const uint32_t resolve_to_scaled[] =
 #include "resolve.scaled.comp.inc"
     ;
-static const uint32_t resolve_msaa_to_scaled[] =
+static const uint32_t resolve_to_msaa_scaled[] =
 #include "resolve.msaa.scaled.comp.inc"
     ;
 static const uint32_t resolve_to_unscaled[] =
 #include "resolve.unscaled.comp.inc"
+    ;
+static const uint32_t resolve_msaa_to_unscaled[] =
+#include "resolve.msaa.unscaled.comp.inc"
     ;
 
 static const uint32_t flat_vert[] =
