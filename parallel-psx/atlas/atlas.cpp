@@ -34,10 +34,8 @@ bool FBAtlas::texture_loaded(const Rect &rect)
 	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 	unsigned ybegin = rect.y / BLOCK_HEIGHT;
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	// Ignore first/last row/column which tend to be different
-	// Otherwise transition screen in Silent Hill gets wonky
-	for (unsigned y = ybegin + 1; y <= yend - 1; y++)
-		for (unsigned x = xbegin + 1; x <= xend - 1; x++)
+	for (unsigned y = ybegin; y <= yend; y++)
+		for (unsigned x = xbegin; x <= xend; x++)
 			if (info(x, y) & STATUS_TEXTURE_LOADED)
 				return true;
 	return false;
