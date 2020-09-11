@@ -11,72 +11,28 @@ set -x
 
 mkdir -p prebuilt
 
-# nearest
-"$GLSLC" -o prebuilt/opaque.flat.vert.inc -mfmt=c -DFLAT primitive.vert
-"$GLSLC" -o prebuilt/opaque.flat.frag.inc -mfmt=c -DFLAT primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.vert.inc -mfmt=c -DTEXTURED -DOPAQUE primitive.vert
-"$GLSLC" -o prebuilt/opaque.textured.frag.inc -mfmt=c -DTEXTURED -DOPAQUE primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS primitive.frag
-#"$GLSLC" -o prebuilt/semitrans.opaque.textured.vert.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE primitive.vert
-#"$GLSLC" -o prebuilt/semitrans.trans.textured.vert.inc -mfmt=c -DTEXTURED -DSEMI_TRANS primitive.vert
-
-# xBR
-"$GLSLC" -o prebuilt/opaque.flat.xbr.frag.inc -mfmt=c -DFLAT -DFILTER_XBR primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.xbr.frag.inc -mfmt=c -DTEXTURED -DOPAQUE -DFILTER_XBR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.xbr.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE -DFILTER_XBR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.xbr.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS -DFILTER_XBR primitive.frag
-
-# bilinear
-"$GLSLC" -o prebuilt/opaque.flat.bilinear.frag.inc -mfmt=c -DFLAT -DFILTER_BILINEAR primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.bilinear.frag.inc -mfmt=c -DTEXTURED -DOPAQUE -DFILTER_BILINEAR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.bilinear.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE -DFILTER_BILINEAR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.bilinear.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS -DFILTER_BILINEAR primitive.frag
-
-# 3point bilinear
-"$GLSLC" -o prebuilt/opaque.flat.3point.frag.inc -mfmt=c -DFLAT -DFILTER_3POINT primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.3point.frag.inc -mfmt=c -DTEXTURED -DOPAQUE -DFILTER_3POINT primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.3point.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE -DFILTER_3POINT primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.3point.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS -DFILTER_3POINT primitive.frag
-
-# JINC2
-"$GLSLC" -o prebuilt/opaque.flat.jinc2.frag.inc -mfmt=c -DFLAT -DFILTER_JINC2 primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.jinc2.frag.inc -mfmt=c -DTEXTURED -DOPAQUE -DFILTER_JINC2 primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.jinc2.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE -DFILTER_JINC2 primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.jinc2.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS -DFILTER_JINC2 primitive.frag
-
-# SABR
-"$GLSLC" -o prebuilt/opaque.flat.sabr.frag.inc -mfmt=c -DFLAT -DFILTER_SABR primitive.frag
-"$GLSLC" -o prebuilt/opaque.textured.sabr.frag.inc -mfmt=c -DTEXTURED -DOPAQUE -DFILTER_SABR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.opaque.textured.sabr.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS_OPAQUE -DFILTER_SABR primitive.frag
-"$GLSLC" -o prebuilt/semitrans.trans.textured.sabr.frag.inc -mfmt=c -DTEXTURED -DSEMI_TRANS -DFILTER_SABR primitive.frag
+# Primitives shaders
+"$GLSLC" -o prebuilt/flat.vert.inc -mfmt=c primitive.vert
+"$GLSLC" -o prebuilt/flat.frag.inc -mfmt=c primitive.frag
+"$GLSLC" -o prebuilt/textured.vert.inc -mfmt=c -DTEXTURED primitive.vert
+"$GLSLC" -o prebuilt/textured.frag.inc -mfmt=c -DTEXTURED primitive.frag
+"$GLSLC" -o prebuilt/textured.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED primitive.frag
+"$GLSLC" -o prebuilt/textured.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive.frag
+"$GLSLC" -o prebuilt/textured.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive.frag
 
 # Feedback shaders
-"$GLSLC" -o prebuilt/feedback.add.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.avg.frag.inc -mfmt=c -DTEXTURED -DBLEND_AVG primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.sub.frag.inc -mfmt=c -DTEXTURED -DBLEND_SUB primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.add_quarter.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD_QUARTER primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.add.frag.inc -mfmt=c -DBLEND_ADD primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.avg.frag.inc -mfmt=c -DBLEND_AVG primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.sub.frag.inc -mfmt=c -DBLEND_SUB primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER primitive_feedback.frag
-
-"$GLSLC" -o prebuilt/feedback.msaa.add.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.avg.frag.inc -mfmt=c -DTEXTURED -DBLEND_AVG -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.sub.frag.inc -mfmt=c -DTEXTURED -DBLEND_SUB -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.add_quarter.frag.inc -mfmt=c -DTEXTURED -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.add.frag.inc -mfmt=c -DBLEND_ADD -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.avg.frag.inc -mfmt=c -DBLEND_AVG -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.sub.frag.inc -mfmt=c -DBLEND_SUB -DMSAA primitive_feedback.frag
-"$GLSLC" -o prebuilt/feedback.msaa.flat.add_quarter.frag.inc -mfmt=c -DBLEND_ADD_QUARTER -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.frag.inc -mfmt=c -DTEXTURED primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.flat.frag.inc -mfmt=c primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.flat.frag.inc -mfmt=c -DMSAA primitive_feedback.frag
 
 # Resolve shaders
 "$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp
 "$GLSLC" -o prebuilt/resolve.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.2.comp.inc -mfmt=c -DUNSCALED -DSCALE=2 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.4.comp.inc -mfmt=c -DUNSCALED -DSCALE=4 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.8.comp.inc -mfmt=c -DUNSCALED -DSCALE=8 resolve.comp
-"$GLSLC" -o prebuilt/resolve.unscaled.16.comp.inc -mfmt=c -DUNSCALED -DSCALE=16 resolve.comp
+"$GLSLC" -o prebuilt/resolve.unscaled.comp.inc -mfmt=c -DUNSCALED resolve.comp
+"$GLSLC" -o prebuilt/resolve.msaa.unscaled.comp.inc -mfmt=c -DUNSCALED -DMSAA resolve.comp
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert

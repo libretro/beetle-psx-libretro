@@ -360,7 +360,16 @@ public:
 		unsigned native_draw_calls = 0;
 	} counters;
 
-	enum class FilterMode
+	enum
+	{
+		SpecConstIndex_TransMode = 0,
+		SpecConstIndex_FilterMode = 1,
+		SpecConstIndex_BlendMode = 2,
+		SpecConstIndex_Scaling = 3,
+		SpecConstIndex_Samples = 0,
+	};
+
+	enum class FilterMode : uint32_t
 	{
 		NearestNeighbor = 0,
 		XBR = 1,
@@ -368,6 +377,21 @@ public:
 		Bilinear = 3,
 		Bilinear3Point = 4,
 		JINC2 = 5
+	};
+
+	enum class TransMode : uint32_t
+	{
+		Opaque = 0,
+		SemiTrans = 1,
+		SemiTransOpaque = 2
+	};
+
+	enum class BlendMode : uint32_t
+	{
+		BlendAdd = 0,
+		BlendAvg = 1,
+		BlendSub = 2,
+		BlendAddQuarter = 3
 	};
 
 	void set_filter_mode(FilterMode mode);
@@ -385,6 +409,7 @@ private:
 	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
+	Vulkan::ImageHandle framebuffer_ssaa;
 	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
@@ -436,18 +461,12 @@ private:
 		Vulkan::Program *blit_vram_cached_unscaled;
 		Vulkan::Program *blit_vram_cached_unscaled_masked;
 
-		Vulkan::Program *opaque_flat;
-		Vulkan::Program *opaque_textured;
-		Vulkan::Program *opaque_semi_transparent;
-		Vulkan::Program *semi_transparent;
-		Vulkan::Program *semi_transparent_masked_add;
-		Vulkan::Program *semi_transparent_masked_average;
-		Vulkan::Program *semi_transparent_masked_sub;
-		Vulkan::Program *semi_transparent_masked_add_quarter;
-		Vulkan::Program *flat_masked_add;
-		Vulkan::Program *flat_masked_average;
-		Vulkan::Program *flat_masked_sub;
-		Vulkan::Program *flat_masked_add_quarter;
+		Vulkan::Program *flat;
+		Vulkan::Program *textured_scaled;
+		Vulkan::Program *textured_unscaled;
+		Vulkan::Program *flat_masked;
+		Vulkan::Program *textured_masked_scaled;
+		Vulkan::Program *textured_masked_unscaled;
 
 		Vulkan::Program *mipmap_resolve;
 		Vulkan::Program *mipmap_dither_resolve;
@@ -491,11 +510,14 @@ private:
 		SemiTransparentMode semi_transparent;
 		bool textured;
 		bool masked;
+		bool filtering;
+		bool scaled_read;
 
 		bool operator==(const SemiTransparentState &other) const
 		{
 			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
-			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked;
+			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
+				   filtering == other.filtering && scaled_read == other.scaled_read;
 		}
 
 		bool operator!=(const SemiTransparentState &other) const
@@ -515,10 +537,19 @@ private:
 		unsigned triangle_index;
 		int scissor_index;
 		HdTextureHandle hd_texture_index;
+		bool filtering;
+		bool scaled_read;
 
 		// needed for emplace_back
-		PrimitiveInfo(unsigned triangle_index, int scissor_index, HdTextureHandle hd_texture_index)
-			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index)
+		PrimitiveInfo(
+			unsigned triangle_index,
+			int scissor_index = -1,
+			HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
+			bool filtering = false,
+			bool scaled_read = false
+		)
+			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
+			filtering(filtering), scaled_read(scaled_read)
 		{
 
 		}
@@ -559,18 +590,20 @@ private:
 	bool render_pass_is_feedback = false;
 	float last_uv_scale_x, last_uv_scale_y;
 
-	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors);
+	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors, bool textured = false);
 	void render_opaque_primitives();
 	void render_opaque_texture_primitives();
 	void render_semi_transparent_opaque_texture_primitives();
 	void render_semi_transparent_primitives();
 	void reset_queue();
 
-	float allocate_depth(const Rect &rect);
+	float allocate_depth(Domain domain, const Rect &rect);
 
-	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index);
+	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
+		bool &filtering, bool &scaled_read);
 	void build_line_quad(Vertex *quad, const Vertex *line);
-	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture);
+	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
+		bool filtering, bool scaled_read);
 
 	void flush_resolves();
 	void flush_blits();
@@ -586,6 +619,7 @@ private:
 	Rect compute_vram_framebuffer_rect();
 
 	void mipmap_framebuffer();
+	void ssaa_framebuffer();
 	Vulkan::BufferHandle quad;
 };
 }

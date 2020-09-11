@@ -13,8 +13,39 @@ FBAtlas::FBAtlas()
 		f = STATUS_FB_PREFER;
 }
 
+void FBAtlas::load_image(const Rect &rect)
+{
+	write_compute(Domain::Unscaled, rect);
+
+	unsigned xbegin = rect.x / BLOCK_WIDTH;
+	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+	unsigned ybegin = rect.y / BLOCK_HEIGHT;
+	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+	for (unsigned y = ybegin; y <= yend; y++)
+		for (unsigned x = xbegin; x <= xend; x++)
+			info(x, y) |= STATUS_TEXTURE_LOADED;
+}
+
+bool FBAtlas::texture_loaded(const Rect &rect)
+{
+	unsigned ret = 0;
+
+	unsigned xbegin = rect.x / BLOCK_WIDTH;
+	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+	unsigned ybegin = rect.y / BLOCK_HEIGHT;
+	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+	// Ignore first/last row/column which tend to be different
+	// Otherwise transition screen in Silent Hill gets wonky
+	for (unsigned y = ybegin + 1; y <= yend - 1; y++)
+		for (unsigned x = xbegin + 1; x <= xend - 1; x++)
+			if (info(x, y) & STATUS_TEXTURE_LOADED)
+				return true;
+	return false;
+}
+
 Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 {
+#if 0
 	auto src_domain = find_suitable_domain(src);
 	auto dst_domain = find_suitable_domain(dst);
 	Domain domain;
@@ -22,11 +53,35 @@ Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 		domain = Domain::Unscaled;
 	else
 		domain = src_domain;
+#else
+	auto domain = find_suitable_domain(src);
+#endif
 
 	sync_domain(domain, src);
 	sync_domain(domain, dst);
 	read_domain(domain, Stage::Compute, src);
 	write_domain(domain, Stage::Compute, dst);
+
+	unsigned dst_xbegin = dst.x / BLOCK_WIDTH;
+	unsigned dst_xend = (dst.x + dst.width - 1) / BLOCK_WIDTH;
+	unsigned dst_ybegin = dst.y / BLOCK_HEIGHT;
+	unsigned dst_yend = (dst.y + dst.height - 1) / BLOCK_HEIGHT;
+
+	unsigned src_xbegin = src.x / BLOCK_WIDTH;
+	unsigned src_xend = (src.x + src.width - 1) / BLOCK_WIDTH;
+	unsigned src_ybegin = src.y / BLOCK_HEIGHT;
+	unsigned src_yend = (src.y + src.height - 1) / BLOCK_HEIGHT;
+
+	for (unsigned j = 0; j <= min(dst_yend - dst_ybegin, src_yend - src_ybegin); j++)
+		for (unsigned i = 0; i <= min(dst_xend - dst_xbegin, src_xend - src_xbegin); i++)
+		{
+			bool loaded = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_LOADED;
+			if (loaded)
+				info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_LOADED;
+			else
+				info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_LOADED;
+		}
+
 	return domain;
 }
 
@@ -60,7 +115,7 @@ void FBAtlas::write_transfer(Domain domain, const Rect &rect)
 	write_domain(domain, Stage::Transfer, rect);
 }
 
-void FBAtlas::read_texture()
+void FBAtlas::read_texture(Domain domain)
 {
 	auto shifted = renderpass.texture_window;
 	bool palette;
@@ -79,7 +134,6 @@ void FBAtlas::read_texture()
 	shifted.y += renderpass.texture_offset_y;
 
 	//auto domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
-	auto domain = Domain::Unscaled;
 	sync_domain(domain, shifted);
 
 	Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
@@ -108,23 +162,24 @@ bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
 	unsigned resolve_domains = 0;
 	if (domain == Domain::Unscaled)
 	{
-		hazard_domains = STATUS_FB_WRITE | STATUS_FB_READ;
+		hazard_domains = STATUS_FB_WRITE | STATUS_FB_READ | STATUS_TEXTURE_READ;
 		if (stage == Stage::Compute)
-			resolve_domains = STATUS_COMPUTE_FB_WRITE | STATUS_FB_ONLY;
+			resolve_domains = STATUS_COMPUTE_FB_WRITE;
 		else if (stage == Stage::Transfer)
-			resolve_domains = STATUS_TRANSFER_FB_WRITE | STATUS_FB_ONLY;
+			resolve_domains = STATUS_TRANSFER_FB_WRITE;
 		else if (stage == Stage::Fragment)
 		{
 			// Write-after-write in fragment is handled implicitly.
 			// Write-after-read means rendering to a block after reading it as a texture.
 			// This is a hazard we must handle.
-			hazard_domains &= ~STATUS_FRAGMENT;
-			resolve_domains = STATUS_FRAGMENT_FB_WRITE | STATUS_FB_ONLY;
+			hazard_domains &= ~STATUS_FRAGMENT_FB_WRITE;
+			resolve_domains = STATUS_FRAGMENT_FB_WRITE;
 		}
+		resolve_domains |= STATUS_FB_ONLY;
 	}
 	else
 	{
-		hazard_domains = STATUS_SFB_WRITE | STATUS_SFB_READ;
+		hazard_domains = STATUS_SFB_WRITE | STATUS_SFB_READ | STATUS_TEXTURE_READ;
 		if (stage == Stage::Compute)
 			resolve_domains = STATUS_COMPUTE_SFB_WRITE;
 		else if (stage == Stage::Fragment)
@@ -132,7 +187,7 @@ bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
 			// Write-after-write in fragment is handled implicitly.
 			// Write-after-read means rendering to a block after reading it as a texture.
 			// This is a hazard we must handle.
-			hazard_domains &= ~STATUS_FRAGMENT;
+			hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
 			resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
 		}
 		else if (stage == Stage::Transfer)
@@ -156,7 +211,7 @@ bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
 		for (unsigned x = xbegin; x <= xend; x++)
 			info(x, y) = (info(x, y) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
 
-	return (write_domains & STATUS_FRAGMENT_FB_READ) != 0;
+	return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
 }
 
 void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
@@ -181,12 +236,12 @@ void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
 			resolve_domains = STATUS_TRANSFER_FB_READ;
 		else if (stage == Stage::Fragment)
 		{
-			hazard_domains &= ~STATUS_FRAGMENT;
+			hazard_domains &= ~STATUS_FRAGMENT_FB_READ;
 			resolve_domains = STATUS_FRAGMENT_FB_READ;
 		}
 		else if (stage == Stage::FragmentTexture)
 		{
-			hazard_domains &= ~STATUS_FRAGMENT;
+			hazard_domains &= ~(STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ);
 			resolve_domains = STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ;
 		}
 	}
@@ -199,12 +254,12 @@ void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
 			resolve_domains = STATUS_TRANSFER_SFB_READ;
 		else if (stage == Stage::Fragment)
 		{
-			hazard_domains &= ~STATUS_FRAGMENT;
+			hazard_domains &= ~STATUS_FRAGMENT_SFB_READ;
 			resolve_domains = STATUS_FRAGMENT_SFB_READ;
 		}
 		else if (stage == Stage::FragmentTexture)
 		{
-			hazard_domains &= ~STATUS_FRAGMENT;
+			hazard_domains &= ~(STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ);
 			resolve_domains = STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ;
 		}
 	}
@@ -354,8 +409,17 @@ void FBAtlas::flush_render_pass()
 		f &= ~STATUS_TEXTURE_READ;
 
 	renderpass.inside = false;
-	write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect);
-	listener->flush_render_pass(renderpass.rect);
+	auto const &rect = renderpass.rect;
+	write_domain(Domain::Scaled, Stage::Fragment, rect);
+	listener->flush_render_pass(rect);
+
+	unsigned xbegin = rect.x / BLOCK_WIDTH;
+	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+	unsigned ybegin = rect.y / BLOCK_HEIGHT;
+	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+	for (unsigned y = ybegin; y <= yend; y++)
+		for (unsigned x = xbegin; x <= xend; x++)
+			info(x, y) &= ~STATUS_TEXTURE_LOADED;
 }
 
 void FBAtlas::set_texture_window(const Rect &rect)
@@ -396,6 +460,8 @@ void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
 		{
 			// If render pass was flushed here due to write-after-read hazards, set rect to
 			// our new scissored_rect instead.
+			renderpass.inside = true;
+			flush_render_pass();
 			renderpass.rect = scissored_rect;
 		}
 
@@ -403,7 +469,7 @@ void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
 	}
 }
 
-void FBAtlas::write_fragment(const Rect &rect)
+void FBAtlas::write_fragment(Domain domain, const Rect &rect)
 {
 	bool reads_window = renderpass.texture_mode != TextureMode::None;
 	if (reads_window)
@@ -435,7 +501,7 @@ void FBAtlas::write_fragment(const Rect &rect)
 		else if (inside_render_pass(shifted))
 			flush_render_pass();
 
-		read_texture();
+		read_texture(domain);
 	}
 
 	extend_render_pass(rect, true);
@@ -453,6 +519,14 @@ void FBAtlas::clear_rect(const Rect &rect, FBColor color)
 	// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
 	// which helps a lot on mobile GPUs.
 	listener->clear_quad(rect, color, renderpass.rect == rect);
+
+	unsigned xbegin = rect.x / BLOCK_WIDTH;
+	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+	unsigned ybegin = rect.y / BLOCK_HEIGHT;
+	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+	for (unsigned y = ybegin; y <= yend; y++)
+		for (unsigned x = xbegin; x <= xend; x++)
+			info(x, y) &= ~STATUS_TEXTURE_LOADED;
 }
 
 void FBAtlas::set_draw_rect(const Rect &rect)
@@ -494,7 +568,7 @@ void FBAtlas::notify_external_barrier(StatusFlags domains)
 
 void FBAtlas::pipeline_barrier(StatusFlags domains)
 {
-	if (domains & (STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_FB_READ))
+	if (domains & (STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_SFB_READ))
 		flush_render_pass();
 	listener->hazard(domains);
 	notify_external_barrier(domains);
