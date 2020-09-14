@@ -3822,7 +3822,7 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
       if(linebuf[0] == 0)
          continue;
 
-      efp = MDFN_EvalFIP(dir_path, std::string(linebuf));
+      efp = MDFN_EvalFIP(dir_path, std::string(linebuf), false);
 
       if(efp.size() >= 4 && efp.substr(efp.size() - 4) == ".m3u")
       {

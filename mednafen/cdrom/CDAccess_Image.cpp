@@ -241,7 +241,7 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
       track->FirstFileInstance = 1;
 
-      efn = MDFN_EvalFIP(base_dir, filename);
+      efn = MDFN_EvalFIP(base_dir, filename, false);
 
       if(image_memcache)
          track->fp = new MemoryStream(new FileStream(efn.c_str(), MODE_READ));
@@ -638,7 +638,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             std::string efn;
 
             if(args[0].find("cdrom://") == std::string::npos)
-               efn = MDFN_EvalFIP(base_dir, args[0]);
+               efn = MDFN_EvalFIP(base_dir, args[0], false);
             else
                efn = args[0];
 

@@ -133,11 +133,10 @@ void MDFN_GetFilePathComponents(const std::string &file_path,
 
 std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path, bool skip_safety_check)
 {
-   char slash;
 #ifdef _WIN32
-   slash = '\\';
+   char slash = '\\';
 #else
-   slash = '/';
+   char slash = '/';
 #endif
 
    if(!skip_safety_check && !MDFN_IsFIROPSafe(rel_path))
@@ -145,8 +144,7 @@ std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_pat
 
    if(IsAbsolutePath(rel_path.c_str()))
       return(rel_path);
-   else
-      return(dir_path + slash + rel_path);
+   return(dir_path + slash + rel_path);
 }
 
 // Remove whitespace from beginning of string
