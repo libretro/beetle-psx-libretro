@@ -4817,8 +4817,6 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
    rsx_intf_set_video_refresh(cb);
 }
 
-static size_t serialize_size;
-
 size_t retro_serialize_size(void)
 {
    if (enable_variable_serialization_size)
@@ -4835,10 +4833,10 @@ size_t retro_serialize_size(void)
          return 0;
 
       free(st.data);
-      return serialize_size = st.len;
+      return st.len;
    }
 
-   return serialize_size = DEFAULT_STATE_SIZE; // 16MB
+   return DEFAULT_STATE_SIZE; // 16MB
 }
 
 bool UsingFastSavestates(void)
