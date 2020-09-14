@@ -277,7 +277,6 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CDROM_DIR)/edc_crc32.c
 
    SOURCES_CXX += $(MEDNAFEN_DIR)/error.cpp \
-                  $(MEDNAFEN_DIR)/settings.cpp \
                   $(MEDNAFEN_DIR)/general.cpp \
                   $(MEDNAFEN_DIR)/FileStream.cpp \
                   $(MEDNAFEN_DIR)/MemoryStream.cpp \
@@ -291,6 +290,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_DIR)/rsx/rsx_intf.cpp
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c \
+						$(MEDNAFEN_DIR)/settings.c \
                   $(MEDNAFEN_DIR)/state.c
 
    ifneq ($(RSX_DUMP),)

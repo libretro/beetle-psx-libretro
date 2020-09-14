@@ -1997,7 +1997,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
          abort();
 
       const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
-            0, MDFN_GetSettingS(biospath_sname).c_str());
+            0, MDFN_GetSettingS(biospath_sname));
 
       BIOSFile      = filestream_open(biospath,
             RETRO_VFS_FILE_ACCESS_READ,
