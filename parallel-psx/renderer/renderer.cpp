@@ -1756,7 +1756,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 												 shift });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+		// if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
 			render_pass_is_feedback = true;
 	}
 }
@@ -1815,7 +1815,7 @@ void Renderer::draw_quad(const Vertex *vertices)
 												 shift });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+		// if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
 			render_pass_is_feedback = true;
 	}
 }
@@ -2288,6 +2288,18 @@ void Renderer::render_semi_transparent_primitives()
 			counters.draw_calls++;
 			counters.vertices += to_draw * 3;
 			cmd->set_specialization_constant_mask(-1);
+
+			{
+				VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+				barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+				vkCmdPipelineBarrier(cmd->get_command_buffer(),
+					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					VK_DEPENDENCY_BY_REGION_BIT,
+					1, &barrier, 0, nullptr, 0, nullptr);
+			}
+
 			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
 				cmd->set_multisample_state(false);
