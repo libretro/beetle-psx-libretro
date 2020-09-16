@@ -1,6 +1,10 @@
 #ifndef __MDFN_PSX_MASMEM_H
 #define __MDFN_PSX_MASMEM_H
 
+#include <retro_inline.h>
+
+#include "mednafen-types.h"
+
 // TODO, WIP (big-endian stores and loads not fully supported yet)
 
 #ifdef MSB_FIRST

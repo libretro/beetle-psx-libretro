@@ -10,6 +10,8 @@
 #include <math.h>
 #include "FastFIFO.h"
 
+#include "../git.h"
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsm/glsmsym.h>
 #endif

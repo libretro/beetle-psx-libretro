@@ -23,6 +23,7 @@
 #include "psx.h"
 #include "gte.h"
 
+#include "../math_ops.h"
 #include "../state_helpers.h"
 #include "../pgxp/pgxp_gte.h"
 #include "../pgxp/pgxp_main.h"
