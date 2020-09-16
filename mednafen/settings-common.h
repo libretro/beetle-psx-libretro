@@ -40,7 +40,7 @@ typedef struct
 typedef struct
 {
    const char *name;
-   uint32 flags;
+   uint32_t flags;
    const char *description;
    const char *description_extra;
 

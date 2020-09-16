@@ -63,9 +63,7 @@ PS_CDC::PS_CDC() : DMABuffer(4096)
    DriveStatus = DS_STOPPED;
    PendingCommandPhase = 0;
 
-#ifndef HAVE_CDROM_NEW
    TOC_Clear(&toc);
-#endif
 }
 
 extern unsigned cd_2x_speedup;

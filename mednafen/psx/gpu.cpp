@@ -17,9 +17,11 @@
 
 #include "psx.h"
 #include "timer.h"
-#include "../../rsx/rsx_intf.h"
+#include "FastFIFO.h"
 
+#include "../math_ops.h"
 #include "../state_helpers.h"
+#include "../../rsx/rsx_intf.h"
 
 #include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"

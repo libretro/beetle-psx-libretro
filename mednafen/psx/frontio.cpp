@@ -17,7 +17,9 @@
 
 #include "psx.h"
 #include "frontio.h"
+
 #include <compat/msvc.h>
+#include <streams/file_stream.h>
 
 #include "../state_helpers.h"
 #include "../video/surface.h"

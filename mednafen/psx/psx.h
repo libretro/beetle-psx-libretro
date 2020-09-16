@@ -1,16 +1,11 @@
 #ifndef __MDFN_PSX_PSX_H
 #define __MDFN_PSX_PSX_H
 
-#include "../mednafen.h"
-#include "../masmem.h"
+#include <stdint.h>
 
-#ifdef HAVE_CDROM_NEW
-#include "../cdrom-new/cdromif.h"
-#else
-#include "../cdrom/cdromif.h"
-#endif
-#include "../general.h"
-#include "../FileStream.h"
+#include "../masmem.h"
+#include "../mednafen-types.h"
+#include "../video/surface.h"
 
 // Comment out these 2 defines for extra speeeeed.
 #define PSX_DBGPRINT_ENABLE    1

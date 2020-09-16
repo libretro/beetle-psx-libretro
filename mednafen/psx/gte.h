@@ -1,6 +1,8 @@
 #ifndef __MDFN_PSX_GTE_H
 #define __MDFN_PSX_GTE_H
 
+#include "../state.h"
+
 void GTE_Init(void);
 void GTE_Power(void);
 int GTE_StateAction(StateMem *sm, int load, int data_only);
