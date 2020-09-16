@@ -1310,17 +1310,11 @@ static bool TestMagicCD(std::vector<CDIF *> *_CDInterfaces)
    TOC toc;
    int dt;
 
-#ifndef HAVE_CDROM_NEW
    TOC_Clear(&toc);
-#endif
 
    (*_CDInterfaces)[0]->ReadTOC(&toc);
 
-#ifdef HAVE_CDROM_NEW
-   dt = toc.FindTrackByLBA(4);
-#else
    dt = TOC_FindTrackByLBA(&toc, 4);
-#endif
 
    if(dt > 0 && !(toc.tracks[dt].control & 0x4))
       return(false);
@@ -2369,7 +2363,6 @@ static void CDInsertEject(void)
 
    for(unsigned disc = 0; disc < cdifs->size(); disc++)
    {
-#ifndef HAVE_CDROM_NEW
       if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
       {
          MDFND_DispMessage(3, RETRO_LOG_ERROR,
@@ -2378,7 +2371,6 @@ static void CDInsertEject(void)
 
          CD_TrayOpen = !CD_TrayOpen;
       }
-#endif
    }
 
    if(CD_TrayOpen)
@@ -2894,9 +2886,7 @@ static void mednafen_update_md5_checksum(CDIF *iface)
 
    mednafen_md5_starts(&layout_md5);
 
-#ifndef HAVE_CDROM_NEW
    TOC_Clear(&toc);
-#endif
 
    iface->ReadTOC(&toc);
 
@@ -2942,11 +2932,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    bool success = true;
 
-#ifdef HAVE_CDROM_NEW
-   CDIF *iface = CDIF_Open(info->path, false);
-#else
    CDIF *iface = CDIF_Open(&success, info->path, false, false);
-#endif
 
    if (!success)
       return false;
@@ -3869,13 +3855,8 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 
             image_label[0] = '\0';
 
-#ifdef HAVE_CDROM_NEW
-            CDIF *image  = CDIF_Open(
-                  disk_control_ext_info.image_paths[i].c_str(), old_cdimagecache);
-#else
             CDIF *image  = CDIF_Open(
                   &success, disk_control_ext_info.image_paths[i].c_str(), false, old_cdimagecache);
-#endif
             CDInterfaces.push_back(image);
 
             extract_basename(
@@ -3887,11 +3868,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
       else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
       {
          bool success = true;
-#ifdef HAVE_CDROM_NEW
-         CDIF *image  = CDIF_Open(devicename, old_cdimagecache);
-#else
          CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
-#endif
          CD_IsPBP     = true;
          CDInterfaces.push_back(image);
 
@@ -3925,11 +3902,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 
          image_label[0] = '\0';
 
-#ifdef HAVE_CDROM_NEW
-         CDIF *image  = CDIF_Open(devicename, old_cdimagecache);
-#else
          CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
-#endif
          if (!success)
             return(0);
 
@@ -3950,9 +3923,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
    for(unsigned i = 0; i < CDInterfaces.size(); i++)
    {
       TOC toc;
-#ifndef HAVE_CDROM_NEW
       TOC_Clear(&toc);
-#endif
 
       CDInterfaces[i]->ReadTOC(&toc);
 
@@ -3977,9 +3948,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
       {
          TOC toc;
 
-#ifndef HAVE_CDROM_NEW
          TOC_Clear(&toc);
-#endif
          CDInterfaces[i]->ReadTOC(&toc);
 
          mednafen_md5_update_u32_as_lsb(&layout_md5, toc.first_track);
