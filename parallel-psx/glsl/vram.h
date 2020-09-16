@@ -8,11 +8,13 @@ layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in mediump ivec4 vTexLimits;
 #if defined(UNSCALED)
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
-#elif defined(MSAA)
-layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
+#else
 layout(constant_id = 3) const int SCALE = 1;
+#if defined(MSAA)
+layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
 #else
 layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
+#endif
 #endif
 
 vec2 clamp_coord(vec2 coord)
@@ -24,10 +26,15 @@ vec2 clamp_coord(vec2 coord)
 vec4 sample_vram_atlas(vec2 uvv)
 {
     const vec2 FB_SIZE = vec2(1024, 512);
+    const ivec2 FB_MASK = ivec2(1023, 511);
     ivec3 params = vParam;
     int shift = params.z & 3;
 
+#if defined(UNSCALED)
+    ivec2 coord;
+#else
     vec2 coord;
+#endif
     if (shift != 0)
     {
         int bpp = 16 >> shift;
@@ -35,13 +42,15 @@ vec4 sample_vram_atlas(vec2 uvv)
         int phase = uv.x & ((1 << shift) - 1);
         int align = bpp * phase;
         uv.x >>= shift;
-        uv = ivec2(mod((vBaseUV + uv), FB_SIZE));
 #if defined(UNSCALED)
-        int value = int(textureLod(uFramebuffer, uv / FB_SIZE, 0).x);
-#elif defined(MSAA)
+        int value = int(texelFetch(uFramebuffer, (vBaseUV + uv) & FB_MASK, 0).x);
+#else
+        uv = ivec2(mod((vBaseUV + uv), FB_SIZE));
+#if defined(MSAA)
         int value = int(pack_abgr1555(texelFetch(uFramebufferMS, uv * SCALE, gl_SampleID)));
 #else
-        int value = int(pack_abgr1555(textureLod(uFramebuffer, uv / FB_SIZE, 0)));
+        int value = int(pack_abgr1555(texelFetch(uFramebuffer, uv * SCALE, 0)));
+#endif
 #endif
         int mask = (1 << bpp) - 1;
         value = (value >> align) & mask;
@@ -50,14 +59,18 @@ vec4 sample_vram_atlas(vec2 uvv)
         coord = params.xy;
     }
     else
+#if defined(UNSCALED)
+        coord = vBaseUV + ivec2(uvv);
+#else
         coord = vBaseUV + uvv;
+#endif
 
 #if defined(UNSCALED)
-    return abgr1555(textureLod(uFramebuffer, mod(coord, FB_SIZE) / FB_SIZE, 0).x);
+    return abgr1555(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
 #elif defined(MSAA)
     return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
 #else
-    return textureLod(uFramebuffer, mod(coord, FB_SIZE) / FB_SIZE, 0);
+    return texelFetch(uFramebuffer, ivec2(mod(coord, FB_SIZE) * SCALE), 0);
 #endif
 }
 
