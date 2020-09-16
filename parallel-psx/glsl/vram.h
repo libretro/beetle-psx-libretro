@@ -16,6 +16,7 @@ layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
 layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
 #endif
 #endif
+layout(constant_id = 4) const int SHIFT = 0;
 
 vec2 clamp_coord(vec2 coord)
 {
@@ -28,7 +29,8 @@ vec4 sample_vram_atlas(vec2 uvv)
     const vec2 FB_SIZE = vec2(1024, 512);
     const ivec2 FB_MASK = ivec2(1023, 511);
     ivec3 params = vParam;
-    int shift = params.z & 3;
+    // int shift = params.z & 3;
+    const int shift = SHIFT;
 
 #if defined(UNSCALED)
     ivec2 coord;
