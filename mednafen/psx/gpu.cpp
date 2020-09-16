@@ -17,6 +17,7 @@
 
 #include "psx.h"
 #include "timer.h"
+#include "FastFIFO.h"
 
 #include "../math_ops.h"
 #include "../state_helpers.h"

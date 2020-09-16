@@ -21,6 +21,7 @@
 
 #include <libretro.h>
 
+#include "mednafen-driver.h"
 #include "settings.h"
 
 int setting_initial_scanline = 0;

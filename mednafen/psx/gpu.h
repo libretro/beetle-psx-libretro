@@ -4,11 +4,7 @@
 #ifndef __MDFN_PSX_GPU_H
 #define __MDFN_PSX_GPU_H
 
-#include <map>
-#include <queue>
-#include <cmath>
 #include <math.h>
-#include "FastFIFO.h"
 
 #include "../git.h"
 
