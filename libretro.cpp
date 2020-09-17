@@ -3836,7 +3836,7 @@ end:
 
 // TODO: LoadCommon()
 
-static MDFNGI *MDFNI_LoadCD(const char *devicename)
+static bool MDFNI_LoadCD(const char *devicename)
 {
    uint8 LayoutMD5[16];
 
@@ -3904,7 +3904,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
 
          CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
          if (!success)
-            return(0);
+            return false;
 
          CDInterfaces.push_back(image);
 
@@ -3916,7 +3916,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
    catch(std::exception &e)
    {
       log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
-      return(0);
+      return false;
    }
 
    // Print out a track list for all discs.
@@ -3965,10 +3965,8 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
       mednafen_md5_finish(&layout_md5, LayoutMD5);
    }
 
-   if (MDFNGameInfo == NULL)
-   {
+   if (!MDFNGameInfo)
       MDFNGameInfo = &EmulatedPSX;
-   }
 
    // TODO: include module name in hash
    memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
@@ -3985,7 +3983,7 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
       disk_control_ext_info.image_labels.clear();
 
       MDFNGameInfo = NULL;
-      return NULL;
+      return false;
    }
 
    //MDFNI_SetLayerEnableMask(~0ULL);
@@ -3993,11 +3991,11 @@ static MDFNGI *MDFNI_LoadCD(const char *devicename)
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
 
-   return(MDFNGameInfo);
+   return true;
 }
 #endif
 
-static MDFNGI *MDFNI_LoadGame(const char *name)
+static bool MDFNI_LoadGame(const char *name)
 {
    RFILE *GameFile = NULL;
 
@@ -4024,14 +4022,15 @@ static MDFNGI *MDFNI_LoadGame(const char *name)
    filestream_close(GameFile);
    GameFile   = NULL;
 
-   return(MDFNGameInfo);
+   return true;
 
 error:
    if (GameFile)
       filestream_close(GameFile);
    GameFile     = NULL;
    MDFNGameInfo = NULL;
-   return NULL;
+
+   return false;
 }
 
 bool retro_load_game(const struct retro_game_info *info)
@@ -4896,9 +4895,9 @@ void *retro_get_memory_data(unsigned type)
       case RETRO_MEMORY_SYSTEM_RAM:
          return MainRAM->data8;
       case RETRO_MEMORY_SAVE_RAM:
-         if (use_mednafen_memcard0_method)
-            return NULL;
-         return PSX_FIO->GetMemcardDevice(0)->GetNVData();
+         if (!use_mednafen_memcard0_method)
+            return PSX_FIO->GetMemcardDevice(0)->GetNVData();
+         break;
       default:
          break;
    }
@@ -4912,9 +4911,9 @@ size_t retro_get_memory_size(unsigned type)
       case RETRO_MEMORY_SYSTEM_RAM:
          return 0x200000;
       case RETRO_MEMORY_SAVE_RAM:
-         if (use_mednafen_memcard0_method)
-            return 0;
-         return (1 << 17);
+         if (!use_mednafen_memcard0_method)
+            return (1 << 17);
+         break;
       default:
          break;
    }
