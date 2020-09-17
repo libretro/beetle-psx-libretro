@@ -4438,9 +4438,15 @@ void retro_run(void)
 
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
+   spec.SoundRate = 44100;
+   spec.SoundBuf = NULL;
    spec.LineWidths = rects;
+   spec.SoundBufMaxSize = 0;
+   spec.SoundVolume = 1.0;
+   spec.soundmultiplier = 1.0;
    spec.SoundBufSize = 0;
    spec.VideoFormatChanged = false;
+   spec.SoundFormatChanged = false;
 
    //if (disableVideo)
    //{
@@ -4456,6 +4462,7 @@ void retro_run(void)
    MDFNMP_ApplyPeriodicCheats();
 
 
+   espec->MasterCycles = 0;
    espec->SoundBufSize = 0;
 
    PSX_FIO->UpdateInput();
@@ -4484,6 +4491,8 @@ void retro_run(void)
    PSX_FIO->ResetTS();
 
    RebaseTS(timestamp);
+
+   espec->MasterCycles = timestamp;
 
    // Save memcards if dirty.
    unsigned players = input_get_player_count();
