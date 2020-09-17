@@ -505,6 +505,16 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(scaling * rect.x), int(scaling * rect.y), 0 };
 		VkExtent3D extent = { scaling * rect.width, scaling * rect.height, 1 };
+		if (rect.x + rect.width >= FB_WIDTH)
+		{
+			offset.x = 0;
+			extent.width = FB_WIDTH * scaling;
+		}
+		if (rect.y + rect.height >= FB_HEIGHT)
+		{
+			offset.y = 0;
+			extent.height = FB_HEIGHT * scaling;
+		}
 		VkImageResolve region = { subres, offset, subres, offset, extent };
 		vkCmdResolveImage(cmd->get_command_buffer(),
 			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
@@ -630,7 +640,7 @@ void Renderer::ssaa_framebuffer()
 	for (unsigned y = top; y < bottom; y++)
 		for (unsigned x = left; x < right; x++)
 			resolves_ssaa.push_back({
-				{ int(x * BLOCK_WIDTH), int(y * BLOCK_HEIGHT) },
+				{ int(x * BLOCK_WIDTH % FB_WIDTH), int(y * BLOCK_HEIGHT % FB_HEIGHT) },
 				{ BLOCK_WIDTH, BLOCK_HEIGHT }
 			});
 
@@ -968,6 +978,16 @@ ImageHandle Renderer::scanout_to_texture()
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(rect.x * scaling), int(rect.y * scaling), 0 };
 		VkExtent3D extent = { rect.width * scaling, rect.height * scaling, 1 };
+		if (rect.x + rect.width >= FB_WIDTH)
+		{
+			offset.x = 0;
+			extent.width = FB_WIDTH * scaling;
+		}
+		if (rect.y + rect.height >= FB_HEIGHT)
+		{
+			offset.y = 0;
+			extent.height = FB_HEIGHT * scaling;
+		}
 		VkImageResolve region = { subres, offset, subres, offset, extent };
 		vkCmdResolveImage(cmd->get_command_buffer(),
 			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
@@ -1048,7 +1068,7 @@ ImageHandle Renderer::scanout_to_texture()
 			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cmd->set_program(*pipelines.bpp24_quad_blitter);
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
 	}
 	else if (ssaa)
 	{
@@ -1057,7 +1077,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.unscaled_quad_blitter);
 
-		cmd->set_texture(0, 0, framebuffer_ssaa->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 0, framebuffer_ssaa->get_view(), StockSampler::NearestWrap);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
@@ -1066,7 +1086,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.scaled_quad_blitter);
 
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearWrap);
 	}
 	else
 	{
@@ -1075,8 +1095,8 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.mipmap_resolve);
 
-		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearClamp);
-		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearWrap);
+		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearWrap);
 	}
 
 	if (dither)
