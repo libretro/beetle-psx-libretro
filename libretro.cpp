@@ -4581,7 +4581,7 @@ void retro_run(void)
          if (!PrevInterlaced)
             deint.ClearState();
 
-         deint.Process(spec.surface, spec.DisplayRect, spec.LineWidths, spec.InterlaceField);
+         deint.Process(surf, spec.DisplayRect, rects, spec.InterlaceField);
 
          PrevInterlaced = true;
 
