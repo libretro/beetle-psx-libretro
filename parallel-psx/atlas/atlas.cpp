@@ -23,10 +23,10 @@ void FBAtlas::load_image(const Rect &rect)
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 	for (unsigned y = ybegin; y <= yend; y++)
 		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) |= STATUS_TEXTURE_LOADED;
+			info(x, y) &= ~STATUS_TEXTURE_RENDERED;
 }
 
-bool FBAtlas::texture_loaded(const Rect &rect)
+bool FBAtlas::texture_rendered(const Rect &rect)
 {
 	unsigned ret = 0;
 
@@ -36,7 +36,7 @@ bool FBAtlas::texture_loaded(const Rect &rect)
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 	for (unsigned y = ybegin; y <= yend; y++)
 		for (unsigned x = xbegin; x <= xend; x++)
-			if (info(x, y) & STATUS_TEXTURE_LOADED)
+			if (info(x, y) & STATUS_TEXTURE_RENDERED)
 				return true;
 	return false;
 }
@@ -73,11 +73,11 @@ Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 	for (unsigned j = 0; j <= min(dst_yend - dst_ybegin, src_yend - src_ybegin); j++)
 		for (unsigned i = 0; i <= min(dst_xend - dst_xbegin, src_xend - src_xbegin); i++)
 		{
-			bool loaded = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_LOADED;
-			if (loaded)
-				info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_LOADED;
+			bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
+			if (rendered)
+				info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
 			else
-				info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_LOADED;
+				info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
 		}
 
 	return domain;
@@ -417,7 +417,7 @@ void FBAtlas::flush_render_pass()
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 	for (unsigned y = ybegin; y <= yend; y++)
 		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) &= ~STATUS_TEXTURE_LOADED;
+			info(x, y) |= STATUS_TEXTURE_RENDERED;
 }
 
 void FBAtlas::set_texture_window(const Rect &rect)
@@ -524,7 +524,7 @@ void FBAtlas::clear_rect(const Rect &rect, FBColor color)
 	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 	for (unsigned y = ybegin; y <= yend; y++)
 		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) &= ~STATUS_TEXTURE_LOADED;
+			info(x, y) &= ~STATUS_TEXTURE_RENDERED;
 }
 
 void FBAtlas::set_draw_rect(const Rect &rect)
