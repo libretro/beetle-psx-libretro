@@ -1468,32 +1468,11 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	{
 		if (render_state.draw_rect.intersects(rect))
 		{
-			auto clipped_rect = render_state.draw_rect.scissor(rect);
-
-			// TODO this looks really hacky:
-			// The point of this code is to avoid Texture Filtering when the texture is something that is
-			// previously drawn. This code clips the uv rect proportionally to draw_rect before testing with atlas.
-			unsigned delta_u = max_u - min_u;
-			unsigned delta_v = max_v - min_v;
-			max_u = min_u + delta_u * (clipped_rect.x + clipped_rect.width - rect.x) / rect.width;
-			max_v = min_v + delta_v * (clipped_rect.y + clipped_rect.height - rect.y) / rect.height;
-			max_u = min(max_u, FB_WIDTH - 1);
-			max_v = min(max_v, FB_HEIGHT - 1);
-
-			min_u = min_u + delta_u * (clipped_rect.x - rect.x) / rect.width;
-			min_v = min_v + delta_v * (clipped_rect.y - rect.y) / rect.height;
-			min_u = min(min_u, FB_WIDTH - 1);
-			min_v = min(min_v, FB_HEIGHT - 1);
-
-			// max_u and max_v are meant to be exclusive due to last one being skipped by renderer
-			// assuming uv ranges are greater than or equal to xy ranges (prolly overkill to check this specifically)
-			const Rect uv_rect = {
-				min_u, min_v, max_u - min_u, max_v - min_v,
-			};
-			// true: loaded texture; false: something else (e.g. previously drawn content)
-			bool texture_loaded = atlas.texture_loaded(uv_rect);
-			filtering = texture_loaded; // Only use texture filtering when it's loaded texture instead of drawn vram
-			scaled_read = !texture_loaded; // Do not read from scaled when it's texture
+			// HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
+			// avoid texture filtering and enable scaled read if the texture is rendered content
+			bool texture_rendered = atlas.texture_rendered(hd_texture_vram);
+			filtering = !texture_rendered;
+			scaled_read = texture_rendered;
 		}
 		else
 		{
