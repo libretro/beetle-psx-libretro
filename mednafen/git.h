@@ -300,11 +300,6 @@ typedef struct
    int rotated;
 
    uint8_t MD5[16];
-   uint8_t GameSetMD5[16];	/* A unique ID for the game set this CD belongs to, only used in PC-FX emulation. */
-   bool GameSetMD5Valid; /* True if GameSetMD5 is valid. */
-
-   uint8_t StateMD5[16];	// ID to use in save state naming and netplay session IDs, if
-   bool StateMD5Valid;	// StateMD5Valid is true(useful for systems with multiple BIOS revisions, e.g. PS1).
 
    int soundrate;  /* For Ogg Vorbis expansion sound wacky support.  0 for default. */
 
