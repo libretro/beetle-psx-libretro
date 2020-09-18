@@ -1,11 +1,10 @@
 #ifndef _GIT_H
 #define _GIT_H
 
+#include <libretro.h>
+
 #include "video.h"
 #include "state.h"
-#include "settings-common.h"
-
-#include <libretro.h>
 
 typedef struct
 {
@@ -263,8 +262,6 @@ class CDIF;
 
 typedef struct
 {
-   const MDFNSetting *Settings;
-
    int64_t MasterClock;
 
    uint32_t fps; // frames per second * 65536 * 256, truncated

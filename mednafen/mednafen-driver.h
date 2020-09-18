@@ -6,8 +6,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "settings-common.h"
-
 void MDFND_DispMessage(
       unsigned priority, enum retro_log_level level,
       enum retro_message_target target, enum retro_message_type type,
