@@ -239,6 +239,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/spu.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
+                  $(CORE_EMU_DIR)/gpu_polygon_sub.cpp \
                   $(CORE_EMU_DIR)/mdec.cpp \
                   $(CORE_EMU_DIR)/input/gamepad.cpp \
                   $(CORE_EMU_DIR)/input/dualanalog.cpp \
