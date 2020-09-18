@@ -6,12 +6,6 @@
 #include "video.h"
 #include "state.h"
 
-typedef struct
-{
-   const char *extension;
-   const char *description;
-} FileExtensionSpecStruct;
-
 enum
 {
    MDFN_ROTATE0 = 0,
@@ -295,8 +289,6 @@ typedef struct
 
 
    int rotated;
-
-   uint8_t MD5[16];
 
    int soundrate;  /* For Ogg Vorbis expansion sound wacky support.  0 for default. */
 

@@ -2,7 +2,6 @@
 #include "mednafen/mempatcher.h"
 #include "mednafen/git.h"
 #include "mednafen/general.h"
-#include "mednafen/md5.h"
 #include <compat/msvc.h>
 #include "mednafen/psx/gpu.h"
 #ifdef NEED_DEINTERLACER
@@ -2691,14 +2690,6 @@ static CheatFormatInfoStruct CheatFormatInfo =
    CheatFormats
 };
 
-static const FileExtensionSpecStruct KnownExtensions[] =
-{
-   { ".psf", "PSF1 Rip" },
-   { ".psx", "PS-X Executable" },
-   { ".exe", "PS-X Executable" },
-   { NULL, NULL }
-};
-
 // Note for the future: If we ever support PSX emulation with non-8-bit RGB color components, or add a new linear RGB colorspace to MDFN_PixelFormat, we'll need
 // to buffer the intermediate 24-bit non-linear RGB calculation into an array and pass that into the GPULineHook stuff, otherwise netplay could break when
 // an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
@@ -2810,34 +2801,6 @@ static bool disk_set_image_index(unsigned index)
 
 // Mednafen PSX really doesn't support adding disk images on the fly ...
 // Hack around this.
-static void mednafen_update_md5_checksum(CDIF *iface)
-{
-   uint8 LayoutMD5[16];
-   md5_context layout_md5;
-   TOC toc;
-
-   mednafen_md5_starts(&layout_md5);
-
-   TOC_Clear(&toc);
-
-   iface->ReadTOC(&toc);
-
-   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.first_track);
-   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.last_track);
-   mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
-
-   for (uint32 track = toc.first_track; track <= toc.last_track; track++)
-   {
-      mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
-      mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
-   }
-
-   mednafen_md5_finish(&layout_md5, LayoutMD5);
-   memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
-
-   char *md5 = mednafen_md5_asciistr(MDFNGameInfo->MD5);
-   log_cb(RETRO_LOG_DEBUG, "[Mednafen]: Updated md5 checksum: %s.\n", md5);
-}
 
 // Untested ...
 static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
@@ -2875,8 +2838,6 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    /* If we replace, we want the "swap disk manually effect". */
    extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
-   /* Ugly, but needed to get proper disk swapping effect. */
-   mednafen_update_md5_checksum(iface);
 
    /* Update disk path/label vectors */
    disk_control_ext_info.image_paths[index]  = info->path;
@@ -3781,8 +3742,6 @@ end:
 
 static bool MDFNI_LoadCD(const char *devicename)
 {
-   uint8 LayoutMD5[16];
-
    log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename);
 
    try
@@ -3880,39 +3839,8 @@ static bool MDFNI_LoadCD(const char *devicename)
       log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
    }
 
-   // Calculate layout MD5.  The system emulation LoadCD() code is free to ignore this value and calculate
-   // its own, or to use it to look up a game in its database.
-   {
-      md5_context layout_md5;
-
-      mednafen_md5_starts(&layout_md5);
-
-      for(unsigned i = 0; i < CDInterfaces.size(); i++)
-      {
-         TOC toc;
-
-         TOC_Clear(&toc);
-         CDInterfaces[i]->ReadTOC(&toc);
-
-         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.first_track);
-         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.last_track);
-         mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[100].lba);
-
-         for(uint32 track = toc.first_track; track <= toc.last_track; track++)
-         {
-            mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].lba);
-            mednafen_md5_update_u32_as_lsb(&layout_md5, toc.tracks[track].control & 0x4);
-         }
-      }
-
-      mednafen_md5_finish(&layout_md5, LayoutMD5);
-   }
-
    if (!MDFNGameInfo)
       MDFNGameInfo = &EmulatedPSX;
-
-   // TODO: include module name in hash
-   memcpy(MDFNGameInfo->MD5, LayoutMD5, 16);
 
    if(!(LoadCD(&CDInterfaces)))
    {

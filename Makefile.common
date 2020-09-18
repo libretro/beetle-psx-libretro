@@ -290,7 +290,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_DIR)/input.cpp \
                   $(CORE_DIR)/rsx/rsx_intf.cpp
 
-   SOURCES_C +=   $(MEDNAFEN_DIR)/md5.c \
+   SOURCES_C +=   \
 						$(MEDNAFEN_DIR)/settings.c \
                   $(MEDNAFEN_DIR)/state.c
 
