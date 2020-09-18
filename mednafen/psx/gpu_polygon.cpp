@@ -499,6 +499,8 @@ void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
+extern unsigned int psx_pgxp_2d_tol;
+
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 {
@@ -636,11 +638,12 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          // lacking w component tends to mean degenerate coordinates
          // set to non-pgxp value if difference is too great
-         //
-         // TODO the difference could be a configurable option
-         if (
-            abs(vertices[v].precise[0] - vertices[v].x) > 4.0 * UPSCALE(gpu) ||
-            abs(vertices[v].precise[1] - vertices[v].y) > 4.0 * UPSCALE(gpu)
+         int tol = psx_pgxp_2d_tol * UPSCALE(gpu);
+         if (psx_pgxp_2d_tol >= 0 &&
+            (
+               abs(vertices[v].precise[0] - vertices[v].x) > tol ||
+               abs(vertices[v].precise[1] - vertices[v].y) > tol
+            )
          )
          {
             vertices[v].precise[0] = vertices[v].x;
