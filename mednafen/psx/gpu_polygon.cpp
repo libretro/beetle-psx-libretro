@@ -499,6 +499,8 @@ void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
+extern int psx_pgxp_2d_tol;
+
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 {
@@ -607,15 +609,11 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
          vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * UPSCALE(gpu));
          vertices[v].precise[2] = vert.w;
 
-         if (!vert.valid_w)
+         if (!vert.valid_w || vert.w <= 0.0)
             invalidW = true;
       }
       else
-      {
-         vertices[v].precise[0] = vertices[v].x;
-         vertices[v].precise[1] = vertices[v].y;
          invalidW = true;
-      }
 
       cb++;
 
@@ -637,7 +635,22 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
    // iCB: If any vertices lack w components then set all to 1
    if (invalidW)
       for (unsigned v = 0; v < 3; v++)
+      {
+         // lacking w component tends to mean degenerate coordinates
+         // set to non-pgxp value if difference is too great
+         int tol = psx_pgxp_2d_tol * UPSCALE(gpu);
+         if (psx_pgxp_2d_tol >= 0 &&
+            (
+               abs(vertices[v].precise[0] - vertices[v].x) > tol ||
+               abs(vertices[v].precise[1] - vertices[v].y) > tol
+            )
+         )
+         {
+            vertices[v].precise[0] = vertices[v].x;
+            vertices[v].precise[1] = vertices[v].y;
+         }
          vertices[v].precise[2] = 1.f;
+      }
 
    // Copy before Calc_UVOffsets which modifies vertices
    // Calc_UVOffsets likes to see unadjusted vertices

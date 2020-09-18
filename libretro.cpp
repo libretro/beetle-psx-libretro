@@ -126,6 +126,7 @@ enum dither_mode psx_gpu_dither_mode;
 
 //iCB: PGXP options
 unsigned int psx_pgxp_mode;
+int psx_pgxp_2d_tol;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 // \iCB
@@ -3461,6 +3462,17 @@ static void check_variables(bool startup)
    }
    else
       psx_pgxp_mode = PGXP_MODE_NONE;
+
+   var.key = BEETLE_OPT(pgxp_2d_tol);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         psx_pgxp_2d_tol = -1;
+      else
+         psx_pgxp_2d_tol = atoi(var.value);
+   }
+   else
+      psx_pgxp_2d_tol = -1;
 
    var.key = BEETLE_OPT(pgxp_vertex);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
