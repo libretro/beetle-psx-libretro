@@ -499,7 +499,7 @@ void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
-extern unsigned int psx_pgxp_2d_tol;
+extern int psx_pgxp_2d_tol;
 
 template<int numvertices, bool goraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
