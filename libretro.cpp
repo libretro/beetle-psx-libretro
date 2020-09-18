@@ -126,7 +126,7 @@ enum dither_mode psx_gpu_dither_mode;
 
 //iCB: PGXP options
 unsigned int psx_pgxp_mode;
-unsigned int psx_pgxp_2d_tol;
+int psx_pgxp_2d_tol;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 // \iCB
