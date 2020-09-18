@@ -640,8 +640,9 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
          vertices[v].precise[2] = 1.f;
 
    // Copy before Calc_UVOffsets which modifies vertices
+   // Calc_UVOffsets likes to see unadjusted vertices
    if(numvertices == 4 && gpu->InCmd != INCMD_QUAD)
-      memcpy(&gpu->InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex) * 3);
+      memcpy(&gpu->InQuad_F3Vertices[1], &vertices[1], sizeof(tri_vertex) * 2);
 
    // Calculated UV offsets (needed for hardware renderers and software with scaling)
    // Do one time updates for primitive
@@ -662,6 +663,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          gpu->InCmd = INCMD_QUAD;
          gpu->InCmd_CC = cb0 >> 24;
+         memcpy(&gpu->InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex));
          gpu->InQuad_clut = clut;
          gpu->InQuad_invalidW = invalidW;
       }
