@@ -260,6 +260,25 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(pgxp_2d_tol),
+      "PGXP 2D Geometry Tolerance",
+      "Hide more glaring errors in PGXP operations: the value specifies the tolerance in which PGXP values will be kept in case of geometries without proper depth information.",
+      {
+         { "disabled", NULL },
+         { "0px", NULL },
+         { "1px", NULL },
+         { "2px", NULL },
+         { "3px", NULL },
+         { "4px", NULL },
+         { "5px", NULL },
+         { "6px", NULL },
+         { "7px", NULL },
+         { "8px", NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(pgxp_vertex),
