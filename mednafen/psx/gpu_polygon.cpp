@@ -613,7 +613,11 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
             invalidW = true;
       }
       else
+      {
+         vertices[v].precise[0] = vertices[v].x;
+         vertices[v].precise[1] = vertices[v].y;
          invalidW = true;
+      }
 
       cb++;
 
@@ -638,16 +642,17 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          // lacking w component tends to mean degenerate coordinates
          // set to non-pgxp value if difference is too great
-         int tol = psx_pgxp_2d_tol * UPSCALE(gpu);
-         if (psx_pgxp_2d_tol >= 0 &&
-            (
+         if (pgxp && psx_pgxp_2d_tol >= 0)
+         {
+            unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
+            if (
                abs(vertices[v].precise[0] - vertices[v].x) > tol ||
                abs(vertices[v].precise[1] - vertices[v].y) > tol
             )
-         )
-         {
-            vertices[v].precise[0] = vertices[v].x;
-            vertices[v].precise[1] = vertices[v].y;
+            {
+               vertices[v].precise[0] = vertices[v].x;
+               vertices[v].precise[1] = vertices[v].y;
+            }
          }
          vertices[v].precise[2] = 1.f;
       }
