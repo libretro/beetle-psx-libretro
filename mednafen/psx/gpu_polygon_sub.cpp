@@ -97,26 +97,27 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 
 			// HACK fix Wild Arms 2 overworld forest sprite
 			// TODO generalize this perhaps?
+			const float one = float(1 << gpu->upscale_shift);
 			if (zero_dvdx &&
-				(aby == 1.0 || bcy == 1.0 || cay == 1.0) &&
+				(aby == one || bcy == one || cay == one) &&
 				(aby == 0.0 || bcy == 0.0 || cay == 0.0) &&
-				(aby == -1.0 || bcy == -1.0 || cay == -1.0)
+				(aby == -one || bcy == -one || cay == -one)
 			)
 			{
 				if (neg_dvdy)
 				{
-					if (aby == -1.0)
+					if (aby == -one)
 						vertices[0].v = vertices[1].v - 1;
-					else if (bcy == -1.0)
+					else if (bcy == -one)
 						vertices[1].v = vertices[2].v - 1;
-					else if (cay == -1.0)
+					else if (cay == -one)
 						vertices[2].v = vertices[0].v - 1;
 
-					if (aby == 1.0)
+					if (aby == one)
 						vertices[1].v = vertices[0].v - 1;
-					else if (bcy == 1.0)
+					else if (bcy == one)
 						vertices[2].v = vertices[1].v - 1;
-					else if (cay == 1.0)
+					else if (cay == one)
 						vertices[0].v = vertices[2].v - 1;
 				}
 			}
