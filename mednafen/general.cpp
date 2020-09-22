@@ -19,6 +19,8 @@
 
 #include <sys/types.h>
 
+#include <file/file_path.h>
+
 #include <string>
 
 #include <boolean.h>
@@ -26,30 +28,10 @@
 #include "error.h"
 #include "mednafen.h"
 #include "general.h"
+#include "settings.h"
 #include "state.h"
 
 using namespace std;
-
-static bool IsAbsolutePath(const char *path)
-{
-   if (
-#ifdef _WIN32
-         path[0] == '\\' ||
-#endif
-         path[0] == '/'
-      )
-         return true;
-
-#if defined(_WIN32) || defined(DOS)
-   if((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z'))
-   {
-      if(path[1] == ':')
-         return true;
-   }
-#endif
-
- return(false);
-}
 
 bool MDFN_IsFIROPSafe(const std::string &path)
 {
@@ -140,8 +122,8 @@ std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_pat
    if(!skip_safety_check && !MDFN_IsFIROPSafe(rel_path))
       throw MDFN_Error(0, "Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n", rel_path.c_str());
 
-   if(IsAbsolutePath(rel_path.c_str()))
-      return(rel_path);
+   if (path_is_absolute(rel_path.c_str()))
+      return rel_path;
    return(dir_path + slash + rel_path);
 }
 

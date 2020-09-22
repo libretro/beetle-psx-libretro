@@ -26,6 +26,7 @@
 
 #include "../state_helpers.h"
 #include "../math_ops.h"
+#include "../mednafen.h"
 #include "../mednafen-endian.h"
 
 // iCB: PGXP STUFF

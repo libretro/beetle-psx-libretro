@@ -19,6 +19,7 @@
 #include "../frontio.h"
 #include "dualshock.h"
 
+#include "../../mednafen.h"
 #include "../../mednafen-endian.h"
 
 /*

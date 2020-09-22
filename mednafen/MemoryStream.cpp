@@ -2,6 +2,7 @@
 #include "MemoryStream.h"
 #include "error.h"
 #include <compat/msvc.h>
+#include "math_ops.h"
 
 /*
  TODO:

@@ -3,7 +3,7 @@
 
 #include <libretro.h>
 
-#include "video.h"
+#include "video/surface.h"
 #include "state.h"
 
 enum
@@ -228,15 +228,6 @@ typedef struct
    // performance possible.  HOWEVER, emulation modules must make sure the value is in a range(with minimum and maximum) that their code can handle
    // before they try to handle it.
    double soundmultiplier;
-
-   // True if we want to rewind one frame.  Set by the driver code.
-   bool NeedRewind;
-
-   // Sound reversal during state rewinding is normally done in mednafen.cpp, but
-   // individual system emulation code can also do it if this is set, and clear it after it's done.
-   // (Also, the driver code shouldn't touch this variable)
-   bool NeedSoundReverse;
-
 } EmulateSpecStruct;
 
 typedef enum
@@ -294,11 +285,6 @@ typedef struct
 
    VideoSystems VideoSystem;
    GameMediumTypes GameType;
-
-   //int DiskLogicalCount;	// A single double-sided disk would be 2 here.
-   //const char *DiskNames;	// Null-terminated.
-
-   const char *cspecial;  /* Special cart expansion: DIP switches, barcode reader, etc. */
 
    // For absolute coordinates(IDIT_X_AXIS and IDIT_Y_AXIS), usually mapped to a mouse(hence the naming).
    float mouse_scale_x, mouse_scale_y;

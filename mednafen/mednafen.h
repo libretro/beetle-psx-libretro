@@ -2,16 +2,11 @@
 #define _MEDNAFEN_H
 
 #include <libretro.h>
-
 #include "mednafen-types.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define _(String) (String)
-
-#include "math_ops.h"
-#include "git.h"
 
 #ifdef _WIN32
 #define strcasecmp _stricmp
@@ -27,10 +22,6 @@
 #define GET_FDATA_PTR(fp) (fp->data)
 #define GET_FSIZE_PTR(fp) (fp->size)
 #define GET_FEXTS_PTR(fp) (fp->ext)
-
-extern MDFNGI *MDFNGameInfo;
-
-#include "settings.h"
 
 void MDFND_DispMessage(
       unsigned priority, enum retro_log_level level,
@@ -50,7 +41,5 @@ void MDFN_DispMessage(
 
 void MDFN_LoadGameCheats(void *override);
 void MDFN_FlushGameCheats(int nosave);
-
-#include "mednafen-driver.h"
 
 #endif

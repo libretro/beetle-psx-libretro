@@ -1,8 +1,8 @@
 #include "../mednafen.h"
-#include "../video.h"
 #include "../general.h"
 #include "../state.h"
-#include "../driver.h"
+
+#include "surface.h"
 
 extern "C" uint8_t psx_gpu_upscale_shift;
 
