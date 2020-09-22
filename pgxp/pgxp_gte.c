@@ -113,7 +113,7 @@ void PGXP_pushSXYZ2s(s64 _x, s64 _y, s64 _z, u32 v)
 #define VY(n) (psxRegs.CP2D.p[ n << 1 ].sw.h)
 #define VZ(n) (psxRegs.CP2D.p[ (n << 1) + 1 ].sw.l)
 
-int PGXP_NLCIP_valid(u32 sxy0, u32 sxy1, u32 sxy2)
+int PGXP_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2)
 {
 	Validate(&SXY0, sxy0);
 	Validate(&SXY1, sxy1);

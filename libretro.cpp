@@ -129,6 +129,7 @@ unsigned int psx_pgxp_mode;
 int psx_pgxp_2d_tol;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
+unsigned int psx_pgxp_nclip;
 // \iCB
 
 #define NEGCON_RANGE 0x7FFF
@@ -3390,6 +3391,17 @@ static void check_variables(bool startup)
       psx_pgxp_texture_correction = PGXP_MODE_NONE;
    // \iCB
 
+   var.key = BEETLE_OPT(pgxp_nclip);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         psx_pgxp_nclip = PGXP_MODE_NONE;
+      else if (strcmp(var.value, "enabled") == 0)
+         psx_pgxp_nclip = PGXP_NCLIP_IMPL;
+   }
+   else
+      psx_pgxp_nclip = PGXP_MODE_NONE;
+
    var.key = BEETLE_OPT(line_render);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -4196,7 +4208,7 @@ void retro_run(void)
       GPU_set_visible_scanlines(MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
                                 MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
-      PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction);
+      PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction | psx_pgxp_nclip);
 
       // Reload memory cards if they were changed
       if (use_mednafen_memcard0_method &&

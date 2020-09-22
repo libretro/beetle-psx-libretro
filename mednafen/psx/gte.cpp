@@ -1541,8 +1541,8 @@ static int32_t NCLIP(uint32_t instr)
    int64_t c      = x2 * (y0 - y1);
    int32_t sum    = a + b + c;
 
-   if (PGXP_enabled() &&
-       PGXP_NLCIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2]))) {
+   if ((PGXP_GetModes() & PGXP_NCLIP_IMPL) &&
+       PGXP_NCLIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2]))) {
       sum = PGXP_NCLIP();
    } else {
       sum = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
