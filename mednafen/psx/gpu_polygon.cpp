@@ -673,9 +673,23 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          gpu->InCmd = INCMD_NONE;
 
-         // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
          if (invalidW)
+         {
+            if (pgxp && psx_pgxp_2d_tol >= 0)
+            {
+               unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
+               if (
+                  abs(gpu->InQuad_F3Vertices[0].precise[0] - gpu->InQuad_F3Vertices[0].x) > tol ||
+                  abs(gpu->InQuad_F3Vertices[0].precise[1] - gpu->InQuad_F3Vertices[0].y) > tol
+               )
+               {
+                  gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x;
+                  gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y;
+               }
+            }
+            // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
             gpu->InQuad_F3Vertices[0].precise[2] = 1.f;
+         }
       }
       else
       {
