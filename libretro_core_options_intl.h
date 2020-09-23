@@ -234,6 +234,17 @@ struct retro_core_option_definition option_defs_it[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(pgxp_nclip),
+      "Eliminación primitiva de PGXP",
+      "Utilice la implementación NCLIP de PGXP. Mejora la apariencia pero hace que muchos juegos se bloqueen.",
+      {
+         { "disabled", NULL },
+         { "enabled", NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(pgxp_vertex),

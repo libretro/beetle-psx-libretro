@@ -36,6 +36,7 @@
 
 #define PGXP_VERTEX_CACHE (1 << 4)
 #define PGXP_TEXTURE_CORRECTION (1 << 5)
+#define PGXP_NCLIP_IMPL (1 << 6)
 
 #ifdef __cplusplus
 extern "C" {

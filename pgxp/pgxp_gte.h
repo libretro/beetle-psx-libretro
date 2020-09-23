@@ -47,7 +47,7 @@ void	PGXP_pushSXYZ2s(s64 _x, s64 _y, s64 _z, u32 v);
 
 void	PGXP_RTPS(u32 _n, u32 _v);
 
-int		PGXP_NLCIP_valid(u32 sxy0, u32 sxy1, u32 sxy2);
+int		PGXP_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2);
 float	PGXP_NCLIP();
 
 // Data transfer tracking
