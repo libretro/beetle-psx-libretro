@@ -229,8 +229,17 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       if ((preferred == RETRO_HW_CONTEXT_DUMMY ||
-           preferred == RETRO_HW_CONTEXT_OPENGL ||
            preferred == RETRO_HW_CONTEXT_OPENGL_CORE)
+          && rsx_gl_core_open(is_pal))
+      {
+         rsx_type       = RSX_OPENGL;
+         gl_initialized = true;
+         rsx_intf_dump_init();
+         return true;
+      }
+
+      if ((preferred == RETRO_HW_CONTEXT_DUMMY ||
+           preferred == RETRO_HW_CONTEXT_OPENGL)
           && rsx_gl_open(is_pal))
       {
          rsx_type       = RSX_OPENGL;
