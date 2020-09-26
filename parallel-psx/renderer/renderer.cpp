@@ -437,12 +437,6 @@ BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
 
 void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 {
-	if (rect.x + rect.width > FB_WIDTH || rect.y + rect.height > FB_HEIGHT)
-	{
-	   LOGI("copy_vram_to_cpu_synchronous: TODO: handle wraparound case.\n");
-	   return;
-	}
-
 #ifndef NDEBUG
 	Util::Timer timer;
 	timer.start();
@@ -450,17 +444,30 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 		"copy_vram_to_cpu_synchronous(rect={%i, %i, %i x %i}).\n", rect.x, rect.y, rect.width, rect.height
 	);
 #endif
-	atlas.read_transfer(Domain::Unscaled, rect);
+	bool wrap_x = rect.x + rect.width > FB_WIDTH;
+	bool wrap_y = rect.y + rect.height > FB_HEIGHT;
+	Rect copy_rect = rect;
+	bool wrap = wrap_x || wrap_y;
+	// We could do four separate reads but this is eaiser
+	if (wrap)
+	{
+		copy_rect.x = 0;
+		copy_rect.width = FB_WIDTH;
+		copy_rect.y = 0;
+		copy_rect.height = FB_HEIGHT;
+	}
+
+	atlas.read_transfer(Domain::Unscaled, copy_rect);
 	ensure_command_buffer();
 
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain::CachedHost;
-	buffer_create_info.size = rect.width * rect.height * 4;
+	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	auto buffer = device.create_buffer(buffer_create_info, nullptr);
-	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(rect.x), int(rect.y), 0 },
-	                          { rect.width, rect.height, 1 }, 0, 0,
+	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(copy_rect.x), int(copy_rect.y), 0 },
+	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
 	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -471,10 +478,24 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 
 	auto *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 
-	for (uint16_t y = 0; y < rect.height; y++)
-	   for (uint16_t x = 0; x < rect.width; x++)
-		  vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
-		
+	if (!wrap)
+	{
+		for (uint16_t y = 0; y < rect.height; y++)
+			for (uint16_t x = 0; x < rect.width; x++)
+				vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
+	}
+	else
+	{
+		for (uint16_t y = 0; y < rect.height; y++)
+			for (uint16_t x = 0; x < rect.width; x++)
+				{
+					uint32_t h = (x + rect.x) & (FB_WIDTH - 1);
+					uint32_t v = (y + rect.y) & (FB_HEIGHT - 1);
+					uint32_t p = v * FB_WIDTH + h;
+					vram[p] = uint16_t(mapped[p]);
+				}
+	}
+
 	if (texture_tracking_enabled) {
 		tracker.notifyReadback(rect, vram);
 	}
