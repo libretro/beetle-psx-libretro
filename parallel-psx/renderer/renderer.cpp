@@ -505,12 +505,12 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(scaling * rect.x), int(scaling * rect.y), 0 };
 		VkExtent3D extent = { scaling * rect.width, scaling * rect.height, 1 };
-		if (rect.x + rect.width >= FB_WIDTH)
+		if (rect.x + rect.width > FB_WIDTH)
 		{
 			offset.x = 0;
 			extent.width = FB_WIDTH * scaling;
 		}
-		if (rect.y + rect.height >= FB_HEIGHT)
+		if (rect.y + rect.height > FB_HEIGHT)
 		{
 			offset.y = 0;
 			extent.height = FB_HEIGHT * scaling;
@@ -548,9 +548,21 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 
 void Renderer::mipmap_framebuffer()
 {
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	auto &rect = render_state.display_fb_rect;
+	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	auto rect = render_state.display_fb_rect;
+	if (rect.x + rect.width > FB_WIDTH)
+	{
+		rect.x = 0;
+		rect.width = FB_WIDTH;
+	}
+	if (rect.y + rect.height > FB_HEIGHT)
+	{
+		rect.y = 0;
+		rect.height = FB_HEIGHT;
+	}
 	unsigned levels = scaled_views.size();
+
+	ensure_command_buffer();
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
@@ -629,7 +641,7 @@ void Renderer::mipmap_framebuffer()
 
 void Renderer::ssaa_framebuffer()
 {
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
 	auto &rect = render_state.display_fb_rect;
 	unsigned left = rect.x / BLOCK_WIDTH;
 	unsigned top = rect.y / BLOCK_HEIGHT;
@@ -969,21 +981,20 @@ ImageHandle Renderer::scanout_to_texture()
 	else
 		atlas.read_fragment(Domain::Scaled, rect);
 
-	ensure_command_buffer();
-
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
 	else if (msaa > 1)
 	{
+		ensure_command_buffer();
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(rect.x * scaling), int(rect.y * scaling), 0 };
 		VkExtent3D extent = { rect.width * scaling, rect.height * scaling, 1 };
-		if (rect.x + rect.width >= FB_WIDTH)
+		if (rect.x + rect.width > FB_WIDTH)
 		{
 			offset.x = 0;
 			extent.width = FB_WIDTH * scaling;
 		}
-		if (rect.y + rect.height >= FB_HEIGHT)
+		if (rect.y + rect.height > FB_HEIGHT)
 		{
 			offset.y = 0;
 			extent.height = FB_HEIGHT * scaling;
