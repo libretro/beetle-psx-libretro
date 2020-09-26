@@ -412,7 +412,8 @@ private:
 	Vulkan::ImageHandle framebuffer;
 	Vulkan::ImageHandle framebuffer_ssaa;
 	Vulkan::Semaphore scanout_semaphore;
-	std::vector<Vulkan::ImageViewHandle> scaled_views;
+	Vulkan::ImageHandle scaled_framebuffer_asmooth;
+	std::vector<Vulkan::ImageViewHandle> scaled_views_asmooth;
 	FBAtlas atlas;
 	bool texture_tracking_enabled = false;
 	TextureTracker tracker;

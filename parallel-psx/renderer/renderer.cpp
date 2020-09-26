@@ -94,21 +94,23 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	info.width *= scaling;
 	info.height *= scaling;
 	info.format = VK_FORMAT_R8G8B8A8_UNORM;
-	info.levels = trailing_zeroes(scaling) + 1;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 	             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	scaled_framebuffer = device.create_image(info);
 	scaled_framebuffer->set_layout(Layout::General);
+	info.levels = trailing_zeroes(scaling) + 1;
+	scaled_framebuffer_asmooth = device.create_image(info);
+	scaled_framebuffer_asmooth->set_layout(Layout::General);
 
 	{
-		auto view_info = scaled_framebuffer->get_view().get_create_info();
+		auto view_info = scaled_framebuffer_asmooth->get_view().get_create_info();
 		for (unsigned i = 0; i < info.levels; i++)
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			scaled_views.push_back(device.create_image_view(view_info));
+			scaled_views_asmooth.push_back(device.create_image_view(view_info));
 		}
 	}
 
@@ -505,12 +507,12 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(scaling * rect.x), int(scaling * rect.y), 0 };
 		VkExtent3D extent = { scaling * rect.width, scaling * rect.height, 1 };
-		if (rect.x + rect.width >= FB_WIDTH)
+		if (rect.x + rect.width > FB_WIDTH)
 		{
 			offset.x = 0;
 			extent.width = FB_WIDTH * scaling;
 		}
-		if (rect.y + rect.height >= FB_HEIGHT)
+		if (rect.y + rect.height > FB_HEIGHT)
 		{
 			offset.y = 0;
 			extent.height = FB_HEIGHT * scaling;
@@ -548,9 +550,75 @@ BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsign
 
 void Renderer::mipmap_framebuffer()
 {
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
 	auto &rect = render_state.display_fb_rect;
-	unsigned levels = scaled_views.size();
+
+	ensure_command_buffer();
+
+	// VRAM wrap-around
+	{
+		VkOffset3D dst_offset = {0, 0, 0};
+		VkOffset3D src_offset = {int(rect.x * scaling), int(rect.y * scaling), 0};
+		bool wrap_x = rect.x + rect.width > FB_WIDTH;
+		bool wrap_y = rect.y + rect.height > FB_HEIGHT;
+		int width = wrap_x ? FB_WIDTH - rect.x : rect.width;
+		int height = wrap_y ? FB_HEIGHT - rect.y : rect.height;
+		VkOffset3D dst_extent = {int(width * scaling), int(height * scaling), 1};
+		VkOffset3D src_extent = {int(width * scaling), int(height * scaling), 1};
+		cmd->blit_image(
+			scaled_views_asmooth[0].get()->get_image(),
+			scaled_framebuffer->get_view().get_image(),
+			dst_offset, dst_extent, src_offset, src_extent,
+			0, 0, 0, 0, 1, VK_FILTER_NEAREST
+			);
+		int width_rest  = rect.width - width;
+		int height_rest  = rect.height - height;
+		if (wrap_x)
+		{
+			VkOffset3D dst_offset = {int(width * scaling), 0, 0};
+			VkOffset3D src_offset = {0, int(rect.y * scaling), 0};
+			VkOffset3D dst_extent = {int(width_rest * scaling), int(height * scaling), 1};
+			VkOffset3D src_extent = {int(width_rest * scaling), int(height * scaling), 1};
+			cmd->blit_image(
+				scaled_views_asmooth[0].get()->get_image(),
+				scaled_framebuffer->get_view().get_image(),
+				dst_offset, dst_extent, src_offset, src_extent,
+				0, 0, 0, 0, 1, VK_FILTER_NEAREST
+				);
+		}
+		if (wrap_y)
+		{
+			VkOffset3D dst_offset = {0, int(height * scaling), 0};
+			VkOffset3D src_offset = {int(rect.x * scaling), 0, 0};
+			VkOffset3D dst_extent = {int(width * scaling), int(height_rest * scaling), 1};
+			VkOffset3D src_extent = {int(width * scaling), int(height_rest * scaling), 1};
+			cmd->blit_image(
+				scaled_views_asmooth[0].get()->get_image(),
+				scaled_framebuffer->get_view().get_image(),
+				dst_offset, dst_extent, src_offset, src_extent,
+				0, 0, 0, 0, 1, VK_FILTER_NEAREST
+				);
+		}
+		if (wrap_x && wrap_y)
+		{
+			VkOffset3D dst_offset = {int(width * scaling), int(height * scaling), 0};
+			VkOffset3D src_offset = {0, 0, 0};
+			VkOffset3D dst_extent = {int(width_rest * scaling), int(height_rest * scaling), 1};
+			VkOffset3D src_extent = {int(width_rest * scaling), int(height_rest * scaling), 1};
+			cmd->blit_image(
+				scaled_views_asmooth[0].get()->get_image(),
+				scaled_framebuffer->get_view().get_image(),
+				dst_offset, dst_extent, src_offset, src_extent,
+				0, 0, 0, 0, 1, VK_FILTER_NEAREST
+				);
+		}
+		cmd->image_barrier(*scaled_framebuffer_asmooth,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+	}
+
+	unsigned levels = scaled_views_asmooth.size();
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
@@ -559,11 +627,11 @@ void Renderer::mipmap_framebuffer()
 		if (i == levels)
 			rp.color_attachments[0] = &bias_framebuffer->get_view();
 		else
-			rp.color_attachments[0] = scaled_views[i].get();
+			rp.color_attachments[0] = scaled_views_asmooth[i].get();
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
-		rp.render_area = { { int(rect.x * current_scale), int(rect.y * current_scale) },
+		rp.render_area = { { 0, 0 },
 			               { rect.width * current_scale, rect.height * current_scale } };
 
 		if (i == levels)
@@ -582,7 +650,7 @@ void Renderer::mipmap_framebuffer()
 		else
 			cmd->set_program(*pipelines.mipmap_energy);
 
-		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, *scaled_views_asmooth[i - 1], StockSampler::LinearClamp);
 
 		cmd->set_quad_state();
 		cmd->set_vertex_binding(0, *quad, 0, 2);
@@ -595,11 +663,11 @@ void Renderer::mipmap_framebuffer()
 			float uv_max[2];
 		};
 		Push push = {
-			{ float(rect.x) / FB_WIDTH, float(rect.y) / FB_HEIGHT },
+			{ 0.0f, 0.0f },
 			{ float(rect.width) / FB_WIDTH, float(rect.height) / FB_HEIGHT },
 			{ 1.0f / (FB_WIDTH * current_scale), 1.0f / (FB_HEIGHT * current_scale) },
-			{ (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
-			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
+			{ 0.5f / FB_WIDTH, 0.5f / FB_HEIGHT },
+			{ (rect.width - 0.5f) / FB_WIDTH, (rect.height - 0.5f) / FB_HEIGHT },
 		};
 		cmd->push_constants(&push, 0, sizeof(push));
 		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
@@ -619,7 +687,7 @@ void Renderer::mipmap_framebuffer()
 		}
 		else
 		{
-			cmd->image_barrier(*scaled_framebuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			cmd->image_barrier(*scaled_framebuffer_asmooth, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
@@ -629,7 +697,7 @@ void Renderer::mipmap_framebuffer()
 
 void Renderer::ssaa_framebuffer()
 {
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
 	auto &rect = render_state.display_fb_rect;
 	unsigned left = rect.x / BLOCK_WIDTH;
 	unsigned top = rect.y / BLOCK_HEIGHT;
@@ -654,7 +722,7 @@ void Renderer::ssaa_framebuffer()
 	if (msaa > 1)
 		cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 	else
-		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 1, scaled_framebuffer->get_view(), StockSampler::LinearClamp);
 
 	struct Push
 	{
@@ -854,7 +922,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	if (scaled)
 	{
 		cmd->set_program(*pipelines.scaled_quad_blitter);
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::LinearClamp);
 	}
 	else
 	{
@@ -876,7 +944,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		          { float(vram_rect.width) / FB_WIDTH, float(vram_rect.height) / FB_HEIGHT },
 		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
 		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
-		          float(scaled_views.size() - 1) };
+		          float(scaled_views_asmooth.size() - 1) };
 
 	cmd->push_constants(&push, 0, sizeof(push));
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
@@ -969,21 +1037,21 @@ ImageHandle Renderer::scanout_to_texture()
 	else
 		atlas.read_fragment(Domain::Scaled, rect);
 
-	ensure_command_buffer();
-
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
 	else if (msaa > 1)
 	{
+		ensure_command_buffer();
+
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { int(rect.x * scaling), int(rect.y * scaling), 0 };
 		VkExtent3D extent = { rect.width * scaling, rect.height * scaling, 1 };
-		if (rect.x + rect.width >= FB_WIDTH)
+		if (rect.x + rect.width > FB_WIDTH)
 		{
 			offset.x = 0;
 			extent.width = FB_WIDTH * scaling;
 		}
-		if (rect.y + rect.height >= FB_HEIGHT)
+		if (rect.y + rect.height > FB_HEIGHT)
 		{
 			offset.y = 0;
 			extent.height = FB_HEIGHT * scaling;
@@ -1061,6 +1129,7 @@ ImageHandle Renderer::scanout_to_texture()
 	cmd->set_viewport(new_vp);
 
 	bool dither = render_state.scanout_mode == ScanoutMode::ABGR1555_Dither;
+	bool asmooth = false;
 
 	if (bpp24)
 	{
@@ -1086,7 +1155,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.scaled_quad_blitter);
 
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearWrap);
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::LinearWrap);
 	}
 	else
 	{
@@ -1095,8 +1164,10 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.mipmap_resolve);
 
-		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearWrap);
-		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearWrap);
+		cmd->set_texture(0, 0, scaled_framebuffer_asmooth->get_view(), StockSampler::TrilinearClamp);
+		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearClamp);
+
+		asmooth = true;
 	}
 
 	if (dither)
@@ -1142,9 +1213,11 @@ ImageHandle Renderer::scanout_to_texture()
 	};
 	Push push = { { float(rect.x) / FB_WIDTH, float(rect.y) / FB_HEIGHT },
 		          { float(rect.width) / FB_WIDTH, float(rect.height) / FB_HEIGHT },
-		          { (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
-		          { (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
-		          float(scaled_views.size() - 1) };
+		          { 0.5f / FB_WIDTH, 0.5f / FB_HEIGHT },
+		          { (rect.width - 0.5f) / FB_WIDTH, (rect.height - 0.5f) / FB_HEIGHT },
+		          float(scaled_views_asmooth.size() - 1) };
+	if (asmooth)
+		push.offset[0] = push.offset[1] = 0.0f;
 
 	cmd->push_constants(&push, 0, sizeof(push));
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
@@ -1275,7 +1348,7 @@ void Renderer::flush_resolves()
 		if (msaa > 1)
 			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
 		else
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
+			cmd->set_storage_texture(0, 0, scaled_framebuffer->get_view());
 
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1303,7 +1376,7 @@ void Renderer::flush_resolves()
 		if (msaa > 1)
 			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 		else
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 1, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -1864,7 +1937,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	if (msaa > 1)
 		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
 	else
-		info.color_attachments[0] = scaled_views.front().get();
+		info.color_attachments[0] = &scaled_framebuffer->get_view();
 
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.depth_stencil =
@@ -1967,7 +2040,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 		if (msaa > 1)
 			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 	}
 	else
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -2015,7 +2088,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 					if (msaa > 1)
 						cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 					else
-						cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+						cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 				}
 				else
 					cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -2118,7 +2191,7 @@ void Renderer::render_semi_transparent_primitives()
 			if (msaa > 1)
 				cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
 			else
-				cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+				cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 		}
 		else
 			cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
@@ -2382,8 +2455,8 @@ void Renderer::flush_blits()
 			}
 			else
 			{
-				cmd->set_storage_texture(0, 0, *scaled_views[0]);
-				cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+				cmd->set_storage_texture(0, 0, scaled_framebuffer->get_view());
+				cmd->set_texture(0, 1, scaled_framebuffer->get_view(), StockSampler::NearestClamp);
 			}
 		}
 		else
@@ -2470,7 +2543,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			}
 			else
 			{
-				cmd->set_storage_texture(0, 0, *scaled_views[0]);
+				cmd->set_storage_texture(0, 0, scaled_framebuffer->get_view());
 				cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
 														*pipelines.blit_vram_cached_scaled);
 				cmd->dispatch(factor, factor, 1);
