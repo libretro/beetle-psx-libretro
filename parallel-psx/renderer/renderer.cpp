@@ -987,9 +987,20 @@ ImageHandle Renderer::scanout_to_texture()
 	bool bpp24 = render_state.scanout_mode == ScanoutMode::BGR24;
 	bool ssaa = render_state.scanout_filter == ScanoutFilter::SSAA && scaling != 1;
 
+	auto read_rect = rect;
+	if (rect.x + rect.width > FB_WIDTH)
+	{
+		read_rect.x = 0;
+		read_rect.width = FB_WIDTH;
+	}
+	if (rect.y + rect.height > FB_HEIGHT)
+	{
+		read_rect.y = 0;
+		read_rect.height = FB_HEIGHT;
+	}
 	if (bpp24)
 	{
-		auto tmp = rect;
+		auto tmp = read_rect;
 		if (bpp24)
 		{
 			tmp.width = (tmp.width * 3 + 1) / 2;
@@ -998,9 +1009,9 @@ ImageHandle Renderer::scanout_to_texture()
 		atlas.read_fragment(Domain::Unscaled, tmp);
 	}
 	else if (ssaa)
-		atlas.read_compute(Domain::Scaled, rect);
+		atlas.read_compute(Domain::Scaled, read_rect);
 	else
-		atlas.read_fragment(Domain::Scaled, rect);
+		atlas.read_fragment(Domain::Scaled, read_rect);
 
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
