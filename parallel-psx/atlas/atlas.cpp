@@ -15,6 +15,9 @@ FBAtlas::FBAtlas()
 
 void FBAtlas::load_image(const Rect &rect)
 {
+	if (rect.width == 0 || rect.height == 0)
+		return;
+
 	write_compute(Domain::Unscaled, rect);
 
 	unsigned xbegin = rect.x / BLOCK_WIDTH;
@@ -28,7 +31,8 @@ void FBAtlas::load_image(const Rect &rect)
 
 bool FBAtlas::texture_rendered(const Rect &rect)
 {
-	unsigned ret = 0;
+	if (rect.width == 0 || rect.height == 0)
+		return false;
 
 	unsigned xbegin = rect.x / BLOCK_WIDTH;
 	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -408,6 +412,9 @@ void FBAtlas::flush_render_pass()
 
 	renderpass.inside = false;
 	auto const &rect = renderpass.rect;
+	if (rect.width == 0 || rect.height == 0)
+		return;
+
 	write_domain(Domain::Scaled, Stage::Fragment, rect);
 	listener->flush_render_pass(rect);
 
@@ -507,6 +514,9 @@ void FBAtlas::write_fragment(Domain domain, const Rect &rect)
 
 void FBAtlas::clear_rect(const Rect &rect, FBColor color)
 {
+	if (rect.width == 0 || rect.height == 0)
+		return;
+
 	// If we're clearing completely outside the renderpass, we're probably doing another render pass
 	// somewhere else, so end the current one and start a new one instead.
 	if (renderpass.inside && !renderpass.rect.intersects(rect))
