@@ -380,6 +380,7 @@ public:
 		SpecConstIndex_BlendMode = 2,
 		SpecConstIndex_Scaling = 3,
 		SpecConstIndex_Shift = 4,
+		SpecConstIndex_OffsetUV = 5,
 		SpecConstIndex_Samples = 0,
 	};
 
@@ -431,10 +432,16 @@ public:
 		polygon_2d_filter_exclude = exclude;
 	}
 
+	void set_scaled_uv_offset(bool offset)
+	{
+		scaled_uv_offset = offset;
+	}
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
 	unsigned msaa;
+	bool scaled_uv_offset = false;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	FilterExclude sprite_filter_exclude = FilterExcludeNone;
 	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
@@ -546,12 +553,14 @@ private:
 		bool filtering;
 		bool scaled_read;
 		unsigned shift;
+		bool offset_uv;
 
 		bool operator==(const SemiTransparentState &other) const
 		{
 			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
 			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
-				   filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift;
+				   filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift &&
+				   offset_uv == other.offset_uv;
 		}
 
 		bool operator!=(const SemiTransparentState &other) const
@@ -574,6 +583,7 @@ private:
 		bool filtering;
 		bool scaled_read;
 		unsigned shift;
+		bool offset_uv;
 
 		// needed for emplace_back
 		PrimitiveInfo(
@@ -582,13 +592,12 @@ private:
 			HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
 			bool filtering = false,
 			bool scaled_read = false,
-			unsigned shift = 0
+			unsigned shift = 0,
+			bool offset_uv = false
 		)
 			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
-			filtering(filtering), scaled_read(scaled_read), shift(shift)
-		{
-
-		}
+			filtering(filtering), scaled_read(scaled_read), shift(shift), offset_uv(offset_uv)
+		{}
 	};
 
 	struct OpaqueQueue
@@ -636,10 +645,10 @@ private:
 	float allocate_depth(Domain domain, const Rect &rect);
 
 	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
-		bool &filtering, bool &scaled_read, unsigned &shift);
+		bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
 	void build_line_quad(Vertex *quad, const Vertex *line);
 	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
-		bool filtering, bool scaled_read, unsigned shift);
+		bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
 	bool get_filer_exclude(FilterExclude exclude)
 	{
 		if (

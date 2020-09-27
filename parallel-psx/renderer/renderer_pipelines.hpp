@@ -51,6 +51,9 @@ static const uint32_t flat_frag[] =
 static const uint32_t textured_vert[] =
 #include "textured.vert.inc"
     ;
+static const uint32_t textured_unscaled_vert[] =
+#include "textured.unscaled.vert.inc"
+    ;
 static const uint32_t textured_frag[] =
 #include "textured.frag.inc"
     ;

@@ -5,6 +5,7 @@
 bool content_is_pal = false;
 uint8_t widescreen_hack;
 uint8_t psx_gpu_upscale_shift;
+uint8_t psx_gpu_upscale_shift_hw;
 int line_render_mode;
 int filter_mode;
 bool opaque_check;

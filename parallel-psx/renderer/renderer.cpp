@@ -249,8 +249,16 @@ void Renderer::init_primitive_pipelines()
 	}
 	else
 	{
-		pipelines.textured_scaled = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
-		pipelines.textured_unscaled = device.request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+		if (scaling > 1)
+		{
+			pipelines.textured_scaled = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
+			pipelines.textured_unscaled = device.request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+		}
+		else
+		{
+			pipelines.textured_scaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
+			pipelines.textured_unscaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+		}
 	}
 }
 
@@ -268,12 +276,22 @@ void Renderer::init_primitive_feedback_pipelines()
 	}
 	else
 	{
-		pipelines.textured_masked_scaled = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_frag, sizeof(feedback_frag));
-		pipelines.textured_masked_unscaled = device.request_program(textured_vert, sizeof(textured_vert),
-				feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
 				feedback_flat_frag, sizeof(feedback_flat_frag));
+		if (scaling > 1)
+		{
+			pipelines.textured_masked_scaled = device.request_program(textured_vert, sizeof(textured_vert),
+					feedback_frag, sizeof(feedback_frag));
+			pipelines.textured_masked_unscaled = device.request_program(textured_vert, sizeof(textured_vert),
+					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
+		}
+		else
+		{
+			pipelines.textured_masked_scaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+					feedback_frag, sizeof(feedback_frag));
+			pipelines.textured_masked_unscaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
+		}
 	}
 }
 
@@ -1412,7 +1430,7 @@ HdTextureHandle Renderer::get_hd_texture_index(const Rect &vram_rect, bool &fast
 }
 
 void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
-	bool &filtering, bool &scaled_read, unsigned &shift)
+	bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv)
 {
 	switch (render_state.texture_mode)
 	{
@@ -1548,6 +1566,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		filtering = render_state.texture_mode != TextureMode::None;
 		scaled_read = false;
 	}
+	offset_uv = scaled_uv_offset && render_state.primitive_type == PrimitiveType::Polygon;
 
 	float z = allocate_depth(scaled_read ? Domain::Scaled : Domain::Unscaled, rect);
 
@@ -1611,7 +1630,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 }
 
 std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
-	bool filtering, bool scaled_read, unsigned shift)
+	bool filtering, bool scaled_read, unsigned shift, bool offset_uv)
 {
 	// For mask testing, force primitives through the serialized blend path.
 	if (render_state.mask_test)
@@ -1625,15 +1644,15 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 		if (render_state.semi_transparent != SemiTransparentMode::None)
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.semi_transparent_opaque_scissor.emplace_back(queue.semi_transparent_opaque_scissor.size(),
-				                                                   scissor, hd_texture, filtering, scaled_read, shift);
+				queue.semi_transparent_opaque_scissor.emplace_back(queue.semi_transparent_opaque_scissor.size(), scissor, hd_texture,
+					filtering, scaled_read, shift, offset_uv);
 			return &queue.semi_transparent_opaque;
 		}
 		else
 		{
 			for (unsigned i = 0; i < prims; i++)
 				queue.opaque_textured_scissor.emplace_back(queue.opaque_textured_scissor.size(), scissor, hd_texture,
-					filtering, scaled_read, shift);
+					filtering, scaled_read, shift, offset_uv);
 			return &queue.opaque_textured;
 		}
 	}
@@ -1643,7 +1662,7 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 	{
 		for (unsigned i = 0; i < prims; i++)
 			queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), scissor, hd_texture,
-				filtering, scaled_read, shift);
+				filtering, scaled_read, shift, offset_uv);
 		return &queue.opaque;
 	}
 }
@@ -1780,9 +1799,10 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
-	build_attribs(vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift);
+	bool offset_uv = false;
+	build_attribs(vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift);
+	auto *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
 		for (unsigned i = 0; i < 3; i++)
@@ -1801,7 +1821,8 @@ void Renderer::draw_triangle(const Vertex *vertices)
 		                                         render_state.mask_test,
 		                                         filtering,
 		                                         scaled_read,
-												 shift });
+												 shift,
+												 offset_uv });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 
@@ -1832,9 +1853,10 @@ void Renderer::draw_quad(const Vertex *vertices)
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
-	build_attribs(vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift);
+	bool offset_uv = false;
+	build_attribs(vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift);
+	auto *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
 	{
@@ -1851,24 +1873,22 @@ void Renderer::draw_quad(const Vertex *vertices)
 		if (filtering)
 			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
+		const SemiTransparentState state = {
+			scissor_index, hd_texture_index, render_state.semi_transparent,
+			render_state.texture_mode != TextureMode::None,
+			render_state.mask_test,
+			filtering,
+			scaled_read,
+			shift,
+			offset_uv };
 		queue.semi_transparent.push_back(vert[0]);
 		queue.semi_transparent.push_back(vert[1]);
 		queue.semi_transparent.push_back(vert[2]);
 		queue.semi_transparent.push_back(vert[3]);
 		queue.semi_transparent.push_back(vert[2]);
 		queue.semi_transparent.push_back(vert[1]);
-		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
-		                                         render_state.texture_mode != TextureMode::None,
-		                                         render_state.mask_test,
-		                                         filtering,
-		                                         scaled_read,
-												 shift });
-		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
-		                                         render_state.texture_mode != TextureMode::None,
-		                                         render_state.mask_test,
-		                                         filtering,
-		                                         scaled_read,
-												 shift });
+		queue.semi_transparent_state.push_back(state);
+		queue.semi_transparent_state.push_back(state);
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 #if 0
@@ -1991,6 +2011,8 @@ void Renderer::flush_render_pass(const Rect &rect)
 void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveInfo> &scissors, bool textured)
 {
 	sort(begin(scissors), end(scissors), [](const PrimitiveInfo &a, const PrimitiveInfo &b) {
+		if (a.offset_uv != b.offset_uv)
+			return a.offset_uv > b.offset_uv;
 		if (a.shift != b.shift)
 			return a.shift > b.shift;
 		if (a.scaled_read != b.scaled_read)
@@ -2013,6 +2035,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	bool filtering = scissors.front().filtering;
 	bool scaled_read = scissors.front().scaled_read;
 	unsigned shift = scissors.front().shift;
+	bool offset_uv = scissors.front().offset_uv;
 	unsigned last_draw = 0;
 	unsigned i = 1;
 	unsigned size = scissors.size();
@@ -2021,6 +2044,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
 	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
+	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 	auto set_scaled_read_texture = [&] {
 		if (scaled_read)
 		{
@@ -2050,7 +2074,8 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	for (; i < size; i++, vert += 3)
 	{
 		if (scissors[i].scissor_index != scissor || scissors[i].hd_texture_index != hd_texture ||
-			scissors[i].filtering != filtering || scissors[i].scaled_read != scaled_read || scissors[i].shift != shift)
+			scissors[i].filtering != filtering || scissors[i].scaled_read != scaled_read || scissors[i].shift != shift ||
+			scissors[i].offset_uv != offset_uv)
 		{
 			unsigned to_draw = i - last_draw;
 			cmd->set_specialization_constant_mask(-1);
@@ -2077,6 +2102,10 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 			if (scissors[i].shift != shift) {
 				shift = scissors[i].shift;
 				cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
+			}
+			if (scissors[i].offset_uv != offset_uv) {
+				offset_uv = scissors[i].offset_uv;
+				cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
 		memcpy(vert, vertices.data() + 3 * scissors[i].triangle_index, 3 * sizeof(BufferVertex));
@@ -2168,6 +2197,7 @@ void Renderer::render_semi_transparent_primitives()
 		cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
 		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 		cmd->set_specialization_constant(SpecConstIndex_Shift, state.shift);
+		cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
 
 		if (state.scissor_index < 0)
 			cmd->set_scissor(queue.default_scissor);

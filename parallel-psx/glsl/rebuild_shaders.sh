@@ -15,6 +15,7 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/flat.vert.inc -mfmt=c primitive.vert
 "$GLSLC" -o prebuilt/flat.frag.inc -mfmt=c primitive.frag
 "$GLSLC" -o prebuilt/textured.vert.inc -mfmt=c -DTEXTURED primitive.vert
+"$GLSLC" -o prebuilt/textured.unscaled.vert.inc -mfmt=c -DTEXTURED -DUNSCALED primitive.vert
 "$GLSLC" -o prebuilt/textured.frag.inc -mfmt=c -DTEXTURED primitive.frag
 "$GLSLC" -o prebuilt/textured.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED primitive.frag
 "$GLSLC" -o prebuilt/textured.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive.frag

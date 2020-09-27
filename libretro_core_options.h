@@ -121,6 +121,19 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "1x(native)"
    },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(scaled_uv_offset),
+      "Texture UV Offset",
+      "Sample textures for 3D polygons at an offset for higher than 1x internal resolution. Reduce texture seams but may cause unintended graphical glitches.",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(filter),

@@ -47,6 +47,7 @@ static retro_vulkan_image swapchain_image;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
+static bool scaled_uv_offset;
 static int filter_exclude_sprites;
 static int filter_exclude_2d_polygons;
 static bool adaptive_smoothing;
@@ -261,6 +262,15 @@ void rsx_vulkan_refresh_variables(void)
          scaling  = (var.value[0] - '0') * 10;
          scaling += var.value[1] - '0';
       }
+   }
+
+   var.key = BEETLE_OPT(scaled_uv_offset);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         scaled_uv_offset = true;
+      else
+         scaled_uv_offset = false;
    }
 
    var.key = BEETLE_OPT(filter_exclude_sprite);
@@ -488,6 +498,7 @@ void rsx_vulkan_prepare_frame(void)
    device->next_frame_context();
    renderer->reset_counters();
 
+   renderer->set_scaled_uv_offset(scaled_uv_offset);
    renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
    renderer->set_sprite_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_sprites));
    renderer->set_polygon_2d_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_2d_polygons));
