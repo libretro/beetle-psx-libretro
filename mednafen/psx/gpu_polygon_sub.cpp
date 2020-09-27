@@ -141,10 +141,10 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 				{
 					if (adjust_u)
 						if (vertices[v].u != min_u)
-							++vertices[v].u;
+							vertices[v].u += off_u;
 					if (adjust_v)
 						if (vertices[v].v != min_v)
-							++vertices[v].v;
+							vertices[v].v += off_v;
 				}
 				if (adjust_u)
 					off_u = 0;
@@ -258,7 +258,7 @@ void Finalise_UVLimits(PS_GPU *gpu)
 
 		// In nearest neighbor, we'll get *very* close to this UV, but not close enough to actually sample it.
 		// If du/dx or dv/dx are negative, we probably need to invert this though ...
-		if (rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw)
+		if ((rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw) && gpu->may_be_2d)
 		{
 			if (max_u > min_u)
 				max_u--;
