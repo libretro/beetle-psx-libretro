@@ -1611,11 +1611,26 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 }
 
 std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
-	bool filtrering, bool scaled_read, unsigned shift)
+	bool filtering, bool scaled_read, unsigned shift)
 {
 	// For mask testing, force primitives through the serialized blend path.
 	if (render_state.mask_test)
 		return nullptr;
+
+	if (
+		filtering &&
+		(
+			(
+				render_state.primitive_type == PrimitiveType::Sprite &&
+				sprite_filter_exclude >= FilterExcludeOpaque
+			) ||
+			(
+				render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+				polygon_2d_filter_exclude >= FilterExcludeOpaque
+			)
+		)
+	)
+		filtering = false;
 
 	if (render_state.texture_mode != TextureMode::None)
 	{
@@ -1623,14 +1638,14 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 		{
 			for (unsigned i = 0; i < prims; i++)
 				queue.semi_transparent_opaque_scissor.emplace_back(queue.semi_transparent_opaque_scissor.size(),
-				                                                   scissor, hd_texture, filtrering, scaled_read, shift);
+				                                                   scissor, hd_texture, filtering, scaled_read, shift);
 			return &queue.semi_transparent_opaque;
 		}
 		else
 		{
 			for (unsigned i = 0; i < prims; i++)
 				queue.opaque_textured_scissor.emplace_back(queue.opaque_textured_scissor.size(), scissor, hd_texture,
-					filtrering, scaled_read, shift);
+					filtering, scaled_read, shift);
 			return &queue.opaque_textured;
 		}
 	}
@@ -1640,7 +1655,7 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 	{
 		for (unsigned i = 0; i < prims; i++)
 			queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), scissor, hd_texture,
-				filtrering, scaled_read, shift);
+				filtering, scaled_read, shift);
 		return &queue.opaque;
 	}
 }
@@ -1788,6 +1803,21 @@ void Renderer::draw_triangle(const Vertex *vertices)
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
 	{
+		if (
+			filtering &&
+			(
+				(
+					render_state.primitive_type == PrimitiveType::Sprite &&
+					sprite_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
+				) ||
+				(
+					render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+					polygon_2d_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
+				)
+			)
+		)
+			filtering = false;
+
 		for (unsigned i = 0; i < 3; i++)
 			queue.semi_transparent.push_back(vert[i]);
 		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
@@ -1798,7 +1828,12 @@ void Renderer::draw_triangle(const Vertex *vertices)
 												 shift });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-		// if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+
+		// render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws
+		// hence getting rid of the condition
+#if 0
+		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+#endif
 			render_pass_is_feedback = true;
 	}
 }
@@ -1837,6 +1872,21 @@ void Renderer::draw_quad(const Vertex *vertices)
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
 	{
+		if (
+			filtering &&
+			(
+				(
+					render_state.primitive_type == PrimitiveType::Sprite &&
+					sprite_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
+				) ||
+				(
+					render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+					polygon_2d_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
+				)
+			)
+		)
+			filtering = false;
+
 		queue.semi_transparent.push_back(vert[0]);
 		queue.semi_transparent.push_back(vert[1]);
 		queue.semi_transparent.push_back(vert[2]);
@@ -1857,7 +1907,9 @@ void Renderer::draw_quad(const Vertex *vertices)
 												 shift });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-		// if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+#if 0
+		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
+#endif
 			render_pass_is_feedback = true;
 	}
 }

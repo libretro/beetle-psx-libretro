@@ -137,6 +137,32 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "nearest"
    },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(filter_exclude_sprite),
+      "Exclude Sprites from Filtering",
+      "Do not apply texture filtering to sprites. Prevent seams in various games with 2D sprite-rendered backgrounds. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
+      {
+         { "disable", NULL },
+         { "opaque", "Opaque Only" },
+         { "all", "Opaque and Semi-Transparent" },
+         { NULL, NULL },
+      },
+      "disable"
+   },
+   {
+      BEETLE_OPT(filter_exclude_2d_polygon),
+      "Exclude 2D Polygons from Filtering",
+      "Do not apply texture filtering to 2D polygons. 2D polygons are detected with a heuristic and there may be glitches. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
+      {
+         { "disable", NULL },
+         { "opaque", "Opaque Only" },
+         { "all", "Opaque and Semi-Transparent" },
+         { NULL, NULL },
+      },
+      "disable"
+   },
+#endif
 #endif
 #ifdef HAVE_VULKAN
    {

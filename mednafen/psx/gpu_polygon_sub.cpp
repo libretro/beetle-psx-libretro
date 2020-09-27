@@ -6,15 +6,12 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	// iCB: Just borrowing this from \parallel-psx\renderer\renderer.cpp
 	uint16 off_u = 0;
 	uint16 off_v = 0;
-	if (gpu->InCmd != INCMD_QUAD)
-	{
-		off_u = 0;
-		off_v = 0;
-	}
-	else
+	bool may_be_2d = false;
+	if (gpu->InCmd == INCMD_QUAD)
 	{
 		off_u = gpu->off_u;
 		off_v = gpu->off_v;
+		may_be_2d = gpu->may_be_2d;
 	}
 
 	// For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
@@ -27,8 +24,10 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	// we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
 	// or similar which should not share edges, which leads to this unfortunate code below.
 	//
+#if 0
 	// Only apply this workaround for quads.
-	// if (count == 4)
+	if (count == 4)
+#endif
 	{
 		// It might be faster to do more direct checking here, but the code below handles primitives in any order
 		// and orientation, and is far more SIMD-friendly if needed.
@@ -121,11 +120,15 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 						vertices[0].v = vertices[2].v - 1;
 				}
 			}
+
+			// Dumb heuristic to check if a polygon may be 2D
+			may_be_2d = may_be_2d || zero_dudy || zero_dudx || zero_dvdy || zero_dvdx;
 		}
 	}
 
 	gpu->off_u = off_u;
 	gpu->off_v = off_v;
+	gpu->may_be_2d = may_be_2d;
 }
 
 // Reset min/max UVs for primitive

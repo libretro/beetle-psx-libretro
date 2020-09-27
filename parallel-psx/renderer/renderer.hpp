@@ -40,6 +40,13 @@ enum class SemiTransparentMode
 	AddQuarter
 };
 
+enum class PrimitiveType
+{
+	Sprite,
+	Polygon,
+	May_Be_2D_Polygon
+};
+
 class Renderer : private HazardListener, private TextureUploader
 {
 public:
@@ -126,6 +133,7 @@ public:
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
+		PrimitiveType primitive_type = PrimitiveType::Polygon;
 		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
 		ScanoutFilter scanout_filter = ScanoutFilter::None;
 		ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
@@ -296,6 +304,11 @@ public:
 		render_state.semi_transparent = state;
 	}
 
+	inline void set_primitive_type(PrimitiveType primitive_type)
+	{
+		render_state.primitive_type = primitive_type;
+	}
+
 	inline void set_force_mask_bit(bool enable)
 	{
 		render_state.force_mask_bit = enable;
@@ -370,6 +383,13 @@ public:
 		SpecConstIndex_Samples = 0,
 	};
 
+	enum FilterExclude
+	{
+		FilterExcludeNone = 0,
+		FilterExcludeOpaque = 1,
+		FilterExcludeOpaqueAndSemiTrans = 2,
+	};
+
 	enum class FilterMode : uint32_t
 	{
 		NearestNeighbor = 0,
@@ -401,11 +421,23 @@ public:
 		return render_state.scanout_mode;
 	}
 
+	void set_sprite_filter_exclude(FilterExclude exclude)
+	{
+		sprite_filter_exclude = exclude;
+	}
+
+	void set_polygon_2d_filter_exclude(FilterExclude exclude)
+	{
+		polygon_2d_filter_exclude = exclude;
+	}
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
 	unsigned msaa;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
+	FilterExclude sprite_filter_exclude = FilterExcludeNone;
+	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
 	Vulkan::ImageHandle scaled_framebuffer;
 	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;

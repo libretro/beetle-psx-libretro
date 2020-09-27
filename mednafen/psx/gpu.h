@@ -149,6 +149,7 @@ struct PS_GPU
    uint16_t off_u, off_v;
    // primitive UV limits (used to clamp texture sampling)
    uint16_t min_u, min_v, max_u, max_v;
+   bool may_be_2d;
 
    line_point InPLine_PrevPoint;
 
