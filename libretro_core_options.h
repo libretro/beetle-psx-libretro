@@ -121,6 +121,19 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "1x(native)"
    },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(scaled_uv_offset),
+      "Texture UV Offset",
+      "Sample textures for 3D polygons at an offset for higher than 1x internal resolution. Reduce texture seams but may cause unintended graphical glitches.",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(filter),
@@ -137,6 +150,32 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "nearest"
    },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(filter_exclude_sprite),
+      "Exclude Sprites from Filtering",
+      "Do not apply texture filtering to sprites. Prevent seams in various games with 2D sprite-rendered backgrounds. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
+      {
+         { "disable", NULL },
+         { "opaque", "Opaque Only" },
+         { "all", "Opaque and Semi-Transparent" },
+         { NULL, NULL },
+      },
+      "disable"
+   },
+   {
+      BEETLE_OPT(filter_exclude_2d_polygon),
+      "Exclude 2D Polygons from Filtering",
+      "Do not apply texture filtering to 2D polygons. 2D polygons are detected with a heuristic and there may be glitches. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
+      {
+         { "disable", NULL },
+         { "opaque", "Opaque Only" },
+         { "all", "Opaque and Semi-Transparent" },
+         { NULL, NULL },
+      },
+      "disable"
+   },
+#endif
 #endif
 #ifdef HAVE_VULKAN
    {
@@ -282,7 +321,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(pgxp_nclip),
       "PGXP Primitive Culling",
-      "Use PGXP's NCLIP implementation. Improves appearance but causes many games to lock up.",
+      "Use PGXP's NCLIP implementation. Improves appearance by reducing holes in geometries with PGXP coordinates. Known to cause some games to lock up in various circumstances.",
       {
          { "disabled", NULL },
          { "enabled", NULL },

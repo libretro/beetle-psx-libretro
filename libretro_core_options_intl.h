@@ -237,7 +237,7 @@ struct retro_core_option_definition option_defs_it[] = {
    {
       BEETLE_OPT(pgxp_nclip),
       "Eliminación primitiva de PGXP",
-      "Utilice la implementación NCLIP de PGXP. Mejora la apariencia pero hace que muchos juegos se bloqueen.",
+      "Utilice la implementación NCLIP de PGXP. Mejora la apariencia al reducir los agujeros en las geometrías con coordenadas PGXP. Se sabe que hace que algunos juegos se bloqueen en diversas circunstancias.",
       {
          { "disabled", NULL },
          { "enabled", NULL },

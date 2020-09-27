@@ -568,7 +568,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          memcpy(&vertices[0], &gpu->InQuad_F3Vertices[1], 2 * sizeof(tri_vertex));
          clut = gpu->InQuad_clut;
-       invalidW = gpu->InQuad_invalidW;
+         invalidW = gpu->InQuad_invalidW;
          sv = 2;
       }
    }
@@ -810,7 +810,9 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 						DitherEnabled(gpu),
 						BlendMode,
 						MaskEval_TA,
-						gpu->MaskSetOR);
+						gpu->MaskSetOR,
+                  false,
+                  gpu->may_be_2d);
 				}
 			}
 			else

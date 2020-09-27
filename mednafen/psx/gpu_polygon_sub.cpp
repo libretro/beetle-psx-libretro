@@ -1,4 +1,9 @@
 #include "psx.h"
+#include "../../rsx/rsx_intf.h"
+
+#include <float.h>
+
+extern "C" uint8_t psx_gpu_upscale_shift_hw;
 
 // Determine whether to offset UVs to account for difference in interpolation between PS1 and modern GPUs
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
@@ -6,15 +11,15 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	// iCB: Just borrowing this from \parallel-psx\renderer\renderer.cpp
 	uint16 off_u = 0;
 	uint16 off_v = 0;
-	if (gpu->InCmd != INCMD_QUAD)
-	{
-		off_u = 0;
-		off_v = 0;
-	}
-	else
+	bool may_be_2d = false;
+	bool du_ge_1 = false, dv_ge_1 = false;
+	if (gpu->InCmd == INCMD_QUAD)
 	{
 		off_u = gpu->off_u;
 		off_v = gpu->off_v;
+		may_be_2d = gpu->may_be_2d;
+		du_ge_1 = gpu->du_ge_1;
+		dv_ge_1 = gpu->dv_ge_1;
 	}
 
 	// For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
@@ -27,8 +32,10 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	// we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
 	// or similar which should not share edges, which leads to this unfortunate code below.
 	//
+#if 0
 	// Only apply this workaround for quads.
-	// if (count == 4)
+	if (count == 4)
+#endif
 	{
 		// It might be faster to do more direct checking here, but the code below handles primitives in any order
 		// and orientation, and is far more SIMD-friendly if needed.
@@ -71,6 +78,20 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 			bool zero_dvdx = dvdx == 0.0f;
 			bool zero_dvdy = dvdy == 0.0f;
 
+			// Dumb heuristic to check if a polygon may be 2D
+			may_be_2d = may_be_2d || zero_dudy || zero_dudx || zero_dvdy || zero_dvdx;
+			if (may_be_2d)
+			{
+				if (zero_dudy && fabs(dudx) >= 1.0)
+					du_ge_1 = true;
+				else if (zero_dudx && fabs(dudy) >= 1.0)
+					du_ge_1 = true;
+				if (zero_dvdy && fabs(dvdx) >= 1.0)
+					dv_ge_1 = true;
+				else if (zero_dvdx && fabs(dvdy) >= 1.0)
+					dv_ge_1 = true;
+			}
+
 			// If we have negative dU or dV in any direction, increment the U or V to work properly with nearest-neighbor in this impl.
 			// If we don't have 1:1 pixel correspondence, this creates a slight "shift" in the sprite, but we guarantee that we don't sample garbage at least.
 			// Overall, this is kinda hacky because there can be legitimate, rare cases where 3D meshes hit this scenario, and a single texel offset can pop in, but
@@ -83,16 +104,52 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 			// Case 2: U is decreasing in Y, but no change in X.
 			// Case 3: V is decreasing in X, but no change in Y.
 			// Case 4: V is decreasing in Y, but no change in X.
-			if (gpu->InCmd != INCMD_QUAD)
+			if (rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw)
 			{
 				if (neg_dudx && zero_dudy)
-					off_u++;
+					off_u = 1;
 				else if (neg_dudy && zero_dudx)
-					off_u++;
+					off_u = 1;
 				if (neg_dvdx && zero_dvdy)
-					off_v++;
+					off_v = 1;
 				else if (neg_dvdy && zero_dvdx)
-					off_v++;
+					off_v = 1;
+			}
+
+			// Only adjust uv for all vertices if changes in uv is greater than xy respectively
+			// Here we only adjust vertices with the greater uv values
+			bool adjust_u = off_u > 0 && !du_ge_1;
+			bool adjust_v = off_v > 0 && !dv_ge_1;
+			if (rsx_intf_is_type() != RSX_SOFTWARE && (adjust_u || adjust_v))
+			{
+				float min_u = FLT_MAX;
+				float min_v = FLT_MAX;
+				for (unsigned v = 0; v < 3; v++)
+				{
+					if (adjust_u)
+					{
+						float tmp_u = vertices[v].u;
+						min_u = std::min(min_u, tmp_u);
+					}
+					if (adjust_v)
+					{
+						float tmp_v = vertices[v].v;
+						min_v = std::min(min_v, tmp_v);
+					}
+				}
+				for (unsigned v = 0; v < 3; ++v)
+				{
+					if (adjust_u)
+						if (vertices[v].u != min_u)
+							vertices[v].u += off_u;
+					if (adjust_v)
+						if (vertices[v].v != min_v)
+							vertices[v].v += off_v;
+				}
+				if (adjust_u)
+					off_u = 0;
+				if (adjust_v)
+					off_v = 0;
 			}
 
 			// HACK fix Wild Arms 2 overworld forest sprite
@@ -126,6 +183,9 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 
 	gpu->off_u = off_u;
 	gpu->off_v = off_v;
+	gpu->may_be_2d = may_be_2d;
+	gpu->du_ge_1 = du_ge_1;
+	gpu->dv_ge_1 = dv_ge_1;
 }
 
 // Reset min/max UVs for primitive
@@ -198,10 +258,13 @@ void Finalise_UVLimits(PS_GPU *gpu)
 
 		// In nearest neighbor, we'll get *very* close to this UV, but not close enough to actually sample it.
 		// If du/dx or dv/dx are negative, we probably need to invert this though ...
-		if (max_u > min_u)
-			max_u--;
-		if (max_v > min_v)
-			max_v--;
+		if ((rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw) && gpu->may_be_2d)
+		{
+			if (max_u > min_u)
+				max_u--;
+			if (max_v > min_v)
+				max_v--;
+		}
 
 		// If there's no wrapping, we can prewrap and avoid fallback.
 		if ((max_u & 0xff00) == (min_u & 0xff00))

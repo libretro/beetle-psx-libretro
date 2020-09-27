@@ -47,6 +47,9 @@ static retro_vulkan_image swapchain_image;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
+static bool scaled_uv_offset;
+static int filter_exclude_sprites;
+static int filter_exclude_2d_polygons;
 static bool adaptive_smoothing;
 static bool super_sampling;
 static unsigned msaa = 1;
@@ -261,6 +264,37 @@ void rsx_vulkan_refresh_variables(void)
       }
    }
 
+   var.key = BEETLE_OPT(scaled_uv_offset);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         scaled_uv_offset = true;
+      else
+         scaled_uv_offset = false;
+   }
+
+   var.key = BEETLE_OPT(filter_exclude_sprite);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "all"))
+         filter_exclude_sprites = 2;
+      else if (!strcmp(var.value, "opaque"))
+         filter_exclude_sprites = 1;
+      else
+         filter_exclude_sprites = 0;
+   }
+
+   var.key = BEETLE_OPT(filter_exclude_2d_polygon);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "all"))
+         filter_exclude_2d_polygons = 2;
+      else if (!strcmp(var.value, "opaque"))
+         filter_exclude_2d_polygons = 1;
+      else
+         filter_exclude_2d_polygons = 0;
+   }
+
    var.key = BEETLE_OPT(adaptive_smoothing);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -464,7 +498,10 @@ void rsx_vulkan_prepare_frame(void)
    device->next_frame_context();
    renderer->reset_counters();
 
+   renderer->set_scaled_uv_offset(scaled_uv_offset);
    renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
+   renderer->set_sprite_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_sprites));
+   renderer->set_polygon_2d_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_2d_polygons));
 }
 
 static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
@@ -727,6 +764,8 @@ void rsx_vulkan_push_triangle(
          break;
    }
 
+   renderer->set_primitive_type(PrimitiveType::Polygon);
+
    Vertex vertices[3] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
       { p1x, p1y, p1w, c1, t1x, t1y },
@@ -754,7 +793,8 @@ void rsx_vulkan_push_quad(
       uint8_t depth_shift,
       bool dither,
       int blend_mode,
-      bool mask_test, bool set_mask)
+      bool mask_test, bool set_mask,
+      bool is_sprite, bool may_be_2d)
 {
    if (!renderer)
       return;
@@ -804,6 +844,13 @@ void rsx_vulkan_push_quad(
          renderer->set_semi_transparent(SemiTransparentMode::AddQuarter);
          break;
    }
+
+   if (is_sprite)
+      renderer->set_primitive_type(PrimitiveType::Sprite);
+   else if (may_be_2d)
+      renderer->set_primitive_type(PrimitiveType::May_Be_2D_Polygon);
+   else
+      renderer->set_primitive_type(PrimitiveType::Polygon);
 
    Vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },

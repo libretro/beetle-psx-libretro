@@ -212,10 +212,10 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
                            v + h,            /* t2y */
                            u + w,            /* t5x */
                            v + h,            /* t5y */
-						   u,
-		                   v,
-		                   u + w - 1,	// clamp UVs 1 pixel from edge (sampling should not quite reach it)
-		                   v + h - 1,
+                           u,
+                           v,
+                           u + w - 1,	// clamp UVs 1 pixel from edge (sampling should not quite reach it)
+                           v + h - 1,
                            gpu->TexPageX,
                            gpu->TexPageY,
                            clut_x,
@@ -225,7 +225,9 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
                            DitherEnabled(gpu),
                            BlendMode,
                            MaskEval_TA,
-                           gpu->MaskSetOR);
+                           gpu->MaskSetOR,
+                           true,
+                           true);
    }
 #endif
 
