@@ -40,6 +40,13 @@ enum class SemiTransparentMode
 	AddQuarter
 };
 
+enum class PrimitiveType
+{
+	Sprite,
+	Polygon,
+	May_Be_2D_Polygon
+};
+
 class Renderer : private HazardListener, private TextureUploader
 {
 public:
@@ -126,6 +133,7 @@ public:
 
 		TextureMode texture_mode = TextureMode::None;
 		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
+		PrimitiveType primitive_type = PrimitiveType::Polygon;
 		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
 		ScanoutFilter scanout_filter = ScanoutFilter::None;
 		ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
@@ -296,6 +304,11 @@ public:
 		render_state.semi_transparent = state;
 	}
 
+	inline void set_primitive_type(PrimitiveType primitive_type)
+	{
+		render_state.primitive_type = primitive_type;
+	}
+
 	inline void set_force_mask_bit(bool enable)
 	{
 		render_state.force_mask_bit = enable;
@@ -367,7 +380,15 @@ public:
 		SpecConstIndex_BlendMode = 2,
 		SpecConstIndex_Scaling = 3,
 		SpecConstIndex_Shift = 4,
+		SpecConstIndex_OffsetUV = 5,
 		SpecConstIndex_Samples = 0,
+	};
+
+	enum FilterExclude
+	{
+		FilterExcludeNone = 0,
+		FilterExcludeOpaque = 1,
+		FilterExcludeOpaqueAndSemiTrans = 2,
 	};
 
 	enum class FilterMode : uint32_t
@@ -401,11 +422,29 @@ public:
 		return render_state.scanout_mode;
 	}
 
+	void set_sprite_filter_exclude(FilterExclude exclude)
+	{
+		sprite_filter_exclude = exclude;
+	}
+
+	void set_polygon_2d_filter_exclude(FilterExclude exclude)
+	{
+		polygon_2d_filter_exclude = exclude;
+	}
+
+	void set_scaled_uv_offset(bool offset)
+	{
+		scaled_uv_offset = offset;
+	}
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
 	unsigned msaa;
+	bool scaled_uv_offset = false;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
+	FilterExclude sprite_filter_exclude = FilterExcludeNone;
+	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
 	Vulkan::ImageHandle scaled_framebuffer;
 	Vulkan::ImageHandle scaled_framebuffer_msaa;
 	Vulkan::ImageHandle bias_framebuffer;
@@ -514,12 +553,14 @@ private:
 		bool filtering;
 		bool scaled_read;
 		unsigned shift;
+		bool offset_uv;
 
 		bool operator==(const SemiTransparentState &other) const
 		{
 			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
 			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
-				   filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift;
+				   filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift &&
+				   offset_uv == other.offset_uv;
 		}
 
 		bool operator!=(const SemiTransparentState &other) const
@@ -542,6 +583,7 @@ private:
 		bool filtering;
 		bool scaled_read;
 		unsigned shift;
+		bool offset_uv;
 
 		// needed for emplace_back
 		PrimitiveInfo(
@@ -550,13 +592,12 @@ private:
 			HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
 			bool filtering = false,
 			bool scaled_read = false,
-			unsigned shift = 0
+			unsigned shift = 0,
+			bool offset_uv = false
 		)
 			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
-			filtering(filtering), scaled_read(scaled_read), shift(shift)
-		{
-
-		}
+			filtering(filtering), scaled_read(scaled_read), shift(shift), offset_uv(offset_uv)
+		{}
 	};
 
 	struct OpaqueQueue
@@ -604,10 +645,24 @@ private:
 	float allocate_depth(Domain domain, const Rect &rect);
 
 	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
-		bool &filtering, bool &scaled_read, unsigned &shift);
+		bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
 	void build_line_quad(Vertex *quad, const Vertex *line);
 	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
-		bool filtering, bool scaled_read, unsigned shift);
+		bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
+	bool get_filer_exclude(FilterExclude exclude)
+	{
+		if (
+			render_state.primitive_type == PrimitiveType::Sprite &&
+			sprite_filter_exclude >= exclude
+		)
+			return true;
+		if (
+			render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+			polygon_2d_filter_exclude >= exclude
+		)
+			return true;
+		return false;
+	}
 
 	void flush_resolves();
 	void flush_blits();
