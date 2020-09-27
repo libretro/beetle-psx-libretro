@@ -3999,6 +3999,10 @@ bool retro_load_game(const struct retro_game_info *info)
 
          option_display.key = BEETLE_OPT(renderer_software_fb);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         option_display.key = BEETLE_OPT(filter_exclude_sprite);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         option_display.key = BEETLE_OPT(filter_exclude_2d_polygon);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(adaptive_smoothing);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(super_sampling);
@@ -4030,6 +4034,10 @@ bool retro_load_game(const struct retro_game_info *info)
          struct retro_core_option_display option_display;
          option_display.visible = false;
 
+         option_display.key = BEETLE_OPT(filter_exclude_sprite);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         option_display.key = BEETLE_OPT(filter_exclude_2d_polygon);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(adaptive_smoothing);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(super_sampling);

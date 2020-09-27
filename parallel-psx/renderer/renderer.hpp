@@ -640,6 +640,20 @@ private:
 	void build_line_quad(Vertex *quad, const Vertex *line);
 	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 		bool filtering, bool scaled_read, unsigned shift);
+	bool get_filer_exclude(FilterExclude exclude)
+	{
+		if (
+			render_state.primitive_type == PrimitiveType::Sprite &&
+			sprite_filter_exclude >= exclude
+		)
+			return true;
+		if (
+			render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+			polygon_2d_filter_exclude >= exclude
+		)
+			return true;
+		return false;
+	}
 
 	void flush_resolves();
 	void flush_blits();

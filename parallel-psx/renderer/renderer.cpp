@@ -1617,20 +1617,8 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 	if (render_state.mask_test)
 		return nullptr;
 
-	if (
-		filtering &&
-		(
-			(
-				render_state.primitive_type == PrimitiveType::Sprite &&
-				sprite_filter_exclude >= FilterExcludeOpaque
-			) ||
-			(
-				render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
-				polygon_2d_filter_exclude >= FilterExcludeOpaque
-			)
-		)
-	)
-		filtering = false;
+	if (filtering)
+		filtering = !get_filer_exclude(FilterExcludeOpaque);
 
 	if (render_state.texture_mode != TextureMode::None)
 	{
@@ -1803,20 +1791,8 @@ void Renderer::draw_triangle(const Vertex *vertices)
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
 	{
-		if (
-			filtering &&
-			(
-				(
-					render_state.primitive_type == PrimitiveType::Sprite &&
-					sprite_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
-				) ||
-				(
-					render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
-					polygon_2d_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
-				)
-			)
-		)
-			filtering = false;
+		if (filtering)
+			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
 		for (unsigned i = 0; i < 3; i++)
 			queue.semi_transparent.push_back(vert[i]);
@@ -1872,20 +1848,8 @@ void Renderer::draw_quad(const Vertex *vertices)
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
 	{
-		if (
-			filtering &&
-			(
-				(
-					render_state.primitive_type == PrimitiveType::Sprite &&
-					sprite_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
-				) ||
-				(
-					render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
-					polygon_2d_filter_exclude >= FilterExcludeOpaqueAndSemiTrans
-				)
-			)
-		)
-			filtering = false;
+		if (filtering)
+			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
 		queue.semi_transparent.push_back(vert[0]);
 		queue.semi_transparent.push_back(vert[1]);
@@ -2057,26 +2021,29 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
 	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
-	if (scaled_read)
-	{
-		if (msaa > 1)
-			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
-	}
-	else
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
-	if (textured)
-	{
+	auto set_scaled_read_texture = [&] {
 		if (scaled_read)
-			cmd->set_program(*pipelines.textured_scaled);
+		{
+			if (msaa > 1)
+				cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			else
+				cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+		}
 		else
-			cmd->set_program(*pipelines.textured_unscaled);
-	}
-	else
-	{
-		cmd->set_program(*pipelines.flat);
-	}
+			cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+		if (textured)
+		{
+			if (scaled_read)
+				cmd->set_program(*pipelines.textured_scaled);
+			else
+				cmd->set_program(*pipelines.textured_unscaled);
+		}
+		else
+		{
+			cmd->set_program(*pipelines.flat);
+		}
+	};
+	set_scaled_read_texture();
 	memcpy(vert, vertices.data() + 3 * scissors.front().triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
@@ -2105,27 +2072,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 			}
 			if (scissors[i].scaled_read != scaled_read) {
 				scaled_read = scissors[i].scaled_read;
-				if (scaled_read)
-				{
-					if (msaa > 1)
-						cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-					else
-						cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
-				}
-				else
-					cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
-
-				if (textured)
-				{
-					if (scaled_read)
-						cmd->set_program(*pipelines.textured_scaled);
-					else
-						cmd->set_program(*pipelines.textured_unscaled);
-				}
-				else
-				{
-					cmd->set_program(*pipelines.flat);
-				}
+				set_scaled_read_texture();
 			}
 			if (scissors[i].shift != shift) {
 				shift = scissors[i].shift;

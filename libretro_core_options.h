@@ -308,7 +308,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(pgxp_nclip),
       "PGXP Primitive Culling",
-      "Use PGXP's NCLIP implementation. Improves appearance but causes many games to lock up.",
+      "Use PGXP's NCLIP implementation. Improves appearance by reducing holes in geometries with PGXP coordinates. Known to cause some games to lock up in various circumstances.",
       {
          { "disabled", NULL },
          { "enabled", NULL },
