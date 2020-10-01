@@ -10,6 +10,7 @@ void rsx_gl_set_video_refresh(retro_video_refresh_t cb);
 void rsx_gl_get_system_av_info(struct retro_system_av_info *info);
 
 bool rsx_gl_open(bool is_pal);
+bool rsx_gl_core_open(bool is_pal);
 void rsx_gl_close(void);
 void rsx_gl_refresh_variables(void);
 void rsx_gl_prepare_frame(void);
