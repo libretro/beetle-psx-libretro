@@ -373,7 +373,6 @@ extern "C"
 }
 #endif
 
-extern struct retro_hw_render_callback hw_render;
 
 #ifdef DEBUG
 static void get_error(const char *msg)
@@ -2313,40 +2312,6 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 }
 
 bool rsx_gl_open(bool is_pal)
-{
-   glsm_ctx_params_t params = {0};
-   retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
-   VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
-
-   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f))
-      return false;
-
-   /* glsm related setup */
-   params.context_reset         = gl_context_reset;
-   params.context_destroy       = gl_context_destroy;
-   params.framebuffer_lock      = gl_context_framebuffer_lock;
-   params.environ_cb            = environ_cb;
-   params.stencil               = false;
-   params.imm_vbo_draw          = NULL;
-   params.imm_vbo_disable       = NULL;
-   params.context_type          = RETRO_HW_CONTEXT_OPENGL;
-   // i identified 2 issues with RA's gl context's versioning :
-   // - any value above 3.0 won't provide a valid context, while the GLSM_CTL_STATE_CONTEXT_INIT call returned true...
-   // - the only way to overwrite previously set version with zero values is to set them directly in hw_render, otherwise they are ignored (see glsm_state_ctx_init logic)
-   // so we need a workaround like this
-   hw_render.version_major = 3;
-   hw_render.version_minor = 0;
-
-   if (!glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
-      return false;
-
-   /* No context until 'context_reset' is called */
-   static_renderer.video_clock  = clock;
-
-   return true;
-}
-
-bool rsx_gl_core_open(bool is_pal)
 {
    glsm_ctx_params_t params = {0};
    retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
