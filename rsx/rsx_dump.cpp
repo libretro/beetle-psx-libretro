@@ -1,5 +1,4 @@
 #include "rsx_dump.h"
-#include <stdio.h>
 
 static FILE *file;
 

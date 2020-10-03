@@ -1,6 +1,5 @@
 #include "rsx_lib_gl.h"
 
-#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h> /* exit() */
