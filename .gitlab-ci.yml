@@ -3,13 +3,13 @@
     JNI_PATH: .
     CORENAME: mednafen_psx
 
-.core-defs-hw
+.core-defs-hw:
   extends: .core-defs
   variables:
     CORENAME: mednafen_psx_hw
     HAVE_HW: 1
 
-.core-defs-hw-lightrec
+.core-defs-hw-lightrec:
   extends: .core-defs
   variables:
     CORENAME: mednafen_psx_hw
