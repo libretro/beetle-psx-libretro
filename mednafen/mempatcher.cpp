@@ -168,8 +168,8 @@ void MDFNMP_InstallReadPatches(void)
       for(chit = SubCheats[x].begin(); chit != SubCheats[x].end(); chit++)
       {
 #if 0
-         if(MDFNGameInfo->InstallReadPatch)
-            MDFNGameInfo->InstallReadPatch(chit->addr);
+         if(EmulatedPSX.InstallReadPatch)
+            EmulatedPSX.InstallReadPatch(chit->addr);
 #endif
       }
 }
@@ -177,8 +177,8 @@ void MDFNMP_InstallReadPatches(void)
 void MDFNMP_RemoveReadPatches(void)
 {
 #if 0
-   if(MDFNGameInfo->RemoveReadPatches)
-      MDFNGameInfo->RemoveReadPatches();
+   if(EmulatedPSX.RemoveReadPatches)
+      EmulatedPSX.RemoveReadPatches();
 #endif
 }
 

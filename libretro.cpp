@@ -326,7 +326,6 @@ bool setting_apply_analog_toggle  = false;
 bool use_mednafen_memcard0_method = false;
 
 extern MDFNGI EmulatedPSX;
-MDFNGI *MDFNGameInfo = NULL;
 
 #if PSX_DBGPRINT_ENABLE
 static unsigned psx_dbg_level = 0;
@@ -2247,8 +2246,6 @@ static int Load(const char *name, RFILE *fp)
       free(header);
    }
 
-   MDFNGameInfo = &EmulatedPSX;
-
    disk_control_ext_info.image_paths.push_back(name);
    extract_basename(image_label, name, sizeof(image_label));
    disk_control_ext_info.image_labels.push_back(image_label);
@@ -2263,7 +2260,7 @@ static int LoadCD(std::vector<CDIF *> *_CDInterfaces)
    if (psx_skipbios == 1)
    BIOSROM->WriteU32(0x6990, 0);
 
-   MDFNGameInfo->GameType = GMT_CDROM;
+   EmulatedPSX.GameType = GMT_CDROM;
 
    return(1);
 }
@@ -3850,9 +3847,6 @@ static bool MDFNI_LoadCD(const char *devicename)
       log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
    }
 
-   if (!MDFNGameInfo)
-      MDFNGameInfo = &EmulatedPSX;
-
    if(!(LoadCD(&CDInterfaces)))
    {
       for(unsigned i = 0; i < CDInterfaces.size(); i++)
@@ -3864,7 +3858,6 @@ static bool MDFNI_LoadCD(const char *devicename)
       disk_control_ext_info.image_paths.clear();
       disk_control_ext_info.image_labels.clear();
 
-      MDFNGameInfo = NULL;
       return false;
    }
 
@@ -3910,7 +3903,6 @@ error:
    if (GameFile)
       filestream_close(GameFile);
    GameFile     = NULL;
-   MDFNGameInfo = NULL;
 
    return false;
 }
@@ -4101,9 +4093,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game(void)
 {
-   if(!MDFNGameInfo)
-      return;
-
    rsx_intf_close();
 
    MDFN_FlushGameCheats(0);
@@ -4111,8 +4100,6 @@ void retro_unload_game(void)
    CloseGame();
 
    MDFNMP_Kill();
-
-   MDFNGameInfo = NULL;
 
    for(unsigned i = 0; i < CDInterfaces.size(); i++)
       delete CDInterfaces[i];
