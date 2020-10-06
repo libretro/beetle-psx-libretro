@@ -1,7 +1,6 @@
 #include "rsx/rsx_lib_vulkan.h"
 
 #include <stdint.h>
-#include <stdio.h>
 
 #include <functional>
 #include <vector>

@@ -26,7 +26,7 @@ struct line_fxp_step
 #define LINE_XY_FRACTBITS  32
 #define LINE_RGB_FRACTBITS 12
 
-template<bool goraud>
+template<bool gouraud>
 static INLINE void line_point_to_fixed_point_coord(const line_point *point,
       const line_fxp_step *step, line_fxp_coord *coord)
 {
@@ -38,7 +38,7 @@ static INLINE void line_point_to_fixed_point_coord(const line_point *point,
    if(step->dy_dk < 0)
       coord->y -= 1024;
 
-   if(goraud)
+   if(gouraud)
    {
       coord->r = (point->r << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
       coord->g = (point->g << LINE_RGB_FRACTBITS) | (1 << (LINE_RGB_FRACTBITS - 1));
@@ -58,7 +58,7 @@ static INLINE int64_t line_divide(int64_t delta, int32_t dk)
    return(delta / dk);
 }
 
-template<bool goraud>
+template<bool gouraud>
 static INLINE void line_points_to_fixed_point_step(const line_point *point0,
       const line_point *point1, const int32_t dk, line_fxp_step *step)
 {
@@ -67,7 +67,7 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
       step->dx_dk = 0;
       step->dy_dk = 0;
 
-      if(goraud)
+      if(gouraud)
       {
          step->dr_dk = 0;
          step->dg_dk = 0;
@@ -79,7 +79,7 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
    step->dx_dk = line_divide(point1->x - point0->x, dk);
    step->dy_dk = line_divide(point1->y - point0->y, dk);
 
-   if(goraud)
+   if(gouraud)
    {
       step->dr_dk = (int32_t)((uint32_t)(point1->r - point0->r) << LINE_RGB_FRACTBITS) / dk;
       step->dg_dk = (int32_t)((uint32_t)(point1->g - point0->g) << LINE_RGB_FRACTBITS) / dk;
@@ -87,13 +87,13 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
    }
 }
 
-template<bool goraud>
+template<bool gouraud>
 static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 {
    point->x += step->dx_dk;
    point->y += step->dy_dk;
 
-   if(goraud)
+   if(gouraud)
    {
       point->r += step->dr_dk;
       point->g += step->dg_dk;
@@ -101,7 +101,7 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
    }
 }
 
-template<bool goraud, int BlendMode, bool MaskEval_TA>
+template<bool gouraud, int BlendMode, bool MaskEval_TA>
 static void DrawLine(PS_GPU *gpu, line_point *points)
 {
    line_fxp_coord cur_point;
@@ -115,8 +115,8 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
 
    gpu->DrawTimeAvail -= k * 2;
 
-   line_points_to_fixed_point_step<goraud>(&points[0], &points[1], k, &step);
-   line_point_to_fixed_point_coord<goraud>(&points[0], &step, &cur_point);
+   line_points_to_fixed_point_step<gouraud>(&points[0], &points[1], k, &step);
+   line_point_to_fixed_point_coord<gouraud>(&points[0], &step, &cur_point);
 
    for(int32_t i = 0; i <= k; i++)  // <= is not a typo.
    {
@@ -129,7 +129,7 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
          uint8_t r, g, b;
          uint16_t pix = 0x8000;
 
-         if(goraud)
+         if(gouraud)
          {
             r = cur_point.r >> LINE_RGB_FRACTBITS;
             g = cur_point.g >> LINE_RGB_FRACTBITS;
@@ -158,11 +158,11 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
             PlotNativePixel<BlendMode, MaskEval_TA, false>(gpu, x, y, pix);
       }
 
-      AddLineStep<goraud>(&cur_point, &step);
+      AddLineStep<gouraud>(&cur_point, &step);
    }
 }
 
-template<bool polyline, bool goraud, int BlendMode, bool MaskEval_TA>
+template<bool polyline, bool gouraud, int BlendMode, bool MaskEval_TA>
 static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 {
    line_point points[2];
@@ -187,7 +187,7 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
       cb++;
    }
 
-   if(goraud)
+   if(gouraud)
    {
       points[1].r = (*cb >> 0) & 0xFF;
       points[1].g = (*cb >> 8) & 0xFF;
@@ -240,5 +240,5 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 #endif
 
    if (rsx_intf_has_software_renderer())
-      DrawLine<goraud, BlendMode, MaskEval_TA>(gpu, points);
+      DrawLine<gouraud, BlendMode, MaskEval_TA>(gpu, points);
 }

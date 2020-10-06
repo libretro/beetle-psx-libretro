@@ -109,11 +109,11 @@ int SIO_StateAction(void *data, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
-      SFVAR(Status),
-      SFVAR(Mode),
-      SFVAR(Control),
-      SFVAR(BaudRate),
-      SFVAR(DataBuffer),
+      SFVARN(Status, "Status"),
+      SFVARN(Mode, "Mode"),
+      SFVARN(Control, "Control"),
+      SFVARN(BaudRate, "BaudRate"),
+      SFVARN(DataBuffer, "DataBuffer"),
 
       SFEND
    };

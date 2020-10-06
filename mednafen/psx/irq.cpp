@@ -38,9 +38,9 @@ int IRQ_StateAction(void *data, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
-      SFVAR(Asserted),
-      SFVAR(Mask),
-      SFVAR(Status),
+      SFVARN(Asserted, "Asserted"),
+      SFVARN(Mask, "Mask"),
+      SFVARN(Status, "Status"),
       SFEND
    };
    int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "IRQ");

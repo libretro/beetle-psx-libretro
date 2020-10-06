@@ -487,15 +487,15 @@ int TIMER_StateAction(void *sm, const unsigned load, const bool data_only)
       SFVARN(Timers[n].Counter, #n "Counter"),     \
       SFVARN(Timers[n].Target, #n "Target"),       \
       SFVARN(Timers[n].Div8Counter, #n "Div8Counter"),   \
-      SFVARN(Timers[n].IRQDone, #n "IRQDone"),     \
+      SFVARN_BOOL(Timers[n].IRQDone, #n "IRQDone"),     \
       SFVARN(Timers[n].DoZeCounting, #n "DoZeCounting")
       SFTIMER(0),
       SFTIMER(1),
       SFTIMER(2),
 #undef SFTIMER
 
-      SFVAR(vblank),
-      SFVAR(hretrace),
+      SFVARN_BOOL(vblank, "vblank"),
+      SFVARN_BOOL(hretrace, "hretrace"),
 
       SFEND
    };
