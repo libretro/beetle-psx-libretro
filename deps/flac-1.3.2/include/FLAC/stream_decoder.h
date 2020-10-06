@@ -531,7 +531,7 @@ typedef FLAC__StreamDecoderReadStatus (*FLAC__StreamDecoderReadCallback)(const F
  *   FILE *file = ((MyClientData*)client_data)->file;
  *   if(file == stdin)
  *     return FLAC__STREAM_DECODER_SEEK_STATUS_UNSUPPORTED;
- *   else if(fseeko(file, (off_t)absolute_byte_offset, SEEK_SET) < 0)
+ *   else if(fseek_wrap(file, (off_t)absolute_byte_offset, SEEK_SET) < 0)
  *     return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
  *   else
  *     return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
@@ -567,7 +567,7 @@ typedef FLAC__StreamDecoderSeekStatus (*FLAC__StreamDecoderSeekCallback)(const F
  *   off_t pos;
  *   if(file == stdin)
  *     return FLAC__STREAM_DECODER_TELL_STATUS_UNSUPPORTED;
- *   else if((pos = ftello(file)) < 0)
+ *   else if((pos = ftell_wrap(file)) < 0)
  *     return FLAC__STREAM_DECODER_TELL_STATUS_ERROR;
  *   else {
  *     *absolute_byte_offset = (FLAC__uint64)pos;

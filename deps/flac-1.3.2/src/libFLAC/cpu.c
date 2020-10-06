@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && _MSC_VER > 1310
 #  include <intrin.h> /* for __cpuid() and _xgetbv() */
 #endif
 
@@ -50,12 +50,11 @@
 #ifdef DEBUG
 #include <stdio.h>
 
-#define dfprintf fprintf
-#else
 /* This is bad practice, it should be a static void empty function */
-#define dfprintf(file, format, ...)
+static int dfprintf(FILE *stream, const char *format, ...)
+{
+}
 #endif
-
 
 #if defined FLAC__CPU_IA32
 /* these are flags in EDX of CPUID AX=00000001 */
@@ -88,7 +87,7 @@ cpu_xgetbv_x86(void)
 	return (uint32_t)_xgetbv(0);
 #elif defined __GNUC__
 	uint32_t lo, hi;
-	__asm__ volatile (".byte 0x0f, 0x01, 0xd0" : "=a"(lo), "=d"(hi) : "c" (0));
+	asm volatile (".byte 0x0f, 0x01, 0xd0" : "=a"(lo), "=d"(hi) : "c" (0));
 	return lo;
 #else
 	return 0;
@@ -138,6 +137,7 @@ ia32_cpu_info (FLAC__CPUInfo *info)
 		info->ia32.avx2  = (flags_ebx & FLAC__CPUINFO_IA32_CPUID_AVX2   ) ? true : false;
 	}
 
+#ifdef DEBUG
 	dfprintf(stderr, "CPU info (IA-32):\n");
 	dfprintf(stderr, "  CMOV ....... %c\n", info->ia32.cmov    ? 'Y' : 'n');
 	dfprintf(stderr, "  MMX ........ %c\n", info->ia32.mmx     ? 'Y' : 'n');
@@ -153,6 +153,7 @@ ia32_cpu_info (FLAC__CPUInfo *info)
 		dfprintf(stderr, "  FMA ........ %c\n", info->ia32.fma     ? 'Y' : 'n');
 		dfprintf(stderr, "  AVX2 ....... %c\n", info->ia32.avx2    ? 'Y' : 'n');
 	}
+#endif
 
 	/*
 	 * now have to check for OS support of AVX instructions
@@ -164,9 +165,11 @@ ia32_cpu_info (FLAC__CPUInfo *info)
 		info->ia32.fma     = false;
 	}
 
-	if (FLAC__HAS_X86INTRIN && FLAC__AVX_SUPPORTED) {
+#ifdef DEBUG
+	if (FLAC__HAS_X86INTRIN && FLAC__AVX_SUPPORTED)
 		dfprintf(stderr, "  AVX OS sup . %c\n", info->ia32.avx ? 'Y' : 'n');
-	}
+#endif
+
 #else
 	info->use_asm = false;
 #endif
@@ -199,6 +202,7 @@ x86_64_cpu_info (FLAC__CPUInfo *info)
 		info->x86.avx2  = (flags_ebx & FLAC__CPUINFO_IA32_CPUID_AVX2   ) ? true : false;
 	}
 
+#ifdef DEBUG
 	dfprintf(stderr, "CPU info (x86-64):\n");
 	dfprintf(stderr, "  SSE3 ....... %c\n", info->x86.sse3  ? 'Y' : 'n');
 	dfprintf(stderr, "  SSSE3 ...... %c\n", info->x86.ssse3 ? 'Y' : 'n');
@@ -210,6 +214,7 @@ x86_64_cpu_info (FLAC__CPUInfo *info)
 		dfprintf(stderr, "  FMA ........ %c\n", info->x86.fma   ? 'Y' : 'n');
 		dfprintf(stderr, "  AVX2 ....... %c\n", info->x86.avx2  ? 'Y' : 'n');
 	}
+#endif
 
 	/*
 	 * now have to check for OS support of AVX instructions
@@ -221,9 +226,11 @@ x86_64_cpu_info (FLAC__CPUInfo *info)
 		info->x86.fma     = false;
 	}
 
-	if (FLAC__AVX_SUPPORTED) {
+#ifdef DEBUG
+	if (FLAC__AVX_SUPPORTED)
 		dfprintf(stderr, "  AVX OS sup . %c\n", info->x86.avx ? 'Y' : 'n');
-	}
+#endif
+
 #else
 	/* Silence compiler warnings. */
 	(void) info;

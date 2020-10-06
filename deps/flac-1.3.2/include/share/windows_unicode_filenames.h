@@ -55,7 +55,11 @@ int flac_internal_utime_utf8(const char *filename, struct utimbuf *times);
 int flac_internal_unlink_utf8(const char *filename);
 int flac_internal_rename_utf8(const char *oldname, const char *newname);
 
+#ifdef _XBOX
+#include <xtl.h>
+#else
 #include <windows.h>
+#endif
 HANDLE WINAPI flac_internal_CreateFile_utf8(const char *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
 #define CreateFile_utf8 flac_internal_CreateFile_utf8
 

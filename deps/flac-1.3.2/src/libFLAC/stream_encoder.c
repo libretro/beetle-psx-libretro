@@ -4459,12 +4459,9 @@ FLAC__StreamEncoderReadStatus file_read_callback_(const FLAC__StreamEncoder *enc
 
 FLAC__StreamEncoderSeekStatus file_seek_callback_(const FLAC__StreamEncoder *encoder, FLAC__uint64 absolute_byte_offset, void *client_data)
 {
-	(void)client_data;
-
-	if(fseeko(encoder->private_->file, (FLAC__off_t)absolute_byte_offset, SEEK_SET) < 0)
+	if(fseek_wrap(encoder->private_->file, (FLAC__off_t)absolute_byte_offset, SEEK_SET) < 0)
 		return FLAC__STREAM_ENCODER_SEEK_STATUS_ERROR;
-	else
-		return FLAC__STREAM_ENCODER_SEEK_STATUS_OK;
+   return FLAC__STREAM_ENCODER_SEEK_STATUS_OK;
 }
 
 FLAC__StreamEncoderTellStatus file_tell_callback_(const FLAC__StreamEncoder *encoder, FLAC__uint64 *absolute_byte_offset, void *client_data)
@@ -4473,7 +4470,7 @@ FLAC__StreamEncoderTellStatus file_tell_callback_(const FLAC__StreamEncoder *enc
 
 	(void)client_data;
 
-	offset = ftello(encoder->private_->file);
+	offset = ftell_wrap(encoder->private_->file);
 
 	if(offset < 0) {
 		return FLAC__STREAM_ENCODER_TELL_STATUS_ERROR;

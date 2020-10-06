@@ -38,7 +38,7 @@
 
 #include "share/compat.h"
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && _MSC_VER > 1310
 #include <intrin.h> /* for _BitScanReverse* */
 #endif
 
