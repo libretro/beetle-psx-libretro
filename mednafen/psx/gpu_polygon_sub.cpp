@@ -39,12 +39,12 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	{
 		// It might be faster to do more direct checking here, but the code below handles primitives in any order
 		// and orientation, and is far more SIMD-friendly if needed.
-		float abx = vertices[1].precise[0] - vertices[0].precise[0];
-		float aby = vertices[1].precise[1] - vertices[0].precise[1];
-		float bcx = vertices[2].precise[0] - vertices[1].precise[0];
-		float bcy = vertices[2].precise[1] - vertices[1].precise[1];
-		float cax = vertices[0].precise[0] - vertices[2].precise[0];
-		float cay = vertices[0].precise[1] - vertices[2].precise[1];
+		float abx = vertices[1].x - vertices[0].x;
+		float aby = vertices[1].y - vertices[0].y;
+		float bcx = vertices[2].x - vertices[1].x;
+		float bcy = vertices[2].y - vertices[1].y;
+		float cax = vertices[0].x - vertices[2].x;
+		float cay = vertices[0].y - vertices[2].y;
 
 		// Compute static derivatives, just assume W is uniform across the primitive
 		// and that the plane equation remains the same across the quad.
