@@ -161,7 +161,7 @@
 #endif
 
 #if defined(_WIN32)
-#if !defined(_MSC_VER) || (defined(_MSC_VER) && _MSC_VER >= 1400)
+#if defined(_MSC_VER) && _MSC_VER >= 1400
 #define ATLEAST_VC2005
 #endif
 #endif
@@ -177,7 +177,7 @@
 #include <vfs/vfs_implementation_cdrom.h>
 #endif
 
-#if (defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE - 0) >= 200112) || (defined(__POSIX_VISIBLE) && __POSIX_VISIBLE >= 200112) || (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112) || __USE_LARGEFILE
+#if (defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE - 0) >= 200112) || (defined(__POSIX_VISIBLE) && __POSIX_VISIBLE >= 200112) || (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112) || __USE_LARGEFILE || (defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 64)
 #ifndef HAVE_64BIT_OFFSETS
 #define HAVE_64BIT_OFFSETS
 #endif
@@ -251,7 +251,7 @@ int64_t retro_vfs_file_seek_internal(
    }
 #endif
 
-   if (lseek(stream->fd, offset, whence) < 0)
+   if (lseek(stream->fd, (off_t)offset, whence) < 0)
       return -1;
 
    return 0;
@@ -446,7 +446,14 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
        */
       /* TODO: this is only useful for a few platforms, 
        * find which and add ifdef */
-#if !defined(PSP)
+#if defined(_3DS)
+      if (stream->scheme != VFS_SCHEME_CDROM)
+      {
+         stream->buf = (char*)calloc(1, 0x10000);
+         if (stream->fp)
+            setvbuf(stream->fp, stream->buf, _IOFBF, 0x10000);
+      }
+#elif !defined(PSP)
       if (stream->scheme != VFS_SCHEME_CDROM)
       {
          stream->buf = (char*)calloc(1, 0x4000);
@@ -610,7 +617,7 @@ int64_t retro_vfs_file_truncate_impl(libretro_vfs_implementation_file *stream, i
    if (_chsize(_fileno(stream->fp), length) != 0)
       return -1;
 #elif !defined(VITA) && !defined(PSP) && !defined(PS2) && !defined(ORBIS) && (!defined(SWITCH) || defined(HAVE_LIBNX))
-   if (ftruncate(fileno(stream->fp), length) != 0)
+   if (ftruncate(fileno(stream->fp), (off_t)length) != 0)
       return -1;
 #endif
 
@@ -968,6 +975,40 @@ int retro_vfs_stat_impl(const char *path, int32_t *size)
       *size = (int32_t)buf.st_size;
 
    is_dir = (file_info & FILE_ATTRIBUTE_DIRECTORY);
+
+#elif defined(GEKKO)
+   /* On GEKKO platforms, paths cannot have
+    * trailing slashes - we must therefore
+    * remove them */
+   char *path_buf = NULL;
+   int stat_ret   = -1;
+   struct stat stat_buf;
+   size_t len;
+
+   if (string_is_empty(path))
+      return 0;
+
+   path_buf = strdup(path);
+   if (!path_buf)
+      return 0;
+
+   len = strlen(path_buf);
+   if (len > 0)
+      if (path_buf[len - 1] == '/')
+         path_buf[len - 1] = '\0';
+
+   stat_ret = stat(path_buf, &stat_buf);
+   free(path_buf);
+
+   if (stat_ret < 0)
+      return 0;
+
+   if (size)
+      *size             = (int32_t)stat_buf.st_size;
+
+   is_dir               = S_ISDIR(stat_buf.st_mode);
+   is_character_special = S_ISCHR(stat_buf.st_mode);
+
 #else
    /* Every other platform */
    struct stat buf;
@@ -1017,6 +1058,28 @@ int retro_vfs_mkdir_impl(const char *dir)
    int ret = orbisMkdir(dir, 0755);
 #elif defined(__QNX__)
    int ret = mkdir(dir, 0777);
+#elif defined(GEKKO)
+   /* On GEKKO platforms, mkdir() fails if
+    * the path has a trailing slash. We must
+    * therefore remove it. */
+   int ret = -1;
+   if (!string_is_empty(dir))
+   {
+      char *dir_buf = strdup(dir);
+
+      if (dir_buf)
+      {
+         size_t len = strlen(dir_buf);
+
+         if (len > 0)
+            if (dir_buf[len - 1] == '/')
+               dir_buf[len - 1] = '\0';
+
+         ret = mkdir(dir_buf, 0750);
+
+         free(dir_buf);
+      }
+   }
 #else
    int ret = mkdir(dir, 0750);
 #endif

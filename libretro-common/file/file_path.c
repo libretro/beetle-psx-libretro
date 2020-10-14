@@ -1010,7 +1010,7 @@ void fill_pathname_expand_special(char *out_path,
             retro_assert(src_size < size);
 
             out_path += src_size;
-            size -= src_size;
+            size     -= src_size;
          }
 
          in_path += 2;
@@ -1100,8 +1100,7 @@ void fill_pathname_abbreviate_special(char *out_path,
 
          if (!PATH_CHAR_IS_SLASH(*in_path))
          {
-            retro_assert(strlcpy(out_path,
-                     PATH_DEFAULT_SLASH(), size) < size);
+            strcpy_literal(out_path, PATH_DEFAULT_SLASH());
             out_path++;
             size--;
          }
@@ -1267,30 +1266,28 @@ void fill_pathname_application_dir(char *s, size_t len)
 void fill_pathname_home_dir(char *s, size_t len)
 {
 #ifdef __WINRT__
-   strlcpy(s, uwp_dir_data, len);
+   const char *home = uwp_dir_data;
 #else
    const char *home = getenv("HOME");
+#endif
    if (home)
       strlcpy(s, home, len);
    else
       *s = 0;
-#endif
 }
 #endif
 
 bool is_path_accessible_using_standard_io(const char *path)
 {
-   bool result                = true;
 #ifdef __WINRT__
-   size_t         path_sizeof = PATH_MAX_LENGTH * sizeof(char);
-   char *relative_path_abbrev = (char*)malloc(path_sizeof);
-   fill_pathname_abbreviate_special(relative_path_abbrev, path, path_sizeof);
-
-   result = (strlen(relative_path_abbrev) >= 2 )
-      && (relative_path_abbrev[0] == ':' || relative_path_abbrev[0] == '~') 
+   char relative_path_abbrev[PATH_MAX_LENGTH];
+   fill_pathname_abbreviate_special(relative_path_abbrev,
+         path, sizeof(relative_path_abbrev));
+   return (strlen(relative_path_abbrev) >= 2 )
+      &&  (    relative_path_abbrev[0] == ':'
+            || relative_path_abbrev[0] == '~')
       && PATH_CHAR_IS_SLASH(relative_path_abbrev[1]);
-
-   free(relative_path_abbrev);
+#else
+   return true;
 #endif
-   return result;
 }
