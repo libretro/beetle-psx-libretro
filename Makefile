@@ -655,7 +655,6 @@ ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
 	@$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(GL_LIB) $(LIBS)
-	@echo "LD $(TARGET)"
 endif
 
 %.o: %.cpp
