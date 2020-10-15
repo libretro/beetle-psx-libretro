@@ -30,22 +30,12 @@ class SimpleFIFO
   return(size - in_count);
  }
 
- INLINE uint8 ReadUnit(bool peek)
+ INLINE uint8 ReadByte(void)
  {
-  uint8 ret = data[read_pos];
-
-  if(!peek)
-  {
-     read_pos = (read_pos + 1) & (size - 1);
-     in_count--;
-  }
-
-  return(ret);
- }
-
- INLINE uint8 ReadByte(bool peek)
- {
-    return(ReadUnit(peek));
+    uint8 ret = data[read_pos];
+    read_pos  = (read_pos + 1) & (size - 1);
+    in_count--;
+    return(ret);
  }
 
  INLINE void Write(const uint8 *happy_data, uint32 happy_count)
@@ -61,14 +51,11 @@ class SimpleFIFO
     }
  }
 
- INLINE void WriteUnit(const uint8& wr_data)
+ INLINE void WriteByte(const uint8 wr_data)
  {
-  Write(&wr_data, 1);
- }
-
- INLINE void WriteByte(const uint8& wr_data)
- {
-  Write(&wr_data, 1);
+    data[write_pos] = wr_data;
+    write_pos       = (write_pos + 1) & (size - 1);
+    in_count++;
  }
 
 
