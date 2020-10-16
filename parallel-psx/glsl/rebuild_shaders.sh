@@ -13,6 +13,7 @@ mkdir -p prebuilt
 
 # Primitives shaders
 "$GLSLC" -o prebuilt/flat.vert.inc -mfmt=c primitive.vert
+"$GLSLC" -o prebuilt/flat.unscaled.vert.inc -mfmt=c -DUNSCALED primitive.vert
 "$GLSLC" -o prebuilt/flat.frag.inc -mfmt=c primitive.frag
 "$GLSLC" -o prebuilt/textured.vert.inc -mfmt=c -DTEXTURED primitive.vert
 "$GLSLC" -o prebuilt/textured.unscaled.vert.inc -mfmt=c -DTEXTURED -DUNSCALED primitive.vert

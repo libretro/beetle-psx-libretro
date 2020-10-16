@@ -45,6 +45,9 @@ static const uint32_t resolve_msaa_to_unscaled[] =
 static const uint32_t flat_vert[] =
 #include "flat.vert.inc"
     ;
+static const uint32_t flat_unscaled_vert[] =
+#include "flat.unscaled.vert.inc"
+    ;
 static const uint32_t flat_frag[] =
 #include "flat.frag.inc"
     ;
