@@ -241,7 +241,11 @@ void Renderer::set_filter_mode(FilterMode mode)
 
 void Renderer::init_primitive_pipelines()
 {
-	pipelines.flat = device.request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+	if (msaa > 1 || scaling > 1)
+		pipelines.flat = device.request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+	else
+		pipelines.flat = device.request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
+
 	if (msaa > 1)
 	{
 		pipelines.textured_scaled = device.request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
@@ -276,10 +280,10 @@ void Renderer::init_primitive_feedback_pipelines()
 	}
 	else
 	{
-		pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
-				feedback_flat_frag, sizeof(feedback_flat_frag));
 		if (scaling > 1)
 		{
+			pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
+					feedback_flat_frag, sizeof(feedback_flat_frag));
 			pipelines.textured_masked_scaled = device.request_program(textured_vert, sizeof(textured_vert),
 					feedback_frag, sizeof(feedback_frag));
 			pipelines.textured_masked_unscaled = device.request_program(textured_vert, sizeof(textured_vert),
@@ -287,6 +291,8 @@ void Renderer::init_primitive_feedback_pipelines()
 		}
 		else
 		{
+			pipelines.flat_masked = device.request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
+					feedback_flat_frag, sizeof(feedback_flat_frag));
 			pipelines.textured_masked_scaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_frag, sizeof(feedback_frag));
 			pipelines.textured_masked_unscaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
