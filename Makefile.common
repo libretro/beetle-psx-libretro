@@ -12,7 +12,7 @@ CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 LIBCHDR_INCFLAGS = \
                      -I$(DEPS_DIR)/flac-1.3.3/include \
                      -I$(DEPS_DIR)/flac-1.3.3/src/include \
-                     -I$(DEPS_DIR)/lzma-19.00/src \
+                     -I$(DEPS_DIR)/lzma-19.00/include \
                      -I$(DEPS_DIR)/libchdr/include
 LIBCHDR_SOURCES_C = \
                      $(DEPS_DIR)/flac-1.3.3/src/bitmath.c \
@@ -37,7 +37,6 @@ LIBCHDR_SOURCES_C = \
                      $(DEPS_DIR)/flac-1.3.3/src/window.c \
                      $(DEPS_DIR)/lzma-19.00/src/Alloc.c \
                      $(DEPS_DIR)/lzma-19.00/src/Bra86.c \
-                     $(DEPS_DIR)/lzma-19.00/src/Bra.c \
                      $(DEPS_DIR)/lzma-19.00/src/BraIA64.c \
                      $(DEPS_DIR)/lzma-19.00/src/CpuArch.c \
                      $(DEPS_DIR)/lzma-19.00/src/Delta.c \
@@ -46,7 +45,6 @@ LIBCHDR_SOURCES_C = \
                      $(DEPS_DIR)/lzma-19.00/src/Lzma86Enc.c \
                      $(DEPS_DIR)/lzma-19.00/src/LzmaDec.c \
                      $(DEPS_DIR)/lzma-19.00/src/LzmaEnc.c \
-                     $(DEPS_DIR)/lzma-19.00/src/LzmaLib.c \
                      $(DEPS_DIR)/lzma-19.00/src/Sort.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
@@ -193,11 +191,7 @@ ifeq ($(HAVE_CHD), 1)
       INCFLAGS += $(shell pkg-config --cflags libchdr)
       LIBS += $(shell pkg-config --libs libchdr)
    else
-      INCFLAGS += -I$(DEPS_DIR)/crypto \
-                  -I$(DEPS_DIR)/flac-1.3.3/include \
-                  -I$(DEPS_DIR)/flac-1.3.3/src/include \
-                  -I$(DEPS_DIR)/lzma-19.00/C \
-                  -I$(DEPS_DIR)/libchdr
+      INCFLAGS += $(LIBCHDR_INCFLAGS)
    endif
 endif
 
