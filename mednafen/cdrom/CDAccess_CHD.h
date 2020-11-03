@@ -4,7 +4,7 @@
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
 
-#include "chd.h"
+#include <libchdr/chd.h>
 
 class CDAccess_CHD : public CDAccess
 {
