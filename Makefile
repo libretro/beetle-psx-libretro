@@ -402,6 +402,21 @@ else ifeq ($(platform), emscripten)
       endif
    endif
 
+# Raspberry Pi 4 in 64bit mode
+else ifeq ($(platform), rpi4_64)
+   TARGET := $(TARGET_NAME)_libretro.so
+   fpic   := -fPIC
+   GREP = grep
+   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   CFLAGS   += -O3 -DNDEBUG -march=armv8-a+crc+simd -mtune=cortex-a72 -fsigned-char 
+   CXXFLAGS += -O3 -DNDEBUG -march=armv8-a+crc+simd -mtune=cortex-a72 -fsigned-char
+   LDFLAGS += $(PTHREAD_FLAGS) -ldl -lrt
+   HAVE_LIGHTREC = 1
+   FLAGS += -DHAVE_SHM
+   GLES = 1
+   GL_LIB := -lGLESv2
+   HAVE_CDROM = 0
+
 # Windows MSVC 2017 all architectures
 else ifneq (,$(findstring windows_msvc2017,$(platform)))
 
