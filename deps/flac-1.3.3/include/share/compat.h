@@ -46,20 +46,31 @@
 # include <unistd.h>
 #endif
 
-#if defined _MSC_VER || defined __BORLANDC__ || defined __MINGW32__
+#if defined(__CELLOS_LV2__)
+#define fseek_wrap fseek
+#define ftell_wrap ftell
+#elif defined _MSC_VER || defined __BORLANDC__ || defined __MINGW32__
 #include <sys/types.h> /* for off_t */
 #define FLAC__off_t __int64 /* use this instead of off_t to fix the 2 GB limit */
-#if !defined __MINGW32__
-#define fseeko _fseeki64
-#define ftello _ftelli64
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#define fseek_wrap _fseeki64
+#define ftell_wrap _ftelli64
+#elif defined(_MSC_VER) && (_MSC_VER < 1400)
+#define fseek_wrap fseek
+#define ftell_wrap ftell
 #else /* MinGW */
 #if !defined(HAVE_FSEEKO)
-#define fseeko fseeko64
-#define ftello ftello64
+#define fseek_wrap fseeko64
+#define ftell_wrap ftello64
+#else
+#define fseek_wrap fseeko
+#define ftell_wrap ftello
 #endif
 #endif
 #else
 #define FLAC__off_t off_t
+#define fseek_wrap fseeko
+#define ftell_wrap ftello
 #endif
 
 #if HAVE_INTTYPES_H
@@ -136,7 +147,7 @@
 #  endif
 #endif /* defined _MSC_VER */
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(_XBOX)
 /* All char* strings are in UTF-8 format. Added to support Unicode files on Windows */
 
 #include "share/win_utf8_io.h"
