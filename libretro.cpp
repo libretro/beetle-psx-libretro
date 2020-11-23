@@ -42,6 +42,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#include <unistd.h>            // for ftruncate
 #include <sys/stat.h>
 #include <fcntl.h>
 #endif
