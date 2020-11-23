@@ -117,9 +117,9 @@ typedef uint64_t uint64;
   #define MDFN_MAKE_GCCV(maj,min,pl) (((maj)*100*100) + ((min) * 100) + (pl))
   #define MDFN_GCC_VERSION	MDFN_MAKE_GCCV(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
 
-#ifndef INLINE
+  #ifndef INLINE
   #define INLINE inline __attribute__((always_inline))
-#endif
+  #endif
 
   #define NO_INLINE __attribute__((noinline))
 
@@ -176,7 +176,10 @@ typedef uint64_t uint64;
   // Begin MSVC
   //
 
+  #if !defined(INLINE)
   #define INLINE __forceinline
+  #endif
+
   #define NO_INLINE __declspec(noinline)
   #define NO_CLONE
 

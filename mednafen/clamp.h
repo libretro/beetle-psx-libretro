@@ -6,11 +6,8 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-static INLINE void clamp(int32_t *val, ssize_t min, ssize_t max)
+// ptrdiff_t (adopted by C99/C++) is generally a more portable version of ssize_t (POSIX only).
+static INLINE void clamp(int32_t *val, ptrdiff_t min, ptrdiff_t max)
 {
    if(*val < min)
       *val = min;

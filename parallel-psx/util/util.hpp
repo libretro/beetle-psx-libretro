@@ -39,6 +39,7 @@ extern retro_log_printf_t libretro_log;
 #define LOGI(...) do { if (::Granite::libretro_log) ::Granite::libretro_log(RETRO_LOG_INFO, __VA_ARGS__); } while(0)
 #elif defined(_MSC_VER)
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #define LOGE(...) do { \
     fprintf(stderr, "[ERROR]: " __VA_ARGS__); \
