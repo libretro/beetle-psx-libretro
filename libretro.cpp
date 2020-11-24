@@ -53,7 +53,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif /* HAVE_LIGHTREC */
 
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
-extern bool FastSaveStates;
+extern "C" bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
 static bool libretro_supports_bitmasks = false;

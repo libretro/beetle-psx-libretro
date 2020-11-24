@@ -37,7 +37,7 @@ int StateAction(StateMem *sm, int load, int data_only);
  * variables in the savestate, and are at least 20% faster.
  * Only used for internal savestates which will not be written to a file. */
 
-bool FastSaveStates = false;
+_Bool FastSaveStates = false;
 
 static INLINE void MDFN_en32lsb_(uint8_t *buf, uint32_t morp)
 {
