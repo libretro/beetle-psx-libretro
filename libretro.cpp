@@ -108,7 +108,7 @@ int memfd;
 #endif
 #endif
 
-uint32 EventCycles = 128;
+int32 EventCycles = 128;
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
