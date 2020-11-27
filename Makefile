@@ -174,7 +174,7 @@ else ifneq (,$(findstring ios,$(platform)))
    endif
    HAVE_LIGHTREC = 0
    LDFLAGS += $(IPHONEMINVER)
-   FLAGS   += $(IPHONEMINVER)
+   FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H
    CC      += $(IPHONEMINVER)
    CXX     += $(IPHONEMINVER)
 
@@ -184,6 +184,7 @@ else ifeq ($(platform), tvos-arm64)
    fpic := -fPIC
    SHARED := -dynamiclib
    HAVE_LIGHTREC = 0
+   FLAGS += -DHAVE_UNISTD_H
 
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
