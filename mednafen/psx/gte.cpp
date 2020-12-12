@@ -164,6 +164,7 @@ static uint32_t Reg23;        /* Register 23: 32bit read/write but not used for 
 // end DR
 
 extern "C" unsigned char widescreen_hack;
+extern "C" unsigned char widescreen_hack_aspect_ratio_setting;
 
 static INLINE uint8_t Sat5(int16_t cc)
 {
@@ -1184,7 +1185,24 @@ static INLINE void check_mac_overflow(int64_t value)
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float precise_z)
 {
 
-   MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00)) >> 16;
+   float widescreen_hack_aspect_ratio;
+   switch(widescreen_hack_aspect_ratio_setting)
+   {
+      case 0: // 16:10
+         widescreen_hack_aspect_ratio = 0.80f;
+         break;
+      case 1: // 16:9 (default)
+         widescreen_hack_aspect_ratio = 0.75f;
+         break;
+      case 2: // 21:9 (64:27)
+         widescreen_hack_aspect_ratio = 0.55f;
+         break;
+      case 3: // 32:9
+         widescreen_hack_aspect_ratio = 0.37f;
+         break;
+   }
+
+   MAC[0] = F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00)) >> 16;
    XY_FIFO[3].X = Lm_G(0, MAC[0]);
 
    MAC[0] = F((int64_t)OFY + IR2 * h_div_sz) >> 16;
@@ -1201,11 +1219,11 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    float fofy       = ((float)OFY / (float)(1 << 16));
 
    /* Project X and Y onto the plane */
-   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? 0.75 : 1.00);
+   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
    int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
 
    /* Increased precision calculation (sub-pixel precision) */
-   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? 0.75 : 1.00);
+   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
    uint32 value = *((uint32*)&XY_FIFO[3]);

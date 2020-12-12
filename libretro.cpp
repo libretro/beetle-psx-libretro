@@ -3179,6 +3179,35 @@ static void check_variables(bool startup)
       widescreen_hack = false;
    }
 
+   var.key = BEETLE_OPT(widescreen_hack_aspect_ratio);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "16:10"))
+      {
+         if (!startup && widescreen_hack_aspect_ratio_setting != 0)
+            has_new_geometry = true;
+         widescreen_hack_aspect_ratio_setting = 0;
+      }
+      else if (!strcmp(var.value, "16:9"))
+      {
+         if (!startup && widescreen_hack_aspect_ratio_setting != 1)
+            has_new_geometry = true;
+         widescreen_hack_aspect_ratio_setting = 1;
+      }
+      else if (!strcmp(var.value, "21:9")) // 64:27
+      {
+         if (!startup && widescreen_hack_aspect_ratio_setting != 2)
+            has_new_geometry = true;
+         widescreen_hack_aspect_ratio_setting = 2;
+      }
+      else if (!strcmp(var.value, "32:9"))
+      {
+         if (!startup && widescreen_hack_aspect_ratio_setting != 3)
+            has_new_geometry = true;
+         widescreen_hack_aspect_ratio_setting = 3;
+      }
+   }
+
    var.key = BEETLE_OPT(pal_video_timing_override);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {

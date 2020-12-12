@@ -29,6 +29,8 @@ static unsigned scaling = 4;
 // Declare extern as workaround for now to avoid variable
 // naming conflicts with beetle_psx_globals.h
 extern "C" uint8_t widescreen_hack;
+extern "C" uint8_t widescreen_hack_aspect_ratio;
+extern "C" uint8_t widescreen_hack_aspect_ratio_setting;
 extern "C" bool content_is_pal;
 extern "C" int filter_mode;
 extern "C" bool currently_interlaced;
@@ -219,7 +221,7 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
                                        content_is_pal ? initial_scanline_pal : initial_scanline,
                                        content_is_pal ? last_scanline_pal : last_scanline,
-                                       aspect_ratio_setting, show_vram, widescreen_hack);
+                                       aspect_ratio_setting, show_vram, widescreen_hack, widescreen_hack_aspect_ratio_setting);
 
    // Set retro_system_timing
    info->timing.fps = rsx_common_get_timing_fps();
@@ -249,6 +251,7 @@ void rsx_vulkan_refresh_variables(void)
    bool old_show_vram = show_vram;
    bool old_crop_overscan = crop_overscan;
    bool old_widescreen_hack = widescreen_hack;
+   unsigned old_widescreen_hack_aspect_ratio = widescreen_hack_aspect_ratio;
    bool visible_scanlines_changed = false;
 
    var.key = BEETLE_OPT(internal_resolution);

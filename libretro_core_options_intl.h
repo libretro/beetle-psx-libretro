@@ -401,6 +401,19 @@ struct retro_core_option_definition option_defs_it[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(widescreen_hack_aspect_ratio),
+      "Widescreen Mode Hack Aspect Ratio",
+      "The aspect ratio that's used by the Widescreen Mode Hack.",
+      {
+         { "16:10", NULL },
+         { "16:9",  NULL },
+         { "21:9",  NULL }, // 64:27
+         { "32:9",  NULL },
+         { NULL,    NULL },
+      },
+      "16:9"
+   },
+   {
       BEETLE_OPT(crop_overscan),
       "Taglia Overscan Orizzontale",
       "Da predefinito, i renderer aggiungono un'imbottitura orizzontale (colonne su entrambi i lati dell'immagine) per emulare le stesse barre nere generate in output video analogico da hardware PSX reali. Abilitando questa impostazione rimuove le imbottiture orizzontali.",
