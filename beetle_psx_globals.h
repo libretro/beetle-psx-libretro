@@ -16,6 +16,7 @@ extern "C" {
 
 extern bool content_is_pal;
 extern uint8_t widescreen_hack;
+extern uint8_t widescreen_hack_aspect_ratio_setting;
 extern uint8_t psx_gpu_upscale_shift;
 extern uint8_t psx_gpu_upscale_shift_hw;
 extern int line_render_mode;

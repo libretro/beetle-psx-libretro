@@ -91,7 +91,7 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
                                           MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
                                           MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"),
-                                          aspect_ratio_setting, false, widescreen_hack);
+                                          aspect_ratio_setting, false, widescreen_hack, widescreen_hack_aspect_ratio_setting);
          break;
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -876,7 +876,8 @@ double rsx_common_get_timing_fps(void)
 
 float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
-                                  int aspect_ratio_setting, bool vram_override, bool widescreen_override)
+                                  int aspect_ratio_setting, bool vram_override, bool widescreen_override,
+                                  int widescreen_hack_aspect_ratio_setting)
 {
    // Current assumptions
    //    A fixed percentage of width is cropped when crop_overscan is true
@@ -892,7 +893,17 @@ float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
       return 2.0 / 1.0;
 
    if (widescreen_override)
-      return 16.0 / 9.0;
+      switch(widescreen_hack_aspect_ratio_setting)
+      {
+         case 0:
+            return (16.0 / 10.0);
+         case 1:
+            return (16.0 / 9.0);
+         case 2:
+            return (/*21.0 / 9.0*/ 64.0 / 27.0);
+         case 3:
+            return (32.0 / 9.0);
+      }
 
    float ar = (4.0 / 3.0);
 

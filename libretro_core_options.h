@@ -582,6 +582,19 @@ struct retro_core_option_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(widescreen_hack_aspect_ratio),
+      "Widescreen Mode Hack Aspect Ratio",
+      "The aspect ratio that's used by the Widescreen Mode Hack.",
+      {
+         { "16:10", NULL },
+         { "16:9",  NULL },
+         { "21:9",  NULL }, // 64:27
+         { "32:9",  NULL },
+         { NULL,    NULL },
+      },
+      "16:9"
+   },
+   {
       BEETLE_OPT(pal_video_timing_override),
       "PAL (European) Video Timing Override",
       "Due to different standards PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override PAL timings in order to attempt to run these games with the NTSC framerate. This option has no effect when running NTSC content.",

@@ -359,6 +359,7 @@ static RetroGl static_renderer;
 static bool has_software_fb = false;
 
 extern "C" unsigned char widescreen_hack;
+extern "C" unsigned char widescreen_hack_aspect_ratio_setting;
 extern "C" bool content_is_pal;
 extern "C" int aspect_ratio_setting;
 
@@ -1666,7 +1667,8 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
                                                                            renderer->initial_scanline,
                                                           content_is_pal ? renderer->last_scanline_pal :
                                                                            renderer->last_scanline,
-                                                          aspect_ratio_setting, renderer->display_vram, widescreen_hack);
+                                                          aspect_ratio_setting, renderer->display_vram, widescreen_hack,
+                                                          widescreen_hack_aspect_ratio_setting);
 
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 
@@ -2211,16 +2213,17 @@ extern "C" bool currently_interlaced;
 static struct retro_system_av_info get_av_info(VideoClock std)
 {
    struct retro_system_av_info info;
-   unsigned int max_width    = 0;
-   unsigned int max_height   = 0;
-   uint8_t upscaling         = 1;
-   bool widescreen_hack      = false;
-   bool display_vram         = false;
-   bool crop_overscan        = false;
-   int initial_scanline_ntsc = 0;
-   int last_scanline_ntsc    = 239;
-   int initial_scanline_pal  = 0;
-   int last_scanline_pal     = 287;
+   unsigned int max_width           = 0;
+   unsigned int max_height          = 0;
+   uint8_t upscaling                = 1;
+   bool widescreen_hack             = false;
+   int widescreen_hack_aspect_ratio = 2;
+   bool display_vram                = false;
+   bool crop_overscan               = false;
+   int initial_scanline_ntsc        = 0;
+   int last_scanline_ntsc           = 239;
+   int initial_scanline_pal         = 0;
+   int last_scanline_pal            = 287;
 
    /* This function currently queries core options rather than
       checking GlRenderer state; possible to refactor? */
@@ -2290,7 +2293,8 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    info.geometry.aspect_ratio = rsx_common_get_aspect_ratio(std, crop_overscan,
                                                             std ? initial_scanline_pal : initial_scanline_ntsc,
                                                             std ? last_scanline_pal : last_scanline_ntsc,
-                                                            aspect_ratio_setting, display_vram, widescreen_hack);
+                                                            aspect_ratio_setting, display_vram, widescreen_hack,
+                                                            widescreen_hack_aspect_ratio_setting);
 
    info.timing.fps = rsx_common_get_timing_fps();
    info.timing.sample_rate = SOUND_FREQUENCY;
