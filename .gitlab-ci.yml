@@ -3,6 +3,11 @@
     JNI_PATH: .
     CORENAME: mednafen_psx
 
+.core-defs-lightrec:
+  extends: .core-defs
+  variables:
+    HAVE_LIGHTREC: 1
+
 .core-defs-hw:
   extends: .core-defs
   variables:
@@ -10,11 +15,13 @@
     HAVE_HW: 1
 
 .core-defs-hw-lightrec:
-  extends: .core-defs
+  extends: .core-defs-lightrec
+  extends: .core-defs-hw
+
+.core-defs-hw-android:
+  extends: .core-defs-hw
   variables:
-    CORENAME: mednafen_psx_hw
-    HAVE_HW: 1
-    HAVE_LIGHTREC: 1
+    PLATFORM_ARGS: APP_ABI=$ANDROID_ABI HAVE_HW=1
 
 include:
   - template: Jobs/Code-Quality.gitlab-ci.yml
@@ -31,34 +38,74 @@ stages:
   - build-static
   - test
 
-#Desktop
+##################
+## mednafen_psx ##
+##################
+
+# Desktop
 libretro-build-linux-x64:
   extends:
-    - .core-defs-hw-lightrec
     - .libretro-linux-x64-make-default
+    - .core-defs-lightrec
 
 libretro-build-windows-x64:
   extends:
-    - .core-defs-hw-lightrec
     - .libretro-windows-x64-mingw-make-default
-    
+    - .core-defs-lightrec
+
 # Android
 android-armeabi-v7a:
   extends:
-    - .core-defs-hw
     - .libretro-android-jni-armeabi-v7a
+    - .core-defs
 
 android-arm64-v8a:
   extends:
-    - .core-defs-hw
     - .libretro-android-jni-arm64-v8a
+    - .core-defs
 
 android-x86_64:
   extends:
-    - .core-defs-hw
     - .libretro-android-jni-x86_64
-    
+    - .core-defs
+
 android-x86:
   extends:
-    - .core-defs-hw
     - .libretro-android-jni-x86
+    - .core-defs
+
+#####################
+## mednafen_psx_hw ##
+#####################
+
+# Desktop
+libretro-build-linux-x64-hw:
+  extends:
+    - .libretro-linux-x64-make-default
+    - .core-defs-hw-lightrec
+
+libretro-build-windows-x64-hw:
+  extends:
+    - .libretro-windows-x64-mingw-make-default
+    - .core-defs-hw-lightrec
+
+# Android
+android-armeabi-v7a-hw:
+  extends:
+    - .libretro-android-jni-armeabi-v7a
+    - .core-defs-hw-android
+
+android-arm64-v8a-hw:
+  extends:
+    - .libretro-android-jni-arm64-v8a
+    - .core-defs-hw-android
+
+android-x86_64-hw:
+  extends:
+    - .libretro-android-jni-x86_64
+    - .core-defs-hw-android
+
+android-x86-hw:
+  extends:
+    - .libretro-android-jni-x86
+    - .core-defs-hw-android
