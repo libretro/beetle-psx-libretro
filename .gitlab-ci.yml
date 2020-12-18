@@ -18,11 +18,6 @@
   extends: .core-defs-lightrec
   extends: .core-defs-hw
 
-.core-defs-hw-android:
-  extends: .core-defs-hw
-  variables:
-    PLATFORM_ARGS: APP_ABI=$ANDROID_ABI HAVE_HW=1
-
 include:
   - template: Jobs/Code-Quality.gitlab-ci.yml
   - project: 'libretro-infrastructure/ci-templates'
@@ -93,19 +88,19 @@ libretro-build-windows-x64-hw:
 android-armeabi-v7a-hw:
   extends:
     - .libretro-android-jni-armeabi-v7a
-    - .core-defs-hw-android
+    - .core-defs-hw
 
 android-arm64-v8a-hw:
   extends:
     - .libretro-android-jni-arm64-v8a
-    - .core-defs-hw-android
+    - .core-defs-hw
 
 android-x86_64-hw:
   extends:
     - .libretro-android-jni-x86_64
-    - .core-defs-hw-android
+    - .core-defs-hw
 
 android-x86-hw:
   extends:
     - .libretro-android-jni-x86
-    - .core-defs-hw-android
+    - .core-defs-hw
