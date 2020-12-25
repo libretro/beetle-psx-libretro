@@ -1,3 +1,10 @@
+# DESCRIPTION: GitLab CI/CD for libRetro (NOT FOR GitLab-proper)
+
+##############################################################################
+################################# BOILERPLATE ################################
+##############################################################################
+
+# Core definitions
 .core-defs:
   variables:
     JNI_PATH: .
@@ -18,88 +25,111 @@
   extends: .core-defs-lightrec
   extends: .core-defs-hw
 
+# Inclusion templates, required for the build to work
 include:
-  - template: Jobs/Code-Quality.gitlab-ci.yml
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/linux-x64.yml'
+  ################################## DESKTOPS ################################
+  # Windows 64-bit
   - project: 'libretro-infrastructure/ci-templates'
     file: '/windows-x64-mingw.yml'
+
+  # Linux 64-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/linux-x64.yml'
+
+  # MacOS 64-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/osx-x64.yml'
+
+  ################################## CELLULAR ################################
+  # Android
   - project: 'libretro-infrastructure/ci-templates'
     file: '/android-jni.yml'
 
+# Stages for building
 stages:
   - build-prepare
   - build-shared
   - build-static
-  - test
 
-##################
-## mednafen_psx ##
-##################
-
-# Desktop
-libretro-build-linux-x64:
-  extends:
-    - .libretro-linux-x64-make-default
-    - .core-defs-lightrec
-
+##############################################################################
+#################################### STAGES ##################################
+##############################################################################
+#
+################################### DESKTOPS #################################
+# Windows 64-bit
 libretro-build-windows-x64:
   extends:
     - .libretro-windows-x64-mingw-make-default
     - .core-defs-lightrec
 
-# Android
-android-armeabi-v7a:
-  extends:
-    - .libretro-android-jni-armeabi-v7a
-    - .core-defs
-
-android-arm64-v8a:
-  extends:
-    - .libretro-android-jni-arm64-v8a
-    - .core-defs
-
-android-x86_64:
-  extends:
-    - .libretro-android-jni-x86_64
-    - .core-defs
-
-android-x86:
-  extends:
-    - .libretro-android-jni-x86
-    - .core-defs
-
-#####################
-## mednafen_psx_hw ##
-#####################
-
-# Desktop
-libretro-build-linux-x64-hw:
-  extends:
-    - .libretro-linux-x64-make-default
-    - .core-defs-hw-lightrec
-
+# Windows 64-bit (HW)
 libretro-build-windows-x64-hw:
   extends:
     - .libretro-windows-x64-mingw-make-default
     - .core-defs-hw-lightrec
 
-# Android
+# Linux 64-bit
+libretro-build-linux-x64:
+  extends:
+    - .libretro-linux-x64-make-default
+    - .core-defs-lightrec
+
+# Linux 64-bit (HW) 
+libretro-build-linux-x64-hw:
+  extends:
+    - .libretro-linux-x64-make-default
+    - .core-defs-hw-lightrec
+
+# MacOS 64-bit
+libretro-build-osx-x64:
+  extends:
+    - .libretro-osx-x64-make-default
+    - .core-defs
+
+################################### CELLULAR #################################
+# Android ARMv7a
+android-armeabi-v7a:
+  extends:
+    - .libretro-android-jni-armeabi-v7a
+    - .core-defs
+
+# Android ARMv7a (HW)
 android-armeabi-v7a-hw:
   extends:
     - .libretro-android-jni-armeabi-v7a
     - .core-defs-hw
 
+# Android ARMv8a
+android-arm64-v8a:
+  extends:
+    - .libretro-android-jni-arm64-v8a
+    - .core-defs
+
+# Android ARMv8a (HW)
 android-arm64-v8a-hw:
   extends:
     - .libretro-android-jni-arm64-v8a
     - .core-defs-hw
 
+# Android 64-bit x86
+android-x86_64:
+  extends:
+    - .libretro-android-jni-x86_64
+    - .core-defs
+
+# Android 64-bit x86 (HW)
 android-x86_64-hw:
   extends:
     - .libretro-android-jni-x86_64
     - .core-defs-hw
 
+# Android 32-bit x86
+android-x86:
+  extends:
+    - .libretro-android-jni-x86
+    - .core-defs
+
+# Android 32-bit x86 (HW)
 android-x86-hw:
   extends:
     - .libretro-android-jni-x86
