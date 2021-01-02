@@ -67,6 +67,18 @@ libretro-build-windows-x64-hw:
   extends:
     - .libretro-windows-x64-mingw-make-default
     - .core-defs-hw-lightrec
+    
+# Windows 32-bit
+libretro-build-windows-i686:
+  extends:
+    - .libretro-windows-i686-mingw-make-default
+    - .core-defs-lightrec
+
+# Windows 32-bit (HW)
+libretro-build-windows-i686-hw:
+  extends:
+    - .libretro-windows-i686-mingw-make-default
+    - .core-defs-hw-lightrec
 
 # Linux 64-bit
 libretro-build-linux-x64:
