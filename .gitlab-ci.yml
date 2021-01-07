@@ -172,9 +172,3 @@ libretro-build-ios-9:
   extends:
     - .libretro-ios9-make-default
     - .core-defs
-    
-# iOS 9
-libretro-build-ios-9-hw:
-  extends:
-    - .libretro-ios9-make-default
-    - .core-defs-hw
