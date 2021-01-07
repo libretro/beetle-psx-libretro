@@ -40,10 +40,18 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/linux-x64.yml'
 
+  # Linux 32-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/linux-i686.yml'
+
   ################################## CELLULAR ################################
   # Android
   - project: 'libretro-infrastructure/ci-templates'
     file: '/android-jni.yml'
+
+  # iOS 9
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/ios9.yml'
 
 # Stages for building
 stages:
@@ -86,10 +94,22 @@ libretro-build-linux-x64:
     - .libretro-linux-x64-make-default
     - .core-defs-lightrec
 
+# Linux 32-bit
+libretro-build-linux-i686:
+  extends:
+    - .libretro-linux-i686-make-default
+    - .core-defs-lightrec
+
 # Linux 64-bit (HW) 
 libretro-build-linux-x64-hw:
   extends:
     - .libretro-linux-x64-make-default
+    - .core-defs-hw-lightrec
+
+# Linux 32-bit (HW)
+libretro-build-linux-i686-hw:
+  extends:
+    - .libretro-linux-i686-make-default
     - .core-defs-hw-lightrec
 
 # MacOS 64-bit
@@ -145,4 +165,16 @@ android-x86:
 android-x86-hw:
   extends:
     - .libretro-android-jni-x86
+    - .core-defs-hw
+
+# iOS 9
+libretro-build-ios-9:
+  extends:
+    - .libretro-ios9-make-default
+    - .core-defs
+    
+# iOS 9
+libretro-build-ios-9-hw:
+  extends:
+    - .libretro-ios9-make-default
     - .core-defs-hw
