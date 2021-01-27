@@ -3,6 +3,11 @@
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include "gzguts.h"
 
 /* Local functions */
