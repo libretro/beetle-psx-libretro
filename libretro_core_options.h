@@ -1032,13 +1032,14 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(shared_memory_cards),
       "Shared Memory Cards (Restart)",
-      "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: 'Memory Card 0 Method' must be set to 'Mednafen' for shared memory cards to take effect.",
+      "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: Select accordingly to the option set in Memory Card 0 Method.",
       {
-         { "disabled", NULL },
-         { "enabled",  NULL },
+         { "none", "Disabled" },
+		 { "right", "Libretro (Right Only)" },
+         { "both",  "Mednafen (Both)" },
          { NULL, NULL },
       },
-      "disabled"
+      "none"
    },
    {
       BEETLE_OPT(analog_calibration),

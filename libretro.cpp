@@ -2343,7 +2343,7 @@ static void CloseGame(void)
                snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
             else
                snprintf(ext, sizeof(ext), "%d.mcr", i);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV_RIGHT, 0, ext);
             PSX_FIO->SaveMemcard(i, memcard);
          }
          catch(std::exception &e)
@@ -3029,6 +3029,7 @@ static bool boot = true;
 
 // shared memory cards support
 static bool shared_memorycards = false;
+static bool shared_memright = false;
 
 static bool has_new_geometry = false;
 static bool has_new_timing = false;
@@ -3619,18 +3620,27 @@ static void check_variables(bool startup)
       var.key = BEETLE_OPT(shared_memory_cards);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
-         if (!strcmp(var.value, "enabled"))
+         if (!strcmp(var.value, "both"))
          {
-            if(use_mednafen_memcard0_method)
-               shared_memorycards = true;
+            if (use_mednafen_memcard0_method)
+            {    
+		       shared_memorycards = true;
+		       shared_memright = true;
+			}
             else
                MDFND_DispMessage(3, RETRO_LOG_WARN,
                      RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                      "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
-         else if (!strcmp(var.value, "disabled"))
+		 else if (!strcmp(var.value, "right"))
          {
             shared_memorycards = false;
+			shared_memright = true;
+         }
+         else if (!strcmp(var.value, "none"))
+         {
+            shared_memorycards = false;
+			shared_memright = false;
          }
       }
    }
@@ -4280,12 +4290,12 @@ void retro_run(void)
 
             // Save contents of right memory card to previously selected index
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV_RIGHT, 0, ext);
             PSX_FIO->SaveMemcard(1, memcard, true);
 
             // Load contents of currently selected index to right memory card
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV_RIGHT, 0, ext);
             PSX_FIO->LoadMemcard(1, memcard, true);
          }
          catch (std::exception &e)
@@ -4441,7 +4451,7 @@ void retro_run(void)
             else if (i == 1) index = memcard_right_index;
 
             snprintf(ext, sizeof(ext), "%d.mcr", index);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            memcard = MDFN_MakeFName(MDFNMKF_SAV_RIGHT, 0, ext);
             PSX_FIO->SaveMemcard(i, memcard);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
@@ -4915,6 +4925,13 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
                retro_save_directory,
                retro_slash,
                shared_memorycards ? "mednafen_psx_libretro_shared" : retro_cd_base_name,
+               cd1);
+         break;
+      case MDFNMKF_SAV_RIGHT:
+         r = snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
+               retro_save_directory,
+               retro_slash,
+               shared_memright ? "mednafen_psx_libretro_shared" : retro_cd_base_name,
                cd1);
          break;
       case MDFNMKF_FIRMWARE:
