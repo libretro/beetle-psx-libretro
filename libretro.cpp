@@ -3621,12 +3621,12 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "enabled"))
          {
-            if(use_mednafen_memcard0_method)
+            // if(use_mednafen_memcard0_method)
                shared_memorycards = true;
-            else
-               MDFND_DispMessage(3, RETRO_LOG_WARN,
-                     RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
-                     "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
+            // else
+               // MDFND_DispMessage(3, RETRO_LOG_WARN,
+                     // RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                     // "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
          else if (!strcmp(var.value, "disabled"))
          {
