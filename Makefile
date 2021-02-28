@@ -6,6 +6,7 @@ HAVE_JIT = 0
 HAVE_CHD = 1
 HAVE_CDROM = 0
 HAVE_LIGHTREC = 1
+LINK_STATIC_LIBCPLUSPLUS = 1
 THREADED_RECOMPILER = 1
 LIGHTREC_DEBUG = 0
 
@@ -94,6 +95,9 @@ ifneq (,$(findstring unix,$(platform)))
    else
       GREP = grep
       SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
+   endif
+   ifeq ($(LINK_STATIC_LIBCPLUSPLUS),1)
+      LDFLAGS += static-libgcc -static-libstdc++
    endif
    ifneq ($(shell uname -p | $(GREP) -E '((i.|x)86|amd64)'),)
       IS_X86 = 1

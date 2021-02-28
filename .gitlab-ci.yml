@@ -15,15 +15,30 @@
   variables:
     HAVE_LIGHTREC: 1
 
+.core-defs-lightrec-static-libcplusplus:
+   extends: .core-defs-lightrec
+   variables:
+      LINK_STATIC_LIBCPLUSPLUS: 1
+
 .core-defs-hw:
   extends: .core-defs
   variables:
     CORENAME: mednafen_psx_hw
     HAVE_HW: 1
 
+.core-defs-hw-static-libcplusplus:
+   extends: .core-defs-hw
+   variables:
+      LINK_STATIC_LIBCPLUSPLUS: 1
+
 .core-defs-hw-lightrec:
   extends: .core-defs-lightrec
   extends: .core-defs-hw
+
+.core-defs-hw-lightrec-static-libcplusplus:
+   extends: .core-defs-hw-lightrec
+   variables:
+      LINK_STATIC_LIBCPLUSPLUS: 1
 
 # Inclusion templates, required for the build to work
 include:
@@ -100,25 +115,25 @@ libretro-build-windows-i686-hw:
 libretro-build-linux-x64:
   extends:
     - .libretro-linux-x64-make-default
-    - .core-defs-lightrec
+    - .core-defs-lightrec-static-libcplusplus
 
 # Linux 32-bit
 libretro-build-linux-i686:
   extends:
     - .libretro-linux-i686-make-default
-    - .core-defs-lightrec
+    - .core-defs-lightrec-static-libcplusplus
 
 # Linux 64-bit (HW) 
 libretro-build-linux-x64-hw:
   extends:
     - .libretro-linux-x64-make-default
-    - .core-defs-hw-lightrec
+    - .core-defs-hw-lightrec-static-libcplusplus
 
 # Linux 32-bit (HW)
 libretro-build-linux-i686-hw:
   extends:
     - .libretro-linux-i686-make-default
-    - .core-defs-hw-lightrec
+    - .core-defs-hw-lightrec-static-libcplusplus
 
 # MacOS 64-bit
 libretro-build-osx-x64:
