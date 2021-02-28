@@ -97,7 +97,7 @@ ifneq (,$(findstring unix,$(platform)))
       SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    endif
    ifeq ($(LINK_STATIC_LIBCPLUSPLUS),1)
-      LDFLAGS += static-libgcc -static-libstdc++
+      LDFLAGS += -static-libgcc -static-libstdc++
    endif
    ifneq ($(shell uname -p | $(GREP) -E '((i.|x)86|amd64)'),)
       IS_X86 = 1
