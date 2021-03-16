@@ -376,7 +376,7 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
 #if 0
             else
             {
-               if(voice->LoopAddr != voice->CurAddr)
+               if((voice->LoopAddr ^ voice->CurAddr) & ~0x7)
                {
                   PSX_DBG(PSX_DBG_FLOOD, "[SPU] Ignore: LoopAddr=0x%08x, SampLA=0x%08x\n", voice->LoopAddr, voice->CurAddr);
                }
@@ -851,6 +851,11 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
          //PSX_WARNING("[SPU] Voice %d CurPhase=%08x, pitch=%04x, CurAddr=%08x", voice_num, voice->CurPhase, voice->Pitch, voice->CurAddr);
 
+         if(voice->DecodePlayDelay)
+         {
+            voice->IgnoreSampLA = false;
+         }
+
          //
          // Decode new samples if necessary.
          //
@@ -943,8 +948,30 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          {
             if(voice->ADSR.Phase != ADSR_RELEASE)
             {
-               ReleaseEnvelope(voice);
+               // TODO/FIXME:
+               //  To fix all the missing notes in "Dragon Ball GT: Final Bout" music, !voice->DecodePlayDelay instead of
+               //  voice->DecodePlayDelay < 3 is necessary, but that would cause the length of time for which the voice off is
+               //  effectively ignored to be too long by about half a sample(rough test measurement).  That, combined with current
+               //  CPU and DMA emulation timing inaccuracies(execution generally too fast), creates a significant risk of regressions
+               //  in other games, so be very conservative for now.
+               //
+               //  Also, voice on should be ignored during the delay as well, but comprehensive tests are needed before implementing that
+               //  due to some effects that appear to occur repeatedly during the delay on a PS1 but are currently only emulated as
+               //  performed when the voice on is processed(e.g. curaddr = startaddr).
+               //
+               if(voice->DecodePlayDelay < 3)
+               {
+#if 0
+                  if(voice->DecodePlayDelay)
+                     PSX_DBG(PSX_DBG_WARNING, "[SPU] Voice %u off maybe should be ignored, but isn't due to current emulation code limitations; dpd=%u\n", voice_num, voice->DecodePlayDelay);
+#endif
+                  ReleaseEnvelope(voice);
+               }
             }
+#if 0
+            else
+               PSX_DBG(PSX_DBG_WARNING, "[SPU] Voice %u off ignored.\n", voice_num);
+#endif
          }
 
          if(VoiceOn & (1U << voice_num))
@@ -1148,6 +1175,10 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
             voice->LoopAddr = (V << 2) & 0x3FFFF;
             voice->IgnoreSampLA = true;
 #if 0
+            if(voice->DecodePlayDelay || (VoiceOn & (1U << (voice - Voices))))
+            {
+               PSX_WARNING("[SPU] Loop address for voice %u written during voice on delay.", (unsigned)(voice - Voices));
+            }
             if((voice - Voices) == 22)
             {
                SPUIRQ_DBG("Manual loop address setting for voice %d: %04x", (int)(voice - Voices), V);
