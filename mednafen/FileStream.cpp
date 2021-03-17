@@ -39,6 +39,11 @@ FileStream::FileStream(const char *path, const int mode)
 
 FileStream::~FileStream()
 {
+   if (fp)
+   {
+      filestream_close(fp);
+      fp = NULL;
+   }
 }
 
 uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
@@ -94,4 +99,5 @@ void FileStream::close(void)
    if (!fp)
       return;
    filestream_close(fp);
+   fp = NULL;
 }

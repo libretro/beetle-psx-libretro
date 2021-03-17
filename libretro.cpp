@@ -3020,9 +3020,9 @@ bool retro_load_game_special(unsigned, const struct retro_game_info *, size_t)
 }
 
 #ifdef EMSCRIPTEN
-static bool old_cdimagecache = true;
+static bool cdimagecache = true;
 #else
-static bool old_cdimagecache = false;
+static bool cdimagecache = false;
 #endif
 
 static bool boot = true;
@@ -3045,17 +3045,17 @@ static void check_variables(bool startup)
    {
       if (strcmp(var.value, "sync") == 0)
       {
-         old_cdimagecache = false;
+         cdimagecache = false;
          cd_async = false;
       }
       else if (strcmp(var.value, "async") == 0)
       {
-         old_cdimagecache = false;
+         cdimagecache = false;
          cd_async = true;
       }
       else if (strcmp(var.value, "precache") == 0)
       {
-         old_cdimagecache = true;
+         cdimagecache = true;
          cd_async = false;
       }
    }
@@ -3795,7 +3795,7 @@ static bool MDFNI_LoadCD(const char *devicename)
             image_label[0] = '\0';
 
             CDIF *image  = CDIF_Open(
-                  &success, disk_control_ext_info.image_paths[i].c_str(), false, old_cdimagecache);
+                  &success, disk_control_ext_info.image_paths[i].c_str(), false, cdimagecache);
             CDInterfaces.push_back(image);
 
             extract_basename(
@@ -3807,7 +3807,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
       {
          bool success = true;
-         CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
+         CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
          CD_IsPBP     = true;
          CDInterfaces.push_back(image);
 
@@ -3841,7 +3841,7 @@ static bool MDFNI_LoadCD(const char *devicename)
 
          image_label[0] = '\0';
 
-         CDIF *image  = CDIF_Open(&success, devicename, false, old_cdimagecache);
+         CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
          if (!success)
             return false;
 
