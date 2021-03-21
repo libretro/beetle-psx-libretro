@@ -1779,7 +1779,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                                sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio,
                                GPU.scanline == 0,
                                NULL,
-                               &GPU.surface->format,
+                               NULL,
                                0, 0, 0, 0,
                                GPU.surface->pitch32,
                                (1 << GPU.upscale_shift));
