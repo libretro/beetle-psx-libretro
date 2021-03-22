@@ -6,7 +6,6 @@ set(CHDR_VERSION_MAJOR 0)
 set(CHDR_VERSION_MINOR 1)
 
 option(BUILD_SHARED_LIBS "Build libchdr also as a shared library" ON)
-option(WITH_SYSTEM_FLAC "Use system provided FLAC library" OFF)
 option(WITH_SYSTEM_ZLIB "Use system provided zlib library" OFF)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -50,17 +49,6 @@ endif()
 # dependencies
 #--------------------------------------------------
 
-
-# flac
-if (WITH_SYSTEM_FLAC)
-  pkg_check_modules(FLAC REQUIRED flac)
-  list(APPEND PLATFORM_INCLUDES ${FLAC_INCLUDE_DIRS})
-  list(APPEND PLATFORM_LIBS ${FLAC_LIBRARIES})
-else()
-  add_subdirectory(deps/flac-1.3.3 EXCLUDE_FROM_ALL)
-  list(APPEND CHDR_LIBS FLAC)
-  list(APPEND CHDR_INCLUDES FLAC)
-endif()
 
 # lzma
 add_subdirectory(deps/lzma-19.00 EXCLUDE_FROM_ALL)
@@ -108,7 +96,13 @@ if (BUILD_SHARED_LIBS)
   target_include_directories(chdr PRIVATE ${CHDR_INCLUDES} ${PLATFORM_INCLUDES})
   target_compile_definitions(chdr PRIVATE ${CHDR_DEFS})
   target_link_libraries(chdr ${CHDR_LIBS} ${PLATFORM_LIBS})
-  target_link_options(chdr PRIVATE -Wl,--version-script ${CMAKE_SOURCE_DIR}/src/link.T -Wl,--no-undefined)
+
+  if(MSVC)
+    target_compile_definitions(chdr PUBLIC "CHD_DLL")
+    target_compile_definitions(chdr PRIVATE "CHD_DLL_EXPORTS")
+  else()
+    target_link_options(chdr PRIVATE -Wl,--version-script ${CMAKE_SOURCE_DIR}/src/link.T -Wl,--no-undefined)
+  endif()
 
   set_target_properties(chdr PROPERTIES PUBLIC_HEADER "include/libchdr/bitstream.h;include/libchdr/cdrom.h;include/libchdr/chd.h;include/libchdr/coretypes.h;include/libchdr/flac.h;include/libchdr/huffman.h")
   set_target_properties(chdr PROPERTIES VERSION "${CHDR_VERSION_MAJOR}.${CHDR_VERSION_MINOR}")

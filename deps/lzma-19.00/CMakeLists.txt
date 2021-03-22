@@ -20,7 +20,6 @@ add_library(lzma STATIC
   src/Delta.c
   src/LzFind.c
   src/Lzma86Dec.c
-  src/Lzma86Enc.c
   src/LzmaDec.c
   src/LzmaEnc.c
   src/Sort.c

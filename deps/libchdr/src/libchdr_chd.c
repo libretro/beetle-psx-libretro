@@ -430,7 +430,7 @@ static void *lzma_fast_alloc(void *p, size_t size)
 	addr = (uint32_t *)malloc(size + sizeof(uint32_t) + LZMA_MIN_ALIGNMENT_BYTES);
 	if (addr==NULL)
 		return NULL;
-	for (int scan = 0; scan < MAX_LZMA_ALLOCS; scan++)
+	for (scan = 0; scan < MAX_LZMA_ALLOCS; scan++)
 	{
 		if (codec->allocptr[scan] == NULL)
 		{
@@ -794,8 +794,7 @@ static chd_error cdfl_codec_init(void *codec, uint32_t hunkbytes)
 #endif
 
 	/* flac decoder init */
-	flac_decoder_init(&cdfl->decoder);
-	if (cdfl->decoder.decoder == NULL)
+	if (flac_decoder_init(&cdfl->decoder))
 		return CHDERR_OUT_OF_MEMORY;
 
 	return CHDERR_NONE;
@@ -1523,7 +1522,11 @@ cleanup:
 
 CHD_EXPORT chd_error chd_precache(chd_file *chd)
 {
+#ifdef _MSC_VER
+	size_t size, count;
+#else
 	ssize_t size, count;
+#endif
 
 	if (chd->file_cache == NULL)
 	{
@@ -2093,7 +2096,11 @@ static chd_error header_read(chd_file *chd, chd_header *header)
 
 static UINT8* hunk_read_compressed(chd_file *chd, UINT64 offset, size_t size)
 {
+#ifdef _MSC_VER
+	size_t bytes;
+#else
 	ssize_t bytes;
+#endif
 	if (chd->file_cache != NULL)
 	{
 		return chd->file_cache + offset;
@@ -2115,7 +2122,11 @@ static UINT8* hunk_read_compressed(chd_file *chd, UINT64 offset, size_t size)
 
 static chd_error hunk_read_uncompressed(chd_file *chd, UINT64 offset, size_t size, UINT8 *dest)
 {
+#ifdef _MSC_VER
+	size_t bytes;
+#else
 	ssize_t bytes;
+#endif
 	if (chd->file_cache != NULL)
 	{
 		memcpy(dest, chd->file_cache + offset, size);

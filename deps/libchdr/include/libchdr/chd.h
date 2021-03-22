@@ -347,7 +347,19 @@ struct _chd_verify_result
     FUNCTION PROTOTYPES
 ***************************************************************************/
 
+#ifdef _MSC_VER
+#ifdef CHD_DLL
+#ifdef CHD_DLL_EXPORTS
+#define CHD_EXPORT __declspec(dllexport)
+#else
+#define CHD_EXPORT __declspec(dllimport)
+#endif
+#else
+#define CHD_EXPORT
+#endif
+#else
 #define CHD_EXPORT __attribute__ ((visibility("default")))
+#endif
 
 /* ----- CHD file management ----- */
 
