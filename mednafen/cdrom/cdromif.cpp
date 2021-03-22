@@ -424,6 +424,12 @@ CDIF_MT::~CDIF_MT()
       SBMutex = NULL;
    }
 
+   if(SBCond)
+   {
+      scond_free(SBCond);
+      SBCond = NULL;
+   }
+
    if(disc_cdaccess)
    {
       delete disc_cdaccess;

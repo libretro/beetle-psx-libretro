@@ -23,5 +23,5 @@ add_library(zlib STATIC
   zutil.h
 )
 
-target_include_directories(zlib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_include_directories(zlib INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(zlib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(zlib INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
