@@ -341,16 +341,10 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       if (!FastSaveStates)
       {
          if (smem_read(st, toa, 1) != 1)
-         {
-            puts("Unexpected EOF");
             return(0);
-         }
 
          if (smem_read(st, toa + 1, toa[0]) != toa[0])
-         {
-            puts("Unexpected EOF?");
             return 0;
-         }
 
          toa[1 + toa[0]] = 0;
       }
@@ -370,14 +364,8 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 
          if(recorded_size != expected_size)
          {
-#ifndef NDEBUG
-            printf("Variable in save state wrong size: %s.  Need: %d, got: %d\n", toa + 1, expected_size, recorded_size);
-#endif
             if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
-            {
-               puts("Seek error");
                return(0);
-            }
          }
          else
          {
@@ -406,10 +394,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       else
       {
          if(smem_seek(st, recorded_size, SEEK_CUR) < 0)
-         {
-            puts("Seek error");
             return(0);
-         }
       }
    }
 
@@ -448,23 +433,13 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, stru
          else
          {
             if(smem_seek(st, tmp_size, SEEK_CUR) < 0)
-            {
-               puts("Chunk seek failure");
                return(0);
-            }
          }
       }
       if(smem_seek(st, -total, SEEK_CUR) < 0)
-      {
-         puts("Reverse seek error");
          return(0);
-      }
       if(!found && !section->optional) /* Not found.  We are sad! */
-      {
-         printf(
-               "Section missing:  %.32s\n", section->name);
          return(0);
-      }
    }
    else
    {
