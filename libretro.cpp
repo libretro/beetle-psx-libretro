@@ -3858,6 +3858,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       return false;
    }
 
+#ifdef DEBUG
    // Print out a track list for all discs.
    for(unsigned i = 0; i < CDInterfaces.size(); i++)
    {
@@ -3875,6 +3876,7 @@ static bool MDFNI_LoadCD(const char *devicename)
 
       log_cb(RETRO_LOG_DEBUG, "Leadout: %6d\n", toc.tracks[100].lba);
    }
+#endif
 
    if(!(LoadCD(&CDInterfaces)))
    {
