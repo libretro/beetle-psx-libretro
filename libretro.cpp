@@ -3033,11 +3033,11 @@ static bool shared_memorycards = false;
 static bool has_new_geometry = false;
 static bool has_new_timing = false;
 
+extern void PSXDitherApply(bool);
+
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
-
-   extern void PSXDitherApply(bool);
 
 #ifndef EMSCRIPTEN
    var.key = BEETLE_OPT(cd_access_method);

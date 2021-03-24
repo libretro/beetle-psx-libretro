@@ -293,10 +293,12 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
    };
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GTE");
 
+#if 0
    if(load)
    {
 
    }
+#endif
 
    return(ret);
 }

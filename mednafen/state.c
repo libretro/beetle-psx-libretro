@@ -112,12 +112,6 @@ int32_t smem_seek(StateMem *st, uint32_t offset, int whence)
       return -1;
    }
 
-   if(st->loc < 0)
-   {
-      st->loc = 0;
-      return -1;
-   }
-
    return 0;
 }
 

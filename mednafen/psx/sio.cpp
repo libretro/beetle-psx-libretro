@@ -119,10 +119,12 @@ int SIO_StateAction(void *data, int load, int data_only)
    };
    int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "SIO");
 
+#if 0
    if(load)
    {
 
    }
+#endif
 
    return(ret);
 }
