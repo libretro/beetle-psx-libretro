@@ -17,6 +17,7 @@
 
 #include "mednafen.h"
 #include "error.h"
+#include <errno.h>
 #include <string.h>
 #include <stdarg.h>
 #include <libretro.h>
@@ -42,39 +43,6 @@ MDFN_Error::~MDFN_Error()
    if(error_message)
       free(error_message);
    error_message = NULL;
-}
-
-MDFN_Error::MDFN_Error(const MDFN_Error &ze_error)
-{
-   if(ze_error.error_message)
-      error_message = strdup(ze_error.error_message);
-   else
-      error_message = NULL;
-
-   errno_code = ze_error.errno_code;
-}
-
-MDFN_Error& MDFN_Error::operator=(const MDFN_Error &ze_error)
-{
-   char *new_error_message = ze_error.error_message ? strdup(ze_error.error_message) : NULL;
-   int new_errno_code = ze_error.errno_code;
-
-   if(error_message)
-      free(error_message);
-
-   error_message = new_error_message;
-   errno_code = new_errno_code;
-
-   return(*this);
-}
-
-
-const char * MDFN_Error::what(void)
-{
-   if(!error_message)
-      return("Error allocating memory for the error message!");
-
-   return(error_message);
 }
 
 int MDFN_Error::GetErrno(void)

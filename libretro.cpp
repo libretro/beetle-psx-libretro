@@ -2348,7 +2348,6 @@ static void CloseGame(void)
          }
          catch(std::exception &e)
          {
-            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
          }
       }
    }
@@ -4264,7 +4263,6 @@ void retro_run(void)
          }
          catch (std::exception &e)
          {
-            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
          }
       }
 
@@ -4292,7 +4290,6 @@ void retro_run(void)
          }
          catch (std::exception &e)
          {
-            log_cb(RETRO_LOG_ERROR, "%s\n", e.what());
          }
       }
    }
