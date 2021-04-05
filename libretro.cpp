@@ -3731,14 +3731,15 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
 {
    std::string dir_path;
    char linebuf[2048];
-   FILE *fp = fopen(path.c_str(), "rb");
+   RFILE *fp = filestream_open(path.c_str(), RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
    if (fp == NULL)
       return;
 
    MDFN_GetFilePathComponents(path, &dir_path);
 
-   while(fgets(linebuf, sizeof(linebuf), fp) != NULL)
+   while(filestream_gets(fp, linebuf, sizeof(linebuf)) != NULL)
    {
       std::string efp;
 
@@ -3771,7 +3772,7 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
    }
 
 end:
-   fclose(fp);
+   filestream_close(fp);
 }
 
 // TODO: LoadCommon()
