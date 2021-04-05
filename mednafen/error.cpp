@@ -37,14 +37,6 @@ MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...)
 }
 
 
-MDFN_Error::MDFN_Error(const ErrnoHolder &enh)
-{
-   errno_code = enh.Errno();
-
-   error_message = strdup(enh.StrError());
-}
-
-
 MDFN_Error::~MDFN_Error()
 {
    if(error_message)
@@ -89,34 +81,3 @@ int MDFN_Error::GetErrno(void)
 {
    return(errno_code);
 }
-
-static const char *srr_wrap(int ret, const char *local_strerror)
-{
-   if(ret == -1)
-      return("ERROR IN strerror_r()!!!");
-
-   return(local_strerror);
-}
-
-static const char *srr_wrap(const char *ret, const char *local_strerror)
-{
-   if(ret == NULL)
-      return("ERROR IN strerror_r()!!!");
-
-   return(ret);
-}
-
-void ErrnoHolder::SetErrno(int the_errno)
-{
-   local_errno = the_errno;
-
-   if(the_errno == 0)
-      local_strerror[0] = 0;
-   else
-   {
-      strncpy(local_strerror, strerror(the_errno), 255);
-
-      local_strerror[255] = 0;
-   }
-}
-
