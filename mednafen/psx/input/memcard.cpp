@@ -131,10 +131,11 @@ InputDevice_Memcard::~InputDevice_Memcard()
 
 void InputDevice_Memcard::Power(void)
 {
+   presence_new = true;
+   memset(rw_buffer, 0, sizeof(rw_buffer));
+   write_xor = 0;
+
    dtr = 0;
-
-   //buttons[0] = buttons[1] = 0;
-
    command_phase = 0;
 
    bitpos = 0;
@@ -142,14 +143,12 @@ void InputDevice_Memcard::Power(void)
    receive_buffer = 0;
 
    command = 0;
+   addr = 0;
+   calced_xor = 0;
 
    transmit_buffer = 0;
 
    transmit_count = 0;
-
-   addr = 0;
-
-   presence_new = true;
 }
 
 int InputDevice_Memcard::StateAction(StateMem* sm, int load, int data_only, const char* section_name)
