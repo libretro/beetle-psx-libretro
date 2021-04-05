@@ -26,8 +26,6 @@ extern retro_log_printf_t log_cb;
 
 MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...)
 {
-   errno_code = errno_code_new;
-
    va_list ap;
    va_start(ap, format);
    error_message = (char*)malloc(4096 * sizeof(char));
@@ -43,9 +41,4 @@ MDFN_Error::~MDFN_Error()
    if(error_message)
       free(error_message);
    error_message = NULL;
-}
-
-int MDFN_Error::GetErrno(void)
-{
-   return(errno_code);
 }

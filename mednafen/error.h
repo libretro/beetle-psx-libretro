@@ -7,20 +7,12 @@
 
 class MDFN_Error
 {
- public:
-
- MDFN_Error();
-
- MDFN_Error(int errno_code_new, const char *format, ...);
-
- ~MDFN_Error();
-
- int GetErrno(void);
-
- private:
-
- int errno_code;
- char *error_message;
+   public:
+      MDFN_Error();
+      MDFN_Error(int errno_code_new, const char *format, ...);
+      ~MDFN_Error();
+   private:
+      char *error_message;
 };
 
 #endif
