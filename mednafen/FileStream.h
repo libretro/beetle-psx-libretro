@@ -30,7 +30,7 @@ class FileStream : public Stream
       FileStream(const char *path, const int mode);
       virtual ~FileStream();
 
-      virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true);
+      virtual uint64_t read(void *data, uint64_t count);
       virtual void write(const void *data, uint64_t count);
       virtual void seek(int64_t offset, int whence);
       virtual uint64_t tell(void);

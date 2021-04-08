@@ -116,7 +116,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
       fp = new FileStream(path, MODE_READ);
 
    // check for valid pbp
-   if(fp->read(magic, 4, false) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
+   if(fp->read(magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
    {
       log_cb(RETRO_LOG_ERROR, "Invalid PBP header: %s\n", path);
       return false;

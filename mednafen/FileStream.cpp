@@ -38,7 +38,7 @@ FileStream::~FileStream()
    }
 }
 
-uint64_t FileStream::read(void *data, uint64_t count, bool error_on_eos)
+uint64_t FileStream::read(void *data, uint64_t count)
 {
    if (!fp)
       return 0;

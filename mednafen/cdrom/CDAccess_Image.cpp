@@ -394,7 +394,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    {
       uint8 bom_tmp[3];
 
-      if(fp.read(bom_tmp, 3, false) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
+      if(fp.read(bom_tmp, 3) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
       {
          log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
       }

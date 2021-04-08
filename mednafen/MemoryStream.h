@@ -40,7 +40,7 @@ class MemoryStream : public Stream
  virtual uint8 *map(void);
  virtual void unmap(void);
 
- virtual uint64 read(void *data, uint64 count, bool error_on_eos = true);
+ virtual uint64 read(void *data, uint64 count);
  virtual void write(const void *data, uint64 count);
  virtual void seek(int64 offset, int whence);
  virtual uint64_t tell(void);

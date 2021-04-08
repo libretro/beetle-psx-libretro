@@ -22,7 +22,7 @@ class Stream
       Stream();
       virtual ~Stream();
 
-      virtual uint64_t read(void *data, uint64_t count, bool error_on_eos = true) = 0;
+      virtual uint64_t read(void *data, uint64_t count) = 0;
       virtual void write(const void *data, uint64_t count) = 0;
 
       virtual void seek(int64_t offset, int whence) = 0;

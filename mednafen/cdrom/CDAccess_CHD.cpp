@@ -499,7 +499,7 @@ int CDAccess_CHD::LoadSBI(const char* sbi_path)
    if(memcmp(header, "SBI\0", 4))
       return -1;
 
-   while(sbis.read(ed, sizeof(ed), false) == sizeof(ed))
+   while(sbis.read(ed, sizeof(ed)) == sizeof(ed))
    {
       /* Bad BCD MSF offset in SBI file. */
       if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))

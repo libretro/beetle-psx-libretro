@@ -702,7 +702,7 @@ class CDIF_Stream_Thing : public Stream
       virtual uint8 *map(void);
       virtual void unmap(void);
 
-      virtual uint64 read(void *data, uint64 count, bool error_on_eos = true);
+      virtual uint64 read(void *data, uint64 count);
       virtual void write(const void *data, uint64 count);
 
       virtual void seek(int64 offset, int whence);
@@ -739,17 +739,12 @@ void CDIF_Stream_Thing::unmap(void)
 
 }
 
-uint64 CDIF_Stream_Thing::read(void *data, uint64 count, bool error_on_eos)
+uint64 CDIF_Stream_Thing::read(void *data, uint64 count)
 {
    uint64_t rp;
 
    if(count > (((uint64)sector_count * 2048) - position))
-   {
-      if(error_on_eos)
-         throw MDFN_Error(0, "EOF");
-
       count = ((uint64)sector_count * 2048) - position;
-   }
 
    if(!count)
       return(0);
