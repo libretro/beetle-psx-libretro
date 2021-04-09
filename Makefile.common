@@ -31,18 +31,10 @@ LIBCHDR_SOURCES_C = \
 
 ZLIB_INCFLAGS = -I$(DEPS_DIR)/zlib-1.2.11
 ZLIB_SOURCES_C = $(DEPS_DIR)/zlib-1.2.11/adler32.c \
-               $(DEPS_DIR)/zlib-1.2.11/compress.c \
                $(DEPS_DIR)/zlib-1.2.11/crc32.c \
-               $(DEPS_DIR)/zlib-1.2.11/deflate.c \
-               $(DEPS_DIR)/zlib-1.2.11/gzclose.c \
-               $(DEPS_DIR)/zlib-1.2.11/gzlib.c \
-               $(DEPS_DIR)/zlib-1.2.11/gzread.c \
-               $(DEPS_DIR)/zlib-1.2.11/gzwrite.c \
                $(DEPS_DIR)/zlib-1.2.11/inffast.c \
                $(DEPS_DIR)/zlib-1.2.11/inflate.c \
                $(DEPS_DIR)/zlib-1.2.11/inftrees.c \
-               $(DEPS_DIR)/zlib-1.2.11/trees.c \
-               $(DEPS_DIR)/zlib-1.2.11/uncompr.c \
                $(DEPS_DIR)/zlib-1.2.11/zutil.c
 
 ifeq ($(HAVE_OPENGL), 1)
