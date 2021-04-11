@@ -8,34 +8,36 @@ MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
+LIBZMA_DIR   := $(DEPS_DIR)/lzma-19.00
+ZLIB_DIR     := $(DEPS_DIR)/zlib-1.2.11
 
 LIBCHDR_INCFLAGS = \
-                     -I$(DEPS_DIR)/lzma-19.00/include \
+                     -I$(LIBZMA_DIR)/include \
                      -I$(DEPS_DIR)/libchdr/include
 LIBCHDR_SOURCES_C = \
-                     $(DEPS_DIR)/lzma-19.00/src/Alloc.c \
-                     $(DEPS_DIR)/lzma-19.00/src/Bra86.c \
-                     $(DEPS_DIR)/lzma-19.00/src/BraIA64.c \
-                     $(DEPS_DIR)/lzma-19.00/src/CpuArch.c \
-                     $(DEPS_DIR)/lzma-19.00/src/Delta.c \
-                     $(DEPS_DIR)/lzma-19.00/src/LzFind.c \
-                     $(DEPS_DIR)/lzma-19.00/src/Lzma86Dec.c \
-                     $(DEPS_DIR)/lzma-19.00/src/LzmaDec.c \
-                     $(DEPS_DIR)/lzma-19.00/src/LzmaEnc.c \
-                     $(DEPS_DIR)/lzma-19.00/src/Sort.c \
+                     $(LIBZMA_DIR)/src/Alloc.c \
+                     $(LIBZMA_DIR)/src/Bra86.c \
+                     $(LIBZMA_DIR)/src/BraIA64.c \
+                     $(LIBZMA_DIR)/src/CpuArch.c \
+                     $(LIBZMA_DIR)/src/Delta.c \
+                     $(LIBZMA_DIR)/src/LzFind.c \
+                     $(LIBZMA_DIR)/src/Lzma86Dec.c \
+                     $(LIBZMA_DIR)/src/LzmaDec.c \
+                     $(LIBZMA_DIR)/src/LzmaEnc.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_chd.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_flac.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_huffman.c
 
-ZLIB_INCFLAGS = -I$(DEPS_DIR)/zlib-1.2.11
-ZLIB_SOURCES_C = $(DEPS_DIR)/zlib-1.2.11/adler32.c \
-               $(DEPS_DIR)/zlib-1.2.11/crc32.c \
-               $(DEPS_DIR)/zlib-1.2.11/inffast.c \
-               $(DEPS_DIR)/zlib-1.2.11/inflate.c \
-               $(DEPS_DIR)/zlib-1.2.11/inftrees.c \
-               $(DEPS_DIR)/zlib-1.2.11/zutil.c
+ZLIB_INCFLAGS = -I$(ZLIB_DIR)
+ZLIB_SOURCES_C = \
+					  $(ZLIB_DIR)/adler32.c \
+					  $(ZLIB_DIR)/crc32.c \
+					  $(ZLIB_DIR)/inffast.c \
+					  $(ZLIB_DIR)/inflate.c \
+					  $(ZLIB_DIR)/inftrees.c \
+					  $(ZLIB_DIR)/zutil.c
 
 ifeq ($(HAVE_OPENGL), 1)
    ifeq ($(GLES), 1)
