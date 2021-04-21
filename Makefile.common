@@ -161,6 +161,12 @@ endif
 ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
 
+   ifeq ($(NO_GCC), 1)
+       FLAGS += -DHAS_DEFAULT_ELM=0
+   else
+       FLAGS += -DHAS_DEFAULT_ELM=1
+   endif
+
    ifeq ($(THREADED_RECOMPILER), 0)
        FLAGS += -DENABLE_THREADED_COMPILER=0
    else
