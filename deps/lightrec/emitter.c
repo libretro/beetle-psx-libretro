@@ -605,7 +605,7 @@ static void rec_alu_mult(const struct block *block,
 	jit_note(__FILE__, __LINE__);
 
 	lo = lightrec_alloc_reg_out(reg_cache, _jit, REG_LO);
-	if (!(op->flags & LIGHTREC_MULT32))
+	if (!(op->flags & LIGHTREC_NO_HI))
 		hi = lightrec_alloc_reg_out_ext(reg_cache, _jit, REG_HI);
 	else if (__WORDSIZE == 64)
 		hi = lightrec_alloc_reg_temp(reg_cache, _jit);
@@ -621,7 +621,7 @@ static void rec_alu_mult(const struct block *block,
 #if __WORDSIZE == 32
 	/* On 32-bit systems, do a 32*32->64 bit operation, or a 32*32->32 bit
 	 * operation if the MULT was detected a 32-bit only. */
-	if (!(op->flags & LIGHTREC_MULT32)) {
+	if (!(op->flags & LIGHTREC_NO_HI)) {
 		if (is_signed)
 			jit_qmulr(lo, hi, rs, rt);
 		else
@@ -642,14 +642,14 @@ static void rec_alu_mult(const struct block *block,
 	}
 
 	/* The 64-bit output value is in $lo, store the upper 32 bits in $hi */
-	if (!(op->flags & LIGHTREC_MULT32))
+	if (!(op->flags & LIGHTREC_NO_HI))
 		jit_rshi(hi, lo, 32);
 #endif
 
 	lightrec_free_reg(reg_cache, rs);
 	lightrec_free_reg(reg_cache, rt);
 	lightrec_free_reg(reg_cache, lo);
-	if (__WORDSIZE == 64 || !(op->flags & LIGHTREC_MULT32))
+	if (__WORDSIZE == 64 || !(op->flags & LIGHTREC_NO_HI))
 		lightrec_free_reg(reg_cache, hi);
 }
 
@@ -657,13 +657,17 @@ static void rec_alu_div(const struct block *block,
 			const struct opcode *op, bool is_signed)
 {
 	struct regcache *reg_cache = block->state->reg_cache;
+	bool no_check = op->flags & LIGHTREC_NO_DIV_CHECK;
 	jit_state_t *_jit = block->_jit;
 	jit_node_t *branch, *to_end;
 	u8 lo, hi, rs, rt;
 
 	jit_note(__FILE__, __LINE__);
 	lo = lightrec_alloc_reg_out(reg_cache, _jit, REG_LO);
-	hi = lightrec_alloc_reg_out(reg_cache, _jit, REG_HI);
+	if (!(op->flags & LIGHTREC_NO_HI))
+		hi = lightrec_alloc_reg_out(reg_cache, _jit, REG_HI);
+	else if (__WORDSIZE == 64 && !is_signed)
+		hi = lightrec_alloc_reg_temp(reg_cache, _jit);
 
 	if (__WORDSIZE == 32 || !is_signed) {
 		rs = lightrec_alloc_reg_in(reg_cache, _jit, op->r.rs);
@@ -674,46 +678,70 @@ static void rec_alu_div(const struct block *block,
 	}
 
 	/* Jump to special handler if dividing by zero  */
-	branch = jit_beqi(rt, 0);
+	if (!no_check)
+		branch = jit_beqi(rt, 0);
 
 #if __WORDSIZE == 32
-	if (is_signed)
-		jit_qdivr(lo, hi, rs, rt);
-	else
-		jit_qdivr_u(lo, hi, rs, rt);
+	if (op->flags & LIGHTREC_NO_HI) {
+		if (is_signed)
+			jit_divr(lo, rs, rt);
+		else
+			jit_divr_u(lo, rs, rt);
+	} else {
+		if (is_signed)
+			jit_qdivr(lo, hi, rs, rt);
+		else
+			jit_qdivr_u(lo, hi, rs, rt);
+	}
 #else
 	/* On 64-bit systems, the input registers must be 32 bits, so we first sign-extend
 	 * (if div) or clear (if divu) the input registers. */
-	if (is_signed) {
-		jit_qdivr(lo, hi, rs, rt);
+	if (op->flags & LIGHTREC_NO_HI) {
+		if (is_signed) {
+			jit_divr(lo, rs, rt);
+		} else {
+			jit_extr_ui(lo, rt);
+			jit_extr_ui(hi, rs);
+			jit_divr_u(lo, hi, lo);
+		}
 	} else {
-		jit_extr_ui(lo, rt);
-		jit_extr_ui(hi, rs);
-		jit_qdivr_u(lo, hi, hi, lo);
+		if (is_signed) {
+			jit_qdivr(lo, hi, rs, rt);
+		} else {
+			jit_extr_ui(lo, rt);
+			jit_extr_ui(hi, rs);
+			jit_qdivr_u(lo, hi, hi, lo);
+		}
 	}
 #endif
 
-	/* Jump above the div-by-zero handler */
-	to_end = jit_jmpi();
+	if (!no_check) {
+		/* Jump above the div-by-zero handler */
+		to_end = jit_jmpi();
 
-	jit_patch(branch);
+		jit_patch(branch);
 
-	if (is_signed) {
-		jit_lti(lo, rs, 0);
-		jit_lshi(lo, lo, 1);
-		jit_subi(lo, lo, 1);
-	} else {
-		jit_movi(lo, 0xffffffff);
+		if (is_signed) {
+			jit_lti(lo, rs, 0);
+			jit_lshi(lo, lo, 1);
+			jit_subi(lo, lo, 1);
+		} else {
+			jit_movi(lo, 0xffffffff);
+		}
+
+		if (!(op->flags & LIGHTREC_NO_HI))
+			jit_movr(hi, rs);
+
+		jit_patch(to_end);
 	}
-
-	jit_movr(hi, rs);
-
-	jit_patch(to_end);
 
 	lightrec_free_reg(reg_cache, rs);
 	lightrec_free_reg(reg_cache, rt);
 	lightrec_free_reg(reg_cache, lo);
-	lightrec_free_reg(reg_cache, hi);
+
+	if (!(op->flags & LIGHTREC_NO_HI)
+	    || (__WORDSIZE == 64 && !is_signed))
+		lightrec_free_reg(reg_cache, hi);
 }
 
 static void rec_special_MULT(const struct block *block,
@@ -1432,6 +1460,7 @@ static void rec_meta_sync(const struct block *block,
 }
 
 static const lightrec_rec_func_t rec_standard[64] = {
+	SET_DEFAULT_ELM(rec_standard, unknown_opcode),
 	[OP_SPECIAL]		= rec_SPECIAL,
 	[OP_REGIMM]		= rec_REGIMM,
 	[OP_J]			= rec_J,
@@ -1473,6 +1502,7 @@ static const lightrec_rec_func_t rec_standard[64] = {
 };
 
 static const lightrec_rec_func_t rec_special[64] = {
+	SET_DEFAULT_ELM(rec_special, unknown_opcode),
 	[OP_SPECIAL_SLL]	= rec_special_SLL,
 	[OP_SPECIAL_SRL]	= rec_special_SRL,
 	[OP_SPECIAL_SRA]	= rec_special_SRA,
@@ -1504,6 +1534,7 @@ static const lightrec_rec_func_t rec_special[64] = {
 };
 
 static const lightrec_rec_func_t rec_regimm[64] = {
+	SET_DEFAULT_ELM(rec_regimm, unknown_opcode),
 	[OP_REGIMM_BLTZ]	= rec_regimm_BLTZ,
 	[OP_REGIMM_BGEZ]	= rec_regimm_BGEZ,
 	[OP_REGIMM_BLTZAL]	= rec_regimm_BLTZAL,
@@ -1511,6 +1542,7 @@ static const lightrec_rec_func_t rec_regimm[64] = {
 };
 
 static const lightrec_rec_func_t rec_cp0[64] = {
+	SET_DEFAULT_ELM(rec_cp0, rec_CP),
 	[OP_CP0_MFC0]		= rec_cp0_MFC0,
 	[OP_CP0_CFC0]		= rec_cp0_CFC0,
 	[OP_CP0_MTC0]		= rec_cp0_MTC0,
@@ -1519,6 +1551,7 @@ static const lightrec_rec_func_t rec_cp0[64] = {
 };
 
 static const lightrec_rec_func_t rec_cp2_basic[64] = {
+	SET_DEFAULT_ELM(rec_cp2_basic, rec_CP),
 	[OP_CP2_BASIC_MFC2]	= rec_cp2_basic_MFC2,
 	[OP_CP2_BASIC_CFC2]	= rec_cp2_basic_CFC2,
 	[OP_CP2_BASIC_MTC2]	= rec_cp2_basic_MTC2,
@@ -1529,36 +1562,40 @@ static void rec_SPECIAL(const struct block *block,
 			const struct opcode *op, u32 pc)
 {
 	lightrec_rec_func_t f = rec_special[op->r.op];
-	if (likely(f))
-		(*f)(block, op, pc);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		unknown_opcode(block, op, pc);
+	else
+		(*f)(block, op, pc);
 }
 
 static void rec_REGIMM(const struct block *block,
 		       const struct opcode *op, u32 pc)
 {
 	lightrec_rec_func_t f = rec_regimm[op->r.rt];
-	if (likely(f))
-		(*f)(block, op, pc);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		unknown_opcode(block, op, pc);
+	else
+		(*f)(block, op, pc);
 }
 
 static void rec_CP0(const struct block *block, const struct opcode *op, u32 pc)
 {
 	lightrec_rec_func_t f = rec_cp0[op->r.rs];
-	if (likely(f))
-		(*f)(block, op, pc);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		rec_CP(block, op, pc);
+	else
+		(*f)(block, op, pc);
 }
 
 static void rec_CP2(const struct block *block, const struct opcode *op, u32 pc)
 {
 	if (op->r.op == OP_CP2_BASIC) {
 		lightrec_rec_func_t f = rec_cp2_basic[op->r.rs];
-		if (likely(f)) {
+
+		if (HAS_DEFAULT_ELM || likely(f)) {
 			(*f)(block, op, pc);
 			return;
 		}
@@ -1571,8 +1608,9 @@ void lightrec_rec_opcode(const struct block *block,
 			 const struct opcode *op, u32 pc)
 {
 	lightrec_rec_func_t f = rec_standard[op->i.op];
-	if (likely(f))
-		(*f)(block, op, pc);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		unknown_opcode(block, op, pc);
+	else
+		(*f)(block, op, pc);
 }

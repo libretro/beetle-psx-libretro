@@ -75,6 +75,11 @@ static inline u32 jump_after_branch(struct interpreter *inter)
 	return jump_skip(inter);
 }
 
+static inline u32 lightrec_int_op(struct interpreter *inter)
+{
+	return execute(int_standard[inter->op->i.op], inter);
+}
+
 static void update_cycles_before_branch(struct interpreter *inter)
 {
 	u32 cycles;
@@ -228,7 +233,7 @@ static u32 int_delay_slot(struct interpreter *inter, u32 pc, bool branch)
 			inter2.op = &new_op;
 
 			/* Execute the first opcode of the next block */
-			(*int_standard[inter2.op->i.op])(&inter2);
+			lightrec_int_op(&inter2);
 
 			if (save_rs) {
 				new_rs = reg_cache[op->r.rs];
@@ -250,7 +255,7 @@ static u32 int_delay_slot(struct interpreter *inter, u32 pc, bool branch)
 		new_rt = reg_cache[op->r.rt];
 
 	/* Execute delay slot opcode */
-	ds_next_pc = (*int_standard[inter2.op->i.op])(&inter2);
+	ds_next_pc = lightrec_int_op(&inter2);
 
 	if (branch_at_addr) {
 		if (op_next.i.op == OP_SPECIAL)
@@ -295,7 +300,7 @@ static u32 int_delay_slot(struct interpreter *inter, u32 pc, bool branch)
 
 		pr_debug("Running delay slot of branch at target of impossible "
 			 "branch\n");
-		(*int_standard[inter2.op->i.op])(&inter2);
+		lightrec_int_op(&inter2);
 	}
 
 	return next_pc;
@@ -770,7 +775,7 @@ static u32 int_special_MULT(struct interpreter *inter)
 	s32 rt = reg_cache[inter->op->r.rt];
 	u64 res = (s64)rs * (s64)rt;
 
-	if (!(inter->op->flags & LIGHTREC_MULT32))
+	if (!(inter->op->flags & LIGHTREC_NO_HI))
 		reg_cache[REG_HI] = res >> 32;
 	reg_cache[REG_LO] = res;
 
@@ -784,7 +789,7 @@ static u32 int_special_MULTU(struct interpreter *inter)
 	u32 rt = reg_cache[inter->op->r.rt];
 	u64 res = (u64)rs * (u64)rt;
 
-	if (!(inter->op->flags & LIGHTREC_MULT32))
+	if (!(inter->op->flags & LIGHTREC_NO_HI))
 		reg_cache[REG_HI] = res >> 32;
 	reg_cache[REG_LO] = res;
 
@@ -962,6 +967,7 @@ static u32 int_META_SYNC(struct interpreter *inter)
 }
 
 static const lightrec_int_func_t int_standard[64] = {
+	SET_DEFAULT_ELM(int_standard, int_unimplemented),
 	[OP_SPECIAL]		= int_SPECIAL,
 	[OP_REGIMM]		= int_REGIMM,
 	[OP_J]			= int_J,
@@ -1003,6 +1009,7 @@ static const lightrec_int_func_t int_standard[64] = {
 };
 
 static const lightrec_int_func_t int_special[64] = {
+	SET_DEFAULT_ELM(int_special, int_unimplemented),
 	[OP_SPECIAL_SLL]	= int_special_SLL,
 	[OP_SPECIAL_SRL]	= int_special_SRL,
 	[OP_SPECIAL_SRA]	= int_special_SRA,
@@ -1034,6 +1041,7 @@ static const lightrec_int_func_t int_special[64] = {
 };
 
 static const lightrec_int_func_t int_regimm[64] = {
+	SET_DEFAULT_ELM(int_regimm, int_unimplemented),
 	[OP_REGIMM_BLTZ]	= int_regimm_BLTZ,
 	[OP_REGIMM_BGEZ]	= int_regimm_BGEZ,
 	[OP_REGIMM_BLTZAL]	= int_regimm_BLTZAL,
@@ -1041,6 +1049,7 @@ static const lightrec_int_func_t int_regimm[64] = {
 };
 
 static const lightrec_int_func_t int_cp0[64] = {
+	SET_DEFAULT_ELM(int_cp0, int_CP),
 	[OP_CP0_MFC0]		= int_cfc,
 	[OP_CP0_CFC0]		= int_cfc,
 	[OP_CP0_MTC0]		= int_ctc,
@@ -1049,6 +1058,7 @@ static const lightrec_int_func_t int_cp0[64] = {
 };
 
 static const lightrec_int_func_t int_cp2_basic[64] = {
+	SET_DEFAULT_ELM(int_cp2_basic, int_CP),
 	[OP_CP2_BASIC_MFC2]	= int_cfc,
 	[OP_CP2_BASIC_CFC2]	= int_cfc,
 	[OP_CP2_BASIC_MTC2]	= int_ctc,
@@ -1058,44 +1068,42 @@ static const lightrec_int_func_t int_cp2_basic[64] = {
 static u32 int_SPECIAL(struct interpreter *inter)
 {
 	lightrec_int_func_t f = int_special[inter->op->r.op];
-	if (likely(f))
-		return execute(f, inter);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		return int_unimplemented(inter);
+
+	return execute(f, inter);
 }
 
 static u32 int_REGIMM(struct interpreter *inter)
 {
 	lightrec_int_func_t f = int_regimm[inter->op->r.rt];
-	if (likely(f))
-		return execute(f, inter);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		return int_unimplemented(inter);
+
+	return execute(f, inter);
 }
 
 static u32 int_CP0(struct interpreter *inter)
 {
 	lightrec_int_func_t f = int_cp0[inter->op->r.rs];
-	if (likely(f))
-		return execute(f, inter);
-	else
+
+	if (!HAS_DEFAULT_ELM && unlikely(!f))
 		return int_CP(inter);
+
+	return execute(f, inter);
 }
 
 static u32 int_CP2(struct interpreter *inter)
 {
 	if (inter->op->r.op == OP_CP2_BASIC) {
 		lightrec_int_func_t f = int_cp2_basic[inter->op->r.rs];
-		if (likely(f))
+		if (HAS_DEFAULT_ELM || likely(f))
 			return execute(f, inter);
 	}
 
 	return int_CP(inter);
-}
-
-static u32 lightrec_int_op(struct interpreter *inter)
-{
-	return execute(int_standard[inter->op->i.op], inter);
 }
 
 static u32 lightrec_emulate_block_list(struct block *block, struct opcode *op)

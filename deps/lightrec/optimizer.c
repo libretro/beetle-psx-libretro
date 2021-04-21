@@ -196,6 +196,9 @@ static bool is_nop(union code op)
 		case OP_SPECIAL_SRA:
 		case OP_SPECIAL_SRL:
 			return op.r.rd == op.r.rt && op.r.imm == 0;
+		case OP_SPECIAL_MFHI:
+		case OP_SPECIAL_MFLO:
+			return op.r.rd == 0;
 		default:
 			return false;
 		}
@@ -724,7 +727,7 @@ static int lightrec_local_branches(struct block *block)
 	int ret;
 
 	for (list = block->opcode_list; list; list = list->next) {
-		if (list->flags & LIGHTREC_EMULATE_BRANCH)
+		if (should_emulate(list))
 			continue;
 
 		switch (list->i.op) {
@@ -750,7 +753,7 @@ static int lightrec_local_branches(struct block *block)
 			    target->j.op == OP_META_SYNC)
 				continue;
 
-			if (target->flags & LIGHTREC_EMULATE_BRANCH) {
+			if (should_emulate(target)) {
 				pr_debug("Branch target must be emulated"
 					 " - skip\n");
 				break;
@@ -804,6 +807,12 @@ bool has_delay_slot(union code op)
 	default:
 		return false;
 	}
+}
+
+bool should_emulate(struct opcode *list)
+{
+	return has_delay_slot(list->c) &&
+		(list->flags & LIGHTREC_EMULATE_BRANCH);
 }
 
 static int lightrec_add_unload(struct block *block, struct opcode *op, u8 reg)
@@ -909,12 +918,13 @@ static int lightrec_flag_stores(struct block *block)
 	return 0;
 }
 
-static bool is_mult32(const struct block *block, const struct opcode *op)
+static u8 get_mfhi_mflo_reg(const struct opcode *op, bool mflo)
 {
-	const struct opcode *next, *last = NULL;
+	const struct opcode *next;
 	u32 offset;
+	u8 reg2, reg = mflo ? REG_LO : REG_HI;
 
-	for (op = op->next; op != last; op = op->next) {
+	for (; op; op = op->next) {
 		switch (op->i.op) {
 		case OP_BEQ:
 		case OP_BNE:
@@ -931,30 +941,51 @@ static bool is_mult32(const struct block *block, const struct opcode *op)
 				for (next = op; next->offset != offset;
 				     next = next->next);
 
-				if (!is_mult32(block, next))
-					return false;
-
-				last = next;
-				continue;
-			} else {
-				return false;
+				reg = get_mfhi_mflo_reg(next, mflo);
+				reg2 = get_mfhi_mflo_reg(op->next, mflo);
+				if (reg > 0 && reg == reg2)
+					return reg;
+				if (!reg && !reg2)
+					return 0;
 			}
+
+			return mflo ? REG_LO : REG_HI;
 		case OP_SPECIAL:
 			switch (op->r.op) {
 			case OP_SPECIAL_MULT:
 			case OP_SPECIAL_MULTU:
 			case OP_SPECIAL_DIV:
 			case OP_SPECIAL_DIVU:
+				return 0;
 			case OP_SPECIAL_MTHI:
-				return true;
+				if (!mflo)
+					return 0;
+				continue;
+			case OP_SPECIAL_MTLO:
+				if (mflo)
+					return 0;
+				continue;
 			case OP_SPECIAL_JR:
-				return op->r.rs == 31 &&
-					((op->flags & LIGHTREC_NO_DS) ||
-					 !(op->next->i.op == OP_SPECIAL &&
-					   op->next->r.op == OP_SPECIAL_MFHI));
+				if (op->r.rs != 31)
+					return reg;
+
+				if (!(op->flags & LIGHTREC_NO_DS) &&
+				    (op->next->i.op == OP_SPECIAL) &&
+				    (!mflo && op->next->r.op == OP_SPECIAL_MFHI) ||
+				    (mflo && op->next->r.op == OP_SPECIAL_MFLO))
+					return op->next->r.rd;
+
+				return 0;
 			case OP_SPECIAL_JALR:
+				return reg;
 			case OP_SPECIAL_MFHI:
-				return false;
+				if (!mflo)
+					return op->r.rd;
+				continue;
+			case OP_SPECIAL_MFLO:
+				if (mflo)
+					return op->r.rd;
+				continue;
 			default:
 				continue;
 			}
@@ -963,12 +994,13 @@ static bool is_mult32(const struct block *block, const struct opcode *op)
 		}
 	}
 
-	return last != NULL;
+	return reg;
 }
 
-static int lightrec_flag_mults(struct block *block)
+static int lightrec_flag_mults_divs(struct block *block)
 {
 	struct opcode *list, *prev;
+	u8 reg_hi;
 
 	for (list = block->opcode_list, prev = NULL; list;
 	     prev = list, list = list->next) {
@@ -978,32 +1010,130 @@ static int lightrec_flag_mults(struct block *block)
 		switch (list->r.op) {
 		case OP_SPECIAL_MULT:
 		case OP_SPECIAL_MULTU:
+		case OP_SPECIAL_DIV:
+		case OP_SPECIAL_DIVU:
 			break;
 		default:
 			continue;
 		}
 
-		/* Don't support MULT(U) opcodes in delay slots */
+		/* Don't support opcodes in delay slots */
 		if (prev && has_delay_slot(prev->c))
 			continue;
 
-		if (is_mult32(block, list)) {
-			pr_debug("Mark MULT(U) opcode at offset 0x%x as"
+		reg_hi = get_mfhi_mflo_reg(list->next, false);
+		if (reg_hi == 0) {
+			pr_debug("Mark MULT(U)/DIV(U) opcode at offset 0x%x as"
 				 " 32-bit\n", list->offset << 2);
-			list->flags |= LIGHTREC_MULT32;
+			list->flags |= LIGHTREC_NO_HI;
 		}
 	}
 
 	return 0;
 }
 
+static bool remove_div_sequence(struct opcode *list)
+{
+	struct opcode *op;
+	unsigned int i, found = 0;
+
+	/*
+	 * Scan for the zero-checking sequence that GCC automatically introduced
+	 * after most DIV/DIVU opcodes. This sequence checks the value of the
+	 * divisor, and if zero, executes a BREAK opcode, causing the BIOS
+	 * handler to crash the PS1.
+	 *
+	 * For DIV opcodes, this sequence additionally checks that the signed
+	 * operation does not overflow.
+	 *
+	 * With the assumption that the games never crashed the PS1, we can
+	 * therefore assume that the games never divided by zero or overflowed,
+	 * and these sequences can be removed.
+	 */
+
+	for (op = list; op; op = op->next) {
+		if (!found) {
+			if (op->i.op == OP_SPECIAL &&
+			    (op->r.op == OP_SPECIAL_DIV || op->r.op == OP_SPECIAL_DIVU))
+				break;
+
+			if ((op->opcode & 0xfc1fffff) == 0x14000002) {
+				/* BNE ???, zero, +8 */
+				found++;
+			} else {
+				list = list->next;
+			}
+		} else if (found == 1 && !op->opcode) {
+			/* NOP */
+			found++;
+		} else if (found == 2 && op->opcode == 0x0007000d) {
+			/* BREAK 0x1c00 */
+			found++;
+		} else if (found == 3 && op->opcode == 0x2401ffff) {
+			/* LI at, -1 */
+			found++;
+		} else if (found == 4 && (op->opcode & 0xfc1fffff) == 0x14010004) {
+			/* BNE ???, at, +16 */
+			found++;
+		} else if (found == 5 && op->opcode == 0x3c018000) {
+			/* LUI at, 0x8000 */
+			found++;
+		} else if (found == 6 && (op->opcode & 0x141fffff) == 0x14010002) {
+			/* BNE ???, at, +16 */
+			found++;
+		} else if (found == 7 && !op->opcode) {
+			/* NOP */
+			found++;
+		} else if (found == 8 && op->opcode == 0x0006000d) {
+			/* BREAK 0x1800 */
+			found++;
+			break;
+		} else {
+			break;
+		}
+	}
+
+	if (found >= 3) {
+		if (found != 9)
+			found = 3;
+
+		pr_debug("Removing DIV%s sequence at offset 0x%x\n",
+			 found == 9 ? "" : "U",
+			 list->offset << 2);
+
+		for (i = 0; list && i < found; i++) {
+			list->opcode = 0;
+			list = list->next;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+static int lightrec_remove_div_by_zero_check_sequence(struct block *block)
+{
+	struct opcode *op;
+
+	for (op = block->opcode_list; op; op = op->next) {
+		if (op->i.op == OP_SPECIAL &&
+		    (op->r.op == OP_SPECIAL_DIVU || op->r.op == OP_SPECIAL_DIV) &&
+		    remove_div_sequence(op->next))
+			op->flags |= LIGHTREC_NO_DIV_CHECK;
+	}
+
+	return 0;
+}
+
 static int (*lightrec_optimizers[])(struct block *) = {
+	&lightrec_remove_div_by_zero_check_sequence,
 	&lightrec_detect_impossible_branches,
 	&lightrec_transform_ops,
 	&lightrec_local_branches,
 	&lightrec_switch_delay_slots,
 	&lightrec_flag_stores,
-	&lightrec_flag_mults,
+	&lightrec_flag_mults_divs,
 	&lightrec_early_unload,
 };
 
