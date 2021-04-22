@@ -3206,6 +3206,12 @@ static void check_variables(bool startup)
          widescreen_hack_aspect_ratio_setting = 3;
       }
    }
+   else
+   {
+      if (!startup && widescreen_hack_aspect_ratio_setting != 1)
+         has_new_geometry = true;
+      widescreen_hack_aspect_ratio_setting = 1;
+   }
 
    var.key = BEETLE_OPT(pal_video_timing_override);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

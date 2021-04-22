@@ -2213,17 +2213,17 @@ extern "C" bool currently_interlaced;
 static struct retro_system_av_info get_av_info(VideoClock std)
 {
    struct retro_system_av_info info;
-   unsigned int max_width           = 0;
-   unsigned int max_height          = 0;
-   uint8_t upscaling                = 1;
-   bool widescreen_hack             = false;
-   int widescreen_hack_aspect_ratio = 2;
-   bool display_vram                = false;
-   bool crop_overscan               = false;
-   int initial_scanline_ntsc        = 0;
-   int last_scanline_ntsc           = 239;
-   int initial_scanline_pal         = 0;
-   int last_scanline_pal            = 287;
+   unsigned int max_width                   = 0;
+   unsigned int max_height                  = 0;
+   uint8_t upscaling                        = 1;
+   bool widescreen_hack                     = false;
+   int widescreen_hack_aspect_ratio_setting = 1;
+   bool display_vram                        = false;
+   bool crop_overscan                       = false;
+   int initial_scanline_ntsc                = 0;
+   int last_scanline_ntsc                   = 239;
+   int initial_scanline_pal                 = 0;
+   int last_scanline_pal                    = 287;
 
    /* This function currently queries core options rather than
       checking GlRenderer state; possible to refactor? */
@@ -2237,6 +2237,19 @@ static struct retro_system_av_info get_av_info(VideoClock std)
    {
       if (!strcmp(var.value, "enabled"))
          widescreen_hack = true;
+   }
+
+   var.key = BEETLE_OPT(widescreen_hack_aspect_ratio);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "16:10"))
+         widescreen_hack_aspect_ratio_setting = 0;
+      else if (!strcmp(var.value, "16:9"))
+         widescreen_hack_aspect_ratio_setting = 1;
+      else if (!strcmp(var.value, "21:9"))
+         widescreen_hack_aspect_ratio_setting = 2;
+      else if (!strcmp(var.value, "32:9"))
+         widescreen_hack_aspect_ratio_setting = 3;
    }
 
    var.key = BEETLE_OPT(crop_overscan);
