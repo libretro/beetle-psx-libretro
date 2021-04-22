@@ -214,6 +214,7 @@ static bool firmware_is_present(unsigned region)
       int r = snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
       if (r >= 4096)
       {
+         bios_path[4095] = '\0';
          log_cb(RETRO_LOG_ERROR, "Firmware path longer than 4095: %s\n", bios_path);
          break;
       }
@@ -3824,7 +3825,9 @@ static bool MDFNI_LoadCD(const char *devicename)
 
          for(unsigned i = 0; i < PBP_PhysicalDiscCount; i++)
          {
-            char image_name[4096];
+            /* image_name is at most 4096 - 4 (removing ".pbp")
+             * gives label room to add index and quiets gcc warnings */
+            char image_name[4092];
             char image_label[4096];
 
             image_name[0]  = '\0';
@@ -4944,8 +4947,8 @@ const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
 
    if (r > 4095)
    {
-      log_cb(RETRO_LOG_ERROR,"MakeFName path longer than 4095\n");
       fullpath[4095] = '\0';
+      log_cb(RETRO_LOG_ERROR,"MakeFName path longer than 4095: %s\n", fullpath);
    }
 
    return fullpath;
