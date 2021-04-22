@@ -115,8 +115,8 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t coun
    }
 }
 
-template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl)
+template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA>
+static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl, bool MaskEval_TA)
 {
    if(LineSkipTest(gpu, y >> gpu->upscale_shift))
       return;
@@ -190,7 +190,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
       uint8_t *dither_offset = gpu->DitherLUT[dither_y][dither_x];
       fbw = ModTexel(dither_offset, fbw, r, g, b);
      }
-     PlotPixel<BlendMode, MaskEval_TA, true>(gpu, x, y, fbw);
+     PlotPixel<BlendMode, true>(gpu, x, y, fbw, MaskEval_TA);
     }
    }
    else
@@ -210,7 +210,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
      pix |= (b >> 3) << 10;
     }
 
-    PlotPixel<BlendMode, MaskEval_TA, false>(gpu, x, y, pix);
+    PlotPixel<BlendMode, false>(gpu, x, y, pix, MaskEval_TA);
    }
 
    x++;
@@ -218,8 +218,8 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
   } while(MDFN_LIKELY(--w > 0));
 }
 
-template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices)
+template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA>
+static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices, bool MaskEval_TA)
 {
    i_deltas idl;
    unsigned core_vertex;
@@ -452,7 +452,7 @@ if(vertices[1].y == vertices[0].y)
      continue;
     }
 
-    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
+    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl, MaskEval_TA);
    }
   }
   else
@@ -470,7 +470,7 @@ if(vertices[1].y == vertices[0].y)
      goto skipit;
     }
 
-    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
+    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl, MaskEval_TA);
     //
     //
     //
@@ -501,8 +501,8 @@ bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
 extern int psx_pgxp_2d_tol;
 
-template<int numvertices, bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
-static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
+template<int numvertices, bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA>
+static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb, bool pgxp, bool MaskEval_TA)
 {
    tri_vertex vertices[3];
    const uint32_t* baseCB = cb;
@@ -884,7 +884,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       }
 
 		if (rsx_intf_has_software_renderer())
-			DrawTriangle<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
+			DrawTriangle<gouraud, textured, BlendMode, TexMult, TexMode_TA>(gpu, vertices, MaskEval_TA);
 
 		// Line Render: Overwrite vertices with those of the second triangle
 		if ((lineFound) && (numvertices == 3) && (textured))

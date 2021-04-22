@@ -101,8 +101,8 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
    }
 }
 
-template<bool gouraud, int BlendMode, bool MaskEval_TA>
-static void DrawLine(PS_GPU *gpu, line_point *points)
+template<bool gouraud, int BlendMode>
+static void DrawLine(PS_GPU *gpu, line_point *points, bool MaskEval_TA)
 {
    line_fxp_coord cur_point;
    line_fxp_step step;
@@ -155,15 +155,15 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
 
          // FIXME: There has to be a faster way than checking for being inside the drawing area for each pixel.
          if(x >= gpu->ClipX0 && x <= gpu->ClipX1 && y >= gpu->ClipY0 && y <= gpu->ClipY1)
-            PlotNativePixel<BlendMode, MaskEval_TA, false>(gpu, x, y, pix);
+            PlotNativePixel<BlendMode, false>(gpu, x, y, pix, MaskEval_TA);
       }
 
       AddLineStep<gouraud>(&cur_point, &step);
    }
 }
 
-template<bool polyline, bool gouraud, int BlendMode, bool MaskEval_TA>
-static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
+template<bool polyline, bool gouraud, int BlendMode>
+static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb, bool MaskEval_TA)
 {
    line_point points[2];
    const uint8_t cc = cb[0] >> 24; // For pline handling later.
@@ -240,5 +240,5 @@ static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 #endif
 
    if (rsx_intf_has_software_renderer())
-      DrawLine<gouraud, BlendMode, MaskEval_TA>(gpu, points);
+      DrawLine<gouraud, BlendMode>(gpu, points, MaskEval_TA);
 }
