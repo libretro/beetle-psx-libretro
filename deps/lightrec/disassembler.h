@@ -22,14 +22,24 @@
 #define __packed __attribute__((packed))
 #endif
 
-#define LIGHTREC_DIRECT_IO	(1 << 0)
-#define LIGHTREC_NO_INVALIDATE	(1 << 1)
-#define LIGHTREC_NO_DS		(1 << 2)
-#define LIGHTREC_SMC		(1 << 3)
-#define LIGHTREC_EMULATE_BRANCH	(1 << 4)
-#define LIGHTREC_LOCAL_BRANCH	(1 << 5)
-#define LIGHTREC_HW_IO		(1 << 6)
-#define LIGHTREC_MULT32		(1 << 7)
+#define BIT(x) (1 << (x))
+
+/* Flags for all opcodes */
+#define LIGHTREC_NO_DS		BIT(0)
+
+/* Flags for load/store opcodes */
+#define LIGHTREC_DIRECT_IO	BIT(1)
+#define LIGHTREC_HW_IO		BIT(2)
+#define LIGHTREC_SMC		BIT(3)
+#define LIGHTREC_NO_INVALIDATE	BIT(4)
+
+/* Flags for branches */
+#define LIGHTREC_EMULATE_BRANCH	BIT(1)
+#define LIGHTREC_LOCAL_BRANCH	BIT(2)
+
+/* Flags for div/mult opcodes */
+#define LIGHTREC_NO_HI		BIT(1)
+#define LIGHTREC_NO_DIV_CHECK	BIT(2)
 
 struct block;
 

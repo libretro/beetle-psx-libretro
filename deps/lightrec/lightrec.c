@@ -864,7 +864,7 @@ static struct block * lightrec_precompile_block(struct lightrec_state *state,
 
 	/* If the first opcode is an 'impossible' branch, never compile the
 	 * block */
-	if (list->flags & LIGHTREC_EMULATE_BRANCH)
+	if (should_emulate(list))
 		block->flags |= BLOCK_NEVER_COMPILE;
 
 	block->hash = lightrec_calculate_block_hash(block);
@@ -967,7 +967,7 @@ int lightrec_compile_block(struct block *block)
 
 		state->cycles += lightrec_cycles_of_opcode(elm->c);
 
-		if (elm->flags & LIGHTREC_EMULATE_BRANCH) {
+		if (should_emulate(elm)) {
 			pr_debug("Branch at offset 0x%x will be emulated\n",
 				 elm->offset << 2);
 			lightrec_emit_eob(block, elm, next_pc);

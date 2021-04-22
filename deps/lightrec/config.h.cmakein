@@ -20,5 +20,7 @@
 #cmakedefine01 ENABLE_DISASSEMBLER
 #cmakedefine01 ENABLE_TINYMM
 
+#cmakedefine01 HAS_DEFAULT_ELM
+
 #endif /* __LIGHTREC_CONFIG_H__ */
 

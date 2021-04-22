@@ -47,8 +47,7 @@ static bool is_unconditional_jump(const struct opcode *op)
 
 static bool is_syscall(const struct opcode *op)
 {
-	return (op->i.op == OP_SPECIAL && (op->r.op == OP_SPECIAL_SYSCALL ||
-					   op->r.op == OP_SPECIAL_BREAK)) ||
+	return (op->i.op == OP_SPECIAL && op->r.op == OP_SPECIAL_SYSCALL) ||
 		(op->i.op == OP_CP0 && (op->r.rs == OP_CP0_MTC0 ||
 					op->r.rs == OP_CP0_CTC0) &&
 		 (op->r.rd == 12 || op->r.rd == 13));

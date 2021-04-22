@@ -29,7 +29,6 @@ static unsigned scaling = 4;
 // Declare extern as workaround for now to avoid variable
 // naming conflicts with beetle_psx_globals.h
 extern "C" uint8_t widescreen_hack;
-extern "C" uint8_t widescreen_hack_aspect_ratio;
 extern "C" uint8_t widescreen_hack_aspect_ratio_setting;
 extern "C" bool content_is_pal;
 extern "C" int filter_mode;
@@ -251,7 +250,7 @@ void rsx_vulkan_refresh_variables(void)
    bool old_show_vram = show_vram;
    bool old_crop_overscan = crop_overscan;
    bool old_widescreen_hack = widescreen_hack;
-   unsigned old_widescreen_hack_aspect_ratio = widescreen_hack_aspect_ratio;
+   unsigned old_widescreen_hack_aspect_ratio_setting = widescreen_hack_aspect_ratio_setting;
    bool visible_scanlines_changed = false;
 
    var.key = BEETLE_OPT(internal_resolution);
@@ -408,6 +407,19 @@ void rsx_vulkan_refresh_variables(void)
          widescreen_hack = false;
    }
 
+   var.key = BEETLE_OPT(widescreen_hack_aspect_ratio);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "16:10"))
+         widescreen_hack_aspect_ratio_setting = 0;
+      else if (!strcmp(var.value, "16:9"))
+         widescreen_hack_aspect_ratio_setting = 1;
+      else if (!strcmp(var.value, "21:9"))
+         widescreen_hack_aspect_ratio_setting = 2;
+      else if (!strcmp(var.value, "32:9"))
+         widescreen_hack_aspect_ratio_setting = 3;
+   }
+
    var.key = BEETLE_OPT(track_textures);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -416,7 +428,7 @@ void rsx_vulkan_refresh_variables(void)
       else
          track_textures = false;
    }
-   
+
    var.key = BEETLE_OPT(dump_textures);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -475,6 +487,8 @@ void rsx_vulkan_refresh_variables(void)
         old_msaa != msaa ||
         old_show_vram != show_vram ||
         old_crop_overscan != crop_overscan ||
+        old_widescreen_hack != widescreen_hack ||
+        old_widescreen_hack_aspect_ratio_setting != widescreen_hack_aspect_ratio_setting ||
         visible_scanlines_changed)
        && renderer)
    {

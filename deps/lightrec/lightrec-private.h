@@ -24,7 +24,6 @@
 #endif
 
 #define ARRAY_SIZE(x) (sizeof(x) ? sizeof(x) / sizeof((x)[0]) : 0)
-#define BIT(x) (1 << (x))
 
 #ifdef __GNUC__
 #	define likely(x)       __builtin_expect(!!(x),1)
@@ -44,6 +43,12 @@
 #	define HTOLE32(x)	(x)
 #	define LE16TOH(x)	(x)
 #	define HTOLE16(x)	(x)
+#endif
+
+#if HAS_DEFAULT_ELM
+#define SET_DEFAULT_ELM(table, value) [0 ... ARRAY_SIZE(table) - 1] = value
+#else
+#define SET_DEFAULT_ELM(table, value) [0] = NULL
 #endif
 
 /* Flags for (struct block *)->flags */

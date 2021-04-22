@@ -25,6 +25,8 @@ if (CMAKE_COMPILER_IS_GNUCC)
 	add_compile_options(-fvisibility=hidden)
 endif()
 
+set(HAS_DEFAULT_ELM ${CMAKE_COMPILER_IS_GNUCC})
+
 list(APPEND LIGHTREC_SOURCES
 	blockcache.c
 	disassembler.c
