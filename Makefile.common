@@ -183,7 +183,8 @@ ifeq ($(HAVE_LIGHTREC), 1)
    endif
 
    INCFLAGS += -I$(DEPS_DIR)/lightning/include \
-               -I$(DEPS_DIR)/lightrec
+               -I$(DEPS_DIR)/lightrec \
+               -I$(CORE_DIR)/lightning-lightrec-include
 endif
 
 ifneq ($(HAVE_GRIFFIN), 1)
