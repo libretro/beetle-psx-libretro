@@ -45,6 +45,7 @@ bool prev_invalidate;
 extern bool psx_dynarec_invalidate;
 extern uint8 psx_mmap;
 static struct lightrec_state *lightrec_state;
+uint8 next_interpreter;
 #endif
 
 extern bool psx_gte_overclock;
@@ -193,6 +194,7 @@ void PS_CPU::Power(void)
  PGXP_Init();
 
 #ifdef HAVE_LIGHTREC
+ next_interpreter = 0;
  prev_dynarec = psx_dynarec;
  prev_invalidate = psx_dynarec_invalidate;
  pgxpMode = PGXP_GetModes();
@@ -256,9 +258,22 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
  {
 #ifdef HAVE_LIGHTREC
   if(psx_dynarec != DYNAREC_DISABLED) {
-   if(lightrec_state)
-    lightrec_invalidate_all(lightrec_state);
-   else
+   if(lightrec_state) {
+    /* Hack to prevent Dynarec + Runahead from causing a crash by
+     * switching to lightrec interpreter after load state in bios */
+    if(psx_dynarec != DYNAREC_RUN_INTERPRETER &&
+       BACKED_PC >= 0xBFC00000 && BACKED_PC <= 0xBFC80000) {
+     if(next_interpreter == 0) {
+      log_cb(RETRO_LOG_INFO, "PC 0x%08x Dynarec using interpreter for a few "
+                             "frames, avoid crash due to Runahead\n",BACKED_PC);
+      lightrec_plugin_init();
+     }
+     /* run lightrec's interpreter for a few frames
+      * 76 for NTSC, 93 for PAL seems to prevent crash at max runahead */
+     next_interpreter = 93;
+    } else
+     lightrec_invalidate_all(lightrec_state);
+   }else
     lightrec_plugin_init();
   }
 #endif
@@ -2719,6 +2734,9 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode
   prev_invalidate = psx_dynarec_invalidate;
  }
 
+ if(next_interpreter > 0)
+  next_interpreter--;
+
  if(psx_dynarec != DYNAREC_DISABLED)
   return(lightrec_plugin_execute(timestamp_in));
 #endif
@@ -3895,12 +3913,12 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		lightrec_restore_registers(lightrec_state, GPRL);
 		lightrec_reset_cycle_count(lightrec_state, timestamp);
 
-		if (psx_dynarec == DYNAREC_EXECUTE)
+		if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
+			PC = lightrec_run_interpreter(lightrec_state,PC);
+		else if (psx_dynarec == DYNAREC_EXECUTE)
 			PC = lightrec_execute(lightrec_state, PC, next_event_ts);
 		else if (psx_dynarec == DYNAREC_EXECUTE_ONE)
 			PC = lightrec_execute_one(lightrec_state,PC);
-		else if (psx_dynarec == DYNAREC_RUN_INTERPRETER)
-			PC = lightrec_run_interpreter(lightrec_state,PC);
 
 		timestamp = lightrec_current_cycle_count(
 				lightrec_state);
