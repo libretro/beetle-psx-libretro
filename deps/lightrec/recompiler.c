@@ -1,15 +1,6 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
 /*
- * Copyright (C) 2019-2020 Paul Cercueil <paul@crapouillou.net>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * Copyright (C) 2019-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
 #include "debug.h"
@@ -126,6 +117,8 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state)
 		pr_err("Cannot create recompiler thread: %d\n", ret);
 		goto err_mtx_destroy;
 	}
+
+	pr_info("Threaded recompiler started\n");
 
 	return rec;
 
@@ -263,8 +256,7 @@ void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
 
 				/* The block was already compiled but the opcode list
 				 * didn't get freed yet - do it now */
-				lightrec_free_opcode_list(block->state,
-							  block->opcode_list);
+				lightrec_free_opcode_list(block);
 				block->opcode_list = NULL;
 			}
 		}
@@ -289,7 +281,7 @@ void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
 		pr_debug("Block PC 0x%08x is fully tagged"
 			 " - free opcode list\n", block->pc);
 
-		lightrec_free_opcode_list(block->state, block->opcode_list);
+		lightrec_free_opcode_list(block);
 		block->opcode_list = NULL;
 	}
 

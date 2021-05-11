@@ -1,15 +1,6 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
- * Copyright (C) 2014-2020 Paul Cercueil <paul@crapouillou.net>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * Copyright (C) 2014-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
 #ifndef __BLOCKCACHE_H__
@@ -20,6 +11,10 @@
 struct blockcache;
 
 struct block * lightrec_find_block(struct blockcache *cache, u32 pc);
+struct block * lightrec_find_block_from_lut(struct blockcache *cache,
+					    u16 lut_entry, u32 addr_in_block);
+u16 lightrec_get_lut_entry(const struct block *block);
+
 void lightrec_register_block(struct blockcache *cache, struct block *block);
 void lightrec_unregister_block(struct blockcache *cache, struct block *block);
 
