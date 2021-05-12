@@ -39,6 +39,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #ifdef HAVE_ASHMEM
 #include <sys/ioctl.h>
 #include <linux/ashmem.h>
+#include <dlfcn.h>
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
@@ -1641,6 +1642,7 @@ static const uintptr_t supported_io_bases[] = {
 #define RAM_SIZE 0x200000
 #define BIOS_SIZE 0x80000
 #define SCRATCH_SIZE 0x400
+#define SHM_SIZE RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE
 
 #ifdef HAVE_WIN_SHM
 #define MAP(addr, size, fd, offset) \
@@ -1675,12 +1677,49 @@ int lightrec_init_mmap()
 	memfd = open("/dev/ashmem", O_RDWR);
 
 	if (memfd < 0) {
-		log_cb(RETRO_LOG_ERROR, "Failed to create ASHMEM: %s\n", strerror(errno));
-		return 0;
-	}
+		/* Android 10+ / API 29+ gives EACCES (permission denied) opening /dev/ashmem
+		 * fallback to ASharedMemory_create available since Android 8 / API 26 */
+		if(errno == EACCES) {
+			void *lib;
+			int (*create)(const char*, size_t);
+			int (*setProt)(int, int);
+			char *error1, *error2;
 
-	ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
-	ioctl(memfd, ASHMEM_SET_SIZE, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE);
+			dlerror();      /* Clear any existing error */
+			lib = dlopen("libandroid.so", RTLD_NOW);
+			if (lib == NULL) {
+				log_cb(RETRO_LOG_ERROR, "Failed to dlopen: %s\n", dlerror());
+				return 0;
+			}
+
+			*(void **)(&create) = dlsym(lib, "ASharedMemory_create");
+			error1 = dlerror();
+			*(void **)(&setProt) = dlsym(lib, "ASharedMemory_setProt");
+			error2 = dlerror();
+
+			if (error1 == NULL)
+				memfd = (*create)("lightrec_memfd",SHM_SIZE);
+
+			if (memfd < 0) {
+				log_cb(RETRO_LOG_ERROR, "Failed to ASharedMemory_create: %s\n",
+							(error1 != NULL) ? error1 : strerror(errno));
+				dlclose(lib);
+				return 0;
+			}
+
+			if (error2 != NULL || (((*setProt)(memfd, PROT_READ|PROT_WRITE)) < 0))
+				log_cb(RETRO_LOG_ERROR, "Failed to ASharedMemory_setProt: %s\n",
+							(error2 != NULL) ? error2 : strerror(errno));
+
+			dlclose(lib);
+		} else {
+			log_cb(RETRO_LOG_ERROR, "Failed to create ASHMEM: %s\n", strerror(errno));
+			return 0;
+		}
+	} else {
+		ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
+		ioctl(memfd, ASHMEM_SET_SIZE, SHM_SIZE);
+	}
 #endif
 #ifdef HAVE_SHM
 	int memfd;
@@ -1697,7 +1736,7 @@ int lightrec_init_mmap()
 	/* unlink ASAP to prevent leaving a file in shared memory if we crash */
 	shm_unlink(shm_name);
 
-	if (ftruncate(memfd, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE) < 0) {
+	if (ftruncate(memfd, SHM_SIZE) < 0) {
 		log_cb(RETRO_LOG_ERROR, "Could not truncate SHM size: %s\n", strerror(errno));
 		goto close_return;
 	}
@@ -1705,8 +1744,7 @@ int lightrec_init_mmap()
 #ifdef HAVE_WIN_SHM
 	HANDLE memfd;
 
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
-			RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, SHM_SIZE, NULL);
 
 	if (memfd == NULL) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
@@ -1805,7 +1843,7 @@ void lightrec_free_mmap()
 	UNMAP(psx_scratch, SCRATCH_SIZE);
 
 #ifdef HAVE_ASHMEM
-	/* ashmem shared memory is not pinned by mmap, it dies on close */
+	/* android shared memory is not pinned by mmap, it dies on close */
 	close(memfd);
 #endif
 }
