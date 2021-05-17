@@ -3963,9 +3963,6 @@ void PS_CPU::lightrec_plugin_clear(u32 addr, u32 size)
 
 void PS_CPU::lightrec_plugin_shutdown(void)
 {
-	log_cb(RETRO_LOG_INFO,"Lightrec memory usage: %u KiB, average IPI: %.2f\n",
-		lightrec_get_total_mem_usage()/1024,
-		lightrec_get_average_ipi());
 	lightrec_destroy(lightrec_state);
 }
 
