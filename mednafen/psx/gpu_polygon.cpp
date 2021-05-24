@@ -502,7 +502,7 @@ bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 extern int psx_pgxp_2d_tol;
 
 template<int numvertices, bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
-static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
+static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb, bool pgxp_runtime)
 {
    tri_vertex vertices[3];
    const uint32_t* baseCB = cb;
@@ -600,7 +600,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       vertices[v].x = (x + gpu->OffsX) << gpu->upscale_shift;
       vertices[v].y = (y + gpu->OffsY) << gpu->upscale_shift;
 
-      if (pgxp)
+      if (pgxp && pgxp_runtime)
       {
          OGLVertex vert;
          PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
@@ -642,7 +642,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       {
          // lacking w component tends to mean degenerate coordinates
          // set to non-pgxp value if difference is too great
-         if (pgxp && psx_pgxp_2d_tol >= 0)
+         if (pgxp && pgxp_runtime && psx_pgxp_2d_tol >= 0)
          {
             unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
             if (
@@ -675,7 +675,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 
          if (invalidW)
          {
-            if (pgxp && psx_pgxp_2d_tol >= 0)
+            if (pgxp && pgxp_runtime && psx_pgxp_2d_tol >= 0)
             {
                unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
                if (

@@ -83,9 +83,11 @@ static const int8 dither_table[4][4] =
 
 static FastFIFO<uint32, 0x20> GPU_BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
 
+const int CTENTRY_TMPL_COUNT = GPU_SW_COMPILE_FAST ? 4 : 8;
+
 struct CTEntry
 {
-   void (*func[4][8])(PS_GPU* g, const uint32 *cb);
+   void (*func[4][CTENTRY_TMPL_COUNT])(PS_GPU* g, const uint32 *cb);
    uint8_t len;
    uint8_t fifo_fb_len;
    bool ss_cmd;
@@ -144,12 +146,17 @@ template<int numvertices, bool shaded, bool textured,
     int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
 {
+#if GPU_SW_COMPILE_FAST
+    Command_DrawPolygon<numvertices, shaded, textured,
+            BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb, PGXP_enabled());
+#else
   if (PGXP_enabled())
     Command_DrawPolygon<numvertices, shaded, textured,
-            BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb);
+            BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb, 1);
   else
     Command_DrawPolygon<numvertices, shaded, textured,
-            BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
+            BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb, 0);
+#endif
 }
 
 
