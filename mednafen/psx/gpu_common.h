@@ -261,27 +261,22 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 #define POLY_HELPER_SUB(bm, cv, tm, mam)	\
 	 G_Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam >
 
-#if GPU_SW_COMPILE_FAST
+// force-enable MaskEvalAND for all conditions. When MaskEval_TA=1, behavior will always be judged according
+// to the gpu's MaskEvalAND setting at runtime.
+static bool const MaskEvalAND_TA_Enabled   = GPU_SW_COMPILE_FAST ? 1 : 1;
+static bool const MaskEvalAND_TA_Disabled  = GPU_SW_COMPILE_FAST ? 1 : 0;
+
 #define POLY_HELPER_FG(bm, cv)						\
 	 {								\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), MaskEvalAND_TA_Disabled),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), MaskEvalAND_TA_Disabled),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Disabled),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Disabled),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), MaskEvalAND_TA_Enabled ),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), MaskEvalAND_TA_Enabled ),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Enabled ),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Enabled ),	\
 	 }
-#else
-#define POLY_HELPER_FG(bm, cv)						\
-	 {								\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-	 }
-#endif
 
 #define POLY_HELPER(cv)														\
 	{ 															\
@@ -293,27 +288,17 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
 #define SPR_HELPER_SUB(bm, cv, tm, mam) Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
 
-#if GPU_SW_COMPILE_FAST
 #define SPR_HELPER_FG(bm, cv)						\
 	 {								\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), MaskEvalAND_TA_Disabled),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), MaskEvalAND_TA_Disabled),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Disabled),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Disabled),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), MaskEvalAND_TA_Enabled ),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), MaskEvalAND_TA_Enabled ),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Enabled ),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), MaskEvalAND_TA_Enabled ),	\
 	 }
-#else
-#define SPR_HELPER_FG(bm, cv)						\
-	 {								\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-	 }
-#endif
 
 #define SPR_HELPER(cv)												\
 	{													\
@@ -325,27 +310,17 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
 #define LINE_HELPER_SUB(bm, cv, mam) Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1, mam>
 
-#if GPU_SW_COMPILE_FAST
 #define LINE_HELPER_FG(bm, cv)											\
 	 {													\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1)									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Disabled),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Disabled),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Disabled),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Disabled),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Enabled ),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Enabled ),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Enabled ),									\
+		LINE_HELPER_SUB(bm, cv, MaskEvalAND_TA_Enabled )									\
 	 }
-#else
-#define LINE_HELPER_FG(bm, cv)											\
-	 {													\
-		LINE_HELPER_SUB(bm, cv, 0),									\
-		LINE_HELPER_SUB(bm, cv, 0),									\
-		LINE_HELPER_SUB(bm, cv, 0),									\
-		LINE_HELPER_SUB(bm, cv, 0),									\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1),									\
-		LINE_HELPER_SUB(bm, cv, 1)									\
-	 }
-#endif
 
 #define LINE_HELPER(cv)												\
 	{ 													\
@@ -355,13 +330,8 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 	 false													\
 	}
 
-#if GPU_SW_COMPILE_FAST
-#define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr }
-#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL }
-#else
 #define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr }
 #define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
-#endif
 
 #define OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr) { { OTHER_HELPER_FG(0, arg_ptr), OTHER_HELPER_FG(1, arg_ptr), OTHER_HELPER_FG(2, arg_ptr), OTHER_HELPER_FG(3, arg_ptr) }, arg_cs, arg_fbcs, arg_ss }
 #define OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr)
@@ -371,3 +341,4 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 #define OTHER_HELPER_X32(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 
 #define NULLCMD() { { NULLCMD_FG(0), NULLCMD_FG(1), NULLCMD_FG(2), NULLCMD_FG(3) }, 1, 1, true }
+
