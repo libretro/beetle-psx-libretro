@@ -5,6 +5,14 @@
 #  define GPU_SW_COMPILE_FAST   0
 #endif
 
+#if GPU_SW_COMPILE_FAST
+#  define GPU_MaskEvalAND (gpu->MaskEvalAND)
+#else
+   // MaskEvalAND can only be either 0 or 0x8000, so if MaskEval_TA=1, then GPU_MaskEvalAND can be specifiec
+   // as a literal value 0x8000.
+#  define GPU_MaskEvalAND (0x8000)
+#endif
+
 extern enum dither_mode psx_gpu_dither_mode;
 
 /* Return a pixel from VRAM */
@@ -88,7 +96,7 @@ static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pi
       PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
-   if(!MaskEval_TA || !(vram_fetch(gpu, x, y) & 0x8000))
+   if(!MaskEval_TA || !(vram_fetch(gpu, x, y) & GPU_MaskEvalAND))
    {
       if (textured)
          vram_put(gpu, x, y, fore_pix | gpu->MaskSetOR);
@@ -110,7 +118,7 @@ static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t f
       PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
    }
 
-   if(!MaskEval_TA || !(texel_fetch(gpu, x, y) & 0x8000))
+   if(!MaskEval_TA || !(texel_fetch(gpu, x, y) & GPU_MaskEvalAND))
       texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR);
 }
 

@@ -81,7 +81,7 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
              * to "draw" proportional to its height. */
             int32_t suck_time = /* 8 + */ (x_bound - x_start);
 
-            if((BlendMode >= 0) || MaskEval_TA)
+            if((BlendMode >= 0) || (MaskEval_TA && GPU_MaskEvalAND))
                suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
 
             gpu->DrawTimeAvail -= suck_time;

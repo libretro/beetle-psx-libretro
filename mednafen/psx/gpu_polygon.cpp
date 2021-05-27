@@ -156,7 +156,7 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
   if ((y & ((1UL << gpu->upscale_shift) - 1)) == 0) {
      if(gouraud || textured)
         gpu->DrawTimeAvail -= (w * 2) >> gpu->upscale_shift;
-     else if((BlendMode >= 0) || MaskEval_TA)
+     else if((BlendMode >= 0) || (MaskEval_TA && GPU_MaskEvalAND))
         gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> gpu->upscale_shift;
      else
         gpu->DrawTimeAvail -= w >> gpu->upscale_shift;
