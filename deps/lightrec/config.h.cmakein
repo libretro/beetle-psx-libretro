@@ -1,15 +1,6 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
- * Copyright (C) 2019 Paul Cercueil <paul@crapouillou.net>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * Copyright (C) 2019-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
 #ifndef __LIGHTREC_CONFIG_H__
@@ -21,6 +12,16 @@
 #cmakedefine01 ENABLE_TINYMM
 
 #cmakedefine01 HAS_DEFAULT_ELM
+
+#cmakedefine01 OPT_REMOVE_DIV_BY_ZERO_SEQ
+#cmakedefine01 OPT_REPLACE_MEMSET
+#cmakedefine01 OPT_DETECT_IMPOSSIBLE_BRANCHES
+#cmakedefine01 OPT_TRANSFORM_OPS
+#cmakedefine01 OPT_LOCAL_BRANCHES
+#cmakedefine01 OPT_SWITCH_DELAY_SLOTS
+#cmakedefine01 OPT_FLAG_STORES
+#cmakedefine01 OPT_FLAG_MULT_DIV
+#cmakedefine01 OPT_EARLY_UNLOAD
 
 #endif /* __LIGHTREC_CONFIG_H__ */
 

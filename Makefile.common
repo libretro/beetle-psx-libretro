@@ -161,6 +161,19 @@ endif
 ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
 
+   ifeq ($(LIGHTREC_LOG_LEVEL),)
+       FLAGS += -DLOG_LEVEL=2 \
+                -DENABLE_DISASSEMBLER=0
+   else
+       ifeq ($(LIGHTREC_LOG_LEVEL), 4)
+           FLAGS += -DLOG_LEVEL=4 \
+                    -DENABLE_DISASSEMBLER=1
+       else
+           FLAGS += -DLOG_LEVEL=$(LIGHTREC_LOG_LEVEL) \
+                    -DENABLE_DISASSEMBLER=0
+       endif
+   endif
+
    ifeq ($(NO_GCC), 1)
        FLAGS += -DHAS_DEFAULT_ELM=0
    else
@@ -183,7 +196,8 @@ ifeq ($(HAVE_LIGHTREC), 1)
    endif
 
    INCFLAGS += -I$(DEPS_DIR)/lightning/include \
-               -I$(DEPS_DIR)/lightrec
+               -I$(DEPS_DIR)/lightrec \
+               -I$(CORE_DIR)/lightning-lightrec-include
 endif
 
 ifneq ($(HAVE_GRIFFIN), 1)
@@ -356,7 +370,6 @@ ifeq ($(HAVE_LIGHTREC), 1)
                   $(DEPS_DIR)/lightning/lib/jit_size.c \
                   $(DEPS_DIR)/lightning/lib/lightning.c \
                   $(DEPS_DIR)/lightrec/blockcache.c \
-                  $(DEPS_DIR)/lightrec/disassembler.c \
                   $(DEPS_DIR)/lightrec/emitter.c \
                   $(DEPS_DIR)/lightrec/interpreter.c \
                   $(DEPS_DIR)/lightrec/lightrec.c \
@@ -371,8 +384,12 @@ ifeq ($(HAVE_LIGHTREC), 1)
       endif
    endif
 
+   ifeq ($(LIGHTREC_LOG_LEVEL), 4)
+      SOURCES_C +=   $(DEPS_DIR)/lightrec/disassembler.c
+   endif
+
    ifneq (,$(findstring win,$(platform)))
-       SOURCES_C +=   $(DEPS_DIR)/mman/sys/mman.c
+      SOURCES_C +=   $(DEPS_DIR)/mman/sys/mman.c
    endif
 
 endif ##ifeq ($(HAVE_LIGHTREC), 1)

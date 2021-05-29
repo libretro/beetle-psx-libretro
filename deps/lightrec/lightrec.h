@@ -1,15 +1,6 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
- * Copyright (C) 2016-2020 Paul Cercueil <paul@crapouillou.net>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * Copyright (C) 2016-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
 #ifndef __LIGHTREC_H__
@@ -67,14 +58,6 @@ enum psx_map {
 	PSX_MAP_MIRROR1,
 	PSX_MAP_MIRROR2,
 	PSX_MAP_MIRROR3,
-};
-
-enum mem_type {
-	MEM_FOR_CODE,
-	MEM_FOR_MIPS_CODE,
-	MEM_FOR_IR,
-	MEM_FOR_LIGHTREC,
-	MEM_TYPE_END,
 };
 
 struct lightrec_mem_map_ops {
@@ -138,10 +121,6 @@ __api u32 lightrec_current_cycle_count(const struct lightrec_state *state);
 __api void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles);
 __api void lightrec_set_target_cycle_count(struct lightrec_state *state,
 					   u32 cycles);
-
-__api unsigned int lightrec_get_mem_usage(enum mem_type type);
-__api unsigned int lightrec_get_total_mem_usage(void);
-__api float lightrec_get_average_ipi(void);
 
 #ifdef __cplusplus
 };
