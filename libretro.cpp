@@ -3888,7 +3888,14 @@ static bool MDFNI_LoadCD(const char *devicename)
 
          image_label[0] = '\0';
 
-         CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
+         bool cache = cdimagecache;
+         /* don't precache if physical cdrom, will take way too long and be unresponive */
+         if (cdimagecache && devicename && !strncasecmp(devicename, "cdrom:", 6)) {
+            cache = false;
+            log_cb(RETRO_LOG_INFO, "Skipping Pre-Cache due to using physical media: %s\n", devicename);
+         }
+
+         CDIF *image  = CDIF_Open(&success, devicename, false, cache);
          if (!success)
             return false;
 
