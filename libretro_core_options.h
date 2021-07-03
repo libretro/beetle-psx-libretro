@@ -54,7 +54,7 @@ struct retro_core_option_definition option_defs_us[] = {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(renderer),
-      "Renderer (Restart)",
+      "Renderer (Restart Required)",
       "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer.",
       {
          { "hardware",    "Hardware (Auto)" },
@@ -415,7 +415,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       BEETLE_OPT(dynarec_eventcycles),
       "Dynarec DMA/GPU Event Cycles",
-      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec",
+      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec.",
       {
          { "128", "128 (Default)" },
          { "256",  NULL },
@@ -980,7 +980,7 @@ struct retro_core_option_definition option_defs_us[] = {
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
-      "CD Access Method (Restart)",
+      "CD Access Method (Restart Required)",
       "Select method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content which may improve in-game loading times at the cost of an initial delay at startup. 'Pre-Cache' may cause issues on systems with low RAM.",
       {
          { "sync",     "Synchronous" },
@@ -1009,7 +1009,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
-      "Memory Card 0 Method (Restart)",
+      "Memory Card 0 Method (Restart Required)",
       "Choose the save data format used for memory card 0. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen. When used with Beetle PSX, Libretro (.srm) and Mednafen (.mcr) saves have internally identical formats and can be converted between one another via renaming.",
       {
          { "libretro", "Libretro" },
@@ -1020,7 +1020,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(enable_memcard1),
-      "Enable Memory Card 1 (Restart)",
+      "Enable Memory Card 1 (Restart Required)",
       "Select whether to emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka). Note: Memory Card 1 uses the Mednafen (.mcr) save format.",
       {
          { "enabled",  NULL },
@@ -1031,7 +1031,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(shared_memory_cards),
-      "Shared Memory Cards (Restart)",
+      "Shared Memory Cards (Restart Required)",
       "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: if 'Memory Card 0 Method' is set to 'Libretro', only the right memory card will be affected.",
       {
          { "disabled", NULL },
@@ -1345,7 +1345,7 @@ struct retro_core_option_definition *option_defs_intl[RETRO_LANGUAGE_LAST] = {
    option_defs_us, /* RETRO_LANGUAGE_ENGLISH */
    NULL,           /* RETRO_LANGUAGE_JAPANESE */
    NULL,           /* RETRO_LANGUAGE_FRENCH */
-   NULL,           /* RETRO_LANGUAGE_SPANISH */
+   option_defs_es, /* RETRO_LANGUAGE_SPANISH */
    NULL,           /* RETRO_LANGUAGE_GERMAN */
    option_defs_it, /* RETRO_LANGUAGE_ITALIAN */
    NULL,           /* RETRO_LANGUAGE_DUTCH */
