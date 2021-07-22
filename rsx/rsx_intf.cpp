@@ -900,8 +900,14 @@ float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
          case 1:
             return (16.0 / 9.0);
          case 2:
-            return (/*21.0 / 9.0*/ 64.0 / 27.0);
+            return (18.0 / 9.0);
          case 3:
+            return (19.0 / 9.0);
+         case 4:
+            return (20.0 / 9.0);
+         case 5:
+            return (/*21.0 / 9.0*/ 64.0 / 27.0);
+         case 6:
             return (32.0 / 9.0);
       }
 
