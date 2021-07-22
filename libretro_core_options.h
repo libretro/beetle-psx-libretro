@@ -588,6 +588,9 @@ struct retro_core_option_definition option_defs_us[] = {
       {
          { "16:10", NULL },
          { "16:9",  NULL },
+         { "18:9",  NULL },
+         { "19:9",  NULL },
+         { "20:9",  NULL },
          { "21:9",  NULL }, // 64:27
          { "32:9",  NULL },
          { NULL,    NULL },

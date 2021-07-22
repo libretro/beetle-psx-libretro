@@ -2246,10 +2246,16 @@ static struct retro_system_av_info get_av_info(VideoClock std)
          widescreen_hack_aspect_ratio_setting = 0;
       else if (!strcmp(var.value, "16:9"))
          widescreen_hack_aspect_ratio_setting = 1;
-      else if (!strcmp(var.value, "21:9"))
+      else if (!strcmp(var.value, "18:9"))
          widescreen_hack_aspect_ratio_setting = 2;
-      else if (!strcmp(var.value, "32:9"))
+      else if (!strcmp(var.value, "19:9"))
          widescreen_hack_aspect_ratio_setting = 3;
+      else if (!strcmp(var.value, "20:9"))
+         widescreen_hack_aspect_ratio_setting = 4;
+      else if (!strcmp(var.value, "21:9"))
+         widescreen_hack_aspect_ratio_setting = 5;
+      else if (!strcmp(var.value, "32:9"))
+         widescreen_hack_aspect_ratio_setting = 6;
    }
 
    var.key = BEETLE_OPT(crop_overscan);

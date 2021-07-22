@@ -1196,10 +1196,19 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
       case 1: // 16:9 (default)
          widescreen_hack_aspect_ratio = 0.75f;
          break;
-      case 2: // 21:9 (64:27)
+      case 2: // 18:9 (smartphone)
+         widescreen_hack_aspect_ratio = 0.66f;
+         break;
+      case 3: // 19:9 (smartphone)
+         widescreen_hack_aspect_ratio = 0.63f;
+         break;
+      case 4: // 20:9 (smartphone)
+         widescreen_hack_aspect_ratio = 0.6f;
+         break;
+      case 5: // 21:9 (ultrawide, 64:27)
          widescreen_hack_aspect_ratio = 0.55f;
          break;
-      case 3: // 32:9
+      case 6: // 32:9 (superwide)
          widescreen_hack_aspect_ratio = 0.37f;
          break;
    }
