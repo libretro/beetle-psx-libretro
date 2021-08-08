@@ -16,7 +16,8 @@
 #define OPT_LOCAL_BRANCHES 1
 #define OPT_SWITCH_DELAY_SLOTS 1
 #define OPT_FLAG_STORES 1
-#define OPT_FLAG_MULT_DIV 1
+/* Disable until ape escape bug is fixed */
+#define OPT_FLAG_MULT_DIV 0
 #define OPT_EARLY_UNLOAD 1
 
 #endif /* __LIGHTREC_CONFIG_H__ */
