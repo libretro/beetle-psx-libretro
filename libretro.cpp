@@ -56,6 +56,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 extern bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
+static bool libretro_supports_option_categories = false;
 static bool libretro_supports_bitmasks = false;
 static unsigned libretro_msg_interface_version = 0;
 
@@ -4716,6 +4717,7 @@ void retro_deinit(void)
    log_cb(RETRO_LOG_DEBUG, "[%s]: Estimated FPS: %.5f\n",
          MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
 
+   libretro_supports_option_categories = false;
    libretro_supports_bitmasks = false;
 }
 
@@ -4739,7 +4741,9 @@ void retro_set_environment(retro_environment_t cb)
    struct retro_vfs_interface_info vfs_iface_info;
    environ_cb = cb;
 
-   libretro_set_core_options(environ_cb);
+   libretro_supports_option_categories = false;
+   libretro_set_core_options(environ_cb,
+           &libretro_supports_option_categories);
 
    vfs_iface_info.required_interface_version = 1;
    vfs_iface_info.iface                      = NULL;
