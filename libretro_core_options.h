@@ -101,8 +101,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "16x",        NULL },
          { NULL, NULL },
       },
-      "1x(native)",
-      NULL
+      "1x(native)"
    },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {
@@ -117,8 +116,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "32bpp",         "32 bpp" },
          { NULL, NULL },
       },
-      "16bpp(native)",
-      NULL
+      "16bpp(native)"
    },
    // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
@@ -135,8 +133,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled",            NULL },
          { NULL, NULL },
       },
-      "1x(native)",
-      NULL
+      "1x(native)"
    },
 #ifdef HAVE_VULKAN
    {
@@ -151,8 +148,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { NULL, NULL },
       },
-      "enabled",
-      "bool"
+      "enabled"
    },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
@@ -172,8 +168,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "JINC2",    NULL },
          { NULL, NULL },
       },
-      "nearest",
-      NULL
+      "nearest"
    },
 #ifdef HAVE_VULKAN
    {
@@ -189,8 +184,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "all", "Opaque and Semi-Transparent" },
          { NULL, NULL },
       },
-      "disable",
-      NULL
+      "disable"
    },
    {
       BEETLE_OPT(filter_exclude_2d_polygon),
@@ -205,8 +199,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "all", "Opaque and Semi-Transparent" },
          { NULL, NULL },
       },
-      "disable",
-      NULL
+      "disable"
    },
 #endif
 #endif
@@ -223,8 +216,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(super_sampling),
@@ -239,7 +231,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "disabled"
-      "bool"
    },
    {
       BEETLE_OPT(msaa),
@@ -256,8 +247,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "16x", NULL },
          { NULL, NULL },
       },
-      "1x",
-      NULL
+      "1x"
    },
    {
       BEETLE_OPT(mdec_yuv),
@@ -272,7 +262,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "disabled"
-      "bool"
    },
    {
       BEETLE_OPT(track_textures),
@@ -286,8 +275,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #ifdef TEXTURE_DUMPING_ENABLED
    {
@@ -302,8 +290,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #endif
    {
@@ -318,8 +305,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -335,8 +321,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #endif
    {
@@ -351,8 +336,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(display_internal_fps),
@@ -366,8 +350,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
@@ -382,8 +365,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #endif
    {
@@ -398,8 +380,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(analog_toggle),
@@ -413,8 +394,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(enable_multitap_port1),
@@ -428,8 +408,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(enable_multitap_port2),
@@ -443,8 +422,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(gun_input_mode),
@@ -458,8 +436,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "touchscreen", "Touchscreen" },
          { NULL, NULL },
       },
-      "lightgun",
-      NULL
+      "lightgun"
    },
    // Shouldn't the gun_input_mode just be Mouse vs. Touchscreen?
    {
@@ -475,8 +452,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "off",   "disabled" },
          { NULL, NULL },
       },
-      "cross",
-      NULL
+      "cross"
    },
    {
       BEETLE_OPT(mouse_sensitivity),
@@ -528,8 +504,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "200%", NULL },
          { NULL, NULL },
       },
-      "100%",
-      NULL
+      "100%"
    },
    {
       BEETLE_OPT(negcon_response),
@@ -544,8 +519,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "cubic",     "Cubic" },
          { NULL, NULL },
       },
-      "linear",
-      NULL
+      "linear"
    },
    {
       BEETLE_OPT(negcon_deadzone),
@@ -564,8 +538,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "30%", NULL },
          { NULL, NULL },
       },
-      "0%",
-      NULL
+      "0%"
    },
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
@@ -579,8 +552,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "mednafen", "Mednafen" },
          { NULL, NULL },
       },
-      "libretro",
-      NULL
+      "libretro"
    },
    {
       BEETLE_OPT(enable_memcard1),
@@ -594,8 +566,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { NULL, NULL },
       },
-      "enabled",
-      "bool"
+      "enabled"
    },
    {
       BEETLE_OPT(shared_memory_cards),
@@ -609,8 +580,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(memcard_left_index),
@@ -686,8 +656,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "63",  NULL },
          { NULL, NULL },
       },
-      "0",
-      "int"
+      "0"
    },
    {
       BEETLE_OPT(memcard_right_index),
@@ -763,8 +732,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "63",  NULL },
          { NULL, NULL },
       },
-      "1",
-      "int"
+      "1"
    },
    {
       BEETLE_OPT(pgxp_mode),
@@ -779,8 +747,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "memory + CPU", "Memory + CPU (Buggy)" },
          { NULL, NULL },
       },
-      "disabled",
-      NULL
+      "disabled"
    },
    {
       BEETLE_OPT(pgxp_2d_tol),
@@ -802,8 +769,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "8px", NULL },
          { NULL, NULL },
       },
-      "disabled",
-      NULL
+      "disabled"
    },
    {
       BEETLE_OPT(pgxp_nclip),
@@ -817,8 +783,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled", NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
@@ -833,8 +798,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(pgxp_texture),
@@ -848,8 +812,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #endif
    {
@@ -865,8 +828,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled",   NULL },
          { NULL, NULL },
       },
-      "default",
-      NULL
+      "default"
    },
    {
       BEETLE_OPT(widescreen_hack),
@@ -880,8 +842,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(widescreen_hack_aspect_ratio),
@@ -900,8 +861,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "32:9",  NULL },
          { NULL,    NULL },
       },
-      "16:9",
-      NULL
+      "16:9"
    },
    {
       BEETLE_OPT(cpu_freq_scale),
@@ -984,8 +944,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "750%",          NULL },
          { NULL, NULL },
       },
-      "100%(native)",
-      NULL
+      "100%(native)"
    },
    {
       BEETLE_OPT(gte_overclock),
@@ -999,8 +958,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(skip_bios),
@@ -1014,8 +972,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
@@ -1036,8 +993,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "software",    "Software" },
          { NULL, NULL },
       },
-      "hardware",
-      NULL
+      "hardware"
    },
    {
       BEETLE_OPT(renderer_software_fb),
@@ -1051,8 +1007,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { NULL, NULL },
       },
-      "enabled",
-      "bool"
+      "enabled"
    },
 #endif
 #if defined(HAVE_LIGHTREC)
@@ -1070,8 +1025,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "run_interpreter", "Lightrec Interpreter" },
          { NULL, NULL },
       },
-      "disabled",
-      NULL
+      "disabled"
    },
    {
       BEETLE_OPT(dynarec_invalidate),
@@ -1085,8 +1039,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "dma",  "DMA Only (Slightly Faster)" },
          { NULL, NULL },
       },
-      "full",
-      NULL
+      "full"
    },
    {
       BEETLE_OPT(dynarec_eventcycles),
@@ -1106,8 +1059,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "1024",  NULL },
          { NULL, NULL },
       },
-      "128",
-      "int"
+      "128"
    },
 #endif
    {
@@ -1122,8 +1074,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "force_interlaced",  "Force Interlaced Rate" },
          { "auto_toggle", "Allow Automatic Toggling" },
       },
-      "force_progressive",
-      NULL
+      "force_progressive"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -1136,8 +1087,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { "enabled",  NULL },
       },
-      "disabled",
-      "bool"
+      "disabled"
    },
    {
       BEETLE_OPT(crop_overscan),
@@ -1151,8 +1101,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { NULL, NULL },
       },
-      "enabled",
-      "bool"
+      "enabled"
    },
    {
       BEETLE_OPT(image_crop),
@@ -1185,8 +1134,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "20px",     NULL },
          { NULL, NULL },
       },
-      "disabled",
-      NULL
+      "disabled"
    },
    {
       BEETLE_OPT(image_offset),
@@ -1223,8 +1171,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "+12px",    NULL },
          { NULL, NULL },
       },
-      "disabled",
-      NULL
+      "disabled"
    },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
@@ -1318,8 +1265,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "+40",      NULL },
          { NULL, NULL},
       },
-      "0",
-      NULL
+      "0"
    },
 #endif
    {
@@ -1338,8 +1284,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "32x",        NULL },
          { NULL, NULL },
       },
-      "1x(native)",
-      NULL
+      "1x(native)"
    },
    {
       BEETLE_OPT(aspect_ratio),
@@ -1354,8 +1299,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "4:3",  "Force 4:3" },
          { "ntsc", "Force NTSC" },
       },
-      "corrected",
-      NULL
+      "corrected"
    },
    {
       BEETLE_OPT(initial_scanline),
@@ -1408,8 +1352,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "40", NULL },
          { NULL, NULL },
       },
-      "0",
-      NULL
+      "0"
    },
    {
       BEETLE_OPT(last_scanline),
@@ -1451,8 +1394,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "239", NULL },
          { NULL, NULL },
       },
-      "239",
-      "int"
+      "239"
    },
    {
       BEETLE_OPT(initial_scanline_pal),
@@ -1505,8 +1447,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "40", NULL },
          { NULL, NULL },
       },
-      "0",
-      "int"
+      "0"
    },
    {
       BEETLE_OPT(last_scanline_pal),
@@ -1576,8 +1517,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "287", NULL },
          { NULL, NULL },
       },
-      "287",
-      "int"
+      "287"
    },
 #ifndef EMSCRIPTEN
    {
@@ -1593,8 +1533,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "precache", "Pre-Cache" },
          { NULL, NULL },
       },
-      "sync",
-      NULL
+      "sync"
    },
 #endif
    {
@@ -1614,10 +1553,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "14x",         NULL },
          { NULL, NULL },
       },
-      "2x(native)",
-      NULL
+      "2x(native)"
    },
-   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL, NULL },
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };
 
 struct retro_core_options_v2 options_us = {
