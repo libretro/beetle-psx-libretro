@@ -570,7 +570,7 @@ static u32 lightrec_propagate_consts(union code c, u32 known, u32 *v)
 	return known;
 }
 
-static int lightrec_transform_ops(struct block *block)
+static int lightrec_transform_ops(struct lightrec_state *state, struct block *block)
 {
 	struct opcode *list;
 	unsigned int i;
@@ -661,7 +661,7 @@ static int lightrec_transform_ops(struct block *block)
 	return 0;
 }
 
-static int lightrec_switch_delay_slots(struct block *block)
+static int lightrec_switch_delay_slots(struct lightrec_state *state, struct block *block)
 {
 	struct opcode *list, *next = &block->opcode_list[0];
 	unsigned int i;
@@ -751,7 +751,7 @@ static int lightrec_switch_delay_slots(struct block *block)
 	return 0;
 }
 
-static int shrink_opcode_list(struct block *block, u16 new_size)
+static int shrink_opcode_list(struct lightrec_state *state, struct block *block, u16 new_size)
 {
 	struct opcode *list;
 
@@ -762,7 +762,7 @@ static int shrink_opcode_list(struct block *block, u16 new_size)
 	}
 
 
-	list = lightrec_malloc(block->state, MEM_FOR_IR,
+	list = lightrec_malloc(state, MEM_FOR_IR,
 			       sizeof(*list) * new_size);
 	if (!list) {
 		pr_err("Unable to allocate memory\n");
@@ -771,7 +771,7 @@ static int shrink_opcode_list(struct block *block, u16 new_size)
 
 	memcpy(list, block->opcode_list, sizeof(*list) * new_size);
 
-	lightrec_free_opcode_list(block);
+	lightrec_free_opcode_list(state, block);
 	block->opcode_list = list;
 	block->nb_ops = new_size;
 
@@ -781,7 +781,8 @@ static int shrink_opcode_list(struct block *block, u16 new_size)
 	return 0;
 }
 
-static int lightrec_detect_impossible_branches(struct block *block)
+static int lightrec_detect_impossible_branches(struct lightrec_state *state,
+					       struct block *block)
 {
 	struct opcode *op, *next = &block->opcode_list[0];
 	unsigned int i;
@@ -814,7 +815,7 @@ static int lightrec_detect_impossible_branches(struct block *block)
 			 * only keep the first two opcodes of the block (the
 			 * branch itself + its delay slot) */
 			if (block->nb_ops > 2)
-				ret = shrink_opcode_list(block, 2);
+				ret = shrink_opcode_list(state, block, 2);
 			break;
 		}
 	}
@@ -822,7 +823,7 @@ static int lightrec_detect_impossible_branches(struct block *block)
 	return ret;
 }
 
-static int lightrec_local_branches(struct block *block)
+static int lightrec_local_branches(struct lightrec_state *state, struct block *block)
 {
 	struct opcode *list;
 	unsigned int i;
@@ -913,7 +914,7 @@ static void lightrec_add_unload(struct opcode *op, u8 reg)
 		op->flags |= LIGHTREC_UNLOAD_RT;
 }
 
-static int lightrec_early_unload(struct block *block)
+static int lightrec_early_unload(struct lightrec_state *state, struct block *block)
 {
 	unsigned int i, offset;
 	struct opcode *op;
@@ -952,7 +953,7 @@ static int lightrec_early_unload(struct block *block)
 	return 0;
 }
 
-static int lightrec_flag_stores(struct block *block)
+static int lightrec_flag_stores(struct lightrec_state *state, struct block *block)
 {
 	struct opcode *list;
 	u32 known = BIT(0);
@@ -975,7 +976,7 @@ static int lightrec_flag_stores(struct block *block)
 			 * on the heuristic that stores using one of these
 			 * registers as address will never hit a code page. */
 			if (list->i.rs >= 28 && list->i.rs <= 29 &&
-			    !block->state->maps[PSX_MAP_KERNEL_USER_RAM].ops) {
+			    !state->maps[PSX_MAP_KERNEL_USER_RAM].ops) {
 				pr_debug("Flaging opcode 0x%08x as not requiring invalidation\n",
 					 list->opcode);
 				list->flags |= LIGHTREC_NO_INVALIDATE;
@@ -1004,7 +1005,7 @@ static int lightrec_flag_stores(struct block *block)
 
 static u8 get_mfhi_mflo_reg(const struct block *block, u16 offset,
 			    const struct opcode *last,
-			    u32 mask, bool sync, bool mflo)
+			    u32 mask, bool sync, bool mflo, bool another)
 {
 	const struct opcode *op, *next = &block->opcode_list[offset];
 	u32 old_mask;
@@ -1041,9 +1042,9 @@ static u8 get_mfhi_mflo_reg(const struct block *block, u16 offset,
 					- !!(OPT_SWITCH_DELAY_SLOTS && (op->flags & LIGHTREC_NO_DS));
 
 				reg = get_mfhi_mflo_reg(block, branch_offset, NULL,
-							mask, sync, mflo);
+							mask, sync, mflo, false);
 				reg2 = get_mfhi_mflo_reg(block, offset + 1, next,
-							 mask, sync, mflo);
+							 mask, sync, mflo, false);
 				if (reg > 0 && reg == reg2)
 					return reg;
 				if (!reg && !reg2)
@@ -1082,6 +1083,14 @@ static u8 get_mfhi_mflo_reg(const struct block *block, u16 offset,
 				return reg;
 			case OP_SPECIAL_MFHI:
 				if (!mflo) {
+					if (another)
+						return op->r.rd;
+					/* Must use REG_HI if there is another MFHI target*/
+					reg2 = get_mfhi_mflo_reg(block, i + 1, next,
+							 0, sync, mflo, true);
+					if (reg2 > 0 && reg2 != REG_HI)
+						return REG_HI;
+
 					if (!sync && !(old_mask & BIT(op->r.rd)))
 						return op->r.rd;
 					else
@@ -1090,6 +1099,14 @@ static u8 get_mfhi_mflo_reg(const struct block *block, u16 offset,
 				continue;
 			case OP_SPECIAL_MFLO:
 				if (mflo) {
+					if (another)
+						return op->r.rd;
+					/* Must use REG_LO if there is another MFLO target*/
+					reg2 = get_mfhi_mflo_reg(block, i + 1, next,
+							 0, sync, mflo, true);
+					if (reg2 > 0 && reg2 != REG_LO)
+						return REG_LO;
+
 					if (!sync && !(old_mask & BIT(op->r.rd)))
 						return op->r.rd;
 					else
@@ -1160,7 +1177,7 @@ static void lightrec_replace_lo_hi(struct block *block, u16 offset,
 	}
 }
 
-static int lightrec_flag_mults_divs(struct block *block)
+static int lightrec_flag_mults_divs(struct lightrec_state *state, struct block *block)
 {
 	struct opcode *list;
 	u8 reg_hi, reg_lo;
@@ -1187,14 +1204,14 @@ static int lightrec_flag_mults_divs(struct block *block)
 		    (list->flags & LIGHTREC_NO_DS))
 			continue;
 
-		reg_lo = get_mfhi_mflo_reg(block, i + 1, NULL, 0, false, true);
+		reg_lo = get_mfhi_mflo_reg(block, i + 1, NULL, 0, false, true, false);
 		if (reg_lo == 0) {
 			pr_debug("Mark MULT(U)/DIV(U) opcode at offset 0x%x as"
 				 " not writing LO\n", i << 2);
 			list->flags |= LIGHTREC_NO_LO;
 		}
 
-		reg_hi = get_mfhi_mflo_reg(block, i + 1, NULL, 0, false, false);
+		reg_hi = get_mfhi_mflo_reg(block, i + 1, NULL, 0, false, false, false);
 		if (reg_hi == 0) {
 			pr_debug("Mark MULT(U)/DIV(U) opcode at offset 0x%x as"
 				 " not writing HI\n", i << 2);
@@ -1311,7 +1328,8 @@ static bool remove_div_sequence(struct block *block, unsigned int offset)
 	return false;
 }
 
-static int lightrec_remove_div_by_zero_check_sequence(struct block *block)
+static int lightrec_remove_div_by_zero_check_sequence(struct lightrec_state *state,
+						      struct block *block)
 {
 	struct opcode *op;
 	unsigned int i;
@@ -1340,7 +1358,7 @@ static const u32 memset_code[] = {
 	0x00000000,	// nop
 };
 
-static int lightrec_replace_memset(struct block *block)
+static int lightrec_replace_memset(struct lightrec_state *state, struct block *block)
 {
 	unsigned int i;
 	union code c;
@@ -1364,7 +1382,7 @@ static int lightrec_replace_memset(struct block *block)
 	return 0;
 }
 
-static int (*lightrec_optimizers[])(struct block *) = {
+static int (*lightrec_optimizers[])(struct lightrec_state *state, struct block *) = {
 	IF_OPT(OPT_REMOVE_DIV_BY_ZERO_SEQ, &lightrec_remove_div_by_zero_check_sequence),
 	IF_OPT(OPT_REPLACE_MEMSET, &lightrec_replace_memset),
 	IF_OPT(OPT_DETECT_IMPOSSIBLE_BRANCHES, &lightrec_detect_impossible_branches),
@@ -1376,14 +1394,14 @@ static int (*lightrec_optimizers[])(struct block *) = {
 	IF_OPT(OPT_EARLY_UNLOAD, &lightrec_early_unload),
 };
 
-int lightrec_optimize(struct block *block)
+int lightrec_optimize(struct lightrec_state *state, struct block *block)
 {
 	unsigned int i;
 	int ret;
 
 	for (i = 0; i < ARRAY_SIZE(lightrec_optimizers); i++) {
 		if (lightrec_optimizers[i]) {
-			ret = (*lightrec_optimizers[i])(block);
+			ret = (*lightrec_optimizers[i])(state, block);
 			if (ret)
 				return ret;
 		}

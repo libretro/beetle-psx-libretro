@@ -9,7 +9,7 @@
 struct lightrec_state;
 struct reaper;
 
-typedef void (*reap_func_t)(void *);
+typedef void (*reap_func_t)(struct lightrec_state *state, void *);
 
 struct reaper *lightrec_reaper_init(struct lightrec_state *state);
 void lightrec_reaper_destroy(struct reaper *reaper);

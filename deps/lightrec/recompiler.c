@@ -44,7 +44,7 @@ static void lightrec_compile_list(struct recompiler *rec)
 
 		pthread_mutex_unlock(&rec->mutex);
 
-		ret = lightrec_compile_block(block);
+		ret = lightrec_compile_block(rec->state, block);
 		if (ret) {
 			pr_err("Unable to compile block at PC 0x%x: %d\n",
 			       block->pc, ret);
@@ -242,7 +242,8 @@ void lightrec_recompiler_remove(struct recompiler *rec, struct block *block)
 	pthread_mutex_unlock(&rec->mutex);
 }
 
-void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
+void * lightrec_recompiler_run_first_pass(struct lightrec_state *state,
+					  struct block *block, u32 *pc)
 {
 	bool freed;
 
@@ -256,7 +257,7 @@ void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
 
 				/* The block was already compiled but the opcode list
 				 * didn't get freed yet - do it now */
-				lightrec_free_opcode_list(block);
+				lightrec_free_opcode_list(state, block);
 				block->opcode_list = NULL;
 			}
 		}
@@ -269,7 +270,7 @@ void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
 	freed = atomic_flag_test_and_set(&block->op_list_freed);
 
 	/* Block wasn't compiled yet - run the interpreter */
-	*pc = lightrec_emulate_block(block, *pc);
+	*pc = lightrec_emulate_block(state, block, *pc);
 
 	if (!freed)
 		atomic_flag_clear(&block->op_list_freed);
@@ -281,7 +282,7 @@ void * lightrec_recompiler_run_first_pass(struct block *block, u32 *pc)
 		pr_debug("Block PC 0x%08x is fully tagged"
 			 " - free opcode list\n", block->pc);
 
-		lightrec_free_opcode_list(block);
+		lightrec_free_opcode_list(state, block);
 		block->opcode_list = NULL;
 	}
 

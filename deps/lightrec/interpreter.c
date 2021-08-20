@@ -379,7 +379,7 @@ static u32 int_do_branch(struct interpreter *inter, u32 old_pc, u32 next_pc)
 	    (inter->op->flags & LIGHTREC_LOCAL_BRANCH) &&
 	    (s16)inter->op->c.i.imm >= 0) {
 		next_pc = old_pc + ((1 + (s16)inter->op->c.i.imm) << 2);
-		next_pc = lightrec_emulate_block(inter->block, next_pc);
+		next_pc = lightrec_emulate_block(inter->state, inter->block, next_pc);
 	}
 
 	return next_pc;
@@ -823,9 +823,6 @@ static u32 int_special_DIV(struct interpreter *inter)
 	if (rt == 0) {
 		hi = rs;
 		lo = (rs < 0) * 2 - 1;
-	} else if ((rs == 0x80000000) && (rt == 0xFFFFFFFF)) {
-		lo = rs;
-		hi = 0;
 	} else {
 		lo = rs / rt;
 		hi = rs % rt;
@@ -1117,13 +1114,14 @@ static u32 int_CP2(struct interpreter *inter)
 	return int_CP(inter);
 }
 
-static u32 lightrec_emulate_block_list(struct block *block, u32 offset)
+static u32 lightrec_emulate_block_list(struct lightrec_state *state,
+				       struct block *block, u32 offset)
 {
 	struct interpreter inter;
 	u32 pc;
 
 	inter.block = block;
-	inter.state = block->state;
+	inter.state = state;
 	inter.offset = offset;
 	inter.op = &block->opcode_list[offset];
 	inter.cycles = 0;
@@ -1134,17 +1132,17 @@ static u32 lightrec_emulate_block_list(struct block *block, u32 offset)
 	/* Add the cycles of the last branch */
 	inter.cycles += lightrec_cycles_of_opcode(inter.op->c);
 
-	block->state->current_cycle += inter.cycles;
+	state->current_cycle += inter.cycles;
 
 	return pc;
 }
 
-u32 lightrec_emulate_block(struct block *block, u32 pc)
+u32 lightrec_emulate_block(struct lightrec_state *state, struct block *block, u32 pc)
 {
 	u32 offset = (kunseg(pc) - kunseg(block->pc)) >> 2;
 
 	if (offset < block->nb_ops)
-		return lightrec_emulate_block_list(block, offset);
+		return lightrec_emulate_block_list(state, block, offset);
 
 	pr_err("PC 0x%x is outside block at PC 0x%x\n", pc, block->pc);
 

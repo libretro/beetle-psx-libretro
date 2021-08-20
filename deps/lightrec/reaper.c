@@ -102,7 +102,7 @@ void lightrec_reaper_reap(struct reaper *reaper)
 
 		reaper_elm = container_of(elm, struct reaper_elm, slist);
 
-		(*reaper_elm->func)(reaper_elm->data);
+		(*reaper_elm->func)(reaper->state, reaper_elm->data);
 
 		lightrec_free(reaper->state, MEM_FOR_LIGHTREC,
 			      sizeof(*reaper_elm), reaper_elm);
