@@ -162,7 +162,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
 
    ifeq ($(LIGHTREC_LOG_LEVEL),)
-       FLAGS += -DLOG_LEVEL=2 \
+       FLAGS += -DLOG_LEVEL=3 \
                 -DENABLE_DISASSEMBLER=0
    else
        ifeq ($(LIGHTREC_LOG_LEVEL), 4)
