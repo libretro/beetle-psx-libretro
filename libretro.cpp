@@ -1724,10 +1724,14 @@ int lightrec_init_mmap()
 #endif
 #ifdef HAVE_SHM
 	int memfd;
-	const char *shm_name = "/lightrec_memfd";
+	const char *shm_name = "/lightrec_memfd_beetle";
 
-	memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL,
-			S_IRUSR | S_IWUSR);
+	memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+
+	if (memfd < 0 && errno == EEXIST) {
+		shm_unlink(shm_name);
+		memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	}
 
 	if (memfd < 0) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create SHM: %s\n", strerror(errno));

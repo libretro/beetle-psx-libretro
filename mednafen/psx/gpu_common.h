@@ -68,8 +68,8 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 
 }
 
-template<int BlendMode, bool textured>
-static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix, bool MaskEval_TA)
+template<int BlendMode, bool MaskEval_TA, bool textured>
+static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
    // More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
    y &= (512 << gpu->upscale_shift) - 1;
@@ -91,8 +91,8 @@ static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pi
 }
 
 /// Copy of PlotPixel without internal upscaling, used to draw lines and sprites
-template<int BlendMode, bool textured>
-static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix, bool MaskEval_TA)
+template<int BlendMode, bool MaskEval_TA, bool textured>
+static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
    uint16_t output;
    y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
@@ -251,15 +251,19 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
 //#define BM_HELPER(fg) { fg(0), fg(1), fg(2), fg(3) }
 
-#define POLY_HELPER_SUB(bm, cv, tm)	\
-	 G_Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm>
+#define POLY_HELPER_SUB(bm, cv, tm, mam)	\
+	 G_Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam >
 
-#define POLY_HELPER_FG(bm, cv)					\
-	 {							\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0)),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0)),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0)),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0)),	\
+#define POLY_HELPER_FG(bm, cv)						\
+	 {								\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
 	 }
 
 #define POLY_HELPER(cv)														\
@@ -270,14 +274,18 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  	 false															\
 	}
 
-#define SPR_HELPER_SUB(bm, cv, tm) Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm>
+#define SPR_HELPER_SUB(bm, cv, tm, mam) Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
 
-#define SPR_HELPER_FG(bm, cv)					\
-	 {							\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0)),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0)),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0)),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0)),	\
+#define SPR_HELPER_FG(bm, cv)						\
+	 {								\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
+		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
 	 }
 
 
@@ -289,14 +297,18 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 	 false													\
 	}
 
-#define LINE_HELPER_SUB(bm, cv) Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1>
+#define LINE_HELPER_SUB(bm, cv, mam) Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1, mam>
 
 #define LINE_HELPER_FG(bm, cv)											\
 	 {													\
-		LINE_HELPER_SUB(bm, cv),									\
-		LINE_HELPER_SUB(bm, cv),									\
-		LINE_HELPER_SUB(bm, cv),									\
-		LINE_HELPER_SUB(bm, cv),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 0),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1),									\
+		LINE_HELPER_SUB(bm, cv, 1)									\
 	 }
 
 #define LINE_HELPER(cv)												\
@@ -307,7 +319,7 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 	 false													\
 	}
 
-#define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr }
+#define OTHER_HELPER_FG(bm, arg_ptr) { arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr, arg_ptr }
 #define OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr) { { OTHER_HELPER_FG(0, arg_ptr), OTHER_HELPER_FG(1, arg_ptr), OTHER_HELPER_FG(2, arg_ptr), OTHER_HELPER_FG(3, arg_ptr) }, arg_cs, arg_fbcs, arg_ss }
 #define OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 #define OTHER_HELPER_X4(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X2(arg_cs, arg_fbcs, arg_ss, arg_ptr)
@@ -315,5 +327,5 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 #define OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X8(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 #define OTHER_HELPER_X32(arg_cs, arg_fbcs, arg_ss, arg_ptr)	OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr), OTHER_HELPER_X16(arg_cs, arg_fbcs, arg_ss, arg_ptr)
 
-#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL }
+#define NULLCMD_FG(bm) { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 #define NULLCMD() { { NULLCMD_FG(0), NULLCMD_FG(1), NULLCMD_FG(2), NULLCMD_FG(3) }, 1, 1, true }

@@ -17,6 +17,7 @@ static const char *std_opcodes[] = {
 	[OP_BEQ]		= "beq     ",
 	[OP_BNE]		= "bne     ",
 	[OP_BLEZ]		= "blez    ",
+	[OP_BGTZ]		= "bgtz    ",
 	[OP_ADDI]		= "addi    ",
 	[OP_ADDIU]		= "addiu   ",
 	[OP_SLTI]		= "slti    ",

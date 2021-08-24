@@ -71,19 +71,18 @@ struct reaper;
 
 struct block {
 	jit_state_t *_jit;
-	struct lightrec_state *state;
 	struct opcode *opcode_list;
 	void (*function)(void);
+	const u32 *code;
+	struct block *next;
 	u32 pc;
 	u32 hash;
+	unsigned int code_size;
+	u16 nb_ops;
+	u8 flags;
 #if ENABLE_THREADED_COMPILER
 	atomic_flag op_list_freed;
 #endif
-	unsigned int code_size;
-	u16 flags;
-	u16 nb_ops;
-	const struct lightrec_mem_map *map;
-	struct block *next;
 };
 
 struct lightrec_branch {
@@ -146,7 +145,7 @@ u32 lightrec_rw(struct lightrec_state *state, union code op,
 		u32 addr, u32 data, u16 *flags,
 		struct block *block);
 
-void lightrec_free_block(struct block *block);
+void lightrec_free_block(struct lightrec_state *state, struct block *block);
 
 void remove_from_code_lut(struct blockcache *cache, struct block *block);
 
@@ -190,8 +189,8 @@ u32 lightrec_mfc(struct lightrec_state *state, union code op);
 union code lightrec_read_opcode(struct lightrec_state *state, u32 pc);
 
 struct block * lightrec_get_block(struct lightrec_state *state, u32 pc);
-int lightrec_compile_block(struct block *block);
-void lightrec_free_opcode_list(struct block *block);
+int lightrec_compile_block(struct lightrec_state *state, struct block *block);
+void lightrec_free_opcode_list(struct lightrec_state *state, struct block *block);
 
 unsigned int lightrec_cycles_of_opcode(union code code);
 
