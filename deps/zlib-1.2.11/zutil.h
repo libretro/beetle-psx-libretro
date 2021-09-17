@@ -105,8 +105,6 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 
 #if defined(VAXC) || defined(VMS)
 #  define OS_CODE  2
-#  define F_OPEN(name, mode) \
-     fopen((name), (mode), "mbc=60", "ctx=stm", "rfm=fix", "mrs=512")
 #endif
 
 #ifdef __370__
@@ -196,10 +194,6 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 
 #ifndef OS_CODE
 #  define OS_CODE  3     /* assume Unix */
-#endif
-
-#ifndef F_OPEN
-#  define F_OPEN(name, mode) fopen((name), (mode))
 #endif
 
          /* functions */
