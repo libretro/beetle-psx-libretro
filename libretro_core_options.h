@@ -1107,7 +1107,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(image_crop),
       "Additional Cropping",
       NULL,
-      "When 'Crop Horizontal Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels. Only supported by the software renderer.",
+      "When 'Crop Horizontal Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels",
       NULL,
       "video",
       {

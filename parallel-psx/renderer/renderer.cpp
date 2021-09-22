@@ -794,8 +794,8 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	if (render_state.crop_overscan)
 	{
 		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
-		display_width = 2560/clock_div;
-		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div);
+		display_width = (2560/clock_div) - render_state.image_crop;
+		left_offset = floor(((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div) - (render_state.image_crop / 2));
 	}
 	else
 	{
