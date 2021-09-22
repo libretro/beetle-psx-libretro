@@ -504,7 +504,7 @@ void rsx_vulkan_refresh_variables(void)
         old_msaa != msaa ||
         old_show_vram != show_vram ||
         old_crop_overscan != crop_overscan ||
-		old_image_crop != image_crop ||
+        old_image_crop != image_crop ||
         old_widescreen_hack != widescreen_hack ||
         old_widescreen_hack_aspect_ratio_setting != widescreen_hack_aspect_ratio_setting ||
         visible_scanlines_changed)
