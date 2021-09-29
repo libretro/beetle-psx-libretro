@@ -33,6 +33,8 @@
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
 
+extern bool crop_overscan;
+
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
 
@@ -1478,9 +1480,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          else
          {
             const unsigned int FirstVisibleLine =
-               GPU.LineVisFirst + (GPU.HardwarePALType ? 20 : 16);
+               GPU.LineVisFirst + (crop_overscan ? GPU.VertStart : (GPU.HardwarePALType ? 20 : 16));
             const unsigned int VisibleLineCount =
-               GPU.LineVisLast + 1 - GPU.LineVisFirst; //HardwarePALType ? 288 : 240;
+               (crop_overscan ? (GPU.VertEnd - GPU.VertStart) - ((GPU.HardwarePALType ? 287 : 239) - GPU.LineVisLast) - GPU.LineVisFirst : GPU.LineVisLast + 1 - GPU.LineVisFirst); //HardwarePALType ? 288 : 240;
 
             TIMER_SetHRetrace(false);
 
@@ -1674,7 +1676,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32 fb_x      = GPU.DisplayFB_XStart * 2;
-               int32 dx_start  = GPU.HorizStart, dx_end = GPU.HorizEnd;
+               int32 dx_start  = (crop_overscan ? 608 : GPU.HorizStart), dx_end = GPU.HorizEnd;
                int32 dest_line =
                   ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
                   + GPU.espec->InterlaceField;
