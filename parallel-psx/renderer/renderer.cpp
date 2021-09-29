@@ -795,7 +795,7 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	{
 		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
 		display_width = (2560/clock_div) - render_state.image_crop;
-		left_offset = floor(((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div) - (render_state.image_crop / 2));
+		left_offset = floor((render_state.offset_cycles / (double) clock_div) - (render_state.image_crop / 2));
 	}
 	else
 	{
@@ -805,15 +805,31 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 
 	unsigned display_height;
 	int upper_offset;
-	if (render_state.is_pal)
+	if (render_state.crop_overscan)
 	{
-		display_height = render_state.slend_pal - render_state.slstart_pal + 1;
-		upper_offset = render_state.vert_start - 20 - render_state.slstart_pal;
+		if (render_state.is_pal)
+		{
+			display_height = (render_state.vert_end - render_state.vert_start) - (287 - render_state.slend_pal) - render_state.slstart_pal;
+			upper_offset = 0 - render_state.slstart_pal;
+		}
+		else
+		{
+			display_height = (render_state.vert_end - render_state.vert_start) - (239 - render_state.slend) - render_state.slstart;
+			upper_offset = 0 - render_state.slstart;
+		}
 	}
 	else
 	{
-		display_height = render_state.slend - render_state.slstart + 1;
-		upper_offset = render_state.vert_start - 16 - render_state.slstart;
+		if (render_state.is_pal)
+		{
+			display_height = render_state.slend_pal - render_state.slstart_pal + 1;
+			upper_offset = render_state.vert_start - 20 - render_state.slstart_pal;
+		}
+		else
+		{
+			display_height = render_state.slend - render_state.slstart + 1;
+			upper_offset = render_state.vert_start - 16 - render_state.slstart;
+		}
 	}
 	display_height *= (render_state.is_480i ? 2 : 1);
 	upper_offset *= (render_state.is_480i ? 2 : 1);

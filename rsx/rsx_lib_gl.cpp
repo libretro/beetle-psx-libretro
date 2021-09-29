@@ -1586,8 +1586,7 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
    {
       width = (uint32_t) ((2560/clock_div) - renderer->image_crop);
       int32_t offset_cycles = renderer->image_offset_cycles;
-      int32_t h_start = (int32_t) renderer->config.display_area_hrange[0];
-      x = floor(((h_start - 608 + offset_cycles) / (double) clock_div) - (renderer->image_crop / 2));
+      x = floor((offset_cycles / (double) clock_div) - (renderer->image_crop / 2));
    }
    else
    {
@@ -1599,17 +1598,35 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
 
    uint32_t height;
    int32_t y;
-   if (renderer->config.is_pal)
+   if (renderer->crop_overscan)
    {
-      int h = renderer->last_scanline_pal - renderer->initial_scanline_pal + 1;
-      height = (h < 0 ? 0 : (uint32_t) h);
-      y = (308 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline_pal - 287);
+        if (renderer->config.is_pal)
+        {
+            int h = (renderer->config.display_area_vrange[1] - renderer->config.display_area_vrange[0]) - (287 - renderer->last_scanline_pal) - renderer->initial_scanline_pal;
+            height = (h < 0 ? 0 : (uint32_t) h);
+            y = renderer->last_scanline_pal - 287;
+        }
+        else
+        {
+            int h = (renderer->config.display_area_vrange[1] - renderer->config.display_area_vrange[0]) - (239 - renderer->last_scanline) - renderer->initial_scanline;
+            height = (h < 0 ? 0 : (uint32_t) h);
+            y = renderer->last_scanline - 239;
+        }
    }
    else
    {
-      int h = renderer->last_scanline - renderer->initial_scanline + 1;
-      height = (h < 0 ? 0 : (uint32_t) h);
-      y = (256 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline - 239);
+        if (renderer->config.is_pal)
+        {
+            int h = renderer->last_scanline_pal - renderer->initial_scanline_pal + 1;
+            height = (h < 0 ? 0 : (uint32_t) h);
+            y = (308 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline_pal - 287);
+        }
+        else
+        {
+            int h = renderer->last_scanline - renderer->initial_scanline + 1;
+            height = (h < 0 ? 0 : (uint32_t) h);
+            y = (256 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline - 239);
+        }
    }
    height *= (renderer->config.is_480i ? 2 : 1);
    y *= (renderer->config.is_480i ? 2 : 1);
