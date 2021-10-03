@@ -1676,7 +1676,12 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32 fb_x      = GPU.DisplayFB_XStart * 2;
-               int32 dx_start  = (crop_overscan ? 608 : GPU.HorizStart), dx_end = GPU.HorizEnd;
+               // Restore old center behaviour if GPU.HorizStart is intentionally very high.
+               // 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
+               // but this value should be lowered in the future if necessary.
+               // Additionally cut off everything after GPU.HorizEnd that shouldn't be
+               // in the viewport (the hardware renderers already takes care of this).
+               int32 dx_start  = (crop_overscan && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
                int32 dest_line =
                   ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
                   + GPU.espec->InterlaceField;
