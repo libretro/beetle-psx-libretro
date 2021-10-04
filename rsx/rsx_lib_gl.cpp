@@ -1586,7 +1586,14 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
    {
       width = (uint32_t) ((2560/clock_div) - renderer->image_crop);
       int32_t offset_cycles = renderer->image_offset_cycles;
-      x = floor((offset_cycles / (double) clock_div) - (renderer->image_crop / 2));
+      int32_t h_start = (int32_t) renderer->config.display_area_hrange[0];
+      /* Restore old center behaviour is render_state.horiz_start is intentionally very high.
+       * 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
+       * but this value should be lowerer in the future if necessary. */
+      if (renderer->config.display_area_hrange[0] < 938)
+          x = floor((offset_cycles / (double) clock_div) - (renderer->image_crop / 2));
+      else
+          x = floor(((h_start - 608 + offset_cycles) / (double) clock_div) - (renderer->image_crop / 2));
    }
    else
    {
