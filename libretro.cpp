@@ -122,6 +122,7 @@ unsigned psx_gpu_overclock_shift = 0;
 #define INTERNAL_FPS_SAMPLE_PERIOD 64
 
 static int psx_skipbios;
+static int override_bios;
 
 bool psx_gte_overclock;
 enum dither_mode psx_gpu_dither_mode;
@@ -164,18 +165,76 @@ static bool firmware_is_present(unsigned region)
 
    /* SHA1 and alternate BIOS names sourced from
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
+
+
+	if (override_bios)
+	{
+		if (override_bios == 1)
+		{
+			bios_name_list[0] = "psxonpsp660.bin";
+			bios_name_list[1] = "PSXONPSP660.bin";
+			bios_name_list[2] = NULL;
+			bios_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
+		}
+		
+		else if (override_bios == 2)
+		{
+			bios_name_list[0] = "ps1_rom.bin";
+			bios_name_list[1] = "PS1_ROM.bin";
+			bios_name_list[2] = NULL;
+			bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
+		}
+	   
+	    size_t i;
+		for (i = 0; i < list_size; ++i)
+		{
+			if (!bios_name_list[i])
+				break;
+
+			int r = snprintf(bios_path, sizeof(bios_path), "%s%c%s", retro_base_directory, retro_slash, bios_name_list[i]);
+			if (r >= 4096)
+			{
+				bios_path[4095] = '\0';
+				log_cb(RETRO_LOG_ERROR, "Firmware path longer than 4095: %s\n", bios_path);
+				break;
+			}
+
+			if (filestream_exists(bios_path))
+			{
+				firmware_found = true;
+				break;
+			}
+		}
+
+		if (firmware_found)
+		{	
+			char obtained_sha1[41];
+			sha1_calculate(bios_path, obtained_sha1);
+			if (strcmp(obtained_sha1, bios_sha1))
+			{
+				log_cb(RETRO_LOG_WARN, "Override firmware found but has invalid SHA1: %s\n", bios_path);
+				log_cb(RETRO_LOG_WARN, "Expected SHA1: %s\n", bios_sha1);
+				log_cb(RETRO_LOG_WARN, "Obtained SHA1: %s\n", obtained_sha1);
+				log_cb(RETRO_LOG_WARN, "Unsupported firmware may cause emulation glitches.\n");
+				return true;
+			}
+
+			log_cb(RETRO_LOG_INFO, "Override firmware found: %s\n", bios_path);
+			log_cb(RETRO_LOG_INFO, "Override firmware SHA1: %s\n", obtained_sha1);
+
+			return true;
+		}
+      log_cb(RETRO_LOG_WARN, "Override firmware is missing: %s\n", bios_name_list[0]);
+      log_cb(RETRO_LOG_WARN, "Fallback to region specific firmware.\n");
+   }
+
+
    if (region == REGION_JP)
    {
       bios_name_list[0] = "scph5500.bin";
       bios_name_list[1] = "SCPH5500.bin";
       bios_name_list[2] = "SCPH-5500.bin";
       bios_name_list[3] = NULL;
-      bios_name_list[4] = NULL;
-      bios_name_list[5] = NULL;
-      bios_name_list[6] = NULL;
-      bios_name_list[7] = NULL;
-      bios_name_list[8] = NULL;
-      bios_name_list[9] = NULL;
       bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    }
    else if (region == REGION_NA)
@@ -201,9 +260,6 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[4] = "SCPH5552.bin";
       bios_name_list[5] = "SCPH-5552.bin";
       bios_name_list[6] = NULL;
-      bios_name_list[7] = NULL;
-      bios_name_list[8] = NULL;
-      bios_name_list[9] = NULL;
       bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
@@ -3197,6 +3253,23 @@ static void check_variables(bool startup)
          psx_skipbios = 1;
       else
          psx_skipbios = 0;
+   }
+
+   var.key = BEETLE_OPT(override_bios);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "disabled"))
+      {
+         override_bios = 0;
+      }
+      else if (!strcmp(var.value, "psxonpsp"))
+	  {
+         override_bios = 1;
+      }
+      else if (!strcmp(var.value, "ps1_rom"))
+      {
+         override_bios = 2;
+      }
    }
 
    var.key = BEETLE_OPT(widescreen_hack);
