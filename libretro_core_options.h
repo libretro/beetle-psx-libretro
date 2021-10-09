@@ -974,6 +974,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(override_bios),
+      "Override BIOS (Restart)",
+      NULL,
+      "Override the standard region specific BIOS with a region-free one if found.",
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "psxonpsp",  "PSP PS1 BIOS" },
+         { "ps1_rom",  "PS3 PS1 BIOS" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(renderer),
