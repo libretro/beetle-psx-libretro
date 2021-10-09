@@ -978,7 +978,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(override_bios),
       "Override BIOS (Restart)",
       NULL,
-      "Override the standard region specific BIOS with a region-free one if found. Depending on the BIOS, may improve performance at the expence of compatibility",
+      "Override the standard region specific BIOS with a region-free one if found.",
       NULL,
       "hacks",
       {
