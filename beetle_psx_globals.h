@@ -38,6 +38,7 @@ extern bool interlace_setting_dirty;
 
 extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
+extern bool is_monkey_hero;
 
 #ifdef __cplusplus
 }

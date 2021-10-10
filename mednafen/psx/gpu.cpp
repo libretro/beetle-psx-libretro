@@ -34,6 +34,7 @@
 #include "gpu_line.cpp"
 
 extern bool crop_overscan;
+extern bool is_monkey_hero;
 
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.
@@ -534,6 +535,8 @@ static CTEntry Commands[256] =
 
 static INLINE bool CalcFIFOReadyBit(void)
 {
+   uint32_t ctcommand = (GPU_BlitterFIFO.Peek() >> 24);
+
    if(GPU.InCmd & (INCMD_PLINE | INCMD_QUAD))
       return(false);
 
@@ -543,7 +546,8 @@ static INLINE bool CalcFIFOReadyBit(void)
    if(GPU.InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
       return(false);
 
-   if(GPU_BlitterFIFO.in_count >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len)
+   // Change fifo_fb_len from 2 to 3 for Command_FBWrite when running Monkey Hero.
+   if(GPU_BlitterFIFO.in_count >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len + ((ctcommand >= 0xA0) && (ctcommand <= 0xBF) && is_monkey_hero ? 1 : 0))
       return(false);
 
    return(true);
