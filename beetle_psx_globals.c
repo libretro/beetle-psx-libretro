@@ -19,3 +19,4 @@ bool interlace_setting_dirty = false;
 
 int aspect_ratio_setting = 0;
 bool aspect_ratio_dirty = false;
+bool is_monkey_hero = false;

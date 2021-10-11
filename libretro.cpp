@@ -1494,6 +1494,12 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
             if(!strncasecmp(bootpos, "cdrom:\\", 7))
             {
                bootpos += 7;
+               if(!strncmp(bootpos + 7, "SLUS_007.65", 11) || !strncmp(bootpos + 7, "SLES_009.79", 11))
+               {
+                  is_monkey_hero = true;
+                  log_cb(RETRO_LOG_INFO, "Monkey Hero FBWrite Tweak Activated\n");
+               }
+
                char *tmp;
 
                if((tmp = strchr(bootpos, '_'))) *tmp = 0;
