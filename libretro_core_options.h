@@ -1108,15 +1108,16 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
       NULL,
-      "By default, the renderers add padding (pillarboxes on either side of the image for NTSC, on all sides for PAL) to emulate the same black bars generated in analog video output by real PSX hardware. Enabling this option removes that padding.",
+      "By default, the renderers add padding (pillarboxes on either side of the image for NTSC, on all sides for PAL) to emulate the same black bars generated in analog video output by real PSX hardware. Dynamic removes all padding, while Static only removes horizontal padding.",
       NULL,
       "video",
       {
-         { "enabled",  NULL },
-         { "disabled", NULL },
+         { "disabled",  NULL },
+         { "static",  "Static" },
+         { "smart", "Dynamic" },
          { NULL, NULL },
       },
-      "enabled"
+      "smart"
    },
    {
       BEETLE_OPT(image_crop),

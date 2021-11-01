@@ -33,7 +33,7 @@
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
 
-extern bool crop_overscan;
+extern int crop_overscan;
 extern bool is_monkey_hero;
 
 /*
@@ -1484,9 +1484,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          else
          {
             const unsigned int FirstVisibleLine =
-               GPU.LineVisFirst + (crop_overscan ? GPU.VertStart : (GPU.HardwarePALType ? 20 : 16));
+               GPU.LineVisFirst + (crop_overscan == 2 ? GPU.VertStart : (GPU.HardwarePALType ? 20 : 16));
             const unsigned int VisibleLineCount =
-               (crop_overscan ? (GPU.VertEnd - GPU.VertStart) - ((GPU.HardwarePALType ? 287 : 239) - GPU.LineVisLast) - GPU.LineVisFirst : GPU.LineVisLast + 1 - GPU.LineVisFirst); //HardwarePALType ? 288 : 240;
+               (crop_overscan == 2 ? (GPU.VertEnd - GPU.VertStart) - ((GPU.HardwarePALType ? 287 : 239) - GPU.LineVisLast) - GPU.LineVisFirst : GPU.LineVisLast + 1 - GPU.LineVisFirst); //HardwarePALType ? 288 : 240;
 
             TIMER_SetHRetrace(false);
 
@@ -1685,7 +1685,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                // but this value should be lowered in the future if necessary.
                // Additionally cut off everything after GPU.HorizEnd that shouldn't be
                // in the viewport (the hardware renderers already takes care of this).
-               int32 dx_start  = (crop_overscan && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
+               int32 dx_start  = (crop_overscan == 2 && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan == 2 && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
                int32 dest_line =
                   ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
                   + GPU.espec->InterlaceField;

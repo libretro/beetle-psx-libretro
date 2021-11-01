@@ -874,13 +874,13 @@ double rsx_common_get_timing_fps(void)
 }
 
 
-float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
+float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting)
 {
    // Current assumptions
-   //    A fixed percentage of width is cropped when crop_overscan is true
+   //    A fixed percentage of width is cropped when crop_overscan isn't 0
    //    aspect_ratio_setting is one of the following:
    //          0 - Corrected
    //          1 - Uncorrected (1:1 PAR)
