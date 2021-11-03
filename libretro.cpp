@@ -3811,17 +3811,18 @@ static void check_variables(bool startup)
    var.key = BEETLE_OPT(crop_overscan);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (strcmp(var.value, "enabled") == 0)
+      int old_crop_overscan = crop_overscan;
+      if (strcmp(var.value, "disabled") == 0)
+         crop_overscan = 0;
+      else if (strcmp(var.value, "static") == 0)
+         crop_overscan = 1;
+      else if (strcmp(var.value, "smart") == 0)
+         crop_overscan = 2;
+
+      if(crop_overscan != old_crop_overscan)
       {
-         if (crop_overscan == false)
-            has_new_geometry = true;
-         crop_overscan = true;
-      }
-      else if (strcmp(var.value, "disabled") == 0)
-      {
-         if (crop_overscan == true)
-            has_new_geometry = true;
-         crop_overscan = false;
+         has_new_geometry = true;
+         old_crop_overscan = crop_overscan;
       }
    }
 

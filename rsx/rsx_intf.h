@@ -171,7 +171,7 @@ bool rsx_intf_has_software_renderer(void);
 
 double rsx_common_get_timing_fps(void);
 
-float rsx_common_get_aspect_ratio(bool pal_content, bool crop_overscan,
+float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting);

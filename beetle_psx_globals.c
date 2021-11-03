@@ -11,7 +11,7 @@ int line_render_mode;
 int filter_mode;
 bool opaque_check;
 bool semitrans_check;
-bool crop_overscan = false;
+int crop_overscan = 0;
 
 int core_timing_fps_mode = FORCE_PROGRESSIVE_TIMING;
 bool currently_interlaced = false;

@@ -798,7 +798,7 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 		// 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
 		// but this value should be lowerer in the future if necessary.
 		display_width = (2560/clock_div) - render_state.image_crop;
-		if (render_state.horiz_start < 938)
+		if ((render_state.horiz_start < 938) && (render_state.crop_overscan == 2))
 			left_offset = floor((render_state.offset_cycles / (double) clock_div) - (render_state.image_crop / 2));
 		else
 			left_offset = floor(((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div) - (render_state.image_crop / 2));
@@ -811,7 +811,7 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 
 	unsigned display_height;
 	int upper_offset;
-	if (render_state.crop_overscan)
+	if (render_state.crop_overscan == 2)
 	{
 		if (render_state.is_pal)
 		{

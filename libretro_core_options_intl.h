@@ -520,8 +520,9 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       NULL,
       {
-         { "disabled", NULL },
-         { "enabled",  NULL },
+         { "disabled",  NULL },
+         { "static",  "Static" },
+         { "smart", "Dynamic" },
          { NULL, NULL },
       },
       NULL

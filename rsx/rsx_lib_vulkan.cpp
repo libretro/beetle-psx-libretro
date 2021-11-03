@@ -59,7 +59,7 @@ static dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
-static bool crop_overscan;
+static int crop_overscan;
 static int image_offset_cycles;
 static unsigned image_crop;
 static int initial_scanline;
@@ -249,7 +249,7 @@ void rsx_vulkan_refresh_variables(void)
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
-   bool old_crop_overscan = crop_overscan;
+   int old_crop_overscan = crop_overscan;
    unsigned old_image_crop = image_crop;
    bool old_widescreen_hack = widescreen_hack;
    unsigned old_widescreen_hack_aspect_ratio_setting = widescreen_hack_aspect_ratio_setting;
@@ -344,10 +344,12 @@ void rsx_vulkan_refresh_variables(void)
    var.key = BEETLE_OPT(crop_overscan);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if (!strcmp(var.value, "enabled"))
-         crop_overscan = true;
-      else
-         crop_overscan = false;
+      if (strcmp(var.value, "disabled") == 0)
+         crop_overscan = 0;
+      else if (strcmp(var.value, "static") == 0)
+         crop_overscan = 1;
+      else if (strcmp(var.value, "smart") == 0)
+         crop_overscan = 2;
    }
 
    var.key = BEETLE_OPT(image_offset_cycles);
