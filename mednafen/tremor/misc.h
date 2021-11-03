@@ -180,7 +180,8 @@ static INLINE int32_t CLIP_TO_15(int32_t x) {
 static INLINE int32_t VFLOAT_MULT(int32_t a,int32_t ap,
 				      int32_t b,int32_t bp,
 				      int32_t *p){
-  if(a && b){
+  if(a && b)
+  {
 #ifndef _LOW_ACCURACY_
     *p=ap+bp+32;
     return MULT32(a,b);
@@ -188,8 +189,8 @@ static INLINE int32_t VFLOAT_MULT(int32_t a,int32_t ap,
     *p=ap+bp+31;
     return (a>>15)*(b>>16); 
 #endif
-  }else
-    return 0;
+  }
+  return 0;
 }
 
 int _ilog(unsigned int);
