@@ -28,6 +28,8 @@ int setting_initial_scanline = 0;
 int setting_initial_scanline_pal = 0;
 int setting_last_scanline = 239;
 int setting_last_scanline_pal = 287;
+int setting_crosshair_color_p1 = 0xFF0000;
+int setting_crosshair_color_p2 = 0x0080FF;
 
 uint32_t setting_psx_multitap_port_1 = 0;
 uint32_t setting_psx_multitap_port_2 = 0;
@@ -38,6 +40,10 @@ uint64_t MDFN_GetSettingUI(const char *name)
 {
    if (!strcmp("psx.spu.resamp_quality", name)) /* make configurable */
       return 4;
+   if (!strcmp("psx.input.port1.gun_chairs", name))
+      return setting_crosshair_color_p1;
+   if (!strcmp("psx.input.port2.gun_chairs", name))
+      return setting_crosshair_color_p2;
 
    MDFN_DispMessage(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
