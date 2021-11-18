@@ -1971,7 +1971,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    PSX_CDC = new PS_CDC();
    PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
    PSX_FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
-   for(unsigned i = 0; i < 8; i++)
+   for(unsigned i = 0; i < 2; i++)
    {
       char buf[64];
       snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
@@ -3623,6 +3623,56 @@ static void check_variables(bool startup)
          setting_psx_analog_toggle = 0;
          setting_apply_analog_toggle = true;
       }
+   }
+
+   var.key = BEETLE_OPT(crosshair_color_p1);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "red") == 0)
+         setting_crosshair_color_p1 = 0xFF0000;
+      else if (strcmp(var.value, "blue") == 0)
+         setting_crosshair_color_p1 = 0x0080FF;
+      else if (strcmp(var.value, "green") == 0)
+         setting_crosshair_color_p1 = 0x00FF00;
+      else if (strcmp(var.value, "orange") == 0)
+         setting_crosshair_color_p1 = 0xFF8000;
+      else if (strcmp(var.value, "yellow") == 0)
+         setting_crosshair_color_p1 = 0xFFFF00;
+      else if (strcmp(var.value, "cyan") == 0)
+         setting_crosshair_color_p1 = 0x00FFFF;
+      else if (strcmp(var.value, "pink") == 0)
+         setting_crosshair_color_p1 = 0xFF00FF;
+      else if (strcmp(var.value, "purple") == 0)
+         setting_crosshair_color_p1 = 0x8000FF;
+      else if (strcmp(var.value, "black") == 0)
+         setting_crosshair_color_p1 = 0x000000;
+      else if (strcmp(var.value, "white") == 0)
+         setting_crosshair_color_p1 = 0xFFFFFF;
+   }
+
+   var.key = BEETLE_OPT(crosshair_color_p2);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "red") == 0)
+         setting_crosshair_color_p2 = 0xFF0000;
+      else if (strcmp(var.value, "blue") == 0)
+         setting_crosshair_color_p2 = 0x0080FF;
+      else if (strcmp(var.value, "green") == 0)
+         setting_crosshair_color_p2 = 0x00FF00;
+      else if (strcmp(var.value, "orange") == 0)
+         setting_crosshair_color_p2 = 0xFF8000;
+      else if (strcmp(var.value, "yellow") == 0)
+         setting_crosshair_color_p2 = 0xFFFF00;
+      else if (strcmp(var.value, "cyan") == 0)
+         setting_crosshair_color_p2 = 0x00FFFF;
+      else if (strcmp(var.value, "pink") == 0)
+         setting_crosshair_color_p2 = 0xFF00FF;
+      else if (strcmp(var.value, "purple") == 0)
+         setting_crosshair_color_p2 = 0x8000FF;
+      else if (strcmp(var.value, "black") == 0)
+         setting_crosshair_color_p2 = 0x000000;
+      else if (strcmp(var.value, "white") == 0)
+         setting_crosshair_color_p2 = 0xFFFFFF;
    }
 
    var.key = BEETLE_OPT(enable_multitap_port1);
