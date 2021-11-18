@@ -147,7 +147,6 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
       Tracks[tkid].index[1] = 0;
 
       fileOffset += Tracks[tkid].pregap_dv;
-      //printf("Tracks[%d].fileOffset=%d\n",NumTracks, fileOffset);
       Tracks[tkid].FileOffset = fileOffset;
       fileOffset += frames - Tracks[tkid].pregap_dv;
       fileOffset += Tracks[tkid].postgap;
@@ -252,13 +251,9 @@ int32_t CDAccess_CHD::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       }
    }
 
-   //printf("%d %d\n", Tracks[1].LBA, Tracks[1].sectors);
 
    if(!track_found)
-   {
-      printf("MakeSubPQ error for sector %u!", lba);
       track = FirstTrack;
-   }
 
    lba_relative = abs((int32)lba - Tracks[track].LBA);
 
@@ -275,10 +270,7 @@ int32_t CDAccess_CHD::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 
    // Handle pause(D7 of interleaved subchannel byte) bit, should be set to 1 when in pregap or postgap.
    if((lba < Tracks[track].LBA) || (lba >= Tracks[track].LBA + Tracks[track].sectors))
-   {
-      //printf("pause_or = 0x80 --- %d\n", lba);
       pause_or = 0x80;
-   }
 
    // Handle pregap between audio->data track
    {
@@ -292,10 +284,7 @@ int32_t CDAccess_CHD::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       if(pg_offset < -150)
       {
          if((Tracks[track].subq_control & SUBQ_CTRLF_DATA) && (FirstTrack < track) && !(Tracks[track - 1].subq_control & SUBQ_CTRLF_DATA))
-         {
-            //printf("Pregap part 1 audio->data: lba=%d track_lba=%d\n", lba, Tracks[track].LBA);
             control = Tracks[track - 1].subq_control;
-         }
       }
    }
 
@@ -322,14 +311,10 @@ int32_t CDAccess_CHD::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 
    if(!SubQReplaceMap.empty())
    {
-      //printf("%d\n", lba);
       std::map<uint32, cpp11_array_doodad>::const_iterator it = SubQReplaceMap.find(LBA_to_ABA(lba));
 
       if(it != SubQReplaceMap.end())
-      {
-         //printf("Replace: %d\n", lba);
          memcpy(buf, it->second.data, 12);
-      }
    }
 
    for (i = 0; i < 96; i++)
@@ -412,7 +397,6 @@ bool CDAccess_CHD::Read_Raw_Sector(uint8 *buf, int32 lba)
             // TODO: Zero out optional(?) checksum bytes?
             break;
       }
-      printf("Pre/post-gap read, LBA=%d(LBA-track_start_LBA=%d)\n", lba, lba - ct->LBA);
    }
    else
    {
@@ -520,9 +504,6 @@ int CDAccess_CHD::LoadSBI(const char* sbi_path)
       memcpy(SubQReplaceMap[aba].data, tmpq, 12);
    }
 
-#if 0
-   MDFN_printf("Loaded Q subchannel replacements for %zu sectors.\n", SubQReplaceMap.size());
-#endif
    log_cb(RETRO_LOG_INFO, "[CHD] Loaded SBI file %s\n", sbi_path);
    return 0;
 }

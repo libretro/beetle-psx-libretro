@@ -60,12 +60,6 @@ GaloisTables* CreateGaloisTables(int32_t gf_generator)
          b = b ^ gf_generator;
    }
 
-   if(b!=1) 
-   {
-      printf("Failed to create the Galois field log tables!\n");
-      exit(1);
-   }
-
    /* we're even closed using infinity (makes things easier) */
 
    gt->indexOf[0] = GF_ALPHA0;    /* log(0) = inf */
