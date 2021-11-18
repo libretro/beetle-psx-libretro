@@ -76,11 +76,6 @@
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
 
-//#define SPUIRQ_DBG(format, ...) { printf("[SPUIRQDBG] " format " -- Voice 22 CA=0x%06x,LA=0x%06x\n", ## __VA_ARGS__, Voices[22].CurAddr, Voices[22].LoopAddr); }
-
-static INLINE void SPUIRQ_DBG(const char *fmt, ...)
-{
-}
 
 static const int16 FIR_Table[256][4] =
 {
@@ -252,7 +247,6 @@ void SPU_Sweep::Clock()
    int divinco;
 
    CalcVCDelta(0x7F, Control & 0x7F, log_mode, dec_mode, inv_increment, (int16)(Current ^ vc_cv_xor), increment, divinco);
-   //printf("%d %d\n", divinco, increment);
 
    if((dec_mode & !(inv_mode & log_mode)) && ((Current & 0x8000) == (inv_mode ? 0x0000 : 0x8000) || (Current == 0)))
    {
@@ -273,8 +267,6 @@ void SPU_Sweep::Clock()
          {
             uint16 PrevCurrent = Current;
             Current = Current + increment;
-
-            //printf("%04x %04x\n", PrevCurrent, Current);
 
             if(!dec_mode && ((Current ^ PrevCurrent) & 0x8000) && ((Current ^ TestInvert) & 0x8000))
                Current = 0x7FFF ^ TestInvert;
@@ -312,7 +304,6 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
          unsigned test_addr = (voice->CurAddr - 1) & 0x3FFFF;
          if(IRQAddr == test_addr || IRQAddr == (test_addr & 0x3FFF8))
          {
-            //SPUIRQ_DBG("SPU IRQ (VDA): 0x%06x", addr);
             IRQAsserted = true;
             IRQ_Assert(IRQ_SPU, IRQAsserted);
          }
@@ -355,7 +346,6 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
          unsigned test_addr = voice->CurAddr & 0x3FFFF;
          if(IRQAddr == test_addr || IRQAddr == (test_addr & 0x3FFF8))
          {
-            //SPUIRQ_DBG("SPU IRQ: 0x%06x", addr);
             IRQAsserted = true;
             IRQ_Assert(IRQ_SPU, IRQAsserted);
          }
@@ -372,15 +362,6 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
          {
             if(!voice->IgnoreSampLA)
                voice->LoopAddr = voice->CurAddr;
-#if 0
-            else
-            {
-               if((voice->LoopAddr ^ voice->CurAddr) & ~0x7)
-               {
-                  PSX_DBG(PSX_DBG_FLOOD, "[SPU] Ignore: LoopAddr=0x%08x, SampLA=0x%08x\n", voice->LoopAddr, voice->CurAddr);
-               }
-            }
-#endif
          }
          voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
       }
@@ -402,8 +383,6 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
 
          if(MDFN_UNLIKELY(shift > 12))
          {
-            //PSX_DBG(PSX_DBG_FLOOD, "[SPU] Buggy/Illegal ADPCM block shift value on voice %u: %u\n", (unsigned)(voice - Voices), shift);
-
             shift = 8;
             CV &= 0x8888;
          }
@@ -542,7 +521,6 @@ INLINE void PS_SPU::CheckIRQAddr(uint32 addr)
       if(IRQAddr != addr)
          return;
 
-      //SPUIRQ_DBG("SPU IRQ (ALT): 0x%06x", addr);
       IRQAsserted = true;
       IRQ_Assert(IRQ_SPU, IRQAsserted);
    }
@@ -580,11 +558,6 @@ INLINE uint32 PS_SPU::Get_Reverb_Offset(uint32 in_offset)
 
  offset += ReverbWA & ((int32)(offset << 13) >> 31);
  offset &= 0x3FFFF;
-
- // For debugging in case there are any problems with games misprogramming the reverb registers in a race-conditiony manner that
- // causes important data in SPU RAM to be trashed:
- //if(offset < ReverbWA)
- // printf("BARF: offset=%05x reverbwa=%05x reverbcur=%05x in_offset=%05x\n", offset, ReverbWA, ReverbCur, in_offset & 0x3FFFF);
 
  return(offset);
 }
@@ -950,23 +923,13 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
                //
                if(voice->DecodePlayDelay < 3)
                {
-#if 0
-                  if(voice->DecodePlayDelay)
-                     PSX_DBG(PSX_DBG_WARNING, "[SPU] Voice %u off maybe should be ignored, but isn't due to current emulation code limitations; dpd=%u\n", voice_num, voice->DecodePlayDelay);
-#endif
                   ReleaseEnvelope(voice);
                }
             }
-#if 0
-            else
-               PSX_DBG(PSX_DBG_WARNING, "[SPU] Voice %u off ignored.\n", voice_num);
-#endif
          }
 
          if(VoiceOn & (1U << voice_num))
          {
-            //printf("Voice On: %u\n", voice_num);
-
             ResetEnvelope(voice);
 
             voice->DecodeFlags = 0;
@@ -1084,7 +1047,6 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
 void PS_SPU::WriteDMA(uint32 V)
 {
-   //SPUIRQ_DBG("DMA Write, RWAddr after=0x%06x", RWAddr);
    WriteSPURAM(RWAddr, V);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
@@ -1105,7 +1067,6 @@ uint32 PS_SPU::ReadDMA(void)
 
    CheckIRQAddr(RWAddr);
 
-   //SPUIRQ_DBG("DMA Read, RWAddr after=0x%06x", RWAddr);
 
    return(ret);
 }
@@ -1119,7 +1080,6 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 
    if(A >= 0x200)
    {
-      //printf("Write: %08x %04x\n", A, V);
       if(A < 0x260)
       {
          SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
@@ -1163,16 +1123,6 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
          case 0x0E:
             voice->LoopAddr = (V << 2) & 0x3FFFF;
             voice->IgnoreSampLA = true;
-#if 0
-            if(voice->DecodePlayDelay || (VoiceOn & (1U << (voice - Voices))))
-            {
-               PSX_WARNING("[SPU] Loop address for voice %u written during voice on delay.", (unsigned)(voice - Voices));
-            }
-            if((voice - Voices) == 22)
-            {
-               SPUIRQ_DBG("Manual loop address setting for voice %d: %04x", (int)(voice - Voices), V);
-            }
-#endif
             break;
       }
    }
@@ -1248,13 +1198,11 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
          case 0x24:
                     IRQAddr = (V << 2) & 0x3FFFF;
                     CheckIRQAddr(RWAddr);
-                    //SPUIRQ_DBG("Set IRQAddr=0x%06x", IRQAddr);
                     break;
 
          case 0x26:
                     RWAddr = (V << 2) & 0x3FFFF;	      
                     CheckIRQAddr(RWAddr);
-                    //SPUIRQ_DBG("Set RWAddr=0x%06x", RWAddr);
                     break;
 
          case 0x28: WriteSPURAM(RWAddr, V);
@@ -1262,12 +1210,9 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
                     CheckIRQAddr(RWAddr);
                     break;
 
-         case 0x2A: //if((SPUControl & 0x80) && !(V & 0x80))
-                    // printf("\n\n\n\n ************** REVERB PROCESSING DISABLED\n\n\n\n");
+         case 0x2A: 
 
                     SPUControl = V;
-                    //SPUIRQ_DBG("Set SPUControl=0x%04x -- IRQA=%06x, RWA=%06x", V, IRQAddr, RWAddr);
-                    //printf("SPU control write: %04x\n", V);
                     if(!(V & 0x40))
                     {
                        IRQAsserted = false;
@@ -1305,16 +1250,11 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
 {
    A &= 0x3FF;
 
-   //PSX_DBGINFO("[SPU] Read: %08x", A);
-
    if(A >= 0x200)
    {
       if(A < 0x260)
       {
          SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
-
-         //printf("Read: %08x %04x\n", A, voice->Sweep[(A & 2) >> 1].ReadVolume());
-
          return voice->Sweep[(A & 2) >> 1].ReadVolume();
       }
       else if(A < 0x280)

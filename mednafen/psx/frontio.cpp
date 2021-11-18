@@ -36,11 +36,6 @@
 
 #include "input/multitap.h"
 
-//#define PSX_FIODBGINFO(format, ...) { /* printf(format " -- timestamp=%d -- PAD temp\n", ## __VA_ARGS__, timestamp); */  }
-static void PSX_FIODBGINFO(const char *format, ...)
-{
-}
-
 InputDevice::InputDevice() :
 	chair_r(0),
 	chair_g(0),
@@ -543,7 +538,6 @@ INLINE void FrontIO::DoDSRIRQ(void)
 {
    if(Control & 0x1000)
    {
-      PSX_FIODBGINFO("[DSR] IRQ");
       istatus = true;
       ::IRQ_Assert(IRQ_SIO, true);
    }
@@ -553,8 +547,6 @@ INLINE void FrontIO::DoDSRIRQ(void)
 void FrontIO::Write(int32_t timestamp, uint32_t A, uint32_t V)
 {
    assert(!(A & 0x1));
-
-   PSX_FIODBGINFO("[FIO] Write: %08x %08x", A, V);
 
    Update(timestamp);
 
@@ -571,12 +563,6 @@ void FrontIO::Write(int32_t timestamp, uint32_t A, uint32_t V)
          break;
 
       case 0xa:
-#if 0
-         if(ClockDivider > 0 && ((V & 0x2000) != (Control & 0x2000)) && ((Control & 0x2) == (V & 0x2))  )
-            PSX_DBG(PSX_DBG_WARNING, "FIO device selection changed during comm %04x->%04x\n", Control, V);
-#endif
-
-         //printf("Control: %d, %04x\n", timestamp, V);
          Control = V & 0x3F2F;
 
          if(V & 0x10)
@@ -700,9 +686,6 @@ uint32_t FrontIO::Read(int32_t timestamp, uint32_t A)
          break;
    }
 
-   if((A & 0xF) != 0x4)
-      PSX_FIODBGINFO("[FIO] Read: %08x %08x", A, ret);
-
    return(ret);
 }
 
@@ -759,7 +742,6 @@ int32_t FrontIO::Update(int32_t timestamp)
                if(!TransmitBitCounter)
                {
                   need_start_stop_check = true;
-                  PSX_FIODBGINFO("[FIO] Data transmitted: %08x", TransmitBuffer);
                   TransmitInProgress = false;
 
                   if(Control & 0x400)
@@ -783,8 +765,6 @@ int32_t FrontIO::Update(int32_t timestamp)
                if(!ReceiveBitCounter)
                {
                   need_start_stop_check = true;
-                  PSX_FIODBGINFO("[FIO] Data received: %08x", ReceiveBuffer);
-
                   ReceiveInProgress = false;
                   ReceiveBufferAvail = true;
 

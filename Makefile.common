@@ -127,10 +127,6 @@ ifeq ($(NEED_BPP), 32)
    FLAGS += -DWANT_32BPP
 endif
 
-ifeq ($(WANT_NEW_API), 1)
-   FLAGS += -DWANT_NEW_API
-endif
-
 ifeq ($(NO_COMPUTED_GOTO), 1)
    FLAGS += -DNO_COMPUTED_GOTO
 endif

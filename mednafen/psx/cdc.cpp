@@ -1323,11 +1323,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                      else if(ArgsReceiveIn < Commands[PendingCommand].args_min || 
                            ArgsReceiveIn > Commands[PendingCommand].args_max)
                      {
-                        PSX_DBG(PSX_DBG_WARNING, "[CDC] Bad number(%d) of args(first check) for command 0x%02x", ArgsReceiveIn, PendingCommand);
-                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                           PSX_DBG(PSX_DBG_WARNING, " 0x%02x", ArgsReceiveBuf[i]);
-                        PSX_DBG(PSX_DBG_WARNING, "\n");
-
                         WriteResult(MakeStatus(true));
                         WriteResult(ERRCODE_BAD_NUMARGS);
                         WriteIRQ(CDCIRQ_DISC_ERROR);
@@ -1335,12 +1330,6 @@ int32_t PS_CDC::Update(const int32_t timestamp)
                      else
                      {
                         const CDC_CTEntry *command = &Commands[PendingCommand];
-
-                        PSX_DBG(PSX_DBG_SPARSE, "[CDC] Command: %s --- ", command->name);
-                        for(unsigned int i = 0; i < ArgsReceiveIn; i++)
-                           PSX_DBG(PSX_DBG_SPARSE, " 0x%02x", ArgsReceiveBuf[i]);
-                        PSX_DBG(PSX_DBG_SPARSE, "\n");
-
                         next_time = (this->*(command->func))(ArgsReceiveIn, ArgsReceiveBuf);
                         PendingCommandPhase = 2;
                      }
@@ -1680,9 +1669,6 @@ int32 PS_CDC::CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paus
    // ret += 1000000;
 
    ret += PSX_GetRandU32(0, 25000);
-
-   PSX_DBG(PSX_DBG_SPARSE, "[CDC] CalcSeekTime() %d->%d = %d\n", initial, target, ret);
-
    return(ret);
 }
 

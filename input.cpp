@@ -1,7 +1,6 @@
 #include "libretro.h"
 #include "mednafen/mednafen-types.h"
 #include <math.h>
-#include <stdio.h>
 #include <algorithm>
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"

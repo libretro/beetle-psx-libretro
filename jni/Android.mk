@@ -6,7 +6,6 @@ DEBUG                    := 0
 FRONTEND_SUPPORTS_RGB565 := 1
 NEED_CD                  := 1
 NEED_BPP                 := 32
-WANT_NEW_API             := 1
 NEED_DEINTERLACER        := 1
 NEED_THREADING           := 1
 NEED_TREMOR              := 1

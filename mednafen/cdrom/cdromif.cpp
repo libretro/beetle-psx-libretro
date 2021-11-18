@@ -568,10 +568,7 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
       uint8_t tmpbuf[2352 + 96];
 
       if(!ReadRawSector(tmpbuf, lba))
-      {
-         puts("CDIF Raw Read error");
          return(false);
-      }
 
       if(!ValidateRawSector(tmpbuf))
          return(false);
@@ -605,8 +602,6 @@ int CDIF::ReadSector(uint8* pBuf, uint32 lba, uint32 nSectors)
 
 CDIF_ST::CDIF_ST(CDAccess *cda) : disc_cdaccess(cda)
 {
-   //puts("***WARNING USING SINGLE-THREADED CD READER***");
-
    UnrecoverableError = false;
    DiscEjected = false;
 

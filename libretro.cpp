@@ -1559,7 +1559,7 @@ Breakout:
 static unsigned CalcDiscSCEx(void)
 {
    const char *prev_valid_id = NULL;
-   unsigned ret_region = MDFN_GetSettingI("psx.region_default");
+   unsigned ret_region       = MDFN_GetSettingI("psx.region_default");
 
    cdifs_scex_ids.clear();
 

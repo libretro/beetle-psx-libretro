@@ -1,7 +1,8 @@
 #include <stdlib.h>
+#include <string.h>
+#include <compat/strl.h>
 #include <string/stdstring.h>
 #include <ugui.h>
-#include <stdio.h>
 
 #define UGUI_MAX_OBJECTS 2
 static UG_GUI gui;
@@ -57,7 +58,7 @@ void gui_set_message(const char *message)
 {
    memset(gui_message, 0, sizeof(gui_message));
 
-   snprintf(gui_message, sizeof(gui_message), "%s", message);
+   strlcpy(gui_message, message, sizeof(gui_message));
 
    gui_message[sizeof(gui_message) - 1] = '\0';
 

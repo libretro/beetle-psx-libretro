@@ -279,7 +279,6 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
    track->FileOffset = offset; // Make sure this is set before calling GetSectorCount()!
    sectors = GetSectorCount(track);
-   //printf("Track: %d, offset: %ld, %ld\n", tracknum, offset, sectors);
 
    if(length)
    {
@@ -354,7 +353,6 @@ int CDAccess_Image::LoadSBI(const char* sbi_path)
       memcpy(SubQReplaceMap[aba].data, tmpq, 12);
    }
 
-   //MDFN_printf("Loaded Q subchannel replacements for %zu sectors.\n", SubQReplaceMap.size());
    log_cb(RETRO_LOG_INFO, "[Image] Loaded SBI file %s\n", sbi_path);
    filestream_close(sbis);
    return 0;
@@ -442,8 +440,6 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          MDFN_strtoupper(cmdbuf);
       }
 
-      //printf("%s\n", cmdbuf.c_str()); //: %s %s %s %s\n", cmdbuf.c_str(), args[0].c_str(), args[1].c_str(), args[2].c_str(), args[3].c_str());
-
       if(IsTOC)
       {
          if(cmdbuf == "TRACK")
@@ -526,7 +522,6 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                msfoffset = args[1].c_str();
                length = args[2].c_str();
             }
-            //printf("%s, %s, %s, %s\n", args[0].c_str(), binoffset, msfoffset, length);
             ParseTOCFileLineInfo(&TmpTrack, active_track, args[0], binoffset, msfoffset, length, image_memcache, toc_streamcache);
          }
          else if(cmdbuf == "DATAFILE")
@@ -893,11 +888,8 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                Tracks[x].sectors = Tracks[x + 1].index[0] - Tracks[x].index[1];	//Tracks[x + 1].index - Tracks[x].index;
          }
 
-         //printf("Poo: %d %d\n", x, Tracks[x].sectors);
          RunningLBA += Tracks[x].sectors;
          RunningLBA += Tracks[x].postgap;
-
-         //printf("%d, %ld %d %d %d %d\n", x, FileOffset, Tracks[x].index, Tracks[x].pregap, Tracks[x].sectors, Tracks[x].LBA);
 
          FileOffset += Tracks[x].sectors * DI_Size_Table[Tracks[x].DIFormat];
       } // end to cue sheet handling
@@ -994,7 +986,6 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
          // Handle pregap and postgap reading
          if(lba < (ct->LBA - ct->pregap_dv) || lba >= (ct->LBA + ct->sectors))
          {
-            //printf("Pre/post-gap read, LBA=%d(LBA-track_start_LBA=%d)\n", lba, lba - ct->LBA);
             memset(buf, 0, 2352);	// Null sector data, per spec
          }
          else
@@ -1007,10 +998,7 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
                ct->LastSamplePos += frames_read;
 
                if(frames_read < 0 || frames_read > 588)	// This shouldn't happen.
-               {
-                  printf("Error: frames_read out of range: %d\n", frames_read);
                   frames_read = 0;
-               }
 
                if(frames_read < 588)
                   memset((uint8 *)AudioBuf + frames_read * 2 * sizeof(int16), 0, (588 - frames_read) * 2 * sizeof(int16));
@@ -1083,34 +1071,6 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
       return false;
    }
 
-#if 0
-   if(qbuf[0] & 0x40)
-   {
-      uint8 dummy_buf[2352 + 96];
-      bool any_mismatch = false;
-
-      memcpy(dummy_buf + 16, buf + 16, 2048); 
-      memset(dummy_buf + 2352, 0, 96);
-
-      MakeSubPQ(lba, dummy_buf + 2352);
-      encode_mode1_sector(lba + 150, dummy_buf);
-
-      for(int i = 0; i < 2352 + 96; i++)
-      {
-         if(dummy_buf[i] != buf[i])
-         {
-            printf("Mismatch at %d, %d: %02x:%02x; ", lba, i, dummy_buf[i], buf[i]);
-            any_mismatch = true;
-         }
-      }
-      if(any_mismatch)
-         puts("\n");
-   }
-#endif
-
-   //subq_deinterleave(buf + 2352, qbuf);
-   //printf("%02x\n", qbuf[0]);
-   //printf("%02x\n", buf[12 + 3]);
    return true;
 }
 
@@ -1136,13 +1096,8 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       }
    }
 
-   //printf("%d %d\n", Tracks[1].LBA, Tracks[1].sectors);
-
    if(!track_found)
-   {
-      printf("MakeSubPQ error for sector %u!", lba);
       track = FirstTrack;
-   }
 
    lba_relative = abs((int32)lba - Tracks[track].LBA);
 
@@ -1159,10 +1114,7 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 
    // Handle pause(D7 of interleaved subchannel byte) bit, should be set to 1 when in pregap or postgap.
    if((lba < Tracks[track].LBA) || (lba >= Tracks[track].LBA + Tracks[track].sectors))
-   {
-      //printf("pause_or = 0x80 --- %d\n", lba);
       pause_or = 0x80;
-   }
 
    // Handle pregap between audio->data track
    {
@@ -1176,10 +1128,7 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
       if(pg_offset < -150)
       {
          if((Tracks[track].subq_control & SUBQ_CTRLF_DATA) && (FirstTrack < track) && !(Tracks[track - 1].subq_control & SUBQ_CTRLF_DATA))
-         {
-            //printf("Pregap part 1 audio->data: lba=%d track_lba=%d\n", lba, Tracks[track].LBA);
             control = Tracks[track - 1].subq_control;
-         }
       }
    }
 
@@ -1206,14 +1155,10 @@ void CDAccess_Image::MakeSubPQ(int32 lba, uint8 *SubPWBuf)
 
    if(!SubQReplaceMap.empty())
    {
-      //printf("%d\n", lba);
       std::map<uint32, cpp11_array_doodad>::const_iterator it = SubQReplaceMap.find(LBA_to_ABA(lba));
 
       if(it != SubQReplaceMap.end())
-      {
-         //printf("Replace: %d\n", lba);
          memcpy(buf, it->second.data, 12);
-      }
    }
 
    for (i = 0; i < 96; i++)

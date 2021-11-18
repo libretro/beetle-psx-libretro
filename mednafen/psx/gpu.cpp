@@ -181,7 +181,6 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
    int32_t width             = (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
    int32_t height            = (cb[2] >> 16) & 0x1FF;
 
-   //printf("[GPU] FB Fill %d:%d w=%d, h=%d\n", destX, destY, width, height);
    gpu->DrawTimeAvail       -= 46; // Approximate
 
    for(y = 0; y < height; y++)
@@ -222,7 +221,6 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
       height = 0x200;
 
    InvalidateTexCache(g);
-   //printf("FB Copy: %d %d %d %d %d %d\n", sourceX, sourceY, destX, destY, width, height);
 
    g->DrawTimeAvail -= (width * height) * 2;
 
@@ -313,15 +311,11 @@ static void Command_FBRead(PS_GPU* g, const uint32 *cb)
 
    if (!rsx_intf_has_software_renderer())
    {
-	   //fprintf(stderr, "Hard GPU readback (X: %d, Y: %d, W: %d, H: %d)\n", g->FBRW_X, g->FBRW_Y, g->FBRW_W, g->FBRW_H);
        /* Need a hard readback from GPU renderer. */
        bool supported = rsx_intf_read_vram(
                g->FBRW_X, g->FBRW_Y,
                g->FBRW_W, g->FBRW_H,
                g->vram);
-
-       //if (!supported)
-       //    fprintf(stderr, "Game is trying to reading back from VRAM, but SW rendering is not enabled, and RSX backend does not support it.\n");
    }
 }
 
@@ -336,12 +330,7 @@ static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
    g->dfe =        (cmdw >> 10) & 1;
 
    if (g->dfe)
-   {
       GPU.display_possibly_dirty = true;
-      //printf("Display possibly dirty this frame\n");
-   }
-
-   //printf("*******************DFE: %d -- scanline=%d\n", dfe, scanline);
 }
 
 static void Command_TexWindow(PS_GPU* g, const uint32 *cb)
@@ -375,13 +364,10 @@ static void Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
 {
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
    g->OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
-
-   //fprintf(stderr, "[GPU] Drawing offset: %d(raw=%d) %d(raw=%d) -- %d\n", OffsX, *cb, OffsY, *cb >> 11, scanline);
 }
 
 static void Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 {
-   //printf("Mask setting: %08x\n", *cb);
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
 
@@ -1112,10 +1098,7 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
    if(GPU_BlitterFIFO.in_count >= 0x10
       && (GPU.InCmd != INCMD_NONE || 
       (GPU_BlitterFIFO.in_count - 0x10) >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len))
-   {
-      PSX_DBG(PSX_DBG_WARNING, "GPU FIFO overflow!!!\n");
       return;
-   }
 
    if(PGXP_enabled())
       PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
@@ -1146,7 +1129,6 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             PSX_WARNING("[GPU] Unknown control command %02x - %06x", command, V);
             break;
          case 0x00:  // Reset GPU
-            //printf("\n\n************ Soft Reset %u ********* \n\n", scanline);
             GPU_SoftReset();
             rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
                                    GPU.ClipX1, GPU.ClipY1);
@@ -1198,7 +1180,6 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x08:
-            //printf("\n\nDISPLAYMODE SET: 0x%02x, %u *************************\n\n\n", V & 0xFF, scanline);
             GPU.DisplayMode = V & 0xFF;
             RSX_UpdateDisplayMode();
             break;
@@ -1252,9 +1233,6 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
    }
    else     // GP0 ("Data")
    {
-      //uint32_t command = V >> 24;
-      //printf("Meow command: %02x\n", command);
-      //assert(!(GPU.DMAControl & 2));
       GPU_WriteCB(V, A);
    }
 }
@@ -1422,8 +1400,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
    const uint32_t dmw = 2800 / DotClockRatios[dmc];   // Must be <= 768
    int32_t sys_clocks = sys_timestamp - GPU.lastts;
 
-   //printf("GPUISH: %d\n", sys_timestamp - GPU.lastts);
-
    if(!sys_clocks)
       goto TheEnd;
 
@@ -1448,10 +1424,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
       int32 dot_clocks;
 
       if(chunk_clocks > GPU.LineClockCounter)
-      {
-         //printf("Chunk: %u, LCC: %u\n", chunk_clocks, LineClockCounter);
          chunk_clocks = GPU.LineClockCounter;
-      }
 
       gpu_clocks -= chunk_clocks;
       GPU.LineClockCounter -= chunk_clocks;
@@ -1514,19 +1487,13 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             if(GPU.scanline == (GPU.HardwarePALType ? 308 : 256)) // Will need to be redone if we ever allow for visible vertical overscan with NTSC.
             {
                if(GPU.sl_zero_reached)
-               {
-                  //printf("Req Exit(visible fallthrough case): %u\n", GPU.scanline);
                   PSX_RequestMLExit();
-               }
             }
 
             if(GPU.scanline == (GPU.LinesPerField - 1))
             {
                if(GPU.sl_zero_reached)
-               {
-                  //printf("Req Exit(final fallthrough case): %u\n", GPU.scanline);
                   PSX_RequestMLExit();
-               }
 
                if(GPU.DisplayMode & DISP_INTERLACED)
                   GPU.field = !GPU.field;
@@ -1574,11 +1541,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                         memset(dest, 0, 384 * sizeof(int32));
                      }
-
-                     //char buffer[256];
-                     //snprintf(buffer, sizeof(buffer), "VIDEO STANDARD MISMATCH");
-                     //DrawTextTrans(surface->pixels + ((DisplayRect->h / 2) - (13 / 2)) * surface->pitch32, surface->pitch32 << 2, DisplayRect->w, (UTF8*)buffer,
-                     //MAKECOLOR(0x00, 0xFF, 0x00), true, MDFN_FONT_6x13_12x13, 0);
                   }
                   else
                   {
@@ -1619,19 +1581,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   //  FMV(which we don't handle here because low-latency in that case is not so important).
                   //
                   if(GPU.scanline >= (GPU.HardwarePALType ? 260 : 232))
-                  {
-                     //printf("Req Exit(vblank case): %u\n", GPU.scanline);
                      PSX_RequestMLExit();
-                  }
-#if 0
-                  else
-                  {
-                     //printf("VBlank too early, chickening out early exit: %u!\n", GPU.scanline);
-                  }
-#endif
                }
 
-               //printf("VBLANK: %u\n", GPU.scanline);
                GPU.InVBlank = true;
 
                GPU.DisplayFB_CurYOffset = 0;
@@ -1714,8 +1666,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                GPU.LineWidths[dest_line] = dmw;
 
-               //printf("dx_start base: %d, dmw: %d\n", dx_start, dmw);
-
                if (rsx_intf_is_type() == RSX_SOFTWARE)
                {
                   // Convert the necessary variables to the upscaled version
@@ -1732,15 +1682,10 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                      const uint16_t *src = GPU.vram +
                         ((y + i) << (10 + GPU.upscale_shift));
 
-                     // printf("surface: %dx%d (%d) %u %u + %u\n",
-                     //       surface->w, surface->h, surface->pitchinpix,
-                     //       dest_line, y, i);
-
                      dest = GPU.surface->pixels +
                         ((dest_line << GPU.upscale_shift) + i) * GPU.surface->pitch32;
                      memset(dest, 0, udx_start * sizeof(int32));
 
-                     //printf("%d %d %d - %d %d\n", scanline, dx_start, dx_end, HorizStart, HorizEnd);
                      ReorderRGB_Var(
                            RED_SHIFT,
                            GREEN_SHIFT,
@@ -1754,8 +1699,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                            GPU.upscale_shift,
                            _upscale);
 
-                     //printf("dx_end: %d, dmw: %d\n", udx_end, udmw);
-                     //
                      for(x = udx_end; x < udmw; x++)
                         dest[x] = 0;
                   }
@@ -1763,9 +1706,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   //reset dest back to i=0 for PSX_GPULineHook call
                   dest = GPU.surface->pixels + ((dest_line << GPU.upscale_shift) * GPU.surface->pitch32);
                }
-
-               //if(GPU.scanline == 64)
-               // printf("%u\n", sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio);
 
                dmw_width = dmw;
                pix_clock_offset = (488 - 146) / DotClockRatios[dmc];
@@ -1819,8 +1759,6 @@ TheEnd:
 
    next_dt = std::max<int32>(1, next_dt);
    next_dt = std::min<int32>(EventCycles, next_dt);
-
-   //printf("%d\n", next_dt);
 
    return(sys_timestamp + next_dt);
 }
