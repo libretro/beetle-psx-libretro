@@ -124,7 +124,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dither_mode),
       "Dithering Pattern",
       NULL,
-      "Set dithering pattern configuration. '1x (Native)' emulates native low resolution dithering used by original hardware to smooth out color banding artefacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth while disabling will automatically enable output at higher color depth.",
+      "Set dithering pattern configuration. '1x (Native)' emulates native low resolution dithering used by original hardware to smooth out color banding artifacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth, while disabling will automatically enable output at higher color depth.",
       NULL,
       "video",
       {
@@ -253,7 +253,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(mdec_yuv),
       "MDEC YUV Chroma Filter",
       NULL,
-      "Improves the quality of FMV playback by reducing 'macroblocking' artefacts (squares/jagged edges). Only supported by the Vulkan renderer.",
+      "Improves the quality of FMV playback by reducing 'macroblocking' artifacts (squares/jagged edges). Only supported by the Vulkan renderer.",
       NULL,
       "video",
       {
@@ -297,7 +297,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(replace_textures),
       "Replace Textures",
       NULL,
-      "Replaces textures using hd versions from <cd>-texture-replacements/",
+      "Replaces textures using HD versions from <cd>-texture-replacements/",
       NULL,
       "video",
       {
@@ -357,7 +357,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(display_vram),
       "Display Full VRAM (Debug)",
       NULL,
-      "When enabled, visualises the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled.",
+      "When enabled, visualizes the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled.",
       NULL,
       "osd",
       {
@@ -443,7 +443,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gun_cursor),
       "Gun Cursor",
       NULL,
-      "Select the gun cursor to be displayed on screen while using the the 'Guncon / G-Con 45' and 'Justifier' input device types. When disabled, cross hairs are always hidden.",
+      "Select the gun cursor to be displayed on screen while using the 'Guncon / G-Con 45' and 'Justifier' input device types. When disabled, crosshairs are always hidden.",
       NULL,
       "input",
       {
@@ -554,7 +554,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(negcon_response),
       "NegCon Twist Response",
       NULL,
-      "Specifies the response of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to negCon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional gamepads implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
+      "Specifies the response of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to negCon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional controllers implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
       NULL,
       "input",
       {
@@ -586,7 +586,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(use_mednafen_memcard0_method),
-      "Memory Card 0 Method (Restart)",
+      "Memory Card 0 Method (Restart Required)",
       NULL,
       "Choose the save data format used for memory card 0. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen. When used with Beetle PSX, Libretro (.srm) and Mednafen (.mcr) saves have internally identical formats and can be converted between one another via renaming.",
       NULL,
@@ -600,7 +600,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(enable_memcard1),
-      "Enable Memory Card 1 (Restart)",
+      "Enable Memory Card 1 (Restart Required)",
       NULL,
       "Select whether to emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka). Note: Memory Card 1 uses the Mednafen (.mcr) save format.",
       NULL,
@@ -614,7 +614,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(shared_memory_cards),
-      "Shared Memory Cards (Restart)",
+      "Shared Memory Cards (Restart Required)",
       NULL,
       "When enabled, all games will save to and load from the same memory card files. When disabled, separate memory card files will be generated for each item of loaded content. Note: if 'Memory Card 0 Method' is set to 'Libretro', only the right memory card will be affected.",
       NULL,
@@ -863,7 +863,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(line_render),
       "Line-to-Quad Hack",
       NULL,
-      "Choose line-to-quad hack method. Some games (e.g. Doom, Hexen, Soul Blade, etc) draw horizontal lines by stretching single-pixel-high triangles across the screen, which are rasterized as a row of pixels on original hardware. This hack detects these small triangles and converts them to quads as required, allowing them to be displayed properly on the hardware renderers and at upscaled internal resolutions. 'Aggressive' is required for some titles (e.g. Dark Forces, Duke Nukem) but may otherwise introduce graphical glitches. Leave at 'Default' if unsure.",
+      "Choose line-to-quad hack method. Some games (e.g. Doom, Hexen, Soul Blade, etc.) draw horizontal lines by stretching single-pixel-high triangles across the screen, which are rasterized as a row of pixels on original hardware. This hack detects these small triangles and converts them to quads as required, allowing them to be displayed properly on the hardware renderers and at upscaled internal resolutions. 'Aggressive' is required for some titles (e.g. Dark Forces, Duke Nukem) but may otherwise introduce graphical glitches. Leave at 'Default' if unsure.",
       NULL,
       "hacks",
       {
@@ -1008,7 +1008,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(skip_bios),
       "Skip BIOS",
       NULL,
-      "Skips the PlayStation BIOS boot animation normally displayed when loading content. Note: Enabling this causes compatibility issues with a number of games (PAL copy protected games, Saga Frontier, etc).",
+      "Skips the PlayStation BIOS boot animation normally displayed when loading content. Note: Enabling this causes compatibility issues with a number of games (PAL copy protected games, Saga Frontier, etc.).",
       NULL,
       "hacks",
       {
@@ -1036,9 +1036,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(renderer),
-      "Renderer (Restart)",
+      "Renderer (Restart Required)",
       NULL,
-      "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible then the core will fall back to the software renderer.",
+      "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer, depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible, then the core will fall back to the software renderer.",
       NULL,
       NULL,
       {
@@ -1090,7 +1090,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dynarec_invalidate),
       "Dynarec Code Invalidation",
       NULL,
-      "Some games require Full invalidation, some require DMA Only.",
+      "Some games require 'Full' invalidation, some require 'DMA Only'.",
       NULL,
       NULL,
       {
@@ -1104,7 +1104,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dynarec_eventcycles),
       "Dynarec DMA/GPU Event Cycles",
       NULL,
-      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec",
+      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec.",
       NULL,
       NULL,
       {
@@ -1139,7 +1139,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(pal_video_timing_override),
       "PAL (European) Video Timing Override",
       NULL,
-      "Due to different standards PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override PAL timings in order to attempt to run these games with the NTSC framerate. This option has no effect when running NTSC content.",
+      "Due to different standards, PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override PAL timings in order to attempt to run these games with the NTSC framerate. This option has no effect when running NTSC content.",
       NULL,
       "video",
       {
@@ -1363,9 +1363,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(initial_scanline),
-      "Initial Scanline - NTSC",
+      "Initial Scan Line - NTSC",
       NULL,
-      "Select the first displayed scanline when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
+      "Select the first displayed scan line when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1416,9 +1416,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(last_scanline),
-      "Last Scanline - NTSC",
+      "Last Scan Line - NTSC",
       NULL,
-      "Select the last displayed scanline when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
+      "Select the last displayed scan line when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1458,9 +1458,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(initial_scanline_pal),
-      "Initial Scanline - PAL",
+      "Initial Scan Line - PAL",
       NULL,
-      "Select the first displayed scanline when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
+      "Select the first displayed scan line when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1511,9 +1511,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(last_scanline_pal),
-      "Last Scanline - PAL",
+      "Last Scan Line - PAL",
       NULL,
-      "Select the last displayed scanline when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
+      "Select the last displayed scan line when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1582,9 +1582,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
-      "CD Access Method (Restart)",
+      "CD Access Method (Restart Required)",
       NULL,
-      "Select method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content which may improve in-game loading times at the cost of an initial delay at startup. 'Pre-Cache' may cause issues on systems with low RAM, and will fall back to 'Synchronous' for physical media",
+      "Select method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content, which may improve in-game loading times at the cost of an initial delay at startup. 'Pre-Cache' may cause issues on systems with low RAM, and will fall back to 'Synchronous' for physical media",
       NULL,
       NULL,
       {
@@ -1632,24 +1632,29 @@ struct retro_core_options_v2 options_us = {
 #ifndef HAVE_NO_LANGEXTRA
 struct retro_core_options_v2 *options_intl[RETRO_LANGUAGE_LAST] = {
    &options_us,    /* RETRO_LANGUAGE_ENGLISH */
-   NULL,           /* RETRO_LANGUAGE_JAPANESE */
-   NULL,           /* RETRO_LANGUAGE_FRENCH */
-   NULL,           /* RETRO_LANGUAGE_SPANISH */
-   NULL,           /* RETRO_LANGUAGE_GERMAN */
-   &options_it,    /* RETRO_LANGUAGE_ITALIAN */
-   NULL,           /* RETRO_LANGUAGE_DUTCH */
-   NULL,           /* RETRO_LANGUAGE_PORTUGUESE_BRAZIL */
-   NULL,           /* RETRO_LANGUAGE_PORTUGUESE_PORTUGAL */
-   NULL,           /* RETRO_LANGUAGE_RUSSIAN */
-   NULL,           /* RETRO_LANGUAGE_KOREAN */
-   NULL,           /* RETRO_LANGUAGE_CHINESE_TRADITIONAL */
-   NULL,           /* RETRO_LANGUAGE_CHINESE_SIMPLIFIED */
-   NULL,           /* RETRO_LANGUAGE_ESPERANTO */
-   NULL,           /* RETRO_LANGUAGE_POLISH */
-   NULL,           /* RETRO_LANGUAGE_VIETNAMESE */
-   NULL,           /* RETRO_LANGUAGE_ARABIC */
-   NULL,           /* RETRO_LANGUAGE_GREEK */
-   NULL,           /* RETRO_LANGUAGE_TURKISH */
+   &options_ja,      /* RETRO_LANGUAGE_JAPANESE */
+   &options_fr,      /* RETRO_LANGUAGE_FRENCH */
+   &options_es,      /* RETRO_LANGUAGE_SPANISH */
+   &options_de,      /* RETRO_LANGUAGE_GERMAN */
+   &options_it,      /* RETRO_LANGUAGE_ITALIAN */
+   &options_nl,      /* RETRO_LANGUAGE_DUTCH */
+   &options_pt_br,   /* RETRO_LANGUAGE_PORTUGUESE_BRAZIL */
+   &options_pt_pt,   /* RETRO_LANGUAGE_PORTUGUESE_PORTUGAL */
+   &options_ru,      /* RETRO_LANGUAGE_RUSSIAN */
+   &options_ko,      /* RETRO_LANGUAGE_KOREAN */
+   &options_cht,     /* RETRO_LANGUAGE_CHINESE_TRADITIONAL */
+   &options_chs,     /* RETRO_LANGUAGE_CHINESE_SIMPLIFIED */
+   &options_eo,      /* RETRO_LANGUAGE_ESPERANTO */
+   &options_pl,      /* RETRO_LANGUAGE_POLISH */
+   &options_vn,      /* RETRO_LANGUAGE_VIETNAMESE */
+   &options_ar,      /* RETRO_LANGUAGE_ARABIC */
+   &options_el,      /* RETRO_LANGUAGE_GREEK */
+   &options_tr,      /* RETRO_LANGUAGE_TURKISH */
+   &options_sv,      /* RETRO_LANGUAGE_SLOVAK */
+   &options_fa,      /* RETRO_LANGUAGE_PERSIAN */
+   &options_he,      /* RETRO_LANGUAGE_HEBREW */
+   &options_ast,     /* RETRO_LANGUAGE_ASTURIAN */
+   &options_fi,      /* RETRO_LANGUAGE_FINNISH */
 };
 #endif
 
