@@ -55,17 +55,17 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "video",
       "Video",
-      "Configure aspect ratio / display cropping / video filter / frame skipping parameters."
+      "Change aspect ratio, display cropping, video filter and frame skipping settings."
    },
    {
       "osd",
       "Onscreen Notifications",
-      "Configure onscreen notifications being shown onscreen."
+      "Change the notifications being shown onscreen."
    },
    {
       "input",
       "Input",
-      "Configure lightgun / mouse / NegCon input."
+      "Change lightgun, mouse and neGcon settings."
    },
    {
       "memcards",
@@ -80,7 +80,7 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "hacks",
       "Emulation hacks",
-      "Configure processor overclocking and emulation accuracy parameters affecting low-level performance and compatibility."
+      "Change processor overclocking and emulation accuracy settings affecting low-level performance and compatibility."
    },
    { NULL, NULL, NULL },
 };
@@ -428,7 +428,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gun_input_mode),
       "Gun Input Mode",
       NULL,
-      "Specify whether to use a mouse-controlled 'Light Gun' or a 'Touchscreen' input when device type is set to 'Guncon / G-Con 45' or 'Justifier'.",
+      "Specify whether to use a mouse-controlled 'Light Gun' or a 'Touchscreen' input when device type is set to 'Guncon/G-Con 45' or 'Justifier'.",
       NULL,
       "input",
       {
@@ -443,7 +443,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gun_cursor),
       "Gun Cursor",
       NULL,
-      "Select the gun cursor to be displayed on screen while using the 'Guncon / G-Con 45' and 'Justifier' input device types. When disabled, crosshairs are always hidden.",
+      "Select the gun cursor to be displayed on screen while using the 'Guncon/G-Con 45' and 'Justifier' input device types. When disabled, crosshairs are always hidden.",
       NULL,
       "input",
       {
@@ -552,9 +552,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(negcon_response),
-      "NegCon Twist Response",
+      "neGcon Twist Response",
       NULL,
-      "Specifies the response of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to negCon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional controllers implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
+      "Specifies the response of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to neGcon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional controllers implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
       NULL,
       "input",
       {
@@ -567,9 +567,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(negcon_deadzone),
-      "NegCon Twist Deadzone",
+      "neGcon Twist Deadzone",
       NULL,
-      "Sets the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most negCon-compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any required adjustments should *only* be applied via this core option. This is particularly important when 'NegCon Twist Response' is set to 'Quadratic' or 'Cubic'.",
+      "Sets the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most neGcon-compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any required adjustments should *only* be applied via this core option. This is particularly important when 'neGcon Twist Response' is set to 'Quadratic' or 'Cubic'.",
       NULL,
       "input",
       {
