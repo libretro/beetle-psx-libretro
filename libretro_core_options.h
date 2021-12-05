@@ -65,12 +65,12 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "input",
       "Input",
-      "Change lightgun, mouse and neGcon settings."
+      "Change light gun, mouse and neGcon settings."
    },
    {
       "memcards",
       "Memory Card",
-      "This lets you modify settings related to the virtual Memory Card(s) used by the system."
+      "Change settings related to the virtual Memory Card(s) used by the system."
    },
    {
       "pgxp",
@@ -90,7 +90,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(internal_resolution),
       "Internal GPU Resolution",
       NULL,
-      "Set internal resolution multiplier. Resolutions higher than '1x (Native)' improve fidelity of 3D models at the expense of increased performance requirements. 2D elements are generally unaffected by this setting.",
+      "Choose internal resolution multiplier. Resolutions higher than '1x (Native)' improve fidelity of 3D models at the expense of increased performance requirements. 2D elements are generally unaffected by this setting.",
       NULL,
       "video",
       {
@@ -108,7 +108,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(depth),
       "Internal Color Depth",
       NULL,
-      "Set internal color depth. Higher color depth can reduce color banding effects without the use of dithering. 16 bpp emulates original hardware but may have visible banding if dithering is not enabled. 'Dithering Pattern' is recommended to be disabled when this option is set to 32 bpp.",
+      "Choose internal color depth. Higher color depth can reduce color banding effects without the use of dithering. 16 bpp emulates original hardware but may have visible banding if dithering is not enabled. 'Dithering Pattern' is recommended to be disabled when this option is set to 32 bpp.",
       NULL,
       "video",
       {
@@ -124,7 +124,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dither_mode),
       "Dithering Pattern",
       NULL,
-      "Set dithering pattern configuration. '1x (Native)' emulates native low resolution dithering used by original hardware to smooth out color banding artifacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth, while disabling will automatically enable output at higher color depth.",
+      "Choose dithering pattern configuration. '1x (Native)' emulates native low resolution dithering used by original hardware to smooth out color banding artifacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth, while disabling will automatically enable output at higher color depth.",
       NULL,
       "video",
       {
@@ -140,7 +140,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(scaled_uv_offset),
       "Texture UV Offset",
       NULL,
-      "Sample textures for 3D polygons at an offset for higher than 1x internal resolution. Reduce texture seams but may cause unintended graphical glitches.",
+      "Sample textures for 3D polygons at an offset for higher than 1x internal resolution. Reduces texture seams but may cause unintended graphical glitches.",
       NULL,
       "video",
       {
@@ -156,7 +156,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(filter),
       "Texture Filtering",
       NULL,
-      "Select texture filtering method. 'Nearest' emulates original hardware. 'Bilinear' and '3-Point' are smoothing filters, which reduce pixelation via blurring. 'SABR', 'xBR', and 'JINC2' are upscaling filters that may improve texture fidelity/sharpness at the expense of increased performance requirements. Only supported by the hardware renderers.",
+      "Choose texture filtering method. 'Nearest' emulates original hardware. 'Bilinear' and '3-Point' are smoothing filters, which reduce pixelation via blurring. 'SABR', 'xBR', and 'JINC2' are upscaling filters that may improve texture fidelity/sharpness at the expense of increased performance requirements. Only supported by the hardware renderers.",
       NULL,
       "video",
       {
@@ -175,16 +175,16 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(filter_exclude_sprite),
       "Exclude Sprites from Filtering",
       NULL,
-      "Do not apply texture filtering to sprites. Prevent seams in various games with 2D sprite-rendered backgrounds. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
+      "Do not apply texture filtering to sprites. Prevents seams in various games with 2D sprite-rendered backgrounds. Use together with Adaptive Smoothing or another post-processing filter for best effect.",
       NULL,
       "video",
       {
-         { "disable", NULL },
+         { "disabled", NULL },
          { "opaque", "Opaque Only" },
          { "all", "Opaque and Semi-Transparent" },
          { NULL, NULL },
       },
-      "disable"
+      "disabled"
    },
    {
       BEETLE_OPT(filter_exclude_2d_polygon),
@@ -194,12 +194,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       "video",
       {
-         { "disable", NULL },
+         { "disabled", NULL },
          { "opaque", "Opaque Only" },
          { "all", "Opaque and Semi-Transparent" },
          { NULL, NULL },
       },
-      "disable"
+      "disabled"
    },
 #endif
 #endif
@@ -208,7 +208,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(adaptive_smoothing),
       "Adaptive Smoothing",
       NULL,
-      "When enabled, smooths 2D artwork and UI elements without blurring 3D rendered objects. Only supported by the Vulkan renderer.",
+      "Smooth out 2D artwork and UI elements without blurring 3D rendered objects. Only supported by the Vulkan renderer.",
       NULL,
       "video",
       {
@@ -222,7 +222,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(super_sampling),
       "Supersampling (Downsample to Native Resolution)",
       NULL,
-      "When enabled, downsamples rendered content from upscaled internal resolution down to native resolution. Combining this with higher internal resolution multipliers allows for games to be displayed with anti-aliased 3D objects at native low resolution. Produces best results when applied to titles that mix 2D and 3D elements (e.g. 3D characters on pre-rendered backgrounds), and works well in conjunction with CRT shaders. Only supported by the Vulkan renderer. Note: 'Dithering Pattern' is recommended to be disabled when enabling this option.",
+      "Downsample rendered content from upscaled internal resolution down to native resolution. Combining this with higher internal resolution multipliers allows for games to be displayed with anti-aliased 3D objects at native low resolution. Produces best results when applied to titles that mix 2D and 3D elements (e.g. 3D characters on pre-rendered backgrounds), and works well in conjunction with CRT shaders. Only supported by the Vulkan renderer. Note: 'Dithering Pattern' is recommended to be disabled when enabling this option.",
       NULL,
       "video",
       {
@@ -236,11 +236,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(msaa),
       "Multi-Sampled Anti Aliasing",
       NULL,
-      "Set MSAA level for rendered content. Improves the appearance of 3D objects. Only supported by the Vulkan renderer.",
+      "Choose MSAA level for rendered content. Improves the appearance of 3D objects. Only supported by the Vulkan renderer.",
       NULL,
       "video",
       {
-         { "1x",  "1x (Default)" },
+         { "1x",  NULL },
          { "2x",  NULL },
          { "4x",  NULL },
          { "8x",  NULL },
@@ -253,7 +253,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(mdec_yuv),
       "MDEC YUV Chroma Filter",
       NULL,
-      "Improves the quality of FMV playback by reducing 'macroblocking' artifacts (squares/jagged edges). Only supported by the Vulkan renderer.",
+      "Improve the quality of FMV playback by reducing 'macroblocking' artifacts (squares/jagged edges). Only supported by the Vulkan renderer.",
       NULL,
       "video",
       {
@@ -282,7 +282,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dump_textures),
       "Dump Textures",
       NULL,
-      "Dumps used textures to <cd>-texture-dump/",
+      "Dump used textures to <cd>-texture-dump/",
       NULL,
       "video",
       {
@@ -297,7 +297,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(replace_textures),
       "Replace Textures",
       NULL,
-      "Replaces textures using HD versions from <cd>-texture-replacements/",
+      "Replace textures using HD versions from <cd>-texture-replacements/",
       NULL,
       "video",
       {
@@ -313,7 +313,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(wireframe),
       "Wireframe Mode (Debug)",
       NULL,
-      "When enabled, renders 3D models in outline form without textures or shading. Only supported by the OpenGL hardware renderer. Note: This is for debugging purposes, and should normally be disabled.",
+      "Render 3D models in outline form without textures or shading. Only supported by the OpenGL hardware renderer. Note: This is for debugging purposes, and should normally be disabled.",
       NULL,
       "video",
       {
@@ -328,7 +328,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(frame_duping),
       "Frame Duping (Speedup)",
       NULL,
-      "When enabled and supported by the libretro frontend, provides a small performance increase by directing the frontend to repeat the previous frame if the core has nothing new to display.",
+      "When enabled and supported by the libretro frontend, this provides a small performance increase by directing the frontend to repeat the previous frame if the core has nothing new to display.",
       NULL,
       "video",
       {
@@ -357,7 +357,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(display_vram),
       "Display Full VRAM (Debug)",
       NULL,
-      "When enabled, visualizes the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled.",
+      "Visualize the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled.",
       NULL,
       "osd",
       {
@@ -372,7 +372,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(analog_calibration),
       "Analog Self-Calibration",
       NULL,
-      "When the input device is set to DualShock, Analog Controller, Analog Joystick, or neGcon, this option allows dynamic calibration of analog inputs. Maximum registered input values are monitored in real time and used to scale analog coordinates passed to the emulator. This should be used for games such as Mega Man Legends 2 that expect larger values than what modern controllers provide. For best results, analog sticks should be rotated at full extent to tune the calibration algorithm each time content is loaded.",
+      "When the input device is set to DualShock, Analog Controller, Analog Joystick, or neGcon, this option enables dynamic calibration of analog inputs. Maximum registered input values are monitored in real time and used to scale analog coordinates passed to the emulator. This should be used for games such as Mega Man Legends 2 that expect larger values than what modern controllers provide. For best results, analog sticks should be rotated at full extent to tune the calibration algorithm each time content is loaded.",
       NULL,
       "input",
       {
@@ -386,7 +386,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(analog_toggle),
       "Enable DualShock Analog Mode Toggle",
       NULL,
-      "When the input device type is DualShock, sets whether or not the emulated DualShock can be toggled between DIGITAL and ANALOG mode like original hardware. When this option is disabled, the DualShock is locked to ANALOG mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOG mode by pressing and holding START+SELECT+L1+L2+R1+R2.",
+      "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOG mode like original hardware. When disabled, the DualShock is locked to ANALOG mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOG mode by pressing and holding START+SELECT+L1+L2+R1+R2.",
       NULL,
       "input",
       {
@@ -400,7 +400,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(enable_multitap_port1),
       "Port 1: Multitap Enable",
       NULL,
-      "Enables/Disables multitap functionality on port 1.",
+      "Enable multitap functionality on port 1.",
       NULL,
       "input",
       {
@@ -414,7 +414,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(enable_multitap_port2),
       "Port 2: Multitap Enable",
       NULL,
-      "Enables/Disables multitap functionality on port 2.",
+      "Enable multitap functionality on port 2.",
       NULL,
       "input",
       {
@@ -428,7 +428,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gun_input_mode),
       "Gun Input Mode",
       NULL,
-      "Specify whether to use a mouse-controlled 'Light Gun' or a 'Touchscreen' input when device type is set to 'Guncon/G-Con 45' or 'Justifier'.",
+      "Choose whether to use a mouse-controlled 'Light Gun' or a 'Touchscreen' input when device type is set to 'Guncon/G-Con 45' or 'Justifier'.",
       NULL,
       "input",
       {
@@ -443,13 +443,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gun_cursor),
       "Gun Cursor",
       NULL,
-      "Select the gun cursor to be displayed on screen while using the 'Guncon/G-Con 45' and 'Justifier' input device types. When disabled, crosshairs are always hidden.",
+      "Choose the gun cursor to be displayed on screen while using the 'Guncon/G-Con 45' and 'Justifier' input device types. When disabled, crosshairs are always hidden.",
       NULL,
       "input",
       {
          { "cross", "Cross" },
          { "dot",   "Dot" },
-         { "off",   "disabled" },
+         { "off",   "No Cursor" },
          { NULL, NULL },
       },
       "cross"
@@ -458,7 +458,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(crosshair_color_p1),
       "Port 1: Gun Crosshair Color",
       NULL,
-      "Change the light gun crosshair color for port 1.",
+      "Choose the light gun crosshair color for port 1.",
       NULL,
       "input",
       {
@@ -480,12 +480,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(crosshair_color_p2),
       "Port 2: Gun Crosshair Color",
       NULL,
-      "Change the light gun crosshair color for port 2.",
+      "Choose the light gun crosshair color for port 2.",
       NULL,
       "input",
       {
-         { "red", "Red" },
          { "blue", "Blue" },
+         { "red", "Red" },
          { "green", "Green" },
          { "orange", "Orange" },
          { "yellow", "Yellow" },
@@ -502,7 +502,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(mouse_sensitivity),
       "Mouse Sensitivity",
       NULL,
-      "Configure the response of the 'Mouse' input device type.",
+      "Choose the responsiveness of the 'Mouse' input device type.",
       NULL,
       "input",
       {
@@ -525,7 +525,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "85%",  NULL },
          { "90%",  NULL },
          { "95%",  NULL },
-         { "100%", NULL },
+         { "100%", "100% (Default)" },
          { "105%", NULL },
          { "110%", NULL },
          { "115%", NULL },
@@ -554,7 +554,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(negcon_response),
       "neGcon Twist Response",
       NULL,
-      "Specifies the response of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to neGcon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional controllers implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
+      "Choose the response type of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Analog stick displacement may be mapped to neGcon rotation angle either linearly, quadratically or cubically. 'Quadratic' allows for greater precision than 'Linear' when making small movements. 'Cubic' further increases small movement precision, but 'exaggerates' larger movements. Note: 'Linear' is only recommended when using racing wheel peripherals. Conventional controllers implement analog input in a manner fundamentally different from the neGcon 'twist' mechanism, such that linear mapping over-amplifies small movements, impairing fine control. In most cases, 'Quadratic' provides the closest approximation of real hardware.",
       NULL,
       "input",
       {
@@ -569,7 +569,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(negcon_deadzone),
       "neGcon Twist Deadzone",
       NULL,
-      "Sets the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most neGcon-compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any required adjustments should *only* be applied via this core option. This is particularly important when 'neGcon Twist Response' is set to 'Quadratic' or 'Cubic'.",
+      "Choose the deadzone of the RetroPad left analog stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most neGcon-compatible titles provide in-game options for setting a 'twist' deadzone value. To avoid loss of precision, the in-game deadzone should *always* be set to zero. Any required adjustments should *only* be applied via this core option. This is particularly important when 'neGcon Twist Response' is set to 'Quadratic' or 'Cubic'.",
       NULL,
       "input",
       {
@@ -602,7 +602,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(enable_memcard1),
       "Enable Memory Card 1 (Restart Required)",
       NULL,
-      "Select whether to emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka). Note: Memory Card 1 uses the Mednafen (.mcr) save format.",
+      "Emulate a second memory card in slot 1. When disabled, games can only access the memory card in slot 0. Note: Some games require this option to be disabled for correct operation (e.g. Codename Tenka). Note: Memory Card 1 uses the Mednafen (.mcr) save format.",
       NULL,
       "memcards",
       {
@@ -630,7 +630,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(memcard_left_index),
       "Memory Card Left Index",
       NULL,
-      "Changes the memory card currently loaded in the left slot. This option will only work if Memory Card 0 method is set to Mednafen. The default card is index 0.",
+      "Change the memory card currently loaded in the left slot. This option will only work if Memory Card 0 method is set to Mednafen. The default card is index 0.",
       NULL,
       "memcards",
       {
@@ -706,12 +706,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(memcard_right_index),
       "Memory Card Right Index",
       NULL,
-      "Changes the memory card currently loaded in the right slot. This option will only work if Memory Card 1 is enabled. The default card is index 1.",
+      "Change the memory card currently loaded in the right slot. This option will only work if Memory Card 1 is enabled. The default card is index 1.",
       NULL,
       "memcards",
       {
          { "0",  NULL },
-         { "1",  NULL },
+         { "1",  "1 (Default)" },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -834,7 +834,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(pgxp_vertex),
       "PGXP Vertex Cache",
       NULL,
-      "Allows PGXP-enhanced vertex positions to be cached for re-use across polygon draws. Can potentially improve object alignment and reduce visible seams when rendering textures, but false positives when querying the cache may produce graphical glitches. It is currently recommended to leave this option disabled. This option is applied only when PGXP Operation Mode is enabled. Only supported by the hardware renderers.",
+      "Cache PGXP-enhanced vertex positions for re-use across polygon draws. Can potentially improve object alignment and reduce visible seams when rendering textures, but false positives when querying the cache may produce graphical glitches. It is currently recommended to leave this option disabled. This option is applied only when PGXP Operation Mode is enabled. Only supported by the hardware renderers.",
       NULL,
       "pgxp",
       {
@@ -848,7 +848,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(pgxp_texture),
       "PGXP Perspective Correct Texturing",
       NULL,
-      "When enabled, replaces native PSX affine texture mapping with perspective correct texture mapping. Eliminates position-dependent distortion and warping of textures, resulting in properly aligned textures. This option is applied only when PGXP Operation Mode is enabled. Only supported by the hardware renderers.",
+      "Replace native PSX affine texture mapping with perspective correct texture mapping. Eliminates position-dependent distortion and warping of textures, resulting in properly aligned textures. This option is applied only when PGXP Operation Mode is enabled. Only supported by the hardware renderers.",
       NULL,
       "pgxp",
       {
@@ -878,7 +878,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(widescreen_hack),
       "Widescreen Mode Hack",
       NULL,
-      "When enabled, renders 3D content anamorphically and outputs the emulated framebuffer at a widescreen aspect ratio. Produces best results with fully 3D games. 2D elements will be horizontally stretched and may be misaligned.",
+      "Render 3D content anamorphically and output the emulated framebuffer at a widescreen aspect ratio. Produces best results with fully 3D games. 2D elements will be horizontally stretched and may be misaligned.",
       NULL,
       "hacks",
       {
@@ -892,12 +892,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(widescreen_hack_aspect_ratio),
       "Widescreen Mode Hack Aspect Ratio",
       NULL,
-      "The aspect ratio that's used by the Widescreen Mode Hack.",
+      "Choose the aspect ratio to be used by the Widescreen Mode Hack.",
       NULL,
       "hacks",
       {
-         { "16:10", NULL },
          { "16:9",  NULL },
+         { "16:10", NULL },
          { "18:9",  NULL },
          { "19:9",  NULL },
          { "20:9",  NULL },
@@ -911,7 +911,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(cpu_freq_scale),
       "CPU Frequency Scaling (Overclock)",
       NULL,
-      "Enable overclocking (or underclocking) of the emulated PSX CPU. Overclocking can eliminate slowdown and improve frame rates in certain games at the expense of increased performance requirements. Note that some games have an internal frame rate limiter and may not benefit from overclocking. May cause certain effects to animate faster than intended in some titles when overclocked.",
+      "Overclock (or underclock) the emulated PSX CPU. Overclocking can eliminate slowdown and improve frame rates in certain games at the expense of increased performance requirements. Note that some games have an internal frame rate limiter and may not benefit from overclocking. May cause certain effects to animate faster than intended in some titles when overclocked.",
       NULL,
       "hacks",
       {
@@ -994,7 +994,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(gte_overclock),
       "GTE Overclock",
       NULL,
-      "When enabled, lowers all emulated GTE (CPU coprocessor for 3D graphics) operations to a constant one-cycle latency. For games that make heavy use of the GTE, this can greatly improve frame rate and frame time stability.",
+      "Lower all emulated GTE (CPU coprocessor for 3D graphics) operations to a constant one-cycle latency. For games that make heavy use of the GTE, this can greatly improve frame rate and frame time stability.",
       NULL,
       "hacks",
       {
@@ -1008,7 +1008,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(skip_bios),
       "Skip BIOS",
       NULL,
-      "Skips the PlayStation BIOS boot animation normally displayed when loading content. Note: Enabling this causes compatibility issues with a number of games (PAL copy protected games, Saga Frontier, etc.).",
+      "Skip the PlayStation BIOS boot animation normally displayed when loading content. Note: Enabling this causes compatibility issues with a number of games (PAL copy protected games, Saga Frontier, etc.).",
       NULL,
       "hacks",
       {
@@ -1020,7 +1020,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(override_bios),
-      "Override BIOS (Restart)",
+      "Override BIOS (Restart Required)",
       NULL,
       "Override the standard region specific BIOS with a region-free one if found.",
       NULL,
@@ -1038,7 +1038,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(renderer),
       "Renderer (Restart Required)",
       NULL,
-      "Choose video renderer. The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer, depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible, then the core will fall back to the software renderer.",
+      "The software renderer is the most accurate but has steep performance requirements when running at increased internal GPU resolutions. The hardware renderers, while less accurate, improve performance over the software renderer at increased internal resolutions and enable various graphical enhancements. 'Hardware (Auto)' automatically selects the Vulkan or OpenGL renderer, depending upon the current libretro frontend video driver. If the provided video driver is not Vulkan or OpenGL 3.3-compatible, then the core will fall back to the software renderer.",
       NULL,
       NULL,
       {
@@ -1108,7 +1108,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       NULL,
       {
-         { "128", "128 (Default)" },
+         { "128",  NULL },
          { "256",  NULL },
          { "384",  NULL },
          { "512",  NULL },
@@ -1125,11 +1125,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(core_timing_fps),
       "Core-Reported FPS Timing",
       NULL,
-      "Sets FPS timing that the core will report to the frontend. Automatic toggling will allow the core to switch between reporting progressive and interlaced rates, but may cause frontend video/audio driver reinits.",
+      "Choose the FPS timing that the core will report to the frontend. Automatic Toggling will allow the core to switch between reporting progressive and interlaced rates, but may cause frontend video/audio driver re-inits.",
       NULL,
       NULL,
       {
-         { "force_progressive", "Progressive Rate (Default)" },
+         { "force_progressive", "Progressive Rate" },
          { "force_interlaced",  "Force Interlaced Rate" },
          { "auto_toggle", "Allow Automatic Toggling" },
       },
@@ -1152,13 +1152,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
       NULL,
-      "By default, the renderers add padding (pillarboxes on either side of the image for NTSC, on all sides for PAL) to emulate the same black bars generated in analog video output by real PSX hardware. Dynamic removes all padding, while Static only removes horizontal padding.",
+      "'None' retains padding (pillarboxes on either side of the image for NTSC, on all sides for PAL) to emulate the same black bars generated in analog video output by real PSX hardware. 'Static' only removes horizontal padding, 'Dynamic' removes all padding.",
       NULL,
       "video",
       {
-         { "disabled",  NULL },
+         { "disabled",  "None" },
          { "static",  "Static" },
-         { "smart", "Dynamic" },
+         { "smart", "Dynamic (Default)" },
          { NULL, NULL },
       },
       "smart"
@@ -1167,11 +1167,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(image_crop),
       "Additional Cropping",
       NULL,
-      "When 'Crop Horizontal Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels",
+      "When 'Crop Horizontal Overscan' is enabled, this option further reduces the width of the cropped image by the specified number of pixels.",
       NULL,
       "video",
       {
-         { "disabled", NULL },
+         { "disabled", "0" },
          { "1px",      NULL },
          { "2px",      NULL },
          { "3px",      NULL },
@@ -1200,7 +1200,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(image_offset),
       "Offset Cropped Image",
       NULL,
-      "When 'Crop Horizontal Overscan' is enabled, allows the resultant cropped image to be offset horizontally to the right (positive) or left (negative) by the specified number of pixels. May be used to correct alignment issues. Only supported by the software renderer.",
+      "When 'Crop Horizontal Overscan' is enabled, this allows the resultant cropped image to be offset horizontally to the right (positive) or left (negative) by the specified number of pixels. May be used to correct alignment issues. Only supported by the software renderer.",
       NULL,
       "video",
       {
@@ -1216,7 +1216,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "-3px",     NULL },
          { "-2px",     NULL },
          { "-1px",     NULL },
-         { "disabled", NULL },
+         { "disabled", "0 (Default)" },
          { "+1px",     NULL },
          { "+2px",     NULL },
          { "+3px",     NULL },
@@ -1238,7 +1238,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(image_offset_cycles),
       "Horizontal Image Offset (GPU Cycles)",
       NULL,
-      "Specify number of GPU cycles to offset image by. Positive values move image to the right, negative values move image to the left. Only supported by the hardware renderers.",
+      "Choose number of GPU cycles to offset image by. Positive values move image to the right, negative values move image to the left. Only supported by the hardware renderers.",
       NULL,
       "video",
       {
@@ -1282,7 +1282,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        NULL },
+         { "0",        "0 (Default)" },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -1350,7 +1350,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(aspect_ratio),
       "Core Aspect Ratio",
       NULL,
-      "Set core provided aspect ratio. This setting is ignored when the Widescreen Mode Hack or Display Full VRAM options are enabled.",
+      "Choose core provided aspect ratio. This setting is ignored when the Widescreen Mode Hack or Display Full VRAM options are enabled.",
       NULL,
       "video",
       {
@@ -1365,7 +1365,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(initial_scanline),
       "Initial Scan Line - NTSC",
       NULL,
-      "Select the first displayed scan line when running NTSC content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
+      "Choose the first displayed scan line when running NTSC content. Values greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1418,7 +1418,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(last_scanline),
       "Last Scan Line - NTSC",
       NULL,
-      "Select the last displayed scan line when running NTSC content. Setting a value less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
+      "Choose the last displayed scan line when running NTSC content. Values less than 239 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1451,7 +1451,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "236", NULL },
          { "237", NULL },
          { "238", NULL },
-         { "239", NULL },
+         { "239", "239 (Default)" },
          { NULL, NULL },
       },
       "239"
@@ -1460,7 +1460,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(initial_scanline_pal),
       "Initial Scan Line - PAL",
       NULL,
-      "Select the first displayed scan line when running PAL content. Setting a value greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
+      "Choose the first displayed scan line when running PAL content. Values greater than zero will reduce the height of output images by cropping pixels from the topmost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1513,7 +1513,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(last_scanline_pal),
       "Last Scan Line - PAL",
       NULL,
-      "Select the last displayed scan line when running PAL content. Setting a value less than 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
+      "Choose the last displayed scan line when running PAL content. Values below 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letterboxing.",
       NULL,
       "video",
       {
@@ -1574,7 +1574,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "284", NULL },
          { "285", NULL },
          { "286", NULL },
-         { "287", NULL },
+         { "287", "287 (Default)" },
          { NULL, NULL },
       },
       "287"
@@ -1584,7 +1584,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(cd_access_method),
       "CD Access Method (Restart Required)",
       NULL,
-      "Select method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content, which may improve in-game loading times at the cost of an initial delay at startup. 'Pre-Cache' may cause issues on systems with low RAM, and will fall back to 'Synchronous' for physical media",
+      "Choose method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content, which may improve in-game loading times at the cost of an initial delay at startup. 'Pre-Cache' may cause issues on systems with low RAM, and will fall back to 'Synchronous' for physical media.",
       NULL,
       NULL,
       {
@@ -1600,7 +1600,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(cd_fastload),
       "CD Loading Speed",
       NULL,
-      "Select disk access speed multiplier. Setting this higher than '2x (Native)' can greatly reduce in-game loading times, but may introduce timing errors. Some games may not function properly if this option is increased above a certain value.",
+      "Choose disk access speed multiplier. Values higher than '2x (Native)' can greatly reduce in-game loading times, but may introduce timing errors. Some games may not function properly above a certain value.",
       NULL,
       NULL,
       {
