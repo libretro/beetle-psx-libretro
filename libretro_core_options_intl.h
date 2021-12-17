@@ -25581,7 +25581,7 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_3PX_O55_FI NULL
 #define OPTION_VAL_2PX_O55_FI NULL
 #define OPTION_VAL_1PX_O55_FI NULL
-#define OPTION_VAL_DISABLED_O55_FI NULL
+#define OPTION_VAL_DISABLED_O55_FI "0 (Oletus)"
 #define OPTION_VAL_1PX_O55_0_FI NULL
 #define OPTION_VAL_2PX_O55_0_FI NULL
 #define OPTION_VAL_3PX_O55_0_FI NULL
@@ -25609,12 +25609,12 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_FI NULL
-#define OPTION_VAL_239_FI NULL
+#define OPTION_VAL_239_FI "239 (Oletus)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_FI NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_FI NULL
-#define OPTION_VAL_287_FI NULL
+#define OPTION_VAL_287_FI "287 (Oletus)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FI NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FI NULL
 #define OPTION_VAL_SYNC_FI "Synkroninen"
@@ -40934,17 +40934,17 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_KO "슬롯 1에 두 번째 메모리 카드를 에뮬레이트합니다. 비활성화할 경우, 게임은 슬롯 0의 메모리 카드에만 접근할 수 있습니다. 주의: 일부 게임(예: Codename Tenka)은 이 옵션을 비활성화해야 정상 작동합니다. 메모리 카드 1은 Mednafen(.mcr) 저장 형식을 사용합니다."
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_KO "공유 메모리 카드 (재시작 필요)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_KO "사용할 경우, 모든 게임이 같은 메모리 카드 파일에 저장하고 불러옵니다. 사용하지 않을 경우, 불러온 컨텐츠마다 별도의 메모리 카드 파일을 사용합니다. 주의: '메모리 카드 0 방식'이 'Libretro'일 경우 오른쪽 메모리 카드에만 적용됩니다."
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_KO NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_KO NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_KO NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_KO NULL
-#define OPTION_VAL_1_KO NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_KO NULL
-#define BEETLE_OPT_PGXP_MODE_INFO_0_KO NULL
-#define OPTION_VAL_MEMORY_ONLY_KO NULL
-#define OPTION_VAL_MEMORY_CPU_KO NULL
-#define BEETLE_OPT_PGXP_2D_TOL_LABEL_KO NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_KO NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_KO "왼쪽 메모리 카드 인덱스"
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_KO "왼쪽 슬롯에 삽입될 메모리 카드를 변경합니다. 이 옵션은 메모리 카드 0 방식이 Mednafen으로 설정되어 있어야 작동합니다. 기본 카드 인덱스는 0입니다."
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_KO "오른쪽 메모리 카드 인덱스"
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_KO "오른쪽 슬롯에 삽입될 메모리 카드를 변경합니다. 이 옵션은 메모리 카드 1이 활성화되어 있어야 작동합니다. 기본 카드 인덱스는 1입니다."
+#define OPTION_VAL_1_KO "1 (기본)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_KO "PGXP 작동 모드"
+#define BEETLE_OPT_PGXP_MODE_INFO_0_KO "3D 개체가 서브픽셀 단위 정확도로 렌더링될 수 있게 합니다. 이는 원본 하드웨어가 버텍스 좌표에 고정소수점을 사용하여 발생하는 3D 개체의 뒤틀림과 떨림 현상을 최소화합니다. '메모리만'은 호환성 문제가 적으며 일반적인 사용에 적합합니다. '메모리 + CPU (불안정)'은 떨림 현상을 더 많이 줄일 수 있지만 성능 요구사항이 높으며 다양한 그래픽 오류가 발생할 수 있습니다."
+#define OPTION_VAL_MEMORY_ONLY_KO "메모리만"
+#define OPTION_VAL_MEMORY_CPU_KO "메모리 + CPU (불안정)"
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_KO "PGXP 2D 기하 허용오차"
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_KO "PGXP 작업에서 더 눈에 띄는 오류를 숨깁니다. 개체에 적절한 깊이 정보가 없는 경우 지정한 만큼의 PGXP 값이 오차로서 허용됩니다."
 #define OPTION_VAL_0PX_KO NULL
 #define OPTION_VAL_1PX_KO NULL
 #define OPTION_VAL_2PX_KO NULL
@@ -48545,12 +48545,12 @@ struct retro_core_options_v2 options_oc = {
 #define CATEGORY_OSD_LABEL_PL "Powiadomienia na ekranie"
 #define CATEGORY_OSD_INFO_0_PL "Zmień powiadomienia wyświetlane na ekranie."
 #define CATEGORY_INPUT_LABEL_PL "Wejście"
-#define CATEGORY_INPUT_INFO_0_PL NULL
+#define CATEGORY_INPUT_INFO_0_PL "Zmień ustawienia pistoletu, myszy i neGcon."
 #define CATEGORY_MEMCARDS_LABEL_PL "Karta pamięci"
-#define CATEGORY_MEMCARDS_INFO_0_PL NULL
-#define CATEGORY_PGXP_LABEL_PL NULL
-#define CATEGORY_PGXP_INFO_0_PL NULL
-#define CATEGORY_HACKS_LABEL_PL NULL
+#define CATEGORY_MEMCARDS_INFO_0_PL "Zmień ustawienia związane z wirtualnymi kartami pamięci używanymi przez system."
+#define CATEGORY_PGXP_LABEL_PL "Ulepszenie geometrii tekstur PGXP (Precision Geometry Transform Pipeline)"
+#define CATEGORY_PGXP_INFO_0_PL "Te opcje kontrolują ulepszenia, które mogą poprawić grafikę w porównaniu z oryginalną konsolą. PGXP pomaga pozbyć się pływających tekstur i problemów z Z-buforem."
+#define CATEGORY_HACKS_LABEL_PL "Hacki emulacyjne"
 #define CATEGORY_HACKS_INFO_0_PL "Zmiana ustawień przetaktowania procesora i dokładności emulacji wpływająca na niską wydajność i kompatybilność."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PL "Wewnętrzna rozdzielczość GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PL NULL
@@ -48559,11 +48559,11 @@ struct retro_core_options_v2 options_oc = {
 #define OPTION_VAL_4X_PL NULL
 #define OPTION_VAL_8X_PL NULL
 #define OPTION_VAL_16X_PL NULL
-#define BEETLE_OPT_DEPTH_LABEL_PL NULL
+#define BEETLE_OPT_DEPTH_LABEL_PL "Wewnętrzna głębia koloru"
 #define BEETLE_OPT_DEPTH_INFO_0_PL NULL
-#define OPTION_VAL_16BPP_NATIVE_PL NULL
+#define OPTION_VAL_16BPP_NATIVE_PL "16 bpp (natywna)"
 #define OPTION_VAL_32BPP_PL NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_PL NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_PL "Wzorzec ditheringu"
 #define BEETLE_OPT_DITHER_MODE_INFO_0_PL NULL
 #define OPTION_VAL_INTERNAL_RESOLUTION_PL "Wewnętrzna rozdzielczość"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_PL NULL
@@ -50481,9 +50481,9 @@ struct retro_core_options_v2 options_pl = {
 /* RETRO_LANGUAGE_PT_BR */
 
 #define CATEGORY_VIDEO_LABEL_PT_BR "Vídeo"
-#define CATEGORY_VIDEO_INFO_0_PT_BR NULL
+#define CATEGORY_VIDEO_INFO_0_PT_BR "Altera a proporção da tela, o corte, o filtro de vídeo e as configurações do salto de quadros."
 #define CATEGORY_OSD_LABEL_PT_BR "Notificações na tela"
-#define CATEGORY_OSD_INFO_0_PT_BR NULL
+#define CATEGORY_OSD_INFO_0_PT_BR "Seleciona as notificações sendo exibidas na tela."
 #define CATEGORY_INPUT_LABEL_PT_BR "Entrada"
 #define CATEGORY_INPUT_INFO_0_PT_BR "Altera as configurações das pistolas de luz, do mouse e o neGcon."
 #define CATEGORY_MEMCARDS_LABEL_PT_BR "Cartão de memória"
@@ -50491,7 +50491,7 @@ struct retro_core_options_v2 options_pl = {
 #define CATEGORY_PGXP_LABEL_PT_BR "PGXP (Canal de Transformação de Geometria de Precisão)"
 #define CATEGORY_PGXP_INFO_0_PT_BR "Estas opções controlam aprimoramentos que podem melhorar os gráficos em comparação com o console original. O PGXP pode se livrar de texturas deformadas e problemas de polígonos no eixo Z."
 #define CATEGORY_HACKS_LABEL_PT_BR "Hacks de emulação"
-#define CATEGORY_HACKS_INFO_0_PT_BR NULL
+#define CATEGORY_HACKS_INFO_0_PT_BR "Seleciona as configurações de precisão do overclock e da emulação do processador que afetam o baixo desempenho e a compatibilidade."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_BR "Resolução interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_BR "Seleciona o multiplicador de resolução interno. Qualquer resolução maior do que '1x (nativa)' irá melhor a fidelidade dos modelos 3D ao custo de maiores exigências de desempenho. Os elementos 2D geralmente não são afetados."
 #define OPTION_VAL_1X_NATIVE_PT_BR "1x (nativa)"
@@ -50501,7 +50501,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_16X_PT_BR NULL
 #define BEETLE_OPT_DEPTH_LABEL_PT_BR "Profundidade de cor interna"
 #define BEETLE_OPT_DEPTH_INFO_0_PT_BR "Seleciona a profundidade interna da cor. Uma maior profundidade de cor pode reduzir os efeitos de gradientes da cor sem o uso de pontilhamento. 16 bpp emula o hardware original, mas terá um efeito de gradiente da cor se o pontilhamento não for ativado. Recomenda-se desativar o 'Pontilhamento' quando esta opção estiver configurada para 32 bpp."
-#define OPTION_VAL_16BPP_NATIVE_PT_BR "16 bpp (Nativo)"
+#define OPTION_VAL_16BPP_NATIVE_PT_BR "16 bpp (nativo)"
 #define OPTION_VAL_32BPP_PT_BR NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_PT_BR "Pontilhamento"
 #define BEETLE_OPT_DITHER_MODE_INFO_0_PT_BR "Seleciona a configuração do pontilhamento. \"1x (nativa)\" simula o pontilhamento nativo em baixa resolução usado pelo hardware original para suavizar os efeitos da faixa de gradientes na profundidade da cor nativa. 'Resolução interna' redimensiona o pontilhamento à resolução interna configurada para produzir um resultado mais limpo. É recomendável desativar esta opção quando se utiliza 32 bpp de profundidade de cor. Nota: A ativação desta opção no Vulkan desativará a redução da cor até a profundidade nativa e permitirá uma maior profundidade interna."
@@ -50623,7 +50623,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_LINEAR_PT_BR NULL
 #define OPTION_VAL_QUADRATIC_PT_BR "Quadrático"
 #define OPTION_VAL_CUBIC_PT_BR "Cúbico"
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_PT_BR NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_PT_BR "Zona morta ao torcer o NegCon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_PT_BR "Seleciona a zona morta do direcional analógico esquerdo do RetroPad ao simular a ação de 'torção' do dispositivo de entrada 'neGcon' emulado. Serve para evitar que o controle registre movimentos não realizados. Nota: A maioria dos títulos compatíveis com neGcon fornecem opções dentro do jogo para definir um valor de zona morta para a 'torção'. Para evitar perda de precisão, a zona morta dentro do jogo deve *sempre* ser definida como zero. Quaisquer ajustes necessários *somente* devem ser aplicados através desta opção central. Isto é particularmente importante quando a 'Resposta ao torcer o neGcon' for definida como 'Quadrática' ou 'Cúbica'."
 #define OPTION_VAL_0_PT_BR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_PT_BR "Método do cartão de memória 0 (requer reinício)"
@@ -50661,7 +50661,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_PT_BR "Textura fiel à perspectiva do PGXP"
 #define BEETLE_OPT_PGXP_TEXTURE_INFO_0_PT_BR "Substitui o mapeamento de textura afim nativo de PSX pelo mapeamento de textura fiel à perspectiva. Elimina distorções posicionais e deformações de textura, produzindo texturas corretamente alinhadas. Somente se aplicará quando o 'Modo de operação do PGXP' estiver ativado. Funciona somente com renderizadores de hardware."
 #define BEETLE_OPT_LINE_RENDER_LABEL_PT_BR "Hack para o efeito 'Line-to-Quad'"
-#define BEETLE_OPT_LINE_RENDER_INFO_0_PT_BR NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_PT_BR "Selecione o método de execução do hack para converter linhas em retângulos. Certos jogos (Doom, Hexen, Soul Blade, etc.) desenham linhas horizontais esticando triângulos de um pixel de altura através da tela, que são então rasterizados como uma fileira de pixels no hardware original. Este hack detecta esses triângulos e os converte em retângulos conforme necessário, permitindo que sejam exibidos corretamente em renderizadores de hardware e em resoluções internas superiores às nativas. A opção 'Agressivo' é necessária em certos títulos (ex: Dark Forces, Duke Nukem), mas pode produzir defeitos visuais em outros. Em caso de dúvida, selecione 'Padrão'."
 #define OPTION_VAL_DEFAULT_PT_BR "Padrão"
 #define OPTION_VAL_AGGRESSIVE_PT_BR "Agressivo"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_PT_BR "Hack de modificação de widescreen"
@@ -50750,30 +50750,30 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_PT_BR "Quadro de buffer por software"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_BR "Permite emular com precisão os efeitos de quadro de buffer (por exemplo, desfoque de movimento, espiral de batalha FF7) ao usar renderizadores de hardware, executando uma cópia do renderizador de software com resolução nativa em segundo plano. A desativação desta opção irá omitir estas operações (OpenGL) ou serão renderizadas na GPU (Vulkan). A desativação desta opção pode melhorar o desempenho ao custo de erros gráficos graves. Em caso de dúvida, deixe esta opção ativada."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_PT_BR "Dynarec de CPU"
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_BR NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_BR "Recompilar dinamicamente as instruções da CPU para instruções nativas. Muito mais rápido do que o intérprete, mas o tempo da CPU é menos preciso e pode ter erros."
 #define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretor de Beetle)"
 #define OPTION_VAL_EXECUTE_PT_BR "Máximo desempenho"
-#define OPTION_VAL_EXECUTE_ONE_PT_BR NULL
-#define OPTION_VAL_RUN_INTERPRETER_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_BR NULL
+#define OPTION_VAL_EXECUTE_ONE_PT_BR "Verificação de intervalo entre ciclos"
+#define OPTION_VAL_RUN_INTERPRETER_PT_BR "Interpretador Lightrec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_PT_BR "Invalidação de código do dynarec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_BR "Alguns jogos requerem invalidação 'Completa', alguns requerem 'Apenas DMA'."
 #define OPTION_VAL_FULL_PT_BR "Completa"
-#define OPTION_VAL_DMA_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PT_BR NULL
+#define OPTION_VAL_DMA_PT_BR "Apenas DMA (um pouco mais rápido)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR "Ciclos de eventos de DMA/GPU do dynarec"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR "Número máximo de ciclos executados pela CPU antes da verificar a DMA ou a GPU. Um valor mais alto será mais rápido. Tem menos impacto sobre o interpretador Beetle do que sobre o dynarec."
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PT_BR "Tempos dos quadros reportado pelo núcleo"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_PT_BR "Seleciona os tempos de quadros por segundos que o núcleo indicará para a interface. 'Permitir alternância automática' permite que o núcleo mude entre taxas progressivas e entrelaçadas, mas pode causar reinícios nos drivers de vídeo e no áudio da interface."
 #define OPTION_VAL_FORCE_PROGRESSIVE_PT_BR "Taxa progressiva"
 #define OPTION_VAL_FORCE_INTERLACED_PT_BR "Forçar taxa entrelaçada"
 #define OPTION_VAL_AUTO_TOGGLE_PT_BR "Permitir alternância automática"
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PT_BR NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_BR NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_BR NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PT_BR "Substituir sincronia de vídeo PAL (europeu)"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_BR "Devido a diferentes padrões, os jogos PAL costumam parecer lentos em comparação com os lançamentos Americanos ou Japoneses NTSC. Esta opção pode ser usada para substituir a sincronia de vídeo PAL para tentar executar esses jogos com a taxa de quadros NTSC. Esta opção não tem efeito ao executar o conteúdo NTSC."
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_BR "Corta o excedente da tela"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_BR "'Nenhum' retém as bordas (colunas pretas em ambos os lados no caso de imagens NTSC, bordas nos quatro lados para imagens PAL) para simular as barras pretas produzidas pelo hardware real de PSX em um sinal de vídeo analógico. \"Estático\" simplesmente remove as bordas horizontais, enquanto 'Dinâmico' remove todas as bordas."
 #define OPTION_VAL_DISABLED_O53_PT_BR "Nenhum"
 #define OPTION_VAL_STATIC_PT_BR "Estático"
 #define OPTION_VAL_SMART_PT_BR "Dinâmico (padrão)"
-#define BEETLE_OPT_IMAGE_CROP_LABEL_PT_BR NULL
+#define BEETLE_OPT_IMAGE_CROP_LABEL_PT_BR "Corte adicional"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_PT_BR "Quando a opção 'Cortar overscan horizontal' estiver ativada, esta opção permite reduzir a largura da imagem cortada usando um valor específico em pixels."
 #define OPTION_VAL_9PX_PT_BR NULL
 #define OPTION_VAL_10PX_PT_BR NULL
@@ -50787,7 +50787,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_18PX_PT_BR NULL
 #define OPTION_VAL_19PX_PT_BR NULL
 #define OPTION_VAL_20PX_PT_BR NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_PT_BR NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_PT_BR "Deslocar imagem cortada"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_PT_BR "Quando a opção \"Cortar overscan horizontal\" estiver ativada, isso permite que a imagem cortada seja deslocada horizontalmente para a direita (valores positivos) ou para a esquerda (valores negativos) usando um valor específico em pixels. Pode ser usado para corrigir problemas de alinhamento. Somente suportado pelo renderizador por software."
 #define OPTION_VAL_12PX_O55_PT_BR NULL
 #define OPTION_VAL_11PX_O55_PT_BR NULL
@@ -50825,14 +50825,14 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_UNCORRECTED_PT_BR "Não corrigida"
 #define OPTION_VAL_4_3_PT_BR "Forçar 4:3"
 #define OPTION_VAL_NTSC_PT_BR "Forçar NTSC"
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PT_BR NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PT_BR "Linha de varredura inicial em formato NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_PT_BR "Seleciona a primeira linha de varredura a ser exibida ao executar conteúdos NTSC. Um valor maior que zero reduzirá a altura das imagens geradas, cortando os pixels da parte superior. Isto pode ser usado para evitar o efeito 'letterboxing'."
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_PT_BR NULL
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_PT_BR "Linha de varredura final em formato NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos NTSC. Um valor menor que 239 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_239_PT_BR "239 (padrão)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_PT_BR NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura inicial em formato PAL"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a primeira linha de varredura a ser exibida ao executar conteúdos PAL. Um valor maior que zero reduzirá a altura das imagens geradas, cortando os pixels da parte superior. Isto pode ser usado para evitar o efeito 'letterboxing'."
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura final em formato PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos PAL. Um valor inferior a 287 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_287_PT_BR "287 (padrão)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PT_BR "Método de acesso ao CD (requer reinício)"
@@ -50842,7 +50842,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_PRECACHE_PT_BR "Pré-cache"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_PT_BR "Velocidade de carregamento do CD"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_PT_BR "Seleciona o multiplicador de velocidade de acesso ao disco. Definir um valor maior do que '2x (Nativo)' pode reduzir muito os tempos de carregamento no jogo, mas pode introduzir erros de tempo. Alguns jogos podem não funcionar corretamente se esta opção for aumentada acima de um determinado valor."
-#define OPTION_VAL_2X_NATIVE_PT_BR "2x (Nativo)"
+#define OPTION_VAL_2X_NATIVE_PT_BR "2x (nativa)"
 #define OPTION_VAL_6X_PT_BR NULL
 #define OPTION_VAL_10X_PT_BR NULL
 #define OPTION_VAL_12X_PT_BR NULL
@@ -56301,33 +56301,33 @@ struct retro_core_options_v2 options_ro = {
 /* RETRO_LANGUAGE_RU */
 
 #define CATEGORY_VIDEO_LABEL_RU "Видео"
-#define CATEGORY_VIDEO_INFO_0_RU NULL
+#define CATEGORY_VIDEO_INFO_0_RU "Настройки соотношения сторон, кадрирования, графических фильтров и пропуска кадров."
 #define CATEGORY_OSD_LABEL_RU "Экранные уведомления"
-#define CATEGORY_OSD_INFO_0_RU NULL
+#define CATEGORY_OSD_INFO_0_RU "Настройки отображаемых на экране уведомлений."
 #define CATEGORY_INPUT_LABEL_RU "Ввод"
-#define CATEGORY_INPUT_INFO_0_RU NULL
+#define CATEGORY_INPUT_INFO_0_RU "Настройки светового пистолета, мыши и neGcon."
 #define CATEGORY_MEMCARDS_LABEL_RU "Карты памяти"
-#define CATEGORY_MEMCARDS_INFO_0_RU NULL
+#define CATEGORY_MEMCARDS_INFO_0_RU "Настройка параметров используемых системой виртуальных карт памяти."
 #define CATEGORY_PGXP_LABEL_RU NULL
 #define CATEGORY_PGXP_INFO_0_RU "Настройки улучшений, позволяющих добиться качества графики выше уровня оригинальной консоли. PGXP помогает избавиться от деформации текстур и Z-конфликтов."
 #define CATEGORY_HACKS_LABEL_RU "Хаки эмуляции"
-#define CATEGORY_HACKS_INFO_0_RU NULL
+#define CATEGORY_HACKS_INFO_0_RU "Настройка разгона процессора и параметров точности эмуляции, влияющих на производительность и совместимость."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_RU "Внутреннее разрешение GPU"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_RU NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_RU "Установка множителя внутреннего разрешения. Значения выше '1x (нативное)' улучшают качество 3D-моделей, но повышают требования к мощности устройства. Данная настройка, как правило, не влияет на 2D-элементы."
 #define OPTION_VAL_1X_NATIVE_RU "1x (нативное)"
 #define OPTION_VAL_2X_RU NULL
 #define OPTION_VAL_4X_RU NULL
 #define OPTION_VAL_8X_RU NULL
 #define OPTION_VAL_16X_RU NULL
 #define BEETLE_OPT_DEPTH_LABEL_RU "Внутренняя глубина цвета"
-#define BEETLE_OPT_DEPTH_INFO_0_RU NULL
+#define BEETLE_OPT_DEPTH_INFO_0_RU "Установка внутренней глубины цвета. Высокая глубина цвета позволяет скрывать ступенчатые градиенты (бандинг), не используя дизеринг. '16 бит/пкс' имитирует оригинальную консоль, но при откл. дизеринге делает заметным бандинг. При выборе '32 бит/пкс' рекомендуется отключать опцию 'Паттерн дизеринга'."
 #define OPTION_VAL_16BPP_NATIVE_RU "16 бит/пкс (нативная)"
 #define OPTION_VAL_32BPP_RU "32 бит/пкс"
 #define BEETLE_OPT_DITHER_MODE_LABEL_RU "Паттерн дизеринга"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_RU NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_RU "Выбор конфигурации паттерна дизеринга. '1x (нативно)' имитирует дизеринг в оригинальном низком разрешении консоли, используемого для смягчения ступенчатых градиентов, заметных при нативной глубине цвета. 'Внутреннее разрешение' масштабирует плотность дизеринга под внутр. разрешение для лучшего эффекта. Рекомендуется откл. при выборе 32-битной глубины цвета. Примечание: при рендеринге на Vulkan включение опции активирует принудительный даунсэмплинг до нативной глубины цвета, а отключение автоматически вкл. высокую глубину цвета."
 #define OPTION_VAL_INTERNAL_RESOLUTION_RU "Внутреннее разрешение"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_RU "Смещение текстур по UV"
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_RU NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_RU "Сэмплировать текстуры для 3D-полигонов, смещаемых при внутреннем разрешении выше 1x. Скрывает стыки текстур, но приводит к случайным проблемам с графикой."
 #define BEETLE_OPT_FILTER_LABEL_RU "Сглаживание текстур"
 #define BEETLE_OPT_FILTER_INFO_0_RU NULL
 #define OPTION_VAL_NEAREST_RU "Метод ближайшего соседа"
@@ -56608,7 +56608,7 @@ struct retro_core_options_v2 options_ro = {
 #define OPTION_VAL_19PX_RU "19 пикс."
 #define OPTION_VAL_20PX_RU "20 пикс."
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_RU "Сдвиг изображения после обрезки"
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_RU NULL
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_RU "При включении опции 'Обрезать вылеты развёртки', позволяет смещать скадрированное изображение вправо (плюс) или влево (минус) на указанное количество пикселей. Может использоваться для устранения проблем с выравниванием. Поддерживается только программным рендером."
 #define OPTION_VAL_12PX_O55_RU "-12 пикс."
 #define OPTION_VAL_11PX_O55_RU "-11 пикс."
 #define OPTION_VAL_10PX_O55_RU "-10 пикс."
