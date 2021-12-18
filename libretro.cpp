@@ -4508,6 +4508,10 @@ void retro_run(void)
          {
          }
       }
+
+      // Update gun crosshair color
+      PSX_FIO->SetCrosshairsColor(0, setting_crosshair_color_p1);
+      PSX_FIO->SetCrosshairsColor(1, setting_crosshair_color_p2);
    }
 
    /* We only start counting after the first frame we encounter. This
