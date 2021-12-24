@@ -330,7 +330,7 @@ extern "C" {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_AR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_AR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_AR NULL
-#define OPTION_VAL_DISABLED_O53_AR NULL
+#define OPTION_VAL_DISABLED_O53_AR "لاشيء"
 #define OPTION_VAL_STATIC_AR NULL
 #define OPTION_VAL_SMART_AR NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_AR NULL
@@ -2097,7 +2097,7 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_85_AST NULL
 #define OPTION_VAL_90_AST NULL
 #define OPTION_VAL_95_AST NULL
-#define OPTION_VAL_100_AST NULL
+#define OPTION_VAL_100_AST "100% (Por defeutu)"
 #define OPTION_VAL_105_AST NULL
 #define OPTION_VAL_110_AST NULL
 #define OPTION_VAL_115_AST NULL
@@ -5861,7 +5861,7 @@ struct retro_core_options_v2 options_ca = {
 /* RETRO_LANGUAGE_CHS */
 
 #define CATEGORY_VIDEO_LABEL_CHS "视频"
-#define CATEGORY_VIDEO_INFO_0_CHS NULL
+#define CATEGORY_VIDEO_INFO_0_CHS "更改长宽比、显示裁剪、视频过滤和帧跳过设置。"
 #define CATEGORY_OSD_LABEL_CHS "屏幕通知"
 #define CATEGORY_OSD_INFO_0_CHS NULL
 #define CATEGORY_INPUT_LABEL_CHS "输入"
@@ -5941,7 +5941,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_CHS NULL
 #define OPTION_VAL_CROSS_CHS "叉"
 #define OPTION_VAL_DOT_CHS "点"
-#define OPTION_VAL_OFF_CHS NULL
+#define OPTION_VAL_OFF_CHS "无光标"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_CHS NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_CHS NULL
 #define OPTION_VAL_RED_CHS "红色"
@@ -6150,7 +6150,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHS NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHS NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHS NULL
-#define OPTION_VAL_DISABLED_O53_CHS NULL
+#define OPTION_VAL_DISABLED_O53_CHS "无"
 #define OPTION_VAL_STATIC_CHS "静态"
 #define OPTION_VAL_SMART_CHS NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CHS NULL
@@ -6181,7 +6181,7 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_3PX_O55_CHS NULL
 #define OPTION_VAL_2PX_O55_CHS NULL
 #define OPTION_VAL_1PX_O55_CHS NULL
-#define OPTION_VAL_DISABLED_O55_CHS NULL
+#define OPTION_VAL_DISABLED_O55_CHS "0 (默认)"
 #define OPTION_VAL_1PX_O55_0_CHS NULL
 #define OPTION_VAL_2PX_O55_0_CHS NULL
 #define OPTION_VAL_3PX_O55_0_CHS NULL
@@ -6209,12 +6209,12 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_CHS NULL
-#define OPTION_VAL_239_CHS NULL
+#define OPTION_VAL_239_CHS "239 (默认)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_CHS NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CHS NULL
-#define OPTION_VAL_287_CHS NULL
+#define OPTION_VAL_287_CHS "287 (默认)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CHS NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CHS NULL
 #define OPTION_VAL_SYNC_CHS NULL
@@ -8090,7 +8090,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHT NULL
-#define OPTION_VAL_DISABLED_O53_CHT NULL
+#define OPTION_VAL_DISABLED_O53_CHT "無"
 #define OPTION_VAL_STATIC_CHT NULL
 #define OPTION_VAL_SMART_CHT NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CHT NULL
@@ -11970,7 +11970,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CY NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CY NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CY NULL
-#define OPTION_VAL_DISABLED_O53_CY NULL
+#define OPTION_VAL_DISABLED_O53_CY "Dim"
 #define OPTION_VAL_STATIC_CY NULL
 #define OPTION_VAL_SMART_CY NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CY NULL
@@ -15608,7 +15608,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_DE NULL
 #define BEETLE_OPT_MSAA_LABEL_DE NULL
 #define BEETLE_OPT_MSAA_INFO_0_DE NULL
-#define OPTION_VAL_1X_DE NULL
+#define OPTION_VAL_1X_DE "1 x"
 #define BEETLE_OPT_MDEC_YUV_LABEL_DE NULL
 #define BEETLE_OPT_MDEC_YUV_INFO_0_DE NULL
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_DE NULL
@@ -15848,9 +15848,9 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_AUTO_TOGGLE_DE NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_DE NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DE NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_DE NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_DE "Overscan zuschneiden"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DE NULL
-#define OPTION_VAL_DISABLED_O53_DE NULL
+#define OPTION_VAL_DISABLED_O53_DE "Keine"
 #define OPTION_VAL_STATIC_DE NULL
 #define OPTION_VAL_SMART_DE NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_DE NULL
@@ -15881,7 +15881,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_3PX_O55_DE NULL
 #define OPTION_VAL_2PX_O55_DE NULL
 #define OPTION_VAL_1PX_O55_DE NULL
-#define OPTION_VAL_DISABLED_O55_DE NULL
+#define OPTION_VAL_DISABLED_O55_DE "0 (Standard)"
 #define OPTION_VAL_1PX_O55_0_DE NULL
 #define OPTION_VAL_2PX_O55_0_DE NULL
 #define OPTION_VAL_3PX_O55_0_DE NULL
@@ -15909,12 +15909,12 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_DE NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_DE NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_DE NULL
-#define OPTION_VAL_239_DE NULL
+#define OPTION_VAL_239_DE "239 (Standard)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_DE NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_DE NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_DE NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_DE NULL
-#define OPTION_VAL_287_DE NULL
+#define OPTION_VAL_287_DE "287 (Standard)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_DE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_DE NULL
 #define OPTION_VAL_SYNC_DE "Synchron"
@@ -17790,7 +17790,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_EL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_EL NULL
-#define OPTION_VAL_DISABLED_O53_EL NULL
+#define OPTION_VAL_DISABLED_O53_EL "Κανείς"
 #define OPTION_VAL_STATIC_EL NULL
 #define OPTION_VAL_SMART_EL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_EL NULL
@@ -21391,7 +21391,7 @@ struct retro_core_options_v2 options_eo = {
 #define CATEGORY_PGXP_LABEL_ES "PGXP (Proceso de transformación precisa de geometría)"
 #define CATEGORY_PGXP_INFO_0_ES "Estas opciones permiten mejorar los gráficos por encima de lo que puede mostrar la consola real, eliminando las distorsiones de texturas y el «Z-fighting» (distorsión entre polígonos)."
 #define CATEGORY_HACKS_LABEL_ES "Arreglos de emulación"
-#define CATEGORY_HACKS_INFO_0_ES "Cambia las opciones de overclockeo del procesador y de precisión de la emulación que afectan al rendimiento a bajo nivel y a la compatibilidad."
+#define CATEGORY_HACKS_INFO_0_ES "Cambia las opciones de velocidad del procesador y de precisión de la emulación que afectan al rendimiento a bajo nivel y a la compatibilidad."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ES "Resolución interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ES "Selecciona el multiplicador de la resolución interna. Toda resolución superior a «1x (Nativa)» mejorará la fidelidad de los modelos 3D a costa de aumentar los requisitos de rendimiento. Los elementos 2D no suelen verse afectados."
 #define OPTION_VAL_1X_NATIVE_ES "1x (nativa)"
@@ -21575,7 +21575,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_20_9_ES NULL
 #define OPTION_VAL_21_9_ES NULL
 #define OPTION_VAL_32_9_ES NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_ES "Escalado de frecuencia de la CPU («overclocking»)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_ES "Escalado de frecuencia de la CPU (velocidad)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_ES "Aumenta (o disminuye) la velocidad del reloj emulado de la CPU de PSX. Una velocidad superior puede eliminar las ralentizaciones y mejorar la velocidad de fotogramas en ciertos juegos a costa de aumentar los requisitos de rendimiento. Ten en cuenta que ciertos juegos incluyen un limitador de fotogramas interno y no ganarán beneficio alguno al aumentar la velocidad. Puede provocar que ciertos efectos vayan más rápido de lo normal en ciertos juegos."
 #define OPTION_VAL_100_NATIVE_ES "100% (nativo)"
 #define OPTION_VAL_210_ES "210 %"
@@ -21633,8 +21633,8 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_730_ES "730 %"
 #define OPTION_VAL_740_ES "740 %"
 #define OPTION_VAL_750_ES "750 %"
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_ES "Overclockear GTE"
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_ES "Ralentiza todas las operaciones emuladas del GTE (el coprocesador de la CPU para gráficos 3D) a una latencia constante de un ciclo. Aquellos juegos que utilicen en gran medida el GTE pueden mejorar su velocidad de fotogramas y la estabilidad en la duración de los mismos."
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_ES "Acelerar el procesador GTE"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_ES "Frena todas las operaciones emuladas del GTE (el coprocesador de la CPU para gráficos 3D) a una latencia constante de un ciclo. Aquellos juegos que utilicen en gran medida el GTE podrían mejorar su velocidad de fotogramas y la estabilidad en la duración de los mismos."
 #define BEETLE_OPT_SKIP_BIOS_LABEL_ES "Omitir BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_ES "Omite la animación de arranque de la BIOS de PlayStation que suele aparecer al cargar un contenido. Nota: Esta opción puede generar problemas de compatibilidad en varios juegos (juegos PAL con protección anticopia, Saga Frontier, etc.)."
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_ES "Omitir la BIOS (es necesario reiniciar)"
@@ -21716,7 +21716,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_12PX_O55_0_ES "+12 px"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_ES "Desplazar imagen horizontal (ciclos de GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_ES "Especifica el número de ciclos de GPU con los que desplazar la imagen. Los valores positivos mueven la imagen hacia la derecha y los negativos hacia la izquierda. Solo funciona con los renderizadores por hardware."
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_ES "Overclockear rasterizador de la GPU"
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_ES "Acelerar el rasterizador de la GPU"
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_ES "Aumenta la velocidad del rasterizador 2D incluido en la GPU emulada de PSX. No mejora el renderizado 3D y su efecto suele ser limitado."
 #define OPTION_VAL_32X_ES NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_ES "Relación de aspecto del núcleo"
@@ -25261,7 +25261,7 @@ struct retro_core_options_v2 options_fa = {
 /* RETRO_LANGUAGE_FI */
 
 #define CATEGORY_VIDEO_LABEL_FI NULL
-#define CATEGORY_VIDEO_INFO_0_FI NULL
+#define CATEGORY_VIDEO_INFO_0_FI "Muuta kuvasuhdetta, näytön rajausta, videosuodatusta ja kuvanohitusasetuksia."
 #define CATEGORY_OSD_LABEL_FI "Näyttöilmoitukset"
 #define CATEGORY_OSD_INFO_0_FI NULL
 #define CATEGORY_INPUT_LABEL_FI "Syöte"
@@ -25271,7 +25271,7 @@ struct retro_core_options_v2 options_fa = {
 #define CATEGORY_PGXP_LABEL_FI NULL
 #define CATEGORY_PGXP_INFO_0_FI NULL
 #define CATEGORY_HACKS_LABEL_FI NULL
-#define CATEGORY_HACKS_INFO_0_FI NULL
+#define CATEGORY_HACKS_INFO_0_FI "Muuta prosessorin ylikellotus- ja emulointitarkkuusasetuksia, jotka vaikuttavat matalan tason suorituskykyyn ja yhteensopivuuteen."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FI NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FI NULL
 #define OPTION_VAL_1X_NATIVE_FI "1x (Natiivi)"
@@ -25418,7 +25418,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_FI NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_FI NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_FI NULL
-#define OPTION_VAL_1_FI NULL
+#define OPTION_VAL_1_FI "1 (Oletus)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_FI NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FI NULL
 #define OPTION_VAL_MEMORY_ONLY_FI NULL
@@ -25550,9 +25550,9 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_FI NULL
-#define OPTION_VAL_DISABLED_O53_FI NULL
+#define OPTION_VAL_DISABLED_O53_FI "Ei mitään"
 #define OPTION_VAL_STATIC_FI NULL
-#define OPTION_VAL_SMART_FI NULL
+#define OPTION_VAL_SMART_FI "Dynaaminen (Oletus)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_FI NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_FI NULL
 #define OPTION_VAL_9PX_FI NULL
@@ -27337,7 +27337,7 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_185_FR NULL
 #define OPTION_VAL_190_FR NULL
 #define OPTION_VAL_195_FR NULL
-#define OPTION_VAL_200_FR "200 %"
+#define OPTION_VAL_200_FR NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_FR "Réponse de torsion du neGcon"
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_FR "Sélectionner le type de réponse du stick analogique de gauche de la RetroManette lors de la simulation de l'action de 'torsion' des périphériques d'entrée 'neGcon' émulés. Le déplacement des sticks analogiques peut être mappé à un angle de rotation neGcon linéaire, quadratique ou cubique. 'Quadratique' permet une plus grande précision que 'Linéaire' lors de petits déplacements. 'Cubique' augmente davantage la précision des petits déplacements, mais 'exagère' les mouvements plus grands. Remarque : 'Linéaire' n'est recommandé que lorsque vous utilisez des périphériques de volants de course. Les manettes conventionnelles implémentent l'entrée analogique d'une manière fondamentalement différente du mécanisme de 'torsion' du neGcon, de telle sorte que le mappage linéaire amplifie trop les petits mouvements, entravant le contrôle précis. Dans la plupart des cas, 'Quadratique' fournit l'approximation la plus proche du matériel réel."
 #define OPTION_VAL_LINEAR_FR "Linéaire"
@@ -29430,7 +29430,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_GL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GL NULL
-#define OPTION_VAL_DISABLED_O53_GL NULL
+#define OPTION_VAL_DISABLED_O53_GL "Ningún"
 #define OPTION_VAL_STATIC_GL NULL
 #define OPTION_VAL_SMART_GL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_GL NULL
@@ -38841,7 +38841,7 @@ struct retro_core_options_v2 options_it = {
 /* RETRO_LANGUAGE_JA */
 
 #define CATEGORY_VIDEO_LABEL_JA "ビデオのドライバ"
-#define CATEGORY_VIDEO_INFO_0_JA NULL
+#define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、表示トリミング、ビデオフィルター、フレームスキップの設定を変更します。"
 #define CATEGORY_OSD_LABEL_JA "OSD通知"
 #define CATEGORY_OSD_INFO_0_JA NULL
 #define CATEGORY_INPUT_LABEL_JA "入力"
@@ -39130,7 +39130,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_JA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_JA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_JA NULL
-#define OPTION_VAL_DISABLED_O53_JA NULL
+#define OPTION_VAL_DISABLED_O53_JA "なし"
 #define OPTION_VAL_STATIC_JA NULL
 #define OPTION_VAL_SMART_JA NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_JA NULL
@@ -41068,9 +41068,9 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_AUTO_TOGGLE_KO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_KO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_KO NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_KO NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_KO "오버스캔 잘라내기"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_KO NULL
-#define OPTION_VAL_DISABLED_O53_KO NULL
+#define OPTION_VAL_DISABLED_O53_KO "없음"
 #define OPTION_VAL_STATIC_KO NULL
 #define OPTION_VAL_SMART_KO NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_KO NULL
@@ -41101,7 +41101,7 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_3PX_O55_KO NULL
 #define OPTION_VAL_2PX_O55_KO NULL
 #define OPTION_VAL_1PX_O55_KO NULL
-#define OPTION_VAL_DISABLED_O55_KO NULL
+#define OPTION_VAL_DISABLED_O55_KO "0 (기본)"
 #define OPTION_VAL_1PX_O55_0_KO NULL
 #define OPTION_VAL_2PX_O55_0_KO NULL
 #define OPTION_VAL_3PX_O55_0_KO NULL
@@ -41129,12 +41129,12 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_KO NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_KO NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_KO NULL
-#define OPTION_VAL_239_KO NULL
+#define OPTION_VAL_239_KO "239 (기본)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_KO NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_KO NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_KO NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_KO NULL
-#define OPTION_VAL_287_KO NULL
+#define OPTION_VAL_287_KO "287 (기본)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_KO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_KO NULL
 #define OPTION_VAL_SYNC_KO NULL
@@ -44950,7 +44950,7 @@ struct retro_core_options_v2 options_mt = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_NL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_NL NULL
-#define OPTION_VAL_DISABLED_O53_NL NULL
+#define OPTION_VAL_DISABLED_O53_NL "Geen"
 #define OPTION_VAL_STATIC_NL NULL
 #define OPTION_VAL_SMART_NL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_NL NULL
@@ -48828,9 +48828,9 @@ struct retro_core_options_v2 options_oc = {
 #define OPTION_VAL_AUTO_TOGGLE_PL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PL NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PL NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PL "Przytnij overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PL NULL
-#define OPTION_VAL_DISABLED_O53_PL NULL
+#define OPTION_VAL_DISABLED_O53_PL "Brak"
 #define OPTION_VAL_STATIC_PL NULL
 #define OPTION_VAL_SMART_PL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PL NULL
@@ -50768,7 +50768,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_AUTO_TOGGLE_PT_BR "Permitir alternância automática"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PT_BR "Substituir sincronia de vídeo PAL (europeu)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_BR "Devido a diferentes padrões, os jogos PAL costumam parecer lentos em comparação com os lançamentos Americanos ou Japoneses NTSC. Esta opção pode ser usada para substituir a sincronia de vídeo PAL para tentar executar esses jogos com a taxa de quadros NTSC. Esta opção não tem efeito ao executar o conteúdo NTSC."
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_BR "Corta o excedente da tela"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_BR "Cortar overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_BR "'Nenhum' retém as bordas (colunas pretas em ambos os lados no caso de imagens NTSC, bordas nos quatro lados para imagens PAL) para simular as barras pretas produzidas pelo hardware real de PSX em um sinal de vídeo analógico. \"Estático\" simplesmente remove as bordas horizontais, enquanto 'Dinâmico' remove todas as bordas."
 #define OPTION_VAL_DISABLED_O53_PT_BR "Nenhum"
 #define OPTION_VAL_STATIC_PT_BR "Estático"
@@ -52710,7 +52710,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_PT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_PT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_PT NULL
-#define OPTION_VAL_DISABLED_O53_PT_PT NULL
+#define OPTION_VAL_DISABLED_O53_PT_PT "Nenhum"
 #define OPTION_VAL_STATIC_PT_PT NULL
 #define OPTION_VAL_SMART_PT_PT NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PT_PT NULL
@@ -56590,7 +56590,7 @@ struct retro_core_options_v2 options_ro = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_RU "Из-за разницы в стандартах, игры PAL зачастую работали медленнее релизов для Америки или Японии. Данная настройка позволяет изменить тайминги PAL для запуска игр этого региона с кадровой частотой NTSC. Не работает при запуске NTSC-версий игр."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_RU "Обрезать вылеты развёртки"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_RU NULL
-#define OPTION_VAL_DISABLED_O53_RU NULL
+#define OPTION_VAL_DISABLED_O53_RU "Нет"
 #define OPTION_VAL_STATIC_RU "Статически"
 #define OPTION_VAL_SMART_RU NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_RU "Дополнительная обрезка"
@@ -56621,7 +56621,7 @@ struct retro_core_options_v2 options_ro = {
 #define OPTION_VAL_3PX_O55_RU "-3 пикс."
 #define OPTION_VAL_2PX_O55_RU "-2 пикс."
 #define OPTION_VAL_1PX_O55_RU "-1 пикс."
-#define OPTION_VAL_DISABLED_O55_RU NULL
+#define OPTION_VAL_DISABLED_O55_RU "0 (по умолчанию)"
 #define OPTION_VAL_1PX_O55_0_RU "+1 пикс."
 #define OPTION_VAL_2PX_O55_0_RU "+2 пикс."
 #define OPTION_VAL_3PX_O55_0_RU "+3 пикс."
@@ -56649,12 +56649,12 @@ struct retro_core_options_v2 options_ro = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_RU NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_RU "Последняя строка развёртки - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_RU NULL
-#define OPTION_VAL_239_RU NULL
+#define OPTION_VAL_239_RU "239 (по умолчанию)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_RU "Начальная строка развёртки - PAL"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_RU NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_RU "Последняя строка развёртки - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_RU NULL
-#define OPTION_VAL_287_RU NULL
+#define OPTION_VAL_287_RU "287 (по умолчанию)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_RU "Режим доступа к CD (требуется перезапуск)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_RU NULL
 #define OPTION_VAL_SYNC_RU "Синхронный"
@@ -60470,7 +60470,7 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SK NULL
-#define OPTION_VAL_DISABLED_O53_SK NULL
+#define OPTION_VAL_DISABLED_O53_SK "Žiadne"
 #define OPTION_VAL_STATIC_SK NULL
 #define OPTION_VAL_SMART_SK NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SK NULL
@@ -66001,17 +66001,17 @@ struct retro_core_options_v2 options_sv = {
 /* RETRO_LANGUAGE_TR */
 
 #define CATEGORY_VIDEO_LABEL_TR NULL
-#define CATEGORY_VIDEO_INFO_0_TR NULL
-#define CATEGORY_OSD_LABEL_TR "Ekrandaki Bildirimler"
-#define CATEGORY_OSD_INFO_0_TR NULL
+#define CATEGORY_VIDEO_INFO_0_TR "En boy oranını, ekran kırpmayı, video filtresini ve kare atlama ayarlarını değiştirin."
+#define CATEGORY_OSD_LABEL_TR "Ekran Bildirimleri"
+#define CATEGORY_OSD_INFO_0_TR "Ekranda gösterilen bildirimleri değiştirin."
 #define CATEGORY_INPUT_LABEL_TR "Girdi"
 #define CATEGORY_INPUT_INFO_0_TR NULL
-#define CATEGORY_MEMCARDS_LABEL_TR NULL
+#define CATEGORY_MEMCARDS_LABEL_TR "Bellek Kartı"
 #define CATEGORY_MEMCARDS_INFO_0_TR NULL
 #define CATEGORY_PGXP_LABEL_TR NULL
 #define CATEGORY_PGXP_INFO_0_TR NULL
-#define CATEGORY_HACKS_LABEL_TR NULL
-#define CATEGORY_HACKS_INFO_0_TR NULL
+#define CATEGORY_HACKS_LABEL_TR "Emülatör geliştirmeleri"
+#define CATEGORY_HACKS_INFO_0_TR "Düşük seviyeli performansı ve uyumluluğu etkileyen işlemci hız aşırtma ve taklit doğruluğu ayarlarını değiştirin."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TR "Dahili GPU Çözünürlüğü"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TR NULL
 #define OPTION_VAL_1X_NATIVE_TR "1x (Doğal)"
@@ -66023,14 +66023,14 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_DEPTH_INFO_0_TR NULL
 #define OPTION_VAL_16BPP_NATIVE_TR "16 bpp (Doğal)"
 #define OPTION_VAL_32BPP_TR NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_TR NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_TR "Titreşim Kalıbı"
 #define BEETLE_OPT_DITHER_MODE_INFO_0_TR NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_TR NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_TR "Dahili Çözünürlük"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TR NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_TR NULL
 #define BEETLE_OPT_FILTER_LABEL_TR NULL
 #define BEETLE_OPT_FILTER_INFO_0_TR NULL
-#define OPTION_VAL_NEAREST_TR "En yakın"
+#define OPTION_VAL_NEAREST_TR "En Yakın"
 #define OPTION_VAL_SABR_TR NULL
 #define OPTION_VAL_XBR_TR NULL
 #define OPTION_VAL_BILINEAR_TR "İkili Doğrusal"
@@ -66051,19 +66051,19 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_1X_TR NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_TR NULL
 #define BEETLE_OPT_MDEC_YUV_INFO_0_TR NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_TR NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_TR NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_TR "Dokuları Göm"
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TR NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TR NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TR NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_TR NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_TR NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_TR NULL
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_TR "Dokuları İzle"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_TR "Doku saklama ve değiştirme için ön koşul. Muhtemelen çoğu oyunda çökecektir."
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_TR "Dokuları Sakla"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TR "Kullanılan dokuları <cd>-texture-dump/ dizinine saklayın"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TR "Dokuları Değiştir"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TR "<cd>-texture-replacements/ adresindeki HD sürümlerini kullanarak dokuları değiştirin"
+#define BEETLE_OPT_WIREFRAME_LABEL_TR "Tel Kafes Kipi (Hata Ayıklama)"
+#define BEETLE_OPT_WIREFRAME_INFO_0_TR "3B modelleri doku veya gölgeleme olmadan anahat biçiminde işleyin. Yalnızca OpenGL donanım oluşturucusu tarafından desteklenir. Not: Bu, hata ayıklama amaçlıdır ve normalde devre dışı bırakılmalıdır."
+#define BEETLE_OPT_FRAME_DUPING_LABEL_TR "Kareleri Çoğalt (Hızlandır)"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_TR NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_TR NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_TR "Dahili FPS'yi Görüntüle"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_TR NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_TR NULL
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_TR "Tam VRAM Görüntüle (Hata Ayıklama)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_TR NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TR NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TR NULL
@@ -66077,26 +66077,26 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_TR NULL
 #define OPTION_VAL_LIGHTGUN_TR NULL
 #define OPTION_VAL_TOUCHSCREEN_TR "Dokunmatik Ekran"
-#define BEETLE_OPT_GUN_CURSOR_LABEL_TR NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_TR NULL
-#define OPTION_VAL_CROSS_TR NULL
-#define OPTION_VAL_DOT_TR NULL
-#define OPTION_VAL_OFF_TR NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_TR NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_TR NULL
+#define BEETLE_OPT_GUN_CURSOR_LABEL_TR "Silah İmleci"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_TR "'Guncon/G-Con 45' ve 'Justifier' giriş cihazı türlerini kullanırken ekranda görüntülenecek silah imlecini seçin. Devre dışı bırakıldığında, artı işareti her zaman gizlenir."
+#define OPTION_VAL_CROSS_TR "Çarpı"
+#define OPTION_VAL_DOT_TR "Nokta"
+#define OPTION_VAL_OFF_TR "İmleç Yok"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_TR "1. Port: Silah Nişangah Rengi"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_TR "1ç port için hafif silah artı imleci rengini seçin."
 #define OPTION_VAL_RED_TR "Kırmızı"
 #define OPTION_VAL_BLUE_TR "Mavi"
 #define OPTION_VAL_GREEN_TR "Yeşil"
 #define OPTION_VAL_ORANGE_TR "Turuncu"
 #define OPTION_VAL_YELLOW_TR "Sarı"
 #define OPTION_VAL_CYAN_TR "Camgöbeği"
-#define OPTION_VAL_PINK_TR NULL
+#define OPTION_VAL_PINK_TR "Pembe"
 #define OPTION_VAL_PURPLE_TR "Mor"
 #define OPTION_VAL_BLACK_TR "Siyah"
 #define OPTION_VAL_WHITE_TR "Beyaz"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_TR NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TR NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TR NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TR "Fare Hassasiyeti"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TR NULL
 #define OPTION_VAL_5_TR "%5"
 #define OPTION_VAL_10_TR "%10"
@@ -66104,7 +66104,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_20_TR "%20"
 #define OPTION_VAL_25_TR "%25"
 #define OPTION_VAL_30_TR "%30"
-#define OPTION_VAL_35_TR NULL
+#define OPTION_VAL_35_TR "%35"
 #define OPTION_VAL_40_TR "%40"
 #define OPTION_VAL_45_TR "%45"
 #define OPTION_VAL_50_TR "%50"
@@ -66117,32 +66117,32 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_85_TR "%85"
 #define OPTION_VAL_90_TR "%90"
 #define OPTION_VAL_95_TR "%95"
-#define OPTION_VAL_100_TR NULL
-#define OPTION_VAL_105_TR NULL
-#define OPTION_VAL_110_TR NULL
-#define OPTION_VAL_115_TR NULL
-#define OPTION_VAL_120_TR NULL
+#define OPTION_VAL_100_TR "%100 (Varsayılan)"
+#define OPTION_VAL_105_TR "%105"
+#define OPTION_VAL_110_TR "%110"
+#define OPTION_VAL_115_TR "%115"
+#define OPTION_VAL_120_TR "%120"
 #define OPTION_VAL_125_TR "%125"
-#define OPTION_VAL_130_TR NULL
-#define OPTION_VAL_135_TR NULL
-#define OPTION_VAL_140_TR NULL
-#define OPTION_VAL_145_TR NULL
+#define OPTION_VAL_130_TR "%130"
+#define OPTION_VAL_135_TR "%135"
+#define OPTION_VAL_140_TR "%140"
+#define OPTION_VAL_145_TR "%145"
 #define OPTION_VAL_150_TR "%150"
-#define OPTION_VAL_155_TR NULL
-#define OPTION_VAL_160_TR NULL
-#define OPTION_VAL_165_TR NULL
-#define OPTION_VAL_170_TR NULL
+#define OPTION_VAL_155_TR "%155"
+#define OPTION_VAL_160_TR "%160"
+#define OPTION_VAL_165_TR "%165"
+#define OPTION_VAL_170_TR "%170"
 #define OPTION_VAL_175_TR "%175"
-#define OPTION_VAL_180_TR NULL
-#define OPTION_VAL_185_TR NULL
-#define OPTION_VAL_190_TR NULL
-#define OPTION_VAL_195_TR NULL
+#define OPTION_VAL_180_TR "%180"
+#define OPTION_VAL_185_TR "%185"
+#define OPTION_VAL_190_TR "%190"
+#define OPTION_VAL_195_TR "%195"
 #define OPTION_VAL_200_TR "%200"
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_TR NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_TR NULL
 #define OPTION_VAL_LINEAR_TR "Doğrusal"
-#define OPTION_VAL_QUADRATIC_TR NULL
-#define OPTION_VAL_CUBIC_TR NULL
+#define OPTION_VAL_QUADRATIC_TR "Karesel"
+#define OPTION_VAL_CUBIC_TR "Kübik"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_TR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_TR NULL
 #define OPTION_VAL_0_TR "%0"
@@ -66158,7 +66158,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_TR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_TR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_TR NULL
-#define OPTION_VAL_1_TR NULL
+#define OPTION_VAL_1_TR "1 (Varsayılan)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_TR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TR NULL
 #define OPTION_VAL_MEMORY_ONLY_TR NULL
@@ -66183,8 +66183,8 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_LINE_RENDER_LABEL_TR NULL
 #define BEETLE_OPT_LINE_RENDER_INFO_0_TR NULL
 #define OPTION_VAL_DEFAULT_TR "Varsayılan"
-#define OPTION_VAL_AGGRESSIVE_TR NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_TR NULL
+#define OPTION_VAL_AGGRESSIVE_TR "Agresif"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_TR "Geniş Ekran Geliştirmesi"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_TR NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_TR NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_TR NULL
@@ -66197,65 +66197,65 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_32_9_TR NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_TR NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_TR NULL
-#define OPTION_VAL_100_NATIVE_TR NULL
-#define OPTION_VAL_210_TR NULL
-#define OPTION_VAL_220_TR NULL
-#define OPTION_VAL_230_TR NULL
-#define OPTION_VAL_240_TR NULL
-#define OPTION_VAL_250_TR NULL
-#define OPTION_VAL_260_TR NULL
-#define OPTION_VAL_270_TR NULL
-#define OPTION_VAL_280_TR NULL
-#define OPTION_VAL_290_TR NULL
-#define OPTION_VAL_300_TR NULL
-#define OPTION_VAL_310_TR NULL
-#define OPTION_VAL_320_TR NULL
-#define OPTION_VAL_330_TR NULL
-#define OPTION_VAL_340_TR NULL
-#define OPTION_VAL_350_TR NULL
-#define OPTION_VAL_360_TR NULL
-#define OPTION_VAL_370_TR NULL
-#define OPTION_VAL_380_TR NULL
-#define OPTION_VAL_390_TR NULL
-#define OPTION_VAL_400_TR NULL
-#define OPTION_VAL_410_TR NULL
-#define OPTION_VAL_420_TR NULL
-#define OPTION_VAL_430_TR NULL
-#define OPTION_VAL_440_TR NULL
-#define OPTION_VAL_450_TR NULL
-#define OPTION_VAL_460_TR NULL
-#define OPTION_VAL_470_TR NULL
-#define OPTION_VAL_480_TR NULL
-#define OPTION_VAL_490_TR NULL
-#define OPTION_VAL_500_TR NULL
-#define OPTION_VAL_510_TR NULL
-#define OPTION_VAL_520_TR NULL
-#define OPTION_VAL_530_TR NULL
-#define OPTION_VAL_540_TR NULL
-#define OPTION_VAL_550_TR NULL
-#define OPTION_VAL_560_TR NULL
-#define OPTION_VAL_570_TR NULL
-#define OPTION_VAL_580_TR NULL
-#define OPTION_VAL_590_TR NULL
-#define OPTION_VAL_600_TR NULL
-#define OPTION_VAL_610_TR NULL
-#define OPTION_VAL_620_TR NULL
-#define OPTION_VAL_630_TR NULL
-#define OPTION_VAL_640_TR NULL
-#define OPTION_VAL_650_TR NULL
-#define OPTION_VAL_660_TR NULL
-#define OPTION_VAL_670_TR NULL
-#define OPTION_VAL_680_TR NULL
-#define OPTION_VAL_690_TR NULL
-#define OPTION_VAL_700_TR NULL
-#define OPTION_VAL_710_TR NULL
-#define OPTION_VAL_720_TR NULL
-#define OPTION_VAL_730_TR NULL
-#define OPTION_VAL_740_TR NULL
-#define OPTION_VAL_750_TR NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_TR NULL
+#define OPTION_VAL_100_NATIVE_TR "%100 (Doğal)"
+#define OPTION_VAL_210_TR "%210"
+#define OPTION_VAL_220_TR "%220"
+#define OPTION_VAL_230_TR "%230"
+#define OPTION_VAL_240_TR "%240"
+#define OPTION_VAL_250_TR "%250"
+#define OPTION_VAL_260_TR "%260"
+#define OPTION_VAL_270_TR "%270"
+#define OPTION_VAL_280_TR "%280"
+#define OPTION_VAL_290_TR "%290"
+#define OPTION_VAL_300_TR "%300"
+#define OPTION_VAL_310_TR "%310"
+#define OPTION_VAL_320_TR "%320"
+#define OPTION_VAL_330_TR "%330"
+#define OPTION_VAL_340_TR "%340"
+#define OPTION_VAL_350_TR "%350"
+#define OPTION_VAL_360_TR "%360"
+#define OPTION_VAL_370_TR "%370"
+#define OPTION_VAL_380_TR "%380"
+#define OPTION_VAL_390_TR "%390"
+#define OPTION_VAL_400_TR "%400"
+#define OPTION_VAL_410_TR "%410"
+#define OPTION_VAL_420_TR "%420"
+#define OPTION_VAL_430_TR "%430"
+#define OPTION_VAL_440_TR "%440"
+#define OPTION_VAL_450_TR "%450"
+#define OPTION_VAL_460_TR "%460"
+#define OPTION_VAL_470_TR "%470"
+#define OPTION_VAL_480_TR "%480"
+#define OPTION_VAL_490_TR "%490"
+#define OPTION_VAL_500_TR "%500"
+#define OPTION_VAL_510_TR "%510"
+#define OPTION_VAL_520_TR "%520"
+#define OPTION_VAL_530_TR "%530"
+#define OPTION_VAL_540_TR "%540"
+#define OPTION_VAL_550_TR "%550"
+#define OPTION_VAL_560_TR "%560"
+#define OPTION_VAL_570_TR "%570"
+#define OPTION_VAL_580_TR "%580"
+#define OPTION_VAL_590_TR "%590"
+#define OPTION_VAL_600_TR "%600"
+#define OPTION_VAL_610_TR "%610"
+#define OPTION_VAL_620_TR "%620"
+#define OPTION_VAL_630_TR "%630"
+#define OPTION_VAL_640_TR "%640"
+#define OPTION_VAL_650_TR "%650"
+#define OPTION_VAL_660_TR "%660"
+#define OPTION_VAL_670_TR "%670"
+#define OPTION_VAL_680_TR "%680"
+#define OPTION_VAL_690_TR "%690"
+#define OPTION_VAL_700_TR "%700"
+#define OPTION_VAL_710_TR "%710"
+#define OPTION_VAL_720_TR "%720"
+#define OPTION_VAL_730_TR "%730"
+#define OPTION_VAL_740_TR "%740"
+#define OPTION_VAL_750_TR "%750"
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_TR "GTE Hız Aşırtma"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_TR NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_TR NULL
+#define BEETLE_OPT_SKIP_BIOS_LABEL_TR "BIOS'u Atla"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_TR NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_TR NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TR NULL
@@ -66263,16 +66263,16 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_PS1_ROM_TR NULL
 #define BEETLE_OPT_RENDERER_LABEL_TR NULL
 #define BEETLE_OPT_RENDERER_INFO_0_TR NULL
-#define OPTION_VAL_HARDWARE_TR NULL
-#define OPTION_VAL_HARDWARE_GL_TR NULL
-#define OPTION_VAL_HARDWARE_VK_TR NULL
-#define OPTION_VAL_SOFTWARE_TR NULL
+#define OPTION_VAL_HARDWARE_TR "Donanım (Otomatik)"
+#define OPTION_VAL_HARDWARE_GL_TR "Donanım (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_TR "Donanım (Vulkan)"
+#define OPTION_VAL_SOFTWARE_TR "Yazılım"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TR NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_TR NULL
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_TR NULL
 #define OPTION_VAL_DISABLED_TR NULL
-#define OPTION_VAL_EXECUTE_TR NULL
+#define OPTION_VAL_EXECUTE_TR "Azami Performans"
 #define OPTION_VAL_EXECUTE_ONE_TR NULL
 #define OPTION_VAL_RUN_INTERPRETER_TR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_TR NULL
@@ -66288,11 +66288,11 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_AUTO_TOGGLE_TR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_TR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TR NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_TR NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_TR "Aşırı Taramayı Kırp"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_TR NULL
-#define OPTION_VAL_DISABLED_O53_TR NULL
-#define OPTION_VAL_STATIC_TR NULL
-#define OPTION_VAL_SMART_TR NULL
+#define OPTION_VAL_DISABLED_O53_TR "Yok"
+#define OPTION_VAL_STATIC_TR "Statik"
+#define OPTION_VAL_SMART_TR "Dinamik (Varsayılan)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_TR NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_TR NULL
 #define OPTION_VAL_9PX_TR NULL
@@ -66307,8 +66307,8 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_18PX_TR NULL
 #define OPTION_VAL_19PX_TR NULL
 #define OPTION_VAL_20PX_TR NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_TR NULL
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_TR NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_TR "Merkeze Kırpılmış Görüntü"
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_TR "'Yatay Aşırı Tarama Kırp' etkinleştirildiğinde, bu elde edilen kırpılan görüntünün belirtilen piksel sayısı kadar yatay olarak sağa (pozitif) veya sola (negatif) kaydırılmasına izin verir. Hizalama sorunlarını düzeltmek için kullanılabilir. Yalnızca yazılım işleyici tarafından desteklenir."
 #define OPTION_VAL_12PX_O55_TR NULL
 #define OPTION_VAL_11PX_O55_TR NULL
 #define OPTION_VAL_10PX_O55_TR NULL
@@ -66321,7 +66321,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_3PX_O55_TR NULL
 #define OPTION_VAL_2PX_O55_TR NULL
 #define OPTION_VAL_1PX_O55_TR NULL
-#define OPTION_VAL_DISABLED_O55_TR NULL
+#define OPTION_VAL_DISABLED_O55_TR "0 (Varsayılan)"
 #define OPTION_VAL_1PX_O55_0_TR NULL
 #define OPTION_VAL_2PX_O55_0_TR NULL
 #define OPTION_VAL_3PX_O55_0_TR NULL
@@ -66339,30 +66339,30 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_TR NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_TR NULL
 #define OPTION_VAL_32X_TR NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_TR NULL
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_TR NULL
-#define OPTION_VAL_CORRECTED_TR NULL
-#define OPTION_VAL_UNCORRECTED_TR NULL
-#define OPTION_VAL_4_3_TR NULL
-#define OPTION_VAL_NTSC_TR NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_TR "Çekirdek En Boy Oranı"
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_TR "Çekirdek tarafından sağlanan en boy oranını seçin. Geniş Ekran Kipi Geliştirmesi veya Tam VRAM Görüntüle seçenekleri etkinleştirildiğinde bu ayar yok sayılır."
+#define OPTION_VAL_CORRECTED_TR "Düzeltilmiş"
+#define OPTION_VAL_UNCORRECTED_TR "Düzeltilmemiş"
+#define OPTION_VAL_4_3_TR "4:3 İçin Zorla"
+#define OPTION_VAL_NTSC_TR "NTSC İçin Zorla"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_TR NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_TR NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_TR NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_TR NULL
-#define OPTION_VAL_239_TR NULL
+#define OPTION_VAL_239_TR "239 (Varsayılan)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_TR NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_TR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_TR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_TR NULL
-#define OPTION_VAL_287_TR NULL
+#define OPTION_VAL_287_TR "287 (Varsayılan)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_TR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_TR NULL
-#define OPTION_VAL_SYNC_TR NULL
-#define OPTION_VAL_ASYNC_TR NULL
+#define OPTION_VAL_SYNC_TR "Senkron"
+#define OPTION_VAL_ASYNC_TR "Asenkron"
 #define OPTION_VAL_PRECACHE_TR NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_TR NULL
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_TR NULL
-#define OPTION_VAL_2X_NATIVE_TR NULL
+#define OPTION_VAL_2X_NATIVE_TR "2x (Doğal)"
 #define OPTION_VAL_6X_TR NULL
 #define OPTION_VAL_10X_TR NULL
 #define OPTION_VAL_12X_TR NULL
@@ -68230,7 +68230,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_UK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_UK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_UK NULL
-#define OPTION_VAL_DISABLED_O53_UK NULL
+#define OPTION_VAL_DISABLED_O53_UK "Немає"
 #define OPTION_VAL_STATIC_UK NULL
 #define OPTION_VAL_SMART_UK NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_UK NULL
