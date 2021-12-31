@@ -1995,9 +1995,9 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AST NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_AST NULL
 #define OPTION_VAL_1X_NATIVE_AST NULL
-#define OPTION_VAL_2X_AST NULL
-#define OPTION_VAL_4X_AST NULL
-#define OPTION_VAL_8X_AST NULL
+#define OPTION_VAL_2X_AST "x2"
+#define OPTION_VAL_4X_AST "x4"
+#define OPTION_VAL_8X_AST "x8"
 #define OPTION_VAL_16X_AST NULL
 #define BEETLE_OPT_DEPTH_LABEL_AST NULL
 #define BEETLE_OPT_DEPTH_INFO_0_AST NULL
@@ -2028,7 +2028,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_AST NULL
 #define BEETLE_OPT_MSAA_LABEL_AST NULL
 #define BEETLE_OPT_MSAA_INFO_0_AST NULL
-#define OPTION_VAL_1X_AST NULL
+#define OPTION_VAL_1X_AST "x1"
 #define BEETLE_OPT_MDEC_YUV_LABEL_AST NULL
 #define BEETLE_OPT_MDEC_YUV_INFO_0_AST NULL
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_AST NULL
@@ -25377,7 +25377,7 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_85_FI "85 %"
 #define OPTION_VAL_90_FI "90 %"
 #define OPTION_VAL_95_FI "95 %"
-#define OPTION_VAL_100_FI NULL
+#define OPTION_VAL_100_FI "100 % (Oletus)"
 #define OPTION_VAL_105_FI "105 %"
 #define OPTION_VAL_110_FI "110 %"
 #define OPTION_VAL_115_FI "115 %"
@@ -40954,20 +40954,20 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_6PX_KO NULL
 #define OPTION_VAL_7PX_KO NULL
 #define OPTION_VAL_8PX_KO NULL
-#define BEETLE_OPT_PGXP_NCLIP_LABEL_KO NULL
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_KO NULL
-#define BEETLE_OPT_PGXP_VERTEX_LABEL_KO NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_KO NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_KO NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_KO NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_KO NULL
-#define BEETLE_OPT_LINE_RENDER_INFO_0_KO NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_KO "PGXP 프리미티브 컬링"
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_KO "PGXP의 NCLIP 구현을 사용합니다. PGXP 좌표의 폴리곤에 나타나는 구멍을 줄여 외형을 개선합니다. 일부 게임이 다양한 상황에서 멈추는 부작용이 있습니다."
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_KO "PGXP 버텍스 캐시"
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_KO "PGXP 개선된 버텍스 위치를 캐싱하여 다양한 폴리곤 그리기에 재사용합니다. 텍스쳐를 렌더링할 때 개체 정렬을 개선하고 틈을 줄이는 등의 개선 효과를 볼 수 있지만, 캐시 쿼리 시 오탐으로 인해 그래픽 오류가 발생할 수 있습니다. 현재는 사용하지 않는 것이 권장됩니다. 이 설정은 PGXP 작동 모드가 활성화되어 있어야 적용됩니다. 하드웨어 렌더러에서만 지원됩니다."
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_KO "PGXP 원근 교정 텍스쳐링"
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_KO "네이티브 PSX 아핀 텍스쳐 매핑을 원근 교정 텍스쳐 매핑으로 대체합니다. 위치 기반 왜곡 및 뒤틀림을 제거하여 텍스쳐가 올바르게 표시되게 합니다. 이 설정은 PGXP 작동 모드가 활성화되어 있어야 적용됩니다. 하드웨어 렌더러에서만 지원됩니다."
+#define BEETLE_OPT_LINE_RENDER_LABEL_KO "Line-to-Quad 핵"
+#define BEETLE_OPT_LINE_RENDER_INFO_0_KO "Line-to-Quad 핵의 작동 방식을 선택합니다. 일부 게임(예: Doom, Hexen, Soul Blade 등)은 수평선을 원본 하드웨어에서 한 줄의 픽셀로 래스터화되는 1픽셀 높이의 가로로 긴 삼각형을 그리는 방식으로 구현합니다. 이 핵은 그러한 작은 삼각형을 탐지하여 하드웨어 렌더러에서 올바르게 그려지고 업스케일링도 할 수 있는 사각형으로 변환합니다. '과감하게'는 일부 타이틀(예: Dark Forces, Duke Nukem)의 구동에 필요하나 이외의 경우 그래픽 오류를 유발할 수 있습니다. 불확실할 경우 '기본'으로 설정하십시오."
 #define OPTION_VAL_DEFAULT_KO "기본"
-#define OPTION_VAL_AGGRESSIVE_KO NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_KO NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_KO NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_KO NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_KO NULL
+#define OPTION_VAL_AGGRESSIVE_KO "과감하게"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_KO "와이드스크린 모드 핵"
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_KO "3D 컨텐츠를 아나모픽하게 렌더링한 뒤 에뮬레이트되는 프레임버퍼에 와이드스크린 화면비로 출력합니다. 풀 3D 게임에서 최선의 효과를 얻을 수 있습니다. 2D 요소는 가로로 늘어나며 뒤틀릴 수 있습니다."
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_KO "와이드스크린 모드 핵 화면비"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_KO "와이드스크린 모드 핵에서 사용될 화면비를 선택합니다."
 #define OPTION_VAL_16_9_KO NULL
 #define OPTION_VAL_16_10_KO NULL
 #define OPTION_VAL_18_9_KO NULL
@@ -40975,9 +40975,9 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_20_9_KO NULL
 #define OPTION_VAL_21_9_KO NULL
 #define OPTION_VAL_32_9_KO NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_KO NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_KO NULL
-#define OPTION_VAL_100_NATIVE_KO NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_KO "CPU 속도 스케일링 (오버클럭)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_KO "에뮬레이트되는 PSX CPU를 오버클럭(언더클럭)합니다. 오버클러킹은 높은 사양을 요구하는 대신 일부 게임에서 느려짐 증상을 없애고 프레임레이트를 개선할 수 있습니다. 일부 게임은 프레임레이트 리미터가 내장되어 있으므로 오버클러킹의 이득이 없을 수도 있습니다. 일부 타이틀에서 오버클럭을 할 경우 일부 효과가 의도된 것보다 빠르게 재생될 수 있습니다."
+#define OPTION_VAL_100_NATIVE_KO "100% (네이티브)"
 #define OPTION_VAL_210_KO NULL
 #define OPTION_VAL_220_KO NULL
 #define OPTION_VAL_230_KO NULL
@@ -41140,9 +41140,9 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_SYNC_KO NULL
 #define OPTION_VAL_ASYNC_KO NULL
 #define OPTION_VAL_PRECACHE_KO NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_KO NULL
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_KO NULL
-#define OPTION_VAL_2X_NATIVE_KO NULL
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_KO "CD 로딩 속도"
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_KO "디스크 액세스 배속을 선택합니다. '2x (네이티브)'를 초과하는 값은 인게임 로딩 시간을 크게 줄일 수 있지만, 타이밍 오류를 유발하기도 합니다. 일부 게임은 일정 속도 이상에서 올바르게 작동하지 않을 수 있습니다."
+#define OPTION_VAL_2X_NATIVE_KO "2x (네이티브)"
 #define OPTION_VAL_6X_KO NULL
 #define OPTION_VAL_10X_KO NULL
 #define OPTION_VAL_12X_KO NULL
