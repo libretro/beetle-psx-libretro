@@ -7801,53 +7801,53 @@ struct retro_core_options_v2 options_chs = {
 /* RETRO_LANGUAGE_CHT */
 
 #define CATEGORY_VIDEO_LABEL_CHT "視訊"
-#define CATEGORY_VIDEO_INFO_0_CHT NULL
+#define CATEGORY_VIDEO_INFO_0_CHT "變更長寬比，影像裁切，影像濾鏡以及跳幀設定"
 #define CATEGORY_OSD_LABEL_CHT "營幕通知"
-#define CATEGORY_OSD_INFO_0_CHT NULL
+#define CATEGORY_OSD_INFO_0_CHT "變更畫面上顯示的通知"
 #define CATEGORY_INPUT_LABEL_CHT "輸入"
-#define CATEGORY_INPUT_INFO_0_CHT NULL
-#define CATEGORY_MEMCARDS_LABEL_CHT NULL
-#define CATEGORY_MEMCARDS_INFO_0_CHT NULL
+#define CATEGORY_INPUT_INFO_0_CHT "變更光線槍，滑鼠以及neGcon手把設定"
+#define CATEGORY_MEMCARDS_LABEL_CHT "記憶卡"
+#define CATEGORY_MEMCARDS_INFO_0_CHT "變更系統所使用的虛擬記憶卡相關設定"
 #define CATEGORY_PGXP_LABEL_CHT NULL
 #define CATEGORY_PGXP_INFO_0_CHT NULL
 #define CATEGORY_HACKS_LABEL_CHT NULL
 #define CATEGORY_HACKS_INFO_0_CHT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHT NULL
-#define OPTION_VAL_1X_NATIVE_CHT NULL
+#define OPTION_VAL_1X_NATIVE_CHT "1x (原生)"
 #define OPTION_VAL_2X_CHT NULL
 #define OPTION_VAL_4X_CHT NULL
 #define OPTION_VAL_8X_CHT NULL
 #define OPTION_VAL_16X_CHT NULL
-#define BEETLE_OPT_DEPTH_LABEL_CHT NULL
+#define BEETLE_OPT_DEPTH_LABEL_CHT "內部色深"
 #define BEETLE_OPT_DEPTH_INFO_0_CHT NULL
-#define OPTION_VAL_16BPP_NATIVE_CHT NULL
+#define OPTION_VAL_16BPP_NATIVE_CHT "16 bpp (原生)"
 #define OPTION_VAL_32BPP_CHT NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_CHT NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_CHT NULL
 #define OPTION_VAL_INTERNAL_RESOLUTION_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHT NULL
-#define BEETLE_OPT_FILTER_LABEL_CHT NULL
-#define BEETLE_OPT_FILTER_INFO_0_CHT NULL
-#define OPTION_VAL_NEAREST_CHT "最近"
+#define BEETLE_OPT_FILTER_LABEL_CHT "材質過濾"
+#define BEETLE_OPT_FILTER_INFO_0_CHT "選擇材質過濾方法。'最接近'模擬原始硬體。'雙線性'以及'3-Point'為平滑過濾，他會透過模糊畫面來減少像素感。'SABR'，'xBR'以及'JINC2'為升級濾鏡，透過更高的效能需求來提升材質還原度/清晰度。只支援硬體渲染。"
+#define OPTION_VAL_NEAREST_CHT "最接近"
 #define OPTION_VAL_SABR_CHT NULL
 #define OPTION_VAL_XBR_CHT NULL
-#define OPTION_VAL_BILINEAR_CHT "雙線過濾"
+#define OPTION_VAL_BILINEAR_CHT "雙線性插值"
 #define OPTION_VAL_3_POINT_CHT NULL
 #define OPTION_VAL_JINC2_CHT NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_CHT NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_CHT NULL
-#define OPTION_VAL_OPAQUE_CHT NULL
-#define OPTION_VAL_ALL_CHT NULL
+#define OPTION_VAL_OPAQUE_CHT "僅限不透明"
+#define OPTION_VAL_ALL_CHT "不透明與半透明"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_CHT NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_CHT NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_CHT "請勿在2D多邊形使用材質過濾。2D多邊形使用啟發法來偵測並可能造成小故障。搭配適應平滑法或其他後期處理濾鏡來達到最佳效果。"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_CHT NULL
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_CHT NULL
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_CHT NULL
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_CHT "超級取樣 (降採樣至原生解析度)"
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CHT NULL
-#define BEETLE_OPT_MSAA_LABEL_CHT NULL
-#define BEETLE_OPT_MSAA_INFO_0_CHT NULL
+#define BEETLE_OPT_MSAA_LABEL_CHT "多重取樣反鋸齒"
+#define BEETLE_OPT_MSAA_INFO_0_CHT "選擇渲染內容的MSAA等級。改善3D物件的視覺效果。只支援Vulkan渲染器。"
 #define OPTION_VAL_1X_CHT NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_CHT NULL
 #define BEETLE_OPT_MDEC_YUV_INFO_0_CHT NULL
@@ -21668,13 +21668,13 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_AUTO_TOGGLE_ES "Cambiar automáticamente"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_ES "Anular sincronía de vídeo PAL (europea)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ES "Debido a la diferencia entre estándares, los juegos PAL suelen parecer más lentos que sus versiones NTSC, tanto estadounidenses como japonesas. Esta opción puede anular la velocidad de vídeo PAL para intentar ejecutar dichos juegos con la velocidad de fotogramas NTSC. Esta opción no produce efecto alguno en contenidos NTSC."
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_ES "Recortar «overscan» horizontal"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_ES "Recortar sobrebarrido horizontal"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_ES "«Ninguno» conserva los bordes (columnas negras a ambos lados en el caso de imágenes NTSC, bordes por los cuatro costados en imágenes PAL) para simular las barras negras que produce el hardware real de PSX en una señal de vídeo analógica. «Estático» se limita a eliminar los bordes horizontales, mientras que «Dinámico» elimina todos los bordes."
 #define OPTION_VAL_DISABLED_O53_ES "Ninguno"
 #define OPTION_VAL_STATIC_ES "Estático"
 #define OPTION_VAL_SMART_ES "Dinámico (por defecto)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_ES "Recorte adicional"
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_ES "Al activar la opción «Recortar \"overscan\" horizontal», esta opción permite reducir el ancho de la imagen recortada usando un valor concreto en píxeles. Solo funciona con el renderizador por software."
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_ES "Al activar la opción «Recortar sobrebarrido horizontal», esta opción permite reducir el ancho de la imagen recortada usando un valor concreto en píxeles. Solo funciona con el renderizador por software."
 #define OPTION_VAL_9PX_ES "9 px"
 #define OPTION_VAL_10PX_ES "10 px"
 #define OPTION_VAL_11PX_ES "11 px"
@@ -21688,7 +21688,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_19PX_ES "19 px"
 #define OPTION_VAL_20PX_ES "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_ES "Desplazar imagen recortada"
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_ES "Al activar la opción «Recortar \"overscan\" horizontal», esta opción permite desplazar horizontalmente la imagen recortada hacia la derecha (valores positivos) o hacia la izquierda (valores negativos) usando un valor concreto en píxeles. Utilizar para corregir problemas de alineación. Solo funciona con el renderizador por software."
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_ES "Al activar la opción «Recortar sobrebarrido horizontal», esta opción permite desplazar horizontalmente la imagen recortada hacia la derecha (valores positivos) o hacia la izquierda (valores negativos) usando un valor concreto en píxeles. Utilizar para corregir problemas de alineación. Solo funciona con el renderizador por software."
 #define OPTION_VAL_12PX_O55_ES "-12 px"
 #define OPTION_VAL_11PX_O55_ES "-11 px"
 #define OPTION_VAL_10PX_O55_ES "-10 px"
@@ -41033,46 +41033,46 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_730_KO NULL
 #define OPTION_VAL_740_KO NULL
 #define OPTION_VAL_750_KO NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_KO NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_KO NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_KO NULL
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_KO NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_KO NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_KO NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_KO "GTE 오버클럭"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_KO "에뮬레이트되는 GTE(3D 그래픽 보조 처리장치) 연산을 모두 1사이클 시간 내에 처리합니다. GTE를 많이 사용하는 게임에서 프레임레이트와 프레임 시간 안정성을 크게 향상시킬 수 있습니다."
+#define BEETLE_OPT_SKIP_BIOS_LABEL_KO "BIOS 건너뛰기"
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_KO "컨텐츠를 불러올 때 표시되는 PlayStation BIOS 부트 애니메이션을 건너뜁니다. 주의: 이 옵션을 사용하면 일부 게임(PAL 복사 방지 게임, Saga Frontier 등)에서 호환성 문제가 발생합니다."
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_KO "대체 BIOS 사용 (재시작 필요)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_KO "존재할 경우 기존의 지역 제한 BIOS를 지역 제한이 없는 BIOS로 대체합니다."
 #define OPTION_VAL_PSXONPSP_KO NULL
 #define OPTION_VAL_PS1_ROM_KO NULL
-#define BEETLE_OPT_RENDERER_LABEL_KO NULL
-#define BEETLE_OPT_RENDERER_INFO_0_KO NULL
-#define OPTION_VAL_HARDWARE_KO NULL
-#define OPTION_VAL_HARDWARE_GL_KO NULL
-#define OPTION_VAL_HARDWARE_VK_KO NULL
-#define OPTION_VAL_SOFTWARE_KO NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_KO NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_KO NULL
-#define BEETLE_OPT_CPU_DYNAREC_LABEL_KO NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_KO NULL
-#define OPTION_VAL_DISABLED_KO NULL
-#define OPTION_VAL_EXECUTE_KO NULL
-#define OPTION_VAL_EXECUTE_ONE_KO NULL
-#define OPTION_VAL_RUN_INTERPRETER_KO NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_KO NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_KO NULL
+#define BEETLE_OPT_RENDERER_LABEL_KO "렌더러 (재시작 필요)"
+#define BEETLE_OPT_RENDERER_INFO_0_KO "소프트웨어 렌더러는 가장 정확하지만 내부 GPU 해상도를 높여 사용할 경우 요구 사양이 높아집니다. 하드웨어 렌더러는 조금 더 부정확하지만 높은 내부 GPU 해상도에서 소프트웨어 렌더러 대비 성능이 향상되며 다양한 그래픽 개선을 적용할 수 있습니다. '하드웨어 (자동)'은 현재 libretro 프론트엔드 비디오 드라이버에 따라 Vulkan 또는 OpenGL 중 적절한 렌더러를 선택합니다. 제공된 비디오 드라이버가 Vulkan 또는 OpenGL 3.3과 호환되지 않을 경우, 코어는 소프트웨어 렌더러를 사용할 것입니다."
+#define OPTION_VAL_HARDWARE_KO "하드웨어 (자동)"
+#define OPTION_VAL_HARDWARE_GL_KO "하드웨어 (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_KO "하드웨어 (Vulkan)"
+#define OPTION_VAL_SOFTWARE_KO "소프트웨어"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_KO "소프트웨어 프레임버퍼"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_KO "하드웨어 렌더러 사용 시 1배 해상도의 소프트웨어 렌더러를 백그라운드에서 함께 구동하여 프레임버퍼 효과(모션 블러, FF7 전투 개시 효과 등)를 정확하게 에뮬레이트합니다. 비활성화할 경우, 이러한 효과는 무시되거나(OpenGL) GPU에서 렌더됩니다(Vulkan). 비활성화 시 성능이 개선되지만 심각한 그래픽 오류를 일으킬 수 있습니다. 불확실할 경우 활성으로 설정하십시오."
+#define BEETLE_OPT_CPU_DYNAREC_LABEL_KO "CPU 동적 리컴파일러"
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_KO "CPU 명령어를 네이티브 명령어로 동적 리컴파일합니다. 인터프리터보다 훨씬 빠르지만, CPU 타이밍이 부정확해지며, 오류를 일으킬 수 있습니다."
+#define OPTION_VAL_DISABLED_KO "비활성화 (Beetle 인터프리터)"
+#define OPTION_VAL_EXECUTE_KO "최대 성능"
+#define OPTION_VAL_EXECUTE_ONE_KO "사이클 타이밍 검사"
+#define OPTION_VAL_RUN_INTERPRETER_KO "Lightrec 인터프리터"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_KO "동적 리컴파일러 코드 무효화"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_KO "일부 게임은 '모두' 무효화를 필요로 하며, 일부는 'DMA만'을 필요로 합니다."
 #define OPTION_VAL_FULL_KO "모두"
-#define OPTION_VAL_DMA_KO NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_KO NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_KO NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_KO NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_KO NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_KO NULL
-#define OPTION_VAL_FORCE_INTERLACED_KO NULL
-#define OPTION_VAL_AUTO_TOGGLE_KO NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_KO NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_KO NULL
+#define OPTION_VAL_DMA_KO "DMA만 (조금 더 빠름)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_KO "동적 리컴파일러 DMA/GPU 이벤트 사이클"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_KO "GPU 또는 DMA 업데이트 확인 전에 구동할 최대 CPU 사이클 수입니다. 높은 값으로 설정하면 성능이 더 빨라지며, 동적 리컴파일러에 비해 Beetle 인터프리터에는 큰 효과가 없습니다."
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_KO "코어 보고 FPS 타이밍"
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_KO "코어가 프론트엔드에 보고할 FPS 타이밍을 선택합니다. 자동 전환을 선택하면 코어가 프로그레시브 및 인터레이스 주사율을 전환할 수 있게 하며, 프론트엔드의 비디오/오디오 드라이버의 초기화를 일으킬 수 있습니다."
+#define OPTION_VAL_FORCE_PROGRESSIVE_KO "프로그레시브 주사율"
+#define OPTION_VAL_FORCE_INTERLACED_KO "인터레이스 주사율 강제"
+#define OPTION_VAL_AUTO_TOGGLE_KO "자동 전환 허용"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_KO "PAL(유럽) 비디오 타이밍 오버라이드"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_KO "서로 다른 표준으로 인해 PAL 게임은 미국 또는 일본 NTSC 게임에 비해 다소 느리게 구동되기도 합니다. 이 옵션은 PAL 타이밍을 오버라이드하여 NTSC 게임과 동일한 프레임레이트로 구동되게 합니다. 이 옵션은 NTSC 컨텐츠를 실행할 땐 아무런 효과가 없습니다."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_KO "오버스캔 잘라내기"
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_KO NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_KO "'없음'은 패딩(NTSC 좌우 기둥, PAL 전 방향 테두리)을 유지하여 원본 PSX 하드웨어의 아날로그 비디오 출력에 존재하는 검은 막대를 에뮬레이트합니다. '정적'은 수평 패딩만 제거하며, '동적'은 모든 패딩을 제거합니다."
 #define OPTION_VAL_DISABLED_O53_KO "없음"
-#define OPTION_VAL_STATIC_KO NULL
-#define OPTION_VAL_SMART_KO NULL
+#define OPTION_VAL_STATIC_KO "정적"
+#define OPTION_VAL_SMART_KO "동적 (기본값)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_KO NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_KO NULL
 #define OPTION_VAL_9PX_KO NULL
@@ -41116,8 +41116,8 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_12PX_O55_0_KO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_KO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_KO NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_KO NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_KO NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_KO "GPU 래스터라이저 오버클럭"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_KO "에뮬레이트되는 PSX GPU의 2D 래스터라이저를 오버클럭합니다. 3D 렌더링은 개선되지 않으며, 전반적으로 큰 효과는 없습니다."
 #define OPTION_VAL_32X_KO NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_KO NULL
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_KO NULL
@@ -64066,7 +64066,7 @@ struct retro_core_options_v2 options_sr = {
 #define CATEGORY_OSD_INFO_0_SV NULL
 #define CATEGORY_INPUT_LABEL_SV "Inmatning"
 #define CATEGORY_INPUT_INFO_0_SV NULL
-#define CATEGORY_MEMCARDS_LABEL_SV NULL
+#define CATEGORY_MEMCARDS_LABEL_SV "Minneskort"
 #define CATEGORY_MEMCARDS_INFO_0_SV NULL
 #define CATEGORY_PGXP_LABEL_SV NULL
 #define CATEGORY_PGXP_INFO_0_SV NULL
@@ -64085,12 +64085,12 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_32BPP_SV NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_SV NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_SV NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_SV NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_SV "Intern upplösning"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_SV NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_SV NULL
 #define BEETLE_OPT_FILTER_LABEL_SV NULL
 #define BEETLE_OPT_FILTER_INFO_0_SV NULL
-#define OPTION_VAL_NEAREST_SV NULL
+#define OPTION_VAL_NEAREST_SV "Närmaste"
 #define OPTION_VAL_SABR_SV NULL
 #define OPTION_VAL_XBR_SV NULL
 #define OPTION_VAL_BILINEAR_SV "Bilinjär"
@@ -64113,9 +64113,9 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MDEC_YUV_INFO_0_SV NULL
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_SV NULL
 #define BEETLE_OPT_TRACK_TEXTURES_INFO_0_SV NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_SV NULL
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_SV "Dumpa texturer"
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_SV NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_SV NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_SV "Ersätt texturer"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SV NULL
 #define BEETLE_OPT_WIREFRAME_LABEL_SV NULL
 #define BEETLE_OPT_WIREFRAME_INFO_0_SV NULL
@@ -64144,15 +64144,15 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_OFF_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_SV NULL
-#define OPTION_VAL_RED_SV NULL
-#define OPTION_VAL_BLUE_SV NULL
-#define OPTION_VAL_GREEN_SV NULL
+#define OPTION_VAL_RED_SV "Röd"
+#define OPTION_VAL_BLUE_SV "Blå"
+#define OPTION_VAL_GREEN_SV "Grön"
 #define OPTION_VAL_ORANGE_SV NULL
 #define OPTION_VAL_YELLOW_SV NULL
 #define OPTION_VAL_CYAN_SV NULL
 #define OPTION_VAL_PINK_SV NULL
-#define OPTION_VAL_PURPLE_SV NULL
-#define OPTION_VAL_BLACK_SV NULL
+#define OPTION_VAL_PURPLE_SV "Lila"
+#define OPTION_VAL_BLACK_SV "Svart"
 #define OPTION_VAL_WHITE_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV NULL
@@ -64200,8 +64200,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_200_SV NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_SV NULL
-#define OPTION_VAL_LINEAR_SV NULL
-#define OPTION_VAL_QUADRATIC_SV NULL
+#define OPTION_VAL_LINEAR_SV "Linjär"
+#define OPTION_VAL_QUADRATIC_SV "Kvadratisk"
 #define OPTION_VAL_CUBIC_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV NULL
@@ -64323,8 +64323,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_PS1_ROM_SV NULL
 #define BEETLE_OPT_RENDERER_LABEL_SV NULL
 #define BEETLE_OPT_RENDERER_INFO_0_SV NULL
-#define OPTION_VAL_HARDWARE_SV NULL
-#define OPTION_VAL_HARDWARE_GL_SV NULL
+#define OPTION_VAL_HARDWARE_SV "Hårdvara (Auto)"
+#define OPTION_VAL_HARDWARE_GL_SV "Hårdvara (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_SV NULL
 #define OPTION_VAL_SOFTWARE_SV NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV NULL
@@ -64350,7 +64350,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV NULL
-#define OPTION_VAL_DISABLED_O53_SV NULL
+#define OPTION_VAL_DISABLED_O53_SV "Ingen"
 #define OPTION_VAL_STATIC_SV NULL
 #define OPTION_VAL_SMART_SV NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SV NULL
@@ -64403,7 +64403,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV NULL
 #define OPTION_VAL_CORRECTED_SV NULL
 #define OPTION_VAL_UNCORRECTED_SV NULL
-#define OPTION_VAL_4_3_SV NULL
+#define OPTION_VAL_4_3_SV "Tvinga 4:3"
 #define OPTION_VAL_NTSC_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
