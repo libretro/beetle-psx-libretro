@@ -41073,8 +41073,8 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_DISABLED_O53_KO "없음"
 #define OPTION_VAL_STATIC_KO "정적"
 #define OPTION_VAL_SMART_KO "동적 (기본값)"
-#define BEETLE_OPT_IMAGE_CROP_LABEL_KO NULL
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_KO NULL
+#define BEETLE_OPT_IMAGE_CROP_LABEL_KO "추가 잘라내기"
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_KO "'가로 오버스캔 잘라내기'가 활성화된 경우, 이 옵션에 설정한 픽셀 수만큼 화면의 폭을 추가로 줄입니다."
 #define OPTION_VAL_9PX_KO NULL
 #define OPTION_VAL_10PX_KO NULL
 #define OPTION_VAL_11PX_KO NULL
@@ -41087,8 +41087,8 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_18PX_KO NULL
 #define OPTION_VAL_19PX_KO NULL
 #define OPTION_VAL_20PX_KO NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_KO NULL
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_KO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_KO "잘라낸 이미지 위치 조정"
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_KO "'가로 오버스캔 잘라내기'가 활성화된 경우, 이 옵션에 설정한 픽셀 수만큼 화면을 오른쪽(양수) 또는 왼쪽(음수)으로 이동합니다. 맞춤 문제를 교정하는 데 사용될 수 있습니다. 소프트웨어 렌더러에서만 지원됩니다."
 #define OPTION_VAL_12PX_O55_KO NULL
 #define OPTION_VAL_11PX_O55_KO NULL
 #define OPTION_VAL_10PX_O55_KO NULL
@@ -41114,39 +41114,39 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_10PX_O55_0_KO NULL
 #define OPTION_VAL_11PX_O55_0_KO NULL
 #define OPTION_VAL_12PX_O55_0_KO NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_KO NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_KO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_KO "가로 이미지 위치 조정 (GPU 사이클)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_KO "이미지를 위치 조정할 GPU 사이클 수를 선택합니다. 양수는 이미지를 오른쪽으로, 음수는 왼쪽으로 이동시킵니다. 하드웨어 렌더러에서만 지원됩니다."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_KO "GPU 래스터라이저 오버클럭"
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_KO "에뮬레이트되는 PSX GPU의 2D 래스터라이저를 오버클럭합니다. 3D 렌더링은 개선되지 않으며, 전반적으로 큰 효과는 없습니다."
-#define OPTION_VAL_32X_KO NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_KO NULL
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_KO NULL
-#define OPTION_VAL_CORRECTED_KO NULL
-#define OPTION_VAL_UNCORRECTED_KO NULL
-#define OPTION_VAL_4_3_KO NULL
-#define OPTION_VAL_NTSC_KO NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_KO NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_KO NULL
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_KO NULL
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_KO NULL
+#define OPTION_VAL_32X_KO "32배"
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_KO "코어 화면비"
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_KO "코어가 제공할 화면비를 선택합니다. 이 설정은 와이드스크린 모드 핵 또는 전체 VRAM 표시 옵션이 활성화된 경우 무시됩니다."
+#define OPTION_VAL_CORRECTED_KO "교정됨"
+#define OPTION_VAL_UNCORRECTED_KO "교정 안 됨"
+#define OPTION_VAL_4_3_KO "강제 4:3"
+#define OPTION_VAL_NTSC_KO "강제 NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_KO "첫 스캔라인 - NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_KO "NTSC 컨텐츠를 실행할 때 표시할 첫 번째 스캔라인을 선택합니다. 0보다 큰 값으로 설정할 경우 출력되는 이미지를 위에서부터 잘라내 높이를 줄입니다. 레터박스를 없애는 데 사용될 수 있습니다."
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_KO "마지막 스캔라인 - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_KO "NTSC 컨텐츠를 실행할 때 표시할 마지막 스캔라인을 선택합니다. 239보다 작은 값으로 설정할 경우 출력되는 이미지를 아래에서부터 잘라내 높이를 줄입니다. 레터박스를 없애는 데 사용될 수 있습니다."
 #define OPTION_VAL_239_KO "239 (기본)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_KO NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_KO NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_KO NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_KO NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_KO "첫 스캔라인 - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_KO "PAL 컨텐츠를 실행할 때 표시할 첫 번째 스캔라인을 선택합니다. 0보다 큰 값으로 설정할 경우 출력되는 이미지를 위에서부터 잘라내 높이를 줄입니다. 레터박스를 없애는 데 사용될 수 있습니다."
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_KO "마지막 스캔라인 - PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_KO "PAL 컨텐츠를 실행할 때 표시할 마지막 스캔라인을 선택합니다. 287보다 작은 값으로 설정할 경우 출력되는 이미지를 아래에서부터 잘라내 높이를 줄입니다. 레터박스를 없애는 데 사용될 수 있습니다."
 #define OPTION_VAL_287_KO "287 (기본)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_KO NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_KO NULL
-#define OPTION_VAL_SYNC_KO NULL
-#define OPTION_VAL_ASYNC_KO NULL
-#define OPTION_VAL_PRECACHE_KO NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_KO "CD 액세스 방식 (재시작 필요)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_KO "컨텐츠의 디스크 이미지에서 데이터를 읽어올 방식을 선택합니다. '동기'는 원본 하드웨어의 동작을 흉내냅니다. '비동기'는 저장소가 느린 장치에서 버벅임을 줄일 수 있습니다. '미리 캐싱'은 컨텐츠를 실행할 때 전체 디스크 이미지를 메모리에 불러옵니다. 첫 시작 시 딜레이가 생기지만 인게임 로딩 시간이 줄어듭니다. '미리 캐싱'은 RAM이 적은 장치에서 문제를 일으킬 수 있으며, 물리적 미디어를 사용할 경우 '동기'가 사용됩니다."
+#define OPTION_VAL_SYNC_KO "동기"
+#define OPTION_VAL_ASYNC_KO "비동기"
+#define OPTION_VAL_PRECACHE_KO "미리 캐싱"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_KO "CD 로딩 속도"
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_KO "디스크 액세스 배속을 선택합니다. '2x (네이티브)'를 초과하는 값은 인게임 로딩 시간을 크게 줄일 수 있지만, 타이밍 오류를 유발하기도 합니다. 일부 게임은 일정 속도 이상에서 올바르게 작동하지 않을 수 있습니다."
-#define OPTION_VAL_2X_NATIVE_KO "2x (네이티브)"
-#define OPTION_VAL_6X_KO NULL
-#define OPTION_VAL_10X_KO NULL
-#define OPTION_VAL_12X_KO NULL
-#define OPTION_VAL_14X_KO NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_KO "디스크 액세스 배속을 선택합니다. '2배 (네이티브)'를 초과하는 값은 인게임 로딩 시간을 크게 줄일 수 있지만, 타이밍 오류를 유발하기도 합니다. 일부 게임은 일정 속도 이상에서 올바르게 작동하지 않을 수 있습니다."
+#define OPTION_VAL_2X_NATIVE_KO "2배 (Native)"
+#define OPTION_VAL_6X_KO "6배"
+#define OPTION_VAL_10X_KO "10배"
+#define OPTION_VAL_12X_KO "12배"
+#define OPTION_VAL_14X_KO "14배"
 
 struct retro_core_option_v2_category option_cats_ko[] = {
    {
@@ -64136,7 +64136,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV NULL
 #define OPTION_VAL_LIGHTGUN_SV NULL
-#define OPTION_VAL_TOUCHSCREEN_SV NULL
+#define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SV NULL
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SV NULL
 #define OPTION_VAL_CROSS_SV NULL
@@ -64148,9 +64148,9 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_BLUE_SV "Blå"
 #define OPTION_VAL_GREEN_SV "Grön"
 #define OPTION_VAL_ORANGE_SV NULL
-#define OPTION_VAL_YELLOW_SV NULL
+#define OPTION_VAL_YELLOW_SV "Gul"
 #define OPTION_VAL_CYAN_SV NULL
-#define OPTION_VAL_PINK_SV NULL
+#define OPTION_VAL_PINK_SV "Rosa"
 #define OPTION_VAL_PURPLE_SV "Lila"
 #define OPTION_VAL_BLACK_SV "Svart"
 #define OPTION_VAL_WHITE_SV NULL
@@ -64221,7 +64221,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_1_SV NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV NULL
-#define OPTION_VAL_MEMORY_ONLY_SV NULL
+#define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
 #define OPTION_VAL_MEMORY_CPU_SV NULL
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_SV NULL
 #define BEETLE_OPT_PGXP_2D_TOL_INFO_0_SV NULL
@@ -64243,7 +64243,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_LINE_RENDER_LABEL_SV NULL
 #define BEETLE_OPT_LINE_RENDER_INFO_0_SV NULL
 #define OPTION_VAL_DEFAULT_SV NULL
-#define OPTION_VAL_AGGRESSIVE_SV NULL
+#define OPTION_VAL_AGGRESSIVE_SV "Aggressiv"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_SV NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_SV NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_SV NULL
@@ -64326,7 +64326,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_HARDWARE_SV "Hårdvara (Auto)"
 #define OPTION_VAL_HARDWARE_GL_SV "Hårdvara (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_SV NULL
-#define OPTION_VAL_SOFTWARE_SV NULL
+#define OPTION_VAL_SOFTWARE_SV "Mjukvara"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_SV NULL
@@ -64404,7 +64404,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_CORRECTED_SV NULL
 #define OPTION_VAL_UNCORRECTED_SV NULL
 #define OPTION_VAL_4_3_SV "Tvinga 4:3"
-#define OPTION_VAL_NTSC_SV NULL
+#define OPTION_VAL_NTSC_SV "Tvinga NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_SV NULL
@@ -66042,7 +66042,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_ALL_TR NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_TR NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_TR NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_TR NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_TR "Uyarlanabilir Yumuşatma"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_TR NULL
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_TR NULL
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_TR NULL
