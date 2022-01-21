@@ -17613,7 +17613,7 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_65_EL NULL
 #define OPTION_VAL_70_EL NULL
 #define OPTION_VAL_75_EL NULL
-#define OPTION_VAL_80_EL NULL
+#define OPTION_VAL_80_EL "το 80%"
 #define OPTION_VAL_85_EL NULL
 #define OPTION_VAL_90_EL NULL
 #define OPTION_VAL_95_EL NULL
@@ -21424,7 +21424,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_ES "No aplicará el filtrado de texturas a los polígonos en 2D. Estos son detectados mediante un proceso heurístico, por lo que puede haber fallos visuales. Se recomienda activar también la opción «Suavizado adaptativo» u otro efecto de posprocesado para conseguir el mejor efecto."
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_ES "Suavizado adaptativo"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_ES "Suaviza los gráficos y elementos de interfaz en 2D sin difuminar los objetos renderizados en 3D. Solo funciona con el renderizador Vulkan."
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_ES "Supersampleado (reducción a resolución nativa)"
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_ES "Supermuestreo (reducción a resolución nativa)"
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_ES "Reduce el contenido renderizado de una resolución interna superior a la nativa. Al combinar este efecto con multiplicadores para aumentar la resolución interna, los juegos pueden mostrarse con objetos 3D con bordes suavizados en la resolución nativa. Genera los mejores resultados en aquellos títulos que combinan elementos 2D y 3D (p. ej.: personajes 3D sobre fondos prerenderizados) y acompañado de shaders de simulación de CRT. Solo funciona con el renderizador Vulkan. Nota: Se recomienda desactivar el tramado al utilizar esta opción."
 #define BEETLE_OPT_MSAA_LABEL_ES "Suavizado de bordes MSAA"
 #define BEETLE_OPT_MSAA_INFO_0_ES "Ajusta el MSAA que se aplicará al contenido renderizado. Mejora el aspecto de los objetos 3D. Solo funciona con el renderizador Vulkan."
@@ -21527,7 +21527,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_ES "Ajusta la zona muerta del stick analógico izquierdo del RetroPad al simular la acción de torcer un dispositivo de entrada neGcon emulado. Sirve para evitar que el mando registre movimientos no realizados. Nota: la mayoría de juegos compatibles con neGcon incluyen opciones dentro del juego para ajustar un valor de zona muerta al torcerlo. Este valor debe configurarse como cero o neutral en todo momento para que no haya una pérdida de precisión. Cualquier ajuste que sea necesario solo debe aplicarse mediante esta opción del núcleo, sobre todo si «Respuesta al torcer el neGcon» está configurada como «Cuadrática» o «Cúbica»."
 #define OPTION_VAL_0_ES "0 %"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_ES "Método de la Memory Card 0 (es necesario reiniciar)"
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_ES "Selecciona el formato de datos guardados que se utilizará en la Memory Card 0. «Mednafen» puede mejorar la compatibilidad con la versión independiente de Mednafen. Al utilizar los archivos guardados con Beetle PSX, los archivos de Libretro (.srm) y Mednafen (.mcr) son idénticos internamente, así que pueden intercambiarse entre sí modificando sus nombres."
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_ES "Selecciona el formato de datos guardados que se utilizará en la Memory Card 0. «Mednafen» puede mejorar la compatibilidad con la versión independiente de Mednafen. Al utilizar los archivos guardados con Beetle PSX, los archivos de libretro (.srm) y Mednafen (.mcr) son idénticos internamente, así que pueden intercambiarse entre sí modificando sus nombres."
 #define OPTION_VAL_LIBRETRO_ES NULL
 #define OPTION_VAL_MEDNAFEN_ES NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_ES "Activar Memory Card 1 (es necesario reiniciar)"
@@ -38915,7 +38915,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_JA NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_JA NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_JA NULL
-#define OPTION_VAL_LIGHTGUN_JA NULL
+#define OPTION_VAL_LIGHTGUN_JA "ライトガン"
 #define OPTION_VAL_TOUCHSCREEN_JA NULL
 #define BEETLE_OPT_GUN_CURSOR_LABEL_JA NULL
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_JA NULL
@@ -38957,7 +38957,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_85_JA NULL
 #define OPTION_VAL_90_JA NULL
 #define OPTION_VAL_95_JA NULL
-#define OPTION_VAL_100_JA NULL
+#define OPTION_VAL_100_JA "100% (デフォルト)"
 #define OPTION_VAL_105_JA NULL
 #define OPTION_VAL_110_JA NULL
 #define OPTION_VAL_115_JA NULL
@@ -46598,6 +46598,1946 @@ struct retro_core_options_v2 options_nl = {
    option_defs_nl
 };
 
+/* RETRO_LANGUAGE_NO */
+
+#define CATEGORY_VIDEO_LABEL_NO NULL
+#define CATEGORY_VIDEO_INFO_0_NO NULL
+#define CATEGORY_OSD_LABEL_NO NULL
+#define CATEGORY_OSD_INFO_0_NO NULL
+#define CATEGORY_INPUT_LABEL_NO "Inndata"
+#define CATEGORY_INPUT_INFO_0_NO NULL
+#define CATEGORY_MEMCARDS_LABEL_NO NULL
+#define CATEGORY_MEMCARDS_INFO_0_NO NULL
+#define CATEGORY_PGXP_LABEL_NO NULL
+#define CATEGORY_PGXP_INFO_0_NO NULL
+#define CATEGORY_HACKS_LABEL_NO NULL
+#define CATEGORY_HACKS_INFO_0_NO NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NO NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NO NULL
+#define OPTION_VAL_1X_NATIVE_NO NULL
+#define OPTION_VAL_2X_NO NULL
+#define OPTION_VAL_4X_NO NULL
+#define OPTION_VAL_8X_NO NULL
+#define OPTION_VAL_16X_NO NULL
+#define BEETLE_OPT_DEPTH_LABEL_NO NULL
+#define BEETLE_OPT_DEPTH_INFO_0_NO NULL
+#define OPTION_VAL_16BPP_NATIVE_NO NULL
+#define OPTION_VAL_32BPP_NO NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_NO NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_NO NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_NO NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_NO NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_NO NULL
+#define BEETLE_OPT_FILTER_LABEL_NO NULL
+#define BEETLE_OPT_FILTER_INFO_0_NO NULL
+#define OPTION_VAL_NEAREST_NO NULL
+#define OPTION_VAL_SABR_NO NULL
+#define OPTION_VAL_XBR_NO NULL
+#define OPTION_VAL_BILINEAR_NO NULL
+#define OPTION_VAL_3_POINT_NO NULL
+#define OPTION_VAL_JINC2_NO NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_NO NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_NO NULL
+#define OPTION_VAL_OPAQUE_NO NULL
+#define OPTION_VAL_ALL_NO NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_NO NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_NO NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_NO NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_NO NULL
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_NO NULL
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_NO NULL
+#define BEETLE_OPT_MSAA_LABEL_NO NULL
+#define BEETLE_OPT_MSAA_INFO_0_NO NULL
+#define OPTION_VAL_1X_NO NULL
+#define BEETLE_OPT_MDEC_YUV_LABEL_NO NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_NO NULL
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_NO NULL
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_NO NULL
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_NO NULL
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_NO NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_NO NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NO NULL
+#define BEETLE_OPT_WIREFRAME_LABEL_NO NULL
+#define BEETLE_OPT_WIREFRAME_INFO_0_NO NULL
+#define BEETLE_OPT_FRAME_DUPING_LABEL_NO NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_NO NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_NO NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_NO NULL
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_NO NULL
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_NO NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_NO NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_NO NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NO NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_NO NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_NO NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_NO NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_NO NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_NO NULL
+#define OPTION_VAL_LIGHTGUN_NO NULL
+#define OPTION_VAL_TOUCHSCREEN_NO NULL
+#define BEETLE_OPT_GUN_CURSOR_LABEL_NO NULL
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_NO NULL
+#define OPTION_VAL_CROSS_NO NULL
+#define OPTION_VAL_DOT_NO NULL
+#define OPTION_VAL_OFF_NO NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_NO NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_NO NULL
+#define OPTION_VAL_RED_NO NULL
+#define OPTION_VAL_BLUE_NO NULL
+#define OPTION_VAL_GREEN_NO NULL
+#define OPTION_VAL_ORANGE_NO NULL
+#define OPTION_VAL_YELLOW_NO NULL
+#define OPTION_VAL_CYAN_NO NULL
+#define OPTION_VAL_PINK_NO NULL
+#define OPTION_VAL_PURPLE_NO NULL
+#define OPTION_VAL_BLACK_NO NULL
+#define OPTION_VAL_WHITE_NO NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_NO NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_NO NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_NO NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_NO NULL
+#define OPTION_VAL_5_NO NULL
+#define OPTION_VAL_10_NO NULL
+#define OPTION_VAL_15_NO NULL
+#define OPTION_VAL_20_NO NULL
+#define OPTION_VAL_25_NO NULL
+#define OPTION_VAL_30_NO NULL
+#define OPTION_VAL_35_NO NULL
+#define OPTION_VAL_40_NO NULL
+#define OPTION_VAL_45_NO NULL
+#define OPTION_VAL_50_NO NULL
+#define OPTION_VAL_55_NO NULL
+#define OPTION_VAL_60_NO NULL
+#define OPTION_VAL_65_NO NULL
+#define OPTION_VAL_70_NO NULL
+#define OPTION_VAL_75_NO NULL
+#define OPTION_VAL_80_NO NULL
+#define OPTION_VAL_85_NO NULL
+#define OPTION_VAL_90_NO NULL
+#define OPTION_VAL_95_NO NULL
+#define OPTION_VAL_100_NO NULL
+#define OPTION_VAL_105_NO NULL
+#define OPTION_VAL_110_NO NULL
+#define OPTION_VAL_115_NO NULL
+#define OPTION_VAL_120_NO NULL
+#define OPTION_VAL_125_NO NULL
+#define OPTION_VAL_130_NO NULL
+#define OPTION_VAL_135_NO NULL
+#define OPTION_VAL_140_NO NULL
+#define OPTION_VAL_145_NO NULL
+#define OPTION_VAL_150_NO NULL
+#define OPTION_VAL_155_NO NULL
+#define OPTION_VAL_160_NO NULL
+#define OPTION_VAL_165_NO NULL
+#define OPTION_VAL_170_NO NULL
+#define OPTION_VAL_175_NO NULL
+#define OPTION_VAL_180_NO NULL
+#define OPTION_VAL_185_NO NULL
+#define OPTION_VAL_190_NO NULL
+#define OPTION_VAL_195_NO NULL
+#define OPTION_VAL_200_NO NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_NO NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_NO NULL
+#define OPTION_VAL_LINEAR_NO NULL
+#define OPTION_VAL_QUADRATIC_NO NULL
+#define OPTION_VAL_CUBIC_NO NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_NO NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_NO NULL
+#define OPTION_VAL_0_NO NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_NO NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_NO NULL
+#define OPTION_VAL_LIBRETRO_NO NULL
+#define OPTION_VAL_MEDNAFEN_NO NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_NO NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_NO NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_NO NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_NO NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_NO NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_NO NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_NO NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_NO NULL
+#define OPTION_VAL_1_NO NULL
+#define BEETLE_OPT_PGXP_MODE_LABEL_NO NULL
+#define BEETLE_OPT_PGXP_MODE_INFO_0_NO NULL
+#define OPTION_VAL_MEMORY_ONLY_NO NULL
+#define OPTION_VAL_MEMORY_CPU_NO NULL
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_NO NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_NO NULL
+#define OPTION_VAL_0PX_NO NULL
+#define OPTION_VAL_1PX_NO NULL
+#define OPTION_VAL_2PX_NO NULL
+#define OPTION_VAL_3PX_NO NULL
+#define OPTION_VAL_4PX_NO NULL
+#define OPTION_VAL_5PX_NO NULL
+#define OPTION_VAL_6PX_NO NULL
+#define OPTION_VAL_7PX_NO NULL
+#define OPTION_VAL_8PX_NO NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_NO NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_NO NULL
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_NO NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_NO NULL
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_NO NULL
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_NO NULL
+#define BEETLE_OPT_LINE_RENDER_LABEL_NO NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_NO NULL
+#define OPTION_VAL_DEFAULT_NO NULL
+#define OPTION_VAL_AGGRESSIVE_NO NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_NO NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_NO NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_NO NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_NO NULL
+#define OPTION_VAL_16_9_NO NULL
+#define OPTION_VAL_16_10_NO NULL
+#define OPTION_VAL_18_9_NO NULL
+#define OPTION_VAL_19_9_NO NULL
+#define OPTION_VAL_20_9_NO NULL
+#define OPTION_VAL_21_9_NO NULL
+#define OPTION_VAL_32_9_NO NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_NO NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_NO NULL
+#define OPTION_VAL_100_NATIVE_NO NULL
+#define OPTION_VAL_210_NO NULL
+#define OPTION_VAL_220_NO NULL
+#define OPTION_VAL_230_NO NULL
+#define OPTION_VAL_240_NO NULL
+#define OPTION_VAL_250_NO NULL
+#define OPTION_VAL_260_NO NULL
+#define OPTION_VAL_270_NO NULL
+#define OPTION_VAL_280_NO NULL
+#define OPTION_VAL_290_NO NULL
+#define OPTION_VAL_300_NO NULL
+#define OPTION_VAL_310_NO NULL
+#define OPTION_VAL_320_NO NULL
+#define OPTION_VAL_330_NO NULL
+#define OPTION_VAL_340_NO NULL
+#define OPTION_VAL_350_NO NULL
+#define OPTION_VAL_360_NO NULL
+#define OPTION_VAL_370_NO NULL
+#define OPTION_VAL_380_NO NULL
+#define OPTION_VAL_390_NO NULL
+#define OPTION_VAL_400_NO NULL
+#define OPTION_VAL_410_NO NULL
+#define OPTION_VAL_420_NO NULL
+#define OPTION_VAL_430_NO NULL
+#define OPTION_VAL_440_NO NULL
+#define OPTION_VAL_450_NO NULL
+#define OPTION_VAL_460_NO NULL
+#define OPTION_VAL_470_NO NULL
+#define OPTION_VAL_480_NO NULL
+#define OPTION_VAL_490_NO NULL
+#define OPTION_VAL_500_NO NULL
+#define OPTION_VAL_510_NO NULL
+#define OPTION_VAL_520_NO NULL
+#define OPTION_VAL_530_NO NULL
+#define OPTION_VAL_540_NO NULL
+#define OPTION_VAL_550_NO NULL
+#define OPTION_VAL_560_NO NULL
+#define OPTION_VAL_570_NO NULL
+#define OPTION_VAL_580_NO NULL
+#define OPTION_VAL_590_NO NULL
+#define OPTION_VAL_600_NO NULL
+#define OPTION_VAL_610_NO NULL
+#define OPTION_VAL_620_NO NULL
+#define OPTION_VAL_630_NO NULL
+#define OPTION_VAL_640_NO NULL
+#define OPTION_VAL_650_NO NULL
+#define OPTION_VAL_660_NO NULL
+#define OPTION_VAL_670_NO NULL
+#define OPTION_VAL_680_NO NULL
+#define OPTION_VAL_690_NO NULL
+#define OPTION_VAL_700_NO NULL
+#define OPTION_VAL_710_NO NULL
+#define OPTION_VAL_720_NO NULL
+#define OPTION_VAL_730_NO NULL
+#define OPTION_VAL_740_NO NULL
+#define OPTION_VAL_750_NO NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_NO NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_NO NULL
+#define BEETLE_OPT_SKIP_BIOS_LABEL_NO NULL
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_NO NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_NO NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NO NULL
+#define OPTION_VAL_PSXONPSP_NO NULL
+#define OPTION_VAL_PS1_ROM_NO NULL
+#define BEETLE_OPT_RENDERER_LABEL_NO NULL
+#define BEETLE_OPT_RENDERER_INFO_0_NO NULL
+#define OPTION_VAL_HARDWARE_NO NULL
+#define OPTION_VAL_HARDWARE_GL_NO NULL
+#define OPTION_VAL_HARDWARE_VK_NO NULL
+#define OPTION_VAL_SOFTWARE_NO NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_NO NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_NO NULL
+#define BEETLE_OPT_CPU_DYNAREC_LABEL_NO NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_NO NULL
+#define OPTION_VAL_DISABLED_NO NULL
+#define OPTION_VAL_EXECUTE_NO NULL
+#define OPTION_VAL_EXECUTE_ONE_NO NULL
+#define OPTION_VAL_RUN_INTERPRETER_NO NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_NO NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_NO NULL
+#define OPTION_VAL_FULL_NO NULL
+#define OPTION_VAL_DMA_NO NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_NO NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_NO NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_NO NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_NO NULL
+#define OPTION_VAL_FORCE_PROGRESSIVE_NO NULL
+#define OPTION_VAL_FORCE_INTERLACED_NO NULL
+#define OPTION_VAL_AUTO_TOGGLE_NO NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_NO NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NO NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_NO NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_NO NULL
+#define OPTION_VAL_DISABLED_O53_NO NULL
+#define OPTION_VAL_STATIC_NO NULL
+#define OPTION_VAL_SMART_NO NULL
+#define BEETLE_OPT_IMAGE_CROP_LABEL_NO NULL
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_NO NULL
+#define OPTION_VAL_9PX_NO NULL
+#define OPTION_VAL_10PX_NO NULL
+#define OPTION_VAL_11PX_NO NULL
+#define OPTION_VAL_12PX_NO NULL
+#define OPTION_VAL_13PX_NO NULL
+#define OPTION_VAL_14PX_NO NULL
+#define OPTION_VAL_15PX_NO NULL
+#define OPTION_VAL_16PX_NO NULL
+#define OPTION_VAL_17PX_NO NULL
+#define OPTION_VAL_18PX_NO NULL
+#define OPTION_VAL_19PX_NO NULL
+#define OPTION_VAL_20PX_NO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_NO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_NO NULL
+#define OPTION_VAL_12PX_O55_NO NULL
+#define OPTION_VAL_11PX_O55_NO NULL
+#define OPTION_VAL_10PX_O55_NO NULL
+#define OPTION_VAL_9PX_O55_NO NULL
+#define OPTION_VAL_8PX_O55_NO NULL
+#define OPTION_VAL_7PX_O55_NO NULL
+#define OPTION_VAL_6PX_O55_NO NULL
+#define OPTION_VAL_5PX_O55_NO NULL
+#define OPTION_VAL_4PX_O55_NO NULL
+#define OPTION_VAL_3PX_O55_NO NULL
+#define OPTION_VAL_2PX_O55_NO NULL
+#define OPTION_VAL_1PX_O55_NO NULL
+#define OPTION_VAL_DISABLED_O55_NO NULL
+#define OPTION_VAL_1PX_O55_0_NO NULL
+#define OPTION_VAL_2PX_O55_0_NO NULL
+#define OPTION_VAL_3PX_O55_0_NO NULL
+#define OPTION_VAL_4PX_O55_0_NO NULL
+#define OPTION_VAL_5PX_O55_0_NO NULL
+#define OPTION_VAL_6PX_O55_0_NO NULL
+#define OPTION_VAL_7PX_O55_0_NO NULL
+#define OPTION_VAL_8PX_O55_0_NO NULL
+#define OPTION_VAL_9PX_O55_0_NO NULL
+#define OPTION_VAL_10PX_O55_0_NO NULL
+#define OPTION_VAL_11PX_O55_0_NO NULL
+#define OPTION_VAL_12PX_O55_0_NO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_NO NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_NO NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_NO NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_NO NULL
+#define OPTION_VAL_32X_NO NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_NO NULL
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_NO NULL
+#define OPTION_VAL_CORRECTED_NO NULL
+#define OPTION_VAL_UNCORRECTED_NO NULL
+#define OPTION_VAL_4_3_NO NULL
+#define OPTION_VAL_NTSC_NO NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_NO NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_NO NULL
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_NO NULL
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_NO NULL
+#define OPTION_VAL_239_NO NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_NO NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_NO NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_NO NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_NO NULL
+#define OPTION_VAL_287_NO NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_NO NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_NO NULL
+#define OPTION_VAL_SYNC_NO NULL
+#define OPTION_VAL_ASYNC_NO NULL
+#define OPTION_VAL_PRECACHE_NO NULL
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_NO NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_NO NULL
+#define OPTION_VAL_2X_NATIVE_NO NULL
+#define OPTION_VAL_6X_NO NULL
+#define OPTION_VAL_10X_NO NULL
+#define OPTION_VAL_12X_NO NULL
+#define OPTION_VAL_14X_NO NULL
+
+struct retro_core_option_v2_category option_cats_no[] = {
+   {
+      "video",
+      CATEGORY_VIDEO_LABEL_NO,
+      CATEGORY_VIDEO_INFO_0_NO
+   },
+   {
+      "osd",
+      CATEGORY_OSD_LABEL_NO,
+      CATEGORY_OSD_INFO_0_NO
+   },
+   {
+      "input",
+      CATEGORY_INPUT_LABEL_NO,
+      CATEGORY_INPUT_INFO_0_NO
+   },
+   {
+      "memcards",
+      CATEGORY_MEMCARDS_LABEL_NO,
+      CATEGORY_MEMCARDS_INFO_0_NO
+   },
+   {
+      "pgxp",
+      CATEGORY_PGXP_LABEL_NO,
+      CATEGORY_PGXP_INFO_0_NO
+   },
+   {
+      "hacks",
+      CATEGORY_HACKS_LABEL_NO,
+      CATEGORY_HACKS_INFO_0_NO
+   },
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_no[] = {
+   {
+      BEETLE_OPT(internal_resolution),
+      BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NO,
+      NULL,
+      BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "1x(native)", OPTION_VAL_1X_NATIVE_NO },
+         { "2x",         OPTION_VAL_2X_NO },
+         { "4x",         OPTION_VAL_4X_NO },
+         { "8x",         OPTION_VAL_8X_NO },
+         { "16x",        OPTION_VAL_16X_NO },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   {
+      BEETLE_OPT(depth),
+      BEETLE_OPT_DEPTH_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DEPTH_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_NO },
+         { "32bpp",         OPTION_VAL_32BPP_NO },
+         { NULL, NULL },
+      },
+      "16bpp(native)"
+   },
+   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
+#endif
+   {
+      BEETLE_OPT(dither_mode),
+      BEETLE_OPT_DITHER_MODE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DITHER_MODE_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "1x(native)",          OPTION_VAL_1X_NATIVE_NO },
+         { "internal resolution", OPTION_VAL_INTERNAL_RESOLUTION_NO },
+         { "disabled",            NULL },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(scaled_uv_offset),
+      BEETLE_OPT_SCALED_UV_OFFSET_LABEL_NO,
+      NULL,
+      BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(filter),
+      BEETLE_OPT_FILTER_LABEL_NO,
+      NULL,
+      BEETLE_OPT_FILTER_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "nearest",  OPTION_VAL_NEAREST_NO },
+         { "SABR",     OPTION_VAL_SABR_NO },
+         { "xBR",      OPTION_VAL_XBR_NO },
+         { "bilinear", OPTION_VAL_BILINEAR_NO },
+         { "3-point",  OPTION_VAL_3_POINT_NO },
+         { "JINC2",    OPTION_VAL_JINC2_NO },
+         { NULL, NULL },
+      },
+      "nearest"
+   },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(filter_exclude_sprite),
+      BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "opaque", OPTION_VAL_OPAQUE_NO },
+         { "all", OPTION_VAL_ALL_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(filter_exclude_2d_polygon),
+      BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_NO,
+      NULL,
+      BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "opaque", OPTION_VAL_OPAQUE_NO },
+         { "all", OPTION_VAL_ALL_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+#endif
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(adaptive_smoothing),
+      BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(super_sampling),
+      BEETLE_OPT_SUPER_SAMPLING_LABEL_NO,
+      NULL,
+      BEETLE_OPT_SUPER_SAMPLING_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(msaa),
+      BEETLE_OPT_MSAA_LABEL_NO,
+      NULL,
+      BEETLE_OPT_MSAA_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "1x",  OPTION_VAL_1X_NO },
+         { "2x",  OPTION_VAL_2X_NO },
+         { "4x",  OPTION_VAL_4X_NO },
+         { "8x",  OPTION_VAL_8X_NO },
+         { "16x", OPTION_VAL_16X_NO },
+         { NULL, NULL },
+      },
+      "1x"
+   },
+   {
+      BEETLE_OPT(mdec_yuv),
+      BEETLE_OPT_MDEC_YUV_LABEL_NO,
+      NULL,
+      BEETLE_OPT_MDEC_YUV_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(track_textures),
+      BEETLE_OPT_TRACK_TEXTURES_LABEL_NO,
+      NULL,
+      BEETLE_OPT_TRACK_TEXTURES_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#ifdef TEXTURE_DUMPING_ENABLED
+   {
+      BEETLE_OPT(dump_textures),
+      BEETLE_OPT_DUMP_TEXTURES_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DUMP_TEXTURES_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(replace_textures),
+      BEETLE_OPT_REPLACE_TEXTURES_LABEL_NO,
+      NULL,
+      BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   {
+      BEETLE_OPT(wireframe),
+      BEETLE_OPT_WIREFRAME_LABEL_NO,
+      NULL,
+      BEETLE_OPT_WIREFRAME_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(frame_duping),
+      BEETLE_OPT_FRAME_DUPING_LABEL_NO,
+      NULL,
+      BEETLE_OPT_FRAME_DUPING_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(display_internal_fps),
+      BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_NO,
+      NULL,
+      "osd",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(display_vram),
+      BEETLE_OPT_DISPLAY_VRAM_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DISPLAY_VRAM_INFO_0_NO,
+      NULL,
+      "osd",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(analog_calibration),
+      BEETLE_OPT_ANALOG_CALIBRATION_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(analog_toggle),
+      BEETLE_OPT_ANALOG_TOGGLE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(enable_multitap_port1),
+      BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(enable_multitap_port2),
+      BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(gun_input_mode),
+      BEETLE_OPT_GUN_INPUT_MODE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_GUN_INPUT_MODE_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "lightgun",    OPTION_VAL_LIGHTGUN_NO },
+         { "touchscreen", OPTION_VAL_TOUCHSCREEN_NO },
+         { NULL, NULL },
+      },
+      "lightgun"
+   },
+   // Shouldn't the gun_input_mode just be Mouse vs. Touchscreen?
+   {
+      BEETLE_OPT(gun_cursor),
+      BEETLE_OPT_GUN_CURSOR_LABEL_NO,
+      NULL,
+      BEETLE_OPT_GUN_CURSOR_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "cross", OPTION_VAL_CROSS_NO },
+         { "dot",   OPTION_VAL_DOT_NO },
+         { "off",   OPTION_VAL_OFF_NO },
+         { NULL, NULL },
+      },
+      "cross"
+   },
+   {
+      BEETLE_OPT(crosshair_color_p1),
+      BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "red", OPTION_VAL_RED_NO },
+         { "blue", OPTION_VAL_BLUE_NO },
+         { "green", OPTION_VAL_GREEN_NO },
+         { "orange", OPTION_VAL_ORANGE_NO },
+         { "yellow", OPTION_VAL_YELLOW_NO },
+         { "cyan", OPTION_VAL_CYAN_NO },
+         { "pink", OPTION_VAL_PINK_NO },
+         { "purple", OPTION_VAL_PURPLE_NO },
+         { "black", OPTION_VAL_BLACK_NO },
+         { "white", OPTION_VAL_WHITE_NO },
+         { NULL, NULL },
+      },
+      "red"
+   },
+   {
+      BEETLE_OPT(crosshair_color_p2),
+      BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "blue", OPTION_VAL_BLUE_NO },
+         { "red", OPTION_VAL_RED_NO },
+         { "green", OPTION_VAL_GREEN_NO },
+         { "orange", OPTION_VAL_ORANGE_NO },
+         { "yellow", OPTION_VAL_YELLOW_NO },
+         { "cyan", OPTION_VAL_CYAN_NO },
+         { "pink", OPTION_VAL_PINK_NO },
+         { "purple", OPTION_VAL_PURPLE_NO },
+         { "black", OPTION_VAL_BLACK_NO },
+         { "white", OPTION_VAL_WHITE_NO },
+         { NULL, NULL },
+      },
+      "blue"
+   },
+   {
+      BEETLE_OPT(mouse_sensitivity),
+      BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_NO,
+      NULL,
+      BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "5%",   OPTION_VAL_5_NO },
+         { "10%",  OPTION_VAL_10_NO },
+         { "15%",  OPTION_VAL_15_NO },
+         { "20%",  OPTION_VAL_20_NO },
+         { "25%",  OPTION_VAL_25_NO },
+         { "30%",  OPTION_VAL_30_NO },
+         { "35%",  OPTION_VAL_35_NO },
+         { "40%",  OPTION_VAL_40_NO },
+         { "45%",  OPTION_VAL_45_NO },
+         { "50%",  OPTION_VAL_50_NO },
+         { "55%",  OPTION_VAL_55_NO },
+         { "60%",  OPTION_VAL_60_NO },
+         { "65%",  OPTION_VAL_65_NO },
+         { "70%",  OPTION_VAL_70_NO },
+         { "75%",  OPTION_VAL_75_NO },
+         { "80%",  OPTION_VAL_80_NO },
+         { "85%",  OPTION_VAL_85_NO },
+         { "90%",  OPTION_VAL_90_NO },
+         { "95%",  OPTION_VAL_95_NO },
+         { "100%", OPTION_VAL_100_NO },
+         { "105%", OPTION_VAL_105_NO },
+         { "110%", OPTION_VAL_110_NO },
+         { "115%", OPTION_VAL_115_NO },
+         { "120%", OPTION_VAL_120_NO },
+         { "125%", OPTION_VAL_125_NO },
+         { "130%", OPTION_VAL_130_NO },
+         { "135%", OPTION_VAL_135_NO },
+         { "140%", OPTION_VAL_140_NO },
+         { "145%", OPTION_VAL_145_NO },
+         { "150%", OPTION_VAL_150_NO },
+         { "155%", OPTION_VAL_155_NO },
+         { "160%", OPTION_VAL_160_NO },
+         { "165%", OPTION_VAL_165_NO },
+         { "170%", OPTION_VAL_170_NO },
+         { "175%", OPTION_VAL_175_NO },
+         { "180%", OPTION_VAL_180_NO },
+         { "185%", OPTION_VAL_185_NO },
+         { "190%", OPTION_VAL_190_NO },
+         { "195%", OPTION_VAL_195_NO },
+         { "200%", OPTION_VAL_200_NO },
+         { NULL, NULL },
+      },
+      "100%"
+   },
+   {
+      BEETLE_OPT(negcon_response),
+      BEETLE_OPT_NEGCON_RESPONSE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_NEGCON_RESPONSE_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "linear",    OPTION_VAL_LINEAR_NO },
+         { "quadratic", OPTION_VAL_QUADRATIC_NO },
+         { "cubic",     OPTION_VAL_CUBIC_NO },
+         { NULL, NULL },
+      },
+      "linear"
+   },
+   {
+      BEETLE_OPT(negcon_deadzone),
+      BEETLE_OPT_NEGCON_DEADZONE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_NEGCON_DEADZONE_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "0%",  OPTION_VAL_0_NO },
+         { "5%",  OPTION_VAL_5_NO },
+         { "10%", OPTION_VAL_10_NO },
+         { "15%", OPTION_VAL_15_NO },
+         { "20%", OPTION_VAL_20_NO },
+         { "25%", OPTION_VAL_25_NO },
+         { "30%", OPTION_VAL_30_NO },
+         { NULL, NULL },
+      },
+      "0%"
+   },
+   {
+      BEETLE_OPT(use_mednafen_memcard0_method),
+      BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_NO,
+      NULL,
+      BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_NO,
+      NULL,
+      "memcards",
+      {
+         { "libretro", OPTION_VAL_LIBRETRO_NO },
+         { "mednafen", OPTION_VAL_MEDNAFEN_NO },
+         { NULL, NULL },
+      },
+      "libretro"
+   },
+   {
+      BEETLE_OPT(enable_memcard1),
+      BEETLE_OPT_ENABLE_MEMCARD1_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_NO,
+      NULL,
+      "memcards",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      BEETLE_OPT(shared_memory_cards),
+      BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_NO,
+      NULL,
+      BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_NO,
+      NULL,
+      "memcards",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(memcard_left_index),
+      BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_NO,
+      NULL,
+      BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_NO,
+      NULL,
+      "memcards",
+      {
+         { "0",  NULL },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10",  NULL },
+         { "11",  NULL },
+         { "12",  NULL },
+         { "13",  NULL },
+         { "14",  NULL },
+         { "15",  NULL },
+         { "16",  NULL },
+         { "17",  NULL },
+         { "18",  NULL },
+         { "19",  NULL },
+         { "20",  NULL },
+         { "21",  NULL },
+         { "22",  NULL },
+         { "23",  NULL },
+         { "24",  NULL },
+         { "25",  NULL },
+         { "26",  NULL },
+         { "27",  NULL },
+         { "28",  NULL },
+         { "29",  NULL },
+         { "30",  NULL },
+         { "31",  NULL },
+         { "32",  NULL },
+         { "33",  NULL },
+         { "34",  NULL },
+         { "35",  NULL },
+         { "36",  NULL },
+         { "37",  NULL },
+         { "38",  NULL },
+         { "39",  NULL },
+         { "40",  NULL },
+         { "41",  NULL },
+         { "42",  NULL },
+         { "43",  NULL },
+         { "44",  NULL },
+         { "45",  NULL },
+         { "46",  NULL },
+         { "47",  NULL },
+         { "48",  NULL },
+         { "49",  NULL },
+         { "50",  NULL },
+         { "51",  NULL },
+         { "52",  NULL },
+         { "53",  NULL },
+         { "54",  NULL },
+         { "55",  NULL },
+         { "56",  NULL },
+         { "57",  NULL },
+         { "58",  NULL },
+         { "59",  NULL },
+         { "60",  NULL },
+         { "61",  NULL },
+         { "62",  NULL },
+         { "63",  NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(memcard_right_index),
+      BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_NO,
+      NULL,
+      BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_NO,
+      NULL,
+      "memcards",
+      {
+         { "0",  NULL },
+         { "1",  OPTION_VAL_1_NO },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10",  NULL },
+         { "11",  NULL },
+         { "12",  NULL },
+         { "13",  NULL },
+         { "14",  NULL },
+         { "15",  NULL },
+         { "16",  NULL },
+         { "17",  NULL },
+         { "18",  NULL },
+         { "19",  NULL },
+         { "20",  NULL },
+         { "21",  NULL },
+         { "22",  NULL },
+         { "23",  NULL },
+         { "24",  NULL },
+         { "25",  NULL },
+         { "26",  NULL },
+         { "27",  NULL },
+         { "28",  NULL },
+         { "29",  NULL },
+         { "30",  NULL },
+         { "31",  NULL },
+         { "32",  NULL },
+         { "33",  NULL },
+         { "34",  NULL },
+         { "35",  NULL },
+         { "36",  NULL },
+         { "37",  NULL },
+         { "38",  NULL },
+         { "39",  NULL },
+         { "40",  NULL },
+         { "41",  NULL },
+         { "42",  NULL },
+         { "43",  NULL },
+         { "44",  NULL },
+         { "45",  NULL },
+         { "46",  NULL },
+         { "47",  NULL },
+         { "48",  NULL },
+         { "49",  NULL },
+         { "50",  NULL },
+         { "51",  NULL },
+         { "52",  NULL },
+         { "53",  NULL },
+         { "54",  NULL },
+         { "55",  NULL },
+         { "56",  NULL },
+         { "57",  NULL },
+         { "58",  NULL },
+         { "59",  NULL },
+         { "60",  NULL },
+         { "61",  NULL },
+         { "62",  NULL },
+         { "63",  NULL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
+      BEETLE_OPT(pgxp_mode),
+      BEETLE_OPT_PGXP_MODE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PGXP_MODE_INFO_0_NO,
+      NULL,
+      "pgxp",
+      {
+         { "disabled",     NULL },
+         { "memory only",  OPTION_VAL_MEMORY_ONLY_NO },
+         { "memory + CPU", OPTION_VAL_MEMORY_CPU_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_2d_tol),
+      BEETLE_OPT_PGXP_2D_TOL_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PGXP_2D_TOL_INFO_0_NO,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "0px", OPTION_VAL_0PX_NO },
+         { "1px", OPTION_VAL_1PX_NO },
+         { "2px", OPTION_VAL_2PX_NO },
+         { "3px", OPTION_VAL_3PX_NO },
+         { "4px", OPTION_VAL_4PX_NO },
+         { "5px", OPTION_VAL_5PX_NO },
+         { "6px", OPTION_VAL_6PX_NO },
+         { "7px", OPTION_VAL_7PX_NO },
+         { "8px", OPTION_VAL_8PX_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_nclip),
+      BEETLE_OPT_PGXP_NCLIP_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PGXP_NCLIP_INFO_0_NO,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled", NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(pgxp_vertex),
+      BEETLE_OPT_PGXP_VERTEX_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PGXP_VERTEX_INFO_0_NO,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_texture),
+      BEETLE_OPT_PGXP_TEXTURE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PGXP_TEXTURE_INFO_0_NO,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(line_render),
+      BEETLE_OPT_LINE_RENDER_LABEL_NO,
+      NULL,
+      BEETLE_OPT_LINE_RENDER_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "default",    OPTION_VAL_DEFAULT_NO },
+         { "aggressive", OPTION_VAL_AGGRESSIVE_NO },
+         { "disabled",   NULL },
+         { NULL, NULL },
+      },
+      "default"
+   },
+   {
+      BEETLE_OPT(widescreen_hack),
+      BEETLE_OPT_WIDESCREEN_HACK_LABEL_NO,
+      NULL,
+      BEETLE_OPT_WIDESCREEN_HACK_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(widescreen_hack_aspect_ratio),
+      BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_NO,
+      NULL,
+      BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "16:9",  OPTION_VAL_16_9_NO },
+         { "16:10", OPTION_VAL_16_10_NO },
+         { "18:9",  OPTION_VAL_18_9_NO },
+         { "19:9",  OPTION_VAL_19_9_NO },
+         { "20:9",  OPTION_VAL_20_9_NO },
+         { "21:9",  OPTION_VAL_21_9_NO }, // 64:27
+         { "32:9",  OPTION_VAL_32_9_NO },
+         { NULL,    NULL },
+      },
+      "16:9"
+   },
+   {
+      BEETLE_OPT(cpu_freq_scale),
+      BEETLE_OPT_CPU_FREQ_SCALE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "50%",           OPTION_VAL_50_NO },
+         { "60%",           OPTION_VAL_60_NO },
+         { "70%",           OPTION_VAL_70_NO },
+         { "80%",           OPTION_VAL_80_NO },
+         { "90%",           OPTION_VAL_90_NO },
+         { "100%(native)", OPTION_VAL_100_NATIVE_NO },
+         { "110%",          OPTION_VAL_110_NO },
+         { "120%",          OPTION_VAL_120_NO },
+         { "130%",          OPTION_VAL_130_NO },
+         { "140%",          OPTION_VAL_140_NO },
+         { "150%",          OPTION_VAL_150_NO },
+         { "160%",          OPTION_VAL_160_NO },
+         { "170%",          OPTION_VAL_170_NO },
+         { "180%",          OPTION_VAL_180_NO },
+         { "190%",          OPTION_VAL_190_NO },
+         { "200%",          OPTION_VAL_200_NO },
+         { "210%",          OPTION_VAL_210_NO },
+         { "220%",          OPTION_VAL_220_NO },
+         { "230%",          OPTION_VAL_230_NO },
+         { "240%",          OPTION_VAL_240_NO },
+         { "250%",          OPTION_VAL_250_NO },
+         { "260%",          OPTION_VAL_260_NO },
+         { "270%",          OPTION_VAL_270_NO },
+         { "280%",          OPTION_VAL_280_NO },
+         { "290%",          OPTION_VAL_290_NO },
+         { "300%",          OPTION_VAL_300_NO },
+         { "310%",          OPTION_VAL_310_NO },
+         { "320%",          OPTION_VAL_320_NO },
+         { "330%",          OPTION_VAL_330_NO },
+         { "340%",          OPTION_VAL_340_NO },
+         { "350%",          OPTION_VAL_350_NO },
+         { "360%",          OPTION_VAL_360_NO },
+         { "370%",          OPTION_VAL_370_NO },
+         { "380%",          OPTION_VAL_380_NO },
+         { "390%",          OPTION_VAL_390_NO },
+         { "400%",          OPTION_VAL_400_NO },
+         { "410%",          OPTION_VAL_410_NO },
+         { "420%",          OPTION_VAL_420_NO },
+         { "430%",          OPTION_VAL_430_NO },
+         { "440%",          OPTION_VAL_440_NO },
+         { "450%",          OPTION_VAL_450_NO },
+         { "460%",          OPTION_VAL_460_NO },
+         { "470%",          OPTION_VAL_470_NO },
+         { "480%",          OPTION_VAL_480_NO },
+         { "490%",          OPTION_VAL_490_NO },
+         { "500%",          OPTION_VAL_500_NO },
+         { "510%",          OPTION_VAL_510_NO },
+         { "520%",          OPTION_VAL_520_NO },
+         { "530%",          OPTION_VAL_530_NO },
+         { "540%",          OPTION_VAL_540_NO },
+         { "550%",          OPTION_VAL_550_NO },
+         { "560%",          OPTION_VAL_560_NO },
+         { "570%",          OPTION_VAL_570_NO },
+         { "580%",          OPTION_VAL_580_NO },
+         { "590%",          OPTION_VAL_590_NO },
+         { "600%",          OPTION_VAL_600_NO },
+         { "610%",          OPTION_VAL_610_NO },
+         { "620%",          OPTION_VAL_620_NO },
+         { "630%",          OPTION_VAL_630_NO },
+         { "640%",          OPTION_VAL_640_NO },
+         { "650%",          OPTION_VAL_650_NO },
+         { "660%",          OPTION_VAL_660_NO },
+         { "670%",          OPTION_VAL_670_NO },
+         { "680%",          OPTION_VAL_680_NO },
+         { "690%",          OPTION_VAL_690_NO },
+         { "700%",          OPTION_VAL_700_NO },
+         { "710%",          OPTION_VAL_710_NO },
+         { "720%",          OPTION_VAL_720_NO },
+         { "730%",          OPTION_VAL_730_NO },
+         { "740%",          OPTION_VAL_740_NO },
+         { "750%",          OPTION_VAL_750_NO },
+         { NULL, NULL },
+      },
+      "100%(native)"
+   },
+   {
+      BEETLE_OPT(gte_overclock),
+      BEETLE_OPT_GTE_OVERCLOCK_LABEL_NO,
+      NULL,
+      BEETLE_OPT_GTE_OVERCLOCK_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(skip_bios),
+      BEETLE_OPT_SKIP_BIOS_LABEL_NO,
+      NULL,
+      BEETLE_OPT_SKIP_BIOS_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(override_bios),
+      BEETLE_OPT_OVERRIDE_BIOS_LABEL_NO,
+      NULL,
+      BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NO,
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "psxonpsp",  OPTION_VAL_PSXONPSP_NO },
+         { "ps1_rom",  OPTION_VAL_PS1_ROM_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(renderer),
+      BEETLE_OPT_RENDERER_LABEL_NO,
+      NULL,
+      BEETLE_OPT_RENDERER_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "hardware",    OPTION_VAL_HARDWARE_NO },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         { "hardware_gl", OPTION_VAL_HARDWARE_GL_NO },
+#endif
+#if defined(HAVE_VULKAN)
+         { "hardware_vk", OPTION_VAL_HARDWARE_VK_NO },
+#endif
+         { "software",    OPTION_VAL_SOFTWARE_NO },
+         { NULL, NULL },
+      },
+      "hardware"
+   },
+   {
+      BEETLE_OPT(renderer_software_fb),
+      BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_NO,
+      NULL,
+      BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
+#if defined(HAVE_LIGHTREC)
+   {
+      BEETLE_OPT(cpu_dynarec),
+      BEETLE_OPT_CPU_DYNAREC_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CPU_DYNAREC_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "disabled", OPTION_VAL_DISABLED_NO },
+         { "execute",  OPTION_VAL_EXECUTE_NO },
+         { "execute_one",  OPTION_VAL_EXECUTE_ONE_NO },
+         { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(dynarec_invalidate),
+      BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "full", OPTION_VAL_FULL_NO },
+         { "dma",  OPTION_VAL_DMA_NO },
+         { NULL, NULL },
+      },
+      "full"
+   },
+   {
+      BEETLE_OPT(dynarec_eventcycles),
+      BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "128",  NULL },
+         { "256",  NULL },
+         { "384",  NULL },
+         { "512",  NULL },
+         { "640",  NULL },
+         { "768",  NULL },
+         { "896",  NULL },
+         { "1024",  NULL },
+         { NULL, NULL },
+      },
+      "128"
+   },
+#endif
+   {
+      BEETLE_OPT(core_timing_fps),
+      BEETLE_OPT_CORE_TIMING_FPS_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CORE_TIMING_FPS_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_NO },
+         { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_NO },
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_NO },
+      },
+      "force_progressive"
+   },
+   {
+      BEETLE_OPT(pal_video_timing_override),
+      BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(crop_overscan),
+      BEETLE_OPT_CROP_OVERSCAN_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CROP_OVERSCAN_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled",  OPTION_VAL_DISABLED_O53_NO },
+         { "static",  OPTION_VAL_STATIC_NO },
+         { "smart", OPTION_VAL_SMART_NO },
+         { NULL, NULL },
+      },
+      "smart"
+   },
+   {
+      BEETLE_OPT(image_crop),
+      BEETLE_OPT_IMAGE_CROP_LABEL_NO,
+      NULL,
+      BEETLE_OPT_IMAGE_CROP_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "disabled", "0" },
+         { "1px",      OPTION_VAL_1PX_NO },
+         { "2px",      OPTION_VAL_2PX_NO },
+         { "3px",      OPTION_VAL_3PX_NO },
+         { "4px",      OPTION_VAL_4PX_NO },
+         { "5px",      OPTION_VAL_5PX_NO },
+         { "6px",      OPTION_VAL_6PX_NO },
+         { "7px",      OPTION_VAL_7PX_NO },
+         { "8px",      OPTION_VAL_8PX_NO },
+         { "9px",      OPTION_VAL_9PX_NO },
+         { "10px",     OPTION_VAL_10PX_NO },
+         { "11px",     OPTION_VAL_11PX_NO },
+         { "12px",     OPTION_VAL_12PX_NO },
+         { "13px",     OPTION_VAL_13PX_NO },
+         { "14px",     OPTION_VAL_14PX_NO },
+         { "15px",     OPTION_VAL_15PX_NO },
+         { "16px",     OPTION_VAL_16PX_NO },
+         { "17px",     OPTION_VAL_17PX_NO },
+         { "18px",     OPTION_VAL_18PX_NO },
+         { "19px",     OPTION_VAL_19PX_NO },
+         { "20px",     OPTION_VAL_20PX_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(image_offset),
+      BEETLE_OPT_IMAGE_OFFSET_LABEL_NO,
+      NULL,
+      BEETLE_OPT_IMAGE_OFFSET_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "-12px",    OPTION_VAL_12PX_O55_NO },
+         { "-11px",    OPTION_VAL_11PX_O55_NO },
+         { "-10px",    OPTION_VAL_10PX_O55_NO },
+         { "-9px",     OPTION_VAL_9PX_O55_NO },
+         { "-8px",     OPTION_VAL_8PX_O55_NO },
+         { "-7px",     OPTION_VAL_7PX_O55_NO },
+         { "-6px",     OPTION_VAL_6PX_O55_NO },
+         { "-5px",     OPTION_VAL_5PX_O55_NO },
+         { "-4px",     OPTION_VAL_4PX_O55_NO },
+         { "-3px",     OPTION_VAL_3PX_O55_NO },
+         { "-2px",     OPTION_VAL_2PX_O55_NO },
+         { "-1px",     OPTION_VAL_1PX_O55_NO },
+         { "disabled", OPTION_VAL_DISABLED_O55_NO },
+         { "+1px",     OPTION_VAL_1PX_O55_0_NO },
+         { "+2px",     OPTION_VAL_2PX_O55_0_NO },
+         { "+3px",     OPTION_VAL_3PX_O55_0_NO },
+         { "+4px",     OPTION_VAL_4PX_O55_0_NO },
+         { "+5px",     OPTION_VAL_5PX_O55_0_NO },
+         { "+6px",     OPTION_VAL_6PX_O55_0_NO },
+         { "+7px",     OPTION_VAL_7PX_O55_0_NO },
+         { "+8px",     OPTION_VAL_8PX_O55_0_NO },
+         { "+9px",     OPTION_VAL_9PX_O55_0_NO },
+         { "+10px",    OPTION_VAL_10PX_O55_0_NO },
+         { "+11px",    OPTION_VAL_11PX_O55_0_NO },
+         { "+12px",    OPTION_VAL_12PX_O55_0_NO },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(image_offset_cycles),
+      BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_NO,
+      NULL,
+      BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "-40",      NULL },
+         { "-39",      NULL },
+         { "-38",      NULL },
+         { "-37",      NULL },
+         { "-36",      NULL },
+         { "-35",      NULL },
+         { "-34",      NULL },
+         { "-33",      NULL },
+         { "-32",      NULL },
+         { "-31",      NULL },
+         { "-30",      NULL },
+         { "-29",      NULL },
+         { "-28",      NULL },
+         { "-27",      NULL },
+         { "-26",      NULL },
+         { "-25",      NULL },
+         { "-24",      NULL },
+         { "-23",      NULL },
+         { "-22",      NULL },
+         { "-21",      NULL },
+         { "-20",      NULL },
+         { "-19",      NULL },
+         { "-18",      NULL },
+         { "-17",      NULL },
+         { "-16",      NULL },
+         { "-15",      NULL },
+         { "-14",      NULL },
+         { "-13",      NULL },
+         { "-12",      NULL },
+         { "-11",      NULL },
+         { "-10",      NULL },
+         { "-9",       NULL },
+         { "-8",       NULL },
+         { "-7",       NULL },
+         { "-6",       NULL },
+         { "-5",       NULL },
+         { "-4",       NULL },
+         { "-3",       NULL },
+         { "-2",       NULL },
+         { "-1",       NULL },
+         { "0",        OPTION_VAL_DISABLED_O55_NO },
+         { "+1",       NULL },
+         { "+2",       NULL },
+         { "+3",       NULL },
+         { "+4",       NULL },
+         { "+5",       NULL },
+         { "+6",       NULL },
+         { "+7",       NULL },
+         { "+8",       NULL },
+         { "+9",       NULL },
+         { "+10",      NULL },
+         { "+11",      NULL },
+         { "+12",      NULL },
+         { "+13",      NULL },
+         { "+14",      NULL },
+         { "+15",      NULL },
+         { "+16",      NULL },
+         { "+17",      NULL },
+         { "+18",      NULL },
+         { "+19",      NULL },
+         { "+20",      NULL },
+         { "+21",      NULL },
+         { "+22",      NULL },
+         { "+23",      NULL },
+         { "+24",      NULL },
+         { "+25",      NULL },
+         { "+26",      NULL },
+         { "+27",      NULL },
+         { "+28",      NULL },
+         { "+29",      NULL },
+         { "+30",      NULL },
+         { "+31",      NULL },
+         { "+32",      NULL },
+         { "+33",      NULL },
+         { "+34",      NULL },
+         { "+35",      NULL },
+         { "+36",      NULL },
+         { "+37",      NULL },
+         { "+38",      NULL },
+         { "+39",      NULL },
+         { "+40",      NULL },
+         { NULL, NULL},
+      },
+      "0"
+   },
+#endif
+   {
+      BEETLE_OPT(gpu_overclock),
+      BEETLE_OPT_GPU_OVERCLOCK_LABEL_NO,
+      NULL,
+      BEETLE_OPT_GPU_OVERCLOCK_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "1x(native)", OPTION_VAL_1X_NATIVE_NO },
+         { "2x",         OPTION_VAL_2X_NO },
+         { "4x",         OPTION_VAL_4X_NO },
+         { "8x",         OPTION_VAL_8X_NO },
+         { "16x",        OPTION_VAL_16X_NO },
+         { "32x",        OPTION_VAL_32X_NO },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+   {
+      BEETLE_OPT(aspect_ratio),
+      BEETLE_OPT_ASPECT_RATIO_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ASPECT_RATIO_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "corrected", OPTION_VAL_CORRECTED_NO },
+         { "uncorrected", OPTION_VAL_UNCORRECTED_NO },
+         { "4:3",  OPTION_VAL_4_3_NO },
+         { "ntsc", OPTION_VAL_NTSC_NO },
+      },
+      "corrected"
+   },
+   {
+      BEETLE_OPT(initial_scanline),
+      BEETLE_OPT_INITIAL_SCANLINE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_INITIAL_SCANLINE_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "0",  NULL },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(last_scanline),
+      BEETLE_OPT_LAST_SCANLINE_LABEL_NO,
+      NULL,
+      BEETLE_OPT_LAST_SCANLINE_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "210", NULL },
+         { "211", NULL },
+         { "212", NULL },
+         { "213", NULL },
+         { "214", NULL },
+         { "215", NULL },
+         { "216", NULL },
+         { "217", NULL },
+         { "218", NULL },
+         { "219", NULL },
+         { "220", NULL },
+         { "221", NULL },
+         { "222", NULL },
+         { "223", NULL },
+         { "224", NULL },
+         { "225", NULL },
+         { "226", NULL },
+         { "227", NULL },
+         { "228", NULL },
+         { "229", NULL },
+         { "230", NULL },
+         { "231", NULL },
+         { "232", NULL },
+         { "233", NULL },
+         { "234", NULL },
+         { "235", NULL },
+         { "236", NULL },
+         { "237", NULL },
+         { "238", NULL },
+         { "239", OPTION_VAL_239_NO },
+         { NULL, NULL },
+      },
+      "239"
+   },
+   {
+      BEETLE_OPT(initial_scanline_pal),
+      BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_NO,
+      NULL,
+      BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "0",  NULL },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(last_scanline_pal),
+      BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_NO,
+      NULL,
+      BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "230", NULL },
+         { "231", NULL },
+         { "232", NULL },
+         { "233", NULL },
+         { "234", NULL },
+         { "235", NULL },
+         { "236", NULL },
+         { "237", NULL },
+         { "238", NULL },
+         { "239", NULL },
+         { "240", NULL },
+         { "241", NULL },
+         { "242", NULL },
+         { "243", NULL },
+         { "244", NULL },
+         { "245", NULL },
+         { "246", NULL },
+         { "247", NULL },
+         { "248", NULL },
+         { "249", NULL },
+         { "250", NULL },
+         { "251", NULL },
+         { "252", NULL },
+         { "253", NULL },
+         { "254", NULL },
+         { "255", NULL },
+         { "256", NULL },
+         { "257", NULL },
+         { "258", NULL },
+         { "259", NULL },
+         { "260", NULL },
+         { "261", NULL },
+         { "262", NULL },
+         { "263", NULL },
+         { "264", NULL },
+         { "265", NULL },
+         { "266", NULL },
+         { "267", NULL },
+         { "268", NULL },
+         { "269", NULL },
+         { "270", NULL },
+         { "271", NULL },
+         { "272", NULL },
+         { "273", NULL },
+         { "274", NULL },
+         { "275", NULL },
+         { "276", NULL },
+         { "277", NULL },
+         { "278", NULL },
+         { "279", NULL },
+         { "280", NULL },
+         { "281", NULL },
+         { "282", NULL },
+         { "283", NULL },
+         { "284", NULL },
+         { "285", NULL },
+         { "286", NULL },
+         { "287", OPTION_VAL_287_NO },
+         { NULL, NULL },
+      },
+      "287"
+   },
+#ifndef EMSCRIPTEN
+   {
+      BEETLE_OPT(cd_access_method),
+      BEETLE_OPT_CD_ACCESS_METHOD_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "sync",     OPTION_VAL_SYNC_NO },
+         { "async",    OPTION_VAL_ASYNC_NO },
+         { "precache", OPTION_VAL_PRECACHE_NO },
+         { NULL, NULL },
+      },
+      "sync"
+   },
+#endif
+   {
+      BEETLE_OPT(cd_fastload),
+      BEETLE_OPT_CD_FASTLOAD_LABEL_NO,
+      NULL,
+      BEETLE_OPT_CD_FASTLOAD_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "2x(native)", OPTION_VAL_2X_NATIVE_NO },
+         { "4x",          OPTION_VAL_4X_NO },
+         { "6x",          OPTION_VAL_6X_NO },
+         { "8x",          OPTION_VAL_8X_NO },
+         { "10x",         OPTION_VAL_10X_NO },
+         { "12x",         OPTION_VAL_12X_NO },
+         { "14x",         OPTION_VAL_14X_NO },
+         { NULL, NULL },
+      },
+      "2x(native)"
+   },
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_no = {
+   option_cats_no,
+   option_defs_no
+};
+
 /* RETRO_LANGUAGE_OC */
 
 #define CATEGORY_VIDEO_LABEL_OC "Vidèo"
@@ -48636,7 +50576,7 @@ struct retro_core_options_v2 options_oc = {
 #define OPTION_VAL_WHITE_PL NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_PL NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_PL NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_PL NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_PL "Czułość myszy"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_PL NULL
 #define OPTION_VAL_5_PL NULL
 #define OPTION_VAL_10_PL NULL
@@ -48861,7 +50801,7 @@ struct retro_core_options_v2 options_oc = {
 #define OPTION_VAL_3PX_O55_PL NULL
 #define OPTION_VAL_2PX_O55_PL NULL
 #define OPTION_VAL_1PX_O55_PL NULL
-#define OPTION_VAL_DISABLED_O55_PL NULL
+#define OPTION_VAL_DISABLED_O55_PL "0 (domyślnie)"
 #define OPTION_VAL_1PX_O55_0_PL NULL
 #define OPTION_VAL_2PX_O55_0_PL NULL
 #define OPTION_VAL_3PX_O55_0_PL NULL
@@ -48882,19 +50822,19 @@ struct retro_core_options_v2 options_oc = {
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_PL NULL
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_PL NULL
 #define OPTION_VAL_CORRECTED_PL NULL
-#define OPTION_VAL_UNCORRECTED_PL NULL
+#define OPTION_VAL_UNCORRECTED_PL "Niepoprawione"
 #define OPTION_VAL_4_3_PL NULL
 #define OPTION_VAL_NTSC_PL NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PL NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_PL NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_PL NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_PL NULL
-#define OPTION_VAL_239_PL NULL
+#define OPTION_VAL_239_PL "239 (domyślnie)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_PL NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_PL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PL NULL
-#define OPTION_VAL_287_PL NULL
+#define OPTION_VAL_287_PL "287 (domyślnie)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_PL NULL
 #define OPTION_VAL_SYNC_PL NULL
@@ -64153,7 +66093,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_PINK_SV "Rosa"
 #define OPTION_VAL_PURPLE_SV "Lila"
 #define OPTION_VAL_BLACK_SV "Svart"
-#define OPTION_VAL_WHITE_SV NULL
+#define OPTION_VAL_WHITE_SV "Vit"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV NULL
@@ -66094,7 +68034,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_PURPLE_TR "Mor"
 #define OPTION_VAL_BLACK_TR "Siyah"
 #define OPTION_VAL_WHITE_TR "Beyaz"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_TR NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_TR "2. Port: Silah Nişangah Rengi"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TR "Fare Hassasiyeti"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TR NULL
