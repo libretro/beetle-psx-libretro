@@ -1622,7 +1622,7 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
             y = renderer->last_scanline - 239;
         }
    }
-   else
+   if (renderer->crop_overscan != 2 || height > (renderer->config.is_pal? 288 : 240))
    {
         if (renderer->config.is_pal)
         {

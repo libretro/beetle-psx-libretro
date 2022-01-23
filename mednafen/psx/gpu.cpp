@@ -1456,10 +1456,20 @@ int32_t GPU_Update(const int32_t sys_timestamp)
          }
          else
          {
-            const unsigned int FirstVisibleLine =
+            unsigned int FirstVisibleLineTemp =
                GPU.LineVisFirst + (crop_overscan == 2 ? GPU.VertStart : (GPU.HardwarePALType ? 20 : 16));
-            const unsigned int VisibleLineCount =
+            unsigned int VisibleLineCountTemp =
                (crop_overscan == 2 ? (GPU.VertEnd - GPU.VertStart) - ((GPU.HardwarePALType ? 287 : 239) - GPU.LineVisLast) - GPU.LineVisFirst : GPU.LineVisLast + 1 - GPU.LineVisFirst); //HardwarePALType ? 288 : 240;
+
+            if (VisibleLineCountTemp > (GPU.HardwarePALType ? 288 : 240))
+            {
+               FirstVisibleLineTemp =
+                  GPU.LineVisFirst + (GPU.HardwarePALType ? 20 : 16);
+               VisibleLineCountTemp =
+                  GPU.LineVisLast + 1 - GPU.LineVisFirst; //HardwarePALType ? 288 : 240;
+            }
+            const unsigned int FirstVisibleLine = FirstVisibleLineTemp;
+            const unsigned int VisibleLineCount = VisibleLineCountTemp;
 
             TIMER_SetHRetrace(false);
 

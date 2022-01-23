@@ -824,7 +824,7 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 			upper_offset = 0 - render_state.slstart;
 		}
 	}
-	else
+	if (render_state.crop_overscan != 2 || display_height > (render_state.is_pal ? 288 : 240))
 	{
 		if (render_state.is_pal)
 		{
