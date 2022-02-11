@@ -2005,7 +2005,7 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_32BPP_AST NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_AST NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_AST NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_AST NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_AST "Resolución interna"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_AST NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_AST NULL
 #define BEETLE_OPT_FILTER_LABEL_AST NULL
@@ -3945,7 +3945,7 @@ struct retro_core_options_v2 options_ast = {
 #define OPTION_VAL_32BPP_CA NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_CA NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_CA NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_CA NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_CA "Resolució Interna"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CA NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CA NULL
 #define BEETLE_OPT_FILTER_LABEL_CA NULL
@@ -17596,7 +17596,7 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_WHITE_EL NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_EL NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_EL NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_EL NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_EL "Ευαισθησία Ποντικιού"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_EL NULL
 #define OPTION_VAL_5_EL NULL
 #define OPTION_VAL_10_EL NULL
@@ -17682,7 +17682,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_PGXP_TEXTURE_INFO_0_EL NULL
 #define BEETLE_OPT_LINE_RENDER_LABEL_EL NULL
 #define BEETLE_OPT_LINE_RENDER_INFO_0_EL NULL
-#define OPTION_VAL_DEFAULT_EL NULL
+#define OPTION_VAL_DEFAULT_EL "Προκαθορισμένο"
 #define OPTION_VAL_AGGRESSIVE_EL NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_EL NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_EL NULL
@@ -17821,7 +17821,7 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_3PX_O55_EL NULL
 #define OPTION_VAL_2PX_O55_EL NULL
 #define OPTION_VAL_1PX_O55_EL NULL
-#define OPTION_VAL_DISABLED_O55_EL NULL
+#define OPTION_VAL_DISABLED_O55_EL "0 (Προεπιλογή)"
 #define OPTION_VAL_1PX_O55_0_EL NULL
 #define OPTION_VAL_2PX_O55_0_EL NULL
 #define OPTION_VAL_3PX_O55_0_EL NULL
@@ -17849,12 +17849,12 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_EL NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_EL NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_EL NULL
-#define OPTION_VAL_239_EL NULL
+#define OPTION_VAL_239_EL "239 (Προεπιλογή)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_EL NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_EL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_EL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_EL NULL
-#define OPTION_VAL_287_EL NULL
+#define OPTION_VAL_287_EL "287 (Προεπιλογή)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_EL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_EL NULL
 #define OPTION_VAL_SYNC_EL NULL
@@ -19465,7 +19465,7 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_32BPP_EO NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_EO NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_EO NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_EO NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_EO "Interna Rezolucio"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_EO NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_EO NULL
 #define BEETLE_OPT_FILTER_LABEL_EO NULL
@@ -21639,8 +21639,8 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_ES "Omite la animación de arranque de la BIOS de PlayStation que suele aparecer al cargar un contenido. Nota: Esta opción puede generar problemas de compatibilidad en varios juegos (juegos PAL con protección anticopia, Saga Frontier, etc.)."
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_ES "Omitir la BIOS (es necesario reiniciar)"
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ES "Reemplaza la BIOS correspondiente a la región del contenido con una de región libre (si está disponible)."
-#define OPTION_VAL_PSXONPSP_ES "BIOS de PS1 de PSP"
-#define OPTION_VAL_PS1_ROM_ES "BIOS de PS1 de PS3"
+#define OPTION_VAL_PSXONPSP_ES "BIOS de PS1 usada en PSP"
+#define OPTION_VAL_PS1_ROM_ES "BIOS de PS1 usada en PS3"
 #define BEETLE_OPT_RENDERER_LABEL_ES "Renderizador (es necesario reiniciar)"
 #define BEETLE_OPT_RENDERER_INFO_0_ES "El renderizador por software es el más preciso, pero sus requisitos son muy elevados si se ejecuta a una resolución interna superior a la de la GPU. Los renderizadores por hardware son menos precisos, pero tienen un mejor rendimiento al usar resoluciones internas superiores y permiten varias mejoras gráficas. «Hardware (Automático)» seleccionará automáticamente el renderizador Vulkan u OpenGL según el controlador de vídeo actual del front-end de libretro. Si el controlador no es compatible con Vulkan o con OpenGL 3.3, se utilizará el renderizador por software como reserva del núcleo."
 #define OPTION_VAL_HARDWARE_ES "Hardware (automático)"
@@ -21653,8 +21653,8 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_ES "Recompila de forma dinámica las instrucciones de la CPU a instrucciones nativas. Es más rápido que el intérprete, pero los intervalos de la CPU son menos precisos y puede provocar fallos."
 #define OPTION_VAL_DISABLED_ES "Desactivada (intérprete Beetle)"
 #define OPTION_VAL_EXECUTE_ES "Máximo rendimiento"
-#define OPTION_VAL_EXECUTE_ONE_ES "Comprobación del intervalo entre ciclos"
-#define OPTION_VAL_RUN_INTERPRETER_ES "Intérprete Lightrec"
+#define OPTION_VAL_EXECUTE_ONE_ES "Con control de los intervalos entre ciclos"
+#define OPTION_VAL_RUN_INTERPRETER_ES "Intérprete lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_ES "Invalidación de código del dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_ES "Algunos juegos necesitan una invalidación completa y otros solo necesitan invalidar la DMA."
 #define OPTION_VAL_FULL_ES "Completa"
@@ -41143,7 +41143,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_KO "CD 로딩 속도"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_KO "디스크 액세스 배속을 선택합니다. '2배 (네이티브)'를 초과하는 값은 인게임 로딩 시간을 크게 줄일 수 있지만, 타이밍 오류를 유발하기도 합니다. 일부 게임은 일정 속도 이상에서 올바르게 작동하지 않을 수 있습니다."
 #define OPTION_VAL_2X_NATIVE_KO "2배 (Native)"
-#define OPTION_VAL_6X_KO "6배"
+#define OPTION_VAL_6X_KO NULL
 #define OPTION_VAL_10X_KO "10배"
 #define OPTION_VAL_12X_KO "12배"
 #define OPTION_VAL_14X_KO "14배"
@@ -46625,7 +46625,7 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_32BPP_NO NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_NO NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_NO NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_NO NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_NO "Intern oppløsning"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_NO NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_NO NULL
 #define BEETLE_OPT_FILTER_LABEL_NO NULL
@@ -46633,7 +46633,7 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_NEAREST_NO NULL
 #define OPTION_VAL_SABR_NO NULL
 #define OPTION_VAL_XBR_NO NULL
-#define OPTION_VAL_BILINEAR_NO NULL
+#define OPTION_VAL_BILINEAR_NO "Bilineær"
 #define OPTION_VAL_3_POINT_NO NULL
 #define OPTION_VAL_JINC2_NO NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_NO NULL
@@ -72110,7 +72110,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VAL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_VAL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_VAL NULL
-#define OPTION_VAL_DISABLED_O53_VAL NULL
+#define OPTION_VAL_DISABLED_O53_VAL "Cap"
 #define OPTION_VAL_STATIC_VAL NULL
 #define OPTION_VAL_SMART_VAL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_VAL NULL
