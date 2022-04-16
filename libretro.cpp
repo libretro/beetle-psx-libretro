@@ -1916,6 +1916,30 @@ void lightrec_free_mmap()
 }
 #endif /* HAVE_LIGHTREC */
 
+/* LED interface */
+static retro_set_led_state_t led_state_cb = NULL;
+static unsigned int retro_led_state[2] = {0};
+static void retro_led_interface(void)
+{
+   /* 0: Power
+    * 1: CD */
+
+   unsigned int led_state[2] = {0};
+   unsigned int l            = 0;
+
+   led_state[0] = (!Running) ? 1 : 0;
+   led_state[1] = (PSX_CDC->DriveStatus > 0) ? 1 : 0;
+
+   for (l = 0; l < sizeof(led_state)/sizeof(led_state[0]); l++)
+   {
+      if (retro_led_state[l] != led_state[l])
+      {
+         retro_led_state[l] = led_state[l];
+         led_state_cb(l, led_state[l]);
+      }
+   }
+}
+
 /* Forward declarations, required for disk control
  * 'set initial disk' functionality */
 static unsigned disk_get_num_images(void);
@@ -4809,6 +4833,9 @@ void retro_run(void)
             MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
    }
 
+   /* LED interface */
+   retro_led_interface();
+
    video_frames++;
    audio_frames += spec.SoundBufSize;
 
@@ -4873,6 +4900,7 @@ unsigned retro_api_version(void)
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
+   struct retro_led_interface led_interface;
    environ_cb = cb;
 
    libretro_supports_option_categories = false;
@@ -4884,7 +4912,11 @@ void retro_set_environment(retro_environment_t cb)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
 	   filestream_vfs_init(&vfs_iface_info);
 
-	input_set_env( cb );
+   environ_cb(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface);
+   if (led_interface.set_led_state)
+      led_state_cb = led_interface.set_led_state;
+
+   input_set_env(cb);
 
    rsx_intf_set_environment(cb);
 }

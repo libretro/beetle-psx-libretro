@@ -40,6 +40,9 @@ class PS_CDC
       void GetCDAudio(int32 samples[2], const unsigned freq);
 
       CD_Audio_Buffer AudioBuffer;
+#ifdef __LIBRETRO__
+      int DriveStatus;
+#endif
 
    private:
       CDIF *Cur_CDIF;
@@ -152,7 +155,9 @@ class PS_CDC
          DS_READING,
          DS_RESETTING
       };
+#ifndef __LIBRETRO__
       int DriveStatus;
+#endif
       int StatusAfterSeek;
       bool Forward;
       bool Backward;
