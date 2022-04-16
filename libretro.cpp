@@ -4834,7 +4834,8 @@ void retro_run(void)
    }
 
    /* LED interface */
-   retro_led_interface();
+   if (led_state_cb)
+      retro_led_interface();
 
    video_frames++;
    audio_frames += spec.SoundBufSize;
