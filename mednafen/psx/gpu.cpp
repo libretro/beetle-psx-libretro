@@ -766,10 +766,6 @@ void GPU_FillVideoParams(MDFNGI* gi)
 
       gi->fb_width = 768;
       gi->fb_height = 576;
-
-      gi->fps = 836203078; // 49.842
-
-      gi->VideoSystem = VIDSYS_PAL;
    }
    else
    {
@@ -781,10 +777,6 @@ void GPU_FillVideoParams(MDFNGI* gi)
 
       gi->fb_width = 768;
       gi->fb_height = 480;
-
-      gi->fps = 1005643085; // 59.941
-
-      gi->VideoSystem = VIDSYS_NTSC;
    }
 
    //

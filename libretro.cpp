@@ -2823,9 +2823,6 @@ static CheatFormatInfoStruct CheatFormatInfo =
 // an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
 MDFNGI EmulatedPSX =
 {
-   MDFN_MASTERCLOCK_FIXED(33868800),
-   0,
-
    true, // Multires possible?
 
    //
@@ -2840,12 +2837,6 @@ MDFNGI EmulatedPSX =
 
    0,   // Framebuffer width
    0,   // Framebuffer height
-   //
-   //
-   //
-
-   2,     // Number of output sound channels
-
 };
 
 /* end of Mednafen psx.cpp */
@@ -4592,19 +4583,8 @@ void retro_run(void)
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
    spec.SoundRate = 44100;
-   spec.SoundBuf = NULL;
    spec.LineWidths = rects;
-   spec.SoundBufMaxSize = 0;
-   spec.SoundVolume = 1.0;
-   spec.soundmultiplier = 1.0;
    spec.SoundBufSize = 0;
-   spec.VideoFormatChanged = false;
-   spec.SoundFormatChanged = false;
-
-   //if (disableVideo)
-   //{
-   //   spec.skip = true;
-   //}
 
    EmulateSpecStruct *espec = (EmulateSpecStruct*)&spec;
    /* start of Emulate */
@@ -4614,8 +4594,6 @@ void retro_run(void)
 
    MDFNMP_ApplyPeriodicCheats();
 
-
-   espec->MasterCycles = 0;
    espec->SoundBufSize = 0;
 
    PSX_FIO->UpdateInput();
@@ -4632,8 +4610,6 @@ void retro_run(void)
       PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
 #endif
 
-   //printf("scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
-
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
 
@@ -4644,8 +4620,6 @@ void retro_run(void)
    PSX_FIO->ResetTS();
 
    RebaseTS(timestamp);
-
-   espec->MasterCycles = timestamp;
 
    // Save memcards if dirty.
    unsigned players = input_get_player_count();
