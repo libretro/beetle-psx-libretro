@@ -160,6 +160,7 @@ endif
 
 ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
+   FLAGS += -DHAVE_MMAP
 
    ifeq ($(LIGHTREC_LOG_LEVEL),)
        FLAGS += -DLOG_LEVEL=3 \
