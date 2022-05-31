@@ -45,14 +45,15 @@
 int pgxpMode;
 
 #ifdef HAVE_LIGHTREC
-#include <lightrec.h>
 #include <unistd.h>
 #include <signal.h>
 
+extern enum DYNAREC psx_dynarec;
 enum DYNAREC prev_dynarec;
 bool         prev_invalidate;
 extern bool  psx_dynarec_invalidate;
 extern uint8 psx_mmap;
+extern uint8 *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
 uint8 next_interpreter;
 #endif
@@ -3505,6 +3506,9 @@ static struct lightrec_mem_map lightrec_map[] = {
 		.ops = NULL,
 		.mirror_of = &lightrec_map[PSX_MAP_PARALLEL_PORT],
 	},
+	[PSX_MAP_CODE_BUFFER] = {
+	},
+
 };
 
 static struct lightrec_ops ops = {
@@ -3560,6 +3564,13 @@ static int lightrec_plugin_init(PS_CPU *self)
             (uintptr_t) psxP,
             (uintptr_t) psxR,
             (uintptr_t) psxH);
+
+      if(lightrec_codebuffer)
+      {
+         log_cb(RETRO_LOG_INFO, "Lightrec codebuffer address: 0x%lx, size: %uMB (0x%08x)\n",
+                lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE/(1024*1024),
+                LIGHTREC_CODEBUFFER_SIZE);
+      }
    }
 
    lightrec_map[PSX_MAP_KERNEL_USER_RAM].address = psxM;
@@ -3574,6 +3585,12 @@ static int lightrec_plugin_init(PS_CPU *self)
    lightrec_map[PSX_MAP_BIOS].address          = psxR;
    lightrec_map[PSX_MAP_SCRATCH_PAD].address   = psxH;
    lightrec_map[PSX_MAP_PARALLEL_PORT].address = psxP;
+
+   if(lightrec_codebuffer)
+   {
+      lightrec_map[PSX_MAP_CODE_BUFFER].address = lightrec_codebuffer;
+      lightrec_map[PSX_MAP_CODE_BUFFER].length = LIGHTREC_CODEBUFFER_SIZE;
+   }
 
    if (PGXP_GetModes() & (PGXP_MODE_MEMORY | PGXP_MODE_GTE))
    {

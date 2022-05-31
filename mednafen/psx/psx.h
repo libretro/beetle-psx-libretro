@@ -49,12 +49,6 @@ extern MultiAccessSizeMem *BIOSROM;
 extern MultiAccessSizeMem *MainRAM;
 extern MultiAccessSizeMem *ScratchRAM;
 
-#ifdef HAVE_LIGHTREC
-enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
-
-extern enum DYNAREC psx_dynarec;
-#endif
-
 extern unsigned psx_gpu_overclock_shift;
 
 extern uint8_t analog_combo[2];
