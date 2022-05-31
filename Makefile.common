@@ -197,8 +197,8 @@ ifeq ($(HAVE_LIGHTREC), 1)
 
    INCFLAGS += -I$(DEPS_DIR)/lightning/include \
                -I$(DEPS_DIR)/lightrec \
-               -I$(CORE_DIR)/lightning-lightrec-include \
-               -include $(CORE_DIR)/lightning-lightrec-include/debug.h
+               -I$(CORE_DIR)/include \
+               -include $(CORE_DIR)/include/debug.h
 endif
 
 ifneq ($(HAVE_GRIFFIN), 1)
