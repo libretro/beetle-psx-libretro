@@ -188,8 +188,8 @@ static bool firmware_is_present(unsigned region)
    case REGION_NA:
    bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    break;
-   bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    case REGION_EU:
+   bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    break;
    default:
       break;
