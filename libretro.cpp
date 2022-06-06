@@ -164,6 +164,8 @@ static bool firmware_is_present(unsigned region)
    /* SHA1 and alternate BIOS names sourced from
    https://github.com/mamedev/mame/blob/master/src/mame/drivers/psx.cpp */
 
+
+   
    if (override_bios)
    {
       if (override_bios == 1)
@@ -176,6 +178,8 @@ static bool firmware_is_present(unsigned region)
 			bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
       }
    }
+   else
+   {
    switch (region)
    {
    case REGION_JP:
@@ -190,6 +194,8 @@ static bool firmware_is_present(unsigned region)
    default:
       break;
    }
+   }
+   
 
    RDIR *dir= retro_opendir(retro_base_directory);
    if(!dir)return false;
