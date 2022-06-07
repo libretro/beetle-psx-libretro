@@ -170,11 +170,13 @@ static bool firmware_is_present(unsigned region)
    {
       if (override_bios == 1)
       {
+         //psxonpsp660.bin
 			bios_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
       }
 		
       else if (override_bios == 2)
       {
+         //ps1_rom.bin
 			bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
       }
    }
@@ -183,12 +185,15 @@ static bool firmware_is_present(unsigned region)
    switch (region)
    {
    case REGION_JP:
+   //scph5500.bin
    bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    break;
    case REGION_NA:
+   //scph5501.bin
    bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    break;
    case REGION_EU:
+   //scph5502.bin
    bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    break;
    default:
