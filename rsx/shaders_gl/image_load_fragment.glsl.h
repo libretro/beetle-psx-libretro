@@ -1,6 +1,6 @@
 #include "shaders_common.h"
 
-static const char *image_load_fragment = GLSL(
+static const char *image_load_fragment = GLSL_FRAGMENT(
       uniform sampler2D fb_texture;
       uniform uint internal_upscaling;
       in vec2 frag_fb_coord;
@@ -12,6 +12,7 @@ static const char *image_load_fragment = GLSL(
       }
 
       void main() {
+      // GLES 5551 note: color reinterpretation can be done here
       frag_color = vram_get_pixel(int(frag_fb_coord.x), int(frag_fb_coord.y));
       }
 );

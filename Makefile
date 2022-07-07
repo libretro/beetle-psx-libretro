@@ -1,6 +1,8 @@
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_OPENGL = 0
+GLES = 0
+GLES3 = 0 # HW renderer now supported on GLES3
 HAVE_VULKAN = 0
 HAVE_JIT = 0
 HAVE_CHD = 1
@@ -173,6 +175,8 @@ else ifneq (,$(findstring ios,$(platform)))
    endif
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -framework OpenGLES
+      GLES = 1
+      GLES3 = 0
    endif
 
    CC = cc -arch $(iarch) -isysroot $(IOSSDK)
@@ -324,12 +328,18 @@ else ifeq ($(platform), gcw0)
 else ifeq ($(platform), emscripten)
    TARGET  := $(TARGET_NAME)_libretro_$(platform).bc
    fpic    := -fPIC
-   SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   LDFLAGS += $(PTHREAD_FLAGS)
-   STATIC_LINKING = 1
+   FLAGS   += -DEMSCRIPTEN
+   FLAGS   += -msimd128 -ftree-vectorize
+
+   HAVE_OPENGL = 1
+   GLES = 1
+   GLES3 = 1
    HAVE_LIGHTREC = 0
    NEED_THREADING = 0
    HAVE_CDROM = 0
+   THREADED_RECOMPILER = 0
+
+   STATIC_LINKING = 1
 
 # Raspberry Pi 4 in 64bit mode
 else ifeq ($(platform), rpi4_64)
@@ -342,7 +352,7 @@ else ifeq ($(platform), rpi4_64)
    LDFLAGS += $(PTHREAD_FLAGS) -ldl -lrt
    HAVE_LIGHTREC = 1
    FLAGS += -DHAVE_SHM
-   GLES = 1
+   GLES3 = 1
    GL_LIB := -lGLESv2
    HAVE_CDROM = 0
 
