@@ -177,9 +177,6 @@ typedef struct
    // you can ignore this.  If you do wish to use this, you must set all elements every frame.
    int32_t *LineWidths;
 
-   // TODO
-   bool *IsFMV;
-
    // Set(optionally) by emulation code.  If InterlaceOn is true, then assume field height is 1/2 DisplayRect.h, and
    // only every other line in surface (with the start line defined by InterlacedField) has valid data
    // (it's up to internal Mednafen code to deinterlace it).
@@ -189,45 +186,11 @@ typedef struct
    // Skip rendering this frame if true.  Set by the driver code.
    int skip;
 
-   //
-   // If sound is disabled, the driver code must set SoundRate to false, SoundBuf to NULL, SoundBufMaxSize to 0.
-
-   // Will be set to TRUE if the sound format(only rate for now, at least) has changed since the last call to Emulate(), FALSE otherwise.
-   // Will be set to TRUE on the first call to the Emulate() function/method
-   bool SoundFormatChanged;
-
    // Sound rate.  Set by driver side.
    double SoundRate;
 
-   // Pointer to sound buffer, set by the driver code, that the emulation code should render sound to.
-   // Guaranteed to be at least 500ms in length, but emulation code really shouldn't exceed 40ms or so.  Additionally, if emulation code
-   // generates >= 100ms, 
-   // DEPRECATED: Emulation code may set this pointer to a sound buffer internal to the emulation module.
-   int16_t *SoundBuf;
-
-   // Maximum size of the sound buffer, in frames.  Set by the driver code.
-   int32_t SoundBufMaxSize;
-
    // Number of frames currently in internal sound buffer.  Set by the system emulation code, to be read by the driver code.
    int32_t SoundBufSize;
-   int32_t SoundBufSizeALMS;	// SoundBufSize value at last MidSync(), 0
-   // if mid sync isn't implemented for the emulation module in use.
-
-   // Number of cycles that this frame consumed, using MDFNGI::MasterClock as a time base.
-   // Set by emulation code.
-   int64_t MasterCycles;
-   int64_t MasterCyclesALMS;	// MasterCycles value at last MidSync(), 0
-   // if mid sync isn't implemented for the emulation module in use.
-
-   // Current sound volume(0.000...<=volume<=1.000...).  If, after calling Emulate(), it is still != 1, Mednafen will handle it internally.
-   // Emulation modules can handle volume themselves if they like, for speed reasons.  If they do, afterwards, they should set its value to 1.
-   double SoundVolume;
-
-   // Current sound speed multiplier.  Set by the driver code.  If, after calling Emulate(), it is still != 1, Mednafen will handle it internally
-   // by resampling the audio.  This means that emulation modules can handle(and set the value to 1 after handling it) it if they want to get the most
-   // performance possible.  HOWEVER, emulation modules must make sure the value is in a range(with minimum and maximum) that their code can handle
-   // before they try to handle it.
-   double soundmultiplier;
 } EmulateSpecStruct;
 
 typedef enum
@@ -247,10 +210,6 @@ class CDIF;
 
 typedef struct
 {
-   int64_t MasterClock;
-
-   uint32_t fps; // frames per second * 65536 * 256, truncated
-
    // multires is a hint that, if set, indicates that the system has fairly programmable video modes(particularly, the ability
    // to display multiple horizontal resolutions, such as the PCE, PC-FX, or Genesis).  In practice, it will cause the driver
    // code to set the linear interpolation on by default.
@@ -276,14 +235,6 @@ typedef struct
    int fb_width;		// Width of the framebuffer(not necessarily width of the image).  MDFN_Surface width should be >= this.
    int fb_height;		// Height of the framebuffer passed to the Emulate() function(not necessarily height of the image)
 
-   int soundchan; 	// Number of output sound channels.
-
-
-   int rotated;
-
-   int soundrate;  /* For Ogg Vorbis expansion sound wacky support.  0 for default. */
-
-   VideoSystems VideoSystem;
    GameMediumTypes GameType;
 
    // For absolute coordinates(IDIT_X_AXIS and IDIT_Y_AXIS), usually mapped to a mouse(hence the naming).

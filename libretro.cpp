@@ -1916,6 +1916,30 @@ void lightrec_free_mmap()
 }
 #endif /* HAVE_LIGHTREC */
 
+/* LED interface */
+static retro_set_led_state_t led_state_cb = NULL;
+static unsigned int retro_led_state[2] = {0};
+static void retro_led_interface(void)
+{
+   /* 0: Power
+    * 1: CD */
+
+   unsigned int led_state[2] = {0};
+   unsigned int l            = 0;
+
+   led_state[0] = (!Running) ? 1 : 0;
+   led_state[1] = (PSX_CDC->DriveStatus > 0) ? 1 : 0;
+
+   for (l = 0; l < sizeof(led_state)/sizeof(led_state[0]); l++)
+   {
+      if (retro_led_state[l] != led_state[l])
+      {
+         retro_led_state[l] = led_state[l];
+         led_state_cb(l, led_state[l]);
+      }
+   }
+}
+
 /* Forward declarations, required for disk control
  * 'set initial disk' functionality */
 static unsigned disk_get_num_images(void);
@@ -2799,9 +2823,6 @@ static CheatFormatInfoStruct CheatFormatInfo =
 // an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
 MDFNGI EmulatedPSX =
 {
-   MDFN_MASTERCLOCK_FIXED(33868800),
-   0,
-
    true, // Multires possible?
 
    //
@@ -2816,12 +2837,6 @@ MDFNGI EmulatedPSX =
 
    0,   // Framebuffer width
    0,   // Framebuffer height
-   //
-   //
-   //
-
-   2,     // Number of output sound channels
-
 };
 
 /* end of Mednafen psx.cpp */
@@ -4568,19 +4583,8 @@ void retro_run(void)
    EmulateSpecStruct spec = {0};
    spec.surface = surf;
    spec.SoundRate = 44100;
-   spec.SoundBuf = NULL;
    spec.LineWidths = rects;
-   spec.SoundBufMaxSize = 0;
-   spec.SoundVolume = 1.0;
-   spec.soundmultiplier = 1.0;
    spec.SoundBufSize = 0;
-   spec.VideoFormatChanged = false;
-   spec.SoundFormatChanged = false;
-
-   //if (disableVideo)
-   //{
-   //   spec.skip = true;
-   //}
 
    EmulateSpecStruct *espec = (EmulateSpecStruct*)&spec;
    /* start of Emulate */
@@ -4590,8 +4594,6 @@ void retro_run(void)
 
    MDFNMP_ApplyPeriodicCheats();
 
-
-   espec->MasterCycles = 0;
    espec->SoundBufSize = 0;
 
    PSX_FIO->UpdateInput();
@@ -4608,8 +4610,6 @@ void retro_run(void)
       PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
 #endif
 
-   //printf("scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
-
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
 
@@ -4620,8 +4620,6 @@ void retro_run(void)
    PSX_FIO->ResetTS();
 
    RebaseTS(timestamp);
-
-   espec->MasterCycles = timestamp;
 
    // Save memcards if dirty.
    unsigned players = input_get_player_count();
@@ -4809,6 +4807,10 @@ void retro_run(void)
             MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
    }
 
+   /* LED interface */
+   if (led_state_cb)
+      retro_led_interface();
+
    video_frames++;
    audio_frames += spec.SoundBufSize;
 
@@ -4873,6 +4875,7 @@ unsigned retro_api_version(void)
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
+   struct retro_led_interface led_interface;
    environ_cb = cb;
 
    libretro_supports_option_categories = false;
@@ -4884,7 +4887,11 @@ void retro_set_environment(retro_environment_t cb)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
 	   filestream_vfs_init(&vfs_iface_info);
 
-	input_set_env( cb );
+  if(environ_cb(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface))
+   if (led_interface.set_led_state && !led_state_cb)
+      led_state_cb = led_interface.set_led_state;
+
+   input_set_env(cb);
 
    rsx_intf_set_environment(cb);
 }
