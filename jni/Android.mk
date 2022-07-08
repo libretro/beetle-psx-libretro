@@ -2,6 +2,10 @@ LOCAL_PATH := $(call my-dir)
 
 CORE_DIR := $(LOCAL_PATH)/..
 
+# set these
+HAVE_HW = 0
+HAVE_OPENGLES3 = 0
+
 DEBUG                    := 0
 FRONTEND_SUPPORTS_RGB565 := 1
 NEED_CD                  := 1
@@ -10,6 +14,7 @@ NEED_DEINTERLACER        := 1
 NEED_THREADING           := 1
 NEED_TREMOR              := 1
 GLES                     := 0
+GLES3                    := 0
 HAVE_OPENGL              := 0
 HAVE_VULKAN              := 0
 HAVE_CHD                 := 1
@@ -23,9 +28,12 @@ ifeq ($(TARGET_ARCH),x86)
 endif
 
 ifeq ($(HAVE_HW),1)
-  # gles support will not compile
-  #GLES        := 1
-  #HAVE_OPENGL := 1
+  ifeq ($(HAVE_OPENGLES3),1)
+    HAVE_OPENGL := 1
+    GLES        := 1
+    GLES3       := 1
+    GL_LIB := -lGLESv3
+  endif
 
   ifneq ($(TARGET_ARCH_ABI),armeabi)
     HAVE_VULKAN := 1

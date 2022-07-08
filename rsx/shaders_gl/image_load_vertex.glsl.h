@@ -1,6 +1,6 @@
 #include "shaders_common.h"
 
-static const char *image_load_vertex = GLSL(
+static const char *image_load_vertex = GLSL_VERTEX(
       // Vertex shader for uploading textures from the VRAM texture buffer
       // into the output framebuffer
 
@@ -10,8 +10,8 @@ static const char *image_load_vertex = GLSL(
 
       void main() {
       // Convert VRAM position into OpenGL coordinates
-      float xpos = (float(position.x) / 512) - 1.0;
-      float ypos = (float(position.y) / 256) - 1.0;
+      float xpos = (float(position.x) / 512.) - 1.0;
+      float ypos = (float(position.y) / 256.) - 1.0;
 
       gl_Position.xyzw = vec4(xpos, ypos, 0.0, 1.0);
 

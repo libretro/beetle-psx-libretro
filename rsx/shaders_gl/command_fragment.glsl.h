@@ -16,7 +16,7 @@
 #define command_fragment_name_ command_fragment
 #endif
 
-static const char * command_fragment_name_ = GLSL(
+static const char * command_fragment_name_ = GLSL_FRAGMENT(
 uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
@@ -73,7 +73,17 @@ uint rebuild_psx_color(vec4 color) {
   uint g = uint(floor(color.g * 31. + 0.5));
   uint b = uint(floor(color.b * 31. + 0.5));
 
+)
+#ifdef HAVE_OPENGLES3
+STRINGIZE(
+  return (r << 11) | (g << 6) | (b << 1) | a;
+)
+#else
+STRINGIZE(
   return (a << 15) | (b << 10) | (g << 5) | r;
+)
+#endif
+STRINGIZE(
 }
 
 // Texture color 0x0000 is special in the Playstation GPU, it denotes
@@ -82,6 +92,20 @@ uint rebuild_psx_color(vec4 color) {
 // instead.
 bool is_transparent(vec4 texel) {
   return rebuild_psx_color(texel) == 0U;
+}
+
+// reinterpret 5551 color for GLES (doesn't support 1555 REV)
+vec4 reinterpret_color(vec4 color) {
+  // rebuild as 5551
+  uint pre_bits = rebuild_psx_color(color);
+
+  // interpret as 1555
+  float a = float((pre_bits & 0x8000U) >> 15) / 31.;
+  float b = float((pre_bits & 0x7C00U) >> 10) / 31.;
+  float g = float((pre_bits & 0x3E0U) >> 5) / 31.;
+  float r = float(pre_bits & 0x1FU) / 31.;
+
+  return vec4(r, g, b, a);
 }
 
 // PlayStation dithering pattern. The offset is selected based on the
@@ -157,7 +181,18 @@ vec4 sample_texel(vec2 coords) {
       // Look up the real color for the texel in the CLUT
       texel = vram_get_pixel(clut_x, clut_y);
    }
+
+)
+#ifdef HAVE_OPENGLES3
+STRINGIZE(
+   return reinterpret_color(texel);
+)
+#else
+STRINGIZE(
    return texel;
+)
+#endif
+STRINGIZE(
 }
 )
 
@@ -788,7 +823,7 @@ vec4 get_texel_jinc2(out float opacity)
 STRINGIZE(
 void main() {
    vec4 color;
-   float opacity=1;
+   float opacity=1.;
    
       if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
       {

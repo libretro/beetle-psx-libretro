@@ -7,7 +7,7 @@
 #define command_vertex_name_ command_vertex
 #endif
 
-static const char * command_vertex_name_ = GLSL(
+static const char * command_vertex_name_ = GLSL_VERTEX(
 // Vertex shader for rendering GPU draw commands in the framebuffer
 in vec4 position;
 in uvec3 color;
@@ -55,8 +55,8 @@ void main() {
    // Convert VRAM coordinates (0;1023, 0;511) into OpenGL coordinates
    // (-1;1, -1;1)
    float wpos = position.w;
-   float xpos = (pos.x / 512) - 1.0;
-   float ypos = (pos.y / 256) - 1.0;
+   float xpos = (pos.x / 512.) - 1.0;
+   float ypos = (pos.y / 256.) - 1.0;
 
    // position.z increases as the primitives near the camera so we
    // reverse the order to match the common GL convention

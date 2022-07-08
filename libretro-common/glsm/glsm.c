@@ -646,18 +646,18 @@ void rglBlendFunc(GLenum sfactor, GLenum dfactor)
  * Core in:
  * OpenGL    : 1.4
  */
-void rglBlendFuncSeparate(GLenum sfactor, GLenum dfactor)
+void rglBlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha)
 {
 #ifdef GLSM_DEBUG
    log_cb(RETRO_LOG_INFO, "glBlendFuncSeparate.\n");
 #endif
    glsm_ctl(GLSM_CTL_IMM_VBO_DRAW, NULL);
    gl_state.blendfunc_separate.used     = true;
-   gl_state.blendfunc_separate.srcRGB   = sfactor;
-   gl_state.blendfunc_separate.dstRGB   = dfactor;
-   gl_state.blendfunc_separate.srcAlpha = sfactor;
-   gl_state.blendfunc_separate.dstAlpha = dfactor;
-   glBlendFunc(sfactor, dfactor);
+   gl_state.blendfunc_separate.srcRGB   = srcRGB;
+   gl_state.blendfunc_separate.dstRGB   = dstRGB;
+   gl_state.blendfunc_separate.srcAlpha = srcAlpha;
+   gl_state.blendfunc_separate.dstAlpha = dstAlpha;
+   glBlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
 }
 
 /*
@@ -1030,7 +1030,7 @@ void rglBindFragDataLocation(GLuint program, GLuint colorNumber,
 #ifdef GLSM_DEBUG
    log_cb(RETRO_LOG_INFO, "glBindFragDataLocation.\n");
 #endif
-#if !defined(HAVE_OPENGLES2)
+#if !defined(HAVE_OPENGLES2) && !defined(HAVE_OPENGLES3)
    glBindFragDataLocation(program, colorNumber, name);
 #endif
 }
