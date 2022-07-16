@@ -1541,7 +1541,9 @@ _jit_classify(jit_state_t *_jit, jit_code_t code)
 void
 _jit_patch_abs(jit_state_t *_jit, jit_node_t *instr, jit_pointer_t address)
 {
+#ifndef NDEBUG
     jit_int32_t		mask;
+#endif
 
     switch (instr->code) {
 	case jit_code_movi:	case jit_code_ldi_c:	case jit_code_ldi_uc:
@@ -1555,8 +1557,10 @@ _jit_patch_abs(jit_state_t *_jit, jit_node_t *instr, jit_pointer_t address)
 	    instr->u.p = address;
 	    break;
 	default:
+#ifndef NDEBUG
 	    mask = jit_classify(instr->code);
 	    assert((mask & (jit_cc_a0_reg|jit_cc_a0_jmp)) == jit_cc_a0_jmp);
+#endif
 	    instr->u.p = address;
     }
 }
@@ -1564,8 +1568,9 @@ _jit_patch_abs(jit_state_t *_jit, jit_node_t *instr, jit_pointer_t address)
 void
 _jit_patch_at(jit_state_t *_jit, jit_node_t *instr, jit_node_t *label)
 {
+#ifndef NDEBUG
     jit_int32_t		mask;
-
+#endif
     assert(!(instr->flag & jit_flag_node));
     instr->flag |= jit_flag_node;
     switch (instr->code) {
@@ -1582,9 +1587,11 @@ _jit_patch_at(jit_state_t *_jit, jit_node_t *instr, jit_node_t *label)
 	    instr->u.n = label;
 	    break;
 	default:
+#ifndef NDEBUG
 	    mask = jit_classify(instr->code);
 	    assert((mask & (jit_cc_a0_reg|jit_cc_a0_jmp)) == jit_cc_a0_jmp);
 	    assert(label->code == jit_code_label);
+#endif
 	    instr->u.n = label;
 	    break;
     }
@@ -2009,7 +2016,9 @@ _jit_emit(jit_state_t *_jit)
     jit_pointer_t	 code;
     jit_node_t		*node;
     size_t		 length;
+#ifndef NDEBUG
     int			 result;
+#endif
 #if defined(__sgi)
     int			 mmap_fd;
 #endif
@@ -2093,6 +2102,13 @@ _jit_emit(jit_state_t *_jit)
 
     if (_jit->user_data)
 	jit_free((jit_pointer_t *)&_jitc->data.ptr);
+#ifdef NDEBUG
+    else
+	mprotect(_jit->data.ptr, _jit->data.length, PROT_READ);
+    if (!_jit->user_code)
+	mprotect(_jit->code.ptr, _jit->code.length,
+			  PROT_READ | PROT_EXEC);
+#else
     else {
 	result = mprotect(_jit->data.ptr, _jit->data.length, PROT_READ);
 	assert(result == 0);
@@ -2102,6 +2118,7 @@ _jit_emit(jit_state_t *_jit)
 			  PROT_READ | PROT_EXEC);
 	assert(result == 0);
     }
+#endif
 
     return (_jit->code.ptr);
 fail:

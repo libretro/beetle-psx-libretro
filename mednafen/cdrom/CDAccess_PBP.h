@@ -53,7 +53,6 @@ class CDAccess_PBP : public CDAccess
       int32_t FirstTrack;
       int32_t LastTrack;
       int32_t total_sectors;
-      uint8_t disc_type;
 
       std::string sbi_path;
       uint32_t discs_start_offset[5];

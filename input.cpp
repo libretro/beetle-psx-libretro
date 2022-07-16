@@ -61,7 +61,7 @@ typedef union
 INPUT_DATA;
 
 // Controller state buffer (per player)
-static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {0};
+static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {{0}};
 
 struct analog_calibration
 {
