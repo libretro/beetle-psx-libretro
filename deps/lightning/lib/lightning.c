@@ -167,15 +167,11 @@ void
 init_jit(const char *progname)
 {
     jit_get_cpu();
-    jit_init_debug(progname);
-    jit_init_size();
 }
 
 void
 finish_jit(void)
 {
-    jit_finish_debug();
-    jit_finish_size();
 }
 
 jit_int32_t
@@ -875,10 +871,6 @@ jit_new_state(void)
 	      (_jitc->pool.length = 16) * sizeof(jit_node_t*));
     jit_alloc((jit_pointer_t *)&_jitc->blocks.ptr,
 	      (_jitc->blocks.length = 16) * sizeof(jit_block_t));
-#if __arm__ && DISASSEMBLER
-    jit_alloc((jit_pointer_t *)&_jitc->data_info.ptr,
-	      (_jitc->data_info.length = 1024) * sizeof(jit_data_info_t));
-#endif
 
     /* allocate at most one extra note in case jit_name() is
      * never called, or called after adding at least one note */
@@ -891,13 +883,6 @@ jit_new_state(void)
 void
 _jit_clear_state(jit_state_t *_jit)
 {
-#if DEVEL_DISASSEMBLER
-#  define jit_really_clear_state()	_jit_really_clear_state(_jit)
-}
-
-void _jit_really_clear_state(jit_state_t *_jit)
-{
-#endif
     jit_word_t		 offset;
     jit_function_t	*function;
 
@@ -935,9 +920,6 @@ void _jit_really_clear_state(jit_state_t *_jit)
 	_jitc->note.name = _jitc->note.note = NULL;
     _jitc->note.base = NULL;
 
-#if __arm__ && DISASSEMBLER
-    jit_free((jit_pointer_t *)&_jitc->data_info.ptr);
-#endif
 
 #if (__powerpc__ && _CALL_AIXDESC) || __ia64__
     jit_free((jit_pointer_t *)&_jitc->prolog.ptr);
@@ -953,9 +935,6 @@ void _jit_really_clear_state(jit_state_t *_jit)
 void
 _jit_destroy_state(jit_state_t *_jit)
 {
-#if DEVEL_DISASSEMBLER
-    jit_really_clear_state();
-#endif
     if (!_jit->user_code)
 	munmap(_jit->code.ptr, _jit->code.length);
     if (!_jit->user_data)
@@ -1829,9 +1808,6 @@ _jit_reglive(jit_state_t *_jit, jit_node_t *node)
 void
 _jit_regarg_set(jit_state_t *_jit, jit_node_t *node, jit_int32_t value)
 {
-#if GET_JIT_SIZE
-    jit_size_prepare();
-#endif
     if (value & jit_cc_a0_reg) {
 	if (value & jit_cc_a0_rlh) {
 	    jit_regset_setbit(&_jitc->regarg, jit_regno(node->u.q.l));
@@ -1849,9 +1825,6 @@ _jit_regarg_set(jit_state_t *_jit, jit_node_t *node, jit_int32_t value)
 void
 _jit_regarg_clr(jit_state_t *_jit, jit_node_t *node, jit_int32_t value)
 {
-#if GET_JIT_SIZE
-    jit_size_collect(node);
-#endif
     if (value & jit_cc_a0_reg) {
 	if (value & jit_cc_a0_rlh) {
 	    jit_regset_clrbit(&_jitc->regarg, jit_regno(node->u.q.l));
@@ -1878,13 +1851,7 @@ _jit_realize(jit_state_t *_jit)
     /* ensure it is aligned */
     _jitc->data.offset = (_jitc->data.offset + 7) & -8;
 
-#if GET_JIT_SIZE
-    /* Heuristic to guess code buffer size */
-    _jitc->mult = 4;
-    _jit->code.length = _jitc->pool.length * 1024 * _jitc->mult;
-#else
     _jit->code.length = jit_get_size();
-#endif
 }
 
 void
@@ -2055,13 +2022,8 @@ _jit_emit(jit_state_t *_jit)
 	    }
 	    if (_jit->user_code)
 		goto fail;
-#if GET_JIT_SIZE
-	    ++_jitc->mult;
-	    length = _jitc->pool.length * 1024 * _jitc->mult;
-#else
 	    /* Should only happen on very special cases */
 	    length = _jit->code.length + 4096;
-#endif
 
 #if !HAVE_MREMAP
 	    munmap(_jit->code.ptr, _jit->code.length);

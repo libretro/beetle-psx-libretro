@@ -972,15 +972,9 @@ _emit_code(jit_state_t *_jit)
     struct {
 	jit_node_t	*node;
 	jit_word_t	 word;
-#if DEVEL_DISASSEMBLER
-	jit_word_t	 prevw;
-#endif
 	jit_int32_t	 patch_offset;
 	jit_word_t	 prolog_offset;
     } undo;
-#if DEVEL_DISASSEMBLER
-    jit_word_t		 prevw;
-#endif
 
     _jitc->function = NULL;
 
@@ -995,9 +989,6 @@ _emit_code(jit_state_t *_jit)
     undo.node = NULL;
     undo.patch_offset = 0;
 
-#if DEVEL_DISASSEMBLER
-    prevw = _jit->pc.w;
-#endif
     undo.prolog_offset = 0;
     for (node = _jitc->head; node; node = node->next)
 	if (node->code != jit_code_label &&
@@ -1099,20 +1090,6 @@ _emit_code(jit_state_t *_jit)
 	    return (NULL);
 
 	value = jit_classify(node->code);
-#if GET_JIT_SIZE
-	sync();
-#endif
-#if DEVEL_DISASSEMBLER
-	/* FIXME DEVEL_DISASSEMBLER should become DISASSEMBLER,
-	 * but a "real" DEVEL_DISASSEMBLER should be required
-	 * to turn the below "#if 0" into "#if 1" */
-#  if 0		/* Since disassembly outputs 3 instructions at a time,
-		 * make it "#if 1" for more clear debug output. */
-	sync();
-#  endif
-	node->offset = (jit_uword_t)_jit->pc.w - (jit_uword_t)prevw;
-	prevw = _jit->pc.w;
-#endif
 	jit_regarg_set(node, value);
 	switch (node->code) {
 	    case jit_code_align:
@@ -1518,9 +1495,6 @@ _emit_code(jit_state_t *_jit)
 		_jitc->function = _jitc->functions.ptr + node->w.w;
 		undo.node = node;
 		undo.word = _jit->pc.w;
-#if DEVEL_DISASSEMBLER
-		undo.prevw = prevw;
-#endif
 		undo.patch_offset = _jitc->patches.offset;
 		undo.prolog_offset = _jitc->prolog.offset;
 	    restart_function:
@@ -1556,9 +1530,6 @@ _emit_code(jit_state_t *_jit)
 		    temp->flag &= ~jit_flag_patch;
 		    node = undo.node;
 		    _jit->pc.w = undo.word;
-#if DEVEL_DISASSEMBLER
-		    prevw = undo.prevw;
-#endif
 		    _jitc->patches.offset = undo.patch_offset;
 		    _jitc->prolog.offset = undo.prolog_offset;
 		    _jitc->ioff = 0;
@@ -1648,9 +1619,6 @@ _emit_code(jit_state_t *_jit)
 		    break;
 	    }
 	}
-#if GET_JIT_SIZE
-	sync();
-#endif
 	jit_regarg_clr(node, value);
 	if (jit_regset_cmp_ui(&_jitc->regarg, 0) != 0) {
 	    assert(jit_regset_scan1(&_jitc->regarg, 0) == jit_carry);

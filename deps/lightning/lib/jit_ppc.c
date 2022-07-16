@@ -1151,17 +1151,11 @@ _emit_code(jit_state_t *_jit)
     struct {
 	jit_node_t	*node;
 	jit_word_t	 word;
-#if DEVEL_DISASSEMBLER
-	jit_word_t	 prevw;
-#endif
 	jit_word_t	 patch_offset;
 #if _CALL_AIXDESC
 	jit_word_t	 prolog_offset;
 #endif
     } undo;
-#if DEVEL_DISASSEMBLER
-    jit_word_t		 prevw;
-#endif
 
     _jitc->function = NULL;
 
@@ -1171,9 +1165,6 @@ _emit_code(jit_state_t *_jit)
     undo.node = NULL;
     undo.patch_offset = 0;
 
-#if DEVEL_DISASSEMBLER
-    prevw = _jit->pc.w;
-#endif
 #if _CALL_AIXDESC
     undo.prolog_offset = 0;
     for (node = _jitc->head; node; node = node->next)
@@ -1278,10 +1269,6 @@ _emit_code(jit_state_t *_jit)
 	if (_jit->pc.uc >= _jitc->code.end)
 	    return (NULL);
 
-#if DEVEL_DISASSEMBLER
-	node->offset = (jit_uword_t)_jit->pc.w - (jit_uword_t)prevw;
-	prevw = _jit->pc.w;
-#endif
 	value = jit_classify(node->code);
 	jit_regarg_set(node, value);
 	switch (node->code) {
@@ -1709,9 +1696,6 @@ _emit_code(jit_state_t *_jit)
 		_jitc->function = _jitc->functions.ptr + node->w.w;
 		undo.node = node;
 		undo.word = _jit->pc.w;
-#if DEVEL_DISASSEMBLER
-		undo.prevw = prevw;
-#endif
 		undo.patch_offset = _jitc->patches.offset;
 #if _CALL_AIXDESC
 		undo.prolog_offset = _jitc->prolog.offset;
@@ -1752,9 +1736,6 @@ _emit_code(jit_state_t *_jit)
 		    temp->flag &= ~jit_flag_patch;
 		    node = undo.node;
 		    _jit->pc.w = undo.word;
-#if DEVEL_DISASSEMBLER
-		    prevw = undo.prevw;
-#endif
 		    _jitc->patches.offset = undo.patch_offset;
 #if _CALL_AIXDESC
 		    _jitc->prolog.offset = undo.prolog_offset;

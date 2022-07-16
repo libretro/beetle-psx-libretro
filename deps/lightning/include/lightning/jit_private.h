@@ -359,11 +359,6 @@ typedef struct jit_value	jit_value_t;
 typedef struct jit_compiler	jit_compiler_t;
 typedef struct jit_function	jit_function_t;
 typedef struct jit_register	jit_register_t;
-#if __arm__
-#  if DISASSEMBLER
-typedef struct jit_data_info	jit_data_info_t;
-#  endif
-#endif
 
 union jit_data {
     struct {
@@ -428,13 +423,6 @@ typedef struct {
     jit_word_t		 inst;
     jit_node_t		*node;
 } jit_patch_t;
-
-#if __arm__ && DISASSEMBLER
-struct jit_data_info {
-    jit_uword_t		  code;		/* pointer in code buffer */
-    jit_word_t		  length;	/* length of constant vector */
-};
-#endif
 
 struct jit_function {
     struct {
@@ -560,13 +548,6 @@ struct jit_compiler {
 #if __arm__
     /* prevent using thumb instructions that set flags? */
     jit_uint32_t	  no_set_flags : 1;
-#  if DISASSEMBLER
-    struct {
-	jit_data_info_t	 *ptr;
-	jit_word_t	  offset;
-	jit_word_t	  length;
-    } data_info;			/* constant pools information */
-#  endif
     /* Note that this field is somewhat hackish, but required by most
      * ways to implement jit, unless implementing a pure one function
      * per jit, as most times it needs to start the jit buffer with a
@@ -593,14 +574,6 @@ struct jit_compiler {
 	jit_word_t	  length;
     } prolog;
     jit_bool_t		  jump;
-#endif
-#if GET_JIT_SIZE
-    /* Temporary storage to calculate instructions length */
-    jit_word_t		  size;
-    /* Global flag for code buffer heuristic size computation */
-    jit_word_t		  mult;
-    /* Pointer to code to prevent miscalculation if reallocating buffer */
-    jit_uint8_t		 *cptr;
 #endif
 };
 
@@ -728,31 +701,15 @@ extern void _jit_set_note(jit_state_t*, jit_note_t*, char*, int, jit_int32_t);
 #define jit_annotate()		_jit_annotate(_jit)
 extern void _jit_annotate(jit_state_t*);
 
-#define jit_print_node(u)	_jit_print_node(_jit,u)
-extern void _jit_print_node(jit_state_t*,jit_node_t*);
-
 extern jit_pointer_t jit_memcpy(jit_pointer_t,const void*,jit_word_t);
 extern jit_pointer_t jit_memmove(jit_pointer_t,const void*,jit_word_t);
 extern void jit_alloc(jit_pointer_t*, jit_word_t);
 extern void jit_realloc(jit_pointer_t*, jit_word_t, jit_word_t);
 void jit_free(jit_pointer_t*);
 
-extern void jit_init_size(void);
-extern void jit_finish_size(void);
-
-#if GET_JIT_SIZE
-#  define jit_size_prepare()		_jit_size_prepare(_jit)
-extern void
-_jit_size_prepare(jit_state_t*);
-
-#  define jit_size_collect(node)	_jit_size_collect(_jit, node)
-extern void
-_jit_size_collect(jit_state_t*, jit_node_t*);
-#else
 #  define jit_get_size()		_jit_get_size(_jit)
 extern jit_word_t
 _jit_get_size(jit_state_t*);
-#endif
 
 extern jit_word_t
 jit_get_max_instr(void);
