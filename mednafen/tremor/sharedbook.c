@@ -165,7 +165,8 @@ long _book_maptype1_quantvals(const static_codebook *b){
   int bits=_ilog(b->entries);
   int vals=b->entries>>((bits-1)*(b->dim-1)/b->dim);
 
-  while(1){
+  for(;;)
+  {
     long acc=1;
     long acc1=1;
     int i;
@@ -173,14 +174,14 @@ long _book_maptype1_quantvals(const static_codebook *b){
       acc*=vals;
       acc1*=vals+1;
     }
-    if(acc<=b->entries && acc1>b->entries){
+    if(acc<=b->entries && acc1>b->entries)
       return(vals);
-    }else{
-      if(acc>b->entries){
+    else
+    {
+      if(acc>b->entries)
 	vals--;
-      }else{
+      else
 	vals++;
-      }
     }
   }
 }

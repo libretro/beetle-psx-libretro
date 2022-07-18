@@ -89,28 +89,14 @@ extern int ov_clear(OggVorbis_File *vf);
 extern int ov_open_callbacks(void *datasource, OggVorbis_File *vf,
 		const char *initial, long ibytes, ov_callbacks callbacks);
 
-extern long ov_bitrate(OggVorbis_File *vf,int i);
-extern long ov_bitrate_instant(OggVorbis_File *vf);
-extern long ov_streams(OggVorbis_File *vf);
-extern long ov_seekable(OggVorbis_File *vf);
-extern long ov_serialnumber(OggVorbis_File *vf,int i);
-
-extern int64_t ov_raw_total(OggVorbis_File *vf,int i);
 extern int64_t ov_pcm_total(OggVorbis_File *vf,int i);
 extern int64_t ov_time_total(OggVorbis_File *vf,int i);
 
 extern int ov_raw_seek(OggVorbis_File *vf,int64_t pos);
 extern int ov_pcm_seek(OggVorbis_File *vf,int64_t pos);
 extern int ov_pcm_seek_page(OggVorbis_File *vf,int64_t pos);
-extern int ov_time_seek(OggVorbis_File *vf,int64_t pos);
-extern int ov_time_seek_page(OggVorbis_File *vf,int64_t pos);
-
-extern int64_t ov_raw_tell(OggVorbis_File *vf);
-extern int64_t ov_pcm_tell(OggVorbis_File *vf);
-extern int64_t ov_time_tell(OggVorbis_File *vf);
 
 extern vorbis_info *ov_info(OggVorbis_File *vf,int link);
-extern vorbis_comment *ov_comment(OggVorbis_File *vf,int link);
 
 extern long ov_read(OggVorbis_File *vf,char *buffer,int length,
 		    int *bitstream);

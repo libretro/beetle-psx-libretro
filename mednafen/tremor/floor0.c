@@ -437,5 +437,3 @@ vorbis_func_floor floor0_exportbundle={
   &floor0_unpack,&floor0_look,&floor0_free_info,
   &floor0_free_look,&floor0_inverse1,&floor0_inverse2
 };
-
-
