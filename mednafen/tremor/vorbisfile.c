@@ -27,6 +27,10 @@
 #include "os.h"
 #include "misc.h"
 
+#define VORBIS_SEEK_SET 0
+#define VORBIS_SEEK_CUR 1
+#define VORBIS_SEEK_END 2
+
 /* A 'chained bitstream' is a Vorbis bitstream that contains more than
    one logical bitstream arranged end to end (the only form of Ogg
    multiplexing allowed in a Vorbis bitstream; grouping [parallel
@@ -85,7 +89,7 @@ static long _get_data(OggVorbis_File *vf){
 static int _seek_helper(OggVorbis_File *vf,int64_t offset){
   if(vf->datasource){
     if(!(vf->callbacks.seek_func)||
-       (vf->callbacks.seek_func)(vf->datasource, offset, SEEK_SET) == -1)
+       (vf->callbacks.seek_func)(vf->datasource, offset, VORBIS_SEEK_SET) == -1)
       return OV_EREAD;
     vf->offset=offset;
     ogg_sync_reset(&vf->oy);
@@ -636,7 +640,7 @@ static int _open_seekable2(OggVorbis_File *vf){
 
   /* we can seek, so set out learning all about this file */
   if(vf->callbacks.seek_func && vf->callbacks.tell_func){
-    (vf->callbacks.seek_func)(vf->datasource,0,SEEK_END);
+    (vf->callbacks.seek_func)(vf->datasource,0, VORBIS_SEEK_END);
     vf->offset=vf->end=(vf->callbacks.tell_func)(vf->datasource);
   }else{
     vf->offset=vf->end=-1;
@@ -878,7 +882,7 @@ static int _fetch_and_process_packet(OggVorbis_File *vf,
 
 static int _ov_open1(void *f,OggVorbis_File *vf,const char *initial,
                      long ibytes, ov_callbacks callbacks){
-  int offsettest=((f && callbacks.seek_func)?callbacks.seek_func(f,0,SEEK_CUR):-1);
+  int offsettest=((f && callbacks.seek_func)?callbacks.seek_func(f,0, VORBIS_SEEK_CUR):-1);
   uint32_t *serialno_list=NULL;
   int serialno_list_size=0;
   int ret;
