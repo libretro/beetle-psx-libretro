@@ -21,8 +21,6 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
     * bg_pix   - background  - the texture
     */
 
-   uint32_t sum, carry;
-
    /* Efficient 15bpp pixel math algorithms from blargg */
    switch(BlendMode)
    {
@@ -34,10 +32,13 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 
          /* 1.0 x B + 1.0 x F */
       case BLEND_MODE_ADD:
-         bg_pix   &= ~0x8000;
-         sum       = *fore_pix + bg_pix;
-         carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-         *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         {
+            uint32_t sum, carry;
+            bg_pix   &= ~0x8000;
+            sum       = *fore_pix + bg_pix;
+            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+            *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         }
          break;
 
          /* 1.0 x B - 1.0 x F */
@@ -58,11 +59,16 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
          /* 1.0 x B + 0.25 * F */
 
       case BLEND_MODE_ADD_FOURTH:
-         bg_pix   &= ~0x8000;
-         *fore_pix = ((*fore_pix >> 2) & 0x1CE7) | 0x8000;
-         sum       = *fore_pix + bg_pix;
-         carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-         *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         {
+            uint32_t sum, carry;
+            bg_pix   &= ~0x8000;
+            *fore_pix = ((*fore_pix >> 2) & 0x1CE7) | 0x8000;
+            sum       = *fore_pix + bg_pix;
+            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
+            *fore_pix = (sum - carry) | (carry - (carry >> 5));
+         }
+         break;
+      case BLEND_MODE_OPAQUE:
          break;
    }
 
