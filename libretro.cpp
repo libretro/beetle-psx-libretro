@@ -43,6 +43,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#include <unistd.h>            // for ftruncate
 #include <sys/stat.h>
 #include <fcntl.h>
 #endif
@@ -53,7 +54,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif /* HAVE_LIGHTREC */
 
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
-extern bool FastSaveStates;
+extern "C" bool FastSaveStates;
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
 static bool libretro_supports_option_categories = false;
@@ -109,7 +110,7 @@ int memfd;
 #endif
 #endif
 
-uint32 EventCycles = 128;
+int32 EventCycles = 128;
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
