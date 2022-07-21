@@ -1385,24 +1385,6 @@ static bool TestMagicCD(std::vector<CDIF *> *_CDInterfaces)
    if(strncmp((char *)buf + 10, "Licensed  by", strlen("Licensed  by")))
       return(false);
 
-   //if(strncmp((char *)buf + 32, "Sony", 4))
-   // return(false);
-
-   //for(int i = 0; i < 2048; i++)
-   // printf("%d, %02x %c\n", i, buf[i], buf[i]);
-   //exit(1);
-
-#if 0
-   {
-      uint8_t buf[2048 * 7];
-
-      if((*cdifs)[0]->ReadSector(buf, 5, 7) == 0x2)
-      {
-         printf("CRC32: 0x%08x\n", (uint32)crc32(0, &buf[0], 0x3278));
-      }
-   }
-#endif
-
    return(true);
 }
 
@@ -3996,7 +3978,8 @@ static bool MDFNI_LoadCD(const char *devicename)
 
    try
    {
-      if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".m3u"))
+      size_t devicename_len = strlen(devicename);
+      if(devicename && devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".m3u"))
       {
          ReadM3U(disk_control_ext_info.image_paths, devicename);
 
@@ -4017,7 +4000,7 @@ static bool MDFNI_LoadCD(const char *devicename)
             disk_control_ext_info.image_labels.push_back(image_label);
          }
       }
-      else if(devicename && strlen(devicename) > 4 && !strcasecmp(devicename + strlen(devicename) - 4, ".pbp"))
+      else if(devicename && devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".pbp"))
       {
          bool success = true;
          CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
@@ -4126,14 +4109,15 @@ static bool MDFNI_LoadCD(const char *devicename)
 static bool MDFNI_LoadGame(const char *name)
 {
    RFILE *GameFile = NULL;
+   size_t name_len = strlen(name);
 
-   if(strlen(name) > 4 && (
-      !strcasecmp(name + strlen(name) - 4, ".cue") ||
-      !strcasecmp(name + strlen(name) - 4, ".ccd") ||
-      !strcasecmp(name + strlen(name) - 4, ".toc") ||
-      !strcasecmp(name + strlen(name) - 4, ".m3u") ||
-      !strcasecmp(name + strlen(name) - 4, ".chd") ||
-      !strcasecmp(name + strlen(name) - 4, ".pbp")
+   if(name_len > 4 && (
+      !strcasecmp(name + name_len - 4, ".cue") ||
+      !strcasecmp(name + name_len - 4, ".ccd") ||
+      !strcasecmp(name + name_len - 4, ".toc") ||
+      !strcasecmp(name + name_len - 4, ".m3u") ||
+      !strcasecmp(name + name_len - 4, ".chd") ||
+      !strcasecmp(name + name_len - 4, ".pbp")
       ))
     return MDFNI_LoadCD(name);
 
