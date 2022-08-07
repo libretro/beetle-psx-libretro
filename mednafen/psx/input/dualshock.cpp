@@ -174,7 +174,7 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
 
       if(amct_enabled)
       {
-         if(buttons[0] == 0x00 && buttons[1] == 0x0c)
+         if(buttons[0] == 0x01 && buttons[1] == 0x0c)
          {
             if(combo_anatoggle_counter == -1)
                combo_anatoggle_counter = 0;
