@@ -46,6 +46,7 @@ extern bool psx_dynarec_invalidate;
 extern uint8 psx_mmap;
 static struct lightrec_state *lightrec_state;
 uint8 next_interpreter;
+struct lightrec_registers * PS_CPU::lightrec_regs;
 #endif
 
 extern bool psx_gte_overclock;
@@ -55,7 +56,6 @@ uint32 PS_CPU::BIU;
 bool PS_CPU::Halted;
 struct PS_CPU::CP0 PS_CPU::CP0;
 char PS_CPU::cache_buf[64 * 1024];
-struct lightrec_registers * PS_CPU::lightrec_regs;
 
 #define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
 #define BIU_ICACHE_FSIZE_MASK	0x00000300      // I-cache fill size mask; 0x000 = 2 words, 0x100 = 4 words, 0x200 = 8 words, 0x300 = 16 words
@@ -179,15 +179,6 @@ void PS_CPU::Power(void)
 
  PGXP_Init();
 
-#ifdef HAVE_LIGHTREC
- next_interpreter = 0;
- prev_dynarec = psx_dynarec;
- prev_invalidate = psx_dynarec_invalidate;
- pgxpMode = PGXP_GetModes();
- if(psx_dynarec != DYNAREC_DISABLED)
-  lightrec_plugin_init();
-#endif
-
  // Not quite sure about these poweron/reset values:
  for(unsigned i = 0; i < 1024; i++)
  {
@@ -196,6 +187,15 @@ void PS_CPU::Power(void)
  }
 
  GTE_Power();
+
+#ifdef HAVE_LIGHTREC
+ next_interpreter = 0;
+ prev_dynarec = psx_dynarec;
+ prev_invalidate = psx_dynarec_invalidate;
+ pgxpMode = PGXP_GetModes();
+ if(psx_dynarec != DYNAREC_DISABLED)
+  lightrec_plugin_init();
+#endif
 }
 
 int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
@@ -2656,10 +2656,11 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode
     prev_invalidate != psx_dynarec_invalidate)
  {
   //init lightrec when changing dynarec, invalidate, or PGXP option, cleans entire state if already running
-  if(psx_dynarec != DYNAREC_DISABLED)
-  {
+  if(psx_dynarec == DYNAREC_DISABLED)
+   GTE_SwitchRegisters(false,lightrec_regs->cp2d);
+  else
    lightrec_plugin_init();
-  }
+
   prev_dynarec = psx_dynarec;
   pgxpMode = PGXP_GetModes();
   prev_invalidate = psx_dynarec_invalidate;
@@ -3156,11 +3157,6 @@ u32 PS_CPU::pgxp_cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
 	return r;
 }
 
-u32 PS_CPU::cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
-{
-	return GTE_ReadCR(reg);
-}
-
 u32 PS_CPU::pgxp_cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	u32 r = GTE_ReadCR(reg);
@@ -3175,11 +3171,6 @@ void PS_CPU::pgxp_cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 val
 	GTE_WriteDR(reg, value);
 	if((op >> 26) == OP_CP2)
 		PGXP_GTE_MTC2(op, value, value);
-}
-
-void PS_CPU::cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteCR(reg, value);
 }
 
 void PS_CPU::pgxp_cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
@@ -3202,7 +3193,9 @@ void PS_CPU::cop2_op(struct lightrec_state *state, u32 func)
             "Invalid CP2 function %u\n", func);
    }
    else
+   {
       GTE_Instruction(func);
+   }
 }
 
 void PS_CPU::reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp){
@@ -3685,9 +3678,10 @@ int PS_CPU::lightrec_plugin_init()
 	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
 	uint8_t *psxP = (uint8_t *) PSX_LoadExpansion1();
 
-	if(lightrec_state)
+	if(lightrec_state){
+		GTE_SwitchRegisters(false,lightrec_regs->cp2d);
 		lightrec_destroy(lightrec_state);
-	else{
+	}else{
 		log_cb(RETRO_LOG_INFO, "Lightrec map addresses: M=0x%lx, P=0x%lx, R=0x%lx, H=0x%lx\n",
 			(uintptr_t) psxM,
 			(uintptr_t) psxP,
@@ -3726,9 +3720,11 @@ int PS_CPU::lightrec_plugin_init()
 	lightrec_state = lightrec_init(name,
 			lightrec_map, ARRAY_SIZE(lightrec_map), cop_ops);
 
+	lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
+
 	lightrec_regs = lightrec_get_registers(lightrec_state);
 
-	lightrec_set_invalidate_mode(lightrec_state, psx_dynarec_invalidate);
+	GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
 	return 0;
 }
