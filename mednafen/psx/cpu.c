@@ -56,7 +56,7 @@ extern uint8 psx_mmap;
 extern uint8 *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
 uint8 next_interpreter;
-struct lightrec_registers * PS_CPU::lightrec_regs;
+static struct lightrec_registers *lightrec_regs;
 #endif
 
 extern bool psx_gte_overclock;
@@ -366,15 +366,6 @@ void CPU_Power(PS_CPU *self)
 
    PGXP_Init();
 
-#ifdef HAVE_LIGHTREC
-   next_interpreter = 0;
-   prev_dynarec     = psx_dynarec;
-   prev_invalidate  = psx_dynarec_invalidate;
-   pgxpMode         = PGXP_GetModes();
-   if (psx_dynarec != DYNAREC_DISABLED)
-      lightrec_plugin_init(self);
-#endif
-
    /* Not quite sure about these poweron/reset values: */
    for (i = 0; i < 1024; i++)
    {
@@ -383,6 +374,15 @@ void CPU_Power(PS_CPU *self)
    }
 
    GTE_Power();
+
+#ifdef HAVE_LIGHTREC
+   next_interpreter = 0;
+   prev_dynarec     = psx_dynarec;
+   prev_invalidate  = psx_dynarec_invalidate;
+   pgxpMode         = PGXP_GetModes();
+   if (psx_dynarec != DYNAREC_DISABLED)
+      lightrec_plugin_init(self);
+#endif
 }
 
 int CPU_StateAction(PS_CPU *self, StateMem *sm, const unsigned load, const bool data_only)
@@ -2778,7 +2778,9 @@ pscpu_timestamp_t CPU_Run(PS_CPU *self, pscpu_timestamp_t timestamp_in)
    {
       /* Init lightrec when changing dynarec, invalidate, or PGXP option;
        * cleans entire state if already running. */
-      if (psx_dynarec != DYNAREC_DISABLED)
+      if (psx_dynarec == DYNAREC_DISABLED)
+         GTE_SwitchRegisters(false,lightrec_regs->cp2d);
+      else
          lightrec_plugin_init(self);
       prev_dynarec    = psx_dynarec;
       pgxpMode        = PGXP_GetModes();
@@ -2922,11 +2924,6 @@ static u32 pgxp_cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
 	return r;
 }
 
-static u32 cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
-{
-	return GTE_ReadCR(reg);
-}
-
 static u32 pgxp_cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
 {
 	u32 r = GTE_ReadCR(reg);
@@ -2941,11 +2938,6 @@ static void pgxp_cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 valu
 	GTE_WriteDR(reg, value);
 	if((op >> 26) == OP_CP2)
 		PGXP_GTE_MTC2(op, value, value);
-}
-
-static void cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteCR(reg, value);
 }
 
 static void pgxp_cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
@@ -3490,7 +3482,10 @@ static int lightrec_plugin_init(PS_CPU *self)
    (void)self;
 
    if (lightrec_state)
+   {
+      GTE_SwitchRegisters(false,lightrec_regs->cp2d);
       lightrec_destroy(lightrec_state);
+   }
    else
    {
       log_cb(RETRO_LOG_INFO, "Lightrec map addresses: M=0x%lx, P=0x%lx, R=0x%lx, H=0x%lx\n",
@@ -3551,6 +3546,8 @@ static int lightrec_plugin_init(PS_CPU *self)
    lightrec_regs = lightrec_get_registers(lightrec_state);
 
    lightrec_set_unsafe_opt_flags(lightrec_state, psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0);
+
+   GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
    return 0;
 }
