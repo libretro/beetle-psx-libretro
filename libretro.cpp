@@ -123,6 +123,7 @@ uint8 psx_mmap = 0;
 uint8 *psx_mem = NULL;
 uint8 *psx_bios = NULL;
 uint8 *psx_scratch = NULL;
+uint8 *lightrec_codebuffer = NULL;
 #if defined(HAVE_ASHMEM)
 int memfd;
 #endif
@@ -1678,6 +1679,13 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #else
 #define MAP_FIXED_NOREPLACE 0
 #endif
+#ifndef MFD_HUGETLB
+#define MFD_HUGETLB 0x0004
+#endif
+#ifndef MAP_HUGETLB
+/* don't try to map as hugetlb if not defined */
+#define MAP_HUGETLB 0
+#endif
 #endif
 
 static const uintptr_t supported_io_bases[] = {
@@ -1718,6 +1726,8 @@ static const uintptr_t supported_io_bases[] = {
 	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS, 0, offset, size, addr)
 #define MAP_SHM(addr,size,fd,offset)\
 	MAP(addr,size,fd,offset)
+#define MAP_CODE(addr,size,fd,offset)\
+	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS|FILE_MAP_EXECUTE, 0, offset, size, addr)
 #define UNMAP(addr, size) UnmapViewOfFile(addr)
 #define MFAILED NULL
 #define NUM_MEM 4
@@ -1751,6 +1761,9 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 #define MAP_SHM(addr, size, fd, offset) \
 	mmap_huge(addr,size, PROT_READ | PROT_WRITE, \
 	MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
+#define MAP_CODE(addr, size, fd, offset) \
+	mmap_huge(addr,size, PROT_EXEC | PROT_READ | PROT_WRITE, \
+	MAP_PRIVATE | MAP_FIXED_NOREPLACE | MAP_ANONYMOUS, -1, 0)
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
 #define NUM_MEM 4
@@ -1759,6 +1772,8 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
 	MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
 #define MAP_SHM(addr,size,fd,offset)\
+	MAP(addr,size,fd,offset)
+#define MAP_CODE(addr,size,fd,offset)\
 	MAP(addr,size,fd,offset)
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
@@ -1857,7 +1872,7 @@ int lightrec_init_mmap(bool hugetlb)
 #ifdef HAVE_WIN_SHM
 	HANDLE memfd;
 
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL)
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE, NULL);
 
 	if (memfd == NULL) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
@@ -1892,7 +1907,7 @@ int lightrec_init_mmap(bool hugetlb)
 		{
 			psx_mem = (uint8 *)base;
 
-			map = MAP(bios, BIOS_SIZE, 0, RAM_SIZE);
+			map = MAP(bios, BIOS_SIZE, 0, 0);
 			if (map == MFAILED)
 				goto err_unmap;
 
@@ -1901,7 +1916,7 @@ int lightrec_init_mmap(bool hugetlb)
 			if (map != bios)
 				goto err_unmap_bios;
 
-			map = MAP(scratch, SCRATCH_SIZE, 0, RAM_SIZE+BIOS_SIZE);
+			map = MAP(scratch, SCRATCH_SIZE, 0, 0);
 			if (map == MFAILED)
 				goto err_unmap_bios;
 
@@ -1909,6 +1924,18 @@ int lightrec_init_mmap(bool hugetlb)
 
 			if (map != scratch)
 				goto err_unmap_scratch;
+
+			if (ENABLE_CODE_BUFFER) {
+				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
+				map = MAP_CODE((void *)(base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
+
+				if (map == MFAILED){
+					log_cb(RETRO_LOG_WARN, "Unable to mmap code buffer\n");
+					goto err_unmap_scratch;
+				}
+
+				lightrec_codebuffer = (uint8_t *)map;
+			}
 
 			r = NUM_MEM;
 

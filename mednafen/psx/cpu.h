@@ -61,7 +61,13 @@
 
 #include "gte.h"
 #ifdef HAVE_LIGHTREC
+   #include <lightrec-config.h>
    #include <lightrec.h>
+
+ /* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
+ #define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
+
+ enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
 #endif
 
 class PS_CPU

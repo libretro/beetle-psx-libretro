@@ -160,7 +160,6 @@ endif
 
 ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
-   FLAGS += -DHAVE_MMAP
 
    ifeq ($(LIGHTREC_LOG_LEVEL),)
        FLAGS += -DLOG_LEVEL=3 \
@@ -377,7 +376,8 @@ ifeq ($(HAVE_LIGHTREC), 1)
                   $(DEPS_DIR)/lightrec/memmanager.c \
                   $(DEPS_DIR)/lightrec/optimizer.c \
                   $(DEPS_DIR)/lightrec/reaper.c \
-                  $(DEPS_DIR)/lightrec/regcache.c
+                  $(DEPS_DIR)/lightrec/regcache.c \
+                  $(DEPS_DIR)/lightrec/tlsf/tlsf.c
 
    ifeq ($(THREADED_RECOMPILER), 1)
       ifeq ($(DEBUG), 0)

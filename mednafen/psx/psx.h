@@ -100,11 +100,6 @@ extern MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM;
 extern MultiAccessSizeMem<2048 * 1024, uint32_t, false> *MainRAM;
 extern MultiAccessSizeMem<1024, uint32_t, false> *ScratchRAM;
 
-#ifdef HAVE_LIGHTREC
-enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
-extern enum DYNAREC psx_dynarec;
-#endif
-
 #define OVERCLOCK_SHIFT 8
 extern int32_t psx_overclock_factor;
 
