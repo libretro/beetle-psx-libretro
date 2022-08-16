@@ -2914,36 +2914,16 @@ static void print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 }
 #endif /* LIGHTREC_DEBUG */
 
-static u32 pgxp_cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
+static void pgxp_cop2_notify(struct lightrec_state *state, u32 op, u32 data)
 {
-	u32 r = GTE_ReadDR(reg);
-
-	if((op >> 26) == OP_CP2)
-		PGXP_GTE_MFC2(op, r, r);
-
-	return r;
-}
-
-static u32 pgxp_cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
-{
-	u32 r = GTE_ReadCR(reg);
-
-	PGXP_GTE_CFC2(op, r, r);
-
-	return r;
-}
-
-static void pgxp_cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteDR(reg, value);
-	if((op >> 26) == OP_CP2)
-		PGXP_GTE_MTC2(op, value, value);
-}
-
-static void pgxp_cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteCR(reg, value);
-	PGXP_GTE_CTC2(op, value, value);
+	if((op >> 26) == OP_CP2) {
+		switch ((op >> 21) & 0x1F) {
+			case 0x00: PGXP_GTE_MFC2(op, data, data); break;
+			case 0x02: PGXP_GTE_CFC2(op, data, data); break;
+			case 0x04: PGXP_GTE_MTC2(op, data, data); break;
+			case 0x06: PGXP_GTE_CTC2(op, data, data); break;
+		}
+	}
 }
 
 static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
@@ -3455,20 +3435,14 @@ static void enable_ram(struct lightrec_state *state, _Bool enable)
 }
 
 static struct lightrec_ops ops = {
-	cop2_op,
-	enable_ram,
+	.cop2_op = cop2_op,
+	.enable_ram = enable_ram,
 };
 
-static struct lightrec_ops PS_CPU::pgxp_ops = {
-	/*.cop2_ops = {
-		.mfc = pgxp_cop2_mfc,
-		.cfc = pgxp_cop2_cfc,
-		.mtc = pgxp_cop2_mtc,
-		.ctc = pgxp_cop2_ctc,
-		.op = cop2_op,
-	},*/
-	cop2_op,
-	enable_ram,
+static struct lightrec_ops pgxp_ops = {
+	.cop2_notify = pgxp_cop2_notify,
+	.cop2_op = cop2_op,
+	.enable_ram = enable_ram,
 };
 
 static int lightrec_plugin_init(PS_CPU *self)
@@ -3566,47 +3540,43 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
 
    BACKING_TO_ACTIVE;
 
+   /* GPR_full is laid out as [GPR[0..31], LO, HI, LD_Dummy].
+    * lightrec's u32 regs[34] expects [r0..r31, LO, HI] in that
+    * exact order, so the first 34 entries of GPR_full are a
+    * direct match - no scratch buffer required. The
+    * LD_Dummy slot at [34] is past lightrec's view and stays
+    * intact across the call. */
+   memcpy(lightrec_regs->gpr,&s_cpu.GPR_full,sizeof(lightrec_regs->gpr));
+
    do
    {
 #ifdef LIGHTREC_DEBUG
       u32 oldpc = PC;
 #endif
-      /* GPR_full is laid out as [GPR[0..31], LO, HI, LD_Dummy].
-       * lightrec's u32 regs[34] expects [r0..r31, LO, HI] in that
-       * exact order, so the first 34 entries of GPR_full are a
-       * direct match - no scratch buffer required. The
-       * LD_Dummy slot at [34] is past lightrec's view and stays
-       * intact across the call. Saves 4*34=136 bytes of memcpy traffic
-       * per iteration of this hot loop by not doing a memcpy twice. */
-      memcpy(lightrec_regs->gpr,&s_cpu.GPR_full,sizeof(lightrec_regs->gpr));
-      lightrec_regs->cp0[CP0REG_SR] = CP0.SR;
-      lightrec_regs->cp0[CP0REG_CAUSE] = CP0.CAUSE;
-      lightrec_regs->cp0[CP0REG_EPC] = CP0.EPC;
+      memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
 
       lightrec_reset_cycle_count(lightrec_state, timestamp);
 
       if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
-         PC = lightrec_run_interpreter(lightrec_state, PC);
+         PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts);
       else if (psx_dynarec == DYNAREC_EXECUTE)
          PC = lightrec_execute(lightrec_state, PC, next_event_ts);
-      else if (psx_dynarec == DYNAREC_EXECUTE_ONE)
-         PC = lightrec_execute_one(lightrec_state, PC);
 
       timestamp = lightrec_current_cycle_count(lightrec_state);
 
-      CP0.SR = lightrec_regs->cp0[CP0REG_SR];
-      CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
-      memcpy(&s_cpu.GPR_full,lightrec_regs->gpr,sizeof(lightrec_regs->gpr));
+      memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
 
       flags = lightrec_exit_flags(lightrec_state);
 
-      if (flags & LIGHTREC_EXIT_SEGFAULT)
-      {
-         log_cb(RETRO_LOG_ERROR, "Exiting at cycle 0x%08x\n", timestamp);
+      if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
+         if (flags & LIGHTREC_EXIT_NOMEM)
+            log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n", timestamp);
+         else
+            log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n", timestamp);
+
          exit(1);
       }
-
-      if (flags & LIGHTREC_EXIT_SYSCALL)
+      else if (flags & LIGHTREC_EXIT_SYSCALL)
          PC = CPU_Exception(EXCEPTION_SYSCALL, PC, PC, 0);
 
 #ifdef LIGHTREC_DEBUG
@@ -3619,6 +3589,8 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
          PC = CPU_Exception(EXCEPTION_INT, PC, PC, 0);
       }
    } while (MDFN_LIKELY(PSX_EventHandler(timestamp)));
+
+   memcpy(&s_cpu.GPR_full,lightrec_regs->gpr,sizeof(lightrec_regs->gpr));
 
    ACTIVE_TO_BACKING;
 

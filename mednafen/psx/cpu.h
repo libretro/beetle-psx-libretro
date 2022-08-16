@@ -37,7 +37,7 @@
  /* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
  #define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
 
- enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
+ enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_RUN_INTERPRETER};
 #endif
 
 /* FAST_MAP_* enums are in BYTES (8-bit), not in 32-bit units ("words"
