@@ -1178,9 +1178,8 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       "hacks",
       {
-         { "disabled",        "Disabled (Beetle Interpreter)" },
-         { "execute",         "Max Performance" },
-         { "execute_one",     "Cycle Timing Check" },
+         { "disabled", "Disabled (Beetle Interpreter)" },
+         { "execute",  "Max Performance" },
          { "run_interpreter", "Lightrec Interpreter" },
          { NULL, NULL },
       },
