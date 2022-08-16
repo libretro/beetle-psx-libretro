@@ -48,6 +48,7 @@ extern uint8 *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
 uint8 next_interpreter;
 struct lightrec_registers * PS_CPU::lightrec_regs;
+uint32_t cpu_timestamp;
 #endif
 
 extern bool psx_gte_overclock;
@@ -3207,7 +3208,7 @@ void PS_CPU::reset_target_cycle_count(struct lightrec_state *state, pscpu_timest
 void PS_CPU::hw_write_byte(struct lightrec_state *state,
 		u32 opcode, void *host,	u32 mem, u8 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	PSX_MemWrite8(timestamp, mem, val);
 
@@ -3227,7 +3228,7 @@ void PS_CPU::pgxp_nonhw_write_byte(struct lightrec_state *state,
 void PS_CPU::pgxp_hw_write_byte(struct lightrec_state *state,
 		u32 opcode, void *host,	u32 mem, u8 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3241,7 +3242,7 @@ void PS_CPU::pgxp_hw_write_byte(struct lightrec_state *state,
 void PS_CPU::hw_write_half(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem, u16 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	PSX_MemWrite16(timestamp, mem, val);
 
@@ -3261,7 +3262,7 @@ void PS_CPU::pgxp_nonhw_write_half(struct lightrec_state *state,
 void PS_CPU::pgxp_hw_write_half(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem, u16 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3275,7 +3276,7 @@ void PS_CPU::pgxp_hw_write_half(struct lightrec_state *state,
 void PS_CPU::hw_write_word(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem, u32 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	PSX_MemWrite32(timestamp, mem, val);
 
@@ -3311,7 +3312,7 @@ void PS_CPU::pgxp_nonhw_write_word(struct lightrec_state *state,
 void PS_CPU::pgxp_hw_write_word(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem, u32 val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3342,13 +3343,13 @@ u8 PS_CPU::hw_read_byte(struct lightrec_state *state,
 {
 	u8 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	val = PSX_MemRead8(timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3373,7 +3374,7 @@ u8 PS_CPU::pgxp_hw_read_byte(struct lightrec_state *state,
 {
 	u8 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3386,7 +3387,7 @@ u8 PS_CPU::pgxp_hw_read_byte(struct lightrec_state *state,
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3398,13 +3399,13 @@ u16 PS_CPU::hw_read_half(struct lightrec_state *state,
 {
 	u16 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	val = PSX_MemRead16(timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3429,7 +3430,7 @@ u16 PS_CPU::pgxp_hw_read_half(struct lightrec_state *state,
 {
 	u16 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3442,7 +3443,7 @@ u16 PS_CPU::pgxp_hw_read_half(struct lightrec_state *state,
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3454,13 +3455,13 @@ u32 PS_CPU::hw_read_word(struct lightrec_state *state,
 {
 	u32 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	val = PSX_MemRead32(timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3499,7 +3500,7 @@ u32 PS_CPU::pgxp_hw_read_word(struct lightrec_state *state,
 {
 	u32 val;
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
 	u32 kmem = kunseg(mem);
 
@@ -3526,7 +3527,7 @@ u32 PS_CPU::pgxp_hw_read_word(struct lightrec_state *state,
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
-	lightrec_reset_cycle_count(lightrec_state, timestamp);
+	lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 	reset_target_cycle_count(state, timestamp);
 
@@ -3736,6 +3737,8 @@ int PS_CPU::lightrec_plugin_init()
 
 	GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
+	cpu_timestamp = 0;
+
 	return 0;
 }
 
@@ -3762,17 +3765,16 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		lightrec_regs->cp0[CP0REG_CAUSE] = CP0.CAUSE;
 		lightrec_regs->cp0[CP0REG_EPC] = CP0.EPC;
 
-		lightrec_reset_cycle_count(lightrec_state, timestamp);
+		lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 		if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
 			PC = lightrec_run_interpreter(lightrec_state,PC);
 		else if (psx_dynarec == DYNAREC_EXECUTE)
-			PC = lightrec_execute(lightrec_state, PC, next_event_ts);
+			PC = lightrec_execute(lightrec_state, PC, next_event_ts + cpu_timestamp);
 		else if (psx_dynarec == DYNAREC_EXECUTE_ONE)
 			PC = lightrec_execute_one(lightrec_state,PC);
 
-		timestamp = lightrec_current_cycle_count(
-				lightrec_state);
+		timestamp = lightrec_current_cycle_count(lightrec_state) - cpu_timestamp;
 
 		CP0.SR = lightrec_regs->cp0[CP0REG_SR];
 		CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
@@ -3803,6 +3805,12 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 	} while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
 
 	ACTIVE_TO_BACKING;
+
+	cpu_timestamp += timestamp;
+
+	/* wrap slightly earlier to avoid issues with target < current timestamp */
+	if(cpu_timestamp>0xFE000000)
+		cpu_timestamp &= 0x01FFFFFF;
 
 	return timestamp;
 }
