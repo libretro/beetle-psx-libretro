@@ -3785,7 +3785,13 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		flags = lightrec_exit_flags(lightrec_state);
 
 		if (flags & LIGHTREC_EXIT_SEGFAULT) {
-			log_cb(RETRO_LOG_ERROR, "Exiting at cycle 0x%08x\n",
+			log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n",
+					timestamp);
+			exit(1);
+		}
+
+		if (flags & LIGHTREC_EXIT_NOMEM) {
+			log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n",
 					timestamp);
 			exit(1);
 		}

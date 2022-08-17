@@ -183,11 +183,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
    ifeq ($(THREADED_RECOMPILER), 0)
        FLAGS += -DENABLE_THREADED_COMPILER=0
    else
-      ifeq ($(DEBUG), 0)
-          FLAGS += -DENABLE_THREADED_COMPILER=1
-      else
-          FLAGS += -DENABLE_THREADED_COMPILER=0
-      endif
+       FLAGS += -DENABLE_THREADED_COMPILER=1
    endif
 
    ifneq (,$(findstring win,$(platform)))
@@ -380,9 +376,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
                   $(DEPS_DIR)/lightrec/tlsf/tlsf.c
 
    ifeq ($(THREADED_RECOMPILER), 1)
-      ifeq ($(DEBUG), 0)
-          SOURCES_C +=   $(DEPS_DIR)/lightrec/recompiler.c
-      endif
+      SOURCES_C +=   $(DEPS_DIR)/lightrec/recompiler.c
    endif
 
    ifeq ($(LIGHTREC_LOG_LEVEL), 4)
