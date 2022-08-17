@@ -3139,6 +3139,8 @@ static bool shared_memorycards = false;
 static bool has_new_geometry = false;
 static bool has_new_timing = false;
 
+uint8_t analog_combo[2] = {0};
+
 extern void PSXDitherApply(bool);
 
 static void check_variables(bool startup)
@@ -3632,6 +3634,61 @@ static void check_variables(bool startup)
       {
          setting_psx_analog_toggle = 0;
          setting_apply_analog_toggle = true;
+      }
+   }
+
+   var.key = BEETLE_OPT(analog_toggle_combo);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "l1+l2+r1+r2+start+select") == 0)
+      {
+         analog_combo[0] = 0x09;
+         analog_combo[1] = 0x0f;
+      }
+      else if (strcmp(var.value, "l1+r1+select") == 0)
+      {
+         analog_combo[0] = 0x01;
+         analog_combo[1] = 0x0c;
+      }
+      else if (strcmp(var.value, "l1+r1+start") == 0)
+      {
+         analog_combo[0] = 0x08;
+         analog_combo[1] = 0x0c;
+      }
+      else if (strcmp(var.value, "l1+r1+l3") == 0)
+      {
+         analog_combo[0] = 0x02;
+         analog_combo[1] = 0x0c;
+      }
+      else if (strcmp(var.value, "l1+r1+r3") == 0)
+      {
+         analog_combo[0] = 0x04;
+         analog_combo[1] = 0x0c;
+      }
+      else if (strcmp(var.value, "l2+r2+select") == 0)
+      {
+         analog_combo[0] = 0x01;
+         analog_combo[1] = 0x03;
+      }
+      else if (strcmp(var.value, "l2+r2+start") == 0)
+      {
+         analog_combo[0] = 0x08;
+         analog_combo[1] = 0x03;
+      }
+      else if (strcmp(var.value, "l2+r2+l3") == 0)
+      {
+         analog_combo[0] = 0x02;
+         analog_combo[1] = 0x03;
+      }
+      else if (strcmp(var.value, "l2+r2+r3") == 0)
+      {
+         analog_combo[0] = 0x04;
+         analog_combo[1] = 0x03;
+      }
+      else if (strcmp(var.value, "l3+r3") == 0)
+      {
+         analog_combo[0] = 0x06;
+         analog_combo[1] = 0x00;
       }
    }
 
