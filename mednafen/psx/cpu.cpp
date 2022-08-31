@@ -3752,15 +3752,16 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 
 	BACKING_TO_ACTIVE;
 
+	memcpy(lightrec_regs->gpr,&GPR,32*sizeof(uint32_t));
+	lightrec_regs->gpr[32] = LO;
+	lightrec_regs->gpr[33] = HI;
+
 	u32 flags;
 
 	do {
 #ifdef LIGHTREC_DEBUG
 		u32 oldpc = PC;
 #endif
-		memcpy(lightrec_regs->gpr,&GPR,32*sizeof(uint32_t));
-		lightrec_regs->gpr[32] = LO;
-		lightrec_regs->gpr[33] = HI;
 		lightrec_regs->cp0[CP0REG_SR] = CP0.SR;
 		lightrec_regs->cp0[CP0REG_CAUSE] = CP0.CAUSE;
 		lightrec_regs->cp0[CP0REG_EPC] = CP0.EPC;
@@ -3778,25 +3779,18 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 
 		CP0.SR = lightrec_regs->cp0[CP0REG_SR];
 		CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
-		memcpy(&GPR,lightrec_regs->gpr,32*sizeof(uint32_t));
-		LO = lightrec_regs->gpr[32];
-		HI = lightrec_regs->gpr[33];
 
 		flags = lightrec_exit_flags(lightrec_state);
 
-		if (flags & LIGHTREC_EXIT_SEGFAULT) {
-			log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n",
-					timestamp);
+		if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
+			if (flags & LIGHTREC_EXIT_NOMEM)
+				log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n", timestamp);
+			else
+				log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n", timestamp);
+
 			exit(1);
 		}
-
-		if (flags & LIGHTREC_EXIT_NOMEM) {
-			log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n",
-					timestamp);
-			exit(1);
-		}
-
-		if (flags & LIGHTREC_EXIT_SYSCALL)
+		else if (flags & LIGHTREC_EXIT_SYSCALL)
 			PC = Exception(EXCEPTION_SYSCALL, PC, PC, 0);
 
 #ifdef LIGHTREC_DEBUG
@@ -3809,6 +3803,10 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 			PC = Exception(EXCEPTION_INT, PC, PC, 0);
 		}
 	} while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
+
+	memcpy(&GPR,lightrec_regs->gpr,32*sizeof(uint32_t));
+	LO = lightrec_regs->gpr[32];
+	HI = lightrec_regs->gpr[33];
 
 	ACTIVE_TO_BACKING;
 
