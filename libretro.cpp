@@ -110,6 +110,7 @@ int memfd;
 #endif
 
 uint32 EventCycles = 128;
+uint8_t spu_samples = 1;
 
 // CPU overclock factor (or 0 if disabled)
 int32_t psx_overclock_factor = 0;
@@ -3200,6 +3201,15 @@ static void check_variables(bool startup)
    }
    else
       EventCycles = 128;
+
+   var.key = BEETLE_OPT(dynarec_spu_samples);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+	spu_samples = atoi(var.value);
+   }
+   else
+      spu_samples = 1;
 #endif
 
    var.key = BEETLE_OPT(cpu_freq_scale);

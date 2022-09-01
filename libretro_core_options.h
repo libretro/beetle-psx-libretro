@@ -1102,23 +1102,35 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(dynarec_eventcycles),
-      "Dynarec DMA/GPU Event Cycles",
+      "Dynarec DMA/GPU/MDEC/Timer Event Cycles",
       NULL,
-      "Max cycles run by CPU before a GPU or DMA Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec.",
+      "Max cycles run by CPU before a GPU/DMA/MDEC/Timer Update is checked, higher number will be faster, has much less impact on beetle interpreter than dynarec.",
       NULL,
-      NULL,
+      "hacks",
       {
-         { "128",  NULL },
+         { "128",  "128 (Default)" },
          { "256",  NULL },
-         { "384",  NULL },
          { "512",  NULL },
-         { "640",  NULL },
-         { "768",  NULL },
-         { "896",  NULL },
          { "1024",  NULL },
+         { "2048",  NULL },
          { NULL, NULL },
       },
       "128"
+   },
+   {
+      BEETLE_OPT(dynarec_spu_samples),
+      "Dynarec SPU Samples",
+      NULL,
+      "Max SPU samples to run before a SPU Update is checked, higher number will be faster, but will cause sound glitches in some games with anything other than 1.",
+      NULL,
+      "hacks",
+      {
+         { "1",  "1 (Default)" },
+         { "4",  NULL },
+         { "16",  NULL },
+         { NULL, NULL },
+      },
+      "1"
    },
 #endif
    {

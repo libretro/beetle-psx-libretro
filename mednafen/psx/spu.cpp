@@ -76,6 +76,7 @@
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
 
+extern uint8_t spu_samples;
 
 static const int16 FIR_Table[256][4] =
 {
@@ -746,8 +747,8 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
    while(clock_divider <= 0)
    {
-      clock_divider += 768;
-      sample_clocks++;
+      clock_divider += spu_samples*768;
+      sample_clocks += spu_samples;
    }
 
    while(sample_clocks > 0)
@@ -1451,8 +1452,8 @@ int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
          Voices[i].LoopAddr &= 0x3FFFF;
       }
 
-      if(clock_divider <= 0 || clock_divider > 768)
-         clock_divider = 768;
+      if(clock_divider <= 0 || clock_divider > spu_samples*768)
+         clock_divider = spu_samples*768;
 
       RWAddr &= 0x3FFFF;
       CWA &= 0x1FF;

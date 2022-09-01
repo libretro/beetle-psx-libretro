@@ -111,9 +111,11 @@ static bool hretrace;
 static Timer Timers[3];
 static int32_t lastts;
 
+extern int32 EventCycles;
+
 static uint32_t CalcNextEvent(void)
 {
-   int32_t next_event = 1024; /**/
+   int32_t next_event = 8*EventCycles; /**/
 
    unsigned i;
    for(i = 0; i < 3; i++)

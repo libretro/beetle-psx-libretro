@@ -124,6 +124,8 @@ static const uint8 ZigZag[64] =
  0x2e, 0x27, 0x2f, 0x36, 0x3d, 0x3e, 0x37, 0x3f,
 };
 
+extern int32 EventCycles;
+
 void MDEC_Power(void)
 {
    ClockCounter = 0;
@@ -527,11 +529,11 @@ void MDEC_Run(int32 clocks)
 
    ClockCounter += clocks;
 
-   if(ClockCounter > 128)
+   if(ClockCounter > EventCycles)
    {
       //if(MDRPhase != 0)
       // printf("SNORT: %d\n", ClockCounter);
-      ClockCounter = 128;
+      ClockCounter = EventCycles;
    }
 
    switch(MDRPhase + MDRPhaseBias)
