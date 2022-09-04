@@ -142,7 +142,7 @@ void MDFNMP_AddRAM(uint32 size, uint32 A, uint8 *RAM)
  for(unsigned int x = 0; x < size; x++)
  {
   RAMPtrs[AB + x] = RAM;
-  if(RAM) // Don't increment the RAM pointer if we're passed a NULL pointer
+  if(RAM != INVALID_PTR) // Don't increment the RAM pointer if we're passed an invalid pointer
    RAM += PageSize;
  }
 }
