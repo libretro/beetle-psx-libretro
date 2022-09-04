@@ -501,7 +501,7 @@ FrontIO *PSX_FIO = NULL;
 
 MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
 MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
-MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = NULL;
+MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
 MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 
 #ifdef HAVE_LIGHTREC
@@ -2498,15 +2498,15 @@ static void Cleanup(void)
    DMA_Kill();
 
 #ifdef HAVE_LIGHTREC
-   MainRAM = NULL;
+   MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
    ScratchRAM = NULL;
    BIOSROM = NULL;
    if(psx_mmap > 0)
       lightrec_free_mmap();
 #else
-   if(MainRAM)
+   if(MainRAM != INVALID_PTR)
       delete MainRAM;
-   MainRAM = NULL;
+   MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
 
    if(ScratchRAM)
       delete ScratchRAM;

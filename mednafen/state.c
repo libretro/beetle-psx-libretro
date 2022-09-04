@@ -137,7 +137,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
 {
    while(sf->size || sf->name)	/* Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct. */
    {
-      if(!sf->size || !sf->v)
+      if(!sf->size || sf->v == INVALID_PTR || (!strcmp(sf->name,"MainRAM->data8") && !sf->v))
       {
          sf++;
          continue;
@@ -242,9 +242,9 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
 static SFORMAT *FindSF(const char *name, SFORMAT *sf)
 {
    /* Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct. */
-   while(sf->size || sf->name) 
+   while(sf->size || sf->name)
    {
-      if(!sf->size || !sf->v)
+      if(!sf->size || sf->v == INVALID_PTR || (!strcmp(sf->name,"MainRAM->data8") && !sf->v))
       {
          sf++;
          continue;
@@ -379,7 +379,7 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, stru
                return(0);
             found = 1;
             break;
-         } 
+         }
          else
          {
             if(smem_seek(st, tmp_size, SSEEK_CUR) < 0)
