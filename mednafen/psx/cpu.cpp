@@ -3149,36 +3149,16 @@ void PS_CPU::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 }
 #endif /* LIGHTREC_DEBUG */
 
-u32 PS_CPU::pgxp_cop2_mfc(struct lightrec_state *state, u32 op, u8 reg)
+void PS_CPU::pgxp_cop2_notify(struct lightrec_state *state, u32 op, u32 data)
 {
-	u32 r = GTE_ReadDR(reg);
-
-	if((op >> 26) == OP_CP2)
-		PGXP_GTE_MFC2(op, r, r);
-
-	return r;
-}
-
-u32 PS_CPU::pgxp_cop2_cfc(struct lightrec_state *state, u32 op, u8 reg)
-{
-	u32 r = GTE_ReadCR(reg);
-
-	PGXP_GTE_CFC2(op, r, r);
-
-	return r;
-}
-
-void PS_CPU::pgxp_cop2_mtc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteDR(reg, value);
-	if((op >> 26) == OP_CP2)
-		PGXP_GTE_MTC2(op, value, value);
-}
-
-void PS_CPU::pgxp_cop2_ctc(struct lightrec_state *state, u32 op, u8 reg, u32 value)
-{
-	GTE_WriteCR(reg, value);
-	PGXP_GTE_CTC2(op, value, value);
+	if((op >> 26) == OP_CP2) {
+		switch ((op >> 21) & 0x1F) {
+			case 0x00: PGXP_GTE_MFC2(op, data, data); break;
+			case 0x02: PGXP_GTE_CFC2(op, data, data); break;
+			case 0x04: PGXP_GTE_MTC2(op, data, data); break;
+			case 0x06: PGXP_GTE_CTC2(op, data, data); break;
+		}
+	}
 }
 
 static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
@@ -3659,20 +3639,14 @@ void PS_CPU::enable_ram(struct lightrec_state *state, _Bool enable)
 }
 
 struct lightrec_ops PS_CPU::ops = {
-	cop2_op,
-	enable_ram,
+	.cop2_op = cop2_op,
+	.enable_ram = enable_ram,
 };
 
 struct lightrec_ops PS_CPU::pgxp_ops = {
-	/*.cop2_ops = {
-		.mfc = pgxp_cop2_mfc,
-		.cfc = pgxp_cop2_cfc,
-		.mtc = pgxp_cop2_mtc,
-		.ctc = pgxp_cop2_ctc,
-		.op = cop2_op,
-	},*/
-	cop2_op,
-	enable_ram,
+	.cop2_notify = pgxp_cop2_notify,
+	.cop2_op = cop2_op,
+	.enable_ram = enable_ram,
 };
 
 int PS_CPU::lightrec_plugin_init()
@@ -3769,11 +3743,9 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
 
 		if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
-			PC = lightrec_run_interpreter(lightrec_state,PC);
+			PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts + cpu_timestamp);
 		else if (psx_dynarec == DYNAREC_EXECUTE)
 			PC = lightrec_execute(lightrec_state, PC, next_event_ts + cpu_timestamp);
-		else if (psx_dynarec == DYNAREC_EXECUTE_ONE)
-			PC = lightrec_execute_one(lightrec_state,PC);
 
 		timestamp = lightrec_current_cycle_count(lightrec_state) - cpu_timestamp;
 

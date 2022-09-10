@@ -1139,7 +1139,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       {
          { "disabled", "Disabled (Beetle Interpreter)" },
          { "execute",  "Max Performance" },
-         { "execute_one",  "Cycle Timing Check" },
          { "run_interpreter", "Lightrec Interpreter" },
          { NULL, NULL },
       },
