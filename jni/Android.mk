@@ -2,10 +2,6 @@ LOCAL_PATH := $(call my-dir)
 
 CORE_DIR := $(LOCAL_PATH)/..
 
-# set these
-HAVE_HW = 0
-HAVE_OPENGLES3 = 0
-
 DEBUG                    := 0
 FRONTEND_SUPPORTS_RGB565 := 1
 NEED_CD                  := 1
@@ -28,12 +24,10 @@ ifeq ($(TARGET_ARCH),x86)
 endif
 
 ifeq ($(HAVE_HW),1)
-  ifeq ($(HAVE_OPENGLES3),1)
-    HAVE_OPENGL := 1
-    GLES        := 1
-    GLES3       := 1
-    GL_LIB := -lGLESv3
-  endif
+  HAVE_OPENGL := 1
+  GLES        := 1
+  GLES3       := 1
+  GL_LIB      := -lGLESv3
 
   ifneq ($(TARGET_ARCH_ABI),armeabi)
     HAVE_VULKAN := 1
@@ -76,6 +70,6 @@ LOCAL_SRC_FILES    := $(SOURCES_CXX) $(SOURCES_C)
 LOCAL_CFLAGS       := $(COREFLAGS)
 LOCAL_CXXFLAGS     := $(COREFLAGS) -std=c++11
 LOCAL_LDFLAGS      := -Wl,-version-script=$(CORE_DIR)/link.T -ldl
-LOCAL_LDLIBS       := -llog -landroid
+LOCAL_LDLIBS       := -llog -landroid $(GL_LIB)
 LOCAL_CPP_FEATURES := exceptions rtti
 include $(BUILD_SHARED_LIBRARY)
