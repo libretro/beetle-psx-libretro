@@ -176,7 +176,7 @@ else ifneq (,$(findstring ios,$(platform)))
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -framework OpenGLES
       GLES = 1
-      GLES3 = 0
+      GLES3 = 1
    endif
 
    CC = cc -arch $(iarch) -isysroot $(IOSSDK)
@@ -352,6 +352,7 @@ else ifeq ($(platform), rpi4_64)
    LDFLAGS += $(PTHREAD_FLAGS) -ldl -lrt
    HAVE_LIGHTREC = 1
    FLAGS += -DHAVE_SHM
+   GLES = 1
    GLES3 = 1
    GL_LIB := -lGLESv2
    HAVE_CDROM = 0
