@@ -15,6 +15,7 @@ HAVE_OPENGL              := 0
 HAVE_VULKAN              := 0
 HAVE_CHD                 := 1
 IS_X86                   := 0
+IS_64BIT                 := 0
 FLAGS                    :=
 HAVE_LIGHTREC            := 1
 THREADED_RECOMPILER      := 1
@@ -23,11 +24,17 @@ ifeq ($(TARGET_ARCH),x86)
   IS_X86 := 1
 endif
 
+ifneq (,$(findstring 64,$(TARGET_ARCH)))
+  IS_64BIT := 1
+endif
+
 ifeq ($(HAVE_HW),1)
-  HAVE_OPENGL := 1
-  GLES        := 1
-  GLES3       := 1
-  GL_LIB      := -lGLESv3
+  ifeq ($(IS_64BIT),1)
+    HAVE_OPENGL := 1
+    GLES        := 1
+    GLES3       := 1
+    GL_LIB      := -lGLESv3
+  endif
 
   ifneq ($(TARGET_ARCH_ABI),armeabi)
     HAVE_VULKAN := 1
