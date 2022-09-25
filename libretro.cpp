@@ -1722,6 +1722,8 @@ static const uintptr_t supported_io_bases[] = {
 #define SCRATCH_SIZE 0x400
 
 #ifdef HAVE_WIN_SHM
+/* MapViewOfFileEx requires fd and offset in all cases, as the MAP_ANONYMOUS equivalent
+ is mapping from INVALID_FILE_HANDLE memfd with offset */
 #define MAP(addr, size, fd, offset) \
 	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS, 0, offset, size, addr)
 #define MAP_SHM(addr,size,fd,offset)\
@@ -1755,9 +1757,10 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 	return map;
 }
 
+/* mmap with MAP_ANONYMOUS can ignore fd and offset */
 #define MAP(addr,size,fd,offset)\
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
-	MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, fd, offset)
+	MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0)
 #define MAP_SHM(addr, size, fd, offset) \
 	mmap_huge(addr,size, PROT_READ | PROT_WRITE, \
 	MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
@@ -1872,7 +1875,7 @@ int lightrec_init_mmap(bool hugetlb)
 #ifdef HAVE_WIN_SHM
 	HANDLE memfd;
 
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE, NULL);
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
 
 	if (memfd == NULL) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
@@ -1907,52 +1910,57 @@ int lightrec_init_mmap(bool hugetlb)
 		{
 			psx_mem = (uint8 *)base;
 
-			map = MAP(bios, BIOS_SIZE, 0, 0);
+			if (ENABLE_CODE_BUFFER) {
+				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
+				map = MAP_CODE((void *)(base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
+
+				if (map == MFAILED){
+					log_cb(RETRO_LOG_WARN, "Unable to mmap code buffer, dynarec may be slower\n");
+					goto err_unmap;
+				}
+
+				lightrec_codebuffer = (uint8_t *)map;
+			}
+
+			map = MAP(bios, BIOS_SIZE, memfd, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE);
 			if (map == MFAILED)
 				goto err_unmap;
 
 			psx_bios = (uint8 *)map;
 
 			if (map != bios)
-				goto err_unmap_bios;
+				goto err_unmap;
 
-			map = MAP(scratch, SCRATCH_SIZE, 0, 0);
+			map = MAP(scratch, SCRATCH_SIZE, memfd, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE);
 			if (map == MFAILED)
-				goto err_unmap_bios;
+				goto err_unmap;
 
 			psx_scratch = (uint8 *)map;
 
 			if (map != scratch)
-				goto err_unmap_scratch;
-
-			if (ENABLE_CODE_BUFFER) {
-				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
-				map = MAP_CODE((void *)(base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
-
-				if (map == MFAILED){
-					log_cb(RETRO_LOG_WARN, "Unable to mmap code buffer\n");
-					goto err_unmap_scratch;
-				}
-
-				lightrec_codebuffer = (uint8_t *)map;
-			}
+				goto err_unmap;
 
 			r = NUM_MEM;
 
 			goto close_return;
 		}
 
-err_unmap_scratch:
+err_unmap:
+		if(lightrec_codebuffer){
+			UNMAP(lightrec_codebuffer, BIOS_SIZE);
+			lightrec_codebuffer = NULL;
+		}
+
 		if(psx_scratch){
 			UNMAP(psx_scratch, SCRATCH_SIZE);
 			psx_scratch = NULL;
 		}
-err_unmap_bios:
+
 		if(psx_bios){
 			UNMAP(psx_bios, BIOS_SIZE);
 			psx_bios = NULL;
 		}
-err_unmap:
+
 		/* Clean up any mapped ram or mirrors and try again */
 		for (; j > 0; j--)
 			UNMAP((void *)(base + (j - 1) * RAM_SIZE), RAM_SIZE);
