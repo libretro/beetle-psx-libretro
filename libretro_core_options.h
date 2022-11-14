@@ -59,8 +59,8 @@ struct retro_core_option_v2_category option_cats_us[] = {
    },
    {
       "osd",
-      "Onscreen Notifications",
-      "Change the notifications being shown onscreen."
+      "On-Screen Display",
+      "Change notifications being shown on-screen."
    },
    {
       "input",
@@ -79,7 +79,7 @@ struct retro_core_option_v2_category option_cats_us[] = {
    },
    {
       "hacks",
-      "Emulation hacks",
+      "Emulation Hacks",
       "Change processor overclocking and emulation accuracy settings affecting low-level performance and compatibility."
    },
    { NULL, NULL, NULL },
