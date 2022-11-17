@@ -4,9 +4,9 @@
 ; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
 ;
 [subrepo]
-	remote = https://github.com/pcercuei/lightrec.git
+	remote = https://github.com/mattconte/tlsf
 	branch = master
-	commit = dfa18558702666fc828037fa972c0a120a8d5fa7
-	parent = 2d1b83f98d944faf2bb8a5b7565ad14e7f7d7718
+	commit = deff9ab509341f264addbd3c8ada533678591905
+	parent = 1dc0344052e7379e16753e4a285c30fd158bf78d
 	method = merge
-	cmdver = 0.4.9
+	cmdver = 0.4.3
