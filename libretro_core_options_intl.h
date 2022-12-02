@@ -7860,7 +7860,7 @@ struct retro_core_options_v2 options_chs = {
 
 /* RETRO_LANGUAGE_CHT */
 
-#define CATEGORY_VIDEO_LABEL_CHT "影像"
+#define CATEGORY_VIDEO_LABEL_CHT "顯示"
 #define CATEGORY_VIDEO_INFO_0_CHT "變更長寬比、畫面裁切、影像濾鏡和跳幀的設定。"
 #define CATEGORY_OSD_LABEL_CHT "螢幕選單"
 #define CATEGORY_OSD_INFO_0_CHT NULL
@@ -37188,7 +37188,7 @@ struct retro_core_options_v2 options_hr = {
 #define CATEGORY_VIDEO_LABEL_HU "Kép"
 #define CATEGORY_VIDEO_INFO_0_HU "A képarány, képvágás, videoszűrő és képkocka kihagyás beállításai."
 #define CATEGORY_OSD_LABEL_HU "Képernyőn megjelenő elemek (OSD)"
-#define CATEGORY_OSD_INFO_0_HU NULL
+#define CATEGORY_OSD_INFO_0_HU "A képernyőn megjelenő értesítések beállítása."
 #define CATEGORY_INPUT_LABEL_HU "Bevitel"
 #define CATEGORY_INPUT_INFO_0_HU "A fénypisztoly, az egér és a neGcon beállításai."
 #define CATEGORY_MEMCARDS_LABEL_HU "Memóriakártya"
@@ -37229,9 +37229,9 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_HU "A textúraszűrés nem lesz érvényes a 2D sokszögekre. A 2D sokszögeket egy heurisztika érzékeli és lehetnek hibák. Az adaptív élsimítással vagy más utófeldolgozó szűrővel adja a legjobb eredményt."
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_HU "Adaptív élsimítás"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_HU "A 2D rajzok és és a felhasználói felület elsimítása, a 3D objektumok elhomályosítása nélkül. Csak a Vulkan meghajtó támogatja."
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_HU NULL
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_HU NULL
-#define BEETLE_OPT_MSAA_LABEL_HU NULL
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_HU "Túlmintavételezés (alulmintavételezéssel az eredeti felbontásra)"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_HU "A felskálázott belső felbontáson generált tartalom alulmintavételezése az eredeti felbontáshoz. Nagyobb belső felbontással együtt így az eredeti, alacsony felbontáson is élsimított 3D objektumok tudnak megjelenni a játékban. A legjobb eredményt olyan címeknél adja, amelyek keverik a 2D és 3D elemeket (pl. 3D szereplők előre megrajzolt hátterek előtt), és jól működik a CRT shaderekkel együtt. Csak a Vulkan meghajtó támogatja. Figyelem: a Dithering mintázatot ajánlott kikapcsolni, ha ez az opció aktív."
+#define BEETLE_OPT_MSAA_LABEL_HU "Többszörös mintavételezésű élsimítés (MSAA)"
 #define BEETLE_OPT_MSAA_INFO_0_HU NULL
 #define OPTION_VAL_1X_HU NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_HU NULL
