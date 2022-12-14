@@ -30,7 +30,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 
 #include "pgxp/pgxp_main.h"
 
-#ifdef HAVE_ASHMEM
+#if defined(HAVE_ASHMEM) || defined(HAVE_SHM)
 #include <errno.h>
 #endif
 #include <vector>
