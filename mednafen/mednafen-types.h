@@ -42,7 +42,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <errno.h>
 #include <math.h>
 
 #ifdef __cplusplus

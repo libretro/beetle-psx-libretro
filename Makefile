@@ -448,7 +448,6 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
    export LIB := $(LIB);$(WindowsSDKUCRTLibDir);$(WindowsSDKUMLibDir)
    TARGET := $(TARGET_NAME)_libretro.dll
    TARGET_TMP := $(TARGET_NAME)_libretro.lib $(TARGET_NAME)_libretro.pdb $(TARGET_NAME)_libretro.exp
-   PSS_STYLE :=2
    LDFLAGS += -DLL
 
 # Windows
@@ -542,12 +541,9 @@ FLAGS   += $(fpic) $(NEW_GCC_FLAGS)
 FLAGS   += $(INCFLAGS)
 
 FLAGS += $(ENDIANNESS_DEFINES) \
-         -DSIZEOF_DOUBLE=8 \
          $(WARNINGS) \
          -DMEDNAFEN_VERSION=\"0.9.38.6\" \
-         -DPACKAGE=\"mednafen\" \
          -DMEDNAFEN_VERSION_NUMERIC=9386 \
-         -DPSS_STYLE=1 \
          -DMPC_FIXED_POINT \
          $(CORE_DEFINE) \
          -DSTDC_HEADERS \

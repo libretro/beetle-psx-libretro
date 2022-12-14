@@ -27,7 +27,6 @@
 #include "../tremor/ivorbisfile.h"
 
 #include <string.h>
-#include <errno.h>
 #include <time.h>
 
 #include "../general.h"
@@ -46,7 +45,7 @@ AudioReader::~AudioReader()
 int64_t AudioReader::Read_(int16_t *buffer, int64_t frames)
 {
    abort();
-   return(false);
+   return 0;
 }
 
 bool AudioReader::Seek_(int64_t frame_offset)
@@ -58,7 +57,7 @@ bool AudioReader::Seek_(int64_t frame_offset)
 int64_t AudioReader::FrameCount(void)
 {
    abort();
-   return(0);
+   return 0;
 }
 
 class OggVorbisReader : public AudioReader
@@ -81,7 +80,7 @@ static size_t iov_read_func(void *ptr, size_t size, size_t nmemb, void *user_dat
    Stream *fw = (Stream*)user_data;
 
    if(!size || !fw)
-      return(0);
+      return 0;
 
    return fw->read(ptr, size * nmemb) / size;
 }
@@ -92,7 +91,7 @@ static int iov_seek_func(void *user_data, int64_t offset, int whence)
 
    if (fw)
       fw->seek(offset, whence);
-   return(0);
+   return 0;
 }
 
 static int iov_close_func(void *user_data)
@@ -101,7 +100,7 @@ static int iov_close_func(void *user_data)
 
    if (fw)
       fw->close();
-   return(0);
+   return 0;
 }
 
 static long iov_tell_func(void *user_data)
