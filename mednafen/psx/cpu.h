@@ -64,11 +64,6 @@
    #include <lightrec.h>
 #endif
 
-#if NOT_LIBRETRO
-namespace MDFN_IEN_PSX
-{
-#endif
-
 class PS_CPU
 {
  public:
@@ -333,9 +328,5 @@ class PS_CPU
  void (*CPUHook)(const pscpu_timestamp_t timestamp, uint32 pc);
  void (*ADDBT)(uint32 from, uint32 to, bool exception);
 };
-
-#if NOT_LIBRETRO
-}
-#endif
 
 #endif

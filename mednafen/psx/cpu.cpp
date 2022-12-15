@@ -64,17 +64,8 @@ char PS_CPU::cache_buf[64 * 1024];
 #define BIU_INVALIDATE_MODE	0x00000002	// Enable Invalidate mode(IsC must be set to 1 as well presumably?)
 #define BIU_LOCK_MODE		0x00000001	// Enable Lock mode(IsC must be set to 1 as well presumably?)
 
-
-#if NOT_LIBRETRO
-namespace MDFN_IEN_PSX
-{
-#endif
-
-
 PS_CPU::PS_CPU()
 {
- //printf("%zu\n", (size_t)((uintptr_t)ICache - (uintptr_t)this));
-
    addr_mask[0] = 0xFFFFFFFF;
    addr_mask[1] = 0xFFFFFFFF;
    addr_mask[2] = 0xFFFFFFFF;
@@ -715,19 +706,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
     muldiv_ts_done += timestamp;
 
     BACKING_TO_ACTIVE;
-   }
-#endif
-
-#if NOT_LIBRETRO
-   if(BIOSPrintMode)
-   {
-    if(PC == 0xB0)
-    {
-     if(MDFN_UNLIKELY(GPR[9] == 0x3D))
-     {
-      PSX_DBG_BIOS_PUTC(GPR[4]);
-     }
-    }
    }
 #endif
 
@@ -2759,13 +2737,6 @@ uint32 PS_CPU::GetRegister(unsigned int which, char *special, const uint32 speci
 
   case GSREG_CAUSE:
 	ret = CP0.CAUSE;
-#ifdef NOT_LIBRETRO
-	if(special)
-	{
-	 trio_snprintf(special, special_len, "BD: %u, BT: %u, CE: %u, IP: 0x%02x, Sw: %u, ExcCode: 0x%01x",
-		(ret >> 31) & 1, (ret >> 30) & 1, (ret >> 28) & 3, (ret >> 10) & 0x3F, (ret >> 8) & 3, (ret >> 2) & 0xF);
-	}
-#endif
 	break;
 
   case GSREG_EPC:
@@ -3906,8 +3877,4 @@ void PS_CPU::lightrec_plugin_shutdown(void)
 	lightrec_destroy(lightrec_state);
 }
 
-#endif
-
-#if NOT_LIBRETRO
-}
 #endif

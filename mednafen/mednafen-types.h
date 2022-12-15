@@ -1,33 +1,6 @@
 #ifndef __MDFN_TYPES_H
 #define __MDFN_TYPES_H
 
-#ifdef NOT_LIBRETRO
-// Make sure this file is included BEFORE a few common standard C header files(stdio.h, errno.h, math.h, AND OTHERS, but this is not an exhaustive check, nor
-// should it be), so that any defines in config.h that change header file behavior will work properly.
-#if defined(EOF) || defined(EACCES) || defined(F_LOCK) || defined(NULL) || defined(O_APPEND) || defined(M_LOG2E)
- #error "Wrong include order for types.h"
-#endif
-
-#endif /* NOT_LIBRETRO */
-
-#ifdef HAVE_CONFIG_H
- #include <config.h>
-#endif
-
-//
-//
-//
-
-#ifdef NOT_LIBRETRO
-#if defined(__PIC__) || defined(__pic__) || defined(__PIE__) || defined(__pie__)
- #if defined(__386__) || defined(__i386__) || defined(__i386) || defined(_M_IX86) || defined(_M_I386) //|| (SIZEOF_VOID_P <= 4)
-  #error "Compiling with position-independent code generation enabled is not recommended, for performance reasons."
- #else
-  #warning "Compiling with position-independent code generation enabled is not recommended, for performance reasons."
- #endif
-#endif
-#endif /* NOT_LIBRETRO */
-
 #if defined(__x86_64__) && defined(__code_model_large__)
  #error "Compiling with large memory model is not recommended, for performance reasons."
 #endif
@@ -236,26 +209,16 @@ typedef uint64_t uint64;
  #error "Define only one of MSB_FIRST or LSB_FIRST, not both!"
 #endif
 
-#ifdef LSB_FIRST
- #define MDFN_IS_BIGENDIAN false
-#else
+#ifdef MSB_FIRST
  #define MDFN_IS_BIGENDIAN true
-#endif
-
-#if NOT_LIBRETRO
-
-#ifdef __cplusplus
-template<typename T> typename std::remove_all_extents<T>::type* MDAP(T* v) { return (typename std::remove_all_extents<T>::type*)v; }
-#include "error.h"
-#include "math_ops.h"
-#include "endian.h"
-#endif
-#endif /* NOT_LIBRETRO */
-
-#ifndef _MSC_VER
-#define MDFN_ALIGN(n)        __attribute__ ((aligned (n)))
 #else
+ #define MDFN_IS_BIGENDIAN false
+#endif
+
+#ifdef _MSC_VER
 #define MDFN_ALIGN(n)        __declspec(align(n))
+#else
+#define MDFN_ALIGN(n)        __attribute__ ((aligned (n)))
 #endif
 
 #endif
