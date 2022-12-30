@@ -64565,7 +64565,7 @@ struct retro_core_options_v2 options_si = {
 #define CATEGORY_MEMCARDS_INFO_0_SK NULL
 #define CATEGORY_PGXP_LABEL_SK NULL
 #define CATEGORY_PGXP_INFO_0_SK NULL
-#define CATEGORY_HACKS_LABEL_SK NULL
+#define CATEGORY_HACKS_LABEL_SK "Emulačné hacky"
 #define CATEGORY_HACKS_INFO_0_SK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SK NULL
@@ -64630,8 +64630,8 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SK NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SK NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SK NULL
-#define OPTION_VAL_LIGHTGUN_SK NULL
-#define OPTION_VAL_TOUCHSCREEN_SK NULL
+#define OPTION_VAL_LIGHTGUN_SK "Svetelná pištoľ"
+#define OPTION_VAL_TOUCHSCREEN_SK "Dotykový displej"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SK NULL
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SK NULL
 #define OPTION_VAL_CROSS_SK "Kríž"
@@ -64818,9 +64818,9 @@ struct retro_core_options_v2 options_si = {
 #define OPTION_VAL_PS1_ROM_SK NULL
 #define BEETLE_OPT_RENDERER_LABEL_SK NULL
 #define BEETLE_OPT_RENDERER_INFO_0_SK NULL
-#define OPTION_VAL_HARDWARE_SK NULL
-#define OPTION_VAL_HARDWARE_GL_SK NULL
-#define OPTION_VAL_HARDWARE_VK_SK NULL
+#define OPTION_VAL_HARDWARE_SK "Hardvér (Auto)"
+#define OPTION_VAL_HARDWARE_GL_SK "Hardvér (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_SK "Hardvér (Vulkan)"
 #define OPTION_VAL_SOFTWARE_SK "Softvér"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SK NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SK NULL
@@ -64846,7 +64846,7 @@ struct retro_core_options_v2 options_si = {
 #define OPTION_VAL_AUTO_TOGGLE_SK NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SK NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SK NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_SK NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_SK "Orezať overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SK NULL
 #define OPTION_VAL_DISABLED_O54_SK "Žiadne"
 #define OPTION_VAL_STATIC_SK "Statické"
@@ -64900,9 +64900,9 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SK NULL
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SK NULL
 #define OPTION_VAL_CORRECTED_SK NULL
-#define OPTION_VAL_UNCORRECTED_SK NULL
-#define OPTION_VAL_4_3_SK NULL
-#define OPTION_VAL_NTSC_SK NULL
+#define OPTION_VAL_UNCORRECTED_SK "Neopravené"
+#define OPTION_VAL_4_3_SK "Vynútiť 4:3"
+#define OPTION_VAL_NTSC_SK "Vynútiť NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SK NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SK NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_SK NULL
@@ -72378,17 +72378,17 @@ struct retro_core_options_v2 options_tr = {
 #define CATEGORY_VIDEO_LABEL_UK "Відео"
 #define CATEGORY_VIDEO_INFO_0_UK "Налаштування співвідношення сторін / кадрування / відеофільтрів / пропуску кадрів."
 #define CATEGORY_OSD_LABEL_UK "Зображення на екрані"
-#define CATEGORY_OSD_INFO_0_UK NULL
+#define CATEGORY_OSD_INFO_0_UK "Змінити сповіщення, що показуються на екрані."
 #define CATEGORY_INPUT_LABEL_UK "Ввід"
-#define CATEGORY_INPUT_INFO_0_UK NULL
+#define CATEGORY_INPUT_INFO_0_UK "Зміна налаштувань світлового пістолету, миші та neGcon."
 #define CATEGORY_MEMCARDS_LABEL_UK "Карта пам'яті"
-#define CATEGORY_MEMCARDS_INFO_0_UK NULL
+#define CATEGORY_MEMCARDS_INFO_0_UK "Це дозволяє змінити налаштування, пов'язані з віртуальною пам'яттю."
 #define CATEGORY_PGXP_LABEL_UK NULL
 #define CATEGORY_PGXP_INFO_0_UK "Цей параметр може покращувати графіку в порівнянні з оригінальною консолею. PGXP може виправити викривлення текстур і проблем з Z-fighting."
 #define CATEGORY_HACKS_LABEL_UK "Гаки емуляції"
 #define CATEGORY_HACKS_INFO_0_UK "Налаштування розгону процесора та точності емуляції, що впливають на низькорівневу продуктивність та сумісність."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_UK "Роздільна здатність GPU"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_UK NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_UK "Встановити внутрішній роздільний множник. Роздільна здатність вище, ніж '1x (Native)' поліпшує точність 3D-моделей за рахунок збільшення вимог щодо продуктивності. 2D елементи, як правило, не впливають на це налаштування."
 #define OPTION_VAL_1X_NATIVE_UK "1x (рідна)"
 #define OPTION_VAL_2X_UK NULL
 #define OPTION_VAL_4X_UK NULL
@@ -72400,10 +72400,10 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_32BPP_UK NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_UK "Шаблон дизерингу"
 #define BEETLE_OPT_DITHER_MODE_INFO_0_UK NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_UK NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_UK "Роздільна здатність"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_UK NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_UK NULL
-#define BEETLE_OPT_FILTER_LABEL_UK NULL
+#define BEETLE_OPT_FILTER_LABEL_UK "Фільтрація текстур"
 #define BEETLE_OPT_FILTER_INFO_0_UK NULL
 #define OPTION_VAL_NEAREST_UK "Найближчі"
 #define OPTION_VAL_SABR_UK NULL
@@ -72411,13 +72411,13 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_BILINEAR_UK "Білінійна"
 #define OPTION_VAL_3_POINT_UK NULL
 #define OPTION_VAL_JINC2_UK NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_UK NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_UK "Виключити спрайти з фільтрації"
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_UK NULL
 #define OPTION_VAL_OPAQUE_UK NULL
 #define OPTION_VAL_ALL_UK NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_UK NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_UK NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_UK NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_UK "Адаптивне згладжування"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_UK NULL
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_UK NULL
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_UK NULL
@@ -72426,11 +72426,11 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_1X_UK NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_UK NULL
 #define BEETLE_OPT_MDEC_YUV_INFO_0_UK NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_UK NULL
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_UK "Відслідковувати текстури"
 #define BEETLE_OPT_TRACK_TEXTURES_INFO_0_UK NULL
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_UK NULL
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_UK NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_UK NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_UK "Замінити текстури"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_UK NULL
 #define BEETLE_OPT_WIREFRAME_LABEL_UK NULL
 #define BEETLE_OPT_WIREFRAME_INFO_0_UK NULL
