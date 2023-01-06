@@ -15690,7 +15690,7 @@ struct retro_core_options_v2 options_da = {
 #define CATEGORY_MEMCARDS_INFO_0_DE "Einstellungen bezüglich der virtuellen Memory Card(s) des Systems ändern."
 #define CATEGORY_PGXP_LABEL_DE NULL
 #define CATEGORY_PGXP_INFO_0_DE "Diese Optionen steuern Erweiterungen, die die Grafik im Vergleich zur Originalkonsole verbessern können. PGXP kann verzerrte Texturen und Z-Fighting-Probleme beseitigen."
-#define CATEGORY_HACKS_LABEL_DE "Emulationshacks"
+#define CATEGORY_HACKS_LABEL_DE "Emulations-Hacks"
 #define CATEGORY_HACKS_INFO_0_DE "Parameter für Prozessorübertaktung und Emulationsgenauigkeit, die sich auf die Low-Level-Leistung und Kompatibilität auswirken, ändern."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_DE "Interne GPU-Auflösung"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_DE "Internen Auflösungsmultiplikator wählen. Auflösungen höher als \"1× (Nativ)\" verbessern die Wiedergabetreue von 3D-Modellen auf Kosten von höheren Leistungsanforderungen. 2D-Elemente sind von dieser Einstellung in der Regel nicht betroffen."
@@ -27698,7 +27698,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_FI NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_FI NULL
 #define OPTION_VAL_FORCE_INTERLACED_FI NULL
-#define OPTION_VAL_AUTO_TOGGLE_FI NULL
+#define OPTION_VAL_AUTO_TOGGLE_FI "Salli automaattinen vaihtaminen"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FI NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FI NULL
@@ -39150,7 +39150,7 @@ struct retro_core_options_v2 options_hu = {
 #define CATEGORY_MEMCARDS_INFO_0_ID NULL
 #define CATEGORY_PGXP_LABEL_ID NULL
 #define CATEGORY_PGXP_INFO_0_ID NULL
-#define CATEGORY_HACKS_LABEL_ID NULL
+#define CATEGORY_HACKS_LABEL_ID "Peretasan Emulasi"
 #define CATEGORY_HACKS_INFO_0_ID NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ID NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ID NULL
@@ -41105,7 +41105,7 @@ struct retro_core_options_v2 options_id = {
 #define CATEGORY_MEMCARDS_INFO_0_IT "Cambia le impostazioni relative alle schede di memoria virtuali utilizzate dal sistema."
 #define CATEGORY_PGXP_LABEL_IT "Pgxp (Precision Geometry Transform Pipeline)"
 #define CATEGORY_PGXP_INFO_0_IT "Queste opzioni controllano i miglioramenti che possono migliorare la grafica rispetto alla console originale. PGXP può sbarazzarsi di texture di deformazione e problemi di combattimento Z."
-#define CATEGORY_HACKS_LABEL_IT "Hacks di Emulazione"
+#define CATEGORY_HACKS_LABEL_IT "Hack di Emulazione"
 #define CATEGORY_HACKS_INFO_0_IT "Cambia le impostazioni di overclocking e di precisione di emulazione del processore che influenzano prestazioni e compatibilità di basso livello."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_IT "Risoluzione GPU Interna"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_IT "Scegli il moltiplicatore di risoluzione interno. Risoluzioni superiori a '1x (Native)' migliorano la fedeltà dei modelli 3D a scapito di maggiori requisiti di prestazioni. Gli elementi 2D non sono generalmente influenzati da questa impostazione."
@@ -64561,7 +64561,7 @@ struct retro_core_options_v2 options_si = {
 #define CATEGORY_OSD_INFO_0_SK NULL
 #define CATEGORY_INPUT_LABEL_SK "Vstup"
 #define CATEGORY_INPUT_INFO_0_SK NULL
-#define CATEGORY_MEMCARDS_LABEL_SK NULL
+#define CATEGORY_MEMCARDS_LABEL_SK "Pamäťová karta"
 #define CATEGORY_MEMCARDS_INFO_0_SK NULL
 #define CATEGORY_PGXP_LABEL_SK NULL
 #define CATEGORY_PGXP_INFO_0_SK NULL
@@ -64580,7 +64580,7 @@ struct retro_core_options_v2 options_si = {
 #define OPTION_VAL_32BPP_SK NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_SK NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_SK NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_SK NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_SK "Vnútorné rozlíšenie"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_SK NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_SK NULL
 #define BEETLE_OPT_FILTER_LABEL_SK NULL
@@ -64632,11 +64632,11 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SK NULL
 #define OPTION_VAL_LIGHTGUN_SK "Svetelná pištoľ"
 #define OPTION_VAL_TOUCHSCREEN_SK "Dotykový displej"
-#define BEETLE_OPT_GUN_CURSOR_LABEL_SK NULL
+#define BEETLE_OPT_GUN_CURSOR_LABEL_SK "Kurzor zbrane"
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SK NULL
 #define OPTION_VAL_CROSS_SK "Kríž"
 #define OPTION_VAL_DOT_SK "Bod"
-#define OPTION_VAL_OFF_SK NULL
+#define OPTION_VAL_OFF_SK "Žiadny kurzor"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_SK NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_SK NULL
 #define OPTION_VAL_RED_SK "Červená"
@@ -64713,10 +64713,10 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SK NULL
-#define OPTION_VAL_1_SK NULL
+#define OPTION_VAL_1_SK "1 (predvolené)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_SK NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SK NULL
-#define OPTION_VAL_MEMORY_ONLY_SK NULL
+#define OPTION_VAL_MEMORY_ONLY_SK "Iba pamäť"
 #define OPTION_VAL_MEMORY_CPU_SK NULL
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_SK NULL
 #define BEETLE_OPT_PGXP_2D_TOL_INFO_0_SK NULL
@@ -64879,7 +64879,7 @@ struct retro_core_options_v2 options_si = {
 #define OPTION_VAL_3PX_O56_SK NULL
 #define OPTION_VAL_2PX_O56_SK NULL
 #define OPTION_VAL_1PX_O56_SK NULL
-#define OPTION_VAL_DISABLED_O56_SK NULL
+#define OPTION_VAL_DISABLED_O56_SK "0 (predvolené)"
 #define OPTION_VAL_1PX_O56_0_SK NULL
 #define OPTION_VAL_2PX_O56_0_SK NULL
 #define OPTION_VAL_3PX_O56_0_SK NULL
@@ -64897,9 +64897,9 @@ struct retro_core_options_v2 options_si = {
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SK NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_SK NULL
 #define OPTION_VAL_32X_SK NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_SK NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_SK "Pomer strán jadra"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SK NULL
-#define OPTION_VAL_CORRECTED_SK NULL
+#define OPTION_VAL_CORRECTED_SK "Opravené"
 #define OPTION_VAL_UNCORRECTED_SK "Neopravené"
 #define OPTION_VAL_4_3_SK "Vynútiť 4:3"
 #define OPTION_VAL_NTSC_SK "Vynútiť NTSC"
@@ -64915,10 +64915,10 @@ struct retro_core_options_v2 options_si = {
 #define OPTION_VAL_287_SK "287 (predvolené)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SK NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SK NULL
-#define OPTION_VAL_SYNC_SK NULL
+#define OPTION_VAL_SYNC_SK "Synchrónne"
 #define OPTION_VAL_ASYNC_SK NULL
 #define OPTION_VAL_PRECACHE_SK NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_SK NULL
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_SK "Rýchlosť čítania CD"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_SK NULL
 #define OPTION_VAL_2X_NATIVE_SK "2x (natívne)"
 #define OPTION_VAL_6X_SK NULL
