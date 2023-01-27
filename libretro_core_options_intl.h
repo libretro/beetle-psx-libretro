@@ -27413,7 +27413,7 @@ struct retro_core_options_v2 options_fa = {
 #define CATEGORY_VIDEO_LABEL_FI NULL
 #define CATEGORY_VIDEO_INFO_0_FI "Muuta kuvasuhdetta, näytön rajausta, videosuodatusta ja kuvanohitusasetuksia."
 #define CATEGORY_OSD_LABEL_FI "Näyttöruutu"
-#define CATEGORY_OSD_INFO_0_FI NULL
+#define CATEGORY_OSD_INFO_0_FI "Muuta näytöllä näytettäviä ilmoituksia."
 #define CATEGORY_INPUT_LABEL_FI "Syöte"
 #define CATEGORY_INPUT_INFO_0_FI "Muokkaa valoaseen, hiiren ja neGcon:in asetuksia."
 #define CATEGORY_MEMCARDS_LABEL_FI "Muistikortti"
@@ -27473,7 +27473,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_FI NULL
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_FI "Näytä sisäinen FPS"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_FI NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_FI NULL
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_FI "Näytä täysi VRAM (vianetsintä)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_FI NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_FI NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_FI NULL
@@ -27491,7 +27491,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_FI NULL
 #define OPTION_VAL_CROSS_FI "Risti"
 #define OPTION_VAL_DOT_FI "Piste"
-#define OPTION_VAL_OFF_FI NULL
+#define OPTION_VAL_OFF_FI "Ei tähtäintä"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_FI NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_FI NULL
 #define OPTION_VAL_RED_FI "Punainen"
@@ -27772,7 +27772,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FI NULL
 #define OPTION_VAL_SYNC_FI "Synkroninen"
 #define OPTION_VAL_ASYNC_FI "Asynkroninen"
-#define OPTION_VAL_PRECACHE_FI NULL
+#define OPTION_VAL_PRECACHE_FI "Esivälimuisti"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_FI "CD:n latausnopeus"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_FI NULL
 #define OPTION_VAL_2X_NATIVE_FI "2x (Natiivi)"
@@ -45007,7 +45007,7 @@ struct retro_core_options_v2 options_ja = {
 
 #define CATEGORY_VIDEO_LABEL_KO "비디오"
 #define CATEGORY_VIDEO_INFO_0_KO "화면비, 잘라내기, 비디오 필터, 프레임 스킵 등의 설정을 변경합니다."
-#define CATEGORY_OSD_LABEL_KO "OSD 표시"
+#define CATEGORY_OSD_LABEL_KO "온스크린 디스플레이"
 #define CATEGORY_OSD_INFO_0_KO "화면에 표시되는 OSD 알림을 설정합니다."
 #define CATEGORY_INPUT_LABEL_KO "입력"
 #define CATEGORY_INPUT_INFO_0_KO "라이트 건, 마우스, neGcon 등을 설정합니다."
