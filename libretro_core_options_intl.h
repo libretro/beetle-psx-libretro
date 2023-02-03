@@ -56793,13 +56793,13 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_RU "Замена текстур"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_RU "Замещает текстуры копиями в высоком разрешении из <cd>-texture-replacements/"
 #define BEETLE_OPT_WIREFRAME_LABEL_RU "Режим каркаса (отладка)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_RU NULL
+#define BEETLE_OPT_WIREFRAME_INFO_0_RU "Отрисовка 3D-моделей в виде контуров, без текстур и шейдинга. Поддерживается только аппаратным OpenGL-рендером. Примечание: используется для отладки и в обычном режиме должно быть выключено."
 #define BEETLE_OPT_FRAME_DUPING_LABEL_RU "Дублирование кадра (ускорение)"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_RU NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_RU "Если включено и поддерживается фронтендом libretro даёт небольшой прирост скорости, сообщая фронтенду повторять предыдущий кадр, когда у ядра нет новых данных для отображения."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_RU "Показывать частоту кадров"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_RU "Отображать внутреннюю частоту кадров, с которой эмулируемая PlayStation производит рендеринг. Примечание: требуется включение уведомлений в настройках фронтенда."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_RU "Показывать VRAM (отладка)"
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_RU NULL
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_RU "Отображение полной видеопамяти эмулируемой консоли. Поддерживается только аппаратными рендерами OpenGL и Vulkan. Примечание: используется для отладки и в обычном режиме должно быть выключено."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_RU "Автокалибровка аналогового ввода"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_RU "Переключатель аналогового режима DualShock"
