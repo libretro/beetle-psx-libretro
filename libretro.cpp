@@ -5107,7 +5107,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
             if(!cf->DecodeCheat(std::string(part), &patch))
             {
                //Generate a name
-               sprintf(name,"cheat_%i_%i",index,cursor);
+               snprintf(name, sizeof(name), "cheat_%i_%i",index,cursor);
 
                //Set parameters
                patch.name=(std::string)name;
