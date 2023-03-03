@@ -7861,7 +7861,7 @@ struct retro_core_options_v2 options_chs = {
 /* RETRO_LANGUAGE_CHT */
 
 #define CATEGORY_VIDEO_LABEL_CHT "顯示"
-#define CATEGORY_VIDEO_INFO_0_CHT "變更長寬比、畫面裁切、影像濾鏡和跳幀的設定。"
+#define CATEGORY_VIDEO_INFO_0_CHT "變更長寬比、畫面裁剪、影像濾鏡和跳幀的設定。"
 #define CATEGORY_OSD_LABEL_CHT "螢幕選單"
 #define CATEGORY_OSD_INFO_0_CHT "變更螢幕上顯示資訊的設定。"
 #define CATEGORY_INPUT_LABEL_CHT "輸入"
@@ -8151,7 +8151,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_AUTO_TOGGLE_CHT "允許自動切換"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CHT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHT NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHT NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHT "裁剪過度掃描"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHT NULL
 #define OPTION_VAL_DISABLED_O54_CHT "無"
 #define OPTION_VAL_STATIC_CHT "靜態"
