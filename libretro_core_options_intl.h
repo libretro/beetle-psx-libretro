@@ -7865,27 +7865,27 @@ struct retro_core_options_v2 options_chs = {
 #define CATEGORY_OSD_LABEL_CHT "螢幕選單"
 #define CATEGORY_OSD_INFO_0_CHT "變更螢幕上顯示資訊的設定。"
 #define CATEGORY_INPUT_LABEL_CHT "輸入"
-#define CATEGORY_INPUT_INFO_0_CHT "變更轉接插座、光線槍、滑鼠和neGcon相關的設定。"
+#define CATEGORY_INPUT_INFO_0_CHT "變更轉接插座、光線槍、滑鼠和類比搖桿的設定。"
 #define CATEGORY_MEMCARDS_LABEL_CHT "記憶卡"
-#define CATEGORY_MEMCARDS_INFO_0_CHT "變更虛擬記憶卡相關的設定。"
+#define CATEGORY_MEMCARDS_INFO_0_CHT "變更系統的虛擬記憶卡設定。"
 #define CATEGORY_PGXP_LABEL_CHT "精密幾何轉換管線 (PGXP)"
-#define CATEGORY_PGXP_INFO_0_CHT "變更改進圖形功能的設定。PGXP 可消除扭曲紋理和高度軸衝突問題。"
+#define CATEGORY_PGXP_INFO_0_CHT "變更改進圖形功能的設定, PGXP可消除扭曲紋理和高度軸衝突問題。"
 #define CATEGORY_HACKS_LABEL_CHT "進階"
 #define CATEGORY_HACKS_INFO_0_CHT "變更模擬器進階破解的設定。"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHT "三維模型解析度"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHT "設定三維模型解析度(倍率)。越高倍率需要越高的效能，提高三維模型的解析度。二維圖形不受影響。"
-#define OPTION_VAL_1X_NATIVE_CHT "1倍 (原始)"
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHT "內部解析度 (GPU)"
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHT "設定內部三維模型解析度(倍率), 越高倍率GPU效能需求越高, 可提高三維模型解析度, 此選項不影響二維圖形。"
+#define OPTION_VAL_1X_NATIVE_CHT "1倍 (原廠)"
 #define OPTION_VAL_2X_CHT "2倍"
 #define OPTION_VAL_4X_CHT "4倍"
 #define OPTION_VAL_8X_CHT "8倍"
 #define OPTION_VAL_16X_CHT "16倍"
 #define BEETLE_OPT_DEPTH_LABEL_CHT "內部色彩深度"
-#define BEETLE_OPT_DEPTH_INFO_0_CHT NULL
-#define OPTION_VAL_16BPP_NATIVE_CHT "16位元 (原始)"
-#define OPTION_VAL_32BPP_CHT "32位元"
-#define BEETLE_OPT_DITHER_MODE_LABEL_CHT NULL
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_CHT NULL
+#define BEETLE_OPT_DEPTH_INFO_0_CHT "設定內部色彩深度。\n設定<每像素16位元>時使用主機原廠設定值, 建議開啟「抖動色彩」增加漸層色顯示效果, 設定<每像素32位元>時請關閉「抖動色彩效果」。"
+#define OPTION_VAL_16BPP_NATIVE_CHT "每像素16位元 (原廠)"
+#define OPTION_VAL_32BPP_CHT "每像素32位元"
+#define BEETLE_OPT_DITHER_MODE_LABEL_CHT "抖動色彩效果"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項。\n設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, \n設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」使用<Vulkan>時, 預設顏色深度為16位元, 將此選項關閉時為32位元。"
+#define OPTION_VAL_INTERNAL_RESOLUTION_CHT "內部解析度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHT NULL
 #define BEETLE_OPT_FILTER_LABEL_CHT "材質過濾"
@@ -7925,22 +7925,22 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CHT NULL
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_CHT NULL
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CHT NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CHT "模擬自我校準"
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CHT "類比自動校正"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHT "連接埠 1 四手把轉接器"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHT "開啟連接埠 1 轉接插座，可對應四位玩家。"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHT "開啟連接埠1轉接插座可對應四位玩家。"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CHT "連接埠 2 四手把轉接器"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_CHT "開啟連接埠 2 轉接插座，可對應四位玩家。"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_CHT "開啟連接埠2轉接插座可對應四位玩家。"
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_CHT "光線槍輸入模式"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_CHT NULL
 #define OPTION_VAL_LIGHTGUN_CHT "光線槍"
 #define OPTION_VAL_TOUCHSCREEN_CHT "觸控螢幕"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_CHT "光線槍準心"
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_CHT NULL
-#define OPTION_VAL_CROSS_CHT "[＋]"
-#define OPTION_VAL_DOT_CHT "[．]"
+#define OPTION_VAL_CROSS_CHT "十字"
+#define OPTION_VAL_DOT_CHT "圓點"
 #define OPTION_VAL_OFF_CHT "無"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_CHT "連接埠 1: 光線槍準心顏色"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_CHT "設定連接埠1光線槍準心顏色。"
@@ -8007,17 +8007,17 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CHT NULL
 #define OPTION_VAL_0_CHT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CHT "記憶卡1模式 (需要重新啟動)"
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CHT "設定記憶卡1檔案儲存格式。設定 <MCR格式> 時可用於 Mednafen模擬器 兼容。SRM格式和MCR格式，可透過重新命名直接轉換。"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CHT "設定記憶卡1檔案儲存格式, 設定<MCR格式>時兼容Mednafen模擬器, SRM格式和MCR格式可透過重新命名直接轉換。"
 #define OPTION_VAL_LIBRETRO_CHT "SRM格式 (Libretro模擬器)"
 #define OPTION_VAL_MEDNAFEN_CHT "MCR格式 (Mednafen模擬器)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CHT "記憶卡2模式 (需要重新啟動)"
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHT "開啟時主機載入記憶卡2檔案編號。僅限「記憶卡1模式」設定 <MCR格式> 時有效。\n注意: 部分遊戲需要關閉此選項才能執行，例如: Codename Tenka (代號天下)。"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHT "開啟時主機載入記憶卡2檔案編號, 僅限「記憶卡1模式」設定<MCR格式>時有效。\n注意: 部分遊戲需要關閉此選項才能執行, 例如: Codename Tenka (代號天下)。"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CHT "共用記憶卡 (需要重新啟動)"
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CHT "開啟時用相同記憶卡檔案儲存存檔。關閉時依執行名稱建立記憶卡檔案。\n注意: 「記憶卡1模式」設定 <SRM格式> 時只有記憶卡2檔案共用。"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CHT "開啟時用相同記憶卡檔案儲存存檔, 關閉時依執行名稱建立記憶卡檔案。\n注意: 「記憶卡1模式」設定<SRM格式>時, 僅限記憶卡2檔案共用。"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CHT "記憶卡1檔案編號"
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHT "變更記憶卡1檔案使用編號。僅限「記憶卡1模式」設定 <MCR格式> 時有效。預設 <0> 為檔案使用編號。"
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHT "變更記憶卡1檔案使用編號, 僅限「記憶卡1模式」設定<MCR格式>時有效, 預設<0>為檔案使用編號。"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CHT "記憶卡2檔案編號"
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHT "變更記憶卡2檔案使用編號。僅限開啟「記憶卡2模式」時有效。預設 <1> 為檔案使用編號。"
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHT "變更記憶卡2檔案使用編號, 僅限開啟「記憶卡2模式」時有效, 預設<1>為檔案使用編號。"
 #define OPTION_VAL_1_CHT "1 (預設)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_CHT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CHT NULL
@@ -8057,7 +8057,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_32_9_CHT NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CHT NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CHT NULL
-#define OPTION_VAL_100_NATIVE_CHT "100% (原始)"
+#define OPTION_VAL_100_NATIVE_CHT "100% (原廠)"
 #define OPTION_VAL_210_CHT NULL
 #define OPTION_VAL_220_CHT NULL
 #define OPTION_VAL_230_CHT NULL
@@ -8119,14 +8119,14 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_CHT NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_CHT NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHT NULL
-#define OPTION_VAL_PSXONPSP_CHT NULL
-#define OPTION_VAL_PS1_ROM_CHT NULL
-#define BEETLE_OPT_RENDERER_LABEL_CHT "渲染器(必須重新啟動)"
+#define OPTION_VAL_PSXONPSP_CHT "PSP內建 (psxonpsp660.bin)"
+#define OPTION_VAL_PS1_ROM_CHT "PS3內建 (ps1_rom.bin)"
+#define BEETLE_OPT_RENDERER_LABEL_CHT "渲染器 (需要重新啟動)"
 #define BEETLE_OPT_RENDERER_INFO_0_CHT NULL
-#define OPTION_VAL_HARDWARE_CHT "硬體(自動)"
-#define OPTION_VAL_HARDWARE_GL_CHT "硬體(OpenGL)"
-#define OPTION_VAL_HARDWARE_VK_CHT "硬體(Vulkan)"
-#define OPTION_VAL_SOFTWARE_CHT "軟體"
+#define OPTION_VAL_HARDWARE_CHT "自動 (硬體)"
+#define OPTION_VAL_HARDWARE_GL_CHT "OpenGL (硬體)"
+#define OPTION_VAL_HARDWARE_VK_CHT "Vulkan (硬體)"
+#define OPTION_VAL_SOFTWARE_CHT "軟體渲染"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CHT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CHT NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_CHT NULL
@@ -8137,7 +8137,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_RUN_INTERPRETER_CHT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CHT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CHT NULL
-#define OPTION_VAL_FULL_CHT NULL
+#define OPTION_VAL_FULL_CHT "全部"
 #define OPTION_VAL_DMA_CHT NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_CHT NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_CHT NULL
@@ -8205,7 +8205,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CHT NULL
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_CHT NULL
 #define OPTION_VAL_CORRECTED_CHT NULL
-#define OPTION_VAL_UNCORRECTED_CHT NULL
+#define OPTION_VAL_UNCORRECTED_CHT "未調整"
 #define OPTION_VAL_4_3_CHT NULL
 #define OPTION_VAL_NTSC_CHT NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CHT NULL
@@ -8225,7 +8225,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_PRECACHE_CHT NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_CHT NULL
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_CHT NULL
-#define OPTION_VAL_2X_NATIVE_CHT "2倍 (原始)"
+#define OPTION_VAL_2X_NATIVE_CHT "2倍 (原廠)"
 #define OPTION_VAL_6X_CHT "6倍"
 #define OPTION_VAL_10X_CHT "10倍"
 #define OPTION_VAL_12X_CHT "12倍"
