@@ -25,10 +25,10 @@
 
 #include <stdint.h>
 
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-#include <sys/timer.h>
-#elif defined(XENON)
+#if defined(XENON)
 #include <time/time.h>
+#elif !defined(__PSL1GHT__) && defined(__PS3__)
+#include <sys/timer.h>
 #elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
 #include <unistd.h>
 #elif defined(WIIU)
@@ -83,9 +83,7 @@ static int nanosleepDOS(const struct timespec *rqtp, struct timespec *rmtp)
  *
  * Sleeps for a specified amount of milliseconds (@msec).
  **/
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-#define retro_sleep(msec) (sys_timer_usleep(1000 * (msec)))
-#elif defined(PSP) || defined(VITA)
+#if defined(VITA)
 #define retro_sleep(msec) (sceKernelDelayThread(1000 * (msec)))
 #elif defined(_3DS)
 #define retro_sleep(msec) (svcSleepThread(1000000 * (s64)(msec)))
@@ -95,6 +93,8 @@ static int nanosleepDOS(const struct timespec *rqtp, struct timespec *rmtp)
 #define retro_sleep(msec) (Sleep((msec)))
 #elif defined(XENON)
 #define retro_sleep(msec) (udelay(1000 * (msec)))
+#elif !defined(__PSL1GHT__) && defined(__PS3__)
+#define retro_sleep(msec) (sys_timer_usleep(1000 * (msec)))
 #elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
 #define retro_sleep(msec) (usleep(1000 * (msec)))
 #elif defined(WIIU)
@@ -102,7 +102,7 @@ static int nanosleepDOS(const struct timespec *rqtp, struct timespec *rmtp)
 #else
 static INLINE void retro_sleep(unsigned msec)
 {
-   struct timespec tv = {0};
+   struct timespec tv;
    tv.tv_sec          = msec / 1000;
    tv.tv_nsec         = (msec % 1000) * 1000000;
    nanosleep(&tv, NULL);
