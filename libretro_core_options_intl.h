@@ -7884,7 +7884,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_16BPP_NATIVE_CHT "每像素16位元 (原廠)"
 #define OPTION_VAL_32BPP_CHT "每像素32位元"
 #define BEETLE_OPT_DITHER_MODE_LABEL_CHT "抖動色彩效果"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項。\n設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, \n設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」使用<Vulkan>時, 預設顏色深度為16位元, 將此選項關閉時為32位元。"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項, 設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, 設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」使用<Vulkan>時, 預設顏色深度為16位元, 將此選項關閉時為32位元。"
 #define OPTION_VAL_INTERNAL_RESOLUTION_CHT "內部解析度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHT NULL
@@ -7927,7 +7927,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CHT NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CHT "類比自動校正"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHT NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHT "支援類比搖桿切換模式 (DualShock)"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHT "連接埠 1 四手把轉接器"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHT "開啟連接埠1轉接插座可對應四位玩家。"
@@ -7998,12 +7998,12 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_190_CHT NULL
 #define OPTION_VAL_195_CHT NULL
 #define OPTION_VAL_200_CHT NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_CHT NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_CHT "扭轉控制器靈敏度 (neGcon)"
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_CHT NULL
 #define OPTION_VAL_LINEAR_CHT "線性"
 #define OPTION_VAL_QUADRATIC_CHT NULL
 #define OPTION_VAL_CUBIC_CHT NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CHT NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CHT "扭轉控制器作用區 (neGcon)"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CHT NULL
 #define OPTION_VAL_0_CHT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CHT "記憶卡1模式 (需要重新啟動)"
