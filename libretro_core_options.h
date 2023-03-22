@@ -386,7 +386,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(analog_toggle),
       "Enable DualShock Analog Mode Toggle",
       NULL,
-      "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOG mode like original hardware. When disabled, the DualShock is locked to ANALOG mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOG mode by pressing and holding START+SELECT+L1+L2+R1+R2.",
+      "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOG mode like original hardware. When disabled, the DualShock is locked to ANALOG mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOG mode by using the selected buttons combination.",
       NULL,
       "input",
       {
@@ -395,6 +395,28 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "disabled"
+   },
+   {
+      BEETLE_OPT(analog_toggle_combo),
+      "DualShock Analog Mode Combo",
+      NULL,
+      "Choose the buttons combination that will be used to toggle between DIGITAL and ANALOG mode for the emulated DualShock. Only works when 'Enable DualShock Analog Mode Toggle' is enabled.",
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", "L1 + L2 + R1 + R2 + Start + Select" },
+         { "l1+r1+select",             "L1 + R1 + Select" },
+         { "l1+r1+start",              "L1 + R1 + Start" },
+         { "l1+r1+l3",                 "L1 + R1 + L3" },
+         { "l1+r1+r3",                 "L1 + R1 + R3" },
+         { "l2+r2+select",             "L2 + R2 + Select" },
+         { "l2+r2+start",              "L2 + R2 + Start" },
+         { "l2+r2+l3",                 "L2 + R2 + L3" },
+         { "l2+r2+r3",                 "L2 + R2 + R3" },
+         { "l3+r3",                    "L3 + R3" },
+         { NULL, NULL },
+      },
+      "l1+l2+r1+r2+start+select"
    },
    {
       BEETLE_OPT(enable_multitap_port1),
