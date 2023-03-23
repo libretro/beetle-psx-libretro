@@ -416,7 +416,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "l3+r3",                    "L3 + R3" },
          { NULL, NULL },
       },
-      "l1+l2+r1+r2+start+select"
+      "l1+r1+select"
    },
    {
       BEETLE_OPT(analog_toggle_hold),
