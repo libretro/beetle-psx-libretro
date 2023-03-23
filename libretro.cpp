@@ -3140,6 +3140,7 @@ static bool has_new_geometry = false;
 static bool has_new_timing = false;
 
 uint8_t analog_combo[2] = {0};
+uint8_t HOLD = {0};
 
 extern void PSXDitherApply(bool);
 
@@ -3692,6 +3693,34 @@ static void check_variables(bool startup)
       }
    }
 
+   var.key = BEETLE_OPT(analog_toggle_hold);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "0") == 0)
+      {
+         HOLD = 0;
+      }
+      else if (strcmp(var.value, "1") == 0)
+      {
+         HOLD = 1;
+      }
+      else if (strcmp(var.value, "2") == 0)
+      {
+         HOLD = 2;
+      }
+      else if (strcmp(var.value, "3") == 0)
+      {
+         HOLD = 3;
+      }
+      else if (strcmp(var.value, "4") == 0)
+      {
+         HOLD = 4;
+      }
+      else if (strcmp(var.value, "5") == 0)
+      {
+         HOLD = 5;
+      }
+   }
    var.key = BEETLE_OPT(crosshair_color_p1);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {

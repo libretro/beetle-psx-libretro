@@ -136,4 +136,6 @@ extern unsigned psx_gpu_overclock_shift;
 
 extern uint8_t analog_combo[2];
 
+extern uint8_t HOLD;
+
 #endif
