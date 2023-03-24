@@ -109,6 +109,26 @@ extern "C" {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_AR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_AR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_AR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_AR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_AR NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_AR NULL
+#define OPTION_VAL_L1_R1_SELECT_AR NULL
+#define OPTION_VAL_L1_R1_START_AR NULL
+#define OPTION_VAL_L1_R1_L3_AR NULL
+#define OPTION_VAL_L1_R1_R3_AR NULL
+#define OPTION_VAL_L2_R2_SELECT_AR NULL
+#define OPTION_VAL_L2_R2_START_AR NULL
+#define OPTION_VAL_L2_R2_L3_AR NULL
+#define OPTION_VAL_L2_R2_R3_AR NULL
+#define OPTION_VAL_L3_R3_AR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AR NULL
+#define OPTION_VAL_0_AR NULL
+#define OPTION_VAL_1_AR NULL
+#define OPTION_VAL_2_AR NULL
+#define OPTION_VAL_3_AR NULL
+#define OPTION_VAL_4_AR NULL
+#define OPTION_VAL_5_AR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_AR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_AR NULL
@@ -138,7 +158,7 @@ extern "C" {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_AR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_AR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_AR NULL
-#define OPTION_VAL_5_AR NULL
+#define OPTION_VAL_5_O28_AR NULL
 #define OPTION_VAL_10_AR NULL
 #define OPTION_VAL_15_AR NULL
 #define OPTION_VAL_20_AR NULL
@@ -185,7 +205,7 @@ extern "C" {
 #define OPTION_VAL_CUBIC_AR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_AR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_AR NULL
-#define OPTION_VAL_0_AR NULL
+#define OPTION_VAL_0_O30_AR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_AR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_AR NULL
 #define OPTION_VAL_LIBRETRO_AR NULL
@@ -198,7 +218,7 @@ extern "C" {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_AR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_AR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_AR NULL
-#define OPTION_VAL_1_AR NULL
+#define OPTION_VAL_1_O35_AR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_AR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_AR NULL
 #define OPTION_VAL_MEMORY_ONLY_AR NULL
@@ -333,7 +353,7 @@ extern "C" {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_AR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_AR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_AR NULL
-#define OPTION_VAL_DISABLED_O54_AR "لاشيء"
+#define OPTION_VAL_DISABLED_O56_AR "لاشيء"
 #define OPTION_VAL_STATIC_AR NULL
 #define OPTION_VAL_SMART_AR NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_AR NULL
@@ -352,31 +372,31 @@ extern "C" {
 #define OPTION_VAL_20PX_AR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_AR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_AR NULL
-#define OPTION_VAL_12PX_O56_AR NULL
-#define OPTION_VAL_11PX_O56_AR NULL
-#define OPTION_VAL_10PX_O56_AR NULL
-#define OPTION_VAL_9PX_O56_AR NULL
-#define OPTION_VAL_8PX_O56_AR NULL
-#define OPTION_VAL_7PX_O56_AR NULL
-#define OPTION_VAL_6PX_O56_AR NULL
-#define OPTION_VAL_5PX_O56_AR NULL
-#define OPTION_VAL_4PX_O56_AR NULL
-#define OPTION_VAL_3PX_O56_AR NULL
-#define OPTION_VAL_2PX_O56_AR NULL
-#define OPTION_VAL_1PX_O56_AR NULL
-#define OPTION_VAL_DISABLED_O56_AR NULL
-#define OPTION_VAL_1PX_O56_0_AR NULL
-#define OPTION_VAL_2PX_O56_0_AR NULL
-#define OPTION_VAL_3PX_O56_0_AR NULL
-#define OPTION_VAL_4PX_O56_0_AR NULL
-#define OPTION_VAL_5PX_O56_0_AR NULL
-#define OPTION_VAL_6PX_O56_0_AR NULL
-#define OPTION_VAL_7PX_O56_0_AR NULL
-#define OPTION_VAL_8PX_O56_0_AR NULL
-#define OPTION_VAL_9PX_O56_0_AR NULL
-#define OPTION_VAL_10PX_O56_0_AR NULL
-#define OPTION_VAL_11PX_O56_0_AR NULL
-#define OPTION_VAL_12PX_O56_0_AR NULL
+#define OPTION_VAL_12PX_O58_AR NULL
+#define OPTION_VAL_11PX_O58_AR NULL
+#define OPTION_VAL_10PX_O58_AR NULL
+#define OPTION_VAL_9PX_O58_AR NULL
+#define OPTION_VAL_8PX_O58_AR NULL
+#define OPTION_VAL_7PX_O58_AR NULL
+#define OPTION_VAL_6PX_O58_AR NULL
+#define OPTION_VAL_5PX_O58_AR NULL
+#define OPTION_VAL_4PX_O58_AR NULL
+#define OPTION_VAL_3PX_O58_AR NULL
+#define OPTION_VAL_2PX_O58_AR NULL
+#define OPTION_VAL_1PX_O58_AR NULL
+#define OPTION_VAL_DISABLED_O58_AR NULL
+#define OPTION_VAL_1PX_O58_0_AR NULL
+#define OPTION_VAL_2PX_O58_0_AR NULL
+#define OPTION_VAL_3PX_O58_0_AR NULL
+#define OPTION_VAL_4PX_O58_0_AR NULL
+#define OPTION_VAL_5PX_O58_0_AR NULL
+#define OPTION_VAL_6PX_O58_0_AR NULL
+#define OPTION_VAL_7PX_O58_0_AR NULL
+#define OPTION_VAL_8PX_O58_0_AR NULL
+#define OPTION_VAL_9PX_O58_0_AR NULL
+#define OPTION_VAL_10PX_O58_0_AR NULL
+#define OPTION_VAL_11PX_O58_0_AR NULL
+#define OPTION_VAL_12PX_O58_0_AR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_AR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_AR NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_AR NULL
@@ -756,6 +776,46 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_AR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_AR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_AR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_AR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_AR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_AR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_AR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_AR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_AR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_AR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_AR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_AR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_AR },
+         { "1", OPTION_VAL_1_AR },
+         { "2", OPTION_VAL_2_AR },
+         { "3", OPTION_VAL_3_AR },
+         { "4", OPTION_VAL_4_AR },
+         { "5", OPTION_VAL_5_AR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AR,
       NULL,
@@ -865,7 +925,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_AR },
+         { "5%",   OPTION_VAL_5_O28_AR },
          { "10%",  OPTION_VAL_10_AR },
          { "15%",  OPTION_VAL_15_AR },
          { "20%",  OPTION_VAL_20_AR },
@@ -932,8 +992,8 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_AR },
-         { "5%",  OPTION_VAL_5_AR },
+         { "0%",  OPTION_VAL_0_O30_AR },
+         { "5%",  OPTION_VAL_5_O28_AR },
          { "10%", OPTION_VAL_10_AR },
          { "15%", OPTION_VAL_15_AR },
          { "20%", OPTION_VAL_20_AR },
@@ -1070,7 +1130,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_AR },
+         { "1",  OPTION_VAL_1_O35_AR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -1484,7 +1544,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_AR },
+         { "1",  OPTION_VAL_1_O35_AR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -1527,7 +1587,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_AR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_AR },
          { "static",  OPTION_VAL_STATIC_AR },
          { "smart", OPTION_VAL_SMART_AR },
          { NULL, NULL },
@@ -1575,31 +1635,31 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_AR },
-         { "-11px",    OPTION_VAL_11PX_O56_AR },
-         { "-10px",    OPTION_VAL_10PX_O56_AR },
-         { "-9px",     OPTION_VAL_9PX_O56_AR },
-         { "-8px",     OPTION_VAL_8PX_O56_AR },
-         { "-7px",     OPTION_VAL_7PX_O56_AR },
-         { "-6px",     OPTION_VAL_6PX_O56_AR },
-         { "-5px",     OPTION_VAL_5PX_O56_AR },
-         { "-4px",     OPTION_VAL_4PX_O56_AR },
-         { "-3px",     OPTION_VAL_3PX_O56_AR },
-         { "-2px",     OPTION_VAL_2PX_O56_AR },
-         { "-1px",     OPTION_VAL_1PX_O56_AR },
-         { "disabled", OPTION_VAL_DISABLED_O56_AR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_AR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_AR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_AR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_AR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_AR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_AR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_AR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_AR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_AR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_AR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_AR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_AR },
+         { "-12px",    OPTION_VAL_12PX_O58_AR },
+         { "-11px",    OPTION_VAL_11PX_O58_AR },
+         { "-10px",    OPTION_VAL_10PX_O58_AR },
+         { "-9px",     OPTION_VAL_9PX_O58_AR },
+         { "-8px",     OPTION_VAL_8PX_O58_AR },
+         { "-7px",     OPTION_VAL_7PX_O58_AR },
+         { "-6px",     OPTION_VAL_6PX_O58_AR },
+         { "-5px",     OPTION_VAL_5PX_O58_AR },
+         { "-4px",     OPTION_VAL_4PX_O58_AR },
+         { "-3px",     OPTION_VAL_3PX_O58_AR },
+         { "-2px",     OPTION_VAL_2PX_O58_AR },
+         { "-1px",     OPTION_VAL_1PX_O58_AR },
+         { "disabled", OPTION_VAL_DISABLED_O58_AR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_AR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_AR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_AR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_AR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_AR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_AR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_AR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_AR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_AR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_AR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_AR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_AR },
          { NULL, NULL },
       },
       "disabled"
@@ -1653,7 +1713,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_AR },
+         { "0",        OPTION_VAL_DISABLED_O58_AR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -2064,6 +2124,26 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_AST NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_AST NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_AST NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_AST NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_AST NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_AST NULL
+#define OPTION_VAL_L1_R1_SELECT_AST NULL
+#define OPTION_VAL_L1_R1_START_AST NULL
+#define OPTION_VAL_L1_R1_L3_AST NULL
+#define OPTION_VAL_L1_R1_R3_AST NULL
+#define OPTION_VAL_L2_R2_SELECT_AST NULL
+#define OPTION_VAL_L2_R2_START_AST NULL
+#define OPTION_VAL_L2_R2_L3_AST NULL
+#define OPTION_VAL_L2_R2_R3_AST NULL
+#define OPTION_VAL_L3_R3_AST NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AST NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AST NULL
+#define OPTION_VAL_0_AST NULL
+#define OPTION_VAL_1_AST NULL
+#define OPTION_VAL_2_AST NULL
+#define OPTION_VAL_3_AST NULL
+#define OPTION_VAL_4_AST NULL
+#define OPTION_VAL_5_AST NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AST NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_AST NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_AST NULL
@@ -2093,7 +2173,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_AST NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_AST "Sensibilidá del mur"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_AST NULL
-#define OPTION_VAL_5_AST NULL
+#define OPTION_VAL_5_O28_AST NULL
 #define OPTION_VAL_10_AST NULL
 #define OPTION_VAL_15_AST NULL
 #define OPTION_VAL_20_AST NULL
@@ -2140,7 +2220,7 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_CUBIC_AST NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_AST NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_AST NULL
-#define OPTION_VAL_0_AST NULL
+#define OPTION_VAL_0_O30_AST NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_AST NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_AST NULL
 #define OPTION_VAL_LIBRETRO_AST NULL
@@ -2153,7 +2233,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_AST NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_AST NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_AST NULL
-#define OPTION_VAL_1_AST NULL
+#define OPTION_VAL_1_O35_AST NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_AST NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_AST NULL
 #define OPTION_VAL_MEMORY_ONLY_AST NULL
@@ -2288,7 +2368,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_AST NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_AST NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_AST NULL
-#define OPTION_VAL_DISABLED_O54_AST NULL
+#define OPTION_VAL_DISABLED_O56_AST NULL
 #define OPTION_VAL_STATIC_AST NULL
 #define OPTION_VAL_SMART_AST NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_AST NULL
@@ -2307,31 +2387,31 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_20PX_AST NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_AST NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_AST NULL
-#define OPTION_VAL_12PX_O56_AST NULL
-#define OPTION_VAL_11PX_O56_AST NULL
-#define OPTION_VAL_10PX_O56_AST NULL
-#define OPTION_VAL_9PX_O56_AST NULL
-#define OPTION_VAL_8PX_O56_AST NULL
-#define OPTION_VAL_7PX_O56_AST NULL
-#define OPTION_VAL_6PX_O56_AST NULL
-#define OPTION_VAL_5PX_O56_AST NULL
-#define OPTION_VAL_4PX_O56_AST NULL
-#define OPTION_VAL_3PX_O56_AST NULL
-#define OPTION_VAL_2PX_O56_AST NULL
-#define OPTION_VAL_1PX_O56_AST NULL
-#define OPTION_VAL_DISABLED_O56_AST NULL
-#define OPTION_VAL_1PX_O56_0_AST NULL
-#define OPTION_VAL_2PX_O56_0_AST NULL
-#define OPTION_VAL_3PX_O56_0_AST NULL
-#define OPTION_VAL_4PX_O56_0_AST NULL
-#define OPTION_VAL_5PX_O56_0_AST NULL
-#define OPTION_VAL_6PX_O56_0_AST NULL
-#define OPTION_VAL_7PX_O56_0_AST NULL
-#define OPTION_VAL_8PX_O56_0_AST NULL
-#define OPTION_VAL_9PX_O56_0_AST NULL
-#define OPTION_VAL_10PX_O56_0_AST NULL
-#define OPTION_VAL_11PX_O56_0_AST NULL
-#define OPTION_VAL_12PX_O56_0_AST NULL
+#define OPTION_VAL_12PX_O58_AST NULL
+#define OPTION_VAL_11PX_O58_AST NULL
+#define OPTION_VAL_10PX_O58_AST NULL
+#define OPTION_VAL_9PX_O58_AST NULL
+#define OPTION_VAL_8PX_O58_AST NULL
+#define OPTION_VAL_7PX_O58_AST NULL
+#define OPTION_VAL_6PX_O58_AST NULL
+#define OPTION_VAL_5PX_O58_AST NULL
+#define OPTION_VAL_4PX_O58_AST NULL
+#define OPTION_VAL_3PX_O58_AST NULL
+#define OPTION_VAL_2PX_O58_AST NULL
+#define OPTION_VAL_1PX_O58_AST NULL
+#define OPTION_VAL_DISABLED_O58_AST NULL
+#define OPTION_VAL_1PX_O58_0_AST NULL
+#define OPTION_VAL_2PX_O58_0_AST NULL
+#define OPTION_VAL_3PX_O58_0_AST NULL
+#define OPTION_VAL_4PX_O58_0_AST NULL
+#define OPTION_VAL_5PX_O58_0_AST NULL
+#define OPTION_VAL_6PX_O58_0_AST NULL
+#define OPTION_VAL_7PX_O58_0_AST NULL
+#define OPTION_VAL_8PX_O58_0_AST NULL
+#define OPTION_VAL_9PX_O58_0_AST NULL
+#define OPTION_VAL_10PX_O58_0_AST NULL
+#define OPTION_VAL_11PX_O58_0_AST NULL
+#define OPTION_VAL_12PX_O58_0_AST NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_AST NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_AST NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_AST NULL
@@ -2711,6 +2791,46 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_AST,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_AST,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_AST },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_AST },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_AST },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_AST },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_AST },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_AST },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_AST },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_AST },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_AST },
+         { "l3+r3",                    OPTION_VAL_L3_R3_AST },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AST,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AST,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_AST },
+         { "1", OPTION_VAL_1_AST },
+         { "2", OPTION_VAL_2_AST },
+         { "3", OPTION_VAL_3_AST },
+         { "4", OPTION_VAL_4_AST },
+         { "5", OPTION_VAL_5_AST },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AST,
       NULL,
@@ -2820,7 +2940,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_AST },
+         { "5%",   OPTION_VAL_5_O28_AST },
          { "10%",  OPTION_VAL_10_AST },
          { "15%",  OPTION_VAL_15_AST },
          { "20%",  OPTION_VAL_20_AST },
@@ -2887,8 +3007,8 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_AST },
-         { "5%",  OPTION_VAL_5_AST },
+         { "0%",  OPTION_VAL_0_O30_AST },
+         { "5%",  OPTION_VAL_5_O28_AST },
          { "10%", OPTION_VAL_10_AST },
          { "15%", OPTION_VAL_15_AST },
          { "20%", OPTION_VAL_20_AST },
@@ -3025,7 +3145,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_AST },
+         { "1",  OPTION_VAL_1_O35_AST },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -3439,7 +3559,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_AST },
+         { "1",  OPTION_VAL_1_O35_AST },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -3482,7 +3602,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_AST },
+         { "disabled",  OPTION_VAL_DISABLED_O56_AST },
          { "static",  OPTION_VAL_STATIC_AST },
          { "smart", OPTION_VAL_SMART_AST },
          { NULL, NULL },
@@ -3530,31 +3650,31 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_AST },
-         { "-11px",    OPTION_VAL_11PX_O56_AST },
-         { "-10px",    OPTION_VAL_10PX_O56_AST },
-         { "-9px",     OPTION_VAL_9PX_O56_AST },
-         { "-8px",     OPTION_VAL_8PX_O56_AST },
-         { "-7px",     OPTION_VAL_7PX_O56_AST },
-         { "-6px",     OPTION_VAL_6PX_O56_AST },
-         { "-5px",     OPTION_VAL_5PX_O56_AST },
-         { "-4px",     OPTION_VAL_4PX_O56_AST },
-         { "-3px",     OPTION_VAL_3PX_O56_AST },
-         { "-2px",     OPTION_VAL_2PX_O56_AST },
-         { "-1px",     OPTION_VAL_1PX_O56_AST },
-         { "disabled", OPTION_VAL_DISABLED_O56_AST },
-         { "+1px",     OPTION_VAL_1PX_O56_0_AST },
-         { "+2px",     OPTION_VAL_2PX_O56_0_AST },
-         { "+3px",     OPTION_VAL_3PX_O56_0_AST },
-         { "+4px",     OPTION_VAL_4PX_O56_0_AST },
-         { "+5px",     OPTION_VAL_5PX_O56_0_AST },
-         { "+6px",     OPTION_VAL_6PX_O56_0_AST },
-         { "+7px",     OPTION_VAL_7PX_O56_0_AST },
-         { "+8px",     OPTION_VAL_8PX_O56_0_AST },
-         { "+9px",     OPTION_VAL_9PX_O56_0_AST },
-         { "+10px",    OPTION_VAL_10PX_O56_0_AST },
-         { "+11px",    OPTION_VAL_11PX_O56_0_AST },
-         { "+12px",    OPTION_VAL_12PX_O56_0_AST },
+         { "-12px",    OPTION_VAL_12PX_O58_AST },
+         { "-11px",    OPTION_VAL_11PX_O58_AST },
+         { "-10px",    OPTION_VAL_10PX_O58_AST },
+         { "-9px",     OPTION_VAL_9PX_O58_AST },
+         { "-8px",     OPTION_VAL_8PX_O58_AST },
+         { "-7px",     OPTION_VAL_7PX_O58_AST },
+         { "-6px",     OPTION_VAL_6PX_O58_AST },
+         { "-5px",     OPTION_VAL_5PX_O58_AST },
+         { "-4px",     OPTION_VAL_4PX_O58_AST },
+         { "-3px",     OPTION_VAL_3PX_O58_AST },
+         { "-2px",     OPTION_VAL_2PX_O58_AST },
+         { "-1px",     OPTION_VAL_1PX_O58_AST },
+         { "disabled", OPTION_VAL_DISABLED_O58_AST },
+         { "+1px",     OPTION_VAL_1PX_O58_0_AST },
+         { "+2px",     OPTION_VAL_2PX_O58_0_AST },
+         { "+3px",     OPTION_VAL_3PX_O58_0_AST },
+         { "+4px",     OPTION_VAL_4PX_O58_0_AST },
+         { "+5px",     OPTION_VAL_5PX_O58_0_AST },
+         { "+6px",     OPTION_VAL_6PX_O58_0_AST },
+         { "+7px",     OPTION_VAL_7PX_O58_0_AST },
+         { "+8px",     OPTION_VAL_8PX_O58_0_AST },
+         { "+9px",     OPTION_VAL_9PX_O58_0_AST },
+         { "+10px",    OPTION_VAL_10PX_O58_0_AST },
+         { "+11px",    OPTION_VAL_11PX_O58_0_AST },
+         { "+12px",    OPTION_VAL_12PX_O58_0_AST },
          { NULL, NULL },
       },
       "disabled"
@@ -3608,7 +3728,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_AST },
+         { "0",        OPTION_VAL_DISABLED_O58_AST },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -4019,6 +4139,26 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CA NULL
+#define OPTION_VAL_L1_R1_SELECT_CA NULL
+#define OPTION_VAL_L1_R1_START_CA NULL
+#define OPTION_VAL_L1_R1_L3_CA NULL
+#define OPTION_VAL_L1_R1_R3_CA NULL
+#define OPTION_VAL_L2_R2_SELECT_CA NULL
+#define OPTION_VAL_L2_R2_START_CA NULL
+#define OPTION_VAL_L2_R2_L3_CA NULL
+#define OPTION_VAL_L2_R2_R3_CA NULL
+#define OPTION_VAL_L3_R3_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA NULL
+#define OPTION_VAL_0_CA NULL
+#define OPTION_VAL_1_CA NULL
+#define OPTION_VAL_2_CA NULL
+#define OPTION_VAL_3_CA NULL
+#define OPTION_VAL_4_CA NULL
+#define OPTION_VAL_5_CA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CA NULL
@@ -4048,7 +4188,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CA NULL
-#define OPTION_VAL_5_CA NULL
+#define OPTION_VAL_5_O28_CA NULL
 #define OPTION_VAL_10_CA NULL
 #define OPTION_VAL_15_CA NULL
 #define OPTION_VAL_20_CA NULL
@@ -4095,7 +4235,7 @@ struct retro_core_options_v2 options_ast = {
 #define OPTION_VAL_CUBIC_CA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CA NULL
-#define OPTION_VAL_0_CA NULL
+#define OPTION_VAL_0_O30_CA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CA NULL
 #define OPTION_VAL_LIBRETRO_CA NULL
@@ -4108,7 +4248,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CA NULL
-#define OPTION_VAL_1_CA NULL
+#define OPTION_VAL_1_O35_CA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CA NULL
 #define OPTION_VAL_MEMORY_ONLY_CA NULL
@@ -4243,7 +4383,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CA NULL
-#define OPTION_VAL_DISABLED_O54_CA "Cap"
+#define OPTION_VAL_DISABLED_O56_CA "Cap"
 #define OPTION_VAL_STATIC_CA NULL
 #define OPTION_VAL_SMART_CA NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CA NULL
@@ -4262,31 +4402,31 @@ struct retro_core_options_v2 options_ast = {
 #define OPTION_VAL_20PX_CA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_CA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CA NULL
-#define OPTION_VAL_12PX_O56_CA NULL
-#define OPTION_VAL_11PX_O56_CA NULL
-#define OPTION_VAL_10PX_O56_CA NULL
-#define OPTION_VAL_9PX_O56_CA NULL
-#define OPTION_VAL_8PX_O56_CA NULL
-#define OPTION_VAL_7PX_O56_CA NULL
-#define OPTION_VAL_6PX_O56_CA NULL
-#define OPTION_VAL_5PX_O56_CA NULL
-#define OPTION_VAL_4PX_O56_CA NULL
-#define OPTION_VAL_3PX_O56_CA NULL
-#define OPTION_VAL_2PX_O56_CA NULL
-#define OPTION_VAL_1PX_O56_CA NULL
-#define OPTION_VAL_DISABLED_O56_CA NULL
-#define OPTION_VAL_1PX_O56_0_CA NULL
-#define OPTION_VAL_2PX_O56_0_CA NULL
-#define OPTION_VAL_3PX_O56_0_CA NULL
-#define OPTION_VAL_4PX_O56_0_CA NULL
-#define OPTION_VAL_5PX_O56_0_CA NULL
-#define OPTION_VAL_6PX_O56_0_CA NULL
-#define OPTION_VAL_7PX_O56_0_CA NULL
-#define OPTION_VAL_8PX_O56_0_CA NULL
-#define OPTION_VAL_9PX_O56_0_CA NULL
-#define OPTION_VAL_10PX_O56_0_CA NULL
-#define OPTION_VAL_11PX_O56_0_CA NULL
-#define OPTION_VAL_12PX_O56_0_CA NULL
+#define OPTION_VAL_12PX_O58_CA NULL
+#define OPTION_VAL_11PX_O58_CA NULL
+#define OPTION_VAL_10PX_O58_CA NULL
+#define OPTION_VAL_9PX_O58_CA NULL
+#define OPTION_VAL_8PX_O58_CA NULL
+#define OPTION_VAL_7PX_O58_CA NULL
+#define OPTION_VAL_6PX_O58_CA NULL
+#define OPTION_VAL_5PX_O58_CA NULL
+#define OPTION_VAL_4PX_O58_CA NULL
+#define OPTION_VAL_3PX_O58_CA NULL
+#define OPTION_VAL_2PX_O58_CA NULL
+#define OPTION_VAL_1PX_O58_CA NULL
+#define OPTION_VAL_DISABLED_O58_CA NULL
+#define OPTION_VAL_1PX_O58_0_CA NULL
+#define OPTION_VAL_2PX_O58_0_CA NULL
+#define OPTION_VAL_3PX_O58_0_CA NULL
+#define OPTION_VAL_4PX_O58_0_CA NULL
+#define OPTION_VAL_5PX_O58_0_CA NULL
+#define OPTION_VAL_6PX_O58_0_CA NULL
+#define OPTION_VAL_7PX_O58_0_CA NULL
+#define OPTION_VAL_8PX_O58_0_CA NULL
+#define OPTION_VAL_9PX_O58_0_CA NULL
+#define OPTION_VAL_10PX_O58_0_CA NULL
+#define OPTION_VAL_11PX_O58_0_CA NULL
+#define OPTION_VAL_12PX_O58_0_CA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CA NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CA NULL
@@ -4666,6 +4806,46 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CA,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_CA },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_CA },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_CA },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_CA },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_CA },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_CA },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_CA },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_CA },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_CA },
+         { "l3+r3",                    OPTION_VAL_L3_R3_CA },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_CA },
+         { "1", OPTION_VAL_1_CA },
+         { "2", OPTION_VAL_2_CA },
+         { "3", OPTION_VAL_3_CA },
+         { "4", OPTION_VAL_4_CA },
+         { "5", OPTION_VAL_5_CA },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA,
       NULL,
@@ -4775,7 +4955,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_CA },
+         { "5%",   OPTION_VAL_5_O28_CA },
          { "10%",  OPTION_VAL_10_CA },
          { "15%",  OPTION_VAL_15_CA },
          { "20%",  OPTION_VAL_20_CA },
@@ -4842,8 +5022,8 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_CA },
-         { "5%",  OPTION_VAL_5_CA },
+         { "0%",  OPTION_VAL_0_O30_CA },
+         { "5%",  OPTION_VAL_5_O28_CA },
          { "10%", OPTION_VAL_10_CA },
          { "15%", OPTION_VAL_15_CA },
          { "20%", OPTION_VAL_20_CA },
@@ -4980,7 +5160,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_CA },
+         { "1",  OPTION_VAL_1_O35_CA },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -5394,7 +5574,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_CA },
+         { "1",  OPTION_VAL_1_O35_CA },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -5437,7 +5617,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_CA },
+         { "disabled",  OPTION_VAL_DISABLED_O56_CA },
          { "static",  OPTION_VAL_STATIC_CA },
          { "smart", OPTION_VAL_SMART_CA },
          { NULL, NULL },
@@ -5485,31 +5665,31 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_CA },
-         { "-11px",    OPTION_VAL_11PX_O56_CA },
-         { "-10px",    OPTION_VAL_10PX_O56_CA },
-         { "-9px",     OPTION_VAL_9PX_O56_CA },
-         { "-8px",     OPTION_VAL_8PX_O56_CA },
-         { "-7px",     OPTION_VAL_7PX_O56_CA },
-         { "-6px",     OPTION_VAL_6PX_O56_CA },
-         { "-5px",     OPTION_VAL_5PX_O56_CA },
-         { "-4px",     OPTION_VAL_4PX_O56_CA },
-         { "-3px",     OPTION_VAL_3PX_O56_CA },
-         { "-2px",     OPTION_VAL_2PX_O56_CA },
-         { "-1px",     OPTION_VAL_1PX_O56_CA },
-         { "disabled", OPTION_VAL_DISABLED_O56_CA },
-         { "+1px",     OPTION_VAL_1PX_O56_0_CA },
-         { "+2px",     OPTION_VAL_2PX_O56_0_CA },
-         { "+3px",     OPTION_VAL_3PX_O56_0_CA },
-         { "+4px",     OPTION_VAL_4PX_O56_0_CA },
-         { "+5px",     OPTION_VAL_5PX_O56_0_CA },
-         { "+6px",     OPTION_VAL_6PX_O56_0_CA },
-         { "+7px",     OPTION_VAL_7PX_O56_0_CA },
-         { "+8px",     OPTION_VAL_8PX_O56_0_CA },
-         { "+9px",     OPTION_VAL_9PX_O56_0_CA },
-         { "+10px",    OPTION_VAL_10PX_O56_0_CA },
-         { "+11px",    OPTION_VAL_11PX_O56_0_CA },
-         { "+12px",    OPTION_VAL_12PX_O56_0_CA },
+         { "-12px",    OPTION_VAL_12PX_O58_CA },
+         { "-11px",    OPTION_VAL_11PX_O58_CA },
+         { "-10px",    OPTION_VAL_10PX_O58_CA },
+         { "-9px",     OPTION_VAL_9PX_O58_CA },
+         { "-8px",     OPTION_VAL_8PX_O58_CA },
+         { "-7px",     OPTION_VAL_7PX_O58_CA },
+         { "-6px",     OPTION_VAL_6PX_O58_CA },
+         { "-5px",     OPTION_VAL_5PX_O58_CA },
+         { "-4px",     OPTION_VAL_4PX_O58_CA },
+         { "-3px",     OPTION_VAL_3PX_O58_CA },
+         { "-2px",     OPTION_VAL_2PX_O58_CA },
+         { "-1px",     OPTION_VAL_1PX_O58_CA },
+         { "disabled", OPTION_VAL_DISABLED_O58_CA },
+         { "+1px",     OPTION_VAL_1PX_O58_0_CA },
+         { "+2px",     OPTION_VAL_2PX_O58_0_CA },
+         { "+3px",     OPTION_VAL_3PX_O58_0_CA },
+         { "+4px",     OPTION_VAL_4PX_O58_0_CA },
+         { "+5px",     OPTION_VAL_5PX_O58_0_CA },
+         { "+6px",     OPTION_VAL_6PX_O58_0_CA },
+         { "+7px",     OPTION_VAL_7PX_O58_0_CA },
+         { "+8px",     OPTION_VAL_8PX_O58_0_CA },
+         { "+9px",     OPTION_VAL_9PX_O58_0_CA },
+         { "+10px",    OPTION_VAL_10PX_O58_0_CA },
+         { "+11px",    OPTION_VAL_11PX_O58_0_CA },
+         { "+12px",    OPTION_VAL_12PX_O58_0_CA },
          { NULL, NULL },
       },
       "disabled"
@@ -5563,7 +5743,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_CA },
+         { "0",        OPTION_VAL_DISABLED_O58_CA },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -5974,6 +6154,26 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHS NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHS NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHS NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CHS NULL
+#define OPTION_VAL_L1_R1_SELECT_CHS NULL
+#define OPTION_VAL_L1_R1_START_CHS NULL
+#define OPTION_VAL_L1_R1_L3_CHS NULL
+#define OPTION_VAL_L1_R1_R3_CHS NULL
+#define OPTION_VAL_L2_R2_SELECT_CHS NULL
+#define OPTION_VAL_L2_R2_START_CHS NULL
+#define OPTION_VAL_L2_R2_L3_CHS NULL
+#define OPTION_VAL_L2_R2_R3_CHS NULL
+#define OPTION_VAL_L3_R3_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHS NULL
+#define OPTION_VAL_0_CHS NULL
+#define OPTION_VAL_1_CHS NULL
+#define OPTION_VAL_2_CHS NULL
+#define OPTION_VAL_3_CHS NULL
+#define OPTION_VAL_4_CHS NULL
+#define OPTION_VAL_5_CHS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CHS NULL
@@ -6003,7 +6203,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CHS NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CHS "鼠标灵敏度"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CHS NULL
-#define OPTION_VAL_5_CHS NULL
+#define OPTION_VAL_5_O28_CHS NULL
 #define OPTION_VAL_10_CHS NULL
 #define OPTION_VAL_15_CHS NULL
 #define OPTION_VAL_20_CHS NULL
@@ -6050,7 +6250,7 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_CUBIC_CHS "立方"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CHS NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CHS NULL
-#define OPTION_VAL_0_CHS NULL
+#define OPTION_VAL_0_O30_CHS NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CHS "内存卡 0 操作(需要重启)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CHS "选择用于内存卡0的保存数据格式。“Mednafen”可以用于兼容独立版Mednafen。 当和 Beetle PSX使用时，Libretro (.srm) 和 Mednafen (.mcr) 保存具有内部相同的格式，可以通过重命名相互转换。"
 #define OPTION_VAL_LIBRETRO_CHS NULL
@@ -6063,7 +6263,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHS NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CHS NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHS NULL
-#define OPTION_VAL_1_CHS NULL
+#define OPTION_VAL_1_O35_CHS NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CHS NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CHS NULL
 #define OPTION_VAL_MEMORY_ONLY_CHS NULL
@@ -6198,7 +6398,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHS NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHS NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHS NULL
-#define OPTION_VAL_DISABLED_O54_CHS "无"
+#define OPTION_VAL_DISABLED_O56_CHS "无"
 #define OPTION_VAL_STATIC_CHS "静态"
 #define OPTION_VAL_SMART_CHS NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CHS NULL
@@ -6217,31 +6417,31 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_20PX_CHS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_CHS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CHS NULL
-#define OPTION_VAL_12PX_O56_CHS NULL
-#define OPTION_VAL_11PX_O56_CHS NULL
-#define OPTION_VAL_10PX_O56_CHS NULL
-#define OPTION_VAL_9PX_O56_CHS NULL
-#define OPTION_VAL_8PX_O56_CHS NULL
-#define OPTION_VAL_7PX_O56_CHS NULL
-#define OPTION_VAL_6PX_O56_CHS NULL
-#define OPTION_VAL_5PX_O56_CHS NULL
-#define OPTION_VAL_4PX_O56_CHS NULL
-#define OPTION_VAL_3PX_O56_CHS NULL
-#define OPTION_VAL_2PX_O56_CHS NULL
-#define OPTION_VAL_1PX_O56_CHS NULL
-#define OPTION_VAL_DISABLED_O56_CHS NULL
-#define OPTION_VAL_1PX_O56_0_CHS NULL
-#define OPTION_VAL_2PX_O56_0_CHS NULL
-#define OPTION_VAL_3PX_O56_0_CHS NULL
-#define OPTION_VAL_4PX_O56_0_CHS NULL
-#define OPTION_VAL_5PX_O56_0_CHS NULL
-#define OPTION_VAL_6PX_O56_0_CHS NULL
-#define OPTION_VAL_7PX_O56_0_CHS NULL
-#define OPTION_VAL_8PX_O56_0_CHS NULL
-#define OPTION_VAL_9PX_O56_0_CHS NULL
-#define OPTION_VAL_10PX_O56_0_CHS NULL
-#define OPTION_VAL_11PX_O56_0_CHS NULL
-#define OPTION_VAL_12PX_O56_0_CHS NULL
+#define OPTION_VAL_12PX_O58_CHS NULL
+#define OPTION_VAL_11PX_O58_CHS NULL
+#define OPTION_VAL_10PX_O58_CHS NULL
+#define OPTION_VAL_9PX_O58_CHS NULL
+#define OPTION_VAL_8PX_O58_CHS NULL
+#define OPTION_VAL_7PX_O58_CHS NULL
+#define OPTION_VAL_6PX_O58_CHS NULL
+#define OPTION_VAL_5PX_O58_CHS NULL
+#define OPTION_VAL_4PX_O58_CHS NULL
+#define OPTION_VAL_3PX_O58_CHS NULL
+#define OPTION_VAL_2PX_O58_CHS NULL
+#define OPTION_VAL_1PX_O58_CHS NULL
+#define OPTION_VAL_DISABLED_O58_CHS NULL
+#define OPTION_VAL_1PX_O58_0_CHS NULL
+#define OPTION_VAL_2PX_O58_0_CHS NULL
+#define OPTION_VAL_3PX_O58_0_CHS NULL
+#define OPTION_VAL_4PX_O58_0_CHS NULL
+#define OPTION_VAL_5PX_O58_0_CHS NULL
+#define OPTION_VAL_6PX_O58_0_CHS NULL
+#define OPTION_VAL_7PX_O58_0_CHS NULL
+#define OPTION_VAL_8PX_O58_0_CHS NULL
+#define OPTION_VAL_9PX_O58_0_CHS NULL
+#define OPTION_VAL_10PX_O58_0_CHS NULL
+#define OPTION_VAL_11PX_O58_0_CHS NULL
+#define OPTION_VAL_12PX_O58_0_CHS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CHS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CHS NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CHS NULL
@@ -6621,6 +6821,46 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CHS,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHS,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_CHS },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_CHS },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_CHS },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_CHS },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_CHS },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_CHS },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_CHS },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_CHS },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_CHS },
+         { "l3+r3",                    OPTION_VAL_L3_R3_CHS },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHS,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHS,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_CHS },
+         { "1", OPTION_VAL_1_CHS },
+         { "2", OPTION_VAL_2_CHS },
+         { "3", OPTION_VAL_3_CHS },
+         { "4", OPTION_VAL_4_CHS },
+         { "5", OPTION_VAL_5_CHS },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHS,
       NULL,
@@ -6730,7 +6970,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_CHS },
+         { "5%",   OPTION_VAL_5_O28_CHS },
          { "10%",  OPTION_VAL_10_CHS },
          { "15%",  OPTION_VAL_15_CHS },
          { "20%",  OPTION_VAL_20_CHS },
@@ -6797,8 +7037,8 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_CHS },
-         { "5%",  OPTION_VAL_5_CHS },
+         { "0%",  OPTION_VAL_0_O30_CHS },
+         { "5%",  OPTION_VAL_5_O28_CHS },
          { "10%", OPTION_VAL_10_CHS },
          { "15%", OPTION_VAL_15_CHS },
          { "20%", OPTION_VAL_20_CHS },
@@ -6935,7 +7175,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_CHS },
+         { "1",  OPTION_VAL_1_O35_CHS },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -7349,7 +7589,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_CHS },
+         { "1",  OPTION_VAL_1_O35_CHS },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -7392,7 +7632,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_CHS },
+         { "disabled",  OPTION_VAL_DISABLED_O56_CHS },
          { "static",  OPTION_VAL_STATIC_CHS },
          { "smart", OPTION_VAL_SMART_CHS },
          { NULL, NULL },
@@ -7440,31 +7680,31 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_CHS },
-         { "-11px",    OPTION_VAL_11PX_O56_CHS },
-         { "-10px",    OPTION_VAL_10PX_O56_CHS },
-         { "-9px",     OPTION_VAL_9PX_O56_CHS },
-         { "-8px",     OPTION_VAL_8PX_O56_CHS },
-         { "-7px",     OPTION_VAL_7PX_O56_CHS },
-         { "-6px",     OPTION_VAL_6PX_O56_CHS },
-         { "-5px",     OPTION_VAL_5PX_O56_CHS },
-         { "-4px",     OPTION_VAL_4PX_O56_CHS },
-         { "-3px",     OPTION_VAL_3PX_O56_CHS },
-         { "-2px",     OPTION_VAL_2PX_O56_CHS },
-         { "-1px",     OPTION_VAL_1PX_O56_CHS },
-         { "disabled", OPTION_VAL_DISABLED_O56_CHS },
-         { "+1px",     OPTION_VAL_1PX_O56_0_CHS },
-         { "+2px",     OPTION_VAL_2PX_O56_0_CHS },
-         { "+3px",     OPTION_VAL_3PX_O56_0_CHS },
-         { "+4px",     OPTION_VAL_4PX_O56_0_CHS },
-         { "+5px",     OPTION_VAL_5PX_O56_0_CHS },
-         { "+6px",     OPTION_VAL_6PX_O56_0_CHS },
-         { "+7px",     OPTION_VAL_7PX_O56_0_CHS },
-         { "+8px",     OPTION_VAL_8PX_O56_0_CHS },
-         { "+9px",     OPTION_VAL_9PX_O56_0_CHS },
-         { "+10px",    OPTION_VAL_10PX_O56_0_CHS },
-         { "+11px",    OPTION_VAL_11PX_O56_0_CHS },
-         { "+12px",    OPTION_VAL_12PX_O56_0_CHS },
+         { "-12px",    OPTION_VAL_12PX_O58_CHS },
+         { "-11px",    OPTION_VAL_11PX_O58_CHS },
+         { "-10px",    OPTION_VAL_10PX_O58_CHS },
+         { "-9px",     OPTION_VAL_9PX_O58_CHS },
+         { "-8px",     OPTION_VAL_8PX_O58_CHS },
+         { "-7px",     OPTION_VAL_7PX_O58_CHS },
+         { "-6px",     OPTION_VAL_6PX_O58_CHS },
+         { "-5px",     OPTION_VAL_5PX_O58_CHS },
+         { "-4px",     OPTION_VAL_4PX_O58_CHS },
+         { "-3px",     OPTION_VAL_3PX_O58_CHS },
+         { "-2px",     OPTION_VAL_2PX_O58_CHS },
+         { "-1px",     OPTION_VAL_1PX_O58_CHS },
+         { "disabled", OPTION_VAL_DISABLED_O58_CHS },
+         { "+1px",     OPTION_VAL_1PX_O58_0_CHS },
+         { "+2px",     OPTION_VAL_2PX_O58_0_CHS },
+         { "+3px",     OPTION_VAL_3PX_O58_0_CHS },
+         { "+4px",     OPTION_VAL_4PX_O58_0_CHS },
+         { "+5px",     OPTION_VAL_5PX_O58_0_CHS },
+         { "+6px",     OPTION_VAL_6PX_O58_0_CHS },
+         { "+7px",     OPTION_VAL_7PX_O58_0_CHS },
+         { "+8px",     OPTION_VAL_8PX_O58_0_CHS },
+         { "+9px",     OPTION_VAL_9PX_O58_0_CHS },
+         { "+10px",    OPTION_VAL_10PX_O58_0_CHS },
+         { "+11px",    OPTION_VAL_11PX_O58_0_CHS },
+         { "+12px",    OPTION_VAL_12PX_O58_0_CHS },
          { NULL, NULL },
       },
       "disabled"
@@ -7518,7 +7758,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_CHS },
+         { "0",        OPTION_VAL_DISABLED_O58_CHS },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -7880,11 +8120,11 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_8X_CHT "8倍"
 #define OPTION_VAL_16X_CHT "16倍"
 #define BEETLE_OPT_DEPTH_LABEL_CHT "內部色彩深度"
-#define BEETLE_OPT_DEPTH_INFO_0_CHT "設定內部色彩深度。\n設定<每像素16位元>時使用主機原廠設定值, 建議開啟「抖動色彩」增加漸層色顯示效果, 設定<每像素32位元>時請關閉「抖動色彩效果」。"
+#define BEETLE_OPT_DEPTH_INFO_0_CHT "設定內部色彩深度。\n設定<每像素16位元>時為主機原廠設定值, 建議開啟「抖動色彩效果」增加漸層色顯示效果, 設定<每像素32位元>時請關閉「抖動色彩效果」。"
 #define OPTION_VAL_16BPP_NATIVE_CHT "每像素16位元 (原廠)"
 #define OPTION_VAL_32BPP_CHT "每像素32位元"
 #define BEETLE_OPT_DITHER_MODE_LABEL_CHT "抖動色彩效果"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項, 設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, 設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」使用<Vulkan>時, 預設顏色深度為16位元, 將此選項關閉時為32位元。"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項, 設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, 設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」使用<Vulkan>時, 預設顏色深度為16位元, 關閉時使用32位元。"
 #define OPTION_VAL_INTERNAL_RESOLUTION_CHT "內部解析度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHT NULL
@@ -7929,6 +8169,26 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHT "支援類比搖桿切換模式 (DualShock)"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CHT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHT NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CHT NULL
+#define OPTION_VAL_L1_R1_SELECT_CHT NULL
+#define OPTION_VAL_L1_R1_START_CHT NULL
+#define OPTION_VAL_L1_R1_L3_CHT NULL
+#define OPTION_VAL_L1_R1_R3_CHT NULL
+#define OPTION_VAL_L2_R2_SELECT_CHT NULL
+#define OPTION_VAL_L2_R2_START_CHT NULL
+#define OPTION_VAL_L2_R2_L3_CHT NULL
+#define OPTION_VAL_L2_R2_R3_CHT NULL
+#define OPTION_VAL_L3_R3_CHT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHT NULL
+#define OPTION_VAL_0_CHT NULL
+#define OPTION_VAL_1_CHT NULL
+#define OPTION_VAL_2_CHT NULL
+#define OPTION_VAL_3_CHT NULL
+#define OPTION_VAL_4_CHT NULL
+#define OPTION_VAL_5_CHT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHT "連接埠 1 四手把轉接器"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHT "開啟連接埠1轉接插座可對應四位玩家。"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CHT "連接埠 2 四手把轉接器"
@@ -7958,7 +8218,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CHT "設定連接埠2光線槍準心顏色。"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CHT "滑鼠靈敏度"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CHT NULL
-#define OPTION_VAL_5_CHT NULL
+#define OPTION_VAL_5_O28_CHT NULL
 #define OPTION_VAL_10_CHT NULL
 #define OPTION_VAL_15_CHT NULL
 #define OPTION_VAL_20_CHT NULL
@@ -8005,20 +8265,20 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_CUBIC_CHT NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CHT "扭轉控制器作用區 (neGcon)"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CHT NULL
-#define OPTION_VAL_0_CHT NULL
+#define OPTION_VAL_0_O30_CHT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CHT "記憶卡1模式 (需要重新啟動)"
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CHT "設定記憶卡1檔案儲存格式, 設定<MCR格式>時兼容Mednafen模擬器, SRM格式和MCR格式可透過重新命名直接轉換。"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CHT "設定記憶卡1檔案儲存格式, <MCR格式>兼容Mednafen模擬器, SRM和MCR格式可透過重新命名直接轉換。"
 #define OPTION_VAL_LIBRETRO_CHT "SRM格式 (Libretro模擬器)"
 #define OPTION_VAL_MEDNAFEN_CHT "MCR格式 (Mednafen模擬器)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CHT "記憶卡2模式 (需要重新啟動)"
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHT "開啟時主機載入記憶卡2檔案編號, 僅限「記憶卡1模式」設定<MCR格式>時有效。\n注意: 部分遊戲需要關閉此選項才能執行, 例如: Codename Tenka (代號天下)。"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHT "開啟時主機載入記憶卡2檔案編號, 僅限「記憶卡1模式」設定<MCR格式>時有效。\n注意: 部分遊戲要關閉才能執行, 例如Codename Tenka (代號天下)。"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CHT "共用記憶卡 (需要重新啟動)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CHT "開啟時用相同記憶卡檔案儲存存檔, 關閉時依執行名稱建立記憶卡檔案。\n注意: 「記憶卡1模式」設定<SRM格式>時, 僅限記憶卡2檔案共用。"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CHT "記憶卡1檔案編號"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHT "變更記憶卡1檔案使用編號, 僅限「記憶卡1模式」設定<MCR格式>時有效, 預設<0>為檔案使用編號。"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CHT "記憶卡2檔案編號"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHT "變更記憶卡2檔案使用編號, 僅限開啟「記憶卡2模式」時有效, 預設<1>為檔案使用編號。"
-#define OPTION_VAL_1_CHT "1 (預設)"
+#define OPTION_VAL_1_O35_CHT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CHT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CHT NULL
 #define OPTION_VAL_MEMORY_ONLY_CHT "記憶體"
@@ -8153,7 +8413,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHT "裁剪過度掃描"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHT NULL
-#define OPTION_VAL_DISABLED_O54_CHT "無"
+#define OPTION_VAL_DISABLED_O56_CHT "無"
 #define OPTION_VAL_STATIC_CHT "靜態"
 #define OPTION_VAL_SMART_CHT "動態 (預設)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CHT NULL
@@ -8172,31 +8432,31 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_20PX_CHT "20像素"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CHT NULL
-#define OPTION_VAL_12PX_O56_CHT "-12像素"
-#define OPTION_VAL_11PX_O56_CHT "-11像素"
-#define OPTION_VAL_10PX_O56_CHT "-10像素"
-#define OPTION_VAL_9PX_O56_CHT "-9像素"
-#define OPTION_VAL_8PX_O56_CHT "-8像素"
-#define OPTION_VAL_7PX_O56_CHT "-7像素"
-#define OPTION_VAL_6PX_O56_CHT "-6像素"
-#define OPTION_VAL_5PX_O56_CHT "-5像素"
-#define OPTION_VAL_4PX_O56_CHT "-4像素"
-#define OPTION_VAL_3PX_O56_CHT "-3像素"
-#define OPTION_VAL_2PX_O56_CHT "-2像素"
-#define OPTION_VAL_1PX_O56_CHT "-1像素"
-#define OPTION_VAL_DISABLED_O56_CHT "0 (預設)"
-#define OPTION_VAL_1PX_O56_0_CHT "+1像素"
-#define OPTION_VAL_2PX_O56_0_CHT "+2像素"
-#define OPTION_VAL_3PX_O56_0_CHT "+3像素"
-#define OPTION_VAL_4PX_O56_0_CHT "+4像素"
-#define OPTION_VAL_5PX_O56_0_CHT "+5像素"
-#define OPTION_VAL_6PX_O56_0_CHT "+6像素"
-#define OPTION_VAL_7PX_O56_0_CHT "+7像素"
-#define OPTION_VAL_8PX_O56_0_CHT "+8像素"
-#define OPTION_VAL_9PX_O56_0_CHT "+9像素"
-#define OPTION_VAL_10PX_O56_0_CHT "+10像素"
-#define OPTION_VAL_11PX_O56_0_CHT "+11像素"
-#define OPTION_VAL_12PX_O56_0_CHT "+12像素"
+#define OPTION_VAL_12PX_O58_CHT NULL
+#define OPTION_VAL_11PX_O58_CHT NULL
+#define OPTION_VAL_10PX_O58_CHT NULL
+#define OPTION_VAL_9PX_O58_CHT NULL
+#define OPTION_VAL_8PX_O58_CHT NULL
+#define OPTION_VAL_7PX_O58_CHT NULL
+#define OPTION_VAL_6PX_O58_CHT NULL
+#define OPTION_VAL_5PX_O58_CHT NULL
+#define OPTION_VAL_4PX_O58_CHT NULL
+#define OPTION_VAL_3PX_O58_CHT NULL
+#define OPTION_VAL_2PX_O58_CHT NULL
+#define OPTION_VAL_1PX_O58_CHT NULL
+#define OPTION_VAL_DISABLED_O58_CHT NULL
+#define OPTION_VAL_1PX_O58_0_CHT NULL
+#define OPTION_VAL_2PX_O58_0_CHT NULL
+#define OPTION_VAL_3PX_O58_0_CHT NULL
+#define OPTION_VAL_4PX_O58_0_CHT NULL
+#define OPTION_VAL_5PX_O58_0_CHT NULL
+#define OPTION_VAL_6PX_O58_0_CHT NULL
+#define OPTION_VAL_7PX_O58_0_CHT NULL
+#define OPTION_VAL_8PX_O58_0_CHT NULL
+#define OPTION_VAL_9PX_O58_0_CHT NULL
+#define OPTION_VAL_10PX_O58_0_CHT NULL
+#define OPTION_VAL_11PX_O58_0_CHT NULL
+#define OPTION_VAL_12PX_O58_0_CHT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CHT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CHT NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CHT NULL
@@ -8576,6 +8836,46 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CHT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHT,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_CHT },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_CHT },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_CHT },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_CHT },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_CHT },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_CHT },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_CHT },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_CHT },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_CHT },
+         { "l3+r3",                    OPTION_VAL_L3_R3_CHT },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHT,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_CHT },
+         { "1", OPTION_VAL_1_CHT },
+         { "2", OPTION_VAL_2_CHT },
+         { "3", OPTION_VAL_3_CHT },
+         { "4", OPTION_VAL_4_CHT },
+         { "5", OPTION_VAL_5_CHT },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHT,
       NULL,
@@ -8685,7 +8985,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_CHT },
+         { "5%",   OPTION_VAL_5_O28_CHT },
          { "10%",  OPTION_VAL_10_CHT },
          { "15%",  OPTION_VAL_15_CHT },
          { "20%",  OPTION_VAL_20_CHT },
@@ -8752,8 +9052,8 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_CHT },
-         { "5%",  OPTION_VAL_5_CHT },
+         { "0%",  OPTION_VAL_0_O30_CHT },
+         { "5%",  OPTION_VAL_5_O28_CHT },
          { "10%", OPTION_VAL_10_CHT },
          { "15%", OPTION_VAL_15_CHT },
          { "20%", OPTION_VAL_20_CHT },
@@ -8890,7 +9190,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_CHT },
+         { "1",  OPTION_VAL_1_O35_CHT },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -9304,7 +9604,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_CHT },
+         { "1",  OPTION_VAL_1_O35_CHT },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -9347,7 +9647,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_CHT },
+         { "disabled",  OPTION_VAL_DISABLED_O56_CHT },
          { "static",  OPTION_VAL_STATIC_CHT },
          { "smart", OPTION_VAL_SMART_CHT },
          { NULL, NULL },
@@ -9395,31 +9695,31 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_CHT },
-         { "-11px",    OPTION_VAL_11PX_O56_CHT },
-         { "-10px",    OPTION_VAL_10PX_O56_CHT },
-         { "-9px",     OPTION_VAL_9PX_O56_CHT },
-         { "-8px",     OPTION_VAL_8PX_O56_CHT },
-         { "-7px",     OPTION_VAL_7PX_O56_CHT },
-         { "-6px",     OPTION_VAL_6PX_O56_CHT },
-         { "-5px",     OPTION_VAL_5PX_O56_CHT },
-         { "-4px",     OPTION_VAL_4PX_O56_CHT },
-         { "-3px",     OPTION_VAL_3PX_O56_CHT },
-         { "-2px",     OPTION_VAL_2PX_O56_CHT },
-         { "-1px",     OPTION_VAL_1PX_O56_CHT },
-         { "disabled", OPTION_VAL_DISABLED_O56_CHT },
-         { "+1px",     OPTION_VAL_1PX_O56_0_CHT },
-         { "+2px",     OPTION_VAL_2PX_O56_0_CHT },
-         { "+3px",     OPTION_VAL_3PX_O56_0_CHT },
-         { "+4px",     OPTION_VAL_4PX_O56_0_CHT },
-         { "+5px",     OPTION_VAL_5PX_O56_0_CHT },
-         { "+6px",     OPTION_VAL_6PX_O56_0_CHT },
-         { "+7px",     OPTION_VAL_7PX_O56_0_CHT },
-         { "+8px",     OPTION_VAL_8PX_O56_0_CHT },
-         { "+9px",     OPTION_VAL_9PX_O56_0_CHT },
-         { "+10px",    OPTION_VAL_10PX_O56_0_CHT },
-         { "+11px",    OPTION_VAL_11PX_O56_0_CHT },
-         { "+12px",    OPTION_VAL_12PX_O56_0_CHT },
+         { "-12px",    OPTION_VAL_12PX_O58_CHT },
+         { "-11px",    OPTION_VAL_11PX_O58_CHT },
+         { "-10px",    OPTION_VAL_10PX_O58_CHT },
+         { "-9px",     OPTION_VAL_9PX_O58_CHT },
+         { "-8px",     OPTION_VAL_8PX_O58_CHT },
+         { "-7px",     OPTION_VAL_7PX_O58_CHT },
+         { "-6px",     OPTION_VAL_6PX_O58_CHT },
+         { "-5px",     OPTION_VAL_5PX_O58_CHT },
+         { "-4px",     OPTION_VAL_4PX_O58_CHT },
+         { "-3px",     OPTION_VAL_3PX_O58_CHT },
+         { "-2px",     OPTION_VAL_2PX_O58_CHT },
+         { "-1px",     OPTION_VAL_1PX_O58_CHT },
+         { "disabled", OPTION_VAL_DISABLED_O58_CHT },
+         { "+1px",     OPTION_VAL_1PX_O58_0_CHT },
+         { "+2px",     OPTION_VAL_2PX_O58_0_CHT },
+         { "+3px",     OPTION_VAL_3PX_O58_0_CHT },
+         { "+4px",     OPTION_VAL_4PX_O58_0_CHT },
+         { "+5px",     OPTION_VAL_5PX_O58_0_CHT },
+         { "+6px",     OPTION_VAL_6PX_O58_0_CHT },
+         { "+7px",     OPTION_VAL_7PX_O58_0_CHT },
+         { "+8px",     OPTION_VAL_8PX_O58_0_CHT },
+         { "+9px",     OPTION_VAL_9PX_O58_0_CHT },
+         { "+10px",    OPTION_VAL_10PX_O58_0_CHT },
+         { "+11px",    OPTION_VAL_11PX_O58_0_CHT },
+         { "+12px",    OPTION_VAL_12PX_O58_0_CHT },
          { NULL, NULL },
       },
       "disabled"
@@ -9473,7 +9773,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_CHT },
+         { "0",        OPTION_VAL_DISABLED_O58_CHT },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -9883,7 +10183,27 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CS "Analogová Vlastní Kalibrace"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CS "Pokud je vstupní zařízení nastaveno na DualShock, Analogový ovladač, Analogový joystick nebo neGcon, tato možnost umožňuje dynamickou kalibraci analogových vstupů. Maximální registrované hodnoty vstupů jsou sledovány v reálném čase a použity ke škálování analogových souřadnic předávaných emulátoru. Tato funkce by měla být použita u her, jako je Mega Man Legends 2, které očekávají větší hodnoty, než jaké poskytují moderní ovladače. Pro dosažení nejlepších výsledků by se analogové páčky měly otáčet v plném rozsahu, aby se kalibrační algoritmus vyladil při každém načtení obsahu."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CS "Povolit Přepnutí Režimu Analogu DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS "Pokud je typem vstupního zařízení DualShock, umožňuje tato možnost přepínat emulovaný DualShock mezi DIGITÁLNÍM a ANALOGOVÝM režimem jako původní hardware. Když je tato funkce vypnutá, je zařízení DualShock uzamčeno v režimu ANALOG, a když je povolená, lze zařízení DualShock přepínat mezi režimem DIGITAL a ANALOG stisknutím a podržením kláves START+VYBRAT+L1+L2+R1+R2."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CS NULL
+#define OPTION_VAL_L1_R1_SELECT_CS NULL
+#define OPTION_VAL_L1_R1_START_CS NULL
+#define OPTION_VAL_L1_R1_L3_CS NULL
+#define OPTION_VAL_L1_R1_R3_CS NULL
+#define OPTION_VAL_L2_R2_SELECT_CS NULL
+#define OPTION_VAL_L2_R2_START_CS NULL
+#define OPTION_VAL_L2_R2_L3_CS NULL
+#define OPTION_VAL_L2_R2_R3_CS NULL
+#define OPTION_VAL_L3_R3_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS NULL
+#define OPTION_VAL_0_CS NULL
+#define OPTION_VAL_1_CS NULL
+#define OPTION_VAL_2_CS NULL
+#define OPTION_VAL_3_CS NULL
+#define OPTION_VAL_4_CS NULL
+#define OPTION_VAL_5_CS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CS "Port 1: Povolení Multitapu"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CS "Povolit funkci multitap na portu 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CS "Port 2: Povolení Multitapu"
@@ -9913,7 +10233,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CS "Vyberte barvu světelného kříže pro port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CS "Citlivost Myši"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CS "Zvolte odezvu typu vstupního zařízení 'Myš'."
-#define OPTION_VAL_5_CS NULL
+#define OPTION_VAL_5_O28_CS NULL
 #define OPTION_VAL_10_CS NULL
 #define OPTION_VAL_15_CS NULL
 #define OPTION_VAL_20_CS NULL
@@ -9960,7 +10280,7 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_CUBIC_CS "Kubická"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CS "mrtvá Zóna neGcon Twist"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CS "Při simulaci akce 'twist' u emulovaných vstupních zařízení 'neGcon' vyberte zónu nečinnosti levé analogové páčky zařízení RetroPad. Slouží k eliminaci driftu ovladače. Poznámka: Většina titulů kompatibilních s neGcon poskytuje ve hře možnosti nastavení hodnoty deadzone 'twist'. Aby nedocházelo ke ztrátě přesnosti, měla by být herní deadzone *vždy* nastavena na nulu. Jakékoli požadované úpravy by se měly provádět *pouze* prostřednictvím této základní volby. To je důležité zejména tehdy, když je 'neGcon Twist Response' nastavena na 'Kvadratický' nebo 'Kubický'."
-#define OPTION_VAL_0_CS NULL
+#define OPTION_VAL_0_O30_CS NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CS "Metoda Paměťové Karty 0 (Vyžadován Restart)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CS "Zvolte formát ukládání dat použitý pro paměťovou kartu 0. Pro kompatibilitu se samostatnou verzí programu Mednafen lze použít 'Mednafen'. Při použití s Beetle PSX mají uložená data Libretro (.srm) a Mednafen (.mcr) interně identické formáty a lze je mezi sebou převádět pomocí přejmenování."
 #define OPTION_VAL_LIBRETRO_CS NULL
@@ -9973,7 +10293,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v levém slotu. Tato možnost bude fungovat pouze v případě, že je metoda Paměťová Karta 0 nastavena na Mednafen. Výchozí karta má index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CS "Pravý Index Paměťové Karty"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v pravém slotu. Tato možnost bude fungovat pouze v případě, že je povolena Paměťová Karta 1. Výchozí karta má index 1."
-#define OPTION_VAL_1_CS "1 (Výchozí)"
+#define OPTION_VAL_1_O35_CS NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CS "Provozní Režim PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CS "Umožňuje vykreslovat 3D objekty se subpixelovou přesností, čímž se minimalizuje zkreslení a chvění 3D objektů na původním hardwaru v důsledku použití souřadnic vrcholů s pevným bodem. Režim 'Pouze Paměť' má minimální problémy s kompatibilitou a doporučuje se pro obecné použití. Režim 'Paměť + CPU (Chyby)' může ještě více snížit jitter, ale má vysoké nároky na výkon a může způsobit různé chyby geometrie."
 #define OPTION_VAL_MEMORY_ONLY_CS "Pouze Paměť"
@@ -10108,7 +10428,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CS "Kvůli odlišným normám se hry pro PAL často jeví jako zpomalené ve srovnání s americkými nebo japonskými verzemi pro NTSC. Tuto možnost lze použít k potlačení časování PAL, abyste se pokusili spustit tyto hry se snímkovou frekvencí NTSC. Tato volba nemá žádný účinek při spouštění obsahu NTSC."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CS "Overscan Oříznutí"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CS "'Žádný' zachovává výplň (sloupcové rámečky na obou stranách obrazu pro NTSC, na všech stranách pro PAL), aby se napodobily stejné černé pruhy generované na analogovém video výstupu skutečným hardwarem PSX. 'Statické' odstraní pouze horizontální polstrování, 'Dynamické' odstraní veškeré polstrování."
-#define OPTION_VAL_DISABLED_O54_CS "Žádné"
+#define OPTION_VAL_DISABLED_O56_CS "Žádné"
 #define OPTION_VAL_STATIC_CS "Statické"
 #define OPTION_VAL_SMART_CS "Dynamické (Výchozí)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CS "Dodatečné Oříznutí"
@@ -10127,31 +10447,31 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_20PX_CS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_CS "Posun Oříznutého Snímku"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CS "Pokud je povolena možnost 'Oříznout Horizontální Přesah', umožní to výsledný oříznutý obraz posunout horizontálně doprava (kladně) nebo doleva (záporně) o zadaný počet pixelů. Lze použít k opravě problémů se zarovnáním. Podporováno pouze softwarovým vykreslovačem."
-#define OPTION_VAL_12PX_O56_CS NULL
-#define OPTION_VAL_11PX_O56_CS NULL
-#define OPTION_VAL_10PX_O56_CS NULL
-#define OPTION_VAL_9PX_O56_CS NULL
-#define OPTION_VAL_8PX_O56_CS NULL
-#define OPTION_VAL_7PX_O56_CS NULL
-#define OPTION_VAL_6PX_O56_CS NULL
-#define OPTION_VAL_5PX_O56_CS NULL
-#define OPTION_VAL_4PX_O56_CS NULL
-#define OPTION_VAL_3PX_O56_CS NULL
-#define OPTION_VAL_2PX_O56_CS NULL
-#define OPTION_VAL_1PX_O56_CS NULL
-#define OPTION_VAL_DISABLED_O56_CS "0 (Výchozí)"
-#define OPTION_VAL_1PX_O56_0_CS NULL
-#define OPTION_VAL_2PX_O56_0_CS NULL
-#define OPTION_VAL_3PX_O56_0_CS NULL
-#define OPTION_VAL_4PX_O56_0_CS NULL
-#define OPTION_VAL_5PX_O56_0_CS NULL
-#define OPTION_VAL_6PX_O56_0_CS NULL
-#define OPTION_VAL_7PX_O56_0_CS NULL
-#define OPTION_VAL_8PX_O56_0_CS NULL
-#define OPTION_VAL_9PX_O56_0_CS NULL
-#define OPTION_VAL_10PX_O56_0_CS NULL
-#define OPTION_VAL_11PX_O56_0_CS NULL
-#define OPTION_VAL_12PX_O56_0_CS NULL
+#define OPTION_VAL_12PX_O58_CS NULL
+#define OPTION_VAL_11PX_O58_CS NULL
+#define OPTION_VAL_10PX_O58_CS NULL
+#define OPTION_VAL_9PX_O58_CS NULL
+#define OPTION_VAL_8PX_O58_CS NULL
+#define OPTION_VAL_7PX_O58_CS NULL
+#define OPTION_VAL_6PX_O58_CS NULL
+#define OPTION_VAL_5PX_O58_CS NULL
+#define OPTION_VAL_4PX_O58_CS NULL
+#define OPTION_VAL_3PX_O58_CS NULL
+#define OPTION_VAL_2PX_O58_CS NULL
+#define OPTION_VAL_1PX_O58_CS NULL
+#define OPTION_VAL_DISABLED_O58_CS NULL
+#define OPTION_VAL_1PX_O58_0_CS NULL
+#define OPTION_VAL_2PX_O58_0_CS NULL
+#define OPTION_VAL_3PX_O58_0_CS NULL
+#define OPTION_VAL_4PX_O58_0_CS NULL
+#define OPTION_VAL_5PX_O58_0_CS NULL
+#define OPTION_VAL_6PX_O58_0_CS NULL
+#define OPTION_VAL_7PX_O58_0_CS NULL
+#define OPTION_VAL_8PX_O58_0_CS NULL
+#define OPTION_VAL_9PX_O58_0_CS NULL
+#define OPTION_VAL_10PX_O58_0_CS NULL
+#define OPTION_VAL_11PX_O58_0_CS NULL
+#define OPTION_VAL_12PX_O58_0_CS NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CS "Horizontální Posun Obrazu (Cykly GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CS "Zvolte počet cyklů GPU, o které se má obraz posunout. Kladné hodnoty posunou obraz doprava, záporné hodnoty doleva. Podporováno pouze hardwarovými vykreslovači."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CS "Přetaktování GPU Rasterizer"
@@ -10531,6 +10851,46 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CS,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_CS },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_CS },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_CS },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_CS },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_CS },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_CS },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_CS },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_CS },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_CS },
+         { "l3+r3",                    OPTION_VAL_L3_R3_CS },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_CS },
+         { "1", OPTION_VAL_1_CS },
+         { "2", OPTION_VAL_2_CS },
+         { "3", OPTION_VAL_3_CS },
+         { "4", OPTION_VAL_4_CS },
+         { "5", OPTION_VAL_5_CS },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CS,
       NULL,
@@ -10640,7 +11000,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_CS },
+         { "5%",   OPTION_VAL_5_O28_CS },
          { "10%",  OPTION_VAL_10_CS },
          { "15%",  OPTION_VAL_15_CS },
          { "20%",  OPTION_VAL_20_CS },
@@ -10707,8 +11067,8 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_CS },
-         { "5%",  OPTION_VAL_5_CS },
+         { "0%",  OPTION_VAL_0_O30_CS },
+         { "5%",  OPTION_VAL_5_O28_CS },
          { "10%", OPTION_VAL_10_CS },
          { "15%", OPTION_VAL_15_CS },
          { "20%", OPTION_VAL_20_CS },
@@ -10845,7 +11205,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_CS },
+         { "1",  OPTION_VAL_1_O35_CS },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -11259,7 +11619,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_CS },
+         { "1",  OPTION_VAL_1_O35_CS },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -11302,7 +11662,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_CS },
+         { "disabled",  OPTION_VAL_DISABLED_O56_CS },
          { "static",  OPTION_VAL_STATIC_CS },
          { "smart", OPTION_VAL_SMART_CS },
          { NULL, NULL },
@@ -11350,31 +11710,31 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_CS },
-         { "-11px",    OPTION_VAL_11PX_O56_CS },
-         { "-10px",    OPTION_VAL_10PX_O56_CS },
-         { "-9px",     OPTION_VAL_9PX_O56_CS },
-         { "-8px",     OPTION_VAL_8PX_O56_CS },
-         { "-7px",     OPTION_VAL_7PX_O56_CS },
-         { "-6px",     OPTION_VAL_6PX_O56_CS },
-         { "-5px",     OPTION_VAL_5PX_O56_CS },
-         { "-4px",     OPTION_VAL_4PX_O56_CS },
-         { "-3px",     OPTION_VAL_3PX_O56_CS },
-         { "-2px",     OPTION_VAL_2PX_O56_CS },
-         { "-1px",     OPTION_VAL_1PX_O56_CS },
-         { "disabled", OPTION_VAL_DISABLED_O56_CS },
-         { "+1px",     OPTION_VAL_1PX_O56_0_CS },
-         { "+2px",     OPTION_VAL_2PX_O56_0_CS },
-         { "+3px",     OPTION_VAL_3PX_O56_0_CS },
-         { "+4px",     OPTION_VAL_4PX_O56_0_CS },
-         { "+5px",     OPTION_VAL_5PX_O56_0_CS },
-         { "+6px",     OPTION_VAL_6PX_O56_0_CS },
-         { "+7px",     OPTION_VAL_7PX_O56_0_CS },
-         { "+8px",     OPTION_VAL_8PX_O56_0_CS },
-         { "+9px",     OPTION_VAL_9PX_O56_0_CS },
-         { "+10px",    OPTION_VAL_10PX_O56_0_CS },
-         { "+11px",    OPTION_VAL_11PX_O56_0_CS },
-         { "+12px",    OPTION_VAL_12PX_O56_0_CS },
+         { "-12px",    OPTION_VAL_12PX_O58_CS },
+         { "-11px",    OPTION_VAL_11PX_O58_CS },
+         { "-10px",    OPTION_VAL_10PX_O58_CS },
+         { "-9px",     OPTION_VAL_9PX_O58_CS },
+         { "-8px",     OPTION_VAL_8PX_O58_CS },
+         { "-7px",     OPTION_VAL_7PX_O58_CS },
+         { "-6px",     OPTION_VAL_6PX_O58_CS },
+         { "-5px",     OPTION_VAL_5PX_O58_CS },
+         { "-4px",     OPTION_VAL_4PX_O58_CS },
+         { "-3px",     OPTION_VAL_3PX_O58_CS },
+         { "-2px",     OPTION_VAL_2PX_O58_CS },
+         { "-1px",     OPTION_VAL_1PX_O58_CS },
+         { "disabled", OPTION_VAL_DISABLED_O58_CS },
+         { "+1px",     OPTION_VAL_1PX_O58_0_CS },
+         { "+2px",     OPTION_VAL_2PX_O58_0_CS },
+         { "+3px",     OPTION_VAL_3PX_O58_0_CS },
+         { "+4px",     OPTION_VAL_4PX_O58_0_CS },
+         { "+5px",     OPTION_VAL_5PX_O58_0_CS },
+         { "+6px",     OPTION_VAL_6PX_O58_0_CS },
+         { "+7px",     OPTION_VAL_7PX_O58_0_CS },
+         { "+8px",     OPTION_VAL_8PX_O58_0_CS },
+         { "+9px",     OPTION_VAL_9PX_O58_0_CS },
+         { "+10px",    OPTION_VAL_10PX_O58_0_CS },
+         { "+11px",    OPTION_VAL_11PX_O58_0_CS },
+         { "+12px",    OPTION_VAL_12PX_O58_0_CS },
          { NULL, NULL },
       },
       "disabled"
@@ -11428,7 +11788,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_CS },
+         { "0",        OPTION_VAL_DISABLED_O58_CS },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -11839,6 +12199,26 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CY NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CY NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CY NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CY NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CY NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CY NULL
+#define OPTION_VAL_L1_R1_SELECT_CY NULL
+#define OPTION_VAL_L1_R1_START_CY NULL
+#define OPTION_VAL_L1_R1_L3_CY NULL
+#define OPTION_VAL_L1_R1_R3_CY NULL
+#define OPTION_VAL_L2_R2_SELECT_CY NULL
+#define OPTION_VAL_L2_R2_START_CY NULL
+#define OPTION_VAL_L2_R2_L3_CY NULL
+#define OPTION_VAL_L2_R2_R3_CY NULL
+#define OPTION_VAL_L3_R3_CY NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CY NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CY NULL
+#define OPTION_VAL_0_CY NULL
+#define OPTION_VAL_1_CY NULL
+#define OPTION_VAL_2_CY NULL
+#define OPTION_VAL_3_CY NULL
+#define OPTION_VAL_4_CY NULL
+#define OPTION_VAL_5_CY NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CY NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CY NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CY NULL
@@ -11868,7 +12248,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CY NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CY NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CY NULL
-#define OPTION_VAL_5_CY NULL
+#define OPTION_VAL_5_O28_CY NULL
 #define OPTION_VAL_10_CY NULL
 #define OPTION_VAL_15_CY NULL
 #define OPTION_VAL_20_CY NULL
@@ -11915,7 +12295,7 @@ struct retro_core_options_v2 options_cs = {
 #define OPTION_VAL_CUBIC_CY NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CY NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CY NULL
-#define OPTION_VAL_0_CY NULL
+#define OPTION_VAL_0_O30_CY NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CY NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CY NULL
 #define OPTION_VAL_LIBRETRO_CY NULL
@@ -11928,7 +12308,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CY NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CY NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CY NULL
-#define OPTION_VAL_1_CY NULL
+#define OPTION_VAL_1_O35_CY NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CY NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CY NULL
 #define OPTION_VAL_MEMORY_ONLY_CY NULL
@@ -12063,7 +12443,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CY NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_CY NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CY NULL
-#define OPTION_VAL_DISABLED_O54_CY "Dim"
+#define OPTION_VAL_DISABLED_O56_CY "Dim"
 #define OPTION_VAL_STATIC_CY NULL
 #define OPTION_VAL_SMART_CY NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CY NULL
@@ -12082,31 +12462,31 @@ struct retro_core_options_v2 options_cs = {
 #define OPTION_VAL_20PX_CY NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_CY NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CY NULL
-#define OPTION_VAL_12PX_O56_CY NULL
-#define OPTION_VAL_11PX_O56_CY NULL
-#define OPTION_VAL_10PX_O56_CY NULL
-#define OPTION_VAL_9PX_O56_CY NULL
-#define OPTION_VAL_8PX_O56_CY NULL
-#define OPTION_VAL_7PX_O56_CY NULL
-#define OPTION_VAL_6PX_O56_CY NULL
-#define OPTION_VAL_5PX_O56_CY NULL
-#define OPTION_VAL_4PX_O56_CY NULL
-#define OPTION_VAL_3PX_O56_CY NULL
-#define OPTION_VAL_2PX_O56_CY NULL
-#define OPTION_VAL_1PX_O56_CY NULL
-#define OPTION_VAL_DISABLED_O56_CY NULL
-#define OPTION_VAL_1PX_O56_0_CY NULL
-#define OPTION_VAL_2PX_O56_0_CY NULL
-#define OPTION_VAL_3PX_O56_0_CY NULL
-#define OPTION_VAL_4PX_O56_0_CY NULL
-#define OPTION_VAL_5PX_O56_0_CY NULL
-#define OPTION_VAL_6PX_O56_0_CY NULL
-#define OPTION_VAL_7PX_O56_0_CY NULL
-#define OPTION_VAL_8PX_O56_0_CY NULL
-#define OPTION_VAL_9PX_O56_0_CY NULL
-#define OPTION_VAL_10PX_O56_0_CY NULL
-#define OPTION_VAL_11PX_O56_0_CY NULL
-#define OPTION_VAL_12PX_O56_0_CY NULL
+#define OPTION_VAL_12PX_O58_CY NULL
+#define OPTION_VAL_11PX_O58_CY NULL
+#define OPTION_VAL_10PX_O58_CY NULL
+#define OPTION_VAL_9PX_O58_CY NULL
+#define OPTION_VAL_8PX_O58_CY NULL
+#define OPTION_VAL_7PX_O58_CY NULL
+#define OPTION_VAL_6PX_O58_CY NULL
+#define OPTION_VAL_5PX_O58_CY NULL
+#define OPTION_VAL_4PX_O58_CY NULL
+#define OPTION_VAL_3PX_O58_CY NULL
+#define OPTION_VAL_2PX_O58_CY NULL
+#define OPTION_VAL_1PX_O58_CY NULL
+#define OPTION_VAL_DISABLED_O58_CY NULL
+#define OPTION_VAL_1PX_O58_0_CY NULL
+#define OPTION_VAL_2PX_O58_0_CY NULL
+#define OPTION_VAL_3PX_O58_0_CY NULL
+#define OPTION_VAL_4PX_O58_0_CY NULL
+#define OPTION_VAL_5PX_O58_0_CY NULL
+#define OPTION_VAL_6PX_O58_0_CY NULL
+#define OPTION_VAL_7PX_O58_0_CY NULL
+#define OPTION_VAL_8PX_O58_0_CY NULL
+#define OPTION_VAL_9PX_O58_0_CY NULL
+#define OPTION_VAL_10PX_O58_0_CY NULL
+#define OPTION_VAL_11PX_O58_0_CY NULL
+#define OPTION_VAL_12PX_O58_0_CY NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CY NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CY NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CY NULL
@@ -12486,6 +12866,46 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CY,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CY,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_CY },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_CY },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_CY },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_CY },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_CY },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_CY },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_CY },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_CY },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_CY },
+         { "l3+r3",                    OPTION_VAL_L3_R3_CY },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CY,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CY,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_CY },
+         { "1", OPTION_VAL_1_CY },
+         { "2", OPTION_VAL_2_CY },
+         { "3", OPTION_VAL_3_CY },
+         { "4", OPTION_VAL_4_CY },
+         { "5", OPTION_VAL_5_CY },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CY,
       NULL,
@@ -12595,7 +13015,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_CY },
+         { "5%",   OPTION_VAL_5_O28_CY },
          { "10%",  OPTION_VAL_10_CY },
          { "15%",  OPTION_VAL_15_CY },
          { "20%",  OPTION_VAL_20_CY },
@@ -12662,8 +13082,8 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_CY },
-         { "5%",  OPTION_VAL_5_CY },
+         { "0%",  OPTION_VAL_0_O30_CY },
+         { "5%",  OPTION_VAL_5_O28_CY },
          { "10%", OPTION_VAL_10_CY },
          { "15%", OPTION_VAL_15_CY },
          { "20%", OPTION_VAL_20_CY },
@@ -12800,7 +13220,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_CY },
+         { "1",  OPTION_VAL_1_O35_CY },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -13214,7 +13634,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_CY },
+         { "1",  OPTION_VAL_1_O35_CY },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -13257,7 +13677,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_CY },
+         { "disabled",  OPTION_VAL_DISABLED_O56_CY },
          { "static",  OPTION_VAL_STATIC_CY },
          { "smart", OPTION_VAL_SMART_CY },
          { NULL, NULL },
@@ -13305,31 +13725,31 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_CY },
-         { "-11px",    OPTION_VAL_11PX_O56_CY },
-         { "-10px",    OPTION_VAL_10PX_O56_CY },
-         { "-9px",     OPTION_VAL_9PX_O56_CY },
-         { "-8px",     OPTION_VAL_8PX_O56_CY },
-         { "-7px",     OPTION_VAL_7PX_O56_CY },
-         { "-6px",     OPTION_VAL_6PX_O56_CY },
-         { "-5px",     OPTION_VAL_5PX_O56_CY },
-         { "-4px",     OPTION_VAL_4PX_O56_CY },
-         { "-3px",     OPTION_VAL_3PX_O56_CY },
-         { "-2px",     OPTION_VAL_2PX_O56_CY },
-         { "-1px",     OPTION_VAL_1PX_O56_CY },
-         { "disabled", OPTION_VAL_DISABLED_O56_CY },
-         { "+1px",     OPTION_VAL_1PX_O56_0_CY },
-         { "+2px",     OPTION_VAL_2PX_O56_0_CY },
-         { "+3px",     OPTION_VAL_3PX_O56_0_CY },
-         { "+4px",     OPTION_VAL_4PX_O56_0_CY },
-         { "+5px",     OPTION_VAL_5PX_O56_0_CY },
-         { "+6px",     OPTION_VAL_6PX_O56_0_CY },
-         { "+7px",     OPTION_VAL_7PX_O56_0_CY },
-         { "+8px",     OPTION_VAL_8PX_O56_0_CY },
-         { "+9px",     OPTION_VAL_9PX_O56_0_CY },
-         { "+10px",    OPTION_VAL_10PX_O56_0_CY },
-         { "+11px",    OPTION_VAL_11PX_O56_0_CY },
-         { "+12px",    OPTION_VAL_12PX_O56_0_CY },
+         { "-12px",    OPTION_VAL_12PX_O58_CY },
+         { "-11px",    OPTION_VAL_11PX_O58_CY },
+         { "-10px",    OPTION_VAL_10PX_O58_CY },
+         { "-9px",     OPTION_VAL_9PX_O58_CY },
+         { "-8px",     OPTION_VAL_8PX_O58_CY },
+         { "-7px",     OPTION_VAL_7PX_O58_CY },
+         { "-6px",     OPTION_VAL_6PX_O58_CY },
+         { "-5px",     OPTION_VAL_5PX_O58_CY },
+         { "-4px",     OPTION_VAL_4PX_O58_CY },
+         { "-3px",     OPTION_VAL_3PX_O58_CY },
+         { "-2px",     OPTION_VAL_2PX_O58_CY },
+         { "-1px",     OPTION_VAL_1PX_O58_CY },
+         { "disabled", OPTION_VAL_DISABLED_O58_CY },
+         { "+1px",     OPTION_VAL_1PX_O58_0_CY },
+         { "+2px",     OPTION_VAL_2PX_O58_0_CY },
+         { "+3px",     OPTION_VAL_3PX_O58_0_CY },
+         { "+4px",     OPTION_VAL_4PX_O58_0_CY },
+         { "+5px",     OPTION_VAL_5PX_O58_0_CY },
+         { "+6px",     OPTION_VAL_6PX_O58_0_CY },
+         { "+7px",     OPTION_VAL_7PX_O58_0_CY },
+         { "+8px",     OPTION_VAL_8PX_O58_0_CY },
+         { "+9px",     OPTION_VAL_9PX_O58_0_CY },
+         { "+10px",    OPTION_VAL_10PX_O58_0_CY },
+         { "+11px",    OPTION_VAL_11PX_O58_0_CY },
+         { "+12px",    OPTION_VAL_12PX_O58_0_CY },
          { NULL, NULL },
       },
       "disabled"
@@ -13383,7 +13803,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_CY },
+         { "0",        OPTION_VAL_DISABLED_O58_CY },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -13794,6 +14214,26 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_DA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_DA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_DA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_DA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_DA NULL
+#define OPTION_VAL_L1_R1_SELECT_DA NULL
+#define OPTION_VAL_L1_R1_START_DA NULL
+#define OPTION_VAL_L1_R1_L3_DA NULL
+#define OPTION_VAL_L1_R1_R3_DA NULL
+#define OPTION_VAL_L2_R2_SELECT_DA NULL
+#define OPTION_VAL_L2_R2_START_DA NULL
+#define OPTION_VAL_L2_R2_L3_DA NULL
+#define OPTION_VAL_L2_R2_R3_DA NULL
+#define OPTION_VAL_L3_R3_DA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DA NULL
+#define OPTION_VAL_0_DA NULL
+#define OPTION_VAL_1_DA NULL
+#define OPTION_VAL_2_DA NULL
+#define OPTION_VAL_3_DA NULL
+#define OPTION_VAL_4_DA NULL
+#define OPTION_VAL_5_DA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_DA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_DA NULL
@@ -13823,7 +14263,7 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_DA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_DA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_DA NULL
-#define OPTION_VAL_5_DA NULL
+#define OPTION_VAL_5_O28_DA NULL
 #define OPTION_VAL_10_DA NULL
 #define OPTION_VAL_15_DA NULL
 #define OPTION_VAL_20_DA NULL
@@ -13870,7 +14310,7 @@ struct retro_core_options_v2 options_cy = {
 #define OPTION_VAL_CUBIC_DA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_DA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_DA NULL
-#define OPTION_VAL_0_DA NULL
+#define OPTION_VAL_0_O30_DA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_DA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_DA NULL
 #define OPTION_VAL_LIBRETRO_DA NULL
@@ -13883,7 +14323,7 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_DA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_DA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_DA NULL
-#define OPTION_VAL_1_DA NULL
+#define OPTION_VAL_1_O35_DA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_DA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_DA NULL
 #define OPTION_VAL_MEMORY_ONLY_DA NULL
@@ -14018,7 +14458,7 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_DA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DA NULL
-#define OPTION_VAL_DISABLED_O54_DA NULL
+#define OPTION_VAL_DISABLED_O56_DA NULL
 #define OPTION_VAL_STATIC_DA NULL
 #define OPTION_VAL_SMART_DA NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_DA NULL
@@ -14037,31 +14477,31 @@ struct retro_core_options_v2 options_cy = {
 #define OPTION_VAL_20PX_DA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_DA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_DA NULL
-#define OPTION_VAL_12PX_O56_DA NULL
-#define OPTION_VAL_11PX_O56_DA NULL
-#define OPTION_VAL_10PX_O56_DA NULL
-#define OPTION_VAL_9PX_O56_DA NULL
-#define OPTION_VAL_8PX_O56_DA NULL
-#define OPTION_VAL_7PX_O56_DA NULL
-#define OPTION_VAL_6PX_O56_DA NULL
-#define OPTION_VAL_5PX_O56_DA NULL
-#define OPTION_VAL_4PX_O56_DA NULL
-#define OPTION_VAL_3PX_O56_DA NULL
-#define OPTION_VAL_2PX_O56_DA NULL
-#define OPTION_VAL_1PX_O56_DA NULL
-#define OPTION_VAL_DISABLED_O56_DA NULL
-#define OPTION_VAL_1PX_O56_0_DA NULL
-#define OPTION_VAL_2PX_O56_0_DA NULL
-#define OPTION_VAL_3PX_O56_0_DA NULL
-#define OPTION_VAL_4PX_O56_0_DA NULL
-#define OPTION_VAL_5PX_O56_0_DA NULL
-#define OPTION_VAL_6PX_O56_0_DA NULL
-#define OPTION_VAL_7PX_O56_0_DA NULL
-#define OPTION_VAL_8PX_O56_0_DA NULL
-#define OPTION_VAL_9PX_O56_0_DA NULL
-#define OPTION_VAL_10PX_O56_0_DA NULL
-#define OPTION_VAL_11PX_O56_0_DA NULL
-#define OPTION_VAL_12PX_O56_0_DA NULL
+#define OPTION_VAL_12PX_O58_DA NULL
+#define OPTION_VAL_11PX_O58_DA NULL
+#define OPTION_VAL_10PX_O58_DA NULL
+#define OPTION_VAL_9PX_O58_DA NULL
+#define OPTION_VAL_8PX_O58_DA NULL
+#define OPTION_VAL_7PX_O58_DA NULL
+#define OPTION_VAL_6PX_O58_DA NULL
+#define OPTION_VAL_5PX_O58_DA NULL
+#define OPTION_VAL_4PX_O58_DA NULL
+#define OPTION_VAL_3PX_O58_DA NULL
+#define OPTION_VAL_2PX_O58_DA NULL
+#define OPTION_VAL_1PX_O58_DA NULL
+#define OPTION_VAL_DISABLED_O58_DA NULL
+#define OPTION_VAL_1PX_O58_0_DA NULL
+#define OPTION_VAL_2PX_O58_0_DA NULL
+#define OPTION_VAL_3PX_O58_0_DA NULL
+#define OPTION_VAL_4PX_O58_0_DA NULL
+#define OPTION_VAL_5PX_O58_0_DA NULL
+#define OPTION_VAL_6PX_O58_0_DA NULL
+#define OPTION_VAL_7PX_O58_0_DA NULL
+#define OPTION_VAL_8PX_O58_0_DA NULL
+#define OPTION_VAL_9PX_O58_0_DA NULL
+#define OPTION_VAL_10PX_O58_0_DA NULL
+#define OPTION_VAL_11PX_O58_0_DA NULL
+#define OPTION_VAL_12PX_O58_0_DA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_DA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_DA NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_DA NULL
@@ -14441,6 +14881,46 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_DA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DA,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_DA },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_DA },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_DA },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_DA },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_DA },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_DA },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_DA },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_DA },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_DA },
+         { "l3+r3",                    OPTION_VAL_L3_R3_DA },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DA,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_DA },
+         { "1", OPTION_VAL_1_DA },
+         { "2", OPTION_VAL_2_DA },
+         { "3", OPTION_VAL_3_DA },
+         { "4", OPTION_VAL_4_DA },
+         { "5", OPTION_VAL_5_DA },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DA,
       NULL,
@@ -14550,7 +15030,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_DA },
+         { "5%",   OPTION_VAL_5_O28_DA },
          { "10%",  OPTION_VAL_10_DA },
          { "15%",  OPTION_VAL_15_DA },
          { "20%",  OPTION_VAL_20_DA },
@@ -14617,8 +15097,8 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_DA },
-         { "5%",  OPTION_VAL_5_DA },
+         { "0%",  OPTION_VAL_0_O30_DA },
+         { "5%",  OPTION_VAL_5_O28_DA },
          { "10%", OPTION_VAL_10_DA },
          { "15%", OPTION_VAL_15_DA },
          { "20%", OPTION_VAL_20_DA },
@@ -14755,7 +15235,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_DA },
+         { "1",  OPTION_VAL_1_O35_DA },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -15169,7 +15649,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_DA },
+         { "1",  OPTION_VAL_1_O35_DA },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -15212,7 +15692,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_DA },
+         { "disabled",  OPTION_VAL_DISABLED_O56_DA },
          { "static",  OPTION_VAL_STATIC_DA },
          { "smart", OPTION_VAL_SMART_DA },
          { NULL, NULL },
@@ -15260,31 +15740,31 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_DA },
-         { "-11px",    OPTION_VAL_11PX_O56_DA },
-         { "-10px",    OPTION_VAL_10PX_O56_DA },
-         { "-9px",     OPTION_VAL_9PX_O56_DA },
-         { "-8px",     OPTION_VAL_8PX_O56_DA },
-         { "-7px",     OPTION_VAL_7PX_O56_DA },
-         { "-6px",     OPTION_VAL_6PX_O56_DA },
-         { "-5px",     OPTION_VAL_5PX_O56_DA },
-         { "-4px",     OPTION_VAL_4PX_O56_DA },
-         { "-3px",     OPTION_VAL_3PX_O56_DA },
-         { "-2px",     OPTION_VAL_2PX_O56_DA },
-         { "-1px",     OPTION_VAL_1PX_O56_DA },
-         { "disabled", OPTION_VAL_DISABLED_O56_DA },
-         { "+1px",     OPTION_VAL_1PX_O56_0_DA },
-         { "+2px",     OPTION_VAL_2PX_O56_0_DA },
-         { "+3px",     OPTION_VAL_3PX_O56_0_DA },
-         { "+4px",     OPTION_VAL_4PX_O56_0_DA },
-         { "+5px",     OPTION_VAL_5PX_O56_0_DA },
-         { "+6px",     OPTION_VAL_6PX_O56_0_DA },
-         { "+7px",     OPTION_VAL_7PX_O56_0_DA },
-         { "+8px",     OPTION_VAL_8PX_O56_0_DA },
-         { "+9px",     OPTION_VAL_9PX_O56_0_DA },
-         { "+10px",    OPTION_VAL_10PX_O56_0_DA },
-         { "+11px",    OPTION_VAL_11PX_O56_0_DA },
-         { "+12px",    OPTION_VAL_12PX_O56_0_DA },
+         { "-12px",    OPTION_VAL_12PX_O58_DA },
+         { "-11px",    OPTION_VAL_11PX_O58_DA },
+         { "-10px",    OPTION_VAL_10PX_O58_DA },
+         { "-9px",     OPTION_VAL_9PX_O58_DA },
+         { "-8px",     OPTION_VAL_8PX_O58_DA },
+         { "-7px",     OPTION_VAL_7PX_O58_DA },
+         { "-6px",     OPTION_VAL_6PX_O58_DA },
+         { "-5px",     OPTION_VAL_5PX_O58_DA },
+         { "-4px",     OPTION_VAL_4PX_O58_DA },
+         { "-3px",     OPTION_VAL_3PX_O58_DA },
+         { "-2px",     OPTION_VAL_2PX_O58_DA },
+         { "-1px",     OPTION_VAL_1PX_O58_DA },
+         { "disabled", OPTION_VAL_DISABLED_O58_DA },
+         { "+1px",     OPTION_VAL_1PX_O58_0_DA },
+         { "+2px",     OPTION_VAL_2PX_O58_0_DA },
+         { "+3px",     OPTION_VAL_3PX_O58_0_DA },
+         { "+4px",     OPTION_VAL_4PX_O58_0_DA },
+         { "+5px",     OPTION_VAL_5PX_O58_0_DA },
+         { "+6px",     OPTION_VAL_6PX_O58_0_DA },
+         { "+7px",     OPTION_VAL_7PX_O58_0_DA },
+         { "+8px",     OPTION_VAL_8PX_O58_0_DA },
+         { "+9px",     OPTION_VAL_9PX_O58_0_DA },
+         { "+10px",    OPTION_VAL_10PX_O58_0_DA },
+         { "+11px",    OPTION_VAL_11PX_O58_0_DA },
+         { "+12px",    OPTION_VAL_12PX_O58_0_DA },
          { NULL, NULL },
       },
       "disabled"
@@ -15338,7 +15818,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_DA },
+         { "0",        OPTION_VAL_DISABLED_O58_DA },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -15748,7 +16228,27 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_DE "Analogeingaben-Selbstkalibrierung"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_DE "Wenn das Eingabegerät auf DualShock, Analog-Controller, Analog-Joystick oder neGcon eingestellt ist, aktiviert diese Option die dynamische Kalibrierung der analogen Eingaben. Die maximalen registrierten Eingangswerte werden in Echtzeit überwacht und zur Skalierung der an den Emulator übergebenen analogen Koordinaten verwendet. Diese Option sollte für Spiele wie Mega Man Legends 2 verwendet werden, die größere Werte erwarten, als moderne Controller liefern. Um optimale Ergebnisse zu erzielen, sollten die Analogsticks jedes Mal, wenn Inhalte geladen werden, voll gedreht werden, um den Kalibrierungsalgorithmus einzustellen."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_DE "DualShock-Analogmodusumschalter aktivieren"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_DE "Wenn der Eingangsgerätetyp DualShock ist, kann der emulierte DualShock wie Originalhardware zwischen DIGITAL und ANALOG Modus umgeschaltet werden. Wenn deaktiviert, ist der DualShock im ANALOG Modus gesperrt und wenn aktiviert, kann der DualShock zwischen DIGITAL und ANALOG Modus umgeschaltet werden, indem START+SELECT+L1+L2+R1+R1+R2 gedrückt und gedrückt gehalten wird."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_DE "Wenn der Eingangsgerätetyp DualShock ist, kann der emulierte DualShock wie Originalhardware zwischen DIGITAL- und ANALOG-Modus umgeschaltet werden. Wenn deaktiviert, ist der DualShock im ANALOG-Modus gesperrt und wenn aktiviert, der DualShock kann über die gewählte Tastenkombination zwischen DIGITAL- und ANALOG-Modus umgeschaltet werden."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_DE "DualShock Analogmodus-Combo"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DE "Die Schaltflächenkombination wählen, die zum Umschalten zwischen DIGITAL- und ANALOG-Modus für den emulierten DualShock verwendet wird. Funktioniert nur, wenn „DualShock-Analogmodus einschalten“' aktiviert ist."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_DE NULL
+#define OPTION_VAL_L1_R1_SELECT_DE NULL
+#define OPTION_VAL_L1_R1_START_DE NULL
+#define OPTION_VAL_L1_R1_L3_DE NULL
+#define OPTION_VAL_L1_R1_R3_DE NULL
+#define OPTION_VAL_L2_R2_SELECT_DE NULL
+#define OPTION_VAL_L2_R2_START_DE NULL
+#define OPTION_VAL_L2_R2_L3_DE NULL
+#define OPTION_VAL_L2_R2_R3_DE NULL
+#define OPTION_VAL_L3_R3_DE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE NULL
+#define OPTION_VAL_0_DE NULL
+#define OPTION_VAL_1_DE NULL
+#define OPTION_VAL_2_DE NULL
+#define OPTION_VAL_3_DE NULL
+#define OPTION_VAL_4_DE NULL
+#define OPTION_VAL_5_DE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DE "Port 1: Multitap aktivieren"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_DE "Multitap-Funktionalität auf Port 1 aktivieren."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_DE "Port 2: Multitap aktivieren"
@@ -15778,7 +16278,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_DE "Für Port 2 die Fadenkreuzfarbe der Lightgun wählen."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_DE "Mausempfindlichkeit"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_DE "Wählt die Empfindlichkeit des 'Maus' Eingabegerätetyps."
-#define OPTION_VAL_5_DE "5 %"
+#define OPTION_VAL_5_O28_DE NULL
 #define OPTION_VAL_10_DE "10 %"
 #define OPTION_VAL_15_DE "15 %"
 #define OPTION_VAL_20_DE "20 %"
@@ -15825,7 +16325,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_CUBIC_DE "Kubisch"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_DE "neGcon verdrehen Totzone"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_DE "Wählt die Totzone des linken analogen Sticks des RetroPads bei der Simulation der 'verdrehen' Aktion von emulierten 'neGcon' Eingabegeräten. Wird verwendet, um den Controller-Drift-Effekt zu beseitigen. Hinweis: Die meisten neGcon-kompatiblen Titel bieten in-game Optionen, um einen 'verdrehten' Totzone Wert zu setzen. Um einen Verlust der Genauigkeit zu vermeiden, sollte die Totzone im Spiel *immer* auf Null gesetzt werden. Alle erforderlichen Anpassungen sollten *nur* über diese Kernoption angewendet werden. Dies ist besonders wichtig, wenn 'neGcon verdehen Rückmeldung' auf 'Quadratisch' oder 'Kubisch' gesetzt wird."
-#define OPTION_VAL_0_DE "0 %"
+#define OPTION_VAL_0_O30_DE NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_DE "Methode Speicherkarte 0 (Neustart erforderlich)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_DE "Das Speicherformat für die Speicherkarte 0 auswählen. „Mednafen“ kann zur Kompatibilität mit der Stand-alone-Version von Mednafen verwendet werden. Bei Beetle PSX, Libretro (.srm) und Mednafen (.mcr) haben Speicherstände intern identische Formate und können über Umbenennen untereinander konvertiert werden."
 #define OPTION_VAL_LIBRETRO_DE NULL
@@ -15838,7 +16338,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_DE "Die Speicherkarte wechseln, die derzeit im linken Steckplatz geladen wird. Diese Option funktioniert nur, wenn „Methode Speicherkarte 0“ auf „Mednafen“ gesetzt ist. Die Standardkarte ist Index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_DE "Index rechter Speicherkarte"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_DE "Die Speicherkarte wechseln, die derzeit im rechten Steckplatz geladen wird. Diese Option funktioniert nur, wenn Speicherkarte 1 aktiviert ist. Die Standardkarte ist Index 1."
-#define OPTION_VAL_1_DE "1 (Standard)"
+#define OPTION_VAL_1_O35_DE NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_DE "PGXP-Betriebsart"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_DE "Ermöglicht die Darstellung von 3D-Objekten mit Unterpixelgenauigkeit, minimiert Verzerrung und Ruckler von 3D-Objekten, die auf Originalhardware durch die Verwendung von fixen Punktvertex Koordinaten gesehen werden. Der Modus 'Nur Speicher' hat minimale Kompatibilitätsprobleme und wird für den allgemeinen Gebrauch empfohlen. 'Speicher und CPU (fehlerbehaftet)' Modus kann Ruckler noch weiter reduzieren, hat aber hohe Leistungsanforderungen und kann zu verschiedenen Geometriefehlern führen."
 #define OPTION_VAL_MEMORY_ONLY_DE "Nur Speicher"
@@ -15973,7 +16473,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DE "Aufgrund unterschiedlicher Standards scheinen PAL-Spiele im Vergleich zu den amerikanischen oder japanischen NTSC-Releases verlangsamt. Diese Option kann genutzt werden, um PAL-Timings zu übersteuern und zu versuchen, diese Spiele mit der NTSC-Bildwiederholrate auszuführen. Diese Option hat keine Auswirkung beim Ausführen von NTSC-Inhalten."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_DE "Overscan zuschneiden"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DE "'Keine' behält Fülldaten (schwarze Balken auf beiden Seiten des Bildes für NTSC, auf allen Seiten für PAL), um die gleichen schwarzen Balken zu emulieren, die in analoger Videoausgabe durch echte PSX-Hardware erzeugt werden. 'Statisch' entfernt nur horizontale Fülldaten, 'Dynamisch' entfernt alle Fülldaten."
-#define OPTION_VAL_DISABLED_O54_DE "Nein"
+#define OPTION_VAL_DISABLED_O56_DE "Nein"
 #define OPTION_VAL_STATIC_DE "Statisch"
 #define OPTION_VAL_SMART_DE "Dynamisch (Standard)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_DE "Zusätzliches Zuschneiden"
@@ -15992,31 +16492,31 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_20PX_DE "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_DE "Versatz zugeschnittenes Bild"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_DE "Wenn 'Horizontaler Overscan' aktiviert ist, kann das resultierende zugeschnittene Bild horizontal nach rechts (positiv) oder links (negativ) durch die angegebene Anzahl Pixel versetzt werden. Kann zur Korrektur von Ausrichtungsproblemen verwendet werden. Wird nur vom Software-Renderer unterstützt."
-#define OPTION_VAL_12PX_O56_DE "-12 px"
-#define OPTION_VAL_11PX_O56_DE "-11 px"
-#define OPTION_VAL_10PX_O56_DE "-10 px"
-#define OPTION_VAL_9PX_O56_DE "-9 px"
-#define OPTION_VAL_8PX_O56_DE "-8 px"
-#define OPTION_VAL_7PX_O56_DE "-7 px"
-#define OPTION_VAL_6PX_O56_DE "-6 px"
-#define OPTION_VAL_5PX_O56_DE "-5 px"
-#define OPTION_VAL_4PX_O56_DE NULL
-#define OPTION_VAL_3PX_O56_DE "-3 px"
-#define OPTION_VAL_2PX_O56_DE "-2 px"
-#define OPTION_VAL_1PX_O56_DE "-1 px"
-#define OPTION_VAL_DISABLED_O56_DE "0 (Standard)"
-#define OPTION_VAL_1PX_O56_0_DE "+1 px"
-#define OPTION_VAL_2PX_O56_0_DE "+2 px"
-#define OPTION_VAL_3PX_O56_0_DE "+3 px"
-#define OPTION_VAL_4PX_O56_0_DE "+4 px"
-#define OPTION_VAL_5PX_O56_0_DE "+5 px"
-#define OPTION_VAL_6PX_O56_0_DE "+6 px"
-#define OPTION_VAL_7PX_O56_0_DE "+7 px"
-#define OPTION_VAL_8PX_O56_0_DE "+8 px"
-#define OPTION_VAL_9PX_O56_0_DE "+9 px"
-#define OPTION_VAL_10PX_O56_0_DE "+10 px"
-#define OPTION_VAL_11PX_O56_0_DE "+11 px"
-#define OPTION_VAL_12PX_O56_0_DE "+12 px"
+#define OPTION_VAL_12PX_O58_DE NULL
+#define OPTION_VAL_11PX_O58_DE NULL
+#define OPTION_VAL_10PX_O58_DE NULL
+#define OPTION_VAL_9PX_O58_DE NULL
+#define OPTION_VAL_8PX_O58_DE NULL
+#define OPTION_VAL_7PX_O58_DE NULL
+#define OPTION_VAL_6PX_O58_DE NULL
+#define OPTION_VAL_5PX_O58_DE NULL
+#define OPTION_VAL_4PX_O58_DE NULL
+#define OPTION_VAL_3PX_O58_DE NULL
+#define OPTION_VAL_2PX_O58_DE NULL
+#define OPTION_VAL_1PX_O58_DE NULL
+#define OPTION_VAL_DISABLED_O58_DE NULL
+#define OPTION_VAL_1PX_O58_0_DE NULL
+#define OPTION_VAL_2PX_O58_0_DE NULL
+#define OPTION_VAL_3PX_O58_0_DE NULL
+#define OPTION_VAL_4PX_O58_0_DE NULL
+#define OPTION_VAL_5PX_O58_0_DE NULL
+#define OPTION_VAL_6PX_O58_0_DE NULL
+#define OPTION_VAL_7PX_O58_0_DE NULL
+#define OPTION_VAL_8PX_O58_0_DE NULL
+#define OPTION_VAL_9PX_O58_0_DE NULL
+#define OPTION_VAL_10PX_O58_0_DE NULL
+#define OPTION_VAL_11PX_O58_0_DE NULL
+#define OPTION_VAL_12PX_O58_0_DE NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_DE "Horizontaler Bildversatz (GPU-Zyklen)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_DE "Wählt die Anzahl der GPU-Zyklen, um die das Bild versetzt werden soll. Positive Werte verschieben das Bild nach rechts, negative Werte verschieben das Bild nach links. Nur unterstützt von Hardware-Renderern."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_DE "GPU-Rasterübertaktung"
@@ -16396,6 +16896,46 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_DE,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DE,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_DE },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_DE },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_DE },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_DE },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_DE },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_DE },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_DE },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_DE },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_DE },
+         { "l3+r3",                    OPTION_VAL_L3_R3_DE },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DE,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_DE },
+         { "1", OPTION_VAL_1_DE },
+         { "2", OPTION_VAL_2_DE },
+         { "3", OPTION_VAL_3_DE },
+         { "4", OPTION_VAL_4_DE },
+         { "5", OPTION_VAL_5_DE },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DE,
       NULL,
@@ -16505,7 +17045,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_DE },
+         { "5%",   OPTION_VAL_5_O28_DE },
          { "10%",  OPTION_VAL_10_DE },
          { "15%",  OPTION_VAL_15_DE },
          { "20%",  OPTION_VAL_20_DE },
@@ -16572,8 +17112,8 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_DE },
-         { "5%",  OPTION_VAL_5_DE },
+         { "0%",  OPTION_VAL_0_O30_DE },
+         { "5%",  OPTION_VAL_5_O28_DE },
          { "10%", OPTION_VAL_10_DE },
          { "15%", OPTION_VAL_15_DE },
          { "20%", OPTION_VAL_20_DE },
@@ -16710,7 +17250,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_DE },
+         { "1",  OPTION_VAL_1_O35_DE },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -17124,7 +17664,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_DE },
+         { "1",  OPTION_VAL_1_O35_DE },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -17167,7 +17707,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_DE },
+         { "disabled",  OPTION_VAL_DISABLED_O56_DE },
          { "static",  OPTION_VAL_STATIC_DE },
          { "smart", OPTION_VAL_SMART_DE },
          { NULL, NULL },
@@ -17215,31 +17755,31 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_DE },
-         { "-11px",    OPTION_VAL_11PX_O56_DE },
-         { "-10px",    OPTION_VAL_10PX_O56_DE },
-         { "-9px",     OPTION_VAL_9PX_O56_DE },
-         { "-8px",     OPTION_VAL_8PX_O56_DE },
-         { "-7px",     OPTION_VAL_7PX_O56_DE },
-         { "-6px",     OPTION_VAL_6PX_O56_DE },
-         { "-5px",     OPTION_VAL_5PX_O56_DE },
-         { "-4px",     OPTION_VAL_4PX_O56_DE },
-         { "-3px",     OPTION_VAL_3PX_O56_DE },
-         { "-2px",     OPTION_VAL_2PX_O56_DE },
-         { "-1px",     OPTION_VAL_1PX_O56_DE },
-         { "disabled", OPTION_VAL_DISABLED_O56_DE },
-         { "+1px",     OPTION_VAL_1PX_O56_0_DE },
-         { "+2px",     OPTION_VAL_2PX_O56_0_DE },
-         { "+3px",     OPTION_VAL_3PX_O56_0_DE },
-         { "+4px",     OPTION_VAL_4PX_O56_0_DE },
-         { "+5px",     OPTION_VAL_5PX_O56_0_DE },
-         { "+6px",     OPTION_VAL_6PX_O56_0_DE },
-         { "+7px",     OPTION_VAL_7PX_O56_0_DE },
-         { "+8px",     OPTION_VAL_8PX_O56_0_DE },
-         { "+9px",     OPTION_VAL_9PX_O56_0_DE },
-         { "+10px",    OPTION_VAL_10PX_O56_0_DE },
-         { "+11px",    OPTION_VAL_11PX_O56_0_DE },
-         { "+12px",    OPTION_VAL_12PX_O56_0_DE },
+         { "-12px",    OPTION_VAL_12PX_O58_DE },
+         { "-11px",    OPTION_VAL_11PX_O58_DE },
+         { "-10px",    OPTION_VAL_10PX_O58_DE },
+         { "-9px",     OPTION_VAL_9PX_O58_DE },
+         { "-8px",     OPTION_VAL_8PX_O58_DE },
+         { "-7px",     OPTION_VAL_7PX_O58_DE },
+         { "-6px",     OPTION_VAL_6PX_O58_DE },
+         { "-5px",     OPTION_VAL_5PX_O58_DE },
+         { "-4px",     OPTION_VAL_4PX_O58_DE },
+         { "-3px",     OPTION_VAL_3PX_O58_DE },
+         { "-2px",     OPTION_VAL_2PX_O58_DE },
+         { "-1px",     OPTION_VAL_1PX_O58_DE },
+         { "disabled", OPTION_VAL_DISABLED_O58_DE },
+         { "+1px",     OPTION_VAL_1PX_O58_0_DE },
+         { "+2px",     OPTION_VAL_2PX_O58_0_DE },
+         { "+3px",     OPTION_VAL_3PX_O58_0_DE },
+         { "+4px",     OPTION_VAL_4PX_O58_0_DE },
+         { "+5px",     OPTION_VAL_5PX_O58_0_DE },
+         { "+6px",     OPTION_VAL_6PX_O58_0_DE },
+         { "+7px",     OPTION_VAL_7PX_O58_0_DE },
+         { "+8px",     OPTION_VAL_8PX_O58_0_DE },
+         { "+9px",     OPTION_VAL_9PX_O58_0_DE },
+         { "+10px",    OPTION_VAL_10PX_O58_0_DE },
+         { "+11px",    OPTION_VAL_11PX_O58_0_DE },
+         { "+12px",    OPTION_VAL_12PX_O58_0_DE },
          { NULL, NULL },
       },
       "disabled"
@@ -17293,7 +17833,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_DE },
+         { "0",        OPTION_VAL_DISABLED_O58_DE },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -17704,6 +18244,26 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_EL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_EL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_EL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EL NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_EL NULL
+#define OPTION_VAL_L1_R1_SELECT_EL NULL
+#define OPTION_VAL_L1_R1_START_EL NULL
+#define OPTION_VAL_L1_R1_L3_EL NULL
+#define OPTION_VAL_L1_R1_R3_EL NULL
+#define OPTION_VAL_L2_R2_SELECT_EL NULL
+#define OPTION_VAL_L2_R2_START_EL NULL
+#define OPTION_VAL_L2_R2_L3_EL NULL
+#define OPTION_VAL_L2_R2_R3_EL NULL
+#define OPTION_VAL_L3_R3_EL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EL NULL
+#define OPTION_VAL_0_EL NULL
+#define OPTION_VAL_1_EL NULL
+#define OPTION_VAL_2_EL NULL
+#define OPTION_VAL_3_EL NULL
+#define OPTION_VAL_4_EL NULL
+#define OPTION_VAL_5_EL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_EL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_EL NULL
@@ -17733,7 +18293,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_EL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_EL "Ευαισθησία Ποντικιού"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_EL NULL
-#define OPTION_VAL_5_EL NULL
+#define OPTION_VAL_5_O28_EL NULL
 #define OPTION_VAL_10_EL NULL
 #define OPTION_VAL_15_EL NULL
 #define OPTION_VAL_20_EL NULL
@@ -17780,7 +18340,7 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_CUBIC_EL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_EL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_EL NULL
-#define OPTION_VAL_0_EL NULL
+#define OPTION_VAL_0_O30_EL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_EL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_EL NULL
 #define OPTION_VAL_LIBRETRO_EL NULL
@@ -17793,7 +18353,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_EL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_EL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_EL NULL
-#define OPTION_VAL_1_EL NULL
+#define OPTION_VAL_1_O35_EL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EL NULL
 #define OPTION_VAL_MEMORY_ONLY_EL NULL
@@ -17928,7 +18488,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_EL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_EL NULL
-#define OPTION_VAL_DISABLED_O54_EL "Κανείς"
+#define OPTION_VAL_DISABLED_O56_EL "Κανείς"
 #define OPTION_VAL_STATIC_EL NULL
 #define OPTION_VAL_SMART_EL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_EL NULL
@@ -17947,31 +18507,31 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_20PX_EL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_EL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_EL NULL
-#define OPTION_VAL_12PX_O56_EL NULL
-#define OPTION_VAL_11PX_O56_EL NULL
-#define OPTION_VAL_10PX_O56_EL NULL
-#define OPTION_VAL_9PX_O56_EL NULL
-#define OPTION_VAL_8PX_O56_EL NULL
-#define OPTION_VAL_7PX_O56_EL NULL
-#define OPTION_VAL_6PX_O56_EL NULL
-#define OPTION_VAL_5PX_O56_EL NULL
-#define OPTION_VAL_4PX_O56_EL NULL
-#define OPTION_VAL_3PX_O56_EL NULL
-#define OPTION_VAL_2PX_O56_EL NULL
-#define OPTION_VAL_1PX_O56_EL NULL
-#define OPTION_VAL_DISABLED_O56_EL NULL
-#define OPTION_VAL_1PX_O56_0_EL NULL
-#define OPTION_VAL_2PX_O56_0_EL NULL
-#define OPTION_VAL_3PX_O56_0_EL NULL
-#define OPTION_VAL_4PX_O56_0_EL NULL
-#define OPTION_VAL_5PX_O56_0_EL NULL
-#define OPTION_VAL_6PX_O56_0_EL NULL
-#define OPTION_VAL_7PX_O56_0_EL NULL
-#define OPTION_VAL_8PX_O56_0_EL NULL
-#define OPTION_VAL_9PX_O56_0_EL NULL
-#define OPTION_VAL_10PX_O56_0_EL NULL
-#define OPTION_VAL_11PX_O56_0_EL NULL
-#define OPTION_VAL_12PX_O56_0_EL NULL
+#define OPTION_VAL_12PX_O58_EL NULL
+#define OPTION_VAL_11PX_O58_EL NULL
+#define OPTION_VAL_10PX_O58_EL NULL
+#define OPTION_VAL_9PX_O58_EL NULL
+#define OPTION_VAL_8PX_O58_EL NULL
+#define OPTION_VAL_7PX_O58_EL NULL
+#define OPTION_VAL_6PX_O58_EL NULL
+#define OPTION_VAL_5PX_O58_EL NULL
+#define OPTION_VAL_4PX_O58_EL NULL
+#define OPTION_VAL_3PX_O58_EL NULL
+#define OPTION_VAL_2PX_O58_EL NULL
+#define OPTION_VAL_1PX_O58_EL NULL
+#define OPTION_VAL_DISABLED_O58_EL NULL
+#define OPTION_VAL_1PX_O58_0_EL NULL
+#define OPTION_VAL_2PX_O58_0_EL NULL
+#define OPTION_VAL_3PX_O58_0_EL NULL
+#define OPTION_VAL_4PX_O58_0_EL NULL
+#define OPTION_VAL_5PX_O58_0_EL NULL
+#define OPTION_VAL_6PX_O58_0_EL NULL
+#define OPTION_VAL_7PX_O58_0_EL NULL
+#define OPTION_VAL_8PX_O58_0_EL NULL
+#define OPTION_VAL_9PX_O58_0_EL NULL
+#define OPTION_VAL_10PX_O58_0_EL NULL
+#define OPTION_VAL_11PX_O58_0_EL NULL
+#define OPTION_VAL_12PX_O58_0_EL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_EL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_EL NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_EL NULL
@@ -18351,6 +18911,46 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EL,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_EL },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_EL },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_EL },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_EL },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_EL },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_EL },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_EL },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_EL },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_EL },
+         { "l3+r3",                    OPTION_VAL_L3_R3_EL },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EL,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_EL },
+         { "1", OPTION_VAL_1_EL },
+         { "2", OPTION_VAL_2_EL },
+         { "3", OPTION_VAL_3_EL },
+         { "4", OPTION_VAL_4_EL },
+         { "5", OPTION_VAL_5_EL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EL,
       NULL,
@@ -18460,7 +19060,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_EL },
+         { "5%",   OPTION_VAL_5_O28_EL },
          { "10%",  OPTION_VAL_10_EL },
          { "15%",  OPTION_VAL_15_EL },
          { "20%",  OPTION_VAL_20_EL },
@@ -18527,8 +19127,8 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_EL },
-         { "5%",  OPTION_VAL_5_EL },
+         { "0%",  OPTION_VAL_0_O30_EL },
+         { "5%",  OPTION_VAL_5_O28_EL },
          { "10%", OPTION_VAL_10_EL },
          { "15%", OPTION_VAL_15_EL },
          { "20%", OPTION_VAL_20_EL },
@@ -18665,7 +19265,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_EL },
+         { "1",  OPTION_VAL_1_O35_EL },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -19079,7 +19679,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_EL },
+         { "1",  OPTION_VAL_1_O35_EL },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -19122,7 +19722,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_EL },
+         { "disabled",  OPTION_VAL_DISABLED_O56_EL },
          { "static",  OPTION_VAL_STATIC_EL },
          { "smart", OPTION_VAL_SMART_EL },
          { NULL, NULL },
@@ -19170,31 +19770,31 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_EL },
-         { "-11px",    OPTION_VAL_11PX_O56_EL },
-         { "-10px",    OPTION_VAL_10PX_O56_EL },
-         { "-9px",     OPTION_VAL_9PX_O56_EL },
-         { "-8px",     OPTION_VAL_8PX_O56_EL },
-         { "-7px",     OPTION_VAL_7PX_O56_EL },
-         { "-6px",     OPTION_VAL_6PX_O56_EL },
-         { "-5px",     OPTION_VAL_5PX_O56_EL },
-         { "-4px",     OPTION_VAL_4PX_O56_EL },
-         { "-3px",     OPTION_VAL_3PX_O56_EL },
-         { "-2px",     OPTION_VAL_2PX_O56_EL },
-         { "-1px",     OPTION_VAL_1PX_O56_EL },
-         { "disabled", OPTION_VAL_DISABLED_O56_EL },
-         { "+1px",     OPTION_VAL_1PX_O56_0_EL },
-         { "+2px",     OPTION_VAL_2PX_O56_0_EL },
-         { "+3px",     OPTION_VAL_3PX_O56_0_EL },
-         { "+4px",     OPTION_VAL_4PX_O56_0_EL },
-         { "+5px",     OPTION_VAL_5PX_O56_0_EL },
-         { "+6px",     OPTION_VAL_6PX_O56_0_EL },
-         { "+7px",     OPTION_VAL_7PX_O56_0_EL },
-         { "+8px",     OPTION_VAL_8PX_O56_0_EL },
-         { "+9px",     OPTION_VAL_9PX_O56_0_EL },
-         { "+10px",    OPTION_VAL_10PX_O56_0_EL },
-         { "+11px",    OPTION_VAL_11PX_O56_0_EL },
-         { "+12px",    OPTION_VAL_12PX_O56_0_EL },
+         { "-12px",    OPTION_VAL_12PX_O58_EL },
+         { "-11px",    OPTION_VAL_11PX_O58_EL },
+         { "-10px",    OPTION_VAL_10PX_O58_EL },
+         { "-9px",     OPTION_VAL_9PX_O58_EL },
+         { "-8px",     OPTION_VAL_8PX_O58_EL },
+         { "-7px",     OPTION_VAL_7PX_O58_EL },
+         { "-6px",     OPTION_VAL_6PX_O58_EL },
+         { "-5px",     OPTION_VAL_5PX_O58_EL },
+         { "-4px",     OPTION_VAL_4PX_O58_EL },
+         { "-3px",     OPTION_VAL_3PX_O58_EL },
+         { "-2px",     OPTION_VAL_2PX_O58_EL },
+         { "-1px",     OPTION_VAL_1PX_O58_EL },
+         { "disabled", OPTION_VAL_DISABLED_O58_EL },
+         { "+1px",     OPTION_VAL_1PX_O58_0_EL },
+         { "+2px",     OPTION_VAL_2PX_O58_0_EL },
+         { "+3px",     OPTION_VAL_3PX_O58_0_EL },
+         { "+4px",     OPTION_VAL_4PX_O58_0_EL },
+         { "+5px",     OPTION_VAL_5PX_O58_0_EL },
+         { "+6px",     OPTION_VAL_6PX_O58_0_EL },
+         { "+7px",     OPTION_VAL_7PX_O58_0_EL },
+         { "+8px",     OPTION_VAL_8PX_O58_0_EL },
+         { "+9px",     OPTION_VAL_9PX_O58_0_EL },
+         { "+10px",    OPTION_VAL_10PX_O58_0_EL },
+         { "+11px",    OPTION_VAL_11PX_O58_0_EL },
+         { "+12px",    OPTION_VAL_12PX_O58_0_EL },
          { NULL, NULL },
       },
       "disabled"
@@ -19248,7 +19848,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_EL },
+         { "0",        OPTION_VAL_DISABLED_O58_EL },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -19658,7 +20258,27 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_EN "Analogue Self-Calibration"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_EN "When the input device is set to DualShock, Analogue Controller, Analogue Joystick, or neGcon, this option enables dynamic calibration of analogue inputs. Maximum registered input values are monitored in real time and used to scale analogue coordinates passed to the emulator. This should be used for games such as Mega Man Legends 2 that expect larger values than what modern controllers provide. For best results, analogue sticks should be rotated at full extent to tune the calibration algorithm each time content is loaded."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_EN "Enable DualShock Analogue Mode Toggle"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_EN "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOGUE mode like the original hardware. When disabled, the DualShock is locked to ANALOGUE mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOGUE mode by pressing and holding START+SELECT+L1+L2+R1+R2."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EN NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_EN NULL
+#define OPTION_VAL_L1_R1_SELECT_EN NULL
+#define OPTION_VAL_L1_R1_START_EN NULL
+#define OPTION_VAL_L1_R1_L3_EN NULL
+#define OPTION_VAL_L1_R1_R3_EN NULL
+#define OPTION_VAL_L2_R2_SELECT_EN NULL
+#define OPTION_VAL_L2_R2_START_EN NULL
+#define OPTION_VAL_L2_R2_L3_EN NULL
+#define OPTION_VAL_L2_R2_R3_EN NULL
+#define OPTION_VAL_L3_R3_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EN NULL
+#define OPTION_VAL_0_EN NULL
+#define OPTION_VAL_1_EN NULL
+#define OPTION_VAL_2_EN NULL
+#define OPTION_VAL_3_EN NULL
+#define OPTION_VAL_4_EN NULL
+#define OPTION_VAL_5_EN NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EN "Port 1: Multi-tap Enable"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_EN "Enable multi-tap functionality on port 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_EN "Port 2: Multi-tap Enable"
@@ -19688,7 +20308,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_EN "Choose the light gun cross-hair colour for port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_EN NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_EN NULL
-#define OPTION_VAL_5_EN NULL
+#define OPTION_VAL_5_O28_EN NULL
 #define OPTION_VAL_10_EN NULL
 #define OPTION_VAL_15_EN NULL
 #define OPTION_VAL_20_EN NULL
@@ -19735,7 +20355,7 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_CUBIC_EN NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_EN "neGcon Twist Dead-zone"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_EN "Choose the dead-zone of the RetroPad left analogue stick when simulating the 'twist' action of emulated 'neGcon' input devices. Used to eliminate controller drift. Note: Most neGcon-compatible titles provide in-game options for setting a 'twist' dead-zone value. To avoid loss of precision, the in-game dead-zone should *always* be set to zero. Any required adjustments should *only* be applied with this core option. This is particularly important when 'neGcon Twist Response' is set to 'Quadratic' or 'Cubic'."
-#define OPTION_VAL_0_EN NULL
+#define OPTION_VAL_0_O30_EN NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_EN NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_EN "Choose the save data format used for memory card 0. 'Mednafen' may be used for compatibility with the stand-alone version of Mednafen. When used with Beetle PSX, Libretro (.srm) and Mednafen (.mcr) saves have internally identical formats and can be converted between one another with renaming."
 #define OPTION_VAL_LIBRETRO_EN NULL
@@ -19748,7 +20368,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_EN NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_EN NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_EN NULL
-#define OPTION_VAL_1_EN NULL
+#define OPTION_VAL_1_O35_EN NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EN NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EN "Allows 3D objects to be rendered with sub-pixel precision, minimising distortion and jitter of 3D objects seen on original hardware due to the usage of fixed point vertex coordinates. 'Memory Only' mode has minimal compatibility issues and is recommended for general use. 'Memory + CPU (Buggy)' mode can reduce jitter even further but has high performance requirements and may cause various geometry errors."
 #define OPTION_VAL_MEMORY_ONLY_EN NULL
@@ -19883,7 +20503,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EN "Due to different standards, PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override PAL timings in order to attempt to run these games with the NTSC frame-rate. This option has no effect when running NTSC content."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_EN NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_EN "'None' retains padding (pillar-boxes on either side of the image for NTSC, on all sides for PAL) to emulate the same black bars generated in analogue video output by real PS1 hardware. 'Static' only removes horizontal padding, 'Dynamic' removes all padding."
-#define OPTION_VAL_DISABLED_O54_EN NULL
+#define OPTION_VAL_DISABLED_O56_EN NULL
 #define OPTION_VAL_STATIC_EN NULL
 #define OPTION_VAL_SMART_EN NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_EN NULL
@@ -19902,31 +20522,31 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_20PX_EN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_EN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_EN NULL
-#define OPTION_VAL_12PX_O56_EN NULL
-#define OPTION_VAL_11PX_O56_EN NULL
-#define OPTION_VAL_10PX_O56_EN NULL
-#define OPTION_VAL_9PX_O56_EN NULL
-#define OPTION_VAL_8PX_O56_EN NULL
-#define OPTION_VAL_7PX_O56_EN NULL
-#define OPTION_VAL_6PX_O56_EN NULL
-#define OPTION_VAL_5PX_O56_EN NULL
-#define OPTION_VAL_4PX_O56_EN NULL
-#define OPTION_VAL_3PX_O56_EN NULL
-#define OPTION_VAL_2PX_O56_EN NULL
-#define OPTION_VAL_1PX_O56_EN NULL
-#define OPTION_VAL_DISABLED_O56_EN NULL
-#define OPTION_VAL_1PX_O56_0_EN NULL
-#define OPTION_VAL_2PX_O56_0_EN NULL
-#define OPTION_VAL_3PX_O56_0_EN NULL
-#define OPTION_VAL_4PX_O56_0_EN NULL
-#define OPTION_VAL_5PX_O56_0_EN NULL
-#define OPTION_VAL_6PX_O56_0_EN NULL
-#define OPTION_VAL_7PX_O56_0_EN NULL
-#define OPTION_VAL_8PX_O56_0_EN NULL
-#define OPTION_VAL_9PX_O56_0_EN NULL
-#define OPTION_VAL_10PX_O56_0_EN NULL
-#define OPTION_VAL_11PX_O56_0_EN NULL
-#define OPTION_VAL_12PX_O56_0_EN NULL
+#define OPTION_VAL_12PX_O58_EN NULL
+#define OPTION_VAL_11PX_O58_EN NULL
+#define OPTION_VAL_10PX_O58_EN NULL
+#define OPTION_VAL_9PX_O58_EN NULL
+#define OPTION_VAL_8PX_O58_EN NULL
+#define OPTION_VAL_7PX_O58_EN NULL
+#define OPTION_VAL_6PX_O58_EN NULL
+#define OPTION_VAL_5PX_O58_EN NULL
+#define OPTION_VAL_4PX_O58_EN NULL
+#define OPTION_VAL_3PX_O58_EN NULL
+#define OPTION_VAL_2PX_O58_EN NULL
+#define OPTION_VAL_1PX_O58_EN NULL
+#define OPTION_VAL_DISABLED_O58_EN NULL
+#define OPTION_VAL_1PX_O58_0_EN NULL
+#define OPTION_VAL_2PX_O58_0_EN NULL
+#define OPTION_VAL_3PX_O58_0_EN NULL
+#define OPTION_VAL_4PX_O58_0_EN NULL
+#define OPTION_VAL_5PX_O58_0_EN NULL
+#define OPTION_VAL_6PX_O58_0_EN NULL
+#define OPTION_VAL_7PX_O58_0_EN NULL
+#define OPTION_VAL_8PX_O58_0_EN NULL
+#define OPTION_VAL_9PX_O58_0_EN NULL
+#define OPTION_VAL_10PX_O58_0_EN NULL
+#define OPTION_VAL_11PX_O58_0_EN NULL
+#define OPTION_VAL_12PX_O58_0_EN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_EN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_EN NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_EN "GPU Rasteriser Over-clock"
@@ -20306,6 +20926,46 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EN,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EN,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_EN },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_EN },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_EN },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_EN },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_EN },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_EN },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_EN },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_EN },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_EN },
+         { "l3+r3",                    OPTION_VAL_L3_R3_EN },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EN,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EN,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_EN },
+         { "1", OPTION_VAL_1_EN },
+         { "2", OPTION_VAL_2_EN },
+         { "3", OPTION_VAL_3_EN },
+         { "4", OPTION_VAL_4_EN },
+         { "5", OPTION_VAL_5_EN },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EN,
       NULL,
@@ -20415,7 +21075,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_EN },
+         { "5%",   OPTION_VAL_5_O28_EN },
          { "10%",  OPTION_VAL_10_EN },
          { "15%",  OPTION_VAL_15_EN },
          { "20%",  OPTION_VAL_20_EN },
@@ -20482,8 +21142,8 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_EN },
-         { "5%",  OPTION_VAL_5_EN },
+         { "0%",  OPTION_VAL_0_O30_EN },
+         { "5%",  OPTION_VAL_5_O28_EN },
          { "10%", OPTION_VAL_10_EN },
          { "15%", OPTION_VAL_15_EN },
          { "20%", OPTION_VAL_20_EN },
@@ -20620,7 +21280,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_EN },
+         { "1",  OPTION_VAL_1_O35_EN },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -21034,7 +21694,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_EN },
+         { "1",  OPTION_VAL_1_O35_EN },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -21077,7 +21737,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_EN },
+         { "disabled",  OPTION_VAL_DISABLED_O56_EN },
          { "static",  OPTION_VAL_STATIC_EN },
          { "smart", OPTION_VAL_SMART_EN },
          { NULL, NULL },
@@ -21125,31 +21785,31 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_EN },
-         { "-11px",    OPTION_VAL_11PX_O56_EN },
-         { "-10px",    OPTION_VAL_10PX_O56_EN },
-         { "-9px",     OPTION_VAL_9PX_O56_EN },
-         { "-8px",     OPTION_VAL_8PX_O56_EN },
-         { "-7px",     OPTION_VAL_7PX_O56_EN },
-         { "-6px",     OPTION_VAL_6PX_O56_EN },
-         { "-5px",     OPTION_VAL_5PX_O56_EN },
-         { "-4px",     OPTION_VAL_4PX_O56_EN },
-         { "-3px",     OPTION_VAL_3PX_O56_EN },
-         { "-2px",     OPTION_VAL_2PX_O56_EN },
-         { "-1px",     OPTION_VAL_1PX_O56_EN },
-         { "disabled", OPTION_VAL_DISABLED_O56_EN },
-         { "+1px",     OPTION_VAL_1PX_O56_0_EN },
-         { "+2px",     OPTION_VAL_2PX_O56_0_EN },
-         { "+3px",     OPTION_VAL_3PX_O56_0_EN },
-         { "+4px",     OPTION_VAL_4PX_O56_0_EN },
-         { "+5px",     OPTION_VAL_5PX_O56_0_EN },
-         { "+6px",     OPTION_VAL_6PX_O56_0_EN },
-         { "+7px",     OPTION_VAL_7PX_O56_0_EN },
-         { "+8px",     OPTION_VAL_8PX_O56_0_EN },
-         { "+9px",     OPTION_VAL_9PX_O56_0_EN },
-         { "+10px",    OPTION_VAL_10PX_O56_0_EN },
-         { "+11px",    OPTION_VAL_11PX_O56_0_EN },
-         { "+12px",    OPTION_VAL_12PX_O56_0_EN },
+         { "-12px",    OPTION_VAL_12PX_O58_EN },
+         { "-11px",    OPTION_VAL_11PX_O58_EN },
+         { "-10px",    OPTION_VAL_10PX_O58_EN },
+         { "-9px",     OPTION_VAL_9PX_O58_EN },
+         { "-8px",     OPTION_VAL_8PX_O58_EN },
+         { "-7px",     OPTION_VAL_7PX_O58_EN },
+         { "-6px",     OPTION_VAL_6PX_O58_EN },
+         { "-5px",     OPTION_VAL_5PX_O58_EN },
+         { "-4px",     OPTION_VAL_4PX_O58_EN },
+         { "-3px",     OPTION_VAL_3PX_O58_EN },
+         { "-2px",     OPTION_VAL_2PX_O58_EN },
+         { "-1px",     OPTION_VAL_1PX_O58_EN },
+         { "disabled", OPTION_VAL_DISABLED_O58_EN },
+         { "+1px",     OPTION_VAL_1PX_O58_0_EN },
+         { "+2px",     OPTION_VAL_2PX_O58_0_EN },
+         { "+3px",     OPTION_VAL_3PX_O58_0_EN },
+         { "+4px",     OPTION_VAL_4PX_O58_0_EN },
+         { "+5px",     OPTION_VAL_5PX_O58_0_EN },
+         { "+6px",     OPTION_VAL_6PX_O58_0_EN },
+         { "+7px",     OPTION_VAL_7PX_O58_0_EN },
+         { "+8px",     OPTION_VAL_8PX_O58_0_EN },
+         { "+9px",     OPTION_VAL_9PX_O58_0_EN },
+         { "+10px",    OPTION_VAL_10PX_O58_0_EN },
+         { "+11px",    OPTION_VAL_11PX_O58_0_EN },
+         { "+12px",    OPTION_VAL_12PX_O58_0_EN },
          { NULL, NULL },
       },
       "disabled"
@@ -21203,7 +21863,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_EN },
+         { "0",        OPTION_VAL_DISABLED_O58_EN },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -21614,6 +22274,26 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_EO NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_EO NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_EO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EO NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_EO NULL
+#define OPTION_VAL_L1_R1_SELECT_EO NULL
+#define OPTION_VAL_L1_R1_START_EO NULL
+#define OPTION_VAL_L1_R1_L3_EO NULL
+#define OPTION_VAL_L1_R1_R3_EO NULL
+#define OPTION_VAL_L2_R2_SELECT_EO NULL
+#define OPTION_VAL_L2_R2_START_EO NULL
+#define OPTION_VAL_L2_R2_L3_EO NULL
+#define OPTION_VAL_L2_R2_R3_EO NULL
+#define OPTION_VAL_L3_R3_EO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EO NULL
+#define OPTION_VAL_0_EO NULL
+#define OPTION_VAL_1_EO NULL
+#define OPTION_VAL_2_EO NULL
+#define OPTION_VAL_3_EO NULL
+#define OPTION_VAL_4_EO NULL
+#define OPTION_VAL_5_EO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_EO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_EO NULL
@@ -21643,7 +22323,7 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_EO NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_EO NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_EO NULL
-#define OPTION_VAL_5_EO NULL
+#define OPTION_VAL_5_O28_EO NULL
 #define OPTION_VAL_10_EO NULL
 #define OPTION_VAL_15_EO NULL
 #define OPTION_VAL_20_EO NULL
@@ -21690,7 +22370,7 @@ struct retro_core_options_v2 options_en = {
 #define OPTION_VAL_CUBIC_EO NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_EO NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_EO NULL
-#define OPTION_VAL_0_EO NULL
+#define OPTION_VAL_0_O30_EO NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_EO NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_EO NULL
 #define OPTION_VAL_LIBRETRO_EO NULL
@@ -21703,7 +22383,7 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_EO NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_EO NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_EO NULL
-#define OPTION_VAL_1_EO NULL
+#define OPTION_VAL_1_O35_EO NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EO NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EO NULL
 #define OPTION_VAL_MEMORY_ONLY_EO NULL
@@ -21838,7 +22518,7 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EO NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_EO NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_EO NULL
-#define OPTION_VAL_DISABLED_O54_EO NULL
+#define OPTION_VAL_DISABLED_O56_EO NULL
 #define OPTION_VAL_STATIC_EO NULL
 #define OPTION_VAL_SMART_EO NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_EO NULL
@@ -21857,31 +22537,31 @@ struct retro_core_options_v2 options_en = {
 #define OPTION_VAL_20PX_EO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_EO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_EO NULL
-#define OPTION_VAL_12PX_O56_EO NULL
-#define OPTION_VAL_11PX_O56_EO NULL
-#define OPTION_VAL_10PX_O56_EO NULL
-#define OPTION_VAL_9PX_O56_EO NULL
-#define OPTION_VAL_8PX_O56_EO NULL
-#define OPTION_VAL_7PX_O56_EO NULL
-#define OPTION_VAL_6PX_O56_EO NULL
-#define OPTION_VAL_5PX_O56_EO NULL
-#define OPTION_VAL_4PX_O56_EO NULL
-#define OPTION_VAL_3PX_O56_EO NULL
-#define OPTION_VAL_2PX_O56_EO NULL
-#define OPTION_VAL_1PX_O56_EO NULL
-#define OPTION_VAL_DISABLED_O56_EO NULL
-#define OPTION_VAL_1PX_O56_0_EO NULL
-#define OPTION_VAL_2PX_O56_0_EO NULL
-#define OPTION_VAL_3PX_O56_0_EO NULL
-#define OPTION_VAL_4PX_O56_0_EO NULL
-#define OPTION_VAL_5PX_O56_0_EO NULL
-#define OPTION_VAL_6PX_O56_0_EO NULL
-#define OPTION_VAL_7PX_O56_0_EO NULL
-#define OPTION_VAL_8PX_O56_0_EO NULL
-#define OPTION_VAL_9PX_O56_0_EO NULL
-#define OPTION_VAL_10PX_O56_0_EO NULL
-#define OPTION_VAL_11PX_O56_0_EO NULL
-#define OPTION_VAL_12PX_O56_0_EO NULL
+#define OPTION_VAL_12PX_O58_EO NULL
+#define OPTION_VAL_11PX_O58_EO NULL
+#define OPTION_VAL_10PX_O58_EO NULL
+#define OPTION_VAL_9PX_O58_EO NULL
+#define OPTION_VAL_8PX_O58_EO NULL
+#define OPTION_VAL_7PX_O58_EO NULL
+#define OPTION_VAL_6PX_O58_EO NULL
+#define OPTION_VAL_5PX_O58_EO NULL
+#define OPTION_VAL_4PX_O58_EO NULL
+#define OPTION_VAL_3PX_O58_EO NULL
+#define OPTION_VAL_2PX_O58_EO NULL
+#define OPTION_VAL_1PX_O58_EO NULL
+#define OPTION_VAL_DISABLED_O58_EO NULL
+#define OPTION_VAL_1PX_O58_0_EO NULL
+#define OPTION_VAL_2PX_O58_0_EO NULL
+#define OPTION_VAL_3PX_O58_0_EO NULL
+#define OPTION_VAL_4PX_O58_0_EO NULL
+#define OPTION_VAL_5PX_O58_0_EO NULL
+#define OPTION_VAL_6PX_O58_0_EO NULL
+#define OPTION_VAL_7PX_O58_0_EO NULL
+#define OPTION_VAL_8PX_O58_0_EO NULL
+#define OPTION_VAL_9PX_O58_0_EO NULL
+#define OPTION_VAL_10PX_O58_0_EO NULL
+#define OPTION_VAL_11PX_O58_0_EO NULL
+#define OPTION_VAL_12PX_O58_0_EO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_EO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_EO NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_EO NULL
@@ -22261,6 +22941,46 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_EO,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_EO },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_EO },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_EO },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_EO },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_EO },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_EO },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_EO },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_EO },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_EO },
+         { "l3+r3",                    OPTION_VAL_L3_R3_EO },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EO,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_EO },
+         { "1", OPTION_VAL_1_EO },
+         { "2", OPTION_VAL_2_EO },
+         { "3", OPTION_VAL_3_EO },
+         { "4", OPTION_VAL_4_EO },
+         { "5", OPTION_VAL_5_EO },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EO,
       NULL,
@@ -22370,7 +23090,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_EO },
+         { "5%",   OPTION_VAL_5_O28_EO },
          { "10%",  OPTION_VAL_10_EO },
          { "15%",  OPTION_VAL_15_EO },
          { "20%",  OPTION_VAL_20_EO },
@@ -22437,8 +23157,8 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_EO },
-         { "5%",  OPTION_VAL_5_EO },
+         { "0%",  OPTION_VAL_0_O30_EO },
+         { "5%",  OPTION_VAL_5_O28_EO },
          { "10%", OPTION_VAL_10_EO },
          { "15%", OPTION_VAL_15_EO },
          { "20%", OPTION_VAL_20_EO },
@@ -22575,7 +23295,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_EO },
+         { "1",  OPTION_VAL_1_O35_EO },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -22989,7 +23709,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_EO },
+         { "1",  OPTION_VAL_1_O35_EO },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -23032,7 +23752,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_EO },
+         { "disabled",  OPTION_VAL_DISABLED_O56_EO },
          { "static",  OPTION_VAL_STATIC_EO },
          { "smart", OPTION_VAL_SMART_EO },
          { NULL, NULL },
@@ -23080,31 +23800,31 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_EO },
-         { "-11px",    OPTION_VAL_11PX_O56_EO },
-         { "-10px",    OPTION_VAL_10PX_O56_EO },
-         { "-9px",     OPTION_VAL_9PX_O56_EO },
-         { "-8px",     OPTION_VAL_8PX_O56_EO },
-         { "-7px",     OPTION_VAL_7PX_O56_EO },
-         { "-6px",     OPTION_VAL_6PX_O56_EO },
-         { "-5px",     OPTION_VAL_5PX_O56_EO },
-         { "-4px",     OPTION_VAL_4PX_O56_EO },
-         { "-3px",     OPTION_VAL_3PX_O56_EO },
-         { "-2px",     OPTION_VAL_2PX_O56_EO },
-         { "-1px",     OPTION_VAL_1PX_O56_EO },
-         { "disabled", OPTION_VAL_DISABLED_O56_EO },
-         { "+1px",     OPTION_VAL_1PX_O56_0_EO },
-         { "+2px",     OPTION_VAL_2PX_O56_0_EO },
-         { "+3px",     OPTION_VAL_3PX_O56_0_EO },
-         { "+4px",     OPTION_VAL_4PX_O56_0_EO },
-         { "+5px",     OPTION_VAL_5PX_O56_0_EO },
-         { "+6px",     OPTION_VAL_6PX_O56_0_EO },
-         { "+7px",     OPTION_VAL_7PX_O56_0_EO },
-         { "+8px",     OPTION_VAL_8PX_O56_0_EO },
-         { "+9px",     OPTION_VAL_9PX_O56_0_EO },
-         { "+10px",    OPTION_VAL_10PX_O56_0_EO },
-         { "+11px",    OPTION_VAL_11PX_O56_0_EO },
-         { "+12px",    OPTION_VAL_12PX_O56_0_EO },
+         { "-12px",    OPTION_VAL_12PX_O58_EO },
+         { "-11px",    OPTION_VAL_11PX_O58_EO },
+         { "-10px",    OPTION_VAL_10PX_O58_EO },
+         { "-9px",     OPTION_VAL_9PX_O58_EO },
+         { "-8px",     OPTION_VAL_8PX_O58_EO },
+         { "-7px",     OPTION_VAL_7PX_O58_EO },
+         { "-6px",     OPTION_VAL_6PX_O58_EO },
+         { "-5px",     OPTION_VAL_5PX_O58_EO },
+         { "-4px",     OPTION_VAL_4PX_O58_EO },
+         { "-3px",     OPTION_VAL_3PX_O58_EO },
+         { "-2px",     OPTION_VAL_2PX_O58_EO },
+         { "-1px",     OPTION_VAL_1PX_O58_EO },
+         { "disabled", OPTION_VAL_DISABLED_O58_EO },
+         { "+1px",     OPTION_VAL_1PX_O58_0_EO },
+         { "+2px",     OPTION_VAL_2PX_O58_0_EO },
+         { "+3px",     OPTION_VAL_3PX_O58_0_EO },
+         { "+4px",     OPTION_VAL_4PX_O58_0_EO },
+         { "+5px",     OPTION_VAL_5PX_O58_0_EO },
+         { "+6px",     OPTION_VAL_6PX_O58_0_EO },
+         { "+7px",     OPTION_VAL_7PX_O58_0_EO },
+         { "+8px",     OPTION_VAL_8PX_O58_0_EO },
+         { "+9px",     OPTION_VAL_9PX_O58_0_EO },
+         { "+10px",    OPTION_VAL_10PX_O58_0_EO },
+         { "+11px",    OPTION_VAL_11PX_O58_0_EO },
+         { "+12px",    OPTION_VAL_12PX_O58_0_EO },
          { NULL, NULL },
       },
       "disabled"
@@ -23158,7 +23878,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_EO },
+         { "0",        OPTION_VAL_DISABLED_O58_EO },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -23568,7 +24288,27 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_ES "Autocalibrar controles analógicos"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_ES "Cuando el dispositivo de entrada esté configurado como DualShock, mando analógico, joystick analógico o neGcon, esta opción permitirá calibrar de forma dinámica las entradas analógicas. Se controlarán en tiempo real los valores de entrada máximos registrados para escalar las coordenadas analógicas que se transmitan al emulador. Esto sirve para juegos como Mega Man Legends 2, que esperan unos valores superiores a los que pueden transmitir los mandos modernos. Se recomienda que los sticks analógicos sean girados en toda su extensión nada más cargar un contenido para que el algoritmo de calibración funcione lo mejor posible."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_ES "Conmutador de modo analógico del DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_ES "Cuando el tipo de dispositivo de entrada sea DualShock, esta opción permite que el DualShock emulado pueda alternar entre los modos digital y analógico, como hace el hardware original. Al desactivar esta opción el DualShock quedará fijado en el modo analógico y al activarla el DualShock podrá cambiar entre los modos digital y analógico manteniendo pulsada la combinación START+SELECT+L1+L2+R1+R2."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_ES "Cuando el tipo de dispositivo de entrada sea DualShock, esta opción permite que el DualShock emulado pueda alternar entre los modos digital y analógico, como hace el hardware original. Al desactivar esta opción, el DualShock quedará fijado en el modo analógico, y al activarla, el DualShock podrá cambiar entre los modos digital y analógico al mantener pulsada la combinación de botones seleccionada."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ES "Combinación de botones del modo analógico del DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ES "Selecciona la combinación de botones que se utilizará para alternar entre los modos digital y analógico para el DualShock emulado. Esta opción solo funcionará cuando se haya activado Conmutador de modo analógico del DualShock."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_ES NULL
+#define OPTION_VAL_L1_R1_SELECT_ES NULL
+#define OPTION_VAL_L1_R1_START_ES NULL
+#define OPTION_VAL_L1_R1_L3_ES NULL
+#define OPTION_VAL_L1_R1_R3_ES NULL
+#define OPTION_VAL_L2_R2_SELECT_ES NULL
+#define OPTION_VAL_L2_R2_START_ES NULL
+#define OPTION_VAL_L2_R2_L3_ES NULL
+#define OPTION_VAL_L2_R2_R3_ES NULL
+#define OPTION_VAL_L3_R3_ES NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ES NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ES NULL
+#define OPTION_VAL_0_ES NULL
+#define OPTION_VAL_1_ES NULL
+#define OPTION_VAL_2_ES NULL
+#define OPTION_VAL_3_ES NULL
+#define OPTION_VAL_4_ES NULL
+#define OPTION_VAL_5_ES NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ES "Puerto 1: activar Multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_ES "Activa el sistema de Multitap en el puerto 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_ES "Puerto 2: activar Multitap"
@@ -23598,7 +24338,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_ES "Selecciona el color del punto de mira de la pistola de luz conectada en el puerto 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_ES "Sensibilidad del ratón"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_ES "Ajusta la respuesta del dispositivo de entrada «Mouse (ratón)»."
-#define OPTION_VAL_5_ES "5 %"
+#define OPTION_VAL_5_O28_ES NULL
 #define OPTION_VAL_10_ES "10 %"
 #define OPTION_VAL_15_ES "15 %"
 #define OPTION_VAL_20_ES "20 %"
@@ -23645,7 +24385,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_CUBIC_ES "Cúbica"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_ES "Zona muerta al torcer el neGcon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_ES "Ajusta la zona muerta del stick analógico izquierdo del RetroPad al simular la acción de torcer un dispositivo de entrada neGcon emulado. Sirve para evitar que el mando registre movimientos no realizados. Nota: la mayoría de juegos compatibles con neGcon incluyen opciones dentro del juego para ajustar un valor de zona muerta al torcerlo. Este valor debe configurarse como cero o neutral en todo momento para que no haya una pérdida de precisión. Cualquier ajuste que sea necesario solo debe aplicarse mediante esta opción del núcleo, sobre todo si «Respuesta al torcer el neGcon» está configurada como «Cuadrática» o «Cúbica»."
-#define OPTION_VAL_0_ES "0 %"
+#define OPTION_VAL_0_O30_ES NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_ES "Método de la Memory Card 0 (es necesario reiniciar)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_ES "Selecciona el formato de datos guardados que se utilizará en la Memory Card 0. «Mednafen» puede mejorar la compatibilidad con la versión independiente de Mednafen. Al utilizar los archivos guardados con Beetle PSX, los archivos de libretro (.srm) y Mednafen (.mcr) son idénticos internamente, así que pueden intercambiarse entre sí modificando sus nombres."
 #define OPTION_VAL_LIBRETRO_ES NULL
@@ -23658,7 +24398,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_ES "Cambia la Memory Card que está cargada en la ranura izquierda. Esta opción solo funcionará si la opción «Método de la Memory Card 0» está configurada como «Mednafen». La Memory Card predeterminada es el índice 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_ES "Índice de la Memory Card derecha"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_ES "Cambia la Memory Card que está cargada en la ranura derecha. Esta opción solo funcionará si la opción «Activar Memory Card 1» está activada. La Memory Card predeterminada es el índice 1."
-#define OPTION_VAL_1_ES "1 (por defecto)"
+#define OPTION_VAL_1_O35_ES NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_ES "Modo de operación del PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_ES "Renderiza los objetos 3D con una precisión subpíxel, utilizando coordenadas de vértices de coma fija para minimizar la distorsión y temblores en objetos 3D que tenía el hardware original. «Solo en memoria» apenas da problemas de compatibilidad y se recomienda su uso general. «Memoria + CPU (inestable)» puede reducir aún más los temblores, pero tiene unos requisitos de rendimiento elevados y puede provocar fallos en la geometría."
 #define OPTION_VAL_MEMORY_ONLY_ES "Solo en memoria"
@@ -23793,7 +24533,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ES "Debido a la diferencia entre estándares, los juegos PAL suelen parecer más lentos que sus versiones NTSC, tanto estadounidenses como japonesas. Esta opción puede anular la velocidad de vídeo PAL para intentar ejecutar dichos juegos con la velocidad de fotogramas NTSC. Esta opción no produce efecto alguno en contenidos NTSC."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_ES "Recortar sobrebarrido horizontal"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_ES "«Ninguno» conserva los bordes (columnas negras a ambos lados en el caso de imágenes NTSC, bordes por los cuatro costados en imágenes PAL) para simular las barras negras que produce el hardware real de PSX en una señal de vídeo analógica. «Estático» se limita a eliminar los bordes horizontales, mientras que «Dinámico» elimina todos los bordes."
-#define OPTION_VAL_DISABLED_O54_ES "No compartir"
+#define OPTION_VAL_DISABLED_O56_ES "No compartir"
 #define OPTION_VAL_STATIC_ES "Estático"
 #define OPTION_VAL_SMART_ES "Dinámico (por defecto)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_ES "Recorte adicional"
@@ -23812,31 +24552,31 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_20PX_ES "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_ES "Desplazar imagen recortada"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_ES "Al activar la opción «Recortar sobrebarrido horizontal», esta opción permite desplazar horizontalmente la imagen recortada hacia la derecha (valores positivos) o hacia la izquierda (valores negativos) usando un valor concreto en píxeles. Utilizar para corregir problemas de alineación. Solo funciona con el renderizador por software."
-#define OPTION_VAL_12PX_O56_ES "-12 px"
-#define OPTION_VAL_11PX_O56_ES "-11 px"
-#define OPTION_VAL_10PX_O56_ES "-10 px"
-#define OPTION_VAL_9PX_O56_ES "-9 px"
-#define OPTION_VAL_8PX_O56_ES "-8 px"
-#define OPTION_VAL_7PX_O56_ES "-7 px"
-#define OPTION_VAL_6PX_O56_ES "-6 px"
-#define OPTION_VAL_5PX_O56_ES "-5 px"
-#define OPTION_VAL_4PX_O56_ES "-4 px"
-#define OPTION_VAL_3PX_O56_ES "-3 px"
-#define OPTION_VAL_2PX_O56_ES "-2 px"
-#define OPTION_VAL_1PX_O56_ES "-1 px"
-#define OPTION_VAL_DISABLED_O56_ES "0 (valor predeterminado)"
-#define OPTION_VAL_1PX_O56_0_ES "+1 px"
-#define OPTION_VAL_2PX_O56_0_ES "+2 px"
-#define OPTION_VAL_3PX_O56_0_ES "+3 px"
-#define OPTION_VAL_4PX_O56_0_ES "+4 px"
-#define OPTION_VAL_5PX_O56_0_ES "+5 px"
-#define OPTION_VAL_6PX_O56_0_ES "+6 px"
-#define OPTION_VAL_7PX_O56_0_ES "+7 px"
-#define OPTION_VAL_8PX_O56_0_ES "+8 px"
-#define OPTION_VAL_9PX_O56_0_ES "+9 px"
-#define OPTION_VAL_10PX_O56_0_ES "+10 px"
-#define OPTION_VAL_11PX_O56_0_ES "+11 px"
-#define OPTION_VAL_12PX_O56_0_ES "+12 px"
+#define OPTION_VAL_12PX_O58_ES NULL
+#define OPTION_VAL_11PX_O58_ES NULL
+#define OPTION_VAL_10PX_O58_ES NULL
+#define OPTION_VAL_9PX_O58_ES NULL
+#define OPTION_VAL_8PX_O58_ES NULL
+#define OPTION_VAL_7PX_O58_ES NULL
+#define OPTION_VAL_6PX_O58_ES NULL
+#define OPTION_VAL_5PX_O58_ES NULL
+#define OPTION_VAL_4PX_O58_ES NULL
+#define OPTION_VAL_3PX_O58_ES NULL
+#define OPTION_VAL_2PX_O58_ES NULL
+#define OPTION_VAL_1PX_O58_ES NULL
+#define OPTION_VAL_DISABLED_O58_ES NULL
+#define OPTION_VAL_1PX_O58_0_ES NULL
+#define OPTION_VAL_2PX_O58_0_ES NULL
+#define OPTION_VAL_3PX_O58_0_ES NULL
+#define OPTION_VAL_4PX_O58_0_ES NULL
+#define OPTION_VAL_5PX_O58_0_ES NULL
+#define OPTION_VAL_6PX_O58_0_ES NULL
+#define OPTION_VAL_7PX_O58_0_ES NULL
+#define OPTION_VAL_8PX_O58_0_ES NULL
+#define OPTION_VAL_9PX_O58_0_ES NULL
+#define OPTION_VAL_10PX_O58_0_ES NULL
+#define OPTION_VAL_11PX_O58_0_ES NULL
+#define OPTION_VAL_12PX_O58_0_ES NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_ES "Desplazar imagen horizontal (ciclos de GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_ES "Especifica el número de ciclos de GPU con los que desplazar la imagen. Los valores positivos mueven la imagen hacia la derecha y los negativos hacia la izquierda. Solo funciona con los renderizadores por hardware."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_ES "Acelerar el rasterizador de la GPU"
@@ -24216,6 +24956,46 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ES,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ES,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_ES },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_ES },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_ES },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_ES },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_ES },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_ES },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_ES },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_ES },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_ES },
+         { "l3+r3",                    OPTION_VAL_L3_R3_ES },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ES,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ES,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_ES },
+         { "1", OPTION_VAL_1_ES },
+         { "2", OPTION_VAL_2_ES },
+         { "3", OPTION_VAL_3_ES },
+         { "4", OPTION_VAL_4_ES },
+         { "5", OPTION_VAL_5_ES },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ES,
       NULL,
@@ -24325,7 +25105,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_ES },
+         { "5%",   OPTION_VAL_5_O28_ES },
          { "10%",  OPTION_VAL_10_ES },
          { "15%",  OPTION_VAL_15_ES },
          { "20%",  OPTION_VAL_20_ES },
@@ -24392,8 +25172,8 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_ES },
-         { "5%",  OPTION_VAL_5_ES },
+         { "0%",  OPTION_VAL_0_O30_ES },
+         { "5%",  OPTION_VAL_5_O28_ES },
          { "10%", OPTION_VAL_10_ES },
          { "15%", OPTION_VAL_15_ES },
          { "20%", OPTION_VAL_20_ES },
@@ -24530,7 +25310,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_ES },
+         { "1",  OPTION_VAL_1_O35_ES },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -24944,7 +25724,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_ES },
+         { "1",  OPTION_VAL_1_O35_ES },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -24987,7 +25767,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_ES },
+         { "disabled",  OPTION_VAL_DISABLED_O56_ES },
          { "static",  OPTION_VAL_STATIC_ES },
          { "smart", OPTION_VAL_SMART_ES },
          { NULL, NULL },
@@ -25035,31 +25815,31 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_ES },
-         { "-11px",    OPTION_VAL_11PX_O56_ES },
-         { "-10px",    OPTION_VAL_10PX_O56_ES },
-         { "-9px",     OPTION_VAL_9PX_O56_ES },
-         { "-8px",     OPTION_VAL_8PX_O56_ES },
-         { "-7px",     OPTION_VAL_7PX_O56_ES },
-         { "-6px",     OPTION_VAL_6PX_O56_ES },
-         { "-5px",     OPTION_VAL_5PX_O56_ES },
-         { "-4px",     OPTION_VAL_4PX_O56_ES },
-         { "-3px",     OPTION_VAL_3PX_O56_ES },
-         { "-2px",     OPTION_VAL_2PX_O56_ES },
-         { "-1px",     OPTION_VAL_1PX_O56_ES },
-         { "disabled", OPTION_VAL_DISABLED_O56_ES },
-         { "+1px",     OPTION_VAL_1PX_O56_0_ES },
-         { "+2px",     OPTION_VAL_2PX_O56_0_ES },
-         { "+3px",     OPTION_VAL_3PX_O56_0_ES },
-         { "+4px",     OPTION_VAL_4PX_O56_0_ES },
-         { "+5px",     OPTION_VAL_5PX_O56_0_ES },
-         { "+6px",     OPTION_VAL_6PX_O56_0_ES },
-         { "+7px",     OPTION_VAL_7PX_O56_0_ES },
-         { "+8px",     OPTION_VAL_8PX_O56_0_ES },
-         { "+9px",     OPTION_VAL_9PX_O56_0_ES },
-         { "+10px",    OPTION_VAL_10PX_O56_0_ES },
-         { "+11px",    OPTION_VAL_11PX_O56_0_ES },
-         { "+12px",    OPTION_VAL_12PX_O56_0_ES },
+         { "-12px",    OPTION_VAL_12PX_O58_ES },
+         { "-11px",    OPTION_VAL_11PX_O58_ES },
+         { "-10px",    OPTION_VAL_10PX_O58_ES },
+         { "-9px",     OPTION_VAL_9PX_O58_ES },
+         { "-8px",     OPTION_VAL_8PX_O58_ES },
+         { "-7px",     OPTION_VAL_7PX_O58_ES },
+         { "-6px",     OPTION_VAL_6PX_O58_ES },
+         { "-5px",     OPTION_VAL_5PX_O58_ES },
+         { "-4px",     OPTION_VAL_4PX_O58_ES },
+         { "-3px",     OPTION_VAL_3PX_O58_ES },
+         { "-2px",     OPTION_VAL_2PX_O58_ES },
+         { "-1px",     OPTION_VAL_1PX_O58_ES },
+         { "disabled", OPTION_VAL_DISABLED_O58_ES },
+         { "+1px",     OPTION_VAL_1PX_O58_0_ES },
+         { "+2px",     OPTION_VAL_2PX_O58_0_ES },
+         { "+3px",     OPTION_VAL_3PX_O58_0_ES },
+         { "+4px",     OPTION_VAL_4PX_O58_0_ES },
+         { "+5px",     OPTION_VAL_5PX_O58_0_ES },
+         { "+6px",     OPTION_VAL_6PX_O58_0_ES },
+         { "+7px",     OPTION_VAL_7PX_O58_0_ES },
+         { "+8px",     OPTION_VAL_8PX_O58_0_ES },
+         { "+9px",     OPTION_VAL_9PX_O58_0_ES },
+         { "+10px",    OPTION_VAL_10PX_O58_0_ES },
+         { "+11px",    OPTION_VAL_11PX_O58_0_ES },
+         { "+12px",    OPTION_VAL_12PX_O58_0_ES },
          { NULL, NULL },
       },
       "disabled"
@@ -25113,7 +25893,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_ES },
+         { "0",        OPTION_VAL_DISABLED_O58_ES },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -25524,6 +26304,26 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_FA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_FA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_FA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_FA NULL
+#define OPTION_VAL_L1_R1_SELECT_FA NULL
+#define OPTION_VAL_L1_R1_START_FA NULL
+#define OPTION_VAL_L1_R1_L3_FA NULL
+#define OPTION_VAL_L1_R1_R3_FA NULL
+#define OPTION_VAL_L2_R2_SELECT_FA NULL
+#define OPTION_VAL_L2_R2_START_FA NULL
+#define OPTION_VAL_L2_R2_L3_FA NULL
+#define OPTION_VAL_L2_R2_R3_FA NULL
+#define OPTION_VAL_L3_R3_FA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FA NULL
+#define OPTION_VAL_0_FA NULL
+#define OPTION_VAL_1_FA NULL
+#define OPTION_VAL_2_FA NULL
+#define OPTION_VAL_3_FA NULL
+#define OPTION_VAL_4_FA NULL
+#define OPTION_VAL_5_FA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_FA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_FA NULL
@@ -25553,7 +26353,7 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_FA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_FA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_FA NULL
-#define OPTION_VAL_5_FA NULL
+#define OPTION_VAL_5_O28_FA NULL
 #define OPTION_VAL_10_FA NULL
 #define OPTION_VAL_15_FA NULL
 #define OPTION_VAL_20_FA NULL
@@ -25600,7 +26400,7 @@ struct retro_core_options_v2 options_es = {
 #define OPTION_VAL_CUBIC_FA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_FA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_FA NULL
-#define OPTION_VAL_0_FA NULL
+#define OPTION_VAL_0_O30_FA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_FA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_FA NULL
 #define OPTION_VAL_LIBRETRO_FA NULL
@@ -25613,7 +26413,7 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_FA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_FA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_FA NULL
-#define OPTION_VAL_1_FA NULL
+#define OPTION_VAL_1_O35_FA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_FA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FA NULL
 #define OPTION_VAL_MEMORY_ONLY_FA NULL
@@ -25748,7 +26548,7 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_FA NULL
-#define OPTION_VAL_DISABLED_O54_FA "هیچکدام"
+#define OPTION_VAL_DISABLED_O56_FA "هیچکدام"
 #define OPTION_VAL_STATIC_FA NULL
 #define OPTION_VAL_SMART_FA NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_FA NULL
@@ -25767,31 +26567,31 @@ struct retro_core_options_v2 options_es = {
 #define OPTION_VAL_20PX_FA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_FA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_FA NULL
-#define OPTION_VAL_12PX_O56_FA NULL
-#define OPTION_VAL_11PX_O56_FA NULL
-#define OPTION_VAL_10PX_O56_FA NULL
-#define OPTION_VAL_9PX_O56_FA NULL
-#define OPTION_VAL_8PX_O56_FA NULL
-#define OPTION_VAL_7PX_O56_FA NULL
-#define OPTION_VAL_6PX_O56_FA NULL
-#define OPTION_VAL_5PX_O56_FA NULL
-#define OPTION_VAL_4PX_O56_FA NULL
-#define OPTION_VAL_3PX_O56_FA NULL
-#define OPTION_VAL_2PX_O56_FA NULL
-#define OPTION_VAL_1PX_O56_FA NULL
-#define OPTION_VAL_DISABLED_O56_FA NULL
-#define OPTION_VAL_1PX_O56_0_FA NULL
-#define OPTION_VAL_2PX_O56_0_FA NULL
-#define OPTION_VAL_3PX_O56_0_FA NULL
-#define OPTION_VAL_4PX_O56_0_FA NULL
-#define OPTION_VAL_5PX_O56_0_FA NULL
-#define OPTION_VAL_6PX_O56_0_FA NULL
-#define OPTION_VAL_7PX_O56_0_FA NULL
-#define OPTION_VAL_8PX_O56_0_FA NULL
-#define OPTION_VAL_9PX_O56_0_FA NULL
-#define OPTION_VAL_10PX_O56_0_FA NULL
-#define OPTION_VAL_11PX_O56_0_FA NULL
-#define OPTION_VAL_12PX_O56_0_FA NULL
+#define OPTION_VAL_12PX_O58_FA NULL
+#define OPTION_VAL_11PX_O58_FA NULL
+#define OPTION_VAL_10PX_O58_FA NULL
+#define OPTION_VAL_9PX_O58_FA NULL
+#define OPTION_VAL_8PX_O58_FA NULL
+#define OPTION_VAL_7PX_O58_FA NULL
+#define OPTION_VAL_6PX_O58_FA NULL
+#define OPTION_VAL_5PX_O58_FA NULL
+#define OPTION_VAL_4PX_O58_FA NULL
+#define OPTION_VAL_3PX_O58_FA NULL
+#define OPTION_VAL_2PX_O58_FA NULL
+#define OPTION_VAL_1PX_O58_FA NULL
+#define OPTION_VAL_DISABLED_O58_FA NULL
+#define OPTION_VAL_1PX_O58_0_FA NULL
+#define OPTION_VAL_2PX_O58_0_FA NULL
+#define OPTION_VAL_3PX_O58_0_FA NULL
+#define OPTION_VAL_4PX_O58_0_FA NULL
+#define OPTION_VAL_5PX_O58_0_FA NULL
+#define OPTION_VAL_6PX_O58_0_FA NULL
+#define OPTION_VAL_7PX_O58_0_FA NULL
+#define OPTION_VAL_8PX_O58_0_FA NULL
+#define OPTION_VAL_9PX_O58_0_FA NULL
+#define OPTION_VAL_10PX_O58_0_FA NULL
+#define OPTION_VAL_11PX_O58_0_FA NULL
+#define OPTION_VAL_12PX_O58_0_FA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_FA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_FA NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_FA NULL
@@ -26171,6 +26971,46 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FA,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_FA },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_FA },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_FA },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_FA },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_FA },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_FA },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_FA },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_FA },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_FA },
+         { "l3+r3",                    OPTION_VAL_L3_R3_FA },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FA,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_FA },
+         { "1", OPTION_VAL_1_FA },
+         { "2", OPTION_VAL_2_FA },
+         { "3", OPTION_VAL_3_FA },
+         { "4", OPTION_VAL_4_FA },
+         { "5", OPTION_VAL_5_FA },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FA,
       NULL,
@@ -26280,7 +27120,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_FA },
+         { "5%",   OPTION_VAL_5_O28_FA },
          { "10%",  OPTION_VAL_10_FA },
          { "15%",  OPTION_VAL_15_FA },
          { "20%",  OPTION_VAL_20_FA },
@@ -26347,8 +27187,8 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_FA },
-         { "5%",  OPTION_VAL_5_FA },
+         { "0%",  OPTION_VAL_0_O30_FA },
+         { "5%",  OPTION_VAL_5_O28_FA },
          { "10%", OPTION_VAL_10_FA },
          { "15%", OPTION_VAL_15_FA },
          { "20%", OPTION_VAL_20_FA },
@@ -26485,7 +27325,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_FA },
+         { "1",  OPTION_VAL_1_O35_FA },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -26899,7 +27739,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_FA },
+         { "1",  OPTION_VAL_1_O35_FA },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -26942,7 +27782,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_FA },
+         { "disabled",  OPTION_VAL_DISABLED_O56_FA },
          { "static",  OPTION_VAL_STATIC_FA },
          { "smart", OPTION_VAL_SMART_FA },
          { NULL, NULL },
@@ -26990,31 +27830,31 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_FA },
-         { "-11px",    OPTION_VAL_11PX_O56_FA },
-         { "-10px",    OPTION_VAL_10PX_O56_FA },
-         { "-9px",     OPTION_VAL_9PX_O56_FA },
-         { "-8px",     OPTION_VAL_8PX_O56_FA },
-         { "-7px",     OPTION_VAL_7PX_O56_FA },
-         { "-6px",     OPTION_VAL_6PX_O56_FA },
-         { "-5px",     OPTION_VAL_5PX_O56_FA },
-         { "-4px",     OPTION_VAL_4PX_O56_FA },
-         { "-3px",     OPTION_VAL_3PX_O56_FA },
-         { "-2px",     OPTION_VAL_2PX_O56_FA },
-         { "-1px",     OPTION_VAL_1PX_O56_FA },
-         { "disabled", OPTION_VAL_DISABLED_O56_FA },
-         { "+1px",     OPTION_VAL_1PX_O56_0_FA },
-         { "+2px",     OPTION_VAL_2PX_O56_0_FA },
-         { "+3px",     OPTION_VAL_3PX_O56_0_FA },
-         { "+4px",     OPTION_VAL_4PX_O56_0_FA },
-         { "+5px",     OPTION_VAL_5PX_O56_0_FA },
-         { "+6px",     OPTION_VAL_6PX_O56_0_FA },
-         { "+7px",     OPTION_VAL_7PX_O56_0_FA },
-         { "+8px",     OPTION_VAL_8PX_O56_0_FA },
-         { "+9px",     OPTION_VAL_9PX_O56_0_FA },
-         { "+10px",    OPTION_VAL_10PX_O56_0_FA },
-         { "+11px",    OPTION_VAL_11PX_O56_0_FA },
-         { "+12px",    OPTION_VAL_12PX_O56_0_FA },
+         { "-12px",    OPTION_VAL_12PX_O58_FA },
+         { "-11px",    OPTION_VAL_11PX_O58_FA },
+         { "-10px",    OPTION_VAL_10PX_O58_FA },
+         { "-9px",     OPTION_VAL_9PX_O58_FA },
+         { "-8px",     OPTION_VAL_8PX_O58_FA },
+         { "-7px",     OPTION_VAL_7PX_O58_FA },
+         { "-6px",     OPTION_VAL_6PX_O58_FA },
+         { "-5px",     OPTION_VAL_5PX_O58_FA },
+         { "-4px",     OPTION_VAL_4PX_O58_FA },
+         { "-3px",     OPTION_VAL_3PX_O58_FA },
+         { "-2px",     OPTION_VAL_2PX_O58_FA },
+         { "-1px",     OPTION_VAL_1PX_O58_FA },
+         { "disabled", OPTION_VAL_DISABLED_O58_FA },
+         { "+1px",     OPTION_VAL_1PX_O58_0_FA },
+         { "+2px",     OPTION_VAL_2PX_O58_0_FA },
+         { "+3px",     OPTION_VAL_3PX_O58_0_FA },
+         { "+4px",     OPTION_VAL_4PX_O58_0_FA },
+         { "+5px",     OPTION_VAL_5PX_O58_0_FA },
+         { "+6px",     OPTION_VAL_6PX_O58_0_FA },
+         { "+7px",     OPTION_VAL_7PX_O58_0_FA },
+         { "+8px",     OPTION_VAL_8PX_O58_0_FA },
+         { "+9px",     OPTION_VAL_9PX_O58_0_FA },
+         { "+10px",    OPTION_VAL_10PX_O58_0_FA },
+         { "+11px",    OPTION_VAL_11PX_O58_0_FA },
+         { "+12px",    OPTION_VAL_12PX_O58_0_FA },
          { NULL, NULL },
       },
       "disabled"
@@ -27068,7 +27908,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_FA },
+         { "0",        OPTION_VAL_DISABLED_O58_FA },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -27479,6 +28319,26 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_FI NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_FI NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_FI NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FI NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FI NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_FI NULL
+#define OPTION_VAL_L1_R1_SELECT_FI NULL
+#define OPTION_VAL_L1_R1_START_FI NULL
+#define OPTION_VAL_L1_R1_L3_FI NULL
+#define OPTION_VAL_L1_R1_R3_FI NULL
+#define OPTION_VAL_L2_R2_SELECT_FI NULL
+#define OPTION_VAL_L2_R2_START_FI NULL
+#define OPTION_VAL_L2_R2_L3_FI NULL
+#define OPTION_VAL_L2_R2_R3_FI NULL
+#define OPTION_VAL_L3_R3_FI NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FI NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FI NULL
+#define OPTION_VAL_0_FI NULL
+#define OPTION_VAL_1_FI NULL
+#define OPTION_VAL_2_FI NULL
+#define OPTION_VAL_3_FI NULL
+#define OPTION_VAL_4_FI NULL
+#define OPTION_VAL_5_FI NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FI NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_FI NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_FI NULL
@@ -27508,7 +28368,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_FI NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_FI "Hiiren herkkyys"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_FI NULL
-#define OPTION_VAL_5_FI "5 %"
+#define OPTION_VAL_5_O28_FI NULL
 #define OPTION_VAL_10_FI "10 %"
 #define OPTION_VAL_15_FI "15 %"
 #define OPTION_VAL_20_FI "20 %"
@@ -27555,7 +28415,7 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_CUBIC_FI NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_FI NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_FI NULL
-#define OPTION_VAL_0_FI "0 %"
+#define OPTION_VAL_0_O30_FI NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_FI NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_FI NULL
 #define OPTION_VAL_LIBRETRO_FI NULL
@@ -27568,7 +28428,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_FI NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_FI NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_FI NULL
-#define OPTION_VAL_1_FI "1 (Oletus)"
+#define OPTION_VAL_1_O35_FI NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_FI NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FI NULL
 #define OPTION_VAL_MEMORY_ONLY_FI NULL
@@ -27703,7 +28563,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_FI NULL
-#define OPTION_VAL_DISABLED_O54_FI "Ei mitään"
+#define OPTION_VAL_DISABLED_O56_FI "Ei mitään"
 #define OPTION_VAL_STATIC_FI NULL
 #define OPTION_VAL_SMART_FI "Dynaaminen (Oletus)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_FI NULL
@@ -27722,31 +28582,31 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_20PX_FI NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_FI NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_FI NULL
-#define OPTION_VAL_12PX_O56_FI NULL
-#define OPTION_VAL_11PX_O56_FI NULL
-#define OPTION_VAL_10PX_O56_FI NULL
-#define OPTION_VAL_9PX_O56_FI NULL
-#define OPTION_VAL_8PX_O56_FI NULL
-#define OPTION_VAL_7PX_O56_FI NULL
-#define OPTION_VAL_6PX_O56_FI NULL
-#define OPTION_VAL_5PX_O56_FI NULL
-#define OPTION_VAL_4PX_O56_FI NULL
-#define OPTION_VAL_3PX_O56_FI NULL
-#define OPTION_VAL_2PX_O56_FI NULL
-#define OPTION_VAL_1PX_O56_FI NULL
-#define OPTION_VAL_DISABLED_O56_FI "0 (Oletus)"
-#define OPTION_VAL_1PX_O56_0_FI NULL
-#define OPTION_VAL_2PX_O56_0_FI NULL
-#define OPTION_VAL_3PX_O56_0_FI NULL
-#define OPTION_VAL_4PX_O56_0_FI NULL
-#define OPTION_VAL_5PX_O56_0_FI NULL
-#define OPTION_VAL_6PX_O56_0_FI NULL
-#define OPTION_VAL_7PX_O56_0_FI NULL
-#define OPTION_VAL_8PX_O56_0_FI NULL
-#define OPTION_VAL_9PX_O56_0_FI NULL
-#define OPTION_VAL_10PX_O56_0_FI NULL
-#define OPTION_VAL_11PX_O56_0_FI NULL
-#define OPTION_VAL_12PX_O56_0_FI NULL
+#define OPTION_VAL_12PX_O58_FI NULL
+#define OPTION_VAL_11PX_O58_FI NULL
+#define OPTION_VAL_10PX_O58_FI NULL
+#define OPTION_VAL_9PX_O58_FI NULL
+#define OPTION_VAL_8PX_O58_FI NULL
+#define OPTION_VAL_7PX_O58_FI NULL
+#define OPTION_VAL_6PX_O58_FI NULL
+#define OPTION_VAL_5PX_O58_FI NULL
+#define OPTION_VAL_4PX_O58_FI NULL
+#define OPTION_VAL_3PX_O58_FI NULL
+#define OPTION_VAL_2PX_O58_FI NULL
+#define OPTION_VAL_1PX_O58_FI NULL
+#define OPTION_VAL_DISABLED_O58_FI NULL
+#define OPTION_VAL_1PX_O58_0_FI NULL
+#define OPTION_VAL_2PX_O58_0_FI NULL
+#define OPTION_VAL_3PX_O58_0_FI NULL
+#define OPTION_VAL_4PX_O58_0_FI NULL
+#define OPTION_VAL_5PX_O58_0_FI NULL
+#define OPTION_VAL_6PX_O58_0_FI NULL
+#define OPTION_VAL_7PX_O58_0_FI NULL
+#define OPTION_VAL_8PX_O58_0_FI NULL
+#define OPTION_VAL_9PX_O58_0_FI NULL
+#define OPTION_VAL_10PX_O58_0_FI NULL
+#define OPTION_VAL_11PX_O58_0_FI NULL
+#define OPTION_VAL_12PX_O58_0_FI NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_FI NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_FI NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_FI NULL
@@ -28126,6 +28986,46 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FI,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FI,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_FI },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_FI },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_FI },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_FI },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_FI },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_FI },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_FI },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_FI },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_FI },
+         { "l3+r3",                    OPTION_VAL_L3_R3_FI },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FI,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FI,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_FI },
+         { "1", OPTION_VAL_1_FI },
+         { "2", OPTION_VAL_2_FI },
+         { "3", OPTION_VAL_3_FI },
+         { "4", OPTION_VAL_4_FI },
+         { "5", OPTION_VAL_5_FI },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FI,
       NULL,
@@ -28235,7 +29135,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_FI },
+         { "5%",   OPTION_VAL_5_O28_FI },
          { "10%",  OPTION_VAL_10_FI },
          { "15%",  OPTION_VAL_15_FI },
          { "20%",  OPTION_VAL_20_FI },
@@ -28302,8 +29202,8 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_FI },
-         { "5%",  OPTION_VAL_5_FI },
+         { "0%",  OPTION_VAL_0_O30_FI },
+         { "5%",  OPTION_VAL_5_O28_FI },
          { "10%", OPTION_VAL_10_FI },
          { "15%", OPTION_VAL_15_FI },
          { "20%", OPTION_VAL_20_FI },
@@ -28440,7 +29340,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_FI },
+         { "1",  OPTION_VAL_1_O35_FI },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -28854,7 +29754,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_FI },
+         { "1",  OPTION_VAL_1_O35_FI },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -28897,7 +29797,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_FI },
+         { "disabled",  OPTION_VAL_DISABLED_O56_FI },
          { "static",  OPTION_VAL_STATIC_FI },
          { "smart", OPTION_VAL_SMART_FI },
          { NULL, NULL },
@@ -28945,31 +29845,31 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_FI },
-         { "-11px",    OPTION_VAL_11PX_O56_FI },
-         { "-10px",    OPTION_VAL_10PX_O56_FI },
-         { "-9px",     OPTION_VAL_9PX_O56_FI },
-         { "-8px",     OPTION_VAL_8PX_O56_FI },
-         { "-7px",     OPTION_VAL_7PX_O56_FI },
-         { "-6px",     OPTION_VAL_6PX_O56_FI },
-         { "-5px",     OPTION_VAL_5PX_O56_FI },
-         { "-4px",     OPTION_VAL_4PX_O56_FI },
-         { "-3px",     OPTION_VAL_3PX_O56_FI },
-         { "-2px",     OPTION_VAL_2PX_O56_FI },
-         { "-1px",     OPTION_VAL_1PX_O56_FI },
-         { "disabled", OPTION_VAL_DISABLED_O56_FI },
-         { "+1px",     OPTION_VAL_1PX_O56_0_FI },
-         { "+2px",     OPTION_VAL_2PX_O56_0_FI },
-         { "+3px",     OPTION_VAL_3PX_O56_0_FI },
-         { "+4px",     OPTION_VAL_4PX_O56_0_FI },
-         { "+5px",     OPTION_VAL_5PX_O56_0_FI },
-         { "+6px",     OPTION_VAL_6PX_O56_0_FI },
-         { "+7px",     OPTION_VAL_7PX_O56_0_FI },
-         { "+8px",     OPTION_VAL_8PX_O56_0_FI },
-         { "+9px",     OPTION_VAL_9PX_O56_0_FI },
-         { "+10px",    OPTION_VAL_10PX_O56_0_FI },
-         { "+11px",    OPTION_VAL_11PX_O56_0_FI },
-         { "+12px",    OPTION_VAL_12PX_O56_0_FI },
+         { "-12px",    OPTION_VAL_12PX_O58_FI },
+         { "-11px",    OPTION_VAL_11PX_O58_FI },
+         { "-10px",    OPTION_VAL_10PX_O58_FI },
+         { "-9px",     OPTION_VAL_9PX_O58_FI },
+         { "-8px",     OPTION_VAL_8PX_O58_FI },
+         { "-7px",     OPTION_VAL_7PX_O58_FI },
+         { "-6px",     OPTION_VAL_6PX_O58_FI },
+         { "-5px",     OPTION_VAL_5PX_O58_FI },
+         { "-4px",     OPTION_VAL_4PX_O58_FI },
+         { "-3px",     OPTION_VAL_3PX_O58_FI },
+         { "-2px",     OPTION_VAL_2PX_O58_FI },
+         { "-1px",     OPTION_VAL_1PX_O58_FI },
+         { "disabled", OPTION_VAL_DISABLED_O58_FI },
+         { "+1px",     OPTION_VAL_1PX_O58_0_FI },
+         { "+2px",     OPTION_VAL_2PX_O58_0_FI },
+         { "+3px",     OPTION_VAL_3PX_O58_0_FI },
+         { "+4px",     OPTION_VAL_4PX_O58_0_FI },
+         { "+5px",     OPTION_VAL_5PX_O58_0_FI },
+         { "+6px",     OPTION_VAL_6PX_O58_0_FI },
+         { "+7px",     OPTION_VAL_7PX_O58_0_FI },
+         { "+8px",     OPTION_VAL_8PX_O58_0_FI },
+         { "+9px",     OPTION_VAL_9PX_O58_0_FI },
+         { "+10px",    OPTION_VAL_10PX_O58_0_FI },
+         { "+11px",    OPTION_VAL_11PX_O58_0_FI },
+         { "+12px",    OPTION_VAL_12PX_O58_0_FI },
          { NULL, NULL },
       },
       "disabled"
@@ -29023,7 +29923,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_FI },
+         { "0",        OPTION_VAL_DISABLED_O58_FI },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -29433,7 +30333,27 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_FR "Auto-étalonnage analogique"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_FR "Lorsque le périphérique d'entrée est réglé sur DualShock, Manette analogique, Joystick analogique ou neGcon, cette option active l'étalonnage dynamique des entrées analogiques. Les valeurs maximales enregistrées sont surveillées en temps réel et utilisées pour mettre à l'échelle les coordonnées analogiques passées à l'émulateur. Cela devrait être utilisé pour des jeux tels que Mega Man Legends 2 qui s'attendent à des valeurs plus grandes que ce que les manettes modernes fournissent. Pour de meilleurs résultats, les sticks analogiques devraient être tournés dans toute la mesure du possible pour régler l'algorithme de calibration chaque fois que du contenu est chargé."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_FR "Activer le mode analogique DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_FR "Lorsque le type de périphérique d'entrée est DualShock, cette option permet au DualShock émulé d'être basculé entre le mode NUMÉRIQUE et le mode ANALOGIQUE comme le matériel original. Lorsqu'elle est désactivée, le DualShock est verrouillé en mode ANALOGIQUE et lorsqu'elle est activée, le DualShock peut être basculé entre le mode NUMÉRIQUE et le mode ANALOGIQUE en maintenant appuyé START+SELECT+L1+L2+R1+R2."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_FR "Lorsque le type de périphérique d'entrée est DualShock, cette option permet au DualShock émulé d'être basculé entre le mode NUMÉRIQUE et le mode ANALOGIQUE comme le matériel original. Lorsqu'elle est désactivée, le DualShock est verrouillé en mode ANALOGIQUE et lorsqu'elle est activée, le DualShock peut être basculé entre le mode NUMÉRIQUE et le mode ANALOGIQUE en utilisant la combinaison de touches sélectionnée."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FR "Combinaison mode analogique DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FR "Choisissez la combinaison de touches qui sera utilisée pour basculer entre le mode NUMÉRIQUE et le mode ANALOGIQUE pour le DualShock émulé. Ne fonctionne que lorsque l'option 'Activer le mode analogique DualShock' est activée."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_FR NULL
+#define OPTION_VAL_L1_R1_SELECT_FR NULL
+#define OPTION_VAL_L1_R1_START_FR NULL
+#define OPTION_VAL_L1_R1_L3_FR NULL
+#define OPTION_VAL_L1_R1_R3_FR NULL
+#define OPTION_VAL_L2_R2_SELECT_FR NULL
+#define OPTION_VAL_L2_R2_START_FR NULL
+#define OPTION_VAL_L2_R2_L3_FR NULL
+#define OPTION_VAL_L2_R2_R3_FR NULL
+#define OPTION_VAL_L3_R3_FR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FR NULL
+#define OPTION_VAL_0_FR NULL
+#define OPTION_VAL_1_FR NULL
+#define OPTION_VAL_2_FR NULL
+#define OPTION_VAL_3_FR NULL
+#define OPTION_VAL_4_FR NULL
+#define OPTION_VAL_5_FR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FR "Port 1 : Activer le multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_FR "Activer la fonctionnalité multitap sur le port 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_FR "Port 2 : Activer le multitap"
@@ -29463,7 +30383,7 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_FR "Sélectionner la couleur de viseur du pistolet pour le port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_FR "Sensibilité de la souris"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_FR "Sélectionner la réactivité du type de périphérique d'entrée 'Souris'."
-#define OPTION_VAL_5_FR NULL
+#define OPTION_VAL_5_O28_FR NULL
 #define OPTION_VAL_10_FR NULL
 #define OPTION_VAL_15_FR NULL
 #define OPTION_VAL_20_FR NULL
@@ -29510,7 +30430,7 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_CUBIC_FR "Cubique"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_FR "Deadzone de torsion du negCon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_FR "Sélectionner la deadzone du stick analogique gauche de la RetroManette lors de la simulation de l'action 'torsion' des périphériques d'entrée 'neGcon' émulés. Utilisé pour éliminer la dérive de la manette. Remarque : la plupart des titres compatibles avec le neGcon fournissent des options en jeu pour définir une valeur de deadzone de la 'torsion'. Pour éviter la perte de précision, la deadzone réglée en jeu devrait *toujours* être réglée à zéro. Tous les ajustements requis devraient *uniquement* être appliqués via cette option de coeur. Ceci est particulièrement important lorsque la valeur de 'Réponse de torsion du neGcon' est définie sur 'Quadratique' ou 'Cubique'."
-#define OPTION_VAL_0_FR NULL
+#define OPTION_VAL_0_O30_FR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_FR "Méthode de la Memory Card 0 (Redémarrage requis)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_FR "Choisir le format des données de sauvegarde utilisé pour la carte mémoire 0. 'Mednafen' peut être utilisé pour la compatibilité avec la version autonome de Mednafen. Lors de l'utilisation avec Beetle PSX, Libretro (.srm) et Mednafen (.mcr) les sauvegardes ont des formats internes identiques et peuvent être converties les unes vers les autres via le renommage."
 #define OPTION_VAL_LIBRETRO_FR NULL
@@ -29523,7 +30443,7 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_FR "Modifier la carte mémoire actuellement chargée dans l'emplacement de gauche. Cette option ne fonctionnera que si la Méthode de la Memory Card 0 est définie sur Mednafen. La carte par défaut est à l'index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_FR "Index de la Memory Card de droite"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_FR "Modifier la carte mémoire actuellement chargée dans l'emplacement de droite. Cette option ne fonctionnera que si la Memory Card 1 est activée. La carte par défaut est à l'index 1."
-#define OPTION_VAL_1_FR "1 (par défaut)"
+#define OPTION_VAL_1_O35_FR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_FR "Mode d'opération de PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FR "Permet aux objets 3D d'être rendus avec une précision aux sous-pixels, minimisant la distorsion et les variations des objets 3D vues sur le matériel d'origine en raison de l'utilisation de coordonnées de vertex sur un point fixe. Le mode 'Mémoire uniquement' a un minimum de problèmes de compatibilité et est recommandé pour une utilisation générale. Le mode 'Mémoire + processeur (buggé)' peut réduire encore plus les variations, mais il a des exigences de performances élevées et peut causer diverses erreurs de géométrie."
 #define OPTION_VAL_MEMORY_ONLY_FR "Mémoire uniquement"
@@ -29658,7 +30578,7 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FR "En raison de normes différentes, les jeux PAL semblent souvent ralentis par rapport aux versions américaines ou japonaises à la norme NTSC. Cette option peut être utilisée pour remplacer les timings PAL afin d'essayer d'exécuter ces jeux avec le débit d'image NTSC. Cette option n'a aucun effet lors de l'exécution de contenu NTSC."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FR "Recadrage du surbalayage"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_FR "'Aucun' conserve le remplissage (les piliers de chaque côté de l'image pour NTSC, de tous les côtés pour PAL) pour émuler les mêmes barres noires générées en sortie vidéo analogique par du matériel PSX réel. 'Statique' supprime seulement le remplissage horizontal, 'Dynamique' supprime tout remplissage."
-#define OPTION_VAL_DISABLED_O54_FR "Aucun"
+#define OPTION_VAL_DISABLED_O56_FR "Ne pas partager"
 #define OPTION_VAL_STATIC_FR "Statique"
 #define OPTION_VAL_SMART_FR "Dynamique (par défaut)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_FR "Recadrage supplémentaire"
@@ -29677,31 +30597,31 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_20PX_FR "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_FR "Décalage de l'image recadrée"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_FR "Lorsque le 'Recadrage du surbalayage horizontal' est activé, cela permet à l'image recadrée résultante d'être décalée horizontalement à droite (valeur positive) ou à gauche (valeur négative) par le nombre de pixels spécifié. Peut être utilisé pour corriger des problèmes d'alignement. Uniquement pris en charge par le moteur de rendu logiciel."
-#define OPTION_VAL_12PX_O56_FR "-12 px"
-#define OPTION_VAL_11PX_O56_FR "-11 px"
-#define OPTION_VAL_10PX_O56_FR "-10 px"
-#define OPTION_VAL_9PX_O56_FR "-9 px"
-#define OPTION_VAL_8PX_O56_FR "-8 px"
-#define OPTION_VAL_7PX_O56_FR "-7 px"
-#define OPTION_VAL_6PX_O56_FR "-6 px"
-#define OPTION_VAL_5PX_O56_FR "-5 px"
-#define OPTION_VAL_4PX_O56_FR "-4 px"
-#define OPTION_VAL_3PX_O56_FR "-3 px"
-#define OPTION_VAL_2PX_O56_FR "-2 px"
-#define OPTION_VAL_1PX_O56_FR "-1 px"
-#define OPTION_VAL_DISABLED_O56_FR "0 (par défaut)"
-#define OPTION_VAL_1PX_O56_0_FR "+1 px"
-#define OPTION_VAL_2PX_O56_0_FR "+2 px"
-#define OPTION_VAL_3PX_O56_0_FR "+3 px"
-#define OPTION_VAL_4PX_O56_0_FR "+4 px"
-#define OPTION_VAL_5PX_O56_0_FR "+5 px"
-#define OPTION_VAL_6PX_O56_0_FR "+6 px"
-#define OPTION_VAL_7PX_O56_0_FR "+7 px"
-#define OPTION_VAL_8PX_O56_0_FR "+8 px"
-#define OPTION_VAL_9PX_O56_0_FR "+9 px"
-#define OPTION_VAL_10PX_O56_0_FR "+10 px"
-#define OPTION_VAL_11PX_O56_0_FR "+11 px"
-#define OPTION_VAL_12PX_O56_0_FR "+12 px"
+#define OPTION_VAL_12PX_O58_FR NULL
+#define OPTION_VAL_11PX_O58_FR NULL
+#define OPTION_VAL_10PX_O58_FR NULL
+#define OPTION_VAL_9PX_O58_FR NULL
+#define OPTION_VAL_8PX_O58_FR NULL
+#define OPTION_VAL_7PX_O58_FR NULL
+#define OPTION_VAL_6PX_O58_FR NULL
+#define OPTION_VAL_5PX_O58_FR NULL
+#define OPTION_VAL_4PX_O58_FR NULL
+#define OPTION_VAL_3PX_O58_FR NULL
+#define OPTION_VAL_2PX_O58_FR NULL
+#define OPTION_VAL_1PX_O58_FR NULL
+#define OPTION_VAL_DISABLED_O58_FR NULL
+#define OPTION_VAL_1PX_O58_0_FR NULL
+#define OPTION_VAL_2PX_O58_0_FR NULL
+#define OPTION_VAL_3PX_O58_0_FR NULL
+#define OPTION_VAL_4PX_O58_0_FR NULL
+#define OPTION_VAL_5PX_O58_0_FR NULL
+#define OPTION_VAL_6PX_O58_0_FR NULL
+#define OPTION_VAL_7PX_O58_0_FR NULL
+#define OPTION_VAL_8PX_O58_0_FR NULL
+#define OPTION_VAL_9PX_O58_0_FR NULL
+#define OPTION_VAL_10PX_O58_0_FR NULL
+#define OPTION_VAL_11PX_O58_0_FR NULL
+#define OPTION_VAL_12PX_O58_0_FR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_FR "Décalage horizontal de l'image (cycles du processeur graphique)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_FR "Sélectionner le nombre de cycles du processeur graphique par lesquels décaler l'image. Les valeurs positives déplacent l'image vers la droite, les valeurs négatives déplacent l'image vers la gauche. Uniquement pris en charge par les moteurs de rendu matériels."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_FR "Overclocking du rastériseur processeur graphique"
@@ -30081,6 +31001,46 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_FR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_FR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_FR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_FR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_FR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_FR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_FR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_FR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_FR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_FR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_FR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_FR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_FR },
+         { "1", OPTION_VAL_1_FR },
+         { "2", OPTION_VAL_2_FR },
+         { "3", OPTION_VAL_3_FR },
+         { "4", OPTION_VAL_4_FR },
+         { "5", OPTION_VAL_5_FR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FR,
       NULL,
@@ -30190,7 +31150,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_FR },
+         { "5%",   OPTION_VAL_5_O28_FR },
          { "10%",  OPTION_VAL_10_FR },
          { "15%",  OPTION_VAL_15_FR },
          { "20%",  OPTION_VAL_20_FR },
@@ -30257,8 +31217,8 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_FR },
-         { "5%",  OPTION_VAL_5_FR },
+         { "0%",  OPTION_VAL_0_O30_FR },
+         { "5%",  OPTION_VAL_5_O28_FR },
          { "10%", OPTION_VAL_10_FR },
          { "15%", OPTION_VAL_15_FR },
          { "20%", OPTION_VAL_20_FR },
@@ -30395,7 +31355,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_FR },
+         { "1",  OPTION_VAL_1_O35_FR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -30809,7 +31769,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_FR },
+         { "1",  OPTION_VAL_1_O35_FR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -30852,7 +31812,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_FR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_FR },
          { "static",  OPTION_VAL_STATIC_FR },
          { "smart", OPTION_VAL_SMART_FR },
          { NULL, NULL },
@@ -30900,31 +31860,31 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_FR },
-         { "-11px",    OPTION_VAL_11PX_O56_FR },
-         { "-10px",    OPTION_VAL_10PX_O56_FR },
-         { "-9px",     OPTION_VAL_9PX_O56_FR },
-         { "-8px",     OPTION_VAL_8PX_O56_FR },
-         { "-7px",     OPTION_VAL_7PX_O56_FR },
-         { "-6px",     OPTION_VAL_6PX_O56_FR },
-         { "-5px",     OPTION_VAL_5PX_O56_FR },
-         { "-4px",     OPTION_VAL_4PX_O56_FR },
-         { "-3px",     OPTION_VAL_3PX_O56_FR },
-         { "-2px",     OPTION_VAL_2PX_O56_FR },
-         { "-1px",     OPTION_VAL_1PX_O56_FR },
-         { "disabled", OPTION_VAL_DISABLED_O56_FR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_FR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_FR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_FR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_FR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_FR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_FR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_FR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_FR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_FR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_FR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_FR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_FR },
+         { "-12px",    OPTION_VAL_12PX_O58_FR },
+         { "-11px",    OPTION_VAL_11PX_O58_FR },
+         { "-10px",    OPTION_VAL_10PX_O58_FR },
+         { "-9px",     OPTION_VAL_9PX_O58_FR },
+         { "-8px",     OPTION_VAL_8PX_O58_FR },
+         { "-7px",     OPTION_VAL_7PX_O58_FR },
+         { "-6px",     OPTION_VAL_6PX_O58_FR },
+         { "-5px",     OPTION_VAL_5PX_O58_FR },
+         { "-4px",     OPTION_VAL_4PX_O58_FR },
+         { "-3px",     OPTION_VAL_3PX_O58_FR },
+         { "-2px",     OPTION_VAL_2PX_O58_FR },
+         { "-1px",     OPTION_VAL_1PX_O58_FR },
+         { "disabled", OPTION_VAL_DISABLED_O58_FR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_FR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_FR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_FR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_FR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_FR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_FR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_FR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_FR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_FR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_FR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_FR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_FR },
          { NULL, NULL },
       },
       "disabled"
@@ -30978,7 +31938,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_FR },
+         { "0",        OPTION_VAL_DISABLED_O58_FR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -31389,6 +32349,26 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GL NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_GL NULL
+#define OPTION_VAL_L1_R1_SELECT_GL NULL
+#define OPTION_VAL_L1_R1_START_GL NULL
+#define OPTION_VAL_L1_R1_L3_GL NULL
+#define OPTION_VAL_L1_R1_R3_GL NULL
+#define OPTION_VAL_L2_R2_SELECT_GL NULL
+#define OPTION_VAL_L2_R2_START_GL NULL
+#define OPTION_VAL_L2_R2_L3_GL NULL
+#define OPTION_VAL_L2_R2_R3_GL NULL
+#define OPTION_VAL_L3_R3_GL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GL NULL
+#define OPTION_VAL_0_GL NULL
+#define OPTION_VAL_1_GL NULL
+#define OPTION_VAL_2_GL NULL
+#define OPTION_VAL_3_GL NULL
+#define OPTION_VAL_4_GL NULL
+#define OPTION_VAL_5_GL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_GL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_GL NULL
@@ -31418,7 +32398,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_GL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_GL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_GL NULL
-#define OPTION_VAL_5_GL NULL
+#define OPTION_VAL_5_O28_GL NULL
 #define OPTION_VAL_10_GL NULL
 #define OPTION_VAL_15_GL NULL
 #define OPTION_VAL_20_GL NULL
@@ -31465,7 +32445,7 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_CUBIC_GL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_GL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_GL NULL
-#define OPTION_VAL_0_GL NULL
+#define OPTION_VAL_0_O30_GL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_GL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_GL NULL
 #define OPTION_VAL_LIBRETRO_GL NULL
@@ -31478,7 +32458,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GL NULL
-#define OPTION_VAL_1_GL NULL
+#define OPTION_VAL_1_O35_GL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_GL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_GL NULL
 #define OPTION_VAL_MEMORY_ONLY_GL NULL
@@ -31613,7 +32593,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_GL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GL NULL
-#define OPTION_VAL_DISABLED_O54_GL "Ningún"
+#define OPTION_VAL_DISABLED_O56_GL "Ningún"
 #define OPTION_VAL_STATIC_GL NULL
 #define OPTION_VAL_SMART_GL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_GL NULL
@@ -31632,31 +32612,31 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_20PX_GL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_GL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_GL NULL
-#define OPTION_VAL_12PX_O56_GL NULL
-#define OPTION_VAL_11PX_O56_GL NULL
-#define OPTION_VAL_10PX_O56_GL NULL
-#define OPTION_VAL_9PX_O56_GL NULL
-#define OPTION_VAL_8PX_O56_GL NULL
-#define OPTION_VAL_7PX_O56_GL NULL
-#define OPTION_VAL_6PX_O56_GL NULL
-#define OPTION_VAL_5PX_O56_GL NULL
-#define OPTION_VAL_4PX_O56_GL NULL
-#define OPTION_VAL_3PX_O56_GL NULL
-#define OPTION_VAL_2PX_O56_GL NULL
-#define OPTION_VAL_1PX_O56_GL NULL
-#define OPTION_VAL_DISABLED_O56_GL NULL
-#define OPTION_VAL_1PX_O56_0_GL NULL
-#define OPTION_VAL_2PX_O56_0_GL NULL
-#define OPTION_VAL_3PX_O56_0_GL NULL
-#define OPTION_VAL_4PX_O56_0_GL NULL
-#define OPTION_VAL_5PX_O56_0_GL NULL
-#define OPTION_VAL_6PX_O56_0_GL NULL
-#define OPTION_VAL_7PX_O56_0_GL NULL
-#define OPTION_VAL_8PX_O56_0_GL NULL
-#define OPTION_VAL_9PX_O56_0_GL NULL
-#define OPTION_VAL_10PX_O56_0_GL NULL
-#define OPTION_VAL_11PX_O56_0_GL NULL
-#define OPTION_VAL_12PX_O56_0_GL NULL
+#define OPTION_VAL_12PX_O58_GL NULL
+#define OPTION_VAL_11PX_O58_GL NULL
+#define OPTION_VAL_10PX_O58_GL NULL
+#define OPTION_VAL_9PX_O58_GL NULL
+#define OPTION_VAL_8PX_O58_GL NULL
+#define OPTION_VAL_7PX_O58_GL NULL
+#define OPTION_VAL_6PX_O58_GL NULL
+#define OPTION_VAL_5PX_O58_GL NULL
+#define OPTION_VAL_4PX_O58_GL NULL
+#define OPTION_VAL_3PX_O58_GL NULL
+#define OPTION_VAL_2PX_O58_GL NULL
+#define OPTION_VAL_1PX_O58_GL NULL
+#define OPTION_VAL_DISABLED_O58_GL NULL
+#define OPTION_VAL_1PX_O58_0_GL NULL
+#define OPTION_VAL_2PX_O58_0_GL NULL
+#define OPTION_VAL_3PX_O58_0_GL NULL
+#define OPTION_VAL_4PX_O58_0_GL NULL
+#define OPTION_VAL_5PX_O58_0_GL NULL
+#define OPTION_VAL_6PX_O58_0_GL NULL
+#define OPTION_VAL_7PX_O58_0_GL NULL
+#define OPTION_VAL_8PX_O58_0_GL NULL
+#define OPTION_VAL_9PX_O58_0_GL NULL
+#define OPTION_VAL_10PX_O58_0_GL NULL
+#define OPTION_VAL_11PX_O58_0_GL NULL
+#define OPTION_VAL_12PX_O58_0_GL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_GL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GL NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_GL NULL
@@ -32036,6 +33016,46 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GL,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_GL },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_GL },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_GL },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_GL },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_GL },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_GL },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_GL },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_GL },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_GL },
+         { "l3+r3",                    OPTION_VAL_L3_R3_GL },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GL,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_GL },
+         { "1", OPTION_VAL_1_GL },
+         { "2", OPTION_VAL_2_GL },
+         { "3", OPTION_VAL_3_GL },
+         { "4", OPTION_VAL_4_GL },
+         { "5", OPTION_VAL_5_GL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GL,
       NULL,
@@ -32145,7 +33165,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_GL },
+         { "5%",   OPTION_VAL_5_O28_GL },
          { "10%",  OPTION_VAL_10_GL },
          { "15%",  OPTION_VAL_15_GL },
          { "20%",  OPTION_VAL_20_GL },
@@ -32212,8 +33232,8 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_GL },
-         { "5%",  OPTION_VAL_5_GL },
+         { "0%",  OPTION_VAL_0_O30_GL },
+         { "5%",  OPTION_VAL_5_O28_GL },
          { "10%", OPTION_VAL_10_GL },
          { "15%", OPTION_VAL_15_GL },
          { "20%", OPTION_VAL_20_GL },
@@ -32350,7 +33370,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_GL },
+         { "1",  OPTION_VAL_1_O35_GL },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -32764,7 +33784,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_GL },
+         { "1",  OPTION_VAL_1_O35_GL },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -32807,7 +33827,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_GL },
+         { "disabled",  OPTION_VAL_DISABLED_O56_GL },
          { "static",  OPTION_VAL_STATIC_GL },
          { "smart", OPTION_VAL_SMART_GL },
          { NULL, NULL },
@@ -32855,31 +33875,31 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_GL },
-         { "-11px",    OPTION_VAL_11PX_O56_GL },
-         { "-10px",    OPTION_VAL_10PX_O56_GL },
-         { "-9px",     OPTION_VAL_9PX_O56_GL },
-         { "-8px",     OPTION_VAL_8PX_O56_GL },
-         { "-7px",     OPTION_VAL_7PX_O56_GL },
-         { "-6px",     OPTION_VAL_6PX_O56_GL },
-         { "-5px",     OPTION_VAL_5PX_O56_GL },
-         { "-4px",     OPTION_VAL_4PX_O56_GL },
-         { "-3px",     OPTION_VAL_3PX_O56_GL },
-         { "-2px",     OPTION_VAL_2PX_O56_GL },
-         { "-1px",     OPTION_VAL_1PX_O56_GL },
-         { "disabled", OPTION_VAL_DISABLED_O56_GL },
-         { "+1px",     OPTION_VAL_1PX_O56_0_GL },
-         { "+2px",     OPTION_VAL_2PX_O56_0_GL },
-         { "+3px",     OPTION_VAL_3PX_O56_0_GL },
-         { "+4px",     OPTION_VAL_4PX_O56_0_GL },
-         { "+5px",     OPTION_VAL_5PX_O56_0_GL },
-         { "+6px",     OPTION_VAL_6PX_O56_0_GL },
-         { "+7px",     OPTION_VAL_7PX_O56_0_GL },
-         { "+8px",     OPTION_VAL_8PX_O56_0_GL },
-         { "+9px",     OPTION_VAL_9PX_O56_0_GL },
-         { "+10px",    OPTION_VAL_10PX_O56_0_GL },
-         { "+11px",    OPTION_VAL_11PX_O56_0_GL },
-         { "+12px",    OPTION_VAL_12PX_O56_0_GL },
+         { "-12px",    OPTION_VAL_12PX_O58_GL },
+         { "-11px",    OPTION_VAL_11PX_O58_GL },
+         { "-10px",    OPTION_VAL_10PX_O58_GL },
+         { "-9px",     OPTION_VAL_9PX_O58_GL },
+         { "-8px",     OPTION_VAL_8PX_O58_GL },
+         { "-7px",     OPTION_VAL_7PX_O58_GL },
+         { "-6px",     OPTION_VAL_6PX_O58_GL },
+         { "-5px",     OPTION_VAL_5PX_O58_GL },
+         { "-4px",     OPTION_VAL_4PX_O58_GL },
+         { "-3px",     OPTION_VAL_3PX_O58_GL },
+         { "-2px",     OPTION_VAL_2PX_O58_GL },
+         { "-1px",     OPTION_VAL_1PX_O58_GL },
+         { "disabled", OPTION_VAL_DISABLED_O58_GL },
+         { "+1px",     OPTION_VAL_1PX_O58_0_GL },
+         { "+2px",     OPTION_VAL_2PX_O58_0_GL },
+         { "+3px",     OPTION_VAL_3PX_O58_0_GL },
+         { "+4px",     OPTION_VAL_4PX_O58_0_GL },
+         { "+5px",     OPTION_VAL_5PX_O58_0_GL },
+         { "+6px",     OPTION_VAL_6PX_O58_0_GL },
+         { "+7px",     OPTION_VAL_7PX_O58_0_GL },
+         { "+8px",     OPTION_VAL_8PX_O58_0_GL },
+         { "+9px",     OPTION_VAL_9PX_O58_0_GL },
+         { "+10px",    OPTION_VAL_10PX_O58_0_GL },
+         { "+11px",    OPTION_VAL_11PX_O58_0_GL },
+         { "+12px",    OPTION_VAL_12PX_O58_0_GL },
          { NULL, NULL },
       },
       "disabled"
@@ -32933,7 +33953,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_GL },
+         { "0",        OPTION_VAL_DISABLED_O58_GL },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -33344,6 +34364,26 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_HE NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_HE NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HE NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_HE NULL
+#define OPTION_VAL_L1_R1_SELECT_HE NULL
+#define OPTION_VAL_L1_R1_START_HE NULL
+#define OPTION_VAL_L1_R1_L3_HE NULL
+#define OPTION_VAL_L1_R1_R3_HE NULL
+#define OPTION_VAL_L2_R2_SELECT_HE NULL
+#define OPTION_VAL_L2_R2_START_HE NULL
+#define OPTION_VAL_L2_R2_L3_HE NULL
+#define OPTION_VAL_L2_R2_R3_HE NULL
+#define OPTION_VAL_L3_R3_HE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HE NULL
+#define OPTION_VAL_0_HE NULL
+#define OPTION_VAL_1_HE NULL
+#define OPTION_VAL_2_HE NULL
+#define OPTION_VAL_3_HE NULL
+#define OPTION_VAL_4_HE NULL
+#define OPTION_VAL_5_HE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_HE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_HE NULL
@@ -33373,7 +34413,7 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_HE NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_HE NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_HE NULL
-#define OPTION_VAL_5_HE NULL
+#define OPTION_VAL_5_O28_HE NULL
 #define OPTION_VAL_10_HE NULL
 #define OPTION_VAL_15_HE NULL
 #define OPTION_VAL_20_HE NULL
@@ -33420,7 +34460,7 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_CUBIC_HE NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_HE NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_HE NULL
-#define OPTION_VAL_0_HE NULL
+#define OPTION_VAL_0_O30_HE NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_HE NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_HE NULL
 #define OPTION_VAL_LIBRETRO_HE NULL
@@ -33433,7 +34473,7 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_HE NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_HE NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_HE NULL
-#define OPTION_VAL_1_HE NULL
+#define OPTION_VAL_1_O35_HE NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_HE NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HE NULL
 #define OPTION_VAL_MEMORY_ONLY_HE NULL
@@ -33568,7 +34608,7 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HE NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_HE NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_HE NULL
-#define OPTION_VAL_DISABLED_O54_HE NULL
+#define OPTION_VAL_DISABLED_O56_HE NULL
 #define OPTION_VAL_STATIC_HE NULL
 #define OPTION_VAL_SMART_HE NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_HE NULL
@@ -33587,31 +34627,31 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_20PX_HE NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_HE NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_HE NULL
-#define OPTION_VAL_12PX_O56_HE NULL
-#define OPTION_VAL_11PX_O56_HE NULL
-#define OPTION_VAL_10PX_O56_HE NULL
-#define OPTION_VAL_9PX_O56_HE NULL
-#define OPTION_VAL_8PX_O56_HE NULL
-#define OPTION_VAL_7PX_O56_HE NULL
-#define OPTION_VAL_6PX_O56_HE NULL
-#define OPTION_VAL_5PX_O56_HE NULL
-#define OPTION_VAL_4PX_O56_HE NULL
-#define OPTION_VAL_3PX_O56_HE NULL
-#define OPTION_VAL_2PX_O56_HE NULL
-#define OPTION_VAL_1PX_O56_HE NULL
-#define OPTION_VAL_DISABLED_O56_HE NULL
-#define OPTION_VAL_1PX_O56_0_HE NULL
-#define OPTION_VAL_2PX_O56_0_HE NULL
-#define OPTION_VAL_3PX_O56_0_HE NULL
-#define OPTION_VAL_4PX_O56_0_HE NULL
-#define OPTION_VAL_5PX_O56_0_HE NULL
-#define OPTION_VAL_6PX_O56_0_HE NULL
-#define OPTION_VAL_7PX_O56_0_HE NULL
-#define OPTION_VAL_8PX_O56_0_HE NULL
-#define OPTION_VAL_9PX_O56_0_HE NULL
-#define OPTION_VAL_10PX_O56_0_HE NULL
-#define OPTION_VAL_11PX_O56_0_HE NULL
-#define OPTION_VAL_12PX_O56_0_HE NULL
+#define OPTION_VAL_12PX_O58_HE NULL
+#define OPTION_VAL_11PX_O58_HE NULL
+#define OPTION_VAL_10PX_O58_HE NULL
+#define OPTION_VAL_9PX_O58_HE NULL
+#define OPTION_VAL_8PX_O58_HE NULL
+#define OPTION_VAL_7PX_O58_HE NULL
+#define OPTION_VAL_6PX_O58_HE NULL
+#define OPTION_VAL_5PX_O58_HE NULL
+#define OPTION_VAL_4PX_O58_HE NULL
+#define OPTION_VAL_3PX_O58_HE NULL
+#define OPTION_VAL_2PX_O58_HE NULL
+#define OPTION_VAL_1PX_O58_HE NULL
+#define OPTION_VAL_DISABLED_O58_HE NULL
+#define OPTION_VAL_1PX_O58_0_HE NULL
+#define OPTION_VAL_2PX_O58_0_HE NULL
+#define OPTION_VAL_3PX_O58_0_HE NULL
+#define OPTION_VAL_4PX_O58_0_HE NULL
+#define OPTION_VAL_5PX_O58_0_HE NULL
+#define OPTION_VAL_6PX_O58_0_HE NULL
+#define OPTION_VAL_7PX_O58_0_HE NULL
+#define OPTION_VAL_8PX_O58_0_HE NULL
+#define OPTION_VAL_9PX_O58_0_HE NULL
+#define OPTION_VAL_10PX_O58_0_HE NULL
+#define OPTION_VAL_11PX_O58_0_HE NULL
+#define OPTION_VAL_12PX_O58_0_HE NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_HE NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HE NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_HE NULL
@@ -33991,6 +35031,46 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HE,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HE,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_HE },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_HE },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_HE },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_HE },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_HE },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_HE },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_HE },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_HE },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_HE },
+         { "l3+r3",                    OPTION_VAL_L3_R3_HE },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HE,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HE,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_HE },
+         { "1", OPTION_VAL_1_HE },
+         { "2", OPTION_VAL_2_HE },
+         { "3", OPTION_VAL_3_HE },
+         { "4", OPTION_VAL_4_HE },
+         { "5", OPTION_VAL_5_HE },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HE,
       NULL,
@@ -34100,7 +35180,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_HE },
+         { "5%",   OPTION_VAL_5_O28_HE },
          { "10%",  OPTION_VAL_10_HE },
          { "15%",  OPTION_VAL_15_HE },
          { "20%",  OPTION_VAL_20_HE },
@@ -34167,8 +35247,8 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_HE },
-         { "5%",  OPTION_VAL_5_HE },
+         { "0%",  OPTION_VAL_0_O30_HE },
+         { "5%",  OPTION_VAL_5_O28_HE },
          { "10%", OPTION_VAL_10_HE },
          { "15%", OPTION_VAL_15_HE },
          { "20%", OPTION_VAL_20_HE },
@@ -34305,7 +35385,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_HE },
+         { "1",  OPTION_VAL_1_O35_HE },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -34719,7 +35799,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_HE },
+         { "1",  OPTION_VAL_1_O35_HE },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -34762,7 +35842,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_HE },
+         { "disabled",  OPTION_VAL_DISABLED_O56_HE },
          { "static",  OPTION_VAL_STATIC_HE },
          { "smart", OPTION_VAL_SMART_HE },
          { NULL, NULL },
@@ -34810,31 +35890,31 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_HE },
-         { "-11px",    OPTION_VAL_11PX_O56_HE },
-         { "-10px",    OPTION_VAL_10PX_O56_HE },
-         { "-9px",     OPTION_VAL_9PX_O56_HE },
-         { "-8px",     OPTION_VAL_8PX_O56_HE },
-         { "-7px",     OPTION_VAL_7PX_O56_HE },
-         { "-6px",     OPTION_VAL_6PX_O56_HE },
-         { "-5px",     OPTION_VAL_5PX_O56_HE },
-         { "-4px",     OPTION_VAL_4PX_O56_HE },
-         { "-3px",     OPTION_VAL_3PX_O56_HE },
-         { "-2px",     OPTION_VAL_2PX_O56_HE },
-         { "-1px",     OPTION_VAL_1PX_O56_HE },
-         { "disabled", OPTION_VAL_DISABLED_O56_HE },
-         { "+1px",     OPTION_VAL_1PX_O56_0_HE },
-         { "+2px",     OPTION_VAL_2PX_O56_0_HE },
-         { "+3px",     OPTION_VAL_3PX_O56_0_HE },
-         { "+4px",     OPTION_VAL_4PX_O56_0_HE },
-         { "+5px",     OPTION_VAL_5PX_O56_0_HE },
-         { "+6px",     OPTION_VAL_6PX_O56_0_HE },
-         { "+7px",     OPTION_VAL_7PX_O56_0_HE },
-         { "+8px",     OPTION_VAL_8PX_O56_0_HE },
-         { "+9px",     OPTION_VAL_9PX_O56_0_HE },
-         { "+10px",    OPTION_VAL_10PX_O56_0_HE },
-         { "+11px",    OPTION_VAL_11PX_O56_0_HE },
-         { "+12px",    OPTION_VAL_12PX_O56_0_HE },
+         { "-12px",    OPTION_VAL_12PX_O58_HE },
+         { "-11px",    OPTION_VAL_11PX_O58_HE },
+         { "-10px",    OPTION_VAL_10PX_O58_HE },
+         { "-9px",     OPTION_VAL_9PX_O58_HE },
+         { "-8px",     OPTION_VAL_8PX_O58_HE },
+         { "-7px",     OPTION_VAL_7PX_O58_HE },
+         { "-6px",     OPTION_VAL_6PX_O58_HE },
+         { "-5px",     OPTION_VAL_5PX_O58_HE },
+         { "-4px",     OPTION_VAL_4PX_O58_HE },
+         { "-3px",     OPTION_VAL_3PX_O58_HE },
+         { "-2px",     OPTION_VAL_2PX_O58_HE },
+         { "-1px",     OPTION_VAL_1PX_O58_HE },
+         { "disabled", OPTION_VAL_DISABLED_O58_HE },
+         { "+1px",     OPTION_VAL_1PX_O58_0_HE },
+         { "+2px",     OPTION_VAL_2PX_O58_0_HE },
+         { "+3px",     OPTION_VAL_3PX_O58_0_HE },
+         { "+4px",     OPTION_VAL_4PX_O58_0_HE },
+         { "+5px",     OPTION_VAL_5PX_O58_0_HE },
+         { "+6px",     OPTION_VAL_6PX_O58_0_HE },
+         { "+7px",     OPTION_VAL_7PX_O58_0_HE },
+         { "+8px",     OPTION_VAL_8PX_O58_0_HE },
+         { "+9px",     OPTION_VAL_9PX_O58_0_HE },
+         { "+10px",    OPTION_VAL_10PX_O58_0_HE },
+         { "+11px",    OPTION_VAL_11PX_O58_0_HE },
+         { "+12px",    OPTION_VAL_12PX_O58_0_HE },
          { NULL, NULL },
       },
       "disabled"
@@ -34888,7 +35968,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_HE },
+         { "0",        OPTION_VAL_DISABLED_O58_HE },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -35299,6 +36379,26 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_HR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_HR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HR NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_HR NULL
+#define OPTION_VAL_L1_R1_SELECT_HR NULL
+#define OPTION_VAL_L1_R1_START_HR NULL
+#define OPTION_VAL_L1_R1_L3_HR NULL
+#define OPTION_VAL_L1_R1_R3_HR NULL
+#define OPTION_VAL_L2_R2_SELECT_HR NULL
+#define OPTION_VAL_L2_R2_START_HR NULL
+#define OPTION_VAL_L2_R2_L3_HR NULL
+#define OPTION_VAL_L2_R2_R3_HR NULL
+#define OPTION_VAL_L3_R3_HR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HR NULL
+#define OPTION_VAL_0_HR NULL
+#define OPTION_VAL_1_HR NULL
+#define OPTION_VAL_2_HR NULL
+#define OPTION_VAL_3_HR NULL
+#define OPTION_VAL_4_HR NULL
+#define OPTION_VAL_5_HR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_HR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_HR NULL
@@ -35328,7 +36428,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_HR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_HR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_HR NULL
-#define OPTION_VAL_5_HR NULL
+#define OPTION_VAL_5_O28_HR NULL
 #define OPTION_VAL_10_HR NULL
 #define OPTION_VAL_15_HR NULL
 #define OPTION_VAL_20_HR NULL
@@ -35375,7 +36475,7 @@ struct retro_core_options_v2 options_he = {
 #define OPTION_VAL_CUBIC_HR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_HR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_HR NULL
-#define OPTION_VAL_0_HR NULL
+#define OPTION_VAL_0_O30_HR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_HR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_HR NULL
 #define OPTION_VAL_LIBRETRO_HR NULL
@@ -35388,7 +36488,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_HR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_HR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_HR NULL
-#define OPTION_VAL_1_HR NULL
+#define OPTION_VAL_1_O35_HR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_HR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HR NULL
 #define OPTION_VAL_MEMORY_ONLY_HR NULL
@@ -35523,7 +36623,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_HR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_HR NULL
-#define OPTION_VAL_DISABLED_O54_HR NULL
+#define OPTION_VAL_DISABLED_O56_HR NULL
 #define OPTION_VAL_STATIC_HR NULL
 #define OPTION_VAL_SMART_HR NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_HR NULL
@@ -35542,31 +36642,31 @@ struct retro_core_options_v2 options_he = {
 #define OPTION_VAL_20PX_HR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_HR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_HR NULL
-#define OPTION_VAL_12PX_O56_HR NULL
-#define OPTION_VAL_11PX_O56_HR NULL
-#define OPTION_VAL_10PX_O56_HR NULL
-#define OPTION_VAL_9PX_O56_HR NULL
-#define OPTION_VAL_8PX_O56_HR NULL
-#define OPTION_VAL_7PX_O56_HR NULL
-#define OPTION_VAL_6PX_O56_HR NULL
-#define OPTION_VAL_5PX_O56_HR NULL
-#define OPTION_VAL_4PX_O56_HR NULL
-#define OPTION_VAL_3PX_O56_HR NULL
-#define OPTION_VAL_2PX_O56_HR NULL
-#define OPTION_VAL_1PX_O56_HR NULL
-#define OPTION_VAL_DISABLED_O56_HR NULL
-#define OPTION_VAL_1PX_O56_0_HR NULL
-#define OPTION_VAL_2PX_O56_0_HR NULL
-#define OPTION_VAL_3PX_O56_0_HR NULL
-#define OPTION_VAL_4PX_O56_0_HR NULL
-#define OPTION_VAL_5PX_O56_0_HR NULL
-#define OPTION_VAL_6PX_O56_0_HR NULL
-#define OPTION_VAL_7PX_O56_0_HR NULL
-#define OPTION_VAL_8PX_O56_0_HR NULL
-#define OPTION_VAL_9PX_O56_0_HR NULL
-#define OPTION_VAL_10PX_O56_0_HR NULL
-#define OPTION_VAL_11PX_O56_0_HR NULL
-#define OPTION_VAL_12PX_O56_0_HR NULL
+#define OPTION_VAL_12PX_O58_HR NULL
+#define OPTION_VAL_11PX_O58_HR NULL
+#define OPTION_VAL_10PX_O58_HR NULL
+#define OPTION_VAL_9PX_O58_HR NULL
+#define OPTION_VAL_8PX_O58_HR NULL
+#define OPTION_VAL_7PX_O58_HR NULL
+#define OPTION_VAL_6PX_O58_HR NULL
+#define OPTION_VAL_5PX_O58_HR NULL
+#define OPTION_VAL_4PX_O58_HR NULL
+#define OPTION_VAL_3PX_O58_HR NULL
+#define OPTION_VAL_2PX_O58_HR NULL
+#define OPTION_VAL_1PX_O58_HR NULL
+#define OPTION_VAL_DISABLED_O58_HR NULL
+#define OPTION_VAL_1PX_O58_0_HR NULL
+#define OPTION_VAL_2PX_O58_0_HR NULL
+#define OPTION_VAL_3PX_O58_0_HR NULL
+#define OPTION_VAL_4PX_O58_0_HR NULL
+#define OPTION_VAL_5PX_O58_0_HR NULL
+#define OPTION_VAL_6PX_O58_0_HR NULL
+#define OPTION_VAL_7PX_O58_0_HR NULL
+#define OPTION_VAL_8PX_O58_0_HR NULL
+#define OPTION_VAL_9PX_O58_0_HR NULL
+#define OPTION_VAL_10PX_O58_0_HR NULL
+#define OPTION_VAL_11PX_O58_0_HR NULL
+#define OPTION_VAL_12PX_O58_0_HR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_HR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HR NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_HR NULL
@@ -35946,6 +37046,46 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_HR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_HR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_HR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_HR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_HR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_HR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_HR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_HR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_HR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_HR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_HR },
+         { "1", OPTION_VAL_1_HR },
+         { "2", OPTION_VAL_2_HR },
+         { "3", OPTION_VAL_3_HR },
+         { "4", OPTION_VAL_4_HR },
+         { "5", OPTION_VAL_5_HR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HR,
       NULL,
@@ -36055,7 +37195,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_HR },
+         { "5%",   OPTION_VAL_5_O28_HR },
          { "10%",  OPTION_VAL_10_HR },
          { "15%",  OPTION_VAL_15_HR },
          { "20%",  OPTION_VAL_20_HR },
@@ -36122,8 +37262,8 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_HR },
-         { "5%",  OPTION_VAL_5_HR },
+         { "0%",  OPTION_VAL_0_O30_HR },
+         { "5%",  OPTION_VAL_5_O28_HR },
          { "10%", OPTION_VAL_10_HR },
          { "15%", OPTION_VAL_15_HR },
          { "20%", OPTION_VAL_20_HR },
@@ -36260,7 +37400,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_HR },
+         { "1",  OPTION_VAL_1_O35_HR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -36674,7 +37814,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_HR },
+         { "1",  OPTION_VAL_1_O35_HR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -36717,7 +37857,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_HR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_HR },
          { "static",  OPTION_VAL_STATIC_HR },
          { "smart", OPTION_VAL_SMART_HR },
          { NULL, NULL },
@@ -36765,31 +37905,31 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_HR },
-         { "-11px",    OPTION_VAL_11PX_O56_HR },
-         { "-10px",    OPTION_VAL_10PX_O56_HR },
-         { "-9px",     OPTION_VAL_9PX_O56_HR },
-         { "-8px",     OPTION_VAL_8PX_O56_HR },
-         { "-7px",     OPTION_VAL_7PX_O56_HR },
-         { "-6px",     OPTION_VAL_6PX_O56_HR },
-         { "-5px",     OPTION_VAL_5PX_O56_HR },
-         { "-4px",     OPTION_VAL_4PX_O56_HR },
-         { "-3px",     OPTION_VAL_3PX_O56_HR },
-         { "-2px",     OPTION_VAL_2PX_O56_HR },
-         { "-1px",     OPTION_VAL_1PX_O56_HR },
-         { "disabled", OPTION_VAL_DISABLED_O56_HR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_HR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_HR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_HR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_HR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_HR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_HR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_HR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_HR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_HR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_HR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_HR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_HR },
+         { "-12px",    OPTION_VAL_12PX_O58_HR },
+         { "-11px",    OPTION_VAL_11PX_O58_HR },
+         { "-10px",    OPTION_VAL_10PX_O58_HR },
+         { "-9px",     OPTION_VAL_9PX_O58_HR },
+         { "-8px",     OPTION_VAL_8PX_O58_HR },
+         { "-7px",     OPTION_VAL_7PX_O58_HR },
+         { "-6px",     OPTION_VAL_6PX_O58_HR },
+         { "-5px",     OPTION_VAL_5PX_O58_HR },
+         { "-4px",     OPTION_VAL_4PX_O58_HR },
+         { "-3px",     OPTION_VAL_3PX_O58_HR },
+         { "-2px",     OPTION_VAL_2PX_O58_HR },
+         { "-1px",     OPTION_VAL_1PX_O58_HR },
+         { "disabled", OPTION_VAL_DISABLED_O58_HR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_HR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_HR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_HR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_HR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_HR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_HR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_HR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_HR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_HR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_HR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_HR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_HR },
          { NULL, NULL },
       },
       "disabled"
@@ -36843,7 +37983,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_HR },
+         { "0",        OPTION_VAL_DISABLED_O58_HR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -37253,7 +38393,27 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_HU "Analóg önkalibráció"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_HU "Ha a bemeneti eszköz DualShock, Analóg kontroller, Analóg joystick, vagy neGcon értékre van állítva, engedélyezi az analóg bemenetek dinamikus kalibrálását. A maximum bejövő értékeket valós időben figyeli és méretezi hozzá az emulátornak átadott analóg koordinátákat. Olyan játékokhoz érdemes használni, mint a Mega Man Legends 2, amelyek nagyobb értékeket várnak, mint amit a modern kontrollerek ki tudnak adni. A legjobb eredményhez az analóg karokat minden tartalom betöltéskor teljesen körbe kell fordítani, hogy a kalibrációs algoritmus be tudja magát hangolni."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_HU "DualShock analóg mód átkapcsolás engedélyezése"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HU "Ha a bemeneti eszköz típusa DualShock, ez az opció engedélyezi az emulált DualShock átkapcsolását a DIGITAL és ANALOG mód közt, az eredeti hardverhez hűen. Kikapcsolva a DualShock ANALOG módban van zárolva, bekapcsolva a DualShock átkapcsolható a DIGITAL és ANALOG módok közt a START+SELECT+L1+L2+R1+R2 nyomva tartásával."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HU "Ha a bemeneti eszköz típusa DualShock, ez az opció engedélyezi az emulált DualShock átkapcsolását a DIGITAL és ANALOG mód közt, az eredeti hardverhez hűen. Kikapcsolva a DualShock ANALOG módban van zárolva, bekapcsolva a DualShock átkapcsolható a DIGITAL és ANALOG módok közt a kiválasztott gombkombinációval."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HU "DualShock analóg mód gombkombináció"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HU "Az emulált DualShock DIGITAL és ANALOG módjai közt váltáshoz használt gombkombináció. Csak ha a \"DualShock analóg mód átkapcsolása\" engedélyezve van."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_HU NULL
+#define OPTION_VAL_L1_R1_SELECT_HU NULL
+#define OPTION_VAL_L1_R1_START_HU NULL
+#define OPTION_VAL_L1_R1_L3_HU NULL
+#define OPTION_VAL_L1_R1_R3_HU NULL
+#define OPTION_VAL_L2_R2_SELECT_HU NULL
+#define OPTION_VAL_L2_R2_START_HU NULL
+#define OPTION_VAL_L2_R2_L3_HU NULL
+#define OPTION_VAL_L2_R2_R3_HU NULL
+#define OPTION_VAL_L3_R3_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU NULL
+#define OPTION_VAL_0_HU NULL
+#define OPTION_VAL_1_HU NULL
+#define OPTION_VAL_2_HU NULL
+#define OPTION_VAL_3_HU NULL
+#define OPTION_VAL_4_HU NULL
+#define OPTION_VAL_5_HU NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HU "Multitap engedélyezése az 1. csatlakozón"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_HU "A multitap funkció engedélyezése az 1. csatlakozón."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_HU "Multitap engedélyezése a 2. csatlakozón"
@@ -37283,7 +38443,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_HU "A fénypisztoly célkeresztjének színe a 2. csatlakozóhoz."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_HU "Egér érzékenysége"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_HU "Az \"Egér\" típusú bemeneti eszköz érzékenysége."
-#define OPTION_VAL_5_HU NULL
+#define OPTION_VAL_5_O28_HU NULL
 #define OPTION_VAL_10_HU NULL
 #define OPTION_VAL_15_HU NULL
 #define OPTION_VAL_20_HU NULL
@@ -37330,7 +38490,7 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_CUBIC_HU "Köbös"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_HU "neGcon csavarás holtsávja"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_HU "A RetroPad bal analóg karjának holtsávja az emulált neGcon bemenet csavarásának szimulálásakor, a kontroller elmászás kiküszöböléséhez. Figyelem: a legtöbb neGcon kompatibilis cím lehetőséget ad a játékon belül is a holtsáv állítására. Hogy ne sérüljön a pontosság, a játékon belül *mindig* nulla legyen a holtsáv, és a szükséges beállítás *csak* ennél a mag opciónál legyen beállítva. Ez különösen akkor fontos, ha a neGcon csavarodás érzékelés négyzetes vagy köbös."
-#define OPTION_VAL_0_HU NULL
+#define OPTION_VAL_0_O30_HU NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_HU "A 0-s memóriakártya eljárása (újraindítás szükséges)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_HU "A 0-s memóriakártya adatmentési formátuma. A \"Mednafen\" beállítás kompatibilis az önálló Mednafen verziókkal. A Beetle PSX esetén a Libretro (.srm) és Mednafen (.mcr) mentések belül azonos formátumúak, és átnevezéssel egymásba konvertálhatók."
 #define OPTION_VAL_LIBRETRO_HU NULL
@@ -37343,7 +38503,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_HU "A bal oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 0-s memóriakártya eljárása Mednafen-re van állítva. Az alapértelmezett sorszám 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_HU "Jobb oldali memóriakártya sorszáma"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_HU "A jobb oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 1-s memóriakártya engedélyezett. Az alapértelmezett sorszám 1."
-#define OPTION_VAL_1_HU "1 (alapértelmezett)"
+#define OPTION_VAL_1_O35_HU NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_HU "PGXP működési módja"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HU "A 3D objektumok pixelméretnél pontosabb képalkotása, a 3D objektumok torzulásának és szaggatásának minimalizálásához, amit az eredeti hardveren a fixpontos vertex koordináták okoztak. A \"Csak memóriában\" módnak csak minimális kompatibilitási gondjai vannak és ajánlott általános használathoz. A \"Memória + CPU (hibás)\" mód még tovább csökkentheti a szaggatást, de nagy a teljesítményigénye és különféle geometriai hibákat okozhat."
 #define OPTION_VAL_MEMORY_ONLY_HU "Csak memóriában"
@@ -37478,7 +38638,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HU "Az eltérő szabványok miatt a PAL játékok gyakran lassabbnak tűnnek az amerikai/japán NTSC kiadásoknál. Ezzel a beállítással a PAL időzítés felülbírálható, és megkísérelhető a játék futtatása NTSC képsebességgel. Nincs hatása az NTSC tartalomra."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_HU "Overscan levágása"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_HU "\"Nincs\" állapotban megmarad a helykitöltés (fekete sávok a kép két szélén NTSC-nél, és minden oldalán PAL-nál), a valódi PSX hardver analóg kimenetének emulálásaként. A Statikus a vízszintes helykitöltést távolítja el, a Dinamikus pedig mindet."
-#define OPTION_VAL_DISABLED_O54_HU "Nincs"
+#define OPTION_VAL_DISABLED_O56_HU "Nincs"
 #define OPTION_VAL_STATIC_HU "Statikus"
 #define OPTION_VAL_SMART_HU "Dinamikus (alapértelmezett)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_HU "További képvágás"
@@ -37497,31 +38657,31 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_20PX_HU NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_HU "Vágott kép eltolása"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_HU "Ha a vízszintes overscan levágás engedélyezett, itt lehet a képet a megadott pixelszámmal eltolni jobbra (pozitív) vagy balra (negatív), a középre igazításhoz. Csak a szoftveres megjelenítő támogatja."
-#define OPTION_VAL_12PX_O56_HU NULL
-#define OPTION_VAL_11PX_O56_HU NULL
-#define OPTION_VAL_10PX_O56_HU NULL
-#define OPTION_VAL_9PX_O56_HU NULL
-#define OPTION_VAL_8PX_O56_HU NULL
-#define OPTION_VAL_7PX_O56_HU NULL
-#define OPTION_VAL_6PX_O56_HU NULL
-#define OPTION_VAL_5PX_O56_HU NULL
-#define OPTION_VAL_4PX_O56_HU NULL
-#define OPTION_VAL_3PX_O56_HU NULL
-#define OPTION_VAL_2PX_O56_HU NULL
-#define OPTION_VAL_1PX_O56_HU NULL
-#define OPTION_VAL_DISABLED_O56_HU "0 (alapértelmezett)"
-#define OPTION_VAL_1PX_O56_0_HU NULL
-#define OPTION_VAL_2PX_O56_0_HU NULL
-#define OPTION_VAL_3PX_O56_0_HU NULL
-#define OPTION_VAL_4PX_O56_0_HU NULL
-#define OPTION_VAL_5PX_O56_0_HU NULL
-#define OPTION_VAL_6PX_O56_0_HU NULL
-#define OPTION_VAL_7PX_O56_0_HU NULL
-#define OPTION_VAL_8PX_O56_0_HU NULL
-#define OPTION_VAL_9PX_O56_0_HU NULL
-#define OPTION_VAL_10PX_O56_0_HU NULL
-#define OPTION_VAL_11PX_O56_0_HU NULL
-#define OPTION_VAL_12PX_O56_0_HU NULL
+#define OPTION_VAL_12PX_O58_HU NULL
+#define OPTION_VAL_11PX_O58_HU NULL
+#define OPTION_VAL_10PX_O58_HU NULL
+#define OPTION_VAL_9PX_O58_HU NULL
+#define OPTION_VAL_8PX_O58_HU NULL
+#define OPTION_VAL_7PX_O58_HU NULL
+#define OPTION_VAL_6PX_O58_HU NULL
+#define OPTION_VAL_5PX_O58_HU NULL
+#define OPTION_VAL_4PX_O58_HU NULL
+#define OPTION_VAL_3PX_O58_HU NULL
+#define OPTION_VAL_2PX_O58_HU NULL
+#define OPTION_VAL_1PX_O58_HU NULL
+#define OPTION_VAL_DISABLED_O58_HU NULL
+#define OPTION_VAL_1PX_O58_0_HU NULL
+#define OPTION_VAL_2PX_O58_0_HU NULL
+#define OPTION_VAL_3PX_O58_0_HU NULL
+#define OPTION_VAL_4PX_O58_0_HU NULL
+#define OPTION_VAL_5PX_O58_0_HU NULL
+#define OPTION_VAL_6PX_O58_0_HU NULL
+#define OPTION_VAL_7PX_O58_0_HU NULL
+#define OPTION_VAL_8PX_O58_0_HU NULL
+#define OPTION_VAL_9PX_O58_0_HU NULL
+#define OPTION_VAL_10PX_O58_0_HU NULL
+#define OPTION_VAL_11PX_O58_0_HU NULL
+#define OPTION_VAL_12PX_O58_0_HU NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_HU "Kép vízszintes eltolása (GPU ciklus)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HU "Az eltoláshoz használt GPU ciklusok száma. Pozitív értékeknél a kép jobbra, negatívnál balra mozdul. Csak a hardveres megjelenítők támogatják."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_HU "GPU rasterizer túlhajtás"
@@ -37901,6 +39061,46 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HU,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HU,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_HU },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_HU },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_HU },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_HU },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_HU },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_HU },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_HU },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_HU },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_HU },
+         { "l3+r3",                    OPTION_VAL_L3_R3_HU },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_HU },
+         { "1", OPTION_VAL_1_HU },
+         { "2", OPTION_VAL_2_HU },
+         { "3", OPTION_VAL_3_HU },
+         { "4", OPTION_VAL_4_HU },
+         { "5", OPTION_VAL_5_HU },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HU,
       NULL,
@@ -38010,7 +39210,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_HU },
+         { "5%",   OPTION_VAL_5_O28_HU },
          { "10%",  OPTION_VAL_10_HU },
          { "15%",  OPTION_VAL_15_HU },
          { "20%",  OPTION_VAL_20_HU },
@@ -38077,8 +39277,8 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_HU },
-         { "5%",  OPTION_VAL_5_HU },
+         { "0%",  OPTION_VAL_0_O30_HU },
+         { "5%",  OPTION_VAL_5_O28_HU },
          { "10%", OPTION_VAL_10_HU },
          { "15%", OPTION_VAL_15_HU },
          { "20%", OPTION_VAL_20_HU },
@@ -38215,7 +39415,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_HU },
+         { "1",  OPTION_VAL_1_O35_HU },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -38629,7 +39829,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_HU },
+         { "1",  OPTION_VAL_1_O35_HU },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -38672,7 +39872,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_HU },
+         { "disabled",  OPTION_VAL_DISABLED_O56_HU },
          { "static",  OPTION_VAL_STATIC_HU },
          { "smart", OPTION_VAL_SMART_HU },
          { NULL, NULL },
@@ -38720,31 +39920,31 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_HU },
-         { "-11px",    OPTION_VAL_11PX_O56_HU },
-         { "-10px",    OPTION_VAL_10PX_O56_HU },
-         { "-9px",     OPTION_VAL_9PX_O56_HU },
-         { "-8px",     OPTION_VAL_8PX_O56_HU },
-         { "-7px",     OPTION_VAL_7PX_O56_HU },
-         { "-6px",     OPTION_VAL_6PX_O56_HU },
-         { "-5px",     OPTION_VAL_5PX_O56_HU },
-         { "-4px",     OPTION_VAL_4PX_O56_HU },
-         { "-3px",     OPTION_VAL_3PX_O56_HU },
-         { "-2px",     OPTION_VAL_2PX_O56_HU },
-         { "-1px",     OPTION_VAL_1PX_O56_HU },
-         { "disabled", OPTION_VAL_DISABLED_O56_HU },
-         { "+1px",     OPTION_VAL_1PX_O56_0_HU },
-         { "+2px",     OPTION_VAL_2PX_O56_0_HU },
-         { "+3px",     OPTION_VAL_3PX_O56_0_HU },
-         { "+4px",     OPTION_VAL_4PX_O56_0_HU },
-         { "+5px",     OPTION_VAL_5PX_O56_0_HU },
-         { "+6px",     OPTION_VAL_6PX_O56_0_HU },
-         { "+7px",     OPTION_VAL_7PX_O56_0_HU },
-         { "+8px",     OPTION_VAL_8PX_O56_0_HU },
-         { "+9px",     OPTION_VAL_9PX_O56_0_HU },
-         { "+10px",    OPTION_VAL_10PX_O56_0_HU },
-         { "+11px",    OPTION_VAL_11PX_O56_0_HU },
-         { "+12px",    OPTION_VAL_12PX_O56_0_HU },
+         { "-12px",    OPTION_VAL_12PX_O58_HU },
+         { "-11px",    OPTION_VAL_11PX_O58_HU },
+         { "-10px",    OPTION_VAL_10PX_O58_HU },
+         { "-9px",     OPTION_VAL_9PX_O58_HU },
+         { "-8px",     OPTION_VAL_8PX_O58_HU },
+         { "-7px",     OPTION_VAL_7PX_O58_HU },
+         { "-6px",     OPTION_VAL_6PX_O58_HU },
+         { "-5px",     OPTION_VAL_5PX_O58_HU },
+         { "-4px",     OPTION_VAL_4PX_O58_HU },
+         { "-3px",     OPTION_VAL_3PX_O58_HU },
+         { "-2px",     OPTION_VAL_2PX_O58_HU },
+         { "-1px",     OPTION_VAL_1PX_O58_HU },
+         { "disabled", OPTION_VAL_DISABLED_O58_HU },
+         { "+1px",     OPTION_VAL_1PX_O58_0_HU },
+         { "+2px",     OPTION_VAL_2PX_O58_0_HU },
+         { "+3px",     OPTION_VAL_3PX_O58_0_HU },
+         { "+4px",     OPTION_VAL_4PX_O58_0_HU },
+         { "+5px",     OPTION_VAL_5PX_O58_0_HU },
+         { "+6px",     OPTION_VAL_6PX_O58_0_HU },
+         { "+7px",     OPTION_VAL_7PX_O58_0_HU },
+         { "+8px",     OPTION_VAL_8PX_O58_0_HU },
+         { "+9px",     OPTION_VAL_9PX_O58_0_HU },
+         { "+10px",    OPTION_VAL_10PX_O58_0_HU },
+         { "+11px",    OPTION_VAL_11PX_O58_0_HU },
+         { "+12px",    OPTION_VAL_12PX_O58_0_HU },
          { NULL, NULL },
       },
       "disabled"
@@ -38798,7 +39998,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_HU },
+         { "0",        OPTION_VAL_DISABLED_O58_HU },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -39209,6 +40409,26 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_ID NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_ID NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_ID NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ID NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ID NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_ID NULL
+#define OPTION_VAL_L1_R1_SELECT_ID NULL
+#define OPTION_VAL_L1_R1_START_ID NULL
+#define OPTION_VAL_L1_R1_L3_ID NULL
+#define OPTION_VAL_L1_R1_R3_ID NULL
+#define OPTION_VAL_L2_R2_SELECT_ID NULL
+#define OPTION_VAL_L2_R2_START_ID NULL
+#define OPTION_VAL_L2_R2_L3_ID NULL
+#define OPTION_VAL_L2_R2_R3_ID NULL
+#define OPTION_VAL_L3_R3_ID NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ID NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ID NULL
+#define OPTION_VAL_0_ID NULL
+#define OPTION_VAL_1_ID NULL
+#define OPTION_VAL_2_ID NULL
+#define OPTION_VAL_3_ID NULL
+#define OPTION_VAL_4_ID NULL
+#define OPTION_VAL_5_ID NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ID NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_ID NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_ID NULL
@@ -39238,7 +40458,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_ID NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_ID NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_ID NULL
-#define OPTION_VAL_5_ID NULL
+#define OPTION_VAL_5_O28_ID NULL
 #define OPTION_VAL_10_ID NULL
 #define OPTION_VAL_15_ID NULL
 #define OPTION_VAL_20_ID NULL
@@ -39285,7 +40505,7 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_CUBIC_ID NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_ID NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_ID NULL
-#define OPTION_VAL_0_ID NULL
+#define OPTION_VAL_0_O30_ID NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_ID NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_ID NULL
 #define OPTION_VAL_LIBRETRO_ID NULL
@@ -39298,7 +40518,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_ID NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_ID NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_ID NULL
-#define OPTION_VAL_1_ID NULL
+#define OPTION_VAL_1_O35_ID NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_ID NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_ID NULL
 #define OPTION_VAL_MEMORY_ONLY_ID NULL
@@ -39433,7 +40653,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ID NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_ID NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_ID NULL
-#define OPTION_VAL_DISABLED_O54_ID "Tak ada"
+#define OPTION_VAL_DISABLED_O56_ID "Tak ada"
 #define OPTION_VAL_STATIC_ID NULL
 #define OPTION_VAL_SMART_ID NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_ID NULL
@@ -39452,31 +40672,31 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_20PX_ID NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_ID NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_ID NULL
-#define OPTION_VAL_12PX_O56_ID NULL
-#define OPTION_VAL_11PX_O56_ID NULL
-#define OPTION_VAL_10PX_O56_ID NULL
-#define OPTION_VAL_9PX_O56_ID NULL
-#define OPTION_VAL_8PX_O56_ID NULL
-#define OPTION_VAL_7PX_O56_ID NULL
-#define OPTION_VAL_6PX_O56_ID NULL
-#define OPTION_VAL_5PX_O56_ID NULL
-#define OPTION_VAL_4PX_O56_ID NULL
-#define OPTION_VAL_3PX_O56_ID NULL
-#define OPTION_VAL_2PX_O56_ID NULL
-#define OPTION_VAL_1PX_O56_ID NULL
-#define OPTION_VAL_DISABLED_O56_ID NULL
-#define OPTION_VAL_1PX_O56_0_ID NULL
-#define OPTION_VAL_2PX_O56_0_ID NULL
-#define OPTION_VAL_3PX_O56_0_ID NULL
-#define OPTION_VAL_4PX_O56_0_ID NULL
-#define OPTION_VAL_5PX_O56_0_ID NULL
-#define OPTION_VAL_6PX_O56_0_ID NULL
-#define OPTION_VAL_7PX_O56_0_ID NULL
-#define OPTION_VAL_8PX_O56_0_ID NULL
-#define OPTION_VAL_9PX_O56_0_ID NULL
-#define OPTION_VAL_10PX_O56_0_ID NULL
-#define OPTION_VAL_11PX_O56_0_ID NULL
-#define OPTION_VAL_12PX_O56_0_ID NULL
+#define OPTION_VAL_12PX_O58_ID NULL
+#define OPTION_VAL_11PX_O58_ID NULL
+#define OPTION_VAL_10PX_O58_ID NULL
+#define OPTION_VAL_9PX_O58_ID NULL
+#define OPTION_VAL_8PX_O58_ID NULL
+#define OPTION_VAL_7PX_O58_ID NULL
+#define OPTION_VAL_6PX_O58_ID NULL
+#define OPTION_VAL_5PX_O58_ID NULL
+#define OPTION_VAL_4PX_O58_ID NULL
+#define OPTION_VAL_3PX_O58_ID NULL
+#define OPTION_VAL_2PX_O58_ID NULL
+#define OPTION_VAL_1PX_O58_ID NULL
+#define OPTION_VAL_DISABLED_O58_ID NULL
+#define OPTION_VAL_1PX_O58_0_ID NULL
+#define OPTION_VAL_2PX_O58_0_ID NULL
+#define OPTION_VAL_3PX_O58_0_ID NULL
+#define OPTION_VAL_4PX_O58_0_ID NULL
+#define OPTION_VAL_5PX_O58_0_ID NULL
+#define OPTION_VAL_6PX_O58_0_ID NULL
+#define OPTION_VAL_7PX_O58_0_ID NULL
+#define OPTION_VAL_8PX_O58_0_ID NULL
+#define OPTION_VAL_9PX_O58_0_ID NULL
+#define OPTION_VAL_10PX_O58_0_ID NULL
+#define OPTION_VAL_11PX_O58_0_ID NULL
+#define OPTION_VAL_12PX_O58_0_ID NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_ID NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_ID NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_ID NULL
@@ -39856,6 +41076,46 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ID,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ID,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_ID },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_ID },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_ID },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_ID },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_ID },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_ID },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_ID },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_ID },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_ID },
+         { "l3+r3",                    OPTION_VAL_L3_R3_ID },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ID,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ID,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_ID },
+         { "1", OPTION_VAL_1_ID },
+         { "2", OPTION_VAL_2_ID },
+         { "3", OPTION_VAL_3_ID },
+         { "4", OPTION_VAL_4_ID },
+         { "5", OPTION_VAL_5_ID },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ID,
       NULL,
@@ -39965,7 +41225,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_ID },
+         { "5%",   OPTION_VAL_5_O28_ID },
          { "10%",  OPTION_VAL_10_ID },
          { "15%",  OPTION_VAL_15_ID },
          { "20%",  OPTION_VAL_20_ID },
@@ -40032,8 +41292,8 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_ID },
-         { "5%",  OPTION_VAL_5_ID },
+         { "0%",  OPTION_VAL_0_O30_ID },
+         { "5%",  OPTION_VAL_5_O28_ID },
          { "10%", OPTION_VAL_10_ID },
          { "15%", OPTION_VAL_15_ID },
          { "20%", OPTION_VAL_20_ID },
@@ -40170,7 +41430,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_ID },
+         { "1",  OPTION_VAL_1_O35_ID },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -40584,7 +41844,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_ID },
+         { "1",  OPTION_VAL_1_O35_ID },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -40627,7 +41887,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_ID },
+         { "disabled",  OPTION_VAL_DISABLED_O56_ID },
          { "static",  OPTION_VAL_STATIC_ID },
          { "smart", OPTION_VAL_SMART_ID },
          { NULL, NULL },
@@ -40675,31 +41935,31 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_ID },
-         { "-11px",    OPTION_VAL_11PX_O56_ID },
-         { "-10px",    OPTION_VAL_10PX_O56_ID },
-         { "-9px",     OPTION_VAL_9PX_O56_ID },
-         { "-8px",     OPTION_VAL_8PX_O56_ID },
-         { "-7px",     OPTION_VAL_7PX_O56_ID },
-         { "-6px",     OPTION_VAL_6PX_O56_ID },
-         { "-5px",     OPTION_VAL_5PX_O56_ID },
-         { "-4px",     OPTION_VAL_4PX_O56_ID },
-         { "-3px",     OPTION_VAL_3PX_O56_ID },
-         { "-2px",     OPTION_VAL_2PX_O56_ID },
-         { "-1px",     OPTION_VAL_1PX_O56_ID },
-         { "disabled", OPTION_VAL_DISABLED_O56_ID },
-         { "+1px",     OPTION_VAL_1PX_O56_0_ID },
-         { "+2px",     OPTION_VAL_2PX_O56_0_ID },
-         { "+3px",     OPTION_VAL_3PX_O56_0_ID },
-         { "+4px",     OPTION_VAL_4PX_O56_0_ID },
-         { "+5px",     OPTION_VAL_5PX_O56_0_ID },
-         { "+6px",     OPTION_VAL_6PX_O56_0_ID },
-         { "+7px",     OPTION_VAL_7PX_O56_0_ID },
-         { "+8px",     OPTION_VAL_8PX_O56_0_ID },
-         { "+9px",     OPTION_VAL_9PX_O56_0_ID },
-         { "+10px",    OPTION_VAL_10PX_O56_0_ID },
-         { "+11px",    OPTION_VAL_11PX_O56_0_ID },
-         { "+12px",    OPTION_VAL_12PX_O56_0_ID },
+         { "-12px",    OPTION_VAL_12PX_O58_ID },
+         { "-11px",    OPTION_VAL_11PX_O58_ID },
+         { "-10px",    OPTION_VAL_10PX_O58_ID },
+         { "-9px",     OPTION_VAL_9PX_O58_ID },
+         { "-8px",     OPTION_VAL_8PX_O58_ID },
+         { "-7px",     OPTION_VAL_7PX_O58_ID },
+         { "-6px",     OPTION_VAL_6PX_O58_ID },
+         { "-5px",     OPTION_VAL_5PX_O58_ID },
+         { "-4px",     OPTION_VAL_4PX_O58_ID },
+         { "-3px",     OPTION_VAL_3PX_O58_ID },
+         { "-2px",     OPTION_VAL_2PX_O58_ID },
+         { "-1px",     OPTION_VAL_1PX_O58_ID },
+         { "disabled", OPTION_VAL_DISABLED_O58_ID },
+         { "+1px",     OPTION_VAL_1PX_O58_0_ID },
+         { "+2px",     OPTION_VAL_2PX_O58_0_ID },
+         { "+3px",     OPTION_VAL_3PX_O58_0_ID },
+         { "+4px",     OPTION_VAL_4PX_O58_0_ID },
+         { "+5px",     OPTION_VAL_5PX_O58_0_ID },
+         { "+6px",     OPTION_VAL_6PX_O58_0_ID },
+         { "+7px",     OPTION_VAL_7PX_O58_0_ID },
+         { "+8px",     OPTION_VAL_8PX_O58_0_ID },
+         { "+9px",     OPTION_VAL_9PX_O58_0_ID },
+         { "+10px",    OPTION_VAL_10PX_O58_0_ID },
+         { "+11px",    OPTION_VAL_11PX_O58_0_ID },
+         { "+12px",    OPTION_VAL_12PX_O58_0_ID },
          { NULL, NULL },
       },
       "disabled"
@@ -40753,7 +42013,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_ID },
+         { "0",        OPTION_VAL_DISABLED_O58_ID },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -41163,7 +42423,27 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_IT "Auto-Calibrazione Analogici"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_IT "Quando il dispositivo di ingresso è impostato su DualShock, Analog Controller, Analog Joystick, o neGcon, questa opzione consente la calibrazione dinamica degli ingressi analogici. I valori massimi registrati di input vengono monitorati in tempo reale e utilizzati per scalare le coordinate analogiche passate all'emulatore. Questo dovrebbe essere utilizzato per giochi come Mega Man Legends 2 che si aspettano valori più grandi di quello che i controller moderni forniscono. Per ottenere i migliori risultati, i bastoni analogici dovrebbero essere ruotati in tutta la misura per regolare l'algoritmo di calibrazione ogni volta che il contenuto viene caricato."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_IT "Abilita Modalità Toggle Dualshock Analogico"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_IT "Quando il tipo di dispositivo di ingresso è DualShock, questa opzione consente di attivare il DualShock emulato tra la modalità DIGITAL e ANALOG come l'hardware originale. Quando disabilitato, DualShock è bloccato in modalità ANALOG e quando abilitato, il DualShock può essere commutato tra la modalità DIGITAL e ANALOG premendo e tenendo premuto START+SELECT+L1+L2+R1+R2."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_IT "Quando il tipo di dispositivo di ingresso è DualShock, questa opzione consente di attivare il DualShock emulato tra la modalità DIGITAL e ANALOG come l'hardware originale. Quando disabilitato, DualShock è bloccato in modalità ANALOG e quando abilitato, il DualShock può essere commutato tra la modalità DIGITAL e ANALOG utilizzando la combinazione di pulsanti selezionata."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_IT "Modalità Comibinata DualShock Analogico"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_IT "Scegli la combinazione di pulsanti che verrà usata per passare tra la modalità DIGITAL e ANALOG per il DualShock emulato. Funziona solo quando 'Abilita Modalità Combinazione Analogica DualShock' è attivato."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_IT NULL
+#define OPTION_VAL_L1_R1_SELECT_IT NULL
+#define OPTION_VAL_L1_R1_START_IT NULL
+#define OPTION_VAL_L1_R1_L3_IT NULL
+#define OPTION_VAL_L1_R1_R3_IT NULL
+#define OPTION_VAL_L2_R2_SELECT_IT NULL
+#define OPTION_VAL_L2_R2_START_IT NULL
+#define OPTION_VAL_L2_R2_L3_IT NULL
+#define OPTION_VAL_L2_R2_R3_IT NULL
+#define OPTION_VAL_L3_R3_IT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_IT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_IT NULL
+#define OPTION_VAL_0_IT NULL
+#define OPTION_VAL_1_IT NULL
+#define OPTION_VAL_2_IT NULL
+#define OPTION_VAL_3_IT NULL
+#define OPTION_VAL_4_IT NULL
+#define OPTION_VAL_5_IT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_IT "Porta 1: Abilita Multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_IT "Abilita la funzionalità multitap sulla porta 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_IT "Porta 2: Abilita Multitap"
@@ -41193,7 +42473,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_IT "Scegli il colore del mirino della pistola leggera per la porta 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_IT "Sensibilità Mouse"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_IT "Scegli la reattività del tipo di dispositivo di input 'Mouse'."
-#define OPTION_VAL_5_IT NULL
+#define OPTION_VAL_5_O28_IT NULL
 #define OPTION_VAL_10_IT NULL
 #define OPTION_VAL_15_IT NULL
 #define OPTION_VAL_20_IT NULL
@@ -41240,7 +42520,7 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_CUBIC_IT "Cubico"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_IT "zona morta della torsione del neGcon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_IT "Scegli la zona di chiusura della barra analogica sinistra RetroPad quando si simula l'azione 'twist' dei dispositivi di ingresso emulati 'neGcon'. Usato per eliminare la deriva del regolatore. Nota: la maggior parte dei titoli compatibili con neGcone forniscono opzioni di gioco per impostare un valore di zona di chiusura 'twist'. Per evitare la perdita di precisione, il deadzone di gioco dovrebbe *sempre* essere impostato a zero. Eventuali modifiche richieste dovrebbero *solo* essere applicate tramite questa opzione principale. Questo è particolarmente importante quando 'neGcon Twist Response' è impostato su 'Quadratico' o 'Cubic'."
-#define OPTION_VAL_0_IT NULL
+#define OPTION_VAL_0_O30_IT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_IT "Metodo Memory Card 0 (necessita riavvio)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_IT "Seleziona il formato del salvataggio usato per la memory card 0. 'Libretro' è consigliato. 'Mednafen' può essere usato per compatibilità con la versione stand-alone di Mednafen."
 #define OPTION_VAL_LIBRETRO_IT NULL
@@ -41253,7 +42533,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_IT "Cambia la scheda di memoria attualmente caricata nello slot a sinistra. Questa opzione funzionerà solo se il metodo della scheda di memoria 0 è impostato a Mednafen. La scheda predefinita è indice 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_IT "Indice Destra Della Memory Card"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_IT "Cambia la scheda di memoria attualmente caricata nello slot giusto. Questa opzione funzionerà solo se la scheda di memoria 1 è abilitata. La scheda predefinita è l'indice 1."
-#define OPTION_VAL_1_IT "1 (Predefinito)"
+#define OPTION_VAL_1_O35_IT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_IT "Modalità Operazione PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_IT "Permette agli oggetti 3D di essere renderizzati con precisione sub-pixel, minimizzando effetti di distorsione e jittering di oggetti 3D visti su hardware originario a causa di uso di punti prefissati per le coordinate dei vertici. 'Solo Memoria', avendo problemi di compatibilità minimi, è consigliato per uso generale. 'Memoria + CPU (Buggy)' può ridurre il jittering ulteriormente ma ha requisiti di performance alti e può causare vari errori geometrici."
 #define OPTION_VAL_MEMORY_ONLY_IT "Solo Memoria"
@@ -41388,7 +42668,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_IT "A causa di standard diversi, i giochi PAL appaiono spesso rallentati rispetto alle versioni NTSC americane o giapponesi. Questa opzione può essere utilizzata per sovrascrivere i timings PAL per tentare di eseguire questi giochi con il framerate NTSC. Questa opzione non ha effetto quando si esegue il contenuto NTSC."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_IT "Taglia Overscan Orizzontale"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_IT "'Nessuno' mantiene l'imbottitura (scatole pilastri su entrambi i lati dell'immagine per NTSC, su tutti i lati per PAL) per emulare le stesse barre nere generate in uscita video analogica da hardware PSX reale. 'Static' rimuove solo l'imbottitura orizzontale, 'Dynamic' rimuove tutte le imbottiture."
-#define OPTION_VAL_DISABLED_O54_IT "Nessuno"
+#define OPTION_VAL_DISABLED_O56_IT "Nessuno"
 #define OPTION_VAL_STATIC_IT "Statico"
 #define OPTION_VAL_SMART_IT "Dinamico (predefinito)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_IT "Tagli Addizionali"
@@ -41407,31 +42687,31 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_20PX_IT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_IT "Offset Immagine Tagliata"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_IT "Quando 'Ritaglia Overscan orizzontale' è abilitato, questo permette che l'immagine ritagliata risultante sia spostata orizzontalmente a destra (positiva) o a sinistra (negativa) del numero di pixel specificato. Può essere usato per correggere problemi di allineamento. Supportato solo dal renderer software."
-#define OPTION_VAL_12PX_O56_IT NULL
-#define OPTION_VAL_11PX_O56_IT NULL
-#define OPTION_VAL_10PX_O56_IT NULL
-#define OPTION_VAL_9PX_O56_IT NULL
-#define OPTION_VAL_8PX_O56_IT NULL
-#define OPTION_VAL_7PX_O56_IT NULL
-#define OPTION_VAL_6PX_O56_IT NULL
-#define OPTION_VAL_5PX_O56_IT NULL
-#define OPTION_VAL_4PX_O56_IT NULL
-#define OPTION_VAL_3PX_O56_IT NULL
-#define OPTION_VAL_2PX_O56_IT NULL
-#define OPTION_VAL_1PX_O56_IT NULL
-#define OPTION_VAL_DISABLED_O56_IT "0 (Predefinito)"
-#define OPTION_VAL_1PX_O56_0_IT NULL
-#define OPTION_VAL_2PX_O56_0_IT NULL
-#define OPTION_VAL_3PX_O56_0_IT NULL
-#define OPTION_VAL_4PX_O56_0_IT NULL
-#define OPTION_VAL_5PX_O56_0_IT NULL
-#define OPTION_VAL_6PX_O56_0_IT NULL
-#define OPTION_VAL_7PX_O56_0_IT NULL
-#define OPTION_VAL_8PX_O56_0_IT NULL
-#define OPTION_VAL_9PX_O56_0_IT NULL
-#define OPTION_VAL_10PX_O56_0_IT NULL
-#define OPTION_VAL_11PX_O56_0_IT NULL
-#define OPTION_VAL_12PX_O56_0_IT NULL
+#define OPTION_VAL_12PX_O58_IT NULL
+#define OPTION_VAL_11PX_O58_IT NULL
+#define OPTION_VAL_10PX_O58_IT NULL
+#define OPTION_VAL_9PX_O58_IT NULL
+#define OPTION_VAL_8PX_O58_IT NULL
+#define OPTION_VAL_7PX_O58_IT NULL
+#define OPTION_VAL_6PX_O58_IT NULL
+#define OPTION_VAL_5PX_O58_IT NULL
+#define OPTION_VAL_4PX_O58_IT NULL
+#define OPTION_VAL_3PX_O58_IT NULL
+#define OPTION_VAL_2PX_O58_IT NULL
+#define OPTION_VAL_1PX_O58_IT NULL
+#define OPTION_VAL_DISABLED_O58_IT NULL
+#define OPTION_VAL_1PX_O58_0_IT NULL
+#define OPTION_VAL_2PX_O58_0_IT NULL
+#define OPTION_VAL_3PX_O58_0_IT NULL
+#define OPTION_VAL_4PX_O58_0_IT NULL
+#define OPTION_VAL_5PX_O58_0_IT NULL
+#define OPTION_VAL_6PX_O58_0_IT NULL
+#define OPTION_VAL_7PX_O58_0_IT NULL
+#define OPTION_VAL_8PX_O58_0_IT NULL
+#define OPTION_VAL_9PX_O58_0_IT NULL
+#define OPTION_VAL_10PX_O58_0_IT NULL
+#define OPTION_VAL_11PX_O58_0_IT NULL
+#define OPTION_VAL_12PX_O58_0_IT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_IT "Offset Immagine Orizzontale (Cicli GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_IT "Scegli il numero di cicli GPU da cui spostare l'immagine. I valori positivi spostano l'immagine a destra, i valori negativi spostano l'immagine a sinistra. Sono supportati solo dai renderer hardware."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_IT "Overclock Rasterizzatore GPU"
@@ -41811,6 +43091,46 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_IT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_IT,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_IT },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_IT },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_IT },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_IT },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_IT },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_IT },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_IT },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_IT },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_IT },
+         { "l3+r3",                    OPTION_VAL_L3_R3_IT },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_IT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_IT,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_IT },
+         { "1", OPTION_VAL_1_IT },
+         { "2", OPTION_VAL_2_IT },
+         { "3", OPTION_VAL_3_IT },
+         { "4", OPTION_VAL_4_IT },
+         { "5", OPTION_VAL_5_IT },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_IT,
       NULL,
@@ -41920,7 +43240,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_IT },
+         { "5%",   OPTION_VAL_5_O28_IT },
          { "10%",  OPTION_VAL_10_IT },
          { "15%",  OPTION_VAL_15_IT },
          { "20%",  OPTION_VAL_20_IT },
@@ -41987,8 +43307,8 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_IT },
-         { "5%",  OPTION_VAL_5_IT },
+         { "0%",  OPTION_VAL_0_O30_IT },
+         { "5%",  OPTION_VAL_5_O28_IT },
          { "10%", OPTION_VAL_10_IT },
          { "15%", OPTION_VAL_15_IT },
          { "20%", OPTION_VAL_20_IT },
@@ -42125,7 +43445,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_IT },
+         { "1",  OPTION_VAL_1_O35_IT },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -42539,7 +43859,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_IT },
+         { "1",  OPTION_VAL_1_O35_IT },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -42582,7 +43902,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_IT },
+         { "disabled",  OPTION_VAL_DISABLED_O56_IT },
          { "static",  OPTION_VAL_STATIC_IT },
          { "smart", OPTION_VAL_SMART_IT },
          { NULL, NULL },
@@ -42630,31 +43950,31 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_IT },
-         { "-11px",    OPTION_VAL_11PX_O56_IT },
-         { "-10px",    OPTION_VAL_10PX_O56_IT },
-         { "-9px",     OPTION_VAL_9PX_O56_IT },
-         { "-8px",     OPTION_VAL_8PX_O56_IT },
-         { "-7px",     OPTION_VAL_7PX_O56_IT },
-         { "-6px",     OPTION_VAL_6PX_O56_IT },
-         { "-5px",     OPTION_VAL_5PX_O56_IT },
-         { "-4px",     OPTION_VAL_4PX_O56_IT },
-         { "-3px",     OPTION_VAL_3PX_O56_IT },
-         { "-2px",     OPTION_VAL_2PX_O56_IT },
-         { "-1px",     OPTION_VAL_1PX_O56_IT },
-         { "disabled", OPTION_VAL_DISABLED_O56_IT },
-         { "+1px",     OPTION_VAL_1PX_O56_0_IT },
-         { "+2px",     OPTION_VAL_2PX_O56_0_IT },
-         { "+3px",     OPTION_VAL_3PX_O56_0_IT },
-         { "+4px",     OPTION_VAL_4PX_O56_0_IT },
-         { "+5px",     OPTION_VAL_5PX_O56_0_IT },
-         { "+6px",     OPTION_VAL_6PX_O56_0_IT },
-         { "+7px",     OPTION_VAL_7PX_O56_0_IT },
-         { "+8px",     OPTION_VAL_8PX_O56_0_IT },
-         { "+9px",     OPTION_VAL_9PX_O56_0_IT },
-         { "+10px",    OPTION_VAL_10PX_O56_0_IT },
-         { "+11px",    OPTION_VAL_11PX_O56_0_IT },
-         { "+12px",    OPTION_VAL_12PX_O56_0_IT },
+         { "-12px",    OPTION_VAL_12PX_O58_IT },
+         { "-11px",    OPTION_VAL_11PX_O58_IT },
+         { "-10px",    OPTION_VAL_10PX_O58_IT },
+         { "-9px",     OPTION_VAL_9PX_O58_IT },
+         { "-8px",     OPTION_VAL_8PX_O58_IT },
+         { "-7px",     OPTION_VAL_7PX_O58_IT },
+         { "-6px",     OPTION_VAL_6PX_O58_IT },
+         { "-5px",     OPTION_VAL_5PX_O58_IT },
+         { "-4px",     OPTION_VAL_4PX_O58_IT },
+         { "-3px",     OPTION_VAL_3PX_O58_IT },
+         { "-2px",     OPTION_VAL_2PX_O58_IT },
+         { "-1px",     OPTION_VAL_1PX_O58_IT },
+         { "disabled", OPTION_VAL_DISABLED_O58_IT },
+         { "+1px",     OPTION_VAL_1PX_O58_0_IT },
+         { "+2px",     OPTION_VAL_2PX_O58_0_IT },
+         { "+3px",     OPTION_VAL_3PX_O58_0_IT },
+         { "+4px",     OPTION_VAL_4PX_O58_0_IT },
+         { "+5px",     OPTION_VAL_5PX_O58_0_IT },
+         { "+6px",     OPTION_VAL_6PX_O58_0_IT },
+         { "+7px",     OPTION_VAL_7PX_O58_0_IT },
+         { "+8px",     OPTION_VAL_8PX_O58_0_IT },
+         { "+9px",     OPTION_VAL_9PX_O58_0_IT },
+         { "+10px",    OPTION_VAL_10PX_O58_0_IT },
+         { "+11px",    OPTION_VAL_11PX_O58_0_IT },
+         { "+12px",    OPTION_VAL_12PX_O58_0_IT },
          { NULL, NULL },
       },
       "disabled"
@@ -42708,7 +44028,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_IT },
+         { "0",        OPTION_VAL_DISABLED_O58_IT },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -43119,6 +44439,26 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_JA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_JA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_JA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_JA NULL
+#define OPTION_VAL_L1_R1_SELECT_JA NULL
+#define OPTION_VAL_L1_R1_START_JA NULL
+#define OPTION_VAL_L1_R1_L3_JA NULL
+#define OPTION_VAL_L1_R1_R3_JA NULL
+#define OPTION_VAL_L2_R2_SELECT_JA NULL
+#define OPTION_VAL_L2_R2_START_JA NULL
+#define OPTION_VAL_L2_R2_L3_JA NULL
+#define OPTION_VAL_L2_R2_R3_JA NULL
+#define OPTION_VAL_L3_R3_JA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_JA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_JA NULL
+#define OPTION_VAL_0_JA NULL
+#define OPTION_VAL_1_JA NULL
+#define OPTION_VAL_2_JA NULL
+#define OPTION_VAL_3_JA NULL
+#define OPTION_VAL_4_JA NULL
+#define OPTION_VAL_5_JA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_JA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_JA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_JA NULL
@@ -43148,7 +44488,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_JA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_JA NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_JA NULL
-#define OPTION_VAL_5_JA NULL
+#define OPTION_VAL_5_O28_JA NULL
 #define OPTION_VAL_10_JA NULL
 #define OPTION_VAL_15_JA NULL
 #define OPTION_VAL_20_JA NULL
@@ -43195,7 +44535,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_CUBIC_JA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_JA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_JA NULL
-#define OPTION_VAL_0_JA NULL
+#define OPTION_VAL_0_O30_JA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_JA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_JA NULL
 #define OPTION_VAL_LIBRETRO_JA NULL
@@ -43208,7 +44548,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_JA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_JA NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_JA NULL
-#define OPTION_VAL_1_JA NULL
+#define OPTION_VAL_1_O35_JA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_JA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_JA NULL
 #define OPTION_VAL_MEMORY_ONLY_JA NULL
@@ -43343,7 +44683,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_JA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_JA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_JA NULL
-#define OPTION_VAL_DISABLED_O54_JA "なし"
+#define OPTION_VAL_DISABLED_O56_JA "なし"
 #define OPTION_VAL_STATIC_JA NULL
 #define OPTION_VAL_SMART_JA NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_JA NULL
@@ -43362,31 +44702,31 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_20PX_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_JA NULL
-#define OPTION_VAL_12PX_O56_JA NULL
-#define OPTION_VAL_11PX_O56_JA NULL
-#define OPTION_VAL_10PX_O56_JA NULL
-#define OPTION_VAL_9PX_O56_JA NULL
-#define OPTION_VAL_8PX_O56_JA NULL
-#define OPTION_VAL_7PX_O56_JA NULL
-#define OPTION_VAL_6PX_O56_JA NULL
-#define OPTION_VAL_5PX_O56_JA NULL
-#define OPTION_VAL_4PX_O56_JA NULL
-#define OPTION_VAL_3PX_O56_JA NULL
-#define OPTION_VAL_2PX_O56_JA NULL
-#define OPTION_VAL_1PX_O56_JA NULL
-#define OPTION_VAL_DISABLED_O56_JA NULL
-#define OPTION_VAL_1PX_O56_0_JA NULL
-#define OPTION_VAL_2PX_O56_0_JA NULL
-#define OPTION_VAL_3PX_O56_0_JA NULL
-#define OPTION_VAL_4PX_O56_0_JA NULL
-#define OPTION_VAL_5PX_O56_0_JA NULL
-#define OPTION_VAL_6PX_O56_0_JA NULL
-#define OPTION_VAL_7PX_O56_0_JA NULL
-#define OPTION_VAL_8PX_O56_0_JA NULL
-#define OPTION_VAL_9PX_O56_0_JA NULL
-#define OPTION_VAL_10PX_O56_0_JA NULL
-#define OPTION_VAL_11PX_O56_0_JA NULL
-#define OPTION_VAL_12PX_O56_0_JA NULL
+#define OPTION_VAL_12PX_O58_JA NULL
+#define OPTION_VAL_11PX_O58_JA NULL
+#define OPTION_VAL_10PX_O58_JA NULL
+#define OPTION_VAL_9PX_O58_JA NULL
+#define OPTION_VAL_8PX_O58_JA NULL
+#define OPTION_VAL_7PX_O58_JA NULL
+#define OPTION_VAL_6PX_O58_JA NULL
+#define OPTION_VAL_5PX_O58_JA NULL
+#define OPTION_VAL_4PX_O58_JA NULL
+#define OPTION_VAL_3PX_O58_JA NULL
+#define OPTION_VAL_2PX_O58_JA NULL
+#define OPTION_VAL_1PX_O58_JA NULL
+#define OPTION_VAL_DISABLED_O58_JA NULL
+#define OPTION_VAL_1PX_O58_0_JA NULL
+#define OPTION_VAL_2PX_O58_0_JA NULL
+#define OPTION_VAL_3PX_O58_0_JA NULL
+#define OPTION_VAL_4PX_O58_0_JA NULL
+#define OPTION_VAL_5PX_O58_0_JA NULL
+#define OPTION_VAL_6PX_O58_0_JA NULL
+#define OPTION_VAL_7PX_O58_0_JA NULL
+#define OPTION_VAL_8PX_O58_0_JA NULL
+#define OPTION_VAL_9PX_O58_0_JA NULL
+#define OPTION_VAL_10PX_O58_0_JA NULL
+#define OPTION_VAL_11PX_O58_0_JA NULL
+#define OPTION_VAL_12PX_O58_0_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_JA NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_JA NULL
@@ -43766,6 +45106,46 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_JA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_JA,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_JA },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_JA },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_JA },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_JA },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_JA },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_JA },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_JA },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_JA },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_JA },
+         { "l3+r3",                    OPTION_VAL_L3_R3_JA },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_JA,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_JA,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_JA },
+         { "1", OPTION_VAL_1_JA },
+         { "2", OPTION_VAL_2_JA },
+         { "3", OPTION_VAL_3_JA },
+         { "4", OPTION_VAL_4_JA },
+         { "5", OPTION_VAL_5_JA },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_JA,
       NULL,
@@ -43875,7 +45255,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_JA },
+         { "5%",   OPTION_VAL_5_O28_JA },
          { "10%",  OPTION_VAL_10_JA },
          { "15%",  OPTION_VAL_15_JA },
          { "20%",  OPTION_VAL_20_JA },
@@ -43942,8 +45322,8 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_JA },
-         { "5%",  OPTION_VAL_5_JA },
+         { "0%",  OPTION_VAL_0_O30_JA },
+         { "5%",  OPTION_VAL_5_O28_JA },
          { "10%", OPTION_VAL_10_JA },
          { "15%", OPTION_VAL_15_JA },
          { "20%", OPTION_VAL_20_JA },
@@ -44080,7 +45460,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_JA },
+         { "1",  OPTION_VAL_1_O35_JA },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -44494,7 +45874,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_JA },
+         { "1",  OPTION_VAL_1_O35_JA },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -44537,7 +45917,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_JA },
+         { "disabled",  OPTION_VAL_DISABLED_O56_JA },
          { "static",  OPTION_VAL_STATIC_JA },
          { "smart", OPTION_VAL_SMART_JA },
          { NULL, NULL },
@@ -44585,31 +45965,31 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_JA },
-         { "-11px",    OPTION_VAL_11PX_O56_JA },
-         { "-10px",    OPTION_VAL_10PX_O56_JA },
-         { "-9px",     OPTION_VAL_9PX_O56_JA },
-         { "-8px",     OPTION_VAL_8PX_O56_JA },
-         { "-7px",     OPTION_VAL_7PX_O56_JA },
-         { "-6px",     OPTION_VAL_6PX_O56_JA },
-         { "-5px",     OPTION_VAL_5PX_O56_JA },
-         { "-4px",     OPTION_VAL_4PX_O56_JA },
-         { "-3px",     OPTION_VAL_3PX_O56_JA },
-         { "-2px",     OPTION_VAL_2PX_O56_JA },
-         { "-1px",     OPTION_VAL_1PX_O56_JA },
-         { "disabled", OPTION_VAL_DISABLED_O56_JA },
-         { "+1px",     OPTION_VAL_1PX_O56_0_JA },
-         { "+2px",     OPTION_VAL_2PX_O56_0_JA },
-         { "+3px",     OPTION_VAL_3PX_O56_0_JA },
-         { "+4px",     OPTION_VAL_4PX_O56_0_JA },
-         { "+5px",     OPTION_VAL_5PX_O56_0_JA },
-         { "+6px",     OPTION_VAL_6PX_O56_0_JA },
-         { "+7px",     OPTION_VAL_7PX_O56_0_JA },
-         { "+8px",     OPTION_VAL_8PX_O56_0_JA },
-         { "+9px",     OPTION_VAL_9PX_O56_0_JA },
-         { "+10px",    OPTION_VAL_10PX_O56_0_JA },
-         { "+11px",    OPTION_VAL_11PX_O56_0_JA },
-         { "+12px",    OPTION_VAL_12PX_O56_0_JA },
+         { "-12px",    OPTION_VAL_12PX_O58_JA },
+         { "-11px",    OPTION_VAL_11PX_O58_JA },
+         { "-10px",    OPTION_VAL_10PX_O58_JA },
+         { "-9px",     OPTION_VAL_9PX_O58_JA },
+         { "-8px",     OPTION_VAL_8PX_O58_JA },
+         { "-7px",     OPTION_VAL_7PX_O58_JA },
+         { "-6px",     OPTION_VAL_6PX_O58_JA },
+         { "-5px",     OPTION_VAL_5PX_O58_JA },
+         { "-4px",     OPTION_VAL_4PX_O58_JA },
+         { "-3px",     OPTION_VAL_3PX_O58_JA },
+         { "-2px",     OPTION_VAL_2PX_O58_JA },
+         { "-1px",     OPTION_VAL_1PX_O58_JA },
+         { "disabled", OPTION_VAL_DISABLED_O58_JA },
+         { "+1px",     OPTION_VAL_1PX_O58_0_JA },
+         { "+2px",     OPTION_VAL_2PX_O58_0_JA },
+         { "+3px",     OPTION_VAL_3PX_O58_0_JA },
+         { "+4px",     OPTION_VAL_4PX_O58_0_JA },
+         { "+5px",     OPTION_VAL_5PX_O58_0_JA },
+         { "+6px",     OPTION_VAL_6PX_O58_0_JA },
+         { "+7px",     OPTION_VAL_7PX_O58_0_JA },
+         { "+8px",     OPTION_VAL_8PX_O58_0_JA },
+         { "+9px",     OPTION_VAL_9PX_O58_0_JA },
+         { "+10px",    OPTION_VAL_10PX_O58_0_JA },
+         { "+11px",    OPTION_VAL_11PX_O58_0_JA },
+         { "+12px",    OPTION_VAL_12PX_O58_0_JA },
          { NULL, NULL },
       },
       "disabled"
@@ -44663,7 +46043,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_JA },
+         { "0",        OPTION_VAL_DISABLED_O58_JA },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -45073,7 +46453,27 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_KO "아날로그 자가 교정"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_KO "입력 장치가 DualShock, 아날로그 컨트롤러, 아날로그 조이스틱, neGcon으로 설정된 경우, 이 옵션은 아날로그 입력을 동적으로 교정하도록 합니다. 입력되는 최대 값을 실시간으로 확인하여 에뮬레이터에 조정된 아날로그 수치를 전달합니다. 이 설정은 Mega Man Legends 2처럼 현대의 컨트롤러들이 제공하는 값보다 더 큰 값을 기대하는 게임을 플레이할 때 사용되어야 합니다. 최선의 효과를 위해서는 컨텐츠를 불러올 때마다 아날로그 스틱들을 최대한 끝까지 밀고 한 바퀴 돌리는 동작을 수행하여 교정 알고리즘을 조율해야 합니다."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_KO "DualShock 아날로그 모드 토글 활성화"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_KO "입력 장치가 DualShock일 때, 에뮬레이트된 DualShock이 실제 하드웨어처럼 DIGITAL과 ANALOG 모드를 전환할 수 있어야 할지를 결정합니다. 비활성화할 경우 DualShock이 ANALOG 모드로 고정되며, 활성화할 경우 시작+선택+L1+L2+R1+R2 키를 꾹 눌러 DIGITAL과 ANALOG 모드를 전환할 수 있습니다."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_KO "입력 장치가 DualShock일 때, 에뮬레이트된 DualShock이 실제 하드웨어처럼 DIGITAL과 ANALOG 모드를 전환할 수 있어야 할지를 결정합니다. 비활성화할 경우 DualShock이 ANALOG 모드로 고정되며, 활성화할 경우 선택한 키 조합을 눌러 DIGITAL과 ANALOG 모드를 전환할 수 있습니다."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_KO "DualShock 아날로그 모드 버튼 조합"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_KO "에뮬레이트된 DualShock의 DIGITAL과 ANALOG 모드 사이를 전환하는 데 사용할 버튼 조합을 선택합니다. 'DualShock 아날로그 모드 토글 활성화'가 활성화되어 있어야 작동합니다."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_KO "L1 + L2 + R1 + R2 + 시작 + 선택"
+#define OPTION_VAL_L1_R1_SELECT_KO "L1 + R1 + 선택"
+#define OPTION_VAL_L1_R1_START_KO "L1 + R1 + 시작"
+#define OPTION_VAL_L1_R1_L3_KO NULL
+#define OPTION_VAL_L1_R1_R3_KO NULL
+#define OPTION_VAL_L2_R2_SELECT_KO "L2 + R2 + 선택"
+#define OPTION_VAL_L2_R2_START_KO "L2 + R2 + 시작"
+#define OPTION_VAL_L2_R2_L3_KO NULL
+#define OPTION_VAL_L2_R2_R3_KO NULL
+#define OPTION_VAL_L3_R3_KO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_KO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_KO NULL
+#define OPTION_VAL_0_KO NULL
+#define OPTION_VAL_1_KO NULL
+#define OPTION_VAL_2_KO NULL
+#define OPTION_VAL_3_KO NULL
+#define OPTION_VAL_4_KO NULL
+#define OPTION_VAL_5_KO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_KO "1번 포트에서 멀티탭 사용"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_KO "1번 포트에 멀티탭 기능을 활성화합니다."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_KO "2번 포트에서 멀티탭 사용"
@@ -45103,7 +46503,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_KO "2번 포트 라이트 건의 십자선 색을 선택합니다."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_KO "마우스 감도"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_KO "'마우스' 형식 입력 장치의 반응 정도를 설정합니다."
-#define OPTION_VAL_5_KO NULL
+#define OPTION_VAL_5_O28_KO NULL
 #define OPTION_VAL_10_KO NULL
 #define OPTION_VAL_15_KO NULL
 #define OPTION_VAL_20_KO NULL
@@ -45150,7 +46550,7 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_CUBIC_KO "입방"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_KO "neGcon 뒤틀기 데드존"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_KO "RetroPad 왼쪽 아날로그 스틱으로 'neGcon' 입력 장치의 '뒤틀기' 입력을 흉내낼 때의 데드존을 설정합니다. 컨트롤러 쏠림 현장을 방지하기 위해 사용됩니다. 주의: 대부분의 neGcon 호환 타이틀은 게임 내에서 '뒤틀기' 데드존 값을 설정하는 것을 지원합니다. 가장 정확한 입력을 위해서는 게임 내 데드존 설정이 *반드시* 0으로 설정되어야 하며, 관련 조정은 *반드시* 이 코어 설정을 통해서만 이루어져야 합니다. 특히 'neGcon 뒤틀기 감도'가 '정방' 또는 '입방'일 경우에는 이렇게 하는 것이 중요합니다."
-#define OPTION_VAL_0_KO NULL
+#define OPTION_VAL_0_O30_KO NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_KO "메모리 카드 0 방식 (재시작 필요)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_KO "메모리 카드 0을 저장할 데이터 포맷을 선택합니다. 'Mednafen'은 단독 버전의 Mednafen과의 호환성을 위해 사용될 수 있습니다. Beetle PSX에서 사용할 경우, Libretro(.srm)와 Mednafen(.mcr) 저장 파일은 내부적으로 동일한 형식이며 파일 이름을 바꾸는 것으로 상호 변환할 수 있습니다."
 #define OPTION_VAL_LIBRETRO_KO NULL
@@ -45163,7 +46563,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_KO "왼쪽 슬롯에 삽입될 메모리 카드를 변경합니다. 이 옵션은 메모리 카드 0 방식이 Mednafen으로 설정되어 있어야 작동합니다. 기본 카드 인덱스는 0입니다."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_KO "오른쪽 메모리 카드 인덱스"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_KO "오른쪽 슬롯에 삽입될 메모리 카드를 변경합니다. 이 옵션은 메모리 카드 1이 활성화되어 있어야 작동합니다. 기본 카드 인덱스는 1입니다."
-#define OPTION_VAL_1_KO "1 (기본)"
+#define OPTION_VAL_1_O35_KO NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_KO "PGXP 작동 모드"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_KO "3D 개체가 서브픽셀 단위 정확도로 렌더링될 수 있게 합니다. 이는 원본 하드웨어가 버텍스 좌표에 고정소수점을 사용하여 발생하는 3D 개체의 뒤틀림과 떨림 현상을 최소화합니다. '메모리만'은 호환성 문제가 적으며 일반적인 사용에 적합합니다. '메모리 + CPU (불안정)'은 떨림 현상을 더 많이 줄일 수 있지만 성능 요구사항이 높으며 다양한 그래픽 오류가 발생할 수 있습니다."
 #define OPTION_VAL_MEMORY_ONLY_KO "메모리만"
@@ -45298,7 +46698,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_KO "서로 다른 표준으로 인해 PAL 게임은 미국 또는 일본 NTSC 게임에 비해 다소 느리게 구동되기도 합니다. 이 옵션은 PAL 타이밍을 오버라이드하여 NTSC 게임과 동일한 프레임레이트로 구동되게 합니다. 이 옵션은 NTSC 컨텐츠를 실행할 땐 아무런 효과가 없습니다."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_KO "오버스캔 잘라내기"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_KO "'없음'은 패딩(NTSC 좌우 기둥, PAL 전 방향 테두리)을 유지하여 원본 PSX 하드웨어의 아날로그 비디오 출력에 존재하는 검은 막대를 에뮬레이트합니다. '정적'은 수평 패딩만 제거하며, '동적'은 모든 패딩을 제거합니다."
-#define OPTION_VAL_DISABLED_O54_KO "없음"
+#define OPTION_VAL_DISABLED_O56_KO "없음"
 #define OPTION_VAL_STATIC_KO "정적"
 #define OPTION_VAL_SMART_KO "동적 (기본값)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_KO "추가 잘라내기"
@@ -45317,31 +46717,31 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_20PX_KO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_KO "잘라낸 이미지 위치 조정"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_KO "'가로 오버스캔 잘라내기'가 활성화된 경우, 이 옵션에 설정한 픽셀 수만큼 화면을 오른쪽(양수) 또는 왼쪽(음수)으로 이동합니다. 맞춤 문제를 교정하는 데 사용될 수 있습니다. 소프트웨어 렌더러에서만 지원됩니다."
-#define OPTION_VAL_12PX_O56_KO NULL
-#define OPTION_VAL_11PX_O56_KO NULL
-#define OPTION_VAL_10PX_O56_KO NULL
-#define OPTION_VAL_9PX_O56_KO NULL
-#define OPTION_VAL_8PX_O56_KO NULL
-#define OPTION_VAL_7PX_O56_KO NULL
-#define OPTION_VAL_6PX_O56_KO NULL
-#define OPTION_VAL_5PX_O56_KO NULL
-#define OPTION_VAL_4PX_O56_KO NULL
-#define OPTION_VAL_3PX_O56_KO NULL
-#define OPTION_VAL_2PX_O56_KO NULL
-#define OPTION_VAL_1PX_O56_KO NULL
-#define OPTION_VAL_DISABLED_O56_KO "0 (기본값)"
-#define OPTION_VAL_1PX_O56_0_KO NULL
-#define OPTION_VAL_2PX_O56_0_KO NULL
-#define OPTION_VAL_3PX_O56_0_KO NULL
-#define OPTION_VAL_4PX_O56_0_KO NULL
-#define OPTION_VAL_5PX_O56_0_KO NULL
-#define OPTION_VAL_6PX_O56_0_KO NULL
-#define OPTION_VAL_7PX_O56_0_KO NULL
-#define OPTION_VAL_8PX_O56_0_KO NULL
-#define OPTION_VAL_9PX_O56_0_KO NULL
-#define OPTION_VAL_10PX_O56_0_KO NULL
-#define OPTION_VAL_11PX_O56_0_KO NULL
-#define OPTION_VAL_12PX_O56_0_KO NULL
+#define OPTION_VAL_12PX_O58_KO NULL
+#define OPTION_VAL_11PX_O58_KO NULL
+#define OPTION_VAL_10PX_O58_KO NULL
+#define OPTION_VAL_9PX_O58_KO NULL
+#define OPTION_VAL_8PX_O58_KO NULL
+#define OPTION_VAL_7PX_O58_KO NULL
+#define OPTION_VAL_6PX_O58_KO NULL
+#define OPTION_VAL_5PX_O58_KO NULL
+#define OPTION_VAL_4PX_O58_KO NULL
+#define OPTION_VAL_3PX_O58_KO NULL
+#define OPTION_VAL_2PX_O58_KO NULL
+#define OPTION_VAL_1PX_O58_KO NULL
+#define OPTION_VAL_DISABLED_O58_KO NULL
+#define OPTION_VAL_1PX_O58_0_KO NULL
+#define OPTION_VAL_2PX_O58_0_KO NULL
+#define OPTION_VAL_3PX_O58_0_KO NULL
+#define OPTION_VAL_4PX_O58_0_KO NULL
+#define OPTION_VAL_5PX_O58_0_KO NULL
+#define OPTION_VAL_6PX_O58_0_KO NULL
+#define OPTION_VAL_7PX_O58_0_KO NULL
+#define OPTION_VAL_8PX_O58_0_KO NULL
+#define OPTION_VAL_9PX_O58_0_KO NULL
+#define OPTION_VAL_10PX_O58_0_KO NULL
+#define OPTION_VAL_11PX_O58_0_KO NULL
+#define OPTION_VAL_12PX_O58_0_KO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_KO "가로 이미지 위치 조정 (GPU 사이클)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_KO "이미지를 위치 조정할 GPU 사이클 수를 선택합니다. 양수는 이미지를 오른쪽으로, 음수는 왼쪽으로 이동시킵니다. 하드웨어 렌더러에서만 지원됩니다."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_KO "GPU 래스터라이저 오버클럭"
@@ -45721,6 +47121,46 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_KO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_KO,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_KO },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_KO },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_KO },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_KO },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_KO },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_KO },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_KO },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_KO },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_KO },
+         { "l3+r3",                    OPTION_VAL_L3_R3_KO },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_KO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_KO,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_KO },
+         { "1", OPTION_VAL_1_KO },
+         { "2", OPTION_VAL_2_KO },
+         { "3", OPTION_VAL_3_KO },
+         { "4", OPTION_VAL_4_KO },
+         { "5", OPTION_VAL_5_KO },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_KO,
       NULL,
@@ -45830,7 +47270,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_KO },
+         { "5%",   OPTION_VAL_5_O28_KO },
          { "10%",  OPTION_VAL_10_KO },
          { "15%",  OPTION_VAL_15_KO },
          { "20%",  OPTION_VAL_20_KO },
@@ -45897,8 +47337,8 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_KO },
-         { "5%",  OPTION_VAL_5_KO },
+         { "0%",  OPTION_VAL_0_O30_KO },
+         { "5%",  OPTION_VAL_5_O28_KO },
          { "10%", OPTION_VAL_10_KO },
          { "15%", OPTION_VAL_15_KO },
          { "20%", OPTION_VAL_20_KO },
@@ -46035,7 +47475,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_KO },
+         { "1",  OPTION_VAL_1_O35_KO },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -46449,7 +47889,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_KO },
+         { "1",  OPTION_VAL_1_O35_KO },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -46492,7 +47932,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_KO },
+         { "disabled",  OPTION_VAL_DISABLED_O56_KO },
          { "static",  OPTION_VAL_STATIC_KO },
          { "smart", OPTION_VAL_SMART_KO },
          { NULL, NULL },
@@ -46540,31 +47980,31 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_KO },
-         { "-11px",    OPTION_VAL_11PX_O56_KO },
-         { "-10px",    OPTION_VAL_10PX_O56_KO },
-         { "-9px",     OPTION_VAL_9PX_O56_KO },
-         { "-8px",     OPTION_VAL_8PX_O56_KO },
-         { "-7px",     OPTION_VAL_7PX_O56_KO },
-         { "-6px",     OPTION_VAL_6PX_O56_KO },
-         { "-5px",     OPTION_VAL_5PX_O56_KO },
-         { "-4px",     OPTION_VAL_4PX_O56_KO },
-         { "-3px",     OPTION_VAL_3PX_O56_KO },
-         { "-2px",     OPTION_VAL_2PX_O56_KO },
-         { "-1px",     OPTION_VAL_1PX_O56_KO },
-         { "disabled", OPTION_VAL_DISABLED_O56_KO },
-         { "+1px",     OPTION_VAL_1PX_O56_0_KO },
-         { "+2px",     OPTION_VAL_2PX_O56_0_KO },
-         { "+3px",     OPTION_VAL_3PX_O56_0_KO },
-         { "+4px",     OPTION_VAL_4PX_O56_0_KO },
-         { "+5px",     OPTION_VAL_5PX_O56_0_KO },
-         { "+6px",     OPTION_VAL_6PX_O56_0_KO },
-         { "+7px",     OPTION_VAL_7PX_O56_0_KO },
-         { "+8px",     OPTION_VAL_8PX_O56_0_KO },
-         { "+9px",     OPTION_VAL_9PX_O56_0_KO },
-         { "+10px",    OPTION_VAL_10PX_O56_0_KO },
-         { "+11px",    OPTION_VAL_11PX_O56_0_KO },
-         { "+12px",    OPTION_VAL_12PX_O56_0_KO },
+         { "-12px",    OPTION_VAL_12PX_O58_KO },
+         { "-11px",    OPTION_VAL_11PX_O58_KO },
+         { "-10px",    OPTION_VAL_10PX_O58_KO },
+         { "-9px",     OPTION_VAL_9PX_O58_KO },
+         { "-8px",     OPTION_VAL_8PX_O58_KO },
+         { "-7px",     OPTION_VAL_7PX_O58_KO },
+         { "-6px",     OPTION_VAL_6PX_O58_KO },
+         { "-5px",     OPTION_VAL_5PX_O58_KO },
+         { "-4px",     OPTION_VAL_4PX_O58_KO },
+         { "-3px",     OPTION_VAL_3PX_O58_KO },
+         { "-2px",     OPTION_VAL_2PX_O58_KO },
+         { "-1px",     OPTION_VAL_1PX_O58_KO },
+         { "disabled", OPTION_VAL_DISABLED_O58_KO },
+         { "+1px",     OPTION_VAL_1PX_O58_0_KO },
+         { "+2px",     OPTION_VAL_2PX_O58_0_KO },
+         { "+3px",     OPTION_VAL_3PX_O58_0_KO },
+         { "+4px",     OPTION_VAL_4PX_O58_0_KO },
+         { "+5px",     OPTION_VAL_5PX_O58_0_KO },
+         { "+6px",     OPTION_VAL_6PX_O58_0_KO },
+         { "+7px",     OPTION_VAL_7PX_O58_0_KO },
+         { "+8px",     OPTION_VAL_8PX_O58_0_KO },
+         { "+9px",     OPTION_VAL_9PX_O58_0_KO },
+         { "+10px",    OPTION_VAL_10PX_O58_0_KO },
+         { "+11px",    OPTION_VAL_11PX_O58_0_KO },
+         { "+12px",    OPTION_VAL_12PX_O58_0_KO },
          { NULL, NULL },
       },
       "disabled"
@@ -46618,7 +48058,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_KO },
+         { "0",        OPTION_VAL_DISABLED_O58_KO },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -47029,6 +48469,26 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_NL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_NL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_NL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_NL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_NL NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_NL NULL
+#define OPTION_VAL_L1_R1_SELECT_NL NULL
+#define OPTION_VAL_L1_R1_START_NL NULL
+#define OPTION_VAL_L1_R1_L3_NL NULL
+#define OPTION_VAL_L1_R1_R3_NL NULL
+#define OPTION_VAL_L2_R2_SELECT_NL NULL
+#define OPTION_VAL_L2_R2_START_NL NULL
+#define OPTION_VAL_L2_R2_L3_NL NULL
+#define OPTION_VAL_L2_R2_R3_NL NULL
+#define OPTION_VAL_L3_R3_NL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NL NULL
+#define OPTION_VAL_0_NL NULL
+#define OPTION_VAL_1_NL NULL
+#define OPTION_VAL_2_NL NULL
+#define OPTION_VAL_3_NL NULL
+#define OPTION_VAL_4_NL NULL
+#define OPTION_VAL_5_NL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_NL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_NL NULL
@@ -47058,7 +48518,7 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_NL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_NL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_NL NULL
-#define OPTION_VAL_5_NL NULL
+#define OPTION_VAL_5_O28_NL NULL
 #define OPTION_VAL_10_NL NULL
 #define OPTION_VAL_15_NL NULL
 #define OPTION_VAL_20_NL NULL
@@ -47105,7 +48565,7 @@ struct retro_core_options_v2 options_ko = {
 #define OPTION_VAL_CUBIC_NL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_NL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_NL NULL
-#define OPTION_VAL_0_NL NULL
+#define OPTION_VAL_0_O30_NL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_NL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_NL NULL
 #define OPTION_VAL_LIBRETRO_NL NULL
@@ -47118,7 +48578,7 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_NL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_NL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_NL NULL
-#define OPTION_VAL_1_NL NULL
+#define OPTION_VAL_1_O35_NL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_NL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_NL NULL
 #define OPTION_VAL_MEMORY_ONLY_NL NULL
@@ -47253,7 +48713,7 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_NL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_NL NULL
-#define OPTION_VAL_DISABLED_O54_NL "Geen"
+#define OPTION_VAL_DISABLED_O56_NL "Geen"
 #define OPTION_VAL_STATIC_NL NULL
 #define OPTION_VAL_SMART_NL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_NL NULL
@@ -47272,31 +48732,31 @@ struct retro_core_options_v2 options_ko = {
 #define OPTION_VAL_20PX_NL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_NL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_NL NULL
-#define OPTION_VAL_12PX_O56_NL NULL
-#define OPTION_VAL_11PX_O56_NL NULL
-#define OPTION_VAL_10PX_O56_NL NULL
-#define OPTION_VAL_9PX_O56_NL NULL
-#define OPTION_VAL_8PX_O56_NL NULL
-#define OPTION_VAL_7PX_O56_NL NULL
-#define OPTION_VAL_6PX_O56_NL NULL
-#define OPTION_VAL_5PX_O56_NL NULL
-#define OPTION_VAL_4PX_O56_NL NULL
-#define OPTION_VAL_3PX_O56_NL NULL
-#define OPTION_VAL_2PX_O56_NL NULL
-#define OPTION_VAL_1PX_O56_NL NULL
-#define OPTION_VAL_DISABLED_O56_NL NULL
-#define OPTION_VAL_1PX_O56_0_NL NULL
-#define OPTION_VAL_2PX_O56_0_NL NULL
-#define OPTION_VAL_3PX_O56_0_NL NULL
-#define OPTION_VAL_4PX_O56_0_NL NULL
-#define OPTION_VAL_5PX_O56_0_NL NULL
-#define OPTION_VAL_6PX_O56_0_NL NULL
-#define OPTION_VAL_7PX_O56_0_NL NULL
-#define OPTION_VAL_8PX_O56_0_NL NULL
-#define OPTION_VAL_9PX_O56_0_NL NULL
-#define OPTION_VAL_10PX_O56_0_NL NULL
-#define OPTION_VAL_11PX_O56_0_NL NULL
-#define OPTION_VAL_12PX_O56_0_NL NULL
+#define OPTION_VAL_12PX_O58_NL NULL
+#define OPTION_VAL_11PX_O58_NL NULL
+#define OPTION_VAL_10PX_O58_NL NULL
+#define OPTION_VAL_9PX_O58_NL NULL
+#define OPTION_VAL_8PX_O58_NL NULL
+#define OPTION_VAL_7PX_O58_NL NULL
+#define OPTION_VAL_6PX_O58_NL NULL
+#define OPTION_VAL_5PX_O58_NL NULL
+#define OPTION_VAL_4PX_O58_NL NULL
+#define OPTION_VAL_3PX_O58_NL NULL
+#define OPTION_VAL_2PX_O58_NL NULL
+#define OPTION_VAL_1PX_O58_NL NULL
+#define OPTION_VAL_DISABLED_O58_NL NULL
+#define OPTION_VAL_1PX_O58_0_NL NULL
+#define OPTION_VAL_2PX_O58_0_NL NULL
+#define OPTION_VAL_3PX_O58_0_NL NULL
+#define OPTION_VAL_4PX_O58_0_NL NULL
+#define OPTION_VAL_5PX_O58_0_NL NULL
+#define OPTION_VAL_6PX_O58_0_NL NULL
+#define OPTION_VAL_7PX_O58_0_NL NULL
+#define OPTION_VAL_8PX_O58_0_NL NULL
+#define OPTION_VAL_9PX_O58_0_NL NULL
+#define OPTION_VAL_10PX_O58_0_NL NULL
+#define OPTION_VAL_11PX_O58_0_NL NULL
+#define OPTION_VAL_12PX_O58_0_NL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_NL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_NL NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_NL NULL
@@ -47676,6 +49136,46 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_NL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_NL,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_NL },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_NL },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_NL },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_NL },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_NL },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_NL },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_NL },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_NL },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_NL },
+         { "l3+r3",                    OPTION_VAL_L3_R3_NL },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NL,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_NL },
+         { "1", OPTION_VAL_1_NL },
+         { "2", OPTION_VAL_2_NL },
+         { "3", OPTION_VAL_3_NL },
+         { "4", OPTION_VAL_4_NL },
+         { "5", OPTION_VAL_5_NL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NL,
       NULL,
@@ -47785,7 +49285,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_NL },
+         { "5%",   OPTION_VAL_5_O28_NL },
          { "10%",  OPTION_VAL_10_NL },
          { "15%",  OPTION_VAL_15_NL },
          { "20%",  OPTION_VAL_20_NL },
@@ -47852,8 +49352,8 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_NL },
-         { "5%",  OPTION_VAL_5_NL },
+         { "0%",  OPTION_VAL_0_O30_NL },
+         { "5%",  OPTION_VAL_5_O28_NL },
          { "10%", OPTION_VAL_10_NL },
          { "15%", OPTION_VAL_15_NL },
          { "20%", OPTION_VAL_20_NL },
@@ -47990,7 +49490,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_NL },
+         { "1",  OPTION_VAL_1_O35_NL },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -48404,7 +49904,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_NL },
+         { "1",  OPTION_VAL_1_O35_NL },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -48447,7 +49947,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_NL },
+         { "disabled",  OPTION_VAL_DISABLED_O56_NL },
          { "static",  OPTION_VAL_STATIC_NL },
          { "smart", OPTION_VAL_SMART_NL },
          { NULL, NULL },
@@ -48495,31 +49995,31 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_NL },
-         { "-11px",    OPTION_VAL_11PX_O56_NL },
-         { "-10px",    OPTION_VAL_10PX_O56_NL },
-         { "-9px",     OPTION_VAL_9PX_O56_NL },
-         { "-8px",     OPTION_VAL_8PX_O56_NL },
-         { "-7px",     OPTION_VAL_7PX_O56_NL },
-         { "-6px",     OPTION_VAL_6PX_O56_NL },
-         { "-5px",     OPTION_VAL_5PX_O56_NL },
-         { "-4px",     OPTION_VAL_4PX_O56_NL },
-         { "-3px",     OPTION_VAL_3PX_O56_NL },
-         { "-2px",     OPTION_VAL_2PX_O56_NL },
-         { "-1px",     OPTION_VAL_1PX_O56_NL },
-         { "disabled", OPTION_VAL_DISABLED_O56_NL },
-         { "+1px",     OPTION_VAL_1PX_O56_0_NL },
-         { "+2px",     OPTION_VAL_2PX_O56_0_NL },
-         { "+3px",     OPTION_VAL_3PX_O56_0_NL },
-         { "+4px",     OPTION_VAL_4PX_O56_0_NL },
-         { "+5px",     OPTION_VAL_5PX_O56_0_NL },
-         { "+6px",     OPTION_VAL_6PX_O56_0_NL },
-         { "+7px",     OPTION_VAL_7PX_O56_0_NL },
-         { "+8px",     OPTION_VAL_8PX_O56_0_NL },
-         { "+9px",     OPTION_VAL_9PX_O56_0_NL },
-         { "+10px",    OPTION_VAL_10PX_O56_0_NL },
-         { "+11px",    OPTION_VAL_11PX_O56_0_NL },
-         { "+12px",    OPTION_VAL_12PX_O56_0_NL },
+         { "-12px",    OPTION_VAL_12PX_O58_NL },
+         { "-11px",    OPTION_VAL_11PX_O58_NL },
+         { "-10px",    OPTION_VAL_10PX_O58_NL },
+         { "-9px",     OPTION_VAL_9PX_O58_NL },
+         { "-8px",     OPTION_VAL_8PX_O58_NL },
+         { "-7px",     OPTION_VAL_7PX_O58_NL },
+         { "-6px",     OPTION_VAL_6PX_O58_NL },
+         { "-5px",     OPTION_VAL_5PX_O58_NL },
+         { "-4px",     OPTION_VAL_4PX_O58_NL },
+         { "-3px",     OPTION_VAL_3PX_O58_NL },
+         { "-2px",     OPTION_VAL_2PX_O58_NL },
+         { "-1px",     OPTION_VAL_1PX_O58_NL },
+         { "disabled", OPTION_VAL_DISABLED_O58_NL },
+         { "+1px",     OPTION_VAL_1PX_O58_0_NL },
+         { "+2px",     OPTION_VAL_2PX_O58_0_NL },
+         { "+3px",     OPTION_VAL_3PX_O58_0_NL },
+         { "+4px",     OPTION_VAL_4PX_O58_0_NL },
+         { "+5px",     OPTION_VAL_5PX_O58_0_NL },
+         { "+6px",     OPTION_VAL_6PX_O58_0_NL },
+         { "+7px",     OPTION_VAL_7PX_O58_0_NL },
+         { "+8px",     OPTION_VAL_8PX_O58_0_NL },
+         { "+9px",     OPTION_VAL_9PX_O58_0_NL },
+         { "+10px",    OPTION_VAL_10PX_O58_0_NL },
+         { "+11px",    OPTION_VAL_11PX_O58_0_NL },
+         { "+12px",    OPTION_VAL_12PX_O58_0_NL },
          { NULL, NULL },
       },
       "disabled"
@@ -48573,7 +50073,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_NL },
+         { "0",        OPTION_VAL_DISABLED_O58_NL },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -48984,6 +50484,26 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_NO NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_NO NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_NO NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_NO NULL
+#define OPTION_VAL_L1_R1_SELECT_NO NULL
+#define OPTION_VAL_L1_R1_START_NO NULL
+#define OPTION_VAL_L1_R1_L3_NO NULL
+#define OPTION_VAL_L1_R1_R3_NO NULL
+#define OPTION_VAL_L2_R2_SELECT_NO NULL
+#define OPTION_VAL_L2_R2_START_NO NULL
+#define OPTION_VAL_L2_R2_L3_NO NULL
+#define OPTION_VAL_L2_R2_R3_NO NULL
+#define OPTION_VAL_L3_R3_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NO NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NO NULL
+#define OPTION_VAL_0_NO NULL
+#define OPTION_VAL_1_NO NULL
+#define OPTION_VAL_2_NO NULL
+#define OPTION_VAL_3_NO NULL
+#define OPTION_VAL_4_NO NULL
+#define OPTION_VAL_5_NO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_NO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_NO NULL
@@ -49013,7 +50533,7 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_NO NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_NO NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_NO NULL
-#define OPTION_VAL_5_NO NULL
+#define OPTION_VAL_5_O28_NO NULL
 #define OPTION_VAL_10_NO NULL
 #define OPTION_VAL_15_NO NULL
 #define OPTION_VAL_20_NO NULL
@@ -49060,7 +50580,7 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_CUBIC_NO NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_NO NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_NO NULL
-#define OPTION_VAL_0_NO NULL
+#define OPTION_VAL_0_O30_NO NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_NO NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_NO NULL
 #define OPTION_VAL_LIBRETRO_NO NULL
@@ -49073,7 +50593,7 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_NO NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_NO NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_NO NULL
-#define OPTION_VAL_1_NO NULL
+#define OPTION_VAL_1_O35_NO NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_NO NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_NO NULL
 #define OPTION_VAL_MEMORY_ONLY_NO NULL
@@ -49208,7 +50728,7 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NO NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_NO NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_NO NULL
-#define OPTION_VAL_DISABLED_O54_NO "Ingen"
+#define OPTION_VAL_DISABLED_O56_NO "Ingen"
 #define OPTION_VAL_STATIC_NO NULL
 #define OPTION_VAL_SMART_NO NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_NO NULL
@@ -49227,31 +50747,31 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_20PX_NO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_NO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_NO NULL
-#define OPTION_VAL_12PX_O56_NO NULL
-#define OPTION_VAL_11PX_O56_NO NULL
-#define OPTION_VAL_10PX_O56_NO NULL
-#define OPTION_VAL_9PX_O56_NO NULL
-#define OPTION_VAL_8PX_O56_NO NULL
-#define OPTION_VAL_7PX_O56_NO NULL
-#define OPTION_VAL_6PX_O56_NO NULL
-#define OPTION_VAL_5PX_O56_NO NULL
-#define OPTION_VAL_4PX_O56_NO NULL
-#define OPTION_VAL_3PX_O56_NO NULL
-#define OPTION_VAL_2PX_O56_NO NULL
-#define OPTION_VAL_1PX_O56_NO NULL
-#define OPTION_VAL_DISABLED_O56_NO NULL
-#define OPTION_VAL_1PX_O56_0_NO NULL
-#define OPTION_VAL_2PX_O56_0_NO NULL
-#define OPTION_VAL_3PX_O56_0_NO NULL
-#define OPTION_VAL_4PX_O56_0_NO NULL
-#define OPTION_VAL_5PX_O56_0_NO NULL
-#define OPTION_VAL_6PX_O56_0_NO NULL
-#define OPTION_VAL_7PX_O56_0_NO NULL
-#define OPTION_VAL_8PX_O56_0_NO NULL
-#define OPTION_VAL_9PX_O56_0_NO NULL
-#define OPTION_VAL_10PX_O56_0_NO NULL
-#define OPTION_VAL_11PX_O56_0_NO NULL
-#define OPTION_VAL_12PX_O56_0_NO NULL
+#define OPTION_VAL_12PX_O58_NO NULL
+#define OPTION_VAL_11PX_O58_NO NULL
+#define OPTION_VAL_10PX_O58_NO NULL
+#define OPTION_VAL_9PX_O58_NO NULL
+#define OPTION_VAL_8PX_O58_NO NULL
+#define OPTION_VAL_7PX_O58_NO NULL
+#define OPTION_VAL_6PX_O58_NO NULL
+#define OPTION_VAL_5PX_O58_NO NULL
+#define OPTION_VAL_4PX_O58_NO NULL
+#define OPTION_VAL_3PX_O58_NO NULL
+#define OPTION_VAL_2PX_O58_NO NULL
+#define OPTION_VAL_1PX_O58_NO NULL
+#define OPTION_VAL_DISABLED_O58_NO NULL
+#define OPTION_VAL_1PX_O58_0_NO NULL
+#define OPTION_VAL_2PX_O58_0_NO NULL
+#define OPTION_VAL_3PX_O58_0_NO NULL
+#define OPTION_VAL_4PX_O58_0_NO NULL
+#define OPTION_VAL_5PX_O58_0_NO NULL
+#define OPTION_VAL_6PX_O58_0_NO NULL
+#define OPTION_VAL_7PX_O58_0_NO NULL
+#define OPTION_VAL_8PX_O58_0_NO NULL
+#define OPTION_VAL_9PX_O58_0_NO NULL
+#define OPTION_VAL_10PX_O58_0_NO NULL
+#define OPTION_VAL_11PX_O58_0_NO NULL
+#define OPTION_VAL_12PX_O58_0_NO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_NO NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_NO NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_NO NULL
@@ -49631,6 +51151,46 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_NO },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_NO },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_NO },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_NO },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_NO },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_NO },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_NO },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_NO },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_NO },
+         { "l3+r3",                    OPTION_VAL_L3_R3_NO },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NO,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NO,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_NO },
+         { "1", OPTION_VAL_1_NO },
+         { "2", OPTION_VAL_2_NO },
+         { "3", OPTION_VAL_3_NO },
+         { "4", OPTION_VAL_4_NO },
+         { "5", OPTION_VAL_5_NO },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NO,
       NULL,
@@ -49740,7 +51300,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_NO },
+         { "5%",   OPTION_VAL_5_O28_NO },
          { "10%",  OPTION_VAL_10_NO },
          { "15%",  OPTION_VAL_15_NO },
          { "20%",  OPTION_VAL_20_NO },
@@ -49807,8 +51367,8 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_NO },
-         { "5%",  OPTION_VAL_5_NO },
+         { "0%",  OPTION_VAL_0_O30_NO },
+         { "5%",  OPTION_VAL_5_O28_NO },
          { "10%", OPTION_VAL_10_NO },
          { "15%", OPTION_VAL_15_NO },
          { "20%", OPTION_VAL_20_NO },
@@ -49945,7 +51505,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_NO },
+         { "1",  OPTION_VAL_1_O35_NO },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -50359,7 +51919,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_NO },
+         { "1",  OPTION_VAL_1_O35_NO },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -50402,7 +51962,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_NO },
+         { "disabled",  OPTION_VAL_DISABLED_O56_NO },
          { "static",  OPTION_VAL_STATIC_NO },
          { "smart", OPTION_VAL_SMART_NO },
          { NULL, NULL },
@@ -50450,31 +52010,31 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_NO },
-         { "-11px",    OPTION_VAL_11PX_O56_NO },
-         { "-10px",    OPTION_VAL_10PX_O56_NO },
-         { "-9px",     OPTION_VAL_9PX_O56_NO },
-         { "-8px",     OPTION_VAL_8PX_O56_NO },
-         { "-7px",     OPTION_VAL_7PX_O56_NO },
-         { "-6px",     OPTION_VAL_6PX_O56_NO },
-         { "-5px",     OPTION_VAL_5PX_O56_NO },
-         { "-4px",     OPTION_VAL_4PX_O56_NO },
-         { "-3px",     OPTION_VAL_3PX_O56_NO },
-         { "-2px",     OPTION_VAL_2PX_O56_NO },
-         { "-1px",     OPTION_VAL_1PX_O56_NO },
-         { "disabled", OPTION_VAL_DISABLED_O56_NO },
-         { "+1px",     OPTION_VAL_1PX_O56_0_NO },
-         { "+2px",     OPTION_VAL_2PX_O56_0_NO },
-         { "+3px",     OPTION_VAL_3PX_O56_0_NO },
-         { "+4px",     OPTION_VAL_4PX_O56_0_NO },
-         { "+5px",     OPTION_VAL_5PX_O56_0_NO },
-         { "+6px",     OPTION_VAL_6PX_O56_0_NO },
-         { "+7px",     OPTION_VAL_7PX_O56_0_NO },
-         { "+8px",     OPTION_VAL_8PX_O56_0_NO },
-         { "+9px",     OPTION_VAL_9PX_O56_0_NO },
-         { "+10px",    OPTION_VAL_10PX_O56_0_NO },
-         { "+11px",    OPTION_VAL_11PX_O56_0_NO },
-         { "+12px",    OPTION_VAL_12PX_O56_0_NO },
+         { "-12px",    OPTION_VAL_12PX_O58_NO },
+         { "-11px",    OPTION_VAL_11PX_O58_NO },
+         { "-10px",    OPTION_VAL_10PX_O58_NO },
+         { "-9px",     OPTION_VAL_9PX_O58_NO },
+         { "-8px",     OPTION_VAL_8PX_O58_NO },
+         { "-7px",     OPTION_VAL_7PX_O58_NO },
+         { "-6px",     OPTION_VAL_6PX_O58_NO },
+         { "-5px",     OPTION_VAL_5PX_O58_NO },
+         { "-4px",     OPTION_VAL_4PX_O58_NO },
+         { "-3px",     OPTION_VAL_3PX_O58_NO },
+         { "-2px",     OPTION_VAL_2PX_O58_NO },
+         { "-1px",     OPTION_VAL_1PX_O58_NO },
+         { "disabled", OPTION_VAL_DISABLED_O58_NO },
+         { "+1px",     OPTION_VAL_1PX_O58_0_NO },
+         { "+2px",     OPTION_VAL_2PX_O58_0_NO },
+         { "+3px",     OPTION_VAL_3PX_O58_0_NO },
+         { "+4px",     OPTION_VAL_4PX_O58_0_NO },
+         { "+5px",     OPTION_VAL_5PX_O58_0_NO },
+         { "+6px",     OPTION_VAL_6PX_O58_0_NO },
+         { "+7px",     OPTION_VAL_7PX_O58_0_NO },
+         { "+8px",     OPTION_VAL_8PX_O58_0_NO },
+         { "+9px",     OPTION_VAL_9PX_O58_0_NO },
+         { "+10px",    OPTION_VAL_10PX_O58_0_NO },
+         { "+11px",    OPTION_VAL_11PX_O58_0_NO },
+         { "+12px",    OPTION_VAL_12PX_O58_0_NO },
          { NULL, NULL },
       },
       "disabled"
@@ -50528,7 +52088,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_NO },
+         { "0",        OPTION_VAL_DISABLED_O58_NO },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -50939,6 +52499,26 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_PL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PL NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_PL NULL
+#define OPTION_VAL_L1_R1_SELECT_PL NULL
+#define OPTION_VAL_L1_R1_START_PL NULL
+#define OPTION_VAL_L1_R1_L3_PL NULL
+#define OPTION_VAL_L1_R1_R3_PL NULL
+#define OPTION_VAL_L2_R2_SELECT_PL NULL
+#define OPTION_VAL_L2_R2_START_PL NULL
+#define OPTION_VAL_L2_R2_L3_PL NULL
+#define OPTION_VAL_L2_R2_R3_PL NULL
+#define OPTION_VAL_L3_R3_PL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PL NULL
+#define OPTION_VAL_0_PL "0 sekund opóźnienia"
+#define OPTION_VAL_1_PL "1 sekunda opóźnienia"
+#define OPTION_VAL_2_PL "2 sekundy opóźnienia"
+#define OPTION_VAL_3_PL "3 sekundy opóźnienia"
+#define OPTION_VAL_4_PL "4 sekundy opóźnienia"
+#define OPTION_VAL_5_PL "5 sekund opóźnienia"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_PL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_PL NULL
@@ -50968,7 +52548,7 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_PL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_PL "Czułość myszy"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_PL NULL
-#define OPTION_VAL_5_PL NULL
+#define OPTION_VAL_5_O28_PL NULL
 #define OPTION_VAL_10_PL NULL
 #define OPTION_VAL_15_PL NULL
 #define OPTION_VAL_20_PL NULL
@@ -51015,7 +52595,7 @@ struct retro_core_options_v2 options_no = {
 #define OPTION_VAL_CUBIC_PL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_PL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_PL NULL
-#define OPTION_VAL_0_PL NULL
+#define OPTION_VAL_0_O30_PL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_PL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_PL NULL
 #define OPTION_VAL_LIBRETRO_PL NULL
@@ -51028,7 +52608,7 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_PL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_PL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_PL NULL
-#define OPTION_VAL_1_PL NULL
+#define OPTION_VAL_1_O35_PL "1 (domyślnie)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_PL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PL NULL
 #define OPTION_VAL_MEMORY_ONLY_PL NULL
@@ -51163,7 +52743,7 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_PL "Przytnij overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PL NULL
-#define OPTION_VAL_DISABLED_O54_PL "Brak"
+#define OPTION_VAL_DISABLED_O56_PL "Brak"
 #define OPTION_VAL_STATIC_PL NULL
 #define OPTION_VAL_SMART_PL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PL NULL
@@ -51182,31 +52762,31 @@ struct retro_core_options_v2 options_no = {
 #define OPTION_VAL_20PX_PL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_PL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_PL NULL
-#define OPTION_VAL_12PX_O56_PL NULL
-#define OPTION_VAL_11PX_O56_PL NULL
-#define OPTION_VAL_10PX_O56_PL NULL
-#define OPTION_VAL_9PX_O56_PL NULL
-#define OPTION_VAL_8PX_O56_PL NULL
-#define OPTION_VAL_7PX_O56_PL NULL
-#define OPTION_VAL_6PX_O56_PL NULL
-#define OPTION_VAL_5PX_O56_PL NULL
-#define OPTION_VAL_4PX_O56_PL NULL
-#define OPTION_VAL_3PX_O56_PL NULL
-#define OPTION_VAL_2PX_O56_PL NULL
-#define OPTION_VAL_1PX_O56_PL NULL
-#define OPTION_VAL_DISABLED_O56_PL NULL
-#define OPTION_VAL_1PX_O56_0_PL NULL
-#define OPTION_VAL_2PX_O56_0_PL NULL
-#define OPTION_VAL_3PX_O56_0_PL NULL
-#define OPTION_VAL_4PX_O56_0_PL NULL
-#define OPTION_VAL_5PX_O56_0_PL NULL
-#define OPTION_VAL_6PX_O56_0_PL NULL
-#define OPTION_VAL_7PX_O56_0_PL NULL
-#define OPTION_VAL_8PX_O56_0_PL NULL
-#define OPTION_VAL_9PX_O56_0_PL NULL
-#define OPTION_VAL_10PX_O56_0_PL NULL
-#define OPTION_VAL_11PX_O56_0_PL NULL
-#define OPTION_VAL_12PX_O56_0_PL NULL
+#define OPTION_VAL_12PX_O58_PL NULL
+#define OPTION_VAL_11PX_O58_PL NULL
+#define OPTION_VAL_10PX_O58_PL NULL
+#define OPTION_VAL_9PX_O58_PL NULL
+#define OPTION_VAL_8PX_O58_PL NULL
+#define OPTION_VAL_7PX_O58_PL NULL
+#define OPTION_VAL_6PX_O58_PL NULL
+#define OPTION_VAL_5PX_O58_PL NULL
+#define OPTION_VAL_4PX_O58_PL NULL
+#define OPTION_VAL_3PX_O58_PL NULL
+#define OPTION_VAL_2PX_O58_PL NULL
+#define OPTION_VAL_1PX_O58_PL NULL
+#define OPTION_VAL_DISABLED_O58_PL "0 (domyślnie)"
+#define OPTION_VAL_1PX_O58_0_PL NULL
+#define OPTION_VAL_2PX_O58_0_PL NULL
+#define OPTION_VAL_3PX_O58_0_PL NULL
+#define OPTION_VAL_4PX_O58_0_PL NULL
+#define OPTION_VAL_5PX_O58_0_PL NULL
+#define OPTION_VAL_6PX_O58_0_PL NULL
+#define OPTION_VAL_7PX_O58_0_PL NULL
+#define OPTION_VAL_8PX_O58_0_PL NULL
+#define OPTION_VAL_9PX_O58_0_PL NULL
+#define OPTION_VAL_10PX_O58_0_PL NULL
+#define OPTION_VAL_11PX_O58_0_PL NULL
+#define OPTION_VAL_12PX_O58_0_PL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_PL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_PL NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_PL NULL
@@ -51586,6 +53166,46 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PL,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_PL },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_PL },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_PL },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_PL },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_PL },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_PL },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_PL },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_PL },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_PL },
+         { "l3+r3",                    OPTION_VAL_L3_R3_PL },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PL,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_PL },
+         { "1", OPTION_VAL_1_PL },
+         { "2", OPTION_VAL_2_PL },
+         { "3", OPTION_VAL_3_PL },
+         { "4", OPTION_VAL_4_PL },
+         { "5", OPTION_VAL_5_PL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PL,
       NULL,
@@ -51695,7 +53315,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_PL },
+         { "5%",   OPTION_VAL_5_O28_PL },
          { "10%",  OPTION_VAL_10_PL },
          { "15%",  OPTION_VAL_15_PL },
          { "20%",  OPTION_VAL_20_PL },
@@ -51762,8 +53382,8 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_PL },
-         { "5%",  OPTION_VAL_5_PL },
+         { "0%",  OPTION_VAL_0_O30_PL },
+         { "5%",  OPTION_VAL_5_O28_PL },
          { "10%", OPTION_VAL_10_PL },
          { "15%", OPTION_VAL_15_PL },
          { "20%", OPTION_VAL_20_PL },
@@ -51900,7 +53520,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_PL },
+         { "1",  OPTION_VAL_1_O35_PL },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -52314,7 +53934,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_PL },
+         { "1",  OPTION_VAL_1_O35_PL },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -52357,7 +53977,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_PL },
+         { "disabled",  OPTION_VAL_DISABLED_O56_PL },
          { "static",  OPTION_VAL_STATIC_PL },
          { "smart", OPTION_VAL_SMART_PL },
          { NULL, NULL },
@@ -52405,31 +54025,31 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_PL },
-         { "-11px",    OPTION_VAL_11PX_O56_PL },
-         { "-10px",    OPTION_VAL_10PX_O56_PL },
-         { "-9px",     OPTION_VAL_9PX_O56_PL },
-         { "-8px",     OPTION_VAL_8PX_O56_PL },
-         { "-7px",     OPTION_VAL_7PX_O56_PL },
-         { "-6px",     OPTION_VAL_6PX_O56_PL },
-         { "-5px",     OPTION_VAL_5PX_O56_PL },
-         { "-4px",     OPTION_VAL_4PX_O56_PL },
-         { "-3px",     OPTION_VAL_3PX_O56_PL },
-         { "-2px",     OPTION_VAL_2PX_O56_PL },
-         { "-1px",     OPTION_VAL_1PX_O56_PL },
-         { "disabled", OPTION_VAL_DISABLED_O56_PL },
-         { "+1px",     OPTION_VAL_1PX_O56_0_PL },
-         { "+2px",     OPTION_VAL_2PX_O56_0_PL },
-         { "+3px",     OPTION_VAL_3PX_O56_0_PL },
-         { "+4px",     OPTION_VAL_4PX_O56_0_PL },
-         { "+5px",     OPTION_VAL_5PX_O56_0_PL },
-         { "+6px",     OPTION_VAL_6PX_O56_0_PL },
-         { "+7px",     OPTION_VAL_7PX_O56_0_PL },
-         { "+8px",     OPTION_VAL_8PX_O56_0_PL },
-         { "+9px",     OPTION_VAL_9PX_O56_0_PL },
-         { "+10px",    OPTION_VAL_10PX_O56_0_PL },
-         { "+11px",    OPTION_VAL_11PX_O56_0_PL },
-         { "+12px",    OPTION_VAL_12PX_O56_0_PL },
+         { "-12px",    OPTION_VAL_12PX_O58_PL },
+         { "-11px",    OPTION_VAL_11PX_O58_PL },
+         { "-10px",    OPTION_VAL_10PX_O58_PL },
+         { "-9px",     OPTION_VAL_9PX_O58_PL },
+         { "-8px",     OPTION_VAL_8PX_O58_PL },
+         { "-7px",     OPTION_VAL_7PX_O58_PL },
+         { "-6px",     OPTION_VAL_6PX_O58_PL },
+         { "-5px",     OPTION_VAL_5PX_O58_PL },
+         { "-4px",     OPTION_VAL_4PX_O58_PL },
+         { "-3px",     OPTION_VAL_3PX_O58_PL },
+         { "-2px",     OPTION_VAL_2PX_O58_PL },
+         { "-1px",     OPTION_VAL_1PX_O58_PL },
+         { "disabled", OPTION_VAL_DISABLED_O58_PL },
+         { "+1px",     OPTION_VAL_1PX_O58_0_PL },
+         { "+2px",     OPTION_VAL_2PX_O58_0_PL },
+         { "+3px",     OPTION_VAL_3PX_O58_0_PL },
+         { "+4px",     OPTION_VAL_4PX_O58_0_PL },
+         { "+5px",     OPTION_VAL_5PX_O58_0_PL },
+         { "+6px",     OPTION_VAL_6PX_O58_0_PL },
+         { "+7px",     OPTION_VAL_7PX_O58_0_PL },
+         { "+8px",     OPTION_VAL_8PX_O58_0_PL },
+         { "+9px",     OPTION_VAL_9PX_O58_0_PL },
+         { "+10px",    OPTION_VAL_10PX_O58_0_PL },
+         { "+11px",    OPTION_VAL_11PX_O58_0_PL },
+         { "+12px",    OPTION_VAL_12PX_O58_0_PL },
          { NULL, NULL },
       },
       "disabled"
@@ -52483,7 +54103,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_PL },
+         { "0",        OPTION_VAL_DISABLED_O58_PL },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -52893,7 +54513,27 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_PT_BR "Auto-calibração do analógico"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_PT_BR "Quando o dispositivo de entrada é ajustado para DualShock, Controle analógico, Joystick analógico ou neGcon, esta opção permite a calibração dinâmica das entradas analógicas. Os valores máximos de entrada registrados são monitorados em tempo real e usados para escalar as coordenadas analógicas passadas para o emulador. Isto deve ser usado para jogos como o Mega Man Legends 2 que esperam valores maiores do que o que os controladores modernos fornecem. Para melhores resultados, os direcionais analógicos devem ser girados em toda a extensão para calibrar o algoritmo cada vez que o conteúdo é carregado."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_BR "Alternador de modo analógico do DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_BR "Quando o tipo de dispositivo de entrada for DualShock, esta opção permite que o DualShock emulado pode alternar entre os modos digital e analógico, como faz o hardware original. A desativação desta opção bloqueará o DualShock no modo analógico e permitirá que o DualShock mude entre os modos digital e analógico, mantendo a combinação START+SELECT+L1+L2+R1+R2 pressionada."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_BR NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_BR NULL
+#define OPTION_VAL_L1_R1_SELECT_PT_BR NULL
+#define OPTION_VAL_L1_R1_START_PT_BR NULL
+#define OPTION_VAL_L1_R1_L3_PT_BR NULL
+#define OPTION_VAL_L1_R1_R3_PT_BR NULL
+#define OPTION_VAL_L2_R2_SELECT_PT_BR NULL
+#define OPTION_VAL_L2_R2_START_PT_BR NULL
+#define OPTION_VAL_L2_R2_L3_PT_BR NULL
+#define OPTION_VAL_L2_R2_R3_PT_BR NULL
+#define OPTION_VAL_L3_R3_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_BR NULL
+#define OPTION_VAL_0_PT_BR NULL
+#define OPTION_VAL_1_PT_BR NULL
+#define OPTION_VAL_2_PT_BR NULL
+#define OPTION_VAL_3_PT_BR NULL
+#define OPTION_VAL_4_PT_BR NULL
+#define OPTION_VAL_5_PT_BR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_BR "Porta 1: Ativar Multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_PT_BR "Ativa o sistema Multitap na porta 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_PT_BR "Porta 2: Ativar Multitap"
@@ -52923,7 +54563,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_PT_BR "Seleciona a cor da mira da pistola de luz conectada na porta 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_PT_BR "Sensibilidade do mouse"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_PT_BR "Seleciona a capacidade de resposta do tipo de dispositivo de entrada 'Mouse'."
-#define OPTION_VAL_5_PT_BR NULL
+#define OPTION_VAL_5_O28_PT_BR NULL
 #define OPTION_VAL_10_PT_BR NULL
 #define OPTION_VAL_15_PT_BR NULL
 #define OPTION_VAL_20_PT_BR NULL
@@ -52970,7 +54610,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_CUBIC_PT_BR "Cúbico"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_PT_BR "Zona morta ao torcer o NegCon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_PT_BR "Seleciona a zona morta do direcional analógico esquerdo do RetroPad ao simular a ação de 'torção' do dispositivo de entrada 'neGcon' emulado. Serve para evitar que o controle registre movimentos não realizados. Nota: A maioria dos títulos compatíveis com neGcon fornecem opções dentro do jogo para definir um valor de zona morta para a 'torção'. Para evitar perda de precisão, a zona morta dentro do jogo deve *sempre* ser definida como zero. Quaisquer ajustes necessários *somente* devem ser aplicados através desta opção central. Isto é particularmente importante quando a 'Resposta ao torcer o neGcon' for definida como 'Quadrática' ou 'Cúbica'."
-#define OPTION_VAL_0_PT_BR NULL
+#define OPTION_VAL_0_O30_PT_BR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_PT_BR "Método do cartão de memória 0 (requer reinício)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_PT_BR "Escolha o formato dos dados salvos usado no cartão de memória 0. A opção 'Mednafen' pode ser usada para a compatibilidade com a versão autônoma do Mednafen. Ao usar os arquivos salvos com o Beetle PSX, os arquivos do Libretro (.srm) e Mednafen (.mcr) são internamente idênticos e podem ser convertidos entre si por meio de renomeação."
 #define OPTION_VAL_LIBRETRO_PT_BR NULL
@@ -52983,7 +54623,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_PT_BR "Seleciona o cartão de memória atualmente carregado no compartimento esquerdo. Esta opção só funcionará se o 'Método do cartão de memória 0' estiver definido para 'Mednafen'. O cartão de memória padrão é o índice 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_PT_BR "Índice do cartão de memória direito"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_PT_BR "Muda o cartão de memória atualmente carregado no compartimento direito. Esta opção só funcionará se o cartão de memória 1 estiver ativado. O cartão de memória padrão é o índice 1."
-#define OPTION_VAL_1_PT_BR "1 (padrão)"
+#define OPTION_VAL_1_O35_PT_BR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_PT_BR "Modo de operação do PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PT_BR "Renderiza objetos 3D com precisão de subpixel, usando coordenadas de vértices de ponto fixo para minimizar a distorção e o jitter em objetos 3D que o hardware original tinha. O modo 'Apenas memória' praticamente não dá problemas de compatibilidade e é recomendado para uso geral. o modo 'Memória + CPU (instável)' pode reduzir ainda mais o jitter, mas tem requisitos de desempenho elevados e pode levar a falhas de geometria."
 #define OPTION_VAL_MEMORY_ONLY_PT_BR "Apenas memória"
@@ -53118,7 +54758,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_BR "Devido a diferentes padrões, os jogos PAL costumam parecer lentos em comparação com os lançamentos Americanos ou Japoneses NTSC. Esta opção pode ser usada para substituir a sincronia de vídeo PAL para tentar executar esses jogos com a taxa de quadros NTSC. Esta opção não tem efeito ao executar o conteúdo NTSC."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_BR "Cortar overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_BR "'Nenhum' retém as bordas (colunas pretas em ambos os lados no caso de imagens NTSC, bordas nos quatro lados para imagens PAL) para simular as barras pretas produzidas pelo hardware real de PSX em um sinal de vídeo analógico. \"Estático\" simplesmente remove as bordas horizontais, enquanto 'Dinâmico' remove todas as bordas."
-#define OPTION_VAL_DISABLED_O54_PT_BR "Nenhum"
+#define OPTION_VAL_DISABLED_O56_PT_BR "Nenhum"
 #define OPTION_VAL_STATIC_PT_BR "Estático"
 #define OPTION_VAL_SMART_PT_BR "Dinâmico (padrão)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PT_BR "Corte adicional"
@@ -53137,31 +54777,31 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_20PX_PT_BR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_PT_BR "Deslocar imagem cortada"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_PT_BR "Quando a opção \"Cortar overscan horizontal\" estiver ativada, isso permite que a imagem cortada seja deslocada horizontalmente para a direita (valores positivos) ou para a esquerda (valores negativos) usando um valor específico em pixels. Pode ser usado para corrigir problemas de alinhamento. Somente suportado pelo renderizador por software."
-#define OPTION_VAL_12PX_O56_PT_BR NULL
-#define OPTION_VAL_11PX_O56_PT_BR NULL
-#define OPTION_VAL_10PX_O56_PT_BR NULL
-#define OPTION_VAL_9PX_O56_PT_BR NULL
-#define OPTION_VAL_8PX_O56_PT_BR NULL
-#define OPTION_VAL_7PX_O56_PT_BR NULL
-#define OPTION_VAL_6PX_O56_PT_BR NULL
-#define OPTION_VAL_5PX_O56_PT_BR NULL
-#define OPTION_VAL_4PX_O56_PT_BR NULL
-#define OPTION_VAL_3PX_O56_PT_BR NULL
-#define OPTION_VAL_2PX_O56_PT_BR NULL
-#define OPTION_VAL_1PX_O56_PT_BR NULL
-#define OPTION_VAL_DISABLED_O56_PT_BR "0 (padrão)"
-#define OPTION_VAL_1PX_O56_0_PT_BR NULL
-#define OPTION_VAL_2PX_O56_0_PT_BR NULL
-#define OPTION_VAL_3PX_O56_0_PT_BR NULL
-#define OPTION_VAL_4PX_O56_0_PT_BR NULL
-#define OPTION_VAL_5PX_O56_0_PT_BR NULL
-#define OPTION_VAL_6PX_O56_0_PT_BR NULL
-#define OPTION_VAL_7PX_O56_0_PT_BR NULL
-#define OPTION_VAL_8PX_O56_0_PT_BR NULL
-#define OPTION_VAL_9PX_O56_0_PT_BR NULL
-#define OPTION_VAL_10PX_O56_0_PT_BR NULL
-#define OPTION_VAL_11PX_O56_0_PT_BR NULL
-#define OPTION_VAL_12PX_O56_0_PT_BR NULL
+#define OPTION_VAL_12PX_O58_PT_BR NULL
+#define OPTION_VAL_11PX_O58_PT_BR NULL
+#define OPTION_VAL_10PX_O58_PT_BR NULL
+#define OPTION_VAL_9PX_O58_PT_BR NULL
+#define OPTION_VAL_8PX_O58_PT_BR NULL
+#define OPTION_VAL_7PX_O58_PT_BR NULL
+#define OPTION_VAL_6PX_O58_PT_BR NULL
+#define OPTION_VAL_5PX_O58_PT_BR NULL
+#define OPTION_VAL_4PX_O58_PT_BR NULL
+#define OPTION_VAL_3PX_O58_PT_BR NULL
+#define OPTION_VAL_2PX_O58_PT_BR NULL
+#define OPTION_VAL_1PX_O58_PT_BR NULL
+#define OPTION_VAL_DISABLED_O58_PT_BR NULL
+#define OPTION_VAL_1PX_O58_0_PT_BR NULL
+#define OPTION_VAL_2PX_O58_0_PT_BR NULL
+#define OPTION_VAL_3PX_O58_0_PT_BR NULL
+#define OPTION_VAL_4PX_O58_0_PT_BR NULL
+#define OPTION_VAL_5PX_O58_0_PT_BR NULL
+#define OPTION_VAL_6PX_O58_0_PT_BR NULL
+#define OPTION_VAL_7PX_O58_0_PT_BR NULL
+#define OPTION_VAL_8PX_O58_0_PT_BR NULL
+#define OPTION_VAL_9PX_O58_0_PT_BR NULL
+#define OPTION_VAL_10PX_O58_0_PT_BR NULL
+#define OPTION_VAL_11PX_O58_0_PT_BR NULL
+#define OPTION_VAL_12PX_O58_0_PT_BR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_PT_BR "Deslocar imagem horizontal (ciclos de GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_PT_BR "Seleciona o número de ciclos de GPU com os quais se deve deslocar a imagem. Valores positivos movem a imagem para a direita, valores negativos movem a imagem para a esquerda. Funciona somente com renderizadores de hardware."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_PT_BR "Overclock do rasterizador da GPU"
@@ -53541,6 +55181,46 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_BR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_BR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_BR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_PT_BR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_PT_BR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_PT_BR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_PT_BR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_PT_BR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_PT_BR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_PT_BR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_PT_BR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_PT_BR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_BR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_BR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_PT_BR },
+         { "1", OPTION_VAL_1_PT_BR },
+         { "2", OPTION_VAL_2_PT_BR },
+         { "3", OPTION_VAL_3_PT_BR },
+         { "4", OPTION_VAL_4_PT_BR },
+         { "5", OPTION_VAL_5_PT_BR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_BR,
       NULL,
@@ -53650,7 +55330,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_PT_BR },
+         { "5%",   OPTION_VAL_5_O28_PT_BR },
          { "10%",  OPTION_VAL_10_PT_BR },
          { "15%",  OPTION_VAL_15_PT_BR },
          { "20%",  OPTION_VAL_20_PT_BR },
@@ -53717,8 +55397,8 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_PT_BR },
-         { "5%",  OPTION_VAL_5_PT_BR },
+         { "0%",  OPTION_VAL_0_O30_PT_BR },
+         { "5%",  OPTION_VAL_5_O28_PT_BR },
          { "10%", OPTION_VAL_10_PT_BR },
          { "15%", OPTION_VAL_15_PT_BR },
          { "20%", OPTION_VAL_20_PT_BR },
@@ -53855,7 +55535,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_PT_BR },
+         { "1",  OPTION_VAL_1_O35_PT_BR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -54269,7 +55949,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_PT_BR },
+         { "1",  OPTION_VAL_1_O35_PT_BR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -54312,7 +55992,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_PT_BR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_PT_BR },
          { "static",  OPTION_VAL_STATIC_PT_BR },
          { "smart", OPTION_VAL_SMART_PT_BR },
          { NULL, NULL },
@@ -54360,31 +56040,31 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_PT_BR },
-         { "-11px",    OPTION_VAL_11PX_O56_PT_BR },
-         { "-10px",    OPTION_VAL_10PX_O56_PT_BR },
-         { "-9px",     OPTION_VAL_9PX_O56_PT_BR },
-         { "-8px",     OPTION_VAL_8PX_O56_PT_BR },
-         { "-7px",     OPTION_VAL_7PX_O56_PT_BR },
-         { "-6px",     OPTION_VAL_6PX_O56_PT_BR },
-         { "-5px",     OPTION_VAL_5PX_O56_PT_BR },
-         { "-4px",     OPTION_VAL_4PX_O56_PT_BR },
-         { "-3px",     OPTION_VAL_3PX_O56_PT_BR },
-         { "-2px",     OPTION_VAL_2PX_O56_PT_BR },
-         { "-1px",     OPTION_VAL_1PX_O56_PT_BR },
-         { "disabled", OPTION_VAL_DISABLED_O56_PT_BR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_PT_BR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_PT_BR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_PT_BR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_PT_BR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_PT_BR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_PT_BR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_PT_BR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_PT_BR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_PT_BR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_PT_BR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_PT_BR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_PT_BR },
+         { "-12px",    OPTION_VAL_12PX_O58_PT_BR },
+         { "-11px",    OPTION_VAL_11PX_O58_PT_BR },
+         { "-10px",    OPTION_VAL_10PX_O58_PT_BR },
+         { "-9px",     OPTION_VAL_9PX_O58_PT_BR },
+         { "-8px",     OPTION_VAL_8PX_O58_PT_BR },
+         { "-7px",     OPTION_VAL_7PX_O58_PT_BR },
+         { "-6px",     OPTION_VAL_6PX_O58_PT_BR },
+         { "-5px",     OPTION_VAL_5PX_O58_PT_BR },
+         { "-4px",     OPTION_VAL_4PX_O58_PT_BR },
+         { "-3px",     OPTION_VAL_3PX_O58_PT_BR },
+         { "-2px",     OPTION_VAL_2PX_O58_PT_BR },
+         { "-1px",     OPTION_VAL_1PX_O58_PT_BR },
+         { "disabled", OPTION_VAL_DISABLED_O58_PT_BR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_PT_BR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_PT_BR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_PT_BR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_PT_BR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_PT_BR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_PT_BR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_PT_BR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_PT_BR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_PT_BR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_PT_BR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_PT_BR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_PT_BR },
          { NULL, NULL },
       },
       "disabled"
@@ -54438,7 +56118,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_PT_BR },
+         { "0",        OPTION_VAL_DISABLED_O58_PT_BR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -54849,6 +56529,26 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_PT_PT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_PT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_PT NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_PT NULL
+#define OPTION_VAL_L1_R1_SELECT_PT_PT NULL
+#define OPTION_VAL_L1_R1_START_PT_PT NULL
+#define OPTION_VAL_L1_R1_L3_PT_PT NULL
+#define OPTION_VAL_L1_R1_R3_PT_PT NULL
+#define OPTION_VAL_L2_R2_SELECT_PT_PT NULL
+#define OPTION_VAL_L2_R2_START_PT_PT NULL
+#define OPTION_VAL_L2_R2_L3_PT_PT NULL
+#define OPTION_VAL_L2_R2_R3_PT_PT NULL
+#define OPTION_VAL_L3_R3_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_PT NULL
+#define OPTION_VAL_0_PT_PT NULL
+#define OPTION_VAL_1_PT_PT NULL
+#define OPTION_VAL_2_PT_PT NULL
+#define OPTION_VAL_3_PT_PT NULL
+#define OPTION_VAL_4_PT_PT NULL
+#define OPTION_VAL_5_PT_PT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_PT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_PT_PT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_PT_PT NULL
@@ -54878,7 +56578,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_PT_PT NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_PT_PT NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_PT_PT NULL
-#define OPTION_VAL_5_PT_PT NULL
+#define OPTION_VAL_5_O28_PT_PT NULL
 #define OPTION_VAL_10_PT_PT NULL
 #define OPTION_VAL_15_PT_PT NULL
 #define OPTION_VAL_20_PT_PT NULL
@@ -54925,7 +56625,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_CUBIC_PT_PT NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_PT_PT NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_PT_PT NULL
-#define OPTION_VAL_0_PT_PT NULL
+#define OPTION_VAL_0_O30_PT_PT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_PT_PT NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_PT_PT NULL
 #define OPTION_VAL_LIBRETRO_PT_PT NULL
@@ -54938,7 +56638,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_PT_PT NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_PT_PT NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_PT_PT NULL
-#define OPTION_VAL_1_PT_PT NULL
+#define OPTION_VAL_1_O35_PT_PT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_PT_PT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PT_PT NULL
 #define OPTION_VAL_MEMORY_ONLY_PT_PT NULL
@@ -55073,7 +56773,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_PT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_PT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_PT NULL
-#define OPTION_VAL_DISABLED_O54_PT_PT "Nenhum"
+#define OPTION_VAL_DISABLED_O56_PT_PT "Nenhum"
 #define OPTION_VAL_STATIC_PT_PT NULL
 #define OPTION_VAL_SMART_PT_PT NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PT_PT NULL
@@ -55092,31 +56792,31 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_20PX_PT_PT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_PT_PT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_PT_PT NULL
-#define OPTION_VAL_12PX_O56_PT_PT NULL
-#define OPTION_VAL_11PX_O56_PT_PT NULL
-#define OPTION_VAL_10PX_O56_PT_PT NULL
-#define OPTION_VAL_9PX_O56_PT_PT NULL
-#define OPTION_VAL_8PX_O56_PT_PT NULL
-#define OPTION_VAL_7PX_O56_PT_PT NULL
-#define OPTION_VAL_6PX_O56_PT_PT NULL
-#define OPTION_VAL_5PX_O56_PT_PT NULL
-#define OPTION_VAL_4PX_O56_PT_PT NULL
-#define OPTION_VAL_3PX_O56_PT_PT NULL
-#define OPTION_VAL_2PX_O56_PT_PT NULL
-#define OPTION_VAL_1PX_O56_PT_PT NULL
-#define OPTION_VAL_DISABLED_O56_PT_PT NULL
-#define OPTION_VAL_1PX_O56_0_PT_PT NULL
-#define OPTION_VAL_2PX_O56_0_PT_PT NULL
-#define OPTION_VAL_3PX_O56_0_PT_PT NULL
-#define OPTION_VAL_4PX_O56_0_PT_PT NULL
-#define OPTION_VAL_5PX_O56_0_PT_PT NULL
-#define OPTION_VAL_6PX_O56_0_PT_PT NULL
-#define OPTION_VAL_7PX_O56_0_PT_PT NULL
-#define OPTION_VAL_8PX_O56_0_PT_PT NULL
-#define OPTION_VAL_9PX_O56_0_PT_PT NULL
-#define OPTION_VAL_10PX_O56_0_PT_PT NULL
-#define OPTION_VAL_11PX_O56_0_PT_PT NULL
-#define OPTION_VAL_12PX_O56_0_PT_PT NULL
+#define OPTION_VAL_12PX_O58_PT_PT NULL
+#define OPTION_VAL_11PX_O58_PT_PT NULL
+#define OPTION_VAL_10PX_O58_PT_PT NULL
+#define OPTION_VAL_9PX_O58_PT_PT NULL
+#define OPTION_VAL_8PX_O58_PT_PT NULL
+#define OPTION_VAL_7PX_O58_PT_PT NULL
+#define OPTION_VAL_6PX_O58_PT_PT NULL
+#define OPTION_VAL_5PX_O58_PT_PT NULL
+#define OPTION_VAL_4PX_O58_PT_PT NULL
+#define OPTION_VAL_3PX_O58_PT_PT NULL
+#define OPTION_VAL_2PX_O58_PT_PT NULL
+#define OPTION_VAL_1PX_O58_PT_PT NULL
+#define OPTION_VAL_DISABLED_O58_PT_PT NULL
+#define OPTION_VAL_1PX_O58_0_PT_PT NULL
+#define OPTION_VAL_2PX_O58_0_PT_PT NULL
+#define OPTION_VAL_3PX_O58_0_PT_PT NULL
+#define OPTION_VAL_4PX_O58_0_PT_PT NULL
+#define OPTION_VAL_5PX_O58_0_PT_PT NULL
+#define OPTION_VAL_6PX_O58_0_PT_PT NULL
+#define OPTION_VAL_7PX_O58_0_PT_PT NULL
+#define OPTION_VAL_8PX_O58_0_PT_PT NULL
+#define OPTION_VAL_9PX_O58_0_PT_PT NULL
+#define OPTION_VAL_10PX_O58_0_PT_PT NULL
+#define OPTION_VAL_11PX_O58_0_PT_PT NULL
+#define OPTION_VAL_12PX_O58_0_PT_PT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_PT_PT NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_PT_PT NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_PT_PT NULL
@@ -55496,6 +57196,46 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_PT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_PT,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_PT },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_PT_PT },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_PT_PT },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_PT_PT },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_PT_PT },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_PT_PT },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_PT_PT },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_PT_PT },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_PT_PT },
+         { "l3+r3",                    OPTION_VAL_L3_R3_PT_PT },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_PT,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_PT,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_PT_PT },
+         { "1", OPTION_VAL_1_PT_PT },
+         { "2", OPTION_VAL_2_PT_PT },
+         { "3", OPTION_VAL_3_PT_PT },
+         { "4", OPTION_VAL_4_PT_PT },
+         { "5", OPTION_VAL_5_PT_PT },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_PT,
       NULL,
@@ -55605,7 +57345,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_PT_PT },
+         { "5%",   OPTION_VAL_5_O28_PT_PT },
          { "10%",  OPTION_VAL_10_PT_PT },
          { "15%",  OPTION_VAL_15_PT_PT },
          { "20%",  OPTION_VAL_20_PT_PT },
@@ -55672,8 +57412,8 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_PT_PT },
-         { "5%",  OPTION_VAL_5_PT_PT },
+         { "0%",  OPTION_VAL_0_O30_PT_PT },
+         { "5%",  OPTION_VAL_5_O28_PT_PT },
          { "10%", OPTION_VAL_10_PT_PT },
          { "15%", OPTION_VAL_15_PT_PT },
          { "20%", OPTION_VAL_20_PT_PT },
@@ -55810,7 +57550,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_PT_PT },
+         { "1",  OPTION_VAL_1_O35_PT_PT },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -56224,7 +57964,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_PT_PT },
+         { "1",  OPTION_VAL_1_O35_PT_PT },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -56267,7 +58007,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_PT_PT },
+         { "disabled",  OPTION_VAL_DISABLED_O56_PT_PT },
          { "static",  OPTION_VAL_STATIC_PT_PT },
          { "smart", OPTION_VAL_SMART_PT_PT },
          { NULL, NULL },
@@ -56315,31 +58055,31 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_PT_PT },
-         { "-11px",    OPTION_VAL_11PX_O56_PT_PT },
-         { "-10px",    OPTION_VAL_10PX_O56_PT_PT },
-         { "-9px",     OPTION_VAL_9PX_O56_PT_PT },
-         { "-8px",     OPTION_VAL_8PX_O56_PT_PT },
-         { "-7px",     OPTION_VAL_7PX_O56_PT_PT },
-         { "-6px",     OPTION_VAL_6PX_O56_PT_PT },
-         { "-5px",     OPTION_VAL_5PX_O56_PT_PT },
-         { "-4px",     OPTION_VAL_4PX_O56_PT_PT },
-         { "-3px",     OPTION_VAL_3PX_O56_PT_PT },
-         { "-2px",     OPTION_VAL_2PX_O56_PT_PT },
-         { "-1px",     OPTION_VAL_1PX_O56_PT_PT },
-         { "disabled", OPTION_VAL_DISABLED_O56_PT_PT },
-         { "+1px",     OPTION_VAL_1PX_O56_0_PT_PT },
-         { "+2px",     OPTION_VAL_2PX_O56_0_PT_PT },
-         { "+3px",     OPTION_VAL_3PX_O56_0_PT_PT },
-         { "+4px",     OPTION_VAL_4PX_O56_0_PT_PT },
-         { "+5px",     OPTION_VAL_5PX_O56_0_PT_PT },
-         { "+6px",     OPTION_VAL_6PX_O56_0_PT_PT },
-         { "+7px",     OPTION_VAL_7PX_O56_0_PT_PT },
-         { "+8px",     OPTION_VAL_8PX_O56_0_PT_PT },
-         { "+9px",     OPTION_VAL_9PX_O56_0_PT_PT },
-         { "+10px",    OPTION_VAL_10PX_O56_0_PT_PT },
-         { "+11px",    OPTION_VAL_11PX_O56_0_PT_PT },
-         { "+12px",    OPTION_VAL_12PX_O56_0_PT_PT },
+         { "-12px",    OPTION_VAL_12PX_O58_PT_PT },
+         { "-11px",    OPTION_VAL_11PX_O58_PT_PT },
+         { "-10px",    OPTION_VAL_10PX_O58_PT_PT },
+         { "-9px",     OPTION_VAL_9PX_O58_PT_PT },
+         { "-8px",     OPTION_VAL_8PX_O58_PT_PT },
+         { "-7px",     OPTION_VAL_7PX_O58_PT_PT },
+         { "-6px",     OPTION_VAL_6PX_O58_PT_PT },
+         { "-5px",     OPTION_VAL_5PX_O58_PT_PT },
+         { "-4px",     OPTION_VAL_4PX_O58_PT_PT },
+         { "-3px",     OPTION_VAL_3PX_O58_PT_PT },
+         { "-2px",     OPTION_VAL_2PX_O58_PT_PT },
+         { "-1px",     OPTION_VAL_1PX_O58_PT_PT },
+         { "disabled", OPTION_VAL_DISABLED_O58_PT_PT },
+         { "+1px",     OPTION_VAL_1PX_O58_0_PT_PT },
+         { "+2px",     OPTION_VAL_2PX_O58_0_PT_PT },
+         { "+3px",     OPTION_VAL_3PX_O58_0_PT_PT },
+         { "+4px",     OPTION_VAL_4PX_O58_0_PT_PT },
+         { "+5px",     OPTION_VAL_5PX_O58_0_PT_PT },
+         { "+6px",     OPTION_VAL_6PX_O58_0_PT_PT },
+         { "+7px",     OPTION_VAL_7PX_O58_0_PT_PT },
+         { "+8px",     OPTION_VAL_8PX_O58_0_PT_PT },
+         { "+9px",     OPTION_VAL_9PX_O58_0_PT_PT },
+         { "+10px",    OPTION_VAL_10PX_O58_0_PT_PT },
+         { "+11px",    OPTION_VAL_11PX_O58_0_PT_PT },
+         { "+12px",    OPTION_VAL_12PX_O58_0_PT_PT },
          { NULL, NULL },
       },
       "disabled"
@@ -56393,7 +58133,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_PT_PT },
+         { "0",        OPTION_VAL_DISABLED_O58_PT_PT },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -56801,9 +58541,29 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_RU "Показывать VRAM (отладка)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_RU "Отображение полной видеопамяти эмулируемой консоли. Поддерживается только аппаратными рендерами OpenGL и Vulkan. Примечание: используется для отладки и в обычном режиме должно быть выключено."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_RU "Автокалибровка аналогового ввода"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU "Включает динамическую калибровку аналоговых элементов управления для устройств ввода DualShock, Analog Controller, Analog Joystick или neGcon. Максимальные отклонения регистрируются в реальном времени и используются для масштабирования аналоговых координат, сообщаемых эмулятору. Требуется для игр типа Mega Man Legends 2, которые используют более широкие значения, чем обеспечивают современные контроллеры. Для максимальной эффективности аналоговые стики необходимо вращать в полном диапазоне, чтобы подстраивать алгоритм калибровки при каждом запуске контента."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_RU "Переключатель аналогового режима DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_RU NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_RU NULL
+#define OPTION_VAL_L1_R1_SELECT_RU NULL
+#define OPTION_VAL_L1_R1_START_RU NULL
+#define OPTION_VAL_L1_R1_L3_RU NULL
+#define OPTION_VAL_L1_R1_R3_RU NULL
+#define OPTION_VAL_L2_R2_SELECT_RU NULL
+#define OPTION_VAL_L2_R2_START_RU NULL
+#define OPTION_VAL_L2_R2_L3_RU NULL
+#define OPTION_VAL_L2_R2_R3_RU NULL
+#define OPTION_VAL_L3_R3_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_RU NULL
+#define OPTION_VAL_0_RU NULL
+#define OPTION_VAL_1_RU NULL
+#define OPTION_VAL_2_RU NULL
+#define OPTION_VAL_3_RU NULL
+#define OPTION_VAL_4_RU NULL
+#define OPTION_VAL_5_RU NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_RU "Multitap подключен в порт 1"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_RU NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_RU "Multitap подключен в порт 2"
@@ -56833,7 +58593,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_RU NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_RU "Чувствительность мыши"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_RU NULL
-#define OPTION_VAL_5_RU NULL
+#define OPTION_VAL_5_O28_RU NULL
 #define OPTION_VAL_10_RU NULL
 #define OPTION_VAL_15_RU NULL
 #define OPTION_VAL_20_RU NULL
@@ -56880,7 +58640,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_CUBIC_RU "Кубический"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_RU NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_RU NULL
-#define OPTION_VAL_0_RU NULL
+#define OPTION_VAL_0_O30_RU NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_RU "Формат карты памяти 0 (требуется перезапуск)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_RU "Выбор формата сохранения данных для карты памяти 0. 'Mednafen' может использоваться для совместимости с отдельной версией Mednafen. При использовании с Beetle PSX, файлы сохранений Libretro (.srm) и Mednafen (.mcr) имеют идентичный формат и могут быть сконвертированы через переименование."
 #define OPTION_VAL_LIBRETRO_RU NULL
@@ -56893,7 +58653,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_RU NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_RU "Номер карты памяти справа"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_RU NULL
-#define OPTION_VAL_1_RU NULL
+#define OPTION_VAL_1_O35_RU NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_RU "Режим работы PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_RU "Позволяет выполнять рендеринг 3D с субпиксельной точностью, минимизируя искажение и дрожание 3D-объектов, имеющих место на оригинальной консоли из-за использования координат вершин с фиксированной запятой. Режим 'Только память' обладает лучшей совместимостью и рекомендован для обычного использования. Режим 'Память + CPU (нестабильно)' ещё сильнее уменьшает дрожание, но повышает нагрузку на устройство и может вызывать искажения геометрии."
 #define OPTION_VAL_MEMORY_ONLY_RU "Только память"
@@ -57028,7 +58788,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_RU "Из-за разницы в стандартах, игры PAL зачастую работали медленнее релизов для Америки или Японии. Данная настройка позволяет изменить тайминги PAL для запуска игр этого региона с кадровой частотой NTSC. Не работает при запуске NTSC-версий игр."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_RU "Кадрировать вылеты развёртки"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_RU NULL
-#define OPTION_VAL_DISABLED_O54_RU "Нет"
+#define OPTION_VAL_DISABLED_O56_RU "Нет"
 #define OPTION_VAL_STATIC_RU "Статически"
 #define OPTION_VAL_SMART_RU NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_RU "Дополнительная обрезка"
@@ -57047,31 +58807,31 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_20PX_RU "20 пикс."
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_RU "Сдвиг изображения после обрезки"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_RU "При включенной опции 'Кадрировать вылеты развёртки' позволяет сдвигать скадрированное изображение вправо (плюс) или влево (минус) на заданное число пикселей. Может применяться для решения проблем с выравниванием. Поддерживается только программным рендером."
-#define OPTION_VAL_12PX_O56_RU NULL
-#define OPTION_VAL_11PX_O56_RU NULL
-#define OPTION_VAL_10PX_O56_RU NULL
-#define OPTION_VAL_9PX_O56_RU NULL
-#define OPTION_VAL_8PX_O56_RU NULL
-#define OPTION_VAL_7PX_O56_RU NULL
-#define OPTION_VAL_6PX_O56_RU NULL
-#define OPTION_VAL_5PX_O56_RU NULL
-#define OPTION_VAL_4PX_O56_RU NULL
-#define OPTION_VAL_3PX_O56_RU NULL
-#define OPTION_VAL_2PX_O56_RU NULL
-#define OPTION_VAL_1PX_O56_RU NULL
-#define OPTION_VAL_DISABLED_O56_RU NULL
-#define OPTION_VAL_1PX_O56_0_RU NULL
-#define OPTION_VAL_2PX_O56_0_RU NULL
-#define OPTION_VAL_3PX_O56_0_RU NULL
-#define OPTION_VAL_4PX_O56_0_RU NULL
-#define OPTION_VAL_5PX_O56_0_RU NULL
-#define OPTION_VAL_6PX_O56_0_RU NULL
-#define OPTION_VAL_7PX_O56_0_RU NULL
-#define OPTION_VAL_8PX_O56_0_RU NULL
-#define OPTION_VAL_9PX_O56_0_RU NULL
-#define OPTION_VAL_10PX_O56_0_RU NULL
-#define OPTION_VAL_11PX_O56_0_RU NULL
-#define OPTION_VAL_12PX_O56_0_RU NULL
+#define OPTION_VAL_12PX_O58_RU NULL
+#define OPTION_VAL_11PX_O58_RU NULL
+#define OPTION_VAL_10PX_O58_RU NULL
+#define OPTION_VAL_9PX_O58_RU NULL
+#define OPTION_VAL_8PX_O58_RU NULL
+#define OPTION_VAL_7PX_O58_RU NULL
+#define OPTION_VAL_6PX_O58_RU NULL
+#define OPTION_VAL_5PX_O58_RU NULL
+#define OPTION_VAL_4PX_O58_RU NULL
+#define OPTION_VAL_3PX_O58_RU NULL
+#define OPTION_VAL_2PX_O58_RU NULL
+#define OPTION_VAL_1PX_O58_RU NULL
+#define OPTION_VAL_DISABLED_O58_RU NULL
+#define OPTION_VAL_1PX_O58_0_RU NULL
+#define OPTION_VAL_2PX_O58_0_RU NULL
+#define OPTION_VAL_3PX_O58_0_RU NULL
+#define OPTION_VAL_4PX_O58_0_RU NULL
+#define OPTION_VAL_5PX_O58_0_RU NULL
+#define OPTION_VAL_6PX_O58_0_RU NULL
+#define OPTION_VAL_7PX_O58_0_RU NULL
+#define OPTION_VAL_8PX_O58_0_RU NULL
+#define OPTION_VAL_9PX_O58_0_RU NULL
+#define OPTION_VAL_10PX_O58_0_RU NULL
+#define OPTION_VAL_11PX_O58_0_RU NULL
+#define OPTION_VAL_12PX_O58_0_RU NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_RU "Сдвиг изображения по горизонтали (в тактах GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_RU NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_RU "Разгон растеризатора GPU"
@@ -57451,6 +59211,46 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_RU,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_RU,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_RU },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_RU },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_RU },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_RU },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_RU },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_RU },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_RU },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_RU },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_RU },
+         { "l3+r3",                    OPTION_VAL_L3_R3_RU },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_RU,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_RU,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_RU },
+         { "1", OPTION_VAL_1_RU },
+         { "2", OPTION_VAL_2_RU },
+         { "3", OPTION_VAL_3_RU },
+         { "4", OPTION_VAL_4_RU },
+         { "5", OPTION_VAL_5_RU },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_RU,
       NULL,
@@ -57560,7 +59360,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_RU },
+         { "5%",   OPTION_VAL_5_O28_RU },
          { "10%",  OPTION_VAL_10_RU },
          { "15%",  OPTION_VAL_15_RU },
          { "20%",  OPTION_VAL_20_RU },
@@ -57627,8 +59427,8 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_RU },
-         { "5%",  OPTION_VAL_5_RU },
+         { "0%",  OPTION_VAL_0_O30_RU },
+         { "5%",  OPTION_VAL_5_O28_RU },
          { "10%", OPTION_VAL_10_RU },
          { "15%", OPTION_VAL_15_RU },
          { "20%", OPTION_VAL_20_RU },
@@ -57765,7 +59565,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_RU },
+         { "1",  OPTION_VAL_1_O35_RU },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -58179,7 +59979,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_RU },
+         { "1",  OPTION_VAL_1_O35_RU },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -58222,7 +60022,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_RU },
+         { "disabled",  OPTION_VAL_DISABLED_O56_RU },
          { "static",  OPTION_VAL_STATIC_RU },
          { "smart", OPTION_VAL_SMART_RU },
          { NULL, NULL },
@@ -58270,31 +60070,31 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_RU },
-         { "-11px",    OPTION_VAL_11PX_O56_RU },
-         { "-10px",    OPTION_VAL_10PX_O56_RU },
-         { "-9px",     OPTION_VAL_9PX_O56_RU },
-         { "-8px",     OPTION_VAL_8PX_O56_RU },
-         { "-7px",     OPTION_VAL_7PX_O56_RU },
-         { "-6px",     OPTION_VAL_6PX_O56_RU },
-         { "-5px",     OPTION_VAL_5PX_O56_RU },
-         { "-4px",     OPTION_VAL_4PX_O56_RU },
-         { "-3px",     OPTION_VAL_3PX_O56_RU },
-         { "-2px",     OPTION_VAL_2PX_O56_RU },
-         { "-1px",     OPTION_VAL_1PX_O56_RU },
-         { "disabled", OPTION_VAL_DISABLED_O56_RU },
-         { "+1px",     OPTION_VAL_1PX_O56_0_RU },
-         { "+2px",     OPTION_VAL_2PX_O56_0_RU },
-         { "+3px",     OPTION_VAL_3PX_O56_0_RU },
-         { "+4px",     OPTION_VAL_4PX_O56_0_RU },
-         { "+5px",     OPTION_VAL_5PX_O56_0_RU },
-         { "+6px",     OPTION_VAL_6PX_O56_0_RU },
-         { "+7px",     OPTION_VAL_7PX_O56_0_RU },
-         { "+8px",     OPTION_VAL_8PX_O56_0_RU },
-         { "+9px",     OPTION_VAL_9PX_O56_0_RU },
-         { "+10px",    OPTION_VAL_10PX_O56_0_RU },
-         { "+11px",    OPTION_VAL_11PX_O56_0_RU },
-         { "+12px",    OPTION_VAL_12PX_O56_0_RU },
+         { "-12px",    OPTION_VAL_12PX_O58_RU },
+         { "-11px",    OPTION_VAL_11PX_O58_RU },
+         { "-10px",    OPTION_VAL_10PX_O58_RU },
+         { "-9px",     OPTION_VAL_9PX_O58_RU },
+         { "-8px",     OPTION_VAL_8PX_O58_RU },
+         { "-7px",     OPTION_VAL_7PX_O58_RU },
+         { "-6px",     OPTION_VAL_6PX_O58_RU },
+         { "-5px",     OPTION_VAL_5PX_O58_RU },
+         { "-4px",     OPTION_VAL_4PX_O58_RU },
+         { "-3px",     OPTION_VAL_3PX_O58_RU },
+         { "-2px",     OPTION_VAL_2PX_O58_RU },
+         { "-1px",     OPTION_VAL_1PX_O58_RU },
+         { "disabled", OPTION_VAL_DISABLED_O58_RU },
+         { "+1px",     OPTION_VAL_1PX_O58_0_RU },
+         { "+2px",     OPTION_VAL_2PX_O58_0_RU },
+         { "+3px",     OPTION_VAL_3PX_O58_0_RU },
+         { "+4px",     OPTION_VAL_4PX_O58_0_RU },
+         { "+5px",     OPTION_VAL_5PX_O58_0_RU },
+         { "+6px",     OPTION_VAL_6PX_O58_0_RU },
+         { "+7px",     OPTION_VAL_7PX_O58_0_RU },
+         { "+8px",     OPTION_VAL_8PX_O58_0_RU },
+         { "+9px",     OPTION_VAL_9PX_O58_0_RU },
+         { "+10px",    OPTION_VAL_10PX_O58_0_RU },
+         { "+11px",    OPTION_VAL_11PX_O58_0_RU },
+         { "+12px",    OPTION_VAL_12PX_O58_0_RU },
          { NULL, NULL },
       },
       "disabled"
@@ -58348,7 +60148,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_RU },
+         { "0",        OPTION_VAL_DISABLED_O58_RU },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -58759,6 +60559,26 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SK NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SK NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SK NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SK NULL
+#define OPTION_VAL_L1_R1_SELECT_SK NULL
+#define OPTION_VAL_L1_R1_START_SK NULL
+#define OPTION_VAL_L1_R1_L3_SK NULL
+#define OPTION_VAL_L1_R1_R3_SK NULL
+#define OPTION_VAL_L2_R2_SELECT_SK NULL
+#define OPTION_VAL_L2_R2_START_SK NULL
+#define OPTION_VAL_L2_R2_L3_SK NULL
+#define OPTION_VAL_L2_R2_R3_SK NULL
+#define OPTION_VAL_L3_R3_SK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SK NULL
+#define OPTION_VAL_0_SK NULL
+#define OPTION_VAL_1_SK NULL
+#define OPTION_VAL_2_SK NULL
+#define OPTION_VAL_3_SK NULL
+#define OPTION_VAL_4_SK NULL
+#define OPTION_VAL_5_SK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SK NULL
@@ -58788,7 +60608,7 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SK NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SK NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SK NULL
-#define OPTION_VAL_5_SK NULL
+#define OPTION_VAL_5_O28_SK NULL
 #define OPTION_VAL_10_SK NULL
 #define OPTION_VAL_15_SK NULL
 #define OPTION_VAL_20_SK NULL
@@ -58835,7 +60655,7 @@ struct retro_core_options_v2 options_ru = {
 #define OPTION_VAL_CUBIC_SK NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SK NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SK NULL
-#define OPTION_VAL_0_SK NULL
+#define OPTION_VAL_0_O30_SK NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SK NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SK NULL
 #define OPTION_VAL_LIBRETRO_SK NULL
@@ -58848,7 +60668,7 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SK NULL
-#define OPTION_VAL_1_SK "1 (predvolené)"
+#define OPTION_VAL_1_O35_SK NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_SK NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SK NULL
 #define OPTION_VAL_MEMORY_ONLY_SK "Iba pamäť"
@@ -58983,7 +60803,7 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SK "Orezať overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SK NULL
-#define OPTION_VAL_DISABLED_O54_SK "Žiadne"
+#define OPTION_VAL_DISABLED_O56_SK "Žiadne"
 #define OPTION_VAL_STATIC_SK "Statické"
 #define OPTION_VAL_SMART_SK NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SK NULL
@@ -59002,31 +60822,31 @@ struct retro_core_options_v2 options_ru = {
 #define OPTION_VAL_20PX_SK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_SK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SK NULL
-#define OPTION_VAL_12PX_O56_SK NULL
-#define OPTION_VAL_11PX_O56_SK NULL
-#define OPTION_VAL_10PX_O56_SK NULL
-#define OPTION_VAL_9PX_O56_SK NULL
-#define OPTION_VAL_8PX_O56_SK NULL
-#define OPTION_VAL_7PX_O56_SK NULL
-#define OPTION_VAL_6PX_O56_SK NULL
-#define OPTION_VAL_5PX_O56_SK NULL
-#define OPTION_VAL_4PX_O56_SK NULL
-#define OPTION_VAL_3PX_O56_SK NULL
-#define OPTION_VAL_2PX_O56_SK NULL
-#define OPTION_VAL_1PX_O56_SK NULL
-#define OPTION_VAL_DISABLED_O56_SK "0 (predvolené)"
-#define OPTION_VAL_1PX_O56_0_SK NULL
-#define OPTION_VAL_2PX_O56_0_SK NULL
-#define OPTION_VAL_3PX_O56_0_SK NULL
-#define OPTION_VAL_4PX_O56_0_SK NULL
-#define OPTION_VAL_5PX_O56_0_SK NULL
-#define OPTION_VAL_6PX_O56_0_SK NULL
-#define OPTION_VAL_7PX_O56_0_SK NULL
-#define OPTION_VAL_8PX_O56_0_SK NULL
-#define OPTION_VAL_9PX_O56_0_SK NULL
-#define OPTION_VAL_10PX_O56_0_SK NULL
-#define OPTION_VAL_11PX_O56_0_SK NULL
-#define OPTION_VAL_12PX_O56_0_SK NULL
+#define OPTION_VAL_12PX_O58_SK NULL
+#define OPTION_VAL_11PX_O58_SK NULL
+#define OPTION_VAL_10PX_O58_SK NULL
+#define OPTION_VAL_9PX_O58_SK NULL
+#define OPTION_VAL_8PX_O58_SK NULL
+#define OPTION_VAL_7PX_O58_SK NULL
+#define OPTION_VAL_6PX_O58_SK NULL
+#define OPTION_VAL_5PX_O58_SK NULL
+#define OPTION_VAL_4PX_O58_SK NULL
+#define OPTION_VAL_3PX_O58_SK NULL
+#define OPTION_VAL_2PX_O58_SK NULL
+#define OPTION_VAL_1PX_O58_SK NULL
+#define OPTION_VAL_DISABLED_O58_SK NULL
+#define OPTION_VAL_1PX_O58_0_SK NULL
+#define OPTION_VAL_2PX_O58_0_SK NULL
+#define OPTION_VAL_3PX_O58_0_SK NULL
+#define OPTION_VAL_4PX_O58_0_SK NULL
+#define OPTION_VAL_5PX_O58_0_SK NULL
+#define OPTION_VAL_6PX_O58_0_SK NULL
+#define OPTION_VAL_7PX_O58_0_SK NULL
+#define OPTION_VAL_8PX_O58_0_SK NULL
+#define OPTION_VAL_9PX_O58_0_SK NULL
+#define OPTION_VAL_10PX_O58_0_SK NULL
+#define OPTION_VAL_11PX_O58_0_SK NULL
+#define OPTION_VAL_12PX_O58_0_SK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SK NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SK NULL
@@ -59406,6 +61226,46 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SK,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SK,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_SK },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_SK },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_SK },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_SK },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_SK },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_SK },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_SK },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_SK },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_SK },
+         { "l3+r3",                    OPTION_VAL_L3_R3_SK },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SK,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SK,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_SK },
+         { "1", OPTION_VAL_1_SK },
+         { "2", OPTION_VAL_2_SK },
+         { "3", OPTION_VAL_3_SK },
+         { "4", OPTION_VAL_4_SK },
+         { "5", OPTION_VAL_5_SK },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SK,
       NULL,
@@ -59515,7 +61375,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_SK },
+         { "5%",   OPTION_VAL_5_O28_SK },
          { "10%",  OPTION_VAL_10_SK },
          { "15%",  OPTION_VAL_15_SK },
          { "20%",  OPTION_VAL_20_SK },
@@ -59582,8 +61442,8 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_SK },
-         { "5%",  OPTION_VAL_5_SK },
+         { "0%",  OPTION_VAL_0_O30_SK },
+         { "5%",  OPTION_VAL_5_O28_SK },
          { "10%", OPTION_VAL_10_SK },
          { "15%", OPTION_VAL_15_SK },
          { "20%", OPTION_VAL_20_SK },
@@ -59720,7 +61580,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_SK },
+         { "1",  OPTION_VAL_1_O35_SK },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -60134,7 +61994,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_SK },
+         { "1",  OPTION_VAL_1_O35_SK },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -60177,7 +62037,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_SK },
+         { "disabled",  OPTION_VAL_DISABLED_O56_SK },
          { "static",  OPTION_VAL_STATIC_SK },
          { "smart", OPTION_VAL_SMART_SK },
          { NULL, NULL },
@@ -60225,31 +62085,31 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_SK },
-         { "-11px",    OPTION_VAL_11PX_O56_SK },
-         { "-10px",    OPTION_VAL_10PX_O56_SK },
-         { "-9px",     OPTION_VAL_9PX_O56_SK },
-         { "-8px",     OPTION_VAL_8PX_O56_SK },
-         { "-7px",     OPTION_VAL_7PX_O56_SK },
-         { "-6px",     OPTION_VAL_6PX_O56_SK },
-         { "-5px",     OPTION_VAL_5PX_O56_SK },
-         { "-4px",     OPTION_VAL_4PX_O56_SK },
-         { "-3px",     OPTION_VAL_3PX_O56_SK },
-         { "-2px",     OPTION_VAL_2PX_O56_SK },
-         { "-1px",     OPTION_VAL_1PX_O56_SK },
-         { "disabled", OPTION_VAL_DISABLED_O56_SK },
-         { "+1px",     OPTION_VAL_1PX_O56_0_SK },
-         { "+2px",     OPTION_VAL_2PX_O56_0_SK },
-         { "+3px",     OPTION_VAL_3PX_O56_0_SK },
-         { "+4px",     OPTION_VAL_4PX_O56_0_SK },
-         { "+5px",     OPTION_VAL_5PX_O56_0_SK },
-         { "+6px",     OPTION_VAL_6PX_O56_0_SK },
-         { "+7px",     OPTION_VAL_7PX_O56_0_SK },
-         { "+8px",     OPTION_VAL_8PX_O56_0_SK },
-         { "+9px",     OPTION_VAL_9PX_O56_0_SK },
-         { "+10px",    OPTION_VAL_10PX_O56_0_SK },
-         { "+11px",    OPTION_VAL_11PX_O56_0_SK },
-         { "+12px",    OPTION_VAL_12PX_O56_0_SK },
+         { "-12px",    OPTION_VAL_12PX_O58_SK },
+         { "-11px",    OPTION_VAL_11PX_O58_SK },
+         { "-10px",    OPTION_VAL_10PX_O58_SK },
+         { "-9px",     OPTION_VAL_9PX_O58_SK },
+         { "-8px",     OPTION_VAL_8PX_O58_SK },
+         { "-7px",     OPTION_VAL_7PX_O58_SK },
+         { "-6px",     OPTION_VAL_6PX_O58_SK },
+         { "-5px",     OPTION_VAL_5PX_O58_SK },
+         { "-4px",     OPTION_VAL_4PX_O58_SK },
+         { "-3px",     OPTION_VAL_3PX_O58_SK },
+         { "-2px",     OPTION_VAL_2PX_O58_SK },
+         { "-1px",     OPTION_VAL_1PX_O58_SK },
+         { "disabled", OPTION_VAL_DISABLED_O58_SK },
+         { "+1px",     OPTION_VAL_1PX_O58_0_SK },
+         { "+2px",     OPTION_VAL_2PX_O58_0_SK },
+         { "+3px",     OPTION_VAL_3PX_O58_0_SK },
+         { "+4px",     OPTION_VAL_4PX_O58_0_SK },
+         { "+5px",     OPTION_VAL_5PX_O58_0_SK },
+         { "+6px",     OPTION_VAL_6PX_O58_0_SK },
+         { "+7px",     OPTION_VAL_7PX_O58_0_SK },
+         { "+8px",     OPTION_VAL_8PX_O58_0_SK },
+         { "+9px",     OPTION_VAL_9PX_O58_0_SK },
+         { "+10px",    OPTION_VAL_10PX_O58_0_SK },
+         { "+11px",    OPTION_VAL_11PX_O58_0_SK },
+         { "+12px",    OPTION_VAL_12PX_O58_0_SK },
          { NULL, NULL },
       },
       "disabled"
@@ -60303,7 +62163,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_SK },
+         { "0",        OPTION_VAL_DISABLED_O58_SK },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -60714,6 +62574,26 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SR NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SR NULL
+#define OPTION_VAL_L1_R1_SELECT_SR NULL
+#define OPTION_VAL_L1_R1_START_SR NULL
+#define OPTION_VAL_L1_R1_L3_SR NULL
+#define OPTION_VAL_L1_R1_R3_SR NULL
+#define OPTION_VAL_L2_R2_SELECT_SR NULL
+#define OPTION_VAL_L2_R2_START_SR NULL
+#define OPTION_VAL_L2_R2_L3_SR NULL
+#define OPTION_VAL_L2_R2_R3_SR NULL
+#define OPTION_VAL_L3_R3_SR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SR NULL
+#define OPTION_VAL_0_SR NULL
+#define OPTION_VAL_1_SR NULL
+#define OPTION_VAL_2_SR NULL
+#define OPTION_VAL_3_SR NULL
+#define OPTION_VAL_4_SR NULL
+#define OPTION_VAL_5_SR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SR NULL
@@ -60743,7 +62623,7 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SR NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SR NULL
-#define OPTION_VAL_5_SR NULL
+#define OPTION_VAL_5_O28_SR NULL
 #define OPTION_VAL_10_SR NULL
 #define OPTION_VAL_15_SR NULL
 #define OPTION_VAL_20_SR NULL
@@ -60790,7 +62670,7 @@ struct retro_core_options_v2 options_sk = {
 #define OPTION_VAL_CUBIC_SR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SR NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SR NULL
-#define OPTION_VAL_0_SR NULL
+#define OPTION_VAL_0_O30_SR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SR NULL
 #define OPTION_VAL_LIBRETRO_SR NULL
@@ -60803,7 +62683,7 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SR NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SR NULL
-#define OPTION_VAL_1_SR NULL
+#define OPTION_VAL_1_O35_SR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_SR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SR NULL
 #define OPTION_VAL_MEMORY_ONLY_SR NULL
@@ -60938,7 +62818,7 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SR NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SR NULL
-#define OPTION_VAL_DISABLED_O54_SR NULL
+#define OPTION_VAL_DISABLED_O56_SR NULL
 #define OPTION_VAL_STATIC_SR NULL
 #define OPTION_VAL_SMART_SR NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SR NULL
@@ -60957,31 +62837,31 @@ struct retro_core_options_v2 options_sk = {
 #define OPTION_VAL_20PX_SR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_SR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SR NULL
-#define OPTION_VAL_12PX_O56_SR NULL
-#define OPTION_VAL_11PX_O56_SR NULL
-#define OPTION_VAL_10PX_O56_SR NULL
-#define OPTION_VAL_9PX_O56_SR NULL
-#define OPTION_VAL_8PX_O56_SR NULL
-#define OPTION_VAL_7PX_O56_SR NULL
-#define OPTION_VAL_6PX_O56_SR NULL
-#define OPTION_VAL_5PX_O56_SR NULL
-#define OPTION_VAL_4PX_O56_SR NULL
-#define OPTION_VAL_3PX_O56_SR NULL
-#define OPTION_VAL_2PX_O56_SR NULL
-#define OPTION_VAL_1PX_O56_SR NULL
-#define OPTION_VAL_DISABLED_O56_SR NULL
-#define OPTION_VAL_1PX_O56_0_SR NULL
-#define OPTION_VAL_2PX_O56_0_SR NULL
-#define OPTION_VAL_3PX_O56_0_SR NULL
-#define OPTION_VAL_4PX_O56_0_SR NULL
-#define OPTION_VAL_5PX_O56_0_SR NULL
-#define OPTION_VAL_6PX_O56_0_SR NULL
-#define OPTION_VAL_7PX_O56_0_SR NULL
-#define OPTION_VAL_8PX_O56_0_SR NULL
-#define OPTION_VAL_9PX_O56_0_SR NULL
-#define OPTION_VAL_10PX_O56_0_SR NULL
-#define OPTION_VAL_11PX_O56_0_SR NULL
-#define OPTION_VAL_12PX_O56_0_SR NULL
+#define OPTION_VAL_12PX_O58_SR NULL
+#define OPTION_VAL_11PX_O58_SR NULL
+#define OPTION_VAL_10PX_O58_SR NULL
+#define OPTION_VAL_9PX_O58_SR NULL
+#define OPTION_VAL_8PX_O58_SR NULL
+#define OPTION_VAL_7PX_O58_SR NULL
+#define OPTION_VAL_6PX_O58_SR NULL
+#define OPTION_VAL_5PX_O58_SR NULL
+#define OPTION_VAL_4PX_O58_SR NULL
+#define OPTION_VAL_3PX_O58_SR NULL
+#define OPTION_VAL_2PX_O58_SR NULL
+#define OPTION_VAL_1PX_O58_SR NULL
+#define OPTION_VAL_DISABLED_O58_SR NULL
+#define OPTION_VAL_1PX_O58_0_SR NULL
+#define OPTION_VAL_2PX_O58_0_SR NULL
+#define OPTION_VAL_3PX_O58_0_SR NULL
+#define OPTION_VAL_4PX_O58_0_SR NULL
+#define OPTION_VAL_5PX_O58_0_SR NULL
+#define OPTION_VAL_6PX_O58_0_SR NULL
+#define OPTION_VAL_7PX_O58_0_SR NULL
+#define OPTION_VAL_8PX_O58_0_SR NULL
+#define OPTION_VAL_9PX_O58_0_SR NULL
+#define OPTION_VAL_10PX_O58_0_SR NULL
+#define OPTION_VAL_11PX_O58_0_SR NULL
+#define OPTION_VAL_12PX_O58_0_SR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SR NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SR NULL
@@ -61361,6 +63241,46 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_SR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_SR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_SR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_SR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_SR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_SR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_SR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_SR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_SR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_SR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_SR },
+         { "1", OPTION_VAL_1_SR },
+         { "2", OPTION_VAL_2_SR },
+         { "3", OPTION_VAL_3_SR },
+         { "4", OPTION_VAL_4_SR },
+         { "5", OPTION_VAL_5_SR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SR,
       NULL,
@@ -61470,7 +63390,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_SR },
+         { "5%",   OPTION_VAL_5_O28_SR },
          { "10%",  OPTION_VAL_10_SR },
          { "15%",  OPTION_VAL_15_SR },
          { "20%",  OPTION_VAL_20_SR },
@@ -61537,8 +63457,8 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_SR },
-         { "5%",  OPTION_VAL_5_SR },
+         { "0%",  OPTION_VAL_0_O30_SR },
+         { "5%",  OPTION_VAL_5_O28_SR },
          { "10%", OPTION_VAL_10_SR },
          { "15%", OPTION_VAL_15_SR },
          { "20%", OPTION_VAL_20_SR },
@@ -61675,7 +63595,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_SR },
+         { "1",  OPTION_VAL_1_O35_SR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -62089,7 +64009,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_SR },
+         { "1",  OPTION_VAL_1_O35_SR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -62132,7 +64052,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_SR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_SR },
          { "static",  OPTION_VAL_STATIC_SR },
          { "smart", OPTION_VAL_SMART_SR },
          { NULL, NULL },
@@ -62180,31 +64100,31 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_SR },
-         { "-11px",    OPTION_VAL_11PX_O56_SR },
-         { "-10px",    OPTION_VAL_10PX_O56_SR },
-         { "-9px",     OPTION_VAL_9PX_O56_SR },
-         { "-8px",     OPTION_VAL_8PX_O56_SR },
-         { "-7px",     OPTION_VAL_7PX_O56_SR },
-         { "-6px",     OPTION_VAL_6PX_O56_SR },
-         { "-5px",     OPTION_VAL_5PX_O56_SR },
-         { "-4px",     OPTION_VAL_4PX_O56_SR },
-         { "-3px",     OPTION_VAL_3PX_O56_SR },
-         { "-2px",     OPTION_VAL_2PX_O56_SR },
-         { "-1px",     OPTION_VAL_1PX_O56_SR },
-         { "disabled", OPTION_VAL_DISABLED_O56_SR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_SR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_SR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_SR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_SR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_SR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_SR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_SR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_SR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_SR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_SR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_SR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_SR },
+         { "-12px",    OPTION_VAL_12PX_O58_SR },
+         { "-11px",    OPTION_VAL_11PX_O58_SR },
+         { "-10px",    OPTION_VAL_10PX_O58_SR },
+         { "-9px",     OPTION_VAL_9PX_O58_SR },
+         { "-8px",     OPTION_VAL_8PX_O58_SR },
+         { "-7px",     OPTION_VAL_7PX_O58_SR },
+         { "-6px",     OPTION_VAL_6PX_O58_SR },
+         { "-5px",     OPTION_VAL_5PX_O58_SR },
+         { "-4px",     OPTION_VAL_4PX_O58_SR },
+         { "-3px",     OPTION_VAL_3PX_O58_SR },
+         { "-2px",     OPTION_VAL_2PX_O58_SR },
+         { "-1px",     OPTION_VAL_1PX_O58_SR },
+         { "disabled", OPTION_VAL_DISABLED_O58_SR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_SR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_SR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_SR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_SR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_SR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_SR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_SR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_SR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_SR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_SR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_SR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_SR },
          { NULL, NULL },
       },
       "disabled"
@@ -62258,7 +64178,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_SR },
+         { "0",        OPTION_VAL_DISABLED_O58_SR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -62669,6 +64589,26 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SV NULL
+#define OPTION_VAL_L1_R1_SELECT_SV NULL
+#define OPTION_VAL_L1_R1_START_SV NULL
+#define OPTION_VAL_L1_R1_L3_SV NULL
+#define OPTION_VAL_L1_R1_R3_SV NULL
+#define OPTION_VAL_L2_R2_SELECT_SV NULL
+#define OPTION_VAL_L2_R2_START_SV NULL
+#define OPTION_VAL_L2_R2_L3_SV NULL
+#define OPTION_VAL_L2_R2_R3_SV NULL
+#define OPTION_VAL_L3_R3_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV NULL
+#define OPTION_VAL_0_SV NULL
+#define OPTION_VAL_1_SV NULL
+#define OPTION_VAL_2_SV NULL
+#define OPTION_VAL_3_SV NULL
+#define OPTION_VAL_4_SV NULL
+#define OPTION_VAL_5_SV NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SV NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV NULL
@@ -62698,7 +64638,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV NULL
-#define OPTION_VAL_5_SV "5 %"
+#define OPTION_VAL_5_O28_SV NULL
 #define OPTION_VAL_10_SV "10 %"
 #define OPTION_VAL_15_SV "15 %"
 #define OPTION_VAL_20_SV "20 %"
@@ -62745,7 +64685,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_CUBIC_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV NULL
-#define OPTION_VAL_0_SV "0 %"
+#define OPTION_VAL_0_O30_SV NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SV NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SV NULL
 #define OPTION_VAL_LIBRETRO_SV NULL
@@ -62758,7 +64698,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV NULL
-#define OPTION_VAL_1_SV NULL
+#define OPTION_VAL_1_O35_SV NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV NULL
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
@@ -62893,7 +64833,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV NULL
-#define OPTION_VAL_DISABLED_O54_SV "Ingen"
+#define OPTION_VAL_DISABLED_O56_SV "Ingen"
 #define OPTION_VAL_STATIC_SV NULL
 #define OPTION_VAL_SMART_SV NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SV NULL
@@ -62912,31 +64852,31 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_20PX_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SV NULL
-#define OPTION_VAL_12PX_O56_SV NULL
-#define OPTION_VAL_11PX_O56_SV NULL
-#define OPTION_VAL_10PX_O56_SV NULL
-#define OPTION_VAL_9PX_O56_SV NULL
-#define OPTION_VAL_8PX_O56_SV NULL
-#define OPTION_VAL_7PX_O56_SV NULL
-#define OPTION_VAL_6PX_O56_SV NULL
-#define OPTION_VAL_5PX_O56_SV NULL
-#define OPTION_VAL_4PX_O56_SV NULL
-#define OPTION_VAL_3PX_O56_SV NULL
-#define OPTION_VAL_2PX_O56_SV NULL
-#define OPTION_VAL_1PX_O56_SV NULL
-#define OPTION_VAL_DISABLED_O56_SV NULL
-#define OPTION_VAL_1PX_O56_0_SV NULL
-#define OPTION_VAL_2PX_O56_0_SV NULL
-#define OPTION_VAL_3PX_O56_0_SV NULL
-#define OPTION_VAL_4PX_O56_0_SV NULL
-#define OPTION_VAL_5PX_O56_0_SV NULL
-#define OPTION_VAL_6PX_O56_0_SV NULL
-#define OPTION_VAL_7PX_O56_0_SV NULL
-#define OPTION_VAL_8PX_O56_0_SV NULL
-#define OPTION_VAL_9PX_O56_0_SV NULL
-#define OPTION_VAL_10PX_O56_0_SV NULL
-#define OPTION_VAL_11PX_O56_0_SV NULL
-#define OPTION_VAL_12PX_O56_0_SV NULL
+#define OPTION_VAL_12PX_O58_SV NULL
+#define OPTION_VAL_11PX_O58_SV NULL
+#define OPTION_VAL_10PX_O58_SV NULL
+#define OPTION_VAL_9PX_O58_SV NULL
+#define OPTION_VAL_8PX_O58_SV NULL
+#define OPTION_VAL_7PX_O58_SV NULL
+#define OPTION_VAL_6PX_O58_SV NULL
+#define OPTION_VAL_5PX_O58_SV NULL
+#define OPTION_VAL_4PX_O58_SV NULL
+#define OPTION_VAL_3PX_O58_SV NULL
+#define OPTION_VAL_2PX_O58_SV NULL
+#define OPTION_VAL_1PX_O58_SV NULL
+#define OPTION_VAL_DISABLED_O58_SV NULL
+#define OPTION_VAL_1PX_O58_0_SV NULL
+#define OPTION_VAL_2PX_O58_0_SV NULL
+#define OPTION_VAL_3PX_O58_0_SV NULL
+#define OPTION_VAL_4PX_O58_0_SV NULL
+#define OPTION_VAL_5PX_O58_0_SV NULL
+#define OPTION_VAL_6PX_O58_0_SV NULL
+#define OPTION_VAL_7PX_O58_0_SV NULL
+#define OPTION_VAL_8PX_O58_0_SV NULL
+#define OPTION_VAL_9PX_O58_0_SV NULL
+#define OPTION_VAL_10PX_O58_0_SV NULL
+#define OPTION_VAL_11PX_O58_0_SV NULL
+#define OPTION_VAL_12PX_O58_0_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SV NULL
@@ -63316,6 +65256,46 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_SV },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_SV },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_SV },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_SV },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_SV },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_SV },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_SV },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_SV },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_SV },
+         { "l3+r3",                    OPTION_VAL_L3_R3_SV },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_SV },
+         { "1", OPTION_VAL_1_SV },
+         { "2", OPTION_VAL_2_SV },
+         { "3", OPTION_VAL_3_SV },
+         { "4", OPTION_VAL_4_SV },
+         { "5", OPTION_VAL_5_SV },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV,
       NULL,
@@ -63425,7 +65405,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_SV },
+         { "5%",   OPTION_VAL_5_O28_SV },
          { "10%",  OPTION_VAL_10_SV },
          { "15%",  OPTION_VAL_15_SV },
          { "20%",  OPTION_VAL_20_SV },
@@ -63492,8 +65472,8 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_SV },
-         { "5%",  OPTION_VAL_5_SV },
+         { "0%",  OPTION_VAL_0_O30_SV },
+         { "5%",  OPTION_VAL_5_O28_SV },
          { "10%", OPTION_VAL_10_SV },
          { "15%", OPTION_VAL_15_SV },
          { "20%", OPTION_VAL_20_SV },
@@ -63630,7 +65610,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_SV },
+         { "1",  OPTION_VAL_1_O35_SV },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -64044,7 +66024,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_SV },
+         { "1",  OPTION_VAL_1_O35_SV },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -64087,7 +66067,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_SV },
+         { "disabled",  OPTION_VAL_DISABLED_O56_SV },
          { "static",  OPTION_VAL_STATIC_SV },
          { "smart", OPTION_VAL_SMART_SV },
          { NULL, NULL },
@@ -64135,31 +66115,31 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_SV },
-         { "-11px",    OPTION_VAL_11PX_O56_SV },
-         { "-10px",    OPTION_VAL_10PX_O56_SV },
-         { "-9px",     OPTION_VAL_9PX_O56_SV },
-         { "-8px",     OPTION_VAL_8PX_O56_SV },
-         { "-7px",     OPTION_VAL_7PX_O56_SV },
-         { "-6px",     OPTION_VAL_6PX_O56_SV },
-         { "-5px",     OPTION_VAL_5PX_O56_SV },
-         { "-4px",     OPTION_VAL_4PX_O56_SV },
-         { "-3px",     OPTION_VAL_3PX_O56_SV },
-         { "-2px",     OPTION_VAL_2PX_O56_SV },
-         { "-1px",     OPTION_VAL_1PX_O56_SV },
-         { "disabled", OPTION_VAL_DISABLED_O56_SV },
-         { "+1px",     OPTION_VAL_1PX_O56_0_SV },
-         { "+2px",     OPTION_VAL_2PX_O56_0_SV },
-         { "+3px",     OPTION_VAL_3PX_O56_0_SV },
-         { "+4px",     OPTION_VAL_4PX_O56_0_SV },
-         { "+5px",     OPTION_VAL_5PX_O56_0_SV },
-         { "+6px",     OPTION_VAL_6PX_O56_0_SV },
-         { "+7px",     OPTION_VAL_7PX_O56_0_SV },
-         { "+8px",     OPTION_VAL_8PX_O56_0_SV },
-         { "+9px",     OPTION_VAL_9PX_O56_0_SV },
-         { "+10px",    OPTION_VAL_10PX_O56_0_SV },
-         { "+11px",    OPTION_VAL_11PX_O56_0_SV },
-         { "+12px",    OPTION_VAL_12PX_O56_0_SV },
+         { "-12px",    OPTION_VAL_12PX_O58_SV },
+         { "-11px",    OPTION_VAL_11PX_O58_SV },
+         { "-10px",    OPTION_VAL_10PX_O58_SV },
+         { "-9px",     OPTION_VAL_9PX_O58_SV },
+         { "-8px",     OPTION_VAL_8PX_O58_SV },
+         { "-7px",     OPTION_VAL_7PX_O58_SV },
+         { "-6px",     OPTION_VAL_6PX_O58_SV },
+         { "-5px",     OPTION_VAL_5PX_O58_SV },
+         { "-4px",     OPTION_VAL_4PX_O58_SV },
+         { "-3px",     OPTION_VAL_3PX_O58_SV },
+         { "-2px",     OPTION_VAL_2PX_O58_SV },
+         { "-1px",     OPTION_VAL_1PX_O58_SV },
+         { "disabled", OPTION_VAL_DISABLED_O58_SV },
+         { "+1px",     OPTION_VAL_1PX_O58_0_SV },
+         { "+2px",     OPTION_VAL_2PX_O58_0_SV },
+         { "+3px",     OPTION_VAL_3PX_O58_0_SV },
+         { "+4px",     OPTION_VAL_4PX_O58_0_SV },
+         { "+5px",     OPTION_VAL_5PX_O58_0_SV },
+         { "+6px",     OPTION_VAL_6PX_O58_0_SV },
+         { "+7px",     OPTION_VAL_7PX_O58_0_SV },
+         { "+8px",     OPTION_VAL_8PX_O58_0_SV },
+         { "+9px",     OPTION_VAL_9PX_O58_0_SV },
+         { "+10px",    OPTION_VAL_10PX_O58_0_SV },
+         { "+11px",    OPTION_VAL_11PX_O58_0_SV },
+         { "+12px",    OPTION_VAL_12PX_O58_0_SV },
          { NULL, NULL },
       },
       "disabled"
@@ -64213,7 +66193,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_SV },
+         { "0",        OPTION_VAL_DISABLED_O58_SV },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -64623,7 +66603,27 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TR "Analog Otomatik Kalibrasyon"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TR "Giriş cihazı DualShock, Analog Kontrolcü, Analog Joystick veya neGcon olarak ayarlandığında, bu seçenek analog girişlerin dinamik kalibrasyonunu sağlar. Kaydedilen en yüksek giriş değerleri gerçek zamanlı olarak izlenir ve emülatöre iletilen analog koordinatları ölçeklendirmek için kullanılır. Bu, Mega Man Legends 2 gibi modern denetleyicilerin sağladığından daha büyük değerler bekleyen oyunlar için kullanılmalıdır. En iyi sonuçlar için, içerik her yüklendiğinde kalibrasyon algoritmasını ayarlamak için analog çubuklar tam olarak döndürülmelidir."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_TR "DualShock Analog Mod Değişimini Etkinleştir"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR "Giriş cihazı tipi DualShock olduğunda, bu seçenek, taklit edilen DualShock'un orijinal donanım gibi DİJİTAL ve ANALOG mod arasında geçiş yapmasına izin verir. Devre dışı bırakıldığında, DualShock ANALOG moda kilitlenir ve etkinleştirildiğinde DualShock, BAŞLAT+SEÇ+L1+L2+R1+R2 tuşlarına basılı tutularak DİJİTAL ve ANALOG mod arasında geçiş yapılabilir."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_TR NULL
+#define OPTION_VAL_L1_R1_SELECT_TR NULL
+#define OPTION_VAL_L1_R1_START_TR NULL
+#define OPTION_VAL_L1_R1_L3_TR NULL
+#define OPTION_VAL_L1_R1_R3_TR NULL
+#define OPTION_VAL_L2_R2_SELECT_TR NULL
+#define OPTION_VAL_L2_R2_START_TR NULL
+#define OPTION_VAL_L2_R2_L3_TR NULL
+#define OPTION_VAL_L2_R2_R3_TR NULL
+#define OPTION_VAL_L3_R3_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR NULL
+#define OPTION_VAL_0_TR NULL
+#define OPTION_VAL_1_TR NULL
+#define OPTION_VAL_2_TR NULL
+#define OPTION_VAL_3_TR NULL
+#define OPTION_VAL_4_TR NULL
+#define OPTION_VAL_5_TR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TR "Port 1: Multitap Etkinleştir"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_TR "Port 1 üstünde multilab işlevini etkinleştirin."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_TR "Port 2: Multitap Etkinleştir"
@@ -64653,7 +66653,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TR "2. port için hafif silah artı imleci rengini seçin."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TR "Fare Hassasiyeti"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TR "'Fare' giriş cihazı türünün yanıt verme hızını seçin."
-#define OPTION_VAL_5_TR "%5"
+#define OPTION_VAL_5_O28_TR NULL
 #define OPTION_VAL_10_TR "%10"
 #define OPTION_VAL_15_TR "%15"
 #define OPTION_VAL_20_TR "%20"
@@ -64700,7 +66700,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_CUBIC_TR "Kübik"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_TR "neGcon Büküm Ölü Bölge"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_TR "Taklit edilmiş 'neGcon' giriş cihazlarının 'döndürme' eylemini taklit ederken RetroPad sol analog çubuğunun ölü bölgesini seçin. Denetleyici kaymasını ortadan kaldırmak için kullanılır. Not: Çoğu neGcon uyumlu oyun, bir 'büküm' ölü bölge değeri ayarlamak için oyun içi seçenekler sunar. Hassasiyet kaybını önlemek için oyun içi ölü bölge *her zaman* sıfıra ayarlanmalıdır. Gerekli ayarlamalar *yalnızca* bu temel seçenek aracılığıyla uygulanmalıdır. Bu, 'neGcon Twist Response', 'Quadratic' veya 'Cubic' olarak ayarlandığında özellikle önemlidir."
-#define OPTION_VAL_0_TR "%0"
+#define OPTION_VAL_0_O30_TR NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_TR "Bellek Kartı 0 Yöntemi (Yeniden Başlatılmalı)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_TR "Bellek kartı 0 için kullanılan veri kaydetme biçimini seçin. Mednafen'in bağımsız sürümüyle uyumluluk için 'Mednafen' kullanılabilir. Beetle PSX ile kullanıldığında, Libretro (.srm) ve Mednafen (.mcr) kayıtları dahili olarak aynı biçimlere sahiptir ve yeniden adlandırma yoluyla birbirleri arasında dönüştürülebilir."
 #define OPTION_VAL_LIBRETRO_TR NULL
@@ -64713,7 +66713,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_TR "Sol yuvada yüklü olan bellek kartını değiştirin. Bu seçenek yalnızca Bellek Kartı 0 yöntemi Mednafen olarak ayarlanmışsa çalışacaktır. Varsayılan kart dizini 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_TR "Bellek Kartı Sağ Dizin"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_TR "Sağ yuvada yüklü olan bellek kartını değiştirin. Bu seçenek yalnızca Bellek Kartı 1 yöntemi Mednafen olarak ayarlanmışsa çalışacaktır. Varsayılan kart dizini 1."
-#define OPTION_VAL_1_TR "1 (Varsayılan)"
+#define OPTION_VAL_1_O35_TR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_TR "PGXP Çalışma Kipi"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TR "Sabit nokta tepe koordinatları kullanımı nedeniyle orijinal donanımda görülen 3B nesnelerin bozulmasını ve titremesini en aza indirerek 3B nesnelerin piksel altı hassasiyetle oluşturulmasına izin verir. 'Yalnızca Bellek' kipinde çok az uyumluluk sorunları vardır ve genel kullanım için önerilir. 'Bellek + CPU (Çılgınca)' kipi titreşimi daha da azaltabilir ancak yüksek performans gereksinimleri vardır ve çeşitli geometri hatalarına neden olabilir."
 #define OPTION_VAL_MEMORY_ONLY_TR "Yalnızca Bellek"
@@ -64848,7 +66848,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TR "Farklı standartlar nedeni ile, PAL oyunları genellikle Amerikan veya Japon NTSC sürümlerine kıyasla yavaşlamış görünür. Bu seçenek, bu oyunları NTSC kare hızıyla çalıştırmayı denemek için PAL zamanlamalarını geçersiz kılmak için kullanılabilir. NTSC içeriğini çalıştırırken bu seçeneğin hiçbir etkisi yoktur."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_TR "Aşırı Taramayı Kırp"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_TR "'Hiçbiri', gerçek PSX donanımı tarafından analog video çıkışında oluşturulan aynı siyah çubukları taklit etmek için dolguyu (NTSC için görüntünün her iki tarafında, PAL için her tarafta sütun kutuları) korur. 'Statik' yalnızca yatay dolguyu kaldırır, 'Dinamik' tüm dolguyu kaldırır."
-#define OPTION_VAL_DISABLED_O54_TR "Yok"
+#define OPTION_VAL_DISABLED_O56_TR "Yok"
 #define OPTION_VAL_STATIC_TR "Statik"
 #define OPTION_VAL_SMART_TR "Dinamik (Varsayılan)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_TR "Ek Kırpma"
@@ -64867,31 +66867,31 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_20PX_TR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_TR "Merkeze Kırpılmış Görüntü"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_TR "'Yatay Aşırı Tarama Kırp' etkinleştirildiğinde, bu elde edilen kırpılan görüntünün belirtilen piksel sayısı kadar yatay olarak sağa (pozitif) veya sola (negatif) kaydırılmasına izin verir. Hizalama sorunlarını düzeltmek için kullanılabilir. Yalnızca yazılım işleyici tarafından desteklenir."
-#define OPTION_VAL_12PX_O56_TR NULL
-#define OPTION_VAL_11PX_O56_TR NULL
-#define OPTION_VAL_10PX_O56_TR NULL
-#define OPTION_VAL_9PX_O56_TR NULL
-#define OPTION_VAL_8PX_O56_TR NULL
-#define OPTION_VAL_7PX_O56_TR NULL
-#define OPTION_VAL_6PX_O56_TR NULL
-#define OPTION_VAL_5PX_O56_TR NULL
-#define OPTION_VAL_4PX_O56_TR NULL
-#define OPTION_VAL_3PX_O56_TR NULL
-#define OPTION_VAL_2PX_O56_TR NULL
-#define OPTION_VAL_1PX_O56_TR NULL
-#define OPTION_VAL_DISABLED_O56_TR "0 (Varsayılan)"
-#define OPTION_VAL_1PX_O56_0_TR NULL
-#define OPTION_VAL_2PX_O56_0_TR NULL
-#define OPTION_VAL_3PX_O56_0_TR NULL
-#define OPTION_VAL_4PX_O56_0_TR NULL
-#define OPTION_VAL_5PX_O56_0_TR NULL
-#define OPTION_VAL_6PX_O56_0_TR NULL
-#define OPTION_VAL_7PX_O56_0_TR NULL
-#define OPTION_VAL_8PX_O56_0_TR NULL
-#define OPTION_VAL_9PX_O56_0_TR NULL
-#define OPTION_VAL_10PX_O56_0_TR NULL
-#define OPTION_VAL_11PX_O56_0_TR NULL
-#define OPTION_VAL_12PX_O56_0_TR NULL
+#define OPTION_VAL_12PX_O58_TR NULL
+#define OPTION_VAL_11PX_O58_TR NULL
+#define OPTION_VAL_10PX_O58_TR NULL
+#define OPTION_VAL_9PX_O58_TR NULL
+#define OPTION_VAL_8PX_O58_TR NULL
+#define OPTION_VAL_7PX_O58_TR NULL
+#define OPTION_VAL_6PX_O58_TR NULL
+#define OPTION_VAL_5PX_O58_TR NULL
+#define OPTION_VAL_4PX_O58_TR NULL
+#define OPTION_VAL_3PX_O58_TR NULL
+#define OPTION_VAL_2PX_O58_TR NULL
+#define OPTION_VAL_1PX_O58_TR NULL
+#define OPTION_VAL_DISABLED_O58_TR NULL
+#define OPTION_VAL_1PX_O58_0_TR NULL
+#define OPTION_VAL_2PX_O58_0_TR NULL
+#define OPTION_VAL_3PX_O58_0_TR NULL
+#define OPTION_VAL_4PX_O58_0_TR NULL
+#define OPTION_VAL_5PX_O58_0_TR NULL
+#define OPTION_VAL_6PX_O58_0_TR NULL
+#define OPTION_VAL_7PX_O58_0_TR NULL
+#define OPTION_VAL_8PX_O58_0_TR NULL
+#define OPTION_VAL_9PX_O58_0_TR NULL
+#define OPTION_VAL_10PX_O58_0_TR NULL
+#define OPTION_VAL_11PX_O58_0_TR NULL
+#define OPTION_VAL_12PX_O58_0_TR NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_TR "Yatay Görüntü Dengesi (GPU Döngüleri)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_TR "Görüntüyü dengelemek için GPU döngülerinin sayısını seçin. Pozitif değerler görüntüyü sağa, negatif değerler görüntüyü sola taşır. Yalnızca donanım oluşturucular tarafından desteklenir."
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_TR "GPU Rasterleştirici Hız Aşırtma"
@@ -65271,6 +67271,46 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_TR },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_TR },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_TR },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_TR },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_TR },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_TR },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_TR },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_TR },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_TR },
+         { "l3+r3",                    OPTION_VAL_L3_R3_TR },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_TR },
+         { "1", OPTION_VAL_1_TR },
+         { "2", OPTION_VAL_2_TR },
+         { "3", OPTION_VAL_3_TR },
+         { "4", OPTION_VAL_4_TR },
+         { "5", OPTION_VAL_5_TR },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TR,
       NULL,
@@ -65380,7 +67420,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_TR },
+         { "5%",   OPTION_VAL_5_O28_TR },
          { "10%",  OPTION_VAL_10_TR },
          { "15%",  OPTION_VAL_15_TR },
          { "20%",  OPTION_VAL_20_TR },
@@ -65447,8 +67487,8 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_TR },
-         { "5%",  OPTION_VAL_5_TR },
+         { "0%",  OPTION_VAL_0_O30_TR },
+         { "5%",  OPTION_VAL_5_O28_TR },
          { "10%", OPTION_VAL_10_TR },
          { "15%", OPTION_VAL_15_TR },
          { "20%", OPTION_VAL_20_TR },
@@ -65585,7 +67625,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_TR },
+         { "1",  OPTION_VAL_1_O35_TR },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -65999,7 +68039,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_TR },
+         { "1",  OPTION_VAL_1_O35_TR },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -66042,7 +68082,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_TR },
+         { "disabled",  OPTION_VAL_DISABLED_O56_TR },
          { "static",  OPTION_VAL_STATIC_TR },
          { "smart", OPTION_VAL_SMART_TR },
          { NULL, NULL },
@@ -66090,31 +68130,31 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_TR },
-         { "-11px",    OPTION_VAL_11PX_O56_TR },
-         { "-10px",    OPTION_VAL_10PX_O56_TR },
-         { "-9px",     OPTION_VAL_9PX_O56_TR },
-         { "-8px",     OPTION_VAL_8PX_O56_TR },
-         { "-7px",     OPTION_VAL_7PX_O56_TR },
-         { "-6px",     OPTION_VAL_6PX_O56_TR },
-         { "-5px",     OPTION_VAL_5PX_O56_TR },
-         { "-4px",     OPTION_VAL_4PX_O56_TR },
-         { "-3px",     OPTION_VAL_3PX_O56_TR },
-         { "-2px",     OPTION_VAL_2PX_O56_TR },
-         { "-1px",     OPTION_VAL_1PX_O56_TR },
-         { "disabled", OPTION_VAL_DISABLED_O56_TR },
-         { "+1px",     OPTION_VAL_1PX_O56_0_TR },
-         { "+2px",     OPTION_VAL_2PX_O56_0_TR },
-         { "+3px",     OPTION_VAL_3PX_O56_0_TR },
-         { "+4px",     OPTION_VAL_4PX_O56_0_TR },
-         { "+5px",     OPTION_VAL_5PX_O56_0_TR },
-         { "+6px",     OPTION_VAL_6PX_O56_0_TR },
-         { "+7px",     OPTION_VAL_7PX_O56_0_TR },
-         { "+8px",     OPTION_VAL_8PX_O56_0_TR },
-         { "+9px",     OPTION_VAL_9PX_O56_0_TR },
-         { "+10px",    OPTION_VAL_10PX_O56_0_TR },
-         { "+11px",    OPTION_VAL_11PX_O56_0_TR },
-         { "+12px",    OPTION_VAL_12PX_O56_0_TR },
+         { "-12px",    OPTION_VAL_12PX_O58_TR },
+         { "-11px",    OPTION_VAL_11PX_O58_TR },
+         { "-10px",    OPTION_VAL_10PX_O58_TR },
+         { "-9px",     OPTION_VAL_9PX_O58_TR },
+         { "-8px",     OPTION_VAL_8PX_O58_TR },
+         { "-7px",     OPTION_VAL_7PX_O58_TR },
+         { "-6px",     OPTION_VAL_6PX_O58_TR },
+         { "-5px",     OPTION_VAL_5PX_O58_TR },
+         { "-4px",     OPTION_VAL_4PX_O58_TR },
+         { "-3px",     OPTION_VAL_3PX_O58_TR },
+         { "-2px",     OPTION_VAL_2PX_O58_TR },
+         { "-1px",     OPTION_VAL_1PX_O58_TR },
+         { "disabled", OPTION_VAL_DISABLED_O58_TR },
+         { "+1px",     OPTION_VAL_1PX_O58_0_TR },
+         { "+2px",     OPTION_VAL_2PX_O58_0_TR },
+         { "+3px",     OPTION_VAL_3PX_O58_0_TR },
+         { "+4px",     OPTION_VAL_4PX_O58_0_TR },
+         { "+5px",     OPTION_VAL_5PX_O58_0_TR },
+         { "+6px",     OPTION_VAL_6PX_O58_0_TR },
+         { "+7px",     OPTION_VAL_7PX_O58_0_TR },
+         { "+8px",     OPTION_VAL_8PX_O58_0_TR },
+         { "+9px",     OPTION_VAL_9PX_O58_0_TR },
+         { "+10px",    OPTION_VAL_10PX_O58_0_TR },
+         { "+11px",    OPTION_VAL_11PX_O58_0_TR },
+         { "+12px",    OPTION_VAL_12PX_O58_0_TR },
          { NULL, NULL },
       },
       "disabled"
@@ -66168,7 +68208,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_TR },
+         { "0",        OPTION_VAL_DISABLED_O58_TR },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -66579,6 +68619,26 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_UK NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_UK NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_UK NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_UK NULL
+#define OPTION_VAL_L1_R1_SELECT_UK NULL
+#define OPTION_VAL_L1_R1_START_UK NULL
+#define OPTION_VAL_L1_R1_L3_UK NULL
+#define OPTION_VAL_L1_R1_R3_UK NULL
+#define OPTION_VAL_L2_R2_SELECT_UK NULL
+#define OPTION_VAL_L2_R2_START_UK NULL
+#define OPTION_VAL_L2_R2_L3_UK NULL
+#define OPTION_VAL_L2_R2_R3_UK NULL
+#define OPTION_VAL_L3_R3_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_UK NULL
+#define OPTION_VAL_0_UK NULL
+#define OPTION_VAL_1_UK NULL
+#define OPTION_VAL_2_UK NULL
+#define OPTION_VAL_3_UK NULL
+#define OPTION_VAL_4_UK NULL
+#define OPTION_VAL_5_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_UK NULL
@@ -66608,7 +68668,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_UK NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_UK "Чутливість миші"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_UK NULL
-#define OPTION_VAL_5_UK NULL
+#define OPTION_VAL_5_O28_UK NULL
 #define OPTION_VAL_10_UK NULL
 #define OPTION_VAL_15_UK NULL
 #define OPTION_VAL_20_UK NULL
@@ -66655,7 +68715,7 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_CUBIC_UK NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_UK NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_UK NULL
-#define OPTION_VAL_0_UK NULL
+#define OPTION_VAL_0_O30_UK NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_UK NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_UK NULL
 #define OPTION_VAL_LIBRETRO_UK NULL
@@ -66668,7 +68728,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_UK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_UK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_UK NULL
-#define OPTION_VAL_1_UK NULL
+#define OPTION_VAL_1_O35_UK NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_UK NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_UK NULL
 #define OPTION_VAL_MEMORY_ONLY_UK NULL
@@ -66803,7 +68863,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_UK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_UK NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_UK NULL
-#define OPTION_VAL_DISABLED_O54_UK "Немає"
+#define OPTION_VAL_DISABLED_O56_UK "Немає"
 #define OPTION_VAL_STATIC_UK NULL
 #define OPTION_VAL_SMART_UK NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_UK NULL
@@ -66822,31 +68882,31 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_20PX_UK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_UK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_UK NULL
-#define OPTION_VAL_12PX_O56_UK NULL
-#define OPTION_VAL_11PX_O56_UK NULL
-#define OPTION_VAL_10PX_O56_UK NULL
-#define OPTION_VAL_9PX_O56_UK NULL
-#define OPTION_VAL_8PX_O56_UK NULL
-#define OPTION_VAL_7PX_O56_UK NULL
-#define OPTION_VAL_6PX_O56_UK NULL
-#define OPTION_VAL_5PX_O56_UK NULL
-#define OPTION_VAL_4PX_O56_UK NULL
-#define OPTION_VAL_3PX_O56_UK NULL
-#define OPTION_VAL_2PX_O56_UK NULL
-#define OPTION_VAL_1PX_O56_UK NULL
-#define OPTION_VAL_DISABLED_O56_UK NULL
-#define OPTION_VAL_1PX_O56_0_UK NULL
-#define OPTION_VAL_2PX_O56_0_UK NULL
-#define OPTION_VAL_3PX_O56_0_UK NULL
-#define OPTION_VAL_4PX_O56_0_UK NULL
-#define OPTION_VAL_5PX_O56_0_UK NULL
-#define OPTION_VAL_6PX_O56_0_UK NULL
-#define OPTION_VAL_7PX_O56_0_UK NULL
-#define OPTION_VAL_8PX_O56_0_UK NULL
-#define OPTION_VAL_9PX_O56_0_UK NULL
-#define OPTION_VAL_10PX_O56_0_UK NULL
-#define OPTION_VAL_11PX_O56_0_UK NULL
-#define OPTION_VAL_12PX_O56_0_UK NULL
+#define OPTION_VAL_12PX_O58_UK NULL
+#define OPTION_VAL_11PX_O58_UK NULL
+#define OPTION_VAL_10PX_O58_UK NULL
+#define OPTION_VAL_9PX_O58_UK NULL
+#define OPTION_VAL_8PX_O58_UK NULL
+#define OPTION_VAL_7PX_O58_UK NULL
+#define OPTION_VAL_6PX_O58_UK NULL
+#define OPTION_VAL_5PX_O58_UK NULL
+#define OPTION_VAL_4PX_O58_UK NULL
+#define OPTION_VAL_3PX_O58_UK NULL
+#define OPTION_VAL_2PX_O58_UK NULL
+#define OPTION_VAL_1PX_O58_UK NULL
+#define OPTION_VAL_DISABLED_O58_UK NULL
+#define OPTION_VAL_1PX_O58_0_UK NULL
+#define OPTION_VAL_2PX_O58_0_UK NULL
+#define OPTION_VAL_3PX_O58_0_UK NULL
+#define OPTION_VAL_4PX_O58_0_UK NULL
+#define OPTION_VAL_5PX_O58_0_UK NULL
+#define OPTION_VAL_6PX_O58_0_UK NULL
+#define OPTION_VAL_7PX_O58_0_UK NULL
+#define OPTION_VAL_8PX_O58_0_UK NULL
+#define OPTION_VAL_9PX_O58_0_UK NULL
+#define OPTION_VAL_10PX_O58_0_UK NULL
+#define OPTION_VAL_11PX_O58_0_UK NULL
+#define OPTION_VAL_12PX_O58_0_UK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_UK NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_UK NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_UK NULL
@@ -67226,6 +69286,46 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_UK,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_UK,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_UK },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_UK },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_UK },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_UK },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_UK },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_UK },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_UK },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_UK },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_UK },
+         { "l3+r3",                    OPTION_VAL_L3_R3_UK },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_UK,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_UK,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_UK },
+         { "1", OPTION_VAL_1_UK },
+         { "2", OPTION_VAL_2_UK },
+         { "3", OPTION_VAL_3_UK },
+         { "4", OPTION_VAL_4_UK },
+         { "5", OPTION_VAL_5_UK },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_UK,
       NULL,
@@ -67335,7 +69435,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_UK },
+         { "5%",   OPTION_VAL_5_O28_UK },
          { "10%",  OPTION_VAL_10_UK },
          { "15%",  OPTION_VAL_15_UK },
          { "20%",  OPTION_VAL_20_UK },
@@ -67402,8 +69502,8 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_UK },
-         { "5%",  OPTION_VAL_5_UK },
+         { "0%",  OPTION_VAL_0_O30_UK },
+         { "5%",  OPTION_VAL_5_O28_UK },
          { "10%", OPTION_VAL_10_UK },
          { "15%", OPTION_VAL_15_UK },
          { "20%", OPTION_VAL_20_UK },
@@ -67540,7 +69640,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_UK },
+         { "1",  OPTION_VAL_1_O35_UK },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -67954,7 +70054,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_UK },
+         { "1",  OPTION_VAL_1_O35_UK },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -67997,7 +70097,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_UK },
+         { "disabled",  OPTION_VAL_DISABLED_O56_UK },
          { "static",  OPTION_VAL_STATIC_UK },
          { "smart", OPTION_VAL_SMART_UK },
          { NULL, NULL },
@@ -68045,31 +70145,31 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_UK },
-         { "-11px",    OPTION_VAL_11PX_O56_UK },
-         { "-10px",    OPTION_VAL_10PX_O56_UK },
-         { "-9px",     OPTION_VAL_9PX_O56_UK },
-         { "-8px",     OPTION_VAL_8PX_O56_UK },
-         { "-7px",     OPTION_VAL_7PX_O56_UK },
-         { "-6px",     OPTION_VAL_6PX_O56_UK },
-         { "-5px",     OPTION_VAL_5PX_O56_UK },
-         { "-4px",     OPTION_VAL_4PX_O56_UK },
-         { "-3px",     OPTION_VAL_3PX_O56_UK },
-         { "-2px",     OPTION_VAL_2PX_O56_UK },
-         { "-1px",     OPTION_VAL_1PX_O56_UK },
-         { "disabled", OPTION_VAL_DISABLED_O56_UK },
-         { "+1px",     OPTION_VAL_1PX_O56_0_UK },
-         { "+2px",     OPTION_VAL_2PX_O56_0_UK },
-         { "+3px",     OPTION_VAL_3PX_O56_0_UK },
-         { "+4px",     OPTION_VAL_4PX_O56_0_UK },
-         { "+5px",     OPTION_VAL_5PX_O56_0_UK },
-         { "+6px",     OPTION_VAL_6PX_O56_0_UK },
-         { "+7px",     OPTION_VAL_7PX_O56_0_UK },
-         { "+8px",     OPTION_VAL_8PX_O56_0_UK },
-         { "+9px",     OPTION_VAL_9PX_O56_0_UK },
-         { "+10px",    OPTION_VAL_10PX_O56_0_UK },
-         { "+11px",    OPTION_VAL_11PX_O56_0_UK },
-         { "+12px",    OPTION_VAL_12PX_O56_0_UK },
+         { "-12px",    OPTION_VAL_12PX_O58_UK },
+         { "-11px",    OPTION_VAL_11PX_O58_UK },
+         { "-10px",    OPTION_VAL_10PX_O58_UK },
+         { "-9px",     OPTION_VAL_9PX_O58_UK },
+         { "-8px",     OPTION_VAL_8PX_O58_UK },
+         { "-7px",     OPTION_VAL_7PX_O58_UK },
+         { "-6px",     OPTION_VAL_6PX_O58_UK },
+         { "-5px",     OPTION_VAL_5PX_O58_UK },
+         { "-4px",     OPTION_VAL_4PX_O58_UK },
+         { "-3px",     OPTION_VAL_3PX_O58_UK },
+         { "-2px",     OPTION_VAL_2PX_O58_UK },
+         { "-1px",     OPTION_VAL_1PX_O58_UK },
+         { "disabled", OPTION_VAL_DISABLED_O58_UK },
+         { "+1px",     OPTION_VAL_1PX_O58_0_UK },
+         { "+2px",     OPTION_VAL_2PX_O58_0_UK },
+         { "+3px",     OPTION_VAL_3PX_O58_0_UK },
+         { "+4px",     OPTION_VAL_4PX_O58_0_UK },
+         { "+5px",     OPTION_VAL_5PX_O58_0_UK },
+         { "+6px",     OPTION_VAL_6PX_O58_0_UK },
+         { "+7px",     OPTION_VAL_7PX_O58_0_UK },
+         { "+8px",     OPTION_VAL_8PX_O58_0_UK },
+         { "+9px",     OPTION_VAL_9PX_O58_0_UK },
+         { "+10px",    OPTION_VAL_10PX_O58_0_UK },
+         { "+11px",    OPTION_VAL_11PX_O58_0_UK },
+         { "+12px",    OPTION_VAL_12PX_O58_0_UK },
          { NULL, NULL },
       },
       "disabled"
@@ -68123,7 +70223,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_UK },
+         { "0",        OPTION_VAL_DISABLED_O58_UK },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -68534,6 +70634,26 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VAL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VAL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VAL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VAL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VAL NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_VAL NULL
+#define OPTION_VAL_L1_R1_SELECT_VAL NULL
+#define OPTION_VAL_L1_R1_START_VAL NULL
+#define OPTION_VAL_L1_R1_L3_VAL NULL
+#define OPTION_VAL_L1_R1_R3_VAL NULL
+#define OPTION_VAL_L2_R2_SELECT_VAL NULL
+#define OPTION_VAL_L2_R2_START_VAL NULL
+#define OPTION_VAL_L2_R2_L3_VAL NULL
+#define OPTION_VAL_L2_R2_R3_VAL NULL
+#define OPTION_VAL_L3_R3_VAL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VAL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VAL NULL
+#define OPTION_VAL_0_VAL NULL
+#define OPTION_VAL_1_VAL NULL
+#define OPTION_VAL_2_VAL NULL
+#define OPTION_VAL_3_VAL NULL
+#define OPTION_VAL_4_VAL NULL
+#define OPTION_VAL_5_VAL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VAL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_VAL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_VAL NULL
@@ -68563,7 +70683,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_VAL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_VAL NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_VAL NULL
-#define OPTION_VAL_5_VAL NULL
+#define OPTION_VAL_5_O28_VAL NULL
 #define OPTION_VAL_10_VAL NULL
 #define OPTION_VAL_15_VAL NULL
 #define OPTION_VAL_20_VAL NULL
@@ -68610,7 +70730,7 @@ struct retro_core_options_v2 options_uk = {
 #define OPTION_VAL_CUBIC_VAL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_VAL NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VAL NULL
-#define OPTION_VAL_0_VAL NULL
+#define OPTION_VAL_0_O30_VAL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_VAL NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_VAL NULL
 #define OPTION_VAL_LIBRETRO_VAL NULL
@@ -68623,7 +70743,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_VAL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_VAL NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_VAL NULL
-#define OPTION_VAL_1_VAL NULL
+#define OPTION_VAL_1_O35_VAL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_VAL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_VAL NULL
 #define OPTION_VAL_MEMORY_ONLY_VAL NULL
@@ -68758,7 +70878,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VAL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_VAL NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_VAL NULL
-#define OPTION_VAL_DISABLED_O54_VAL "Cap"
+#define OPTION_VAL_DISABLED_O56_VAL "Cap"
 #define OPTION_VAL_STATIC_VAL NULL
 #define OPTION_VAL_SMART_VAL NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_VAL NULL
@@ -68777,31 +70897,31 @@ struct retro_core_options_v2 options_uk = {
 #define OPTION_VAL_20PX_VAL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_VAL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_VAL NULL
-#define OPTION_VAL_12PX_O56_VAL NULL
-#define OPTION_VAL_11PX_O56_VAL NULL
-#define OPTION_VAL_10PX_O56_VAL NULL
-#define OPTION_VAL_9PX_O56_VAL NULL
-#define OPTION_VAL_8PX_O56_VAL NULL
-#define OPTION_VAL_7PX_O56_VAL NULL
-#define OPTION_VAL_6PX_O56_VAL NULL
-#define OPTION_VAL_5PX_O56_VAL NULL
-#define OPTION_VAL_4PX_O56_VAL NULL
-#define OPTION_VAL_3PX_O56_VAL NULL
-#define OPTION_VAL_2PX_O56_VAL NULL
-#define OPTION_VAL_1PX_O56_VAL NULL
-#define OPTION_VAL_DISABLED_O56_VAL NULL
-#define OPTION_VAL_1PX_O56_0_VAL NULL
-#define OPTION_VAL_2PX_O56_0_VAL NULL
-#define OPTION_VAL_3PX_O56_0_VAL NULL
-#define OPTION_VAL_4PX_O56_0_VAL NULL
-#define OPTION_VAL_5PX_O56_0_VAL NULL
-#define OPTION_VAL_6PX_O56_0_VAL NULL
-#define OPTION_VAL_7PX_O56_0_VAL NULL
-#define OPTION_VAL_8PX_O56_0_VAL NULL
-#define OPTION_VAL_9PX_O56_0_VAL NULL
-#define OPTION_VAL_10PX_O56_0_VAL NULL
-#define OPTION_VAL_11PX_O56_0_VAL NULL
-#define OPTION_VAL_12PX_O56_0_VAL NULL
+#define OPTION_VAL_12PX_O58_VAL NULL
+#define OPTION_VAL_11PX_O58_VAL NULL
+#define OPTION_VAL_10PX_O58_VAL NULL
+#define OPTION_VAL_9PX_O58_VAL NULL
+#define OPTION_VAL_8PX_O58_VAL NULL
+#define OPTION_VAL_7PX_O58_VAL NULL
+#define OPTION_VAL_6PX_O58_VAL NULL
+#define OPTION_VAL_5PX_O58_VAL NULL
+#define OPTION_VAL_4PX_O58_VAL NULL
+#define OPTION_VAL_3PX_O58_VAL NULL
+#define OPTION_VAL_2PX_O58_VAL NULL
+#define OPTION_VAL_1PX_O58_VAL NULL
+#define OPTION_VAL_DISABLED_O58_VAL NULL
+#define OPTION_VAL_1PX_O58_0_VAL NULL
+#define OPTION_VAL_2PX_O58_0_VAL NULL
+#define OPTION_VAL_3PX_O58_0_VAL NULL
+#define OPTION_VAL_4PX_O58_0_VAL NULL
+#define OPTION_VAL_5PX_O58_0_VAL NULL
+#define OPTION_VAL_6PX_O58_0_VAL NULL
+#define OPTION_VAL_7PX_O58_0_VAL NULL
+#define OPTION_VAL_8PX_O58_0_VAL NULL
+#define OPTION_VAL_9PX_O58_0_VAL NULL
+#define OPTION_VAL_10PX_O58_0_VAL NULL
+#define OPTION_VAL_11PX_O58_0_VAL NULL
+#define OPTION_VAL_12PX_O58_0_VAL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_VAL NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_VAL NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_VAL NULL
@@ -69181,6 +71301,46 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VAL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VAL,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_VAL },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_VAL },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_VAL },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_VAL },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_VAL },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_VAL },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_VAL },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_VAL },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_VAL },
+         { "l3+r3",                    OPTION_VAL_L3_R3_VAL },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VAL,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VAL,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_VAL },
+         { "1", OPTION_VAL_1_VAL },
+         { "2", OPTION_VAL_2_VAL },
+         { "3", OPTION_VAL_3_VAL },
+         { "4", OPTION_VAL_4_VAL },
+         { "5", OPTION_VAL_5_VAL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VAL,
       NULL,
@@ -69290,7 +71450,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_VAL },
+         { "5%",   OPTION_VAL_5_O28_VAL },
          { "10%",  OPTION_VAL_10_VAL },
          { "15%",  OPTION_VAL_15_VAL },
          { "20%",  OPTION_VAL_20_VAL },
@@ -69357,8 +71517,8 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_VAL },
-         { "5%",  OPTION_VAL_5_VAL },
+         { "0%",  OPTION_VAL_0_O30_VAL },
+         { "5%",  OPTION_VAL_5_O28_VAL },
          { "10%", OPTION_VAL_10_VAL },
          { "15%", OPTION_VAL_15_VAL },
          { "20%", OPTION_VAL_20_VAL },
@@ -69495,7 +71655,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_VAL },
+         { "1",  OPTION_VAL_1_O35_VAL },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -69909,7 +72069,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_VAL },
+         { "1",  OPTION_VAL_1_O35_VAL },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -69952,7 +72112,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_VAL },
+         { "disabled",  OPTION_VAL_DISABLED_O56_VAL },
          { "static",  OPTION_VAL_STATIC_VAL },
          { "smart", OPTION_VAL_SMART_VAL },
          { NULL, NULL },
@@ -70000,31 +72160,31 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_VAL },
-         { "-11px",    OPTION_VAL_11PX_O56_VAL },
-         { "-10px",    OPTION_VAL_10PX_O56_VAL },
-         { "-9px",     OPTION_VAL_9PX_O56_VAL },
-         { "-8px",     OPTION_VAL_8PX_O56_VAL },
-         { "-7px",     OPTION_VAL_7PX_O56_VAL },
-         { "-6px",     OPTION_VAL_6PX_O56_VAL },
-         { "-5px",     OPTION_VAL_5PX_O56_VAL },
-         { "-4px",     OPTION_VAL_4PX_O56_VAL },
-         { "-3px",     OPTION_VAL_3PX_O56_VAL },
-         { "-2px",     OPTION_VAL_2PX_O56_VAL },
-         { "-1px",     OPTION_VAL_1PX_O56_VAL },
-         { "disabled", OPTION_VAL_DISABLED_O56_VAL },
-         { "+1px",     OPTION_VAL_1PX_O56_0_VAL },
-         { "+2px",     OPTION_VAL_2PX_O56_0_VAL },
-         { "+3px",     OPTION_VAL_3PX_O56_0_VAL },
-         { "+4px",     OPTION_VAL_4PX_O56_0_VAL },
-         { "+5px",     OPTION_VAL_5PX_O56_0_VAL },
-         { "+6px",     OPTION_VAL_6PX_O56_0_VAL },
-         { "+7px",     OPTION_VAL_7PX_O56_0_VAL },
-         { "+8px",     OPTION_VAL_8PX_O56_0_VAL },
-         { "+9px",     OPTION_VAL_9PX_O56_0_VAL },
-         { "+10px",    OPTION_VAL_10PX_O56_0_VAL },
-         { "+11px",    OPTION_VAL_11PX_O56_0_VAL },
-         { "+12px",    OPTION_VAL_12PX_O56_0_VAL },
+         { "-12px",    OPTION_VAL_12PX_O58_VAL },
+         { "-11px",    OPTION_VAL_11PX_O58_VAL },
+         { "-10px",    OPTION_VAL_10PX_O58_VAL },
+         { "-9px",     OPTION_VAL_9PX_O58_VAL },
+         { "-8px",     OPTION_VAL_8PX_O58_VAL },
+         { "-7px",     OPTION_VAL_7PX_O58_VAL },
+         { "-6px",     OPTION_VAL_6PX_O58_VAL },
+         { "-5px",     OPTION_VAL_5PX_O58_VAL },
+         { "-4px",     OPTION_VAL_4PX_O58_VAL },
+         { "-3px",     OPTION_VAL_3PX_O58_VAL },
+         { "-2px",     OPTION_VAL_2PX_O58_VAL },
+         { "-1px",     OPTION_VAL_1PX_O58_VAL },
+         { "disabled", OPTION_VAL_DISABLED_O58_VAL },
+         { "+1px",     OPTION_VAL_1PX_O58_0_VAL },
+         { "+2px",     OPTION_VAL_2PX_O58_0_VAL },
+         { "+3px",     OPTION_VAL_3PX_O58_0_VAL },
+         { "+4px",     OPTION_VAL_4PX_O58_0_VAL },
+         { "+5px",     OPTION_VAL_5PX_O58_0_VAL },
+         { "+6px",     OPTION_VAL_6PX_O58_0_VAL },
+         { "+7px",     OPTION_VAL_7PX_O58_0_VAL },
+         { "+8px",     OPTION_VAL_8PX_O58_0_VAL },
+         { "+9px",     OPTION_VAL_9PX_O58_0_VAL },
+         { "+10px",    OPTION_VAL_10PX_O58_0_VAL },
+         { "+11px",    OPTION_VAL_11PX_O58_0_VAL },
+         { "+12px",    OPTION_VAL_12PX_O58_0_VAL },
          { NULL, NULL },
       },
       "disabled"
@@ -70078,7 +72238,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_VAL },
+         { "0",        OPTION_VAL_DISABLED_O58_VAL },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -70489,6 +72649,26 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_VN NULL
+#define OPTION_VAL_L1_R1_SELECT_VN NULL
+#define OPTION_VAL_L1_R1_START_VN NULL
+#define OPTION_VAL_L1_R1_L3_VN NULL
+#define OPTION_VAL_L1_R1_R3_VN NULL
+#define OPTION_VAL_L2_R2_SELECT_VN NULL
+#define OPTION_VAL_L2_R2_START_VN NULL
+#define OPTION_VAL_L2_R2_L3_VN NULL
+#define OPTION_VAL_L2_R2_R3_VN NULL
+#define OPTION_VAL_L3_R3_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN NULL
+#define OPTION_VAL_0_VN NULL
+#define OPTION_VAL_1_VN NULL
+#define OPTION_VAL_2_VN NULL
+#define OPTION_VAL_3_VN NULL
+#define OPTION_VAL_4_VN NULL
+#define OPTION_VAL_5_VN NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VN NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_VN NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_VN NULL
@@ -70518,7 +72698,7 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_VN NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_VN NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_VN NULL
-#define OPTION_VAL_5_VN NULL
+#define OPTION_VAL_5_O28_VN NULL
 #define OPTION_VAL_10_VN NULL
 #define OPTION_VAL_15_VN NULL
 #define OPTION_VAL_20_VN NULL
@@ -70565,7 +72745,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_CUBIC_VN NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_VN NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VN NULL
-#define OPTION_VAL_0_VN NULL
+#define OPTION_VAL_0_O30_VN NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_VN NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_VN NULL
 #define OPTION_VAL_LIBRETRO_VN NULL
@@ -70578,7 +72758,7 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_VN NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_VN NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_VN NULL
-#define OPTION_VAL_1_VN NULL
+#define OPTION_VAL_1_O35_VN NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_VN NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_VN NULL
 #define OPTION_VAL_MEMORY_ONLY_VN NULL
@@ -70713,7 +72893,7 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VN NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_VN NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_VN NULL
-#define OPTION_VAL_DISABLED_O54_VN "Không"
+#define OPTION_VAL_DISABLED_O56_VN "Không"
 #define OPTION_VAL_STATIC_VN NULL
 #define OPTION_VAL_SMART_VN NULL
 #define BEETLE_OPT_IMAGE_CROP_LABEL_VN NULL
@@ -70732,31 +72912,31 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_20PX_VN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_VN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_VN NULL
-#define OPTION_VAL_12PX_O56_VN NULL
-#define OPTION_VAL_11PX_O56_VN NULL
-#define OPTION_VAL_10PX_O56_VN NULL
-#define OPTION_VAL_9PX_O56_VN NULL
-#define OPTION_VAL_8PX_O56_VN NULL
-#define OPTION_VAL_7PX_O56_VN NULL
-#define OPTION_VAL_6PX_O56_VN NULL
-#define OPTION_VAL_5PX_O56_VN NULL
-#define OPTION_VAL_4PX_O56_VN NULL
-#define OPTION_VAL_3PX_O56_VN NULL
-#define OPTION_VAL_2PX_O56_VN NULL
-#define OPTION_VAL_1PX_O56_VN NULL
-#define OPTION_VAL_DISABLED_O56_VN NULL
-#define OPTION_VAL_1PX_O56_0_VN NULL
-#define OPTION_VAL_2PX_O56_0_VN NULL
-#define OPTION_VAL_3PX_O56_0_VN NULL
-#define OPTION_VAL_4PX_O56_0_VN NULL
-#define OPTION_VAL_5PX_O56_0_VN NULL
-#define OPTION_VAL_6PX_O56_0_VN NULL
-#define OPTION_VAL_7PX_O56_0_VN NULL
-#define OPTION_VAL_8PX_O56_0_VN NULL
-#define OPTION_VAL_9PX_O56_0_VN NULL
-#define OPTION_VAL_10PX_O56_0_VN NULL
-#define OPTION_VAL_11PX_O56_0_VN NULL
-#define OPTION_VAL_12PX_O56_0_VN NULL
+#define OPTION_VAL_12PX_O58_VN NULL
+#define OPTION_VAL_11PX_O58_VN NULL
+#define OPTION_VAL_10PX_O58_VN NULL
+#define OPTION_VAL_9PX_O58_VN NULL
+#define OPTION_VAL_8PX_O58_VN NULL
+#define OPTION_VAL_7PX_O58_VN NULL
+#define OPTION_VAL_6PX_O58_VN NULL
+#define OPTION_VAL_5PX_O58_VN NULL
+#define OPTION_VAL_4PX_O58_VN NULL
+#define OPTION_VAL_3PX_O58_VN NULL
+#define OPTION_VAL_2PX_O58_VN NULL
+#define OPTION_VAL_1PX_O58_VN NULL
+#define OPTION_VAL_DISABLED_O58_VN NULL
+#define OPTION_VAL_1PX_O58_0_VN NULL
+#define OPTION_VAL_2PX_O58_0_VN NULL
+#define OPTION_VAL_3PX_O58_0_VN NULL
+#define OPTION_VAL_4PX_O58_0_VN NULL
+#define OPTION_VAL_5PX_O58_0_VN NULL
+#define OPTION_VAL_6PX_O58_0_VN NULL
+#define OPTION_VAL_7PX_O58_0_VN NULL
+#define OPTION_VAL_8PX_O58_0_VN NULL
+#define OPTION_VAL_9PX_O58_0_VN NULL
+#define OPTION_VAL_10PX_O58_0_VN NULL
+#define OPTION_VAL_11PX_O58_0_VN NULL
+#define OPTION_VAL_12PX_O58_0_VN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_VN NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_VN NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_VN NULL
@@ -71136,6 +73316,46 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_VN },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_VN },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_VN },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_VN },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_VN },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_VN },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_VN },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_VN },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_VN },
+         { "l3+r3",                    OPTION_VAL_L3_R3_VN },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_VN },
+         { "1", OPTION_VAL_1_VN },
+         { "2", OPTION_VAL_2_VN },
+         { "3", OPTION_VAL_3_VN },
+         { "4", OPTION_VAL_4_VN },
+         { "5", OPTION_VAL_5_VN },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
       BEETLE_OPT(enable_multitap_port1),
       BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VN,
       NULL,
@@ -71245,7 +73465,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "input",
       {
-         { "5%",   OPTION_VAL_5_VN },
+         { "5%",   OPTION_VAL_5_O28_VN },
          { "10%",  OPTION_VAL_10_VN },
          { "15%",  OPTION_VAL_15_VN },
          { "20%",  OPTION_VAL_20_VN },
@@ -71312,8 +73532,8 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "input",
       {
-         { "0%",  OPTION_VAL_0_VN },
-         { "5%",  OPTION_VAL_5_VN },
+         { "0%",  OPTION_VAL_0_O30_VN },
+         { "5%",  OPTION_VAL_5_O28_VN },
          { "10%", OPTION_VAL_10_VN },
          { "15%", OPTION_VAL_15_VN },
          { "20%", OPTION_VAL_20_VN },
@@ -71450,7 +73670,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       "memcards",
       {
          { "0",  NULL },
-         { "1",  OPTION_VAL_1_VN },
+         { "1",  OPTION_VAL_1_O35_VN },
          { "2",  NULL },
          { "3",  NULL },
          { "4",  NULL },
@@ -71864,7 +74084,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "hacks",
       {
-         { "1",  OPTION_VAL_1_VN },
+         { "1",  OPTION_VAL_1_O35_VN },
          { "4",  NULL },
          { "16",  NULL },
          { NULL, NULL },
@@ -71907,7 +74127,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "video",
       {
-         { "disabled",  OPTION_VAL_DISABLED_O54_VN },
+         { "disabled",  OPTION_VAL_DISABLED_O56_VN },
          { "static",  OPTION_VAL_STATIC_VN },
          { "smart", OPTION_VAL_SMART_VN },
          { NULL, NULL },
@@ -71955,31 +74175,31 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "video",
       {
-         { "-12px",    OPTION_VAL_12PX_O56_VN },
-         { "-11px",    OPTION_VAL_11PX_O56_VN },
-         { "-10px",    OPTION_VAL_10PX_O56_VN },
-         { "-9px",     OPTION_VAL_9PX_O56_VN },
-         { "-8px",     OPTION_VAL_8PX_O56_VN },
-         { "-7px",     OPTION_VAL_7PX_O56_VN },
-         { "-6px",     OPTION_VAL_6PX_O56_VN },
-         { "-5px",     OPTION_VAL_5PX_O56_VN },
-         { "-4px",     OPTION_VAL_4PX_O56_VN },
-         { "-3px",     OPTION_VAL_3PX_O56_VN },
-         { "-2px",     OPTION_VAL_2PX_O56_VN },
-         { "-1px",     OPTION_VAL_1PX_O56_VN },
-         { "disabled", OPTION_VAL_DISABLED_O56_VN },
-         { "+1px",     OPTION_VAL_1PX_O56_0_VN },
-         { "+2px",     OPTION_VAL_2PX_O56_0_VN },
-         { "+3px",     OPTION_VAL_3PX_O56_0_VN },
-         { "+4px",     OPTION_VAL_4PX_O56_0_VN },
-         { "+5px",     OPTION_VAL_5PX_O56_0_VN },
-         { "+6px",     OPTION_VAL_6PX_O56_0_VN },
-         { "+7px",     OPTION_VAL_7PX_O56_0_VN },
-         { "+8px",     OPTION_VAL_8PX_O56_0_VN },
-         { "+9px",     OPTION_VAL_9PX_O56_0_VN },
-         { "+10px",    OPTION_VAL_10PX_O56_0_VN },
-         { "+11px",    OPTION_VAL_11PX_O56_0_VN },
-         { "+12px",    OPTION_VAL_12PX_O56_0_VN },
+         { "-12px",    OPTION_VAL_12PX_O58_VN },
+         { "-11px",    OPTION_VAL_11PX_O58_VN },
+         { "-10px",    OPTION_VAL_10PX_O58_VN },
+         { "-9px",     OPTION_VAL_9PX_O58_VN },
+         { "-8px",     OPTION_VAL_8PX_O58_VN },
+         { "-7px",     OPTION_VAL_7PX_O58_VN },
+         { "-6px",     OPTION_VAL_6PX_O58_VN },
+         { "-5px",     OPTION_VAL_5PX_O58_VN },
+         { "-4px",     OPTION_VAL_4PX_O58_VN },
+         { "-3px",     OPTION_VAL_3PX_O58_VN },
+         { "-2px",     OPTION_VAL_2PX_O58_VN },
+         { "-1px",     OPTION_VAL_1PX_O58_VN },
+         { "disabled", OPTION_VAL_DISABLED_O58_VN },
+         { "+1px",     OPTION_VAL_1PX_O58_0_VN },
+         { "+2px",     OPTION_VAL_2PX_O58_0_VN },
+         { "+3px",     OPTION_VAL_3PX_O58_0_VN },
+         { "+4px",     OPTION_VAL_4PX_O58_0_VN },
+         { "+5px",     OPTION_VAL_5PX_O58_0_VN },
+         { "+6px",     OPTION_VAL_6PX_O58_0_VN },
+         { "+7px",     OPTION_VAL_7PX_O58_0_VN },
+         { "+8px",     OPTION_VAL_8PX_O58_0_VN },
+         { "+9px",     OPTION_VAL_9PX_O58_0_VN },
+         { "+10px",    OPTION_VAL_10PX_O58_0_VN },
+         { "+11px",    OPTION_VAL_11PX_O58_0_VN },
+         { "+12px",    OPTION_VAL_12PX_O58_0_VN },
          { NULL, NULL },
       },
       "disabled"
@@ -72033,7 +74253,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        OPTION_VAL_DISABLED_O56_VN },
+         { "0",        OPTION_VAL_DISABLED_O58_VN },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
