@@ -416,7 +416,25 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "l3+r3",                    "L3 + R3" },
          { NULL, NULL },
       },
-      "l1+l2+r1+r2+start+select"
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      "DualShock Analog Mode Combo Hold Delay",
+      NULL,
+      "Sets the hold time for the analog mode combo buttons. Only works when 'Enable DualShock Analog Mode Toggle' is enabled.",
+      NULL,
+      "input",
+      {
+         { "0", "0 Second Delay" },
+         { "1", "1 Second Delay" },
+         { "2", "2 Second Delay" },
+         { "3", "3 Second Delay" },
+         { "4", "4 Second Delay" },
+         { "5", "5 Second Delay" },
+         { NULL, NULL },
+      },
+      "1"
    },
    {
       BEETLE_OPT(enable_multitap_port1),
