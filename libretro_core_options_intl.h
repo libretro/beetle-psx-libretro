@@ -10139,7 +10139,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_16BPP_NATIVE_CHT "每像素16位元 (原廠)"
 #define OPTION_VAL_32BPP_CHT "每像素32位元"
 #define BEETLE_OPT_DITHER_MODE_LABEL_CHT "抖動色彩效果"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項, 設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, 設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」為<Vulkan>預設色深16位元, <關閉>此選項為32位元。"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CHT "設定抖動色彩效果, 選項「內部色彩深度」使用32位元時請關閉此選項, 設定<1倍>時使用主機原廠設定值, 用於色深不足增加漸層色顯示效果, 設定<內部解析度>時依設定的倍率縮放抖動像素, 用於減少顆粒感但倍率過大時會降低漸層色效果。\n注意: 「渲染器」為<Vulkan>預設16位元, <關閉>此選項為32位元。"
 #define OPTION_VAL_INTERNAL_RESOLUTION_CHT "內部解析度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHT NULL
