@@ -30274,7 +30274,7 @@ struct retro_core_options_v2 options_fa = {
 #define CATEGORY_MEMCARDS_LABEL_FI "Muistikortti"
 #define CATEGORY_MEMCARDS_INFO_0_FI "Muokkaa järjestelmän käyttämiä virtuaalisia muistikortteja koskevia asetuksia."
 #define CATEGORY_PGXP_LABEL_FI NULL
-#define CATEGORY_PGXP_INFO_0_FI "Nämä asetukset ohjaavat parannuksia, jotka voivat parantaa grafiikkaa verrattuna alkuperäiseen konsoliin. PGXP voi poistaa vääristelevät tekstuurit ja Z-kiistelyyn liittyvät ongelmat."
+#define CATEGORY_PGXP_INFO_0_FI "Nämä asetukset ohjaavat parannuksia, jotka voivat parantaa grafiikkaa alkuperäiseen konsoliin verrattuna. PGXP saattaa poistaa vääristelevät tekstuurit ja Z-kiistelyyn liittyvät ongelmat."
 #define CATEGORY_HACKS_LABEL_FI "Emulointikikat"
 #define CATEGORY_HACKS_INFO_0_FI "Muuta prosessorin ylikellotus- ja emulointitarkkuusasetuksia, jotka vaikuttavat matalan tason suorituskykyyn ja yhteensopivuuteen."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FI "Sisäisen näytönohjaimen resoluutio"
@@ -40421,14 +40421,14 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_L2_R2_L3_HU NULL
 #define OPTION_VAL_L2_R2_R3_HU NULL
 #define OPTION_VAL_L3_R3_HU NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU NULL
-#define OPTION_VAL_0_HU NULL
-#define OPTION_VAL_1_HU NULL
-#define OPTION_VAL_2_HU NULL
-#define OPTION_VAL_3_HU NULL
-#define OPTION_VAL_4_HU NULL
-#define OPTION_VAL_5_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU "DualShock analóg mód gombkombináció késleltetés"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU "Az analóg mód gombkombinációját eddig kell nyomva tartani. Csak ha a DualShock analóg mód átkapcsolás engedélyezett."
+#define OPTION_VAL_0_HU "0 másodperc"
+#define OPTION_VAL_1_HU "1 másodperc"
+#define OPTION_VAL_2_HU "2 másodperc"
+#define OPTION_VAL_3_HU "3 másodperc"
+#define OPTION_VAL_4_HU "4 másodperc"
+#define OPTION_VAL_5_HU "5 másodperc"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HU "Multitap engedélyezése az 1. csatlakozón"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_HU "A multitap funkció engedélyezése az 1. csatlakozón."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_HU "Multitap engedélyezése a 2. csatlakozón"
@@ -40518,7 +40518,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_HU "A bal oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 0-s memóriakártya eljárása Mednafen-re van állítva. Az alapértelmezett sorszám 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_HU "Jobb oldali memóriakártya sorszáma"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_HU "A jobb oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 1-s memóriakártya engedélyezett. Az alapértelmezett sorszám 1."
-#define OPTION_VAL_1_O35_HU NULL
+#define OPTION_VAL_1_O35_HU "1 (alapértelmezett)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_HU "PGXP működési módja"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HU "A 3D objektumok pixelméretnél pontosabb képalkotása, a 3D objektumok torzulásának és szaggatásának minimalizálásához, amit az eredeti hardveren a fixpontos vertex koordináták okoztak. A \"Csak memóriában\" módnak csak minimális kompatibilitási gondjai vannak és ajánlott általános használathoz. A \"Memória + CPU (hibás)\" mód még tovább csökkentheti a szaggatást, de nagy a teljesítményigénye és különféle geometriai hibákat okozhat."
 #define OPTION_VAL_MEMORY_ONLY_HU "Csak memóriában"
@@ -40684,7 +40684,7 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_3PX_O58_HU NULL
 #define OPTION_VAL_2PX_O58_HU NULL
 #define OPTION_VAL_1PX_O58_HU NULL
-#define OPTION_VAL_DISABLED_O58_HU NULL
+#define OPTION_VAL_DISABLED_O58_HU "0 (alapértelmezett)"
 #define OPTION_VAL_1PX_O58_0_HU NULL
 #define OPTION_VAL_2PX_O58_0_HU NULL
 #define OPTION_VAL_3PX_O58_0_HU NULL
@@ -70633,27 +70633,27 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_UK NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_UK NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_UK NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_UK NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_UK NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_UK NULL
-#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_UK NULL
-#define OPTION_VAL_L1_R1_SELECT_UK NULL
-#define OPTION_VAL_L1_R1_START_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_UK "Якщо тип пристрою введення DualShock, ця опція дозволяє емуляції DualShock перемикатися між ЦИФРОВИМ і АНАЛОГОВИМ режимами, як на оригінальному обладнанні. Якщо опцію вимкнено, DualShock буде заблоковано у режимі АНАЛОГ, а якщо увімкнено, DualShock можна перемикати між ЦИФРОВИМ та АНАЛОГОВИМ режимами за допомогою вибраної комбінації кнопок."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_UK "Комбінація Аналогового Режиму DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_UK "Виберіть комбінацію кнопок, яка буде використовуватися для перемикання між ЦИФРОВИМ та АНАЛОГОВИМ режимами для емуляції DualShock. Працює лише якщо увімкнено \"Увімкнути Перемикання Аналогового Режиму DualShock\"."
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_UK "L1 + L2 + R1 + R2 + Старт + Вибрати"
+#define OPTION_VAL_L1_R1_SELECT_UK "L1 + R1 + Вибрати"
+#define OPTION_VAL_L1_R1_START_UK "L1 + R1 + Старт"
 #define OPTION_VAL_L1_R1_L3_UK NULL
 #define OPTION_VAL_L1_R1_R3_UK NULL
-#define OPTION_VAL_L2_R2_SELECT_UK NULL
-#define OPTION_VAL_L2_R2_START_UK NULL
+#define OPTION_VAL_L2_R2_SELECT_UK "L2 + R2 + Вибрати"
+#define OPTION_VAL_L2_R2_START_UK "L2 + R2 + Старт"
 #define OPTION_VAL_L2_R2_L3_UK NULL
 #define OPTION_VAL_L2_R2_R3_UK NULL
 #define OPTION_VAL_L3_R3_UK NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_UK NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_UK NULL
-#define OPTION_VAL_0_UK NULL
-#define OPTION_VAL_1_UK NULL
-#define OPTION_VAL_2_UK NULL
-#define OPTION_VAL_3_UK NULL
-#define OPTION_VAL_4_UK NULL
-#define OPTION_VAL_5_UK NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_UK "Комбінація Аналогового Режиму DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_UK "Задає час утримання для комбінованих кнопок аналогового режиму. Працює лише якщо увімкнено \"Увімкнути Перемикання Аналогового Режиму DualShock\"."
+#define OPTION_VAL_0_UK "0 Секунд Затримки"
+#define OPTION_VAL_1_UK "1 Секунда Затримки"
+#define OPTION_VAL_2_UK "2 Секунди Затримки"
+#define OPTION_VAL_3_UK "3 Секунди Затримки"
+#define OPTION_VAL_4_UK "4 Секунди Затримки"
+#define OPTION_VAL_5_UK "5 Секунд Затримки"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_UK NULL
@@ -70743,7 +70743,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_UK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_UK NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_UK NULL
-#define OPTION_VAL_1_O35_UK NULL
+#define OPTION_VAL_1_O35_UK "1 (За замовчуванням)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_UK NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_UK NULL
 #define OPTION_VAL_MEMORY_ONLY_UK NULL
@@ -70909,7 +70909,7 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_3PX_O58_UK NULL
 #define OPTION_VAL_2PX_O58_UK NULL
 #define OPTION_VAL_1PX_O58_UK NULL
-#define OPTION_VAL_DISABLED_O58_UK NULL
+#define OPTION_VAL_DISABLED_O58_UK "0 (За замовчуванням)"
 #define OPTION_VAL_1PX_O58_0_UK NULL
 #define OPTION_VAL_2PX_O58_0_UK NULL
 #define OPTION_VAL_3PX_O58_0_UK NULL
