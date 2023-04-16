@@ -61,7 +61,13 @@
 
 #include "gte.h"
 #ifdef HAVE_LIGHTREC
+   #include <lightrec-config.h>
    #include <lightrec.h>
+
+ /* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
+ #define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
+
+ enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_RUN_INTERPRETER};
 #endif
 
 class PS_CPU
@@ -236,23 +242,14 @@ class PS_CPU
  uint32 ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address);
 
 #ifdef HAVE_LIGHTREC
+ static struct lightrec_registers *lightrec_regs;
+ static void enable_ram(struct lightrec_state *state, bool enable);
+ static void cop2_op(struct lightrec_state *state, uint32 op);
  void print_for_big_ass_debugger(int32 timestamp, uint32 PC);
  int lightrec_plugin_init();
  void lightrec_plugin_shutdown();
  int32 lightrec_plugin_execute(int32 timestamp);
- static uint32 cop_cfc(lightrec_state *state, uint32 op, uint8 reg);
- static uint32 cop_mfc(lightrec_state *state, uint32 op, uint8);
- static uint32 cop2_cfc(lightrec_state *state, uint32 op, uint8);
- static uint32 cop2_mfc(lightrec_state *state, uint32 op, uint8);
- static void cop_mtc_ctc(struct lightrec_state *state, uint8 reg, uint32 value);
- static void cop_ctc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
- static void cop_mtc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
- static void cop2_ctc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
- static void cop2_mtc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
- static uint32 pgxp_cop2_cfc(lightrec_state *state, uint32 op, uint8);
- static uint32 pgxp_cop2_mfc(lightrec_state *state, uint32 op, uint8);
- static void pgxp_cop2_ctc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
- static void pgxp_cop2_mtc(lightrec_state *state, uint32 op, uint8 reg, uint32 value);
+ static void pgxp_cop2_notify(lightrec_state *state, uint32 op, uint32 data);
  static struct lightrec_ops ops;
  static struct lightrec_ops pgxp_ops;
  static struct lightrec_mem_map_ops pgxp_hw_regs_ops;

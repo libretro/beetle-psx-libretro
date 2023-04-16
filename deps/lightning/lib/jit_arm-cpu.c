@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2019  Free Software Foundation, Inc.
+ * Copyright (C) 2012-2022  Free Software Foundation, Inc.
  *
  * This file is part of GNU lightning.
  *
@@ -36,6 +36,7 @@
 #  define jit_armv5_p()			(jit_cpu.version >= 5)
 #  define jit_armv5e_p()		(jit_cpu.version > 5 || (jit_cpu.version == 5 && jit_cpu.extend))
 #  define jit_armv6_p()			(jit_cpu.version >= 6)
+#  define jit_armv7_p()			(jit_cpu.version >= 7)
 #  define jit_armv7r_p()		0
 #  define stack_framesize		48
 extern int	__aeabi_idivmod(int, int);
@@ -179,7 +180,23 @@ extern unsigned	__aeabi_uidivmod(unsigned, unsigned);
 #  define ARM_XTR8			0x00000400 /* ?xt? rotate 8 bits */
 #  define ARM_XTR16			0x00000800 /* ?xt? rotate 16 bits */
 #  define ARM_XTR24			0x00000c00 /* ?xt? rotate 24 bits */
+#  define ARM_LDREX			0x01900090
+#  define THUMB2_LDREX			0xe8500000
+#  define ARM_STREX			0x01800090
+#  define THUMB2_STREX			0xe8400000
 /* << ARMv6* */
+/* >> ARMv7 */
+#  define ARM_DMB			0xf57ff050
+#  define THUMB2_DMB			0xf3bf8f50
+#  define DMB_SY			0xf
+#  define DMB_ST			0xe
+#  define DMB_ISH			0xb
+#  define DMB_ISHST			0xa
+#  define DMB_NSH			0x7
+#  define DMB_NSHT			0x6
+#  define DMB_OSH			0x3
+#  define DMB_OSHST			0x2
+/* << ARMv7 */
 #  define ARM_SHIFT			0x01a00000
 #  define ARM_R				0x00000010 /* register shift */
 #  define ARM_LSL			0x00000000
@@ -399,6 +416,12 @@ static void _tcit(jit_state_t*,unsigned int,int);
 static void _tpp(jit_state_t*,int,int);
 #  define torl(o,rn,im)			_torl(_jit,o,rn,im)
 static void _torl(jit_state_t*,int,int,int) maybe_unused;
+#  define DMB(im)			dmb(im)
+#  define T2_DMB(im)			tdmb(im)
+#  define dmb(im)			_dmb(_jit, im)
+static void _dmb(jit_state_t *_jit, int im);
+#  define tdmb(im)			_tdmb(_jit, im)
+static void _tdmb(jit_state_t *_jit, int im);
 #  define CC_MOV(cc,rd,rm)		corrr(cc,ARM_MOV,0,rd,rm)
 #  define MOV(rd,rm)			CC_MOV(ARM_CC_AL,rd,rm)
 #  define T1_MOV(rd,rm)			is(THUMB_MOV|((_u4(rd)&8)<<4)|(_u4(rm)<<3)|(rd&7))
@@ -612,7 +635,7 @@ static void _torl(jit_state_t*,int,int,int) maybe_unused;
 #  define CMNI(rn,im)			CC_CMNI(ARM_CC_AL,rn,im)
 #  define T2_CMNI(rn,im)		torri(THUMB2_CMNI,rn,_R15_REGNO,im)
 #  define CC_TST(cc,rn,rm)		corrr(cc,ARM_TST,rn,r0,rm)
-#  define TST(rn,rm)			CC_TST(ARM_CC_AL,rn,rm)
+#  define TST(rn,rm)			corrr(ARM_CC_AL,ARM_TST,rn,0,rm)
 #  define T1_TST(rn,rm)			is(THUMB_TST|(_u3(rm)<<3)|_u3(rn))
 #  define T2_TST(rn,rm)			torrr(THUMB2_TST,rn,_R15_REGNO,rm)
 #  define CC_TSTI(cc,rn,im)		corri(cc,ARM_TST|ARM_I,rn,0,im)
@@ -718,6 +741,9 @@ static void _torl(jit_state_t*,int,int,int) maybe_unused;
 #  define CC_LDRDIN(cc,rt,rn,im)	corri8(cc,ARM_LDRDI,rn,rt,im)
 #  define LDRDIN(rt,rn,im)		CC_LDRDIN(ARM_CC_AL,rt,rn,im)
 #  define T2_LDRDIN(rt,rt2,rn,im)	torrri8(THUMB2_LDRDI,rn,rt,rt2,im)
+#  define CC_LDREX(cc,rt,rn)		corrrr(cc,ARM_LDREX,rn,rt,0xf,0xf)
+#  define LDREX(rt,rn)			CC_LDREX(ARM_CC_AL,rt,rn)
+#  define T2_LDREX(rt,rn,im)		torrri8(THUMB2_LDREX,rn,rt,0xf,im)
 #  define CC_STRB(cc,rt,rn,rm)		corrr(cc,ARM_STRB|ARM_P,rn,rt,rm)
 #  define STRB(rt,rn,rm)		CC_STRB(ARM_CC_AL,rt,rn,rm)
 #  define T1_STRB(rt,rn,rm)		is(THUMB_STRB|(_u3(rm)<<6)|(_u3(rn)<<3)|_u3(rt))
@@ -771,6 +797,9 @@ static void _torl(jit_state_t*,int,int,int) maybe_unused;
 #  define CC_STRDIN(cc,rt,rn,im)	corri8(cc,ARM_STRDI,rn,rt,im)
 #  define STRDIN(rt,rn,im)		CC_STRDIN(ARM_CC_AL,rt,rn,im)
 #  define T2_STRDIN(rt,rt2,rn,im)	torrri8(THUMB2_STRDI,rn,rt,rt2,im)
+#  define CC_STREX(cc,rd,rt,rn)		corrrr(cc,ARM_STREX,rn,rd,0xf,rt)
+#  define STREX(rd,rt,rn)		CC_STREX(ARM_CC_AL,rd,rt,rn)
+#  define T2_STREX(rd,rt,rn,im)		torrri8(THUMB2_STREX,rn,rt,rd,im)
 #  define CC_LDMIA(cc,rn,im)		corl(cc,ARM_M|ARM_M_L|ARM_M_I,rn,im)
 #  define LDMIA(rn,im)			CC_LDMIA(ARM_CC_AL,rn,im)
 #  define CC_LDM(cc,rn,im)		CC_LDMIA(cc,rn,im)
@@ -843,6 +872,15 @@ static void _movr(jit_state_t*,jit_int32_t,jit_int32_t);
 static void _movi(jit_state_t*,jit_int32_t,jit_word_t);
 #  define movi_p(r0,i0)			_movi_p(_jit,r0,i0)
 static jit_word_t _movi_p(jit_state_t*,jit_int32_t,jit_word_t);
+#  define movnr(r0,r1,r2)		_movnr(_jit,r0,r1,r2)
+static void _movnr(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t);
+#  define movzr(r0,r1,r2)		_movzr(_jit,r0,r1,r2)
+static void _movzr(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t);
+#  define casx(r0, r1, r2, r3, i0)	_casx(_jit, r0, r1, r2, r3, i0)
+static void _casx(jit_state_t *_jit,jit_int32_t,jit_int32_t,
+		  jit_int32_t,jit_int32_t,jit_word_t);
+#define casr(r0, r1, r2, r3)		casx(r0, r1, r2, r3, 0)
+#define casi(r0, i0, r1, r2)		casx(r0, _NOREG, r1, r2, i0)
 #  define comr(r0,r1)			_comr(_jit,r0,r1)
 static void _comr(jit_state_t*,jit_int32_t,jit_int32_t);
 #  define negr(r0,r1)			_negr(_jit,r0,r1)
@@ -1091,15 +1129,10 @@ static void _sti_i(jit_state_t*,jit_word_t,jit_int32_t);
 static void _stxr_i(jit_state_t*,jit_word_t,jit_int32_t,jit_int32_t);
 #  define stxi_i(r0,r1,i0)		_stxi_i(_jit,r0,r1,i0)
 static void _stxi_i(jit_state_t*,jit_word_t,jit_int32_t,jit_int32_t);
-#  if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define htonr_us(r0,r1)		_htonr_us(_jit,r0,r1)
-static void _htonr_us(jit_state_t*,jit_int32_t,jit_int32_t);
-#  define htonr_ui(r0,r1)		_htonr_ui(_jit,r0,r1)
-static void _htonr_ui(jit_state_t*,jit_int32_t,jit_int32_t);
-#  else
-#    define htonr_us(r0,r1)		extr_us(r0,r1)
-#    define htonr(r0,r1)		movr(r0,r1)
-#  endif
+#  define bswapr_us(r0,r1)		_bswapr_us(_jit,r0,r1)
+static void _bswapr_us(jit_state_t*,jit_int32_t,jit_int32_t);
+#  define bswapr_ui(r0,r1)		_bswapr_ui(_jit,r0,r1)
+static void _bswapr_ui(jit_state_t*,jit_int32_t,jit_int32_t);
 #  define extr_c(r0,r1)			_extr_c(_jit,r0,r1)
 static void _extr_c(jit_state_t*,jit_int32_t,jit_int32_t);
 #  define extr_uc(r0,r1)		_extr_uc(_jit,r0,r1)
@@ -1510,6 +1543,22 @@ _torl(jit_state_t *_jit, int o, int rn, int im)
 }
 
 static void
+_dmb(jit_state_t *_jit, int im)
+{
+    assert(!(im & 0xfffffff0));
+    ii(ARM_DMB|im);
+}
+
+static void
+_tdmb(jit_state_t *_jit, int im)
+{
+    jit_thumb_t	thumb;
+    assert(!(im & 0xfffffff0));
+    thumb.i = THUMB2_DMB | im;
+    iss(thumb.s[0], thumb.s[1]);
+}
+
+static void
 _nop(jit_state_t *_jit, jit_int32_t i0)
 {
     if (jit_thumb_p()) {
@@ -1580,6 +1629,86 @@ _movi_p(jit_state_t *_jit, jit_int32_t r0, jit_word_t i0)
     else
 	load_const(1, r0, 0);
     return (w);
+}
+
+static void
+_movznr(jit_state_t *_jit, int ct, jit_int32_t r0,
+        jit_int32_t r1, jit_int32_t r2)
+{
+    if (jit_thumb_p()) {
+        if (r2 < 7)
+            T1_CMPI(r2, 0);
+        else
+            T2_CMPI(r2, 0);
+        IT(ct);
+        T1_MOV(r0, r1);
+    } else {
+        CMPI(r2, 0);
+        CC_MOV(ct, r0, r1);
+    }
+}
+
+static void
+_movnr(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1, jit_int32_t r2)
+{
+    _movznr(_jit, ARM_CC_NE, r0, r1, r2);
+}
+
+static void
+_movzr(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1, jit_int32_t r2)
+{
+    _movznr(_jit, ARM_CC_EQ, r0, r1, r2);
+}
+
+static void
+_casx(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1,
+      jit_int32_t r2, jit_int32_t r3, jit_word_t i0)
+{
+    jit_int32_t		r1_reg, iscasi;
+    jit_word_t		retry, done, jump0, jump1;
+    if (!jit_armv7_p())
+	fallback_casx(r0, r1, r2, r3, i0);
+    else {
+	if ((iscasi = (r1 == _NOREG))) {
+	    r1_reg = jit_get_reg(jit_class_gpr);
+	    r1 = rn(r1_reg);
+	    movi(r1, i0);
+	}
+	if (jit_thumb_p()) {
+	    T2_DMB(DMB_ISH);
+	    /* retry: */
+	    retry = _jit->pc.w;
+	    T2_LDREX(r0, r1, 0);
+	    eqr(r0, r0, r2);
+	    jump0 = beqi(_jit->pc.w, r0, 0);	/* beqi done r0 0 */
+	    T2_STREX(r0, r3, r1, 0);
+	    jump1 = bnei(_jit->pc.w, r0, 0);	/* bnei retry r0 0 */
+	    /* r0 = 0 if memory updated, 1 otherwise */
+	    xori(r0, r0, 1);
+	    /* done: */
+	    done = _jit->pc.w;
+	    T2_DMB(DMB_ISH);
+	}
+	else {
+	    DMB(DMB_ISH);
+	    /* retry: */
+	    retry = _jit->pc.w;
+	    LDREX(r0, r1);
+	    eqr(r0, r0, r2);
+	    jump0 = beqi(_jit->pc.w, r0, 0);	/* beqi done r0 0 */
+	    STREX(r0, r3, r1);
+	    jump1 = bnei(_jit->pc.w, r0, 0);	/* bnei retry r0 0 */
+	    /* r0 = 0 if memory updated, 1 otherwise */
+	    xori(r0, r0, 1);
+	    /* done: */
+	    done = _jit->pc.w;
+	    DMB(DMB_ISH);
+	}
+	patch_at(arm_patch_jump, jump0, done);
+	patch_at(arm_patch_jump, jump1, retry);
+	if (iscasi)
+	    jit_unget_reg(r1_reg);
+    }
 }
 
 static void
@@ -3576,11 +3705,9 @@ _stxi_i(jit_state_t *_jit, jit_word_t i0, jit_int32_t r0, jit_int32_t r1)
     }
 }
 
-#  if __BYTE_ORDER == __LITTLE_ENDIAN
 static void
-_htonr_us(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
+_bswapr_us(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
 {
-    jit_int32_t		t0;
     if (jit_thumb_p()) {
 	if ((r0|r1) < 8)
 	    T1_REV(r0, r1);
@@ -3594,20 +3721,14 @@ _htonr_us(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
 	    rshi_u(r0, r0, 16);
 	}
 	else {
-	    t0 = jit_get_reg(jit_class_gpr);
-	    rshi(rn(t0), r1, 8);
-	    andi(r0, r1, 0xff);
-	    andi(rn(t0), rn(t0), 0xff);
-	    lshi(r0, r0, 8);
-	    orr(r0, r0, rn(t0));
-	    jit_unget_reg(t0);
+		generic_bswapr_us(_jit, r0, r1);
 	}
     }
 }
 
 /* inline glibc htonl (without register clobber) */
 static void
-_htonr_ui(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
+_bswapr_ui(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
 {
     jit_int32_t		reg;
     if (jit_thumb_p()) {
@@ -3629,7 +3750,6 @@ _htonr_ui(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)
 	}
     }
 }
-#endif
 
 static void
 _extr_c(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1)

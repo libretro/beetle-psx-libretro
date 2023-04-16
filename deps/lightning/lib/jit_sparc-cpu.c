@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2019  Free Software Foundation, Inc.
+ * Copyright (C) 2013-2022  Free Software Foundation, Inc.
  *
  * This file is part of GNU lightning.
  *
@@ -100,6 +100,9 @@ _f2bp(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,
 static void _f3r(jit_state_t*,
 		 jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t);
 #  if __WORDSIZE == 64
+#  define f3ri(op, rd, op3, rs1, rs2)	_f3ri(_jit, op, rd, op3, rs1, rs2)
+static void _f3ri(jit_state_t*,
+		  jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t);
 #  define f3rx(op, rd, op3, rs1, rs2)	_f3rx(_jit, op, rd, op3, rs1, rs2)
 static void _f3rx(jit_state_t*,
 		  jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t);
@@ -113,7 +116,7 @@ static void _f3s(jit_state_t*,
 #  define f3t(cond, rs1, i, ri)		_f3t(_jit, cond, rs1, i, ri)
 static void _f3t(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t)
     maybe_unused;
-#  define f3a(op, rd, op3, rs1, rs2)	_f3a(_jit, op, rd, op3, rs1, asi, rs2)
+#  define f3a(op,rd,op3,rs1,asi,rs2)	_f3a(_jit, op, rd, op3, rs1, asi, rs2)
 static void _f3a(jit_state_t*,jit_int32_t,
 		 jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t,jit_int32_t)
     maybe_unused;
@@ -194,6 +197,11 @@ static void _f3a(jit_state_t*,jit_int32_t,
 #  define SWAP(rs1, rs2, rd)		f3r(3, rd, 15, rs1, rs2)
 #  define SWAPI(rs1, imm, rd)		f3r(3, rd, 15, rs1, imm)
 #  define SWAPA(rs1, rs2, asi, rd)	f3a(3, rd, 23, rs1, asi, rs2)
+/* Sparc v9 deprecates SWAP* in favor of CAS*A */
+#  define CASA(rs1, rs2, rd)		f3a(3, rd, 60, rs1, 128, rs2)
+#  if __WORDSIZE == 64
+#    define CASXA(rs1, rs2, rd)		f3a(3, rd, 62, rs1, 128, rs2)
+#  endif
 #  define NOP()				SETHI(0, 0)
 #  define HI(im)			((im) >> 10)
 #  define LO(im)			((im) & 0x3ff)
@@ -545,6 +553,18 @@ static void _movr(jit_state_t*, jit_int32_t, jit_int32_t);
 static void _movi(jit_state_t*, jit_int32_t, jit_word_t);
 #  define movi_p(r0, i0)		_movi_p(_jit, r0, i0)
 static jit_word_t _movi_p(jit_state_t*, jit_int32_t, jit_word_t);
+#  define bswapr_us(r0, r1)		generic_bswapr_us(_jit, r0, r1)
+#  define bswapr_ui(r0, r1)		generic_bswapr_ui(_jit, r0, r1)
+#  define bswapr_ul(r0, r1)		generic_bswapr_ul(_jit, r0, r1)
+#  define movnr(r0,r1,r2)		_movnr(_jit,r0,r1,r2)
+static void _movnr(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t);
+#  define movzr(r0,r1,r2)		_movzr(_jit,r0,r1,r2)
+static void _movzr(jit_state_t*,jit_int32_t,jit_int32_t,jit_int32_t);
+#  define casx(r0, r1, r2, r3, i0)	_casx(_jit, r0, r1, r2, r3, i0)
+static void _casx(jit_state_t *_jit,jit_int32_t,jit_int32_t,
+		  jit_int32_t,jit_int32_t,jit_word_t);
+#define casr(r0, r1, r2, r3)		casx(r0, r1, r2, r3, 0)
+#define casi(r0, i0, r1, r2)		casx(r0, _NOREG, r1, r2, i0)
 #  define comr(r0, r1)			XNOR(r1, 0, r0)
 #  define negr(r0, r1)			NEG(r1, r0)
 #  define addr(r0, r1, r2)		ADD(r1, r2, r0)
@@ -669,7 +689,6 @@ static void _xori(jit_state_t*, jit_int32_t, jit_int32_t, jit_word_t);
 #    define rshr_u(r0, r1, r2)		SRLX(r1, r2, r0)
 #    define rshi_u(r0, r1, i0)		SRLXI(r1, i0, r0)
 #  endif
-#  define htonr_us(r0,r1)		extr_us(r0,r1)
 #  define extr_c(r0,r1)			_extr_c(_jit,r0,r1)
 static void _extr_c(jit_state_t*,jit_int32_t,jit_int32_t);
 #  define extr_uc(r0,r1)		andi(r0, r1, 0xff)
@@ -677,11 +696,7 @@ static void _extr_c(jit_state_t*,jit_int32_t,jit_int32_t);
 static void _extr_s(jit_state_t*,jit_int32_t,jit_int32_t);
 #  define extr_us(r0,r1)		_extr_us(_jit,r0,r1)
 static void _extr_us(jit_state_t*,jit_int32_t,jit_int32_t);
-#  if __WORDSIZE == 32
-#    define htonr_ui(r0,r1)		movr(r0,r1)
-#  else
-#    define htonr_ui(r0,r1)		extr_ui(r0,r1)
-#    define htonr_ul(r0,r1)		movr(r0,r1)
+#  if __WORDSIZE == 64
 #    define extr_i(r0,r1)		_extr_i(_jit,r0,r1)
 static void _extr_i(jit_state_t*,jit_int32_t,jit_int32_t);
 #    define extr_ui(r0,r1)		_extr_ui(_jit,r0,r1)
@@ -926,13 +941,13 @@ _bm_w(jit_state_t*,jit_bool_t,jit_word_t,jit_int32_t,jit_word_t);
 #  define jmpr(r0)			_jmpr(_jit, r0)
 static void _jmpr(jit_state_t*,jit_int32_t);
 #  define jmpi(i0)			_jmpi(_jit, i0)
-static void _jmpi(jit_state_t*,jit_word_t);
+static jit_word_t _jmpi(jit_state_t*,jit_word_t);
 #  define jmpi_p(i0)			_jmpi_p(_jit, i0)
 static jit_word_t _jmpi_p(jit_state_t*,jit_word_t);
 #  define callr(r0)			_callr(_jit, r0)
 static void _callr(jit_state_t*,jit_int32_t);
 #  define calli(i0)			_calli(_jit, i0)
-static void _calli(jit_state_t*,jit_word_t);
+static jit_word_t _calli(jit_state_t*,jit_word_t);
 #  define calli_p(i0)			_calli_p(_jit, i0)
 static jit_word_t _calli_p(jit_state_t*,jit_word_t);
 #  define prolog(node)			_prolog(_jit, node)
@@ -1028,6 +1043,26 @@ _f3r(jit_state_t *_jit, jit_int32_t op, jit_int32_t rd,
 }
 
 #  if __WORDSIZE == 64
+static void
+_f3ri(jit_state_t *_jit, jit_int32_t op, jit_int32_t rd,
+      jit_int32_t op3, jit_int32_t rs1, jit_int32_t rs2)
+{
+    jit_instr_t		v;
+    assert(!(op  & 0xfffffffc));
+    assert(!(rd  & 0xffffffe0));
+    assert(!(op3 & 0xffffffc0));
+    assert(!(rs1 & 0xffffffe0));
+    assert(!(rs2 & 0xffffffe0));
+    v.op.b  = op;
+    v.rd.b  = rd;
+    v.op3.b = op3;
+    v.rs1.b = rs1;
+    v.i.b   = 1;
+    v.asi.b = 0;
+    v.rs2.b = rs2;
+    ii(v.v);
+}
+
 static void
 _f3rx(jit_state_t *_jit, jit_int32_t op, jit_int32_t rd,
       jit_int32_t op3, jit_int32_t rs1, jit_int32_t rs2)
@@ -1211,6 +1246,54 @@ _movi_p(jit_state_t *_jit, jit_int32_t r0, jit_word_t i0)
     ORI(r0, LO(i0), r0);
 #  endif
     return (w);
+}
+
+static void
+_movnr(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1, jit_int32_t r2)
+{
+    jit_word_t	w;
+    w = beqi(_jit->pc.w, r2, 0);
+    ORI(r1, 0, r0);
+    patch_at(w, _jit->pc.w);
+}
+
+static void
+_movzr(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1, jit_int32_t r2)
+{
+    jit_word_t	w;
+    w = bnei(_jit->pc.w, r2, 0);
+    ORI(r1, 0, r0);
+    patch_at(w, _jit->pc.w);
+}
+
+static void
+_casx(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1,
+      jit_int32_t r2, jit_int32_t r3, jit_word_t i0)
+{
+    jit_int32_t         iscasi, r1_reg;
+    if ((iscasi = (r1 == _NOREG))) {
+        r1_reg = jit_get_reg(jit_class_gpr);
+        r1 = rn(r1_reg);
+        movi(r1, i0);
+    }
+    /* Do not clobber r2 */
+    movr(r0, r3);
+    /* The CASXA instruction compares the value in register r[rs2] with
+     * the doubleword in memory pointed to by the doubleword address in
+     *  r[rs1]. If the values are equal, the value in r[rd] is swapped
+     * with the doubleword pointed to by the doubleword address in r[rs1].
+     *  If the values are not equal, the contents of the doubleword pointed
+     *  to by r[rs1] replaces the value in r[rd], but the memory location
+     * remains unchanged.
+     */
+#  if __WORDSIZE == 32
+    CASA(r1, r2, r0);
+#  else
+    CASXA(r1, r2, r0);
+#  endif
+    eqr(r0, r0, r2);
+    if (iscasi)
+        jit_unget_reg(r1_reg);
 }
 
 static void
@@ -2224,11 +2307,7 @@ _bw(jit_state_t *_jit, jit_int32_t cc,
     if (s13_p(i1)) {
 	CMPI(r0, i1);
 	w = _jit->pc.w;
-#  if __WORDSIZE == 32
 	B(cc, (i0 - w) >> 2);
-#  else
-	B(cc, (i0 - w) >> 2);
-#  endif
 	NOP();
     }
     else {
@@ -2347,14 +2426,15 @@ _jmpr(jit_state_t *_jit, jit_int32_t r0)
     NOP();
 }
 
-static void
+static jit_word_t
 _jmpi(jit_state_t *_jit, jit_word_t i0)
 {
-    jit_word_t		w;
     jit_int32_t		reg;
-    w = (i0 - _jit->pc.w) >> 2;
-    if (s22_p(w)) {
-	BA(w);
+    jit_word_t		d, w;
+    w = _jit->pc.w;
+    d = (i0 - w) >> 2;
+    if (s22_p(d)) {
+	BA(d);
 	NOP();
     }
     else {
@@ -2363,6 +2443,7 @@ _jmpi(jit_state_t *_jit, jit_word_t i0)
 	jmpr(rn(reg));
 	jit_unget_reg(reg);
     }
+    return (w);
 }
 
 static jit_word_t
@@ -2384,13 +2465,19 @@ _callr(jit_state_t *_jit, jit_int32_t r0)
     NOP();
 }
 
-static void
+static jit_word_t
 _calli(jit_state_t *_jit, jit_word_t i0)
 {
-    jit_word_t		w;
-    w = (i0 - _jit->pc.w) >> 2;
-    CALLI(w);
-    NOP();
+    jit_word_t		d, w;
+    w = _jit->pc.w;
+    d = (i0 - w) >> 2;
+    if (s30_p(d)) {
+	CALLI(d);
+	NOP();
+    }
+    else
+	w = calli_p(i0);
+    return (w);
 }
 
 static jit_word_t
@@ -2561,6 +2648,11 @@ _patch_at(jit_state_t *_jit, jit_word_t instr, jit_word_t label)
 	}
 	else
 	    abort();
+    }
+    else if (i.op.b == 1) {
+	assert(s30_p((label - instr) >> 2));
+	i.disp30.b = (label - instr) >> 2;
+	u.i[0] = i.v;
     }
     else
 	abort();

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(lightrec LANGUAGES C VERSION 0.4)
+project(lightrec LANGUAGES C VERSION 0.6)
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries")
 if (NOT BUILD_SHARED_LIBS)
@@ -68,6 +68,7 @@ option(OPT_TRANSFORM_OPS "(optimization) Transform opcodes" ON)
 option(OPT_LOCAL_BRANCHES "(optimization) Detect local branches" ON)
 option(OPT_SWITCH_DELAY_SLOTS "(optimization) Switch delay slots" ON)
 option(OPT_FLAG_STORES "(optimization) Flag stores that don't require invalidation" ON)
+option(OPT_FLAG_IO "(optimization) Flag I/O opcodes whose target is known" ON)
 option(OPT_FLAG_MULT_DIV "(optimization) Flag MULT/DIV that only use one of HI/LO" ON)
 option(OPT_EARLY_UNLOAD "(optimization) Unload registers early" ON)
 
@@ -90,15 +91,6 @@ if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
 	target_compile_options(${PROJECT_NAME} PRIVATE -Wno-initializer-overrides)
 endif()
 
-option(ENABLE_TINYMM "Enable optional libtinymm dependency" OFF)
-if (ENABLE_TINYMM)
-	find_library(TINYMM_LIBRARIES tinymm REQUIRED)
-	find_path(TINYMM_INCLUDE_DIR tinymm.h REQUIRED)
-
-	include_directories(${TINYMM_INCLUDE_DIR})
-	target_link_libraries(${PROJECT_NAME} PRIVATE ${TINYMM_LIBRARIES})
-endif (ENABLE_TINYMM)
-
 if (ENABLE_THREADED_COMPILER)
 	find_library(PTHREAD_LIBRARIES pthread REQUIRED)
 	find_path(PTHREAD_INCLUDE_DIR pthread.h REQUIRED)
@@ -106,6 +98,12 @@ if (ENABLE_THREADED_COMPILER)
 	include_directories(${PTHREAD_INCLUDE_DIR})
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${PTHREAD_LIBRARIES})
 endif (ENABLE_THREADED_COMPILER)
+
+option(ENABLE_CODE_BUFFER "Enable external code buffer" OFF)
+if (ENABLE_CODE_BUFFER)
+	target_sources(${PROJECT_NAME} PRIVATE tlsf/tlsf.c)
+	target_include_directories(${PROJECT_NAME} PRIVATE tlsf)
+endif (ENABLE_CODE_BUFFER)
 
 find_library(LIBLIGHTNING lightning REQUIRED)
 find_path(LIBLIGHTNING_INCLUDE_DIR lightning.h REQUIRED)
@@ -118,7 +116,7 @@ if (LOG_LEVEL STREQUAL Debug)
 	target_sources(${PROJECT_NAME} PRIVATE disassembler.c)
 endif()
 
-configure_file(config.h.cmakein config.h @ONLY)
+configure_file(lightrec-config.h.cmakein lightrec-config.h @ONLY)
 
 include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}
