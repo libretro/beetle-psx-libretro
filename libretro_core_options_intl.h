@@ -68618,9 +68618,9 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TR "Analog Otomatik Kalibrasyon"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TR "Giriş cihazı DualShock, Analog Kontrolcü, Analog Joystick veya neGcon olarak ayarlandığında, bu seçenek analog girişlerin dinamik kalibrasyonunu sağlar. Kaydedilen en yüksek giriş değerleri gerçek zamanlı olarak izlenir ve emülatöre iletilen analog koordinatları ölçeklendirmek için kullanılır. Bu, Mega Man Legends 2 gibi modern denetleyicilerin sağladığından daha büyük değerler bekleyen oyunlar için kullanılmalıdır. En iyi sonuçlar için, içerik her yüklendiğinde kalibrasyon algoritmasını ayarlamak için analog çubuklar tam olarak döndürülmelidir."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_TR "DualShock Analog Mod Değişimini Etkinleştir"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR "Giriş cihazı türü DualShock olduğunda, bu seçenek taklit edilmiş DualShock'un orijinal donanım gibi DİJİTAL ve ANALOG mod arasında geçiş yapmasına izin verir. Devre dışı bırakıldığında DualShock, ANALOG moduna kilitlenir ve etkinleştirildiğinde, DualShock, seçilen düğme kombinasyonu kullanılarak DİJİTAL ve ANALOG mod arasında değiştirilebilir."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TR "DualShock Analog Mod Kombinasyonu"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR "Taklit edilmiş DualShock için DİJİTAL ve ANALOG modları arasında geçiş yapmak için kullanılacak düğme kombinasyonunu seçin. Yalnızca \"DualShock Analog Modu Geçişini Etkinleştir\" etkinleştirildiğinde çalışır."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_TR NULL
 #define OPTION_VAL_L1_R1_SELECT_TR NULL
 #define OPTION_VAL_L1_R1_START_TR NULL
@@ -68631,14 +68631,14 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_L2_R2_L3_TR NULL
 #define OPTION_VAL_L2_R2_R3_TR NULL
 #define OPTION_VAL_L3_R3_TR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR NULL
-#define OPTION_VAL_0_TR NULL
-#define OPTION_VAL_1_TR NULL
-#define OPTION_VAL_2_TR NULL
-#define OPTION_VAL_3_TR NULL
-#define OPTION_VAL_4_TR NULL
-#define OPTION_VAL_5_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR "DualShock Analog Mod Kombinasyonu Basma Gecikmesi"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR "Analog mod kombiasyon düğmeleri için basılı tutma süresini ayarlar. Yalnızca \"DualShock Analog Modu Geçişini Etkinleştir\" etkinleştirildiğinde çalışır."
+#define OPTION_VAL_0_TR "0 Saniye Gecikme"
+#define OPTION_VAL_1_TR "1 Saniye Gecikme"
+#define OPTION_VAL_2_TR "2 Saniye Gecikme"
+#define OPTION_VAL_3_TR "3 Saniye Gecikme"
+#define OPTION_VAL_4_TR "4 Saniye Gecikme"
+#define OPTION_VAL_5_TR "5 Saniye Gecikme"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TR "Port 1: Multitap Etkinleştir"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_TR "Port 1 üstünde multilab işlevini etkinleştirin."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_TR "Port 2: Multitap Etkinleştir"
@@ -68668,7 +68668,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TR "2. port için hafif silah artı imleci rengini seçin."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TR "Fare Hassasiyeti"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TR "'Fare' giriş cihazı türünün yanıt verme hızını seçin."
-#define OPTION_VAL_5_O28_TR NULL
+#define OPTION_VAL_5_O28_TR "%5"
 #define OPTION_VAL_10_TR "%10"
 #define OPTION_VAL_15_TR "%15"
 #define OPTION_VAL_20_TR "%20"
@@ -68715,7 +68715,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_CUBIC_TR "Kübik"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_TR "neGcon Büküm Ölü Bölge"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_TR "Taklit edilmiş 'neGcon' giriş cihazlarının 'döndürme' eylemini taklit ederken RetroPad sol analog çubuğunun ölü bölgesini seçin. Denetleyici kaymasını ortadan kaldırmak için kullanılır. Not: Çoğu neGcon uyumlu oyun, bir 'büküm' ölü bölge değeri ayarlamak için oyun içi seçenekler sunar. Hassasiyet kaybını önlemek için oyun içi ölü bölge *her zaman* sıfıra ayarlanmalıdır. Gerekli ayarlamalar *yalnızca* bu temel seçenek aracılığıyla uygulanmalıdır. Bu, 'neGcon Twist Response', 'Quadratic' veya 'Cubic' olarak ayarlandığında özellikle önemlidir."
-#define OPTION_VAL_0_O30_TR NULL
+#define OPTION_VAL_0_O30_TR "%0"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_TR "Bellek Kartı 0 Yöntemi (Yeniden Başlatılmalı)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_TR "Bellek kartı 0 için kullanılan veri kaydetme biçimini seçin. Mednafen'in bağımsız sürümüyle uyumluluk için 'Mednafen' kullanılabilir. Beetle PSX ile kullanıldığında, Libretro (.srm) ve Mednafen (.mcr) kayıtları dahili olarak aynı biçimlere sahiptir ve yeniden adlandırma yoluyla birbirleri arasında dönüştürülebilir."
 #define OPTION_VAL_LIBRETRO_TR NULL
@@ -68728,7 +68728,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_TR "Sol yuvada yüklü olan bellek kartını değiştirin. Bu seçenek yalnızca Bellek Kartı 0 yöntemi Mednafen olarak ayarlanmışsa çalışacaktır. Varsayılan kart dizini 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_TR "Bellek Kartı Sağ Dizin"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_TR "Sağ yuvada yüklü olan bellek kartını değiştirin. Bu seçenek yalnızca Bellek Kartı 1 yöntemi Mednafen olarak ayarlanmışsa çalışacaktır. Varsayılan kart dizini 1."
-#define OPTION_VAL_1_O35_TR NULL
+#define OPTION_VAL_1_O35_TR "1 (Varsayılan)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_TR "PGXP Çalışma Kipi"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TR "Sabit nokta tepe koordinatları kullanımı nedeniyle orijinal donanımda görülen 3B nesnelerin bozulmasını ve titremesini en aza indirerek 3B nesnelerin piksel altı hassasiyetle oluşturulmasına izin verir. 'Yalnızca Bellek' kipinde çok az uyumluluk sorunları vardır ve genel kullanım için önerilir. 'Bellek + CPU (Çılgınca)' kipi titreşimi daha da azaltabilir ancak yüksek performans gereksinimleri vardır ve çeşitli geometri hatalarına neden olabilir."
 #define OPTION_VAL_MEMORY_ONLY_TR "Yalnızca Bellek"
@@ -68894,7 +68894,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_3PX_O58_TR NULL
 #define OPTION_VAL_2PX_O58_TR NULL
 #define OPTION_VAL_1PX_O58_TR NULL
-#define OPTION_VAL_DISABLED_O58_TR NULL
+#define OPTION_VAL_DISABLED_O58_TR "0 (Varsayılan)"
 #define OPTION_VAL_1PX_O58_0_TR NULL
 #define OPTION_VAL_2PX_O58_0_TR NULL
 #define OPTION_VAL_3PX_O58_0_TR NULL
