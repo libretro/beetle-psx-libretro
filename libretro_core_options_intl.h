@@ -12264,9 +12264,9 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CS "Analogová Vlastní Kalibrace"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CS "Pokud je vstupní zařízení nastaveno na DualShock, Analogový ovladač, Analogový joystick nebo neGcon, tato možnost umožňuje dynamickou kalibraci analogových vstupů. Maximální registrované hodnoty vstupů jsou sledovány v reálném čase a použity ke škálování analogových souřadnic předávaných emulátoru. Tato funkce by měla být použita u her, jako je Mega Man Legends 2, které očekávají větší hodnoty, než jaké poskytují moderní ovladače. Pro dosažení nejlepších výsledků by se analogové páčky měly otáčet v plném rozsahu, aby se kalibrační algoritmus vyladil při každém načtení obsahu."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CS "Povolit Přepnutí Režimu Analogu DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS "Pokud je typem vstupního zařízení DualShock, umožňuje tato možnost přepínat emulovaný DualShock mezi DIGITÁLNÍM a ANALOGOVÝM režimem jako původní hardware. Pokud je tato funkce zakázána, je zařízení DualShock uzamčeno v režimu ANALOG a pokud je povolena, lze zařízení DualShock přepínat mezi režimem DIGITAL a ANALOG pomocí vybrané kombinace tlačítek."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CS "Kombinace analogového režimu DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS "Zvolte kombinaci tlačítek, která se bude používat k přepínání mezi DIGITÁLNÍM a ANALOGOVÝM režimem emulovaného zařízení DualShock. Funguje pouze v případě, že je povolena možnost \"Povolit přepínání analogového režimu DualShock\"."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CS NULL
 #define OPTION_VAL_L1_R1_SELECT_CS NULL
 #define OPTION_VAL_L1_R1_START_CS NULL
@@ -12277,14 +12277,14 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_L2_R2_L3_CS NULL
 #define OPTION_VAL_L2_R2_R3_CS NULL
 #define OPTION_VAL_L3_R3_CS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS NULL
-#define OPTION_VAL_0_CS NULL
-#define OPTION_VAL_1_CS NULL
-#define OPTION_VAL_2_CS NULL
-#define OPTION_VAL_3_CS NULL
-#define OPTION_VAL_4_CS NULL
-#define OPTION_VAL_5_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS "Zpoždění podržení analogového režimu DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS "Nastavuje dobu podržení pro kombinovaná tlačítka analogového režimu. Funguje pouze v případě, že je povolena možnost \"Povolit přepínání analogového režimu DualShock\"."
+#define OPTION_VAL_0_CS "0 sekundové zpoždění"
+#define OPTION_VAL_1_CS "1 sekundové zpoždění"
+#define OPTION_VAL_2_CS "2 sekundové zpoždění"
+#define OPTION_VAL_3_CS "3 sekundové zpoždění"
+#define OPTION_VAL_4_CS "4 sekundové zpoždění"
+#define OPTION_VAL_5_CS "5 sekundové zpoždění"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CS "Port 1: Povolení Multitapu"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CS "Povolit funkci multitap na portu 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CS "Port 2: Povolení Multitapu"
@@ -12374,7 +12374,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v levém slotu. Tato možnost bude fungovat pouze v případě, že je metoda Paměťová Karta 0 nastavena na Mednafen. Výchozí karta má index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CS "Pravý Index Paměťové Karty"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v pravém slotu. Tato možnost bude fungovat pouze v případě, že je povolena Paměťová Karta 1. Výchozí karta má index 1."
-#define OPTION_VAL_1_O35_CS NULL
+#define OPTION_VAL_1_O35_CS "1 (Výchozí)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_CS "Provozní Režim PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CS "Umožňuje vykreslovat 3D objekty se subpixelovou přesností, čímž se minimalizuje zkreslení a chvění 3D objektů na původním hardwaru v důsledku použití souřadnic vrcholů s pevným bodem. Režim 'Pouze Paměť' má minimální problémy s kompatibilitou a doporučuje se pro obecné použití. Režim 'Paměť + CPU (Chyby)' může ještě více snížit jitter, ale má vysoké nároky na výkon a může způsobit různé chyby geometrie."
 #define OPTION_VAL_MEMORY_ONLY_CS "Pouze Paměť"
@@ -12540,7 +12540,7 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_3PX_O58_CS NULL
 #define OPTION_VAL_2PX_O58_CS NULL
 #define OPTION_VAL_1PX_O58_CS NULL
-#define OPTION_VAL_DISABLED_O58_CS NULL
+#define OPTION_VAL_DISABLED_O58_CS "0 (Výchozí)"
 #define OPTION_VAL_1PX_O58_0_CS NULL
 #define OPTION_VAL_2PX_O58_0_CS NULL
 #define OPTION_VAL_3PX_O58_0_CS NULL
