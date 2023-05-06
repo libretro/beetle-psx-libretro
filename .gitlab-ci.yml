@@ -224,6 +224,11 @@ libretro-build-ios-arm64:
     - .libretro-ios-arm64-make-default
     - .core-defs
 
+libretro-build-ios-arm64-hw:
+  extends:
+    - .libretro-ios-arm64-make-default
+    - .core-defs-hw
+
 # iOS (armv7) [iOS 9 and up]
 libretro-build-ios9:
   extends:

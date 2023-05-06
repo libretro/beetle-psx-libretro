@@ -189,7 +189,7 @@ else ifneq (,$(findstring ios,$(platform)))
    endif
    HAVE_LIGHTREC = 0
    LDFLAGS += $(IPHONEMINVER)
-   FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H
+   FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H -DIOS=1
    CC      += $(IPHONEMINVER)
    CXX     += $(IPHONEMINVER)
 
