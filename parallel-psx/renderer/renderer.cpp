@@ -183,7 +183,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	ImageInitialData dither_initial = { dither_lut_data };
 	dither_lut = device.create_image(dither_info, &dither_initial);
 
-	static const int8_t quad_data[] = {
+	static const float quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
 	};
 
@@ -642,7 +642,7 @@ void Renderer::mipmap_framebuffer()
 		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler::LinearClamp);
 
 		cmd->set_quad_state();
-		cmd->set_vertex_binding(0, *quad, 0, 2);
+		cmd->set_vertex_binding(0, *quad, 0, 8);
 		struct Push
 		{
 			float offset[2];
@@ -659,7 +659,7 @@ void Renderer::mipmap_framebuffer()
 			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
 		};
 		cmd->push_constants(&push, 0, sizeof(push));
-		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 		cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 		counters.draw_calls++;
 		counters.vertices += 4;
@@ -941,7 +941,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::LinearClamp);
 	}
 
-	cmd->set_vertex_binding(0, *quad, 0, 2);
+	cmd->set_vertex_binding(0, *quad, 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -958,7 +958,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		          float(scaled_views.size() - 1) };
 
 	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 	counters.draw_calls++;
 	counters.vertices += 4;
@@ -1220,7 +1220,7 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 	}
 
-	cmd->set_vertex_binding(0, *quad, 0, 2);
+	cmd->set_vertex_binding(0, *quad, 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -1236,7 +1236,7 @@ ImageHandle Renderer::scanout_to_texture()
 		          float(scaled_views.size() - 1) };
 
 	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 	counters.draw_calls++;
 	counters.vertices += 4;
@@ -1264,7 +1264,7 @@ void Renderer::scanout()
 	cmd->set_program(*pipelines.scaled_quad_blitter);
 	cmd->set_texture(0, 0, image->get_view(), StockSampler::LinearClamp);
 
-	cmd->set_vertex_binding(0, *quad, 0, 2);
+	cmd->set_vertex_binding(0, *quad, 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -1273,7 +1273,7 @@ void Renderer::scanout()
 	const Push push = { { 0.0f, 0.0f }, { 1.0f, 1.0f } };
 
 	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R8G8_SNORM, 0);
+	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 	counters.draw_calls++;
 	counters.vertices += 4;

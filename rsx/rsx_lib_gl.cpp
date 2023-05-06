@@ -398,12 +398,14 @@ static void get_error(const char *msg)
       case GL_OUT_OF_MEMORY:
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_OUT_OF_MEMORY [%s]\n", msg);
          break;
+#ifndef __APPLE__
       case GL_STACK_UNDERFLOW:
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_STACK_UNDERFLOW [%s]\n", msg);
          break;
       case GL_STACK_OVERFLOW:
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_STACK_OVERFLOW [%s]\n", msg);
          break;
+#endif
       case GL_INVALID_OPERATION:
          log_cb(RETRO_LOG_ERROR, "GL error flag: GL_INVALID_OPERATION [%s]\n", msg);
          break;

@@ -131,7 +131,7 @@ endif
 else ifeq ($(platform), osx)
    TARGET  := $(TARGET_NAME)_libretro.dylib
    fpic    := -fPIC
-   SHARED  := -dynamiclib
+   SHARED  := -dynamiclib -Wl,-exported_symbols_list,libretro.osx.def
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS   += $(PTHREAD_FLAGS)
    ifeq ($(arch),ppc)
