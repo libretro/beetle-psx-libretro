@@ -131,7 +131,7 @@ endif
 else ifeq ($(platform), osx)
    TARGET  := $(TARGET_NAME)_libretro.dylib
    fpic    := -fPIC
-   SHARED  := -dynamiclib
+   SHARED  := -dynamiclib -Wl,-exported_symbols_list,libretro.osx.def
    LDFLAGS += $(PTHREAD_FLAGS)
    FLAGS   += $(PTHREAD_FLAGS)
    ifeq ($(arch),ppc)
@@ -189,7 +189,7 @@ else ifneq (,$(findstring ios,$(platform)))
    endif
    HAVE_LIGHTREC = 0
    LDFLAGS += $(IPHONEMINVER)
-   FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H
+   FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H -DIOS=1
    CC      += $(IPHONEMINVER)
    CXX     += $(IPHONEMINVER)
 
