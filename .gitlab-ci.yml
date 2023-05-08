@@ -240,3 +240,8 @@ libretro-build-tvos-arm64:
   extends:
     - .libretro-tvos-arm64-make-default
     - .core-defs
+
+libretro-build-tvos-arm64-hw:
+  extends:
+    - .libretro-tvos-arm64-make-default
+    - .core-defs-hw

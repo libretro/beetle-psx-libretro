@@ -199,11 +199,19 @@ else ifeq ($(platform), tvos-arm64)
    fpic := -fPIC
    SHARED := -dynamiclib
    HAVE_LIGHTREC = 0
-   FLAGS += -DHAVE_UNISTD_H
+   FLAGS += -DHAVE_UNISTD_H -DIOS=1 -DTVOS=1
 
-ifeq ($(IOSSDK),)
-   IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
-endif
+   ifeq ($(IOSSDK),)
+      IOSSDK := $(shell xcrun -sdk appletvos -show-sdk-path)
+   endif
+   ifeq ($(HAVE_OPENGL),1)
+      GL_LIB := -framework OpenGLES
+      GLES = 1
+      GLES3 = 1
+   endif
+
+   CC = cc -arch arm64 -isysroot $(IOSSDK)
+   CXX = c++ -arch arm64 -isysroot $(IOSSDK)
 
 # QNX
 else ifeq ($(platform), qnx)
