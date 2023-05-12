@@ -4092,7 +4092,7 @@ struct retro_core_options_v2 options_ast = {
 
 /* RETRO_LANGUAGE_BE */
 
-#define CATEGORY_VIDEO_LABEL_BE NULL
+#define CATEGORY_VIDEO_LABEL_BE "Відэа"
 #define CATEGORY_VIDEO_INFO_0_BE NULL
 #define CATEGORY_OSD_LABEL_BE NULL
 #define CATEGORY_OSD_INFO_0_BE NULL
