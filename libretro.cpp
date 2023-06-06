@@ -85,6 +85,7 @@ static bool gui_inited = false;
 static bool gui_show = false;
 static char bios_path[4096];
 static bool firmware_found = false;
+static int close_tray_counter = 0;
 
 // Switchable memory cards
 static int memcard_left_index = 0;
@@ -2875,7 +2876,11 @@ static bool disk_set_eject_state(bool ejected)
    if (ejected == eject_state)
       return false;
 
-   DoSimpleCommand(ejected ? MDFN_MSC_EJECT_DISK : MDFN_MSC_INSERT_DISK);
+   if (ejected)
+      DoSimpleCommand(MDFN_MSC_EJECT_DISK);
+   else // Handled in retro_run
+      close_tray_counter = 1;
+
    eject_state = ejected;
    return true;
 }
@@ -4750,6 +4755,21 @@ void retro_run(void)
    }
 
    /* end of Emulate */
+
+   // The core needs to run for a few frames to register that the tray was opened,
+   // this is a small workaround so the user doesn't have to akwardly resume game before closing tray
+   // so instead of doing eject -> resume -> switch disc -> insert
+   // the user can simply do eject -> switch disc -> insert
+   if (close_tray_counter)
+   {
+      if (close_tray_counter > 5)
+      {
+         close_tray_counter = 0;
+         DoSimpleCommand(MDFN_MSC_INSERT_DISK);
+      }
+      else
+         close_tray_counter++;
+   }
 
    // Check if aspect ratio needs to be changed due to display mode change on this frame
    if (MDFN_UNLIKELY((aspect_ratio_setting == 1) && aspect_ratio_dirty))
