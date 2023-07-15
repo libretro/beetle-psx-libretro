@@ -345,7 +345,7 @@ void PS_CPU_LIGHTREC::reset_target_cycle_count(struct lightrec_state *state, psc
 }
 
 void PS_CPU_LIGHTREC::hw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u8 val)
+		u32 opcode, void *host,	u32 mem, u32 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
@@ -355,7 +355,7 @@ void PS_CPU_LIGHTREC::hw_write_byte(struct lightrec_state *state,
 }
 
 void PS_CPU_LIGHTREC::pgxp_nonhw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u8 val)
+		u32 opcode, void *host,	u32 mem, u32 val)
 {
 	*(u8 *)host = val;
 	PGXP_CPU_SB(opcode, val, mem);
@@ -365,7 +365,7 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_byte(struct lightrec_state *state,
 }
 
 void PS_CPU_LIGHTREC::pgxp_hw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u8 val)
+		u32 opcode, void *host,	u32 mem, u32 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
@@ -379,7 +379,7 @@ void PS_CPU_LIGHTREC::pgxp_hw_write_byte(struct lightrec_state *state,
 }
 
 void PS_CPU_LIGHTREC::hw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u16 val)
+		u32 opcode, void *host, u32 mem, u32 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
@@ -389,7 +389,7 @@ void PS_CPU_LIGHTREC::hw_write_half(struct lightrec_state *state,
 }
 
 void PS_CPU_LIGHTREC::pgxp_nonhw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u16 val)
+		u32 opcode, void *host, u32 mem, u32 val)
 {
 	*(u16 *)host = HTOLE16(val);
 	PGXP_CPU_SH(opcode, val, mem);
@@ -399,7 +399,7 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_half(struct lightrec_state *state,
 }
 
 void PS_CPU_LIGHTREC::pgxp_hw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u16 val)
+		u32 opcode, void *host, u32 mem, u32 val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
@@ -864,7 +864,7 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 	lightrec_state = lightrec_init(name,
 			lightrec_map, ARRAY_SIZE(lightrec_map), cop_ops);
 
-	lightrec_set_invalidate_mode(lightrec_state, noInvalidate);
+	lightrec_set_unsafe_opt_flags(lightrec_state, noInvalidate?LIGHTREC_OPT_INV_DMA_ONLY:0);
 
 	lightrec_regs = lightrec_get_registers(lightrec_state);
 
@@ -915,6 +915,9 @@ int32_t PS_CPU_LIGHTREC::lightrec_plugin_execute(int32_t timestamp)
 		CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
 
 		flags = lightrec_exit_flags(lightrec_state);
+
+		if (flags & LIGHTREC_EXIT_UNKNOWN_OP)
+			log_cb(RETRO_LOG_ERROR, "Unknown Operation in block at PC 0x%08x\n", PC);
 
 		if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
 			if (flags & LIGHTREC_EXIT_NOMEM)
