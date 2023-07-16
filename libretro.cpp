@@ -117,7 +117,8 @@ bool fast_pal = false;
 unsigned image_height = 0;
 
 #ifdef HAVE_LIGHTREC
-enum DYNAREC psx_dynarec;
+bool lightrec_interpreter;
+bool psx_dynarec;
 bool psx_dynarec_invalidate;
 uint8 psx_mmap = 0;
 uint8 *psx_mem = NULL;
@@ -505,6 +506,9 @@ MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = (MultiAccessSizeMem<20
 MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 
 #ifdef HAVE_LIGHTREC
+PS_CPU *PSX_CPU_MEDNAFEN = NULL;
+PS_CPU_LIGHTREC *PSX_CPU_LIGHTREC = NULL;
+
 /* Size of Expansion 1 (8MB) */
 #define PSX_EXPANSION1_SIZE        0x800000U
 /* Base address of Expansion 1 */
@@ -1283,8 +1287,12 @@ static void PSX_Power(void)
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
 
-   PSX_CPU->Power();
-
+   PSX_CPU_MEDNAFEN->Power();
+#ifdef HAVE_LIGHTREC
+   //setoptions can be called before power (lightrec init) for tracking of options changing
+   PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
+   PSX_CPU_LIGHTREC->Power();
+#endif
    EventReset();
 
    TIMER_Power();
@@ -2068,7 +2076,13 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       sle = tmp;
    }
 
+#ifdef HAVE_LIGHTREC
+   PSX_CPU_MEDNAFEN = new PS_CPU();
+   PSX_CPU_LIGHTREC = new PS_CPU_LIGHTREC();
+   PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
+#else
    PSX_CPU = new PS_CPU();
+#endif
    PSX_SPU = new PS_SPU();
 
    GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
@@ -2494,8 +2508,17 @@ static void Cleanup(void)
 
    GPU_Destroy();
 
+#ifdef HAVE_LIGHTREC
+   if(PSX_CPU_MEDNAFEN)
+      delete PSX_CPU_MEDNAFEN;
+   PSX_CPU_MEDNAFEN = NULL;
+   if(PSX_CPU_LIGHTREC)
+      delete PSX_CPU_LIGHTREC;
+   PSX_CPU_LIGHTREC = NULL;
+#else
    if(PSX_CPU)
       delete PSX_CPU;
+#endif
    PSX_CPU = NULL;
 
    if(PSX_FIO)
@@ -3275,14 +3298,20 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "execute") == 0)
-         psx_dynarec = DYNAREC_EXECUTE;
+      {
+         lightrec_interpreter = false;
+         psx_dynarec = true;
+      }
       else if (strcmp(var.value, "run_interpreter") == 0)
-         psx_dynarec = DYNAREC_RUN_INTERPRETER;
+      {
+         lightrec_interpreter = true;
+         psx_dynarec = true;
+      }
       else
-         psx_dynarec = DYNAREC_DISABLED;
+         psx_dynarec = false;
    }
    else
-      psx_dynarec = DYNAREC_DISABLED;
+      psx_dynarec = false;
 
    var.key = BEETLE_OPT(dynarec_invalidate);
 
@@ -4128,6 +4157,16 @@ static void check_variables(bool startup)
       memcard_right_index_old = memcard_right_index;
       memcard_right_index     = atoi(var.value);
    }
+
+#ifdef HAVE_LIGHTREC
+   if(PSX_CPU)
+   {
+    PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
+
+    //lightrec tracks options to move data between lightrec internal state and mednafen
+    PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
+   }
+#endif
 }
 
 #ifdef NEED_CD
@@ -4419,7 +4458,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef HAVE_LIGHTREC
       /* Do not run lightrec if firmware is not found, recompiling garbage is bad*/
-      psx_dynarec = DYNAREC_DISABLED;
+      psx_dynarec = false;
+      PSX_CPU = PSX_CPU_MEDNAFEN;
+      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
 #endif
    }
 

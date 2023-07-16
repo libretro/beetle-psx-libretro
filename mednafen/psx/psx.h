@@ -85,6 +85,9 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 
 #include "dis.h"
 #include "cpu.h"
+#ifdef HAVE_LIGHTREC
+#include "cpu_lightrec.h"
+#endif
 #include "irq.h"
 #include "gpu.h"
 #include "dma.h"
