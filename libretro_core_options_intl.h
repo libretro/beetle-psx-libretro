@@ -18586,7 +18586,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_DE "PAL (europäisch) Videotiming übersteuern"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DE "Aufgrund unterschiedlicher Standards scheinen PAL-Spiele im Vergleich zu den amerikanischen oder japanischen NTSC-Releases verlangsamt. Diese Option kann genutzt werden, um PAL-Timings zu übersteuern und zu versuchen, diese Spiele mit der NTSC-Bildwiederholrate auszuführen. Diese Option hat keine Auswirkung beim Ausführen von NTSC-Inhalten."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_DE "Overscan zuschneiden"
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DE "'Keine' behält Fülldaten (schwarze Balken auf beiden Seiten des Bildes für NTSC, auf allen Seiten für PAL), um die gleichen schwarzen Balken zu emulieren, die in analoger Videoausgabe durch echte PSX-Hardware erzeugt werden. 'Statisch' entfernt nur horizontale Fülldaten, 'Dynamisch' entfernt alle Fülldaten."
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DE "'Nein' behält Fülldaten (schwarze Balken auf beiden Seiten des Bildes für NTSC, auf allen Seiten für PAL), um die gleichen schwarzen Balken zu emulieren, die in analoger Videoausgabe durch echte PSX-Hardware erzeugt werden. 'Statisch' entfernt nur horizontale Fülldaten, 'Dynamisch' entfernt alle Fülldaten."
 #define OPTION_VAL_DISABLED_O56_DE "Nein"
 #define OPTION_VAL_STATIC_DE "Statisch"
 #define OPTION_VAL_SMART_DE "Dynamisch (Standard)"
