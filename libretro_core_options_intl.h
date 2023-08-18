@@ -62853,7 +62853,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define CATEGORY_INPUT_LABEL_RU "Ввод"
 #define CATEGORY_INPUT_INFO_0_RU "Настройки светового пистолета, мыши и neGcon."
 #define CATEGORY_MEMCARDS_LABEL_RU "Карты памяти"
-#define CATEGORY_MEMCARDS_INFO_0_RU "Настройка параметров используемых системой виртуальных карт памяти."
+#define CATEGORY_MEMCARDS_INFO_0_RU "Настройка параметров виртуальных карт памяти, используемых системой."
 #define CATEGORY_PGXP_LABEL_RU NULL
 #define CATEGORY_PGXP_INFO_0_RU "Настройки улучшений, позволяющих добиться качества графики выше уровня оригинальной консоли. PGXP помогает избавиться от деформации текстур и Z-конфликтов."
 #define CATEGORY_HACKS_LABEL_RU "Хаки эмуляции"
