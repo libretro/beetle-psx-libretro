@@ -63211,7 +63211,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_RU "Соотношение сторон ядра"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_RU NULL
 #define OPTION_VAL_CORRECTED_RU "Скорректированное"
-#define OPTION_VAL_UNCORRECTED_RU "Нескорректированное"
+#define OPTION_VAL_UNCORRECTED_RU NULL
 #define OPTION_VAL_4_3_RU "4:3 принудительно"
 #define OPTION_VAL_NTSC_RU "NTSC принудительно"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_RU "Начальная строка развёртки - NTSC"
