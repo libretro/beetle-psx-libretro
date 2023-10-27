@@ -68989,12 +68989,12 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_SV "Visa den interna bildrutefrekvensen (FPS) som det emulerade PlayStation-systemet renderar innehåll i. Obs!: Kräver att meddelanden på skärmen är aktiverade i libretro-frontenden."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_SV "Visa fullständig VRAM (Felsökning)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_SV "Visualisera hela den emulerade konsolens VRAM. Stöds endast av OpenGL- och Vulkan-hårdvarurenderare. Obs!: Detta är för felsökningsändamål och bör normalt sett vara inaktiverat."
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_SV NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_SV "Självkalibrera analoga spakar"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV "När ingångsenheten är inställd på DualShock, Analog Controller, Analog Joystick eller neGcon möjliggör den här inställningen dynamisk kalibrering av analoga ingångar. Hösta registrerade ingångsvärden övervakas i realtid och används för att justera analoga koordinater som skickas till emulatorn. Detta bör användas för spel som Mega Man Legends 2 som förväntar sig större värden än vad moderna kontroller tillhandahåller. För bästa resultat bör analoga spakar roteras i full utsträckning för att finjustera kalibreringsalgoritmen varje gång innehåll laddas."
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV "Aktivera Dualshock-analogt lägesväxling"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV "När typen av inmatningsenhet är DualShock, tillåter denna inställning att den emulerade DualShock-kontrollen växlar mellan DIGITAL och ANALOG läge, precis som originalet. När det är inaktiverat, är DualShock låst i ANALOG läge, och när det är aktiverat, kan DualShock växlas mellan DIGITAL och ANALOG läge genom att använda den valda knappkombinationen."
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV "DualShock-analogt läge för kombinationer"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV "Välj knappkombinationen som kommer att användas för att växla mellan DIGITALT och ANALOGT läge för den emulerade DualShock-kontrollen. Fungerar endast när \"Aktivera Dualshock-analogt lägesväxling\" är aktiverat."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SV NULL
 #define OPTION_VAL_L1_R1_SELECT_SV NULL
 #define OPTION_VAL_L1_R1_START_SV NULL
