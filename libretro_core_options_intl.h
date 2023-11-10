@@ -46644,7 +46644,7 @@ struct retro_core_options_v2 options_it = {
 #define CATEGORY_OSD_INFO_0_JA NULL
 #define CATEGORY_INPUT_LABEL_JA "入力"
 #define CATEGORY_INPUT_INFO_0_JA NULL
-#define CATEGORY_MEMCARDS_LABEL_JA NULL
+#define CATEGORY_MEMCARDS_LABEL_JA "メモリーカード"
 #define CATEGORY_MEMCARDS_INFO_0_JA NULL
 #define CATEGORY_PGXP_LABEL_JA NULL
 #define CATEGORY_PGXP_INFO_0_JA NULL
@@ -69005,14 +69005,14 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_L2_R2_L3_SV NULL
 #define OPTION_VAL_L2_R2_R3_SV NULL
 #define OPTION_VAL_L3_R3_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV NULL
-#define OPTION_VAL_0_SV NULL
-#define OPTION_VAL_1_SV NULL
-#define OPTION_VAL_2_SV NULL
-#define OPTION_VAL_3_SV NULL
-#define OPTION_VAL_4_SV NULL
-#define OPTION_VAL_5_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV "Hållningsfördröjning för DualShock analogt läges-kombo"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV "Sätter hålltiden för knappkombinationen för analoga lägen. Fungerar endast när \"Aktivera DualShock-analogt läge växling\" är aktiverad."
+#define OPTION_VAL_0_SV "0 sekunds fördröjning"
+#define OPTION_VAL_1_SV "1 sekunds fördröjning"
+#define OPTION_VAL_2_SV "2 sekunders fördröjning"
+#define OPTION_VAL_3_SV "3 sekunders fördröjning"
+#define OPTION_VAL_4_SV "4 sekunders fördröjning"
+#define OPTION_VAL_5_SV "5 sekunders fördröjning"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SV NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV NULL
@@ -69299,17 +69299,17 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_239_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_SV NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SV NULL
-#define OPTION_VAL_287_SV NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SV NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SV NULL
-#define OPTION_VAL_SYNC_SV NULL
-#define OPTION_VAL_ASYNC_SV NULL
-#define OPTION_VAL_PRECACHE_SV NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_SV NULL
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_SV NULL
-#define OPTION_VAL_2X_NATIVE_SV NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV "Senast visade skanningslinje - PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SV "Välj den senast visade skanningslinjen när du kör PAL-innehåll. Värden under 287 kommer att minska höjden på utdata bilder genom att beskära pixlar från den nedersta kanten. Kan användas för att motverka letterboxing."
+#define OPTION_VAL_287_SV "287 (Standard)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SV "CD-åtkomstmetod (Omstart krävs)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SV "Välj metod för att läsa data från innehållsskivavbilder. \"Synkron\" efterliknar originalhårdvaran. \"Asynkron\" kan minska hackningar på enheter med långsam lagring. \"Förhandsinläsning\" laddar hela skivavbildningen i minnet vid start av innehållet, vilket kan förbättra inladdningstider i spelet på bekostnad av en initial fördröjning vid uppstart. \"Förhandsinläsning\" kan orsaka problem på system med lågt RAM och kommer att falla tillbaka till \"Synkron\" för fysiska medier."
+#define OPTION_VAL_SYNC_SV "Synkron"
+#define OPTION_VAL_ASYNC_SV "Asynkron"
+#define OPTION_VAL_PRECACHE_SV "Förhandsinläsning"
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_SV "CD-laddningshastighet"
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_SV "Välj multiplikator för skivåtkomsthastighet. Värden högre än \"2x (Native)\" kan kraftigt minska inladdningstiderna i spelet, men kan introducera tidsfel. Vissa spel kan fungera korrekt ovanför en viss värde."
+#define OPTION_VAL_2X_NATIVE_SV "2x (Nativ)"
 #define OPTION_VAL_6X_SV NULL
 #define OPTION_VAL_10X_SV NULL
 #define OPTION_VAL_12X_SV NULL
