@@ -12198,7 +12198,7 @@ struct retro_core_options_v2 options_cht = {
 
 #define CATEGORY_VIDEO_LABEL_CS NULL
 #define CATEGORY_VIDEO_INFO_0_CS "Změňte poměr stran, oříznutí displeje, filtr videa a nastavení přeskakování snímků."
-#define CATEGORY_OSD_LABEL_CS "Zobrazení na Obrazovce"
+#define CATEGORY_OSD_LABEL_CS "Zobrazení na obrazovce"
 #define CATEGORY_OSD_INFO_0_CS "Změna oznámení zobrazovaných na obrazovce."
 #define CATEGORY_INPUT_LABEL_CS "Vstup"
 #define CATEGORY_INPUT_INFO_0_CS "Změna nastavení světelné pistole, myši a neGconu."
@@ -68925,8 +68925,8 @@ struct retro_core_options_v2 options_sr = {
 /* RETRO_LANGUAGE_SV */
 
 #define CATEGORY_VIDEO_LABEL_SV "Bild"
-#define CATEGORY_VIDEO_INFO_0_SV "Ändra bildförhållande, beskärning, videofilter och inställningar för bildruteskippning."
-#define CATEGORY_OSD_LABEL_SV "On Screen Display"
+#define CATEGORY_VIDEO_INFO_0_SV "Ändra bildformat, beskärning, videofilter och inställningar för bildruteskippning."
+#define CATEGORY_OSD_LABEL_SV NULL
 #define CATEGORY_OSD_INFO_0_SV "Ändra aviseringar som visas på skärmen."
 #define CATEGORY_INPUT_LABEL_SV "Inmatning"
 #define CATEGORY_INPUT_INFO_0_SV "Ändra inställningar för ljuspistol, mus och neGcon."
@@ -68954,7 +68954,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_SV "Texturer för 3D-polygoner med en förskjutning för högre än 1x intern upplösning. Minskar textursekvenser men kan orsaka oavsiktliga grafiska problem."
 #define BEETLE_OPT_FILTER_LABEL_SV "Texturfiltrering"
 #define BEETLE_OPT_FILTER_INFO_0_SV "Välj texturfiltreringsmetod. \"Närmaste\" emulerar originalhårdvaran. \"Bilineär\" och \"3-Punkt\" är slätningsfilter, som minskar pixelering genom suddighet. \"SABR\", \"xBR\" och \"JINC2\" är uppskalningsfilter som kan förbättra texturkvalitet/skärpa på bekostnad av ökade prestandakrav. Endast stöds av hårdvaru-renderaren."
-#define OPTION_VAL_NEAREST_SV "Närmaste"
+#define OPTION_VAL_NEAREST_SV "Närmsta"
 #define OPTION_VAL_SABR_SV NULL
 #define OPTION_VAL_XBR_SV NULL
 #define OPTION_VAL_BILINEAR_SV "Bilinjär"
@@ -69023,9 +69023,9 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SV NULL
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SV NULL
-#define OPTION_VAL_CROSS_SV NULL
-#define OPTION_VAL_DOT_SV NULL
-#define OPTION_VAL_OFF_SV NULL
+#define OPTION_VAL_CROSS_SV "Kors"
+#define OPTION_VAL_DOT_SV "Punkt"
+#define OPTION_VAL_OFF_SV "Inget hårkors"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_SV NULL
 #define OPTION_VAL_RED_SV "Röd"
@@ -69043,50 +69043,50 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV NULL
 #define OPTION_VAL_5_O28_SV NULL
-#define OPTION_VAL_10_SV "10 %"
-#define OPTION_VAL_15_SV "15 %"
-#define OPTION_VAL_20_SV "20 %"
-#define OPTION_VAL_25_SV "25 %"
-#define OPTION_VAL_30_SV "30 %"
-#define OPTION_VAL_35_SV "35 %"
-#define OPTION_VAL_40_SV "40 %"
-#define OPTION_VAL_45_SV "45 %"
-#define OPTION_VAL_50_SV "50 %"
-#define OPTION_VAL_55_SV "55 %"
-#define OPTION_VAL_60_SV "60 %"
-#define OPTION_VAL_65_SV "65 %"
-#define OPTION_VAL_70_SV "70 %"
-#define OPTION_VAL_75_SV "75 %"
-#define OPTION_VAL_80_SV "80 %"
-#define OPTION_VAL_85_SV "85 %"
-#define OPTION_VAL_90_SV "90 %"
-#define OPTION_VAL_95_SV "95 %"
-#define OPTION_VAL_100_SV NULL
-#define OPTION_VAL_105_SV "105 %"
-#define OPTION_VAL_110_SV "110 %"
-#define OPTION_VAL_115_SV "115 %"
-#define OPTION_VAL_120_SV "120 %"
-#define OPTION_VAL_125_SV "125 %"
-#define OPTION_VAL_130_SV "130 %"
-#define OPTION_VAL_135_SV "135 %"
-#define OPTION_VAL_140_SV "140 %"
-#define OPTION_VAL_145_SV "145 %"
-#define OPTION_VAL_150_SV "150 %"
-#define OPTION_VAL_155_SV "155 %"
-#define OPTION_VAL_160_SV "160 %"
-#define OPTION_VAL_165_SV "165 %"
-#define OPTION_VAL_170_SV "170 %"
-#define OPTION_VAL_175_SV "175 %"
-#define OPTION_VAL_180_SV "180 %"
-#define OPTION_VAL_185_SV "185 %"
-#define OPTION_VAL_190_SV "190 %"
-#define OPTION_VAL_195_SV "195 %"
-#define OPTION_VAL_200_SV "200 %"
+#define OPTION_VAL_10_SV NULL
+#define OPTION_VAL_15_SV NULL
+#define OPTION_VAL_20_SV NULL
+#define OPTION_VAL_25_SV NULL
+#define OPTION_VAL_30_SV NULL
+#define OPTION_VAL_35_SV NULL
+#define OPTION_VAL_40_SV NULL
+#define OPTION_VAL_45_SV NULL
+#define OPTION_VAL_50_SV NULL
+#define OPTION_VAL_55_SV NULL
+#define OPTION_VAL_60_SV NULL
+#define OPTION_VAL_65_SV NULL
+#define OPTION_VAL_70_SV NULL
+#define OPTION_VAL_75_SV NULL
+#define OPTION_VAL_80_SV NULL
+#define OPTION_VAL_85_SV NULL
+#define OPTION_VAL_90_SV NULL
+#define OPTION_VAL_95_SV NULL
+#define OPTION_VAL_100_SV "100% (Standard)"
+#define OPTION_VAL_105_SV NULL
+#define OPTION_VAL_110_SV NULL
+#define OPTION_VAL_115_SV NULL
+#define OPTION_VAL_120_SV NULL
+#define OPTION_VAL_125_SV NULL
+#define OPTION_VAL_130_SV NULL
+#define OPTION_VAL_135_SV NULL
+#define OPTION_VAL_140_SV NULL
+#define OPTION_VAL_145_SV NULL
+#define OPTION_VAL_150_SV NULL
+#define OPTION_VAL_155_SV NULL
+#define OPTION_VAL_160_SV NULL
+#define OPTION_VAL_165_SV NULL
+#define OPTION_VAL_170_SV NULL
+#define OPTION_VAL_175_SV NULL
+#define OPTION_VAL_180_SV NULL
+#define OPTION_VAL_185_SV NULL
+#define OPTION_VAL_190_SV NULL
+#define OPTION_VAL_195_SV NULL
+#define OPTION_VAL_200_SV NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_SV NULL
 #define OPTION_VAL_LINEAR_SV "Linjär"
 #define OPTION_VAL_QUADRATIC_SV "Kvadratisk"
-#define OPTION_VAL_CUBIC_SV NULL
+#define OPTION_VAL_CUBIC_SV "Kubisk"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV NULL
 #define OPTION_VAL_0_O30_SV NULL
@@ -69102,11 +69102,11 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV NULL
-#define OPTION_VAL_1_O35_SV NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_SV NULL
+#define OPTION_VAL_1_O35_SV "1 (Standard)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV NULL
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
-#define OPTION_VAL_MEMORY_CPU_SV NULL
+#define OPTION_VAL_MEMORY_CPU_SV "Minne + CPU (Buggig)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_SV NULL
 #define BEETLE_OPT_PGXP_2D_TOL_INFO_0_SV NULL
 #define OPTION_VAL_0PX_SV NULL
@@ -69139,65 +69139,65 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_20_9_SV NULL
 #define OPTION_VAL_21_9_SV NULL
 #define OPTION_VAL_32_9_SV NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_SV NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_SV "CPU-frekvens Skalning (Överklockning)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_SV NULL
-#define OPTION_VAL_100_NATIVE_SV NULL
-#define OPTION_VAL_210_SV "210 %"
-#define OPTION_VAL_220_SV "220 %"
-#define OPTION_VAL_230_SV "230 %"
-#define OPTION_VAL_240_SV "240 %"
-#define OPTION_VAL_250_SV "250 %"
-#define OPTION_VAL_260_SV "260 %"
-#define OPTION_VAL_270_SV "270 %"
-#define OPTION_VAL_280_SV "280 %"
-#define OPTION_VAL_290_SV "290 %"
-#define OPTION_VAL_300_SV "300 %"
-#define OPTION_VAL_310_SV "310 %"
-#define OPTION_VAL_320_SV "320 %"
-#define OPTION_VAL_330_SV "330 %"
-#define OPTION_VAL_340_SV "340 %"
-#define OPTION_VAL_350_SV "350 %"
-#define OPTION_VAL_360_SV "360 %"
-#define OPTION_VAL_370_SV "370 %"
-#define OPTION_VAL_380_SV "380 %"
-#define OPTION_VAL_390_SV "390 %"
-#define OPTION_VAL_400_SV "400 %"
-#define OPTION_VAL_410_SV "410 %"
-#define OPTION_VAL_420_SV "420 %"
-#define OPTION_VAL_430_SV "430 %"
-#define OPTION_VAL_440_SV "440 %"
-#define OPTION_VAL_450_SV "450 %"
-#define OPTION_VAL_460_SV "460 %"
-#define OPTION_VAL_470_SV "470 %"
-#define OPTION_VAL_480_SV "480 %"
-#define OPTION_VAL_490_SV "490 %"
-#define OPTION_VAL_500_SV "500 %"
-#define OPTION_VAL_510_SV "510 %"
-#define OPTION_VAL_520_SV "520 %"
-#define OPTION_VAL_530_SV "530 %"
-#define OPTION_VAL_540_SV "540 %"
-#define OPTION_VAL_550_SV "550 %"
-#define OPTION_VAL_560_SV "560 %"
-#define OPTION_VAL_570_SV "570 %"
-#define OPTION_VAL_580_SV "580 %"
-#define OPTION_VAL_590_SV "590 %"
-#define OPTION_VAL_600_SV "600 %"
-#define OPTION_VAL_610_SV "610 %"
-#define OPTION_VAL_620_SV "620 %"
-#define OPTION_VAL_630_SV "630 %"
-#define OPTION_VAL_640_SV "640 %"
-#define OPTION_VAL_650_SV "650 %"
-#define OPTION_VAL_660_SV "660 %"
-#define OPTION_VAL_670_SV "670 %"
-#define OPTION_VAL_680_SV "680 %"
-#define OPTION_VAL_690_SV "690 %"
-#define OPTION_VAL_700_SV "700 %"
-#define OPTION_VAL_710_SV "710 %"
-#define OPTION_VAL_720_SV "720 %"
-#define OPTION_VAL_730_SV "730 %"
-#define OPTION_VAL_740_SV "740 %"
-#define OPTION_VAL_750_SV "750 %"
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_SV NULL
+#define OPTION_VAL_100_NATIVE_SV "100% (Standard)"
+#define OPTION_VAL_210_SV NULL
+#define OPTION_VAL_220_SV NULL
+#define OPTION_VAL_230_SV NULL
+#define OPTION_VAL_240_SV NULL
+#define OPTION_VAL_250_SV NULL
+#define OPTION_VAL_260_SV NULL
+#define OPTION_VAL_270_SV NULL
+#define OPTION_VAL_280_SV NULL
+#define OPTION_VAL_290_SV NULL
+#define OPTION_VAL_300_SV NULL
+#define OPTION_VAL_310_SV NULL
+#define OPTION_VAL_320_SV NULL
+#define OPTION_VAL_330_SV NULL
+#define OPTION_VAL_340_SV NULL
+#define OPTION_VAL_350_SV NULL
+#define OPTION_VAL_360_SV NULL
+#define OPTION_VAL_370_SV NULL
+#define OPTION_VAL_380_SV NULL
+#define OPTION_VAL_390_SV NULL
+#define OPTION_VAL_400_SV NULL
+#define OPTION_VAL_410_SV NULL
+#define OPTION_VAL_420_SV NULL
+#define OPTION_VAL_430_SV NULL
+#define OPTION_VAL_440_SV NULL
+#define OPTION_VAL_450_SV NULL
+#define OPTION_VAL_460_SV NULL
+#define OPTION_VAL_470_SV NULL
+#define OPTION_VAL_480_SV NULL
+#define OPTION_VAL_490_SV NULL
+#define OPTION_VAL_500_SV NULL
+#define OPTION_VAL_510_SV NULL
+#define OPTION_VAL_520_SV NULL
+#define OPTION_VAL_530_SV NULL
+#define OPTION_VAL_540_SV NULL
+#define OPTION_VAL_550_SV NULL
+#define OPTION_VAL_560_SV NULL
+#define OPTION_VAL_570_SV NULL
+#define OPTION_VAL_580_SV NULL
+#define OPTION_VAL_590_SV NULL
+#define OPTION_VAL_600_SV NULL
+#define OPTION_VAL_610_SV NULL
+#define OPTION_VAL_620_SV NULL
+#define OPTION_VAL_630_SV NULL
+#define OPTION_VAL_640_SV NULL
+#define OPTION_VAL_650_SV NULL
+#define OPTION_VAL_660_SV NULL
+#define OPTION_VAL_670_SV NULL
+#define OPTION_VAL_680_SV NULL
+#define OPTION_VAL_690_SV NULL
+#define OPTION_VAL_700_SV NULL
+#define OPTION_VAL_710_SV NULL
+#define OPTION_VAL_720_SV NULL
+#define OPTION_VAL_730_SV NULL
+#define OPTION_VAL_740_SV NULL
+#define OPTION_VAL_750_SV NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_SV "GTE Överklockning"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_SV NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_SV NULL
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_SV NULL
@@ -69205,18 +69205,18 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV NULL
 #define OPTION_VAL_PSXONPSP_SV NULL
 #define OPTION_VAL_PS1_ROM_SV NULL
-#define BEETLE_OPT_RENDERER_LABEL_SV NULL
+#define BEETLE_OPT_RENDERER_LABEL_SV "Rendera (Omstart krävs)"
 #define BEETLE_OPT_RENDERER_INFO_0_SV NULL
 #define OPTION_VAL_HARDWARE_SV "Hårdvara (Auto)"
 #define OPTION_VAL_HARDWARE_GL_SV "Hårdvara (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_SV NULL
 #define OPTION_VAL_SOFTWARE_SV "Mjukvara"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV "Bildbuffer mjukvara"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_SV NULL
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_SV NULL
-#define OPTION_VAL_DISABLED_SV NULL
-#define OPTION_VAL_EXECUTE_SV NULL
+#define OPTION_VAL_DISABLED_SV "Inaktiverad (Beetle Interpreter)"
+#define OPTION_VAL_EXECUTE_SV "Max prestanda"
 #define OPTION_VAL_EXECUTE_ONE_SV NULL
 #define OPTION_VAL_RUN_INTERPRETER_SV NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SV NULL
@@ -69225,7 +69225,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_DMA_SV NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_SV NULL
-#define OPTION_VAL_128_SV NULL
+#define OPTION_VAL_128_SV "128 (Standard)"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV NULL
@@ -69235,12 +69235,12 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_AUTO_TOGGLE_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV "Beskär Overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV NULL
 #define OPTION_VAL_DISABLED_O56_SV "Ingen"
 #define OPTION_VAL_STATIC_SV NULL
-#define OPTION_VAL_SMART_SV NULL
-#define BEETLE_OPT_IMAGE_CROP_LABEL_SV NULL
+#define OPTION_VAL_SMART_SV "Dynamisk (Standard)"
+#define BEETLE_OPT_IMAGE_CROP_LABEL_SV "Ytterligare beskärning"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_SV NULL
 #define OPTION_VAL_9PX_SV NULL
 #define OPTION_VAL_10PX_SV NULL
@@ -69254,7 +69254,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_18PX_SV NULL
 #define OPTION_VAL_19PX_SV NULL
 #define OPTION_VAL_20PX_SV NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_SV NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_SV "Förskjutning beskuren bild"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SV NULL
 #define OPTION_VAL_12PX_O58_SV NULL
 #define OPTION_VAL_11PX_O58_SV NULL
@@ -69268,7 +69268,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_3PX_O58_SV NULL
 #define OPTION_VAL_2PX_O58_SV NULL
 #define OPTION_VAL_1PX_O58_SV NULL
-#define OPTION_VAL_DISABLED_O58_SV NULL
+#define OPTION_VAL_DISABLED_O58_SV "0 (Standard)"
 #define OPTION_VAL_1PX_O58_0_SV NULL
 #define OPTION_VAL_2PX_O58_0_SV NULL
 #define OPTION_VAL_3PX_O58_0_SV NULL
@@ -69286,17 +69286,17 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SV NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_SV NULL
 #define OPTION_VAL_32X_SV NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_SV NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV NULL
-#define OPTION_VAL_CORRECTED_SV NULL
-#define OPTION_VAL_UNCORRECTED_SV NULL
+#define OPTION_VAL_CORRECTED_SV "Korrigerad"
+#define OPTION_VAL_UNCORRECTED_SV "Okorrigerad"
 #define OPTION_VAL_4_3_SV "Tvinga 4:3"
 #define OPTION_VAL_NTSC_SV "Tvinga NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV NULL
-#define OPTION_VAL_239_SV NULL
+#define OPTION_VAL_239_SV "239 (Standard)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_SV NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV "Senast visade skanningslinje - PAL"
@@ -69309,7 +69309,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_PRECACHE_SV "Förhandsinläsning"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_SV "CD-laddningshastighet"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_SV "Välj multiplikator för skivåtkomsthastighet. Värden högre än \"2x (Native)\" kan kraftigt minska inladdningstiderna i spelet, men kan introducera tidsfel. Vissa spel kan fungera korrekt ovanför en viss värde."
-#define OPTION_VAL_2X_NATIVE_SV "2x (Nativ)"
+#define OPTION_VAL_2X_NATIVE_SV "2x (Standard)"
 #define OPTION_VAL_6X_SV NULL
 #define OPTION_VAL_10X_SV NULL
 #define OPTION_VAL_12X_SV NULL
