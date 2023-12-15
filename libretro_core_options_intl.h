@@ -4094,7 +4094,7 @@ struct retro_core_options_v2 options_ast = {
 
 #define CATEGORY_VIDEO_LABEL_BE "Відэа"
 #define CATEGORY_VIDEO_INFO_0_BE NULL
-#define CATEGORY_OSD_LABEL_BE NULL
+#define CATEGORY_OSD_LABEL_BE "Адлюстраванне на экране"
 #define CATEGORY_OSD_INFO_0_BE NULL
 #define CATEGORY_INPUT_LABEL_BE "Увод"
 #define CATEGORY_INPUT_INFO_0_BE NULL
@@ -46638,12 +46638,12 @@ struct retro_core_options_v2 options_it = {
 
 /* RETRO_LANGUAGE_JA */
 
-#define CATEGORY_VIDEO_LABEL_JA "ビデオのドライバ"
+#define CATEGORY_VIDEO_LABEL_JA "ビデオ"
 #define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、表示トリミング、ビデオフィルター、フレームスキップの設定を変更します。"
 #define CATEGORY_OSD_LABEL_JA "OSDディスプレイ"
-#define CATEGORY_OSD_INFO_0_JA NULL
+#define CATEGORY_OSD_INFO_0_JA "画面に表示される通知を変更します。"
 #define CATEGORY_INPUT_LABEL_JA "入力"
-#define CATEGORY_INPUT_INFO_0_JA NULL
+#define CATEGORY_INPUT_INFO_0_JA "ライトガン、マウス、ネジコンの設定を変更します。"
 #define CATEGORY_MEMCARDS_LABEL_JA "メモリーカード"
 #define CATEGORY_MEMCARDS_INFO_0_JA NULL
 #define CATEGORY_PGXP_LABEL_JA NULL
@@ -46652,18 +46652,18 @@ struct retro_core_options_v2 options_it = {
 #define CATEGORY_HACKS_INFO_0_JA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_JA NULL
-#define OPTION_VAL_1X_NATIVE_JA NULL
+#define OPTION_VAL_1X_NATIVE_JA "1x (実機)"
 #define OPTION_VAL_2X_JA NULL
 #define OPTION_VAL_4X_JA NULL
 #define OPTION_VAL_8X_JA NULL
 #define OPTION_VAL_16X_JA NULL
-#define BEETLE_OPT_DEPTH_LABEL_JA NULL
+#define BEETLE_OPT_DEPTH_LABEL_JA "内部色深度"
 #define BEETLE_OPT_DEPTH_INFO_0_JA NULL
-#define OPTION_VAL_16BPP_NATIVE_JA NULL
+#define OPTION_VAL_16BPP_NATIVE_JA "16 bpp (実機)"
 #define OPTION_VAL_32BPP_JA NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_JA NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_JA NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_JA NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_JA "内部解像度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_JA NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_JA NULL
 #define BEETLE_OPT_FILTER_LABEL_JA NULL
@@ -46671,7 +46671,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_NEAREST_JA "ニアレスト"
 #define OPTION_VAL_SABR_JA NULL
 #define OPTION_VAL_XBR_JA NULL
-#define OPTION_VAL_BILINEAR_JA "バイリニア（線形補間）"
+#define OPTION_VAL_BILINEAR_JA "バイリニア"
 #define OPTION_VAL_3_POINT_JA NULL
 #define OPTION_VAL_JINC2_JA NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_JA NULL
@@ -46709,13 +46709,13 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_JA NULL
-#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_JA NULL
-#define OPTION_VAL_L1_R1_SELECT_JA NULL
-#define OPTION_VAL_L1_R1_START_JA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_JA "L1 + L2 + R1 + R2 + スタート + セレクト"
+#define OPTION_VAL_L1_R1_SELECT_JA "L1 + R1 + セレクト"
+#define OPTION_VAL_L1_R1_START_JA "L1 + R1 + スタート"
 #define OPTION_VAL_L1_R1_L3_JA NULL
 #define OPTION_VAL_L1_R1_R3_JA NULL
-#define OPTION_VAL_L2_R2_SELECT_JA NULL
-#define OPTION_VAL_L2_R2_START_JA NULL
+#define OPTION_VAL_L2_R2_SELECT_JA "L2 + R2 + セレクト"
+#define OPTION_VAL_L2_R2_START_JA "L2 + R2 + スタート"
 #define OPTION_VAL_L2_R2_L3_JA NULL
 #define OPTION_VAL_L2_R2_R3_JA NULL
 #define OPTION_VAL_L3_R3_JA NULL
@@ -46855,7 +46855,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_32_9_JA NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_JA NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_JA NULL
-#define OPTION_VAL_100_NATIVE_JA NULL
+#define OPTION_VAL_100_NATIVE_JA "100% (実機)"
 #define OPTION_VAL_210_JA NULL
 #define OPTION_VAL_220_JA NULL
 #define OPTION_VAL_230_JA NULL
@@ -46921,10 +46921,10 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_PS1_ROM_JA NULL
 #define BEETLE_OPT_RENDERER_LABEL_JA NULL
 #define BEETLE_OPT_RENDERER_INFO_0_JA NULL
-#define OPTION_VAL_HARDWARE_JA NULL
-#define OPTION_VAL_HARDWARE_GL_JA NULL
-#define OPTION_VAL_HARDWARE_VK_JA NULL
-#define OPTION_VAL_SOFTWARE_JA NULL
+#define OPTION_VAL_HARDWARE_JA "ハードウェア (自動)"
+#define OPTION_VAL_HARDWARE_GL_JA "ハードウェア (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_JA "ハードウェア (Vulkan)"
+#define OPTION_VAL_SOFTWARE_JA "ソフトウェア"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_JA NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_JA NULL
@@ -47023,7 +47023,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_PRECACHE_JA NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_JA NULL
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_JA NULL
-#define OPTION_VAL_2X_NATIVE_JA NULL
+#define OPTION_VAL_2X_NATIVE_JA "2x (実機)"
 #define OPTION_VAL_6X_JA NULL
 #define OPTION_VAL_10X_JA NULL
 #define OPTION_VAL_12X_JA NULL
@@ -68960,8 +68960,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_BILINEAR_SV "Bilinjär"
 #define OPTION_VAL_3_POINT_SV "3-Punkt"
 #define OPTION_VAL_JINC2_SV NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_SV "Undanta spriter från filtrering"
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_SV "Tillämpa inte texturfiltrering på spriter. Förhindrar skarvar i olika spel med 2D-sprit-renderade bakgrunder. Använd tillsammans med adaptiv jämnhet eller en annan efterbehandlingsfilter för bästa effekt."
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_SV "Exkludera blockfigurer från filtrering"
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_SV "Tillämpa inte texturfiltrering på blockfigurer. Förhindrar skarvar i olika spel med 2D-blockfigur-renderade bakgrunder. Använd tillsammans med adaptiv jämnhet eller en annan efterbehandlingsfilter för bästa effekt."
 #define OPTION_VAL_OPAQUE_SV "Endast opaka"
 #define OPTION_VAL_ALL_SV "Opaka och halvgenomskinlig"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_SV "Undanta 2D-polygoner från filtrering"
@@ -69040,7 +69040,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_WHITE_SV "Vit"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV "Muskänslighet"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV NULL
 #define OPTION_VAL_5_O28_SV NULL
 #define OPTION_VAL_10_SV NULL
