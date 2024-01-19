@@ -46639,11 +46639,11 @@ struct retro_core_options_v2 options_it = {
 /* RETRO_LANGUAGE_JA */
 
 #define CATEGORY_VIDEO_LABEL_JA "ビデオ"
-#define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、表示トリミング、ビデオフィルター、フレームスキップの設定を変更します。"
+#define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、ディスプレイのトリミング、ビデオフィルターおよびフレームスキップの設定を変更します。"
 #define CATEGORY_OSD_LABEL_JA "OSD 表示"
 #define CATEGORY_OSD_INFO_0_JA "画面に表示される通知を変更します。"
 #define CATEGORY_INPUT_LABEL_JA "入力"
-#define CATEGORY_INPUT_INFO_0_JA "ライトガン、マウス、ネジコンの設定を変更します。"
+#define CATEGORY_INPUT_INFO_0_JA "ライトガン、マウスおよびネジコンの設定を変更します。"
 #define CATEGORY_MEMCARDS_LABEL_JA "メモリーカード"
 #define CATEGORY_MEMCARDS_INFO_0_JA "システムで使用される仮想メモリーカードに関連する設定を変更します。"
 #define CATEGORY_PGXP_LABEL_JA NULL
@@ -46652,14 +46652,14 @@ struct retro_core_options_v2 options_it = {
 #define CATEGORY_HACKS_INFO_0_JA "低水準パフォーマンスと互換性に影響を与えるプロセッサのオーバークロックとエミュレーションの精度設定を変更します。"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA "内部 GPU 解像度"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_JA NULL
-#define OPTION_VAL_1X_NATIVE_JA "1x (実機)"
+#define OPTION_VAL_1X_NATIVE_JA "1x (ネイティブ)"
 #define OPTION_VAL_2X_JA NULL
 #define OPTION_VAL_4X_JA NULL
 #define OPTION_VAL_8X_JA NULL
 #define OPTION_VAL_16X_JA NULL
 #define BEETLE_OPT_DEPTH_LABEL_JA "内部色深度"
 #define BEETLE_OPT_DEPTH_INFO_0_JA NULL
-#define OPTION_VAL_16BPP_NATIVE_JA "16 bpp (実機)"
+#define OPTION_VAL_16BPP_NATIVE_JA "16 bpp (ネイティブ)"
 #define OPTION_VAL_32BPP_JA NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_JA NULL
 #define BEETLE_OPT_DITHER_MODE_INFO_0_JA NULL
@@ -46727,9 +46727,9 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_3_JA "3 秒遅延"
 #define OPTION_VAL_4_JA "4 秒遅延"
 #define OPTION_VAL_5_JA "5 秒遅延"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_JA NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_JA "ポート 1: マルチタップの有効化"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_JA "マルチタップ機能をポート 1 で有効にします。"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_JA NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_JA "ポート 2: マルチタップの有効化"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_JA "マルチタップ機能をポート 2 で有効にします。"
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_JA "ガン入力モード"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_JA NULL
@@ -46749,7 +46749,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_YELLOW_JA "イエロー"
 #define OPTION_VAL_CYAN_JA "シアン"
 #define OPTION_VAL_PINK_JA "ピンク"
-#define OPTION_VAL_PURPLE_JA NULL
+#define OPTION_VAL_PURPLE_JA "紫"
 #define OPTION_VAL_BLACK_JA "黒"
 #define OPTION_VAL_WHITE_JA "白"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_JA NULL
@@ -46804,18 +46804,18 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_JA NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_JA NULL
 #define OPTION_VAL_0_O30_JA NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_JA NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_JA "メモリーカード 0 方式 (再起動が必要)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_JA NULL
 #define OPTION_VAL_LIBRETRO_JA NULL
 #define OPTION_VAL_MEDNAFEN_JA NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_JA NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_JA "メモリーカード 1 を有効にする (再起動が必要)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_JA NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_JA NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_JA "共有メモリーカード (再起動が必要)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_JA NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_JA "メモリーカード左インデックス"
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_JA NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_JA "左スロットに現在ロードされているメモリーカードを変更します。このオプションはメモリーカード 0 方式が Mednafen に設定されている場合にのみ動作します。デフォルトのカードはインデックス 0 です。"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_JA "メモリーカード右インデックス"
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_JA NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_JA "右スロットに現在ロードされているメモリーカードを変更します。このオプションはメモリーカード 1 方式が有効にされている場合にのみ動作します。デフォルトのカードはインデックス 1 です。"
 #define OPTION_VAL_1_O35_JA "1 (デフォルト)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_JA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_JA NULL
@@ -46844,7 +46844,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_AGGRESSIVE_JA NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_JA "ワイドスクリーンモードハック"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_JA NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_JA NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_JA "ワイドスクリーンモードハックのアスペクト比"
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_JA "ワイドスクリーンモードハックで使用されるアスペクト比を選択します。"
 #define OPTION_VAL_16_9_JA NULL
 #define OPTION_VAL_16_10_JA NULL
@@ -46914,7 +46914,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_JA "GTE オーバークロック"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_JA NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_JA "BIOS をスキップ"
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_JA NULL
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_JA "コンテンツのロード時に通常表示される PlayStation BIOS 起動アニメーションをスキップします。注意: これのオプションを有効にすると、多くのゲームで互換性の問題が発生します (PAL コピープロテクトが存在するゲーム、サガフロンティアなど)。"
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_JA NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_JA NULL
 #define OPTION_VAL_PSXONPSP_JA NULL
@@ -46945,15 +46945,15 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_JA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_JA NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_JA NULL
-#define OPTION_VAL_FORCE_INTERLACED_JA NULL
-#define OPTION_VAL_AUTO_TOGGLE_JA NULL
+#define OPTION_VAL_FORCE_INTERLACED_JA "強制インターレースレート"
+#define OPTION_VAL_AUTO_TOGGLE_JA "自動切り替えを許可"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_JA NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_JA NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_JA "オーバースキャンをトリミング"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_JA NULL
 #define OPTION_VAL_DISABLED_O56_JA "なし"
-#define OPTION_VAL_STATIC_JA NULL
-#define OPTION_VAL_SMART_JA NULL
+#define OPTION_VAL_STATIC_JA "静的"
+#define OPTION_VAL_SMART_JA "動的 (デフォルト)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_JA "追加のトリミング"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_JA NULL
 #define OPTION_VAL_9PX_JA NULL
@@ -47023,7 +47023,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_PRECACHE_JA NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_JA "CD 読み込み速度"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_JA NULL
-#define OPTION_VAL_2X_NATIVE_JA "2x (実機)"
+#define OPTION_VAL_2X_NATIVE_JA "2x (ネイティブ)"
 #define OPTION_VAL_6X_JA NULL
 #define OPTION_VAL_10X_JA NULL
 #define OPTION_VAL_12X_JA NULL
