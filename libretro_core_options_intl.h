@@ -46639,7 +46639,7 @@ struct retro_core_options_v2 options_it = {
 /* RETRO_LANGUAGE_JA */
 
 #define CATEGORY_VIDEO_LABEL_JA "ビデオ"
-#define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、ディスプレイのトリミング、ビデオフィルターおよびフレームスキップの設定を変更します。"
+#define CATEGORY_VIDEO_INFO_0_JA "アスペクト比、画面のトリミング、ビデオフィルターおよびフレームスキップの設定を変更します。"
 #define CATEGORY_OSD_LABEL_JA "OSD 表示"
 #define CATEGORY_OSD_INFO_0_JA "画面に表示される通知を変更します。"
 #define CATEGORY_INPUT_LABEL_JA "入力"
@@ -46701,11 +46701,11 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_JA NULL
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_JA "内部 FPS を表示"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_JA NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_JA NULL
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_JA "フル VRAM を表示 (デバッグ)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_JA NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_JA NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_JA "アナログ自己調整"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_JA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_JA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_JA "デュアルショックアナログモード切り替えを有効にする"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_JA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_JA NULL
@@ -46739,8 +46739,8 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_JA NULL
 #define OPTION_VAL_CROSS_JA NULL
 #define OPTION_VAL_DOT_JA NULL
-#define OPTION_VAL_OFF_JA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_JA NULL
+#define OPTION_VAL_OFF_JA "カーソルなし"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_JA "ポート 1: ガンクロスヘアの色"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_JA "ポート 1 のライトガンのクロスヘアの色を選択します。"
 #define OPTION_VAL_RED_JA "レッド"
 #define OPTION_VAL_BLUE_JA "ブルー"
@@ -46752,7 +46752,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_PURPLE_JA "紫"
 #define OPTION_VAL_BLACK_JA "黒"
 #define OPTION_VAL_WHITE_JA "白"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_JA NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_JA "ポート 2: ガンクロスヘアの色"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_JA "ポート 2 のライトガンのクロスヘアの色を選択します。"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_JA "マウス感度"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_JA NULL
@@ -46855,7 +46855,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_32_9_JA NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_JA NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_JA NULL
-#define OPTION_VAL_100_NATIVE_JA "100% (実機)"
+#define OPTION_VAL_100_NATIVE_JA "100% (ネイティブ)"
 #define OPTION_VAL_210_JA NULL
 #define OPTION_VAL_220_JA NULL
 #define OPTION_VAL_230_JA NULL
@@ -46915,8 +46915,8 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_JA NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_JA "BIOS をスキップ"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_JA "コンテンツのロード時に通常表示される PlayStation BIOS 起動アニメーションをスキップします。注意: これのオプションを有効にすると、多くのゲームで互換性の問題が発生します (PAL コピープロテクトが存在するゲーム、サガフロンティアなど)。"
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_JA NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_JA NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_JA "BIOS 優先設定 (再起動が必要)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_JA "ファイルが存在する場合、地域ごとに指定されている BIOS ではなくリージョンフリー BIOS の使用を優先します。"
 #define OPTION_VAL_PSXONPSP_JA NULL
 #define OPTION_VAL_PS1_ROM_JA NULL
 #define BEETLE_OPT_RENDERER_LABEL_JA NULL
@@ -46929,10 +46929,10 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_JA NULL
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_JA NULL
-#define OPTION_VAL_DISABLED_JA NULL
+#define OPTION_VAL_DISABLED_JA "無効 (Beetle インタプリタ)"
 #define OPTION_VAL_EXECUTE_JA "最大パフォーマンス"
 #define OPTION_VAL_EXECUTE_ONE_JA NULL
-#define OPTION_VAL_RUN_INTERPRETER_JA NULL
+#define OPTION_VAL_RUN_INTERPRETER_JA "Lightrec インタプリタ"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_JA NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_JA NULL
 #define OPTION_VAL_FULL_JA "フル"
@@ -46944,7 +46944,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_JA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_JA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_JA NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_JA NULL
+#define OPTION_VAL_FORCE_PROGRESSIVE_JA "プログレッシブレート"
 #define OPTION_VAL_FORCE_INTERLACED_JA "強制インターレースレート"
 #define OPTION_VAL_AUTO_TOGGLE_JA "自動切り替えを許可"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_JA NULL
@@ -46997,7 +46997,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_12PX_O58_0_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_JA NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_JA NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_JA "GPU ラスタライザオーバークロック"
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_JA NULL
 #define OPTION_VAL_32X_JA NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_JA "コアアスペクト比"
@@ -47007,20 +47007,20 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_4_3_JA "強制 4:3"
 #define OPTION_VAL_NTSC_JA "強制 NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_JA "初期スキャンライン - NTSC"
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_JA NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_JA "NTSC コンテンツを実行するときに最初に表示されるスキャンラインを選択します。 0 より大きい値を指定すると、上端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_JA "最終スキャンライン - NTSC"
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_JA NULL
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_JA "NTSC コンテンツを実行するときに最後に表示されるスキャンラインを選択します。 239 より小さい値を指定すると、下端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define OPTION_VAL_239_JA "239 (デフォルト)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_JA "初期スキャンライン - PAL"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_JA NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_JA "PAL コンテンツを実行するときに最初に表示されるスキャンラインを選択します。 0 より大きい値を指定すると、上端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_JA "最終スキャンライン - PAL"
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_JA NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_JA "PAL コンテンツを実行するときに最後に表示されるスキャンラインを選択します。 287 より小さい値を指定すると、下端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define OPTION_VAL_287_JA "287 (デフォルト)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_JA NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_JA "CD アクセス方式 (再起動が必要)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_JA NULL
 #define OPTION_VAL_SYNC_JA "同期"
 #define OPTION_VAL_ASYNC_JA "非同期"
-#define OPTION_VAL_PRECACHE_JA NULL
+#define OPTION_VAL_PRECACHE_JA "事前キャッシュ"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_JA "CD 読み込み速度"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_JA NULL
 #define OPTION_VAL_2X_NATIVE_JA "2x (ネイティブ)"
