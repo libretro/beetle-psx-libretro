@@ -30707,8 +30707,8 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_FI NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_FI "Ohita BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_FI NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_FI NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_FI "Korvaa BIOS (vaatii uudelleenkäynnistyksen)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI "Korvaa vakioaluekohtainen BIOS aluevapaalla, jos sellainen löytyy."
 #define OPTION_VAL_PSXONPSP_FI NULL
 #define OPTION_VAL_PS1_ROM_FI NULL
 #define BEETLE_OPT_RENDERER_LABEL_FI NULL
@@ -30739,8 +30739,8 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_FORCE_PROGRESSIVE_FI NULL
 #define OPTION_VAL_FORCE_INTERLACED_FI NULL
 #define OPTION_VAL_AUTO_TOGGLE_FI "Salli automaattinen vaihtaminen"
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FI NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FI "Eurooppalaisen PAL-videoajoituksen ohitus"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI "Erilaisista standardeista johtuen, PAL-pelit näkyvät usein amerikkalaisia tai japanilaisia NTSC julkaisuja hitaampina. Tällä valinnalla PAL-ajoitukset voidaan ohittaa, jotta tällaiset pelit voidaan pyrkiä suorittamaan NTSC-kuvanopeudella. Asetus ei vaikuta NTSC-sisältöön."
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_FI NULL
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_FI NULL
 #define OPTION_VAL_DISABLED_O56_FI "Ei mitään"
@@ -46649,7 +46649,7 @@ struct retro_core_options_v2 options_it = {
 #define CATEGORY_PGXP_LABEL_JA NULL
 #define CATEGORY_PGXP_INFO_0_JA NULL
 #define CATEGORY_HACKS_LABEL_JA "エミュレーションハック"
-#define CATEGORY_HACKS_INFO_0_JA "低水準パフォーマンスと互換性に影響を与えるプロセッサのオーバークロックとエミュレーションの精度設定を変更します。"
+#define CATEGORY_HACKS_INFO_0_JA "低レベルパフォーマンスと互換性に影響を与えるプロセッサのオーバークロックとエミュレーションの精度設定を変更します。"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA "内部 GPU 解像度"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_JA NULL
 #define OPTION_VAL_1X_NATIVE_JA "1x (ネイティブ)"
@@ -46661,8 +46661,8 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_DEPTH_INFO_0_JA NULL
 #define OPTION_VAL_16BPP_NATIVE_JA "16 bpp (ネイティブ)"
 #define OPTION_VAL_32BPP_JA NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_JA NULL
-#define BEETLE_OPT_DITHER_MODE_INFO_0_JA NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_JA "ディザリングパターン"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_JA "ディザリングパターンの設定を選択します。[1x (ネイティブ)] は実機で使用されるネイティブの低解像度ディザリングをエミュレートし、ネイティブの色深度で表示されるカラーバンディングを滑らかにします。[内部解像度] はディザリングの粒度を設定された内部解像度にスケーリングし、よりクリーンな描画を実現します。32 bpp では無効にすることをお勧めします。"
 #define OPTION_VAL_INTERNAL_RESOLUTION_JA "内部解像度"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_JA NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_JA NULL
@@ -46684,7 +46684,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_JA NULL
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_JA NULL
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_JA NULL
-#define BEETLE_OPT_MSAA_LABEL_JA NULL
+#define BEETLE_OPT_MSAA_LABEL_JA "マルチサンプリングアンチエイリアシング"
 #define BEETLE_OPT_MSAA_INFO_0_JA NULL
 #define OPTION_VAL_1X_JA NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_JA NULL
@@ -46737,8 +46737,8 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_TOUCHSCREEN_JA "タッチスクリーン"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_JA "ガンカーソル"
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_JA NULL
-#define OPTION_VAL_CROSS_JA NULL
-#define OPTION_VAL_DOT_JA NULL
+#define OPTION_VAL_CROSS_JA "クロス"
+#define OPTION_VAL_DOT_JA "ドット"
 #define OPTION_VAL_OFF_JA "カーソルなし"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_JA "ポート 1: ガンクロスヘアの色"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_JA "ポート 1 のライトガンのクロスヘアの色を選択します。"
@@ -46820,7 +46820,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_PGXP_MODE_LABEL_JA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_JA NULL
 #define OPTION_VAL_MEMORY_ONLY_JA "メモリのみ"
-#define OPTION_VAL_MEMORY_CPU_JA NULL
+#define OPTION_VAL_MEMORY_CPU_JA "メモリ + CPU (バグあり)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_JA NULL
 #define BEETLE_OPT_PGXP_2D_TOL_INFO_0_JA NULL
 #define OPTION_VAL_0PX_JA NULL
@@ -47017,10 +47017,10 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_JA "PAL コンテンツを実行するときに最後に表示されるスキャンラインを選択します。 287 より小さい値を指定すると、下端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define OPTION_VAL_287_JA "287 (デフォルト)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_JA "CD アクセス方式 (再起動が必要)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_JA NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_JA "コンテンツディスクのイメージからデータを読み取る方式を選択します。[同期] は実機を模倣します。[非同期] はストレージが遅いデバイスでカクつきを減らすことができます。[プリキャッシュ] はコンテンツの起動時にディスクイメージ全体をメモリにロードし、起動時間が増加する代わりにゲーム中のロード時間を改善します。"
 #define OPTION_VAL_SYNC_JA "同期"
 #define OPTION_VAL_ASYNC_JA "非同期"
-#define OPTION_VAL_PRECACHE_JA "事前キャッシュ"
+#define OPTION_VAL_PRECACHE_JA "プリキャッシュ"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_JA "CD 読み込み速度"
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_JA NULL
 #define OPTION_VAL_2X_NATIVE_JA "2x (ネイティブ)"
