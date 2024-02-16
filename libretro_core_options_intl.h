@@ -58795,7 +58795,7 @@ struct retro_core_options_v2 options_pl = {
 /* RETRO_LANGUAGE_PT_BR */
 
 #define CATEGORY_VIDEO_LABEL_PT_BR "Vídeo"
-#define CATEGORY_VIDEO_INFO_0_PT_BR "Altera a proporção da tela, o corte, o filtro de vídeo e as configurações do salto de quadros."
+#define CATEGORY_VIDEO_INFO_0_PT_BR "Altera as configurações de proporção de tela, corte de tela, filtro de vídeo e pulo de quadro."
 #define CATEGORY_OSD_LABEL_PT_BR "Exibição na tela"
 #define CATEGORY_OSD_INFO_0_PT_BR NULL
 #define CATEGORY_INPUT_LABEL_PT_BR "Entrada"
@@ -58805,7 +58805,7 @@ struct retro_core_options_v2 options_pl = {
 #define CATEGORY_PGXP_LABEL_PT_BR "PGXP (Canal de Transformação de Geometria de Precisão)"
 #define CATEGORY_PGXP_INFO_0_PT_BR "Estas opções controlam aprimoramentos que podem melhorar os gráficos em comparação com o console original. O PGXP pode se livrar de texturas deformadas e problemas de polígonos no eixo Z."
 #define CATEGORY_HACKS_LABEL_PT_BR "Hacks de emulação"
-#define CATEGORY_HACKS_INFO_0_PT_BR "Altera as configurações de precisão da emulação e da velocidade do processador (overclock) que afetam o baixo desempenho e a compatibilidade."
+#define CATEGORY_HACKS_INFO_0_PT_BR "Altera as configurações de precisão de emulação e velocidade do processador (overclock), que afetam o desempenho de baixo nível e compatibilidade."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_BR "Resolução interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_BR "Seleciona o multiplicador de resolução interno. Qualquer resolução maior do que '1x (nativa)' irá melhor a fidelidade dos modelos 3D ao custo de maiores exigências de desempenho. Os elementos 2D geralmente não são afetados."
 #define OPTION_VAL_1X_NATIVE_PT_BR "1x (nativa)"
