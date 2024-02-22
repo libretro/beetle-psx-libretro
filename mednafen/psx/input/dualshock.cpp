@@ -149,13 +149,23 @@ void InputDevice_DualShock::ResetTS(void)
    lastts = 0;
 }
 
+#ifdef __LIBRETRO__
+extern bool setting_apply_analog_default;
+#endif
+
 void InputDevice_DualShock::SetAMCT(bool enabled)
 {
+   bool amct_prev_info = amct_enabled;
    amct_enabled = enabled;
    if(amct_enabled)
-      analog_mode = false;
+      analog_mode = setting_apply_analog_default;
    else
       analog_mode = true;
+
+   if (amct_prev_info == analog_mode && amct_prev_info == amct_enabled)
+      return;
+
+   am_prev_info = analog_mode;
 
    MDFN_DispMessage(2, RETRO_LOG_INFO,
          RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
