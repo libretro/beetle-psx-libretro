@@ -1988,7 +1988,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       PSX_FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
    }
 
-	input_set_fio( PSX_FIO );
+   input_set_fio(PSX_FIO);
 
    DMA_Init();
 
@@ -3690,6 +3690,11 @@ static void check_variables(bool startup)
       {
          analog_combo[0] = 0x06;
          analog_combo[1] = 0x00;
+      }
+      else
+      {
+         analog_combo[0] = 0xFF;
+         analog_combo[1] = 0xFF;
       }
    }
 

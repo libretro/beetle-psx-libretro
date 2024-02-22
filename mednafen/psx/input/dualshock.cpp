@@ -172,7 +172,11 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
    {
       bool need_mode_toggle = false;
 
+#ifdef __LIBRETRO__
+      if (1)
+#else
       if(amct_enabled)
+#endif
       {
          if(buttons[0] == analog_combo[0] && buttons[1] == analog_combo[1])
          {

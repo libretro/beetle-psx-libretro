@@ -384,14 +384,14 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(analog_toggle),
-      "Enable DualShock Analog Mode Toggle",
+      "DualShock Analog Mode Toggle",
       NULL,
-      "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOG mode like original hardware. When disabled, the DualShock is locked to ANALOG mode and when enabled, the DualShock can be toggled between DIGITAL and ANALOG mode by using the selected buttons combination.",
+      "When the input device type is DualShock, this option allows the emulated DualShock to be toggled between DIGITAL and ANALOG mode like original hardware. Mode can also be toggled by using the selected button combination.",
       NULL,
       "input",
       {
-         { "disabled", NULL },
-         { "enabled",  NULL },
+         { "disabled", "Analog" },
+         { "enabled",  "Digital" },
          { NULL, NULL },
       },
       "disabled"
@@ -400,7 +400,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(analog_toggle_combo),
       "DualShock Analog Mode Combo",
       NULL,
-      "Choose the buttons combination that will be used to toggle between DIGITAL and ANALOG mode for the emulated DualShock. Only works when 'Enable DualShock Analog Mode Toggle' is enabled.",
+      "Choose the button combination that will be used to toggle between DIGITAL and ANALOG mode for the emulated DualShock.",
       NULL,
       "input",
       {
@@ -414,6 +414,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "l2+r2+l3",                 "L2 + R2 + L3" },
          { "l2+r2+r3",                 "L2 + R2 + R3" },
          { "l3+r3",                    "L3 + R3" },
+         { "none",                     "None" },
          { NULL, NULL },
       },
       "l1+r1+select"
@@ -422,7 +423,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(analog_toggle_hold),
       "DualShock Analog Mode Combo Hold Delay",
       NULL,
-      "Sets the hold time for the analog mode combo buttons. Only works when 'Enable DualShock Analog Mode Toggle' is enabled.",
+      "Set the hold time for the analog mode combo buttons.",
       NULL,
       "input",
       {
