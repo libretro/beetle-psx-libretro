@@ -28,6 +28,7 @@
 #endif
 
 extern bool fast_pal;
+extern unsigned int image_height;
 
 static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
 
@@ -81,6 +82,18 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
    switch (rsx_type)
    {
       case RSX_SOFTWARE:
+      {
+         int first_visible_scanline = MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart");
+         int last_visible_scanline  = MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend");
+         int manual_height          = last_visible_scanline - first_visible_scanline + 1;
+
+         /* Compensate height in smart/dynamic crop mode to keep proper aspect ratio */
+         if (crop_overscan == 2 && image_height && manual_height > image_height)
+         {
+            first_visible_scanline = 0;
+            last_visible_scanline  = first_visible_scanline + image_height - 1;
+         }
+
          memset(info, 0, sizeof(*info));
          info->timing.fps            = rsx_common_get_timing_fps();
          info->timing.sample_rate    = SOUND_FREQUENCY;
@@ -89,10 +102,10 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
          info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
-                                          MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
-                                          MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"),
+                                          first_visible_scanline, last_visible_scanline,
                                           aspect_ratio_setting, false, widescreen_hack, widescreen_hack_aspect_ratio_setting);
          break;
+      }
       case RSX_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rsx_gl_get_system_av_info(info);
@@ -872,7 +885,6 @@ double rsx_common_get_timing_fps(void)
                (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
 }
-
 
 float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
