@@ -99,6 +99,7 @@ int64 cd_slow_timeout = 8000; // microseconds
 
 // If true, PAL games will run at 60fps
 bool fast_pal = false;
+unsigned image_height = 0;
 
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
@@ -4476,6 +4477,22 @@ void retro_unload_game(void)
 static uint64_t video_frames, audio_frames;
 #define SOUND_CHANNELS 2
 
+static bool retro_set_geometry(void)
+{
+   struct retro_system_av_info new_av_info;
+
+   retro_get_system_av_info(&new_av_info);
+   return environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+}
+
+static bool retro_set_system_av_info(void)
+{
+   struct retro_system_av_info new_av_info;
+
+   retro_get_system_av_info(&new_av_info);
+   return environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info);
+}
+
 void retro_run(void)
 {
    bool updated = false;
@@ -4502,13 +4519,11 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
       check_variables(false);
-      struct retro_system_av_info new_av_info;
 
       /* Max width/height changed, need to call SET_SYSTEM_AV_INFO */
       if (GPU_get_upscale_shift() != psx_gpu_upscale_shift)
       {
-         retro_get_system_av_info(&new_av_info);
-         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
+         if (retro_set_system_av_info())
          {
             // We successfully changed the frontend's resolution, we can
             // apply the change immediately
@@ -4532,8 +4547,7 @@ void retro_run(void)
        */
       if (has_new_timing)
       {
-         retro_get_system_av_info(&new_av_info);
-         if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
+         if (retro_set_system_av_info())
             has_new_timing = false;
       }
 
@@ -4541,11 +4555,8 @@ void retro_run(void)
          changed, need to call SET_GEOMETRY to change aspect ratio */
       if (has_new_geometry)
       {
-         retro_get_system_av_info(&new_av_info);
-         if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info))
-         {
+         if (retro_set_geometry())
             has_new_geometry = false;
-         }
       }
 
       switch (psx_gpu_dither_mode)
@@ -4768,10 +4779,7 @@ void retro_run(void)
    // Check if aspect ratio needs to be changed due to display mode change on this frame
    if (MDFN_UNLIKELY((aspect_ratio_setting == 1) && aspect_ratio_dirty))
    {
-      struct retro_system_av_info new_av_info;
-      retro_get_system_av_info(&new_av_info);
-
-      if (environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info.geometry))
+      if (retro_set_geometry())
          aspect_ratio_dirty = false;
 
       // If unable to change geometry here, defer to next frame and leave aspect_ratio_dirty flagged
@@ -4783,10 +4791,7 @@ void retro_run(void)
    {
       // This may cause video and audio reinit on the frontend, so it may be preferable to
       // set the core option to force progressive or interlaced timings
-      struct retro_system_av_info new_av_info;
-      retro_get_system_av_info(&new_av_info);
-
-      if (environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &new_av_info))
+      if (retro_set_system_av_info())
          interlace_setting_dirty = false;
 
       // If unable to change AV info here, defer to next frame and leave interlace_setting_dirty flagged
@@ -4816,10 +4821,8 @@ void retro_run(void)
          PrevInterlaced = false;
 #endif
       // PSX is rather special, and needs specific handling ...
-
       width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
       height = spec.DisplayRect.h;
-      //fprintf(stderr, "(%u x %u)\n", width, height);
 
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
       const uint32_t *pix = surf->pixels;
@@ -4866,8 +4869,17 @@ void retro_run(void)
                // This shouldn't happen.
                break;
          }
-      }
 
+         /* Smart/dynamic height geometry trigger */
+         if (crop_overscan == 2)
+         {
+            if (image_height != height)
+            {
+               image_height = height;
+               retro_set_geometry();
+            }
+         }
+      }
 
       width  <<= upscale_shift;
       height <<= upscale_shift;

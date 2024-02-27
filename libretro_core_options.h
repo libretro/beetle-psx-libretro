@@ -1032,6 +1032,24 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "100%(native)"
    },
    {
+      BEETLE_OPT(gpu_overclock),
+      "GPU Rasterizer Overclock",
+      NULL,
+      "Enable overclocking of the 2D rasterizer contained within the emulated PSX's GPU. Does not improve 3D rendering, and in general has little effect.",
+      NULL,
+      "hacks",
+      {
+         { "1x(native)", "1x (Native)" },
+         { "2x",         NULL },
+         { "4x",         NULL },
+         { "8x",         NULL },
+         { "16x",        NULL },
+         { "32x",        NULL },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+   {
       BEETLE_OPT(gte_overclock),
       "GTE Overclock",
       NULL,
@@ -1213,6 +1231,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(aspect_ratio),
+      "Core Aspect Ratio",
+      NULL,
+      "Choose core provided aspect ratio. This setting is ignored when the Widescreen Mode Hack or Display Full VRAM options are enabled.",
+      NULL,
+      "video",
+      {
+         { "corrected", "Corrected" },
+         { "uncorrected", "Uncorrected" },
+         { "4:3",  "Force 4:3" },
+         { "ntsc", "Force NTSC" },
+      },
+      "corrected"
+   },
+   {
       BEETLE_OPT(crop_overscan),
       "Crop Overscan",
       NULL,
@@ -1280,7 +1313,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "-3px",     NULL },
          { "-2px",     NULL },
          { "-1px",     NULL },
-         { "disabled", "0 (Default)" },
+         { "disabled", "0" },
          { "+1px",     NULL },
          { "+2px",     NULL },
          { "+3px",     NULL },
@@ -1346,7 +1379,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "-3",       NULL },
          { "-2",       NULL },
          { "-1",       NULL },
-         { "0",        "0 (Default)" },
+         { "0",        "0" },
          { "+1",       NULL },
          { "+2",       NULL },
          { "+3",       NULL },
@@ -1393,39 +1426,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
 #endif
    {
-      BEETLE_OPT(gpu_overclock),
-      "GPU Rasterizer Overclock",
-      NULL,
-      "Enable overclocking of the 2D rasterizer contained within the emulated PSX's GPU. Does not improve 3D rendering, and in general has little effect.",
-      NULL,
-      "video",
-      {
-         { "1x(native)", "1x (Native)" },
-         { "2x",         NULL },
-         { "4x",         NULL },
-         { "8x",         NULL },
-         { "16x",        NULL },
-         { "32x",        NULL },
-         { NULL, NULL },
-      },
-      "1x(native)"
-   },
-   {
-      BEETLE_OPT(aspect_ratio),
-      "Core Aspect Ratio",
-      NULL,
-      "Choose core provided aspect ratio. This setting is ignored when the Widescreen Mode Hack or Display Full VRAM options are enabled.",
-      NULL,
-      "video",
-      {
-         { "corrected", "Corrected" },
-         { "uncorrected", "Uncorrected" },
-         { "4:3",  "Force 4:3" },
-         { "ntsc", "Force NTSC" },
-      },
-      "corrected"
-   },
-   {
       BEETLE_OPT(initial_scanline),
       "Initial Scan Line - NTSC",
       NULL,
@@ -1433,7 +1433,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       "video",
       {
-         { "0",  NULL },
+         { "0",  "0 (Default)" },
          { "1",  NULL },
          { "2",  NULL },
          { "3",  NULL },
@@ -1528,7 +1528,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       "video",
       {
-         { "0",  NULL },
+         { "0",  "0 (Default)" },
          { "1",  NULL },
          { "2",  NULL },
          { "3",  NULL },
