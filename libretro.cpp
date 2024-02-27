@@ -386,6 +386,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 #include <ctype.h>
 
 bool setting_apply_analog_toggle  = false;
+bool setting_apply_analog_default = false;
 bool use_mednafen_memcard0_method = false;
 
 extern MDFNGI EmulatedPSX;
@@ -1980,7 +1981,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    PSX_CDC = new PS_CDC();
    PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
-   PSX_FIO->SetAMCT(MDFN_GetSettingB("psx.input.analog_mode_ct"));
+   PSX_FIO->SetAMCT(setting_psx_analog_toggle);
    for(unsigned i = 0; i < 2; i++)
    {
       char buf[64];
@@ -1988,7 +1989,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       PSX_FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
    }
 
-	input_set_fio( PSX_FIO );
+   input_set_fio(PSX_FIO);
 
    DMA_Init();
 
@@ -3624,18 +3625,31 @@ static void check_variables(bool startup)
    var.key = BEETLE_OPT(analog_toggle);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-      if ((strcmp(var.value, "enabled") == 0)
-            && setting_psx_analog_toggle != 1)
-      {
-         setting_psx_analog_toggle = 1;
-         setting_apply_analog_toggle = true;
-      }
-      else if ((strcmp(var.value, "disabled") == 0)
-            && setting_psx_analog_toggle != 0)
+      if ((strcmp(var.value, "disabled") == 0)
+            && setting_psx_analog_toggle)
       {
          setting_psx_analog_toggle = 0;
          setting_apply_analog_toggle = true;
+         setting_apply_analog_default = false;
       }
+      else if ((strcmp(var.value, "enabled") == 0)
+            && (!setting_psx_analog_toggle || setting_apply_analog_default))
+      {
+         setting_psx_analog_toggle = 1;
+         setting_apply_analog_toggle = true;
+         setting_apply_analog_default = false;
+      }
+      else if ((strcmp(var.value, "enabled-analog") == 0)
+            && (!setting_psx_analog_toggle || !setting_apply_analog_default))
+      {
+         setting_psx_analog_toggle = 1;
+         setting_apply_analog_toggle = true;
+         setting_apply_analog_default = true;
+      }
+
+      /* No need to apply if going to do it in InitCommon */
+      if (startup)
+         setting_apply_analog_toggle = false;
    }
 
    var.key = BEETLE_OPT(analog_toggle_combo);
