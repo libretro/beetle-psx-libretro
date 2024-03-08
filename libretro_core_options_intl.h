@@ -18359,11 +18359,11 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_DE "Den gesamten VRAM der emulierten Konsole visualisieren. Wird nur von den OpenGL- und Vulkan-Hardware-Renderern unterstützt. Hinweis: Diese Funktion ist für Debugging-Zwecke gedacht und sollte normalerweise deaktiviert werden."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_DE "Analogeingaben-Selbstkalibrierung"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_DE "Wenn das Eingabegerät auf DualShock, Analog-Controller, Analog-Joystick oder neGcon eingestellt ist, aktiviert diese Option die dynamische Kalibrierung der analogen Eingaben. Die maximalen registrierten Eingangswerte werden in Echtzeit überwacht und zur Skalierung der an den Emulator übergebenen analogen Koordinaten verwendet. Diese Option sollte für Spiele wie Mega Man Legends 2 verwendet werden, die größere Werte erwarten, als moderne Controller liefern. Um optimale Ergebnisse zu erzielen, sollten die Analogsticks jedes Mal, wenn Inhalte geladen werden, voll gedreht werden, um den Kalibrierungsalgorithmus einzustellen."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_DE NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_DE NULL
-#define OPTION_VAL_ENABLED_ANALOG_DE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_DE "DualShock-Analogmodusumschalter"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_DE "Wenn der Typ des Eingabegeräts DualShock ist, kann mit dieser Option der emulierte DualShock wie die Originalhardware zwischen DIGITAL- und ANALOG-Modus umgeschaltet werden. Der Modus kann auch über die ausgewählte Tastenkombination umgeschaltet werden."
+#define OPTION_VAL_ENABLED_ANALOG_DE "Standardanalog"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_DE "DualShock Analogmodus-Combo"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_DE "Bitte die Tastenkombination wählen, mit der zwischen DIGITAL- und ANALOG-Modus für den emulierten DualShock umgeschaltet werden soll."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_DE NULL
 #define OPTION_VAL_L1_R1_SELECT_DE NULL
 #define OPTION_VAL_L1_R1_START_DE NULL
@@ -18375,7 +18375,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_L2_R2_R3_DE NULL
 #define OPTION_VAL_L3_R3_DE NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DE "DualShock Analogmodus-Combo Halteverzögerung"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE "Legt die Haltezeit für die Analogmodus-Kombinationstasten fest."
 #define OPTION_VAL_0_DE "0 Sekunden Verzögerung"
 #define OPTION_VAL_1_DE "1 Sekunde Verzögerung"
 #define OPTION_VAL_2_DE "2 Sekunden Verzögerung"
@@ -18615,7 +18615,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_NTSC_DE "NTSC erzwingen"
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_DE "Overscan zuschneiden"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_DE "'Nein' behält Fülldaten (schwarze Balken auf beiden Seiten des Bildes für NTSC, auf allen Seiten für PAL), um die gleichen schwarzen Balken zu emulieren, die in analoger Videoausgabe durch echte PSX-Hardware erzeugt werden. 'Statisch' entfernt nur horizontale Fülldaten, 'Dynamisch' entfernt alle Fülldaten."
-#define OPTION_VAL_DISABLED_O58_DE "Nein"
+#define OPTION_VAL_DISABLED_O58_DE "Kein"
 #define OPTION_VAL_STATIC_DE "Statisch"
 #define OPTION_VAL_SMART_DE "Dynamisch (Standard)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_DE "Zusätzliches Zuschneiden"
@@ -18634,35 +18634,35 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_20PX_DE "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_DE "Versatz zugeschnittenes Bild"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_DE "Wenn 'Horizontaler Overscan' aktiviert ist, kann das resultierende zugeschnittene Bild horizontal nach rechts (positiv) oder links (negativ) durch die angegebene Anzahl Pixel versetzt werden. Kann zur Korrektur von Ausrichtungsproblemen verwendet werden. Wird nur vom Software-Renderer unterstützt."
-#define OPTION_VAL_12PX_O60_DE NULL
-#define OPTION_VAL_11PX_O60_DE NULL
-#define OPTION_VAL_10PX_O60_DE NULL
-#define OPTION_VAL_9PX_O60_DE NULL
-#define OPTION_VAL_8PX_O60_DE NULL
-#define OPTION_VAL_7PX_O60_DE NULL
-#define OPTION_VAL_6PX_O60_DE NULL
-#define OPTION_VAL_5PX_O60_DE NULL
-#define OPTION_VAL_4PX_O60_DE NULL
-#define OPTION_VAL_3PX_O60_DE NULL
-#define OPTION_VAL_2PX_O60_DE NULL
-#define OPTION_VAL_1PX_O60_DE NULL
-#define OPTION_VAL_1PX_O60_0_DE NULL
-#define OPTION_VAL_2PX_O60_0_DE NULL
-#define OPTION_VAL_3PX_O60_0_DE NULL
-#define OPTION_VAL_4PX_O60_0_DE NULL
-#define OPTION_VAL_5PX_O60_0_DE NULL
-#define OPTION_VAL_6PX_O60_0_DE NULL
-#define OPTION_VAL_7PX_O60_0_DE NULL
-#define OPTION_VAL_8PX_O60_0_DE NULL
-#define OPTION_VAL_9PX_O60_0_DE NULL
-#define OPTION_VAL_10PX_O60_0_DE NULL
-#define OPTION_VAL_11PX_O60_0_DE NULL
-#define OPTION_VAL_12PX_O60_0_DE NULL
+#define OPTION_VAL_12PX_O60_DE "-12 px"
+#define OPTION_VAL_11PX_O60_DE "-11 px"
+#define OPTION_VAL_10PX_O60_DE "-10 px"
+#define OPTION_VAL_9PX_O60_DE "-9 px"
+#define OPTION_VAL_8PX_O60_DE "-8 px"
+#define OPTION_VAL_7PX_O60_DE "-7 px"
+#define OPTION_VAL_6PX_O60_DE "-6 px"
+#define OPTION_VAL_5PX_O60_DE "-5 px"
+#define OPTION_VAL_4PX_O60_DE "-4 px"
+#define OPTION_VAL_3PX_O60_DE "-3 px"
+#define OPTION_VAL_2PX_O60_DE "-2 px"
+#define OPTION_VAL_1PX_O60_DE "-1 px"
+#define OPTION_VAL_1PX_O60_0_DE "+1 px"
+#define OPTION_VAL_2PX_O60_0_DE "+2 px"
+#define OPTION_VAL_3PX_O60_0_DE "+3 px"
+#define OPTION_VAL_4PX_O60_0_DE "+4 px"
+#define OPTION_VAL_5PX_O60_0_DE "+5 px"
+#define OPTION_VAL_6PX_O60_0_DE "+6 px"
+#define OPTION_VAL_7PX_O60_0_DE "+7 px"
+#define OPTION_VAL_8PX_O60_0_DE "+8 px"
+#define OPTION_VAL_9PX_O60_0_DE "+9 px"
+#define OPTION_VAL_10PX_O60_0_DE "+10 px"
+#define OPTION_VAL_11PX_O60_0_DE "+11 px"
+#define OPTION_VAL_12PX_O60_0_DE "+12 px"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_DE "Horizontaler Bildversatz (GPU-Zyklen)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_DE "Wählt die Anzahl der GPU-Zyklen, um die das Bild versetzt werden soll. Positive Werte verschieben das Bild nach rechts, negative Werte verschieben das Bild nach links. Nur unterstützt von Hardware-Renderern."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_DE "Erste Abtastzeile - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_DE "Wählt die erste angezeigte Scanline beim Ausführen von NTSC-Inhalten. Werte größer als Null verringern die Höhe der Ausgabebilder durch Zuschneiden von Pixeln von der obersten Kante. Kann verwendet werden, um schwarze Balken entgegenzuwirken."
-#define OPTION_VAL_0_O62_DE NULL
+#define OPTION_VAL_0_O62_DE "0 (Standard)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_DE "Letzte Abtastzeile - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_DE "Wählen Sie die letzte angezeigte Scanline beim Ausführen von NTSC-Inhalten. Werte kleiner als 239 reduzieren die Höhe der Ausgabebilder durch Zuschneiden von Pixeln von der unteren Kante. Kann verwendet werden, um schwarze Balken entgegenzuwirken."
 #define OPTION_VAL_239_DE "239 (Standard)"
@@ -46693,7 +46693,7 @@ struct retro_core_options_v2 options_it = {
 #define CATEGORY_MEMCARDS_LABEL_JA "メモリーカード"
 #define CATEGORY_MEMCARDS_INFO_0_JA "システムで使用される仮想メモリーカードに関連する設定を変更します。"
 #define CATEGORY_PGXP_LABEL_JA "PGXP (精度ジオメトリ変換パイプライン)"
-#define CATEGORY_PGXP_INFO_0_JA NULL
+#define CATEGORY_PGXP_INFO_0_JA "これらのオプションは、実機と比較してグラフィックスを改善することができる拡張を制御します。PGXP は、テクスチャの歪みやZ ファイティングの問題を取り除くことができます。"
 #define CATEGORY_HACKS_LABEL_JA "エミュレーションハック"
 #define CATEGORY_HACKS_INFO_0_JA "低レベルパフォーマンスと互換性に影響する、プロセッサのオーバークロックとエミュレーション精度の設定を変更します。"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA "内部 GPU 解像度"
@@ -46734,9 +46734,9 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_MSAA_INFO_0_JA "レンダリングされたコンテンツの MSAA レベルを選択します。3D オブジェクトの外観を改善します。Vulkan レンダラーでのみサポートされています。"
 #define OPTION_VAL_1X_JA NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_JA "MDEC YUV クロマフィルター"
-#define BEETLE_OPT_MDEC_YUV_INFO_0_JA NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_JA NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_JA NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_JA "マクロブロックアーティファクト (四角形/ギザギザのエッジ) を減らすことで FMV 再生の品質を向上させます。Vulkan レンダラーでのみサポートされています。"
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_JA "テクスチャを追跡"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_JA "テクスチャのダンプと置換の前提条件です。おそらくほとんどのゲームでクラッシュします。"
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_JA "テクスチャをダンプ"
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_JA "使用されているテクスチャを <cd>-texture-dump/ にダンプします。"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_JA "テクスチャを置換"
@@ -46744,16 +46744,16 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_WIREFRAME_LABEL_JA "ワイヤーフレームモード (デバッグ)"
 #define BEETLE_OPT_WIREFRAME_INFO_0_JA "テクスチャやシェーディングを適用せずにアウトライン形式で 3D モデルをレンダリングします。 OpenGL ハードウェアレンダラーでのみサポートされています。注意: これはデバッグ用であり、通常は無効にする必要があります。"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_JA "フレーム複製 (高速化)"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_JA NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_JA "サポートされている Libretro フロントエンドで有効にし、コアが新しく表示するものがない場合、フロントエンドに前のフレームを繰り返すように指示することでパフォーマンスをわずかに向上させます。"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_JA "内部 FPS を表示"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_JA "エミュレートされた PlayStation システムが描画しているコンテンツの内部フレームレートを表示します。注意: Libretro フロントエンドで OSD 通知を有効にする必要があります。"
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_JA "フル VRAM を表示 (デバッグ)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_JA "エミュレートされたコンソールの VRAM 全体を可視化します。OpenGL と Vulkan ハードウェアレンダラーでのみサポートされています。注意: これはデバッグ用であり、通常は無効にする必要があります。"
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_JA "アナログ自動キャリブレーション"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_JA NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_JA "入力デバイスの種類にアナログ入力を持つコントローラーが設定されている場合、アナログ入力の動的キャリブレーションを有効にします。最大入力値がリアルタイムで監視され、エミュレータに渡されるアナログ座標のスケーリングに使用されます。ロックマンDASH2など、現代的なコントローラーが提供する値よりも大きな値を期待するゲームで必要になります。"
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_JA "DUALSHOCK アナログモード切り替え"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_JA "入力デバイスの種類が DUALSHOCK の場合、このオプションを使用すると、エミュレートされた DUALSHOCK を元のハードウェアと同様にデジタル/アナログモードの間で切り替えることができます。選択したボタンの組み合わせでモードを切り替えることもできます。"
-#define OPTION_VAL_ENABLED_ANALOG_JA NULL
+#define OPTION_VAL_ENABLED_ANALOG_JA "デフォルトアナログ"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_JA "DUALSHOCK アナログモード切り替えコンボ"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_JA "エミュレートされた DUALSHOCK の DIGITAL モードと ANALOG モードを切り替えるために使用するボタンの組み合わせを選択します。"
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_JA "L1 + L2 + R1 + R2 + スタート + セレクト"
@@ -46843,12 +46843,12 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_190_JA NULL
 #define OPTION_VAL_195_JA NULL
 #define OPTION_VAL_200_JA NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_JA "ネジコンツイスト応答"
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_JA "ネジコンねじり応答"
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_JA NULL
-#define OPTION_VAL_LINEAR_JA "リニア"
-#define OPTION_VAL_QUADRATIC_JA NULL
-#define OPTION_VAL_CUBIC_JA "キュービック"
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_JA "ネジコンツイストデッドゾーン"
+#define OPTION_VAL_LINEAR_JA "線形"
+#define OPTION_VAL_QUADRATIC_JA "平方"
+#define OPTION_VAL_CUBIC_JA "立方"
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_JA "ネジコンねじりデッドゾーン"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_JA NULL
 #define OPTION_VAL_0_O30_JA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_JA "メモリーカード 0 形式 (再起動が必要)"
@@ -46959,7 +46959,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_740_JA NULL
 #define OPTION_VAL_750_JA NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_JA "GPU ラスタライザオーバークロック"
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_JA NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_JA "エミュレートされた PS1 の GPU に含まれる 2D ラスタライザのオーバークロックを有効にします。3D レンダリングは改善されず、一般的にはほとんど効果がありません。"
 #define OPTION_VAL_32X_JA NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_JA "GTE オーバークロック"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_JA NULL
@@ -58880,7 +58880,7 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_INTERNAL_RESOLUTION_PT_BR "Resolução interna"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_PT_BR "Deslocamento UV da textura"
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_PT_BR "Amostra de texturas para polígonos 3D em um deslocamento para uma resolução interna superior a 1x. Reduz as emendas de textura, mas pode causar falhas gráficas não intencionais."
-#define BEETLE_OPT_FILTER_LABEL_PT_BR "Filtro de texturas"
+#define BEETLE_OPT_FILTER_LABEL_PT_BR "Filtragem de textura"
 #define BEETLE_OPT_FILTER_INFO_0_PT_BR "Seleciona o método de filtragem de textura. O 'Mais próximo' emula o hardware original. Os filtros \"Bilinear\" e \"3 pontos\" são filtros suavizantes, que reduzem a pixelização por embaçamento. Os filtros 'SABR', 'xBR', e 'JINC2' são filtros de ampliação que podem melhorar a fidelidade/ruído da textura às custas do aumento dos requisitos de desempenho. Somente suportado por renderizadores de hardware."
 #define OPTION_VAL_NEAREST_PT_BR "Mais próximo"
 #define OPTION_VAL_SABR_PT_BR NULL
@@ -58913,7 +58913,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_WIREFRAME_INFO_0_PT_BR "Renderiza os modelos 3D em forma de contorno sem texturas ou sombreamento. Somente suportado pelo renderizador de hardware OpenGL. Nota: Isto é para fins de depuração, e normalmente deve ser desativado."
 #define BEETLE_OPT_FRAME_DUPING_LABEL_PT_BR "Duplicidade de quadros (maior velocidade)"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_PT_BR "Quando ativado e suportado pela interface libretro, proporciona um pequeno aumento de desempenho ao direcionar a interface para repetir o quadro anterior se o núcleo não tiver nada de novo para exibir."
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_PT_BR "Exibir FPS interno"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_PT_BR "Mostrar QPS interno"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_PT_BR "Exibir a taxa de quadros internos na qual o sistema PlayStation emulado está renderizando o conteúdo. Nota: Requer que as notificações na tela sejam habilitadas na interface libretro."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_PT_BR "Exibir a VRAM completa (depuração)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_PT_BR "Visualiza toda a VRAM do console emulado. Somente suportada pelos renderizadores de hardware OpenGL e Vulkan. Nota: Isto é para fins de depuração, e normalmente deve estar desativado."
@@ -59220,15 +59220,15 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_12PX_O60_0_PT_BR "+12 px"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_PT_BR "Deslocar imagem horizontal (ciclos de GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_PT_BR "Seleciona o número de ciclos de GPU com os quais se deve deslocar a imagem. Valores positivos movem a imagem para a direita, valores negativos movem a imagem para a esquerda. Funciona somente com renderizadores de hardware."
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PT_BR "Linha de varredura inicial em formato NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PT_BR "Linha de varredura inicial (NTSC)"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_PT_BR "Seleciona a primeira linha de varredura a ser exibida ao executar conteúdos NTSC. Um valor maior que zero reduzirá a altura das imagens geradas, cortando os pixels da parte superior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_0_O62_PT_BR "0 (padrão)"
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_PT_BR "Linha de varredura final em formato NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_PT_BR "Linha de varredura final (NTSC)"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos NTSC. Um valor menor que 239 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_239_PT_BR "239 (padrão)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura inicial em formato PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura inicial (PAL)"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a primeira linha de varredura a ser exibida ao executar conteúdos PAL. Um valor maior que zero reduzirá a altura das imagens geradas, cortando os pixels da parte superior. Isto pode ser usado para evitar o efeito 'letterboxing'."
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura final em formato PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura final (PAL)"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos PAL. Um valor inferior a 287 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_287_PT_BR "287 (padrão)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PT_BR "Método de acesso ao CD (requer reinício)"
@@ -62975,11 +62975,11 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_RU "Выводить на экран полное содержимое видеопамяти эмулируемой консоли. Поддерживается только для аппаратных рендеров OpenGL и Vulkan. Используется для отладки и в обычном режиме должно быть отключено."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_RU "Автокалибровка аналогового ввода"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU "Включает динамическую калибровку аналогового ввода для типов устройств DualShock, Analog Controller, Analog Joystick или neGcon. Значения макс. отклонений фиксируются в реальном времени и используются для масштабирования аналоговых координат, сообщаемых эмулятору. Используется в таких играх как Mega Man Legends 2, которым требуются значения выше тех, что могут предоставить современные контроллеры. Для макс. эффективности калибровки аналоговые стики необходимо вращать в полном диапазоне при каждом запуске игры."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_RU NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_RU NULL
-#define OPTION_VAL_ENABLED_ANALOG_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_RU "Переключатель режима DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_RU "При выборе устройства ввода типа DualShock данная опция позволяет переключать эмулируемый DualShock между цифровым и аналоговым режимами, как на реальной консоли. Режим также может быть изменён одной из комбинаций кнопок."
+#define OPTION_VAL_ENABLED_ANALOG_RU "По умолчанию-аналоговый"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_RU "Связка для смены режима DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_RU "Выбор комбинации кнопок для переключения между цифровым и аналоговым режимами эмулируемого DualShock."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_RU NULL
 #define OPTION_VAL_L1_R1_SELECT_RU NULL
 #define OPTION_VAL_L1_R1_START_RU NULL
@@ -62991,7 +62991,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_L2_R2_R3_RU NULL
 #define OPTION_VAL_L3_R3_RU NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_RU "Задержка нажатия для смены режима DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_RU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_RU "Период удерживания комбинации кнопок для переключения режима."
 #define OPTION_VAL_0_RU "0 секунд"
 #define OPTION_VAL_1_RU "1 секунда"
 #define OPTION_VAL_2_RU "2 секунды"
@@ -71087,11 +71087,11 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_TR "Taklit edilmiş konsolun VRAM miktarının tamamını görselleştirin. Yalnızca OpenGL ve Vulkan donanım işleyicileri tarafından desteklenir. Not: Bu, hata ayıklama amaçlıdır ve normalde devre dışı bırakılmalıdır."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TR "Analog Otomatik Kalibrasyon"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TR "Giriş cihazı DualShock, Analog Kontrolcü, Analog Joystick veya neGcon olarak ayarlandığında, bu seçenek analog girişlerin dinamik kalibrasyonunu sağlar. Kaydedilen en yüksek giriş değerleri gerçek zamanlı olarak izlenir ve emülatöre iletilen analog koordinatları ölçeklendirmek için kullanılır. Bu, Mega Man Legends 2 gibi modern denetleyicilerin sağladığından daha büyük değerler bekleyen oyunlar için kullanılmalıdır. En iyi sonuçlar için, içerik her yüklendiğinde kalibrasyon algoritmasını ayarlamak için analog çubuklar tam olarak döndürülmelidir."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_TR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR NULL
-#define OPTION_VAL_ENABLED_ANALOG_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_TR "DualShock Analog Mod Değiştir"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TR "Giriş cihazı türü DualShock olduğunda, bu seçenek taklit edilen DualShock'un orijinal donanım gibi DİJİTAL ve ANALOG mod arasında geçiş yapmasına olanak tanır. Mod, seçilen düğme kombinasyonu kullanılarak da değiştirilebilir."
+#define OPTION_VAL_ENABLED_ANALOG_TR "Varsayılan-Analog"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TR "DualShock Analog Mod Kombinasyonu"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TR "Taklit edilmiş DualShock için DİJİTAL ve ANALOG mod arasında geçiş yapmak için kullanılacak düğme kombinasyonunu seçin."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_TR NULL
 #define OPTION_VAL_L1_R1_SELECT_TR NULL
 #define OPTION_VAL_L1_R1_START_TR NULL
@@ -71103,7 +71103,7 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_L2_R2_R3_TR NULL
 #define OPTION_VAL_L3_R3_TR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR "DualShock Analog Mod Kombinasyonu Basma Gecikmesi"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR "Analog mod birleşik düğmelerinin tutma süresini ayarlayın."
 #define OPTION_VAL_0_TR "0 Saniye Gecikme"
 #define OPTION_VAL_1_TR "1 Saniye Gecikme"
 #define OPTION_VAL_2_TR "2 Saniye Gecikme"
