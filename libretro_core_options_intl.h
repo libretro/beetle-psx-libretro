@@ -38942,7 +38942,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HR NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_HR NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_HR NULL
-#define OPTION_VAL_0_O62_HR NULL
+#define OPTION_VAL_0_O62_HR "0 (Zadano)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_HR NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_HR NULL
 #define OPTION_VAL_239_HR NULL
@@ -46721,7 +46721,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_3_POINT_JA NULL
 #define OPTION_VAL_JINC2_JA NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_JA "スプライトをフィルタリングから除外"
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_JA "スプライトをテクスチャフィルタリングの対象から除外します。2D スプライトレンダリングされた背景を持つ様々なゲームで継ぎ目の発生を防止します。最適な効果を得るには、適応型スムージングまたは他のポストプロセスフィルターと併せて使用してください。"
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_JA "スプライトをテクスチャフィルタリングの対象から除外します。2D スプライトレンダリングされた背景を持つ様々なゲームで継ぎ目の発生を防止します。最適な効果を得るには、適応型スムージングまたは他のポストプロセスフィルターと併用してください。"
 #define OPTION_VAL_OPAQUE_JA "不透明のみ"
 #define OPTION_VAL_ALL_JA "不透明と半透明"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_JA "2D ポリゴンをフィルタリングから除外"
@@ -46729,7 +46729,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_JA "適応型スムージング"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_JA "3D レンダリングされたオブジェクトをぼかすことなく、2D アートワークと UI 要素を滑らかにします。Vulkan レンダラーでのみサポートされています。"
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_JA "スーパーサンプリング (ネイティブ解像度へのダウンサンプリング)"
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_JA "レンダリングされたコンテンツをアップスケールされた解像度からネイティブ解像度までダウンサンプリングします。このオプションをより高い内部解像度倍率と組み合わせることで、ネイティブの低解像度で滑らかな 3D オブジェクトを表示することができます。CRT シェーダーを使用する場合に役立ちます。Vulkan レンダラーでのみサポートされています。"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_JA "レンダリングされたコンテンツをアップスケールされた解像度からネイティブ解像度までダウンサンプリングします。このオプションをより高い内部解像度倍率と併用することで、ネイティブの低解像度で滑らかな 3D オブジェクトを表示することができます。CRT シェーダーを使用する場合に役立ちます。Vulkan レンダラーでのみサポートされています。"
 #define BEETLE_OPT_MSAA_LABEL_JA "マルチサンプリングアンチエイリアシング (MSAA)"
 #define BEETLE_OPT_MSAA_INFO_0_JA "レンダリングされたコンテンツの MSAA レベルを選択します。3D オブジェクトの外観を改善します。Vulkan レンダラーでのみサポートされています。"
 #define OPTION_VAL_1X_JA NULL
@@ -46844,19 +46844,19 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_195_JA NULL
 #define OPTION_VAL_200_JA NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_JA "ネジコンねじり応答"
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_JA NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_JA "エミュレートされた [neGcon] 入力デバイスの [ねじり] 動作をシミュレートする際の、レトロパッド左アナログスティックの応答タイプを選択します。注意: [線形] はレーシングホイール周辺機器を使用する場合にのみ推奨されます。ほとんどの場合、[平方] が実際のハードウェアに最も近い精度を提供します。"
 #define OPTION_VAL_LINEAR_JA "線形"
 #define OPTION_VAL_QUADRATIC_JA "平方"
 #define OPTION_VAL_CUBIC_JA "立方"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_JA "ネジコンねじりデッドゾーン"
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_JA NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_JA "エミュレートされた [neGcon] 入力デバイスの [ねじり] 動作をシミュレートする際の、レトロパッド左アナログスティックのデッドゾーンを選択します。ドリフトを除去するために使用します。注意: ほとんどのネジコン対応タイトルはデッドゾーン値を設定するためのゲーム内オプションがあり、精度の損失を避けるためにはそれらを 0 に設定する必要があります。"
 #define OPTION_VAL_0_O30_JA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_JA "メモリーカード 0 形式 (再起動が必要)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_JA "メモリーカード 0 で使用するセーブデータ形式を選択します。[Mednafen] はスタンドアロン版の Mednafen と互換性を維持するために使用できます。Beetle PSX で使用する場合、Libretro (.srm) と Mednafen (.mcr) のセーブデータ形式は内部的に同一であり、拡張子を変更することで相互に変換することができます。"
 #define OPTION_VAL_LIBRETRO_JA NULL
 #define OPTION_VAL_MEDNAFEN_JA NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_JA "メモリーカード 1 を有効にする (再起動が必要)"
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_JA "2 番目のメモリーカード を スロット 1 でエミュレートします。無効にすると、ゲームはスロット 1 のメモリーカードにのみアクセスできます。注意: 一部のゲームでは、正しくゲームを動作させるためにこのオプションを無効にする必要があります。メモリーカード 1 は Mednafen (.mcr) セーブ形式を使用します。"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_JA "2 番目のメモリーカード を スロット 1 でエミュレートします。無効にすると、ゲームはスロット 0 のメモリーカードにのみアクセスできます。注意: 一部のゲームでは、正しくゲームを動作させるためにこのオプションを無効にする必要があります。メモリーカード 1 は Mednafen (.mcr) セーブ形式を使用します。"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_JA "共有メモリーカード (再起動が必要)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_JA "有効にすると、すべてのゲームが共通のメモリーカードファイルを参照してセーブ/ロードを行うようになります。無効にすると、ロードされたコンテンツごとに個別のメモリーカードファイルが生成されます。注意: [メモリーカード 0 形式] が [Libretro] に設定されている場合、右メモリーカードのみが影響を受けます。"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_JA "メモリーカード左インデックス"
@@ -46865,11 +46865,11 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_JA "右スロットに現在ロードされているメモリーカードを変更します。このオプションはメモリーカード 1 方式が有効にされている場合にのみ動作します。デフォルトのカードはインデックス 1 です。"
 #define OPTION_VAL_1_O35_JA "1 (デフォルト)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_JA "PGXP 動作モード"
-#define BEETLE_OPT_PGXP_MODE_INFO_0_JA NULL
+#define BEETLE_OPT_PGXP_MODE_INFO_0_JA "3D オブジェクトをサブピクセル精度でレンダリングし、固定頂点座標の使用で発生する 3D オブジェクトの歪みやブレを最小限に抑えます。[メモリのみ] モードは互換性の問題が少なく、一般的に推奨されます。[メモリ + CPU (バグあり)] モードはブレをさらに減らすことができますが、システム要件が高くさまざまなジオメトリエラーを引き起こす可能性があります。"
 #define OPTION_VAL_MEMORY_ONLY_JA "メモリのみ"
 #define OPTION_VAL_MEMORY_CPU_JA "メモリ + CPU (バグあり)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_JA "PGXP 2D ジオメトリ許容範囲"
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_JA NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_JA "PGXP 動作における顕著なエラーを隠します。この値は、ジオメトリが適切な深度情報を持たない場合に PGXP 値が保持される許容範囲を指定します。"
 #define OPTION_VAL_0PX_JA NULL
 #define OPTION_VAL_1PX_JA NULL
 #define OPTION_VAL_2PX_JA NULL
@@ -46880,17 +46880,17 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_7PX_JA NULL
 #define OPTION_VAL_8PX_JA NULL
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_JA "PGXP プリミティブカリング"
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_JA NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_JA "PGXP の NCLIP 実装を使用します。 PGXP 座標を持つジオメトリの穴を減らすことで外観を改善します。一部のゲームは様々な状況でフリーズすることが判明しています。"
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_JA "PGXP 頂点キャッシュ"
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_JA NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_JA NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_JA NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_JA "ポリゴン描画全体で再利用するため、PGXP 拡張頂点位置をキャッシュします。テクスチャのレンダリング時にオブジェクトのアライメントを改善し、表示される継ぎ目を減らすことができますが、キャッシュの照会時に誤検知が発生すると描画バグが発生する可能性があります。無効にすることをおすすめします。ハードウェアレンダラーでのみサポートされています。"
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_JA "PGXP 視点修正テクスチャリング"
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_JA "ネイティブの PS1 アフィンテクスチャマッピングを視点修正テクスチャマッピングに置換します。テクスチャの位置に依存する歪みを除去し、テクスチャを適切にアライメントします。ハードウェアレンダラーでのみサポートされています。"
 #define BEETLE_OPT_LINE_RENDER_LABEL_JA "線形二次ハック"
-#define BEETLE_OPT_LINE_RENDER_INFO_0_JA NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_JA "線形二次ハック方式を選択します。一部のゲームは、画面を横切るように 1px の高さの三角形を引き伸ばすことで水平線を描画し、ピクセル行としてラスタライズします。このハックはこれらの小さな三角形を検出し、必要に応じてそれらを二次に変換することで、ハードウェアレンダラーで適切な描画を行います。不明な場合は [デフォルト] のままにしてください。"
 #define OPTION_VAL_DEFAULT_JA "デフォルト"
-#define OPTION_VAL_AGGRESSIVE_JA NULL
+#define OPTION_VAL_AGGRESSIVE_JA "アグレッシブ"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_JA "ワイドスクリーンモードハック"
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_JA NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_JA "3D コンテンツをアナモルフィック状態でレンダリングし、エミュレートされたフレームバッファをワイドスクリーンアスペクト比で出力します。フルポリゴン 3D ゲームで最高の結果を生成します。2D 要素は水平方向に引き伸ばされ、配置がずれる可能性があります。"
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_JA "ワイドスクリーンモードハックのアスペクト比"
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_JA "ワイドスクリーンモードハックで使用されるアスペクト比を選択します。"
 #define OPTION_VAL_16_9_JA NULL
@@ -46962,7 +46962,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_JA "エミュレートされた PS1 の GPU に含まれる 2D ラスタライザのオーバークロックを有効にします。3D レンダリングは改善されず、一般的にはほとんど効果がありません。"
 #define OPTION_VAL_32X_JA NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_JA "GTE オーバークロック"
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_JA NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_JA "すべてのエミュレートされた GTE (3D グラフィック用 CPU コプロセッサ) 動画を一定の 1 サイクルレイテンシに低減します。GTE を多用するゲームでフレームレートとフレームタイムの安定性が大幅に向上します。"
 #define BEETLE_OPT_SKIP_BIOS_LABEL_JA "BIOS をスキップ"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_JA "コンテンツのロード時に通常表示される PlayStation BIOS 起動アニメーションをスキップします。注意: これのオプションを有効にすると、多くのゲームで互換性の問題が発生します (PAL コピープロテクトが存在するゲーム、サガフロンティアなど)。"
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_JA "BIOS 優先設定 (再起動が必要)"
@@ -46976,24 +46976,24 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_HARDWARE_VK_JA "ハードウェア (Vulkan)"
 #define OPTION_VAL_SOFTWARE_JA "ソフトウェア"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_JA "ソフトウェアフレームバッファ"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA "ソフトウェアレンダラーのコピー (ネイティブ解像度) をバックグラウンドで実行することで、ハードウェアレンダラーを使用中にフレームバッファ効果の正確なエミュレーションを有効にします。無効にすると、これらの操作は省略される (OpenGL) か、GPU でレンダリング (Vulkan) されます。不明な場合は有効のままにしてください。"
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_JA "CPU 動的再コンパイル"
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_JA "CPU 命令をネイティブ命令に動的に再コンパイルします。インタプリタよりもはるかに高速ですが、CPU タイミングは正確ではなく、バグがある可能性があります。"
 #define OPTION_VAL_DISABLED_JA "無効 (Beetle インタプリタ)"
 #define OPTION_VAL_EXECUTE_JA "最大パフォーマンス"
-#define OPTION_VAL_EXECUTE_ONE_JA NULL
+#define OPTION_VAL_EXECUTE_ONE_JA "サイクルタイミングチェック"
 #define OPTION_VAL_RUN_INTERPRETER_JA "Lightrec インタプリタ"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_JA "動的再コンパイルコードの無効化"
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_JA NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_JA "ゲームによって [フル] 無効化を必要とするものと [DMA のみ] を必要とするものがあります。"
 #define OPTION_VAL_FULL_JA "フル"
 #define OPTION_VAL_DMA_JA "DMA のみ (やや早い)"
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_JA NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_JA NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_JA "動的再コンパイル DMA/GPU/MDEC/Timer イベントサイクル"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_JA "GPU/DMA/MDEC/Timer 更新がチェックされる前に CPU によって実行される最大サイクル数です。値を高くするほど高速になりますが、Beetle インタプリタにはほとんど影響を与えません。"
 #define OPTION_VAL_128_JA "128 (デフォルト)"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_JA "動的再コンパイル SPU サンプル"
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_JA NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_JA "SPU 更新がチェックされる前に実行される最大 SPU サンプル数です。値を高くするほど高速になりますが、1 以外に設定すると一部のゲームで音声バグが発生する可能性があります。"
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_JA "コア報告 FPS タイミング"
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_JA NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_JA "コアがフロントエンドに報告する FPS タイミングを選択します。自動切り替えを選択すると、コアはプログレッシブレートとインターレースレートを切り替えることができますが、フロントエンドのビデオ/オーディオドライバの再初期化を引き起こす可能性があります。"
 #define OPTION_VAL_FORCE_PROGRESSIVE_JA "プログレッシブレート"
 #define OPTION_VAL_FORCE_INTERLACED_JA "強制インターレースレート"
 #define OPTION_VAL_AUTO_TOGGLE_JA "自動切り替えを許可"
@@ -47006,7 +47006,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_4_3_JA "強制 4:3"
 #define OPTION_VAL_NTSC_JA "強制 NTSC"
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_JA "オーバースキャンをトリミング"
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_JA NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_JA "[なし] は実機のアナログビデオ出力時に生成された余白 (黒枠) を保持します。[静的] は水平余白のみを削除し、[動的] はすべての余白を削除します。"
 #define OPTION_VAL_DISABLED_O58_JA "なし"
 #define OPTION_VAL_STATIC_JA "静的"
 #define OPTION_VAL_SMART_JA "動的 (デフォルト)"
@@ -47051,7 +47051,7 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_11PX_O60_0_JA NULL
 #define OPTION_VAL_12PX_O60_0_JA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_JA "水平イメージオフセット (GPU サイクル)"
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_JA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_JA "イメージをオフセットする GPU サイクル数を選択します。正の値はイメージを右に移動させ、負の値はイメージを左に移動させます。ハードウェアレンダラーでのみサポートされています。"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_JA "開始スキャンライン - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_JA "NTSC コンテンツを実行する際に最初に表示されるスキャンラインを選択します。 0 より大きい値を指定すると、上端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define OPTION_VAL_0_O62_JA "0 (デフォルト)"
@@ -60947,11 +60947,11 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_PT_PT NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_PT_PT NULL
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_PT_PT NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_PT NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_PT NULL
-#define OPTION_VAL_ENABLED_ANALOG_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_PT "Alternar o modo analógico do DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_PT "Quando o tipo de dispositivo de entrada é o DualShock, esta opção permite que o DualShock emulado seja alternado entre os modos DIGITAL e ANALÓGICO, tal como o hardware original. O modo também pode ser alternado utilizando a combinação de botões selecionada."
+#define OPTION_VAL_ENABLED_ANALOG_PT_PT "Analógico por predefinição"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_PT NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_PT "Escolha a combinação de botões que será utilizada para alternar entre o modo DIGITAL e ANALÓGICO para o DualShock emulado."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_PT NULL
 #define OPTION_VAL_L1_R1_SELECT_PT_PT NULL
 #define OPTION_VAL_L1_R1_START_PT_PT NULL
@@ -60963,7 +60963,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_L2_R2_R3_PT_PT NULL
 #define OPTION_VAL_L3_R3_PT_PT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_PT NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_PT NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_PT "Definir o tempo de espera para os botões combinados do modo analógico."
 #define OPTION_VAL_0_PT_PT NULL
 #define OPTION_VAL_1_PT_PT NULL
 #define OPTION_VAL_2_PT_PT NULL
@@ -61202,10 +61202,10 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_4_3_PT_PT NULL
 #define OPTION_VAL_NTSC_PT_PT NULL
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_PT_PT NULL
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_PT NULL
-#define OPTION_VAL_DISABLED_O58_PT_PT "Nenhum"
-#define OPTION_VAL_STATIC_PT_PT NULL
-#define OPTION_VAL_SMART_PT_PT NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_PT_PT "'Nenhum' mantém o preenchimento (os pilares em ambos os lados da imagem para NTSC, em todos os lados para PAL) para emular as mesmas barras pretas geradas na saída de vídeo analógico pelo hardware real da PSX. 'Estático' remove apenas o preenchimento horizontal, 'Dinâmico' remove todo o preenchimento."
+#define OPTION_VAL_DISABLED_O58_PT_PT "Não partilhar"
+#define OPTION_VAL_STATIC_PT_PT "Estático"
+#define OPTION_VAL_SMART_PT_PT "Dinâmico (Predefinição)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_PT_PT NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_PT_PT NULL
 #define OPTION_VAL_9PX_PT_PT NULL
@@ -61250,7 +61250,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_PT_PT NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_PT_PT NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_PT_PT NULL
-#define OPTION_VAL_0_O62_PT_PT NULL
+#define OPTION_VAL_0_O62_PT_PT "0 (Predefinição)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_PT_PT NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_PT_PT NULL
 #define OPTION_VAL_239_PT_PT "239 (Padrão)"
