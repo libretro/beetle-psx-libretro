@@ -42695,11 +42695,11 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_HU "Az emulált konzol teljes VRAM tartalmának megjelenítése. Csak az OpenGL és Vulkan hardveres megjelenítők támogatják. Figyelem: ez csak hibakeresési célokat szolgál, és normál esetben ki kell legyen kapcsolva."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_HU "Analóg önkalibráció"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_HU "Ha a bemeneti eszköz DualShock, Analóg kontroller, Analóg joystick, vagy neGcon értékre van állítva, engedélyezi az analóg bemenetek dinamikus kalibrálását. A maximum bejövő értékeket valós időben figyeli és méretezi hozzá az emulátornak átadott analóg koordinátákat. Olyan játékokhoz érdemes használni, mint a Mega Man Legends 2, amelyek nagyobb értékeket várnak, mint amit a modern kontrollerek ki tudnak adni. A legjobb eredményhez az analóg karokat minden tartalom betöltéskor teljesen körbe kell fordítani, hogy a kalibrációs algoritmus be tudja magát hangolni."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_HU NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HU NULL
-#define OPTION_VAL_ENABLED_ANALOG_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_HU "DualShock analóg mód átkapcsolás"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_HU "Ha a bemeneti eszköz típusa DualShock, ez az opció engedélyezi az emulált DualShock átkapcsolását a DIGITAL és ANALOG mód közt, az eredeti hardverhez hűen. A mód a kiválasztott gombkombinációval is átkapcsolható."
+#define OPTION_VAL_ENABLED_ANALOG_HU "Alapértelmezett - Analóg"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_HU "DualShock analóg mód gombkombináció"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_HU "Gombkombináció az emulált DualShock DIGITAL és ANALOG módjai közti váltáshoz."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_HU NULL
 #define OPTION_VAL_L1_R1_SELECT_HU NULL
 #define OPTION_VAL_L1_R1_START_HU NULL
@@ -42711,7 +42711,7 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_L2_R2_R3_HU NULL
 #define OPTION_VAL_L3_R3_HU NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU "DualShock analóg mód gombkombináció késleltetés"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU "Az analóg mód gombkombinációjának lenyomási ideje."
 #define OPTION_VAL_0_HU "0 másodperc"
 #define OPTION_VAL_1_HU "1 másodperc"
 #define OPTION_VAL_2_HU "2 másodperc"
@@ -42998,7 +42998,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HU "Az eltoláshoz használt GPU ciklusok száma. Pozitív értékeknél a kép jobbra, negatívnál balra mozdul. Csak a hardveres megjelenítők támogatják."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_HU "Kezdő scanline - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_HU "Az első megjelenített scanline NTSC tartalom futtatásakor. A nullánál nagyobb értékek csökkentik a kimenő kép magasságát, levágva a felső sorokat. A letterbox hatást lehet vele ellensúlyozni."
-#define OPTION_VAL_0_O62_HU NULL
+#define OPTION_VAL_0_O62_HU "0 (alapértelmezett)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_HU "Utolsó scanline - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_HU "Az utolsó megjelenített scanline NTSC tartalom futtatásakor. A 239-nél kisebb értékek csökkentik a kimenő kép magasságát, levágva az alsó sorokat. A letterbox hatást lehet vele ellensúlyozni."
 #define OPTION_VAL_239_HU "239 (alapértelmezett)"
