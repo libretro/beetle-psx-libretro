@@ -36545,35 +36545,35 @@ struct retro_core_options_v2 options_fr = {
 /* RETRO_LANGUAGE_GL */
 
 #define CATEGORY_VIDEO_LABEL_GL "Vídeo"
-#define CATEGORY_VIDEO_INFO_0_GL NULL
+#define CATEGORY_VIDEO_INFO_0_GL "Cambia a relación de aspecto, o recorte da pantalla, o filtro de vídeo e a configuración de saltar de fotogramas."
 #define CATEGORY_OSD_LABEL_GL "Información en pantalla (OSD)"
-#define CATEGORY_OSD_INFO_0_GL NULL
+#define CATEGORY_OSD_INFO_0_GL "Configurar as notificacións que se amosan na pantalla."
 #define CATEGORY_INPUT_LABEL_GL "Entrada"
-#define CATEGORY_INPUT_INFO_0_GL NULL
+#define CATEGORY_INPUT_INFO_0_GL "Cambia a configuración de pistola lixeira, rato e neGcon."
 #define CATEGORY_MEMCARDS_LABEL_GL "Tarxeta de memoria"
-#define CATEGORY_MEMCARDS_INFO_0_GL NULL
+#define CATEGORY_MEMCARDS_INFO_0_GL "Cambia a configuración relacionada coa(s) tarxeta(s) de memoria virtuais utilizadas polo sistema."
 #define CATEGORY_PGXP_LABEL_GL NULL
 #define CATEGORY_PGXP_INFO_0_GL "Estas opcións controlan qué parámetros poden millorar os gráficos comparados coa consola orixinal PGXP pode desbotar texturas deformadas e problemas co eixe Z nos xogos de loita."
 #define CATEGORY_HACKS_LABEL_GL "Hacks de emulación"
-#define CATEGORY_HACKS_INFO_0_GL NULL
+#define CATEGORY_HACKS_INFO_0_GL "Cambia a configuración de overclocking e precisión de emulación do procesador que afectan o rendemento e a compatibilidade de baixo nivel."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GL "Resolución interna da GPU"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GL NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GL "Escolla o multiplicador de resolución interna. As resolucións superiores a \"1x (nativa)\" melloran a fidelidade dos modelos 3D a costa de aumentar os requisitos de rendemento. Os elementos 2D xeralmente non se ven afectados por esta configuración."
 #define OPTION_VAL_1X_NATIVE_GL "1x (Nativo)"
 #define OPTION_VAL_2X_GL NULL
 #define OPTION_VAL_4X_GL NULL
 #define OPTION_VAL_8X_GL NULL
 #define OPTION_VAL_16X_GL NULL
 #define BEETLE_OPT_DEPTH_LABEL_GL "Profundidade de Cor Interna"
-#define BEETLE_OPT_DEPTH_INFO_0_GL NULL
+#define BEETLE_OPT_DEPTH_INFO_0_GL "Escolla a profundidade da cor interna. A maior profundidade de cor pode reducir os efectos de bandas de cor sen usar o tramado. 16 bpp emula o hardware orixinal pero pode ter bandas visibles se non se activa o dithering. Recoméndase que se desactive o 'Patrón de tramado' cando esta opción se establece en 32 bpp."
 #define OPTION_VAL_16BPP_NATIVE_GL "16 bpp (Nativo)"
 #define OPTION_VAL_32BPP_GL NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_GL "Patrón Dithering"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_GL NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_GL "Escolla a configuración do patrón de tramado. '1x (Native)' emula o tramado nativo de baixa resolución usado polo hardware orixinal para suavizar os artefactos de bandas de cor visibles na profundidade da cor nativa. A 'Resolución interna' escala a granularidade de dithering á resolución interna configurada para obter resultados máis limpos. Recoméndase desactivalo cando se executa a unha profundidade de cor de 32 bpp. Nota: en Vulkan, activar isto forzará a baixa-mostraxe á profundidade de cor nativa, mentres que a desactivación activará automaticamente a saída a unha profundidade de cor máis alta."
 #define OPTION_VAL_INTERNAL_RESOLUTION_GL "Resolución interna"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_GL "Desprazamento UV da textura"
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_GL NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_GL "Mostra de texturas para polígonos 3D cunha compensación para unha resolución interna superior a 1x. Reduce as costuras de textura pero pode causar fallos gráficos non desexados."
 #define BEETLE_OPT_FILTER_LABEL_GL "Filtrado de Texturas"
-#define BEETLE_OPT_FILTER_INFO_0_GL NULL
+#define BEETLE_OPT_FILTER_INFO_0_GL "Escolla o método de filtrado de texturas. 'Nearest' emula o hardware orixinal. \"Bilineal\" e \"3-Point\" son filtros suavizantes, que reducen a pixelación mediante o desenfoque. \"SABR\", \"xBR\" e \"JINC2\" son filtros de ampliación que poden mellorar a fidelidade/nitidez da textura a costa de aumentar os requisitos de rendemento. Só admitido polos renderizadores de hardware."
 #define OPTION_VAL_NEAREST_GL NULL
 #define OPTION_VAL_SABR_GL NULL
 #define OPTION_VAL_XBR_GL NULL
@@ -36581,41 +36581,41 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_3_POINT_GL "3-puntos"
 #define OPTION_VAL_JINC2_GL NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_GL "Exclúe os sprites do filtrado"
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_GL NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_GL "Non aplique filtrado de textura aos sprites. Evita as costuras en varios xogos con fondos representados en sprites en 2D. Utilízao xunto con Adaptive Smoothing ou outro filtro de post-procesamento para obter o mellor efecto."
 #define OPTION_VAL_OPAQUE_GL "Opaco únicamente"
 #define OPTION_VAL_ALL_GL "Opaco e semi-transparente"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_GL "Exclúe os polígonos 2D do filtrado"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_GL "Non aplica o filtrado de texturas ós polígonos 2D. Os polígonos 2D son detectados cunha heurística e pode haber erros gráficos. Usar esta opción xunto co Suavizado Adaptativo ou con outro filtro de post-procesado para un millor efecto."
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_GL "Suavizado Adaptativo"
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_GL NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_GL "Suavizar as obras de arte en 2D e os elementos da IU sen difuminar os obxectos renderizados en 3D. Só admitido polo renderizador Vulkan."
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_GL "Supermostreo (redución da mostra á resolución nativa)"
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_GL NULL
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_GL "Reducir o contido renderizado desde a resolución interna aumentada ata a resolución nativa. A combinación destes con multiplicadores de resolución interna máis altas permite que os xogos se mostren con obxectos 3D con antialias a baixa resolución nativa. Produce os mellores resultados cando se aplica a títulos que mesturan elementos 2D e 3D (por exemplo, caracteres 3D sobre fondos renderizados previamente) e funciona ben xunto cos sombreadores CRT. Só admitido polo renderizador Vulkan. Nota: Recoméndase que se desactive o \"Patrón de tramado\" ao activar esta opción."
 #define BEETLE_OPT_MSAA_LABEL_GL NULL
-#define BEETLE_OPT_MSAA_INFO_0_GL NULL
+#define BEETLE_OPT_MSAA_INFO_0_GL "Escolla o nivel MSAA para o contido renderizado. Mellora a aparencia dos obxectos 3D. Só admitido polo renderizador Vulkan."
 #define OPTION_VAL_1X_GL NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_GL "Filtro cromático MDEC YUV"
-#define BEETLE_OPT_MDEC_YUV_INFO_0_GL NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_GL NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_GL NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_GL "Mellora a calidade da reprodución FMV reducindo os artefactos de \"macrobloqueo\" (cadrados/bordes irregulares). Só admitido polo renderizador Vulkan."
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_GL "Seguimento de texturas"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_GL "Requisito previo para o vertido e substitución da textura. Probablemente fallará na maioría dos xogos."
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_GL "Texturas de volcado"
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GL NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GL NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GL NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_GL NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_GL NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_GL NULL
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_GL NULL
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GL "Volcar as texturas usadas a <cd>-texture-dump/"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GL "Substituír texturas"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GL "Substitúe texturas usando versións HD de <cd>-texture-replacements/"
+#define BEETLE_OPT_WIREFRAME_LABEL_GL "Modo Wireframe (Depuración)"
+#define BEETLE_OPT_WIREFRAME_INFO_0_GL "Renderizar modelos 3D en forma de contorno sen texturas nin sombreados. Só é compatible co renderizador de hardware OpenGL. Nota: Isto é para fins de depuración e normalmente debería estar desactivado."
+#define BEETLE_OPT_FRAME_DUPING_LABEL_GL "Duping de cadros (aceleración)"
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_GL "Cando está habilitado e admitido polo frontend de libretro, isto proporciona un pequeno aumento de rendemento ao dirixir o frontend para que repita o cadro anterior se o núcleo non ten nada novo que mostrar."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_GL NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_GL NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_GL NULL
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GL NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GL NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GL NULL
-#define OPTION_VAL_ENABLED_ANALOG_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GL NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_GL "Mostra a velocidade de fotogramas interna á que o sistema PlayStation emulado está a renderizar contido. Nota: Require que as notificacións en pantalla estean activadas na interface de libretro."
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_GL "Mostrar VRAM completa (depuración)"
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GL "Visualiza a VRAM de toda a consola emulada. Só admitido polos renderizadores de hardware OpenGL e Vulkan. Nota: Isto é para fins de depuración e normalmente debería estar desactivado."
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GL "Autocalibración analóxica"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GL "Cando o dispositivo de entrada está configurado en DualShock, Controlador analóxico, Joystick analóxico ou neGcon, esta opción permite a calibración dinámica das entradas analóxicas. Os valores de entrada máximos rexistrados son monitorizados en tempo real e utilízanse para escalar as coordenadas analóxicas pasadas ao emulador. Isto debería usarse para xogos como Mega Man Legends 2 que esperan valores maiores que os que proporcionan os controladores modernos. Para obter mellores resultados, os sticks analóxicos deben xirar ao máximo para axustar o algoritmo de calibración cada vez que se carga o contido."
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GL "Alternador de modo analóxico de DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GL "Cando o tipo de dispositivo de entrada é DualShock, esta opción permite que o DualShock emulado se altere entre os modos DIXITAL e ANALÓXICO como o hardware orixinal. O modo tamén se pode cambiar usando a combinación de botóns seleccionada."
+#define OPTION_VAL_ENABLED_ANALOG_GL "Predeterminado: analóxico"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GL "Combinación de modo analóxico DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GL "Escolla a combinación de botóns que se utilizará para alternar entre os modos DIXITAL e ANALÓXICO para o DualShock emulado."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_GL NULL
 #define OPTION_VAL_L1_R1_SELECT_GL NULL
 #define OPTION_VAL_L1_R1_START_GL NULL
@@ -36626,43 +36626,43 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_L2_R2_L3_GL NULL
 #define OPTION_VAL_L2_R2_R3_GL NULL
 #define OPTION_VAL_L3_R3_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GL NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GL NULL
-#define OPTION_VAL_0_GL NULL
-#define OPTION_VAL_1_GL NULL
-#define OPTION_VAL_2_GL NULL
-#define OPTION_VAL_3_GL NULL
-#define OPTION_VAL_4_GL NULL
-#define OPTION_VAL_5_GL NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GL NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_GL NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_GL NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_GL NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_GL NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_GL NULL
-#define OPTION_VAL_LIGHTGUN_GL NULL
-#define OPTION_VAL_TOUCHSCREEN_GL NULL
-#define BEETLE_OPT_GUN_CURSOR_LABEL_GL NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_GL NULL
-#define OPTION_VAL_CROSS_GL NULL
-#define OPTION_VAL_DOT_GL NULL
-#define OPTION_VAL_OFF_GL NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_GL NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_GL NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GL "Retardo de retención combinado de modo analóxico DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GL "Establece o tempo de espera para os botóns combinados do modo analóxico."
+#define OPTION_VAL_0_GL "Retraso de 0 segundos"
+#define OPTION_VAL_1_GL "Retraso de 1 segundo"
+#define OPTION_VAL_2_GL "Retraso de 2 segundos"
+#define OPTION_VAL_3_GL "Retraso de 3 segundos"
+#define OPTION_VAL_4_GL "Retraso de 4 segundo"
+#define OPTION_VAL_5_GL "Retraso de 5 segundo"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GL "Porto 1: Activar multitoque"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_GL "Activa a función de multitoque no porto 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_GL "Porto 2: Activar multitoque"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_GL "Activa a funcionalidade de múltiples toques no porto 2."
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_GL "Modo de entrada de pistola"
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_GL "Escolla se quere utilizar unha entrada \"Light Gun\" ou \"pantalla táctil\" controlada co rato cando o tipo de dispositivo estea definido como \"Guncon/G-Con 45\" ou \"Justifier\"."
+#define OPTION_VAL_LIGHTGUN_GL "Pistola lixeira"
+#define OPTION_VAL_TOUCHSCREEN_GL "Pantalla táctil"
+#define BEETLE_OPT_GUN_CURSOR_LABEL_GL "Cursor de pistola"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_GL "Escolle o cursor da arma que se mostrará na pantalla mentres utilizas os tipos de dispositivos de entrada \"Guncon/G-Con 45\" e \"Justifier\". Cando está desactivado, o punto de mira sempre está oculto."
+#define OPTION_VAL_CROSS_GL "Cruz"
+#define OPTION_VAL_DOT_GL "Punto"
+#define OPTION_VAL_OFF_GL "Sen cursor"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_GL "Porto 1: cor da mira de pistola"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_GL "Escolla a cor do punto de mira da pistola lixeira para o porto 1."
 #define OPTION_VAL_RED_GL "Vermello"
 #define OPTION_VAL_BLUE_GL "Azul"
 #define OPTION_VAL_GREEN_GL "Verde"
 #define OPTION_VAL_ORANGE_GL "Laranxa"
 #define OPTION_VAL_YELLOW_GL "Amarelo"
 #define OPTION_VAL_CYAN_GL "Azul ceo"
-#define OPTION_VAL_PINK_GL NULL
+#define OPTION_VAL_PINK_GL "Rosa"
 #define OPTION_VAL_PURPLE_GL "Malva"
 #define OPTION_VAL_BLACK_GL "Negro"
 #define OPTION_VAL_WHITE_GL "Branco"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_GL NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_GL NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_GL NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_GL NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_GL "Porto 2: cor da mira de pistola"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_GL "Escolla a cor do punto de mira da pistola lixeira para o porto 2."
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_GL "Sensibilidade do rato"
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_GL "Escolla a capacidade de resposta do tipo de dispositivo de entrada \"Rato\"."
 #define OPTION_VAL_5_O28_GL NULL
 #define OPTION_VAL_10_GL NULL
 #define OPTION_VAL_15_GL NULL
@@ -36682,7 +36682,7 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_85_GL NULL
 #define OPTION_VAL_90_GL NULL
 #define OPTION_VAL_95_GL NULL
-#define OPTION_VAL_100_GL NULL
+#define OPTION_VAL_100_GL "100 % (predeterminado)"
 #define OPTION_VAL_105_GL NULL
 #define OPTION_VAL_110_GL NULL
 #define OPTION_VAL_115_GL NULL
@@ -36704,32 +36704,32 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_195_GL NULL
 #define OPTION_VAL_200_GL NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_GL NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_GL NULL
-#define OPTION_VAL_LINEAR_GL NULL
-#define OPTION_VAL_QUADRATIC_GL NULL
-#define OPTION_VAL_CUBIC_GL NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_GL "Escolla o tipo de resposta do stick analóxico esquerdo do RetroPad ao simular a acción de \"torsión\" dos dispositivos de entrada \"neGcon\" emulados. O desprazamento da vara analóxica pódese asignar ao ángulo de rotación neGcon de forma lineal, cuadrática ou cúbica. 'Cuadrático' permite unha maior precisión que 'Lineal' ao facer pequenos movementos. \"Cúbico\" aumenta aínda máis a precisión dos pequenos movementos, pero \"esaxera\" os movementos máis grandes. Nota: \"Lineal\" só se recomenda cando se usan periféricos para volantes de carreiras. Os controladores convencionais implementan a entrada analóxica dun xeito fundamentalmente diferente do mecanismo de \"torsión\" de neGcon, de forma que o mapeo lineal sobreamplifica os pequenos movementos, prexudicando o control fino. Na maioría dos casos, 'Quadratic' ofrece a aproximación máis próxima ao hardware real."
+#define OPTION_VAL_LINEAR_GL "Lineal"
+#define OPTION_VAL_QUADRATIC_GL "Cuadrático"
+#define OPTION_VAL_CUBIC_GL "Cuadrático"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_GL NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_GL NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_GL "Escolla a zona morta do stick analóxico esquerdo do RetroPad ao simular a acción de \"torsión\" dos dispositivos de entrada \"neGcon\" emulados. Usado para eliminar a deriva do controlador. Nota: a maioría dos títulos compatibles con neGcon ofrecen opcións no xogo para establecer un valor de zona morta de \"torsión\". Para evitar a perda de precisión, a zona morta do xogo debe *sempre* poñerse en cero. Calquera axuste necesario debe *só* aplicar a través desta opción básica. Isto é especialmente importante cando a \"Resposta de torsión neGcon\" está configurada como \"Cuadrático\" ou \"Cúbico\"."
 #define OPTION_VAL_0_O30_GL NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_GL NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_GL NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_GL "Método da tarxeta de memoria 0 (reinicio necesario)"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_GL "Escolla o formato de datos de gardar usado para a tarxeta de memoria 0. 'Mednafen' pódese usar para compatibilidade coa versión autónoma de Mednafen. Cando se usan con Beetle PSX, os gardados de Libretro (.srm) e Mednafen (.mcr) teñen formatos internamente idénticos e pódense converter entre si mediante o cambio de nome."
 #define OPTION_VAL_LIBRETRO_GL NULL
 #define OPTION_VAL_MEDNAFEN_GL NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_GL NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_GL NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_GL NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_GL NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_GL NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GL NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GL NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GL NULL
-#define OPTION_VAL_1_O35_GL NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_GL NULL
-#define BEETLE_OPT_PGXP_MODE_INFO_0_GL NULL
-#define OPTION_VAL_MEMORY_ONLY_GL NULL
-#define OPTION_VAL_MEMORY_CPU_GL NULL
-#define BEETLE_OPT_PGXP_2D_TOL_LABEL_GL NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_GL NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_GL "Activar tarxeta de memoria 1 (reinicio necesario)"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_GL "Emula unha segunda tarxeta de memoria na ranura 1. Cando está desactivada, os xogos só poden acceder á tarxeta de memoria na ranura 0. Nota: algúns xogos requiren que esta opción estea desactivada para que funcione correctamente (por exemplo, Codename Tenka). Nota: a tarxeta de memoria 1 usa o formato de gardar Mednafen (.mcr)."
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_GL "Tarxetas de memoria compartidas (necesario reiniciar)"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_GL "Cando estea activado, todos os xogos gardaranse e cargaranse desde os mesmos ficheiros da tarxeta de memoria. Cando estea desactivado, xeraranse ficheiros de tarxeta de memoria separados para cada elemento de contido cargado. Nota: se \"Método da tarxeta de memoria 0\" está definido como \"Libretro\", só se verá afectada a tarxeta de memoria correcta."
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_GL "Índice esquerdo da tarxeta de memoria"
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GL "Cambia a tarxeta de memoria cargada actualmente na rañura esquerda. Esta opción só funcionará se o método da tarxeta de memoria 0 está configurado en Mednafen. A tarxeta predeterminada é o índice 0."
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GL "Índice dereito da tarxeta de memoria"
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GL "Cambia a tarxeta de memoria cargada actualmente na ranura correcta. Esta opción só funcionará se a tarxeta de memoria 1 está activada. A tarxeta predeterminada é o índice 1."
+#define OPTION_VAL_1_O35_GL "1 (predeterminado)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_GL "Modo de operación PGXP"
+#define BEETLE_OPT_PGXP_MODE_INFO_0_GL "Permite renderizar obxectos 3D con precisión de subpíxeles, minimizando a distorsión e a fluctuación dos obxectos 3D vistos no hardware orixinal debido ao uso de coordenadas de vértice de punto fixo. O modo \"Só memoria\" ten problemas mínimos de compatibilidade e recoméndase para uso xeral. O modo \"Memoria + CPU (Buggy)\" pode reducir aínda máis a fluctuación, pero ten requisitos de alto rendemento e pode causar varios erros de xeometría."
+#define OPTION_VAL_MEMORY_ONLY_GL "Só memoria"
+#define OPTION_VAL_MEMORY_CPU_GL "Memoria + CPU (Buggy)"
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_GL "Tolerancia á xeometría 2D PGXP"
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_GL "Ocultar erros máis evidentes nas operacións PGXP: o valor especifica a tolerancia na que se manterán os valores PGXP no caso de xeometrías sen a información de profundidade adecuada."
 #define OPTION_VAL_0PX_GL NULL
 #define OPTION_VAL_1PX_GL NULL
 #define OPTION_VAL_2PX_GL NULL
@@ -36740,19 +36740,19 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_7PX_GL NULL
 #define OPTION_VAL_8PX_GL NULL
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_GL NULL
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_GL NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_GL "Use a implementación NCLIP de PGXP. Mellora a aparencia reducindo os buracos nas xeometrías con coordenadas PGXP. Sábese que provoca que algúns xogos se bloqueen en varias circunstancias."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_GL NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_GL NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_GL NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_GL NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_GL NULL
-#define BEETLE_OPT_LINE_RENDER_INFO_0_GL NULL
-#define OPTION_VAL_DEFAULT_GL NULL
-#define OPTION_VAL_AGGRESSIVE_GL NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_GL NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_GL NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_GL NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_GL NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_GL "Almacene en caché as posicións dos vértices melloradas con PGXP para reutilizalas en debuxos de polígonos. Pode mellorar o aliñamento dos obxectos e reducir as costuras visibles ao renderizar texturas, pero os falsos positivos ao consultar a caché poden producir fallos gráficos. Actualmente recoméndase deixar esta opción desactivada. Esta opción só se aplica cando o Modo de operación PGXP está activado. Só admitido polos renderizadores de hardware."
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_GL "PGXP Perspectiva Texturización correcta"
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_GL "Substitúe a asignación de texturas afines nativa de PSX pola asignación de texturas correctas en perspectiva. Elimina a distorsión dependente da posición e a deformación das texturas, obtendo texturas correctamente aliñadas. Esta opción só se aplica cando o Modo de operación PGXP está activado. Só admitido polos renderizadores de hardware."
+#define BEETLE_OPT_LINE_RENDER_LABEL_GL "Corte de liña a cuádruple"
+#define BEETLE_OPT_LINE_RENDER_INFO_0_GL "Escolla o método de corte de liña a cuádruple. Algúns xogos (por exemplo, Doom, Hexen, Soul Blade, etc.) debuxan liñas horizontais estirando triángulos de altura dun só píxel pola pantalla, que se rasterizan como unha fila de píxeles no hardware orixinal. Este truco detecta estes pequenos triángulos e convérteos en cuadriláteros segundo sexa necesario, o que permite que se mostren correctamente nos renderizadores de hardware e con resolucións internas ampliadas. Requírese \"Agresivo\" para algúns títulos (por exemplo, Dark Forces, Duke Nukem) pero doutro xeito pode introducir fallas gráficas. Déixao en \"Predeterminado\" se non está seguro."
+#define OPTION_VAL_DEFAULT_GL "Por defecto"
+#define OPTION_VAL_AGGRESSIVE_GL "Agresiva"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_GL "Modo de pantalla ancha Hack"
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_GL "Renderiza o contido 3D de forma anamórfica e mostra o framebuffer emulado cunha relación de aspecto de pantalla panorámica. Produce os mellores resultados con xogos totalmente en 3D. Os elementos 2D estiraranse horizontalmente e poden estar mal aliñados."
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_GL "Modo de pantalla ancha cortar a relación de aspecto"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_GL "Escolla a relación de aspecto para ser usado polo corte de modo de pantalla ancha."
 #define OPTION_VAL_16_9_GL NULL
 #define OPTION_VAL_16_10_GL NULL
 #define OPTION_VAL_18_9_GL NULL
@@ -36760,9 +36760,9 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_20_9_GL NULL
 #define OPTION_VAL_21_9_GL NULL
 #define OPTION_VAL_32_9_GL NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_GL NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_GL NULL
-#define OPTION_VAL_100_NATIVE_GL NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_GL "Escala de frecuencia da CPU (overclock)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_GL "Overclock (ou underclock) a CPU PSX emulada. O overclocking pode eliminar a desaceleración e mellorar as taxas de cadros en determinados xogos a costa de aumentar os requisitos de rendemento. Teña en conta que algúns xogos teñen un limitador de frecuencia de cadros interno e poden non beneficiarse do overclocking. Pode provocar que certos efectos se animen máis rápido do previsto nalgúns títulos cando se fai overclock."
+#define OPTION_VAL_100_NATIVE_GL "100 % (nativo)"
 #define OPTION_VAL_210_GL NULL
 #define OPTION_VAL_220_GL NULL
 #define OPTION_VAL_230_GL NULL
@@ -36818,60 +36818,60 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_730_GL NULL
 #define OPTION_VAL_740_GL NULL
 #define OPTION_VAL_750_GL NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_GL NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_GL NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_GL "Overclock de GPU Rasterizer"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_GL "Activa o overclocking do rasterizador 2D contido na GPU da PSX emulada. Non mellora o renderizado 3D e, en xeral, ten pouco efecto."
 #define OPTION_VAL_32X_GL NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_GL NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_GL NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_GL NULL
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_GL NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_GL NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GL NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_GL "Overclock GTE"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_GL "Reduce todas as operacións emuladas de GTE (coprocesador de CPU para gráficos 3D) a unha latencia constante dun ciclo. Para os xogos que fan un uso intensivo do GTE, isto pode mellorar moito a taxa de cadros e a estabilidade do tempo de cadros."
+#define BEETLE_OPT_SKIP_BIOS_LABEL_GL "Saltar a BIOS"
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_GL "Omita a animación de inicio da BIOS de PlayStation que se mostra normalmente ao cargar contido. Nota: Activar isto provoca problemas de compatibilidade con varios xogos (xogos protexidos contra copia PAL, Saga Frontier, etc.)."
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_GL "Anular a BIOS (reinicio necesario)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GL "Anular a BIOS específica da rexión estándar cunha sen rexión se se atopa."
 #define OPTION_VAL_PSXONPSP_GL NULL
 #define OPTION_VAL_PS1_ROM_GL NULL
-#define BEETLE_OPT_RENDERER_LABEL_GL NULL
-#define BEETLE_OPT_RENDERER_INFO_0_GL NULL
+#define BEETLE_OPT_RENDERER_LABEL_GL "Renderer (reinicio necesario)"
+#define BEETLE_OPT_RENDERER_INFO_0_GL "O renderizador de software é o máis preciso, pero ten requisitos de rendemento elevados cando se executa con resolucións GPU internas máis altas. Os renderizadores de hardware, aínda que son menos precisos, melloran o rendemento sobre o renderizador de software a resolucións internas aumentadas e permiten varias melloras gráficas. 'Hardware (Automático)' selecciona automaticamente o renderizador Vulkan ou OpenGL, dependendo do controlador de vídeo frontend de libretro actual. Se o controlador de vídeo proporcionado non é compatible con Vulkan ou OpenGL 3.3, entón o núcleo volverá caer ao renderizador de software."
 #define OPTION_VAL_HARDWARE_GL NULL
 #define OPTION_VAL_HARDWARE_GL_GL NULL
 #define OPTION_VAL_HARDWARE_VK_GL NULL
 #define OPTION_VAL_SOFTWARE_GL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GL NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GL NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GL "Activa a emulación precisa dos efectos do framebuffer (por exemplo, desenfoque de movemento, remolino de batalla FF7) ao utilizar renderizadores de hardware executando unha copia do renderizador de software con resolución nativa en segundo plano. Se está desactivada, estas operacións omítense (OpenGL) ou represéntanse na GPU (Vulkan). A desactivación pode mellorar o rendemento, pero pode provocar erros gráficos graves. Deixa activado se non está seguro."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_GL NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_GL NULL
-#define OPTION_VAL_DISABLED_GL NULL
-#define OPTION_VAL_EXECUTE_GL NULL
-#define OPTION_VAL_EXECUTE_ONE_GL NULL
-#define OPTION_VAL_RUN_INTERPRETER_GL NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GL NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GL NULL
-#define OPTION_VAL_FULL_GL NULL
-#define OPTION_VAL_DMA_GL NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_GL NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_GL NULL
-#define OPTION_VAL_128_GL NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_GL NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GL NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GL NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GL NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_GL NULL
-#define OPTION_VAL_FORCE_INTERLACED_GL NULL
-#define OPTION_VAL_AUTO_TOGGLE_GL NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GL NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GL NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_GL NULL
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_GL NULL
-#define OPTION_VAL_CORRECTED_GL NULL
-#define OPTION_VAL_UNCORRECTED_GL NULL
-#define OPTION_VAL_4_3_GL NULL
-#define OPTION_VAL_NTSC_GL NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_GL NULL
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GL NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_GL "Recompila dinámicamente as instrucións da CPU a instrucións nativas. Moito máis rápido que o intérprete, pero a sincronización da CPU é menos precisa e pode ter erros."
+#define OPTION_VAL_DISABLED_GL "Desactivado (intérprete de Beetle)"
+#define OPTION_VAL_EXECUTE_GL "Máximo rendemento"
+#define OPTION_VAL_EXECUTE_ONE_GL "Comprobación do tempo de ciclo"
+#define OPTION_VAL_RUN_INTERPRETER_GL "Intérprete Lightrec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GL "Invalidación do código Dynarec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GL "Algúns xogos requiren a invalidación \"completa\", outros requiren \"Só DMA\"."
+#define OPTION_VAL_FULL_GL "Cheo"
+#define OPTION_VAL_DMA_GL "Só DMA (un pouco máis rápido)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_GL "Ciclos de eventos Dynarec DMA/GPU/MDEC/Timer"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_GL "Os ciclos máximos executados pola CPU antes de que se comprobe unha actualización de GPU/DMA/MDEC/temporizador, un número maior será máis rápido, ten moito menos impacto no intérprete do escaravello que o dynarec."
+#define OPTION_VAL_128_GL "128 (predeterminado)"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_GL "Mostras de SPU de Dynarec"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GL "Máximo de mostras de SPU para executar antes de que se comprobe unha actualización de SPU, o número máis alto será máis rápido, pero provocará fallos de son nalgúns xogos con calquera cousa que non sexa 1."
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GL "Cronometraxe FPS informada polo núcleo"
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GL "Escolla o tempo FPS que o núcleo informará ao frontend. A alternancia automática permitirá que o núcleo cambie entre os informes de taxas progresivas e entrelazadas, pero pode provocar que se reinicien o controlador de audio ou vídeo de frontend."
+#define OPTION_VAL_FORCE_PROGRESSIVE_GL "Taxa progresiva"
+#define OPTION_VAL_FORCE_INTERLACED_GL "Forzar taxa entrelazada"
+#define OPTION_VAL_AUTO_TOGGLE_GL "Permitir a alternancia automática"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GL "Anulación de temporización de vídeo PAL (europeo)"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GL "Debido a diferentes estándares, os xogos PAL adoitan aparecer máis lentos en comparación cos lanzamentos NTSC estadounidenses ou xaponeses. Esta opción pódese usar para anular os tempos PAL para intentar executar estes xogos coa taxa de fotogramas NTSC. Esta opción non ten efecto cando se executa contido NTSC."
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_GL "Relación de aspecto do núcleo"
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_GL "Escolla a relación de aspecto proporcionada polo núcleo. Esta configuración ignórase cando se activan as opcións de corte de modo de pantalla ancha ou Mostrar VRAM completa."
+#define OPTION_VAL_CORRECTED_GL "Corrixido"
+#define OPTION_VAL_UNCORRECTED_GL "Sen corrixir"
+#define OPTION_VAL_4_3_GL "Forza 4:3"
+#define OPTION_VAL_NTSC_GL "Forzar NTSC"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_GL "Recortar Overscan"
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GL "'Ningún' conserva o recheo (caixas de pilares a cada lado da imaxe para NTSC, en todos os lados para PAL) para emular as mesmas barras negras xeradas na saída de vídeo analóxico polo hardware PSX real. \"Estático\" só elimina o recheo horizontal, \"Dinámico\" elimina todo o recheo."
 #define OPTION_VAL_DISABLED_O58_GL "Ningún"
-#define OPTION_VAL_STATIC_GL NULL
-#define OPTION_VAL_SMART_GL NULL
-#define BEETLE_OPT_IMAGE_CROP_LABEL_GL NULL
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_GL NULL
+#define OPTION_VAL_STATIC_GL "Estático"
+#define OPTION_VAL_SMART_GL "Dinámico (predefinido)"
+#define BEETLE_OPT_IMAGE_CROP_LABEL_GL "Recorte adicional"
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_GL "Cando se activa \"Recortar sobreescaneo horizontal\", esta opción reduce aínda máis o ancho da imaxe recortada no número de píxeles especificado."
 #define OPTION_VAL_9PX_GL NULL
 #define OPTION_VAL_10PX_GL NULL
 #define OPTION_VAL_11PX_GL NULL
@@ -36884,8 +36884,8 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_18PX_GL NULL
 #define OPTION_VAL_19PX_GL NULL
 #define OPTION_VAL_20PX_GL NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_GL NULL
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_GL NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_GL "Imaxe recortada en compensación"
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_GL "Cando se activa \"Recortar sobreescaneo horizontal\", isto permite que a imaxe recortada resultante se desprace horizontalmente cara á dereita (positiva) ou á esquerda (negativa) no número especificado de píxeles. Pódese usar para corrixir problemas de aliñamento. Só admitido polo renderizador de software."
 #define OPTION_VAL_12PX_O60_GL NULL
 #define OPTION_VAL_11PX_O60_GL NULL
 #define OPTION_VAL_10PX_O60_GL NULL
@@ -36910,27 +36910,27 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_10PX_O60_0_GL NULL
 #define OPTION_VAL_11PX_O60_0_GL NULL
 #define OPTION_VAL_12PX_O60_0_GL NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_GL NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GL NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_GL NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_GL NULL
-#define OPTION_VAL_0_O62_GL NULL
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_GL NULL
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_GL NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_GL "Desfase horizontal da imaxe (ciclos de GPU)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GL "Escolla o número de ciclos da GPU para compensar a imaxe. Os valores positivos moven a imaxe cara á dereita, os valores negativos moven a imaxe cara á esquerda. Só admitido polos renderizadores de hardware."
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_GL "Liña de exploración inicial - NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_GL "Escolla a primeira liña de dixitalización que se mostra ao executar contido NTSC. Os valores superiores a cero reducirán a altura das imaxes de saída recortando os píxeles desde o bordo superior. Pódese usar para contrarrestar o letterboxing."
+#define OPTION_VAL_0_O62_GL "0 (predeterminado)"
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_GL "Última liña de exploración - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_GL "Escolla a última liña de dixitalización que se mostra ao executar contido NTSC. Os valores inferiores a 239 reducirán a altura das imaxes de saída recortando os píxeles desde o bordo inferior. Pódese usar para contrarrestar o letterboxing."
 #define OPTION_VAL_239_GL NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_GL NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_GL NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GL NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GL NULL
-#define OPTION_VAL_287_GL NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GL NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GL NULL
-#define OPTION_VAL_SYNC_GL NULL
-#define OPTION_VAL_ASYNC_GL NULL
-#define OPTION_VAL_PRECACHE_GL NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_GL NULL
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_GL NULL
-#define OPTION_VAL_2X_NATIVE_GL NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_GL "Liña de exploración inicial - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_GL "Escolla a primeira liña de dixitalización que se mostra ao executar contido PAL. Os valores superiores a cero reducirán a altura das imaxes de saída recortando os píxeles desde o bordo superior. Pódese usar para contrarrestar o letterboxing."
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GL "Última liña de exploración - PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GL "Escolla a última liña de dixitalización mostrada ao executar contido PAL. Os valores inferiores a 287 reducirán a altura das imaxes de saída recortando os píxeles desde o bordo inferior. Pódese usar para contrarrestar o letterboxing."
+#define OPTION_VAL_287_GL "287 (predeterminado)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GL "Método de acceso ao CD (reinicio necesario)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GL "Escolla o método utilizado para ler os datos das imaxes do disco de contido. 'Synchronous' imita o hardware orixinal. \"Asíncrona\" pode reducir o tartamudeo nos dispositivos con almacenamento lento. \"Pre-caché\" carga toda a imaxe do disco na memoria ao lanzar contido, o que pode mellorar os tempos de carga do xogo a costa dun atraso inicial no inicio. A \"pre-caché\" pode causar problemas en sistemas con pouca memoria RAM e volverá a utilizar \"Síncronos\" para os medios físicos."
+#define OPTION_VAL_SYNC_GL "Sincrónico"
+#define OPTION_VAL_ASYNC_GL "Asíncrono"
+#define OPTION_VAL_PRECACHE_GL "Pre-caché"
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_GL "Velocidade de carga de CD"
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_GL "Escolla o multiplicador de velocidade de acceso ao disco. Os valores superiores a \"2x (nativo)\" poden reducir moito os tempos de carga do xogo, pero poden introducir erros de sincronización. É posible que algúns xogos non funcionen correctamente por encima dun determinado valor."
+#define OPTION_VAL_2X_NATIVE_GL "2x (nativo)"
 #define OPTION_VAL_6X_GL NULL
 #define OPTION_VAL_10X_GL NULL
 #define OPTION_VAL_12X_GL NULL
