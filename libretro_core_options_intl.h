@@ -4263,13 +4263,13 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_BE NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_BE NULL
 #define OPTION_VAL_0_O30_BE NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_BE "Сістэма карты памяці 0 (патрабуецца перазапуск)"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_BE "Сістэма карткі памяці 0 (патрабуецца перазапуск)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_BE NULL
 #define OPTION_VAL_LIBRETRO_BE NULL
 #define OPTION_VAL_MEDNAFEN_BE NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_BE "Упаўнаважыць карту памяці 1 (патрабуецца перазапуск)"
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_BE "Упаўнаважыць картку памяці 1 (патрабуецца перазапуск)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_BE NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_BE "Абагуленыя карты памяці (патрабуецца перазапуск)"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_BE "Абагуленыя карткі памяці (патрабуецца перазапуск)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_BE NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_BE NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_BE NULL
@@ -54901,11 +54901,11 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_OFF_NO NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_NO NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_NO NULL
-#define OPTION_VAL_RED_NO NULL
-#define OPTION_VAL_BLUE_NO NULL
-#define OPTION_VAL_GREEN_NO NULL
+#define OPTION_VAL_RED_NO "Rød"
+#define OPTION_VAL_BLUE_NO "Blå"
+#define OPTION_VAL_GREEN_NO "Grønn"
 #define OPTION_VAL_ORANGE_NO NULL
-#define OPTION_VAL_YELLOW_NO NULL
+#define OPTION_VAL_YELLOW_NO "Gul"
 #define OPTION_VAL_CYAN_NO NULL
 #define OPTION_VAL_PINK_NO NULL
 #define OPTION_VAL_PURPLE_NO NULL
