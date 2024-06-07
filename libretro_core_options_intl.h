@@ -44657,77 +44657,77 @@ struct retro_core_options_v2 options_hu = {
 /* RETRO_LANGUAGE_ID */
 
 #define CATEGORY_VIDEO_LABEL_ID NULL
-#define CATEGORY_VIDEO_INFO_0_ID NULL
+#define CATEGORY_VIDEO_INFO_0_ID "Mengubah pengaturan rasio aspek, pangkas layar, saring video, dan pelewatan bingkai."
 #define CATEGORY_OSD_LABEL_ID "Tampilan Muka Layar"
-#define CATEGORY_OSD_INFO_0_ID NULL
+#define CATEGORY_OSD_INFO_0_ID "Mengubah tampilan pemberitahuan di layar."
 #define CATEGORY_INPUT_LABEL_ID "Masukan"
-#define CATEGORY_INPUT_INFO_0_ID NULL
-#define CATEGORY_MEMCARDS_LABEL_ID NULL
-#define CATEGORY_MEMCARDS_INFO_0_ID NULL
-#define CATEGORY_PGXP_LABEL_ID NULL
-#define CATEGORY_PGXP_INFO_0_ID NULL
+#define CATEGORY_INPUT_INFO_0_ID "Mengubah pengaturan light gun, tetikus, dan neGcon."
+#define CATEGORY_MEMCARDS_LABEL_ID "Kartu Memori"
+#define CATEGORY_MEMCARDS_INFO_0_ID "Mengubah pengaturan terkait Kartu Memori maya yang digunakan sistem."
+#define CATEGORY_PGXP_LABEL_ID "PGXP (Pipeline Alihragam Geometri Presisi)"
+#define CATEGORY_PGXP_INFO_0_ID "Opsi berikut mengatur penyempurnaan yang dapat meningkatkan grafis dibanding konsol aslinya. PGXP dapat menghilangkan tekstur meleding dan isu Z-fighting."
 #define CATEGORY_HACKS_LABEL_ID "Peretasan Emulasi"
-#define CATEGORY_HACKS_INFO_0_ID NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ID NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ID NULL
-#define OPTION_VAL_1X_NATIVE_ID NULL
+#define CATEGORY_HACKS_INFO_0_ID "Mengubah pengaturan 'overclock' prosesor dan akurasi emulasi untuk kinerja dan kompatabilitas tingkat-rendah."
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ID "Resolusi Internal GPU"
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ID "Memilih pengkali resolusi internal. Resolusi lebih tinggi dari '1x (Lokal)' meningkatkan mutu model 3D tapi persyaratan kinerjanya juga meningkat. Unsur 2D umumnya tidak terpengaruh pengaturan ini."
+#define OPTION_VAL_1X_NATIVE_ID "1x (Lokal)"
 #define OPTION_VAL_2X_ID NULL
 #define OPTION_VAL_4X_ID NULL
 #define OPTION_VAL_8X_ID NULL
 #define OPTION_VAL_16X_ID NULL
-#define BEETLE_OPT_DEPTH_LABEL_ID NULL
-#define BEETLE_OPT_DEPTH_INFO_0_ID NULL
+#define BEETLE_OPT_DEPTH_LABEL_ID "Kedalaman Warna Internal"
+#define BEETLE_OPT_DEPTH_INFO_0_ID "Memilih kedalaman warna internal. Kedalaman warna lebih tinggi dapat mengurangi efek 'color banding' tanpa baur galat. 16 bpp mengemulasi peranti keras asli tapi tetap tampak 'color banding' jika baur galat tidak aktif. 'Pola Baur Galat' lebih baik dinonaktifkan jika opsi ini diatur ke 32 bpp."
 #define OPTION_VAL_16BPP_NATIVE_ID NULL
 #define OPTION_VAL_32BPP_ID NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_ID NULL
-#define BEETLE_OPT_DITHER_MODE_INFO_0_ID NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_ID NULL
-#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_ID NULL
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_ID NULL
-#define BEETLE_OPT_FILTER_LABEL_ID NULL
-#define BEETLE_OPT_FILTER_INFO_0_ID NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_ID "Pola Baur Galat"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_ID "Memilih konfigurasi pola baur galat. '1x (Lokal)' mengemulasi baur galat resolusi rendah lokal seperti peranti keras asli untuk menghaluskan artefak 'color banding' yang tampak di kedalaman warna lokal. 'Resolusi Internal' menakar granular baur galat ke resolusi internal terkonfigurasi untuk hasil lebih bersih. Lebih baik dinonaktifkan saat di kedalaman warna 32 bpp. Catatan: Pada Vulkan, mengaktifkan ini akan memaksa 'downsample' ke kedalaman warna lokal, sedangkan menonaktifkan akan otomatis ke kedalaman warna lebih tinggi."
+#define OPTION_VAL_INTERNAL_RESOLUTION_ID "Resolusi Internal"
+#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_ID "Kompensasi Tekstur UV"
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_ID "Sampel tekstur untuk poligon 3D dengan kompensasi lebih tinggi dari resolusi internal 1x. Mengurangi jahitan tekstur tetapi dapat menyebabkan cacat grafis yang tidak diinginkan."
+#define BEETLE_OPT_FILTER_LABEL_ID "Penyaringan Tekstur"
+#define BEETLE_OPT_FILTER_INFO_0_ID "Memilih metode penyaringan tekstur. 'Nearest' mengemulasi peranti keras asli. 'Bilinear' dan '3-Point' untuk saring penghalus agar tidak berpiksel dengan memburamkan. 'SABR', 'xBR', dan 'JINC2' untuk saring naik skala yang dapat meningkatkan mutu/ketajaman tekstur tapi persyaratan kinerjanya meningkat. Hanya didukung perender peranti keras."
 #define OPTION_VAL_NEAREST_ID NULL
 #define OPTION_VAL_SABR_ID NULL
 #define OPTION_VAL_XBR_ID NULL
 #define OPTION_VAL_BILINEAR_ID NULL
 #define OPTION_VAL_3_POINT_ID NULL
 #define OPTION_VAL_JINC2_ID NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_ID NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_ID NULL
-#define OPTION_VAL_OPAQUE_ID NULL
-#define OPTION_VAL_ALL_ID NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_ID NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_ID NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_ID NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_ID NULL
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_ID NULL
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_ID NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_ID "Lepas Penyaringan Sprite"
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_ID "Tidak menerapkan penyaringan tekstur ke sprite. Mencegah jahitan di beberapa permainan dengan latar belakang di-render sprite 2D. Gunakan dengan Penghalusan Adaptif atau saring pasca-pengolahan lain untuk efek terbaik."
+#define OPTION_VAL_OPAQUE_ID "Hanya Buram"
+#define OPTION_VAL_ALL_ID "Buram dan Setengah Tembus Pandang"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_ID "Lepas Penyaringan Poligon 2D"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_ID "Tidak menerapkan penyaringan tekstur ke poligon 2D. Poligon 2D terdapat heuristik dan kemungkinan akan 'glitch'. Gunakan dengan Penghalusan Adaptif atau saring pasca-pengolahan lain untuk efek terbaik."
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_ID "Penghalusan Adaptif"
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_ID "Menghaluskan karya 2D dan elemen UI tanpa memburamkan objek yang di render 3D. Hanya didukung oleh renderer Vulkan."
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_ID "Supersampling (Downsample ke Resolusi Native)"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_ID "Men-'downsample' konten yang di-render dari resolusi naik skala internal ke resolusi lokal lagi. Menggabungkan ini dengan pengkalian resolusi internal lebih tinggi bisa menampilkan objek 3D pada permainan dengan objek 3D ter-'antialias' di resolusi rendah lokal. Memberikan hasil terbaik jika diterapkan ke permainan bercampuran unsur 2D dan 3D (misal: karakter 3D di latar belakang pra-render), dan juga berfungsi dengan 'shader' CRT. Hanya didukung perender Vulkan. Catatan: 'Pola Baur Galat' lebih baik dinonaktifkan saat opsi ini aktif."
 #define BEETLE_OPT_MSAA_LABEL_ID NULL
-#define BEETLE_OPT_MSAA_INFO_0_ID NULL
+#define BEETLE_OPT_MSAA_INFO_0_ID "Pilih level MSAA untuk konten yang di render. Memperindah tampilan objek 3D. Hanya didukung renderer Vulkan."
 #define OPTION_VAL_1X_ID NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_ID NULL
-#define BEETLE_OPT_MDEC_YUV_INFO_0_ID NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_ID NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_ID NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_ID NULL
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_ID NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_ID NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ID NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_ID NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_ID NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_ID NULL
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_ID NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_ID NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_ID NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_ID NULL
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_ID NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_ID NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_ID NULL
-#define OPTION_VAL_ENABLED_ANALOG_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ID NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_ID "Meningkatkan mutu pemutaran FMV dengan mengurangi artefak 'macroblocking' (tepi kotak/bergerigi). Hanya didukung perender Vulkan."
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_ID "Lacak Tekstur"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_ID "Prasyarat untuk dump dan ganti tekstur. Mungkin akan meng-crash sebagian besar game."
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_ID "Dump Tekstur"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_ID "Dump tekstur yang digunakan ke <cd>-dump-tekstur/"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_ID "Ganti Tekstur"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ID "Ganti tekstur dengan versi HD dari <cd>-pengganti-tekstur/"
+#define BEETLE_OPT_WIREFRAME_LABEL_ID "Mode Wireframe (Debug)"
+#define BEETLE_OPT_WIREFRAME_INFO_0_ID "Render model 3D dalam bentuk garis luar tanpa tekstur atau pencorakan. Hanya didukung oleh renderer peranti keras OpenGL. Catatan: Ini hanya untuk tujuan penelusuran kesalahan, dan biasanya harus dinonaktifkan."
+#define BEETLE_OPT_FRAME_DUPING_LABEL_ID "Duplikasi Frame (Pencepatan)"
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_ID "Apabila diaktifkan dan didukung oleh frontend libretro, hal ini memberikan peningkatan performa dengan perutean frontend untuk mengulang frame sebelumnya jika core tidak memiliki sesuatu yang baru untuk ditampilkan."
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_ID "Tampilkan FPS Internal"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_ID "Tampilkan kecepatan bingkai internal dimana sistem PlayStation yang diemulasi merender konten. Catatan: Membutuhkan pemberitahuan dalam layar untuk aktif di frontend libretro."
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_ID "Tampilkan VRAM Penuh (Debug)"
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_ID "Visualkan semua VRAM konsol yang diemulasi. Hanya didukung oleh renderer peranti keras OpenGL dan Vulkan. Catatan: Ini hanya untuk tujuan penelusuran kesalahan, dan biasanya harus dinonaktifkan."
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_ID "Pengkalibrasian Sendiri Analog"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_ID "Apabila peranti masukan di set ke DualShock, Pengontrol Analog, Joistick Analog, atau neGcon, opsi ini mengaktifkan kalibrasi dinamis dari masukan analog. Masukan nilai terdaftar yang maksimum diawasi secara real tiem dan digunakan untuk skalakan koordinat analog yang diteruskan ke emulator. Ini hanya untuk digunakan game seperti Mega Man Legends 2 yang mengharapkan nilai lebih besar daripada yang diberi pengontrol modern. Untuk hasil terbaik, stik analog harus diputar secara penuh untuk menyetel algoritma kalibrasi setiap konten dimuat."
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_ID "Alihkan Mode Analog DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_ID "Saat jenis perangkat masukannya DualShock, opsi ini mengizinkan emulasi DualShock diaktifkan ke mode DIGITAL atau ANALOG seperti fisik asli. Mode juga dapat diaktifkan menggunakan kombinasi tombol yang dipilih."
+#define OPTION_VAL_ENABLED_ANALOG_ID "Analog-Asali"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_ID "Mode Kombo Analog DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_ID "Pilih kombinasi tombol yang akan digunakan untuk mengalihkan antara DIGITAL dan ANALOG mode untuk DualShock yang diemulasi."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_ID NULL
 #define OPTION_VAL_L1_R1_SELECT_ID NULL
 #define OPTION_VAL_L1_R1_START_ID NULL
@@ -44738,43 +44738,43 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_L2_R2_L3_ID NULL
 #define OPTION_VAL_L2_R2_R3_ID NULL
 #define OPTION_VAL_L3_R3_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ID NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ID NULL
-#define OPTION_VAL_0_ID NULL
-#define OPTION_VAL_1_ID NULL
-#define OPTION_VAL_2_ID NULL
-#define OPTION_VAL_3_ID NULL
-#define OPTION_VAL_4_ID NULL
-#define OPTION_VAL_5_ID NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ID NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_ID NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_ID NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_ID NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_ID NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_ID NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ID "Tahan Penundaan Mode Kombo Analog DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ID "Set waktu penundaan untuk tombol mode kombo analog."
+#define OPTION_VAL_0_ID "Delay 0 Detik"
+#define OPTION_VAL_1_ID "Delay 1 Detik"
+#define OPTION_VAL_2_ID "Delay 2 Detik"
+#define OPTION_VAL_3_ID "Delay 3 Detik"
+#define OPTION_VAL_4_ID "Delay 4 Detik"
+#define OPTION_VAL_5_ID "Delay 5 Detik"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ID "Port 1: Aktifkan Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_ID "Aktifkan fungsionalitas multitap pada port 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_ID "Port 2: Aktifkan Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_ID "Aktifkan fungsionalitas multitap pada port 2."
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_ID "Mode Masukan Senjata"
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_ID "Pilih antara 'Light Gun' berkendali tetikus atau masukan 'Layar sentuh' saat jenis perangkat diatur ke 'Guncon/G-Con 45' atau 'Justifier'."
 #define OPTION_VAL_LIGHTGUN_ID NULL
-#define OPTION_VAL_TOUCHSCREEN_ID NULL
-#define BEETLE_OPT_GUN_CURSOR_LABEL_ID NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_ID NULL
-#define OPTION_VAL_CROSS_ID NULL
+#define OPTION_VAL_TOUCHSCREEN_ID "Layar Sentuh"
+#define BEETLE_OPT_GUN_CURSOR_LABEL_ID "Kursor Senjata"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_ID "Pilih kursor senjata untuk ditampilkan di layar saat menggunakan jenis masukan 'Guncon/G-Con 45' dan 'Justifier'. Saat dinonaktifkan, garis bidik akan disembunyikan."
+#define OPTION_VAL_CROSS_ID "Silang"
 #define OPTION_VAL_DOT_ID NULL
-#define OPTION_VAL_OFF_ID NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_ID NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_ID NULL
-#define OPTION_VAL_RED_ID NULL
-#define OPTION_VAL_BLUE_ID NULL
-#define OPTION_VAL_GREEN_ID NULL
-#define OPTION_VAL_ORANGE_ID NULL
-#define OPTION_VAL_YELLOW_ID NULL
+#define OPTION_VAL_OFF_ID "Tanpa Kursor"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_ID "Port 1: Warna Garis Bidik"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_ID "Pilih warna garis bidik light gun untuk port 1."
+#define OPTION_VAL_RED_ID "Merah"
+#define OPTION_VAL_BLUE_ID "Biru"
+#define OPTION_VAL_GREEN_ID "Hijau"
+#define OPTION_VAL_ORANGE_ID "Oranye"
+#define OPTION_VAL_YELLOW_ID "Kuning"
 #define OPTION_VAL_CYAN_ID NULL
-#define OPTION_VAL_PINK_ID NULL
-#define OPTION_VAL_PURPLE_ID NULL
-#define OPTION_VAL_BLACK_ID NULL
-#define OPTION_VAL_WHITE_ID NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_ID NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_ID NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_ID NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_ID NULL
+#define OPTION_VAL_PINK_ID "Merah Muda"
+#define OPTION_VAL_PURPLE_ID "Ungu"
+#define OPTION_VAL_BLACK_ID "Hitam"
+#define OPTION_VAL_WHITE_ID "Putih"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_ID "Port 2: Warna Garis Bidik"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_ID "Pilih warna garis bidik light gun untuk port 2."
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_ID "Sensivitas Mouse"
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_ID "Pilih ketertanggapan dari jenis masukan 'Tetikus'."
 #define OPTION_VAL_5_O28_ID NULL
 #define OPTION_VAL_10_ID NULL
 #define OPTION_VAL_15_ID NULL
@@ -44815,7 +44815,7 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_190_ID NULL
 #define OPTION_VAL_195_ID NULL
 #define OPTION_VAL_200_ID NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_ID NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_ID "Respon Putaran neGcon"
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_ID NULL
 #define OPTION_VAL_LINEAR_ID NULL
 #define OPTION_VAL_QUADRATIC_ID NULL
@@ -44827,9 +44827,9 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_ID NULL
 #define OPTION_VAL_LIBRETRO_ID NULL
 #define OPTION_VAL_MEDNAFEN_ID NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_ID "Aktifkan Kartu Memori 1 (Perlu Mulai Ulang)"
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_ID "Aktifkan Memory Card 1 (Perlu Mulai Ulang)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_ID NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_ID "Kartu Memori Bagi-Bagi (Perlu Mulai Ulang)"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_ID "Memory Card Bersama (Perlu Mulai Ulang)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_ID NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_ID NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_ID NULL
@@ -44874,7 +44874,7 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_32_9_ID NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_ID NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_ID NULL
-#define OPTION_VAL_100_NATIVE_ID NULL
+#define OPTION_VAL_100_NATIVE_ID "100% (Lokal)"
 #define OPTION_VAL_210_ID NULL
 #define OPTION_VAL_220_ID NULL
 #define OPTION_VAL_230_ID NULL
@@ -44941,7 +44941,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ID NULL
 #define OPTION_VAL_PSXONPSP_ID NULL
 #define OPTION_VAL_PS1_ROM_ID NULL
-#define BEETLE_OPT_RENDERER_LABEL_ID "Pereka Citra (Perlu Mulai Ulang)"
+#define BEETLE_OPT_RENDERER_LABEL_ID "Renderer (Perlu Mulai Ulang)"
 #define BEETLE_OPT_RENDERER_INFO_0_ID NULL
 #define OPTION_VAL_HARDWARE_ID "Peranti Keras (Auto)"
 #define OPTION_VAL_HARDWARE_GL_ID "Peranti Keras (OpenGL)"
@@ -45042,7 +45042,7 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_PRECACHE_ID NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_ID NULL
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_ID NULL
-#define OPTION_VAL_2X_NATIVE_ID NULL
+#define OPTION_VAL_2X_NATIVE_ID "2x (Lokal)"
 #define OPTION_VAL_6X_ID NULL
 #define OPTION_VAL_10X_ID NULL
 #define OPTION_VAL_12X_ID NULL
