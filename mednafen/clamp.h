@@ -10,6 +10,10 @@ extern "C" {
 #include <unistd.h>
 #endif
 
+#ifdef _MSC_VER
+#include <compat/msvc.h>
+#endif
+
 static INLINE void clamp(int32_t *val, ssize_t min, ssize_t max)
 {
    if(*val < min)
