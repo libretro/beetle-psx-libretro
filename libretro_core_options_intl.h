@@ -30462,7 +30462,7 @@ struct retro_core_options_v2 options_es = {
 
 #define CATEGORY_VIDEO_LABEL_FA "ویدیو"
 #define CATEGORY_VIDEO_INFO_0_FA NULL
-#define CATEGORY_OSD_LABEL_FA NULL
+#define CATEGORY_OSD_LABEL_FA "نمایش روی صفحه"
 #define CATEGORY_OSD_INFO_0_FA NULL
 #define CATEGORY_INPUT_LABEL_FA "داده"
 #define CATEGORY_INPUT_INFO_0_FA NULL
