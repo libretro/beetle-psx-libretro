@@ -28613,7 +28613,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_ES "Cambia la Memory Card que está cargada en la ranura derecha. Esta opción solo funcionará si la opción «Activar Memory Card 1» está activada. La Memory Card predeterminada es el índice 1."
 #define OPTION_VAL_1_O35_ES "1 (valor predeterminado)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_ES "Modo de operación del PGXP"
-#define BEETLE_OPT_PGXP_MODE_INFO_0_ES "Renderiza los objetos 3D con una precisión subpíxel, utilizando coordenadas de vértices de coma fija para minimizar la distorsión y temblores en objetos 3D que tenía el hardware original. «Solo en memoria» apenas da problemas de compatibilidad y se recomienda su uso general. «Memoria + CPU (inestable)» puede reducir aún más los temblores, pero tiene unos requisitos de rendimiento elevados y puede provocar fallos en la geometría."
+#define BEETLE_OPT_PGXP_MODE_INFO_0_ES "Renderiza los objetos 3D con una precisión subpíxel, utilizando coordenadas de vértices de coma fija para minimizar la distorsión y temblores en objetos 3D que tenía el hardware original. «Solo en memoria» apenas da problemas de compatibilidad y se recomienda su uso general. «Memoria + CPU (inestable)» puede reducir aún más las distorsiones visuales, pero tiene unos requisitos de rendimiento elevados y puede provocar fallos en la geometría."
 #define OPTION_VAL_MEMORY_ONLY_ES "Solo en memoria"
 #define OPTION_VAL_MEMORY_CPU_ES "Memoria + CPU (inestable)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_ES "Tolerancia a la geometría 2D del PGXP"
@@ -28798,7 +28798,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_10PX_O60_0_ES "+10 px"
 #define OPTION_VAL_11PX_O60_0_ES "+11 px"
 #define OPTION_VAL_12PX_O60_0_ES "+12 px"
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_ES "Desplazar imagen horizontal (ciclos de GPU)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_ES "Desplazamiento horizontal de imagen (ciclos de GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_ES "Especifica el número de ciclos de GPU con los que desplazar la imagen. Los valores positivos mueven la imagen hacia la derecha y los negativos hacia la izquierda. Solo funciona con los renderizadores por hardware."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_ES "Línea de barrido inicial en formato NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_ES "Selecciona la primera línea de barrido que se mostrará al ejecutar contenidos NTSC. Un valor superior a cero reducirá la altura de las imágenes generadas recortando los píxeles de la parte superior. Puede servir para evitar el efecto «letterboxing»."
@@ -32517,12 +32517,12 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_FI NULL
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_FI NULL
 #define BEETLE_OPT_FILTER_LABEL_FI "Tekstuurisuodatus"
-#define BEETLE_OPT_FILTER_INFO_0_FI NULL
+#define BEETLE_OPT_FILTER_INFO_0_FI "Valitse tekstuurisuodatusmenetelmä. Lähin emuloi alkuperäistä laitteistoa. \"Bilineaarinen\" ja \"Kolmipiste\" ovat tasoitussuodattimia, jotka vähentävät pikselöintiä sumentamalla. \"SABR\", \"xBR\" ja \"JINC2\" ovat skaalaussuodattimia, jotka voivat parantaa tekstuurin tarkkuutta/terävyyttä lisääntyneiden suorituskykyvaatimusten kustannuksella. Tekstuurinsuodatusta tukee vain laitteiston renderöijät."
 #define OPTION_VAL_NEAREST_FI "Lähin"
 #define OPTION_VAL_SABR_FI NULL
 #define OPTION_VAL_XBR_FI NULL
 #define OPTION_VAL_BILINEAR_FI "Bilineaarinen"
-#define OPTION_VAL_3_POINT_FI NULL
+#define OPTION_VAL_3_POINT_FI "Kolmipiste"
 #define OPTION_VAL_JINC2_FI NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_FI NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_FI NULL
@@ -32607,7 +32607,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_FI NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_FI "Hiiren herkkyys"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_FI NULL
-#define OPTION_VAL_5_O28_FI NULL
+#define OPTION_VAL_5_O28_FI "5 %"
 #define OPTION_VAL_10_FI "10 %"
 #define OPTION_VAL_15_FI "15 %"
 #define OPTION_VAL_20_FI "20 %"
@@ -32654,7 +32654,7 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_CUBIC_FI NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_FI NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_FI NULL
-#define OPTION_VAL_0_O30_FI NULL
+#define OPTION_VAL_0_O30_FI "0 %"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_FI NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_FI NULL
 #define OPTION_VAL_LIBRETRO_FI NULL
@@ -32673,16 +32673,16 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_MEMORY_ONLY_FI NULL
 #define OPTION_VAL_MEMORY_CPU_FI NULL
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_FI NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_FI NULL
-#define OPTION_VAL_0PX_FI NULL
-#define OPTION_VAL_1PX_FI NULL
-#define OPTION_VAL_2PX_FI NULL
-#define OPTION_VAL_3PX_FI NULL
-#define OPTION_VAL_4PX_FI NULL
-#define OPTION_VAL_5PX_FI NULL
-#define OPTION_VAL_6PX_FI NULL
-#define OPTION_VAL_7PX_FI NULL
-#define OPTION_VAL_8PX_FI NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_FI "Piilota räikeämmät virheet PGXP-operaatioissa: arvo määrittää toleranssin, jossa PGXP-arvot säilytetään, jos geometriat on ilman asianmukaista syvyystietoa."
+#define OPTION_VAL_0PX_FI "0 px"
+#define OPTION_VAL_1PX_FI "1 px"
+#define OPTION_VAL_2PX_FI "2 px"
+#define OPTION_VAL_3PX_FI "3 px"
+#define OPTION_VAL_4PX_FI "4 px"
+#define OPTION_VAL_5PX_FI "5 px"
+#define OPTION_VAL_6PX_FI "6 px"
+#define OPTION_VAL_7PX_FI "7 px"
+#define OPTION_VAL_8PX_FI "8 px"
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_FI NULL
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_FI NULL
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_FI NULL
@@ -32816,18 +32816,18 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_SMART_FI "Dynaaminen (Oletus)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_FI NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_FI NULL
-#define OPTION_VAL_9PX_FI NULL
-#define OPTION_VAL_10PX_FI NULL
-#define OPTION_VAL_11PX_FI NULL
-#define OPTION_VAL_12PX_FI NULL
-#define OPTION_VAL_13PX_FI NULL
-#define OPTION_VAL_14PX_FI NULL
-#define OPTION_VAL_15PX_FI NULL
-#define OPTION_VAL_16PX_FI NULL
-#define OPTION_VAL_17PX_FI NULL
-#define OPTION_VAL_18PX_FI NULL
-#define OPTION_VAL_19PX_FI NULL
-#define OPTION_VAL_20PX_FI NULL
+#define OPTION_VAL_9PX_FI "9 px"
+#define OPTION_VAL_10PX_FI "10 px"
+#define OPTION_VAL_11PX_FI "11 px"
+#define OPTION_VAL_12PX_FI "12 px"
+#define OPTION_VAL_13PX_FI "13 px"
+#define OPTION_VAL_14PX_FI "14 px"
+#define OPTION_VAL_15PX_FI "15 px"
+#define OPTION_VAL_16PX_FI "16 px"
+#define OPTION_VAL_17PX_FI "17 px"
+#define OPTION_VAL_18PX_FI "18 px"
+#define OPTION_VAL_19PX_FI "19 px"
+#define OPTION_VAL_20PX_FI "20 px"
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_FI NULL
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_FI NULL
 #define OPTION_VAL_12PX_O60_FI NULL
