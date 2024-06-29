@@ -323,10 +323,10 @@ size_t fill_dated_filename(char *out_filename,
  * Hidden non-leaf function cost:
  * - Calls time
  * - Calls rtime_localtime()
- * - Calls strlcpy 2x
+ * - Calls strlcpy
  * - Calls string_is_empty()
  * - Calls strftime
- * - Calls strlcat
+ * - Calls strlcat at least 2x
  *
  * @return Length of the string copied into @out_path
  **/
@@ -369,7 +369,7 @@ char *find_last_slash(const char *str);
  * Hidden non-leaf function cost:
  * - Calls fill_pathname_slash()
  * - Calls path_basename()
- * - Calls strlcpy 2x
+ * - Calls strlcat 2x
  **/
 size_t fill_pathname_dir(char *in_dir, const char *in_basename,
       const char *replace, size_t size);
@@ -470,8 +470,9 @@ void fill_pathname_resolve_relative(char *out_path, const char *in_refpath,
  * between directory and path.
  * 
  * Hidden non-leaf function cost: 
- * - calls strlcpy at least once
+ * - calls strlcpy
  * - calls fill_pathname_slash()
+ * - calls strlcat
  *
  * Deprecated. Use fill_pathname_join_special() instead
  * if you can ensure @dir != @out_path
@@ -498,8 +499,9 @@ size_t fill_pathname_join(char *out_path, const char *dir,
  * between directory and path.
  *
  * Hidden non-leaf function cost: 
- * - calls strlcpy 2x
+ * - calls strlcpy
  * - calls find_last_slash()
+ * - calls strlcat
  *
  * @return Length of the string copied into @out_path
  **/
@@ -625,7 +627,7 @@ void path_basedir_wrapper(char *path);
  *   - can call strlcat once if it returns false
  * - calls strlen
  **/
-size_t fill_pathname_slash(char *path, size_t size);
+void fill_pathname_slash(char *path, size_t size);
 
 #if !defined(RARCH_CONSOLE) && defined(RARCH_INTERNAL)
 void fill_pathname_application_path(char *buf, size_t size);
@@ -661,11 +663,6 @@ bool path_mkdir(const char *dir);
  * @return true if path is a directory, otherwise false.
  */
 bool path_is_directory(const char *path);
-
-/* Time format strings with AM-PM designation require special
- * handling due to platform dependence */
-void strftime_am_pm(char *s, size_t len, const char* format,
-      const void* timeptr);
 
 bool path_is_character_special(const char *path);
 

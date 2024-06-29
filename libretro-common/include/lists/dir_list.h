@@ -86,15 +86,6 @@ bool dir_list_initialize(struct string_list *list,
 void dir_list_sort(struct string_list *list, bool dir_first);
 
 /**
- * dir_list_sort_ignore_ext:
- * @list      : pointer to the directory listing.
- * @dir_first : move the directories in the listing to the top?
- *
- * Sorts a directory listing. File extensions are ignored.
- **/
-void dir_list_sort_ignore_ext(struct string_list *list, bool dir_first);
-
-/**
  * dir_list_free:
  * @list : pointer to the directory listing
  *

@@ -49,10 +49,6 @@
 #include <compat/msvc.h>
 #endif
 
-#ifdef IOS
-#include <sys/param.h>
-#endif
-
 static INLINE void bits_or_bits(uint32_t *a, uint32_t *b, uint32_t count)
 {
    uint32_t i;

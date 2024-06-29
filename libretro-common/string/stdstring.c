@@ -217,24 +217,27 @@ char *string_trim_whitespace(char *const s)
  * correctly any text containing so-called 'wide' Unicode
  * characters (e.g. CJK languages, emojis, etc.).
  **/
-size_t word_wrap(
+void word_wrap(
       char *dst,       size_t dst_size,
       const char *src, size_t src_len,
       int line_width,  int wideglyph_width, unsigned max_lines)
 {
-   char *last_space    = NULL;
+   char *lastspace     = NULL;
    unsigned counter    = 0;
    unsigned lines      = 1;
    const char *src_end = src + src_len;
 
    /* Prevent buffer overflow */
    if (dst_size < src_len + 1)
-      return 0;
+      return;
 
    /* Early return if src string length is less
     * than line width */
    if (src_len < (size_t)line_width)
-      return strlcpy(dst, src, dst_size);
+   {
+      strlcpy(dst, src, dst_size);
+      return;
+   }
 
    while (*src != '\0')
    {
@@ -242,18 +245,21 @@ size_t word_wrap(
       counter++;
 
       if (*src == ' ')
-         last_space = dst; /* Remember the location of the whitespace */
+         lastspace = dst; /* Remember the location of the whitespace */
       else if (*src == '\n')
       {
          /* If newlines embedded in the input,
           * reset the index */
          lines++;
-         counter   = 0;
+         counter = 0;
 
          /* Early return if remaining src string
           * length is less than line width */
          if (src_end - src <= line_width)
-            return strlcpy(dst, src, dst_size);
+         {
+            strlcpy(dst, src, dst_size);
+            return;
+         }
      }
 
       while (char_len--)
@@ -263,27 +269,29 @@ size_t word_wrap(
       {
          counter = 0;
 
-         if (last_space && (max_lines == 0 || lines < max_lines))
+         if (lastspace && (max_lines == 0 || lines < max_lines))
          {
             /* Replace nearest (previous) whitespace
              * with newline character */
-            *last_space = '\n';
+            *lastspace = '\n';
             lines++;
 
-            src        -= dst - last_space - 1;
-            dst         = last_space + 1;
-            last_space  = NULL;
+            src -= dst - lastspace - 1;
+            dst = lastspace + 1;
+            lastspace  = NULL;
 
             /* Early return if remaining src string
              * length is less than line width */
             if (src_end - src < line_width)
-               return strlcpy(dst, src, dst_size);
+            {
+               strlcpy(dst, src, dst_size);
+               return;
+            }
          }
       }
    }
 
    *dst = '\0';
-   return 0;
 }
 
 /**
@@ -319,7 +327,7 @@ size_t word_wrap(
  * on-screen pixel width deviates greatly from the set
  * @wideglyph_width value.
  **/
-size_t word_wrap_wideglyph(char *dst, size_t dst_size,
+void word_wrap_wideglyph(char *dst, size_t dst_size,
       const char *src, size_t src_len, int line_width,
       int wideglyph_width, unsigned max_lines)
 {
@@ -351,11 +359,14 @@ size_t word_wrap_wideglyph(char *dst, size_t dst_size,
    unsigned counter_normalized       = 0;
    int line_width_normalized         = line_width * 100;
    int additional_counter_normalized = wideglyph_width - 100;
-
+ 
    /* Early return if src string length is less
     * than line width */
    if (src_end - src < line_width)
-      return strlcpy(dst, src, dst_size);
+   {
+      strlcpy(dst, src, dst_size);
+      return;
+   }
 
    while (*src != '\0')
    {
@@ -378,7 +389,10 @@ size_t word_wrap_wideglyph(char *dst, size_t dst_size,
          /* Early return if remaining src string
           * length is less than line width */
          if (src_end - src <= line_width)
-            return strlcpy(dst, src, dst_size);
+         {
+            strlcpy(dst, src, dst_size);
+            return;
+         }
       }
       else if (char_len >= 3)
       {
@@ -410,7 +424,10 @@ size_t word_wrap_wideglyph(char *dst, size_t dst_size,
             /* Early return if remaining src string
              * length is less than line width */
             if (src_end - src <= line_width)
-               return strlcpy(dst, src, dst_size);
+            {
+               strlcpy(dst, src, dst_size);
+               return;
+            }
          }
          else if (lastspace)
          {
@@ -425,13 +442,15 @@ size_t word_wrap_wideglyph(char *dst, size_t dst_size,
             /* Early return if remaining src string
              * length is less than line width */
             if (src_end - src < line_width)
-               return strlcpy(dst, src, dst_size);
+            {
+               strlcpy(dst, src, dst_size);
+               return;
+            }
          }
       }
    }
 
    *dst = '\0';
-   return 0;
 }
 
 /**
@@ -573,7 +592,7 @@ unsigned string_hex_to_unsigned(const char *str)
    if (str[0] != '\0' && str[1] != '\0')
    {
       if ( (str[0] == '0') &&
-          ((str[1] == 'x') ||
+          ((str[1] == 'x') || 
            (str[1] == 'X')))
       {
          hex_str = str + 2;
@@ -616,7 +635,7 @@ int string_count_occurrences_single_character(const char *str, char c)
 
 /**
  * string_replace_whitespace_with_single_character:
- *
+ * 
  * Leaf function.
  *
  * Replaces all spaces with given character @c.
