@@ -24443,7 +24443,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_EN "Visualise the entire emulated console's VRAM. Only supported by the OpenGL and Vulkan hardware renderers. Note: This is for debugging purposes, and should normally be disabled."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_EN "Analogue Self-Calibration"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_EN "When the input device is set to DualShock, Analogue Controller, Analogue Joystick, or neGcon, this option enables dynamic calibration of analogue inputs. Maximum registered input values are monitored in real time and used to scale analogue coordinates passed to the emulator. This should be used for games such as Mega Man Legends 2 that expect larger values than what modern controllers provide. For best results, analogue sticks should be rotated at full extent to tune the calibration algorithm each time content is loaded."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_EN "DualShock Analogue Mode Toggle"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_EN NULL
 #define OPTION_VAL_ENABLED_ANALOG_EN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_EN NULL
@@ -24459,7 +24459,7 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_L2_R2_R3_EN NULL
 #define OPTION_VAL_L3_R3_EN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EN "Set the hold time for the analogue mode combo buttons."
 #define OPTION_VAL_0_EN NULL
 #define OPTION_VAL_1_EN NULL
 #define OPTION_VAL_2_EN NULL
