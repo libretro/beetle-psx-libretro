@@ -220,6 +220,7 @@ ifneq ($(HAVE_GRIFFIN), 1)
                   $(CORE_EMU_DIR)/input/justifier.cpp \
                   $(CORE_EMU_DIR)/input/guncon.cpp \
                   $(CORE_EMU_DIR)/input/negcon.cpp \
+                  $(CORE_EMU_DIR)/input/negconrumble.cpp \
                   $(CORE_EMU_DIR)/input/memcard.cpp \
                   $(CORE_EMU_DIR)/input/multitap.cpp \
                   $(CORE_EMU_DIR)/input/mouse.cpp

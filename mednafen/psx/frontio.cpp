@@ -29,6 +29,7 @@
 #include "input/dualshock.h"
 #include "input/mouse.h"
 #include "input/negcon.h"
+#include "input/negconrumble.h"
 #include "input/guncon.h"
 #include "input/justifier.h"
 
@@ -907,6 +908,12 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
       Devices[port] = Device_Mouse_Create();
    else if(!strcmp(type, "negcon"))
       Devices[port] = Device_neGcon_Create();
+   else if(!strcmp(type, "negconrumble"))
+   {
+      char name[256];
+      snprintf(name, 256, "neGcon Rumble on port %u", port + 1);
+      Devices[port] = Device_neGconRumble_Create(std::string(name));
+   }
    else if(!strcmp(type, "guncon"))
       Devices[port] = Device_GunCon_Create();
    else if(!strcmp(type, "justifier"))
@@ -1118,6 +1125,15 @@ static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =
   NULL,
   sizeof(Device_neGcon_IDII) / sizeof(InputDeviceInputInfoStruct),
   Device_neGcon_IDII,
+ },
+
+ {
+  "negconrumble",
+  "neGcon Rumble",
+  "Namco's unconventional twisty racing-game-oriented gamepad with added rumble interface; NPC-101.",
+  NULL,
+  sizeof(Device_neGconRumble_IDII) / sizeof(InputDeviceInputInfoStruct),
+  Device_neGconRumble_IDII,
  },
 
  {

@@ -15,6 +15,7 @@
 #include "mednafen/psx/input/justifier.cpp"
 #include "mednafen/psx/input/guncon.cpp"
 #include "mednafen/psx/input/negcon.cpp"
+#include "mednafen/psx/input/negconrumble.cpp"
 #include "mednafen/psx/input/memcard.cpp"
 #include "mednafen/psx/input/multitap.cpp"
 #include "mednafen/psx/input/mouse.cpp"
