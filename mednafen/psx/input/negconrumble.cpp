@@ -104,7 +104,6 @@ class InputDevice_neGconRumble : public InputDevice
 
       uint8 buttons[2];
       uint8 twist;
-      uint8 axes[2][2];
       uint8 anabuttons[3];
 
       int32 command_phase;
@@ -186,7 +185,7 @@ void InputDevice_neGconRumble::CheckManualAnaModeChange(void)
       {
          if(combo_anatoggle_counter == -1)
             combo_anatoggle_counter = 0;
-         else if(combo_anatoggle_counter >= (44100 * (768 * HOLD)))
+         else if(combo_anatoggle_counter >= (44100))
          {
             need_mode_toggle = true;
             combo_anatoggle_counter = -2;
@@ -263,7 +262,6 @@ int InputDevice_neGconRumble::StateAction(StateMem* sm, int load, int data_only,
       SFVAR(dtr),
 
       SFARRAY(buttons, sizeof(buttons)),
-      SFARRAY(&axes[0][0], sizeof(axes)),
 
       SFVAR(command_phase),
       SFVAR(bitpos),
@@ -333,11 +331,6 @@ void InputDevice_neGconRumble::UpdateInput(const void *data)
       MDFN_en32lsb<false>(&d8[4 + 32 + 0], sneaky_weaky << 0);
    }
 
-   //printf("%d %d %d %d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]);
-
-   //
-   //
-   //
    CheckManualAnaModeChange();
 
    if(am_prev_info != analog_mode || aml_prev_info != analog_mode_locked)
