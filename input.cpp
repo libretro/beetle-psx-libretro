@@ -88,8 +88,9 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_JUSTIFIER          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1)
 #define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
 #define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
+#define RETRO_DEVICE_PS_NEGCON_RUMBLE      RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 8 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 9 }; // <-- update me!
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -101,6 +102,7 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
    { "Justifier", RETRO_DEVICE_PS_JUSTIFIER },
    { "Mouse", RETRO_DEVICE_PS_MOUSE },
    { "neGcon", RETRO_DEVICE_PS_NEGCON },
+   { "neGcon Rumble", RETRO_DEVICE_PS_NEGCON_RUMBLE },
    { NULL, 0 },
 };
 
@@ -779,104 +781,8 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
             break;
 
+
          case RETRO_DEVICE_PS_NEGCON:
-
-            // Analog Inputs
-            {
-               uint16_t button_ii = std::max(
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 ),
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y )
-                     );
-
-               uint16_t button_i = std::max(
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 ),
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B )
-                     );
-               uint16_t left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
-
-               p_input->u32[ 3 ] = button_i; // Analog button I
-               p_input->u32[ 4 ] = button_ii; // Analog button II
-               p_input->u32[ 5 ] = left_shoulder; // Analog shoulder (left only!)
-            }
-
-            // Twist
-            {
-               int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-
-               // Account for deadzone
-               if (analog_left_x > negcon_deadzone)
-                  analog_left_x = analog_left_x - negcon_deadzone;
-               else if (analog_left_x < -negcon_deadzone)
-                  analog_left_x = analog_left_x + negcon_deadzone;
-               else
-                  analog_left_x = 0;
-
-               // Convert to an 'amplitude' [-1.0,1.0]
-               float analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
-
-               // Handle 'analog self-calibration'...
-               // NB: This seems pointless, since all it does is arbitrarily
-               // reduce the precision of 'twist' input (making games rather
-               // unplayable). Someone, however, must have thought it was a
-               // good idea at some point, so we'll leave the basic functionality
-               // in place...
-               struct analog_calibration *calibration = &analog_calibration[ iplayer ];
-               if ( enable_analog_calibration )
-               {
-                  // Compute the current stick deflection
-                  float twist = fabsf(analog_left_x_amplitude);
-
-                  // We recalibrate when we find a new max value for the sticks
-                  if ( twist > analog_calibration->twist )
-                  {
-                     analog_calibration->twist = twist;
-                     log_cb(RETRO_LOG_DEBUG, "Recalibrating twist, deflection: %f\n", twist);
-                  }
-
-                  // NOTE: This value was copied from the DualShock code below. Needs confirmation.
-                  static const float neGcon_analog_deflection = 1.35f;
-
-                  // Now compute the scaling factor to apply to convert the
-                  // emulator's controller coordinates to a native neGcon range.
-                  float twist_scaling = neGcon_analog_deflection / analog_calibration->twist;
-
-                  analog_left_x_amplitude = analog_left_x_amplitude * twist_scaling;
-               }
-               else
-               {
-                  // Reset the calibration. Since we only increase the
-                  // calibration coordinates we can start with a reasonably
-                  // small value.
-                  analog_calibration->twist = 0.7;
-               }
-
-               // Safety check
-               // (also fixes range when above 'analog self-calibration' twist_scaling
-               // is applied)
-               analog_left_x_amplitude = analog_left_x_amplitude < -1.0f ? -1.0f : analog_left_x_amplitude;
-               analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
-
-               // Adjust response
-               if (negcon_linearity == 2)
-               {
-                  if (analog_left_x_amplitude < 0.0)
-                     analog_left_x_amplitude = -(analog_left_x_amplitude * analog_left_x_amplitude);
-                  else
-                     analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude;
-               }
-               else if (negcon_linearity == 3)
-                  analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
-
-               // Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF]
-               analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
-
-               uint32_t twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
-               uint32_t twist_right = analog_left_x > 0 ?  analog_left_x : 0;
-
-               p_input->u32[ 1 ] = twist_right; // Twist Right
-               p_input->u32[ 2 ] = twist_left; // Twist Left
-            }
 
             // Digital Buttons
             {
@@ -914,11 +820,51 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
             break;
 
+         case RETRO_DEVICE_PS_NEGCON_RUMBLE:
+
+            // Digital Buttons
+            {
+               p_input->u8[ 0 ] = 0;
+
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP ) )
+                  p_input->u8[ 0 ] |= ( 1 << 4 ); // Pad-Up
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT ) )
+                  p_input->u8[ 0 ] |= ( 1 << 5 ); // Pad-Right
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) )
+                  p_input->u8[ 0 ] |= ( 1 << 6 ); // Pad-Down
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) )
+                  p_input->u8[ 0 ] |= ( 1 << 7 ); // Pad-Left
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) )
+                  p_input->u8[ 0 ] |= ( 1 << 3 ); // Start
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT ) )
+                  p_input->u8[ 0 ] |= ( 1 << 0 ); // Select / Analog
+
+               p_input->u8[ 1 ] = 0;
+
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) )
+                  p_input->u8[ 1 ] |= ( 1 << 5 ); // neGcon A
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X ) )
+                  p_input->u8[ 1 ] |= ( 1 << 4 ); // neGcon B
+               /*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) )
+                 p_input->u8[ 1 ] |= ( 1 << 2 ); // neGcon L shoulder (digital - non-standard?)
+                 */
+               if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
+                  p_input->u8[ 1 ] |= ( 1 << 3 ); // neGcon R shoulder (digital)
+               /*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2 ) )
+                 p_input->u8[ 1 ] |= ( 1 << 0 ); // neGcon L2 (non-standard?)
+                 */
+               /*if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2 ) )
+                 p_input->u8[ 1 ] |= ( 1 << 1 ); // neGcon R2 (non-standard?)
+                 */
+            }
+
+            break;
+
       } // switch ( input_type[ iplayer ] )
 
 
       //
-      // -- Dual Analog Sticks
+      // -- Analog Inputs
 
       switch ( input_type[ iplayer ] )
       {
@@ -1026,6 +972,109 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
             break;
 
+
+         case RETRO_DEVICE_PS_NEGCON:
+         case RETRO_DEVICE_PS_NEGCON_RUMBLE:
+
+            // Analog Inputs
+            {
+               uint16_t button_ii = std::max(
+                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 ),
+                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y )
+                     );
+
+               uint16_t button_i = std::max(
+                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 ),
+                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B )
+                     );
+               uint16_t left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
+
+               p_input->u32[ 3 ] = button_i; // Analog button I
+               p_input->u32[ 4 ] = button_ii; // Analog button II
+               p_input->u32[ 5 ] = left_shoulder; // Analog shoulder (left only!)
+            }
+
+            // Twist
+            {
+               int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                     RETRO_DEVICE_ID_ANALOG_X);
+
+               // Account for deadzone
+               if (analog_left_x > negcon_deadzone)
+                  analog_left_x = analog_left_x - negcon_deadzone;
+               else if (analog_left_x < -negcon_deadzone)
+                  analog_left_x = analog_left_x + negcon_deadzone;
+               else
+                  analog_left_x = 0;
+
+               // Convert to an 'amplitude' [-1.0,1.0]
+               float analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
+
+               // Handle 'analog self-calibration'...
+               // NB: This seems pointless, since all it does is arbitrarily
+               // reduce the precision of 'twist' input (making games rather
+               // unplayable). Someone, however, must have thought it was a
+               // good idea at some point, so we'll leave the basic functionality
+               // in place...
+               struct analog_calibration *calibration = &analog_calibration[ iplayer ];
+               if ( enable_analog_calibration )
+               {
+                  // Compute the current stick deflection
+                  float twist = fabsf(analog_left_x_amplitude);
+
+                  // We recalibrate when we find a new max value for the sticks
+                  if ( twist > analog_calibration->twist )
+                  {
+                     analog_calibration->twist = twist;
+                     log_cb(RETRO_LOG_DEBUG, "Recalibrating twist, deflection: %f\n", twist);
+                  }
+
+                  // NOTE: This value was copied from the DualShock code below. Needs confirmation.
+                  static const float neGcon_analog_deflection = 1.35f;
+
+                  // Now compute the scaling factor to apply to convert the
+                  // emulator's controller coordinates to a native neGcon range.
+                  float twist_scaling = neGcon_analog_deflection / analog_calibration->twist;
+
+                  analog_left_x_amplitude = analog_left_x_amplitude * twist_scaling;
+               }
+               else
+               {
+                  // Reset the calibration. Since we only increase the
+                  // calibration coordinates we can start with a reasonably
+                  // small value.
+                  analog_calibration->twist = 0.7;
+               }
+
+               // Safety check
+               // (also fixes range when above 'analog self-calibration' twist_scaling
+               // is applied)
+               analog_left_x_amplitude = analog_left_x_amplitude < -1.0f ? -1.0f : analog_left_x_amplitude;
+               analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
+
+               // Adjust response
+               if (negcon_linearity == 2)
+               {
+                  if (analog_left_x_amplitude < 0.0)
+                     analog_left_x_amplitude = -(analog_left_x_amplitude * analog_left_x_amplitude);
+                  else
+                     analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude;
+               }
+               else if (negcon_linearity == 3)
+                  analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
+
+               // Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF]
+               analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
+
+               uint32_t twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
+               uint32_t twist_right = analog_left_x > 0 ?  analog_left_x : 0;
+
+               p_input->u32[ 1 ] = twist_right; // Twist Right
+               p_input->u32[ 2 ] = twist_left; // Twist Left
+            }
+
+            break;
+
       } // switch ( input_type[ iplayer ] )
 
 
@@ -1038,6 +1087,7 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
          {
 
             case RETRO_DEVICE_PS_DUALSHOCK:
+            case RETRO_DEVICE_PS_NEGCON_RUMBLE:
 
                {
                   // Appears to be correct.
@@ -1122,6 +1172,11 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
          case RETRO_DEVICE_PS_NEGCON:
             log_cb( RETRO_LOG_INFO, "Controller %u: neGcon\n", (in_port+1) );
             SetInput( in_port, "negcon", (uint8*)&input_data[ in_port ] );
+            break;
+
+         case RETRO_DEVICE_PS_NEGCON_RUMBLE:
+            log_cb( RETRO_LOG_INFO, "Controller %u: neGcon Rumble\n", (in_port+1) );
+            SetInput( in_port, "negconrumble", (uint8*)&input_data[ in_port ] );
             break;
 
          default:
