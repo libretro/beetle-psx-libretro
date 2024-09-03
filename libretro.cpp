@@ -120,6 +120,7 @@ unsigned image_height = 0;
 bool lightrec_interpreter;
 bool psx_dynarec;
 bool psx_dynarec_invalidate;
+bool psx_dynarec_spgp_opt;
 uint8 psx_mmap = 0;
 uint8 *psx_mem = NULL;
 uint8 *psx_bios = NULL;
@@ -1290,7 +1291,7 @@ static void PSX_Power(void)
    PSX_CPU_MEDNAFEN->Power();
 #ifdef HAVE_LIGHTREC
    //setoptions can be called before power (lightrec init) for tracking of options changing
-   PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
+   PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
    PSX_CPU_LIGHTREC->Power();
 #endif
    EventReset();
@@ -3325,6 +3326,18 @@ static void check_variables(bool startup)
    else
       psx_dynarec_invalidate = false;
 
+   var.key = BEETLE_OPT(dynarec_spgp_opt);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         psx_dynarec_spgp_opt = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         psx_dynarec_spgp_opt = false;
+   }
+   else
+      psx_dynarec_spgp_opt = false;
+
    var.key = BEETLE_OPT(dynarec_eventcycles);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4164,7 +4177,7 @@ static void check_variables(bool startup)
     PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
 
     //lightrec tracks options to move data between lightrec internal state and mednafen
-    PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
+    PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
    }
 #endif
 }
@@ -4460,7 +4473,7 @@ bool retro_load_game(const struct retro_game_info *info)
       /* Do not run lightrec if firmware is not found, recompiling garbage is bad*/
       psx_dynarec = false;
       PSX_CPU = PSX_CPU_MEDNAFEN;
-      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec);
+      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
 #endif
    }
 

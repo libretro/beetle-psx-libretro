@@ -35,6 +35,7 @@ int pgxpMode = PGXP_GetModes();
 
 bool useInterpreter;
 bool noInvalidate;
+bool use_spgp_opt;
 bool prev_dynarec;
 extern uint8 psx_mmap;
 extern uint8 *lightrec_codebuffer;
@@ -60,6 +61,7 @@ void PS_CPU_LIGHTREC::Power(void)
  lightrec_plugin_init();
 
  useInterpreter = false;
+ use_spgp_opt = false;
  prev_dynarec = false;
  pgxpMode = PGXP_GetModes();
 }
@@ -164,7 +166,7 @@ uint32 PS_CPU_LIGHTREC::GetBIU(void)
  return BIU;
 }
 
-void PS_CPU_LIGHTREC::SetOptions(bool interpreter, bool invalidate, bool dynarec)
+void PS_CPU_LIGHTREC::SetOptions(bool interpreter, bool invalidate, bool spgp_opt, bool dynarec)
 {
  //only do stuff if already have lightrec_state, to allow calling setoptions before
  //power() without double-init of lightrec
@@ -175,7 +177,7 @@ void PS_CPU_LIGHTREC::SetOptions(bool interpreter, bool invalidate, bool dynarec
   if(dynarec)
   {
    if(prev_dynarec != dynarec || pgxpMode != PGXP_GetModes() ||
-      noInvalidate != invalidate || useInterpreter != interpreter)
+      noInvalidate != invalidate || use_spgp_opt!=spgp_opt || useInterpreter != interpreter)
    {
     //init lightrec when changing invalidate or PGXP option, cleans entire state if already running
     lightrec_plugin_init();
@@ -187,6 +189,7 @@ void PS_CPU_LIGHTREC::SetOptions(bool interpreter, bool invalidate, bool dynarec
  pgxpMode = PGXP_GetModes();
  useInterpreter = interpreter;
  noInvalidate = invalidate;
+ use_spgp_opt = spgp_opt;
  prev_dynarec = dynarec;
 }
 
@@ -865,6 +868,7 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 			lightrec_map, ARRAY_SIZE(lightrec_map), cop_ops);
 
 	lightrec_set_unsafe_opt_flags(lightrec_state, noInvalidate?LIGHTREC_OPT_INV_DMA_ONLY:0);
+	lightrec_set_unsafe_opt_flags(lightrec_state, use_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
 
 	lightrec_regs = lightrec_get_registers(lightrec_state);
 

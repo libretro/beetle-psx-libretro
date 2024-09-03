@@ -46,7 +46,7 @@ class PS_CPU_LIGHTREC : public PS_CPU
  uint32 GetBIU(void);
  void lightrec_plugin_clear(uint32 addr, uint32 size);
 
- void SetOptions(bool interpreter, bool invalidate, bool dynarec);
+ void SetOptions(bool interpreter, bool invalidate, bool spgp_opt, bool dynarec);
 
  bool interpreter;
 

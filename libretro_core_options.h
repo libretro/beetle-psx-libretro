@@ -1159,6 +1159,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "full"
    },
    {
+      BEETLE_OPT(dynarec_spgp_opt),
+      "Dynarec SP GP Hit RAM Optimization",
+      NULL,
+      "Enabled will generate faster code by assuming sp and gp registers always point to ram, disabled is more widely compatible",
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(dynarec_eventcycles),
       "Dynarec DMA/GPU/MDEC/Timer Event Cycles",
       NULL,
