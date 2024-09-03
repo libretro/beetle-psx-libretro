@@ -120,6 +120,7 @@ unsigned image_height = 0;
 enum DYNAREC psx_dynarec;
 bool psx_dynarec_invalidate;
 bool hugetlb;
+bool psx_dynarec_spgp_opt;
 uint8 psx_mmap = 0;
 uint8 *psx_mem = NULL;
 uint8 *psx_bios = NULL;
@@ -3289,6 +3290,18 @@ static void check_variables(bool startup)
    }
    else
       psx_dynarec_invalidate = false;
+
+   var.key = BEETLE_OPT(dynarec_spgp_opt);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         psx_dynarec_spgp_opt = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         psx_dynarec_spgp_opt = false;
+   }
+   else
+      psx_dynarec_spgp_opt = false;
 
    var.key = BEETLE_OPT(dynarec_eventcycles);
 
