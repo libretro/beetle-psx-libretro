@@ -872,6 +872,9 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 
 	lightrec_regs = lightrec_get_registers(lightrec_state);
 
+	//initialize lightrec_regs from emulator regs
+	CopyToLightrec();
+
 	cpu_timestamp = 0;
 
 	return 0;
