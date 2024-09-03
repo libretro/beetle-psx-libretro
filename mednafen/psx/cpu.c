@@ -51,7 +51,9 @@ int pgxpMode;
 extern enum DYNAREC psx_dynarec;
 enum DYNAREC prev_dynarec;
 bool         prev_invalidate;
+bool         prev_spgp_opt;
 extern bool  psx_dynarec_invalidate;
+extern bool  psx_dynarec_spgp_opt;
 extern uint8 psx_mmap;
 extern uint8 *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
@@ -379,6 +381,7 @@ void CPU_Power(PS_CPU *self)
    next_interpreter = 0;
    prev_dynarec     = psx_dynarec;
    prev_invalidate  = psx_dynarec_invalidate;
+   prev_spgp_opt = psx_dynarec_spgp_opt;
    pgxpMode         = PGXP_GetModes();
    if (psx_dynarec != DYNAREC_DISABLED)
       lightrec_plugin_init(self);
@@ -2774,7 +2777,7 @@ pscpu_timestamp_t CPU_Run(PS_CPU *self, pscpu_timestamp_t timestamp_in)
 #ifdef HAVE_LIGHTREC
    /* Track options changing. */
    if (MDFN_UNLIKELY(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) ||
-       prev_invalidate != psx_dynarec_invalidate)
+       prev_invalidate != psx_dynarec_invalidate || prev_spgp_opt != psx_dynarec_spgp_opt)
    {
       /* Init lightrec when changing dynarec, invalidate, or PGXP option;
        * cleans entire state if already running. */
@@ -2785,6 +2788,7 @@ pscpu_timestamp_t CPU_Run(PS_CPU *self, pscpu_timestamp_t timestamp_in)
       prev_dynarec    = psx_dynarec;
       pgxpMode        = PGXP_GetModes();
       prev_invalidate = psx_dynarec_invalidate;
+      prev_spgp_opt = psx_dynarec_spgp_opt;
    }
 
    if (next_interpreter > 0)
@@ -3519,7 +3523,10 @@ static int lightrec_plugin_init(PS_CPU *self)
 
    lightrec_regs = lightrec_get_registers(lightrec_state);
 
-   lightrec_set_unsafe_opt_flags(lightrec_state, psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0);
+   u32 flags = (psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0) |
+               (psx_dynarec_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
+
+   lightrec_set_unsafe_opt_flags(lightrec_state, flags);
 
    GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
