@@ -34,34 +34,27 @@ class PS_CPU_LIGHTREC : public PS_CPU
 {
  public:
 
- PS_CPU_LIGHTREC() MDFN_COLD;
- ~PS_CPU_LIGHTREC() MDFN_COLD;
+ PS_CPU_LIGHTREC(PS_CPU *beetle_cpu) MDFN_COLD;
+
+ void SetOptions(bool interpreter, bool invalidate, bool spgp_opt, bool dynarec);
 
  //virtual method overrides
+ ~PS_CPU_LIGHTREC() MDFN_COLD;
  pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode);
  void Power(void) MDFN_COLD;
  void AssertIRQ(unsigned which, bool asserted);
  int StateAction(StateMem *sm, const unsigned load, const bool data_only);
- void SetBIU(uint32 val);
- uint32 GetBIU(void);
  void lightrec_plugin_clear(uint32 addr, uint32 size);
-
- void SetOptions(bool interpreter, bool invalidate, bool spgp_opt, bool dynarec);
-
- bool interpreter;
+ void print_for_big_ass_debugger(int32 timestamp, uint32 PC);
 
  private:
 
- static char cache_buf[64 * 1024];
+ PS_CPU *Cpu;
 
  //Lightrec specific methods
  static struct lightrec_registers *lightrec_regs;
  static void enable_ram(struct lightrec_state *state, bool enable);
  static void cop2_op(struct lightrec_state *state, uint32 op);
- void print_for_big_ass_debugger(int32 timestamp, uint32 PC);
- int lightrec_plugin_init();
- void lightrec_plugin_shutdown();
- int32 lightrec_plugin_execute(int32 timestamp);
  static void pgxp_cop2_notify(lightrec_state *state, uint32 op, uint32 data);
  static struct lightrec_ops ops;
  static struct lightrec_ops pgxp_ops;
@@ -91,8 +84,10 @@ class PS_CPU_LIGHTREC : public PS_CPU
  static void cache_ctrl_write_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem, uint32 val);
  static uint32 cache_ctrl_read_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
  static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp);
- static void CopyToLightrec();
- static void CopyFromLightrec();
+ int lightrec_plugin_init();
+ void CopyToLightrec();
+ void CopyFromLightrec();
+ void SetUnsafeFlags();
 };
 
 #endif

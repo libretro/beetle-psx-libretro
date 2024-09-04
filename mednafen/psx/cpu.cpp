@@ -36,14 +36,8 @@
 
 extern bool psx_gte_overclock;
 pscpu_timestamp_t PS_CPU::next_event_ts;
-uint32 PS_CPU::IPCache;
 uint32 PS_CPU::BIU;
-bool PS_CPU::Halted;
-struct PS_CPU::CP0 PS_CPU::CP0;
-uint32 PS_CPU::GPR[32+1];
-uint32 PS_CPU::LO;
-uint32 PS_CPU::HI;
-uint32 PS_CPU::BACKED_PC;
+uintptr_t PS_CPU::FastMap[1 << (32 - FAST_MAP_SHIFT)];
 
 #define BIU_ENABLE_ICACHE_S1	0x00000800	// Enable I-cache, set 1
 #define BIU_ICACHE_FSIZE_MASK	0x00000300      // I-cache fill size mask; 0x000 = 2 words, 0x100 = 4 words, 0x200 = 8 words, 0x300 = 16 words
@@ -2955,25 +2949,6 @@ void PS_CPU::CheckBreakpoints(void (*callback)(bool write, uint32 address, unsig
 #ifdef HAVE_LIGHTREC
 //Print data for comparing to lightrec cpu
 #ifdef LIGHTREC_DEBUG
-u32 hash_calculate(const void *buffer, u32 count)
-{
-	unsigned int i;
-	u32 *data = (u32 *) buffer;
-	u32 hash = 0xffffffff;
-
-	count /= 4;
-	for(i = 0; i < count; ++i) {
-		hash += data[i];
-		hash += (hash << 10);
-		hash ^= (hash >> 6);
-	}
-
-	hash += (hash << 3);
-	hash ^= (hash >> 11);
-	hash += (hash << 15);
-	return hash;
-}
-
 void PS_CPU::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 {
 	uint8_t *psxM = (uint8_t *) MainRAM->data8;

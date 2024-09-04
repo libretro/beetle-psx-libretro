@@ -34,24 +34,26 @@
 int pgxpMode = PGXP_GetModes();
 
 bool useInterpreter;
-bool noInvalidate;
-bool use_spgp_opt;
+bool useInvalidate;
+bool useSPGPopt;
 bool prev_dynarec;
 extern uint8 psx_mmap;
 extern uint8 *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
 struct lightrec_registers * PS_CPU_LIGHTREC::lightrec_regs;
 uint32_t cpu_timestamp;
-char PS_CPU_LIGHTREC::cache_buf[64 * 1024];
+char cache_buf[64 * 1024];
 
-PS_CPU_LIGHTREC::PS_CPU_LIGHTREC()
+PS_CPU_LIGHTREC::PS_CPU_LIGHTREC(PS_CPU *beetle_cpu)
 {
+ Cpu = beetle_cpu;
 }
 
 PS_CPU_LIGHTREC::~PS_CPU_LIGHTREC()
 {
+ Cpu = NULL;
  if (lightrec_state)
-  lightrec_plugin_shutdown();
+  lightrec_destroy(lightrec_state);
 }
 
 const uint8_t *PSX_LoadExpansion1(void);
@@ -59,80 +61,25 @@ const uint8_t *PSX_LoadExpansion1(void);
 void PS_CPU_LIGHTREC::Power(void)
 {
  lightrec_plugin_init();
-
- useInterpreter = false;
- use_spgp_opt = false;
- prev_dynarec = false;
- pgxpMode = PGXP_GetModes();
 }
 
 int PS_CPU_LIGHTREC::StateAction(StateMem *sm, const unsigned load, const bool data_only)
 {
- //define some compatibility vars
- uint32 BACKED_new_PC;
- uint32 OPM;
- static uint32 IPCache;
- static bool Halted;
- uint32 BACKED_LDWhich;
- uint32 BACKED_LDValue;
- uint32 LDAbsorb;
- pscpu_timestamp_t gte_ts_done;
- pscpu_timestamp_t muldiv_ts_done;
- uint32 ICache_Bulk[2048];
- uint8 ReadAbsorb[0x20 + 1];
- uint8 ReadAbsorbWhich;
- uint8 ReadFudge;
-
  if(!load)
  {
-  //get data from lightrec struct before save
-  CopyFromLightrec();
+  if(lightrec_state)
+   //get data from lightrec struct before save
+   CopyFromLightrec();
  }
 
- SFORMAT StateRegs[] =
- {
-  SFARRAY32(GPR, 32),
-  SFVAR(LO),
-  SFVAR(HI),
-  SFVAR(BACKED_PC),
-  SFVAR(BACKED_new_PC),
-  SFVARN(OPM, "BACKED_new_PC_mask"),
-
-  SFVAR(IPCache),
-  SFVAR(Halted),
-
-  SFVAR(BACKED_LDWhich),
-  SFVAR(BACKED_LDValue),
-  SFVAR(LDAbsorb),
-
-  SFVAR(next_event_ts),
-  SFVAR(gte_ts_done),
-  SFVAR(muldiv_ts_done),
-
-  SFVAR(BIU),
-  SFVAR(ICache_Bulk),
-
-  SFVAR(CP0.Regs),
-
-  SFARRAY(ReadAbsorb, 0x20),
-  SFVARN(ReadAbsorb[0x20], "ReadAbsorbDummy"),
-  SFVAR(ReadAbsorbWhich),
-  SFVAR(ReadFudge),
-
-  SFARRAYN(ScratchRAM->data8, 1024, "ScratchRAM.data8"),
-
-  SFEND
- };
- int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "CPU");
-
- ret &= GTE_StateAction(sm, load, data_only);
+ int ret = Cpu->StateAction(sm, load, data_only);
 
  if(load)
  {
   if(lightrec_state)
   {
    lightrec_invalidate_all(lightrec_state);
-   //move loaded data into lightrec struct
+   //move loaded data into lightrec_regs struct
    CopyToLightrec();
   }
  }
@@ -141,7 +88,7 @@ int PS_CPU_LIGHTREC::StateAction(StateMem *sm, const unsigned load, const bool d
 
 void PS_CPU_LIGHTREC::AssertIRQ(unsigned which, bool asserted)
 {
- assert(which <= 5);
+ Cpu->AssertIRQ(which,asserted);
 
  lightrec_regs->cp0[CP0REG_CAUSE] &= ~(1 << (10 + which));
 
@@ -149,53 +96,140 @@ void PS_CPU_LIGHTREC::AssertIRQ(unsigned which, bool asserted)
   lightrec_regs->cp0[CP0REG_CAUSE] |= 1 << (10 + which);
 
  lightrec_set_exit_flags(lightrec_state, LIGHTREC_EXIT_CHECK_INTERRUPT);
-
- CP0.CAUSE &= ~(1 << (10 + which));
-
- if(asserted)
-  CP0.CAUSE |= 1 << (10 + which);
-}
-
-void PS_CPU_LIGHTREC::SetBIU(uint32 val)
-{
- BIU = val & ~(0x440);
-}
-
-uint32 PS_CPU_LIGHTREC::GetBIU(void)
-{
- return BIU;
 }
 
 void PS_CPU_LIGHTREC::SetOptions(bool interpreter, bool invalidate, bool spgp_opt, bool dynarec)
 {
- //only do stuff if already have lightrec_state, to allow calling setoptions before
- //power() without double-init of lightrec
+ bool init = false;
+
  if(lightrec_state)
  {
-  //move data out of lightrec_regs struct, GTE stops using lightrec regs
-  CopyFromLightrec();
-  if(dynarec)
-  {
-   if(prev_dynarec != dynarec || pgxpMode != PGXP_GetModes() ||
-      noInvalidate != invalidate || use_spgp_opt!=spgp_opt || useInterpreter != interpreter)
-   {
-    //init lightrec when changing invalidate or PGXP option, cleans entire state if already running
-    lightrec_plugin_init();
-   }
-   //move data into lightrec_regs struct, makes GTE use lightrec regs
+  if(prev_dynarec && !dynarec)
+   //move regs out of lightrec when switching to beetle interpreter
+   CopyFromLightrec();
+  else if(!prev_dynarec && dynarec)
+   //move regs into lightrec when switching from beetle interpreter
    CopyToLightrec();
-  }
+
+  //only re-init if needed to allow calling setoptions at any time
+  //lightrec init needs to be already been done, running in dynarec mode
+  //and some option has changed
+  if(dynarec && (prev_dynarec != dynarec ||
+     useInterpreter != interpreter || pgxpMode != PGXP_GetModes()))
+      init = true;
  }
+
+ //update now that checking for option changes has been done
  pgxpMode = PGXP_GetModes();
  useInterpreter = interpreter;
- noInvalidate = invalidate;
- use_spgp_opt = spgp_opt;
+ useSPGPopt = spgp_opt;
+ useInvalidate = invalidate;
  prev_dynarec = dynarec;
+
+ if(init)
+    lightrec_plugin_init();
+ else if(lightrec_state)
+    //set flags to updated values if init has not been called
+    SetUnsafeFlags();
 }
+
+#ifdef LIGHTREC_DEBUG
+u32 lightrec_begin_cycles = 0;
+
+void PS_CPU_LIGHTREC::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
+{
+	uint8_t *psxM = (uint8_t *) MainRAM->data8;
+	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
+	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
+
+	unsigned int i;
+
+	printf("CYCLE 0x%08x PC 0x%08x", timestamp, PC);
+
+#ifdef LIGHTREC_VERY_DEBUG
+	printf(" RAM 0x%08x SCRATCH 0x%08x",
+		hash_calculate(psxM, 0x200000),
+		hash_calculate(psxH, 0x400));
+#endif
+
+	printf(" CP0 0x%08x",
+		hash_calculate(&(lightrec_regs->cp0),
+			sizeof(lightrec_regs->cp0)));
+
+#ifdef LIGHTREC_VERY_DEBUG
+	for (i = 0; i < 32; i++)
+		printf(" GPR[%i] 0x%08x", i, lightrec_regs->gpr[i]);
+	printf(" LO 0x%08x", lightrec_regs->gpr[32]);
+	printf(" HI 0x%08x", lightrec_regs->gpr[33]);
+#else
+	printf(" GPR 0x%08x", hash_calculate(&(lightrec_regs->gpr), 32*sizeof(uint32_t)));
+#endif
+	printf("\n");
+}
+#endif /* LIGHTREC_DEBUG */
 
 pscpu_timestamp_t PS_CPU_LIGHTREC::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode)
 {
- return(lightrec_plugin_execute(timestamp_in));
+        uint32 PC = Cpu->BACKED_PC;
+	u32 flags;
+
+	do {
+#ifdef LIGHTREC_DEBUG
+		u32 oldpc = PC;
+#endif
+		lightrec_regs->cp0[CP0REG_SR] = Cpu->CP0.SR;
+		lightrec_regs->cp0[CP0REG_CAUSE] = Cpu->CP0.CAUSE;
+		lightrec_regs->cp0[CP0REG_EPC] = Cpu->CP0.EPC;
+
+		lightrec_reset_cycle_count(lightrec_state, timestamp_in + cpu_timestamp);
+
+		if (useInterpreter)
+			PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts + cpu_timestamp);
+		else
+			PC = lightrec_execute(lightrec_state, PC, next_event_ts + cpu_timestamp);
+
+		timestamp_in = lightrec_current_cycle_count(lightrec_state) - cpu_timestamp;
+
+		Cpu->CP0.SR = lightrec_regs->cp0[CP0REG_SR];
+		Cpu->CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
+
+		flags = lightrec_exit_flags(lightrec_state);
+
+		if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM|LIGHTREC_EXIT_UNKNOWN_OP)) {
+			if (flags & LIGHTREC_EXIT_UNKNOWN_OP)
+				log_cb(RETRO_LOG_ERROR, "Unknown Operation in block at PC 0x%08x\n", PC);
+			if (flags & LIGHTREC_EXIT_NOMEM)
+				log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n", timestamp_in);
+			else
+				log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n", timestamp_in);
+
+			exit(1);
+		}
+		else if (flags & LIGHTREC_EXIT_SYSCALL)
+			PC = Cpu->Exception(EXCEPTION_SYSCALL, PC, PC, 0);
+		else if (flags & LIGHTREC_EXIT_BREAK)
+			PC = Cpu->Exception(EXCEPTION_BP, PC, PC, 0);
+
+#ifdef LIGHTREC_DEBUG
+		if (timestamp_in >= lightrec_begin_cycles && PC != oldpc){
+			print_for_big_ass_debugger(timestamp_in, PC);
+		}
+#endif
+		if ((Cpu->CP0.SR & Cpu->CP0.CAUSE & 0xFF00) && (Cpu->CP0.SR & 1)) {
+			/* Handle software interrupts */
+			PC = Cpu->Exception(EXCEPTION_INT, PC, PC, 0);
+		}
+	} while(MDFN_LIKELY(PSX_EventHandler(timestamp_in)));
+
+	cpu_timestamp += timestamp_in;
+
+	/* wrap slightly earlier to avoid issues with target < current timestamp */
+	if(cpu_timestamp>0xFE000000)
+		cpu_timestamp &= 0x01FFFFFF;
+
+        Cpu->BACKED_PC = PC;
+
+	return timestamp_in;
 }
 
 #define ARRAY_SIZE(x) (sizeof(x) ? sizeof(x) / sizeof((x)[0]) : 0)
@@ -257,60 +291,6 @@ enum opcodes {
 
 static char *name = (char*) "beetle_psx_libretro";
 
-#ifdef LIGHTREC_DEBUG
-u32 lightrec_begin_cycles = 0;
-
-u32 hash_calculate(const void *buffer, u32 count)
-{
-	unsigned int i;
-	u32 *data = (u32 *) buffer;
-	u32 hash = 0xffffffff;
-
-	count /= 4;
-	for(i = 0; i < count; ++i) {
-		hash += data[i];
-		hash += (hash << 10);
-		hash ^= (hash >> 6);
-	}
-
-	hash += (hash << 3);
-	hash ^= (hash >> 11);
-	hash += (hash << 15);
-	return hash;
-}
-
-void PS_CPU_LIGHTREC::print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
-{
-	uint8_t *psxM = (uint8_t *) MainRAM->data8;
-	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
-	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
-
-	unsigned int i;
-
-	printf("CYCLE 0x%08x PC 0x%08x", timestamp, PC);
-
-#ifdef LIGHTREC_VERY_DEBUG
-	printf(" RAM 0x%08x SCRATCH 0x%08x",
-		hash_calculate(psxM, 0x200000),
-		hash_calculate(psxH, 0x400));
-#endif
-
-	printf(" CP0 0x%08x",
-		hash_calculate(&CP0.Regs,
-			sizeof(CP0.Regs)));
-
-#ifdef LIGHTREC_VERY_DEBUG
-	for (i = 0; i < 32; i++)
-		printf(" GPR[%i] 0x%08x", i, GPR[i]);
-	printf(" LO 0x%08x", LO);
-	printf(" HI 0x%08x", HI);
-#else
-	printf(" GPR 0x%08x", hash_calculate(&GPR, 32*sizeof(uint32_t)));
-#endif
-	printf("\n");
-}
-#endif /* LIGHTREC_DEBUG */
-
 void PS_CPU_LIGHTREC::pgxp_cop2_notify(struct lightrec_state *state, u32 op, u32 data)
 {
 	if((op >> 26) == OP_CP2) {
@@ -363,7 +343,7 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_byte(struct lightrec_state *state,
 	*(u8 *)host = val;
 	PGXP_CPU_SB(opcode, val, mem);
 
-	if (!noInvalidate)
+	if (useInvalidate)
 		lightrec_invalidate(state, mem, 1);
 }
 
@@ -397,7 +377,7 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_half(struct lightrec_state *state,
 	*(u16 *)host = HTOLE16(val);
 	PGXP_CPU_SH(opcode, val, mem);
 
-	if (!noInvalidate)
+	if (useInvalidate)
 		lightrec_invalidate(state, mem, 2);
 }
 
@@ -447,7 +427,7 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_word(struct lightrec_state *state,
 			break;
 	}
 
-	if (!noInvalidate)
+	if (useInvalidate)
 		lightrec_invalidate(state, mem, 4);
 }
 
@@ -820,6 +800,8 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 	uint8_t *psxP = (uint8_t *) PSX_LoadExpansion1();
 
 	if(lightrec_state){
+		//move data out of lightrec_regs struct, GTE stops using lightrec regs
+		CopyFromLightrec();
 		log_cb(RETRO_LOG_INFO, "Lightrec restarting\n");
 		lightrec_destroy(lightrec_state);
 	}else{
@@ -867,12 +849,11 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 	lightrec_state = lightrec_init(name,
 			lightrec_map, ARRAY_SIZE(lightrec_map), cop_ops);
 
-	lightrec_set_unsafe_opt_flags(lightrec_state, noInvalidate?LIGHTREC_OPT_INV_DMA_ONLY:0);
-	lightrec_set_unsafe_opt_flags(lightrec_state, use_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
-
 	lightrec_regs = lightrec_get_registers(lightrec_state);
 
-	//initialize lightrec_regs from emulator regs
+	SetUnsafeFlags();
+
+	//move data into lightrec_regs struct, makes GTE use lightrec regs
 	CopyToLightrec();
 
 	cpu_timestamp = 0;
@@ -880,92 +861,35 @@ int PS_CPU_LIGHTREC::lightrec_plugin_init()
 	return 0;
 }
 
+void PS_CPU_LIGHTREC::SetUnsafeFlags()
+{
+	u32 flags = useSPGPopt?LIGHTREC_OPT_SP_GP_HIT_RAM:0;
+	//set invalidate dma only flag when invalidate false
+	if(!useInvalidate)
+		flags |= LIGHTREC_OPT_INV_DMA_ONLY;
+	lightrec_set_unsafe_opt_flags(lightrec_state, flags);
+}
+
 void PS_CPU_LIGHTREC::CopyToLightrec()
 {
-        memcpy(lightrec_regs->gpr,&GPR,32*sizeof(uint32_t));
-        lightrec_regs->gpr[32] = LO;
-        lightrec_regs->gpr[33] = HI;
+        memcpy(lightrec_regs->gpr,&(Cpu->GPR),32*sizeof(uint32_t));
+        lightrec_regs->gpr[32] = Cpu->LO;
+        lightrec_regs->gpr[33] = Cpu->HI;
+        memcpy(lightrec_regs->cp0,&(Cpu->CP0),32*sizeof(uint32_t));
         GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 }
 
 void PS_CPU_LIGHTREC::CopyFromLightrec()
 {
-        memcpy(&GPR,lightrec_regs->gpr,32*sizeof(uint32_t));
-        LO = lightrec_regs->gpr[32];
-        HI = lightrec_regs->gpr[33];
+        memcpy(&(Cpu->GPR),lightrec_regs->gpr,32*sizeof(uint32_t));
+        Cpu->LO = lightrec_regs->gpr[32];
+        Cpu->HI = lightrec_regs->gpr[33];
+        memcpy(&(Cpu->CP0),lightrec_regs->cp0,32*sizeof(uint32_t));
         GTE_SwitchRegisters(false,lightrec_regs->cp2d);
-}
-
-int32_t PS_CPU_LIGHTREC::lightrec_plugin_execute(int32_t timestamp)
-{
-        uint32 PC = BACKED_PC;
-	u32 flags;
-
-	do {
-#ifdef LIGHTREC_DEBUG
-		u32 oldpc = PC;
-#endif
-		lightrec_regs->cp0[CP0REG_SR] = CP0.SR;
-		lightrec_regs->cp0[CP0REG_CAUSE] = CP0.CAUSE;
-		lightrec_regs->cp0[CP0REG_EPC] = CP0.EPC;
-
-		lightrec_reset_cycle_count(lightrec_state, timestamp + cpu_timestamp);
-
-		if (useInterpreter)
-			PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts + cpu_timestamp);
-		else
-			PC = lightrec_execute(lightrec_state, PC, next_event_ts + cpu_timestamp);
-
-		timestamp = lightrec_current_cycle_count(lightrec_state) - cpu_timestamp;
-
-		CP0.SR = lightrec_regs->cp0[CP0REG_SR];
-		CP0.CAUSE = lightrec_regs->cp0[CP0REG_CAUSE];
-
-		flags = lightrec_exit_flags(lightrec_state);
-
-		if (flags & LIGHTREC_EXIT_UNKNOWN_OP)
-			log_cb(RETRO_LOG_ERROR, "Unknown Operation in block at PC 0x%08x\n", PC);
-
-		if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
-			if (flags & LIGHTREC_EXIT_NOMEM)
-				log_cb(RETRO_LOG_ERROR, "Out of memory at cycle 0x%08x\n", timestamp);
-			else
-				log_cb(RETRO_LOG_ERROR, "Segfault at cycle 0x%08x\n", timestamp);
-
-			exit(1);
-		}
-		else if (flags & LIGHTREC_EXIT_SYSCALL)
-			PC = Exception(EXCEPTION_SYSCALL, PC, PC, 0);
-
-#ifdef LIGHTREC_DEBUG
-		if (timestamp >= lightrec_begin_cycles && PC != oldpc){
-			print_for_big_ass_debugger(timestamp, PC);
-		}
-#endif
-		if ((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1)) {
-			/* Handle software interrupts */
-			PC = Exception(EXCEPTION_INT, PC, PC, 0);
-		}
-	} while(MDFN_LIKELY(PSX_EventHandler(timestamp)));
-
-	cpu_timestamp += timestamp;
-
-	/* wrap slightly earlier to avoid issues with target < current timestamp */
-	if(cpu_timestamp>0xFE000000)
-		cpu_timestamp &= 0x01FFFFFF;
-
-        BACKED_PC = PC;
-
-	return timestamp;
 }
 
 void PS_CPU_LIGHTREC::lightrec_plugin_clear(u32 addr, u32 size)
 {
 	if (lightrec_state)	/* size * 4: uses DMA units */
 		lightrec_invalidate(lightrec_state, addr, size * 4);
-}
-
-void PS_CPU_LIGHTREC::lightrec_plugin_shutdown(void)
-{
-	lightrec_destroy(lightrec_state);
 }

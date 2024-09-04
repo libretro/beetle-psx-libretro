@@ -63,6 +63,8 @@
 
 class PS_CPU
 {
+ friend class PS_CPU_LIGHTREC;
+
  public:
 
  PS_CPU() MDFN_COLD;
@@ -73,15 +75,11 @@ class PS_CPU
  enum { FAST_MAP_SHIFT = 16 };
  enum { FAST_MAP_PSIZE = 1 << FAST_MAP_SHIFT };
 
- void SetFastMap(void *region_mem, uint32 region_address, uint32 region_size);
+ static void SetFastMap(void *region_mem, uint32 region_address, uint32 region_size);
 
  INLINE void SetEventNT(const pscpu_timestamp_t next_event_ts_arg)
  {
   next_event_ts = next_event_ts_arg;
- }
-
- static INLINE pscpu_timestamp_t GetEventNT(void) {
-  return next_event_ts;
  }
 
  virtual pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode);
@@ -103,17 +101,10 @@ class PS_CPU
  virtual void lightrec_plugin_clear(uint32 addr, uint32 size);
 #endif
 
- //shared with cpu_lightrec.cpp
- protected:
+ private:
 
- static uint32 GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
+ uint32 Exception(uint32 code, uint32 PC, const uint32 NP, const uint32 instr) MDFN_WARN_UNUSED_RESULT;
 
- static uint32 LO;
- static uint32 HI;
-
- static uint32 BACKED_PC;
-
- static uint32 BIU;
  static pscpu_timestamp_t next_event_ts;
 
  enum
@@ -131,7 +122,7 @@ class PS_CPU
   CP0REG_PRID = 15		// Product ID
  };
 
- static struct CP0
+ struct CP0
  {
   union
   {
@@ -175,21 +166,24 @@ class PS_CPU
   EXCEPTION_OV = 12	// Arithmetic overflow
  };
 
- uint32 Exception(uint32 code, uint32 PC, const uint32 NP, const uint32 instr) MDFN_WARN_UNUSED_RESULT;
+ uint32 GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
 
- private:
+ uint32 LO;
+ uint32 HI;
 
  uint32 BACKED_new_PC;
+ uint32 BACKED_PC;
 
- static uint32 IPCache;
+ static uint32 BIU;
+ uint32 IPCache;
  uint8 BDBT;
 
  uint8 ReadAbsorb[0x20 + 1];
  uint8 ReadAbsorbWhich;
  uint8 ReadFudge;
 
- static void RecalcIPCache(void);
- static bool Halted;
+ void RecalcIPCache(void);
+ bool Halted;
 
  uint32 BACKED_LDWhich;
  uint32 BACKED_LDValue;
@@ -223,7 +217,7 @@ class PS_CPU
 
  //PS_GTE GTE;
 
- uintptr_t FastMap[1 << (32 - FAST_MAP_SHIFT)];
+ static uintptr_t FastMap[1 << (32 - FAST_MAP_SHIFT)];
  uint8 DummyPage[FAST_MAP_PSIZE];
 
  template<bool DebugMode, bool BIOSPrintMode, bool ILHMode> NO_INLINE pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
@@ -236,8 +230,30 @@ class PS_CPU
  uint32 ReadInstruction(pscpu_timestamp_t &timestamp, uint32 address);
 
 #ifdef HAVE_LIGHTREC
- void print_for_big_ass_debugger(int32 timestamp, uint32 PC);
+#ifdef LIGHTREC_DEBUG
+ virtual void print_for_big_ass_debugger(int32 timestamp, uint32 PC);
+
+ INLINE uint32 hash_calculate(const void *buffer, uint32 count)
+ {
+        unsigned int i;
+        uint32 *data = (uint32 *) buffer;
+        uint32 hash = 0xffffffff;
+
+        count /= 4;
+        for(i = 0; i < count; ++i) {
+                hash += data[i];
+                hash += (hash << 10);
+                hash ^= (hash >> 6);
+        }
+
+        hash += (hash << 3);
+        hash ^= (hash >> 11);
+        hash += (hash << 15);
+        return hash;
+ }
 #endif
+#endif
+
 
  //
  // Mednafen debugger stuff follows:

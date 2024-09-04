@@ -2079,7 +2079,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
 #ifdef HAVE_LIGHTREC
    PSX_CPU_MEDNAFEN = new PS_CPU();
-   PSX_CPU_LIGHTREC = new PS_CPU_LIGHTREC();
+   PSX_CPU_LIGHTREC = new PS_CPU_LIGHTREC(PSX_CPU_MEDNAFEN);
    PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
 #else
    PSX_CPU = new PS_CPU();
@@ -3319,12 +3319,12 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "full") == 0)
-         psx_dynarec_invalidate = false;
-      else if (strcmp(var.value, "dma") == 0)
          psx_dynarec_invalidate = true;
+      else if (strcmp(var.value, "dma") == 0)
+         psx_dynarec_invalidate = false;
    }
    else
-      psx_dynarec_invalidate = false;
+      psx_dynarec_invalidate = true;
 
    var.key = BEETLE_OPT(dynarec_spgp_opt);
 
