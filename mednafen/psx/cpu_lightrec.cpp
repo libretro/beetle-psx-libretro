@@ -31,7 +31,7 @@
 #include "../pgxp/pgxp_cpu.h"
 #include "../pgxp/pgxp_gte.h"
 #include "../pgxp/pgxp_main.h"
-int pgxpMode = PGXP_GetModes();
+uint32_t pgxpMode;
 
 bool useInterpreter;
 bool useInvalidate;
@@ -431,6 +431,17 @@ void PS_CPU_LIGHTREC::pgxp_nonhw_write_word(struct lightrec_state *state,
 		lightrec_invalidate(state, mem, 4);
 }
 
+void PS_CPU_LIGHTREC::pgxp_nonhw_write_word_unsigned(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem, u32 val)
+{
+	*(u32 *)host = HTOLE32(val);
+
+	PGXP_CPU_SW(opcode, val, mem);
+
+	if (useInvalidate)
+		lightrec_invalidate(state, mem, 4);
+}
+
 void PS_CPU_LIGHTREC::pgxp_hw_write_word(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem, u32 val)
 {
@@ -617,6 +628,16 @@ u32 PS_CPU_LIGHTREC::pgxp_nonhw_read_word(struct lightrec_state *state,
 	return val;
 }
 
+u32 PS_CPU_LIGHTREC::pgxp_nonhw_read_word_unsigned(struct lightrec_state *state,
+		u32 opcode, void *host, u32 mem)
+{
+	u32 val = LE32TOH(*(u32 *)host);
+
+	PGXP_CPU_LW(opcode, val, mem);
+
+	return val;
+}
+
 u32 PS_CPU_LIGHTREC::pgxp_hw_read_word(struct lightrec_state *state,
 		u32 opcode, void *host, u32 mem)
 {
@@ -663,6 +684,8 @@ struct lightrec_mem_map_ops PS_CPU_LIGHTREC::pgxp_nonhw_regs_ops = {
 	.lb = pgxp_nonhw_read_byte,
 	.lh = pgxp_nonhw_read_half,
 	.lw = pgxp_nonhw_read_word,
+	.lwu = pgxp_nonhw_read_word_unsigned,
+	.swu = pgxp_nonhw_write_word_unsigned,
 };
 
 struct lightrec_mem_map_ops PS_CPU_LIGHTREC::pgxp_hw_regs_ops = {

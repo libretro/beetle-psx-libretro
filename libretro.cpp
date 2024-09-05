@@ -4175,9 +4175,6 @@ static void check_variables(bool startup)
    if(PSX_CPU)
    {
     PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
-
-    //lightrec tracks options to move data between lightrec internal state and mednafen
-    PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
    }
 #endif
 }
@@ -4724,6 +4721,10 @@ void retro_run(void)
                                 MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction | psx_pgxp_nclip);
+
+#ifdef HAVE_LIGHTREC
+      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
+#endif
 
       // Reload memory cards if they were changed
       if (use_mednafen_memcard0_method &&

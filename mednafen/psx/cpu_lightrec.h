@@ -81,6 +81,8 @@ class PS_CPU_LIGHTREC : public PS_CPU
  static uint8 pgxp_nonhw_read_byte(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
  static uint16 pgxp_nonhw_read_half(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
  static uint32 pgxp_nonhw_read_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
+ static uint32 pgxp_nonhw_read_word_unsigned(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
+ static void pgxp_nonhw_write_word_unsigned(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem, uint32 val);
  static void cache_ctrl_write_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem, uint32 val);
  static uint32 cache_ctrl_read_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
  static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp);
