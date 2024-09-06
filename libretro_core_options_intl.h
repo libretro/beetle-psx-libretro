@@ -10183,31 +10183,31 @@ struct retro_core_options_v2 options_ca = {
 #define CATEGORY_VIDEO_LABEL_CHS "视频"
 #define CATEGORY_VIDEO_INFO_0_CHS "更改长宽比、显示裁剪、视频过滤和帧跳过设置。"
 #define CATEGORY_OSD_LABEL_CHS "屏显"
-#define CATEGORY_OSD_INFO_0_CHS NULL
+#define CATEGORY_OSD_INFO_0_CHS "配置屏幕上显示的通知。"
 #define CATEGORY_INPUT_LABEL_CHS "输入"
 #define CATEGORY_INPUT_INFO_0_CHS "更改光枪、鼠标和模拟摇杆设置。"
 #define CATEGORY_MEMCARDS_LABEL_CHS "内存卡"
-#define CATEGORY_MEMCARDS_INFO_0_CHS NULL
+#define CATEGORY_MEMCARDS_INFO_0_CHS "更改与系统使用的虚拟存储卡有关的设置。"
 #define CATEGORY_PGXP_LABEL_CHS "PGXP (几何变换管道)"
 #define CATEGORY_PGXP_INFO_0_CHS "这些选项控制增强，可以改进图形与原始控制台相比。PGXP可以消除弹形图和 Z-战斗问题。"
 #define CATEGORY_HACKS_LABEL_CHS "模拟修改"
-#define CATEGORY_HACKS_INFO_0_CHS NULL
+#define CATEGORY_HACKS_INFO_0_CHS "更改影响底层性能和兼容性的处理器超频和仿真精度设置。"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHS "内部GPU分辨率"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHS NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHS "选择内部分辨率乘数。高于 “1 倍(原生)”的分辨率可提高 3D 模型的保真度，但会增加性能需求。2D 元素一般不受此设置影响。"
 #define OPTION_VAL_1X_NATIVE_CHS "1x (原始)"
 #define OPTION_VAL_2X_CHS "2 倍"
 #define OPTION_VAL_4X_CHS "4 倍"
 #define OPTION_VAL_8X_CHS "8 倍"
 #define OPTION_VAL_16X_CHS "16 倍"
 #define BEETLE_OPT_DEPTH_LABEL_CHS "内部色深度"
-#define BEETLE_OPT_DEPTH_INFO_0_CHS NULL
+#define BEETLE_OPT_DEPTH_INFO_0_CHS "选择内部色深。较高的色深可以在不使用抖动的情况下减少色带效应。16 bpp 可模拟原始硬件，但如果不启用抖动，可能会出现明显的色带。当该选项设置为 32 bpp 时，建议禁用 “抖动模式”。"
 #define OPTION_VAL_16BPP_NATIVE_CHS "16位像素(原始)"
 #define OPTION_VAL_32BPP_CHS "32位像素"
 #define BEETLE_OPT_DITHER_MODE_LABEL_CHS "抖动模式"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CHS NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CHS "选择抖动模式配置。“1x(原始)”模拟原始硬件使用的原始低分辨率抖动，以平滑原始色深下可见的色带伪影。内部分辨率 \"根据配置的内部分辨率调整抖动粒度，以获得更清晰的效果。建议在以 32 bpp 颜色深度运行时禁用。注：在 Vulkan 上，启用此选项将强制降采样至原始色深，而禁用则会自动启用更高色深的输出。"
 #define OPTION_VAL_INTERNAL_RESOLUTION_CHS "内部分辨率"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHS "纹理紫外线偏移"
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHS NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CHS "对 3D 多边形的纹理进行偏移采样，以获得高于 1 倍的内部分辨率。这样可以减少纹理接缝，但可能会造成意想不到的图形故障。"
 #define BEETLE_OPT_FILTER_LABEL_CHS "纹理过滤"
 #define BEETLE_OPT_FILTER_INFO_0_CHS NULL
 #define OPTION_VAL_NEAREST_CHS "最近的"
@@ -10217,7 +10217,7 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_3_POINT_CHS "3 点"
 #define OPTION_VAL_JINC2_CHS NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_CHS "从过滤中排除素材"
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_CHS NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_CHS "不对 Sprites 应用纹理过滤。在各种使用二维 Sprite 渲染背景的游戏中防止出现接缝。与自适应平滑或其他后期处理滤镜一起使用可获得最佳效果。"
 #define OPTION_VAL_OPAQUE_CHS "仅不透明度"
 #define OPTION_VAL_ALL_CHS "不透明和半透明度"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_CHS "排除筛选中的 2D 多边形"
@@ -10225,33 +10225,33 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_CHS "自适应平滑化"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_CHS "平滑2D艺术作品和UI元素，而不闪烁3D渲染对象。只能由Vulkan 渲染器支持。"
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_CHS "超大(从样本到原生分辨率)"
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CHS NULL
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CHS "将渲染内容的内部分辨率从高分辨率向下采样至原始分辨率。将其与更高的内部分辨率乘数相结合，就能以原始低分辨率显示抗锯齿 3D 物体。当应用于混合 2D 和 3D 元素(如在预渲染的背景上显示 3D 角色)的游戏时，效果最佳，并能与 CRT 着色器完美结合。仅 Vulkan 渲染器支持。注意：启用此选项时，建议禁用 “抖动模式”。"
 #define BEETLE_OPT_MSAA_LABEL_CHS "多重采样抗锯齿轮模式"
-#define BEETLE_OPT_MSAA_INFO_0_CHS NULL
+#define BEETLE_OPT_MSAA_INFO_0_CHS "选择渲染内容的 MSAA 级别。改善 3D 物体的外观。仅 Vulkan 渲染器支持。"
 #define OPTION_VAL_1X_CHS NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_CHS "MDEC YUV 色度过滤器"
-#define BEETLE_OPT_MDEC_YUV_INFO_0_CHS NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_CHS NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_CHS NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_CHS NULL
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CHS NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHS NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHS NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_CHS "通过减少 “宏区块阻塞 ”伪像(方形/锯齿状边缘)来提高 FMV 播放质量。仅受 Vulkan 渲染器支持。"
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_CHS "轨迹纹理"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_CHS "纹理转储和替换的前提条件。 在大多数游戏中可能会崩溃。"
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_CHS "转储纹理"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CHS "将使用的纹理转储到 <cd>-texture-dump/"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHS "替换纹理"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHS "使用  <cd>-texture-replacements/ 中的高清版本替换纹理"
 #define BEETLE_OPT_WIREFRAME_LABEL_CHS NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_CHS NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_CHS NULL
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_CHS NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CHS NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CHS NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_CHS NULL
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CHS NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CHS NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHS NULL
+#define BEETLE_OPT_WIREFRAME_INFO_0_CHS "以轮廓形式渲染 3D 模型，无需纹理或着色。仅受 OpenGL 硬件渲染器支持。注：此功能用于调试，通常应禁用。"
+#define BEETLE_OPT_FRAME_DUPING_LABEL_CHS "帧重复（加速）"
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_CHS "当 libretro 前端启用并支持该功能时，如果内核没有新内容要显示，它将引导前端重复上一帧，从而略微提高性能。"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CHS "显示内部 FPS"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CHS "显示模拟 PlayStation 系统渲染内容时的内部帧率。注意：需要在 libretro 前端启用屏幕通知。"
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_CHS "显示完整 VRAM (调试)"
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CHS "可视化整个模拟控制台的 VRAM。仅受 OpenGL 和 Vulkan 硬件渲染器支持。注意：此功能用于调试，通常应禁用。"
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CHS "模拟自校准"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CHS "当输入设备设置为 DualShock、模拟控制器、模拟手柄或 neGcon 时，该选项将启用模拟输入的动态校准。最大注册输入值会被实时监控，并用于缩放传递给模拟器的模拟坐标。该选项适用于《洛克人传奇 2》等游戏，这些游戏所需的数值比现代控制器提供的数值更大。为获得最佳效果，每次加载内容时都应将模拟摇杆旋转到最大程度，以调整校准算法。"
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CHS "DualShock 模拟模式切换"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CHS "当输入设备类型为 DualShock 时，该选项允许仿真 DualShock 像原始硬件一样在数字和模拟模式之间切换。也可通过使用选定的按键组合来切换模式。"
 #define OPTION_VAL_ENABLED_ANALOG_CHS NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CHS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CHS "选择用于在模拟 DualShock 的数字和模拟模式之间切换的按钮组合。"
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CHS NULL
 #define OPTION_VAL_L1_R1_SELECT_CHS NULL
 #define OPTION_VAL_L1_R1_START_CHS NULL
@@ -10263,7 +10263,7 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_L2_R2_R3_CHS NULL
 #define OPTION_VAL_L3_R3_CHS NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHS "设置模拟模式组合按钮的保持时间。"
 #define OPTION_VAL_0_CHS NULL
 #define OPTION_VAL_1_CHS NULL
 #define OPTION_VAL_2_CHS NULL
@@ -10274,12 +10274,12 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CHS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CHS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_CHS NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_CHS NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_CHS NULL
-#define OPTION_VAL_LIGHTGUN_CHS NULL
-#define OPTION_VAL_TOUCHSCREEN_CHS NULL
-#define BEETLE_OPT_GUN_CURSOR_LABEL_CHS NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_CHS NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_CHS "光枪输入模式"
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_CHS "当设备类型设置为 “Guncon/G-Con 45 ”或 “Justifier ”时，选择使用鼠标控制的 “光枪 ”还是 “触摸屏 ”输入。"
+#define OPTION_VAL_LIGHTGUN_CHS "光枪"
+#define OPTION_VAL_TOUCHSCREEN_CHS "触摸屏"
+#define BEETLE_OPT_GUN_CURSOR_LABEL_CHS "光枪光标"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_CHS "选择使用 “Guncon/G-Con 45 ”和 “Justifier ”输入设备类型时屏幕上显示的枪支光标。禁用时，十字准线始终隐藏。"
 #define OPTION_VAL_CROSS_CHS "叉"
 #define OPTION_VAL_DOT_CHS "点"
 #define OPTION_VAL_OFF_CHS "无光标"
@@ -10298,7 +10298,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_CHS NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CHS NULL
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CHS "鼠标灵敏度"
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CHS NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CHS "选择 “鼠标 ”输入设备类型的响应速度。"
 #define OPTION_VAL_5_O28_CHS NULL
 #define OPTION_VAL_10_CHS NULL
 #define OPTION_VAL_15_CHS NULL
@@ -10352,20 +10352,20 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_LIBRETRO_CHS NULL
 #define OPTION_VAL_MEDNAFEN_CHS NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CHS "启用内存卡 1 (需要重启)"
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHS NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CHS "在插槽 1 中模拟第二张内存卡。如果禁用，游戏只能在槽 0 中访问内存卡。 注意：某些游戏需要禁用此选项以进行正确的操作 (如 Codename Tenka)：注意：记忆卡 1 使用 Mednafen (.mcr) 保存格式。"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CHS "共享内存卡(需要重启)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CHS "如果启用，所有游戏都将保存并从相同的内存卡文件中加载。 当禁用时，将为已加载的每个内容生成单独的内存卡文件。 注意：如果“内存卡0方法”设置为“Libret”，只有正确的内存卡会受到影响。"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CHS "内存卡左边索引"
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHS NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CHS "更改左侧插槽中当前装载的存储卡。该选项只有在存储卡 0 方法设置为 Mednafen 时才有效。默认存储卡为索引 0。"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CHS NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHS NULL
-#define OPTION_VAL_1_O35_CHS NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_CHS NULL
-#define BEETLE_OPT_PGXP_MODE_INFO_0_CHS NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CHS "更改右侧插槽中当前装载的存储卡。该选项只有在启用存储卡 1 的情况下才会起作用。默认存储卡为索引 1。"
+#define OPTION_VAL_1_O35_CHS "1 (默认)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_CHS "PGXP 操作模式"
+#define BEETLE_OPT_PGXP_MODE_INFO_0_CHS "允许以亚像素精度渲染 3D 物体，最大限度地减少原始硬件上 3D 物体因使用定点顶点坐标而产生的失真和抖动。仅内存 \"模式的兼容性问题最小，建议在一般情况下使用。“内存 + CPU(Buggy)”模式可进一步减少抖动，但对性能要求较高，可能会导致各种几何图形错误。"
 #define OPTION_VAL_MEMORY_ONLY_CHS NULL
 #define OPTION_VAL_MEMORY_CPU_CHS NULL
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_CHS NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_CHS NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_CHS "隐藏 PGXP 操作中更明显的错误：该值指定了在几何图形没有适当深度信息的情况下 PGXP 值的容差。"
 #define OPTION_VAL_0PX_CHS NULL
 #define OPTION_VAL_1PX_CHS NULL
 #define OPTION_VAL_2PX_CHS NULL
@@ -10377,18 +10377,18 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_8PX_CHS NULL
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_CHS NULL
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_CHS NULL
-#define BEETLE_OPT_PGXP_VERTEX_LABEL_CHS NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_CHS NULL
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_CHS "PGXP 顶点缓存"
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_CHS "缓存 PGXP 增强顶点位置，以便在绘制多边形时重复使用。在渲染纹理时，该选项有可能改善对象对齐情况并减少可见接缝，但查询缓存时的误报可能会产生图形故障。目前建议禁用该选项。该选项仅在启用 PGXP 运行模式时应用。仅硬件渲染器支持。"
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_CHS NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_CHS NULL
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_CHS "用透视正确的纹理贴图取代原生的 PSX 仿真纹理贴图。消除与位置有关的纹理变形和扭曲，从而获得正确对齐的纹理。该选项仅在启用 PGXP 运行模式时应用。仅硬件渲染器支持。"
 #define BEETLE_OPT_LINE_RENDER_LABEL_CHS NULL
 #define BEETLE_OPT_LINE_RENDER_INFO_0_CHS NULL
 #define OPTION_VAL_DEFAULT_CHS "默认"
 #define OPTION_VAL_AGGRESSIVE_CHS "激进"
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_CHS NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_CHS "宽屏模式增强"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_CHS NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_CHS NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_CHS NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_CHS "宽屏模式增强宽高比"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_CHS "选择宽屏模式增强使用的宽高比。"
 #define OPTION_VAL_16_9_CHS NULL
 #define OPTION_VAL_16_10_CHS NULL
 #define OPTION_VAL_18_9_CHS NULL
@@ -10396,8 +10396,8 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_20_9_CHS NULL
 #define OPTION_VAL_21_9_CHS NULL
 #define OPTION_VAL_32_9_CHS NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CHS NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CHS NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CHS "CPU 频率扩展 (超频)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CHS "超频(或降频)模拟 PSX CPU。超频可以消除某些游戏中的减速现象并提高帧率，但代价是性能要求的提高。请注意，某些游戏有内部帧率限制器，可能无法从超频中获益。在某些游戏中，超频可能会导致某些特效的动画速度超过预期。"
 #define OPTION_VAL_100_NATIVE_CHS NULL
 #define OPTION_VAL_210_CHS NULL
 #define OPTION_VAL_220_CHS NULL
@@ -10454,19 +10454,19 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_730_CHS NULL
 #define OPTION_VAL_740_CHS NULL
 #define OPTION_VAL_750_CHS NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CHS NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_CHS NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CHS "GPU 光栅器超频"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_CHS "对模拟 PSX GPU 中的 2D 光栅器进行超频。该功能不会改善 3D 渲染效果，一般来说影响不大。"
 #define OPTION_VAL_32X_CHS NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_CHS NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_CHS NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_CHS NULL
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_CHS NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_CHS NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHS NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_CHS "GTE 超频"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_CHS "将所有模拟的GTE (几何变换引擎 - 用于 3D 图形的 CPU 协处理器)操作降至恒定的一个周期延迟。对于大量使用 GTE 的游戏，这可以大大提高帧频和帧时间的稳定性。"
+#define BEETLE_OPT_SKIP_BIOS_LABEL_CHS "跳过 BIOS 启动动画"
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_CHS "跳过通常在加载内容时显示的 PlayStation BIOS 启动动画。注意：启用此功能会导致一些游戏(PAL 受拷贝保护游戏、沙加开拓者等)的兼容性问题。"
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_CHS "BIOS 覆盖 (需要重启)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHS "如果发现特定区域的标准 BIOS，就用无区域的 BIOS 来覆盖它。"
 #define OPTION_VAL_PSXONPSP_CHS NULL
 #define OPTION_VAL_PS1_ROM_CHS NULL
-#define BEETLE_OPT_RENDERER_LABEL_CHS NULL
-#define BEETLE_OPT_RENDERER_INFO_0_CHS NULL
+#define BEETLE_OPT_RENDERER_LABEL_CHS "渲染器 (需要重启)"
+#define BEETLE_OPT_RENDERER_INFO_0_CHS "软件渲染器是最精确的，但在 GPU 内部分辨率提高时对性能要求很高。硬件渲染器虽然精度较低，但在内部分辨率提高时，性能比软件渲染器更好，还能实现各种图形增强功能。“硬件(自动)”会根据当前 libretro 前端的视频驱动程序自动选择 Vulkan 或 OpenGL 渲染器。如果提供的视频驱动程序不兼容 Vulkan 或 OpenGL 3.3，那么内核将退回到软件渲染器。"
 #define OPTION_VAL_HARDWARE_CHS NULL
 #define OPTION_VAL_HARDWARE_GL_CHS NULL
 #define OPTION_VAL_HARDWARE_VK_CHS NULL
@@ -10474,7 +10474,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CHS NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CHS NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_CHS NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_CHS NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_CHS "动态地将 CPU 指令重新编译为本地指令。速度比解释器快得多，但 CPU 时序不太准确，而且可能会有错误。"
 #define OPTION_VAL_DISABLED_CHS NULL
 #define OPTION_VAL_EXECUTE_CHS NULL
 #define OPTION_VAL_EXECUTE_ONE_CHS NULL
@@ -10489,10 +10489,10 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_CHS NULL
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CHS NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CHS NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHS NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHS "选择核心向前端报告的 FPS 时序。“自动切换”允许内核在报告逐行和隔行扫描速率之间切换，但可能导致前端视频/音频驱动程序重新启动。"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CHS NULL
 #define OPTION_VAL_FORCE_INTERLACED_CHS NULL
-#define OPTION_VAL_AUTO_TOGGLE_CHS NULL
+#define OPTION_VAL_AUTO_TOGGLE_CHS "允许自动切换"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CHS NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHS NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CHS NULL
@@ -10500,12 +10500,12 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_CORRECTED_CHS NULL
 #define OPTION_VAL_UNCORRECTED_CHS NULL
 #define OPTION_VAL_4_3_CHS NULL
-#define OPTION_VAL_NTSC_CHS NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHS NULL
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHS NULL
+#define OPTION_VAL_NTSC_CHS "强制 NTSC"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_CHS "裁剪过扫描"
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CHS "“无”保留填充 (NTSC 制式在图像两侧，PAL 制式在图像四周)，以模拟真正的 PSX 硬件在模拟视频输出中产生的黑条。“静态”只移除水平填充，“动态”移除所有填充。"
 #define OPTION_VAL_DISABLED_O58_CHS "无"
 #define OPTION_VAL_STATIC_CHS "静态"
-#define OPTION_VAL_SMART_CHS NULL
+#define OPTION_VAL_SMART_CHS "动态 (默认)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_CHS NULL
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_CHS NULL
 #define OPTION_VAL_9PX_CHS NULL
@@ -10546,8 +10546,8 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_10PX_O60_0_CHS NULL
 #define OPTION_VAL_11PX_O60_0_CHS NULL
 #define OPTION_VAL_12PX_O60_0_CHS NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CHS NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CHS NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CHS "水平图像偏移 (GPU 周期)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CHS "选择偏移图像的 GPU 周期。正值使图像向右移动，负值使图像向左移动。仅硬件渲染器支持。"
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CHS NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_CHS NULL
 #define OPTION_VAL_0_O62_CHS NULL
@@ -10559,11 +10559,11 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CHS NULL
 #define OPTION_VAL_287_CHS "287 (默认)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CHS NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CHS NULL
-#define OPTION_VAL_SYNC_CHS NULL
-#define OPTION_VAL_ASYNC_CHS NULL
-#define OPTION_VAL_PRECACHE_CHS NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CHS "CD 访问方法 (需要重启)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CHS "选择从镜像读取数据的方法。“同步”模拟原始硬件。“异步”可减少存储速度慢的设备上的卡顿现象。“预缓存”会在启动内容时将整个磁盘映像加载到内存中，这可能会改善游戏内的加载时间，但代价是启动时会出现初始延迟。“预缓存”可能会对内存不足的系统造成影响，因此在使用物理介质时会退回到 ”同步 \"模式。"
+#define OPTION_VAL_SYNC_CHS "同步"
+#define OPTION_VAL_ASYNC_CHS "异步"
+#define OPTION_VAL_PRECACHE_CHS "预缓存"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_CHS NULL
 #define BEETLE_OPT_CD_FASTLOAD_INFO_0_CHS NULL
 #define OPTION_VAL_2X_NATIVE_CHS NULL
