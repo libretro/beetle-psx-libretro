@@ -246,14 +246,6 @@ pscpu_timestamp_t PS_CPU_LIGHTREC::Run(pscpu_timestamp_t timestamp_in, bool BIOS
 #	define HTOLE16(x)	(x)
 #endif
 
-static inline u32 kunseg(u32 addr)
-{
-	if (MDFN_UNLIKELY(addr >= 0xa0000000))
-		return addr - 0xa0000000;
-	else
-		return addr &~ 0x80000000;
-}
-
 enum opcodes {
         OP_SPECIAL              = 0x00,
         OP_REGIMM               = 0x01,
@@ -352,9 +344,7 @@ void PS_CPU_LIGHTREC::pgxp_hw_write_byte(struct lightrec_state *state,
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	PSX_MemWrite8(timestamp, kmem, val);
+	PSX_MemWrite8(timestamp, mem, val);
 
 	PGXP_CPU_SB(opcode, val, mem);
 
@@ -386,9 +376,7 @@ void PS_CPU_LIGHTREC::pgxp_hw_write_half(struct lightrec_state *state,
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	PSX_MemWrite16(timestamp, kmem, val);
+	PSX_MemWrite16(timestamp, mem, val);
 
 	PGXP_CPU_SH(opcode, val, mem);
 
@@ -447,9 +435,7 @@ void PS_CPU_LIGHTREC::pgxp_hw_write_word(struct lightrec_state *state,
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	PSX_MemWrite32(timestamp, kmem, val);
+	PSX_MemWrite32(timestamp, mem, val);
 
 	switch (opcode >> 26){
 		case OP_SWL:
@@ -509,9 +495,7 @@ u8 PS_CPU_LIGHTREC::pgxp_hw_read_byte(struct lightrec_state *state,
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	val = PSX_MemRead8(timestamp, kmem);
+	val = PSX_MemRead8(timestamp, mem);
 
 	if((opcode >> 26) == OP_LB)
 		PGXP_CPU_LB(opcode, val, mem);
@@ -565,9 +549,7 @@ u16 PS_CPU_LIGHTREC::pgxp_hw_read_half(struct lightrec_state *state,
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	val = PSX_MemRead16(timestamp, kmem);
+	val = PSX_MemRead16(timestamp, mem);
 
 	if((opcode >> 26) == OP_LH)
 		PGXP_CPU_LH(opcode, val, mem);
@@ -645,9 +627,7 @@ u32 PS_CPU_LIGHTREC::pgxp_hw_read_word(struct lightrec_state *state,
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state) - cpu_timestamp;
 
-	u32 kmem = kunseg(mem);
-
-	val = PSX_MemRead32(timestamp, kmem);
+	val = PSX_MemRead32(timestamp, mem);
 
 	switch (opcode >> 26){
 		case OP_LWL:
