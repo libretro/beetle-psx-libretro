@@ -143,10 +143,6 @@ else ifeq ($(platform), osx)
    ifeq ($(OSX_LT_MAVERICKS),"YES")
       fpic += -mmacosx-version-min=10.5
    endif
-   ifeq ($(HAVE_LIGHTREC), 1)
-      LDFLAGS += -lSystem
-      FLAGS += -DHAVE_SHM -DUSE_FIXED
-   endif
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -framework OpenGL
    endif
@@ -156,6 +152,11 @@ else ifeq ($(platform), osx)
 	CPPFLAGS += $(TARGET_RULE)
 	CXXFLAGS += $(TARGET_RULE)
 	LDFLAGS  += $(TARGET_RULE)
+	HAVE_LIGHTREC = 0
+   endif
+   ifeq ($(HAVE_LIGHTREC), 1)
+      LDFLAGS += -lSystem
+      FLAGS += -DHAVE_SHM -DUSE_FIXED
    endif
 
 # iOS
