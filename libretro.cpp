@@ -57,7 +57,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 
 #if __APPLE__
 #include <TargetConditionals.h>
-#if TARGET_OS_MAC
+#if TARGET_OS_OSX
 #include <mach/shared_region.h>
 #include <sys/attr.h>
 #define __MACOS__ 1
