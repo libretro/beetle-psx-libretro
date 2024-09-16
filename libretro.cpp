@@ -56,9 +56,13 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif /* HAVE_LIGHTREC */
 
 #if __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_MAC
 #include <mach/shared_region.h>
 #include <sys/attr.h>
+#define __MACOS__ 1
 #define MACOS_VM_BASE (SHARED_REGION_BASE+SHARED_REGION_SIZE+ATTR_VOL_RESERVED_SIZE)
+#endif
 #endif
 
 //Fast Save States exclude string labels from variables in the savestate, and are at least 20% faster.
@@ -1675,7 +1679,7 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #endif
 
 static const uintptr_t supported_io_bases[] = {
-#if !__APPLE__
+#if !__MACOS__
 	static_cast<uintptr_t>(0x00000000),
 	static_cast<uintptr_t>(0x10000000),
 	static_cast<uintptr_t>(0x20000000),
