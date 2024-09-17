@@ -360,12 +360,15 @@ ifeq ($(HAVE_CHD), 1)
 endif ## ifeq ($(HAVE_CHD), 1)
 
 ifeq ($(HAVE_LIGHTREC), 1)
-   SOURCES_C +=   $(DEPS_DIR)/lightning/lib/jit_memory.c \
+   SOURCES_C +=   $(DEPS_DIR)/lightning/lib/jit_disasm.c \
+                  $(DEPS_DIR)/lightning/lib/jit_memory.c \
                   $(DEPS_DIR)/lightning/lib/jit_names.c \
                   $(DEPS_DIR)/lightning/lib/jit_note.c \
+                  $(DEPS_DIR)/lightning/lib/jit_print.c \
                   $(DEPS_DIR)/lightning/lib/jit_size.c \
                   $(DEPS_DIR)/lightning/lib/lightning.c \
                   $(DEPS_DIR)/lightrec/blockcache.c \
+                  $(DEPS_DIR)/lightrec/constprop.c \
                   $(DEPS_DIR)/lightrec/emitter.c \
                   $(DEPS_DIR)/lightrec/interpreter.c \
                   $(DEPS_DIR)/lightrec/lightrec.c \
