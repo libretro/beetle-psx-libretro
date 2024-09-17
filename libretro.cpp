@@ -1697,34 +1697,17 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #endif
 #endif
 
-static const uintptr_t supported_io_bases[] = {
-#if !__MACOS__
-	static_cast<uintptr_t>(0x00000000),
-	static_cast<uintptr_t>(0x10000000),
-	static_cast<uintptr_t>(0x20000000),
-	static_cast<uintptr_t>(0x30000000),
+#if __MACOS__
+#define min_io_base MACOS_VM_BASE
 #else
-   static_cast<uintptr_t>(MACOS_VM_BASE),
+#define min_io_base 0x00000000
 #endif
-	static_cast<uintptr_t>(0x40000000),
-	static_cast<uintptr_t>(0x50000000),
-	static_cast<uintptr_t>(0x60000000),
-	static_cast<uintptr_t>(0x70000000),
-	static_cast<uintptr_t>(0x80000000),
-	static_cast<uintptr_t>(0x90000000),
-   /* Some platforms need higher address base for mmap to work */
+
+/* Some platforms might need higher address base for mmap to work */
 #if UINTPTR_MAX == UINT64_MAX
-	static_cast<uintptr_t>(0x100000000),
-	static_cast<uintptr_t>(0x200000000),
-	static_cast<uintptr_t>(0x300000000),
-	static_cast<uintptr_t>(0x400000000),
-	static_cast<uintptr_t>(0x500000000),
-	static_cast<uintptr_t>(0x600000000),
-	static_cast<uintptr_t>(0x700000000),
-	static_cast<uintptr_t>(0x800000000),
-	static_cast<uintptr_t>(0x900000000),
+#define max_io_base_64 0xF00000000
+#define inc_io_base_64 0x100000000
 #endif
-};
 
 #define RAM_SIZE 0x200000
 #define BIOS_SIZE 0x80000
@@ -1794,8 +1777,10 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 
 int lightrec_init_mmap(bool hugetlb)
 {
-	int r = 0, i, j;
-	uintptr_t base;
+	int ret = 0, i = 0, j;
+	uintptr_t io_base;
+	uintptr_t inc_io_base = 0x10000000;
+	uintptr_t max_io_base = 0xD0000000;
 	void *bios, *scratch, *map;
 
 /* open memfd and set size */
@@ -1892,17 +1877,21 @@ int lightrec_init_mmap(bool hugetlb)
 	}
 #endif
 
-	/* Try to map at various base addresses*/
-	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
-		base = supported_io_bases[i];
-		bios = (void *)(base + 0x1fc00000);
-		scratch = (void *)(base + 0x1f800000);
+map_io_base:
+	/* Try to map at various io_base addresses*/
+	for (; i*inc_io_base <= max_io_base; i++) {
+		io_base = i*inc_io_base;
+		if(io_base < min_io_base)
+			continue;
+
+		bios = (void *)(io_base + 0x1fc00000);
+		scratch = (void *)(io_base + 0x1f800000);
 
 		for (j = 0; j < NUM_MEM; j++) {
-			map = MAP_SHM((void *)(base + j * RAM_SIZE), RAM_SIZE, memfd, 0);
+			map = MAP_SHM((void *)(io_base + j * RAM_SIZE), RAM_SIZE, memfd, 0);
 			if (map == MFAILED)
 				break;
-			else if (map != (void *)(base + j * RAM_SIZE))
+			else if (map != (void *)(io_base + j * RAM_SIZE))
 			{
 				//not at expected address, reject it
 				UNMAP(map, RAM_SIZE);
@@ -1910,23 +1899,21 @@ int lightrec_init_mmap(bool hugetlb)
 			}
 		}
 
-		/* Impossible to map using this base */
+		/* Impossible to map using this io_base */
 		if (j == 0)
 			continue;
 
 		/* All mirrors mapped - we got a match! */
 		if (j == NUM_MEM)
 		{
-			psx_mem = (uint8 *)base;
+			psx_mem = (uint8 *)io_base;
 
 			if (ENABLE_CODE_BUFFER) {
 				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
-				map = MAP_CODE((void *)(base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
+				map = MAP_CODE((void *)(io_base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
 
-				if (map == MFAILED){
-					log_cb(RETRO_LOG_WARN, "Unable to mmap code buffer, dynarec may be slower\n");
+				if (map == MFAILED)
 					goto err_unmap;
-				}
 
 				lightrec_codebuffer = (uint8_t *)map;
 			}
@@ -1949,14 +1936,15 @@ int lightrec_init_mmap(bool hugetlb)
 			if (map != scratch)
 				goto err_unmap;
 
-			r = NUM_MEM;
+			ret = NUM_MEM;
 
+			/* Successfull mmap, skipping any code before close_return */
 			goto close_return;
 		}
 
 err_unmap:
 		if(lightrec_codebuffer){
-			UNMAP(lightrec_codebuffer, BIOS_SIZE);
+			UNMAP(lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE);
 			lightrec_codebuffer = NULL;
 		}
 
@@ -1972,12 +1960,28 @@ err_unmap:
 
 		/* Clean up any mapped ram or mirrors and try again */
 		for (; j > 0; j--)
-			UNMAP((void *)(base + (j - 1) * RAM_SIZE), RAM_SIZE);
+			UNMAP((void *)(io_base + (j - 1) * RAM_SIZE), RAM_SIZE);
 
 		psx_mem = NULL;
 	}
 
-	if (i == ARRAY_SIZE(supported_io_bases) && !hugetlb) {
+#ifdef max_io_base_64
+	/* Successful mmap will goto close_return, so have already tried all io_base
+	 up to original max_io_base, try a larger max and increment if running on 64 bit,
+	 adds more than a dozen new io_base, while attempting much higher addresses */
+	if (max_io_base != max_io_base_64) {
+		inc_io_base = inc_io_base_64;
+		max_io_base = max_io_base_64;
+		/* skips 0x0 io_base, already been tried at this point, the for loop
+		 at map_io_base doesn't reset i, so set it here */
+		i = 1;
+		goto map_io_base;
+	}
+#endif
+
+	/* We have tried all io_base addresses, give warning unless we are still in hugetlb mode,
+	 which will fallback to non-hugetlb and attempt lightrec_init_mmap() again */
+	if (!hugetlb) {
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	}
 
@@ -1988,13 +1992,16 @@ close_return:
 #ifdef HAVE_WIN_SHM
 	CloseHandle(memfd);
 #endif
-	return r;
+	return ret;
 }
 
 void lightrec_free_mmap()
 {
 	for (int i = 0; i < NUM_MEM; i++)
 		UNMAP((void *)((uintptr_t)psx_mem + i * RAM_SIZE), RAM_SIZE);
+
+	if (lightrec_codebuffer)
+		UNMAP(lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE);
 
 	UNMAP(psx_bios, BIOS_SIZE);
 	UNMAP(psx_scratch, SCRATCH_SIZE);
@@ -2535,6 +2542,8 @@ static void Cleanup(void)
    BIOSROM = NULL;
    if(psx_mmap > 0)
       lightrec_free_mmap();
+   if(lightrec_codebuffer)
+      lightrec_codebuffer = NULL;
 #else
    if(MainRAM != INVALID_PTR)
       delete MainRAM;
