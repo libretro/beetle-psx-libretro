@@ -1288,11 +1288,13 @@ static void PSX_Power(void)
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
 
-   PSX_CPU_MEDNAFEN->Power();
 #ifdef HAVE_LIGHTREC
+   PSX_CPU_MEDNAFEN->Power();
    //setoptions can be called before power (lightrec init) for tracking of options changing
    PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
    PSX_CPU_LIGHTREC->Power();
+#else
+   PSX_CPU->Power();
 #endif
    EventReset();
 
