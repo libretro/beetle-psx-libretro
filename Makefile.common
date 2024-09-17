@@ -381,6 +381,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
                   $(DEPS_DIR)/lightning/lib/jit_size.c \
                   $(DEPS_DIR)/lightning/lib/lightning.c \
                   $(DEPS_DIR)/lightrec/blockcache.c \
+                  $(DEPS_DIR)/lightrec/constprop.c \
                   $(DEPS_DIR)/lightrec/emitter.c \
                   $(DEPS_DIR)/lightrec/interpreter.c \
                   $(DEPS_DIR)/lightrec/lightrec.c \
