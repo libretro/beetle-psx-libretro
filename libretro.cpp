@@ -4242,13 +4242,13 @@ static bool MDFNI_LoadGame(const char *name)
    RFILE *GameFile = NULL;
    size_t name_len = strlen(name);
 
-   if(name_len > 4 && (
-      !strcasecmp(name + name_len - 4, ".cue") ||
-      !strcasecmp(name + name_len - 4, ".ccd") ||
-      !strcasecmp(name + name_len - 4, ".toc") ||
-      !strcasecmp(name + name_len - 4, ".m3u") ||
-      !strcasecmp(name + name_len - 4, ".chd") ||
-      !strcasecmp(name + name_len - 4, ".pbp")
+   if(name_len > 3 && (
+      !strcasecmp(name + name_len - 3, "cue") ||
+      !strcasecmp(name + name_len - 3, "ccd") ||
+      !strcasecmp(name + name_len - 3, "toc") ||
+      !strcasecmp(name + name_len - 3, "m3u") ||
+      !strcasecmp(name + name_len - 3, "chd") ||
+      !strcasecmp(name + name_len - 3, "pbp")
       ))
     return MDFNI_LoadCD(name);
 
