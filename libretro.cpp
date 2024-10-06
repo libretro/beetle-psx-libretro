@@ -86,6 +86,7 @@ static retro_input_state_t input_state_cb;
 static unsigned frame_count = 0;
 static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
+static bool display_notifications = true;
 static bool allow_frame_duping = false;
 static bool failed_init = false;
 static unsigned image_offset = 0;
@@ -3986,6 +3987,17 @@ static void check_variables(bool startup)
    else
       display_internal_framerate = false;
 
+   var.key = BEETLE_OPT(display_osd);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         display_notifications = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         display_notifications = false;
+   }
+   else
+      display_notifications = true;
+
    var.key = BEETLE_OPT(crop_overscan);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -5292,27 +5304,30 @@ void MDFND_DispMessage(
       enum retro_message_target target, enum retro_message_type type,
       const char *str)
 {
-   if (libretro_msg_interface_version >= 1)
+   if (display_notifications)
    {
-      struct retro_message_ext msg = {
-         str,
-         3000,
-         priority,
-         level,
-         target,
-         type,
-         -1
-      };
-      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
-   }
-   else
-   {
-      struct retro_message msg =
+      if (libretro_msg_interface_version >= 1)
       {
-         str,
-         180
-      };
-      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+         struct retro_message_ext msg = {
+            str,
+            3000,
+            priority,
+            level,
+            target,
+            type,
+            -1
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
+      }
+      else
+      {
+         struct retro_message msg =
+         {
+            str,
+            180
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+      }
    }
 }
 
