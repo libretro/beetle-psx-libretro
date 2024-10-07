@@ -183,11 +183,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
    ifeq ($(THREADED_RECOMPILER), 0)
        FLAGS += -DENABLE_THREADED_COMPILER=0
    else
-      ifeq ($(DEBUG), 0)
-          FLAGS += -DENABLE_THREADED_COMPILER=1
-      else
-          FLAGS += -DENABLE_THREADED_COMPILER=0
-      endif
+       FLAGS += -DENABLE_THREADED_COMPILER=1
    endif
 
    ifneq (,$(findstring win,$(platform)))
@@ -197,8 +193,10 @@ ifeq ($(HAVE_LIGHTREC), 1)
 
    INCFLAGS += -I$(DEPS_DIR)/lightning/include \
                -I$(DEPS_DIR)/lightrec \
-               -I$(CORE_DIR)/lightning-lightrec-include \
-               -include $(CORE_DIR)/lightning-lightrec-include/debug.h
+               -I$(CORE_DIR)/include \
+               -include $(CORE_DIR)/include/debug.h
+
+   SOURCES_CXX += $(CORE_EMU_DIR)/cpu_lightrec.cpp
 endif
 
 ifneq ($(HAVE_GRIFFIN), 1)
@@ -364,24 +362,26 @@ ifeq ($(HAVE_CHD), 1)
 endif ## ifeq ($(HAVE_CHD), 1)
 
 ifeq ($(HAVE_LIGHTREC), 1)
-   SOURCES_C +=   $(DEPS_DIR)/lightning/lib/jit_memory.c \
+   SOURCES_C +=   $(DEPS_DIR)/lightning/lib/jit_disasm.c \
+                  $(DEPS_DIR)/lightning/lib/jit_memory.c \
                   $(DEPS_DIR)/lightning/lib/jit_names.c \
                   $(DEPS_DIR)/lightning/lib/jit_note.c \
+                  $(DEPS_DIR)/lightning/lib/jit_print.c \
                   $(DEPS_DIR)/lightning/lib/jit_size.c \
                   $(DEPS_DIR)/lightning/lib/lightning.c \
                   $(DEPS_DIR)/lightrec/blockcache.c \
+                  $(DEPS_DIR)/lightrec/constprop.c \
                   $(DEPS_DIR)/lightrec/emitter.c \
                   $(DEPS_DIR)/lightrec/interpreter.c \
                   $(DEPS_DIR)/lightrec/lightrec.c \
                   $(DEPS_DIR)/lightrec/memmanager.c \
                   $(DEPS_DIR)/lightrec/optimizer.c \
                   $(DEPS_DIR)/lightrec/reaper.c \
-                  $(DEPS_DIR)/lightrec/regcache.c
+                  $(DEPS_DIR)/lightrec/regcache.c \
+                  $(DEPS_DIR)/lightrec/tlsf/tlsf.c
 
    ifeq ($(THREADED_RECOMPILER), 1)
-      ifeq ($(DEBUG), 0)
-          SOURCES_C +=   $(DEPS_DIR)/lightrec/recompiler.c
-      endif
+      SOURCES_C +=   $(DEPS_DIR)/lightrec/recompiler.c
    endif
 
    ifeq ($(LIGHTREC_LOG_LEVEL), 4)
