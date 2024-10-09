@@ -48,14 +48,14 @@ CDAccess::~CDAccess()
 CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcache)
 {
    size_t path_len = strlen(path);
-   if (path_len >= 4 && !strcasecmp(path + path_len - 4, ".ccd"))
+   if (path_len >= 3 && !strcasecmp(path + path_len - 3, "ccd"))
       return new CDAccess_CCD(success, path, image_memcache);
 #ifdef HAVE_PBP
-   else if (path_len >= 4 && !strcasecmp(path + path_len - 4, ".pbp"))
+   else if (path_len >= 3 && !strcasecmp(path + path_len - 3, "pbp"))
       return new CDAccess_PBP(path, image_memcache);
 #endif
 #ifdef HAVE_CHD
-   else if (path_len >= 4 && !strcasecmp(path + path_len - 4, ".chd"))
+   else if (path_len >= 3 && !strcasecmp(path + path_len - 3, "chd"))
       return new CDAccess_CHD(path, image_memcache);
 #endif
    return new CDAccess_Image(success, path, image_memcache);
