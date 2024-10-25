@@ -36895,8 +36895,8 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_GL "Cando está habilitado e admitido polo frontend de libretro, isto proporciona un pequeno aumento de rendemento ao dirixir o frontend para que repita o cadro anterior se o núcleo non ten nada novo que mostrar."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_GL NULL
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_GL "Mostra a velocidade de fotogramas interna á que o sistema PlayStation emulado está a renderizar contido. Nota: Require que as notificacións en pantalla estean activadas na interface de libretro."
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_GL NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_GL NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_GL "Amosar mensaxes OSD"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_GL "Amosar mensaxes OSD xeradas polo núcleo."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_GL "Mostrar VRAM completa (depuración)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GL "Visualiza a VRAM de toda a consola emulada. Só admitido polos renderizadores de hardware OpenGL e Vulkan. Nota: Isto é para fins de depuración e normalmente debería estar desactivado."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GL "Autocalibración analóxica"
@@ -37013,7 +37013,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GL "Cambia a tarxeta de memoria cargada actualmente na rañura esquerda. Esta opción só funcionará se o método da tarxeta de memoria 0 está configurado en Mednafen. A tarxeta predeterminada é o índice 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GL "Índice dereito da tarxeta de memoria"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GL "Cambia a tarxeta de memoria cargada actualmente na ranura correcta. Esta opción só funcionará se a tarxeta de memoria 1 está activada. A tarxeta predeterminada é o índice 1."
-#define OPTION_VAL_1_O36_GL NULL
+#define OPTION_VAL_1_O36_GL "1 (predeterminado)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_GL "Modo de operación PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_GL "Permite renderizar obxectos 3D con precisión de subpíxeles, minimizando a distorsión e a fluctuación dos obxectos 3D vistos no hardware orixinal debido ao uso de coordenadas de vértice de punto fixo. O modo \"Só memoria\" ten problemas mínimos de compatibilidade e recoméndase para uso xeral. O modo \"Memoria + CPU (Buggy)\" pode reducir aínda máis a fluctuación, pero ten requisitos de alto rendemento e pode causar varios erros de xeometría."
 #define OPTION_VAL_MEMORY_ONLY_GL "Só memoria"
@@ -37204,7 +37204,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GL "Escolla o número de ciclos da GPU para compensar a imaxe. Os valores positivos moven a imaxe cara á dereita, os valores negativos moven a imaxe cara á esquerda. Só admitido polos renderizadores de hardware."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_GL "Liña de exploración inicial - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_GL "Escolla a primeira liña de dixitalización que se mostra ao executar contido NTSC. Os valores superiores a cero reducirán a altura das imaxes de saída recortando os píxeles desde o bordo superior. Pódese usar para contrarrestar o letterboxing."
-#define OPTION_VAL_0_O63_GL NULL
+#define OPTION_VAL_0_O63_GL "0 (predeterminado)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_GL "Última liña de exploración - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_GL "Escolla a última liña de dixitalización que se mostra ao executar contido NTSC. Os valores inferiores a 239 reducirán a altura das imaxes de saída recortando os píxeles desde o bordo inferior. Pódese usar para contrarrestar o letterboxing."
 #define OPTION_VAL_239_GL NULL
