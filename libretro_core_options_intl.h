@@ -43027,8 +43027,8 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_HU "Ha be van kapcsolva és a libretro frontend is támogatja, kis javulást ad a teljesítményhez azáltal, hogy a frontendet az előző képkocka ismétlésére utasítja, ha a magnak nincs új megjelenítendő tartalma."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_HU "Belső FPS megjelenítése"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_HU "A belső képkockasebesség megjelenítése, amivel az emulált PlayStation rendszer előállítja a képet. Figyelem: a képernyőn megjelenő értesítések be kell legyenek kapcsolva a libretro frontenden."
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_HU NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_HU NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_HU "OSD üzenetek megjelenítése"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_HU "A mag által generált OSD üzenetek megjelenítése."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_HU "Az egész VRAM megjelenítése (debug)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_HU "Az emulált konzol teljes VRAM tartalmának megjelenítése. Csak az OpenGL és Vulkan hardveres megjelenítők támogatják. Figyelem: ez csak hibakeresési célokat szolgál, és normál esetben ki kell legyen kapcsolva."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_HU "Analóg önkalibráció"
@@ -43145,7 +43145,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_HU "A bal oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 0-s memóriakártya eljárása Mednafen-re van állítva. Az alapértelmezett sorszám 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_HU "Jobb oldali memóriakártya sorszáma"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_HU "A jobb oldali kártyahelyre behelyezett memóriakártya váltása. Csak akkor működik, ha a 1-s memóriakártya engedélyezett. Az alapértelmezett sorszám 1."
-#define OPTION_VAL_1_O36_HU NULL
+#define OPTION_VAL_1_O36_HU "1 (alapértelmezett)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_HU "PGXP működési módja"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HU "A 3D objektumok pixelméretnél pontosabb képalkotása, a 3D objektumok torzulásának és szaggatásának minimalizálásához, amit az eredeti hardveren a fixpontos vertex koordináták okoztak. A \"Csak memóriában\" módnak csak minimális kompatibilitási gondjai vannak és ajánlott általános használathoz. A \"Memória + CPU (hibás)\" mód még tovább csökkentheti a szaggatást, de nagy a teljesítményigénye és különféle geometriai hibákat okozhat."
 #define OPTION_VAL_MEMORY_ONLY_HU "Csak memóriában"
@@ -43336,7 +43336,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_HU "Az eltoláshoz használt GPU ciklusok száma. Pozitív értékeknél a kép jobbra, negatívnál balra mozdul. Csak a hardveres megjelenítők támogatják."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_HU "Kezdő scanline - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_HU "Az első megjelenített scanline NTSC tartalom futtatásakor. A nullánál nagyobb értékek csökkentik a kimenő kép magasságát, levágva a felső sorokat. A letterbox hatást lehet vele ellensúlyozni."
-#define OPTION_VAL_0_O63_HU NULL
+#define OPTION_VAL_0_O63_HU "0 (alapértelmezett)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_HU "Utolsó scanline - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_HU "Az utolsó megjelenített scanline NTSC tartalom futtatásakor. A 239-nél kisebb értékek csökkentik a kimenő kép magasságát, levágva az alsó sorokat. A letterbox hatást lehet vele ellensúlyozni."
 #define OPTION_VAL_239_HU "239 (alapértelmezett)"
