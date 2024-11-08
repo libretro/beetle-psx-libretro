@@ -6172,11 +6172,11 @@ struct retro_core_options_v2 options_be = {
 
 /* RETRO_LANGUAGE_BG */
 
-#define CATEGORY_VIDEO_LABEL_BG NULL
+#define CATEGORY_VIDEO_LABEL_BG "Видео"
 #define CATEGORY_VIDEO_INFO_0_BG NULL
 #define CATEGORY_OSD_LABEL_BG NULL
 #define CATEGORY_OSD_INFO_0_BG NULL
-#define CATEGORY_INPUT_LABEL_BG NULL
+#define CATEGORY_INPUT_LABEL_BG "Вход"
 #define CATEGORY_INPUT_INFO_0_BG NULL
 #define CATEGORY_MEMCARDS_LABEL_BG NULL
 #define CATEGORY_MEMCARDS_INFO_0_BG NULL
@@ -8217,25 +8217,25 @@ struct retro_core_options_v2 options_bg = {
 /* RETRO_LANGUAGE_CA */
 
 #define CATEGORY_VIDEO_LABEL_CA "Vídeo"
-#define CATEGORY_VIDEO_INFO_0_CA NULL
+#define CATEGORY_VIDEO_INFO_0_CA "Canvia la relació d'aspecte, retalls de la imatge, filtre de vídeo i l'omissió de fotogrames."
 #define CATEGORY_OSD_LABEL_CA "Visualitzacions en Pantalla"
-#define CATEGORY_OSD_INFO_0_CA NULL
+#define CATEGORY_OSD_INFO_0_CA "Canvia les notificacions que es mostraran en pantalla."
 #define CATEGORY_INPUT_LABEL_CA "Dispositius de joc"
-#define CATEGORY_INPUT_INFO_0_CA NULL
+#define CATEGORY_INPUT_INFO_0_CA "Canvia pistola de llum, ratolí i configuració neGcon."
 #define CATEGORY_MEMCARDS_LABEL_CA "Targeta de memòria"
-#define CATEGORY_MEMCARDS_INFO_0_CA NULL
-#define CATEGORY_PGXP_LABEL_CA NULL
+#define CATEGORY_MEMCARDS_INFO_0_CA "Canvia la configuració relativa a la targeta de memòria virtual que fa servir el sistema."
+#define CATEGORY_PGXP_LABEL_CA "PGXP (Procés de transformació precisa de la geometria)"
 #define CATEGORY_PGXP_INFO_0_CA NULL
 #define CATEGORY_HACKS_LABEL_CA "Correccions de l'emulació"
 #define CATEGORY_HACKS_INFO_0_CA NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CA NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CA "Resolució interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CA NULL
 #define OPTION_VAL_1X_NATIVE_CA "1x (Natiu)"
 #define OPTION_VAL_2X_CA NULL
 #define OPTION_VAL_4X_CA NULL
 #define OPTION_VAL_8X_CA NULL
 #define OPTION_VAL_16X_CA NULL
-#define BEETLE_OPT_DEPTH_LABEL_CA NULL
+#define BEETLE_OPT_DEPTH_LABEL_CA "Profunditat interna dels colors"
 #define BEETLE_OPT_DEPTH_INFO_0_CA NULL
 #define OPTION_VAL_16BPP_NATIVE_CA "16 bpp (Natiu)"
 #define OPTION_VAL_32BPP_CA NULL
@@ -8255,42 +8255,42 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_CA "Ometre sprites del filtratge"
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_CA NULL
 #define OPTION_VAL_OPAQUE_CA "Només els sprites opacs"
-#define OPTION_VAL_ALL_CA NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_CA NULL
+#define OPTION_VAL_ALL_CA "Opac i semitransparent"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_CA "Excloure polígons 2D del filtre"
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_CA NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_CA NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_CA "Suavitzat adaptatiu"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_CA NULL
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_CA NULL
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_CA "Sobremostreig (reducció a resolució nativa)"
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CA NULL
-#define BEETLE_OPT_MSAA_LABEL_CA NULL
+#define BEETLE_OPT_MSAA_LABEL_CA "Suavitzat de vores MSAA"
 #define BEETLE_OPT_MSAA_INFO_0_CA NULL
 #define OPTION_VAL_1X_CA NULL
-#define BEETLE_OPT_MDEC_YUV_LABEL_CA NULL
+#define BEETLE_OPT_MDEC_YUV_LABEL_CA "Filtre Croma MDEC YUV"
 #define BEETLE_OPT_MDEC_YUV_INFO_0_CA NULL
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_CA "Rastreig de textures"
 #define BEETLE_OPT_TRACK_TEXTURES_INFO_0_CA NULL
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_CA "Abocar textures"
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CA NULL
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CA "Abocar les textures actuals a <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CA "Substitueix les textures"
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CA NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_CA NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CA "Reemplaça les textures fent servir les versions en alta qualitat (HD) que es troben a <cd>-texture-replacements/"
+#define BEETLE_OPT_WIREFRAME_LABEL_CA "Mode malla (depuració)"
 #define BEETLE_OPT_WIREFRAME_INFO_0_CA NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_CA NULL
+#define BEETLE_OPT_FRAME_DUPING_LABEL_CA "Duplicat de fotogrames (augment velocitat)"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_CA NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CA NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CA "Mostrar FPS interns"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CA NULL
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_CA NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_CA NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_CA NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_CA "Mostrar missatges en pantalla"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_CA "Mostra els missatges en pantalla generats pel nucli."
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_CA "Mostra la VRAM completa (depuració)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CA NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CA NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CA "Calibració automàtica dels controls analògics"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CA "Alternar el mode analògic del DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CA NULL
 #define OPTION_VAL_ENABLED_ANALOG_CA "Analògic per defecte"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CA "Combinació de botons del mode analògic del DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CA NULL
-#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CA NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CA "L1 + L2 + R1 + R2 + Start + Select "
 #define OPTION_VAL_L1_R1_SELECT_CA NULL
 #define OPTION_VAL_L1_R1_START_CA NULL
 #define OPTION_VAL_L1_R1_L3_CA NULL
@@ -8300,18 +8300,18 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_L2_R2_L3_CA NULL
 #define OPTION_VAL_L2_R2_R3_CA NULL
 #define OPTION_VAL_L3_R3_CA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA "Temps d'espera per a les combinacions de botons en el mode analògic"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA "Estableix el temps que cal mantenir premuts els botons de la combinació del mode analògic."
 #define OPTION_VAL_0_CA "Espera de 0 segons"
 #define OPTION_VAL_1_CA "Espera de 1 segon"
 #define OPTION_VAL_2_CA "Espera de 2 segons"
 #define OPTION_VAL_3_CA "Espera de 3 segons"
 #define OPTION_VAL_4_CA "Espera de 4 segons"
 #define OPTION_VAL_5_CA "Espera de 5 segons"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_CA NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA "Port 1: Habilitar Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CA "Habilitar el sistema Multitap en el port 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_CA "Port 2: Habilitar Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_CA "Habilitat el sistema Multitap en el port 2."
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_CA "Mode d'entrada de les pistoles"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_CA NULL
 #define OPTION_VAL_LIGHTGUN_CA "Pistola de llum"
@@ -8321,8 +8321,8 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_CROSS_CA "Creu"
 #define OPTION_VAL_DOT_CA "Punt"
 #define OPTION_VAL_OFF_CA "Sense ratolí"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_CA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_CA NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_CA "Port 1: Color de la mira de la pistola"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_CA "Escollir el color del punt de mira de la pistola de llum conectada al port 1."
 #define OPTION_VAL_RED_CA "Vermell"
 #define OPTION_VAL_BLUE_CA "Blau"
 #define OPTION_VAL_GREEN_CA "Verd"
@@ -8333,10 +8333,10 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_PURPLE_CA "Lila"
 #define OPTION_VAL_BLACK_CA "Negre"
 #define OPTION_VAL_WHITE_CA "Blanc"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_CA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CA NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_CA "Port 2: Color de la mira de la pistola"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_CA "Escollir el color del punt de mira de la pistola de llum connectada al port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_CA "Sensibilitat del ratolí"
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CA NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_CA "Selecciona la sensibilitat del dispositiu d'entrada ratolí."
 #define OPTION_VAL_5_O29_CA NULL
 #define OPTION_VAL_10_CA NULL
 #define OPTION_VAL_15_CA NULL
@@ -8377,32 +8377,32 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_190_CA NULL
 #define OPTION_VAL_195_CA NULL
 #define OPTION_VAL_200_CA NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_CA NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_CA "Resposta neGcon Twist"
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_CA NULL
 #define OPTION_VAL_LINEAR_CA "Lineal"
 #define OPTION_VAL_QUADRATIC_CA "Quadràtic"
 #define OPTION_VAL_CUBIC_CA "Cúbic"
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CA NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CA "Zona morta neGcon Twist"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CA NULL
 #define OPTION_VAL_0_O31_CA NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CA NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CA "Mètode de la targeta de memòria 0 (Es requereix reinici)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CA NULL
 #define OPTION_VAL_LIBRETRO_CA NULL
 #define OPTION_VAL_MEDNAFEN_CA NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CA NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CA "Habilitat targeta de memòria 1 (Es requereix reinici)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_CA NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CA NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CA "Targetes de mèmories compartides (Es requereix reinici)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CA NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CA NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CA "Índex de la targeta de memòria esquerra"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CA NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CA NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CA "Índex de la targeta de memòria dreta"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CA NULL
 #define OPTION_VAL_1_O36_CA "1 (Per defecte)"
-#define BEETLE_OPT_PGXP_MODE_LABEL_CA NULL
+#define BEETLE_OPT_PGXP_MODE_LABEL_CA "Mode d'operació PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CA NULL
 #define OPTION_VAL_MEMORY_ONLY_CA "Només en memòria"
-#define OPTION_VAL_MEMORY_CPU_CA NULL
-#define BEETLE_OPT_PGXP_2D_TOL_LABEL_CA NULL
+#define OPTION_VAL_MEMORY_CPU_CA "Memòria + CPU (inestable)"
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_CA "Tolerància de la geometria plana del PGXP"
 #define BEETLE_OPT_PGXP_2D_TOL_INFO_0_CA NULL
 #define OPTION_VAL_0PX_CA NULL
 #define OPTION_VAL_1PX_CA NULL
@@ -8413,20 +8413,20 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_6PX_CA NULL
 #define OPTION_VAL_7PX_CA NULL
 #define OPTION_VAL_8PX_CA NULL
-#define BEETLE_OPT_PGXP_NCLIP_LABEL_CA NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_CA "Selecció de primitives del PGXP"
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_CA NULL
-#define BEETLE_OPT_PGXP_VERTEX_LABEL_CA NULL
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_CA "Memòria cau dels vèrtexs del PGXP"
 #define BEETLE_OPT_PGXP_VERTEX_INFO_0_CA NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_CA NULL
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_CA "Texturitzat fidel a la perspectiva del PGXP"
 #define BEETLE_OPT_PGXP_TEXTURE_INFO_0_CA NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_CA NULL
+#define BEETLE_OPT_LINE_RENDER_LABEL_CA "Correcció Line-to-Quad"
 #define BEETLE_OPT_LINE_RENDER_INFO_0_CA NULL
 #define OPTION_VAL_DEFAULT_CA "Per defecte"
 #define OPTION_VAL_AGGRESSIVE_CA "Agressiu"
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_CA NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_CA "Correcció de pantalla panoràmica"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_CA NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_CA "Correcció per a pantalles panoràmiques"
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_CA NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_CA "Selecciona la relació d'aspecte que farà servir la correcció de pantalles panoràmiques."
 #define OPTION_VAL_16_9_CA NULL
 #define OPTION_VAL_16_10_CA NULL
 #define OPTION_VAL_18_9_CA NULL
@@ -8434,7 +8434,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_20_9_CA NULL
 #define OPTION_VAL_21_9_CA NULL
 #define OPTION_VAL_32_9_CA NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CA NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CA "Escalat de freqüència de la CPU (augmentar velocitat)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CA NULL
 #define OPTION_VAL_100_NATIVE_CA "100% (Natiu)"
 #define OPTION_VAL_210_CA NULL
@@ -8492,7 +8492,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_730_CA NULL
 #define OPTION_VAL_740_CA NULL
 #define OPTION_VAL_750_CA NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CA NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_CA "Augmentar velocitat del rasteritzador de la GPU"
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_CA NULL
 #define OPTION_VAL_32X_CA NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_CA "Força el processador GTE"
@@ -8500,40 +8500,40 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_SKIP_BIOS_LABEL_CA "Omet la BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_CA NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_CA "Substituir la BIOS (Es requereix reiniciar)"
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CA NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CA "Sobreescriu la regió estàndard específica de la BIOS amb la versió de regió lliure, si està disponible."
 #define OPTION_VAL_PSXONPSP_CA NULL
 #define OPTION_VAL_PS1_ROM_CA NULL
-#define BEETLE_OPT_RENDERER_LABEL_CA NULL
+#define BEETLE_OPT_RENDERER_LABEL_CA "Renderitzador (Es requereix reinici)"
 #define BEETLE_OPT_RENDERER_INFO_0_CA NULL
 #define OPTION_VAL_HARDWARE_CA "Maquinari (Automàtic)"
-#define OPTION_VAL_HARDWARE_GL_CA NULL
-#define OPTION_VAL_HARDWARE_VK_CA NULL
+#define OPTION_VAL_HARDWARE_GL_CA "Maquinari (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_CA "Maquinari (Vulkan)"
 #define OPTION_VAL_SOFTWARE_CA "Programari"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CA NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CA "Memòria intermèdia per programari"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA NULL
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_CA NULL
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CA NULL
 #define OPTION_VAL_DISABLED_CA "Deshabilitat (intèrpret Beetle)"
 #define OPTION_VAL_EXECUTE_CA "Màxim rendiment"
-#define OPTION_VAL_EXECUTE_ONE_CA NULL
-#define OPTION_VAL_RUN_INTERPRETER_CA NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CA NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CA NULL
+#define OPTION_VAL_EXECUTE_ONE_CA "Verificació dels intervals entre cicles"
+#define OPTION_VAL_RUN_INTERPRETER_CA "Intèrpret Lightrec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CA "Invalidar el codi Dynarec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CA "Alguns jocs necessiten invalidació 'Full', altres necessiten 'Només DMA'."
 #define OPTION_VAL_FULL_CA "Complet"
-#define OPTION_VAL_DMA_CA NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_CA NULL
+#define OPTION_VAL_DMA_CA "Només DMA (Lleugerament més ràpid)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_CA "Cicles d'esdeveniments de DMA/GPU/MDEC/Cronòmetre de Dynarec"
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_CA NULL
 #define OPTION_VAL_128_CA "128 (Per defecte)"
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_CA NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_CA "Mostres de la SPU mitjançant dynarec"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CA NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CA NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CA "Cronòmetre de fotogrames per segon segons el nucli"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CA NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_CA "Taxa progressiva"
-#define OPTION_VAL_FORCE_INTERLACED_CA NULL
-#define OPTION_VAL_AUTO_TOGGLE_CA NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CA NULL
+#define OPTION_VAL_FORCE_INTERLACED_CA "Forçar trama entrellaçada"
+#define OPTION_VAL_AUTO_TOGGLE_CA "Habilitar el canvi automàtic"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CA "Anul·lar la sincronització de vídeo PAL (Europa)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CA NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_CA NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_CA "Relació d'aspecte del nucli"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_CA NULL
 #define OPTION_VAL_CORRECTED_CA "Corregit"
 #define OPTION_VAL_UNCORRECTED_CA "Sense corregir"
@@ -8543,8 +8543,8 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_CA NULL
 #define OPTION_VAL_DISABLED_O59_CA "Cap"
 #define OPTION_VAL_STATIC_CA "Estàtic"
-#define OPTION_VAL_SMART_CA NULL
-#define BEETLE_OPT_IMAGE_CROP_LABEL_CA NULL
+#define OPTION_VAL_SMART_CA "Dinàmic (Per defecte)"
+#define BEETLE_OPT_IMAGE_CROP_LABEL_CA "Retallada addicional"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_CA NULL
 #define OPTION_VAL_9PX_CA NULL
 #define OPTION_VAL_10PX_CA NULL
@@ -8558,7 +8558,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_18PX_CA NULL
 #define OPTION_VAL_19PX_CA NULL
 #define OPTION_VAL_20PX_CA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_CA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_CA "Desplaçament de la imatge retallada"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_CA NULL
 #define OPTION_VAL_12PX_O61_CA NULL
 #define OPTION_VAL_11PX_O61_CA NULL
@@ -8584,20 +8584,20 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_10PX_O61_0_CA NULL
 #define OPTION_VAL_11PX_O61_0_CA NULL
 #define OPTION_VAL_12PX_O61_0_CA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CA "Desplaçament horitzontal de la imatge (cicles de la GPU)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CA NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CA NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CA "Línia escanejada inicial - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_CA NULL
 #define OPTION_VAL_0_O63_CA "0 (Per defecte)"
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_CA NULL
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_CA "Última linia escanejada - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_CA NULL
 #define OPTION_VAL_239_CA "239 (Per defecte)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_CA NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_CA "Primera línia escanejada - PAL"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_CA NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CA NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CA "Última linia escanejada - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CA NULL
 #define OPTION_VAL_287_CA "287 (Per defecte)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CA NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CA "Mètode d'accés al CD (Es requereix reinici)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CA NULL
 #define OPTION_VAL_SYNC_CA "Sincrònic"
 #define OPTION_VAL_ASYNC_CA "Asíncron"
