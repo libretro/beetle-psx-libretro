@@ -65477,7 +65477,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_RU "Смещение текстур по UV"
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_RU "Сэмплировать текстуры для 3D-полигонов со смещением при внутреннем разрешении выше 1x. Уменьшает видимость швов текстур, но может вызывать произвольные проблемы с графикой."
 #define BEETLE_OPT_FILTER_LABEL_RU "Сглаживание текстур"
-#define BEETLE_OPT_FILTER_INFO_0_RU "Выбор метода фильтрации текстур. 'Ближайший сосед' эмулирует поведение оригинальной консоли. 'Билинейное' и 'По трём точкам' уменьшают пиксельность с помощью размытия. 'SABR', 'xBR' и 'JINC' улучшают качество/чёткость текстур, но повышают нагрузку на устройство. Поддерживается только аппаратными рендерами."
+#define BEETLE_OPT_FILTER_INFO_0_RU "Метода фильтрации текстур. 'Ближайший сосед' воспроизводит ориг. консоль. 'Билинейное' и 'По трём точкам' сглаживают пиксели при помощи размытия. 'SABR', 'xBR' и 'JINC' улучшают качество/чёткость текстур, но повышают нагрузку на устройство. Поддерживается только аппаратными рендерами."
 #define OPTION_VAL_NEAREST_RU "Ближайший сосед"
 #define OPTION_VAL_SABR_RU NULL
 #define OPTION_VAL_XBR_RU NULL
@@ -65492,8 +65492,8 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_RU "Не применять фильтрацию текстур к 2D-полигонам. 2D-полигоны определяются эвристически, поэтому возможны искажения графики. Для лучшего эффекта используйте вместе с опцией 'Адаптивное сглаживание' или другим фильтром пост-обработки."
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_RU "Адаптивное сглаживание"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_RU "Сглаживает 2D-элементы графики и интерфейса без потери чёткости объектов в 3D. Только для рендеринга на Vulkan."
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_RU "Суперсэмплинг (понижать до нативного разрешения)"
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_RU "Понижает качество отрисованного контента с повышенного разрешения до исходного. В комбинации с повышенным разрешением настройка позволяет получить графику в оригинальном разрешении, но со сглаженным 3D. Наиболее эффективно для игр, использующих 2D и 3D элементы (напр. 3D-персонажи на отрисованном заднем фоне), а также в связке с CRT-шейдерами. Поддерживается только Vulkаn-рендером. Примечание: при включении рекомендуется отключать опцию 'Шаблон дизеринга'."
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_RU "Суперсэмплинг (понижать к исходному разрешению)"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_RU "Понижает качество рендеринга с высокого разрешения до исходного. Совместно с повышением разрешения обеспечивает сглаженное 3D, но в ориг. разрешении. Наиболее эффективно для игр с 2D и 3D-элементами (напр. 3D-персонажи на отрисованном фоне), а также в связке с CRT-шейдерами. Поддерживается только рендером Vulkan. Примечание: при вкл. рекомендуется отключить опцию 'Паттерн дизеринга'."
 #define BEETLE_OPT_MSAA_LABEL_RU "Множественная выборка сглаживания"
 #define BEETLE_OPT_MSAA_INFO_0_RU "Настройка уровня MSAA для отрисованного контента. Улучшает визуализацию 3D-объектов. Только для рендеринга на Vulkan."
 #define OPTION_VAL_1X_RU NULL
@@ -65508,7 +65508,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_WIREFRAME_LABEL_RU "Каркасный режим (отладка)"
 #define BEETLE_OPT_WIREFRAME_INFO_0_RU "Отрисовка 3D-моделей в виде контуров, без текстур и шейдинга. Поддерживается только аппаратным OpenGL-рендером. Примечание: используется для отладки и в обычном режиме должно быть выключено."
 #define BEETLE_OPT_FRAME_DUPING_LABEL_RU "Дублирование кадров (ускорение)"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_RU "При включении и поддержке фронтендом обеспечивает небольшой прирост скорости, сообщая фронтенду повторять предыдущий кадр, если у ядра нет новых данных для вывода на экран."
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_RU "Если вкл. и поддерживается фронтендом, немного повышает производительность, сообщая фронтенду повторять предыдущий кадр при отсутствии новых данных для вывода на экран."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_RU "Показывать частоту кадров"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_RU "Отображать внутреннюю частоту кадров, с которой эмулируемая PlayStation производит рендеринг. Примечание: требуется включение уведомлений в настройках фронтенда."
 #define BEETLE_OPT_DISPLAY_OSD_LABEL_RU "Показывать уведомления"
@@ -65516,7 +65516,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_RU "Отображать всю VRAM (отладка)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_RU "Выводить на экран полное содержимое видеопамяти эмулируемой консоли. Поддерживается только для аппаратных рендеров OpenGL и Vulkan. Используется для отладки и в обычном режиме должно быть отключено."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_RU "Автокалибровка аналогового ввода"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU "Включает динамическую калибровку аналогового ввода для типов устройств DualShock, Analog Controller, Analog Joystick или neGcon. Значения макс. отклонений фиксируются в реальном времени и используются для масштабирования аналоговых координат, сообщаемых эмулятору. Используется в таких играх как Mega Man Legends 2, которым требуются значения выше тех, что могут предоставить современные контроллеры. Для макс. эффективности калибровки аналоговые стики необходимо вращать в полном диапазоне при каждом запуске игры."
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_RU "Включает динам. калибровку аналог. ввода для типов устройств DualShock, Analog Controller, Analog Joystick или neGcon. Макс. отклонения фиксируются в реальном времени и исп. для масштабирования аналог. координат, сообщаемых эмулятору. Исп. в таких играх как Mega Man Legends 2, требующих значений выше, чем обеспечивают современные геймпады. Для наилучшего результата вращайте аналог. стики в полном диапазоне при каждом запуске игры."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_RU "Переключатель режима DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_RU "При выборе устройства ввода типа DualShock данная опция позволяет переключать эмулируемый DualShock между цифровым и аналоговым режимами, как на реальной консоли. Режим также может быть изменён одной из комбинаций кнопок."
 #define OPTION_VAL_ENABLED_ANALOG_RU "По умолчанию-аналоговый"
@@ -65610,12 +65610,12 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_195_RU NULL
 #define OPTION_VAL_200_RU NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_RU "Отклик скручивания neGcon"
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_RU "Отклик левого аналог. стика RetroPad при имитации скручивания для устройства ввода 'neGcon'. Отклонение аналог. стика может иметь линейную, квадратичную или кубическую привязку к углу neGcon. ''Квадратичный' обеспечивает более высокую точность, чем 'Линейный' при небольших смещениях. 'Кубический' ещё больше повышает точность малых отклонений, но излишне усиливает большие отклонения. 'Линейный' рекомендуется выбирать только при использовании руля. Аналоговый ввод в стандартных контроллерах реализован принципиально иначе, чем в механизме скручивания negCon и линейная привязка будет приводить к чрезмерному усилению при небольших смещениях, снижая точность управления. 'Квадратичный' в большинстве случаев обеспечивает наилучшую имитацию реального оборудования."
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_RU "Отклик левого аналог. стика RetroPad при имитации скручивания для устройства ввода 'neGcon'. Отклонение аналог. стика имеет линейную, квадратичную или кубическую привязку к углу neGcon. 'Квадратичный' точней 'Линейного' при небольших смещениях. 'Кубический' ещё точней при малых отклонениях, но излишне усиливает большие отклонения. 'Линейный' рекомендуется только при исп. руля. Аналог. ввод в обычных геймпадах реализован принципиально иначе, чем в механизме скручивания negCon и линейная привязка будет приводить к чрезмерному усилению при небольших смещениях, снижая точность управления. 'Квадратичный' в большинстве случаев наиболее близко имитирует реальное оборудование."
 #define OPTION_VAL_LINEAR_RU "Линейный"
 #define OPTION_VAL_QUADRATIC_RU "Квадратичный"
 #define OPTION_VAL_CUBIC_RU "Кубический"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_RU "Мёртвая зона скручивания neGcon"
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_RU "Зона нечувствительности левого аналог. стика RetroPad при имитации скручивания для устройства ввода 'neGcon'. Уменьшает дрейф контроллера. Примечание: большинство neGcon-совместимых игр имеют собственную настройку мёртвой зоны. Чтобы избежать потерь точности, значение внутриигровой настройки всегда должно быть равным нулю. При необходимости корректировки её следует производить только с помощью данной опции. Это особенно важно, если для опции 'Отклик скручивания NegCon' выбрано 'Квадратичный' или 'Кубический'."
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_RU "Зона нечувствительности левого аналог. стика RetroPad при имитации скручивания neGcon. Уменьшает дрейф контроллера. Большинство neGcon-совместимых игр имеют внутр. настройку мёртвой зоны. Чтобы избежать потерь точности, внутриигровое значение всегда должно быть равным нулю. При необходимости корректировки её следует производить только с помощью данной опции. Это особенно важно, если для опции 'Отклик скручивания NegCon' выбрано 'Квадратичный' или 'Кубический'."
 #define OPTION_VAL_0_O31_RU NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_RU "Формат карты памяти 0 (требуется перезапуск)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_RU "Выбор формата сохранения данных для карты памяти 0. 'Mednafen' может использоваться для совместимости с отдельной версией Mednafen. При использовании с Beetle PSX, файлы сохранений Libretro (.srm) и Mednafen (.mcr) имеют идентичный формат и могут быть сконвертированы через переименование."
@@ -65624,14 +65624,14 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_RU "Включить карту памяти 1 (требуется перезапуск)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_RU "Эмуляция второй карты памяти в слоте 1. Если откл., игры имеют доступ только к карте памяти в слоте 0. Данную настройку необходимо отключать для правильной работы некоторых игр (напр. Codename Tenka). Примечание: карта памяти 1 использует формат сохранения Mednafen (.mcr)."
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_RU "Общие карты памяти (требуется перезапуск)"
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_RU "При включении все игры будут использовать одни файлы карт памяти для сохранения и загрузки. При отключении для каждой игры создаются индивидуальные карты памяти. Примечание: если опция 'Формат карты памяти 0' имеет значение 'Libretro', настройка будет затрагивать только правую карту памяти."
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_RU "При вкл. все игры используют единые файлы карт памяти для сохранения и загрузки. При откл. для каждой игры создаются отдельные карты памяти. Если для опции 'Формат карты памяти 0' выбрано значение 'Libretro', настройка будет затрагивать только правую карту памяти."
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_RU "Карта памяти слева"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_RU "Выбор текущей карты памяти для левого слота. Работает только если для опции 'Формат карты памяти 0' выбрано 'Mednafen'. По умолчанию исп. карта памяти 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_RU "Карта памяти справа"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_RU "Выбор текущей карты памяти для правого слота. Работает только если вкл. 'Карта памяти 1'. По умолчанию исп. карта памяти 1."
 #define OPTION_VAL_1_O36_RU "1 (по умолчанию)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_RU "Режим выполнения PGXP"
-#define BEETLE_OPT_PGXP_MODE_INFO_0_RU "Позволяет отрисовывать 3D с субпиксельной точностью, минимизируя искажения и дрожание 3D-объектов ориг. консоли из-за использования координат вершин с фиксированной точкой. Режим 'Только память' наиболее совместим и рекомендуется в большинстве случаев. Режим 'Память + CPU (нестабильно)' ещё сильней уменьшает дрожание, но повышает нагрузку на устройство и может вызывать ошибки геометрии."
+#define BEETLE_OPT_PGXP_MODE_INFO_0_RU "Разрешает 3D-рендеринг с субпиксельной точностью, минимизируя искажения и дрожание 3D-объектов из-за исп. координат вершин с фиксированной точкой. Режим 'Только память' наиболее совместимый и рекомендуется в большинстве случаев. Режим 'Память + CPU (нестабильно)' ещё сильней уменьшает дрожание, но повышает нагрузку на устройство и может вызывать ошибки геометрии."
 #define OPTION_VAL_MEMORY_ONLY_RU "Только память"
 #define OPTION_VAL_MEMORY_CPU_RU "Память + CPU (нестабильно)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_RU "Допуск PGXP для 2D-геометрии"
@@ -65648,11 +65648,11 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_RU "Отбраковка примитивов PGXP"
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_RU "Использовать PGXP-реализацию NCLIP. Улучшает графику за счёт уменьшения провалов в геометрии с помощью PGXP-координат. В некоторых случаях может приводить к зависанию игр."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_RU "Вершинный кэш PGXP"
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_RU "Кэшировать координаты вершин, улучшенных с PGXP для повторного использования при отрисовке полигонов. Улучшает выравнивание объектов и уменьшает видимость швов при рендеринге текстур, но из-за ошибок при опросе кэша может вызывать сбои графики. Рекомендуется оставлять выкл. Данная опция применяется только если включен 'Режим выполнения PGXP'. Поддерживается только аппаратными рендерами."
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_RU "Кэшировать координаты вершин, улучшенных с PGXP для повторного исп. при отрисовке полигонов. Улучшает выравнивание объектов и уменьшает видимость швов при рендеринге текстур, но из-за ошибок при опросе кэша может вызывать ошибки графики. Рекомендуется оставлять выкл. Применяется только если вкл. 'Режим выполнения PGXP'. Поддерживается только аппаратными рендерами."
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_RU "Перспективно-корректное текстурирование PGXP"
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_RU "Замещает аффинное преобразование текстур оригинальной PSX на перспективно-корректное. Обеспечивает правильное выравнивание текстур, устраняя позиционно-зависимые искажения. Данная опция применяется только если вкл. 'Режим выполнения PGXP'. Поддерживается только аппаратными рендерами."
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_RU "Заменяет аффинное преобразование текстур ориг. PSX на перспективно-корректное. Обеспечивает правильное выравнивание текстур, устраняя позиционно-зависимые искажения. Применяется только если вкл. 'Режим выполнения PGXP'. Поддерживается только аппаратными рендерами."
 #define BEETLE_OPT_LINE_RENDER_LABEL_RU "Хак линия-в-четырёхугольник"
-#define BEETLE_OPT_LINE_RENDER_INFO_0_RU "Некоторые игры (напр. Doom, Hexen, Soul Blade и др.) для отрисовки гориз. линий растягивают на весь экран треугольники высотой в один пиксель, которые ориг. консоль растеризует в ряд пикселей. Хак определяет их и преобразует в четырёхугольники для правильного отображения аппаратными рендерами в повышенном разрешении. 'Агрессивно' исп. для ряда игр (напр. Dark Forces, Duke Nukem), но в других случаях с ним возможны ошибки графики. Если не уверены, оставьте 'По умолчанию'."
+#define BEETLE_OPT_LINE_RENDER_INFO_0_RU "Некоторые игры (Doom, Hexen, Soul Blade и др.) для отрисовки гориз. линий растягивают на весь экран треугольники высотой в один пиксель, которые ориг. консоль растеризует в ряд пикселей. Хак находит их и преобразует в четырёхугольники для правильного вывода аппаратными рендерами в высоком разрешении. 'Агрессивно' требуется для ряда игр (Dark Forces, Duke Nukem), но в других случаях может вызывать ошибки графики. Если не уверены, оставьте 'По умолчанию'."
 #define OPTION_VAL_DEFAULT_RU "По умолчанию"
 #define OPTION_VAL_AGGRESSIVE_RU "Агрессивно"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_RU "Широкоформатный хак"
@@ -65667,7 +65667,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_21_9_RU NULL
 #define OPTION_VAL_32_9_RU NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_RU "Масштабирование частоты CPU (разгон)"
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_RU "Разгон (или занижение) процессора эмулируемой PSX. В некоторых играх может устранить замедления и выровнять частоту кадров, но увеличивает нагрузку. Часть игр не получит преимуществ из-за наличия внутр. ограничителей частоты. Разгон также может привести к завышению скорости анимаций."
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_RU "Разгон (или занижение) частоты CPU эмулируемой PSX. В некоторых играх может устранить замедления и выровнять частоту кадров, но повышает нагрузку. Часть игр не получит преимуществ из-за наличия внутр. ограничителей частоты. Также может привести к завышению скорости анимаций."
 #define OPTION_VAL_100_NATIVE_RU "100% (нативно)"
 #define OPTION_VAL_210_RU NULL
 #define OPTION_VAL_220_RU NULL
@@ -65736,13 +65736,13 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_PSXONPSP_RU NULL
 #define OPTION_VAL_PS1_ROM_RU NULL
 #define BEETLE_OPT_RENDERER_LABEL_RU "Графический движок (требуется перезапуск)"
-#define BEETLE_OPT_RENDERER_INFO_0_RU "Программный рендер наиболее точный, но предъявляет очень высокие требования при повышении внутреннего разрешения GPU. Аппаратные рендеры менее точные, но существенно быстрей программного с повышенным разрешением и улучшениями графики. 'Аппаратный (авто)' в зависимости от видеодрайвера libretro автоматически включает рендеринг на Vulkan или OpenGL. Если текущий видеодрайвер несовместим с Vulkan или OpenGL 3.3 ядро будет использовать программный рендер."
+#define BEETLE_OPT_RENDERER_INFO_0_RU "Программный движок наиболее точный, но очень сильно нагружает устройство при повышении разрешения. Аппаратные рендеры менее точные, но работают быстрей программного при повышении разрешения и с улучшениями графики. 'Аппаратный (авто)' автоматически включает рендер Vulkan или OpenGL, в зависимости от текущего видеодрайвера. Если драйвер несовместим с Vulkan или OpenGL 3.3, то ядро переключится на программный рендер."
 #define OPTION_VAL_HARDWARE_RU "Аппаратный (авто)"
 #define OPTION_VAL_HARDWARE_GL_RU "Аппаратный (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_RU "Аппаратный (Vulkan)"
 #define OPTION_VAL_SOFTWARE_RU "Программный"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_RU "Программный фреймбуфер"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_RU "Включает для аппаратных рендеров точную эмуляцию эффектов фреймбуфера (напр. размытие движения, закручивание перед боем в FF7), запуская фоном копию программного рендера в нативном разрешении. При откл. настройки эффекты пропускаются (OpenGL) или реализуются средствами GPU (Vulkan). Отключение повышает производительность, но приводит к появлению множества графических багов. Если не уверены, оставьте включенной."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_RU "Обеспечивает для аппаратных рендеров точную эмуляцию эффектов фреймбуфера (напр. размытие движения, закручивание перед боем в FF7), запуская фоном копию программного рендера в исходном разрешении. При откл. данные эффекты пропускаются (OpenGL) или выполняются посредством GPU (Vulkan). Отключение повышает скорость, но вызывает ошибки графики. Если не уверены, оставьте вкл."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_RU "Динам. рекомпилятор CPU"
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_RU "Динамически преобразовывает инструкции CPU в нативные. Существенно быстрее интерпретатора, но обеспечивает меньшую точность таймингов CPU и может вызывать ошибки."
 #define OPTION_VAL_DISABLED_RU "Откл. (интерпретатор Beetle)"
@@ -65830,7 +65830,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_RU "Линия развёртки, отображаемая последней при запуске PAL-контента. Значения ниже 287 уменьшают высоту выходного изображения, срезая часть пикселей по нижнему краю. Может применяться для компенсации чёрных полос."
 #define OPTION_VAL_287_RU "287 (по умолчанию)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_RU "Режим доступа к CD (требуется перезапуск)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_RU "Метод считывания данных с копий дисков. 'Синхронный' имитирует ориг. консоль. 'Асинхронный' может уменьшать подвисания на устройствах с медленной памятью. В режиме 'Предзагрузка' образ диска при запуске полностью загружается в опер. память, что помогает ускорить внутриигровые загрузки, ценой задержки при запуске. В режиме 'Предзагрузка' возможны ошибки при низком объёме ОЗУ, а при запуске игр с физ. дисков будет исп. 'Синхронный'."
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_RU "Метод чтения данных с образов дисков. 'Синхронный' имитирует ориг. консоль. 'Асинхронный' может снижать подвисания на устройствах с медленной памятью. Режим 'Предзагрузка' целиком загружает образ в ОЗУ, ускоряя внутриигровые загрузки ценой задержки при запуске. Режим 'Предзагрузка' может вызывать ошибки при низком объёме ОЗУ, а при запуске физ. дисков перейдёт на 'Синхронный'."
 #define OPTION_VAL_SYNC_RU "Синхронный"
 #define OPTION_VAL_ASYNC_RU "Асинхронный"
 #define OPTION_VAL_PRECACHE_RU "Предзагрузка"
@@ -71643,8 +71643,8 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_SV "När aktiverat och stöttat av libretro-gränssnittet ger detta en liten prestandaökning genom att instruera gränssnittet att upprepa den föregående bilden om kärnan inte har något nytt att visa."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_SV "Visa interna bilder per sekund (FPS)"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_SV "Visa den interna bildrutefrekvensen (FPS) som det emulerade PlayStation-systemet renderar innehåll i. Obs!: Kräver att meddelanden på skärmen är aktiverade i libretro-frontenden."
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_SV NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_SV NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_SV "Visa OSD-meddelanden"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_SV "Visa OSD-meddelanden genererade av kärnan."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_SV "Visa fullständig VRAM (Felsökning)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_SV "Visualisera hela den emulerade konsolens VRAM. Stöds endast av OpenGL- och Vulkan-hårdvarurenderare. Obs!: Detta är för felsökningsändamål och bör normalt sett vara inaktiverat."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_SV "Självkalibrera analoga spakar"
@@ -71678,7 +71678,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SV NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV NULL
-#define OPTION_VAL_LIGHTGUN_SV NULL
+#define OPTION_VAL_LIGHTGUN_SV "Ljuspistol"
 #define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SV NULL
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SV NULL
@@ -71761,7 +71761,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV NULL
-#define OPTION_VAL_1_O36_SV NULL
+#define OPTION_VAL_1_O36_SV "1 (standard)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV NULL
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
@@ -71861,7 +71861,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_32X_SV NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_SV "GTE Överklockning"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_SV NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_SV NULL
+#define BEETLE_OPT_SKIP_BIOS_LABEL_SV "Hoppa över BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_SV NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_SV NULL
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV NULL
@@ -71892,7 +71892,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_SV NULL
+#define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
 #define OPTION_VAL_FORCE_INTERLACED_SV NULL
 #define OPTION_VAL_AUTO_TOGGLE_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
@@ -71906,7 +71906,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV "Beskär Overscan"
 #define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV NULL
 #define OPTION_VAL_DISABLED_O59_SV "Ingen"
-#define OPTION_VAL_STATIC_SV NULL
+#define OPTION_VAL_STATIC_SV "Statisk"
 #define OPTION_VAL_SMART_SV "Dynamisk (Standard)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SV "Ytterligare beskärning"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_SV NULL
@@ -71952,7 +71952,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
-#define OPTION_VAL_0_O63_SV NULL
+#define OPTION_VAL_0_O63_SV "0 (standard)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_SV NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV NULL
 #define OPTION_VAL_239_SV "239 (Standard)"
