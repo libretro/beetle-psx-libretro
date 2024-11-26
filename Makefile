@@ -480,6 +480,8 @@ else
 
    ifeq ($(HAVE_LIGHTREC), 1)
       FLAGS += -DHAVE_WIN_SHM
+      #For lightrec to get number of cpus, mingw should provide pthread_num_processors_np like pthread-win32
+      FLAGS += -DPTW32_VERSION
    endif
 endif
 
