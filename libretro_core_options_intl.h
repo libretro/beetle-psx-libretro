@@ -71582,7 +71582,7 @@ struct retro_core_options_v2 options_sr = {
 
 #define CATEGORY_VIDEO_LABEL_SV NULL
 #define CATEGORY_VIDEO_INFO_0_SV "Ändra bildformat, beskärning, videofilter och inställningar för bildruteskippning."
-#define CATEGORY_OSD_LABEL_SV "Skärm-visning"
+#define CATEGORY_OSD_LABEL_SV "Skärmvisning"
 #define CATEGORY_OSD_INFO_0_SV "Ändra aviseringar som visas på skärmen."
 #define CATEGORY_INPUT_LABEL_SV "Inmatning"
 #define CATEGORY_INPUT_INFO_0_SV "Ändra inställningar för ljuspistol, mus och neGcon."
