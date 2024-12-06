@@ -8317,7 +8317,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_LIGHTGUN_CA "Pistola de llum"
 #define OPTION_VAL_TOUCHSCREEN_CA "Pantalla tàctil"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_CA "Mira de arma"
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_CA NULL
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_CA "Selecciona la mira de la pistola que es mostrarà en pantalla quan es fa servir els dispositius Guncon i Justifier. Si es desactiva aquesta opció, no es mostrarà mai la mira."
 #define OPTION_VAL_CROSS_CA "Creu"
 #define OPTION_VAL_DOT_CA "Punt"
 #define OPTION_VAL_OFF_CA "Sense ratolí"
@@ -8394,7 +8394,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_CA "Targetes de mèmories compartides (Es requereix reinici)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CA NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CA "Índex de la targeta de memòria esquerra"
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CA NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CA "Canvia la targeta de memòria que es troba a la ranura esquerra. Aquesta opció només funcionarà si l'opció 'Activar la targeta de memòria 0' està en l'opció Mednafen. La targeta de memòria predeterminada té l'índex 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CA "Índex de la targeta de memòria dreta"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CA "Canvia la targeta de memòria que es troba a la ranura dreta. Aquesta opció només funcionarà si l'opció 'Activar la targeta de memòria 1' està activada. La targeta de memòria predeterminada té l'índex 1."
 #define OPTION_VAL_1_O36_CA "1 (Per defecte)"
@@ -8403,7 +8403,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_MEMORY_ONLY_CA "Només en memòria"
 #define OPTION_VAL_MEMORY_CPU_CA "Memòria + CPU (inestable)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_CA "Tolerància de la geometria plana del PGXP"
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_CA NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_CA "Amaga els errors més evidents en les operacions del PGXP: el valor especifica la tolerància en la qual es mantindrà els valors de PGXP en cas de geometries sense la informació de profunditat."
 #define OPTION_VAL_0PX_CA NULL
 #define OPTION_VAL_1PX_CA NULL
 #define OPTION_VAL_2PX_CA NULL
@@ -8525,7 +8525,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_CA "Indica el nombre màxim de cicles executats per la CPU abans de comprovar la DMA, la GPU, el MDEC o el temporitzador. Un valor alt serà més ràpid, té menys impacte en l'intèrpret Beetle que en el dynarec."
 #define OPTION_VAL_128_CA "128 (Per defecte)"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_CA "Mostres de la SPU mitjançant dynarec"
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CA NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CA "Mostra el nombre màxim de mostres de la SPU que s'executaran abans de comprovar les actualitzacions de la SPU. Un valor alt serà més ràpid, però un valor que no sigui 1 pot provocar errors en el àudio d'alguns jocs."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CA "Cronòmetre de fotogrames per segon segons el nucli"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CA NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_CA "Taxa progressiva"
