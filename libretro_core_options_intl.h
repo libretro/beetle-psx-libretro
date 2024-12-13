@@ -4328,7 +4328,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_BE "Адбракоўка прымітываў PGXP"
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_BE "Выкарыстоўваць PGXP-рэалізацыю NCLIP. Паляпшае графіку за кошт памяншэння правалаў у геаметрыі з дапамогай PGXP-каардынат. У некаторых выпадках можа прыводзіць да завісання гульняў."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_BE "Вяршынны кэш PGXP"
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_BE "Кэшаваць каардынаты вяршыняў, палепшаных з PGXP для паўторнага выкарыстання пры адмалёўцы палігонаў. Паляпшае выраўноўванне аб'ектаў і памяншае бачнасць швоў пры рэндэрынгу тэкстур, але праз памылкі пры апытанні кэша можа выклікаць збоі графікі. Рэкамендуецца пакідаць выклычанай. Дадзеная опцыя прымяняецца толькі калі ўключаны 'Рэжым выканання PGXP'. Падтрымліваецца толькі апаратнымі рэндэрамі."
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_BE "Кэшаваць каардынаты вяршыняў, палепшаных з PGXP дзеля паўторнага выкарыстання пры адмалёўцы палігонаў. Паляпшае выраўноўванне аб'ектаў і памяншае бачнасць швоў пры рэндэрынгу тэкстур, але праз памылкі пры апытанні кэша можа выклікаць збоі графікі. Рэкамендуецца пакідаць выклычанай. Дадзеная опцыя прымяняецца толькі калі ўключаны 'Рэжым выканання PGXP'. Падтрымліваецца толькі апаратнымі рэндэрамі."
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_BE "Перспектыўна-карэктнае тэкстураванне PGXP"
 #define BEETLE_OPT_PGXP_TEXTURE_INFO_0_BE "Замяшчае роднае пераўтварэнне тэкстураў арыгінальнай PSX на перспектыўна-карэктнае. Забяспечвае правільнае выраўноўванне тэкстураў, ухіляючы пазіцыйна-залежныя скажэнні. Дадзеная опцыя прымяняецца толькі калі ўключаны 'Рэжым выканання PGXP'. Падтрымліваецца толькі апаратнымі рэндэрамі."
 #define BEETLE_OPT_LINE_RENDER_LABEL_BE "Хак лінія-у-чатырохкутнік"
@@ -33116,7 +33116,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_FI NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_FI NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_FI NULL
-#define OPTION_VAL_0_O63_FI NULL
+#define OPTION_VAL_0_O63_FI "0 (Oletus)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_FI NULL
 #define OPTION_VAL_239_FI "239 (Oletus)"
