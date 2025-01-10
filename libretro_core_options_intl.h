@@ -61362,8 +61362,8 @@ struct retro_core_options_v2 options_pl = {
 
 #define CATEGORY_VIDEO_LABEL_PT_BR "Vídeo"
 #define CATEGORY_VIDEO_INFO_0_PT_BR "Altera as configurações de proporção de tela, corte de tela, filtro de vídeo e pulo de quadro."
-#define CATEGORY_OSD_LABEL_PT_BR "Exibição na tela"
-#define CATEGORY_OSD_INFO_0_PT_BR NULL
+#define CATEGORY_OSD_LABEL_PT_BR "Informações na tela (OSD)"
+#define CATEGORY_OSD_INFO_0_PT_BR "Altera a visibilidade de notificações e informações na tela."
 #define CATEGORY_INPUT_LABEL_PT_BR "Entrada"
 #define CATEGORY_INPUT_INFO_0_PT_BR "Altera as configurações das pistolas de luz, do mouse e o neGcon."
 #define CATEGORY_MEMCARDS_LABEL_PT_BR "Cartão de memória"
@@ -71672,10 +71672,10 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_3_SV "3 sekunders fördröjning"
 #define OPTION_VAL_4_SV "4 sekunders fördröjning"
 #define OPTION_VAL_5_SV "5 sekunders fördröjning"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SV NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SV NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV "Port 1: Aktivera Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SV "Aktivera multitap-funktionalitet på port 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV "Port 2: Aktivera Multitap"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SV "Aktivera multitap-funktionalitet på port 2."
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV NULL
 #define OPTION_VAL_LIGHTGUN_SV "Ljuspistol"
@@ -71787,7 +71787,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_LINE_RENDER_INFO_0_SV NULL
 #define OPTION_VAL_DEFAULT_SV "Standard"
 #define OPTION_VAL_AGGRESSIVE_SV "Aggressiv"
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_SV NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_SV "Hack för bredbildsläge"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_SV NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_SV NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_SV NULL
@@ -71863,8 +71863,8 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_SV NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_SV "Hoppa över BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_SV NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_SV NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_SV "Åsidosätt BIOS (omstart krävs)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV "Åsidosätt regionsspecifikt standard-BIOS med en regionsfri om hittats."
 #define OPTION_VAL_PSXONPSP_SV NULL
 #define OPTION_VAL_PS1_ROM_SV NULL
 #define BEETLE_OPT_RENDERER_LABEL_SV "Rendera (omstart krävs)"
@@ -71894,7 +71894,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
 #define OPTION_VAL_FORCE_INTERLACED_SV NULL
-#define OPTION_VAL_AUTO_TOGGLE_SV NULL
+#define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
