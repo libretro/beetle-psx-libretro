@@ -8278,7 +8278,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_FRAME_DUPING_LABEL_CA "Duplicat de fotogrames (augment velocitat)"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_CA NULL
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CA "Mostrar FPS interns"
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CA NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CA "Mostra la velocitat de fotogrames interna a la qual el sistema PlayStations emulat renderitza el contingut. Nota: És necessari activar les notificacions en pantalla."
 #define BEETLE_OPT_DISPLAY_OSD_LABEL_CA "Mostrar missatges en pantalla"
 #define BEETLE_OPT_DISPLAY_OSD_INFO_0_CA "Mostra els missatges en pantalla generats pel nucli."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_CA "Mostra la VRAM completa (depuració)"
@@ -8414,7 +8414,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_7PX_CA NULL
 #define OPTION_VAL_8PX_CA NULL
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_CA "Selecció de primitives del PGXP"
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_CA NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_CA "Fes servir la implementació NCLIP de PGXP. Millora l'aparença reduint els forats en les geometries que tenen coordenades PGXP. Pot provocar errors en alguns jocs i en certes circumstàncies."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_CA "Memòria cau dels vèrtexs del PGXP"
 #define BEETLE_OPT_PGXP_VERTEX_INFO_0_CA NULL
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_CA "Texturitzat fidel a la perspectiva del PGXP"
@@ -8585,7 +8585,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_11PX_O61_0_CA NULL
 #define OPTION_VAL_12PX_O61_0_CA NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_CA "Desplaçament horitzontal de la imatge (cicles de la GPU)"
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CA "Selecciona el nombre de cicles de GPU en els que cal desplaçar la imatge. Els valors positius mouen la imatge cap a la dreta i els valors negatius mouen cap a l'esquerra. Només funciona amb el renderitzat per maquinari."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CA "Línia escanejada inicial - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_CA NULL
 #define OPTION_VAL_0_O63_CA "0 (Per defecte)"
