@@ -8240,12 +8240,12 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_16BPP_NATIVE_CA "16 bpp (Natiu)"
 #define OPTION_VAL_32BPP_CA NULL
 #define BEETLE_OPT_DITHER_MODE_LABEL_CA "Tramatge"
-#define BEETLE_OPT_DITHER_MODE_INFO_0_CA NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_CA "Selecciona la configuració del tramatge. '1x (Natiu)' simula el tramatge natiu a baixa resolució que feia servir el maquinari original per suavitzar els defectes de bandes de color visibles en la profunditat de colors nativa. 'Resolució interna' canvia l'escala del tramatge de la resolució interna configurada per produir un resultat més net. Es recomana desactivar aquesta opció en utilitzar una profunditat de colors de 32 bpp. Nota: Activar aquesta opció a Vulkan desactivarà la reducció de colors a la profunditat nativa i activarà una profunditat interna superior."
 #define OPTION_VAL_INTERNAL_RESOLUTION_CA "Resolució Interna"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CA "Compensació UV de textures"
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_CA "Mostra les textures dels polígons 3D amb una compensació per resolucions superiors a la resolució nativa. Redueix els pics en les textures, però pot produir altres errors gràfics."
 #define BEETLE_OPT_FILTER_LABEL_CA "Filtratge de textures"
-#define BEETLE_OPT_FILTER_INFO_0_CA NULL
+#define BEETLE_OPT_FILTER_INFO_0_CA "Selecciona el mètode de filtratge de textures. 'Més proper' emula el maquinari original. 'Bilineal' i 'De tres punts' son filtres de suavitzat que redueixen la pixelació. 'SABR', 'xBR' i 'JIMC2' son filtres d'escalat que poden millorar la definició de les textures a canvi d'augmentar els requisits de maquinari. Només funciona en renderitzats per maquinari."
 #define OPTION_VAL_NEAREST_CA "Més proper"
 #define OPTION_VAL_SABR_CA NULL
 #define OPTION_VAL_XBR_CA NULL
@@ -8261,7 +8261,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_CA "Suavitzat adaptatiu"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_CA "Suavitza els gràfics i els elements de la interfície en 2D sense difuminar els objectes renderitzats en 3D. Només funciona amb el renderitzador Vulkan."
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_CA "Sobremostreig (reducció a resolució nativa)"
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CA NULL
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_CA "Redueix el contingut renderitzat a una resolució interna superior a la resolució nativa. En combinar aquest efecte amb els multiplicadors per augmentar la resolució interna, els jocs es poden mostrar amb objectes 3D amb les vores suavitzades en la resolució nativa. Genera millors resultats en aquells jocs que combinen 2D i 3D (per exemple personatges 3D sobre sobre fons prerenderitzats) i acompanyats de shaders de simulació de pantalles CRT. Només funciona amb el renderitzador Vulkan. Nota: Es recomana desactivar el tramatge en fer servir aquesta opció."
 #define BEETLE_OPT_MSAA_LABEL_CA "Suavitzat de vores MSAA"
 #define BEETLE_OPT_MSAA_INFO_0_CA "Selecciona el nivell de MSAA pel contingut renderitzat. Millora l'aparença dels objectes 3D. Només funciona amb el renderitzador Vulkan."
 #define OPTION_VAL_1X_CA NULL
@@ -8284,7 +8284,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_CA "Mostra la VRAM completa (depuració)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CA "Mostra la memòria VRAM emulada de la consola. Només disponible en els renderitzadors OpenGL i Vulkan. Nota: Només per motius de desenvolupament, normalment ha d'estar desactivat."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CA "Calibració automàtica dels controls analògics"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CA NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CA "Quan el dispositiu d'entrada estigui configurat com DualShock, Controlador Analògic o neGcon, aquesta opció permet calibrar les entrades analògiques. Es calibraran en temps real els valors màxims d'entrada que es registrin per escalar els valors màxims que s'enviïn a l'emulador. Això serveix per jocs com Mega Man Legends 2, que esperen uns valors superiors als que poden enviar els controladors actuals. Es recomana que els joystics analògics es girin en tota l'extensió possible en executar el joc per a que el sistema de calibració funcioni el millor possible."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CA "Alternar el mode analògic del DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CA "Si el dispositiu d'entrada està seleccionat com a DualShock, aquesta opció permet al controlador DualShock emulat alternar entre el mode digital o analògic del controlador original. El mode també es pot canviar amb una combinació de botons."
 #define OPTION_VAL_ENABLED_ANALOG_CA "Analògic per defecte"
@@ -8378,15 +8378,15 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_195_CA NULL
 #define OPTION_VAL_200_CA NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_CA "Resposta neGcon Twist"
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_CA NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_CA "Selecciona el tipus de resposta de la palanca esquerra del RetroPad en simular l'acció de tòrcer un dispositiu d'entrada neGcon. El desplaçament de la palanca analògica pot ser assignada a la rotació del neGcon de forma lineal, quadràtica o cúbica. 'Quadràtica' dona més precisió que 'Lineal' en moviments més petits. 'Cúbica' augmenta la precisió en els moviments més petits, però exagera els moviments grans. Nota: Només es recomana fer servir 'Lineal' amb volants de carrera. Els controladors convencionals gestionene l'entrada analògica de forma molt diferent al mecanisme de rotació del neGcon, de manera que l'assignació 'Lineal' sobreamplifica els moviments petits, el que afecta a la precisió. En la majoria de jocs, 'Quadràtica' ofereix la millor aproximació al maquinari original."
 #define OPTION_VAL_LINEAR_CA "Lineal"
 #define OPTION_VAL_QUADRATIC_CA "Quadràtic"
 #define OPTION_VAL_CUBIC_CA "Cúbic"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_CA "Zona morta neGcon Twist"
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CA NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_CA "Selecciona la zona morta del joystick analògic esquerre del RetroPad en simular l'acció de tòrcer un dispositiu d'entrada neGcon emulat. Serveix per evitar que el controlador registri moviments no realitzats. Nota: Molts jocs compatibles amb neGcon inclouen opcions dins del jocs per ajustar un valor de la zona morta en tòrcer. Aquest valor ha de configurar-se com a 0 o neutral en tot moment per a què no hi hagi un pèrdua de precisió. Qualsevol ajustament que sigui necessari només ha d'aplicar-se mitjançant aquesta opció del nucli, sobretot si 'Resposta en tòrcer el neGcon' està configurada com 'Quadràtica' o 'Cúbica'."
 #define OPTION_VAL_0_O31_CA NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_CA "Mètode de la targeta de memòria 0 (Es requereix reinici)"
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CA NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_CA "Selecciona el format de desat que es farà servir a la targeta de memòria 0. 'Mednafen' pot millorar la compatibilitat amb la versió independent de Mednafen. En utilitzar els fitxers desats amb Beetle PSC, els fitxers de libretro (.srm) i Mednafen (.mcr) son iguals internament, així poden intercanviar entre ells mateixos, canviant els noms."
 #define OPTION_VAL_LIBRETRO_CA NULL
 #define OPTION_VAL_MEDNAFEN_CA NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_CA "Habilitat targeta de memòria 1 (Es requereix reinici)"
@@ -8399,7 +8399,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CA "Canvia la targeta de memòria que es troba a la ranura dreta. Aquesta opció només funcionarà si l'opció 'Activar la targeta de memòria 1' està activada. La targeta de memòria predeterminada té l'índex 1."
 #define OPTION_VAL_1_O36_CA "1 (Per defecte)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_CA "Mode d'operació PGXP"
-#define BEETLE_OPT_PGXP_MODE_INFO_0_CA NULL
+#define BEETLE_OPT_PGXP_MODE_INFO_0_CA "Renderitza els objectes 3D amb una precisió subpíxel, utilitzant coordenades dels vèrtexs de coma fixa per minimitzar la distorsió i tremolors dels objectes 3D que hi havia en el maquinari original. 'Només en memòria' dona menys problemes de compatibilitat i es recomana per ús general. 'Memòria + CPU (inestable)' pot reduir més les distorsions visuals, però augmenten els requisits de maquinari."
 #define OPTION_VAL_MEMORY_ONLY_CA "Només en memòria"
 #define OPTION_VAL_MEMORY_CPU_CA "Memòria + CPU (inestable)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_CA "Tolerància de la geometria plana del PGXP"
@@ -8416,11 +8416,11 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_CA "Selecció de primitives del PGXP"
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_CA "Fes servir la implementació NCLIP de PGXP. Millora l'aparença reduint els forats en les geometries que tenen coordenades PGXP. Pot provocar errors en alguns jocs i en certes circumstàncies."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_CA "Memòria cau dels vèrtexs del PGXP"
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_CA NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_CA "Escorcolla les posicions dels vèrtexs millorades pel PGXP perquè siguin escorcollades per dibuixar polígons. Pot millorar l'alineació dels objectes i reduir les vores, però pot produir defectes visuals. Ara mateix, es recomana desactivar aquesta opció. Només s'aplicarà si s'activa el mode d'operació del PGXP. Només funciona amb els renderitzadors per maquinari."
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_CA "Texturitzat fidel a la perspectiva del PGXP"
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_CA NULL
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_CA "Canvia el mapeig de textures natiu de PSX per un mapeig de textures amb la perspectiva correcta. Elimina les distorsions per posició i la deformació de textures, produïnt textures ben alineades. Només s'aplica quan s'activa el mode d'operació del PGXP. Només funciona en els renderitzadors per maquinari."
 #define BEETLE_OPT_LINE_RENDER_LABEL_CA "Correcció Line-to-Quad"
-#define BEETLE_OPT_LINE_RENDER_INFO_0_CA NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_CA "Selecciona el mètode d'execució de la correcció per convertir línies en rectangles. Alguns jocs (Doom, Hexen, Soul Blade,...) dibuixen línies horitzontal estirant triangles de 1 píxel d'alçada al llarg de la pantalla, que després son renderitzats com una columna de píxels en el maquinari original. Aquesta correcció detecta aquests triangles i els converteix en rectangles si és necessari, permeten que es mostrin correctament en els renderitzadors per maquinari i en resolucions internes superiors a la nativa. L'opció 'Agressiu' és necessària per alguns jocs (per exemple: Dark Forces, Duke Nukem) però pot produir defectes visuals en altres jocs. En cas de dubte, seleccionar 'Predeterminat'."
 #define OPTION_VAL_DEFAULT_CA "Per defecte"
 #define OPTION_VAL_AGGRESSIVE_CA "Agressiu"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_CA "Correcció de pantalla panoràmica"
@@ -8435,7 +8435,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_21_9_CA NULL
 #define OPTION_VAL_32_9_CA NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CA "Escalat de freqüència de la CPU (augmentar velocitat)"
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CA NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CA "Augmenta (o disminueix) la velocitat la CPU emulada de PSX. Augmentar la velocitat pot eliminar les estrabades i millorar la taxa de fotogrames en alguns jocs a canvi d'incrementar els requisits de maquinari. Cal tenir en compte que alguns jocs tenen un limitador de fotogrames intern i no hi ha cap benefici d'augmentar la velocitat. Pot provocar que alguns jocs s'executin més ràpid."
 #define OPTION_VAL_100_NATIVE_CA "100% (Natiu)"
 #define OPTION_VAL_210_CA NULL
 #define OPTION_VAL_220_CA NULL
@@ -8504,13 +8504,13 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_PSXONPSP_CA NULL
 #define OPTION_VAL_PS1_ROM_CA NULL
 #define BEETLE_OPT_RENDERER_LABEL_CA "Renderitzador (Es requereix reinici)"
-#define BEETLE_OPT_RENDERER_INFO_0_CA NULL
+#define BEETLE_OPT_RENDERER_INFO_0_CA "El renderitzador per programari és més precís, però té uns requeriments alts si s'executa el joc a una resolució interna superior a la de la targeta gràfica. Els renderitzadors per maquinari son menys precisos, però tenen un rendiment superior si es fan servir resolucions internes superiors i permeten millores gràfiques. 'Maquinari (Automàtic)' selecciona automàticament Vulkan o OpenGl segons el controlador de vídeo de libretro. Si el controlador no és compatible amb Vulkan o OpenGl 3.3, es farà servir el renderitzador per programari."
 #define OPTION_VAL_HARDWARE_CA "Maquinari (Automàtic)"
 #define OPTION_VAL_HARDWARE_GL_CA "Maquinari (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_CA "Maquinari (Vulkan)"
 #define OPTION_VAL_SOFTWARE_CA "Programari"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CA "Memòria intermèdia per programari"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA "Permet emular amb precisió els efectes de la memòria intermèdia de fotogrames (desenfocament de moviment, les batalles de FF7) en utilitzar els renderitzadors per maquinari executant una còpia del renderitzador per programari a resolució nativa en segon pla. En desactivar aquesta opció, s'ometran aquestes operacions (OpenGL) o es renderitzadaran a la GPU (Vulkan). Desactivar aquesta opció pot millorar el rendiment a costa de generar errors gràfics greus. En cas de dubte, deixa activada aquesta opció."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_CA NULL
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CA "Recompila de forma dinàmica les instruccions de la CPU a instruccions natives. Més ràpid que l'intèrpret, pels intervals de la CPU són menys precisos i pot provocar errors."
 #define OPTION_VAL_DISABLED_CA "Deshabilitat (intèrpret Beetle)"
@@ -8598,7 +8598,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CA "Selecciona l'última línia d'escombrat que es mostrarà en executar contingut PAL. Un valor inferior a 287 reduirà l'alçada de les imatges generades, retallant píxels de la part inferior. Pot servir per evitar l'efecte 'letterboxing'."
 #define OPTION_VAL_287_CA "287 (Per defecte)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CA "Mètode d'accés al CD (Es requereix reinici)"
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CA NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CA "Selecciona el mètode que es farà servir per llegir dades de les imatges de disc. 'Sincrònic' emula el maquinari original, 'Asincrònic' pot reduir les estrebades en els dispositius que tinguin un dispositiu d'emmagatzematge lent i 'Precarregat' carrega la imatge de disc sencera en memòria en executar contingut, això pot millorar el temps de càrrega del joc a costa de retardar l'arrancada inicial del joc. 'Precarregat' pot produir problemes en sistemes amb poca memòria RAM."
 #define OPTION_VAL_SYNC_CA "Sincrònic"
 #define OPTION_VAL_ASYNC_CA "Asíncron"
 #define OPTION_VAL_PRECACHE_CA "Precarregar"
