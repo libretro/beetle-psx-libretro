@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <retro_inline.h>
 
+#include "mednafen-types.h"
+
 typedef struct
 {
    uint8_t *data;
