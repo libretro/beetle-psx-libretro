@@ -61423,17 +61423,17 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_PT_BR "Quando ativado e suportado pela interface libretro, proporciona um pequeno aumento de desempenho ao direcionar a interface para repetir o quadro anterior se o núcleo não tiver nada de novo para exibir."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_PT_BR "Mostrar QPS interno"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_PT_BR "Exibir a taxa de quadros internos na qual o sistema PlayStation emulado está renderizando o conteúdo. Nota: Requer que as notificações na tela sejam habilitadas na interface libretro."
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_PT_BR NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_PT_BR NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_PT_BR "Mostrar mensagens na tela"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_PT_BR "Mostrar mensagens na tela geradas pelo núcleo."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_PT_BR "Exibir a VRAM completa (depuração)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_PT_BR "Visualiza toda a VRAM do console emulado. Somente suportada pelos renderizadores de hardware OpenGL e Vulkan. Nota: Isto é para fins de depuração, e normalmente deve estar desativado."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_PT_BR "Auto-calibração do analógico"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_PT_BR "Quando o dispositivo de entrada é ajustado para DualShock, Controle analógico, Joystick analógico ou neGcon, esta opção permite a calibração dinâmica das entradas analógicas. Os valores máximos de entrada registrados são monitorados em tempo real e usados para escalar as coordenadas analógicas passadas para o emulador. Isto deve ser usado para jogos como o Mega Man Legends 2 que esperam valores maiores do que o que os controladores modernos fornecem. Para melhores resultados, os direcionais analógicos devem ser girados em toda a extensão para calibrar o algoritmo cada vez que o conteúdo é carregado."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_BR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_BR NULL
-#define OPTION_VAL_ENABLED_ANALOG_PT_BR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_BR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_PT_BR "Alternar o modo analógico do DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_PT_BR "Quando o tipo de dispositivo de entrada é o DualShock, esta opção permite que o DualShock emulado seja alternado entre os modos DIGITAL e ANALÓGICO, assim como no hardware original. O modo também pode ser alternado usando a combinação de botões selecionada."
+#define OPTION_VAL_ENABLED_ANALOG_PT_BR "Analógico por padrão"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_PT_BR "Combinação de botões do modo analógico do DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_PT_BR "Escolha a combinação de botões que será usada para alternar entre o modo DIGITAL e ANALÓGICO para o DualShock emulado."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_PT_BR NULL
 #define OPTION_VAL_L1_R1_SELECT_PT_BR NULL
 #define OPTION_VAL_L1_R1_START_PT_BR NULL
@@ -61444,8 +61444,8 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_L2_R2_L3_PT_BR NULL
 #define OPTION_VAL_L2_R2_R3_PT_BR NULL
 #define OPTION_VAL_L3_R3_PT_BR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_BR NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_BR NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_BR "Tempo de espera para a combinação de botões do modo analógico do DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_BR "Define o tempo de espera para a combinação de botões para o modo analógico."
 #define OPTION_VAL_0_PT_BR "0 segundos"
 #define OPTION_VAL_1_PT_BR "1 segundo"
 #define OPTION_VAL_2_PT_BR "2 segundos"
@@ -61657,7 +61657,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_BR "Permite emular com precisão os efeitos de quadro de buffer (por exemplo, desfoque de movimento, espiral de batalha FF7) ao usar renderizadores de hardware, executando uma cópia do renderizador de software com resolução nativa em segundo plano. A desativação desta opção irá omitir estas operações (OpenGL) ou serão renderizadas na GPU (Vulkan). A desativação desta opção pode melhorar o desempenho ao custo de erros gráficos graves. Em caso de dúvida, deixe esta opção ativada."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_PT_BR "Dynarec de CPU"
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_BR "Recompilar dinamicamente as instruções da CPU para instruções nativas. Muito mais rápido do que o intérprete, mas o tempo da CPU é menos preciso e pode ter erros."
-#define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretor de Beetle)"
+#define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretador de Beetle)"
 #define OPTION_VAL_EXECUTE_PT_BR "Máximo desempenho"
 #define OPTION_VAL_EXECUTE_ONE_PT_BR "Verificação de intervalo entre ciclos"
 #define OPTION_VAL_RUN_INTERPRETER_PT_BR "Interpretador Lightrec"
@@ -61665,11 +61665,11 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_BR "Alguns jogos requerem invalidação 'Completa', alguns requerem 'Apenas DMA'."
 #define OPTION_VAL_FULL_PT_BR "Completa"
 #define OPTION_VAL_DMA_PT_BR "Apenas DMA (um pouco mais rápido)"
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR "Ciclos de eventos de DMA/GPU/MDEC/Temporizador do dynarec"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR "Indica o número máximo de ciclos executados pela CPU antes de verificar atualizações na GPU/DMA/MDEC/Temporizador, um número maior será mais rápido, tendo muito menos impacto no interpretador Beetle do que o dynarec."
 #define OPTION_VAL_128_PT_BR "128 (padrão)"
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_PT_BR NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PT_BR NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_PT_BR "Amostras de SPU do Dynarec"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PT_BR "Indica o número máximo de amostras de SPU para executar antes que uma atualização do SPU esteja selecionada, um número maior será mais rápido, mas um valor que não seja 1 causará defeitos sonoros em alguns jogos."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PT_BR "Tempos dos quadros reportado pelo núcleo"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_PT_BR "Seleciona os tempos de quadros por segundos que o núcleo indicará para a interface. 'Permitir alternância automática' permite que o núcleo mude entre taxas progressivas e entrelaçadas, mas pode causar reinícios nos drivers de vídeo e no áudio da interface."
 #define OPTION_VAL_FORCE_PROGRESSIVE_PT_BR "Taxa progressiva"
@@ -71742,21 +71742,21 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_195_SV NULL
 #define OPTION_VAL_200_SV NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_SV NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_SV NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_SV "Välj svarstyp för RetroPads vänstra analoga spak när du simulerar ”twist”-funktionen hos emulerade ”neGcon”-inmatningsenheter. Den analoga spakens förskjutning kan mappas till neGcons rotationsvinkel antingen linjärt, kvadratiskt eller kubiskt. 'Quadratic' ger större precision än 'Linear' vid små rörelser. ”Cubic” ökar precisionen ytterligare för små rörelser, men ’överdriver’ större rörelser. Obs: 'Linjär' rekommenderas endast när du använder kringutrustning för racerhjul. Konventionella styrenheter implementerar analog input på ett sätt som skiljer sig fundamentalt från neGcons ”twist”-mekanism, så att linjär mappning överförstärker små rörelser och försämrar finkontrollen. I de flesta fall ger ”Quadratic” den närmaste approximationen av verklig hårdvara."
 #define OPTION_VAL_LINEAR_SV "Linjär"
 #define OPTION_VAL_QUADRATIC_SV "Kvadratisk"
 #define OPTION_VAL_CUBIC_SV "Kubisk"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV "Välj dödzon för RetroPads vänstra analoga spak när du simulerar ”twist”-rörelsen hos emulerade ”neGcon”-inmatningsenheter. Används för att eliminera styrenhetens drift. Obs: De flesta neGcon-kompatibla titlar ger alternativ i spelet för att ställa in ett ”twist”-dödzonsvärde. För att undvika förlust av precision bör spelets deadzone *alltid* sättas till noll. Eventuella nödvändiga justeringar ska *endast* göras via detta kärnalternativ. Detta är särskilt viktigt när ”neGcon Twist Response” är inställt på ”Quadratic” eller ”Cubic”."
 #define OPTION_VAL_0_O31_SV NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SV NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SV NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SV "Välj det sparformat som ska användas för minneskort 0. ”Mednafen” kan användas för kompatibilitet med den fristående versionen av Mednafen. Vid användning med Beetle PSX har Libretro (.srm) och Mednafen (.mcr) sparningar internt identiska format och kan konverteras mellan varandra genom att byta namn."
 #define OPTION_VAL_LIBRETRO_SV NULL
 #define OPTION_VAL_MEDNAFEN_SV NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_SV NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_SV NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_SV "Emulerar ett andra minneskort i kortplats 1. När alternativet är avaktiverat kan spelen bara komma åt minneskortet i kortplats 0. Obs: Vissa spel kräver att detta alternativ är avaktiverat för att fungera korrekt (t.ex. Codename Tenka). Obs: Minneskort 1 använder sparformatet Mednafen (.mcr)."
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_SV NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_SV NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_SV "När funktionen är aktiverad sparas alla spel till och laddas från samma minneskortsfiler. När den är inaktiverad genereras separata minneskortsfiler för varje laddat innehåll. Obs: om ”Memory Card 0 Method” är inställt på ”Libretro” kommer endast det högra minneskortet att påverkas."
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_SV NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
@@ -71778,17 +71778,17 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_7PX_SV NULL
 #define OPTION_VAL_8PX_SV NULL
 #define BEETLE_OPT_PGXP_NCLIP_LABEL_SV NULL
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_SV NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_SV "Använd PGXP: s NCLIP-implementering. Förbättrar utseendet genom att minska hål i geometrier med PGXP-koordinater. Känd för att orsaka att vissa spel låser sig under olika omständigheter."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_SV NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_SV NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_SV "Cachar PGXP-förbättrade vertexpositioner för återanvändning vid polygonritningar. Kan potentiellt förbättra objektinriktningen och minska synliga sömmar vid rendering av texturer, men falska positiva resultat vid förfrågan till cacheminnet kan ge grafiska störningar. För närvarande rekommenderas att detta alternativ är avaktiverat. Detta alternativ tillämpas endast när PGXP Operation Mode är aktiverat. Stöds endast av hårdvarurenderingarna."
 #define BEETLE_OPT_PGXP_TEXTURE_LABEL_SV NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_SV NULL
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_SV "Ersätt den ursprungliga affina texturmappningen i PSX med perspektivkorrekt texturmappning. Eliminerar positionsberoende förvrängning och skevhet av texturer, vilket resulterar i korrekt inriktade texturer. Detta alternativ tillämpas endast när PGXP Operation Mode är aktiverat. Stöds endast av hårdvarurenderingarna."
 #define BEETLE_OPT_LINE_RENDER_LABEL_SV NULL
-#define BEETLE_OPT_LINE_RENDER_INFO_0_SV NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_SV "Välj hackmetod för linje till fyrkant. Vissa spel (t.ex. Doom, Hexen, Soul Blade, etc.) ritar horisontella linjer genom att sträcka ut enpixelhöga trianglar över skärmen, som rastreras som en rad med pixlar på originalhårdvaran. Detta hack upptäcker dessa små trianglar och konverterar dem till kvadrater efter behov, vilket gör att de kan visas korrekt på hårdvarurenderaren och i uppskalade interna upplösningar. ”Aggressive” krävs för vissa titlar (t.ex. Dark Forces, Duke Nukem) men kan annars medföra grafiska problem. Lämna ”Standard” om du är osäker."
 #define OPTION_VAL_DEFAULT_SV "Standard"
 #define OPTION_VAL_AGGRESSIVE_SV "Aggressiv"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_SV "Hack för bredbildsläge"
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_SV NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_SV "Rendera 3D-innehåll anamorfiskt och mata ut den emulerade framebufferten i ett bredbildsformat. Ger bäst resultat med spel som är helt i 3D. 2D-element kommer att sträckas ut horisontellt och kan vara feljusterade."
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_SV NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_SV NULL
 #define OPTION_VAL_16_9_SV NULL
@@ -71799,7 +71799,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_21_9_SV NULL
 #define OPTION_VAL_32_9_SV NULL
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_SV "CPU-frekvens Skalning (Överklockning)"
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_SV NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_SV "Överklocka (eller underklocka) den emulerade PSX-processorn. Överklockning kan eliminera inbromsningar och förbättra bildfrekvensen i vissa spel på bekostnad av ökade prestandakrav. Observera att vissa spel har en intern bildfrekvensbegränsare och kanske inte gynnas av överklockning. Kan leda till att vissa effekter animeras snabbare än avsett i vissa titlar vid överklockning."
 #define OPTION_VAL_100_NATIVE_SV "100% (Standard)"
 #define OPTION_VAL_210_SV NULL
 #define OPTION_VAL_220_SV NULL
@@ -71857,26 +71857,26 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_740_SV NULL
 #define OPTION_VAL_750_SV NULL
 #define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SV NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_SV NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_SV "Möjliggör överklockning av den 2D-rasterizer som finns i den emulerade PSX: ens GPU. Förbättrar inte 3D-rendering och har i allmänhet liten effekt."
 #define OPTION_VAL_32X_SV NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_SV "GTE Överklockning"
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_SV NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_SV "Sänk alla emulerade GTE-operationer (CPU-koprocessor för 3D-grafik) till en konstant latens på en cykel. För spel som använder GTE i stor utsträckning kan detta förbättra bildfrekvensen och stabiliteten i bildtid avsevärt."
 #define BEETLE_OPT_SKIP_BIOS_LABEL_SV "Hoppa över BIOS"
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_SV NULL
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_SV "Hoppa över PlayStation BIOS-startanimationen som normalt visas när innehåll laddas. Obs: Om du aktiverar detta uppstår kompatibilitetsproblem med ett antal spel (PAL-kopieringsskyddade spel, Saga Frontier etc.)."
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_SV "Åsidosätt BIOS (omstart krävs)"
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV "Åsidosätt regionsspecifikt standard-BIOS med en regionsfri om hittats."
 #define OPTION_VAL_PSXONPSP_SV NULL
 #define OPTION_VAL_PS1_ROM_SV NULL
 #define BEETLE_OPT_RENDERER_LABEL_SV "Rendera (omstart krävs)"
-#define BEETLE_OPT_RENDERER_INFO_0_SV NULL
+#define BEETLE_OPT_RENDERER_INFO_0_SV "Mjukvarurenderingen är den mest exakta men har höga prestandakrav när den körs med högre interna GPU-upplösningar. Hårdvarurenderingen är visserligen mindre exakt, men ger bättre prestanda än mjukvarurenderingen vid högre interna upplösningar och möjliggör olika grafiska förbättringar. 'Hårdvara (Auto)' väljer automatiskt Vulkan- eller OpenGL-renderaren, beroende på den aktuella libretro frontend-videodrivrutinen. Om den medföljande videodrivrutinen inte är Vulkan- eller OpenGL 3.3-kompatibel kommer kärnan att falla tillbaka till mjukvarurenderingen."
 #define OPTION_VAL_HARDWARE_SV "Hårdvara (Auto)"
 #define OPTION_VAL_HARDWARE_GL_SV "Hårdvara (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_SV NULL
 #define OPTION_VAL_SOFTWARE_SV "Mjukvara"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV "Bildbuffer mjukvara"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV "Möjliggör korrekt emulering av framebuffereffekter (t.ex. rörelseoskärpa, FF7-stridsvirvel) när du använder hårdvarurendering genom att köra en kopia av programvarurenderingen med inbyggd upplösning i bakgrunden. Om funktionen inaktiveras utelämnas dessa operationer (OpenGL) eller renderas på GPU:n (Vulkan). Inaktivering kan förbättra prestandan men kan orsaka allvarliga grafiska fel. Lämna aktiverat om du är osäker."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_SV NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_SV NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_SV "Dynamisk omkompilering av CPU-instruktioner till inbyggda instruktioner. Mycket snabbare än tolken, men CPU-timingen är inte lika exakt och kan innehålla buggar."
 #define OPTION_VAL_DISABLED_SV "Inaktiverad (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_SV "Max prestanda"
 #define OPTION_VAL_EXECUTE_ONE_SV NULL
@@ -71886,17 +71886,17 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_FULL_SV NULL
 #define OPTION_VAL_DMA_SV NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_SV NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_SV NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_SV "Max cykler som körs av CPU innan en GPU/DMA/MDEC/Timer-uppdatering kontrolleras, högre tal blir snabbare, har mycket mindre inverkan på Beetle-tolken än dynarec."
 #define OPTION_VAL_128_SV "128 (Standard)"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_SV NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV "Max SPU-samplingar som ska köras innan en SPU-uppdatering kontrolleras, högre tal blir snabbare, men orsakar ljudstörningar i vissa spel med något annat än 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV "Välj den FPS-timing som kärnan ska rapportera till frontend. Automatisk växling gör det möjligt för kärnan att växla mellan att rapportera progressiva och sammanflätade hastigheter, men kan orsaka ominitieringar av frontend-drivrutiner för video/ljud."
 #define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
 #define OPTION_VAL_FORCE_INTERLACED_SV NULL
 #define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder ser PAL-spel ofta långsammare ut jämfört med de amerikanska eller japanska NTSC-utgåvorna. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-framerate. Det här alternativet har ingen effekt när du kör NTSC-innehåll."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV NULL
 #define OPTION_VAL_CORRECTED_SV "Korrigerad"
