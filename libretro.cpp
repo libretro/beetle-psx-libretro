@@ -4062,6 +4062,15 @@ static void check_variables(bool startup)
       memcard_right_index_old = memcard_right_index;
       memcard_right_index     = atoi(var.value);
    }
+
+   var.key = BEETLE_OPT(deinterlacer);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "bob") == 0)
+         deint.SetType(Deinterlacer::DEINT_BOB);
+      else
+         deint.SetType(Deinterlacer::DEINT_WEAVE);
+   }
 }
 
 #ifdef NEED_CD
@@ -4841,7 +4850,7 @@ void retro_run(void)
 
          deint.Process(surf, spec.DisplayRect, rects, spec.InterlaceField);
 
-         PrevInterlaced = true;
+         PrevInterlaced = (deint.GetType() == Deinterlacer::DEINT_WEAVE) ? true : false;
 
          spec.InterlaceOn = false;
          spec.InterlaceField = 0;
@@ -4852,6 +4861,11 @@ void retro_run(void)
       // PSX is rather special, and needs specific handling ...
       width = rects[0]; // spec.DisplayRect.w is 0. Only rects[0].w seems to return something sane.
       height = spec.DisplayRect.h;
+
+#ifdef NEED_DEINTERLACER
+      if (currently_interlaced && deint.GetType() == Deinterlacer::DEINT_BOB)
+         height /= 2;
+#endif
 
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
       const uint32_t *pix = surf->pixels;
@@ -4914,7 +4928,7 @@ void retro_run(void)
       height <<= upscale_shift;
       pix     += pix_offset << upscale_shift;
 
-      if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0) || !allow_frame_duping)
+      if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0) || !allow_frame_duping || currently_interlaced)
          fb = pix;
    }
 
