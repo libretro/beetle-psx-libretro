@@ -14411,17 +14411,17 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_CS "Pokud je tato funkce povolena a podporována frontendem libretro, přináší malé zvýšení výkonu tím, že frontend opakuje předchozí snímek, pokud jádro nemá nic nového k zobrazení."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_CS "Interní Zobrazení FPS"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_CS "Zobrazení interní snímkové frekvence, při které emulovaný systém PlayStation vykresluje obsah. Poznámka: Vyžaduje, aby byla ve frontendu libretro povolena oznámení na obrazovce."
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_CS NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_CS NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_CS "Zobrazení OSD zpráv"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_CS "Zobrazení OSD zpráv generovaných jádrem."
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_CS "Zobrazení Plné Paměti VRAM (Ladění)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_CS "Vizualizace celé paměti VRAM emulované konzole. Podporováno pouze hardwarovými vykreslovači OpenGL a Vulkan. Poznámka: Tato funkce slouží k ladění a měla by být normálně vypnuta."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_CS "Analogová Vlastní Kalibrace"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_CS "Pokud je vstupní zařízení nastaveno na DualShock, Analogový ovladač, Analogový joystick nebo neGcon, tato možnost umožňuje dynamickou kalibraci analogových vstupů. Maximální registrované hodnoty vstupů jsou sledovány v reálném čase a použity ke škálování analogových souřadnic předávaných emulátoru. Tato funkce by měla být použita u her, jako je Mega Man Legends 2, které očekávají větší hodnoty, než jaké poskytují moderní ovladače. Pro dosažení nejlepších výsledků by se analogové páčky měly otáčet v plném rozsahu, aby se kalibrační algoritmus vyladil při každém načtení obsahu."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CS NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS NULL
-#define OPTION_VAL_ENABLED_ANALOG_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_CS "Přepínání analogového režimu DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_CS "Pokud je typem vstupního zařízení DualShock, umožňuje tato možnost přepínat emulovaný DualShock mezi DIGITÁLNÍM a ANALOGOVÝM režimem jako původní hardware. Režim lze přepínat také pomocí vybrané kombinace tlačítek."
+#define OPTION_VAL_ENABLED_ANALOG_CS "Výchozí analogový"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_CS "Kombinace analogového režimu DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_CS "Zvolte kombinaci tlačítek, která se bude používat k přepínání mezi digitálním a analogovým režimem emulovaného zařízení DualShock."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_CS NULL
 #define OPTION_VAL_L1_R1_SELECT_CS NULL
 #define OPTION_VAL_L1_R1_START_CS NULL
@@ -14433,7 +14433,7 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_L2_R2_R3_CS NULL
 #define OPTION_VAL_L3_R3_CS NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS "Zpoždění podržení analogového režimu DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS "Nastavení doby podržení pro kombinovaná tlačítka analogového režimu."
 #define OPTION_VAL_0_CS "0 sekundové zpoždění"
 #define OPTION_VAL_1_CS "1 sekundové zpoždění"
 #define OPTION_VAL_2_CS "2 sekundové zpoždění"
@@ -14529,7 +14529,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v levém slotu. Tato možnost bude fungovat pouze v případě, že je metoda Paměťová Karta 0 nastavena na Mednafen. Výchozí karta má index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CS "Pravý Index Paměťové Karty"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CS "Vyměňte paměťovou kartu, která je aktuálně vložena v pravém slotu. Tato možnost bude fungovat pouze v případě, že je povolena Paměťová Karta 1. Výchozí karta má index 1."
-#define OPTION_VAL_1_O36_CS NULL
+#define OPTION_VAL_1_O36_CS "1 (výchozí)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_CS "Provozní Režim PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CS "Umožňuje vykreslovat 3D objekty se subpixelovou přesností, čímž se minimalizuje zkreslení a chvění 3D objektů na původním hardwaru v důsledku použití souřadnic vrcholů s pevným bodem. Režim 'Pouze Paměť' má minimální problémy s kompatibilitou a doporučuje se pro obecné použití. Režim 'Paměť + CPU (Chyby)' může ještě více snížit jitter, ale má vysoké nároky na výkon a může způsobit různé chyby geometrie."
 #define OPTION_VAL_MEMORY_ONLY_CS "Pouze Paměť"
@@ -14703,7 +14703,7 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_4PX_O61_CS NULL
 #define OPTION_VAL_3PX_O61_CS NULL
 #define OPTION_VAL_2PX_O61_CS NULL
-#define OPTION_VAL_1PX_O61_CS NULL
+#define OPTION_VAL_1PX_O61_CS "1px"
 #define OPTION_VAL_1PX_O61_0_CS NULL
 #define OPTION_VAL_2PX_O61_0_CS NULL
 #define OPTION_VAL_3PX_O61_0_CS NULL
@@ -14720,7 +14720,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_CS "Zvolte počet cyklů GPU, o které se má obraz posunout. Kladné hodnoty posunou obraz doprava, záporné hodnoty doleva. Podporováno pouze hardwarovými vykreslovači."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_CS "Počáteční Skenovací Řádek - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_CS "Při spuštění obsahu NTSC vyberte první zobrazený řádek skenování. Hodnoty větší než nula sníží výšku výstupních obrázků oříznutím pixelů od nejvyššího okraje. Lze použít k potlačení letterboxingu."
-#define OPTION_VAL_0_O63_CS NULL
+#define OPTION_VAL_0_O63_CS "0 (výchozí)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_CS "Poslední Skenovací Řádek - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_CS "Při spuštění obsahu NTSC vyberte poslední zobrazený řádek skenování. Hodnoty menší než 239 sníží výšku výstupních obrázků oříznutím pixelů od nejspodnějšího okraje. Lze použít k potlačení letterboxingu."
 #define OPTION_VAL_239_CS "239 (Výchozí)"
@@ -61657,7 +61657,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_BR "Permite emular com precisão os efeitos de quadro de buffer (por exemplo, desfoque de movimento, espiral de batalha FF7) ao usar renderizadores de hardware, executando uma cópia do renderizador de software com resolução nativa em segundo plano. A desativação desta opção irá omitir estas operações (OpenGL) ou serão renderizadas na GPU (Vulkan). A desativação desta opção pode melhorar o desempenho ao custo de erros gráficos graves. Em caso de dúvida, deixe esta opção ativada."
 #define BEETLE_OPT_CPU_DYNAREC_LABEL_PT_BR "Dynarec de CPU"
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_BR "Recompilar dinamicamente as instruções da CPU para instruções nativas. Muito mais rápido do que o intérprete, mas o tempo da CPU é menos preciso e pode ter erros."
-#define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretador de Beetle)"
+#define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretador do Beetle)"
 #define OPTION_VAL_EXECUTE_PT_BR "Máximo desempenho"
 #define OPTION_VAL_EXECUTE_ONE_PT_BR "Verificação de intervalo entre ciclos"
 #define OPTION_VAL_RUN_INTERPRETER_PT_BR "Interpretador Lightrec"
@@ -61665,8 +61665,8 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_BR "Alguns jogos requerem invalidação 'Completa', alguns requerem 'Apenas DMA'."
 #define OPTION_VAL_FULL_PT_BR "Completa"
 #define OPTION_VAL_DMA_PT_BR "Apenas DMA (um pouco mais rápido)"
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR "Ciclos de eventos de DMA/GPU/MDEC/Temporizador do dynarec"
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR "Indica o número máximo de ciclos executados pela CPU antes de verificar atualizações na GPU/DMA/MDEC/Temporizador, um número maior será mais rápido, tendo muito menos impacto no interpretador Beetle do que o dynarec."
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_PT_BR "Ciclos de eventos de DMA, GPU, MDEC e Temporizador do dynarec"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_PT_BR "Indica o número máximo de ciclos executados pela CPU antes de verificar atualizações na GPU, DMA, MDEC e no Temporizador, um número maior será mais rápido, tendo muito menos impacto no interpretador do Beetle do que o dynarec."
 #define OPTION_VAL_128_PT_BR "128 (padrão)"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_PT_BR "Amostras de SPU do Dynarec"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PT_BR "Indica o número máximo de amostras de SPU para executar antes que uma atualização do SPU esteja selecionada, um número maior será mais rápido, mas um valor que não seja 1 causará defeitos sonoros em alguns jogos."
