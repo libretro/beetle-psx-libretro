@@ -197,6 +197,10 @@ typedef uint64_t uint64;
  #define TRUE 1
 #endif
 
+#ifndef INVALID_PTR
+#define INVALID_PTR ((void *)-1)
+#endif
+
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define MSB_FIRST
 #else

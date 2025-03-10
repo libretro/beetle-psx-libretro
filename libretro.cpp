@@ -37,6 +37,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #define ISHEXDEC ((codeLine[cursor]>='0') && (codeLine[cursor]<='9')) || ((codeLine[cursor]>='a') && (codeLine[cursor]<='f')) || ((codeLine[cursor]>='A') && (codeLine[cursor]<='F'))
 
 #ifdef HAVE_LIGHTREC
+#include <lightrec-config.h>
 #include <sys/mman.h>
 
 #ifdef HAVE_ASHMEM
@@ -46,6 +47,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #endif
 
 #if defined(HAVE_SHM) || defined(HAVE_ASHMEM)
+#include <sys/syscall.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #endif
@@ -116,12 +118,15 @@ bool fast_pal = false;
 unsigned image_height = 0;
 
 #ifdef HAVE_LIGHTREC
-enum DYNAREC psx_dynarec;
+bool lightrec_interpreter;
+bool psx_dynarec;
 bool psx_dynarec_invalidate;
+bool psx_dynarec_spgp_opt;
 uint8 psx_mmap = 0;
 uint8 *psx_mem = NULL;
 uint8 *psx_bios = NULL;
 uint8 *psx_scratch = NULL;
+uint8 *lightrec_codebuffer = NULL;
 #if defined(HAVE_ASHMEM)
 int memfd;
 #endif
@@ -499,10 +504,13 @@ FrontIO *PSX_FIO = NULL;
 
 MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
 MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
-MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = NULL;
+MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
 MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 
 #ifdef HAVE_LIGHTREC
+PS_CPU *PSX_CPU_MEDNAFEN = NULL;
+PS_CPU_LIGHTREC *PSX_CPU_LIGHTREC = NULL;
+
 /* Size of Expansion 1 (8MB) */
 #define PSX_EXPANSION1_SIZE        0x800000U
 /* Base address of Expansion 1 */
@@ -1281,8 +1289,14 @@ static void PSX_Power(void)
    for(i = 0; i < 9; i++)
       SysControl.Regs[i] = 0;
 
+#ifdef HAVE_LIGHTREC
+   PSX_CPU_MEDNAFEN->Power();
+   //setoptions can be called before power (lightrec init) for tracking of options changing
+   PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
+   PSX_CPU_LIGHTREC->Power();
+#else
    PSX_CPU->Power();
-
+#endif
    EventReset();
 
    TIMER_Power();
@@ -1677,68 +1691,99 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #else
 #define MAP_FIXED_NOREPLACE 0
 #endif
+#ifndef MFD_HUGETLB
+#define MFD_HUGETLB 0x0004
+#endif
+#ifndef MAP_HUGETLB
+/* don't try to map as hugetlb if not defined */
+#define MAP_HUGETLB 0
+#endif
 #endif
 
-static const uintptr_t supported_io_bases[] = {
-#if !__MACOS__
-	static_cast<uintptr_t>(0x00000000),
-	static_cast<uintptr_t>(0x10000000),
-	static_cast<uintptr_t>(0x20000000),
-	static_cast<uintptr_t>(0x30000000),
+#if __MACOS__
+#define min_io_base MACOS_VM_BASE
 #else
-   static_cast<uintptr_t>(MACOS_VM_BASE),
+#define min_io_base 0x00000000
 #endif
-	static_cast<uintptr_t>(0x40000000),
-	static_cast<uintptr_t>(0x50000000),
-	static_cast<uintptr_t>(0x60000000),
-	static_cast<uintptr_t>(0x70000000),
-	static_cast<uintptr_t>(0x80000000),
-	static_cast<uintptr_t>(0x90000000),
-   /* Some platforms need higher address base for mmap to work */
+
+/* Some platforms might need higher address base for mmap to work */
 #if UINTPTR_MAX == UINT64_MAX
-	static_cast<uintptr_t>(0x100000000),
-	static_cast<uintptr_t>(0x200000000),
-	static_cast<uintptr_t>(0x300000000),
-	static_cast<uintptr_t>(0x400000000),
-	static_cast<uintptr_t>(0x500000000),
-	static_cast<uintptr_t>(0x600000000),
-	static_cast<uintptr_t>(0x700000000),
-	static_cast<uintptr_t>(0x800000000),
-	static_cast<uintptr_t>(0x900000000),
+#define max_io_base_64 0xF00000000
+#define inc_io_base_64 0x100000000
 #endif
-};
 
 #define RAM_SIZE 0x200000
 #define BIOS_SIZE 0x80000
 #define SCRATCH_SIZE 0x400
-#define SHM_SIZE RAM_SIZE+BIOS_SIZE+SCRATCH_SIZE
 
 #ifdef HAVE_WIN_SHM
+/* MapViewOfFileEx requires fd and offset in all cases, as the MAP_ANONYMOUS equivalent
+ is mapping from INVALID_FILE_HANDLE memfd with offset */
 #define MAP(addr, size, fd, offset) \
 	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS, 0, offset, size, addr)
+#define MAP_SHM(addr,size,fd,offset)\
+	MAP(addr,size,fd,offset)
+#define MAP_CODE(addr,size,fd,offset)\
+	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS|FILE_MAP_EXECUTE, 0, offset, size, addr)
 #define UNMAP(addr, size) UnmapViewOfFile(addr)
 #define MFAILED NULL
 #define NUM_MEM 4
 #elif defined(HAVE_SHM) || defined(HAVE_ASHMEM)
-#define MAP(addr, size, fd, offset) \
+
+static void * mmap_huge(void *addr, size_t length, int prot, int flags,
+			int fd, off_t offset)
+{
+	void *map = MAP_FAILED;
+
+	if (length >= 0x200000) {
+		map = mmap(addr, length, prot,
+			   flags | MAP_HUGETLB | (21 << MAP_HUGE_SHIFT),
+			   fd, offset);
+		if (map != MAP_FAILED)
+			log_cb(RETRO_LOG_DEBUG, "Hugetlb mmap to address 0x%lx succeeded\n", (uintptr_t) addr);
+	}
+
+	if (map == MAP_FAILED) {
+		map = mmap(addr, length, prot, flags, fd, offset);
+		if (map != MAP_FAILED)
+			log_cb(RETRO_LOG_DEBUG, "Regular mmap to address 0x%lx succeeded\n", (uintptr_t) addr);
+	}
+
+	return map;
+}
+
+/* mmap with MAP_ANONYMOUS can ignore fd and offset */
+#define MAP(addr,size,fd,offset)\
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
-		MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
+	MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0)
+#define MAP_SHM(addr, size, fd, offset) \
+	mmap_huge(addr,size, PROT_READ | PROT_WRITE, \
+	MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
+#define MAP_CODE(addr, size, fd, offset) \
+	mmap_huge(addr,size, PROT_EXEC | PROT_READ | PROT_WRITE, \
+	MAP_PRIVATE | MAP_FIXED_NOREPLACE | MAP_ANONYMOUS, -1, 0)
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
 #define NUM_MEM 4
 #else
 #define MAP(addr, size, fd, offset) \
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
-		MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
+	MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
+#define MAP_SHM(addr,size,fd,offset)\
+	MAP(addr,size,fd,offset)
+#define MAP_CODE(addr,size,fd,offset)\
+	MAP(addr,size,fd,offset)
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
 #define NUM_MEM 1
 #endif
 
-int lightrec_init_mmap()
+int lightrec_init_mmap(bool hugetlb)
 {
-	int r = 0, i, j;
-	uintptr_t base;
+	int ret = 0, i = 0, j;
+	uintptr_t io_base;
+	uintptr_t inc_io_base = 0x10000000;
+	uintptr_t max_io_base = 0xD0000000;
 	void *bios, *scratch, *map;
 
 /* open memfd and set size */
@@ -1767,7 +1812,7 @@ int lightrec_init_mmap()
 			error2 = dlerror();
 
 			if (error1 == NULL)
-				memfd = (*create)("lightrec_memfd",SHM_SIZE);
+				memfd = (*create)("lightrec_memfd",RAM_SIZE);
 
 			if (memfd < 0) {
 				log_cb(RETRO_LOG_ERROR, "Failed to ASharedMemory_create: %s\n",
@@ -1787,37 +1832,47 @@ int lightrec_init_mmap()
 		}
 	} else {
 		ioctl(memfd, ASHMEM_SET_NAME, "lightrec_memfd");
-		ioctl(memfd, ASHMEM_SET_SIZE, SHM_SIZE);
+		ioctl(memfd, ASHMEM_SET_SIZE, RAM_SIZE);
 	}
 #endif
 #ifdef HAVE_SHM
 	int memfd;
 	const char *shm_name = "/lightrec_memfd_beetle";
 
-	memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	//try HUGETLB then fallback to normal memfd
+	memfd = syscall(SYS_memfd_create,shm_name,hugetlb?MFD_HUGETLB:0);
 
-	if (memfd < 0 && errno == EEXIST) {
-		shm_unlink(shm_name);
+#ifndef __ANDROID__
+/* Android can build with HAVE_SHM, but doesn't have shm_open/unlink
+   Support platforms with shm_open, but without memfd_create */
+	if (memfd < 0) {
 		memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+
+		if (memfd < 0 && errno == EEXIST) {
+			shm_unlink(shm_name);
+			memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+		}
+
+		/* unlink ASAP to prevent leaving a file in shared memory if we crash */
+		shm_unlink(shm_name);
 	}
+#endif
 
 	if (memfd < 0) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create SHM: %s\n", strerror(errno));
 		return 0;
 	}
 
-	/* unlink ASAP to prevent leaving a file in shared memory if we crash */
-	shm_unlink(shm_name);
 
-	if (ftruncate(memfd, SHM_SIZE) < 0) {
-		log_cb(RETRO_LOG_ERROR, "Could not truncate SHM size: %s\n", strerror(errno));
+	if (ftruncate(memfd, RAM_SIZE) < 0) {
+		log_cb(RETRO_LOG_ERROR, "Could not truncate memfd size: %s\n", strerror(errno));
 		goto close_return;
 	}
 #endif
 #ifdef HAVE_WIN_SHM
 	HANDLE memfd;
 
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, SHM_SIZE, NULL);
+	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
 
 	if (memfd == NULL) {
 		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
@@ -1825,17 +1880,21 @@ int lightrec_init_mmap()
 	}
 #endif
 
-	/* Try to map at various base addresses*/
-	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
-		base = supported_io_bases[i];
-		bios = (void *)(base + 0x1fc00000);
-		scratch = (void *)(base + 0x1f800000);
+map_io_base:
+	/* Try to map at various io_base addresses*/
+	for (; i*inc_io_base <= max_io_base; i++) {
+		io_base = i*inc_io_base;
+		if(io_base < min_io_base)
+			continue;
+
+		bios = (void *)(io_base + 0x1fc00000);
+		scratch = (void *)(io_base + 0x1f800000);
 
 		for (j = 0; j < NUM_MEM; j++) {
-			map = MAP((void *)(base + j * RAM_SIZE), RAM_SIZE, memfd, 0);
+			map = MAP_SHM((void *)(io_base + j * RAM_SIZE), RAM_SIZE, memfd, 0);
 			if (map == MFAILED)
 				break;
-			else if (map != (void *)(base + j * RAM_SIZE))
+			else if (map != (void *)(io_base + j * RAM_SIZE))
 			{
 				//not at expected address, reject it
 				UNMAP(map, RAM_SIZE);
@@ -1843,57 +1902,89 @@ int lightrec_init_mmap()
 			}
 		}
 
-		/* Impossible to map using this base */
+		/* Impossible to map using this io_base */
 		if (j == 0)
 			continue;
 
 		/* All mirrors mapped - we got a match! */
 		if (j == NUM_MEM)
 		{
-			psx_mem = (uint8 *)base;
+			psx_mem = (uint8 *)io_base;
 
-			map = MAP(bios, BIOS_SIZE, memfd, RAM_SIZE);
+			if (ENABLE_CODE_BUFFER) {
+				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
+				map = MAP_CODE((void *)(io_base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
+
+				if (map == MFAILED)
+					goto err_unmap;
+
+				lightrec_codebuffer = (uint8_t *)map;
+			}
+
+			map = MAP(bios, BIOS_SIZE, memfd, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE);
 			if (map == MFAILED)
 				goto err_unmap;
 
 			psx_bios = (uint8 *)map;
 
 			if (map != bios)
-				goto err_unmap_bios;
+				goto err_unmap;
 
-			map = MAP(scratch, SCRATCH_SIZE, memfd, RAM_SIZE+BIOS_SIZE);
+			map = MAP(scratch, SCRATCH_SIZE, memfd, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE);
 			if (map == MFAILED)
-				goto err_unmap_bios;
+				goto err_unmap;
 
 			psx_scratch = (uint8 *)map;
 
 			if (map != scratch)
-				goto err_unmap_scratch;
+				goto err_unmap;
 
-			r = NUM_MEM;
+			ret = NUM_MEM;
 
+			/* Successfull mmap, skipping any code before close_return */
 			goto close_return;
 		}
 
-err_unmap_scratch:
+err_unmap:
+		if(lightrec_codebuffer){
+			UNMAP(lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE);
+			lightrec_codebuffer = NULL;
+		}
+
 		if(psx_scratch){
 			UNMAP(psx_scratch, SCRATCH_SIZE);
 			psx_scratch = NULL;
 		}
-err_unmap_bios:
+
 		if(psx_bios){
 			UNMAP(psx_bios, BIOS_SIZE);
 			psx_bios = NULL;
 		}
-err_unmap:
+
 		/* Clean up any mapped ram or mirrors and try again */
 		for (; j > 0; j--)
-			UNMAP((void *)(base + (j - 1) * RAM_SIZE), RAM_SIZE);
+			UNMAP((void *)(io_base + (j - 1) * RAM_SIZE), RAM_SIZE);
 
 		psx_mem = NULL;
 	}
 
-	if (i == ARRAY_SIZE(supported_io_bases)) {
+#ifdef max_io_base_64
+	/* Successful mmap will goto close_return, so have already tried all io_base
+	 up to original max_io_base, try a larger max and increment if running on 64 bit,
+	 adds more than a dozen new io_base, while attempting much higher addresses */
+	if (max_io_base != max_io_base_64) {
+		inc_io_base = inc_io_base_64;
+		max_io_base = max_io_base_64;
+		/* skips 0x0 io_base, already been tried at this point, the for loop
+		 at map_io_base doesn't reset i, so set it here */
+		i = 1;
+		goto map_io_base;
+	}
+#endif
+
+	/* We have tried all io_base addresses, give warning unless we are still in hugetlb mode,
+	 which will fallback to non-hugetlb and attempt lightrec_init_mmap() again */
+	if (!hugetlb) {
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower\n");
 	}
 
@@ -1904,13 +1995,16 @@ close_return:
 #ifdef HAVE_WIN_SHM
 	CloseHandle(memfd);
 #endif
-	return r;
+	return ret;
 }
 
 void lightrec_free_mmap()
 {
 	for (int i = 0; i < NUM_MEM; i++)
 		UNMAP((void *)((uintptr_t)psx_mem + i * RAM_SIZE), RAM_SIZE);
+
+	if (lightrec_codebuffer)
+		UNMAP(lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE);
 
 	UNMAP(psx_bios, BIOS_SIZE);
 	UNMAP(psx_scratch, SCRATCH_SIZE);
@@ -1993,7 +2087,13 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       sle = tmp;
    }
 
+#ifdef HAVE_LIGHTREC
+   PSX_CPU_MEDNAFEN = new PS_CPU();
+   PSX_CPU_LIGHTREC = new PS_CPU_LIGHTREC(PSX_CPU_MEDNAFEN);
+   PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
+#else
    PSX_CPU = new PS_CPU();
+#endif
    PSX_SPU = new PS_SPU();
 
    GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
@@ -2060,7 +2160,11 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       SetDiscWrapper(CD_TrayOpen);
 
 #ifdef HAVE_LIGHTREC
-   psx_mmap = lightrec_init_mmap();
+   //try hugetlb then fallback if mmap fails
+   psx_mmap = lightrec_init_mmap(true);
+
+   if(psx_mmap == 0)
+      psx_mmap = lightrec_init_mmap(false);
 
    if(psx_mmap > 0)
    {
@@ -2415,8 +2519,17 @@ static void Cleanup(void)
 
    GPU_Destroy();
 
+#ifdef HAVE_LIGHTREC
+   if(PSX_CPU_MEDNAFEN)
+      delete PSX_CPU_MEDNAFEN;
+   PSX_CPU_MEDNAFEN = NULL;
+   if(PSX_CPU_LIGHTREC)
+      delete PSX_CPU_LIGHTREC;
+   PSX_CPU_LIGHTREC = NULL;
+#else
    if(PSX_CPU)
       delete PSX_CPU;
+#endif
    PSX_CPU = NULL;
 
    if(PSX_FIO)
@@ -2427,15 +2540,17 @@ static void Cleanup(void)
    DMA_Kill();
 
 #ifdef HAVE_LIGHTREC
-   MainRAM = NULL;
+   MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
    ScratchRAM = NULL;
    BIOSROM = NULL;
    if(psx_mmap > 0)
       lightrec_free_mmap();
+   if(lightrec_codebuffer)
+      lightrec_codebuffer = NULL;
 #else
-   if(MainRAM)
+   if(MainRAM != INVALID_PTR)
       delete MainRAM;
-   MainRAM = NULL;
+   MainRAM = (MultiAccessSizeMem<2048 * 1024, uint32, false>*)INVALID_PTR;
 
    if(ScratchRAM)
       delete ScratchRAM;
@@ -3196,28 +3311,44 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "execute") == 0)
-         psx_dynarec = DYNAREC_EXECUTE;
-      else if (strcmp(var.value, "execute_one") == 0)
-         psx_dynarec = DYNAREC_EXECUTE_ONE;
+      {
+         lightrec_interpreter = false;
+         psx_dynarec = true;
+      }
       else if (strcmp(var.value, "run_interpreter") == 0)
-         psx_dynarec = DYNAREC_RUN_INTERPRETER;
+      {
+         lightrec_interpreter = true;
+         psx_dynarec = true;
+      }
       else
-         psx_dynarec = DYNAREC_DISABLED;
+         psx_dynarec = false;
    }
    else
-      psx_dynarec = DYNAREC_DISABLED;
+      psx_dynarec = false;
 
    var.key = BEETLE_OPT(dynarec_invalidate);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "full") == 0)
-         psx_dynarec_invalidate = false;
-      else if (strcmp(var.value, "dma") == 0)
          psx_dynarec_invalidate = true;
+      else if (strcmp(var.value, "dma") == 0)
+         psx_dynarec_invalidate = false;
    }
    else
-      psx_dynarec_invalidate = false;
+      psx_dynarec_invalidate = true;
+
+   var.key = BEETLE_OPT(dynarec_spgp_opt);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         psx_dynarec_spgp_opt = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         psx_dynarec_spgp_opt = false;
+   }
+   else
+      psx_dynarec_spgp_opt = false;
 
    var.key = BEETLE_OPT(dynarec_eventcycles);
 
@@ -4062,6 +4193,13 @@ static void check_variables(bool startup)
       memcard_right_index_old = memcard_right_index;
       memcard_right_index     = atoi(var.value);
    }
+
+#ifdef HAVE_LIGHTREC
+   if(PSX_CPU)
+   {
+    PSX_CPU = psx_dynarec ? PSX_CPU_LIGHTREC : PSX_CPU_MEDNAFEN;
+   }
+#endif
 }
 
 #ifdef NEED_CD
@@ -4353,7 +4491,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef HAVE_LIGHTREC
       /* Do not run lightrec if firmware is not found, recompiling garbage is bad*/
-      psx_dynarec = DYNAREC_DISABLED;
+      psx_dynarec = false;
+      PSX_CPU = PSX_CPU_MEDNAFEN;
+      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
 #endif
    }
 
@@ -4604,6 +4744,10 @@ void retro_run(void)
                                 MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
       PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction | psx_pgxp_nclip);
+
+#ifdef HAVE_LIGHTREC
+      PSX_CPU_LIGHTREC->SetOptions(lightrec_interpreter,psx_dynarec_invalidate,psx_dynarec_spgp_opt,psx_dynarec);
+#endif
 
       // Reload memory cards if they were changed
       if (use_mednafen_memcard0_method &&
