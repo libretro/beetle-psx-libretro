@@ -4850,7 +4850,7 @@ void retro_run(void)
 
          deint.Process(surf, spec.DisplayRect, rects, spec.InterlaceField);
 
-         PrevInterlaced = (deint.GetType() == Deinterlacer::DEINT_WEAVE) ? true : false;
+         PrevInterlaced = true;
 
          spec.InterlaceOn = false;
          spec.InterlaceField = 0;
@@ -4863,7 +4863,7 @@ void retro_run(void)
       height = spec.DisplayRect.h;
 
 #ifdef NEED_DEINTERLACER
-      if (currently_interlaced && deint.GetType() == Deinterlacer::DEINT_BOB)
+      if ((currently_interlaced || PrevInterlaced) && deint.GetType() == Deinterlacer::DEINT_BOB)
          height /= 2;
 #endif
 
@@ -4928,7 +4928,7 @@ void retro_run(void)
       height <<= upscale_shift;
       pix     += pix_offset << upscale_shift;
 
-      if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0) || !allow_frame_duping || currently_interlaced)
+      if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0) || !allow_frame_duping || currently_interlaced || PrevInterlaced)
          fb = pix;
    }
 

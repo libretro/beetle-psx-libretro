@@ -99,7 +99,7 @@ void Deinterlacer::InternalProcess(MDFN_Surface *surface, MDFN_Rect &DisplayRect
   {
    const T* src = surface->pixels + ((y * 2) + field + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
 #ifdef BOB_LORES
-   T* dest = surface->pixels + ((y * 1) + field + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
+   T* dest = surface->pixels + (y + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
 #else
    T* dest = surface->pixels + ((y * 2) + (field ^ 1) + DisplayRect.y) * surface->pitchinpix + DisplayRect.x;
 #endif
