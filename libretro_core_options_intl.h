@@ -421,6 +421,10 @@ extern "C" {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_AR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_AR NULL
 #define OPTION_VAL_287_AR NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_AR NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_AR NULL
+#define OPTION_VAL_WEAVE_AR NULL
+#define OPTION_VAL_BOB_AR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_AR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_AR NULL
 #define OPTION_VAL_SYNC_AR NULL
@@ -2039,6 +2043,20 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_AR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_AR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_AR },
+         { "bob",  OPTION_VAL_BOB_AR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -2465,6 +2483,10 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_AST NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_AST NULL
 #define OPTION_VAL_287_AST "287 (por defeutu)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_AST NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_AST NULL
+#define OPTION_VAL_WEAVE_AST NULL
+#define OPTION_VAL_BOB_AST NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_AST "Métodu d'accesu a los CDs (ríquese reaniciar)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_AST NULL
 #define OPTION_VAL_SYNC_AST "Síncronu"
@@ -4083,6 +4105,20 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_AST,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_AST,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_AST },
+         { "bob",  OPTION_VAL_BOB_AST },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -4509,6 +4545,10 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_BE "Апошні радок разгорткі - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_BE "Лінія разгорткі, якая адлюстроўваецца апошняй пры запуску PAL-кантэнту. Значэнні ніжэй 287 памяншаюць вышыню выходнай выявы, зразаючы частку пікселяў па ніжнім краі. Можа прымяняцца для кампенсацыі чорных палос."
 #define OPTION_VAL_287_BE "287 (прадвызначана)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_BE NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_BE NULL
+#define OPTION_VAL_WEAVE_BE NULL
+#define OPTION_VAL_BOB_BE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_BE "Метад доступу CD (патрабуецца перазапуск)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_BE "Метад счытвання дадзеных з вобразаў дыскаў. 'Сінхронны' імітуе арыгінальную кансоль. 'Асінхронны' можа памяншаць падтармажванні для прылад з павольнай памяццю. У рэжыме 'Перадзагрузка' выява дыска цалкам загружаюцца ў аператыўную памяць пры запуску гульні, што дапамагае паскорыць унутрагульнявыя загрузкі за кошт затрымкі пры запуску. 'Прадзагрузка' можа выклікаць памылкі пры малым аб'ёме АЗП. Пры запуску гульняў з фіз. кампакт-дыскаў выкарыстоўваецца 'Сінхронны'."
 #define OPTION_VAL_SYNC_BE "Сінхронны"
@@ -6127,6 +6167,20 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_BE,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_BE,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_BE },
+         { "bob",  OPTION_VAL_BOB_BE },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -6553,6 +6607,10 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_BG NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_BG NULL
 #define OPTION_VAL_287_BG NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_BG NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_BG NULL
+#define OPTION_VAL_WEAVE_BG NULL
+#define OPTION_VAL_BOB_BG NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_BG NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_BG NULL
 #define OPTION_VAL_SYNC_BG NULL
@@ -8171,6 +8229,20 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_BG,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_BG,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_BG },
+         { "bob",  OPTION_VAL_BOB_BG },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -8597,6 +8669,10 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CA "Última linia escanejada - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CA "Selecciona l'última línia d'escombrat que es mostrarà en executar contingut PAL. Un valor inferior a 287 reduirà l'alçada de les imatges generades, retallant píxels de la part inferior. Pot servir per evitar l'efecte 'letterboxing'."
 #define OPTION_VAL_287_CA "287 (Per defecte)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_CA "Mètode de desentrellaçat"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_CA "«Weave» mostra els dos camps en el mateix fotograma per a una imatge estàtica a alta resolució, «Bob» sacrifica la claredat de la resolució per a una major claredat del moviment."
+#define OPTION_VAL_WEAVE_CA NULL
+#define OPTION_VAL_BOB_CA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CA "Mètode d'accés al CD (Es requereix reinici)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CA "Selecciona el mètode que es farà servir per llegir dades de les imatges de disc. 'Sincrònic' emula el maquinari original, 'Asincrònic' pot reduir les estrebades en els dispositius que tinguin un dispositiu d'emmagatzematge lent i 'Precarregat' carrega la imatge de disc sencera en memòria en executar contingut, això pot millorar el temps de càrrega del joc a costa de retardar l'arrancada inicial del joc. 'Precarregat' pot produir problemes en sistemes amb poca memòria RAM."
 #define OPTION_VAL_SYNC_CA "Sincrònic"
@@ -10215,6 +10291,20 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_CA,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_CA,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_CA },
+         { "bob",  OPTION_VAL_BOB_CA },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -10641,6 +10731,10 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CHS NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CHS NULL
 #define OPTION_VAL_287_CHS "287 (默认)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_CHS NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_CHS NULL
+#define OPTION_VAL_WEAVE_CHS NULL
+#define OPTION_VAL_BOB_CHS NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CHS "CD 访问方法 (需要重启)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CHS "选择从镜像读取数据的方法。“同步”模拟原始硬件。“异步”可减少存储速度慢的设备上的卡顿现象。“预缓存”会在启动内容时将整个磁盘映像加载到内存中，这可能会改善游戏内的加载时间，但代价是启动时会出现初始延迟。“预缓存”可能会对内存不足的系统造成影响，因此在使用物理介质时会退回到 ”同步 \"模式。"
 #define OPTION_VAL_SYNC_CHS "同步"
@@ -12259,6 +12353,20 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_CHS,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_CHS,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_CHS },
+         { "bob",  OPTION_VAL_BOB_CHS },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -12685,6 +12793,10 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CHT NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CHT NULL
 #define OPTION_VAL_287_CHT "287 (預設)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_CHT NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_CHT NULL
+#define OPTION_VAL_WEAVE_CHT NULL
+#define OPTION_VAL_BOB_CHT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CHT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CHT NULL
 #define OPTION_VAL_SYNC_CHT NULL
@@ -14303,6 +14415,20 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_CHT,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_CHT,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_CHT },
+         { "bob",  OPTION_VAL_BOB_CHT },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -14729,6 +14855,10 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CS "Poslední Skenovací Řádek - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CS "Při spuštění obsahu PAL vyberte poslední zobrazený řádek skenování. Hodnoty nižší než 287 sníží výšku výstupních obrazů oříznutím pixelů od nejspodnějšího okraje. Lze použít k potlačení letterboxingu."
 #define OPTION_VAL_287_CS "287 (Výchozí)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_CS NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_CS NULL
+#define OPTION_VAL_WEAVE_CS NULL
+#define OPTION_VAL_BOB_CS NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CS "Metoda Přístupu CD (Vyžadován Restart)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CS "Zvolte metodu používanou ke čtení dat z obrazů disku s obsahem. 'Synchronní' napodobuje původní hardware. 'Asynchronní' může snížit zadrhávání na zařízeních s pomalým úložištěm. 'Pre-Cache' načte celý obraz disku do paměti při spuštění obsahu, což může zlepšit časy načítání ve hře za cenu počátečního zpoždění při spuštění. Funkce 'Pre-Cache' může způsobovat problémy na systémech s malou pamětí RAM a v případě fyzických médií se vrátí k funkci 'Synchronní'."
 #define OPTION_VAL_SYNC_CS "Synchronní"
@@ -16347,6 +16477,20 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_CS,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_CS,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_CS },
+         { "bob",  OPTION_VAL_BOB_CS },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -16773,6 +16917,10 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_CY NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_CY NULL
 #define OPTION_VAL_287_CY NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_CY NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_CY NULL
+#define OPTION_VAL_WEAVE_CY NULL
+#define OPTION_VAL_BOB_CY NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CY NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CY NULL
 #define OPTION_VAL_SYNC_CY NULL
@@ -18391,6 +18539,20 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_CY,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_CY,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_CY },
+         { "bob",  OPTION_VAL_BOB_CY },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -18817,6 +18979,10 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_DA NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_DA NULL
 #define OPTION_VAL_287_DA NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_DA NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_DA NULL
+#define OPTION_VAL_WEAVE_DA NULL
+#define OPTION_VAL_BOB_DA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_DA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_DA NULL
 #define OPTION_VAL_SYNC_DA NULL
@@ -20435,6 +20601,20 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_DA,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_DA,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_DA },
+         { "bob",  OPTION_VAL_BOB_DA },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -20861,6 +21041,10 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_DE "Letzte Abtastzeile - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_DE "Wählen Sie die letzte angezeigte Scanline beim Ausführen von PAL-Inhalten. Werte unter 287 verringern die Höhe der Ausgabebilder durch Zuschneiden von Pixeln von der unteren Kante. Kann verwendet werden, um schwarze Balken entgegenzuwirken."
 #define OPTION_VAL_287_DE "287 (Standard)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_DE "Deinterlacing-Methode"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_DE NULL
+#define OPTION_VAL_WEAVE_DE NULL
+#define OPTION_VAL_BOB_DE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_DE "CD-Zugriffsmethode (Neustart erforderlich)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_DE "Methode auswählen, mit der Daten von CD-Abbildern gelesen werden. „Synchron“ ahmt die Originalhardware nach. „Asynchron“ kann das Stottern auf Geräten mit langsamem Speicher verringern. „Vorab laden“ lädt beim Starten von Inhalten das gesamte CD-Abbildes in den Speicher, was die Ladezeiten im Spiel auf Kosten einer anfänglichen Verzögerung beim Starten verbessern kann. „Vorab laden“ kann auf Systemen mit wenig Arbeitsspeicher zu Problemen führen, und wird bei physischen Medien auf „Synchron“ zurückgreifen."
 #define OPTION_VAL_SYNC_DE "Synchron"
@@ -22479,6 +22663,20 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_DE,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_DE,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_DE },
+         { "bob",  OPTION_VAL_BOB_DE },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -22905,6 +23103,10 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_EL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_EL NULL
 #define OPTION_VAL_287_EL "287 (Προεπιλογή)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_EL NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_EL NULL
+#define OPTION_VAL_WEAVE_EL NULL
+#define OPTION_VAL_BOB_EL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_EL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_EL NULL
 #define OPTION_VAL_SYNC_EL NULL
@@ -24523,6 +24725,20 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_EL,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_EL,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_EL },
+         { "bob",  OPTION_VAL_BOB_EL },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -24949,6 +25165,10 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_EN NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_EN "Choose the last displayed scan line when running PAL content. Values below 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letter-boxing."
 #define OPTION_VAL_287_EN NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_EN NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_EN NULL
+#define OPTION_VAL_WEAVE_EN NULL
+#define OPTION_VAL_BOB_EN NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_EN NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_EN "Choose the method used to read data from content disk images. 'Synchronous' mimics original hardware. 'Asynchronous' can reduce stuttering on devices with slow storage. 'Pre-Cache' loads the entire disk image into memory when launching content, which may improve in-game loading times at the cost of an initial delay at start-up. 'Pre-Cache' may cause issues on systems with low RAM, and will fall back to 'Synchronous' for physical media."
 #define OPTION_VAL_SYNC_EN NULL
@@ -26567,6 +26787,20 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_EN,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_EN,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_EN },
+         { "bob",  OPTION_VAL_BOB_EN },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -26993,6 +27227,10 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_EO NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_EO NULL
 #define OPTION_VAL_287_EO NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_EO NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_EO NULL
+#define OPTION_VAL_WEAVE_EO NULL
+#define OPTION_VAL_BOB_EO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_EO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_EO NULL
 #define OPTION_VAL_SYNC_EO NULL
@@ -28611,6 +28849,20 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_EO,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_EO,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_EO },
+         { "bob",  OPTION_VAL_BOB_EO },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -29037,6 +29289,10 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_ES "Línea de barrido final en formato PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_ES "Selecciona la última línea de barrido que se mostrará al ejecutar contenidos PAL. Un valor inferior a 287 reducirá la altura de las imágenes generadas recortando los píxeles de la parte inferior. Puede servir para evitar el efecto «letterboxing»."
 #define OPTION_VAL_287_ES "287 (por defecto)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_ES "Método de desentrelazado"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_ES "«Weave» muestra ambos campos en el mismo fotograma para producir imágenes fijas a la resolución máxima, «Bob» sacrifica claridad en la resolución para ganarla en los movimientos."
+#define OPTION_VAL_WEAVE_ES "«Weave»"
+#define OPTION_VAL_BOB_ES NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_ES "Método de acceso al CD (es necesario reiniciar)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_ES "Selecciona el método utilizado para leer datos de las imágenes de disco del contenido. «Sincrónico» simula el hardware original, «Asincrónico» puede reducir los tirones en aquellos dispositivos que tengan un almacenamiento lento y «Precacheado» carga la imagen de disco entera en memoria al ejecutar el contenido, lo que puede mejorar los tiempos de carga del juego a costa de retrasar el arranque inicial. «Precacheado» puede producir problemas en sistemas con poca RAM."
 #define OPTION_VAL_SYNC_ES "Sincrónico"
@@ -30655,6 +30911,20 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_ES,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_ES,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_ES },
+         { "bob",  OPTION_VAL_BOB_ES },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -31081,6 +31351,10 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_FA NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_FA NULL
 #define OPTION_VAL_287_FA NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_FA NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_FA NULL
+#define OPTION_VAL_WEAVE_FA NULL
+#define OPTION_VAL_BOB_FA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FA NULL
 #define OPTION_VAL_SYNC_FA NULL
@@ -32699,6 +32973,20 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_FA,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_FA,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_FA },
+         { "bob",  OPTION_VAL_BOB_FA },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -33125,6 +33413,10 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_FI NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_FI NULL
 #define OPTION_VAL_287_FI "287 (Oletus)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_FI NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_FI NULL
+#define OPTION_VAL_WEAVE_FI NULL
+#define OPTION_VAL_BOB_FI NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FI NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FI NULL
 #define OPTION_VAL_SYNC_FI "Synkroninen"
@@ -34743,6 +35035,20 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_FI,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_FI,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_FI },
+         { "bob",  OPTION_VAL_BOB_FI },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -35169,6 +35475,10 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_FR "Dernière ligne de balayage - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_FR "Sélectionner la dernière ligne de balayage affichée lors de l'exécution de contenu PAL. Les valeurs inférieures à 287 réduiront la hauteur des images en sortie en recadrant les pixels à partir du bord le plus bas. Peut être utilisé pour contrecarrer l'effet de letterboxing."
 #define OPTION_VAL_287_FR "287 (par défaut)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_FR "Méthode de désentrelacement"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_FR "'Weave' montre les deux champs sur la même image pour une image fixe haute résolution, 'Bob' sacrifie la clarté de la résolution pour la clarté de mouvement."
+#define OPTION_VAL_WEAVE_FR NULL
+#define OPTION_VAL_BOB_FR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FR "Méthode d'accès au CD (Redémarrage requis)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FR "Sélectionner la méthode utilisée pour lire les données à partir des images disque de contenu. 'Synchrone' imite le matériel original. 'Asynchrone' peut réduire les saccades sur les appareils avec un stockage lent. 'Pré-cachée' charge la totalité de l'image disque en mémoire lors du lancement de contenu, ce qui peut améliorer les temps de chargement en jeu au prix d'un délai initial au démarrage. 'Pré-cachée' peut causer des problèmes sur les systèmes avec peu de mémoire vive (RAM), et se repliera sur 'Synchrone' pour les médias physiques."
 #define OPTION_VAL_SYNC_FR "Synchrone"
@@ -36787,6 +37097,20 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_FR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_FR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_FR },
+         { "bob",  OPTION_VAL_BOB_FR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -37213,6 +37537,10 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GL "Última liña de exploración - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GL "Escolla a última liña de dixitalización mostrada ao executar contido PAL. Os valores inferiores a 287 reducirán a altura das imaxes de saída recortando os píxeles desde o bordo inferior. Pódese usar para contrarrestar o letterboxing."
 #define OPTION_VAL_287_GL "287 (predeterminado)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_GL NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_GL NULL
+#define OPTION_VAL_WEAVE_GL NULL
+#define OPTION_VAL_BOB_GL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GL "Método de acceso ao CD (reinicio necesario)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GL "Escolla o método utilizado para ler os datos das imaxes do disco de contido. 'Synchronous' imita o hardware orixinal. \"Asíncrona\" pode reducir o tartamudeo nos dispositivos con almacenamento lento. \"Pre-caché\" carga toda a imaxe do disco na memoria ao lanzar contido, o que pode mellorar os tempos de carga do xogo a costa dun atraso inicial no inicio. A \"pre-caché\" pode causar problemas en sistemas con pouca memoria RAM e volverá a utilizar \"Síncronos\" para os medios físicos."
 #define OPTION_VAL_SYNC_GL "Sincrónico"
@@ -38831,6 +39159,20 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_GL,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_GL,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_GL },
+         { "bob",  OPTION_VAL_BOB_GL },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -39257,6 +39599,10 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_HE NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_HE NULL
 #define OPTION_VAL_287_HE NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_HE NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_HE NULL
+#define OPTION_VAL_WEAVE_HE NULL
+#define OPTION_VAL_BOB_HE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_HE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_HE NULL
 #define OPTION_VAL_SYNC_HE NULL
@@ -40875,6 +41221,20 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_HE,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_HE,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_HE },
+         { "bob",  OPTION_VAL_BOB_HE },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -41301,6 +41661,10 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_HR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_HR NULL
 #define OPTION_VAL_287_HR NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_HR NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_HR NULL
+#define OPTION_VAL_WEAVE_HR NULL
+#define OPTION_VAL_BOB_HR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_HR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_HR NULL
 #define OPTION_VAL_SYNC_HR NULL
@@ -42919,6 +43283,20 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_HR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_HR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_HR },
+         { "bob",  OPTION_VAL_BOB_HR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -43345,6 +43723,10 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_HU "Utolsó scanline - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_HU "Az utolsó megjelenített scanline PAL tartalom futtatásakor. A 287-nél kisebb értékek csökkentik a kimenő kép magasságát, levágva az alsó sorokat. A letterbox hatást lehet vele ellensúlyozni."
 #define OPTION_VAL_287_HU "287 (alapértelmezett)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_HU "Deinterlace módszer"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_HU "A „Szövés” mindkét mezőt ugyanazon a képkockán mutatja a teljes, nagy felbontású állókép érdekében, a „Bob” a felbontás tisztaságát áldozza fel a mozgás tisztaságáért."
+#define OPTION_VAL_WEAVE_HU "Szövés"
+#define OPTION_VAL_BOB_HU NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_HU "CD hozzáférés módszere (újraindítás szükséges)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_HU "A CD képfájlok adatainak beolvasásához használt módszer. A szinkron mód az eredeti hardvert utánozza. Az aszinkron mód csökkentheti a döcögést lassú tárhellyel rendelkező eszközökön. Az előre betöltött módszer a teljes képfájlt memóriába olvassa a tartalom elindításakor, ami a játék közbeni töltési időkön javít, a kezdeti hosszabb várakozásért cserébe. Az előre betöltött módszer gondot okozhat kevés RAM-mal rendelkező rendszereken, és visszaáll a szinkron módra fizikai lemez esetén."
 #define OPTION_VAL_SYNC_HU "Szinkron"
@@ -44963,6 +45345,20 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_HU,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_HU,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_HU },
+         { "bob",  OPTION_VAL_BOB_HU },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -45389,6 +45785,10 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_ID NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_ID NULL
 #define OPTION_VAL_287_ID NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_ID NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_ID NULL
+#define OPTION_VAL_WEAVE_ID NULL
+#define OPTION_VAL_BOB_ID NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_ID "Cara Akses CD (Perlu Mulai Ulang)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_ID NULL
 #define OPTION_VAL_SYNC_ID NULL
@@ -47007,6 +47407,20 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_ID,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_ID,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_ID },
+         { "bob",  OPTION_VAL_BOB_ID },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -47433,6 +47847,10 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_IT "Ultima Linea Di Scansione - Pal"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_IT "Scegli l'ultima linea di scansione visualizzata quando si esegue il contenuto PAL. I valori inferiori a 287 ridurranno l'altezza delle immagini in uscita ritagliando i pixel dal bordo più basso. Può essere usato per contrastare la casella di lettere."
 #define OPTION_VAL_287_IT "287 (Predefinito)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_IT "Metodo Deinterlacciamento"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_IT "'Intreccio' mostra entrambi i campi sullo stesso fotogramma per l'immagine ferma ad alta risoluzione, 'Bob' sacrifici la chiarezza della risoluzione per la chiarezza del movimento."
+#define OPTION_VAL_WEAVE_IT "Intreccio"
+#define OPTION_VAL_BOB_IT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_IT "Metodo Accesso CD (necessita riavvio)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_IT "Scegli il metodo utilizzato per leggere i dati dalle immagini del disco del contenuto. 'Sincrono' imita l'hardware originale. 'Asynchronous' può ridurre la balbuzie su dispositivi con archiviazione lenta. 'Pre-Cache' carica l'intera immagine del disco in memoria quando si avvia il contenuto, che può migliorare i tempi di caricamento in gioco al costo di un ritardo iniziale all'avvio. 'Pre-Cache' può causare problemi sui sistemi con RAM bassa, e ricadrà su 'Sincrono' per i supporti fisici."
 #define OPTION_VAL_SYNC_IT "Sincrono"
@@ -49051,6 +49469,20 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_IT,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_IT,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_IT },
+         { "bob",  OPTION_VAL_BOB_IT },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -49477,6 +49909,10 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_JA "終了スキャンライン - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_JA "PAL コンテンツを実行する際に最後に表示されるスキャンラインを選択します。 287 より小さい値を指定すると、下端からピクセルをトリミングすることで出力イメージの高さが減少します。レターボックスの対処に使用されることがあります。"
 #define OPTION_VAL_287_JA "287 (デフォルト)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_JA "インターレース解除方式"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_JA NULL
+#define OPTION_VAL_WEAVE_JA NULL
+#define OPTION_VAL_BOB_JA NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_JA "CD アクセス方式 (再起動が必要)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_JA "コンテンツディスクのイメージからデータを読み取る方式を選択します。[同期] は実機を模倣します。[非同期] はストレージが遅いデバイスでカクつきを減らすことができます。[プリキャッシュ] はコンテンツの起動時にディスクイメージ全体をメモリにロードし、起動時間が増加する代わりにゲーム中のロード時間を改善します。"
 #define OPTION_VAL_SYNC_JA "同期"
@@ -51095,6 +51531,20 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_JA,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_JA,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_JA },
+         { "bob",  OPTION_VAL_BOB_JA },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -51521,6 +51971,10 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_KO "마지막 스캔라인 - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_KO "PAL 컨텐츠를 실행할 때 표시할 마지막 스캔라인을 선택합니다. 287보다 작은 값으로 설정할 경우 출력되는 이미지를 아래에서부터 잘라내 높이를 줄입니다. 레터박스를 없애는 데 사용될 수 있습니다."
 #define OPTION_VAL_287_KO "287 (기본)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_KO "디인터레이스 방식"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_KO "'Weave'는 두 필드를 한 프레임 안에 모두 표시하는 방식으로 정지 화면에서 전체 해상도의 깔끔한 영상을 얻을 수 있고, 'Bob'은 해상도가 낮아지는 대신 움직이는 화면에서의 시인성이 높은 방식입니다."
+#define OPTION_VAL_WEAVE_KO NULL
+#define OPTION_VAL_BOB_KO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_KO "CD 액세스 방식 (재시작 필요)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_KO "컨텐츠의 디스크 이미지에서 데이터를 읽어올 방식을 선택합니다. '동기'는 원본 하드웨어의 동작을 흉내냅니다. '비동기'는 저장소가 느린 장치에서 버벅임을 줄일 수 있습니다. '미리 캐싱'은 컨텐츠를 실행할 때 전체 디스크 이미지를 메모리에 불러옵니다. 첫 시작 시 딜레이가 생기지만 인게임 로딩 시간이 줄어듭니다. '미리 캐싱'은 RAM이 적은 장치에서 문제를 일으킬 수 있으며, 물리적 미디어를 사용할 경우 '동기'가 사용됩니다."
 #define OPTION_VAL_SYNC_KO "동기"
@@ -53139,6 +53593,20 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_KO,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_KO,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_KO },
+         { "bob",  OPTION_VAL_BOB_KO },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -53565,6 +54033,10 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_NL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_NL NULL
 #define OPTION_VAL_287_NL NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_NL NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_NL NULL
+#define OPTION_VAL_WEAVE_NL NULL
+#define OPTION_VAL_BOB_NL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_NL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_NL NULL
 #define OPTION_VAL_SYNC_NL NULL
@@ -55183,6 +55655,20 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_NL,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_NL,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_NL },
+         { "bob",  OPTION_VAL_BOB_NL },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -55609,6 +56095,10 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_NO NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_NO NULL
 #define OPTION_VAL_287_NO NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_NO NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_NO NULL
+#define OPTION_VAL_WEAVE_NO NULL
+#define OPTION_VAL_BOB_NO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_NO NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_NO NULL
 #define OPTION_VAL_SYNC_NO NULL
@@ -57227,6 +57717,20 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_NO,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_NO },
+         { "bob",  OPTION_VAL_BOB_NO },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -57653,6 +58157,10 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_OR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_OR NULL
 #define OPTION_VAL_287_OR NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_OR NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_OR NULL
+#define OPTION_VAL_WEAVE_OR NULL
+#define OPTION_VAL_BOB_OR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_OR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_OR NULL
 #define OPTION_VAL_SYNC_OR NULL
@@ -59271,6 +59779,20 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_OR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_OR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_OR },
+         { "bob",  OPTION_VAL_BOB_OR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -59697,6 +60219,10 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PL NULL
 #define OPTION_VAL_287_PL "287 (domyślnie)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_PL NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_PL NULL
+#define OPTION_VAL_WEAVE_PL NULL
+#define OPTION_VAL_BOB_PL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_PL NULL
 #define OPTION_VAL_SYNC_PL NULL
@@ -61315,6 +61841,20 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_PL,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_PL,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_PL },
+         { "bob",  OPTION_VAL_BOB_PL },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -61741,6 +62281,10 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura final (PAL)"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos PAL. Um valor inferior a 287 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_287_PT_BR "287 (padrão)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_PT_BR NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_PT_BR NULL
+#define OPTION_VAL_WEAVE_PT_BR NULL
+#define OPTION_VAL_BOB_PT_BR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PT_BR "Método de acesso ao CD (requer reinício)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_PT_BR "Seleciona o método usado para ler os dados das imagens do disco de conteúdo. 'Síncrono' simula o hardware original, 'Assíncrono' pode reduzir os travamentos em dispositivos com armazenamento lento, e 'Pré-cache' carrega toda a imagem do disco para a memória ao executar o conteúdo, o que pode melhorar os tempos de carga do jogo ao custo de atrasar o boot inicial. 'Pré-cache' pode causar problemas em sistemas com pouca RAM."
 #define OPTION_VAL_SYNC_PT_BR "Síncrono"
@@ -63359,6 +63903,20 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_PT_BR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_PT_BR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_PT_BR },
+         { "bob",  OPTION_VAL_BOB_PT_BR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -63785,6 +64343,10 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_PT NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PT_PT NULL
 #define OPTION_VAL_287_PT_PT "287 (Padrão)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_PT_PT NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_PT_PT NULL
+#define OPTION_VAL_WEAVE_PT_PT NULL
+#define OPTION_VAL_BOB_PT_PT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PT_PT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_PT_PT NULL
 #define OPTION_VAL_SYNC_PT_PT NULL
@@ -65403,6 +65965,20 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_PT_PT,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_PT_PT,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_PT_PT },
+         { "bob",  OPTION_VAL_BOB_PT_PT },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -65829,6 +66405,10 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_RU "Последняя строка развёртки - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_RU "Линия развёртки, отображаемая последней при запуске PAL-контента. Значения ниже 287 уменьшают высоту выходного изображения, срезая часть пикселей по нижнему краю. Может применяться для компенсации чёрных полос."
 #define OPTION_VAL_287_RU "287 (по умолчанию)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_RU "Метод деинтерлейсинга"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_RU "'Weave' показывает оба поля на одном кадре для полного неподвижного изображения в высоком разрешении. 'Bob' жертвует чёткостью разрешения ради чёткости движения."
+#define OPTION_VAL_WEAVE_RU NULL
+#define OPTION_VAL_BOB_RU NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_RU "Режим доступа к CD (требуется перезапуск)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_RU "Метод чтения данных с образов дисков. 'Синхронный' имитирует ориг. консоль. 'Асинхронный' может снижать подвисания на устройствах с медленной памятью. Режим 'Предзагрузка' целиком загружает образ в ОЗУ, ускоряя внутриигровые загрузки ценой задержки при запуске. Режим 'Предзагрузка' может вызывать ошибки при низком объёме ОЗУ, а при запуске физ. дисков перейдёт на 'Синхронный'."
 #define OPTION_VAL_SYNC_RU "Синхронный"
@@ -67447,6 +68027,20 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_RU,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_RU,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_RU },
+         { "bob",  OPTION_VAL_BOB_RU },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -67873,6 +68467,10 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SK NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SK NULL
 #define OPTION_VAL_287_SK "287 (predvolené)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_SK NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_SK NULL
+#define OPTION_VAL_WEAVE_SK NULL
+#define OPTION_VAL_BOB_SK NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SK NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SK NULL
 #define OPTION_VAL_SYNC_SK "Synchrónne"
@@ -69491,6 +70089,20 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_SK,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_SK,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_SK },
+         { "bob",  OPTION_VAL_BOB_SK },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -69917,6 +70529,10 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SR NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SR NULL
 #define OPTION_VAL_287_SR NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_SR NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_SR NULL
+#define OPTION_VAL_WEAVE_SR NULL
+#define OPTION_VAL_BOB_SR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SR NULL
 #define OPTION_VAL_SYNC_SR NULL
@@ -71535,6 +72151,20 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_SR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_SR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_SR },
+         { "bob",  OPTION_VAL_BOB_SR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -71961,6 +72591,10 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV "Senast visade skanningslinje - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SV "Välj den senast visade skanningslinjen när du kör PAL-innehåll. Värden under 287 kommer att minska höjden på utdata bilder genom att beskära pixlar från den nedersta kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_287_SV "287 (Standard)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_SV NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_SV NULL
+#define OPTION_VAL_WEAVE_SV NULL
+#define OPTION_VAL_BOB_SV NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SV "CD-åtkomstmetod (Omstart krävs)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_SV "Välj metod för att läsa data från innehållsskivavbilder. \"Synkron\" efterliknar originalhårdvaran. \"Asynkron\" kan minska hackningar på enheter med långsam lagring. \"Förhandsinläsning\" laddar hela skivavbildningen i minnet vid start av innehållet, vilket kan förbättra inladdningstider i spelet på bekostnad av en initial fördröjning vid uppstart. \"Förhandsinläsning\" kan orsaka problem på system med lågt RAM och kommer att falla tillbaka till \"Synkron\" för fysiska medier."
 #define OPTION_VAL_SYNC_SV "Synkron"
@@ -73579,6 +74213,20 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_SV,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_SV,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_SV },
+         { "bob",  OPTION_VAL_BOB_SV },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -74005,6 +74653,10 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_TR "Son Tarama Hattı - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_TR "PAL içeriğini çalıştırırken son görüntülenen tarama satırını seçin. 287'nin altındaki değerler, pikselleri en alt kenardan kırparak çıktı görüntülerinin yüksekliğini azaltır. Aksaklığa karşı koymak için kullanılabilir."
 #define OPTION_VAL_287_TR "287 (Varsayılan)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_TR "Taramasızlaştırma Yöntemi"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_TR "'Weave' yüksek çözünürlüklü sabit görüntü için aynı karede her iki alanı da gösterirken, 'Bob' hareket netliği uğruna çözünürlük netliğinden ödün verir."
+#define OPTION_VAL_WEAVE_TR NULL
+#define OPTION_VAL_BOB_TR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_TR "CD Erişim Yöntemi (Yeniden Başlatılmalı)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_TR "İçerik disk kalıplarından veri okumak için kullanılan yöntemi seçin. 'Eşzamanlı' orijinal donanımı taklit eder. 'Eşzamansız', yavaş depolamaya sahip cihazlarda yavaşlığı azaltabilir. 'Önbellek', içeriği başlatırken tüm disk kalıbını belleğe yükler; bu, başlangıçtaki ilk gecikme pahasına oyun içi yükleme sürelerini iyileştirebilir. 'Önbellek', düşük RAM'e sahip sistemlerde sorunlara neden olabilir ve fiziksel ortam için 'Eşzamanlı' durumuna geri döner."
 #define OPTION_VAL_SYNC_TR "Eşzamanlı"
@@ -75623,6 +76275,20 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_TR,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_TR,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_TR },
+         { "bob",  OPTION_VAL_BOB_TR },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -76049,6 +76715,10 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_TT NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_TT NULL
 #define OPTION_VAL_287_TT NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_TT NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_TT NULL
+#define OPTION_VAL_WEAVE_TT NULL
+#define OPTION_VAL_BOB_TT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_TT NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_TT NULL
 #define OPTION_VAL_SYNC_TT NULL
@@ -77667,6 +78337,20 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_TT,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_TT,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_TT },
+         { "bob",  OPTION_VAL_BOB_TT },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -78093,6 +78777,10 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_UK "Останнє сканування рядка - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_UK "Виберіть останній показаний рядок сканування при запуску PAL-вмісту. Значення нижче 287 зменшить висоту зображень, обрізані пікселі з нижньої частини кута. Може бути використано для протидії буквації."
 #define OPTION_VAL_287_UK "287 (Типово)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_UK "Метод Деінтерлейса"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_UK "'Weave' показує обидві поля в одному і тому ж рамі для повної версії зображення з високою роздільною здатністю, 'Bob' жертвує чіткість для точності руху."
+#define OPTION_VAL_WEAVE_UK "Візерунок"
+#define OPTION_VAL_BOB_UK "Боб"
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_UK "CD метод доступу (потрібен перезапуск)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_UK "Виберіть метод, який використовується для читання даних із вмісту дискових зображень. 'Синхронізувати' оригінальне обладнання. 'Асинхронне' може зменшити таймер на пристроях з повільним сховищем. 'Попередній кеш' завантажує весь диск в пам'ять під час запуску вмісту, які можуть покращити час завантаження в грі ціною початкової затримки під час запуску. 'Pre-Cache' може спричинити проблеми для систем з малим обсягом оперативної пам'яті і повернутися до 'Синхронізувати' для фізичних медіа."
 #define OPTION_VAL_SYNC_UK "Синхронний"
@@ -79711,6 +80399,20 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_UK,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_UK,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_UK },
+         { "bob",  OPTION_VAL_BOB_UK },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -80137,6 +80839,10 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_VAL NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_VAL NULL
 #define OPTION_VAL_287_VAL NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_VAL NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_VAL NULL
+#define OPTION_VAL_WEAVE_VAL NULL
+#define OPTION_VAL_BOB_VAL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_VAL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_VAL NULL
 #define OPTION_VAL_SYNC_VAL NULL
@@ -81755,6 +82461,20 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       },
       "287"
    },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_VAL,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_VAL,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_VAL },
+         { "bob",  OPTION_VAL_BOB_VAL },
+         { NULL, NULL },
+      },
+      "weave"
+   },
 #ifndef EMSCRIPTEN
    {
       BEETLE_OPT(cd_access_method),
@@ -82181,6 +82901,10 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_VN NULL
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_VN NULL
 #define OPTION_VAL_287_VN NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_VN NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_VN NULL
+#define OPTION_VAL_WEAVE_VN NULL
+#define OPTION_VAL_BOB_VN NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_VN NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_VN NULL
 #define OPTION_VAL_SYNC_VN NULL
@@ -83798,6 +84522,20 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
          { NULL, NULL },
       },
       "287"
+   },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_VN,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_VN,
+      NULL,
+      "video",
+      {
+         { "weave",  OPTION_VAL_WEAVE_VN },
+         { "bob",  OPTION_VAL_BOB_VN },
+         { NULL, NULL },
+      },
+      "weave"
    },
 #ifndef EMSCRIPTEN
    {
