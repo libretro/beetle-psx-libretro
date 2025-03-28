@@ -21042,7 +21042,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_DE "Wählen Sie die letzte angezeigte Scanline beim Ausführen von PAL-Inhalten. Werte unter 287 verringern die Höhe der Ausgabebilder durch Zuschneiden von Pixeln von der unteren Kante. Kann verwendet werden, um schwarze Balken entgegenzuwirken."
 #define OPTION_VAL_287_DE "287 (Standard)"
 #define BEETLE_OPT_DEINTERLACER_LABEL_DE "Deinterlacing-Methode"
-#define BEETLE_OPT_DEINTERLACER_INFO_0_DE NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_DE "„Weave“ zeigt beide Felder im selben Frame für ein Standbild mit voller Auflösung, „Bob“ opfert Auflösungsklarheit zugunsten der Bewegungsklarheit."
 #define OPTION_VAL_WEAVE_DE NULL
 #define OPTION_VAL_BOB_DE NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_DE "CD-Zugriffsmethode (Neustart erforderlich)"
@@ -62281,8 +62281,8 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_PT_BR "Linha de varredura final (PAL)"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_PT_BR "Seleciona a última linha de varredura a ser exibida ao executar conteúdos PAL. Um valor inferior a 287 reduzirá a altura das imagens geradas, cortando os pixels da parte inferior. Isto pode ser usado para evitar o efeito 'letterboxing'."
 #define OPTION_VAL_287_PT_BR "287 (padrão)"
-#define BEETLE_OPT_DEINTERLACER_LABEL_PT_BR NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_PT_BR NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_PT_BR "Método de desentrelaçamento"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_PT_BR "'Weave' mostra ambos os campos no mesmo quadro para obter a resolução alta máxima da imagem estática, 'Bob' sacrifica a claridade da resolução por claridade de movimento."
 #define OPTION_VAL_WEAVE_PT_BR NULL
 #define OPTION_VAL_BOB_PT_BR NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_PT_BR "Método de acesso ao CD (requer reinício)"
