@@ -72281,7 +72281,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV "När ingångsenheten är inställd på DualShock, Analog Controller, Analog Joystick eller neGcon möjliggör den här inställningen dynamisk kalibrering av analoga ingångar. Hösta registrerade ingångsvärden övervakas i realtid och används för att justera analoga koordinater som skickas till emulatorn. Detta bör användas för spel som Mega Man Legends 2 som förväntar sig större värden än vad moderna kontroller tillhandahåller. För bästa resultat bör analoga spakar roteras i full utsträckning för att finjustera kalibreringsalgoritmen varje gång innehåll laddas."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV NULL
-#define OPTION_VAL_ENABLED_ANALOG_SV NULL
+#define OPTION_VAL_ENABLED_ANALOG_SV "Standard-analog"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV "DualShock-analogt läge för kombinationer"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV NULL
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SV NULL
@@ -72306,11 +72306,11 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_SV "Aktivera multitap-funktionalitet på port 1."
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV "Port 2: Aktivera Multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SV "Aktivera multitap-funktionalitet på port 2."
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV "Inmatningsläge för pistol"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV NULL
 #define OPTION_VAL_LIGHTGUN_SV "Ljuspistol"
 #define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
-#define BEETLE_OPT_GUN_CURSOR_LABEL_SV NULL
+#define BEETLE_OPT_GUN_CURSOR_LABEL_SV "Pistolmarkör"
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_SV NULL
 #define OPTION_VAL_CROSS_SV "Kors"
 #define OPTION_VAL_DOT_SV "Punkt"
@@ -72393,7 +72393,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV NULL
 #define OPTION_VAL_1_O36_SV "1 (standard)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
-#define BEETLE_OPT_PGXP_MODE_INFO_0_SV NULL
+#define BEETLE_OPT_PGXP_MODE_INFO_0_SV "Gör det möjligt att rendera 3D-objekt med subpixelprecision, vilket minimerar förvrängning och jitter av 3D-objekt som ses på originalhårdvara på grund av användningen av vertexkoordinater med fast punkt. Läget ”Endast minne” har minimala kompatibilitetsproblem och rekommenderas för allmän användning. Läget ”Minne + CPU (Buggig)” kan minska jitter ytterligare, men har höga prestandakrav och kan orsaka olika geometriska fel."
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
 #define OPTION_VAL_MEMORY_CPU_SV "Minne + CPU (Buggig)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_SV NULL
@@ -72580,19 +72580,19 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_12PX_O61_0_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV "Initial skanlinje - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
 #define OPTION_VAL_0_O63_SV "0 (standard)"
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_SV NULL
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV NULL
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_SV "Sista skanlinje - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV "Välj den senast visade skanlinjen när du kör NTSC-innehåll. Värden mindre än 239 minskar höjden på utmatade bilder genom att bildpunkter beskärs från den nedersta kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_239_SV "239 (Standard)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_SV NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV "Initial skanlinje - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_SV "Välj den första skanlinjen som visas när PAL-innehåll körs. Värden större än noll minskar höjden på utmatade bilder genom att bildpunkter beskärs från den översta kanten. Kan användas för att motverka letterboxing."
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV "Senast visade skanningslinje - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SV "Välj den senast visade skanningslinjen när du kör PAL-innehåll. Värden under 287 kommer att minska höjden på utdata bilder genom att beskära pixlar från den nedersta kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_287_SV "287 (Standard)"
-#define BEETLE_OPT_DEINTERLACER_LABEL_SV NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_SV NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_SV "Deinterlace-metod"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_SV "”Weave” visar båda fälten på samma bildruta för en högupplöst stillbild, ’Bob’ offrar upplösningens tydlighet för rörelsens tydlighet."
 #define OPTION_VAL_WEAVE_SV NULL
 #define OPTION_VAL_BOB_SV NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_SV "CD-åtkomstmetod (Omstart krävs)"
