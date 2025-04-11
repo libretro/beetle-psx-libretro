@@ -4167,7 +4167,7 @@ struct retro_core_options_v2 options_ast = {
 #define CATEGORY_VIDEO_LABEL_BE "Відэа"
 #define CATEGORY_VIDEO_INFO_0_BE "Налады суадносін бакоў, кадравання, графічных фільтраў і пропуску кадраў."
 #define CATEGORY_OSD_LABEL_BE "Адлюстраванне на экране"
-#define CATEGORY_OSD_INFO_0_BE "Настройка паказу на экране апавяшчэнняў."
+#define CATEGORY_OSD_INFO_0_BE "Настройка паказу апавяшчэнняў на экране."
 #define CATEGORY_INPUT_LABEL_BE "Увод"
 #define CATEGORY_INPUT_INFO_0_BE "Настройкі светлавога пісталета, мышы і neGcon."
 #define CATEGORY_MEMCARDS_LABEL_BE "Карта памяці"
@@ -72280,10 +72280,10 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_SV "Självkalibrera analoga spakar"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV "När ingångsenheten är inställd på DualShock, Analog Controller, Analog Joystick eller neGcon möjliggör den här inställningen dynamisk kalibrering av analoga ingångar. Hösta registrerade ingångsvärden övervakas i realtid och används för att justera analoga koordinater som skickas till emulatorn. Detta bör användas för spel som Mega Man Legends 2 som förväntar sig större värden än vad moderna kontroller tillhandahåller. För bästa resultat bör analoga spakar roteras i full utsträckning för att finjustera kalibreringsalgoritmen varje gång innehåll laddas."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV "När typen av inmatningsenhet är DualShock gör det här alternativet att den emulerade DualShock kan växlas mellan DIGITAL- och ANALOG-läge som den ursprungliga hårdvaran. Läget kan också växlas genom att använda den valda knappkombinationen."
 #define OPTION_VAL_ENABLED_ANALOG_SV "Standard-analog"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV "DualShock-analogt läge för kombinationer"
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_SV "Välj den knappkombination som ska användas för att växla mellan DIGITAL- och ANALOG-läge för den emulerade DualShock."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_SV NULL
 #define OPTION_VAL_L1_R1_SELECT_SV NULL
 #define OPTION_VAL_L1_R1_START_SV NULL
@@ -72295,7 +72295,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_L2_R2_R3_SV NULL
 #define OPTION_VAL_L3_R3_SV NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV "Hållningsfördröjning för DualShock analogt läges-kombo"
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV "Ställ in hålltiden för kombinationsknapparna för analogt läge."
 #define OPTION_VAL_0_SV "0 sekunds fördröjning"
 #define OPTION_VAL_1_SV "1 sekunds fördröjning"
 #define OPTION_VAL_2_SV "2 sekunders fördröjning"
@@ -72307,7 +72307,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_SV "Port 2: Aktivera Multitap"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_SV "Aktivera multitap-funktionalitet på port 2."
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_SV "Inmatningsläge för pistol"
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_SV "Välj om du vill använda en musstyrd ”Ljuspistol” eller en ”Pekskärm”-ingång när enhetstypen är inställd på ”Guncon/G-Con 45” eller ”Justifier”."
 #define OPTION_VAL_LIGHTGUN_SV "Ljuspistol"
 #define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SV "Pistolmarkör"
@@ -72315,8 +72315,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_CROSS_SV "Kors"
 #define OPTION_VAL_DOT_SV "Punkt"
 #define OPTION_VAL_OFF_SV "Inget hårkors"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_SV NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_SV NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_SV "Port 1: Färg för vapnets hårkors"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_SV "Välj färg på ljuspistolens hårkors för port 1."
 #define OPTION_VAL_RED_SV "Röd"
 #define OPTION_VAL_BLUE_SV "Blå"
 #define OPTION_VAL_GREEN_SV "Grön"
@@ -72327,8 +72327,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_PURPLE_SV "Lila"
 #define OPTION_VAL_BLACK_SV "Svart"
 #define OPTION_VAL_WHITE_SV "Vit"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV "Port 2: Färg för vapnets hårkors"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV "Välj färg på ljuspistolens hårkors för port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV "Muskänslighet"
 #define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV NULL
 #define OPTION_VAL_5_O29_SV NULL
@@ -72379,18 +72379,18 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV "Välj dödzon för RetroPads vänstra analoga spak när du simulerar ”twist”-rörelsen hos emulerade ”neGcon”-inmatningsenheter. Används för att eliminera styrenhetens drift. Obs: De flesta neGcon-kompatibla titlar ger alternativ i spelet för att ställa in ett ”twist”-dödzonsvärde. För att undvika förlust av precision bör spelets deadzone *alltid* sättas till noll. Eventuella nödvändiga justeringar ska *endast* göras via detta kärnalternativ. Detta är särskilt viktigt när ”neGcon Twist Response” är inställt på ”Quadratic” eller ”Cubic”."
 #define OPTION_VAL_0_O31_SV NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SV NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SV "Metod för minneskort 0 (kräver omstart)"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_SV "Välj det sparformat som ska användas för minneskort 0. ”Mednafen” kan användas för kompatibilitet med den fristående versionen av Mednafen. Vid användning med Beetle PSX har Libretro (.srm) och Mednafen (.mcr) sparningar internt identiska format och kan konverteras mellan varandra genom att byta namn."
 #define OPTION_VAL_LIBRETRO_SV NULL
 #define OPTION_VAL_MEDNAFEN_SV NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_SV NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_SV "Aktivera minneskort 1 (kräver omstart)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_SV "Emulerar ett andra minneskort i kortplats 1. När alternativet är avaktiverat kan spelen bara komma åt minneskortet i kortplats 0. Obs: Vissa spel kräver att detta alternativ är avaktiverat för att fungera korrekt (t.ex. Codename Tenka). Obs: Minneskort 1 använder sparformatet Mednafen (.mcr)."
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_SV NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_SV "Delade minneskort (kräver omstart)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_SV "När funktionen är aktiverad sparas alla spel till och laddas från samma minneskortsfiler. När den är inaktiverad genereras separata minneskortsfiler för varje laddat innehåll. Obs: om ”Memory Card 0 Method” är inställt på ”Libretro” kommer endast det högra minneskortet att påverkas."
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_SV NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV "Byt ut det minneskort som för närvarande är inmatat i den vänstra kortplatsen. Detta alternativ fungerar endast om Metod för minneskort 0 är inställd på Mednafen. Standardkortet är index 0."
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV "Byt ut det minneskort som för närvarande är inmatat i den högra kortplatsen. Detta alternativ fungerar endast om Minneskort 1 är aktiverat. Standardkortet är index 1."
 #define OPTION_VAL_1_O36_SV "1 (standard)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV "Gör det möjligt att rendera 3D-objekt med subpixelprecision, vilket minimerar förvrängning och jitter av 3D-objekt som ses på originalhårdvara på grund av användningen av vertexkoordinater med fast punkt. Läget ”Endast minne” har minimala kompatibilitetsproblem och rekommenderas för allmän användning. Läget ”Minne + CPU (Buggig)” kan minska jitter ytterligare, men har höga prestandakrav och kan orsaka olika geometriska fel."
@@ -72419,8 +72419,8 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_AGGRESSIVE_SV "Aggressiv"
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_SV "Hack för bredbildsläge"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_SV "Rendera 3D-innehåll anamorfiskt och mata ut den emulerade framebufferten i ett bredbildsformat. Ger bäst resultat med spel som är helt i 3D. 2D-element kommer att sträckas ut horisontellt och kan vara feljusterade."
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_SV NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_SV NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_SV "Bildförhållande för bredbildshack"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_SV "Välj det bildförhållande som ska användas av hacket för bredbildsläge."
 #define OPTION_VAL_16_9_SV NULL
 #define OPTION_VAL_16_10_SV NULL
 #define OPTION_VAL_18_9_SV NULL
@@ -72581,7 +72581,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV NULL
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV "Initial skanlinje - NTSC"
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV "Välj den första skanlinjen som visas när du kör NTSC-innehåll. Värden större än noll minskar höjden på utmatade bilder genom att bildpunkter beskärs från den översta kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_0_O63_SV "0 (standard)"
 #define BEETLE_OPT_LAST_SCANLINE_LABEL_SV "Sista skanlinje - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV "Välj den senast visade skanlinjen när du kör NTSC-innehåll. Värden mindre än 239 minskar höjden på utmatade bilder genom att bildpunkter beskärs från den nedersta kanten. Kan användas för att motverka letterboxing."
