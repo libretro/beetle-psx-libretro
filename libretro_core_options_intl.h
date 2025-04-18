@@ -37224,7 +37224,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_GL "Mostrar VRAM completa (depuración)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GL "Visualiza a VRAM de toda a consola emulada. Só admitido polos renderizadores de hardware OpenGL e Vulkan. Nota: Isto é para fins de depuración e normalmente debería estar desactivado."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GL "Autocalibración analóxica"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GL "Cando o dispositivo de entrada está configurado en DualShock, Controlador analóxico, Joystick analóxico ou neGcon, esta opción permite a calibración dinámica das entradas analóxicas. Os valores de entrada máximos rexistrados son monitorizados en tempo real e utilízanse para escalar as coordenadas analóxicas pasadas ao emulador. Isto debería usarse para xogos como Mega Man Legends 2 que esperan valores maiores que os que proporcionan os controladores modernos. Para obter mellores resultados, os sticks analóxicos deben xirar ao máximo para axustar o algoritmo de calibración cada vez que se carga o contido."
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GL "Cando o dispositivo de entrada está configurado en DualShock, Controlador analóxico, Panca de mando analóxica ou neGcon, esta opción permite a calibración dinámica das entradas analóxicas. Os valores de entrada máximos rexistrados son monitorizados en tempo real e utilízanse para escalar as coordenadas analóxicas pasadas ao emulador. Isto debería usarse para xogos como Mega Man Legends 2 que esperan valores maiores que os que proporcionan os controladores modernos. Para obter mellores resultados, os sticks analóxicos deben xirar ao máximo para axustar o algoritmo de calibración cada vez que se carga o contido."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GL "Alternador de modo analóxico de DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GL "Cando o tipo de dispositivo de entrada é DualShock, esta opción permite que o DualShock emulado se altere entre os modos DIXITAL e ANALÓXICO como o hardware orixinal. O modo tamén se pode cambiar usando a combinación de botóns seleccionada."
 #define OPTION_VAL_ENABLED_ANALOG_GL "Predeterminado: analóxico"
@@ -37537,9 +37537,9 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GL "Última liña de exploración - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GL "Escolla a última liña de dixitalización mostrada ao executar contido PAL. Os valores inferiores a 287 reducirán a altura das imaxes de saída recortando os píxeles desde o bordo inferior. Pódese usar para contrarrestar o letterboxing."
 #define OPTION_VAL_287_GL "287 (predeterminado)"
-#define BEETLE_OPT_DEINTERLACER_LABEL_GL NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_GL NULL
-#define OPTION_VAL_WEAVE_GL NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_GL "Método de desentrelazado"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_GL "\"Entretecido\" amosa ambos campos na mesma imaxe para obter unha imaxe fixa de alta resolución completa; \"Bob\" sacrifica claridade de resolución a cambio de maior claridade en movemento."
+#define OPTION_VAL_WEAVE_GL "Entretecido"
 #define OPTION_VAL_BOB_GL NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GL "Método de acceso ao CD (reinicio necesario)"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GL "Escolla o método utilizado para ler os datos das imaxes do disco de contido. 'Synchronous' imita o hardware orixinal. \"Asíncrona\" pode reducir o tartamudeo nos dispositivos con almacenamento lento. \"Pre-caché\" carga toda a imaxe do disco na memoria ao lanzar contido, o que pode mellorar os tempos de carga do xogo a costa dun atraso inicial no inicio. A \"pre-caché\" pode causar problemas en sistemas con pouca memoria RAM e volverá a utilizar \"Síncronos\" para os medios físicos."
