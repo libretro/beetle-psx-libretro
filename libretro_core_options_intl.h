@@ -72579,7 +72579,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_11PX_O61_0_SV NULL
 #define OPTION_VAL_12PX_O61_0_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SV NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV "Välj antal GPU-cykler som bilden ska förskjutas med. Positiva värden förflyttar bilden åt höger, negativa värden förflyttar bilden åt vänster. Stöds endast av hårdvarurenderare."
 #define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV "Initial skanlinje - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV "Välj den första skanlinjen som visas när du kör NTSC-innehåll. Värden större än noll minskar höjden på utmatade bilder genom att bildpunkter beskärs från den översta kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_0_O63_SV "0 (standard)"
