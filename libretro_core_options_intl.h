@@ -72528,7 +72528,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder ser PAL-spel ofta långsammare ut jämfört med de amerikanska eller japanska NTSC-utgåvorna. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-framerate. Det här alternativet har ingen effekt när du kör NTSC-innehåll."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV NULL
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV "Välj bildförhållande som anges i kärnan. Denna inställning ignoreras när alternativen Hack för bredbildsläge eller Visa fullständig VRAM är aktiverade."
 #define OPTION_VAL_CORRECTED_SV "Korrigerad"
 #define OPTION_VAL_UNCORRECTED_SV "Okorrigerad"
 #define OPTION_VAL_4_3_SV "Tvinga 4:3"
