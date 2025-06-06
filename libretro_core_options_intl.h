@@ -72311,7 +72311,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_LIGHTGUN_SV "Ljuspistol"
 #define OPTION_VAL_TOUCHSCREEN_SV "Pekskärm"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_SV "Pistolmarkör"
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_SV NULL
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_SV "Välj vilken markör som ska visas på skärmen när du använder inmatningsenheterna ”Guncon/G-Con 45” och ”Justifier”. När funktionen är inaktiverad är hårkorset alltid dolt."
 #define OPTION_VAL_CROSS_SV "Kors"
 #define OPTION_VAL_DOT_SV "Punkt"
 #define OPTION_VAL_OFF_SV "Inget hårkors"
@@ -72397,7 +72397,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
 #define OPTION_VAL_MEMORY_CPU_SV "Minne + CPU (Buggig)"
 #define BEETLE_OPT_PGXP_2D_TOL_LABEL_SV NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_SV NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_SV "Dölj fler uppenbara fel i PGXP-operationer: värdet anger toleransen inom vilken PGXP-värden kommer att behållas i fall av geometrier utan korrekt djupinformation."
 #define OPTION_VAL_0PX_SV NULL
 #define OPTION_VAL_1PX_SV NULL
 #define OPTION_VAL_2PX_SV NULL
@@ -72512,9 +72512,9 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_EXECUTE_ONE_SV NULL
 #define OPTION_VAL_RUN_INTERPRETER_SV NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SV NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SV NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SV "Vissa spel kräver \"Fullständig\" invalidering, vissa kräver \"Endast DMA\"."
 #define OPTION_VAL_FULL_SV NULL
-#define OPTION_VAL_DMA_SV NULL
+#define OPTION_VAL_DMA_SV "Endast DMA (lite snabbare)"
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_SV "Max cykler som körs av CPU innan en GPU/DMA/MDEC/Timer-uppdatering kontrolleras, högre tal blir snabbare, har mycket mindre inverkan på Beetle-tolken än dynarec."
 #define OPTION_VAL_128_SV "128 (Standard)"
@@ -72534,12 +72534,12 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_4_3_SV "Tvinga 4:3"
 #define OPTION_VAL_NTSC_SV "Tvinga NTSC"
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_SV "Beskär Overscan"
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_SV "”Ingen” behåller utfyllnaden (pilarboxar på båda sidor av bilden för NTSC, på alla sidor för PAL) för att emulera samma svarta fält som genereras i analog videoutgång av äkta PSX-hårdvara. ’Statisk’ tar bara bort horisontell utfyllnad, ”Dynamisk” tar bort all utfyllnad."
 #define OPTION_VAL_DISABLED_O59_SV "Ingen"
 #define OPTION_VAL_STATIC_SV "Statisk"
 #define OPTION_VAL_SMART_SV "Dynamisk (Standard)"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_SV "Ytterligare beskärning"
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_SV NULL
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_SV "När ”Beskär horisontell överskanning” är aktiverat minskar detta alternativ bredden på den beskärda bilden med det angivna antalet bildpunkter."
 #define OPTION_VAL_9PX_SV NULL
 #define OPTION_VAL_10PX_SV NULL
 #define OPTION_VAL_11PX_SV NULL
@@ -72553,7 +72553,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_19PX_SV NULL
 #define OPTION_VAL_20PX_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_SV "Förskjutning beskuren bild"
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SV NULL
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_SV "När ”Beskär horisontell överskanning” är aktiverat kan den beskärda bilden förskjutas horisontellt åt höger (positivt) eller vänster (negativt) med det angivna antalet bildpunkter. Kan användas för att korrigera justeringsproblem. Stöds endast av programvarurenderaren."
 #define OPTION_VAL_12PX_O61_SV NULL
 #define OPTION_VAL_11PX_O61_SV NULL
 #define OPTION_VAL_10PX_O61_SV NULL
