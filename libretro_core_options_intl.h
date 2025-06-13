@@ -72510,7 +72510,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_DISABLED_SV "Inaktiverad (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_SV "Max prestanda"
 #define OPTION_VAL_EXECUTE_ONE_SV NULL
-#define OPTION_VAL_RUN_INTERPRETER_SV NULL
+#define OPTION_VAL_RUN_INTERPRETER_SV "Lightrec-tolk"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SV "Vissa spel kräver \"Fullständig\" invalidering, vissa kräver \"Endast DMA\"."
 #define OPTION_VAL_FULL_SV NULL
@@ -72518,12 +72518,12 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_SV "Max cykler som körs av CPU innan en GPU/DMA/MDEC/Timer-uppdatering kontrolleras, högre tal blir snabbare, har mycket mindre inverkan på Beetle-tolken än dynarec."
 #define OPTION_VAL_128_SV "128 (Standard)"
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_SV NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_SV "Dynarec SPU-samplingar"
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV "Max SPU-samplingar som ska köras innan en SPU-uppdatering kontrolleras, högre tal blir snabbare, men orsakar ljudstörningar i vissa spel med något annat än 1."
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV "Kärnrapporterad bildfrekvenstiming"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV "Välj den FPS-timing som kärnan ska rapportera till frontend. Automatisk växling gör det möjligt för kärnan att växla mellan att rapportera progressiva och sammanflätade hastigheter, men kan orsaka ominitieringar av frontend-drivrutiner för video/ljud."
 #define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
-#define OPTION_VAL_FORCE_INTERLACED_SV NULL
+#define OPTION_VAL_FORCE_INTERLACED_SV "Tvinga frekvens med interlace"
 #define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder ser PAL-spel ofta långsammare ut jämfört med de amerikanska eller japanska NTSC-utgåvorna. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-framerate. Det här alternativet har ingen effekt när du kör NTSC-innehåll."
