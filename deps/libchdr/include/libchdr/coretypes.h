@@ -3,55 +3,63 @@
 
 #include <stdint.h>
 #include <stdio.h>
-
+#include <retro_inline.h>
 #ifdef USE_LIBRETRO_VFS
 #include <streams/file_stream_transforms.h>
 #endif
 
+#ifndef ARRAY_LENGTH
 #define ARRAY_LENGTH(x) (sizeof(x)/sizeof(x[0]))
-
-typedef uint64_t UINT64;
-typedef uint32_t UINT32;
-typedef uint16_t UINT16;
-typedef uint8_t UINT8;
-
-typedef int64_t INT64;
-typedef int32_t INT32;
-typedef int16_t INT16;
-typedef int8_t INT8;
-
-#ifdef USE_LIBRETRO_VFS
-#define core_file RFILE
-#define core_fopen(file) rfopen(file, "rb")
-#define core_fseek rfseek
-#define core_ftell rftell
-#define core_fread(fc, buff, len) fread(buff, 1, len, fc)
-#define core_fclose rfclose
-#else /* USE_LIBRETRO_VFS */
-#define core_file FILE
-#define core_fopen(file) fopen(file, "rb")
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32) || defined(__WIN64__)
-#define core_fseek _fseeki64
-#define core_ftell _ftelli64
-#elif defined(_LARGEFILE_SOURCE) && defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 64
-#define core_fseek fseeko64
-#define core_ftell ftello64
-#else
-#define core_fseek fseeko
-#define core_ftell ftello
 #endif
-#define core_fread(fc, buff, len) fread(buff, 1, len, fc)
-#define core_fclose fclose
-#endif /* USE_LIBRETRO_VFS */
 
-static UINT64 core_fsize(core_file* f)
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+#endif
+
+typedef struct chd_core_file {
+	/*
+	 * arbitrary pointer to data the implementation uses to implement the below functions
+	 */
+	void *argp;
+
+	/*
+	 * return the size of a given file as a 64-bit unsigned integer.
+	 * the position of the file pointer after calling this function is
+	 * undefined because many implementations will seek to the end of the
+	 * file and call ftell.
+	 *
+	 * on error, (uint64_t)-1 is returned.
+	 */
+	uint64_t(*fsize)(struct chd_core_file*);
+
+	/*
+	 * should match the behavior of fread, except the FILE* argument at the end
+	 * will be replaced with a struct chd_core_file*.
+	 */
+	size_t(*fread)(void*,size_t,size_t,struct chd_core_file*);
+
+	// closes the given file.
+	int (*fclose)(struct chd_core_file*);
+
+	// fseek clone
+	int (*fseek)(struct chd_core_file*, int64_t, int);
+} core_file;
+
+static INLINE int core_fclose(core_file *fp) {
+	return fp->fclose(fp);
+}
+
+static INLINE size_t core_fread(core_file *fp, void *ptr, size_t len) {
+	return fp->fread(ptr, 1, len, fp);
+}
+
+static INLINE int core_fseek(core_file* fp, int64_t offset, int whence) {
+	return fp->fseek(fp, offset, whence);
+}
+
+static INLINE uint64_t core_fsize(core_file *fp)
 {
-    UINT64 rv;
-    UINT64 p = core_ftell(f);
-    core_fseek(f, 0, SEEK_END);
-    rv = core_ftell(f);
-    core_fseek(f, p, SEEK_SET);
-    return rv;
+	return fp->fsize(fp);
 }
 
 #endif
