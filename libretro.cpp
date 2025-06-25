@@ -88,7 +88,6 @@ static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool display_notifications = true;
 static bool allow_frame_duping = false;
-static bool failed_init = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool enable_memcard1 = false;
@@ -2457,34 +2456,31 @@ static void CloseGame(void)
 {
    int i;
 
-   if (!failed_init)
+   for (i = 0; i < 8; i++)
    {
-      for(i = 0; i < 8; i++)
+      if (i == 0 && !use_mednafen_memcard0_method)
       {
-         if (i == 0 && !use_mednafen_memcard0_method)
-         {
-            PSX_FIO->SaveMemcard(i);
-            continue;
-         }
+         PSX_FIO->SaveMemcard(i);
+         continue;
+      }
 
-         // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
-         // we can reduce potential data loss!
-         try
-         {
-            char ext[64];
-            const char *memcard = NULL;
-            if (i == 0)
-               snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
-            else if (i == 1)
-               snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
-            else
-               snprintf(ext, sizeof(ext), "%d.mcr", i);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
-            PSX_FIO->SaveMemcard(i, memcard);
-         }
-         catch(std::exception &e)
-         {
-         }
+      // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
+      // we can reduce potential data loss!
+      try
+      {
+         char ext[64];
+         const char *memcard = NULL;
+         if (i == 0)
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
+         else if (i == 1)
+            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
+         else
+            snprintf(ext, sizeof(ext), "%d.mcr", i);
+         memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+         PSX_FIO->SaveMemcard(i, memcard);
+      }
+      catch(std::exception &e)
+      {
       }
    }
 
@@ -2667,9 +2663,9 @@ static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
       else
       {
          if(cheat_string[i] & 0x80)
-            log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code..\n");
+            log_cb(RETRO_LOG_ERROR, "Invalid character in GameShark code..\n");
          else
-            log_cb(RETRO_LOG_ERROR, "[Mednafen]: Invalid character in GameShark code: %c.\n", cheat_string[i]);
+            log_cb(RETRO_LOG_ERROR, "Invalid character in GameShark code: %c.\n", cheat_string[i]);
          return false;
       }
    }
@@ -2891,7 +2887,6 @@ static unsigned disk_get_num_images(void)
 
 static bool disk_set_eject_state(bool ejected)
 {
-   log_cb(RETRO_LOG_INFO, "[Mednafen]: Ejected: %u.\n", ejected);
    if (ejected == eject_state)
       return false;
 
@@ -3055,8 +3050,12 @@ static struct retro_disk_control_ext_callback disk_interface_ext =
 
 static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 {
+   (void)level;
+   va_list va;
+   va_start(va, fmt);
+   vfprintf(stderr, fmt, va);
+   va_end(va);
 }
-
 
 void retro_init(void)
 {
@@ -3069,24 +3068,11 @@ void retro_init(void)
    else
       log_cb = fallback_log;
 
-   libretro_msg_interface_version = 0;
-   environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &libretro_msg_interface_version);
-
-   CDUtility_Init();
-
-   eject_state = false;
-
    const char *dir = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
       snprintf(retro_base_directory, sizeof(retro_base_directory), "%s", dir);
-   }
-   else
-   {
-      /* TODO: Add proper fallback */
-      log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
-      failed_init = true;
    }
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir)
@@ -3103,6 +3089,9 @@ void retro_init(void)
       log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
       snprintf(retro_save_directory, sizeof(retro_save_directory), "%s", retro_base_directory);
    }
+
+   CDUtility_Init();
+   eject_state = false;
 
    /* Initialise disk control interface */
    disk_control_ext_info.initial_index = 0;
@@ -3123,6 +3112,9 @@ void retro_init(void)
    if (environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &serialization_quirks) &&
        (serialization_quirks & RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE))
       enable_variable_serialization_size = true;
+
+   libretro_msg_interface_version = 0;
+   environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &libretro_msg_interface_version);
 
    setting_initial_scanline = 0;
    setting_last_scanline = 239;
@@ -3466,8 +3458,10 @@ static void check_variables(bool startup)
 
    if (startup)
    {
-      var.key = BEETLE_OPT(renderer);
       bool hw_renderer = false;
+
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+      var.key = BEETLE_OPT(renderer);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
          if (!strcmp(var.value, "hardware") || !strcmp(var.value, "hardware_gl") || !strcmp(var.value, "hardware_vk"))
@@ -3475,6 +3469,7 @@ static void check_variables(bool startup)
             hw_renderer = true;
          }
       }
+#endif
 
       var.key = BEETLE_OPT(internal_resolution);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4126,7 +4121,7 @@ end:
 
 static bool MDFNI_LoadCD(const char *devicename)
 {
-   log_cb(RETRO_LOG_INFO, "Loading %s...\n", devicename);
+   log_cb(RETRO_LOG_INFO, "Loading \"%s\"\n", devicename);
 
    try
    {
@@ -4300,9 +4295,6 @@ bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
 
-   if (failed_init)
-      return false;
-
    input_init_env(environ_cb);
 
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
@@ -4322,10 +4314,7 @@ bool retro_load_game(const struct retro_game_info *info)
    check_variables(true);
 
    if (!MDFNI_LoadGame(retro_cd_path))
-   {
-      failed_init = true;
       return false;
-   }
 
    MDFN_LoadGameCheats(NULL);
    MDFNMP_InstallReadPatches();
@@ -4353,8 +4342,6 @@ bool retro_load_game(const struct retro_game_info *info)
    bool force_software_renderer = false;
    if (!firmware_found)
    {
-      log_cb(RETRO_LOG_ERROR, "Content cannot be loaded\n");
-
       /* TODO - We're forcing the sw renderer to show the ugui error message. Figure out
       how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
       so we don't have to force this anymore. */
@@ -4511,9 +4498,6 @@ void retro_unload_game(void)
    retro_cd_path[0]           = '\0';
    retro_cd_base_name[0]      = '\0';
 }
-
-static uint64_t video_frames, audio_frames;
-#define SOUND_CHANNELS 2
 
 static bool retro_set_geometry(void)
 {
@@ -4721,7 +4705,7 @@ void retro_run(void)
 
    input_poll_cb();
 
-   input_update(libretro_supports_bitmasks, input_state_cb );
+   input_update(libretro_supports_bitmasks, input_state_cb);
 
    static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    rects[0] = ~0;
@@ -4932,8 +4916,6 @@ void retro_run(void)
          fb = pix;
    }
 
-   int16_t *interbuf = (int16_t*)&IntermediateBuffer;
-
    if (gui_show)
    {
       if (!gui_inited)
@@ -4963,10 +4945,7 @@ void retro_run(void)
    if (led_state_cb)
       retro_led_interface();
 
-   video_frames++;
-   audio_frames += spec.SoundBufSize;
-
-   audio_batch_cb(interbuf, spec.SoundBufSize);
+   audio_batch_cb((int16_t*)&IntermediateBuffer, spec.SoundBufSize);
 
    if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0))
    {
@@ -4999,11 +4978,6 @@ void retro_deinit(void)
 {
    delete surf;
    surf = NULL;
-
-   log_cb(RETRO_LOG_DEBUG, "[%s]: Samples / Frame: %.5f\n",
-         MEDNAFEN_CORE_NAME, (double)audio_frames / video_frames);
-   log_cb(RETRO_LOG_DEBUG, "[%s]: Estimated FPS: %.5f\n",
-         MEDNAFEN_CORE_NAME, (double)video_frames * 44100 / audio_frames);
 
    libretro_supports_option_categories = false;
    libretro_supports_bitmasks = false;

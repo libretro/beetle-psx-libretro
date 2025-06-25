@@ -144,8 +144,8 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 
    enum force_renderer_type force_type = AUTO;
 
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    var.key                   = BEETLE_OPT(renderer);
-
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "software") || force_software)
@@ -156,6 +156,7 @@ bool rsx_intf_open(bool is_pal, bool force_software)
          force_type = FORCE_VULKAN;
    }
    else
+#endif
    {
       /* If 'BEETLE_OPT(renderer)' option is not found, then
        * we are running in software mode */
