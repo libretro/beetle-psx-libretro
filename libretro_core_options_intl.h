@@ -37157,79 +37157,79 @@ struct retro_core_options_v2 options_fr = {
 /* RETRO_LANGUAGE_GA */
 
 #define CATEGORY_VIDEO_LABEL_GA "Físeán"
-#define CATEGORY_VIDEO_INFO_0_GA NULL
+#define CATEGORY_VIDEO_INFO_0_GA "Athraigh cóimheas gné, bearradh taispeána, scagaire físe agus socruithe scipeála frámaí."
 #define CATEGORY_OSD_LABEL_GA "Taispeántas ar an Scáileán"
-#define CATEGORY_OSD_INFO_0_GA NULL
+#define CATEGORY_OSD_INFO_0_GA "Athraigh na fógraí atá á thaispeáint ar an scáileán."
 #define CATEGORY_INPUT_LABEL_GA "Ionchur"
-#define CATEGORY_INPUT_INFO_0_GA NULL
-#define CATEGORY_MEMCARDS_LABEL_GA NULL
-#define CATEGORY_MEMCARDS_INFO_0_GA NULL
-#define CATEGORY_PGXP_LABEL_GA NULL
-#define CATEGORY_PGXP_INFO_0_GA NULL
-#define CATEGORY_HACKS_LABEL_GA NULL
-#define CATEGORY_HACKS_INFO_0_GA NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GA NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GA NULL
-#define OPTION_VAL_1X_NATIVE_GA NULL
+#define CATEGORY_INPUT_INFO_0_GA "Athraigh socruithe an ghunna solais, na luiche agus an neGcon."
+#define CATEGORY_MEMCARDS_LABEL_GA "Cárta Cuimhne"
+#define CATEGORY_MEMCARDS_INFO_0_GA "Athraigh socruithe a bhaineann leis an gCárta(í) Cuimhne fíorúil a úsáideann an córas."
+#define CATEGORY_PGXP_LABEL_GA "PGXP (Píblíne Claochlaithe Geoiméadrachta Beacht)"
+#define CATEGORY_PGXP_INFO_0_GA "Rialaíonn na roghanna seo feabhsuithe ar féidir leo grafaicí a fheabhsú i gcomparáid leis an gconsól bunaidh. Is féidir le PGXP fáil réidh le huigeachtaí casta agus fadhbanna troid-Z."
+#define CATEGORY_HACKS_LABEL_GA "Cleasanna Aithrise"
+#define CATEGORY_HACKS_INFO_0_GA "Athraigh socruithe róchlogála agus cruinneas aithrise próiseálaí a mbíonn tionchar acu ar fheidhmíocht agus comhoiriúnacht íseal-leibhéil."
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GA "Rún GPU Inmheánach"
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GA "Roghnaigh iolraitheoir réitigh inmheánach. Feabhsaíonn réitigh níos airde ná '1x (Dúchasach)' dílseacht na samhlacha 3T ar chostas riachtanais feidhmíochta méadaithe. De ghnáth ní dhéanann an socrú seo difear d'eilimintí 2T."
+#define OPTION_VAL_1X_NATIVE_GA "1x (Dúchasach)"
 #define OPTION_VAL_2X_GA NULL
 #define OPTION_VAL_4X_GA NULL
 #define OPTION_VAL_8X_GA NULL
 #define OPTION_VAL_16X_GA NULL
-#define BEETLE_OPT_DEPTH_LABEL_GA NULL
-#define BEETLE_OPT_DEPTH_INFO_0_GA NULL
-#define OPTION_VAL_16BPP_NATIVE_GA NULL
+#define BEETLE_OPT_DEPTH_LABEL_GA "Doimhneacht Dath Inmheánach"
+#define BEETLE_OPT_DEPTH_INFO_0_GA "Roghnaigh doimhneacht datha inmheánach. Is féidir le doimhneacht datha níos airde éifeachtaí bandaí datha a laghdú gan úsáid a bhaint as díodán. Déanann 16 bpp aithris ar chrua-earraí bunaidh ach d'fhéadfadh bandaí a bheith le feiceáil mura bhfuil díodán cumasaithe. Moltar 'Patrún Díodán' a dhíchumasú nuair a shocraítear an rogha seo go 32 bpp."
+#define OPTION_VAL_16BPP_NATIVE_GA "16 bpp (Dúchasach)"
 #define OPTION_VAL_32BPP_GA NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_GA NULL
-#define BEETLE_OPT_DITHER_MODE_INFO_0_GA NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_GA NULL
-#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_GA NULL
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_GA NULL
-#define BEETLE_OPT_FILTER_LABEL_GA NULL
-#define BEETLE_OPT_FILTER_INFO_0_GA NULL
-#define OPTION_VAL_NEAREST_GA NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_GA "Patrún Díthrithe"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_GA "Roghnaigh cumraíocht patrún díodán. Aithrisíonn '1x (Dúchasach)' díodán ísealtaifigh dúchasach a úsáideann crua-earraí bunaidh chun déantáin bandála datha atá le feiceáil ag doimhneacht datha dúchasach a mhaolú. Scálann 'Taifeach Inmheánach' gráinneacht díodán go dtí an taifeach inmheánach cumraithe le haghaidh torthaí níos glaine. Moltar é a dhíchumasú nuair a bhíonn sé á rith ag doimhneacht datha 32 bpp. Tabhair faoi deara: Ar Vulkan, cuirfidh cumasú seo iallach ar shampláil síos go doimhneacht datha dúchasach, agus cuirfidh díchumasú aschur ar chumas go huathoibríoch ag doimhneacht datha níos airde."
+#define OPTION_VAL_INTERNAL_RESOLUTION_GA "Rún Inmheánach"
+#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_GA "Fritháireamh UV Uigeachta"
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_GA "Uigeachtaí samplacha do pholagáin 3T ag fritháireamh le haghaidh taifeach inmheánach níos airde ná 1x. Laghdaíonn sé seo fuaiseanna uigeachta ach d’fhéadfadh sé go mbeadh teipeanna grafacha neamhbheartaithe mar thoradh air."
+#define BEETLE_OPT_FILTER_LABEL_GA "Scagadh Uigeachta"
+#define BEETLE_OPT_FILTER_INFO_0_GA "Roghnaigh modh scagtha uigeachta. Aithrisíonn 'Nearest' crua-earraí bunaidh. Is scagairí réidhithe iad 'Bilinear' agus '3-Point', a laghdaíonn picteilíniú trí doiléiriú. Is scagairí uasghrádaithe iad 'SABR', 'xBR', agus 'JINC2' a d'fhéadfadh feabhas a chur ar dhílseacht/géire uigeachta ar chostas riachtanais feidhmíochta méadaithe. Ní thacaítear leis seo ach ag na rindreálaithe crua-earraí."
+#define OPTION_VAL_NEAREST_GA "Is cóngaraí"
 #define OPTION_VAL_SABR_GA NULL
 #define OPTION_VAL_XBR_GA NULL
-#define OPTION_VAL_BILINEAR_GA NULL
-#define OPTION_VAL_3_POINT_GA NULL
+#define OPTION_VAL_BILINEAR_GA "Délíneach"
+#define OPTION_VAL_3_POINT_GA "3-Phointe"
 #define OPTION_VAL_JINC2_GA NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_GA NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_GA NULL
-#define OPTION_VAL_OPAQUE_GA NULL
-#define OPTION_VAL_ALL_GA NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_GA NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_GA NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_GA NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_GA NULL
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_GA NULL
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_GA NULL
-#define BEETLE_OPT_MSAA_LABEL_GA NULL
-#define BEETLE_OPT_MSAA_INFO_0_GA NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_GA "Eisiamh Sprideanna ó Scagadh"
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_GA "Ná cuir scagadh uigeachta i bhfeidhm ar sprideanna. Cuireann sé cosc ​​ar shíomaí i gcluichí éagsúla le cúlraí rindreáilte le sprideanna 2T. Úsáid i dteannta le Smúdáil Oiriúnaitheach nó scagaire iarphróiseála eile chun an éifeacht is fearr a fháil."
+#define OPTION_VAL_OPAQUE_GA "Teimhneach Amháin"
+#define OPTION_VAL_ALL_GA "Teimhneach agus Leath-Trédhearcach"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_GA "Eisiamh Polagáin 2T ó Scagadh"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_GA "Ná cuir scagadh uigeachta i bhfeidhm ar pholagáin 2T. Braitear polagáin 2T le heorastach agus d'fhéadfadh go mbeadh teipeanna ann. Bain úsáid as i dteannta le Smúdáil Oiriúnaitheach nó scagaire iarphróiseála eile chun an éifeacht is fearr a bhaint amach."
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_GA "Smúdáil Oiriúnaitheach"
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_GA "Réidh amach saothar ealaíne 2T agus eilimintí UI gan réada rindreáilte 3T a dhéanamh doiléir. Ní thacaítear leis seo ach leis an rindreálaí Vulkan."
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_GA "Super-sampláil (Síossamplú go dtí an Taifeach Dúchasach)"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_GA "Laghdaigh samplaíocht an ábhair rindreáilte ó réiteach inmheánach uasghrádaithe síos go réiteach dúchasach. Trí é seo a chomhcheangal le hiolraitheoirí réitigh inmheánacha níos airde, is féidir cluichí a thaispeáint le rudaí 3T frith-ailíse ag réiteach íseal dúchasach. Tugann sé na torthaí is fearr nuair a chuirtear i bhfeidhm é ar theidil a mheascann eilimintí 2T agus 3T (e.g. carachtair 3T ar chúlraí réamh-rindreáilte), agus oibríonn sé go maith i gcomhar le scáthaitheoirí CRT. Ní thacaítear leis ach amháin ag an rindreálaí Vulkan. Tabhair faoi deara: Moltar 'Patrún Díthrithe' a dhíchumasú agus an rogha seo á cumasú."
+#define BEETLE_OPT_MSAA_LABEL_GA "Frith-Ailiasú Il-Shampláilte"
+#define BEETLE_OPT_MSAA_INFO_0_GA "Roghnaigh leibhéal MSAA le haghaidh ábhar rindreáilte. Feabhsaíonn sé cuma réad 3T. Ní thacaítear leis ach amháin leis an rindreálaí Vulkan."
 #define OPTION_VAL_1X_GA NULL
-#define BEETLE_OPT_MDEC_YUV_LABEL_GA NULL
-#define BEETLE_OPT_MDEC_YUV_INFO_0_GA NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_GA NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_GA NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_GA NULL
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GA NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GA NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GA NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_GA NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_GA NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_GA NULL
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_GA NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_GA NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_GA NULL
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_GA NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_GA NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_GA NULL
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GA NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GA NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GA NULL
-#define OPTION_VAL_ENABLED_ANALOG_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GA NULL
+#define BEETLE_OPT_MDEC_YUV_LABEL_GA "Scagaire Chroma MDEC YUV"
+#define BEETLE_OPT_MDEC_YUV_INFO_0_GA "Feabhas a chur ar cháilíocht athsheinm FMV trí airteafóin 'macrabhlocáil' (cearnóga/imill gharbha) a laghdú. Ní thacaítear leis seo ach leis an rindreálaí Vulkan."
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_GA "Uigeachtaí Rian"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_GA "Réamhriachtanas le haghaidh dumpáil agus athsholáthar uigeachta. Is dócha go dtitfidh sé i bhformhór na gcluichí."
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_GA "Uigeachtaí Dumpála"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GA "Dumpáil uigeachtaí úsáidte chuig <cd>-texture-dump/"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GA "Cuir Uigeachtaí in Ionad"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GA "Cuir uigeachtaí in ionad a chéile ag baint úsáide as leaganacha HD ó <cd>-texture-replacements/"
+#define BEETLE_OPT_WIREFRAME_LABEL_GA "Mód Sreangfhráma (Dífhabhtú)"
+#define BEETLE_OPT_WIREFRAME_INFO_0_GA "Rindreáil samhlacha 3T i bhfoirm imlíne gan uigeachtaí ná scáthú. Ní thacaítear leis seo ach amháin ag rindreálaí crua-earraí OpenGL. Tabhair faoi deara: Chun críocha dífhabhtaithe atá sé seo, agus ba chóir é a dhíchumasú de ghnáth."
+#define BEETLE_OPT_FRAME_DUPING_LABEL_GA "Múchadh Frámaí (Luasghéarú)"
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_GA "Nuair a bhíonn sé cumasaithe agus tacaithe ag an gcomhéadan libretro, soláthraíonn sé seo méadú beag ar fheidhmíocht tríd an gcomhéadan a threorú chun an fráma roimhe sin a athdhéanamh mura bhfuil aon rud nua le taispeáint ag an gcroílár."
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_GA "Taispeáin FPS Inmheánach"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_GA "Taispeáin an ráta fráma inmheánach ag a bhfuil an córas PlayStation aithrisithe ag rindreáil ábhair. Nóta: Éilíonn sé seo go mbeidh fógraí ar an scáileán cumasaithe i dtosach libretro."
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_GA "Taispeáin Teachtaireachtaí OSD"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_GA "Taispeáin teachtaireachtaí OSD a ghineann an croí."
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_GA "Taispeáin VRAM Iomlán (Dífhabhtú)"
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_GA "Amharcléirigh VRAM an chonsóil aithrisithe ar fad. Ní thacaítear leis seo ach ag rindreálaithe crua-earraí OpenGL agus Vulkan. Tabhair faoi deara: Chun críocha dífhabhtaithe atá sé seo, agus ba chóir é a dhíchumasú de ghnáth."
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_GA "Féin-Chalabrú Analógach"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_GA "Nuair a bhíonn an gléas ionchuir socraithe go DualShock, Rialaitheoir Analógach, Luamhán Luamhán Analógach, nó neGcon, cuireann an rogha seo calabrú dinimiciúil ionchuir analógacha ar fáil. Déantar monatóireacht ar uasluachanna ionchuir cláraithe i bhfíor-am agus úsáidtear iad chun comhordanáidí analógacha a chuirtear chuig an aithriseoir a scála. Ba chóir é seo a úsáid le haghaidh cluichí ar nós Mega Man Legends 2 a bhfuil luachanna níos mó ag súil leo ná mar a sholáthraíonn rialtóirí nua-aimseartha. Chun na torthaí is fearr a fháil, ba chóir na bataí analógacha a rothlú go hiomlán chun an algartam calabrúcháin a choigeartú gach uair a luchtaítear ábhar."
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_GA "Mód Analógach DualShock a Athrú"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_GA "Nuair is é DualShock an cineál feiste ionchuir, ceadaíonn an rogha seo don DualShock aithriste a bheith idir mód DIGITEACH agus mód ANALÓGACH cosúil leis an gcrua-earraí bunaidh. Is féidir an mód a athrú freisin trí úsáid a bhaint as an teaglaim cnaipe roghnaithe."
+#define OPTION_VAL_ENABLED_ANALOG_GA "Réamhshocrú-Analógach"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_GA "Comhcheangal Mód Analógach DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_GA "Roghnaigh an teaglaim cnaipí a úsáidfear chun aistriú idir mód DIGITEACH agus mód ANALÓGACH don DualShock aithrisithe."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_GA NULL
 #define OPTION_VAL_L1_R1_SELECT_GA NULL
 #define OPTION_VAL_L1_R1_START_GA NULL
@@ -37240,43 +37240,43 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_L2_R2_L3_GA NULL
 #define OPTION_VAL_L2_R2_R3_GA NULL
 #define OPTION_VAL_L3_R3_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GA NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GA NULL
-#define OPTION_VAL_0_GA NULL
-#define OPTION_VAL_1_GA NULL
-#define OPTION_VAL_2_GA NULL
-#define OPTION_VAL_3_GA NULL
-#define OPTION_VAL_4_GA NULL
-#define OPTION_VAL_5_GA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_GA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_GA NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_GA NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_GA NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_GA NULL
-#define OPTION_VAL_LIGHTGUN_GA NULL
-#define OPTION_VAL_TOUCHSCREEN_GA NULL
-#define BEETLE_OPT_GUN_CURSOR_LABEL_GA NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_GA NULL
-#define OPTION_VAL_CROSS_GA NULL
-#define OPTION_VAL_DOT_GA NULL
-#define OPTION_VAL_OFF_GA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_GA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_GA NULL
-#define OPTION_VAL_RED_GA NULL
-#define OPTION_VAL_BLUE_GA NULL
-#define OPTION_VAL_GREEN_GA NULL
-#define OPTION_VAL_ORANGE_GA NULL
-#define OPTION_VAL_YELLOW_GA NULL
-#define OPTION_VAL_CYAN_GA NULL
-#define OPTION_VAL_PINK_GA NULL
-#define OPTION_VAL_PURPLE_GA NULL
-#define OPTION_VAL_BLACK_GA NULL
-#define OPTION_VAL_WHITE_GA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_GA NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_GA NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_GA NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_GA NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GA "Moill Shealbhaíochta i Mód Analógach DualShock Combo"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GA "Socraigh an t-am coinneála do na cnaipí teaglama mód analógach."
+#define OPTION_VAL_0_GA "Moill 0 Soicind"
+#define OPTION_VAL_1_GA "Moill 1 Soicind"
+#define OPTION_VAL_2_GA "Moill 2 Shoicind"
+#define OPTION_VAL_3_GA "Moill 3 Shoicind"
+#define OPTION_VAL_4_GA "Moill 4 Soicind"
+#define OPTION_VAL_5_GA "Moill 5 Soicind"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GA "Port 1: Cumasaigh Il-thapála"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_GA "Cumasaigh feidhmiúlacht il-thapála ar phort 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_GA "Port 2: Cumasaigh Il-thapála"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_GA "Cumasaigh feidhmiúlacht il-thapála ar phort 2."
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_GA "Mód Ionchuir Gunna"
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_GA "Roghnaigh cibé acu ionchur 'Gunna Solais' atá rialaithe ag an luch nó ionchur 'Scáileán Tadhaill' atá uait nuair atá an cineál gléis socraithe go 'Guncon/G-Con 45' nó 'Justifier'."
+#define OPTION_VAL_LIGHTGUN_GA "Gunna Solais"
+#define OPTION_VAL_TOUCHSCREEN_GA "Scáileán tadhaill"
+#define BEETLE_OPT_GUN_CURSOR_LABEL_GA "Cúrsóir Gunna"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_GA "Roghnaigh cúrsóir an ghunna le taispeáint ar an scáileán agus na cineálacha gléasanna ionchuir 'Guncon/G-Con 45' agus 'Justifier' in úsáid agat. Nuair a bhíonn sé díchumasaithe, bíonn na crosairí i bhfolach i gcónaí."
+#define OPTION_VAL_CROSS_GA "Cros"
+#define OPTION_VAL_DOT_GA "Ponc"
+#define OPTION_VAL_OFF_GA "Gan Cúrsóir"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_GA "Port 1: Dath Crosaire Gunna"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_GA "Roghnaigh dath crosaire an ghunna solais do phort 1."
+#define OPTION_VAL_RED_GA "Dearg"
+#define OPTION_VAL_BLUE_GA "Gorm"
+#define OPTION_VAL_GREEN_GA "Glas"
+#define OPTION_VAL_ORANGE_GA "Oráiste"
+#define OPTION_VAL_YELLOW_GA "Buí"
+#define OPTION_VAL_CYAN_GA "Cian"
+#define OPTION_VAL_PINK_GA "Bándearg"
+#define OPTION_VAL_PURPLE_GA "Corcra"
+#define OPTION_VAL_BLACK_GA "Dubh"
+#define OPTION_VAL_WHITE_GA "Bán"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_GA "Port 2: Dath Crosaire Gunna"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_GA "Roghnaigh dath crosaire an ghunna solais do phort 2."
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_GA "Íogaireacht Luiche"
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_GA "Roghnaigh freagrúlacht chineál gléis ionchuir 'Luch'."
 #define OPTION_VAL_5_O29_GA NULL
 #define OPTION_VAL_10_GA NULL
 #define OPTION_VAL_15_GA NULL
@@ -37296,7 +37296,7 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_85_GA NULL
 #define OPTION_VAL_90_GA NULL
 #define OPTION_VAL_95_GA NULL
-#define OPTION_VAL_100_GA NULL
+#define OPTION_VAL_100_GA "100% (Réamhshocrú)"
 #define OPTION_VAL_105_GA NULL
 #define OPTION_VAL_110_GA NULL
 #define OPTION_VAL_115_GA NULL
@@ -37317,33 +37317,33 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_190_GA NULL
 #define OPTION_VAL_195_GA NULL
 #define OPTION_VAL_200_GA NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_GA NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_GA NULL
-#define OPTION_VAL_LINEAR_GA NULL
-#define OPTION_VAL_QUADRATIC_GA NULL
-#define OPTION_VAL_CUBIC_GA NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_GA NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_GA NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_GA "Freagra Casadh neGcon"
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_GA "Roghnaigh cineál freagartha an mhaide analógaigh chlé ar an CeapRetro agus gníomh 'casadh' gléasanna ionchuir 'neGcon' aithriste á insamhladh. Is féidir díláithriú an mhaide analógaigh a mhapáil chuig uillinn rothlaithe neGcon go líneach, go cearnachach nó go ciúbach. Ligeann 'Cuadrach' cruinneas níos mó ná 'Líneach' agus gluaiseachtaí beaga á ndéanamh. Méadaíonn 'Ciúbach' cruinneas gluaiseachtaí beaga a thuilleadh, ach 'áibhéilíonn' sé gluaiseachtaí níos mó. Tabhair faoi deara: Ní mholtar 'Líneach' ach amháin agus forimeallaigh roth rásaíochta in úsáid. Cuireann rialtóirí traidisiúnta ionchur analógach i bhfeidhm ar bhealach atá go bunúsach difriúil ó mheicníocht 'casadh' an neGcon, sa chaoi is go ndéanann mapáil líneach ró-aimpliú ar ghluaiseachtaí beaga, rud a chuireann isteach ar rialú mín. I bhformhór na gcásanna, soláthraíonn 'Cuadrach' an garmheastachán is gaire do chrua-earraí fíor."
+#define OPTION_VAL_LINEAR_GA "Líneach"
+#define OPTION_VAL_QUADRATIC_GA "Cearnógach"
+#define OPTION_VAL_CUBIC_GA "Ciúbach"
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_GA "crios Marbh Twist neGcon"
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_GA "Roghnaigh crios marbh an mhaide analógach chlé ar an CeapRetro agus gníomh 'casadh' gléasanna ionchuir 'neGcon' aithriste á insamhladh. Úsáidtear é chun drift rialtóra a dhíchur. Tabhair faoi deara: Soláthraíonn formhór na dteideal atá comhoiriúnach le neGcon roghanna sa chluiche chun luach crios marbh 'casadh' a shocrú. Chun cailliúint cruinnis a sheachaint, ba chóir an crios marbh sa chluiche a shocrú go náid *i gcónaí*. Níor chóir aon choigeartuithe riachtanacha a chur i bhfeidhm *ach* tríd an rogha lárnach seo. Tá sé seo thar a bheith tábhachtach nuair a bhíonn 'Freagra Casadh neGcon' socraithe go 'Cearnáiteach' nó 'Ciúbach'."
 #define OPTION_VAL_0_O31_GA NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_GA NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_GA NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_GA "Modh Cárta Cuimhne 0 (Atosú Riachtanach)"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_GA "Roghnaigh an fhormáid sonraí sábhála a úsáidtear do chárta cuimhne 0. Féadfar 'Mednafen' a úsáid le haghaidh comhoiriúnachta leis an leagan neamhspleách de Mednafen. Nuair a úsáidtear iad le Beetle PSX, bíonn formáidí comhionanna inmheánacha ag sábhálacha Libretro (.srm) agus Mednafen (.mcr) agus is féidir iad a thiontú eatarthu trí athainmniú."
 #define OPTION_VAL_LIBRETRO_GA NULL
 #define OPTION_VAL_MEDNAFEN_GA NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_GA NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_GA NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_GA NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_GA NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_GA NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GA NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GA NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GA NULL
-#define OPTION_VAL_1_O36_GA NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_GA NULL
-#define BEETLE_OPT_PGXP_MODE_INFO_0_GA NULL
-#define OPTION_VAL_MEMORY_ONLY_GA NULL
-#define OPTION_VAL_MEMORY_CPU_GA NULL
-#define BEETLE_OPT_PGXP_2D_TOL_LABEL_GA NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_GA NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_GA "Cumasaigh Cárta Cuimhne 1 (Atosú Riachtanach)"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_GA "Déan aithris ar an dara cárta cuimhne i sliotán 1. Nuair a bhíonn sé díchumasaithe, ní féidir le cluichí rochtain a fháil ach ar an gcárta cuimhne i sliotán 0. Tabhair faoi deara: Éilíonn roinnt cluichí go ndíchumasófar an rogha seo chun oibriú i gceart (e.g. Códainm Tenka). Tabhair faoi deara: Úsáideann Cárta Cuimhne 1 an fhormáid sábhála Mednafen (.mcr)."
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_GA "Cártaí Cuimhne Comhroinnte (Atosú Riachtanach)"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_GA "Nuair a bheidh sé cumasaithe, sábhálfar agus lódálfar gach cluiche ó na comhaid cárta cuimhne céanna. Nuair a bheidh sé díchumasaithe, ginfear comhaid cárta cuimhne ar leithligh do gach mír d'ábhar lódáilte. Tabhair faoi deara: má shocraítear 'Memory Card 0 Method' go 'Libretro', ní bheidh tionchar ach ar an gcárta cuimhne ceart."
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_GA "Innéacs Clé Cárta Cuimhne"
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_GA "Athraigh an cárta cuimhne atá luchtaithe sa sliotán clé faoi láthair. Ní oibreoidh an rogha seo ach amháin má tá modh Cárta Cuimhne 0 socraithe go Mednafen. Is é innéacs 0 an cárta réamhshocraithe."
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_GA "Innéacs Deas Cárta Cuimhne"
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_GA "Athraigh an cárta cuimhne atá luchtaithe sa sliotán ceart faoi láthair. Ní oibreoidh an rogha seo ach amháin má tá Cárta Cuimhne 1 cumasaithe. Is é innéacs 1 an cárta réamhshocraithe."
+#define OPTION_VAL_1_O36_GA "1 (Réamhshocrú)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_GA "Mód Oibríochta PGXP"
+#define BEETLE_OPT_PGXP_MODE_INFO_0_GA "Ligeann sé seo duit réada 3T a rindreáil le cruinneas fo-phicteilíní, rud a laghdaíonn saobhadh agus crith réada 3T a fheictear ar chrua-earraí bunaidh mar gheall ar úsáid chomhordanáidí buaicphointí seasta. Tá saincheisteanna comhoiriúnachta íosta ag baint leis an mód 'Cuimhne Amháin' agus moltar é le haghaidh úsáide ginearálta. Is féidir leis an mód 'Cuimhne + LAP (Buggy)' crith a laghdú níos mó fós ach tá ceanglais ardfheidhmíochta aige agus d'fhéadfadh sé earráidí geoiméadrachta éagsúla a chur faoi deara."
+#define OPTION_VAL_MEMORY_ONLY_GA "Cuimhne Amháin"
+#define OPTION_VAL_MEMORY_CPU_GA "Cuimhne + LAP (Buggy)"
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_GA "Caoinfhulaingt Geoiméadrachta 2T PGXP"
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_GA "Folaigh earráidí níos soiléire in oibríochtaí PGXP: sonraíonn an luach an lamháltas ina gcoimeádfar luachanna PGXP i gcás geoiméadrachtaí gan faisnéis cheart faoi dhoimhneacht."
 #define OPTION_VAL_0PX_GA NULL
 #define OPTION_VAL_1PX_GA NULL
 #define OPTION_VAL_2PX_GA NULL
@@ -37353,20 +37353,20 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_6PX_GA NULL
 #define OPTION_VAL_7PX_GA NULL
 #define OPTION_VAL_8PX_GA NULL
-#define BEETLE_OPT_PGXP_NCLIP_LABEL_GA NULL
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_GA NULL
-#define BEETLE_OPT_PGXP_VERTEX_LABEL_GA NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_GA NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_GA NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_GA NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_GA NULL
-#define BEETLE_OPT_LINE_RENDER_INFO_0_GA NULL
-#define OPTION_VAL_DEFAULT_GA NULL
-#define OPTION_VAL_AGGRESSIVE_GA NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_GA NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_GA NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_GA NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_GA NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_GA "Marú Prímitiúil PGXP"
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_GA "Bain úsáid as cur i bhfeidhm NCLIP PGXP. Feabhsaíonn sé an chuma trí phoill i ngeoiméadrachtaí a laghdú le comhordanáidí PGXP. Is eol go mbíonn roinnt cluichí faoi ghlas i gcúinsí éagsúla dá bharr."
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_GA "Taisce Buaicphointe PGXP"
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_GA "Cuir suíomhanna buaicphointí feabhsaithe PGXP i dtaisce lena n-athúsáid ar fud líníochtaí polagán. Is féidir ailíniú réad a fheabhsú agus fuálacha infheicthe a laghdú agus uigeachtaí á rindreáil, ach d'fhéadfadh dearfacha bréagacha agus fiosrúcháin á ndéanamh ar an taisce fabhtanna grafacha a chruthú. Moltar faoi láthair an rogha seo a fhágáil díchumasaithe. Ní chuirtear an rogha seo i bhfeidhm ach amháin nuair a bhíonn Mód Oibríochta PGXP cumasaithe. Ní thacaítear leis ach ag na rindreálaithe crua-earraí."
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_GA "Uigeacht Cheart Peirspictíochta PGXP"
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_GA "Cuir mapáil uigeachta atá ceart ó thaobh peirspictíochta in ionad mapáil uigeachta afíne dúchais PSX. Cuireann sé deireadh le saobhadh agus le lúbadh uigeachtaí atá ag brath ar shuíomh, rud a fhágann go mbíonn uigeachtaí ailínithe i gceart. Ní chuirtear an rogha seo i bhfeidhm ach amháin nuair a bhíonn Mód Oibríochta PGXP cumasaithe. Ní thacaítear leis ach ag na rindreálaithe crua-earraí."
+#define BEETLE_OPT_LINE_RENDER_LABEL_GA "Haic Líne-go-Ceathair"
+#define BEETLE_OPT_LINE_RENDER_INFO_0_GA "Roghnaigh an modh haca líne-go-ceathrú-líne. Tarraingíonn roinnt cluichí (e.g. Doom, Hexen, Soul Blade, srl.) línte cothrománacha trí thriantáin aon-phicteilín ar airde a shíneadh trasna an scáileáin, atá rastraithe mar shraith picteilín ar an gcrua-earraí bunaidh. Braitheann an haca seo na triantáin bheaga seo agus athraíonn sé iad go ceathrú-líne de réir mar is gá, rud a ligeann dóibh a bheith taispeánta i gceart ar na rindreálaithe crua-earraí agus ag taifeach inmheánach uasghrádaithe. Tá 'Ionsaitheach' ag teastáil do roinnt teidil (m.sh. Dark Forces, Duke Nukem) ach d'fhéadfadh sé fabhtanna grafacha a thabhairt isteach murach sin. Fág ag 'Réamhshocrú' mura bhfuil tú cinnte."
+#define OPTION_VAL_DEFAULT_GA "Réamhshocrú"
+#define OPTION_VAL_AGGRESSIVE_GA "Ionsaitheach"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_GA "Haic Mód Leathan-Scáileáin"
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_GA "Déan ábhar 3T a rindreáil go hanamorfach agus aschur an maolán fráma aithrisithe ag cóimheas gné scáileáin leathan. Tugann sé na torthaí is fearr le cluichí lán-3T. Beidh eilimintí 2T sínte go cothrománach agus d'fhéadfadh siad a bheith mí-ailínithe."
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_GA "Cóimheas Gné Haic Mód Leathan-Scáileáin"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_GA "Roghnaigh an cóimheas gné atá le húsáid ag an Haic Mód Scáileáin Leathan."
 #define OPTION_VAL_16_9_GA NULL
 #define OPTION_VAL_16_10_GA NULL
 #define OPTION_VAL_18_9_GA NULL
@@ -37374,9 +37374,9 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_20_9_GA NULL
 #define OPTION_VAL_21_9_GA NULL
 #define OPTION_VAL_32_9_GA NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_GA NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_GA NULL
-#define OPTION_VAL_100_NATIVE_GA NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_GA "Scálú Minicíochta LAP (Róchlogáil)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_GA "Róchlogáil (nó fochlogáil) an LAP PSX aithrisithe. Is féidir le róchlogáil moilliú a dhíchur agus rátaí fráma a fheabhsú i gcluichí áirithe ar chostas riachtanais feidhmíochta méadaithe. Tabhair faoi deara go bhfuil teorannóir ráta fráma inmheánach ag roinnt cluichí agus nach bhféadfadh róchlogáil leas a bhaint astu. D’fhéadfadh sé go mbeadh éifeachtaí áirithe beochan níos tapúla ná mar a bhí beartaithe i roinnt teidil nuair a bhíonn siad róchlogáilte."
+#define OPTION_VAL_100_NATIVE_GA "100% (Dúchasach)"
 #define OPTION_VAL_210_GA NULL
 #define OPTION_VAL_220_GA NULL
 #define OPTION_VAL_230_GA NULL
@@ -37432,60 +37432,60 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_730_GA NULL
 #define OPTION_VAL_740_GA NULL
 #define OPTION_VAL_750_GA NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_GA NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_GA NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_GA "Róchlogáil Rasterizer GPU"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_GA "Cumasaigh róchlogáil an rastairitheora 2T atá laistigh de GPU an PSX aithrisithe. Ní fheabhsaíonn sé rindreáil 3T, agus i gcoitinne níl mórán éifeacht aige."
 #define OPTION_VAL_32X_GA NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_GA NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_GA NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_GA NULL
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_GA NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_GA NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GA NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_GA "Róchlogáil GTE"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_GA "Ísligh gach oibríocht GTE aithriste (comhphróiseálaí LAP le haghaidh grafaicí 3T) go dtí latency tairiseach aon-timthriall. I gcás cluichí a úsáideann an GTE go mór, is féidir leis seo feabhas mór a chur ar an ráta fráma agus ar chobhsaíocht ama fráma."
+#define BEETLE_OPT_SKIP_BIOS_LABEL_GA "Léim thar an BIOS"
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_GA "Seachain beochan tosaithe BIOS PlayStation a thaispeántar de ghnáth agus ábhar á luchtú. Tabhair faoi deara: Má chumasaítear é seo, bíonn fadhbanna comhoiriúnachta ann le roinnt cluichí (cluichí atá cosanta ag cóip PAL, Saga Frontier, srl.)."
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_GA "Sáraigh BIOS (Atosú Riachtanach)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GA "Sáraigh an BIOS caighdeánach atá sainiúil don réigiún le ceann saor ó réigiún má aimsítear é."
 #define OPTION_VAL_PSXONPSP_GA NULL
 #define OPTION_VAL_PS1_ROM_GA NULL
-#define BEETLE_OPT_RENDERER_LABEL_GA NULL
-#define BEETLE_OPT_RENDERER_INFO_0_GA NULL
-#define OPTION_VAL_HARDWARE_GA NULL
-#define OPTION_VAL_HARDWARE_GL_GA NULL
-#define OPTION_VAL_HARDWARE_VK_GA NULL
-#define OPTION_VAL_SOFTWARE_GA NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GA NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA NULL
-#define BEETLE_OPT_CPU_DYNAREC_LABEL_GA NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_GA NULL
-#define OPTION_VAL_DISABLED_GA NULL
-#define OPTION_VAL_EXECUTE_GA NULL
-#define OPTION_VAL_EXECUTE_ONE_GA NULL
-#define OPTION_VAL_RUN_INTERPRETER_GA NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GA NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GA NULL
-#define OPTION_VAL_FULL_GA NULL
-#define OPTION_VAL_DMA_GA NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_GA NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_GA NULL
-#define OPTION_VAL_128_GA NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_GA NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GA NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GA NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GA NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_GA NULL
-#define OPTION_VAL_FORCE_INTERLACED_GA NULL
-#define OPTION_VAL_AUTO_TOGGLE_GA NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GA NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GA NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_GA NULL
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_GA NULL
-#define OPTION_VAL_CORRECTED_GA NULL
-#define OPTION_VAL_UNCORRECTED_GA NULL
-#define OPTION_VAL_4_3_GA NULL
-#define OPTION_VAL_NTSC_GA NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_GA NULL
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GA NULL
-#define OPTION_VAL_DISABLED_O59_GA NULL
-#define OPTION_VAL_STATIC_GA NULL
-#define OPTION_VAL_SMART_GA NULL
-#define BEETLE_OPT_IMAGE_CROP_LABEL_GA NULL
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_GA NULL
+#define BEETLE_OPT_RENDERER_LABEL_GA "Rindreálaí (Atosú Riachtanach)"
+#define BEETLE_OPT_RENDERER_INFO_0_GA "Is é an rindreálaí bogearraí an ceann is cruinne ach tá riachtanais feidhmíochta géara aige nuair a bhíonn sé ag rith ag taifeach inmheánach GPU méadaithe. Cé nach bhfuil na rindreálaithe crua-earraí chomh cruinn céanna, feabhsaíonn siad feidhmíocht thar an rindreálaí bogearraí ag taifeach inmheánach méadaithe agus cuireann siad feabhsuithe grafacha éagsúla ar chumas. Roghnaíonn 'Crua-earraí (Uathoibríoch)' an rindreálaí Vulkan nó OpenGL go huathoibríoch, ag brath ar thiománaí físe tosaigh libretro reatha. Mura bhfuil an tiománaí físe a chuirtear ar fáil comhoiriúnach le Vulkan nó OpenGL 3.3, ansin titeann an croí ar ais chuig an rindreálaí bogearraí."
+#define OPTION_VAL_HARDWARE_GA "Crua-earraí (Uathoibríoch)"
+#define OPTION_VAL_HARDWARE_GL_GA "Crua-earraí (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_GA "Crua-earraí (Vulkan)"
+#define OPTION_VAL_SOFTWARE_GA "Bogearraí"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GA "Maolán Fráma Bogearraí"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA "Cumasaigh aithris chruinn ar éifeachtaí maolán fráma (m.sh. doiléire gluaisne, corraíl chatha FF7) agus rindreálaithe crua-earraí in úsáid trí chóip den rindreálaí bogearraí a rith ag réiteach dúchasach sa chúlra. Má tá sé díchumasaithe, fágtar na hoibríochtaí seo ar lár (OpenGL) nó rindreáiltear iad ar an GPU (Vulkan). Is féidir le díchumasú feidhmíocht a fheabhsú ach d'fhéadfadh earráidí grafacha tromchúiseacha a bheith mar thoradh air. Fág cumasaithe mura bhfuil tú cinnte."
+#define BEETLE_OPT_CPU_DYNAREC_LABEL_GA "LAP Dynarec"
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_GA "Athchóimeáil treoracha LAP go dinimiciúil chuig treoracha dúchasacha. I bhfad níos tapúla ná an léirmhínitheoir, ach níl an t-amchlár LAP chomh cruinn céanna, agus d'fhéadfadh fabhtanna a bheith ann."
+#define OPTION_VAL_DISABLED_GA "Míchumasaithe (Ateangaire Ciaróg)"
+#define OPTION_VAL_EXECUTE_GA "Uasfheidhmíocht"
+#define OPTION_VAL_EXECUTE_ONE_GA "Seiceáil Ama Timthrialla"
+#define OPTION_VAL_RUN_INTERPRETER_GA "Ateangaire Lightrec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GA "Neamhbhailíochtú Cód Dynarec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GA "Éilíonn roinnt cluichí neamhbhailíochtú 'Iomlán', agus teastaíonn 'DMA Amháin' ó chuid eile."
+#define OPTION_VAL_FULL_GA "Lán"
+#define OPTION_VAL_DMA_GA "DMA Amháin (Beagán níos Tapúla)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_GA "Timthriallta Imeachta Dynarec DMA/GPU/MDEC/Amadóir"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_GA "Uasmhéid timthriallta a ritheann an LAP sula ndéantar Nuashonrú GPU/DMA/MDEC/Amaire a sheiceáil, beidh uimhir níos airde níos tapúla, agus bíonn tionchar i bhfad níos lú aige ar léirmhínitheoir beetle ná ar dynarec."
+#define OPTION_VAL_128_GA "128 (Réamhshocrú)"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_GA "Samplaí SPU Dynarec"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GA "Uasmhéid samplaí SPU le rith sula ndéantar Nuashonrú SPU a sheiceáil, beidh uimhir níos airde níos tapúla, ach beidh teipeanna fuaime i roinnt cluichí le rud ar bith seachas 1."
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GA "Amchlár FPS Tuairiscithe ag an gCroí"
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GA "Roghnaigh an t-am FPS a thuairisceoidh an croí don tosaigh. Le hUath-Mholadh, beidh an croí in ann aistriú idir rátaí forásacha agus idirnasctha a thuairisciú, ach d'fhéadfadh sé go ndéanfaí aththosú ar thiománaí físe/fuaime an tosaigh."
+#define OPTION_VAL_FORCE_PROGRESSIVE_GA "Ráta Forásach"
+#define OPTION_VAL_FORCE_INTERLACED_GA "Ráta Idirfhite Fórsa"
+#define OPTION_VAL_AUTO_TOGGLE_GA "Ceadaigh Athrú Uathoibríoch"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GA "Sárú Ama Físe PAL (Eorpach)"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GA "Mar gheall ar chaighdeáin éagsúla, is minic a bhíonn cuma mhoillithe ar chluichí PAL i gcomparáid leis na heisiúintí NTSC Meiriceánacha nó Seapánacha. Is féidir an rogha seo a úsáid chun amanna PAL a shárú d’fhonn iarracht a dhéanamh na cluichí seo a rith le ráta fráma NTSC. Níl aon éifeacht ag an rogha seo agus ábhar NTSC á rith."
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_GA "Cóimheas Gné Croí"
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_GA "Roghnaigh an cóimheas gné lárnach a chuirtear ar fáil. Déantar neamhaird den socrú seo nuair a bhíonn na roghanna Mód Leathan-Scáileáin Haic nó Taispeáin VRAM Iomlán cumasaithe."
+#define OPTION_VAL_CORRECTED_GA "Ceartaithe"
+#define OPTION_VAL_UNCORRECTED_GA "Gan cheartú"
+#define OPTION_VAL_4_3_GA "Fórsa 4:3"
+#define OPTION_VAL_NTSC_GA "Fórsa NTSC"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_GA "Overscan Barraí"
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_GA "Coinníonn 'Gan aon cheann' an líonadh (boscaí piléir ar gach taobh den íomhá le haghaidh NTSC, ar gach taobh le haghaidh PAL) chun na barraí dubha céanna a ghintear in aschur físe analógach ag fíor-chrua-earraí PSX a aithris. Baintear líonadh cothrománach amháin le 'Statach', baintear an líonadh go léir le 'Dinimiciúil'."
+#define OPTION_VAL_DISABLED_O59_GA "Dada"
+#define OPTION_VAL_STATIC_GA "Statach"
+#define OPTION_VAL_SMART_GA "Dinimiciúil (Réamhshocraithe)"
+#define BEETLE_OPT_IMAGE_CROP_LABEL_GA "Bearradh Breise"
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_GA "Nuair a bhíonn 'Bearr Ró-scan Cothrománach' cumasaithe, laghdaíonn an rogha seo leithead na híomhá bearrtha tuilleadh faoin líon picteilíní sonraithe."
 #define OPTION_VAL_9PX_GA NULL
 #define OPTION_VAL_10PX_GA NULL
 #define OPTION_VAL_11PX_GA NULL
@@ -37498,8 +37498,8 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_18PX_GA NULL
 #define OPTION_VAL_19PX_GA NULL
 #define OPTION_VAL_20PX_GA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_GA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_GA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_GA "Íomhá Bearrtha Fritháireamh"
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_GA "Nuair a bhíonn 'Bearr Ró-scan Cothrománach' cumasaithe, ceadaíonn sé seo an íomhá ghearrtha mar thoradh air sin a fhritháireamh go cothrománach ar dheis (dearfach) nó ar chlé (diúltach) faoin líon sonraithe picteilíní. Féadfar é seo a úsáid chun fadhbanna ailínithe a cheartú. Ní thacaítear leis seo ach amháin ag an rindreálaí bogearraí."
 #define OPTION_VAL_12PX_O61_GA NULL
 #define OPTION_VAL_11PX_O61_GA NULL
 #define OPTION_VAL_10PX_O61_GA NULL
@@ -37524,31 +37524,31 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_10PX_O61_0_GA NULL
 #define OPTION_VAL_11PX_O61_0_GA NULL
 #define OPTION_VAL_12PX_O61_0_GA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_GA NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GA NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_GA NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_GA NULL
-#define OPTION_VAL_0_O63_GA NULL
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_GA NULL
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_GA NULL
-#define OPTION_VAL_239_GA NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_GA NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_GA NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GA NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GA NULL
-#define OPTION_VAL_287_GA NULL
-#define BEETLE_OPT_DEINTERLACER_LABEL_GA NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_GA NULL
-#define OPTION_VAL_WEAVE_GA NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_GA "Fritháireamh Íomhá Cothrománach (Timthriallta GPU)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_GA "Roghnaigh líon na dtimthriallta GPU le haghaidh fritháireamh na híomhá. Bogann luachanna dearfacha an íomhá ar dheis, bogann luachanna diúltacha an íomhá ar chlé. Ní thacaítear leis seo ach leis na rindreálaithe crua-earraí."
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_GA "Líne Scanadh Tosaigh - NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_GA "Roghnaigh an chéad líne scanadh a thaispeántar agus ábhar NTSC á rith. Laghdóidh luachanna níos mó ná náid airde na n-íomhánna aschuir trí phicteilíní a bhearradh ón imeall is airde. Is féidir é a úsáid chun dul i ngleic le boscaí litreacha."
+#define OPTION_VAL_0_O63_GA "0 (Réamhshocrú)"
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_GA "Líne Scanadh Deiridh - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_GA "Roghnaigh an líne scanadh dheireanach a thaispeántar agus ábhar NTSC á rith. Laghdóidh luachanna níos lú ná 239 airde na n-íomhánna aschuir trí phicteilíní a bhearradh ón imeall is ísle. Féadfar é a úsáid chun dul i ngleic le boscaí litreacha."
+#define OPTION_VAL_239_GA "239 (Réamhshocrú)"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_GA "Líne Scanadh Tosaigh - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_GA "Roghnaigh an chéad líne scanadh a thaispeántar agus ábhar PAL á rith. Laghdóidh luachanna níos mó ná náid airde na n-íomhánna aschuir trí phicteilíní a bhearradh ón imeall is airde. Féadfar é a úsáid chun dul i ngleic le boscaí litreacha."
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_GA "Líne Scanadh Deiridh - PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_GA "Roghnaigh an líne scanadh dheireanach a thaispeántar agus ábhar PAL á rith. Laghdóidh luachanna faoi bhun 287 airde na n-íomhánna aschuir trí na picteilíní a bhearradh ón imeall is ísle. Féadfar é a úsáid chun dul i ngleic le boscaí litreacha."
+#define OPTION_VAL_287_GA "287 (Réamhshocrú)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_GA "Modh Dí-idirfhite"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_GA "Taispeánann 'Fí' an dá réimse ar an bhfráma céanna le haghaidh íomhá neamhghluaiste ardtaifigh, déanann 'Bob' íobairt ar shoiléireacht réitigh ar mhaithe le soiléireacht gluaisne."
+#define OPTION_VAL_WEAVE_GA "Fí"
 #define OPTION_VAL_BOB_GA NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GA NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GA NULL
-#define OPTION_VAL_SYNC_GA NULL
-#define OPTION_VAL_ASYNC_GA NULL
-#define OPTION_VAL_PRECACHE_GA NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_GA NULL
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_GA NULL
-#define OPTION_VAL_2X_NATIVE_GA NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_GA "Modh Rochtana CD (Atosú Riachtanach)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_GA "Roghnaigh an modh a úsáidtear chun sonraí a léamh ó íomhánna diosca ábhair. Déanann 'Sioncrónach' aithris ar chrua-earraí bunaidh. Is féidir le 'Aisioncrónach' stad a laghdú ar ghléasanna le stóráil mhall. Lódálann 'Réamh-Thaisce' an íomhá diosca iomlán isteach sa chuimhne agus ábhar á sheoladh, rud a d'fhéadfadh amanna lódála sa chluiche a fheabhsú ar chostas moille tosaigh ag an am tosaithe. D'fhéadfadh 'Réamh-Thaisce' fadhbanna a chruthú ar chórais le RAM íseal, agus tiocfaidh sé ar ais go 'Sioncrónach' le haghaidh meán fisiciúil."
+#define OPTION_VAL_SYNC_GA "Sioncrónach"
+#define OPTION_VAL_ASYNC_GA "Asincrónach"
+#define OPTION_VAL_PRECACHE_GA "Réamh-Thaisce"
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_GA "Luas Luchtaithe CD"
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_GA "Roghnaigh iolraitheoir luas rochtana diosca. Is féidir le luachanna níos airde ná '2x (Dúchasach)' amanna lódála sa chluiche a laghdú go mór, ach d'fhéadfadh earráidí uainiúcháin a bheith mar thoradh orthu. B'fhéidir nach bhfeidhmeoidh roinnt cluichí i gceart os cionn luach áirithe."
+#define OPTION_VAL_2X_NATIVE_GA "2x (Dúchasach)"
 #define OPTION_VAL_6X_GA NULL
 #define OPTION_VAL_10X_GA NULL
 #define OPTION_VAL_12X_GA NULL
@@ -74341,7 +74341,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_SV "Visualisera hela den emulerade konsolens VRAM. Stöds endast av OpenGL- och Vulkan-hårdvarurenderare. Obs!: Detta är för felsökningsändamål och bör normalt sett vara inaktiverat."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_SV "Självkalibrera analoga spakar"
 #define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_SV "När ingångsenheten är inställd på DualShock, Analog Controller, Analog Joystick eller neGcon möjliggör den här inställningen dynamisk kalibrering av analoga ingångar. Hösta registrerade ingångsvärden övervakas i realtid och används för att justera analoga koordinater som skickas till emulatorn. Detta bör användas för spel som Mega Man Legends 2 som förväntar sig större värden än vad moderna kontroller tillhandahåller. För bästa resultat bör analoga spakar roteras i full utsträckning för att finjustera kalibreringsalgoritmen varje gång innehåll laddas."
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_SV "Växla analogt läge för DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_SV "När typen av inmatningsenhet är DualShock gör det här alternativet att den emulerade DualShock kan växlas mellan DIGITAL- och ANALOG-läge som den ursprungliga hårdvaran. Läget kan också växlas genom att använda den valda knappkombinationen."
 #define OPTION_VAL_ENABLED_ANALOG_SV "Standard-analog"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_SV "DualShock-analogt läge för kombinationer"
