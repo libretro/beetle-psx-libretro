@@ -1225,11 +1225,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", "Allow Automatic Toggling" },
          { "force_progressive", "Progressive Rate" },
          { "force_interlaced",  "Force Interlaced Rate" },
-         { "auto_toggle", "Allow Automatic Toggling" },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
