@@ -352,9 +352,9 @@ extern "C" {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_AR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_AR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_AR NULL
+#define OPTION_VAL_AUTO_TOGGLE_AR NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_AR NULL
 #define OPTION_VAL_FORCE_INTERLACED_AR NULL
-#define OPTION_VAL_AUTO_TOGGLE_AR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_AR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_AR NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_AR NULL
@@ -1611,11 +1611,11 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_AR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_AR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_AR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_AR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -2414,9 +2414,9 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_AST NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_AST NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_AST NULL
+#define OPTION_VAL_AUTO_TOGGLE_AST NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_AST NULL
 #define OPTION_VAL_FORCE_INTERLACED_AST NULL
-#define OPTION_VAL_AUTO_TOGGLE_AST NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_AST NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_AST NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_AST "Proporción d'aspeutu del nucleu"
@@ -3673,11 +3673,11 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_AST },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_AST },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_AST },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_AST },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -4476,9 +4476,9 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_BE "Максімальная колькасць сэмплаў, якія апрацоўваюцца да праверкі абнаўлення SPU. Больш высокія значэнні павялічваюць хуткасць, але ў некаторых гульнях адхіленне ад 1 прыводзіць да скажэння гуку."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_BE "Таймінг частаты кадраў ядра"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_BE "Выбар таймінгу частаты кадраў, якое ядро ​​будзе паведамляць франтэнду. У рэжыме 'Аўтапераключэнне' ядра могуць перамыкацца паміж перадачай прагрэсіўных і празрадковых частот, але гэта можа прыводзіць да рэініцыялізацый відэа/аўдыё драйвераў."
+#define OPTION_VAL_AUTO_TOGGLE_BE "Дазволіць аўтапераключэнне"
 #define OPTION_VAL_FORCE_PROGRESSIVE_BE "Прагрэсіўная колькасць"
 #define OPTION_VAL_FORCE_INTERLACED_BE "Прымусовая празрадковая"
-#define OPTION_VAL_AUTO_TOGGLE_BE "Дазволіць аўтапераключэнне"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_BE "Перавызначэнне таймінгу PAL (Еўрапейскі)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_BE "Праз розніцу ў стандартах часта гульні PAL працавалі павольней NTSC-рэлізаў для Амерыкі ці Японіі. Дадзеная налада замяшчае таймінгі PAL, дазваляючы запускаць гульні дадзенага рэгіёна з частатой кадраў NTSC. Не працуе пры запуску NTSC-кантэнту."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_BE "Суадносіны бакоў ядра"
@@ -5735,11 +5735,11 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_BE },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_BE },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_BE },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_BE },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -6538,9 +6538,9 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_BG NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_BG NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_BG NULL
+#define OPTION_VAL_AUTO_TOGGLE_BG NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_BG NULL
 #define OPTION_VAL_FORCE_INTERLACED_BG NULL
-#define OPTION_VAL_AUTO_TOGGLE_BG NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_BG NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_BG NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_BG NULL
@@ -7797,11 +7797,11 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_BG },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_BG },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_BG },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_BG },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -8600,9 +8600,9 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CA "Mostra el nombre màxim de mostres de la SPU que s'executaran abans de comprovar les actualitzacions de la SPU. Un valor alt serà més ràpid, però un valor que no sigui 1 pot provocar errors en el àudio d'alguns jocs."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CA "Cronòmetre de fotogrames per segon segons el nucli"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CA "Selecciona el tipus de FPS que el nucli farà servir. 'Canvi Automàtic' permet que el nucli canviï entre progressiu i entrellaçat, però pot provocar reinicis en els controladors d'àudio i vídeo."
+#define OPTION_VAL_AUTO_TOGGLE_CA "Habilitar el canvi automàtic"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CA "Taxa progressiva"
 #define OPTION_VAL_FORCE_INTERLACED_CA "Forçar trama entrellaçada"
-#define OPTION_VAL_AUTO_TOGGLE_CA "Habilitar el canvi automàtic"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CA "Anul·lar la sincronització de vídeo PAL (Europa)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CA "A causa de la diferència entre estàndards, els jocs PAL solen semblar més lents que les seves versions en NTSC, tant americanes com japoneses. Aquesta opció pot anul·lar la velocitat del vídeo PAL per intentar executar aquests jocs amb la velocitat de fotogrames NTSC. Aquesta opció no produeix cap efecte en els jocs NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CA "Relació d'aspecte del nucli"
@@ -9859,11 +9859,11 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CA },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_CA },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_CA },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CA },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -10662,9 +10662,9 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CHS NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CHS NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHS "选择核心向前端报告的 FPS 时序。“自动切换”允许内核在报告逐行和隔行扫描速率之间切换，但可能导致前端视频/音频驱动程序重新启动。"
+#define OPTION_VAL_AUTO_TOGGLE_CHS "允许自动切换"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CHS NULL
 #define OPTION_VAL_FORCE_INTERLACED_CHS NULL
-#define OPTION_VAL_AUTO_TOGGLE_CHS "允许自动切换"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CHS NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHS NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CHS NULL
@@ -11921,11 +11921,11 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CHS },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_CHS },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_CHS },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CHS },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -12724,9 +12724,9 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CHT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CHT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHT NULL
+#define OPTION_VAL_AUTO_TOGGLE_CHT "允許自動切換"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CHT NULL
 #define OPTION_VAL_FORCE_INTERLACED_CHT NULL
-#define OPTION_VAL_AUTO_TOGGLE_CHT "允許自動切換"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CHT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHT NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CHT NULL
@@ -13983,11 +13983,11 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CHT },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_CHT },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_CHT },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CHT },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -14786,9 +14786,9 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CS "Maximální počet vzorků SPU, které mají být spuštěny před kontrolou aktualizace SPU, vyšší číslo bude rychlejší, ale v některých hrách s jiným číslem než 1 bude způsobovat závady zvuku."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CS "Nahlášené-Jádro Časování FPS"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CS "Zvolte časování FPS, které bude jádro hlásit frontendu. Automatické přepínání umožní jádru přepínat mezi hlášením progresivní a prokládané rychlosti, ale může způsobit opětovné spuštění ovladače videa/audia ve frontendu."
+#define OPTION_VAL_AUTO_TOGGLE_CS "Povolit Automatické Přepínání"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CS "Progresivní Hodnota"
 #define OPTION_VAL_FORCE_INTERLACED_CS "Vynutit Prokládanou Hodnotu"
-#define OPTION_VAL_AUTO_TOGGLE_CS "Povolit Automatické Přepínání"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CS "Přepsání Časování Videa v Systému PAL (Evropský)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CS "Kvůli odlišným normám se hry pro PAL často jeví jako zpomalené ve srovnání s americkými nebo japonskými verzemi pro NTSC. Tuto možnost lze použít k potlačení časování PAL, abyste se pokusili spustit tyto hry se snímkovou frekvencí NTSC. Tato volba nemá žádný účinek při spouštění obsahu NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CS "Poměr Stran Jádra"
@@ -16045,11 +16045,11 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CS },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_CS },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_CS },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CS },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -16848,9 +16848,9 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CY NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CY NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CY NULL
+#define OPTION_VAL_AUTO_TOGGLE_CY NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_CY NULL
 #define OPTION_VAL_FORCE_INTERLACED_CY NULL
-#define OPTION_VAL_AUTO_TOGGLE_CY NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CY NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CY NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CY NULL
@@ -18107,11 +18107,11 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CY },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_CY },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_CY },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_CY },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -18910,9 +18910,9 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_DA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_DA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_DA NULL
+#define OPTION_VAL_AUTO_TOGGLE_DA NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_DA NULL
 #define OPTION_VAL_FORCE_INTERLACED_DA NULL
-#define OPTION_VAL_AUTO_TOGGLE_DA NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_DA NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DA NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_DA NULL
@@ -20169,11 +20169,11 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_DA },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_DA },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_DA },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_DA },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -20972,9 +20972,9 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_DE "Maximal laufende SPU-Samples bevor ein SPU-Update geprüft wird; eine höhere Zahl ist schneller, wird aber bei einigen Spielen Soundfehler mit etwas anderem als „1“ verursachen."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_DE "Von Core gemeldetes FPS-Timing"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_DE "Das FPS-Timing auswählen, das der Core an das Frontend melden soll. Automatisches Umschalten ermöglicht dem Core im Wechsel progressive und „interlaced“ Frequenzen zu melden, was aber dazu führen kann, dass der Video-/Audiotreiber des Frontends neu initialisiert wird."
+#define OPTION_VAL_AUTO_TOGGLE_DE "Automatisches Umschalten erlauben"
 #define OPTION_VAL_FORCE_PROGRESSIVE_DE "Progressive Frequenz"
 #define OPTION_VAL_FORCE_INTERLACED_DE "„Interlaced“ Frequenz erzwingen"
-#define OPTION_VAL_AUTO_TOGGLE_DE "Automatisches Umschalten erlauben"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_DE "PAL (europäisch) Videotiming übersteuern"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DE "Aufgrund unterschiedlicher Standards scheinen PAL-Spiele im Vergleich zu den amerikanischen oder japanischen NTSC-Releases verlangsamt. Diese Option kann genutzt werden, um PAL-Timings zu übersteuern und zu versuchen, diese Spiele mit der NTSC-Bildwiederholrate auszuführen. Diese Option hat keine Auswirkung beim Ausführen von NTSC-Inhalten."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_DE "Core-Seitenverhältnis"
@@ -22231,11 +22231,11 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_DE },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_DE },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_DE },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_DE },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -23034,9 +23034,9 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_EL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_EL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_EL NULL
+#define OPTION_VAL_AUTO_TOGGLE_EL NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_EL NULL
 #define OPTION_VAL_FORCE_INTERLACED_EL NULL
-#define OPTION_VAL_AUTO_TOGGLE_EL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_EL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EL NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_EL NULL
@@ -24293,11 +24293,11 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EL },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_EL },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_EL },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EL },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -25096,9 +25096,9 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_EN NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_EN NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_EN "Choose the FPS timing that the core will report to the front-end. Automatic Toggling will allow the core to switch between reporting progressive and interlaced rates, but may cause front-end video/audio driver re-initialisations."
+#define OPTION_VAL_AUTO_TOGGLE_EN NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_EN NULL
 #define OPTION_VAL_FORCE_INTERLACED_EN NULL
-#define OPTION_VAL_AUTO_TOGGLE_EN NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_EN NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EN "Due to different standards, PAL games often appear slowed down compared to the American or Japanese NTSC releases. This option can be used to override PAL timings in order to attempt to run these games with the NTSC frame-rate. This option has no effect when running NTSC content."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_EN NULL
@@ -26355,11 +26355,11 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EN },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_EN },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_EN },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EN },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -27158,9 +27158,9 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_EO NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_EO NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_EO NULL
+#define OPTION_VAL_AUTO_TOGGLE_EO NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_EO NULL
 #define OPTION_VAL_FORCE_INTERLACED_EO NULL
-#define OPTION_VAL_AUTO_TOGGLE_EO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_EO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_EO NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_EO NULL
@@ -28417,11 +28417,11 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EO },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_EO },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_EO },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_EO },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -29220,9 +29220,9 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_ES "Indica el número máximo de muestras que debe ejecutar la SPU antes de comprobar las actualizaciones de la SPU. Un valor superior será más rápido, pero un valor que no sea 1 provocará fallos de sonido en algunos juegos."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_ES "Barrido de señal según núcleo"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_ES "Ajusta el barrido de señal que indicará el núcleo al front-end. «Cambiar automáticamente» permite que el núcleo cambie entre los barridos progresivo y entrelazado, pero pueden provocar reinicios en los controladores de vídeo y audio del front-end."
+#define OPTION_VAL_AUTO_TOGGLE_ES "Cambiar automáticamente"
 #define OPTION_VAL_FORCE_PROGRESSIVE_ES "Tasa progresiva"
 #define OPTION_VAL_FORCE_INTERLACED_ES "Forzar barrido entrelazado"
-#define OPTION_VAL_AUTO_TOGGLE_ES "Cambiar automáticamente"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_ES "Anular sincronía de vídeo PAL (europea)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ES "Debido a la diferencia entre estándares, los juegos PAL suelen parecer más lentos que sus versiones NTSC, tanto estadounidenses como japonesas. Esta opción puede anular la velocidad de vídeo PAL para intentar ejecutar dichos juegos con la velocidad de fotogramas NTSC. Esta opción no produce efecto alguno en contenidos NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_ES "Relación de aspecto del núcleo"
@@ -30479,11 +30479,11 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_ES },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_ES },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_ES },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_ES },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -31282,9 +31282,9 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_FA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_FA NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_FA NULL
+#define OPTION_VAL_AUTO_TOGGLE_FA NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_FA NULL
 #define OPTION_VAL_FORCE_INTERLACED_FA NULL
-#define OPTION_VAL_AUTO_TOGGLE_FA NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FA NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FA NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_FA NULL
@@ -32541,11 +32541,11 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FA },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_FA },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_FA },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FA },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -33344,9 +33344,9 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_FI NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_FI NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_FI NULL
+#define OPTION_VAL_AUTO_TOGGLE_FI "Salli automaattinen vaihtaminen"
 #define OPTION_VAL_FORCE_PROGRESSIVE_FI NULL
 #define OPTION_VAL_FORCE_INTERLACED_FI NULL
-#define OPTION_VAL_AUTO_TOGGLE_FI "Salli automaattinen vaihtaminen"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FI "Eurooppalaisen PAL-videoajoituksen ohitus"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FI "Erilaisista standardeista johtuen, PAL-pelit näkyvät usein amerikkalaisia tai japanilaisia NTSC julkaisuja hitaampina. Tällä valinnalla PAL-ajoitukset voidaan ohittaa, jotta tällaiset pelit voidaan pyrkiä suorittamaan NTSC-kuvanopeudella. Asetus ei vaikuta NTSC-sisältöön."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_FI "Ytimen kuvasuhde"
@@ -34603,11 +34603,11 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FI },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_FI },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_FI },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FI },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -35406,9 +35406,9 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_FR "Nombre maximum d'échantillons SPU à exécuter avant qu'une mise à jour SPU ne soit vérifiée, un nombre plus élevé sera plus rapide, mais causera des problèmes de son dans certains jeux avec une valeur autre que 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_FR "Cadence des i/s communiquée par le cœur"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_FR "Sélectionner la cadence des images par seconde que le coeur va communiquer à l'interface. Le basculement automatique permettra au cœur de basculer entre communiquer les débits progressifs et entrelacés, mais peut causer des réinitialisations de pilotes vidéo/audio pour l'interface."
+#define OPTION_VAL_AUTO_TOGGLE_FR "Autoriser le basculement automatique"
 #define OPTION_VAL_FORCE_PROGRESSIVE_FR "Débit progressif"
 #define OPTION_VAL_FORCE_INTERLACED_FR "Forcer le débit entrelacé"
-#define OPTION_VAL_AUTO_TOGGLE_FR "Autoriser le basculement automatique"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_FR "Substitution de la cadence vidéo PAL (européenne)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_FR "En raison de normes différentes, les jeux PAL semblent souvent ralentis par rapport aux versions américaines ou japonaises à la norme NTSC. Cette option peut être utilisée pour remplacer les timings PAL afin d'essayer d'exécuter ces jeux avec le débit d'image NTSC. Cette option n'a aucun effet lors de l'exécution de contenu NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_FR "Rapport d'aspect du cœur"
@@ -36665,11 +36665,11 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_FR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_FR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_FR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -37468,9 +37468,9 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GA "Uasmhéid samplaí SPU le rith sula ndéantar Nuashonrú SPU a sheiceáil, beidh uimhir níos airde níos tapúla, ach beidh teipeanna fuaime i roinnt cluichí le rud ar bith seachas 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GA "Amchlár FPS Tuairiscithe ag an gCroí"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GA "Roghnaigh an t-am FPS a thuairisceoidh an croí don tosaigh. Le hUath-Mholadh, beidh an croí in ann aistriú idir rátaí forásacha agus idirnasctha a thuairisciú, ach d'fhéadfadh sé go ndéanfaí aththosú ar thiománaí físe/fuaime an tosaigh."
+#define OPTION_VAL_AUTO_TOGGLE_GA "Ceadaigh Athrú Uathoibríoch"
 #define OPTION_VAL_FORCE_PROGRESSIVE_GA "Ráta Forásach"
 #define OPTION_VAL_FORCE_INTERLACED_GA "Ráta Idirfhite Fórsa"
-#define OPTION_VAL_AUTO_TOGGLE_GA "Ceadaigh Athrú Uathoibríoch"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GA "Sárú Ama Físe PAL (Eorpach)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GA "Mar gheall ar chaighdeáin éagsúla, is minic a bhíonn cuma mhoillithe ar chluichí PAL i gcomparáid leis na heisiúintí NTSC Meiriceánacha nó Seapánacha. Is féidir an rogha seo a úsáid chun amanna PAL a shárú d’fhonn iarracht a dhéanamh na cluichí seo a rith le ráta fráma NTSC. Níl aon éifeacht ag an rogha seo agus ábhar NTSC á rith."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_GA "Cóimheas Gné Croí"
@@ -38727,11 +38727,11 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_GA },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_GA },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_GA },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_GA },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -39530,9 +39530,9 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_GL "Máximo de mostras de SPU para executar antes de que se comprobe unha actualización de SPU, o número máis alto será máis rápido, pero provocará fallos de son nalgúns xogos con calquera cousa que non sexa 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_GL "Cronometraxe FPS informada polo núcleo"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_GL "Escolla o tempo FPS que o núcleo informará ao frontend. A alternancia automática permitirá que o núcleo cambie entre os informes de taxas progresivas e entrelazadas, pero pode provocar que se reinicien o controlador de audio ou vídeo de frontend."
+#define OPTION_VAL_AUTO_TOGGLE_GL "Permitir a alternancia automática"
 #define OPTION_VAL_FORCE_PROGRESSIVE_GL "Taxa progresiva"
 #define OPTION_VAL_FORCE_INTERLACED_GL "Forzar taxa entrelazada"
-#define OPTION_VAL_AUTO_TOGGLE_GL "Permitir a alternancia automática"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GL "Anulación de temporización de vídeo PAL (europeo)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GL "Debido a diferentes estándares, os xogos PAL adoitan aparecer máis lentos en comparación cos lanzamentos NTSC estadounidenses ou xaponeses. Esta opción pódese usar para anular os tempos PAL para intentar executar estes xogos coa taxa de fotogramas NTSC. Esta opción non ten efecto cando se executa contido NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_GL "Relación de aspecto do núcleo"
@@ -40789,11 +40789,11 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_GL },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_GL },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_GL },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_GL },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -41592,9 +41592,9 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_HE NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_HE NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_HE NULL
+#define OPTION_VAL_AUTO_TOGGLE_HE NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_HE NULL
 #define OPTION_VAL_FORCE_INTERLACED_HE NULL
-#define OPTION_VAL_AUTO_TOGGLE_HE NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_HE NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HE NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_HE NULL
@@ -42851,11 +42851,11 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HE },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_HE },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_HE },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HE },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -43654,9 +43654,9 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_HR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_HR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_HR NULL
+#define OPTION_VAL_AUTO_TOGGLE_HR NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_HR NULL
 #define OPTION_VAL_FORCE_INTERLACED_HR NULL
-#define OPTION_VAL_AUTO_TOGGLE_HR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_HR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HR NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_HR NULL
@@ -44913,11 +44913,11 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_HR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_HR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -45716,9 +45716,9 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_HU "Az SPU mintáinak maximális száma az SPU frissítés ellenőrzése előtt. Nagyobb értékek gyorsabbak, de néhány játéknál hanghibát okozhatnak 1-től eltérő beállításon."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_HU "Mag által jelentett FPS időzítése"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_HU "Az FPS időzítés, amit a mag a frontend felé jelent. Az automata átkapcsolással a mag váltani tud a progresszív és az interlaced időzítés közt, de ez újraindítást okozhat a frontend audio/video illesztőiben."
+#define OPTION_VAL_AUTO_TOGGLE_HU "Automatikus átkapcsolás engedélyezése"
 #define OPTION_VAL_FORCE_PROGRESSIVE_HU "Progresszív"
 #define OPTION_VAL_FORCE_INTERLACED_HU "Mindenképpen interlaced"
-#define OPTION_VAL_AUTO_TOGGLE_HU "Automatikus átkapcsolás engedélyezése"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_HU "PAL (európai) videoidőzítés felülbírálata"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_HU "Az eltérő szabványok miatt a PAL játékok gyakran lassabbnak tűnnek az amerikai/japán NTSC kiadásoknál. Ezzel a beállítással a PAL időzítés felülbírálható, és megkísérelhető a játék futtatása NTSC képsebességgel. Nincs hatása az NTSC tartalomra."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_HU "A mag képaránya"
@@ -46975,11 +46975,11 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HU },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_HU },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_HU },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_HU },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -47778,9 +47778,9 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_ID NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_ID NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_ID NULL
+#define OPTION_VAL_AUTO_TOGGLE_ID NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_ID "Laju Progresif"
 #define OPTION_VAL_FORCE_INTERLACED_ID NULL
-#define OPTION_VAL_AUTO_TOGGLE_ID NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_ID NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ID NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_ID NULL
@@ -49037,11 +49037,11 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_ID },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_ID },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_ID },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_ID },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -49840,9 +49840,9 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_IT "Max campioni SPU da eseguire prima che venga controllato un aggiornamento SPU, il numero più alto sarà più veloce, ma causerà problemi sonori in alcuni giochi con qualcosa di diverso da 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_IT "Tempistica FPS segnalata dal core"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_IT "Scegliere la tempistica FPS che il core riferirà al frontend. Attivazione automatica Permetterà al core di passare da tassi di segnalazione progressivi a tassi interlacciati, ma potrebbe causare la reinizione del driver video o audio."
+#define OPTION_VAL_AUTO_TOGGLE_IT "Consenti Attivazione Automatica"
 #define OPTION_VAL_FORCE_PROGRESSIVE_IT "Tasso Progressivo"
 #define OPTION_VAL_FORCE_INTERLACED_IT "Forza Tasso Interlacciato"
-#define OPTION_VAL_AUTO_TOGGLE_IT "Consenti Attivazione Automatica"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_IT "Sovrascrivi Video Pal (Europeo)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_IT "A causa di standard diversi, i giochi PAL appaiono spesso rallentati rispetto alle versioni NTSC americane o giapponesi. Questa opzione può essere utilizzata per sovrascrivere i timings PAL per tentare di eseguire questi giochi con il framerate NTSC. Questa opzione non ha effetto quando si esegue il contenuto NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_IT "Rapporto d'aspetto Core"
@@ -51099,11 +51099,11 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_IT },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_IT },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_IT },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_IT },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -51902,9 +51902,9 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_JA "SPU 更新がチェックされる前に実行される最大 SPU サンプル数です。値を高くするほど高速になりますが、1 以外に設定すると一部のゲームで音声バグが発生する可能性があります。"
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_JA "コア報告 FPS タイミング"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_JA "コアがフロントエンドに報告する FPS タイミングを選択します。自動切り替えを選択すると、コアはプログレッシブレートとインターレースレートを切り替えることができますが、フロントエンドのビデオ/オーディオドライバの再初期化を引き起こす可能性があります。"
+#define OPTION_VAL_AUTO_TOGGLE_JA "自動切り替えを許可"
 #define OPTION_VAL_FORCE_PROGRESSIVE_JA "プログレッシブレート"
 #define OPTION_VAL_FORCE_INTERLACED_JA "強制インターレースレート"
-#define OPTION_VAL_AUTO_TOGGLE_JA "自動切り替えを許可"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_JA "PAL (ヨーロッパ) ビデオタイミングの上書き"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_JA "基準が異なるため、PAL ゲームはアメリカや日本で販売された NTSC ゲームと比較して減速して表示されます。このオプションは、NTSC フレームレートで PAL ゲームを実行するために、PAL タイミングを上書きするために使用できます。NTSC コンテンツを実行する場合は効果はありません。"
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_JA "コアアスペクト比"
@@ -53161,11 +53161,11 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_JA },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_JA },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_JA },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_JA },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -53964,9 +53964,9 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_KO "SPU 업데이트 확인 전 실행할 최대 SPU 샘플 수. 숫자가 높을수록 더 빨라지지만 값이 1이 아닌 경우 일부 게임에서 사운드 결함이 발생합니다."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_KO "코어 보고 FPS 타이밍"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_KO "코어가 프론트엔드에 보고할 FPS 타이밍을 선택합니다. 자동 전환을 선택하면 코어가 프로그레시브 및 인터레이스 주사율을 전환할 수 있게 하며, 프론트엔드의 비디오/오디오 드라이버의 초기화를 일으킬 수 있습니다."
+#define OPTION_VAL_AUTO_TOGGLE_KO "자동 전환 허용"
 #define OPTION_VAL_FORCE_PROGRESSIVE_KO "프로그레시브 주사율"
 #define OPTION_VAL_FORCE_INTERLACED_KO "인터레이스 주사율 강제"
-#define OPTION_VAL_AUTO_TOGGLE_KO "자동 전환 허용"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_KO "PAL(유럽) 비디오 타이밍 오버라이드"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_KO "서로 다른 표준으로 인해 PAL 게임은 미국 또는 일본 NTSC 게임에 비해 다소 느리게 구동되기도 합니다. 이 옵션은 PAL 타이밍을 오버라이드하여 NTSC 게임과 동일한 프레임레이트로 구동되게 합니다. 이 옵션은 NTSC 컨텐츠를 실행할 땐 아무런 효과가 없습니다."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_KO "코어 화면비"
@@ -55223,11 +55223,11 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_KO },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_KO },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_KO },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_KO },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -56026,9 +56026,9 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_NL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_NL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_NL NULL
+#define OPTION_VAL_AUTO_TOGGLE_NL NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_NL NULL
 #define OPTION_VAL_FORCE_INTERLACED_NL NULL
-#define OPTION_VAL_AUTO_TOGGLE_NL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_NL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NL NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_NL NULL
@@ -57285,11 +57285,11 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_NL },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_NL },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_NL },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_NL },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -58088,9 +58088,9 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_NO NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_NO NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_NO NULL
+#define OPTION_VAL_AUTO_TOGGLE_NO NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_NO NULL
 #define OPTION_VAL_FORCE_INTERLACED_NO NULL
-#define OPTION_VAL_AUTO_TOGGLE_NO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_NO NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_NO NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_NO NULL
@@ -59347,11 +59347,11 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_NO },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_NO },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_NO },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_NO },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -60150,9 +60150,9 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_OR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_OR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_OR NULL
+#define OPTION_VAL_AUTO_TOGGLE_OR NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_OR NULL
 #define OPTION_VAL_FORCE_INTERLACED_OR NULL
-#define OPTION_VAL_AUTO_TOGGLE_OR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_OR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_OR NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_OR NULL
@@ -61409,11 +61409,11 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_OR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_OR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_OR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_OR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -62212,9 +62212,9 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_PL NULL
+#define OPTION_VAL_AUTO_TOGGLE_PL NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_PL NULL
 #define OPTION_VAL_FORCE_INTERLACED_PL NULL
-#define OPTION_VAL_AUTO_TOGGLE_PL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PL NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_PL NULL
@@ -63471,11 +63471,11 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PL },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_PL },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_PL },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PL },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -64274,9 +64274,9 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PT_BR "Indica o número máximo de amostras de SPU para executar antes que uma atualização do SPU esteja selecionada, um número maior será mais rápido, mas um valor que não seja 1 causará defeitos sonoros em alguns jogos."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PT_BR "Tempos dos quadros reportado pelo núcleo"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_PT_BR "Seleciona os tempos de quadros por segundos que o núcleo indicará para a interface. 'Permitir alternância automática' permite que o núcleo mude entre taxas progressivas e entrelaçadas, mas pode causar reinícios nos drivers de vídeo e no áudio da interface."
+#define OPTION_VAL_AUTO_TOGGLE_PT_BR "Permitir alternância automática"
 #define OPTION_VAL_FORCE_PROGRESSIVE_PT_BR "Taxa progressiva"
 #define OPTION_VAL_FORCE_INTERLACED_PT_BR "Forçar taxa entrelaçada"
-#define OPTION_VAL_AUTO_TOGGLE_PT_BR "Permitir alternância automática"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PT_BR "Substituir sincronia de vídeo PAL (europeu)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_BR "Devido a diferentes padrões, os jogos PAL costumam parecer lentos em comparação com os lançamentos Americanos ou Japoneses NTSC. Esta opção pode ser usada para substituir a sincronia de vídeo PAL para tentar executar esses jogos com a taxa de quadros NTSC. Esta opção não tem efeito ao executar o conteúdo NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_PT_BR "Proporção de tela do núcleo"
@@ -65533,11 +65533,11 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PT_BR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_PT_BR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_PT_BR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PT_BR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -66336,9 +66336,9 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_PT_PT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_PT_PT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_PT_PT NULL
+#define OPTION_VAL_AUTO_TOGGLE_PT_PT NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_PT_PT NULL
 #define OPTION_VAL_FORCE_INTERLACED_PT_PT NULL
-#define OPTION_VAL_AUTO_TOGGLE_PT_PT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_PT_PT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_PT_PT NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_PT_PT NULL
@@ -67595,11 +67595,11 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PT_PT },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_PT_PT },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_PT_PT },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_PT_PT },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -68398,9 +68398,9 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_RU "Макс. сэмплов, обрабатываемых до проверки обновления SPU. Более высокие значения повышают скорость, но в некоторых играх отклонение от 1 приводит к искажению звука."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_RU "Тайминг частоты кадров ядра"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_RU "Выбор тайминга частоты кадров, которое ядро будет сообщать фронтенду. В режиме 'Автопереключение' ядра могут переключаться между передачей прогрессивных и чересстрочных частот, но это может приводить к реинициализациям видео/аудио драйверов."
+#define OPTION_VAL_AUTO_TOGGLE_RU "Разрешить автопереключение"
 #define OPTION_VAL_FORCE_PROGRESSIVE_RU "Прогрессивная"
 #define OPTION_VAL_FORCE_INTERLACED_RU "Принуд. чересстрочная"
-#define OPTION_VAL_AUTO_TOGGLE_RU "Разрешить автопереключение"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_RU "Переопределение тайминга PAL"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_RU "Из-за разницы в стандартах зачастую игры PAL работали медленнее NTSC-релизов для Америки или Японии. Данная настройка замещает тайминги PAL, позволяя запускать игры данного региона с частотой кадров NTSC. Не работает при запуске NTSC-контента."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_RU "Соотношение сторон ядра"
@@ -69657,11 +69657,11 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_RU },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_RU },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_RU },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_RU },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -70460,9 +70460,9 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SK NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SK NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SK NULL
+#define OPTION_VAL_AUTO_TOGGLE_SK NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_SK NULL
 #define OPTION_VAL_FORCE_INTERLACED_SK NULL
-#define OPTION_VAL_AUTO_TOGGLE_SK NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SK NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SK NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SK "Pomer strán jadra"
@@ -71719,11 +71719,11 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SK },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_SK },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_SK },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SK },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -72522,9 +72522,9 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SR NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SR NULL
+#define OPTION_VAL_AUTO_TOGGLE_SR NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_SR NULL
 #define OPTION_VAL_FORCE_INTERLACED_SR NULL
-#define OPTION_VAL_AUTO_TOGGLE_SR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SR NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SR NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SR NULL
@@ -73781,11 +73781,11 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_SR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_SR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -74584,9 +74584,9 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_SV "Max SPU-samplingar som ska köras innan en SPU-uppdatering kontrolleras, högre tal blir snabbare, men orsakar ljudstörningar i vissa spel med något annat än 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_SV "Kärnrapporterad bildfrekvenstiming"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_SV "Välj den FPS-timing som kärnan ska rapportera till frontend. Automatisk växling gör det möjligt för kärnan att växla mellan att rapportera progressiva och sammanflätade hastigheter, men kan orsaka ominitieringar av frontend-drivrutiner för video/ljud."
+#define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
 #define OPTION_VAL_FORCE_INTERLACED_SV "Tvinga frekvens med interlace"
-#define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder ser PAL-spel ofta långsammare ut jämfört med de amerikanska eller japanska NTSC-utgåvorna. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-framerate. Det här alternativet har ingen effekt när du kör NTSC-innehåll."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
@@ -75843,11 +75843,11 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SV },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_SV },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_SV },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_SV },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -76646,9 +76646,9 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_TR "Bir SPU Güncellemesi kontrol edilmeden önce çalıştırılacak en fazla SPU örnekleri, daha yüksek sayı daha hızlı olacaktır, ancak bazı oyunlarda 1'den farklı herhangi bir değerde ses aksaklıklarına neden olacaktır."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_TR "Çekirdek Raporlu FPS Zamanlaması"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_TR "Çekirdeğin ön uca raporlayacağı FPS zamanlamasını seçin. Otomatik Geçiş, çekirdeğin aşamalı ve geçmeli oranları raporlama arasında geçiş yapmasına izin verir, ancak ön uç video/ses sürücüsünün yeniden başlatılmasına neden olabilir."
+#define OPTION_VAL_AUTO_TOGGLE_TR "Otomatik Geçişe İzin Ver"
 #define OPTION_VAL_FORCE_PROGRESSIVE_TR "Aşamalı Oran"
 #define OPTION_VAL_FORCE_INTERLACED_TR "Geçişli Oran Zorla"
-#define OPTION_VAL_AUTO_TOGGLE_TR "Otomatik Geçişe İzin Ver"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_TR "PAL (Avrupa) Video Zamanlamasını Geçersiz Kıl"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TR "Farklı standartlar nedeni ile, PAL oyunları genellikle Amerikan veya Japon NTSC sürümlerine kıyasla yavaşlamış görünür. Bu seçenek, bu oyunları NTSC kare hızıyla çalıştırmayı denemek için PAL zamanlamalarını geçersiz kılmak için kullanılabilir. NTSC içeriğini çalıştırırken bu seçeneğin hiçbir etkisi yoktur."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_TR "Çekirdek En Boy Oranı"
@@ -77905,11 +77905,11 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_TR },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_TR },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_TR },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_TR },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -78708,9 +78708,9 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_TT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_TT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_TT NULL
+#define OPTION_VAL_AUTO_TOGGLE_TT NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_TT NULL
 #define OPTION_VAL_FORCE_INTERLACED_TT NULL
-#define OPTION_VAL_AUTO_TOGGLE_TT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_TT NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TT NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_TT NULL
@@ -79967,11 +79967,11 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_TT },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_TT },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_TT },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_TT },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -80770,9 +80770,9 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_UK "Максимум зразків SPU для запуску перед тим, як буде встановлено оновлення SPU, вище число буде швидшим, але призведе до падіння звуку в деяких іграх із іншими, окрім 1."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_UK "Таймінг з ядром та повідомлення на FPS"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_UK "Виберіть FPS timing, які буде повідомляти ядро на фронтенд. Автоматичне перемикання дозволяє перемикатися ядра між прогресивними та перехресними ставками, але може призвести до повторних змін інтерфейсу відео/аудіосупроводу."
+#define OPTION_VAL_AUTO_TOGGLE_UK "Дозволити автоматичний перемикач"
 #define OPTION_VAL_FORCE_PROGRESSIVE_UK "Прогресивна швидкість"
 #define OPTION_VAL_FORCE_INTERLACED_UK "Примусова швидкість перетину"
-#define OPTION_VAL_AUTO_TOGGLE_UK "Дозволити автоматичний перемикач"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_UK "Перевизначити відеотаймінг PAL (European)"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_UK "Через різні стандарти PAL ігри часто виявляються уповільненими порівняно з звільненнями Американського або Японського NTSC релізів. Ця опція може бути використана для перевизначення PAL таймінгів, щоб спробувати запустити ці ігри з частотою кадрів NTSC. Ця опція не діє під час запуску NTSC контенту."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_UK "Співвідношення сторін ядра"
@@ -82029,11 +82029,11 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_UK },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_UK },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_UK },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_UK },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -82832,9 +82832,9 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_VAL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_VAL NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_VAL NULL
+#define OPTION_VAL_AUTO_TOGGLE_VAL NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_VAL NULL
 #define OPTION_VAL_FORCE_INTERLACED_VAL NULL
-#define OPTION_VAL_AUTO_TOGGLE_VAL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_VAL NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VAL NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_VAL NULL
@@ -84091,11 +84091,11 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_VAL },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_VAL },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_VAL },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_VAL },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
@@ -84894,9 +84894,9 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_VN NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_VN NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_VN NULL
+#define OPTION_VAL_AUTO_TOGGLE_VN NULL
 #define OPTION_VAL_FORCE_PROGRESSIVE_VN NULL
 #define OPTION_VAL_FORCE_INTERLACED_VN NULL
-#define OPTION_VAL_AUTO_TOGGLE_VN NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_VN NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VN NULL
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_VN NULL
@@ -86153,11 +86153,11 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       NULL,
       {
+         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_VN },
          { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_VN },
          { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_VN },
-         { "auto_toggle", OPTION_VAL_AUTO_TOGGLE_VN },
       },
-      "force_progressive"
+      "auto_toggle"
    },
    {
       BEETLE_OPT(pal_video_timing_override),
