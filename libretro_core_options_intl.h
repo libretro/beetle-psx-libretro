@@ -25166,7 +25166,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_EN "Choose the last displayed scan line when running PAL content. Values below 287 will reduce the height of output images by cropping pixels from the bottommost edge. May be used to counteract letter-boxing."
 #define OPTION_VAL_287_EN NULL
 #define BEETLE_OPT_DEINTERLACER_LABEL_EN NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_EN NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_EN "'Weave' shows both fields on the same frame for full high resolution still image, 'Bob' sacrifices resolution clarity for motion clarity."
 #define OPTION_VAL_WEAVE_EN NULL
 #define OPTION_VAL_BOB_EN NULL
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_EN NULL
