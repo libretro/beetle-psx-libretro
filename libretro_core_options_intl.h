@@ -74282,7 +74282,7 @@ struct retro_core_options_v2 options_sr = {
 #define CATEGORY_MEMCARDS_INFO_0_SV "Ändra inställningar relaterade till virtuella minneskort(en) som används av systemet."
 #define CATEGORY_PGXP_LABEL_SV "PGXP (Precision Geometrisk Transformering Pipeline)"
 #define CATEGORY_PGXP_INFO_0_SV "Dessa alternativ styr förbättringar som kan förbättra grafiken jämfört med den ursprungliga spelkonsolen. PGXP kan eliminera förvrängda texturer och Z-fighting problem."
-#define CATEGORY_HACKS_LABEL_SV "Emulator Hacks"
+#define CATEGORY_HACKS_LABEL_SV "Emulatorhack"
 #define CATEGORY_HACKS_INFO_0_SV "Ändra inställningar för processor-överklockning och emuleringsnoggrannhet som påverkar lågnivåprestanda och kompatibilitet."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SV "Intern GPU-upplösning"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SV "Välj intern upplösningsmultiplikator. Upplösningar högre än \"1x (Nativ)\" förbättrar noggrannheten hos 3D-modeller på bekostnad av ökade prestandakrav. 2D-element påverkas normalt inte av den här inställningen."
