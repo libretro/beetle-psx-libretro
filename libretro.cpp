@@ -2494,23 +2494,8 @@ static void CDInsertEject(void)
    for(unsigned disc = 0; disc < cdifs->size(); disc++)
    {
       if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
-      {
-         MDFND_DispMessage(3, RETRO_LOG_ERROR,
-               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-               "Eject error.");
-
          CD_TrayOpen = !CD_TrayOpen;
-      }
    }
-
-   if(CD_TrayOpen)
-      MDFND_DispMessage(0, RETRO_LOG_INFO,
-            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-            "Virtual CD Drive Tray Open");
-   else
-      MDFND_DispMessage(0, RETRO_LOG_INFO,
-            RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-            "Virtual CD Drive Tray Closed");
 
    SetDiscWrapper(CD_TrayOpen);
 }
@@ -2531,15 +2516,6 @@ static void CDSelect(void)
 
       if(CD_SelectedDisc == disc_count)
          CD_SelectedDisc = -1;
-
-      if(CD_SelectedDisc == -1)
-         MDFND_DispMessage(0, RETRO_LOG_INFO,
-               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-               "Disc absence selected.");
-      else
-         MDFN_DispMessage(0, RETRO_LOG_INFO,
-               RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-               "Disc %d of %d selected.", CD_SelectedDisc + 1, disc_count);
    }
 }
 
