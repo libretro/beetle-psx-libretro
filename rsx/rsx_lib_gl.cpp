@@ -633,7 +633,11 @@ static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* a
       return;
 
    glBindVertexArray(drawbuffer->vao);
+#ifdef EMSCRIPTEN
+   glVertexAttribI4ui(index, 1, 1, 1, 1);
+#else
    glEnableVertexAttribArray(index);
+#endif
 }
 
 template<typename T>
@@ -645,7 +649,11 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
       return;
 
    glBindVertexArray(drawbuffer->vao);
+#ifdef EMSCRIPTEN
+   glVertexAttribI4ui(index, 0, 0, 0, 0);
+#else
    glDisableVertexAttribArray(index);
+#endif
 }
 
 #ifdef DEBUG
@@ -708,13 +716,7 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
          offset_bytes,
          buffer_size,
          GL_MAP_WRITE_BIT |
-#ifdef EMSCRIPTEN
-         // in emscripten, glMapBufferRange is only supported when access is MAP_WRITE|INVALIDATE_BUFFER
-         GL_MAP_INVALIDATE_BUFFER_BIT
-#else
-         GL_MAP_INVALIDATE_RANGE_BIT
-#endif
-         );
+         GL_MAP_INVALIDATE_RANGE_BIT);
 
    assert(m != NULL);
 
