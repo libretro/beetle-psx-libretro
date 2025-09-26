@@ -2106,7 +2106,7 @@ struct retro_core_options_v2 options_ar = {
 #define CATEGORY_VIDEO_INFO_0_AST NULL
 #define CATEGORY_OSD_LABEL_AST NULL
 #define CATEGORY_OSD_INFO_0_AST NULL
-#define CATEGORY_INPUT_LABEL_AST "Entrada"
+#define CATEGORY_INPUT_LABEL_AST "Controles"
 #define CATEGORY_INPUT_INFO_0_AST NULL
 #define CATEGORY_MEMCARDS_LABEL_AST "Tarxeta de memoria"
 #define CATEGORY_MEMCARDS_INFO_0_AST NULL
