@@ -74392,7 +74392,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_SV "Port 2: Färg för vapnets hårkors"
 #define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_SV "Välj färg på ljuspistolens hårkors för port 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_SV "Muskänslighet"
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_SV "Välj responsivitet för inmatningsenhetstypen ”Mouse”."
 #define OPTION_VAL_5_O29_SV NULL
 #define OPTION_VAL_10_SV NULL
 #define OPTION_VAL_15_SV NULL
@@ -74449,9 +74449,9 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_SV "Emulerar ett andra minneskort i kortplats 1. När alternativet är avaktiverat kan spelen bara komma åt minneskortet i kortplats 0. Obs: Vissa spel kräver att detta alternativ är avaktiverat för att fungera korrekt (t.ex. Codename Tenka). Obs: Minneskort 1 använder sparformatet Mednafen (.mcr)."
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_SV "Delade minneskort (kräver omstart)"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_SV "När funktionen är aktiverad sparas alla spel till och laddas från samma minneskortsfiler. När den är inaktiverad genereras separata minneskortsfiler för varje laddat innehåll. Obs: om ”Memory Card 0 Method” är inställt på ”Libretro” kommer endast det högra minneskortet att påverkas."
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_SV NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_SV "Vänsterindex för minneskort"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_SV "Byt ut det minneskort som för närvarande är inmatat i den vänstra kortplatsen. Detta alternativ fungerar endast om Metod för minneskort 0 är inställd på Mednafen. Standardkortet är index 0."
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_SV "Högerindex för minneskort"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_SV "Byt ut det minneskort som för närvarande är inmatat i den högra kortplatsen. Detta alternativ fungerar endast om Minneskort 1 är aktiverat. Standardkortet är index 1."
 #define OPTION_VAL_1_O36_SV "1 (standard)"
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
@@ -84583,32 +84583,32 @@ struct retro_core_options_v2 options_val = {
 /* RETRO_LANGUAGE_VN */
 
 #define CATEGORY_VIDEO_LABEL_VN "Hình ảnh"
-#define CATEGORY_VIDEO_INFO_0_VN NULL
+#define CATEGORY_VIDEO_INFO_0_VN "Thay đổi tỷ lệ khung hình, cắt xén màn hình, bộ lọc video và cài đặt bỏ qua khung hình."
 #define CATEGORY_OSD_LABEL_VN "Hiển thị trên màn hình"
-#define CATEGORY_OSD_INFO_0_VN NULL
-#define CATEGORY_INPUT_LABEL_VN "Input Driver"
-#define CATEGORY_INPUT_INFO_0_VN NULL
+#define CATEGORY_OSD_INFO_0_VN "Thay đổi thông báo hiển thị trên màn hình."
+#define CATEGORY_INPUT_LABEL_VN "Đầu vào"
+#define CATEGORY_INPUT_INFO_0_VN "Thay đổi cài đặt súng ánh sáng, chuột và neGcon."
 #define CATEGORY_MEMCARDS_LABEL_VN "Thẻ nhớ"
-#define CATEGORY_MEMCARDS_INFO_0_VN NULL
-#define CATEGORY_PGXP_LABEL_VN NULL
-#define CATEGORY_PGXP_INFO_0_VN NULL
+#define CATEGORY_MEMCARDS_INFO_0_VN "Thay đổi cài đặt liên quan đến Thẻ nhớ ảo được hệ thống sử dụng."
+#define CATEGORY_PGXP_LABEL_VN "PGXP (Đường ống biến đổi hình học chính xác)"
+#define CATEGORY_PGXP_INFO_0_VN "Các tùy chọn này kiểm soát các cải tiến có thể cải thiện đồ họa so với máy chơi game gốc. PGXP có thể loại bỏ hiện tượng cong vênh kết cấu và lỗi Z-fighting."
 #define CATEGORY_HACKS_LABEL_VN "Hacks giả lập"
-#define CATEGORY_HACKS_INFO_0_VN NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VN NULL
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VN NULL
-#define OPTION_VAL_1X_NATIVE_VN NULL
+#define CATEGORY_HACKS_INFO_0_VN "Thay đổi cài đặt ép xung bộ xử lý và độ chính xác mô phỏng ảnh hưởng đến hiệu suất và khả năng tương thích cấp thấp."
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VN "Độ phân giải GPU nội bộ"
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VN "Chọn hệ số nhân độ phân giải nội bộ. Độ phân giải cao hơn “1x (gốc)” sẽ cải thiện độ chi tiết của mô hình 3D nhưng đòi hỏi hiệu năng cao hơn. Các phần tử 2D nhìn chung không bị ảnh hưởng bởi thiết lập này."
+#define OPTION_VAL_1X_NATIVE_VN "1x (gốc)"
 #define OPTION_VAL_2X_VN NULL
 #define OPTION_VAL_4X_VN NULL
 #define OPTION_VAL_8X_VN NULL
 #define OPTION_VAL_16X_VN NULL
-#define BEETLE_OPT_DEPTH_LABEL_VN NULL
-#define BEETLE_OPT_DEPTH_INFO_0_VN NULL
-#define OPTION_VAL_16BPP_NATIVE_VN NULL
+#define BEETLE_OPT_DEPTH_LABEL_VN "Độ sâu màu nội bộ"
+#define BEETLE_OPT_DEPTH_INFO_0_VN "Chọn độ sâu màu nội bộ. Độ sâu màu cao hơn có thể giảm hiện tượng sọc màu mà không cần dùng kỹ thuật dither. 16 bpp mô phỏng phần cứng gốc nhưng có thể xuất hiện sọc màu nếu dither không được bật. Khuyến nghị tắt “Mẫu dither” khi tùy chọn này đặt ở 32 bpp."
+#define OPTION_VAL_16BPP_NATIVE_VN "16 bpp (Gốc)"
 #define OPTION_VAL_32BPP_VN NULL
-#define BEETLE_OPT_DITHER_MODE_LABEL_VN NULL
-#define BEETLE_OPT_DITHER_MODE_INFO_0_VN NULL
-#define OPTION_VAL_INTERNAL_RESOLUTION_VN NULL
-#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_VN NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_VN "Mẫu dither"
+#define BEETLE_OPT_DITHER_MODE_INFO_0_VN "Chọn cấu hình mẫu dither. “1x (Gốc)” mô phỏng dither độ phân giải thấp gốc do phần cứng ban đầu sử dụng để làm mượt các sọc màu nhìn thấy ở độ sâu màu gốc. “Độ phân giải nội bộ” sẽ chia tỷ lệ chi tiết dither theo độ phân giải nội bộ đã thiết lập để cho kết quả sạch hơn. Khuyến nghị tắt khi chạy ở độ sâu màu 32 bpp.Lưu ý: Trên Vulkan, bật tùy chọn này sẽ buộc giảm mẫu xuống độ sâu màu gốc, trong khi tắt sẽ tự động bật xuất ở độ sâu màu cao hơn."
+#define OPTION_VAL_INTERNAL_RESOLUTION_VN "Độ phân giải nội bộ"
+#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_VN "Độ lệch UV kết cấu"
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_VN NULL
 #define BEETLE_OPT_FILTER_LABEL_VN NULL
 #define BEETLE_OPT_FILTER_INFO_0_VN NULL
@@ -84624,21 +84624,21 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_ALL_VN NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_VN NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_VN NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_VN NULL
-#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_VN NULL
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_VN NULL
-#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_VN NULL
-#define BEETLE_OPT_MSAA_LABEL_VN NULL
-#define BEETLE_OPT_MSAA_INFO_0_VN NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_VN "Làm mượt thích ứng"
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_VN "Làm mượt đồ họa 2D và các phần tử giao diện mà không làm mờ các đối tượng 3D được dựng hình. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_VN "Lấy mẫu siêu (giảm xuống độ phân giải gốc)"
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_VN "Giảm mẫu nội dung đã dựng từ độ phân giải nội bộ được nâng cấp xuống độ phân giải gốc. Kết hợp với hệ số độ phân giải nội bộ cao hơn cho phép trò chơi hiển thị các đối tượng 3D được làm mịn răng cưa ở độ phân giải gốc thấp. Cho kết quả tốt nhất khi áp dụng cho các tựa game kết hợp cả 2D và 3D (ví dụ: nhân vật 3D trên nền dựng sẵn), và hoạt động tốt với shader CRT.Chỉ được hỗ trợ bởi bộ kết xuất Vulkan. Lưu ý: nên tắt “Mẫu tô bóng Dithering” khi bật tùy chọn này."
+#define BEETLE_OPT_MSAA_LABEL_VN "Khử răng cưa đa mẫu (Msaa)"
+#define BEETLE_OPT_MSAA_INFO_0_VN "Chọn mức MSAA cho nội dung được dựng. Cải thiện chất lượng hiển thị của các đối tượng 3D. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
 #define OPTION_VAL_1X_VN NULL
-#define BEETLE_OPT_MDEC_YUV_LABEL_VN NULL
-#define BEETLE_OPT_MDEC_YUV_INFO_0_VN NULL
-#define BEETLE_OPT_TRACK_TEXTURES_LABEL_VN NULL
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_VN NULL
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_VN NULL
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VN NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_VN NULL
-#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VN NULL
+#define BEETLE_OPT_MDEC_YUV_LABEL_VN "Bộ lọc MDEC YUV Chroma"
+#define BEETLE_OPT_MDEC_YUV_INFO_0_VN "Cải thiện chất lượng phát lại FMV bằng cách giảm hiện tượng khối vuông (macroblocking) và răng cưa. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_VN "Theo dõi kết cấu"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_VN "Điều kiện tiên quyết để trích xuất và thay thế kết cấu. Có thể gây treo hầu hết các trò chơi."
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_VN "Trích xuất kết cấu"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VN "Xuất các kết cấu đã sử dụng vào thư mục <cd>-texture-dump/"
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_VN "Thay thế kết cấu"
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VN "Thay thế kết cấu bằng các phiên bản HD từ thư mục <cd>-texture-replacements/"
 #define BEETLE_OPT_WIREFRAME_LABEL_VN NULL
 #define BEETLE_OPT_WIREFRAME_INFO_0_VN NULL
 #define BEETLE_OPT_FRAME_DUPING_LABEL_VN NULL
@@ -84654,8 +84654,8 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN NULL
 #define OPTION_VAL_ENABLED_ANALOG_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN "Tổ hợp chế độ Analog của DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN "Chọn tổ hợp nút sẽ được dùng để chuyển đổi giữa chế độ SỐ (DIGITAL) và TƯƠNG TỰ (ANALOG) cho tay cầm DualShock giả lập."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_VN NULL
 #define OPTION_VAL_L1_R1_SELECT_VN NULL
 #define OPTION_VAL_L1_R1_START_VN NULL
@@ -84666,9 +84666,9 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_L2_R2_L3_VN NULL
 #define OPTION_VAL_L2_R2_R3_VN NULL
 #define OPTION_VAL_L3_R3_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN NULL
-#define OPTION_VAL_0_VN NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN "Độ trễ giữ tổ hợp chế độ Analog của DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN "Đặt thời gian giữ tổ hợp nút để kích hoạt chế độ analog."
+#define OPTION_VAL_0_VN "Độ trễ 0 giây"
 #define OPTION_VAL_1_VN NULL
 #define OPTION_VAL_2_VN NULL
 #define OPTION_VAL_3_VN NULL
@@ -84681,21 +84681,21 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_VN NULL
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_VN NULL
 #define OPTION_VAL_LIGHTGUN_VN NULL
-#define OPTION_VAL_TOUCHSCREEN_VN NULL
-#define BEETLE_OPT_GUN_CURSOR_LABEL_VN NULL
-#define BEETLE_OPT_GUN_CURSOR_INFO_0_VN NULL
-#define OPTION_VAL_CROSS_VN NULL
-#define OPTION_VAL_DOT_VN NULL
-#define OPTION_VAL_OFF_VN NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_VN NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_VN NULL
-#define OPTION_VAL_RED_VN NULL
-#define OPTION_VAL_BLUE_VN NULL
-#define OPTION_VAL_GREEN_VN NULL
-#define OPTION_VAL_ORANGE_VN NULL
-#define OPTION_VAL_YELLOW_VN NULL
-#define OPTION_VAL_CYAN_VN NULL
-#define OPTION_VAL_PINK_VN NULL
+#define OPTION_VAL_TOUCHSCREEN_VN "Màn hình cảm ứng"
+#define BEETLE_OPT_GUN_CURSOR_LABEL_VN "Con trỏ súng"
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_VN "Chọn con trỏ súng để hiển thị trên màn hình khi sử dụng các loại thiết bị nhập liệu Guncon/G-Con 45 và Justifier. Khi tắt, tâm ngắm sẽ luôn bị ẩn."
+#define OPTION_VAL_CROSS_VN "Dấu cộng"
+#define OPTION_VAL_DOT_VN "Dấu chấm"
+#define OPTION_VAL_OFF_VN "Không có con trỏ"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_VN "Cổng 1: Màu tâm ngắm súng"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_VN "Chọn màu tâm ngắm súng cho cổng 1."
+#define OPTION_VAL_RED_VN "Đỏ"
+#define OPTION_VAL_BLUE_VN "Xanh dương"
+#define OPTION_VAL_GREEN_VN "Xanh lá"
+#define OPTION_VAL_ORANGE_VN "Cam"
+#define OPTION_VAL_YELLOW_VN "Vàng"
+#define OPTION_VAL_CYAN_VN "Lục lam"
+#define OPTION_VAL_PINK_VN "Hồng"
 #define OPTION_VAL_PURPLE_VN NULL
 #define OPTION_VAL_BLACK_VN NULL
 #define OPTION_VAL_WHITE_VN NULL
@@ -84722,7 +84722,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_85_VN NULL
 #define OPTION_VAL_90_VN NULL
 #define OPTION_VAL_95_VN NULL
-#define OPTION_VAL_100_VN NULL
+#define OPTION_VAL_100_VN "100% (Mặc định)"
 #define OPTION_VAL_105_VN NULL
 #define OPTION_VAL_110_VN NULL
 #define OPTION_VAL_115_VN NULL
@@ -84743,19 +84743,19 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_190_VN NULL
 #define OPTION_VAL_195_VN NULL
 #define OPTION_VAL_200_VN NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_VN NULL
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_VN NULL
-#define OPTION_VAL_LINEAR_VN NULL
-#define OPTION_VAL_QUADRATIC_VN NULL
-#define OPTION_VAL_CUBIC_VN NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_VN NULL
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VN NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_VN "phản hồi xoay neGcon"
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_VN "Chọn kiểu phản hồi của cần analog trái RetroPad khi mô phỏng thao tác “xoay” của thiết bị nhập liệu neGcon giả lập. Độ lệch của cần analog có thể được ánh xạ thành góc xoay neGcon theo dạng tuyến tính, bậc hai hoặc bậc ba. “Bậc hai” cho độ chính xác cao hơn “Tuyến tính” khi thực hiện các chuyển động nhỏ. “Bậc ba” còn tăng độ chính xác chuyển động nhỏ hơn nữa, nhưng sẽ “phóng đại” các chuyển động lớn.Lưu ý: “Tuyến tính” chỉ được khuyến nghị khi sử dụng vô lăng đua. Tay cầm thông thường xử lý đầu vào analog theo cách khác hoàn toàn với cơ chế “xoay” của neGcon, do đó ánh xạ tuyến tính sẽ khuếch đại quá mức chuyển động nhỏ, làm giảm khả năng điều khiển chính xác. Trong hầu hết các trường hợp, “Bậc hai” cho độ gần giống nhất với phần cứng thật."
+#define OPTION_VAL_LINEAR_VN "Tuyến tính"
+#define OPTION_VAL_QUADRATIC_VN "Bậc hai"
+#define OPTION_VAL_CUBIC_VN "Bậc ba"
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_VN "vùng chết xoay neGcon"
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VN "Chọn vùng chết của cần analog trái RetroPad khi mô phỏng thao tác “xoay” của thiết bị nhập liệu neGcon giả lập. Dùng để loại bỏ hiện tượng trôi cần điều khiển.Lưu ý: Phần lớn trò chơi hỗ trợ neGcon có tùy chọn thiết lập vùng chết “xoay” ngay trong game. Để tránh mất độ chính xác, vùng chết trong game nên luôn đặt về 0. Mọi điều chỉnh cần thiết chỉ nên thực hiện qua tùy chọn core này. Điều này đặc biệt quan trọng khi “Phản hồi xoay neGcon” được đặt là “Bậc hai” hoặc “Bậc ba”."
 #define OPTION_VAL_0_O31_VN NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_VN NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_VN NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_VN "Phương thức Thẻ nhớ 0 (Cần khởi động lại)"
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_VN "Chọn định dạng dữ liệu lưu cho thẻ nhớ 0. Có thể dùng “Mednafen” để tương thích với phiên bản độc lập của Mednafen. Khi sử dụng với Beetle PSX, file lưu Libretro (.srm) và Mednafen (.mcr) có định dạng nội bộ giống hệt nhau và có thể chuyển đổi qua lại chỉ bằng cách đổi tên."
 #define OPTION_VAL_LIBRETRO_VN NULL
 #define OPTION_VAL_MEDNAFEN_VN NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_VN NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_VN "Bật Thẻ nhớ 1 (Cần khởi động lại)"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_VN NULL
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_VN NULL
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_VN NULL
