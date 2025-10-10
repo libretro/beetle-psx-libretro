@@ -84582,17 +84582,17 @@ struct retro_core_options_v2 options_val = {
 
 /* RETRO_LANGUAGE_VN */
 
-#define CATEGORY_VIDEO_LABEL_VN "Hình ảnh"
+#define CATEGORY_VIDEO_LABEL_VN NULL
 #define CATEGORY_VIDEO_INFO_0_VN "Thay đổi tỷ lệ khung hình, cắt xén màn hình, bộ lọc video và cài đặt bỏ qua khung hình."
 #define CATEGORY_OSD_LABEL_VN "Hiển thị trên màn hình"
 #define CATEGORY_OSD_INFO_0_VN "Thay đổi thông báo hiển thị trên màn hình."
-#define CATEGORY_INPUT_LABEL_VN "Đầu vào"
+#define CATEGORY_INPUT_LABEL_VN "Đều khiển"
 #define CATEGORY_INPUT_INFO_0_VN "Thay đổi cài đặt súng ánh sáng, chuột và neGcon."
 #define CATEGORY_MEMCARDS_LABEL_VN "Thẻ nhớ"
 #define CATEGORY_MEMCARDS_INFO_0_VN "Thay đổi cài đặt liên quan đến Thẻ nhớ ảo được hệ thống sử dụng."
 #define CATEGORY_PGXP_LABEL_VN "PGXP (Đường ống biến đổi hình học chính xác)"
 #define CATEGORY_PGXP_INFO_0_VN "Các tùy chọn này kiểm soát các cải tiến có thể cải thiện đồ họa so với máy chơi game gốc. PGXP có thể loại bỏ hiện tượng cong vênh kết cấu và lỗi Z-fighting."
-#define CATEGORY_HACKS_LABEL_VN "Hacks giả lập"
+#define CATEGORY_HACKS_LABEL_VN "Thủ thuật giả lập"
 #define CATEGORY_HACKS_INFO_0_VN "Thay đổi cài đặt ép xung bộ xử lý và độ chính xác mô phỏng ảnh hưởng đến hiệu suất và khả năng tương thích cấp thấp."
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VN "Độ phân giải GPU nội bộ"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VN "Chọn hệ số nhân độ phân giải nội bộ. Độ phân giải cao hơn “1x (gốc)” sẽ cải thiện độ chi tiết của mô hình 3D nhưng đòi hỏi hiệu năng cao hơn. Các phần tử 2D nhìn chung không bị ảnh hưởng bởi thiết lập này."
@@ -84609,24 +84609,24 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_DITHER_MODE_INFO_0_VN "Chọn cấu hình mẫu dither. “1x (Gốc)” mô phỏng dither độ phân giải thấp gốc do phần cứng ban đầu sử dụng để làm mượt các sọc màu nhìn thấy ở độ sâu màu gốc. “Độ phân giải nội bộ” sẽ chia tỷ lệ chi tiết dither theo độ phân giải nội bộ đã thiết lập để cho kết quả sạch hơn. Khuyến nghị tắt khi chạy ở độ sâu màu 32 bpp.Lưu ý: Trên Vulkan, bật tùy chọn này sẽ buộc giảm mẫu xuống độ sâu màu gốc, trong khi tắt sẽ tự động bật xuất ở độ sâu màu cao hơn."
 #define OPTION_VAL_INTERNAL_RESOLUTION_VN "Độ phân giải nội bộ"
 #define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_VN "Độ lệch UV kết cấu"
-#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_VN NULL
-#define BEETLE_OPT_FILTER_LABEL_VN NULL
-#define BEETLE_OPT_FILTER_INFO_0_VN NULL
-#define OPTION_VAL_NEAREST_VN NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_VN "Mẫu kết cấu cho đa giác 3D với độ lệch khi độ phân giải nội bộ cao hơn 1x. Giảm các đường nối kết cấu nhưng có thể gây ra lỗi đồ họa không mong muốn."
+#define BEETLE_OPT_FILTER_LABEL_VN "Lọc kết cấu"
+#define BEETLE_OPT_FILTER_INFO_0_VN "Chọn phương pháp lọc kết cấu. 'Gần nhất' mô phỏng phần cứng gốc. 'Bilinear' và '3-Point' là bộ lọc làm mượt, giảm pixel bằng cách làm mờ. 'SABR', 'xBR' và 'JINC2' là bộ lọc nâng cấp có thể cải thiện độ nét/kết cấu nhưng đòi hỏi hiệu năng cao hơn. Chỉ được hỗ trợ bởi các bộ dựng phần cứng."
+#define OPTION_VAL_NEAREST_VN "Gần nhất"
 #define OPTION_VAL_SABR_VN NULL
 #define OPTION_VAL_XBR_VN NULL
-#define OPTION_VAL_BILINEAR_VN NULL
+#define OPTION_VAL_BILINEAR_VN "Lọc song tuyến"
 #define OPTION_VAL_3_POINT_VN NULL
 #define OPTION_VAL_JINC2_VN NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_VN NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_VN NULL
-#define OPTION_VAL_OPAQUE_VN NULL
-#define OPTION_VAL_ALL_VN NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_VN NULL
-#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_VN NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_VN "Loại trừ Sprites khỏi bộ lọc"
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_VN "Không áp dụng lọc kết cấu cho sprites. Ngăn các đường nối trong nhiều trò chơi với nền được vẽ bằng sprite 2D. Sử dụng cùng với Làm mượt thích ứng hoặc bộ lọc xử lý hậu kỳ khác để đạt hiệu quả tốt nhất."
+#define OPTION_VAL_OPAQUE_VN "Chỉ mờ đục"
+#define OPTION_VAL_ALL_VN "Mờ đục và bán trong suốt"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_VN "Loại trừ đa giác 2D khỏi Lọc"
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_VN "Không áp dụng lọc kết cấu cho đa giác 2D. Các đa giác 2D được phát hiện bằng phương pháp heuristic và có thể xảy ra lỗi. Sử dụng cùng với Làm mượt thích ứng hoặc bộ lọc xử lý hậu kỳ khác để đạt hiệu quả tốt nhất."
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_VN "Làm mượt thích ứng"
 #define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_VN "Làm mượt đồ họa 2D và các phần tử giao diện mà không làm mờ các đối tượng 3D được dựng hình. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
-#define BEETLE_OPT_SUPER_SAMPLING_LABEL_VN "Lấy mẫu siêu (giảm xuống độ phân giải gốc)"
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_VN "Siêu lấy mẫu (về độ phân giải gốc)"
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_VN "Giảm mẫu nội dung đã dựng từ độ phân giải nội bộ được nâng cấp xuống độ phân giải gốc. Kết hợp với hệ số độ phân giải nội bộ cao hơn cho phép trò chơi hiển thị các đối tượng 3D được làm mịn răng cưa ở độ phân giải gốc thấp. Cho kết quả tốt nhất khi áp dụng cho các tựa game kết hợp cả 2D và 3D (ví dụ: nhân vật 3D trên nền dựng sẵn), và hoạt động tốt với shader CRT.Chỉ được hỗ trợ bởi bộ kết xuất Vulkan. Lưu ý: nên tắt “Mẫu tô bóng Dithering” khi bật tùy chọn này."
 #define BEETLE_OPT_MSAA_LABEL_VN "Khử răng cưa đa mẫu (Msaa)"
 #define BEETLE_OPT_MSAA_INFO_0_VN "Chọn mức MSAA cho nội dung được dựng. Cải thiện chất lượng hiển thị của các đối tượng 3D. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
@@ -84634,26 +84634,26 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_MDEC_YUV_LABEL_VN "Bộ lọc MDEC YUV Chroma"
 #define BEETLE_OPT_MDEC_YUV_INFO_0_VN "Cải thiện chất lượng phát lại FMV bằng cách giảm hiện tượng khối vuông (macroblocking) và răng cưa. Chỉ được hỗ trợ bởi bộ kết xuất Vulkan."
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_VN "Theo dõi kết cấu"
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_VN "Điều kiện tiên quyết để trích xuất và thay thế kết cấu. Có thể gây treo hầu hết các trò chơi."
-#define BEETLE_OPT_DUMP_TEXTURES_LABEL_VN "Trích xuất kết cấu"
-#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VN "Xuất các kết cấu đã sử dụng vào thư mục <cd>-texture-dump/"
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_VN "Điều kiện cần để trích xuất và thay thế kết cấu. Có thể sẽ làm hầu hết trò chơi bị treo."
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_VN "Xuất kết cấu"
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VN "Xuất các kết cấu đang dùng vào thư mục <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_VN "Thay thế kết cấu"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VN "Thay thế kết cấu bằng các phiên bản HD từ thư mục <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_VN NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_VN NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_VN NULL
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_VN NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_VN NULL
-#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_VN NULL
-#define BEETLE_OPT_DISPLAY_OSD_LABEL_VN NULL
-#define BEETLE_OPT_DISPLAY_OSD_INFO_0_VN NULL
-#define BEETLE_OPT_DISPLAY_VRAM_LABEL_VN NULL
-#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_VN NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_VN NULL
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VN NULL
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN NULL
-#define OPTION_VAL_ENABLED_ANALOG_VN NULL
+#define BEETLE_OPT_WIREFRAME_LABEL_VN "Chế độ Khung Dây (Gỡ lỗi)"
+#define BEETLE_OPT_WIREFRAME_INFO_0_VN "Hiển thị các mô hình 3D dưới dạng khung dây mà không có texture hoặc shading. Chỉ được hỗ trợ bởi bộ xử lý đồ họa OpenGL. Lưu ý: Chế độ này chỉ dùng để gỡ lỗi và thường nên tắt."
+#define BEETLE_OPT_FRAME_DUPING_LABEL_VN "Nhân khung hình (Tăng tốc)"
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_VN "Khi bật và được frontend libretro hỗ trợ, tính năng này cung cấp một chút cải thiện hiệu năng bằng cách lặp lại khung hình trước nếu core không có gì mới để hiển thị."
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_VN "Hiển thị FPS nội bộ"
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_VN "Hiển thị tốc độ khung hình nội bộ mà hệ thống PlayStation giả lập đang render nội dung. Lưu ý: Cần bật thông báo trên màn hình trong frontend libretro."
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_VN "Hiển thị thông báo OSD"
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_VN "Hiển thị các thông báo OSD do core tạo ra."
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_VN "Hiển thị toàn bộ VRAM (Gỡ lỗi)"
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_VN "Hiển thị toàn bộ VRAM của console giả lập. Chỉ được hỗ trợ bởi bộ xử lý đồ họa OpenGL và Vulkan. Lưu ý: Chế độ này chỉ dùng để gỡ lỗi và thường nên tắt."
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_VN "Tự hiệu chuẩn Analog"
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VN "Khi thiết bị đầu vào được đặt là DualShock, Tay cầm Analog, Joystick Analog, hoặc neGcon, tùy chọn này cho phép hiệu chuẩn động các tín hiệu analog. Giá trị nhập tối đa được theo dõi theo thời gian thực và dùng để tỷ lệ hóa tọa độ analog gửi tới trình giả lập. Nên dùng cho các game như Mega Man Legends 2, vốn yêu cầu giá trị lớn hơn những gì tay cầm hiện đại cung cấp. Để có kết quả tốt nhất, cần xoay cần analog hết mức mỗi lần tải nội dung để hiệu chuẩn thuật toán."
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VN "Chuyển chế độ Analog DualShock"
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN "Khi loại thiết bị đầu vào là DualShock, tùy chọn này cho phép DualShock giả lập chuyển đổi giữa chế độ KỸ THUẬT SỐ và CHUẨN ANALOG như phần cứng gốc. Chế độ cũng có thể được chuyển bằng tổ hợp nút đã chọn."
+#define OPTION_VAL_ENABLED_ANALOG_VN "Analog Mặc định"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN "Tổ hợp chế độ Analog của DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN "Chọn tổ hợp nút sẽ được dùng để chuyển đổi giữa chế độ SỐ (DIGITAL) và TƯƠNG TỰ (ANALOG) cho tay cầm DualShock giả lập."
 #define OPTION_VAL_L1_L2_R1_R2_START_SELECT_VN NULL
@@ -84669,18 +84669,18 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN "Độ trễ giữ tổ hợp chế độ Analog của DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN "Đặt thời gian giữ tổ hợp nút để kích hoạt chế độ analog."
 #define OPTION_VAL_0_VN "Độ trễ 0 giây"
-#define OPTION_VAL_1_VN NULL
-#define OPTION_VAL_2_VN NULL
-#define OPTION_VAL_3_VN NULL
-#define OPTION_VAL_4_VN NULL
-#define OPTION_VAL_5_VN NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VN NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_VN NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_VN NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_VN NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_VN NULL
-#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_VN NULL
-#define OPTION_VAL_LIGHTGUN_VN NULL
+#define OPTION_VAL_1_VN "Trễ 1 giây"
+#define OPTION_VAL_2_VN "Trễ 2 giây"
+#define OPTION_VAL_3_VN "Trễ 3 giây"
+#define OPTION_VAL_4_VN "Trễ 4 giây"
+#define OPTION_VAL_5_VN "Trễ 5 giây"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VN "Cổng 1: Bật đa tay cầm"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_VN "Bật chức năng đa tay cầm trên cổng 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_VN "Cổng 2: Bật đa tay cầm"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_VN "Bật chức năng đa tay cầm trên cổng 2."
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_VN "Chế độ nhập liệu súng"
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_VN "Chọn sử dụng 'Súng ánh sáng' điều khiển bằng chuột hoặc nhập liệu bằng 'Màn hình cảm ứng' khi loại thiết bị được đặt là 'Guncon/G-Con 45' hoặc 'Justifier'."
+#define OPTION_VAL_LIGHTGUN_VN "Súng ánh sáng"
 #define OPTION_VAL_TOUCHSCREEN_VN "Màn hình cảm ứng"
 #define BEETLE_OPT_GUN_CURSOR_LABEL_VN "Con trỏ súng"
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_VN "Chọn con trỏ súng để hiển thị trên màn hình khi sử dụng các loại thiết bị nhập liệu Guncon/G-Con 45 và Justifier. Khi tắt, tâm ngắm sẽ luôn bị ẩn."
@@ -84696,13 +84696,13 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_YELLOW_VN "Vàng"
 #define OPTION_VAL_CYAN_VN "Lục lam"
 #define OPTION_VAL_PINK_VN "Hồng"
-#define OPTION_VAL_PURPLE_VN NULL
-#define OPTION_VAL_BLACK_VN NULL
-#define OPTION_VAL_WHITE_VN NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_VN NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_VN NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_VN NULL
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_VN NULL
+#define OPTION_VAL_PURPLE_VN "Tím"
+#define OPTION_VAL_BLACK_VN "Đen"
+#define OPTION_VAL_WHITE_VN "Trắng"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_VN "Cổng 2: Màu Chấm Ngắm Súng"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_VN "Chọn màu chấm ngắm cho súng ánh sáng ở cổng 2."
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_VN "Độ nhạy Chuột"
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_VN "Chọn mức phản hồi của thiết bị nhập liệu loại “Chuột”."
 #define OPTION_VAL_5_O29_VN NULL
 #define OPTION_VAL_10_VN NULL
 #define OPTION_VAL_15_VN NULL
@@ -84756,20 +84756,20 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_LIBRETRO_VN NULL
 #define OPTION_VAL_MEDNAFEN_VN NULL
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_VN "Bật Thẻ nhớ 1 (Cần khởi động lại)"
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_VN NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_VN NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_VN NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_VN NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_VN NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_VN NULL
-#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_VN NULL
-#define OPTION_VAL_1_O36_VN NULL
-#define BEETLE_OPT_PGXP_MODE_LABEL_VN NULL
-#define BEETLE_OPT_PGXP_MODE_INFO_0_VN NULL
-#define OPTION_VAL_MEMORY_ONLY_VN NULL
-#define OPTION_VAL_MEMORY_CPU_VN NULL
-#define BEETLE_OPT_PGXP_2D_TOL_LABEL_VN NULL
-#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_VN NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_VN "Mô phỏng thẻ nhớ thứ hai ở khe 1. Khi tắt, trò chơi chỉ có thể truy cập thẻ nhớ ở khe 0. Lưu ý: Một số trò chơi yêu cầu tùy chọn này bị tắt để hoạt động đúng (ví dụ: Codename Tenka). Lưu ý: Thẻ nhớ 1 sử dụng định dạng lưu Mednafen (.mcr)."
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_VN "Thẻ nhớ chia sẻ (Cần khởi động lại)"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_VN "Khi bật, tất cả trò chơi sẽ lưu và tải từ cùng một file thẻ nhớ. Khi tắt, file thẻ nhớ riêng sẽ được tạo cho mỗi nội dung được tải. Lưu ý: nếu “Phương pháp Thẻ nhớ 0” được đặt là Libretro, chỉ thẻ bên phải bị ảnh hưởng."
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_VN "Chỉ số Thẻ nhớ bên trái"
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_VN "Thay đổi thẻ nhớ đang được tải ở khe trái. Tùy chọn này chỉ hoạt động nếu phương pháp Thẻ nhớ 0 được đặt là Mednafen. Thẻ mặc định là chỉ số 0."
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_VN "Chỉ số Thẻ nhớ bên phải"
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_VN "Thay đổi thẻ nhớ đang được tải ở khe phải. Tùy chọn này chỉ hoạt động nếu Thẻ nhớ 1 được bật. Thẻ mặc định là chỉ số 1."
+#define OPTION_VAL_1_O36_VN "1 (Mặc định)"
+#define BEETLE_OPT_PGXP_MODE_LABEL_VN "Chế độ hoạt động PGXP"
+#define BEETLE_OPT_PGXP_MODE_INFO_0_VN "Cho phép các đối tượng 3D được hiển thị với độ chính xác từng điểm con, giảm thiểu méo và rung của các đối tượng 3D nhìn thấy trên phần cứng gốc do việc sử dụng tọa độ đỉnh điểm cố định. Chế độ “Chỉ bộ nhớ” có ít vấn đề tương thích và được khuyến nghị sử dụng chung. Chế độ “Bộ nhớ + CPU (Có lỗi)” có thể giảm rung nhiều hơn nhưng yêu cầu hiệu năng cao và có thể gây ra lỗi hình học khác nhau."
+#define OPTION_VAL_MEMORY_ONLY_VN "Chỉ bộ nhớ"
+#define OPTION_VAL_MEMORY_CPU_VN "Bộ nhớ + CPU (Có lỗi)"
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_VN "Ngưỡng hình học 2D PGXP"
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_VN "Ẩn những lỗi hiển nhiên hơn trong hoạt động PGXP: giá trị này xác định độ dung sai mà các giá trị PGXP sẽ được giữ trong trường hợp hình học không có thông tin độ sâu phù hợp."
 #define OPTION_VAL_0PX_VN NULL
 #define OPTION_VAL_1PX_VN NULL
 #define OPTION_VAL_2PX_VN NULL
@@ -84779,20 +84779,20 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_6PX_VN NULL
 #define OPTION_VAL_7PX_VN NULL
 #define OPTION_VAL_8PX_VN NULL
-#define BEETLE_OPT_PGXP_NCLIP_LABEL_VN NULL
-#define BEETLE_OPT_PGXP_NCLIP_INFO_0_VN NULL
-#define BEETLE_OPT_PGXP_VERTEX_LABEL_VN NULL
-#define BEETLE_OPT_PGXP_VERTEX_INFO_0_VN NULL
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_VN NULL
-#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_VN NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_VN NULL
-#define BEETLE_OPT_LINE_RENDER_INFO_0_VN NULL
-#define OPTION_VAL_DEFAULT_VN NULL
-#define OPTION_VAL_AGGRESSIVE_VN NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_VN NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_VN NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_VN NULL
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_VN NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_VN "Loại bỏ hình nguyên PGXP"
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_VN "Sử dụng triển khai NCLIP của PGXP. Cải thiện hình ảnh bằng cách giảm các lỗ trong hình học có tọa độ PGXP. Được biết có thể khiến một số trò chơi bị treo trong một số trường hợp."
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_VN "Bộ nhớ đệm đỉnh PGXP"
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_VN "Lưu trữ tạm thời các vị trí đỉnh được nâng cấp bởi PGXP để tái sử dụng khi vẽ đa giác. Có thể cải thiện sự căn chỉnh đối tượng và giảm các đường nối hiển thị khi kết xuất kết cấu, nhưng kết quả sai khi truy vấn bộ nhớ đệm có thể gây ra lỗi đồ họa. Hiện tại khuyến nghị giữ tùy chọn này tắt. Tùy chọn này chỉ áp dụng khi chế độ hoạt động PGXP được bật. Chỉ được hỗ trợ bởi các bộ kết xuất phần cứng."
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_VN "Kết cấu theo phối cảnh PGXP"
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_VN "Thay thế việc ánh xạ texture affine gốc của PSX bằng ánh xạ texture đúng phối cảnh. Loại bỏ hiện tượng biến dạng và vênh vị trí của texture, đảm bảo texture được căn chỉnh chính xác. Tùy chọn này chỉ áp dụng khi Chế độ Hoạt động PGXP được bật. Chỉ được hỗ trợ bởi các bộ dựng phần cứng."
+#define BEETLE_OPT_LINE_RENDER_LABEL_VN "Mẹo chuyển dòng thành hình tứ giác"
+#define BEETLE_OPT_LINE_RENDER_INFO_0_VN "Chọn phương pháp chuyển dòng thành hình tứ giác. Một số trò chơi (ví dụ: Doom, Hexen, Soul Blade, v.v.) vẽ các đường ngang bằng cách kéo dài các tam giác cao một pixel trên màn hình, vốn được raster hóa thành một hàng pixel trên phần cứng gốc. Mẹo này phát hiện các tam giác nhỏ này và chuyển đổi chúng thành hình tứ giác theo yêu cầu, cho phép hiển thị đúng trên bộ dựng phần cứng và ở độ phân giải nội bộ được nâng lên. Chế độ ‘Mạnh’ cần thiết cho một số trò chơi (ví dụ: Dark Forces, Duke Nukem) nhưng có thể gây ra lỗi đồ họa ở các tựa khác. Để ở ‘Mặc định’ nếu không chắc chắn."
+#define OPTION_VAL_DEFAULT_VN "Mặc định"
+#define OPTION_VAL_AGGRESSIVE_VN "Mạnh"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_VN "Mẹo Chế độ Màn hình Rộng"
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_VN "Hiển thị nội dung 3D theo dạng anamorphic và xuất framebuffer giả lập ở tỷ lệ màn hình rộng. Cho kết quả tốt nhất với các trò chơi hoàn toàn 3D. Các yếu tố 2D sẽ bị kéo ngang và có thể không căn chỉnh đúng."
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_VN "Tỷ lệ khung hình của Mẹo Chế độ Màn hình Rộng"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_VN "Chọn tỷ lệ khung hình được sử dụng bởi Mẹo Chế độ Màn hình Rộng."
 #define OPTION_VAL_16_9_VN NULL
 #define OPTION_VAL_16_10_VN NULL
 #define OPTION_VAL_18_9_VN NULL
@@ -84800,9 +84800,9 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_20_9_VN NULL
 #define OPTION_VAL_21_9_VN NULL
 #define OPTION_VAL_32_9_VN NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_VN NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_VN NULL
-#define OPTION_VAL_100_NATIVE_VN NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_VN "Điều chỉnh tần số CPU (Ép xung)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_VN "Ép xung (hoặc giảm xung) CPU của PSX giả lập. Ép xung có thể loại bỏ hiện tượng chậm và cải thiện tốc độ khung hình trong một số trò chơi, đổi lại yêu cầu hiệu năng cao hơn. Lưu ý rằng một số trò chơi có bộ giới hạn khung hình nội bộ và có thể không hưởng lợi từ việc ép xung. Có thể khiến một số hiệu ứng trong một số trò chơi chạy nhanh hơn so với dự định khi ép xung."
+#define OPTION_VAL_100_NATIVE_VN "100% (Nguyên bản)"
 #define OPTION_VAL_210_VN NULL
 #define OPTION_VAL_220_VN NULL
 #define OPTION_VAL_230_VN NULL
@@ -84858,60 +84858,60 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_730_VN NULL
 #define OPTION_VAL_740_VN NULL
 #define OPTION_VAL_750_VN NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_VN NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_VN NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_VN "Ép xung bộ xử lý đồ họa (GPU Rasterizer)"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_VN "Bật ép xung bộ raster 2D bên trong GPU giả lập của PSX. Không cải thiện việc hiển thị 3D và nhìn chung tác động rất nhỏ."
 #define OPTION_VAL_32X_VN NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_VN NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_VN NULL
-#define BEETLE_OPT_SKIP_BIOS_LABEL_VN NULL
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_VN NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_VN NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VN NULL
-#define OPTION_VAL_PSXONPSP_VN NULL
-#define OPTION_VAL_PS1_ROM_VN NULL
-#define BEETLE_OPT_RENDERER_LABEL_VN NULL
-#define BEETLE_OPT_RENDERER_INFO_0_VN NULL
-#define OPTION_VAL_HARDWARE_VN NULL
-#define OPTION_VAL_HARDWARE_GL_VN NULL
-#define OPTION_VAL_HARDWARE_VK_VN NULL
-#define OPTION_VAL_SOFTWARE_VN NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_VN NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN NULL
-#define BEETLE_OPT_CPU_DYNAREC_LABEL_VN NULL
-#define BEETLE_OPT_CPU_DYNAREC_INFO_0_VN NULL
-#define OPTION_VAL_DISABLED_VN NULL
-#define OPTION_VAL_EXECUTE_VN NULL
-#define OPTION_VAL_EXECUTE_ONE_VN NULL
-#define OPTION_VAL_RUN_INTERPRETER_VN NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_VN NULL
-#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_VN NULL
-#define OPTION_VAL_FULL_VN NULL
-#define OPTION_VAL_DMA_VN NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_VN NULL
-#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_VN NULL
-#define OPTION_VAL_128_VN NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_VN NULL
-#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_VN NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_VN NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_VN NULL
-#define OPTION_VAL_AUTO_TOGGLE_VN NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_VN NULL
-#define OPTION_VAL_FORCE_INTERLACED_VN NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_VN NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VN NULL
-#define BEETLE_OPT_ASPECT_RATIO_LABEL_VN NULL
-#define BEETLE_OPT_ASPECT_RATIO_INFO_0_VN NULL
-#define OPTION_VAL_CORRECTED_VN NULL
-#define OPTION_VAL_UNCORRECTED_VN NULL
-#define OPTION_VAL_4_3_VN NULL
-#define OPTION_VAL_NTSC_VN NULL
-#define BEETLE_OPT_CROP_OVERSCAN_LABEL_VN NULL
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_VN NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_VN "Ép xung GTE"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_VN "Giảm tất cả các thao tác GTE giả lập (bộ coprocesor CPU cho đồ họa 3D) xuống độ trễ cố định một chu kỳ. Đối với các game sử dụng nhiều GTE, điều này có thể cải thiện đáng kể tốc độ khung hình và độ ổn định thời gian khung hình."
+#define BEETLE_OPT_SKIP_BIOS_LABEL_VN "Bỏ qua BIOS"
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_VN "Bỏ qua hoạt ảnh khởi động BIOS của PlayStation thường hiển thị khi tải nội dung. Lưu ý: Bật tùy chọn này có thể gây vấn đề tương thích với một số game (game PAL có bảo vệ bản quyền, Saga Frontier, v.v.)."
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_VN "Ghi đè BIOS (Cần khởi động lại)"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VN "Ghi đè BIOS theo vùng tiêu chuẩn bằng một BIOS không phân vùng nếu tìm thấy."
+#define OPTION_VAL_PSXONPSP_VN "BIOS PS1 cho PSP"
+#define OPTION_VAL_PS1_ROM_VN "BIOS PS1 cho PS3"
+#define BEETLE_OPT_RENDERER_LABEL_VN "Bộ dựng hình (Cần khởi động lại)"
+#define BEETLE_OPT_RENDERER_INFO_0_VN "Bộ dựng hình phần mềm chính xác nhất nhưng yêu cầu hiệu năng cao khi chạy ở độ phân giải GPU nội bộ tăng. Bộ dựng hình phần cứng, mặc dù ít chính xác hơn, cải thiện hiệu năng so với phần mềm ở độ phân giải nội bộ cao và cho phép nhiều nâng cấp đồ họa. “Phần cứng (Tự động)” tự động chọn bộ dựng Vulkan hoặc OpenGL, tùy thuộc vào trình điều khiển video của frontend libretro hiện tại. Nếu trình điều khiển video không tương thích Vulkan hoặc OpenGL 3.3, core sẽ quay về bộ dựng hình phần mềm."
+#define OPTION_VAL_HARDWARE_VN "Phần cứng (Tự động)"
+#define OPTION_VAL_HARDWARE_GL_VN "Phần cứng (OpenGL)"
+#define OPTION_VAL_HARDWARE_VK_VN "Phần cứng (Vulkan)"
+#define OPTION_VAL_SOFTWARE_VN "Phần mềm"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_VN "Bộ nhớ khung phần mềm"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN "Bật mô phỏng chính xác các hiệu ứng bộ nhớ khung (ví dụ: mờ chuyển động, xoáy chiến đấu FF7) khi sử dụng bộ kết xuất phần cứng bằng cách chạy một bản sao bộ kết xuất phần mềm ở độ phân giải gốc trong nền. Nếu tắt, các thao tác này sẽ bị bỏ qua (OpenGL) hoặc được kết xuất trên GPU (Vulkan). Tắt có thể cải thiện hiệu năng nhưng có thể gây lỗi đồ họa nghiêm trọng. Giữ bật nếu không chắc chắn."
+#define BEETLE_OPT_CPU_DYNAREC_LABEL_VN "Biên dịch động CPU"
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_VN "Biên dịch động các lệnh CPU thành lệnh gốc. Nhanh hơn nhiều so với thông dịch, nhưng thời gian CPU kém chính xác và có thể có lỗi."
+#define OPTION_VAL_DISABLED_VN "Tắt (Thông dịch Beetle)"
+#define OPTION_VAL_EXECUTE_VN "Hiệu năng tối đa"
+#define OPTION_VAL_EXECUTE_ONE_VN "Kiểm tra thời gian chu kỳ"
+#define OPTION_VAL_RUN_INTERPRETER_VN "Thông dịch Lightrec"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_VN "Vô hiệu hóa mã Biên dịch động"
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_VN "Một số trò chơi yêu cầu vô hiệu hóa ‘Toàn bộ’, một số yêu cầu ‘Chỉ DMA’."
+#define OPTION_VAL_FULL_VN "Toàn bộ"
+#define OPTION_VAL_DMA_VN "Chỉ DMA (Nhanh hơn một chút)"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_VN "Chu kỳ sự kiện Dynarec DMA/GPU/MDEC/Bộ hẹn giờ"
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_VN "Số chu kỳ tối đa CPU chạy trước khi kiểm tra cập nhật GPU/DMA/MDEC/Bộ hẹn giờ."
+#define OPTION_VAL_128_VN "128 (Mặc định)"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_VN "Mẫu SPU Dynarec"
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_VN "Số mẫu SPU tối đa để chạy trước khi kiểm tra Cập nhật SPU, số cao hơn sẽ nhanh hơn, nhưng có thể gây lỗi âm thanh trong một số game nếu khác 1."
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_VN "Thời gian FPS do Core báo cáo"
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_VN "Chọn thời gian FPS mà core sẽ báo cho giao diện chính. Chuyển đổi tự động cho phép core thay đổi giữa báo cáo tốc độ liên tục và xen kẽ, nhưng có thể gây khởi tạo lại trình điều khiển video/âm thanh của giao diện."
+#define OPTION_VAL_AUTO_TOGGLE_VN "Cho phép chuyển đổi tự động"
+#define OPTION_VAL_FORCE_PROGRESSIVE_VN "Tốc độ liên tục"
+#define OPTION_VAL_FORCE_INTERLACED_VN "Ép tốc độ xen kẽ"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_VN "Ghi đè thời gian video PAL (Châu Âu)"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VN "Do tiêu chuẩn khác nhau, game PAL thường chạy chậm hơn so với phiên bản NTSC Mỹ hoặc Nhật. Tùy chọn này có thể được dùng để ghi đè thời gian PAL nhằm cố gắng chạy các game này với tốc độ khung hình NTSC. Tùy chọn này không ảnh hưởng khi chạy nội dung NTSC."
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_VN "Tỷ lệ khung hình của Core"
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_VN "Chọn tỷ lệ khung hình do core cung cấp. Cài đặt này bị bỏ qua khi bật chế độ Mở rộng màn hình hoặc Hiển thị toàn bộ VRAM."
+#define OPTION_VAL_CORRECTED_VN "Đã hiệu chỉnh"
+#define OPTION_VAL_UNCORRECTED_VN "Chưa hiệu chỉnh"
+#define OPTION_VAL_4_3_VN "Ép 4:3"
+#define OPTION_VAL_NTSC_VN "Ép NTSC"
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_VN "Cắt vùng dư màn hình"
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_VN "'Không' giữ nguyên lề (cột đen hai bên hình ảnh cho NTSC, tất cả các cạnh cho PAL) để mô phỏng các thanh đen tương tự trên tín hiệu video analog của phần cứng PSX thật. 'Cố định' chỉ loại bỏ lề ngang, 'Động' loại bỏ tất cả lề."
 #define OPTION_VAL_DISABLED_O59_VN "Không"
-#define OPTION_VAL_STATIC_VN NULL
-#define OPTION_VAL_SMART_VN NULL
-#define BEETLE_OPT_IMAGE_CROP_LABEL_VN NULL
-#define BEETLE_OPT_IMAGE_CROP_INFO_0_VN NULL
+#define OPTION_VAL_STATIC_VN "Cố định"
+#define OPTION_VAL_SMART_VN "Động (Mặc định)"
+#define BEETLE_OPT_IMAGE_CROP_LABEL_VN "Cắt bổ sung"
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_VN "Khi 'Cắt dư ngang' được bật, tùy chọn này sẽ giảm thêm chiều rộng của hình ảnh đã cắt theo số pixel được chỉ định."
 #define OPTION_VAL_9PX_VN NULL
 #define OPTION_VAL_10PX_VN NULL
 #define OPTION_VAL_11PX_VN NULL
@@ -84924,8 +84924,8 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_18PX_VN NULL
 #define OPTION_VAL_19PX_VN NULL
 #define OPTION_VAL_20PX_VN NULL
-#define BEETLE_OPT_IMAGE_OFFSET_LABEL_VN NULL
-#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_VN NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_VN "Dịch ảnh bị cắt"
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_VN "Khi “Cắt phần thừa ngang” được bật, tùy chọn này cho phép ảnh sau khi cắt được dịch ngang sang phải (dương) hoặc sang trái (âm) theo số pixel đã chỉ định. Có thể dùng để chỉnh sửa vấn đề căn chỉnh. Chỉ được hỗ trợ bởi bộ kết xuất phần mềm."
 #define OPTION_VAL_12PX_O61_VN NULL
 #define OPTION_VAL_11PX_O61_VN NULL
 #define OPTION_VAL_10PX_O61_VN NULL
@@ -84950,31 +84950,31 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_10PX_O61_0_VN NULL
 #define OPTION_VAL_11PX_O61_0_VN NULL
 #define OPTION_VAL_12PX_O61_0_VN NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_VN NULL
-#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_VN NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_VN NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_VN NULL
-#define OPTION_VAL_0_O63_VN NULL
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_VN NULL
-#define BEETLE_OPT_LAST_SCANLINE_INFO_0_VN NULL
-#define OPTION_VAL_239_VN NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_VN NULL
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_VN NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_VN NULL
-#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_VN NULL
-#define OPTION_VAL_287_VN NULL
-#define BEETLE_OPT_DEINTERLACER_LABEL_VN NULL
-#define BEETLE_OPT_DEINTERLACER_INFO_0_VN NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_VN "Dịch ngang hình ảnh (Chu kỳ GPU)"
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_VN "Chọn số chu kỳ GPU để dịch hình ảnh. Giá trị dương dịch hình sang phải, giá trị âm dịch hình sang trái. Chỉ được hỗ trợ bởi các bộ kết xuất phần cứng."
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_VN "Dòng quét đầu tiên - NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_VN "Chọn dòng quét đầu tiên hiển thị khi chạy nội dung NTSC. Giá trị lớn hơn 0 sẽ giảm chiều cao của hình ảnh xuất ra bằng cách cắt các pixel từ mép trên. Có thể sử dụng để chống letterboxing."
+#define OPTION_VAL_0_O63_VN "0 (Mặc định)"
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_VN "Dòng quét cuối cùng - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_VN "Chọn dòng quét cuối cùng hiển thị khi chạy nội dung NTSC. Giá trị nhỏ hơn 239 sẽ giảm chiều cao của hình ảnh xuất ra bằng cách cắt các pixel từ mép dưới. Có thể sử dụng để chống letterboxing."
+#define OPTION_VAL_239_VN "239 (Mặc định)"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_VN "Dòng quét đầu tiên - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_VN "Chọn dòng quét đầu tiên hiển thị khi chạy nội dung PAL. Giá trị lớn hơn 0 sẽ giảm chiều cao của hình ảnh xuất ra bằng cách cắt các pixel từ mép trên. Có thể sử dụng để chống letterboxing."
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_VN "Dòng quét cuối cùng - PAL"
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_VN "Chọn dòng quét cuối cùng hiển thị khi chạy nội dung PAL. Giá trị nhỏ hơn 287 sẽ giảm chiều cao của hình ảnh xuất ra bằng cách cắt các pixel từ mép dưới. Có thể sử dụng để chống letterboxing."
+#define OPTION_VAL_287_VN "287 (Mặc định)"
+#define BEETLE_OPT_DEINTERLACER_LABEL_VN "Phương pháp khử răng cưa"
+#define BEETLE_OPT_DEINTERLACER_INFO_0_VN "‘Weave’ hiển thị cả hai trường trên cùng một khung hình để có hình ảnh tĩnh độ phân giải cao đầy đủ, ‘Bob’ đánh đổi độ rõ nét của độ phân giải để tăng độ rõ nét khi chuyển động."
 #define OPTION_VAL_WEAVE_VN NULL
 #define OPTION_VAL_BOB_VN NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_VN NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_VN NULL
-#define OPTION_VAL_SYNC_VN NULL
-#define OPTION_VAL_ASYNC_VN NULL
-#define OPTION_VAL_PRECACHE_VN NULL
-#define BEETLE_OPT_CD_FASTLOAD_LABEL_VN NULL
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_VN NULL
-#define OPTION_VAL_2X_NATIVE_VN NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_VN "Phương thức truy cập CD (Cần khởi động lại)"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_VN "Chọn phương thức dùng để đọc dữ liệu từ ảnh đĩa nội dung. “Đồng bộ” mô phỏng phần cứng gốc. “Không đồng bộ” có thể giảm giật hình trên thiết bị có lưu trữ chậm. “Tải trước vào bộ nhớ” sẽ nạp toàn bộ ảnh đĩa vào RAM khi khởi chạy nội dung, có thể cải thiện thời gian tải trong game nhưng đổi lại sẽ chậm khởi động ban đầu. “Tải trước vào bộ nhớ” có thể gây vấn đề trên hệ thống có RAM thấp, và sẽ quay về “Đồng bộ” đối với phương tiện vật lý."
+#define OPTION_VAL_SYNC_VN "Đồng bộ"
+#define OPTION_VAL_ASYNC_VN "Không đồng bộ"
+#define OPTION_VAL_PRECACHE_VN "Tải trước vào bộ nhớ"
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_VN "Tốc độ tải CD"
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_VN "Chọn hệ số nhân tốc độ truy cập đĩa. Giá trị cao hơn “2x (Nguyên bản)” có thể giảm đáng kể thời gian tải trong game, nhưng có thể gây lỗi về thời gian. Một số trò chơi có thể không hoạt động đúng nếu vượt quá một giá trị nhất định."
+#define OPTION_VAL_2X_NATIVE_VN "2x (Nguyên bản)"
 #define OPTION_VAL_6X_VN NULL
 #define OPTION_VAL_10X_VN NULL
 #define OPTION_VAL_12X_VN NULL
