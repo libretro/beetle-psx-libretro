@@ -74548,7 +74548,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_730_SV NULL
 #define OPTION_VAL_740_SV NULL
 #define OPTION_VAL_750_SV NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SV NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_SV "Överklockning för GPU-rasterisering"
 #define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_SV "Möjliggör överklockning av den 2D-rasterizer som finns i den emulerade PSX: ens GPU. Förbättrar inte 3D-rendering och har i allmänhet liten effekt."
 #define OPTION_VAL_32X_SV NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_SV "GTE Överklockning"
@@ -74587,7 +74587,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_AUTO_TOGGLE_SV "Tillåt automatisk växling"
 #define OPTION_VAL_FORCE_PROGRESSIVE_SV "Progressiv frekvens"
 #define OPTION_VAL_FORCE_INTERLACED_SV "Tvinga frekvens med interlace"
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV "Åsidosätt PAL (Europeisk) videotiming"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder ser PAL-spel ofta långsammare ut jämfört med de amerikanska eller japanska NTSC-utgåvorna. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-framerate. Det här alternativet har ingen effekt när du kör NTSC-innehåll."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_SV "Välj bildförhållande som anges i kärnan. Denna inställning ignoreras när alternativen Hack för bredbildsläge eller Visa fullständig VRAM är aktiverade."
@@ -84650,9 +84650,9 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_DISPLAY_VRAM_LABEL_VN "Hiển thị toàn bộ VRAM (Gỡ lỗi)"
 #define BEETLE_OPT_DISPLAY_VRAM_INFO_0_VN "Hiển thị toàn bộ VRAM của console giả lập. Chỉ được hỗ trợ bởi bộ xử lý đồ họa OpenGL và Vulkan. Lưu ý: Chế độ này chỉ dùng để gỡ lỗi và thường nên tắt."
 #define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_VN "Tự hiệu chuẩn Analog"
-#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VN "Khi thiết bị đầu vào được đặt là DualShock, Tay cầm Analog, Joystick Analog, hoặc neGcon, tùy chọn này cho phép hiệu chuẩn động các tín hiệu analog. Giá trị nhập tối đa được theo dõi theo thời gian thực và dùng để tỷ lệ hóa tọa độ analog gửi tới trình giả lập. Nên dùng cho các game như Mega Man Legends 2, vốn yêu cầu giá trị lớn hơn những gì tay cầm hiện đại cung cấp. Để có kết quả tốt nhất, cần xoay cần analog hết mức mỗi lần tải nội dung để hiệu chuẩn thuật toán."
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_VN "Khi thiết bị điều khiển được đặt là DualShock, Tay cầm Analog, Joystick Analog, hoặc neGcon, tùy chọn này cho phép hiệu chuẩn động các tín hiệu analog. Giá trị nhập tối đa được theo dõi theo thời gian thực và dùng để tỷ lệ hóa tọa độ analog gửi tới trình giả lập. Nên dùng cho các game như Mega Man Legends 2, vốn yêu cầu giá trị lớn hơn những gì tay cầm hiện đại cung cấp. Để có kết quả tốt nhất, cần xoay cần analog hết mức mỗi lần tải nội dung để hiệu chuẩn thuật toán."
 #define BEETLE_OPT_ANALOG_TOGGLE_LABEL_VN "Chuyển chế độ Analog DualShock"
-#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN "Khi loại thiết bị đầu vào là DualShock, tùy chọn này cho phép DualShock giả lập chuyển đổi giữa chế độ KỸ THUẬT SỐ và CHUẨN ANALOG như phần cứng gốc. Chế độ cũng có thể được chuyển bằng tổ hợp nút đã chọn."
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_VN "Khi loại thiết bị điều khiển là DualShock, tùy chọn này cho phép DualShock giả lập chuyển đổi giữa chế độ KỸ THUẬT SỐ và CHUẨN ANALOG như phần cứng gốc. Chế độ cũng có thể được chuyển bằng tổ hợp nút đã chọn."
 #define OPTION_VAL_ENABLED_ANALOG_VN "Analog Mặc định"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_VN "Tổ hợp chế độ Analog của DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_VN "Chọn tổ hợp nút sẽ được dùng để chuyển đổi giữa chế độ SỐ (DIGITAL) và TƯƠNG TỰ (ANALOG) cho tay cầm DualShock giả lập."
@@ -84744,7 +84744,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_195_VN NULL
 #define OPTION_VAL_200_VN NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_VN "phản hồi xoay neGcon"
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_VN "Chọn kiểu phản hồi của cần analog trái RetroPad khi mô phỏng thao tác “xoay” của thiết bị nhập liệu neGcon giả lập. Độ lệch của cần analog có thể được ánh xạ thành góc xoay neGcon theo dạng tuyến tính, bậc hai hoặc bậc ba. “Bậc hai” cho độ chính xác cao hơn “Tuyến tính” khi thực hiện các chuyển động nhỏ. “Bậc ba” còn tăng độ chính xác chuyển động nhỏ hơn nữa, nhưng sẽ “phóng đại” các chuyển động lớn.Lưu ý: “Tuyến tính” chỉ được khuyến nghị khi sử dụng vô lăng đua. Tay cầm thông thường xử lý đầu vào analog theo cách khác hoàn toàn với cơ chế “xoay” của neGcon, do đó ánh xạ tuyến tính sẽ khuếch đại quá mức chuyển động nhỏ, làm giảm khả năng điều khiển chính xác. Trong hầu hết các trường hợp, “Bậc hai” cho độ gần giống nhất với phần cứng thật."
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_VN "Chọn kiểu phản hồi của cần analog trái RetroPad khi mô phỏng thao tác “xoay” của thiết bị nhập liệu neGcon giả lập. Độ lệch của cần analog có thể được gán nút thành góc xoay neGcon theo dạng tuyến tính, bậc hai hoặc bậc ba. “Bậc hai” cho độ chính xác cao hơn “Tuyến tính” khi thực hiện các chuyển động nhỏ. “Bậc ba” còn tăng độ chính xác chuyển động nhỏ hơn nữa, nhưng sẽ “phóng đại” các chuyển động lớn.Lưu ý: “Tuyến tính” chỉ được khuyến nghị khi sử dụng vô lăng đua. Tay cầm thông thường xử lý điều khiển analog theo cách khác hoàn toàn với cơ chế “xoay” của neGcon, do đó ánh xạ tuyến tính sẽ khuếch đại quá mức chuyển động nhỏ, làm giảm khả năng điều khiển chính xác. Trong hầu hết các trường hợp, “Bậc hai” cho độ gần giống nhất với phần cứng thật."
 #define OPTION_VAL_LINEAR_VN "Tuyến tính"
 #define OPTION_VAL_QUADRATIC_VN "Bậc hai"
 #define OPTION_VAL_CUBIC_VN "Bậc ba"
