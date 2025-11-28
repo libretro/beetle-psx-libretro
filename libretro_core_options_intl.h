@@ -12700,7 +12700,7 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_PSXONPSP_CHT "PSP內建 (psxonpsp660.bin)"
 #define OPTION_VAL_PS1_ROM_CHT "PS3內建 (ps1_rom.bin)"
 #define BEETLE_OPT_RENDERER_LABEL_CHT "渲染器 (需要重新啟動)"
-#define BEETLE_OPT_RENDERER_INFO_0_CHT NULL
+#define BEETLE_OPT_RENDERER_INFO_0_CHT "軟體渲染器是最精準的，但在內部 GPU 解析度提高時的效能需求極高。硬體渲染器們雖然比較不精準，但在內部解析度較高時的效能會比軟體渲染器好很多，並且提供多種圖形增強。「硬體（自動）」會依目前的 libretro 前端視訊驅動程式自動選取 Vulkan 或 OpenGL 渲染器。如果提供的視訊驅動程式與 Vulkan 或 OpenGL 3.3 不相容，則核心會退回使用軟體渲染器。"
 #define OPTION_VAL_HARDWARE_CHT "自動 (硬體)"
 #define OPTION_VAL_HARDWARE_GL_CHT "OpenGL (硬體)"
 #define OPTION_VAL_HARDWARE_VK_CHT "Vulkan (硬體)"
@@ -12723,7 +12723,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_CHT NULL
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_CHT NULL
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_CHT NULL
-#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHT NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_CHT "選擇核心會回報給前端的 FPS 時間。自動切換會讓核心能切換回報逐行掃描幀率或是交錯掃描幀率，但可能會造成前端的視訊或音訊驅動程式進行重新初始化。"
 #define OPTION_VAL_AUTO_TOGGLE_CHT "允許自動切換"
 #define OPTION_VAL_FORCE_PROGRESSIVE_CHT NULL
 #define OPTION_VAL_FORCE_INTERLACED_CHT NULL
