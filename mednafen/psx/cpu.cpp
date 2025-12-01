@@ -3689,21 +3689,21 @@ struct lightrec_mem_map PS_CPU::lightrec_map[] = {
 	},
 
 	/* Mirrors of the kernel/user memory */
-	{
+	[PSX_MAP_MIRROR1] = {
 		.pc = 0x00200000,
 		.length = 0x200000,
 		.address = NULL,
 		.ops = NULL,
 		.mirror_of = &lightrec_map[PSX_MAP_KERNEL_USER_RAM],
 	},
-	{
+	[PSX_MAP_MIRROR2] = {
 		.pc = 0x00400000,
 		.length = 0x200000,
 		.address = NULL,
 		.ops = NULL,
 		.mirror_of = &lightrec_map[PSX_MAP_KERNEL_USER_RAM],
 	},
-	{
+	[PSX_MAP_MIRROR3] = {
 		.pc = 0x00600000,
 		.length = 0x200000,
 		.address = NULL,
