@@ -485,6 +485,14 @@ else
    endif
 endif
 
+# WebOS (32-bit)
+ifneq (,$(findstring webos,$(CROSS_COMPILE)))
+   GLES = 1
+   GLES3 = 1
+   GL_LIB := -lGLESv2
+   HAVE_VULKAN = 0
+endif
+
 include Makefile.common
 
 # https://github.com/libretro-mirrors/mednafen-git/blob/master/README.PORTING
