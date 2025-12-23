@@ -1221,12 +1221,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(core_timing_fps),
       "Core-Reported FPS Timing",
       NULL,
-      "Choose the FPS timing that the core will report to the frontend. Automatic Toggling will allow the core to switch between reporting progressive and interlaced rates, but may cause frontend video/audio driver re-inits.",
+      "Choose the FPS timing that the core will report to the frontend. Automatic Toggling allows the core to switch between progressive and interlaced rates.",
       NULL,
       NULL,
       {
-         { "auto_toggle", "Allow Automatic Toggling" },
-         { "force_progressive", "Progressive Rate" },
+         { "auto_toggle",       "Automatic Toggling" },
+         { "force_progressive", "Force Progressive Rate" },
          { "force_interlaced",  "Force Interlaced Rate" },
       },
       "auto_toggle"

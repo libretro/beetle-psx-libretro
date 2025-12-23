@@ -1298,6 +1298,7 @@ static void PSX_Power(void)
    IRQ_Power();
 
    ForceEventUpdates(0);
+   startup_frame_count = 0;
 }
 
 template<typename T, bool Access24> static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32 A, T V)

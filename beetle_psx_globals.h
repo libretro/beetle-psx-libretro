@@ -32,9 +32,10 @@ enum core_timing_fps_modes
    AUTO_TOGGLE_TIMING
 };
 
-extern int core_timing_fps_mode;
+extern enum core_timing_fps_modes core_timing_fps_mode;
 extern bool currently_interlaced;
 extern bool interlace_setting_dirty;
+extern uint8_t startup_frame_count;
 
 extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;

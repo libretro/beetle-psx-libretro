@@ -13,9 +13,10 @@ bool opaque_check;
 bool semitrans_check;
 int crop_overscan = 0;
 
-int core_timing_fps_mode = FORCE_PROGRESSIVE_TIMING;
-bool currently_interlaced = false;
+enum core_timing_fps_modes core_timing_fps_mode = AUTO_TOGGLE_TIMING;
+bool currently_interlaced = true;
 bool interlace_setting_dirty = false;
+uint8_t startup_frame_count = 0;
 
 int aspect_ratio_setting = 0;
 bool aspect_ratio_dirty = false;

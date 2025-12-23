@@ -533,6 +533,14 @@ void rsx_intf_set_display_mode(bool depth_24bpp,
    rsx_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
+   /* Prevent useless initial startup timing change stutter by
+    * starting and staying at interlaced mode during boot */
+   if (startup_frame_count < 10)
+   {
+      startup_frame_count++;
+      return;
+   }
+
    // Is this check accurate for 240i timing? May need to be fixed later
    if (currently_interlaced != is_480i)
    {
