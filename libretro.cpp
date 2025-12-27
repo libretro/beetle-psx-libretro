@@ -2837,7 +2837,7 @@ static void alloc_surface(void)
 {
    MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
-   uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H  : 480;
+   uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H : 480;
 
    width  <<= GPU_get_upscale_shift();
    height <<= GPU_get_upscale_shift();
@@ -3959,11 +3959,8 @@ static void check_variables(bool startup)
       else if (strcmp(var.value, "smart") == 0)
          crop_overscan = 2;
 
-      if(crop_overscan != old_crop_overscan)
-      {
+      if (crop_overscan != old_crop_overscan)
          has_new_geometry = true;
-         old_crop_overscan = crop_overscan;
-      }
    }
 
    var.key = BEETLE_OPT(image_offset);
@@ -4854,7 +4851,7 @@ void retro_run(void)
                break;
          }
 
-         /* Smart/dynamic height geometry trigger */
+         /* Smart height geometry trigger */
          if (crop_overscan == 2)
          {
             if (image_height != height)
