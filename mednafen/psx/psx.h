@@ -135,7 +135,6 @@ static INLINE void overclock_cpu_to_device(int32_t &clock) {
 extern unsigned psx_gpu_overclock_shift;
 
 extern uint8_t analog_combo[2];
-
-extern uint8_t HOLD;
+extern uint8_t analog_combo_hold;
 
 #endif

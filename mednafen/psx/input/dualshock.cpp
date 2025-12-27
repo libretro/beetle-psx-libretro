@@ -188,7 +188,7 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
          {
             if(combo_anatoggle_counter == -1)
                combo_anatoggle_counter = 0;
-            else if(combo_anatoggle_counter >= (44100 * (768 * HOLD)))
+            else if(combo_anatoggle_counter >= (44100 * (768 * analog_combo_hold)))
             {
                need_mode_toggle = true;
                combo_anatoggle_counter = -2;
