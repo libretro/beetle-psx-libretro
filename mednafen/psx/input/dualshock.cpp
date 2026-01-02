@@ -162,15 +162,7 @@ void InputDevice_DualShock::SetAMCT(bool enabled)
    else
       analog_mode = true;
 
-   if (amct_prev_info == analog_mode && amct_prev_info == amct_enabled)
-      return;
-
    am_prev_info = analog_mode;
-
-   MDFN_DispMessage(2, RETRO_LOG_INFO,
-         RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-         "%s: Analog toggle is %s, sticks are %s",
-         gp_name.c_str(), amct_enabled ? "ENABLED" : "DISABLED", analog_mode ? "ON" : "OFF");
 }
 
 //
@@ -209,10 +201,9 @@ void InputDevice_DualShock::CheckManualAnaModeChange(void)
       if(need_mode_toggle)
       {
          if(analog_mode_locked)
-            MDFN_DispMessage(2, RETRO_LOG_INFO,
-                  RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-                  "%s: Analog toggle is DISABLED, sticks are %s",
-                  gp_name.c_str(), analog_mode ? "ON" : "OFF");
+            {
+				
+			}
          else
             analog_mode = !analog_mode;
       }
@@ -245,7 +236,6 @@ void InputDevice_DualShock::Power(void)
    transmit_pos = 0;
    transmit_count = 0;
 
-   analog_mode = true;
    analog_mode_locked = false;
 
    mad_munchkins = false;
@@ -367,11 +357,11 @@ void InputDevice_DualShock::UpdateInput(const void *data)
    //
    CheckManualAnaModeChange();
 
-   if(am_prev_info != analog_mode || aml_prev_info != analog_mode_locked)
+   if(am_prev_info != analog_mode)
       MDFN_DispMessage(2, RETRO_LOG_INFO,
             RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-            "%s: Analog toggle is %s, sticks are %s",
-            gp_name.c_str(), amct_enabled ? "ENABLED" : "DISABLED", analog_mode ? "ON" : "OFF");
+            "%s: %s Mode",
+            gp_name.c_str(), analog_mode ? "Analog" : "Digital");
 
    aml_prev_info = analog_mode_locked;
    am_prev_info = analog_mode;
