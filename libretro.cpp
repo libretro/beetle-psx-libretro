@@ -4814,7 +4814,7 @@ void retro_run(void)
          // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
          // 280 width -> 256 width.
          // 350 width -> 320 width.
-         // 400 width -> 366 width.
+         // 400 width -> 384 width.
          // 560 width -> 512 width.
          // 700 width -> 640 width.
          switch (width)
