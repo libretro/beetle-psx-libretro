@@ -958,18 +958,21 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
             break;
          case WIDTH_MODE_512:
             width_base = crop_overscan ? 512 : 560;
+            return ar;
             break;
          case WIDTH_MODE_640:
             width_base = crop_overscan ? 640 : 700;
+            return ar;
             break;
          case WIDTH_MODE_368:
             // Probably slightly off because of rounding, see libretro.cpp comments
             width_base = crop_overscan ? 366 : 400;
+            return ar;
             break;
       }
 
       double height_base = (last_visible_scanline - first_visible_scanline + 1) *
-                           (rsx_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
+                           (rsx_height_mode == HEIGHT_MODE_480 ? 1.0 : 1.0);
 
       // Calculate aspect ratio as quotient of raw native framebuffer width and height
       return width_base / height_base;
