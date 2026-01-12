@@ -55,7 +55,7 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "system",
       "System",
-      "Change system options."
+      "Change system and overclocking options."
    },
    {
       "video",
@@ -80,12 +80,12 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "memcards",
       "Memory Card",
-      "Change settings related to the virtual Memory Card(s) used by the system."
+      "Change virtual memory card related settings."
    },
    {
       "hacks",
       "Emulation Hacks",
-      "Change processor overclocking and emulation accuracy settings affecting low-level performance and compatibility."
+      "Change emulation accuracy settings affecting low-level performance and compatibility."
    },
    { NULL, NULL, NULL },
 };
