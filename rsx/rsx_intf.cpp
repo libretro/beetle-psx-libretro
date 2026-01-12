@@ -965,8 +965,7 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
             return ar;
             break;
          case WIDTH_MODE_368:
-            // Probably slightly off because of rounding, see libretro.cpp comments
-            width_base = crop_overscan ? 366 : 400;
+            width_base = crop_overscan ? 384 : 400;
             return ar;
             break;
       }
