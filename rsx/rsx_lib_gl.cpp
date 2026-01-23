@@ -1623,7 +1623,7 @@ static GlDisplayRect compute_gl_display_rect(GlRenderer *renderer)
        * different, which necessitates checking width mode 
        * rather than calculated pixel width */
       case WIDTH_MODE_368:
-         clock_div = 7;
+         clock_div = (2560 / 384);
          break;
 
       default: //should never be here -- if we're here, something is terribly wrong
@@ -2572,7 +2572,7 @@ static void compute_vram_framebuffer_dimensions(GlRenderer *renderer)
          break;
 
       case WIDTH_MODE_368:
-         clock_div = 7;
+         clock_div = (2560 / 384);
          break;
 
       default: // Should not be here, if we ever get here then log and crash?
