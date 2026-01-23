@@ -8309,7 +8309,7 @@ struct retro_core_options_v2 options_bg = {
 /* RETRO_LANGUAGE_CA */
 
 #define CATEGORY_SYSTEM_LABEL_CA "Sistema"
-#define CATEGORY_SYSTEM_INFO_0_CA NULL
+#define CATEGORY_SYSTEM_INFO_0_CA "Canvia les opcions de velocitat del processador."
 #define CATEGORY_VIDEO_LABEL_CA "Vídeo"
 #define CATEGORY_VIDEO_INFO_0_CA "Canvia la relació d'aspecte, retalls de la imatge, filtre de vídeo i l'omissió de fotogrames."
 #define CATEGORY_PGXP_LABEL_CA "PGXP (Procés de transformació precisa de la geometria)"
@@ -8319,9 +8319,9 @@ struct retro_core_options_v2 options_bg = {
 #define CATEGORY_INPUT_LABEL_CA "Entrada"
 #define CATEGORY_INPUT_INFO_0_CA "Canvia pistola de llum, ratolí i configuració neGcon."
 #define CATEGORY_MEMCARDS_LABEL_CA "Targeta de memòria"
-#define CATEGORY_MEMCARDS_INFO_0_CA NULL
+#define CATEGORY_MEMCARDS_INFO_0_CA "Canvia la configuració de la targeta de memòria virtual."
 #define CATEGORY_HACKS_LABEL_CA "Correccions de l'emulació"
-#define CATEGORY_HACKS_INFO_0_CA NULL
+#define CATEGORY_HACKS_INFO_0_CA "Canvia les opcions de precisió de l'emulació, que afecten el rendiment a baix nivell i a la compatibilitat."
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CA "Escalat de freqüència de la CPU (augmentar velocitat)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CA "Augmenta (o disminueix) la velocitat la CPU emulada de PSX. Augmentar la velocitat pot eliminar les estrabades i millorar la taxa de fotogrames en alguns jocs a canvi d'incrementar els requisits de maquinari. Cal tenir en compte que alguns jocs tenen un limitador de fotogrames intern i no hi ha cap benefici d'augmentar la velocitat. Pot provocar que alguns jocs s'executin més ràpid."
 #define OPTION_VAL_50_CA NULL
@@ -8329,7 +8329,7 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_70_CA NULL
 #define OPTION_VAL_80_CA NULL
 #define OPTION_VAL_90_CA NULL
-#define OPTION_VAL_100_CA NULL
+#define OPTION_VAL_100_CA "100% (Nadiu)"
 #define OPTION_VAL_110_CA NULL
 #define OPTION_VAL_120_CA NULL
 #define OPTION_VAL_130_CA NULL
@@ -8596,10 +8596,10 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_CA "Fes servir la memòria compartida en compte de targetes de memòria separades per cada contingut. Nota: si el mètode de targeta de memòria està establert en 'Libretro', només afecta a la targeta de memòria de la ranura 2. Es requereix reinici."
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_CA "Índex de la targeta de memòria 1"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_CA "Hi ha una targeta de memòria carregada a la ranura esquerra. Aquesta opció només funciona si el mètode de la targeta de memòria està establert en Mednafen."
-#define OPTION_VAL_0_O48_CA NULL
+#define OPTION_VAL_0_O48_CA "0 (Per defecte)"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_CA "Índex de la targeta de memòria 2"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_CA "Hi ha una targeta de memòria carregada a la ranura dreta. Aquesta opció només funciona si la ranura de la targeta de memòria 2 està activada."
-#define OPTION_VAL_1_O49_CA NULL
+#define OPTION_VAL_1_O49_CA "1 (Per defecte)"
 #define BEETLE_OPT_LINE_RENDER_LABEL_CA "Correcció Line-to-Quad"
 #define BEETLE_OPT_LINE_RENDER_INFO_0_CA "Alguns jocs (Doom, Hexen, Soul Blade,...) dibuixen línies horitzontal estirant triangles de 1 píxel d'alçada al llarg de la pantalla, que després son renderitzats com una columna de píxels en el maquinari original. Aquesta correcció detecta aquests triangles i els converteix en rectangles si és necessari, permeten que es mostrin correctament en els renderitzadors per maquinari i en resolucions internes superiors a la nativa. L'opció 'Agressiu' és necessària per alguns jocs (per exemple: Dark Forces, Duke Nukem) però pot produir defectes visuals en altres jocs. En cas de dubte, seleccionar 'Predeterminat'."
 #define OPTION_VAL_DEFAULT_CA "Per defecte"
@@ -8641,8 +8641,8 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_BOB_CA NULL
 #define BEETLE_OPT_FRAME_DUPING_LABEL_CA "Omissió de fotogrames"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_CA "Si el nucli no té res nou a mostrar, repeteix l'últim fotograma."
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CA NULL
-#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CA NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CA "Anul·la la velocitat de sincronització PAL"
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CA "A causa de la diferència entre estàndards, els jocs PAL solen semblar més lents que les seves versions en NTSC, tant americanes com japoneses. Aquesta opció pot anul·lar la velocitat del vídeo PAL per intentar executar aquests jocs amb la velocitat de fotogrames NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CA "Relació d'aspecte del nucli"
 #define BEETLE_OPT_ASPECT_RATIO_INFO_0_CA "Aquesta opció és ignorada si la correcció de pantalla panoràmica o mostrar VRAM completa està activada."
 #define OPTION_VAL_CORRECTED_CA "Corregit"
@@ -20868,7 +20868,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_MDEC_YUV_LABEL_DE "MDEC YUV Chromafilter"
 #define BEETLE_OPT_MDEC_YUV_INFO_0_DE "Die Qualität der FMV-Wiedergabe durch Reduzierung von „Macroblocking“-Artefakten (Quadrate/gezackte Kanten) verbessern. Wird nur vom Vulkan-Renderer unterstützt."
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_DE "Texturenverfolgung"
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_DE NULL
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_DE "Voraussetzung für Dumping und Ersetzen von Texturen. Wird wahrscheinlich in den meisten Spielen abstürzen."
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_DE "Texturen dumpen"
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_DE "Verwendete Texturen nach <cd>-texture-dump/ ausgeben"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_DE "Texturen ersetzen"
@@ -20980,13 +20980,13 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_175_DE "175 %"
 #define OPTION_VAL_185_DE "185 %"
 #define OPTION_VAL_195_DE "195 %"
-#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_DE "neGcon verdrehen Rückmeldung"
-#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_DE NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_DE "neGcon-Verdrehungs-Rückmeldung"
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_DE "Rückmeldungstyp des linken analogen Sticks des RetroPads, wenn die „Verdrehungs“-Aktion von emulierten „neGcon“-Eingabegeräten simuliert wird. Analogstick-Auslenkung kann entweder linear, quadratisch oder kubisch auf neGcon-Drehwinkel zugeordnet werden. „Quadratisch“ erlaubt eine höhere Präzision als „Linear“ bei kleinen Bewegungen. „Kubisch“ erhöht die kleine Bewegungsgenauigkeit weiter, aber „übertreibt“ größere Bewegungen. Hinweis: „Linear“ wird nur empfohlen bei Verwendung von Rennlenkrad-Peripheriegeräten. Konventionelle Controller implementieren die analoge Eingabe in einer Weise, die sich grundlegend von dem neGcon „Verdrehungs“-Mechanismus unterscheidet, so dass die lineare Zuordnung kleine Bewegungen übersteigt, wodurch die Feinkontrolle beeinträchtigt wird. In den meisten Fällen bietet „Quadratisch“ die engste Annäherung der realen Hardware."
 #define OPTION_VAL_LINEAR_DE NULL
 #define OPTION_VAL_QUADRATIC_DE "Quadratisch"
 #define OPTION_VAL_CUBIC_DE "Kubisch"
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_DE "neGcon verdrehen Totzone"
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_DE NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_DE "neGcon-Verdrehungs-Totzone"
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_DE "Totzone des linken analogen Sticks des RetroPads bei der Simulation der „Verdrehungs“-Aktion von emulierten „neGcon“ Eingabegeräten. Wird verwendet, um den Controller-Drift-Effekt zu beseitigen. Hinweis: Die meisten neGcon-kompatiblen Titel bieten in-game-Optionen, um einen Totzonenwert für die „Verdrehung“ zu setzen. Um einen Verlust der Genauigkeit zu vermeiden, sollte die Totzone im Spiel *immer* auf Null gesetzt werden. Alle erforderlichen Anpassungen sollten *nur* über diese Coreoption angewendet werden. Dies ist besonders wichtig, wenn „neGcon-Verdrehungs-Rückmeldung“ auf „Quadratisch“ oder „Kubisch“ gesetzt wird."
 #define OPTION_VAL_0_O44_DE "0 %"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_DE "Speicherkartenmethode"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_DE "Das Speicherformat für den linken Speicherkartenslot. „Mednafen“ kann zur Kompatibilität mit der Stand-alone-Version von Mednafen verwendet werden. Bei Beetle PSX, Libretro (.srm) und Mednafen (.mcr) haben Speicherstände intern identische Formate und können über Umbenennen untereinander konvertiert werden. Neustart erforderlich."
@@ -20995,7 +20995,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_DE "Speicherkartenslot 2"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_DE "Eine zweite Speicherkarte im rechten Speicherkartenslot emulieren. Hinweis: Bei einigen Spielen muss diese Option für den korrekten Betrieb deaktiviert werden (z. B. Codename Tenka). Hinweis: Speicherkartenslot 2 verwendet das Mednafen (.mcr) Speicherformat. Neustart erforderlich."
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_DE "Gemeinsame Speicherkarten"
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_DE NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_DE "Gemeinsam genutzte Speicherkarten anstelle separater Karten für jeden Inhalt verwenden. Hinweis: Wenn „Speicherkartenmethode“ auf „Libretro“ eingestellt ist, ist nur Speicherkartenslot 2 betroffen. Neustart erforderlich."
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_DE "Index Speicherkartenslot 1"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_DE "Speicherkarte wird aktuell im linken Slot geladen. Diese Option funktioniert nur, wenn die Speicherkartenmethode auf Mednafen eingestellt ist."
 #define OPTION_VAL_0_O48_DE "0 (Standard)"
@@ -74636,7 +74636,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_PGXP_NCLIP_INFO_0_SV "Använd PGXP: s NCLIP-implementering. Förbättrar utseendet genom att minska hål i geometrier med PGXP-koordinater. Känd för att orsaka att vissa spel låser sig under olika omständigheter."
 #define BEETLE_OPT_PGXP_VERTEX_LABEL_SV NULL
 #define BEETLE_OPT_PGXP_VERTEX_INFO_0_SV "Cachar PGXP-förbättrade vertexpositioner för återanvändning vid polygonritningar. Kan potentiellt förbättra objektinriktningen och minska synliga sömmar vid rendering av texturer, men falska positiva resultat vid förfrågan till cacheminnet kan ge grafiska störningar. För närvarande rekommenderas att detta alternativ är avaktiverat. Detta alternativ tillämpas endast när PGXP Operation Mode är aktiverat. Stöds endast av hårdvarurenderingarna."
-#define BEETLE_OPT_PGXP_TEXTURE_LABEL_SV NULL
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_SV "Korrekt texturering för PGXP-perspektiv"
 #define BEETLE_OPT_PGXP_TEXTURE_INFO_0_SV "Ersätt den ursprungliga affina texturmappningen i PSX med perspektivkorrekt texturmappning. Eliminerar positionsberoende förvrängning och skevhet av texturer, vilket resulterar i korrekt inriktade texturer. Detta alternativ tillämpas endast när PGXP Operation Mode är aktiverat. Stöds endast av hårdvarurenderingarna."
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_SV "Visa interna bilder per sekund (FPS)"
 #define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_SV "Visa den interna bildrutefrekvensen (FPS) som det emulerade PlayStation-systemet renderar innehåll i. Obs!: Kräver att meddelanden på skärmen är aktiverade i libretro-frontenden."
@@ -74727,7 +74727,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_LINEAR_SV "Linjär"
 #define OPTION_VAL_QUADRATIC_SV "Kvadratisk"
 #define OPTION_VAL_CUBIC_SV "Kubisk"
-#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_SV "Dödzon för neGcon-vridning"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_SV "Vänster analogspaks dödzon vid simulering av ”vridningsåtgärden\" hos emulerade ”neGcon”-inmatningsenheter. Används för att eliminera kontrollerdrift. Observera: De flesta neGcon-kompatibla titlar har alternativ i spelet för att ställa in ett värde för dödzonen för ”vridning” (twist). För att undvika förlust av precision bör dödzonen i spelet *alltid* ställas in på noll. Eventuella justeringar bör *endast* göras via detta grundläggande alternativ. Detta är särskilt viktigt när ”Vridningsrespons för neGcon” är inställt på ’Kvadratisk’ eller ”Kubisk”."
 #define OPTION_VAL_0_O44_SV NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_SV "Metod för minneskort"
@@ -74839,12 +74839,12 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_12PX_O64_0_SV NULL
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_SV "Horisontell bildförskjutning (GPU-cykler)"
 #define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_SV "Positiva värden flyttar bilden åt höger, negativa värden flyttar bilden åt vänster. Stöds endast av hårdvarurenderare."
-#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV "Initial skanlinje - NTSC"
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_SV "Initial skanningslinje - NTSC"
 #define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_SV "Första visade skanningslinjen vid uppspelning av NTSC-innehåll. Värden större än noll minskar höjden på utgångsbilderna genom att bildpunkter beskärs från den övre kanten. Kan användas för att motverka letterboxing."
-#define BEETLE_OPT_LAST_SCANLINE_LABEL_SV "Sista skanlinje - NTSC"
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_SV "Sista skanningslinje - NTSC"
 #define BEETLE_OPT_LAST_SCANLINE_INFO_0_SV "Senast visade skanningslinje vid uppspelning av NTSC-innehåll. Värden under 239 minskar höjden på utgångsbilderna genom att bildpunkter beskärs från den nedre kanten. Kan användas för att motverka letterboxing."
 #define OPTION_VAL_239_SV "239 (Standard)"
-#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV "Initial skanlinje - PAL"
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_SV "Initial skanningslinje - PAL"
 #define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_SV "Första visade skanningslinjen vid uppspelning av PAL-innehåll. Värden större än noll minskar höjden på utgångsbilderna genom att bildpunkter beskärs från den översta kanten. Kan användas för att motverka letterboxing."
 #define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_SV "Senast visade skanningslinje - PAL"
 #define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_SV "Senast visade skanningslinje vid uppspelning av PAL-innehåll. Värden under 287 minskar höjden på utgångsbilderna genom att bildpunkter beskärs från den nedre kanten. Kan användas för att motverka letterboxing."
