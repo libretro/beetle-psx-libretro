@@ -4814,7 +4814,7 @@ void retro_run(void)
          // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
          // 280 width -> 256 width.
          // 350 width -> 320 width.
-         // 400 width -> 366 width.
+         // 400 width -> 384 width.
          // 560 width -> 512 width.
          // 700 width -> 640 width.
          switch (width)
@@ -4829,11 +4829,9 @@ void retro_run(void)
                width = 320 - image_crop;
                break;
 
-            /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
-               Adjust in future if there are issues. */
             case 400:
-               pix_offset += 17 - image_offset + floor(0.5 * image_crop);
-               width = 366 - image_crop;
+               pix_offset += 8 - image_offset + floor(0.5 * image_crop);
+               width = 384 - image_crop;
                break;
 
             case 560:
