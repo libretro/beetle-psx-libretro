@@ -14510,7 +14510,7 @@ struct retro_core_options_v2 options_cht = {
 /* RETRO_LANGUAGE_CS */
 
 #define CATEGORY_SYSTEM_LABEL_CS "Systém"
-#define CATEGORY_SYSTEM_INFO_0_CS NULL
+#define CATEGORY_SYSTEM_INFO_0_CS "Změňte systémové a přetaktovací možnosti."
 #define CATEGORY_VIDEO_LABEL_CS NULL
 #define CATEGORY_VIDEO_INFO_0_CS "Změňte poměr stran, oříznutí displeje, filtr videa a nastavení přeskakování snímků."
 #define CATEGORY_PGXP_LABEL_CS "PGXP (Přesná transformace geometrie)"
@@ -14520,9 +14520,9 @@ struct retro_core_options_v2 options_cht = {
 #define CATEGORY_INPUT_LABEL_CS "Vstup"
 #define CATEGORY_INPUT_INFO_0_CS "Změna nastavení světelné pistole, myši a neGconu."
 #define CATEGORY_MEMCARDS_LABEL_CS "Paměťová karta"
-#define CATEGORY_MEMCARDS_INFO_0_CS NULL
+#define CATEGORY_MEMCARDS_INFO_0_CS "Změňte nastavení týkající se virtuální paměťové karty."
 #define CATEGORY_HACKS_LABEL_CS "Emulace hacků"
-#define CATEGORY_HACKS_INFO_0_CS NULL
+#define CATEGORY_HACKS_INFO_0_CS "Změňte nastavení přesnosti emulace, které ovlivňuje výkon na nízké úrovni a kompatibilitu."
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_CS "Škálování Frekvence CPU (Přetaktování)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_CS "Přetaktování (nebo podtaktování) emulovaného procesoru PSX. Přetaktování může eliminovat zpomalení a zlepšit snímkovou frekvenci v některých hrách na úkor zvýšených nároků na výkon. Upozorňujeme, že některé hry mají interní omezovač snímkové frekvence a přetaktování pro ně nemusí být přínosem. V některých titulech může přetaktování způsobit, že se některé efekty animují rychleji, než je zamýšleno."
 #define OPTION_VAL_50_CS NULL
@@ -14530,7 +14530,7 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_70_CS NULL
 #define OPTION_VAL_80_CS NULL
 #define OPTION_VAL_90_CS NULL
-#define OPTION_VAL_100_CS NULL
+#define OPTION_VAL_100_CS "100 % (nativní)"
 #define OPTION_VAL_110_CS NULL
 #define OPTION_VAL_120_CS NULL
 #define OPTION_VAL_130_CS NULL
@@ -14606,13 +14606,13 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_32X_CS NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_CS "Přetaktování GTE"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_CS "Snižte všechny emulované operace GTE (koprocesor CPU pro 3D grafiku) na konstantní latenci jednoho cyklu. U her, které GTE hojně využívají, to může výrazně zlepšit stabilitu snímkové frekvence a času snímků."
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CS NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CS NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_CS "Metoda přístupu k CD"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_CS "„Synchronní“ napodobuje původní hardware. „Asynchronní“ může snížit zadrhávání na zařízeních s pomalým úložištěm. „Pre-Cache“ načte celý obraz disku do paměti při spuštění obsahu, což může zlepšit dobu načítání ve hře na úkor počátečního zpoždění při spuštění. „Pre-Cache“ může způsobit problémy na systémech s nízkou pamětí RAM a u fyzických médií se vrátí k „Synchronnímu“ režimu. Je nutný restart."
 #define OPTION_VAL_SYNC_CS "Synchronní"
 #define OPTION_VAL_ASYNC_CS "Asynchronní"
 #define OPTION_VAL_PRECACHE_CS NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_CS "Rychlost Načítání CD"
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_CS NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_CS "Hodnoty vyšší než „2x (nativní)“ mohou výrazně zkrátit dobu načítání ve hře, ale mohou také způsobit chyby v načasování. Některé hry nemusí nad určitou hodnotou fungovat správně."
 #define OPTION_VAL_2X_NATIVE_CS "2x (Nativní)"
 #define OPTION_VAL_6X_CS NULL
 #define OPTION_VAL_10X_CS NULL
