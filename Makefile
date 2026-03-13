@@ -636,13 +636,13 @@ endif
 	@if [ $(SILENT) -ne 1 ]; then\
 		$(if $@, $(shell echo echo CXX $<),);\
 	fi
-	$(CXX) -c $(OBJOUT)$@ $< $(CXXFLAGS)
+	$(CXX) -c $(OBJOUT)$@ $< $(CPPFLAGS) $(CXXFLAGS)
 
 %.o: %.c
 	@if [ $(SILENT) -ne 1 ]; then\
 		$(if $@, $(shell echo echo CC $<),);\
 	fi
-	$(CC) -c $(OBJOUT)$@ $< $(CFLAGS)
+	$(CC) -c $(OBJOUT)$@ $< $(CPPFLAGS) $(CFLAGS)
 
 clean:
 	@rm -f $(OBJECTS)
