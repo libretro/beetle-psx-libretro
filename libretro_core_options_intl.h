@@ -351,7 +351,6 @@ extern "C" {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_AR NULL
 #define OPTION_VAL_DISABLED_AR NULL
 #define OPTION_VAL_EXECUTE_AR NULL
-#define OPTION_VAL_EXECUTE_ONE_AR NULL
 #define OPTION_VAL_RUN_INTERPRETER_AR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_AR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_AR NULL
@@ -1566,7 +1565,6 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_AR },
          { "execute",         OPTION_VAL_EXECUTE_AR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_AR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_AR },
          { NULL, NULL },
       },
@@ -2418,7 +2416,6 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_AST NULL
 #define OPTION_VAL_DISABLED_AST NULL
 #define OPTION_VAL_EXECUTE_AST NULL
-#define OPTION_VAL_EXECUTE_ONE_AST NULL
 #define OPTION_VAL_RUN_INTERPRETER_AST NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_AST NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_AST NULL
@@ -3633,7 +3630,6 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_AST },
          { "execute",         OPTION_VAL_EXECUTE_AST },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_AST },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_AST },
          { NULL, NULL },
       },
@@ -4485,7 +4481,6 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_BE "Дынамічна пераўтварае інструкцыі CPU ў натыўныя. Істотна хутчэй інтэрпрэтатара, але забяспечвае меншую дакладнасць таймінгаў CPU і можа выклікаць памылкі."
 #define OPTION_VAL_DISABLED_BE "Адключана (інтэрпрэтатар Beetle)"
 #define OPTION_VAL_EXECUTE_BE "Макс. прадукцыйнасць"
-#define OPTION_VAL_EXECUTE_ONE_BE "Праверка таймінгаў такту"
 #define OPTION_VAL_RUN_INTERPRETER_BE "Інтэрпрэтатар Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_BE "Інвалідацыя кода dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_BE "Для некаторых гульняў патрабуецца 'Поўная' інвалідацыя, для іншых 'Толькі DMA'."
@@ -5700,7 +5695,6 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_BE },
          { "execute",         OPTION_VAL_EXECUTE_BE },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_BE },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_BE },
          { NULL, NULL },
       },
@@ -6552,7 +6546,6 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_BG NULL
 #define OPTION_VAL_DISABLED_BG NULL
 #define OPTION_VAL_EXECUTE_BG NULL
-#define OPTION_VAL_EXECUTE_ONE_BG NULL
 #define OPTION_VAL_RUN_INTERPRETER_BG NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_BG NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_BG NULL
@@ -7767,7 +7760,6 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_BG },
          { "execute",         OPTION_VAL_EXECUTE_BG },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_BG },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_BG },
          { NULL, NULL },
       },
@@ -8619,7 +8611,6 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CA "Recompila de forma dinàmica les instruccions de la CPU a instruccions natives. Més ràpid que l'intèrpret, pels intervals de la CPU són menys precisos i pot provocar errors."
 #define OPTION_VAL_DISABLED_CA "Deshabilitat (intèrpret Beetle)"
 #define OPTION_VAL_EXECUTE_CA "Màxim rendiment"
-#define OPTION_VAL_EXECUTE_ONE_CA "Verificació dels intervals entre cicles"
 #define OPTION_VAL_RUN_INTERPRETER_CA "Intèrpret Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CA "Invalidar el codi Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CA "Alguns jocs necessiten invalidació 'Full', altres necessiten 'Només DMA'."
@@ -9834,7 +9825,6 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_CA },
          { "execute",         OPTION_VAL_EXECUTE_CA },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_CA },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_CA },
          { NULL, NULL },
       },
@@ -10686,7 +10676,6 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CHS "将 CPU 指令动态重新编译为原生指令。比解释器快得多，但 CPU 计时不够精确，且可能存在 Bug。"
 #define OPTION_VAL_DISABLED_CHS "已禁用（Beetle 解释器）"
 #define OPTION_VAL_EXECUTE_CHS "最大性能"
-#define OPTION_VAL_EXECUTE_ONE_CHS "循环计时检查"
 #define OPTION_VAL_RUN_INTERPRETER_CHS "轻量级解释器"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CHS "Dynarec 代码失效模式"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CHS "某些游戏需要“完整”失效，有些则需要“仅 DMA”。"
@@ -11901,7 +11890,6 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_CHS },
          { "execute",         OPTION_VAL_EXECUTE_CHS },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_CHS },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_CHS },
          { NULL, NULL },
       },
@@ -12753,7 +12741,6 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CHT NULL
 #define OPTION_VAL_DISABLED_CHT NULL
 #define OPTION_VAL_EXECUTE_CHT "最高效能"
-#define OPTION_VAL_EXECUTE_ONE_CHT NULL
 #define OPTION_VAL_RUN_INTERPRETER_CHT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CHT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CHT NULL
@@ -13968,7 +13955,6 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_CHT },
          { "execute",         OPTION_VAL_EXECUTE_CHT },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_CHT },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_CHT },
          { NULL, NULL },
       },
@@ -14820,7 +14806,6 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CS "Dynamická překompilace instrukce procesoru na nativní instrukce. Mnohem rychlejší než interpret, ale časování CPU je méně přesné a může obsahovat chyby."
 #define OPTION_VAL_DISABLED_CS "Zakázáno (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_CS "Maximální Výkon"
-#define OPTION_VAL_EXECUTE_ONE_CS "Kontrola Časování Cyklu"
 #define OPTION_VAL_RUN_INTERPRETER_CS "Interpret Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CS "Zrušení Kódu Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CS "Některé hry vyžadují 'Plné' zneplatnění, jiné pouze 'DMA'."
@@ -16035,7 +16020,6 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_CS },
          { "execute",         OPTION_VAL_EXECUTE_CS },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_CS },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_CS },
          { NULL, NULL },
       },
@@ -16887,7 +16871,6 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_CY NULL
 #define OPTION_VAL_DISABLED_CY NULL
 #define OPTION_VAL_EXECUTE_CY NULL
-#define OPTION_VAL_EXECUTE_ONE_CY NULL
 #define OPTION_VAL_RUN_INTERPRETER_CY NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_CY NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_CY NULL
@@ -18102,7 +18085,6 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_CY },
          { "execute",         OPTION_VAL_EXECUTE_CY },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_CY },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_CY },
          { NULL, NULL },
       },
@@ -18954,7 +18936,6 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_DA NULL
 #define OPTION_VAL_DISABLED_DA NULL
 #define OPTION_VAL_EXECUTE_DA NULL
-#define OPTION_VAL_EXECUTE_ONE_DA NULL
 #define OPTION_VAL_RUN_INTERPRETER_DA NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_DA NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_DA NULL
@@ -20169,7 +20150,6 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_DA },
          { "execute",         OPTION_VAL_EXECUTE_DA },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_DA },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_DA },
          { NULL, NULL },
       },
@@ -21021,7 +21001,6 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_DE "CPU-Anweisungen dynamisch neu zu native Anweisungen kompilieren. Viel schneller als Interpreter, aber das CPU-Timing ist weniger genau und kann Fehler enthalten."
 #define OPTION_VAL_DISABLED_DE "Deaktiviert (Beetle-Interpreter)"
 #define OPTION_VAL_EXECUTE_DE "Max. Leistung"
-#define OPTION_VAL_EXECUTE_ONE_DE "Zykluszeitprüfung"
 #define OPTION_VAL_RUN_INTERPRETER_DE "Lightrec-Interpreter"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_DE "Dynarec-Code-Invalidierung"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_DE "Einige Spiele erfordern „volle“ Invalidierung, andere benötigen „Nur DMA“."
@@ -22236,7 +22215,6 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_DE },
          { "execute",         OPTION_VAL_EXECUTE_DE },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_DE },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_DE },
          { NULL, NULL },
       },
@@ -23088,7 +23066,6 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_EL NULL
 #define OPTION_VAL_DISABLED_EL NULL
 #define OPTION_VAL_EXECUTE_EL NULL
-#define OPTION_VAL_EXECUTE_ONE_EL NULL
 #define OPTION_VAL_RUN_INTERPRETER_EL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_EL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_EL NULL
@@ -24303,7 +24280,6 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_EL },
          { "execute",         OPTION_VAL_EXECUTE_EL },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_EL },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_EL },
          { NULL, NULL },
       },
@@ -25155,7 +25131,6 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_EN "Dynamically recompile CPU instructions to native instructions. Much faster than the interpreter, but CPU timing is less accurate, and may have bugs."
 #define OPTION_VAL_DISABLED_EN NULL
 #define OPTION_VAL_EXECUTE_EN "Maximum Performance"
-#define OPTION_VAL_EXECUTE_ONE_EN NULL
 #define OPTION_VAL_RUN_INTERPRETER_EN "Light-rec Interpreter"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_EN "Dyna-rec Code Invalidation"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_EN NULL
@@ -26370,7 +26345,6 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_EN },
          { "execute",         OPTION_VAL_EXECUTE_EN },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_EN },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_EN },
          { NULL, NULL },
       },
@@ -27222,7 +27196,6 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_EO NULL
 #define OPTION_VAL_DISABLED_EO NULL
 #define OPTION_VAL_EXECUTE_EO NULL
-#define OPTION_VAL_EXECUTE_ONE_EO NULL
 #define OPTION_VAL_RUN_INTERPRETER_EO NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_EO NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_EO NULL
@@ -28437,7 +28410,6 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_EO },
          { "execute",         OPTION_VAL_EXECUTE_EO },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_EO },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_EO },
          { NULL, NULL },
       },
@@ -29289,7 +29261,6 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_ES "Recompila de forma dinámica las instrucciones de la CPU a instrucciones nativas. Es más rápido que el intérprete, pero los intervalos de la CPU son menos precisos y puede provocar fallos."
 #define OPTION_VAL_DISABLED_ES "Desactivada (intérprete Beetle)"
 #define OPTION_VAL_EXECUTE_ES "Máximo rendimiento"
-#define OPTION_VAL_EXECUTE_ONE_ES "Con control de los intervalos entre ciclos"
 #define OPTION_VAL_RUN_INTERPRETER_ES "Intérprete lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_ES "Invalidación de código del dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_ES "Algunos juegos necesitan una invalidación completa y otros solo necesitan invalidar la DMA."
@@ -30504,7 +30475,6 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_ES },
          { "execute",         OPTION_VAL_EXECUTE_ES },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_ES },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_ES },
          { NULL, NULL },
       },
@@ -31356,7 +31326,6 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_FA NULL
 #define OPTION_VAL_DISABLED_FA NULL
 #define OPTION_VAL_EXECUTE_FA NULL
-#define OPTION_VAL_EXECUTE_ONE_FA NULL
 #define OPTION_VAL_RUN_INTERPRETER_FA NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_FA NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_FA NULL
@@ -32571,7 +32540,6 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_FA },
          { "execute",         OPTION_VAL_EXECUTE_FA },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_FA },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_FA },
          { NULL, NULL },
       },
@@ -33423,7 +33391,6 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_FI NULL
 #define OPTION_VAL_DISABLED_FI NULL
 #define OPTION_VAL_EXECUTE_FI NULL
-#define OPTION_VAL_EXECUTE_ONE_FI NULL
 #define OPTION_VAL_RUN_INTERPRETER_FI NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_FI NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_FI "Jotkin pelit vaativat 'Täysi'-mitätöintiä, toiset vaativat 'Vain DMA'."
@@ -34638,7 +34605,6 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_FI },
          { "execute",         OPTION_VAL_EXECUTE_FI },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_FI },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_FI },
          { NULL, NULL },
       },
@@ -35490,7 +35456,6 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_FR "Recompiler dynamiquement les instructions du processeur en mode natif. Bien plus rapide que l'interpréteur, mais la cadence du processeur est moins précise et peut avoir des bugs."
 #define OPTION_VAL_DISABLED_FR "Désactivé (interpréteur Beetle)"
 #define OPTION_VAL_EXECUTE_FR "Performances maximales"
-#define OPTION_VAL_EXECUTE_ONE_FR "Contrôle du temps de cycle"
 #define OPTION_VAL_RUN_INTERPRETER_FR "Interpréteur Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_FR "Invalidation du code Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_FR "Certains jeux requièrent une invalidation 'Complète', certains requièrent 'DMA uniquement'."
@@ -36705,7 +36670,6 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_FR },
          { "execute",         OPTION_VAL_EXECUTE_FR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_FR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_FR },
          { NULL, NULL },
       },
@@ -37557,7 +37521,6 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_GA "Athchóimeáil treoracha LAP go dinimiciúil chuig treoracha dúchasacha. I bhfad níos tapúla ná an léirmhínitheoir, ach níl an t-amchlár LAP chomh cruinn céanna, agus d'fhéadfadh fabhtanna a bheith ann."
 #define OPTION_VAL_DISABLED_GA "Míchumasaithe (Ateangaire Ciaróg)"
 #define OPTION_VAL_EXECUTE_GA "Uasfheidhmíocht"
-#define OPTION_VAL_EXECUTE_ONE_GA "Seiceáil Ama Timthrialla"
 #define OPTION_VAL_RUN_INTERPRETER_GA "Ateangaire Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GA "Neamhbhailíochtú Cód Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GA "Éilíonn roinnt cluichí neamhbhailíochtú 'Iomlán', agus teastaíonn 'DMA Amháin' ó chuid eile."
@@ -38772,7 +38735,6 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_GA },
          { "execute",         OPTION_VAL_EXECUTE_GA },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_GA },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_GA },
          { NULL, NULL },
       },
@@ -39624,7 +39586,6 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_GL "Recompila dinámicamente as instrucións da CPU a instrucións nativas. Moito máis rápido que o intérprete, pero a sincronización da CPU é menos precisa e pode ter erros."
 #define OPTION_VAL_DISABLED_GL "Desactivado (intérprete de Beetle)"
 #define OPTION_VAL_EXECUTE_GL "Máximo rendemento"
-#define OPTION_VAL_EXECUTE_ONE_GL "Comprobación do tempo de ciclo"
 #define OPTION_VAL_RUN_INTERPRETER_GL "Intérprete Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_GL "Invalidación do código Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_GL "Algúns xogos requiren a invalidación \"completa\", outros requiren \"Só DMA\"."
@@ -40839,7 +40800,6 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_GL },
          { "execute",         OPTION_VAL_EXECUTE_GL },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_GL },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_GL },
          { NULL, NULL },
       },
@@ -41691,7 +41651,6 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_HE NULL
 #define OPTION_VAL_DISABLED_HE NULL
 #define OPTION_VAL_EXECUTE_HE NULL
-#define OPTION_VAL_EXECUTE_ONE_HE NULL
 #define OPTION_VAL_RUN_INTERPRETER_HE NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_HE NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_HE NULL
@@ -42906,7 +42865,6 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_HE },
          { "execute",         OPTION_VAL_EXECUTE_HE },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_HE },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_HE },
          { NULL, NULL },
       },
@@ -43758,7 +43716,6 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_HR NULL
 #define OPTION_VAL_DISABLED_HR NULL
 #define OPTION_VAL_EXECUTE_HR NULL
-#define OPTION_VAL_EXECUTE_ONE_HR NULL
 #define OPTION_VAL_RUN_INTERPRETER_HR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_HR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_HR NULL
@@ -44973,7 +44930,6 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_HR },
          { "execute",         OPTION_VAL_EXECUTE_HR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_HR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_HR },
          { NULL, NULL },
       },
@@ -45825,7 +45781,6 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_HU "A CPU utasítások dinamikus újrafordítása a futtató CPU saját utasításaira. Sokkal gyorsabb, mint az értelmező, de a CPU időzítés kevésbé pontos, és tartalmazhat hibákat."
 #define OPTION_VAL_DISABLED_HU "Kikapcsolva (Beetle értelmező)"
 #define OPTION_VAL_EXECUTE_HU "Maximális teljesítmény"
-#define OPTION_VAL_EXECUTE_ONE_HU "Ciklusidőzítés ellenőrző"
 #define OPTION_VAL_RUN_INTERPRETER_HU "Lightrec értelmező"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_HU "Dynarec kód érvénytelenítés"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_HU "Néhány játéknak a Teljes, másoknak a Csak DMA beállításra van szüksége."
@@ -47040,7 +46995,6 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_HU },
          { "execute",         OPTION_VAL_EXECUTE_HU },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_HU },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_HU },
          { NULL, NULL },
       },
@@ -47892,7 +47846,6 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_ID NULL
 #define OPTION_VAL_DISABLED_ID NULL
 #define OPTION_VAL_EXECUTE_ID NULL
-#define OPTION_VAL_EXECUTE_ONE_ID "Periksa Pewaktuan Daur"
 #define OPTION_VAL_RUN_INTERPRETER_ID NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_ID NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_ID NULL
@@ -49107,7 +49060,6 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_ID },
          { "execute",         OPTION_VAL_EXECUTE_ID },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_ID },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_ID },
          { NULL, NULL },
       },
@@ -49959,7 +49911,6 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_IT "Ricompila dinamicamente le istruzioni di CPU a istruzioni native. Molto più veloce dell'interpreter, ma i timing della CPU sono meno accurati e potrebbero avere bug."
 #define OPTION_VAL_DISABLED_IT "Disabilitato (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_IT "Performance Massima"
-#define OPTION_VAL_EXECUTE_ONE_IT "Controllo Tempi Ciclo"
 #define OPTION_VAL_RUN_INTERPRETER_IT "Interprete Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_IT "Invalidamento Codice Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_IT "Alcuni giochi richiedono 'Full' invalidazione, alcuni richiedono 'DMA soltanto'."
@@ -51174,7 +51125,6 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_IT },
          { "execute",         OPTION_VAL_EXECUTE_IT },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_IT },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_IT },
          { NULL, NULL },
       },
@@ -52026,7 +51976,6 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_JA "CPU 命令をネイティブ命令に動的に再コンパイルします。インタプリタよりもはるかに高速ですが、CPU タイミングは正確ではなく、バグがある可能性があります。"
 #define OPTION_VAL_DISABLED_JA "無効 (Beetle インタプリタ)"
 #define OPTION_VAL_EXECUTE_JA "最大パフォーマンス"
-#define OPTION_VAL_EXECUTE_ONE_JA "サイクルタイミングチェック"
 #define OPTION_VAL_RUN_INTERPRETER_JA "Lightrec インタプリタ"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_JA "動的再コンパイルコードの無効化"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_JA "ゲームによって [フル] 無効化を必要とするものと [DMA のみ] を必要とするものがあります。"
@@ -53241,7 +53190,6 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_JA },
          { "execute",         OPTION_VAL_EXECUTE_JA },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_JA },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_JA },
          { NULL, NULL },
       },
@@ -54093,7 +54041,6 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_KO "CPU 명령어를 네이티브 명령어로 동적 리컴파일합니다. 인터프리터보다 훨씬 빠르지만, CPU 타이밍이 부정확해지며, 오류를 일으킬 수 있습니다."
 #define OPTION_VAL_DISABLED_KO "비활성화 (Beetle 인터프리터)"
 #define OPTION_VAL_EXECUTE_KO "최대 성능"
-#define OPTION_VAL_EXECUTE_ONE_KO "사이클 타이밍 검사"
 #define OPTION_VAL_RUN_INTERPRETER_KO "Lightrec 인터프리터"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_KO "동적 리컴파일러 코드 무효화"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_KO "일부 게임은 '모두' 무효화를 필요로 하며, 일부는 'DMA만'을 필요로 합니다."
@@ -55308,7 +55255,6 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_KO },
          { "execute",         OPTION_VAL_EXECUTE_KO },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_KO },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_KO },
          { NULL, NULL },
       },
@@ -56160,7 +56106,6 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_NL NULL
 #define OPTION_VAL_DISABLED_NL NULL
 #define OPTION_VAL_EXECUTE_NL NULL
-#define OPTION_VAL_EXECUTE_ONE_NL NULL
 #define OPTION_VAL_RUN_INTERPRETER_NL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_NL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_NL NULL
@@ -57375,7 +57320,6 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_NL },
          { "execute",         OPTION_VAL_EXECUTE_NL },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_NL },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_NL },
          { NULL, NULL },
       },
@@ -58227,7 +58171,6 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_NO NULL
 #define OPTION_VAL_DISABLED_NO NULL
 #define OPTION_VAL_EXECUTE_NO NULL
-#define OPTION_VAL_EXECUTE_ONE_NO NULL
 #define OPTION_VAL_RUN_INTERPRETER_NO NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_NO NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_NO NULL
@@ -59442,7 +59385,6 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_NO },
          { "execute",         OPTION_VAL_EXECUTE_NO },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_NO },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_NO },
          { NULL, NULL },
       },
@@ -60294,7 +60236,6 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_OR NULL
 #define OPTION_VAL_DISABLED_OR NULL
 #define OPTION_VAL_EXECUTE_OR NULL
-#define OPTION_VAL_EXECUTE_ONE_OR NULL
 #define OPTION_VAL_RUN_INTERPRETER_OR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_OR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_OR NULL
@@ -61509,7 +61450,6 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_OR },
          { "execute",         OPTION_VAL_EXECUTE_OR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_OR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_OR },
          { NULL, NULL },
       },
@@ -62361,7 +62301,6 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_PL NULL
 #define OPTION_VAL_DISABLED_PL NULL
 #define OPTION_VAL_EXECUTE_PL NULL
-#define OPTION_VAL_EXECUTE_ONE_PL NULL
 #define OPTION_VAL_RUN_INTERPRETER_PL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_PL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PL NULL
@@ -63576,7 +63515,6 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_PL },
          { "execute",         OPTION_VAL_EXECUTE_PL },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_PL },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_PL },
          { NULL, NULL },
       },
@@ -64428,7 +64366,6 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_BR "Recompilar dinamicamente as instruções da CPU para instruções nativas. Muito mais rápido do que o intérprete, mas o tempo da CPU é menos preciso e pode ter erros."
 #define OPTION_VAL_DISABLED_PT_BR "Desativada (interpretador do Beetle)"
 #define OPTION_VAL_EXECUTE_PT_BR "Máximo desempenho"
-#define OPTION_VAL_EXECUTE_ONE_PT_BR "Verificação de intervalo entre ciclos"
 #define OPTION_VAL_RUN_INTERPRETER_PT_BR "Interpretador Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_PT_BR "Invalidação de código do dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_BR "Alguns jogos requerem invalidação 'Completa', alguns requerem 'Apenas DMA'."
@@ -65643,7 +65580,6 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_PT_BR },
          { "execute",         OPTION_VAL_EXECUTE_PT_BR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_PT_BR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_PT_BR },
          { NULL, NULL },
       },
@@ -66495,7 +66431,6 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_PT_PT NULL
 #define OPTION_VAL_DISABLED_PT_PT NULL
 #define OPTION_VAL_EXECUTE_PT_PT NULL
-#define OPTION_VAL_EXECUTE_ONE_PT_PT NULL
 #define OPTION_VAL_RUN_INTERPRETER_PT_PT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_PT_PT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_PT_PT NULL
@@ -67710,7 +67645,6 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_PT_PT },
          { "execute",         OPTION_VAL_EXECUTE_PT_PT },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_PT_PT },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_PT_PT },
          { NULL, NULL },
       },
@@ -68562,7 +68496,6 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_RU "Динамически преобразовывает инструкции CPU в нативные. Существенно быстрее интерпретатора, но обеспечивает меньшую точность таймингов CPU и может вызывать ошибки."
 #define OPTION_VAL_DISABLED_RU "Откл. (интерпретатор Beetle)"
 #define OPTION_VAL_EXECUTE_RU "Макс. производительность"
-#define OPTION_VAL_EXECUTE_ONE_RU "Проверка таймингов такта"
 #define OPTION_VAL_RUN_INTERPRETER_RU "Интерпретатор Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_RU "Инвалидация кода dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_RU "Для некоторых игр требуется 'Полная' инвалидация, для других 'Только DMA'."
@@ -69777,7 +69710,6 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_RU },
          { "execute",         OPTION_VAL_EXECUTE_RU },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_RU },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_RU },
          { NULL, NULL },
       },
@@ -70629,7 +70561,6 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_SK NULL
 #define OPTION_VAL_DISABLED_SK NULL
 #define OPTION_VAL_EXECUTE_SK "Maximálny výkon"
-#define OPTION_VAL_EXECUTE_ONE_SK NULL
 #define OPTION_VAL_RUN_INTERPRETER_SK NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SK NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SK NULL
@@ -71844,7 +71775,6 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_SK },
          { "execute",         OPTION_VAL_EXECUTE_SK },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_SK },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_SK },
          { NULL, NULL },
       },
@@ -72696,7 +72626,6 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_SR NULL
 #define OPTION_VAL_DISABLED_SR NULL
 #define OPTION_VAL_EXECUTE_SR NULL
-#define OPTION_VAL_EXECUTE_ONE_SR NULL
 #define OPTION_VAL_RUN_INTERPRETER_SR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SR NULL
@@ -73911,7 +73840,6 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_SR },
          { "execute",         OPTION_VAL_EXECUTE_SR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_SR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_SR },
          { NULL, NULL },
       },
@@ -74763,7 +74691,6 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_SV "Dynamisk omkompilering av CPU-instruktioner till inbyggda instruktioner. Mycket snabbare än tolken, men CPU-timingen är inte lika exakt och kan innehålla buggar."
 #define OPTION_VAL_DISABLED_SV "Inaktiverad (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_SV "Max prestanda"
-#define OPTION_VAL_EXECUTE_ONE_SV NULL
 #define OPTION_VAL_RUN_INTERPRETER_SV "Lightrec-tolk"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_SV NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_SV "Vissa spel kräver \"Fullständig\" invalidering, vissa kräver \"Endast DMA\"."
@@ -75978,7 +75905,6 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_SV },
          { "execute",         OPTION_VAL_EXECUTE_SV },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_SV },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_SV },
          { NULL, NULL },
       },
@@ -76830,7 +76756,6 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_TR "CPU talimatlarını yerel talimatlara dinamik olarak yeniden derleyin. Yorumlayıcıdan çok daha hızlıdır, ancak CPU zamanlaması daha az doğrudur ve hataları olabilir."
 #define OPTION_VAL_DISABLED_TR "Kapalı (Beetle Interpreter)"
 #define OPTION_VAL_EXECUTE_TR "Azami Performans"
-#define OPTION_VAL_EXECUTE_ONE_TR "Döngü Zaman Kontrolü"
 #define OPTION_VAL_RUN_INTERPRETER_TR NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_TR "Dynarec Kodu Geçerliliği"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_TR "Bazı oyunlar 'Tam' geçersizlik gerektirir, bazıları 'Yalnızca DMA' gerektirir."
@@ -78045,7 +77970,6 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_TR },
          { "execute",         OPTION_VAL_EXECUTE_TR },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_TR },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_TR },
          { NULL, NULL },
       },
@@ -78897,7 +78821,6 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_TT NULL
 #define OPTION_VAL_DISABLED_TT NULL
 #define OPTION_VAL_EXECUTE_TT NULL
-#define OPTION_VAL_EXECUTE_ONE_TT NULL
 #define OPTION_VAL_RUN_INTERPRETER_TT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_TT NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_TT NULL
@@ -80112,7 +80035,6 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_TT },
          { "execute",         OPTION_VAL_EXECUTE_TT },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_TT },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_TT },
          { NULL, NULL },
       },
@@ -80964,7 +80886,6 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_UK "Динамічно перекомпільовані інструкції процесора з нативних інструкцій. Значно швидше, ніж інтерпретатор, але таймінг ЦП менш точний і може містити помилки."
 #define OPTION_VAL_DISABLED_UK "Вимкнено (Перетин жуків)"
 #define OPTION_VAL_EXECUTE_UK "Максимальна продуктивність"
-#define OPTION_VAL_EXECUTE_ONE_UK "Перевірити таймінг циклу"
 #define OPTION_VAL_RUN_INTERPRETER_UK "Інтерпретатор Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_UK "Перевірка коду Dynarec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_UK "Деякі ігри потребують \"Full\" перевірки, деякі вимагають \"DMA Only\"."
@@ -82179,7 +82100,6 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_UK },
          { "execute",         OPTION_VAL_EXECUTE_UK },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_UK },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_UK },
          { NULL, NULL },
       },
@@ -83031,7 +82951,6 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_VAL NULL
 #define OPTION_VAL_DISABLED_VAL NULL
 #define OPTION_VAL_EXECUTE_VAL NULL
-#define OPTION_VAL_EXECUTE_ONE_VAL NULL
 #define OPTION_VAL_RUN_INTERPRETER_VAL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_VAL NULL
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_VAL NULL
@@ -84246,7 +84165,6 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_VAL },
          { "execute",         OPTION_VAL_EXECUTE_VAL },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_VAL },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_VAL },
          { NULL, NULL },
       },
@@ -85098,7 +85016,6 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_CPU_DYNAREC_INFO_0_VN "Biên dịch động các lệnh CPU thành lệnh gốc. Nhanh hơn nhiều so với thông dịch, nhưng thời gian CPU kém chính xác và có thể có lỗi."
 #define OPTION_VAL_DISABLED_VN "Tắt (Thông dịch Beetle)"
 #define OPTION_VAL_EXECUTE_VN "Hiệu năng tối đa"
-#define OPTION_VAL_EXECUTE_ONE_VN "Kiểm tra thời gian chu kỳ"
 #define OPTION_VAL_RUN_INTERPRETER_VN "Thông dịch Lightrec"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_VN "Vô hiệu hóa mã Biên dịch động"
 #define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_VN "Một số trò chơi yêu cầu vô hiệu hóa ‘Toàn bộ’, một số yêu cầu ‘Chỉ DMA’."
@@ -86313,7 +86230,6 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       {
          { "disabled",        OPTION_VAL_DISABLED_VN },
          { "execute",         OPTION_VAL_EXECUTE_VN },
-         { "execute_one",     OPTION_VAL_EXECUTE_ONE_VN },
          { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_VN },
          { NULL, NULL },
       },

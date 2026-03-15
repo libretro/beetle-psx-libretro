@@ -1178,9 +1178,8 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       NULL,
       "hacks",
       {
-         { "disabled",        "Disabled (Beetle Interpreter)" },
-         { "execute",         "Max Performance" },
-         { "execute_one",     "Cycle Timing Check" },
+         { "disabled", "Disabled (Beetle Interpreter)" },
+         { "execute",  "Max Performance" },
          { "run_interpreter", "Lightrec Interpreter" },
          { NULL, NULL },
       },
@@ -1242,6 +1241,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "1"
+   },
+   {
+      BEETLE_OPT(dynarec_spgp_opt),
+      "Dynarec SP GP Hit RAM Optimization",
+      NULL,
+      "Enabled will generate faster code by assuming sp and gp registers always point to ram, disabled is more widely compatible",
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
    },
 #endif
    {
