@@ -72,6 +72,7 @@ static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
 
+extern enum rsx_renderer_type rsx_type;
 extern retro_log_printf_t log_cb;
 
 /* How many vertices we buffer before forcing a draw. Since the
@@ -1130,7 +1131,7 @@ static void GlRenderer_upload_textures(
       uint16_t dimensions[2],
       uint16_t pixel_buffer[VRAM_PIXELS])
 {
-   if (!renderer)
+   if (!renderer || static_renderer.state == GlState_Invalid)
       return;
 
    if (!DRAWBUFFER_IS_EMPTY(renderer->command_buffer))
@@ -2522,6 +2523,7 @@ void rsx_gl_prepare_frame(void)
    GlRenderer *renderer = static_renderer.state_data;
    if (!renderer)
    {
+      rsx_type = RSX_SOFTWARE;
       log_cb(RETRO_LOG_ERROR, "[rsx_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
       return;
    }
