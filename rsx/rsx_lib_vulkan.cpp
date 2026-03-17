@@ -21,9 +21,9 @@ using namespace Vulkan;
 using namespace PSX;
 using namespace std;
 
-static Context *context;
-static Device *device;
-static Renderer *renderer;
+static Context *context = nullptr;
+static Device *device = nullptr;
+static Renderer *renderer = nullptr;
 static unsigned scaling = 4;
 
 // Declare extern as workaround for now to avoid variable
@@ -34,6 +34,8 @@ extern "C" bool content_is_pal;
 extern "C" int filter_mode;
 extern "C" bool currently_interlaced;
 extern "C" int aspect_ratio_setting;
+
+extern enum rsx_renderer_type rsx_type;
 
 extern retro_log_printf_t log_cb;
 namespace Granite
@@ -113,6 +115,11 @@ static void vk_context_reset(void)
 
 static void vk_context_destroy(void)
 {
+   if(device == nullptr)
+   {
+      return;
+   }
+
    save_state = renderer->save_vram_state();
    vulkan     = nullptr;
 
@@ -527,6 +534,12 @@ void rsx_vulkan_refresh_variables(void)
 
 void rsx_vulkan_prepare_frame(void)
 {
+   if(device == nullptr)
+   {
+      rsx_type = RSX_SOFTWARE;
+      return;
+   }
+
    inside_frame = true;
    device->flush_frame();
    vulkan->wait_sync_index(vulkan->handle);
@@ -553,6 +566,9 @@ static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
+   if(device == nullptr)
+      return;
+
    if (frame_duping_enabled && !GPU_get_display_change_count())
    {
       /* Any visual core option changes will be deferred to next non-duped frame */
