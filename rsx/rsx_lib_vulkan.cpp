@@ -43,7 +43,8 @@ retro_log_printf_t libretro_log;
 
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
-static retro_vulkan_image swapchain_image;
+static vector<retro_vulkan_image> swapchain_images;
+static vector<ImageHandle> scanout_handles;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
@@ -115,6 +116,8 @@ static void vk_context_destroy(void)
 {
    save_state = renderer->save_vram_state();
    vulkan     = nullptr;
+   scanout_handles.clear();
+   swapchain_images.clear();
 
    delete renderer;
    delete device;
@@ -525,11 +528,27 @@ void rsx_vulkan_refresh_variables(void)
    }
 }
 
+static void ensure_sync_index_resources(void)
+{
+   unsigned mask = vulkan->get_sync_index_mask(vulkan->handle);
+   unsigned num_frames = 0;
+   for (unsigned i = 0; i < 32; i++)
+      if (mask & (1u << i))
+         num_frames = i + 1;
+
+   if (num_frames != swapchain_images.size())
+   {
+      swapchain_images.resize(num_frames);
+      scanout_handles.resize(num_frames);
+   }
+}
+
 void rsx_vulkan_prepare_frame(void)
 {
    inside_frame = true;
    device->flush_frame();
    vulkan->wait_sync_index(vulkan->handle);
+   ensure_sync_index_resources();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
    renderer->reset_counters();
@@ -582,8 +601,9 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
       renderer->set_mdec_filter(Renderer::ScanoutFilter::None);
 
    auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
+   unsigned index = vulkan->get_sync_index(vulkan->handle);
 
-   retro_vulkan_image *image                          = &swapchain_image;
+   retro_vulkan_image *image                          = &swapchain_images[index];
 
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -608,10 +628,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
          nullptr, VK_QUEUE_FAMILY_IGNORED);
    renderer->flush();
 
-   auto semaphore = device->request_semaphore();
-   vulkan->set_signal_semaphore(vulkan->handle, semaphore->get_semaphore());
-   semaphore->signal_external();
-   renderer->set_scanout_semaphore(semaphore);
+   scanout_handles[index] = scanout;
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, scanout->get_width(), scanout->get_height(), 0);
    inside_frame = false;
 
