@@ -33113,7 +33113,7 @@ struct retro_core_options_v2 options_fa = {
 /* RETRO_LANGUAGE_FI */
 
 #define CATEGORY_SYSTEM_LABEL_FI "Järjestelmä"
-#define CATEGORY_SYSTEM_INFO_0_FI NULL
+#define CATEGORY_SYSTEM_INFO_0_FI "Vaihda järjestelmän ja ylikelloitus asetuksia."
 #define CATEGORY_VIDEO_LABEL_FI NULL
 #define CATEGORY_VIDEO_INFO_0_FI "Muuta kuvasuhdetta, näytön rajausta, videosuodatusta ja kuvanohitusasetuksia."
 #define CATEGORY_PGXP_LABEL_FI NULL
@@ -33123,11 +33123,11 @@ struct retro_core_options_v2 options_fa = {
 #define CATEGORY_INPUT_LABEL_FI "Syöte"
 #define CATEGORY_INPUT_INFO_0_FI "Muokkaa valoaseen, hiiren ja neGcon:in asetuksia."
 #define CATEGORY_MEMCARDS_LABEL_FI "Muistikortti"
-#define CATEGORY_MEMCARDS_INFO_0_FI NULL
+#define CATEGORY_MEMCARDS_INFO_0_FI "Vaihda virtuaalisen muistikortin asetuksia."
 #define CATEGORY_HACKS_LABEL_FI "Emulointikikat"
-#define CATEGORY_HACKS_INFO_0_FI NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_FI NULL
-#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_FI NULL
+#define CATEGORY_HACKS_INFO_0_FI "Muuta prosessorin ylikellotus- ja emulointitarkkuusasetuksia, jotka vaikuttavat matalan tason suorituskykyyn ja yhteensopivuuteen."
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_FI "Prosessorin taajuuden skaalaus (ylikelloitus)"
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_FI "Ylikelloita (tai alikelloita) emuloidun PS1 prosessoria. Ylikelloitus voi poistaa hitauden ja parantaa kuvataajuutta tietyissä peleissä, mutta suorituskykyvaatimuksien kustannuksella. Huomaa että joissakin peleissä on sisäinen kuvataajuus rajoitin, jolloin ne ei hyödy ylikelloittamisesta. Ylikelloitus voi nopeuttaa tiettyjä animaatioita ja tehosteita joissakin peleissä."
 #define OPTION_VAL_50_FI "50 %"
 #define OPTION_VAL_60_FI "60 %"
 #define OPTION_VAL_70_FI "70 %"
@@ -33199,44 +33199,44 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_730_FI "730 %"
 #define OPTION_VAL_740_FI "740 %"
 #define OPTION_VAL_750_FI "750 %"
-#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_FI NULL
-#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_FI NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_FI "Näytönohjaimen rasteroijan ylikelloitus"
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_FI "Ota käyttöön emuloidun PS1:n näytönohjaimen 2D rasteroijan ylikelloitus. Ei paranna 3D-renderointintia, ja yleensä sillä on vähän vaikutusta."
 #define OPTION_VAL_1X_NATIVE_FI "1x (Natiivi)"
 #define OPTION_VAL_2X_FI NULL
 #define OPTION_VAL_4X_FI NULL
 #define OPTION_VAL_8X_FI NULL
 #define OPTION_VAL_16X_FI NULL
 #define OPTION_VAL_32X_FI NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_FI NULL
-#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_FI NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FI NULL
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FI NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_FI "GTE ylikelloitus"
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_FI "Pienentää kaikki emuloidut GTE (3D grafiikan apuprosessori) toiminnan jatkuvaksi yhden-syklin viiveeksi. Peleissä jotka käyttää GTE: tä paljon, tämä voi mahdollisesti parantaa kuvataajuutta ja vakautta."
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_FI "CD:n käyttötapa"
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_FI "\"Tahdistettu\" jäljittelee alkuperäistä konsolia. \"Epä-tahdistettu\" voi vähentää jumiutumista hitailla laitteilla. \"Välimuistissa\" lataa koko levyn muistiin käynnistettäessä, mikä voi nopeuttaa pelin sisäisiä latausaikoja aloitusvaiheen viivästymisen kustannuksella. \"Välimuistissa\" voi aiheuttaa ongelmia laitteilla joilla ei ole paljoa RAM-muistia, ja palaa takaisin \"Tahdistettu\" asetukseen. Uudelleenkäynnistys vaaditaan."
 #define OPTION_VAL_SYNC_FI "Synkroninen"
 #define OPTION_VAL_ASYNC_FI "Asynkroninen"
 #define OPTION_VAL_PRECACHE_FI "Esivälimuisti"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_FI "CD:n latausnopeus"
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_FI NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_FI "Arvot, jotka ovat korkeammat kuin 2x (natiivi) voivat vähentää latausaikoja, mutta saattavat aiheuttaa ajoitusvirheitä. Jotkin pelit ei toimi kunnolla tiettyjen arvojen yläpuolella."
 #define OPTION_VAL_2X_NATIVE_FI "2x (Natiivi)"
 #define OPTION_VAL_6X_FI NULL
 #define OPTION_VAL_10X_FI NULL
 #define OPTION_VAL_12X_FI NULL
 #define OPTION_VAL_14X_FI NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_FI "Ohita BIOS"
-#define BEETLE_OPT_SKIP_BIOS_INFO_0_FI NULL
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_FI "Ohittaa Playstationin BIOS:sin käynnistysanimaation. Huom, tämä asetus voi aiheuttaa yhteensopivusongelmia tietyissä peleissä (PAL-kopiosuojatut pelit, Saga Frontier, jne)."
 #define BEETLE_OPT_OVERRIDE_BIOS_LABEL_FI "Ohita BIOS"
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI NULL
-#define OPTION_VAL_PSXONPSP_FI NULL
-#define OPTION_VAL_PS1_ROM_FI NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI "Korvaa vakioaluekohtaisen BIOS:sin aluevapaalla, mikäli sellainen löytyy. Uudelleenkäynnistys vaaditaan."
+#define OPTION_VAL_PSXONPSP_FI "PSP:n PS1 BIOS"
+#define OPTION_VAL_PS1_ROM_FI "PS3:n PS1 BIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FI "Sisäisen näytönohjaimen resoluutio"
-#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FI NULL
-#define BEETLE_OPT_RENDERER_LABEL_FI NULL
-#define BEETLE_OPT_RENDERER_INFO_0_FI NULL
-#define OPTION_VAL_HARDWARE_FI NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FI "Korkeammat resoluutiot kuin 1x (Natiivi) parantaa 3D-mallien tarkkuutta lisääntyvät suorituskukuvaatimuksien kustannuksella. Tämä asetus ei yleensä vaikuta 2D-elementteihin."
+#define BEETLE_OPT_RENDERER_LABEL_FI "Renderoija"
+#define BEETLE_OPT_RENDERER_INFO_0_FI "Ohjelmistorenderoija on tarkka, mutta sillä on jyrkät järjestelmävaatimukset kun käytetään suurempaa sisäistä näytönohjaimen resoluutioita. Laitteistorenderoija on vähemmän tarkempi, mutta parantaa suorituskykykä ja sen kanssa voidaan käyttää erinlaisia grafiikan parannuksia. \"Laitteisto (automaattinen)\" automaattisesti valitsee Vulkan tai OpenGL renderoijan, riippuen nykyisestä libretro käyttöliittymän ajurista. Jos annettu video-ajuri ei ole Vulkan tai OpenGL 3.3-yhteensopiva, sitten ydin palaa takaisin ohjelmistorenderoijaan. Uudelleenkäynnistys vaaditaan."
+#define OPTION_VAL_HARDWARE_FI "Laitteisto (Auto)"
 #define OPTION_VAL_HARDWARE_GL_FI "Laitteisto (OpenGL)"
 #define OPTION_VAL_HARDWARE_VK_FI "Laitteisto (Vulkan)"
 #define OPTION_VAL_SOFTWARE_FI "Ohjelmisto"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_FI NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FI NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_FI "Ohjelmisto kehyspuskuri"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FI "Ota käyttöön kehyspuskuri-tehosteiden (esim. liikkeen hämärtyminen, FF7-taistelun pyörre) tarkka emulointi laitteistopohjaista renderöijöitää käytettäessä ajamalla taustalla ohjelmistopohjaisen renderöijän kopio alkuperäisellä tarkkuudella. Jos tämä asetus on pois käytöstä, nämä toiminnot ohitetaan (OpenGL) tai renderöidään näytönohjaimella (Vulkan). Asetuksen poistaminen käytöstä voi parantaa suorituskykyä, mutta se voi aiheuttaa vakavia graafisia virheitä. Jätä asetus käyttöön, jos et ole varma."
 #define BEETLE_OPT_DEPTH_LABEL_FI "Sisäinen värisyvyys"
 #define BEETLE_OPT_DEPTH_INFO_0_FI NULL
 #define OPTION_VAL_16BPP_NATIVE_FI "16 bpp (Natiivi)"
