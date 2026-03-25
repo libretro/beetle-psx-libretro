@@ -998,15 +998,10 @@ ImageHandle Renderer::scanout_to_texture()
 
 		auto info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
-		if (!reuseable_scanout || reuseable_scanout->get_create_info().width != info.width ||
-		    reuseable_scanout->get_create_info().height != info.height)
-		{
-			//LOG("Creating new scanout image.\n");
-			info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-			info.usage =
-			    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			reuseable_scanout = device.create_image(info);
-		}
+		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		info.usage =
+		    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		reuseable_scanout = device.create_image(info);
 
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -1112,16 +1107,9 @@ ImageHandle Renderer::scanout_to_texture()
 			display_rect.height * render_scale,
 			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
 
-	if (!reuseable_scanout ||
-			reuseable_scanout->get_create_info().width != info.width ||
-			reuseable_scanout->get_create_info().height != info.height ||
-			reuseable_scanout->get_create_info().format != info.format)
-	{
-		//LOG("Creating new scanout image.\n");
-		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		reuseable_scanout = device.create_image(info);
-	}
+	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	reuseable_scanout = device.create_image(info);
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
