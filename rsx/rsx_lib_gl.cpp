@@ -2245,16 +2245,24 @@ std::vector<Attribute> ImageLoadVertex::attributes()
 
 static void cleanup_gl_state(void)
 {
-   /* Cleanup OpenGL context before returning to the frontend */
-   /* All of these GL calls are also done in glsm_ctl(UNBIND) */
+   /* Cleanup OpenGL context before returning to the frontend.
+    * Must reset ALL state that the core modifies, otherwise
+    * the frontend's presentation pass may render incorrectly. */
    glDisable(GL_BLEND);
+   glDisable(GL_SCISSOR_TEST);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_STENCIL_TEST);
    glBlendColor(0.0, 0.0, 0.0, 0.0);
    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+   glDepthMask(GL_TRUE);
+   glStencilMask(0xFF);
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, 0);
    glUseProgram(0);
    glBindVertexArray(0);
+   glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    glLineWidth(1.0);
    glClearColor(0.0, 0.0, 0.0, 0.0);
