@@ -273,6 +273,8 @@ struct GlRenderer {
    DrawBuffer<ImageLoadVertex>* image_load_buffer;
 
    GLushort vertex_indices[INDEX_BUFFER_LEN];
+   /* GPU buffer for vertex_indices (required for core profile) */
+   GLuint index_buffer;
    /* Primitive type for the vertices in the command buffers
     * (TRIANGLES or LINES) */
    GLenum command_draw_mode;
@@ -934,6 +936,8 @@ static void Texture_init(
                   internal_format,
                   (GLsizei) width,
                   (GLsizei) height);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
    tex->id     = id;
    tex->width  = width;
@@ -1035,6 +1039,13 @@ static void GlRenderer_draw(GlRenderer *renderer)
       renderer->batches.back().count = renderer->vertex_index_pos
          - renderer->batches.back().first;
 
+   /* Upload index data to EBO (required for core profile - client-side
+    * index pointers are not allowed) */
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
+   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0,
+                   renderer->vertex_index_pos * sizeof(GLushort),
+                   renderer->vertex_indices);
+
    for (std::vector<PrimitiveBatch>::iterator it =
          renderer->batches.begin();
          it != renderer->batches.end();
@@ -1104,7 +1115,8 @@ static void GlRenderer_draw(GlRenderer *renderer)
           * must be handled by the caller. This is because this command
           * can be called several times on the same buffer (i.e. multiple
           * draw calls between the prepare/finalize) */
-         glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT, &renderer->vertex_indices[it->first]);
+         glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
+                        (GLvoid*)(it->first * sizeof(GLushort)));
       }
    }
 
@@ -1489,6 +1501,14 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    renderer->filter_type = filter;
    renderer->command_buffer = command_buffer;
    renderer->vertex_index_pos = 0;
+
+   /* Create index buffer object for core profile compatibility */
+   glGenBuffers(1, &renderer->index_buffer);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                INDEX_BUFFER_LEN * sizeof(GLushort),
+                NULL, GL_DYNAMIC_DRAW);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
 #ifndef HAVE_OPENGLES3
@@ -1549,6 +1569,10 @@ static void GlRenderer_free(GlRenderer *renderer)
       delete renderer->image_load_buffer;
    }
    renderer->image_load_buffer = NULL;
+
+   if (renderer->index_buffer)
+      glDeleteBuffers(1, &renderer->index_buffer);
+   renderer->index_buffer = 0;
 
    glDeleteTextures(1, &renderer->fb_texture.id);
    renderer->fb_texture.id     = 0;
