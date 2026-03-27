@@ -49746,12 +49746,12 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_IT "Overclock GTE"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_IT "Abbassa tutte le operazioni GTE emulate (CPU coprocessore per grafica 3D) ad una latenza costante di un ciclo. Per i giochi che fanno uso pesante del GTE, questo può migliorare notevolmente il frame rate e la stabilità del tempo del telaio."
 #define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_IT "Metodo di accesso CD"
-#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_IT NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_IT "Decide come leggere i dati dalle immagini disco del contenuto. 'Sincrono' imita l'hardware originale, mentre 'Asincrono' riduce lo stuttering nei dispositivi con lettura dati lenta. 'Pre-Cache' carica l'intera immagine disco in memoria quando si avvia il contenuto, e può ridurre i tempi di caricamento in-game a costo di un avvio più lento. 'Pre-Cache' può causare problemi su dispositivi con poca memoria RAM, e ricade su 'Sincrono' per giochi fisici. È necessario il riavvio."
 #define OPTION_VAL_SYNC_IT "Sincrono"
 #define OPTION_VAL_ASYNC_IT "Asincrono"
 #define OPTION_VAL_PRECACHE_IT NULL
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_IT "Velocità Caricamento CD"
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_IT NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_IT "Valori più alti di '2x (Nativo)' possono ridurre notevolmente i tempi di caricamento in-game, ma possono causare errori di timing. Alcuni giochi potrebbero non funzionare correttamente al di sopra di un certo valore."
 #define OPTION_VAL_2X_NATIVE_IT "2x (Nativo)"
 #define OPTION_VAL_6X_IT NULL
 #define OPTION_VAL_10X_IT NULL
@@ -49766,7 +49766,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_IT "Risoluzione GPU Interna"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_IT "Risoluzioni maggiori di '1x (Nativo)' migliorano la fedeltà dei modelli 3D a spese di requisiti di performance più alti. Elementi 2D sono generalmente non condizionati da questa impostazione."
 #define BEETLE_OPT_RENDERER_LABEL_IT NULL
-#define BEETLE_OPT_RENDERER_INFO_0_IT NULL
+#define BEETLE_OPT_RENDERER_INFO_0_IT "Il renderer software è il più accurato, ma possiede alti requisiti di prestazione quando è eseguito a risoluzioni GPU interne aumentate. I renderer hardware, sebbene meno accurati, migliorano le prestazioni a risoluzioni interne aumentate, e consentono vari miglioramenti grafici. 'Hardware (Auto)' seleziona automaticamente il renderer Vulkan o OpenGL, a seconda del driver video front-end libretro corrente. Se il driver video fornito non è compatibile con Vulkan o OpenGL 3.3, allora il core tornerà al renderer software. È necessario il riavvio."
 #define OPTION_VAL_HARDWARE_IT "Hardware"
 #define OPTION_VAL_HARDWARE_GL_IT NULL
 #define OPTION_VAL_HARDWARE_VK_IT NULL
@@ -49930,11 +49930,11 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_IT NULL
 #define OPTION_VAL_LIBRETRO_IT NULL
 #define OPTION_VAL_MEDNAFEN_IT NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_IT NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_IT NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_IT NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_IT NULL
-#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_IT NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_IT "Ingresso Memory Card 2"
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_IT "Emula una seconda memory card nel secondo ingresso. Nota: Alcuni giochi richiedono che l'impostazione sia disabilitata per funzionare correttamente (es. Codename Tenka). Nota: L'ingresso Memory Card 2 usa il formato di salvataggio Mednafen (.mcr). È necessario il riavvio."
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_IT "Memory Card condivise"
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_IT "Usa un'unica memory card invece di memory card separate per ogni contenuto. Nota: Se l'opzione 'Metodo Memory Card' è impostata su 'Libretro', quest'opzione è applicata solo nel secondo ingresso. È necessario il riavvio."
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_IT "Indice Ingresso Memory Card 1"
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_IT NULL
 #define OPTION_VAL_0_O48_IT "0 (Predefinito)"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_IT NULL
