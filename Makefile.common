@@ -8,38 +8,29 @@ MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
-LIBZMA_DIR   := $(DEPS_DIR)/lzma-19.00
 ZLIB_DIR     := $(DEPS_DIR)/zlib-1.2.11
 
 LIBCHDR_INCFLAGS = \
-                     -I$(LIBZMA_DIR)/include \
-                     -I$(DEPS_DIR)/libchdr/include \
-                     -I$(DEPS_DIR)/zstd/lib \
+                     -I$(DEPS_DIR)/libchdr/include
 
 LIBCHDR_SOURCES_C = \
-                     $(LIBZMA_DIR)/src/Alloc.c \
-                     $(LIBZMA_DIR)/src/Bra86.c \
-                     $(LIBZMA_DIR)/src/BraIA64.c \
-                     $(LIBZMA_DIR)/src/CpuArch.c \
-                     $(LIBZMA_DIR)/src/Delta.c \
-                     $(LIBZMA_DIR)/src/LzFind.c \
-                     $(LIBZMA_DIR)/src/Lzma86Dec.c \
-                     $(LIBZMA_DIR)/src/LzmaDec.c \
-                     $(LIBZMA_DIR)/src/LzmaEnc.c \
+                     $(DEPS_DIR)/libchdr/deps/lzma-25.01/src/LzmaDec.c \
+                     $(DEPS_DIR)/libchdr/deps/miniz-3.1.1/miniz.c \
+                     $(DEPS_DIR)/libchdr/deps/zstd-1.5.7/zstddeclib.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_chd.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdfl.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdlz.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzl.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzs.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_flac.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_huff.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_lzma.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zlib.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zstd.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_flac.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_huffman.c \
-                     $(DEPS_DIR)/zstd/lib/common/entropy_common.c \
-                     $(DEPS_DIR)/zstd/lib/common/error_private.c \
-                     $(DEPS_DIR)/zstd/lib/common/fse_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/common/zstd_common.c \
-                     $(DEPS_DIR)/zstd/lib/common/xxhash.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/huf_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_ddict.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_decompress_block.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_huffman.c
 
 ZLIB_INCFLAGS = -I$(ZLIB_DIR)
 ZLIB_SOURCES_C = \
@@ -155,12 +146,13 @@ ifeq ($(NEED_CD), 1)
 endif
 
 ifeq ($(HAVE_CHD), 1)
-   FLAGS += -DHAVE_CHD -D_7ZIP_ST -DZSTD_DISABLE_ASM
+   FLAGS += -DHAVE_CHD
 
    ifeq ($(SYSTEM_LIBCHDR), 1)
       INCFLAGS += $(shell pkg-config --cflags libchdr)
       LIBS += $(shell pkg-config --libs libchdr)
    else
+      FLAGS += -DCHDR_SYSTEM_ZLIB
       INCFLAGS += $(LIBCHDR_INCFLAGS)
    endif
 endif
