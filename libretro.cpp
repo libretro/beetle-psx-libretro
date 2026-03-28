@@ -30,6 +30,8 @@ retro_input_state_t dbg_input_state_cb = 0;
 
 #include "pgxp/pgxp_main.h"
 
+#include "deps/openbios/openbios.bin.h"
+
 #if defined(HAVE_ASHMEM) || defined(HAVE_SHM)
 #include <errno.h>
 #endif
@@ -310,16 +312,7 @@ static bool firmware_is_present(unsigned region)
 
    if (!firmware_found)
    {
-      char s[4096];
-
-      log_cb(RETRO_LOG_ERROR, "Firmware is missing: %s\n", bios_name_list[0]);
-      s[4095] = '\0';
-
-      snprintf(s, sizeof(s), "Firmware is missing:\n\n%s", bios_name_list[0]);
-
-      gui_set_message(s);
-      gui_show = true;
-
+      log_cb(RETRO_LOG_INFO, "Firmware is missing: %s\n", bios_name_list[0]);
       return false;
    }
 
@@ -2141,11 +2134,15 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
             RETRO_VFS_FILE_ACCESS_HINT_NONE);
    }
 
-      if (BIOSFile)
-      {
-         filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
-         filestream_close(BIOSFile);
-      }
+   if (BIOSFile)
+   {
+      filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
+      filestream_close(BIOSFile);
+   }
+   else
+   {
+      memcpy(BIOSROM->data8, openbios, sizeof(openbios));
+   }
 
    i = 0;
 
