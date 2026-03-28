@@ -50,9 +50,44 @@ static const char *DI_CUE_Strings[7] =
    "MODE2/2352"
 };
 
+static uint64_t Callback_fsize(void *user_data)
+{
+   FileStream *file_stream = (FileStream*)user_data;
+   return file_stream->size();
+}
+
+static size_t Callback_fread(void* buffer, size_t size, size_t count, void *user_data)
+{
+   if (size == 0 || count == 0)
+      return 0;
+
+   FileStream *file_stream = (FileStream*)user_data;
+   return file_stream->read(buffer, count * size) / size;
+}
+
+static int Callback_fclose(void *user_data)
+{
+   return 0;
+}
+
+static int Callback_fseek(void *user_data, int64_t offset, int whence)
+{
+   FileStream *file_stream = (FileStream*)user_data;
+   file_stream->seek(offset, whence);
+   return 0;
+}
+
+static const chd_core_file_callbacks chd_callbacks = {
+   Callback_fsize,
+   Callback_fread,
+   Callback_fclose,
+   Callback_fseek
+};
+
 bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 {
-   chd_error err = chd_open(path, CHD_OPEN_READ, NULL, &chd);
+   // Use our own file IO so that we support UTF-8 paths.
+   chd_error err = chd_open_core_file_callbacks(&chd_callbacks, &file_stream, CHD_OPEN_READ, NULL, &chd);
    if (err != CHDERR_NONE)
       return false;
 
@@ -209,6 +244,7 @@ void CDAccess_CHD::Cleanup(void)
 }
 
 CDAccess_CHD::CDAccess_CHD(const char *path, bool image_memcache)
+   : file_stream(path, MODE_READ)
 {
    chd = NULL;
 

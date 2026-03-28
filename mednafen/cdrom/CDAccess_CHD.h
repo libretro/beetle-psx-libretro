@@ -1,6 +1,8 @@
 #ifndef __MDFN_CDACCESS_CHD_H
 #define __MDFN_CDACCESS_CHD_H
 
+#include <mednafen/FileStream.h>
+
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
 
@@ -22,6 +24,7 @@ class CDAccess_CHD : public CDAccess
       virtual void Eject(bool eject_status);
 
    private:
+      FileStream file_stream;
       chd_file *chd;
       /* hunk data cache */
       uint8_t *hunkmem;

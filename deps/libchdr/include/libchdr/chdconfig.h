@@ -1,12 +1,18 @@
 #ifndef __CHDCONFIG_H__
 #define __CHDCONFIG_H__
 
-#include <retro_inline.h>
+/* Configure CHDR features by defining these beforehand. */
 
-/* Configure CHDR features here */
+#ifndef WANT_RAW_DATA_SECTOR
 #define WANT_RAW_DATA_SECTOR    1
+#endif
+
+#ifndef WANT_SUBCODE
 #define WANT_SUBCODE            1
-#define NEED_CACHE_HUNK         1
+#endif
+
+#ifndef VERIFY_BLOCK_CRC
 #define VERIFY_BLOCK_CRC        1
+#endif
 
 #endif
