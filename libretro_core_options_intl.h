@@ -155,6 +155,7 @@ extern "C" {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_AR NULL
 #define OPTION_VAL_PSXONPSP_AR NULL
 #define OPTION_VAL_PS1_ROM_AR NULL
+#define OPTION_VAL_OPENBIOS_AR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_AR NULL
 #define BEETLE_OPT_RENDERER_LABEL_AR NULL
@@ -653,6 +654,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_AR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_AR },
+         { "openbios", OPTION_VAL_OPENBIOS_AR },
          { NULL, NULL },
       },
       "disabled"
@@ -2222,6 +2224,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_AST NULL
 #define OPTION_VAL_PSXONPSP_AST "BIOS de PS1 de la PSP"
 #define OPTION_VAL_PS1_ROM_AST "BIOS de PS1 de la PS3"
+#define OPTION_VAL_OPENBIOS_AST "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AST NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_AST NULL
 #define BEETLE_OPT_RENDERER_LABEL_AST NULL
@@ -2720,6 +2723,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_AST },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_AST },
+         { "openbios", OPTION_VAL_OPENBIOS_AST },
          { NULL, NULL },
       },
       "disabled"
@@ -4289,6 +4293,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_BE NULL
 #define OPTION_VAL_PSXONPSP_BE NULL
 #define OPTION_VAL_PS1_ROM_BE NULL
+#define OPTION_VAL_OPENBIOS_BE "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_BE "Унутраная раздзяляльнасць"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_BE NULL
 #define BEETLE_OPT_RENDERER_LABEL_BE NULL
@@ -4787,6 +4792,7 @@ struct retro_core_option_v2_definition option_defs_be[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_BE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_BE },
+         { "openbios", OPTION_VAL_OPENBIOS_BE },
          { NULL, NULL },
       },
       "disabled"
@@ -6356,6 +6362,7 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_BG NULL
 #define OPTION_VAL_PSXONPSP_BG NULL
 #define OPTION_VAL_PS1_ROM_BG NULL
+#define OPTION_VAL_OPENBIOS_BG "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_BG NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_BG NULL
 #define BEETLE_OPT_RENDERER_LABEL_BG NULL
@@ -6854,6 +6861,7 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_BG },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_BG },
+         { "openbios", OPTION_VAL_OPENBIOS_BG },
          { NULL, NULL },
       },
       "disabled"
@@ -8423,6 +8431,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CA "Sobreescriu la regió estàndard específica de la BIOS per una sense regió. Cal reiniciar."
 #define OPTION_VAL_PSXONPSP_CA NULL
 #define OPTION_VAL_PS1_ROM_CA NULL
+#define OPTION_VAL_OPENBIOS_CA "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CA "Resolució interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CA "Resolucions superiors a '1x (Natiu)' millora la definició dels models 3D a canvi d'incrementar els requisits de maquinari. Els models 2D no solen veure's afectats per aquest paràmetre."
 #define BEETLE_OPT_RENDERER_LABEL_CA "Renderitzador"
@@ -8921,6 +8930,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CA },
+         { "openbios", OPTION_VAL_OPENBIOS_CA },
          { NULL, NULL },
       },
       "disabled"
@@ -10490,6 +10500,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHS NULL
 #define OPTION_VAL_PSXONPSP_CHS NULL
 #define OPTION_VAL_PS1_ROM_CHS NULL
+#define OPTION_VAL_OPENBIOS_CHS "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHS "内部 GPU 分辨率"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHS NULL
 #define BEETLE_OPT_RENDERER_LABEL_CHS NULL
@@ -10988,6 +10999,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CHS },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CHS },
+         { "openbios", OPTION_VAL_OPENBIOS_CHS },
          { NULL, NULL },
       },
       "disabled"
@@ -12557,6 +12569,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHT NULL
 #define OPTION_VAL_PSXONPSP_CHT "PSP內建 (psxonpsp660.bin)"
 #define OPTION_VAL_PS1_ROM_CHT "PS3內建 (ps1_rom.bin)"
+#define OPTION_VAL_OPENBIOS_CHT "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHT "內部解析度 (GPU)"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHT NULL
 #define BEETLE_OPT_RENDERER_LABEL_CHT NULL
@@ -13055,6 +13068,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CHT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CHT },
+         { "openbios", OPTION_VAL_OPENBIOS_CHT },
          { NULL, NULL },
       },
       "disabled"
@@ -14624,6 +14638,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CS NULL
 #define OPTION_VAL_PSXONPSP_CS NULL
 #define OPTION_VAL_PS1_ROM_CS NULL
+#define OPTION_VAL_OPENBIOS_CS "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CS "Interní rozlišení GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CS NULL
 #define BEETLE_OPT_RENDERER_LABEL_CS NULL
@@ -15122,6 +15137,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CS },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CS },
+         { "openbios", OPTION_VAL_OPENBIOS_CS },
          { NULL, NULL },
       },
       "disabled"
@@ -16691,6 +16707,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CY NULL
 #define OPTION_VAL_PSXONPSP_CY NULL
 #define OPTION_VAL_PS1_ROM_CY NULL
+#define OPTION_VAL_OPENBIOS_CY "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CY NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CY NULL
 #define BEETLE_OPT_RENDERER_LABEL_CY NULL
@@ -17189,6 +17206,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CY },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CY },
+         { "openbios", OPTION_VAL_OPENBIOS_CY },
          { NULL, NULL },
       },
       "disabled"
@@ -18758,6 +18776,7 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_DA NULL
 #define OPTION_VAL_PSXONPSP_DA NULL
 #define OPTION_VAL_PS1_ROM_DA NULL
+#define OPTION_VAL_OPENBIOS_DA "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_DA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_DA NULL
 #define BEETLE_OPT_RENDERER_LABEL_DA NULL
@@ -19256,6 +19275,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_DA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_DA },
+         { "openbios", OPTION_VAL_OPENBIOS_DA },
          { NULL, NULL },
       },
       "disabled"
@@ -20825,6 +20845,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_DE "Das Standard-regionsspezifische BIOS mit einem regionenfreien BIOS überschreiben, falls vorhanden. Neustart erforderlich."
 #define OPTION_VAL_PSXONPSP_DE NULL
 #define OPTION_VAL_PS1_ROM_DE NULL
+#define OPTION_VAL_OPENBIOS_DE "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_DE "Interne GPU-Auflösung"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_DE "Auflösungen, höher als „1x (Native)“, verbessern die Genauigkeit von 3D-Modellen, erhöhen jedoch die Leistungsanforderungen. 2D-Elemente sind von dieser Einstellung in der Regel nicht betroffen."
 #define BEETLE_OPT_RENDERER_LABEL_DE NULL
@@ -21323,6 +21344,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_DE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_DE },
+         { "openbios", OPTION_VAL_OPENBIOS_DE },
          { NULL, NULL },
       },
       "disabled"
@@ -22892,6 +22914,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EL NULL
 #define OPTION_VAL_PSXONPSP_EL NULL
 #define OPTION_VAL_PS1_ROM_EL NULL
+#define OPTION_VAL_OPENBIOS_EL "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EL NULL
 #define BEETLE_OPT_RENDERER_LABEL_EL NULL
@@ -23390,6 +23413,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EL },
+         { "openbios", OPTION_VAL_OPENBIOS_EL },
          { NULL, NULL },
       },
       "disabled"
@@ -24959,6 +24983,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EN NULL
 #define OPTION_VAL_PSXONPSP_EN NULL
 #define OPTION_VAL_PS1_ROM_EN NULL
+#define OPTION_VAL_OPENBIOS_EN "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EN NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EN NULL
 #define BEETLE_OPT_RENDERER_LABEL_EN NULL
@@ -25457,6 +25482,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EN },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EN },
+         { "openbios", OPTION_VAL_OPENBIOS_EN },
          { NULL, NULL },
       },
       "disabled"
@@ -27026,6 +27052,7 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EO NULL
 #define OPTION_VAL_PSXONPSP_EO NULL
 #define OPTION_VAL_PS1_ROM_EO NULL
+#define OPTION_VAL_OPENBIOS_EO "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EO NULL
 #define BEETLE_OPT_RENDERER_LABEL_EO NULL
@@ -27524,6 +27551,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EO },
+         { "openbios", OPTION_VAL_OPENBIOS_EO },
          { NULL, NULL },
       },
       "disabled"
@@ -29093,6 +29121,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ES "Reemplaza la BIOS correspondiente a la región del contenido con una de región libre (si está disponible). Es necesario reiniciar."
 #define OPTION_VAL_PSXONPSP_ES "BIOS de PS1 usada en PSP"
 #define OPTION_VAL_PS1_ROM_ES "BIOS de PS1 usada en PS3"
+#define OPTION_VAL_OPENBIOS_ES "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ES "Resolución interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ES "Toda resolución superior a «1x (Nativa)» mejorarán la fidelidad de los modelos 3D a costa de aumentar los requisitos de rendimiento. Los elementos 2D no suelen verse afectados por este ajuste."
 #define BEETLE_OPT_RENDERER_LABEL_ES "Renderizador"
@@ -29591,6 +29620,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_ES },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_ES },
+         { "openbios", OPTION_VAL_OPENBIOS_ES },
          { NULL, NULL },
       },
       "disabled"
@@ -31160,6 +31190,7 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FA NULL
 #define OPTION_VAL_PSXONPSP_FA NULL
 #define OPTION_VAL_PS1_ROM_FA NULL
+#define OPTION_VAL_OPENBIOS_FA "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FA NULL
 #define BEETLE_OPT_RENDERER_LABEL_FA NULL
@@ -31658,6 +31689,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FA },
+         { "openbios", OPTION_VAL_OPENBIOS_FA },
          { NULL, NULL },
       },
       "disabled"
@@ -33227,6 +33259,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI "Korvaa vakioaluekohtaisen BIOS:sin aluevapaalla, mikäli sellainen löytyy. Uudelleenkäynnistys vaaditaan."
 #define OPTION_VAL_PSXONPSP_FI "PSP:n PS1 BIOS"
 #define OPTION_VAL_PS1_ROM_FI "PS3:n PS1 BIOS"
+#define OPTION_VAL_OPENBIOS_FI "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FI "Sisäisen näytönohjaimen resoluutio"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FI "Korkeammat resoluutiot kuin 1x (Natiivi) parantaa 3D-mallien tarkkuutta lisääntyvät suorituskukuvaatimuksien kustannuksella. Tämä asetus ei yleensä vaikuta 2D-elementteihin."
 #define BEETLE_OPT_RENDERER_LABEL_FI "Renderoija"
@@ -33725,6 +33758,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FI },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FI },
+         { "openbios", OPTION_VAL_OPENBIOS_FI },
          { NULL, NULL },
       },
       "disabled"
@@ -35294,6 +35328,7 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FR "Remplacer le BIOS spécifique à la région standard par un BIOS dézoné s'il est trouvé. Redémarrage requis."
 #define OPTION_VAL_PSXONPSP_FR "BIOS PS1 de la PSP"
 #define OPTION_VAL_PS1_ROM_FR "BIOS PS1 de la PS3"
+#define OPTION_VAL_OPENBIOS_FR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FR "Résolution du processeur graphique interne"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FR "Les résolutions supérieures à 'x1 (native)' améliorent la fidélité des modèles 3D au détriment des exigences de performance accrues. Les éléments 2D ne sont généralement pas affectés par ce réglage."
 #define BEETLE_OPT_RENDERER_LABEL_FR "Moteur de rendu"
@@ -35792,6 +35827,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FR },
+         { "openbios", OPTION_VAL_OPENBIOS_FR },
          { NULL, NULL },
       },
       "disabled"
@@ -37361,6 +37397,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GA "Sáraigh an BIOS caighdeánach atá sainiúil don réigiún le ceann saor ó réigiún má aimsítear é. Atosú ag teastáil."
 #define OPTION_VAL_PSXONPSP_GA NULL
 #define OPTION_VAL_PS1_ROM_GA NULL
+#define OPTION_VAL_OPENBIOS_GA "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GA "Rún GPU Inmheánach"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GA "Feabhsaíonn taifeach níos airde ná '1x (Dúchasach)' dílseacht na samhlacha 3T ar chostas riachtanais feidhmíochta méadaithe. Ní bhíonn tionchar ag an socrú seo ar eilimintí 2T go ginearálta."
 #define BEETLE_OPT_RENDERER_LABEL_GA "Rindreálaí"
@@ -37859,6 +37896,7 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_GA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_GA },
+         { "openbios", OPTION_VAL_OPENBIOS_GA },
          { NULL, NULL },
       },
       "disabled"
@@ -39428,6 +39466,7 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GL "Sobrescribir o BIOS estándar específico dunha rexión cun BIOS libre de rexión se se atopa. É necesario reiniciar."
 #define OPTION_VAL_PSXONPSP_GL NULL
 #define OPTION_VAL_PS1_ROM_GL NULL
+#define OPTION_VAL_OPENBIOS_GL "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GL "Resolución interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GL "Resolucións superiores a “1x (Nativo)” melloran a fidelidade dos modelos 3D a cambio de maiores requirimentos de rendemento. Os elementos 2D xeralmente non se ven afectados por esta configuración."
 #define BEETLE_OPT_RENDERER_LABEL_GL "Motor de renderizado"
@@ -39926,6 +39965,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_GL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_GL },
+         { "openbios", OPTION_VAL_OPENBIOS_GL },
          { NULL, NULL },
       },
       "disabled"
@@ -41495,6 +41535,7 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HE NULL
 #define OPTION_VAL_PSXONPSP_HE NULL
 #define OPTION_VAL_PS1_ROM_HE NULL
+#define OPTION_VAL_OPENBIOS_HE "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HE NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HE NULL
 #define BEETLE_OPT_RENDERER_LABEL_HE NULL
@@ -41993,6 +42034,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HE },
+         { "openbios", OPTION_VAL_OPENBIOS_HE },
          { NULL, NULL },
       },
       "disabled"
@@ -43562,6 +43604,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HR NULL
 #define OPTION_VAL_PSXONPSP_HR NULL
 #define OPTION_VAL_PS1_ROM_HR NULL
+#define OPTION_VAL_OPENBIOS_HR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HR NULL
 #define BEETLE_OPT_RENDERER_LABEL_HR NULL
@@ -44060,6 +44103,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HR },
+         { "openbios", OPTION_VAL_OPENBIOS_HR },
          { NULL, NULL },
       },
       "disabled"
@@ -45629,6 +45673,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HU NULL
 #define OPTION_VAL_PSXONPSP_HU NULL
 #define OPTION_VAL_PS1_ROM_HU NULL
+#define OPTION_VAL_OPENBIOS_HU "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HU "A GPU belső felbontása"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HU NULL
 #define BEETLE_OPT_RENDERER_LABEL_HU NULL
@@ -46127,6 +46172,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HU },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HU },
+         { "openbios", OPTION_VAL_OPENBIOS_HU },
          { NULL, NULL },
       },
       "disabled"
@@ -47696,6 +47742,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ID NULL
 #define OPTION_VAL_PSXONPSP_ID NULL
 #define OPTION_VAL_PS1_ROM_ID NULL
+#define OPTION_VAL_OPENBIOS_ID "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ID "Resolusi Internal GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ID NULL
 #define BEETLE_OPT_RENDERER_LABEL_ID NULL
@@ -48194,6 +48241,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_ID },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_ID },
+         { "openbios", OPTION_VAL_OPENBIOS_ID },
          { NULL, NULL },
       },
       "disabled"
@@ -49763,6 +49811,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_IT "Sovrascrive il BIOS specifico della regione standard con uno senza regione se trovato. È necessario il riavvio."
 #define OPTION_VAL_PSXONPSP_IT NULL
 #define OPTION_VAL_PS1_ROM_IT NULL
+#define OPTION_VAL_OPENBIOS_IT "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_IT "Risoluzione GPU Interna"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_IT "Risoluzioni maggiori di '1x (Nativo)' migliorano la fedeltà dei modelli 3D a spese di requisiti di performance più alti. Elementi 2D sono generalmente non condizionati da questa impostazione."
 #define BEETLE_OPT_RENDERER_LABEL_IT NULL
@@ -50261,6 +50310,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_IT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_IT },
+         { "openbios", OPTION_VAL_OPENBIOS_IT },
          { NULL, NULL },
       },
       "disabled"
@@ -51830,6 +51880,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_JA NULL
 #define OPTION_VAL_PSXONPSP_JA NULL
 #define OPTION_VAL_PS1_ROM_JA NULL
+#define OPTION_VAL_OPENBIOS_JA "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA "内部 GPU 解像度"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_JA NULL
 #define BEETLE_OPT_RENDERER_LABEL_JA NULL
@@ -52328,6 +52379,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_JA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_JA },
+         { "openbios", OPTION_VAL_OPENBIOS_JA },
          { NULL, NULL },
       },
       "disabled"
@@ -53897,6 +53949,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_KO "존재할 경우, 기존의 지역 제한 BIOS를 지역 제한이 없는 BIOS로 대체합니다. 재시작이 필요합니다."
 #define OPTION_VAL_PSXONPSP_KO NULL
 #define OPTION_VAL_PS1_ROM_KO NULL
+#define OPTION_VAL_OPENBIOS_KO "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_KO "내부 GPU 해상도"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_KO "'1x (네이티브)'보다 높은 값으로 설정할 경우 3D 모델의 품질이 개선되지만 요구되는 성능이 높아집니다. 2D 요소들은 일반적으로 이 설정에 아무런 영향을 받지 않습니다."
 #define BEETLE_OPT_RENDERER_LABEL_KO "렌더러"
@@ -54395,6 +54448,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_KO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_KO },
+         { "openbios", OPTION_VAL_OPENBIOS_KO },
          { NULL, NULL },
       },
       "disabled"
@@ -55964,6 +56018,7 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NL NULL
 #define OPTION_VAL_PSXONPSP_NL NULL
 #define OPTION_VAL_PS1_ROM_NL NULL
+#define OPTION_VAL_OPENBIOS_NL "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NL NULL
 #define BEETLE_OPT_RENDERER_LABEL_NL NULL
@@ -56462,6 +56517,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_NL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_NL },
+         { "openbios", OPTION_VAL_OPENBIOS_NL },
          { NULL, NULL },
       },
       "disabled"
@@ -58031,6 +58087,7 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NO NULL
 #define OPTION_VAL_PSXONPSP_NO NULL
 #define OPTION_VAL_PS1_ROM_NO NULL
+#define OPTION_VAL_OPENBIOS_NO "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NO NULL
 #define BEETLE_OPT_RENDERER_LABEL_NO NULL
@@ -58529,6 +58586,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_NO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_NO },
+         { "openbios", OPTION_VAL_OPENBIOS_NO },
          { NULL, NULL },
       },
       "disabled"
@@ -60098,6 +60156,7 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_OR NULL
 #define OPTION_VAL_PSXONPSP_OR NULL
 #define OPTION_VAL_PS1_ROM_OR NULL
+#define OPTION_VAL_OPENBIOS_OR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_OR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_OR NULL
 #define BEETLE_OPT_RENDERER_LABEL_OR NULL
@@ -60596,6 +60655,7 @@ struct retro_core_option_v2_definition option_defs_or[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_OR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_OR },
+         { "openbios", OPTION_VAL_OPENBIOS_OR },
          { NULL, NULL },
       },
       "disabled"
@@ -62165,6 +62225,7 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PL NULL
 #define OPTION_VAL_PSXONPSP_PL NULL
 #define OPTION_VAL_PS1_ROM_PL NULL
+#define OPTION_VAL_OPENBIOS_PL "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PL "Wewnętrzna rozdzielczość GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PL NULL
 #define BEETLE_OPT_RENDERER_LABEL_PL NULL
@@ -62663,6 +62724,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PL },
+         { "openbios", OPTION_VAL_OPENBIOS_PL },
          { NULL, NULL },
       },
       "disabled"
@@ -64232,6 +64294,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PT_BR "Substitui a BIOS padrão específica da região por uma BIOS livre de região, se encontrada. Reinicialização necessária."
 #define OPTION_VAL_PSXONPSP_PT_BR "BIOS de PS1 de PSP"
 #define OPTION_VAL_PS1_ROM_PT_BR "BIOS de PS1 de PS3"
+#define OPTION_VAL_OPENBIOS_PT_BR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_BR "Resolução interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_BR "Resoluções superiores a '1x (Nativa)' melhoram a fidelidade dos modelos 3D, ao custo de maiores requisitos de desempenho. Elementos 2D geralmente não são afetados por esta configuração."
 #define BEETLE_OPT_RENDERER_LABEL_PT_BR "Renderizador"
@@ -64730,6 +64793,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PT_BR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PT_BR },
+         { "openbios", OPTION_VAL_OPENBIOS_PT_BR },
          { NULL, NULL },
       },
       "disabled"
@@ -66299,6 +66363,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PT_PT NULL
 #define OPTION_VAL_PSXONPSP_PT_PT NULL
 #define OPTION_VAL_PS1_ROM_PT_PT NULL
+#define OPTION_VAL_OPENBIOS_PT_PT "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_PT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_PT NULL
 #define BEETLE_OPT_RENDERER_LABEL_PT_PT NULL
@@ -66797,6 +66862,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PT_PT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PT_PT },
+         { "openbios", OPTION_VAL_OPENBIOS_PT_PT },
          { NULL, NULL },
       },
       "disabled"
@@ -68366,6 +68432,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_RU NULL
 #define OPTION_VAL_PSXONPSP_RU NULL
 #define OPTION_VAL_PS1_ROM_RU NULL
+#define OPTION_VAL_OPENBIOS_RU "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_RU "Внутреннее разрешение GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_RU NULL
 #define BEETLE_OPT_RENDERER_LABEL_RU NULL
@@ -68864,6 +68931,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_RU },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_RU },
+         { "openbios", OPTION_VAL_OPENBIOS_RU },
          { NULL, NULL },
       },
       "disabled"
@@ -70433,6 +70501,7 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SK NULL
 #define OPTION_VAL_PSXONPSP_SK NULL
 #define OPTION_VAL_PS1_ROM_SK NULL
+#define OPTION_VAL_OPENBIOS_SK "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SK NULL
 #define BEETLE_OPT_RENDERER_LABEL_SK NULL
@@ -70931,6 +71000,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SK },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SK },
+         { "openbios", OPTION_VAL_OPENBIOS_SK },
          { NULL, NULL },
       },
       "disabled"
@@ -72500,6 +72570,7 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SR NULL
 #define OPTION_VAL_PSXONPSP_SR NULL
 #define OPTION_VAL_PS1_ROM_SR NULL
+#define OPTION_VAL_OPENBIOS_SR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SR NULL
 #define BEETLE_OPT_RENDERER_LABEL_SR NULL
@@ -72998,6 +73069,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SR },
+         { "openbios", OPTION_VAL_OPENBIOS_SR },
          { NULL, NULL },
       },
       "disabled"
@@ -74567,6 +74639,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV "Åsidosätt det vanliga regionsspecifika BIOS med ett regionsfritt BIOS om sådant finns. Omstart krävs."
 #define OPTION_VAL_PSXONPSP_SV NULL
 #define OPTION_VAL_PS1_ROM_SV NULL
+#define OPTION_VAL_OPENBIOS_SV "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SV "Intern GPU-upplösning"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SV "Upplösningar högre än ”1x (Inbyggd)” förbättrar 3D-modellernas trohet, men kräver högre prestanda. 2D-element påverkas i allmänhet inte av denna inställning."
 #define BEETLE_OPT_RENDERER_LABEL_SV "Renderare"
@@ -75065,6 +75138,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SV },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SV },
+         { "openbios", OPTION_VAL_OPENBIOS_SV },
          { NULL, NULL },
       },
       "disabled"
@@ -76634,6 +76708,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TR NULL
 #define OPTION_VAL_PSXONPSP_TR NULL
 #define OPTION_VAL_PS1_ROM_TR NULL
+#define OPTION_VAL_OPENBIOS_TR "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TR "Dahili GPU Çözünürlüğü"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TR NULL
 #define BEETLE_OPT_RENDERER_LABEL_TR NULL
@@ -77132,6 +77207,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_TR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_TR },
+         { "openbios", OPTION_VAL_OPENBIOS_TR },
          { NULL, NULL },
       },
       "disabled"
@@ -78701,6 +78777,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TT NULL
 #define OPTION_VAL_PSXONPSP_TT NULL
 #define OPTION_VAL_PS1_ROM_TT NULL
+#define OPTION_VAL_OPENBIOS_TT "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TT NULL
 #define BEETLE_OPT_RENDERER_LABEL_TT NULL
@@ -79199,6 +79276,7 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_TT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_TT },
+         { "openbios", OPTION_VAL_OPENBIOS_TT },
          { NULL, NULL },
       },
       "disabled"
@@ -80768,6 +80846,7 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_UK NULL
 #define OPTION_VAL_PSXONPSP_UK NULL
 #define OPTION_VAL_PS1_ROM_UK "PS3 BIOS"
+#define OPTION_VAL_OPENBIOS_UK "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_UK "Роздільна здатність GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_UK NULL
 #define BEETLE_OPT_RENDERER_LABEL_UK NULL
@@ -81266,6 +81345,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_UK },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_UK },
+         { "openbios", OPTION_VAL_OPENBIOS_UK },
          { NULL, NULL },
       },
       "disabled"
@@ -82835,6 +82915,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VAL NULL
 #define OPTION_VAL_PSXONPSP_VAL NULL
 #define OPTION_VAL_PS1_ROM_VAL NULL
+#define OPTION_VAL_OPENBIOS_VAL "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VAL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VAL NULL
 #define BEETLE_OPT_RENDERER_LABEL_VAL NULL
@@ -83333,6 +83414,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_VAL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_VAL },
+         { "openbios", OPTION_VAL_OPENBIOS_VAL },
          { NULL, NULL },
       },
       "disabled"
@@ -84902,6 +84984,7 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VN "Ghi đè BIOS theo vùng tiêu chuẩn bằng BIOS không phân vùng nếu được tìm thấy.Cần khởi động lại."
 #define OPTION_VAL_PSXONPSP_VN "BIOS PS1 cho PSP"
 #define OPTION_VAL_PS1_ROM_VN "BIOS PS1 cho PS3"
+#define OPTION_VAL_OPENBIOS_VN "OpenBIOS"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VN "Độ phân giải GPU nội bộ"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VN "Độ phân giải cao hơn “1x (Native)” sẽ cải thiện độ chi tiết của các mô hình 3D nhưng yêu cầu hiệu năng cao hơn. Các thành phần 2D nhìn chung không bị ảnh hưởng bởi thiết lập này."
 #define BEETLE_OPT_RENDERER_LABEL_VN "Renderer (Trình kết xuất)"
@@ -85400,6 +85483,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_VN },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_VN },
+         { "openbios", OPTION_VAL_OPENBIOS_VN },
          { NULL, NULL },
       },
       "disabled"

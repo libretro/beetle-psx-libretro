@@ -267,6 +267,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { "psxonpsp", "PSP PS1 BIOS" },
          { "ps1_rom",  "PS3 PS1 BIOS" },
+         { "openbios", "OpenBIOS"     },
          { NULL, NULL },
       },
       "disabled"
