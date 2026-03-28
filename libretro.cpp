@@ -177,7 +177,7 @@ enum
 
 static bool firmware_is_present(unsigned region)
 {
-   static const size_t list_size = 10;
+   static const size_t list_size = 16;
    const char *bios_name_list[list_size];
    const char *bios_sha1 = NULL;
 
@@ -193,21 +193,24 @@ static bool firmware_is_present(unsigned region)
       {
         bios_name_list[0] = "psxonpsp660.bin";
         bios_name_list[1] = "PSXONPSP660.bin";
-        bios_name_list[2] = NULL;
+        bios_name_list[2] = "PSXONPSP660.BIN";
+        bios_name_list[3] = NULL;
         bios_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
       }
       else if (override_bios == 2)
       {
         bios_name_list[0] = "ps1_rom.bin";
         bios_name_list[1] = "PS1_ROM.bin";
-        bios_name_list[2] = NULL;
+        bios_name_list[2] = "PS1_ROM.BIN";
+        bios_name_list[3] = NULL;
         bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
       }
       else if (override_bios == 3)
       {
         bios_name_list[0] = "openbios.bin";
         bios_name_list[1] = "OPENBIOS.bin";
-        bios_name_list[2] = NULL;
+        bios_name_list[2] = "OPENBIOS.BIN";
+        bios_name_list[3] = NULL;
         bios_sha1 = NULL;
       }
 
@@ -259,33 +262,45 @@ static bool firmware_is_present(unsigned region)
    {
       bios_name_list[0] = "scph5500.bin";
       bios_name_list[1] = "SCPH5500.bin";
-      bios_name_list[2] = "SCPH-5500.bin";
-      bios_name_list[3] = NULL;
+      bios_name_list[2] = "SCPH5500.BIN";
+      bios_name_list[3] = "SCPH-5500.bin";
+      bios_name_list[4] = "SCPH-5500.BIN";
+      bios_name_list[5] = NULL;
       bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
    }
    else if (region == REGION_NA)
    {
-      bios_name_list[0] = "scph5501.bin";
-      bios_name_list[1] = "SCPH5501.bin";
-      bios_name_list[2] = "SCPH-5501.bin";
-      bios_name_list[3] = "scph5503.bin";
-      bios_name_list[4] = "SCPH5503.bin";
-      bios_name_list[5] = "SCPH-5503.bin";
-      bios_name_list[6] = "scph7003.bin";
-      bios_name_list[7] = "SCPH7003.bin";
-      bios_name_list[8] = "SCPH-7003.bin";
-      bios_name_list[9] = NULL;
+      bios_name_list[ 0] = "scph5501.bin";
+      bios_name_list[ 1] = "SCPH5501.bin";
+      bios_name_list[ 2] = "SCPH5501.BIN";
+      bios_name_list[ 3] = "SCPH-5501.bin";
+      bios_name_list[ 4] = "SCPH-5501.BIN";
+      bios_name_list[ 5] = "scph5503.bin";
+      bios_name_list[ 6] = "SCPH5503.bin";
+      bios_name_list[ 7] = "SCPH5503.BIN";
+      bios_name_list[ 8] = "SCPH-5503.bin";
+      bios_name_list[ 9] = "SCPH-5503.BIN";
+      bios_name_list[10] = "scph7003.bin";
+      bios_name_list[11] = "SCPH7003.bin";
+      bios_name_list[12] = "SCPH7003.BIN";
+      bios_name_list[13] = "SCPH-7003.bin";
+      bios_name_list[14] = "SCPH-7003.BIN";
+      bios_name_list[15] = NULL;
       bios_sha1 = "0555C6FAE8906F3F09BAF5988F00E55F88E9F30B";
    }
    else if (region == REGION_EU)
    {
-      bios_name_list[0] = "scph5502.bin";
-      bios_name_list[1] = "SCPH5502.bin";
-      bios_name_list[2] = "SCPH-5502.bin";
-      bios_name_list[3] = "scph5552.bin";
-      bios_name_list[4] = "SCPH5552.bin";
-      bios_name_list[5] = "SCPH-5552.bin";
-      bios_name_list[6] = NULL;
+      bios_name_list[ 0] = "scph5502.bin";
+      bios_name_list[ 1] = "SCPH5502.bin";
+      bios_name_list[ 2] = "SCPH5502.BIN";
+      bios_name_list[ 3] = "SCPH-5502.bin";
+      bios_name_list[ 4] = "SCPH-5502.BIN";
+      bios_name_list[ 5] = "scph5552.bin";
+      bios_name_list[ 6] = "SCPH5552.bin";
+      bios_name_list[ 7] = "SCPH5552.BIN";
+      bios_name_list[ 8] = "SCPH-5552.bin";
+      bios_name_list[ 9] = "SCPH-5552.BIN";
+      bios_name_list[10] = NULL;
       bios_sha1 = "F6BC2D1F5EB6593DE7D089C425AC681D6FFFD3F0";
    }
 
