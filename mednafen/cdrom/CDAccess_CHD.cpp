@@ -86,6 +86,7 @@ static const chd_core_file_callbacks chd_callbacks = {
 
 bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 {
+   // Use our own file IO so that we support UTF-8 paths.
    chd_error err = chd_open_core_file_callbacks(&chd_callbacks, &file_stream, CHD_OPEN_READ, NULL, &chd);
    if (err != CHDERR_NONE)
       return false;
