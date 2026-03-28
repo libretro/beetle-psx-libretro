@@ -189,20 +189,26 @@ static bool firmware_is_present(unsigned region)
    {
       if (override_bios == 1)
       {
-			bios_name_list[0] = "psxonpsp660.bin";
-			bios_name_list[1] = "PSXONPSP660.bin";
-			bios_name_list[2] = NULL;
-			bios_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
+        bios_name_list[0] = "psxonpsp660.bin";
+        bios_name_list[1] = "PSXONPSP660.bin";
+        bios_name_list[2] = NULL;
+        bios_sha1 = "96880D1CA92A016FF054BE5159BB06FE03CB4E14";
       }
-		
       else if (override_bios == 2)
       {
-			bios_name_list[0] = "ps1_rom.bin";
-			bios_name_list[1] = "PS1_ROM.bin";
-			bios_name_list[2] = NULL;
-			bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
+        bios_name_list[0] = "ps1_rom.bin";
+        bios_name_list[1] = "PS1_ROM.bin";
+        bios_name_list[2] = NULL;
+        bios_sha1 = "C40146361EB8CF670B19FDC9759190257803CAB7";
       }
-	   
+      else if (override_bios == 3)
+      {
+        bios_name_list[0] = "openbios.bin";
+        bios_name_list[1] = "OPENBIOS.bin";
+        bios_name_list[2] = NULL;
+        bios_sha1 = NULL;
+      }
+
       size_t i;
       for (i = 0; i < list_size; ++i)
       {
@@ -225,10 +231,10 @@ static bool firmware_is_present(unsigned region)
       }
 
       if (firmware_found)
-      {	
+      {
          char obtained_sha1[41];
          sha1_calculate(bios_path, obtained_sha1);
-         if (strcmp(obtained_sha1, bios_sha1))
+         if (bios_sha1 && strcmp(obtained_sha1, bios_sha1))
          {
             log_cb(RETRO_LOG_WARN, "Override firmware found but has invalid SHA1: %s\n", bios_path);
             log_cb(RETRO_LOG_WARN, "Expected SHA1: %s\n", bios_sha1);
@@ -3277,6 +3283,10 @@ static void check_variables(bool startup)
       else if (!strcmp(var.value, "ps1_rom"))
       {
          override_bios = 2;
+      }
+      else if (!strcmp(var.value, "openbios"))
+      {
+         override_bios = 3;
       }
    }
 
