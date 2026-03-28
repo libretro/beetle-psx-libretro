@@ -50,47 +50,43 @@ static const char *DI_CUE_Strings[7] =
    "MODE2/2352"
 };
 
-static uint64_t Callback_fsize(struct chd_core_file *core_file)
+static uint64_t Callback_fsize(void *user_data)
 {
-   FileStream *file_stream = (FileStream*)core_file->argp;
+   FileStream *file_stream = (FileStream*)user_data;
    return file_stream->size();
 }
 
-static size_t Callback_fread(void* buffer, size_t size, size_t count, struct chd_core_file *core_file)
+static size_t Callback_fread(void* buffer, size_t size, size_t count, void *user_data)
 {
    if (size == 0 || count == 0)
       return 0;
 
-   FileStream *file_stream = (FileStream*)core_file->argp;
+   FileStream *file_stream = (FileStream*)user_data;
    return file_stream->read(buffer, count * size) / size;
 }
 
-static int Callback_fclose(struct chd_core_file *core_file)
+static int Callback_fclose(void *user_data)
 {
-   free(core_file);
    return 0;
 }
 
-static int Callback_fseek(struct chd_core_file *core_file, int64_t offset, int whence)
+static int Callback_fseek(void *user_data, int64_t offset, int whence)
 {
-   FileStream *file_stream = (FileStream*)core_file->argp;
+   FileStream *file_stream = (FileStream*)user_data;
    file_stream->seek(offset, whence);
    return 0;
 }
 
+static const chd_core_file_callbacks chd_callbacks = {
+   Callback_fsize,
+   Callback_fread,
+   Callback_fclose,
+   Callback_fseek
+};
+
 bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
 {
-   struct chd_core_file *core_file = (struct chd_core_file*)malloc(sizeof(struct chd_core_file));
-   if (!core_file)
-      return false;
-
-   core_file->argp = &file_stream;
-   core_file->fsize = Callback_fsize;
-   core_file->fread = Callback_fread;
-   core_file->fclose = Callback_fclose;
-   core_file->fseek = Callback_fseek;
-
-   chd_error err = chd_open_core_file(core_file, CHD_OPEN_READ, NULL, &chd);
+   chd_error err = chd_open_core_file_callbacks(&chd_callbacks, &file_stream, CHD_OPEN_READ, NULL, &chd);
    if (err != CHDERR_NONE)
       return false;
 
@@ -98,10 +94,7 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
    {
       err = chd_precache(chd);
       if (err != CHDERR_NONE)
-      {
-         Callback_fclose(core_file);
          return false;
-      }
    }
 
    /* allocate storage for sector reads */
@@ -148,13 +141,11 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
       if (strncmp(type, "MODE2_RAW", 9) != 0 && strncmp(type, "AUDIO", 5) != 0)
       {
          log_cb(RETRO_LOG_ERROR, "chd_parse track type %s unsupported\n", type);
-         Callback_fclose(core_file);
          return false;
       }
       else if (strncmp(subtype, "NONE", 4) != 0)
       {
          log_cb(RETRO_LOG_ERROR, "chd_parse track subtype %s unsupported\n", subtype);
-         Callback_fclose(core_file);
          return false;
       }
 
