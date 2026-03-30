@@ -59,6 +59,10 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/linux-i686.yml'
 
+  # Linux 64-bit (ARM)
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/linux-aarch64.yml'
+
   # MacOS 64-bit
   - project: 'libretro-infrastructure/ci-templates'
     file: '/osx-x64.yml'
@@ -145,6 +149,18 @@ libretro-build-linux-x64-hw:
 libretro-build-linux-i686-hw:
   extends:
     - .libretro-linux-i686-make-default
+    - .core-defs-hw-lightrec-static-libcplusplus
+
+# Linux 64-bit (ARM)
+libretro-build-linux-aarch64:
+  extends:
+    - .libretro-linux-aarch64-make-default
+    - .core-defs-lightrec-static-libcplusplus
+
+# Linux 64-bit (ARM, HW)
+libretro-build-linux-aarch64-hw:
+  extends:
+    - .libretro-linux-aarch64-make-default
     - .core-defs-hw-lightrec-static-libcplusplus
 
 # MacOS 64-bit
