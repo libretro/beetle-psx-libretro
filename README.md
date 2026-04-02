@@ -11,6 +11,7 @@ Notable additions in this fork are:
 * An OpenGL 3.3 renderer, developed by simias;
 * A Vulkan renderer, developed by TinyTiger;
 * PGXP perspective correct texturing and subpixel precision, developed by iCatButler;
+* OpenBIOS, allowing the emulator to be used without a BIOS file;
 
 ## Building
 
