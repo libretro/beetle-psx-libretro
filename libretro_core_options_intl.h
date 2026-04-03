@@ -155,7 +155,7 @@ extern "C" {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_AR NULL
 #define OPTION_VAL_PSXONPSP_AR NULL
 #define OPTION_VAL_PS1_ROM_AR NULL
-#define OPTION_VAL_OPENBIOS_AR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_AR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_AR NULL
 #define BEETLE_OPT_RENDERER_LABEL_AR NULL
@@ -654,7 +654,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_AR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_AR },
-         { "openbios", OPTION_VAL_OPENBIOS_AR },
+         { "openbios", OPTION_VAL_OPENBIOS_AR     },
          { NULL, NULL },
       },
       "disabled"
@@ -2224,7 +2224,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_AST NULL
 #define OPTION_VAL_PSXONPSP_AST "BIOS de PS1 de la PSP"
 #define OPTION_VAL_PS1_ROM_AST "BIOS de PS1 de la PS3"
-#define OPTION_VAL_OPENBIOS_AST "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_AST NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AST NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_AST NULL
 #define BEETLE_OPT_RENDERER_LABEL_AST NULL
@@ -2723,7 +2723,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_AST },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_AST },
-         { "openbios", OPTION_VAL_OPENBIOS_AST },
+         { "openbios", OPTION_VAL_OPENBIOS_AST     },
          { NULL, NULL },
       },
       "disabled"
@@ -4293,7 +4293,7 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_BE NULL
 #define OPTION_VAL_PSXONPSP_BE NULL
 #define OPTION_VAL_PS1_ROM_BE NULL
-#define OPTION_VAL_OPENBIOS_BE "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_BE NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_BE "Унутраная раздзяляльнасць"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_BE NULL
 #define BEETLE_OPT_RENDERER_LABEL_BE NULL
@@ -4792,7 +4792,7 @@ struct retro_core_option_v2_definition option_defs_be[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_BE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_BE },
-         { "openbios", OPTION_VAL_OPENBIOS_BE },
+         { "openbios", OPTION_VAL_OPENBIOS_BE     },
          { NULL, NULL },
       },
       "disabled"
@@ -6362,7 +6362,7 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_BG NULL
 #define OPTION_VAL_PSXONPSP_BG NULL
 #define OPTION_VAL_PS1_ROM_BG NULL
-#define OPTION_VAL_OPENBIOS_BG "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_BG NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_BG NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_BG NULL
 #define BEETLE_OPT_RENDERER_LABEL_BG NULL
@@ -6861,7 +6861,7 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_BG },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_BG },
-         { "openbios", OPTION_VAL_OPENBIOS_BG },
+         { "openbios", OPTION_VAL_OPENBIOS_BG     },
          { NULL, NULL },
       },
       "disabled"
@@ -8431,7 +8431,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CA "Sobreescriu la regió estàndard específica de la BIOS per una sense regió. Cal reiniciar."
 #define OPTION_VAL_PSXONPSP_CA NULL
 #define OPTION_VAL_PS1_ROM_CA NULL
-#define OPTION_VAL_OPENBIOS_CA "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_CA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CA "Resolució interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CA "Resolucions superiors a '1x (Natiu)' millora la definició dels models 3D a canvi d'incrementar els requisits de maquinari. Els models 2D no solen veure's afectats per aquest paràmetre."
 #define BEETLE_OPT_RENDERER_LABEL_CA "Renderitzador"
@@ -8930,7 +8930,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CA },
-         { "openbios", OPTION_VAL_OPENBIOS_CA },
+         { "openbios", OPTION_VAL_OPENBIOS_CA     },
          { NULL, NULL },
       },
       "disabled"
@@ -10500,7 +10500,7 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHS NULL
 #define OPTION_VAL_PSXONPSP_CHS NULL
 #define OPTION_VAL_PS1_ROM_CHS NULL
-#define OPTION_VAL_OPENBIOS_CHS "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_CHS NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHS "内部 GPU 分辨率"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHS NULL
 #define BEETLE_OPT_RENDERER_LABEL_CHS NULL
@@ -10999,7 +10999,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CHS },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CHS },
-         { "openbios", OPTION_VAL_OPENBIOS_CHS },
+         { "openbios", OPTION_VAL_OPENBIOS_CHS     },
          { NULL, NULL },
       },
       "disabled"
@@ -12569,7 +12569,7 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CHT NULL
 #define OPTION_VAL_PSXONPSP_CHT "PSP內建 (psxonpsp660.bin)"
 #define OPTION_VAL_PS1_ROM_CHT "PS3內建 (ps1_rom.bin)"
-#define OPTION_VAL_OPENBIOS_CHT "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_CHT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CHT "內部解析度 (GPU)"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CHT NULL
 #define BEETLE_OPT_RENDERER_LABEL_CHT NULL
@@ -13068,7 +13068,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CHT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CHT },
-         { "openbios", OPTION_VAL_OPENBIOS_CHT },
+         { "openbios", OPTION_VAL_OPENBIOS_CHT     },
          { NULL, NULL },
       },
       "disabled"
@@ -14638,7 +14638,7 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CS NULL
 #define OPTION_VAL_PSXONPSP_CS NULL
 #define OPTION_VAL_PS1_ROM_CS NULL
-#define OPTION_VAL_OPENBIOS_CS "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_CS NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CS "Interní rozlišení GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CS NULL
 #define BEETLE_OPT_RENDERER_LABEL_CS NULL
@@ -15137,7 +15137,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CS },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CS },
-         { "openbios", OPTION_VAL_OPENBIOS_CS },
+         { "openbios", OPTION_VAL_OPENBIOS_CS     },
          { NULL, NULL },
       },
       "disabled"
@@ -16707,7 +16707,7 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_CY NULL
 #define OPTION_VAL_PSXONPSP_CY NULL
 #define OPTION_VAL_PS1_ROM_CY NULL
-#define OPTION_VAL_OPENBIOS_CY "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_CY NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_CY NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_CY NULL
 #define BEETLE_OPT_RENDERER_LABEL_CY NULL
@@ -17206,7 +17206,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_CY },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_CY },
-         { "openbios", OPTION_VAL_OPENBIOS_CY },
+         { "openbios", OPTION_VAL_OPENBIOS_CY     },
          { NULL, NULL },
       },
       "disabled"
@@ -18776,7 +18776,7 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_DA NULL
 #define OPTION_VAL_PSXONPSP_DA NULL
 #define OPTION_VAL_PS1_ROM_DA NULL
-#define OPTION_VAL_OPENBIOS_DA "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_DA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_DA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_DA NULL
 #define BEETLE_OPT_RENDERER_LABEL_DA NULL
@@ -19275,7 +19275,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_DA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_DA },
-         { "openbios", OPTION_VAL_OPENBIOS_DA },
+         { "openbios", OPTION_VAL_OPENBIOS_DA     },
          { NULL, NULL },
       },
       "disabled"
@@ -20845,7 +20845,7 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_DE "Das Standard-regionsspezifische BIOS mit einem regionenfreien BIOS überschreiben, falls vorhanden. Neustart erforderlich."
 #define OPTION_VAL_PSXONPSP_DE NULL
 #define OPTION_VAL_PS1_ROM_DE NULL
-#define OPTION_VAL_OPENBIOS_DE "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_DE NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_DE "Interne GPU-Auflösung"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_DE "Auflösungen, höher als „1x (Native)“, verbessern die Genauigkeit von 3D-Modellen, erhöhen jedoch die Leistungsanforderungen. 2D-Elemente sind von dieser Einstellung in der Regel nicht betroffen."
 #define BEETLE_OPT_RENDERER_LABEL_DE NULL
@@ -21344,7 +21344,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_DE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_DE },
-         { "openbios", OPTION_VAL_OPENBIOS_DE },
+         { "openbios", OPTION_VAL_OPENBIOS_DE     },
          { NULL, NULL },
       },
       "disabled"
@@ -22914,7 +22914,7 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EL NULL
 #define OPTION_VAL_PSXONPSP_EL NULL
 #define OPTION_VAL_PS1_ROM_EL NULL
-#define OPTION_VAL_OPENBIOS_EL "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_EL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EL NULL
 #define BEETLE_OPT_RENDERER_LABEL_EL NULL
@@ -23413,7 +23413,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EL },
-         { "openbios", OPTION_VAL_OPENBIOS_EL },
+         { "openbios", OPTION_VAL_OPENBIOS_EL     },
          { NULL, NULL },
       },
       "disabled"
@@ -24983,7 +24983,7 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EN NULL
 #define OPTION_VAL_PSXONPSP_EN NULL
 #define OPTION_VAL_PS1_ROM_EN NULL
-#define OPTION_VAL_OPENBIOS_EN "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_EN NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EN NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EN NULL
 #define BEETLE_OPT_RENDERER_LABEL_EN NULL
@@ -25482,7 +25482,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EN },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EN },
-         { "openbios", OPTION_VAL_OPENBIOS_EN },
+         { "openbios", OPTION_VAL_OPENBIOS_EN     },
          { NULL, NULL },
       },
       "disabled"
@@ -27052,7 +27052,7 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_EO NULL
 #define OPTION_VAL_PSXONPSP_EO NULL
 #define OPTION_VAL_PS1_ROM_EO NULL
-#define OPTION_VAL_OPENBIOS_EO "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_EO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_EO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_EO NULL
 #define BEETLE_OPT_RENDERER_LABEL_EO NULL
@@ -27551,7 +27551,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_EO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_EO },
-         { "openbios", OPTION_VAL_OPENBIOS_EO },
+         { "openbios", OPTION_VAL_OPENBIOS_EO     },
          { NULL, NULL },
       },
       "disabled"
@@ -29121,7 +29121,7 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ES "Reemplaza la BIOS correspondiente a la región del contenido con una de región libre (si está disponible). Es necesario reiniciar."
 #define OPTION_VAL_PSXONPSP_ES "BIOS de PS1 usada en PSP"
 #define OPTION_VAL_PS1_ROM_ES "BIOS de PS1 usada en PS3"
-#define OPTION_VAL_OPENBIOS_ES "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_ES NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ES "Resolución interna de la GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ES "Toda resolución superior a «1x (Nativa)» mejorarán la fidelidad de los modelos 3D a costa de aumentar los requisitos de rendimiento. Los elementos 2D no suelen verse afectados por este ajuste."
 #define BEETLE_OPT_RENDERER_LABEL_ES "Renderizador"
@@ -29620,7 +29620,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_ES },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_ES },
-         { "openbios", OPTION_VAL_OPENBIOS_ES },
+         { "openbios", OPTION_VAL_OPENBIOS_ES     },
          { NULL, NULL },
       },
       "disabled"
@@ -31190,7 +31190,7 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FA NULL
 #define OPTION_VAL_PSXONPSP_FA NULL
 #define OPTION_VAL_PS1_ROM_FA NULL
-#define OPTION_VAL_OPENBIOS_FA "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_FA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FA NULL
 #define BEETLE_OPT_RENDERER_LABEL_FA NULL
@@ -31689,7 +31689,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FA },
-         { "openbios", OPTION_VAL_OPENBIOS_FA },
+         { "openbios", OPTION_VAL_OPENBIOS_FA     },
          { NULL, NULL },
       },
       "disabled"
@@ -33259,7 +33259,7 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FI "Korvaa vakioaluekohtaisen BIOS:sin aluevapaalla, mikäli sellainen löytyy. Uudelleenkäynnistys vaaditaan."
 #define OPTION_VAL_PSXONPSP_FI "PSP:n PS1 BIOS"
 #define OPTION_VAL_PS1_ROM_FI "PS3:n PS1 BIOS"
-#define OPTION_VAL_OPENBIOS_FI "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_FI NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FI "Sisäisen näytönohjaimen resoluutio"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FI "Korkeammat resoluutiot kuin 1x (Natiivi) parantaa 3D-mallien tarkkuutta lisääntyvät suorituskukuvaatimuksien kustannuksella. Tämä asetus ei yleensä vaikuta 2D-elementteihin."
 #define BEETLE_OPT_RENDERER_LABEL_FI "Renderoija"
@@ -33758,7 +33758,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FI },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FI },
-         { "openbios", OPTION_VAL_OPENBIOS_FI },
+         { "openbios", OPTION_VAL_OPENBIOS_FI     },
          { NULL, NULL },
       },
       "disabled"
@@ -35328,7 +35328,7 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_FR "Remplacer le BIOS spécifique à la région standard par un BIOS dézoné s'il est trouvé. Redémarrage requis."
 #define OPTION_VAL_PSXONPSP_FR "BIOS PS1 de la PSP"
 #define OPTION_VAL_PS1_ROM_FR "BIOS PS1 de la PS3"
-#define OPTION_VAL_OPENBIOS_FR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_FR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_FR "Résolution du processeur graphique interne"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_FR "Les résolutions supérieures à 'x1 (native)' améliorent la fidélité des modèles 3D au détriment des exigences de performance accrues. Les éléments 2D ne sont généralement pas affectés par ce réglage."
 #define BEETLE_OPT_RENDERER_LABEL_FR "Moteur de rendu"
@@ -35827,7 +35827,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_FR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_FR },
-         { "openbios", OPTION_VAL_OPENBIOS_FR },
+         { "openbios", OPTION_VAL_OPENBIOS_FR     },
          { NULL, NULL },
       },
       "disabled"
@@ -37397,7 +37397,7 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GA "Sáraigh an BIOS caighdeánach atá sainiúil don réigiún le ceann saor ó réigiún má aimsítear é. Atosú ag teastáil."
 #define OPTION_VAL_PSXONPSP_GA NULL
 #define OPTION_VAL_PS1_ROM_GA NULL
-#define OPTION_VAL_OPENBIOS_GA "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_GA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GA "Rún GPU Inmheánach"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GA "Feabhsaíonn taifeach níos airde ná '1x (Dúchasach)' dílseacht na samhlacha 3T ar chostas riachtanais feidhmíochta méadaithe. Ní bhíonn tionchar ag an socrú seo ar eilimintí 2T go ginearálta."
 #define BEETLE_OPT_RENDERER_LABEL_GA "Rindreálaí"
@@ -37896,7 +37896,7 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_GA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_GA },
-         { "openbios", OPTION_VAL_OPENBIOS_GA },
+         { "openbios", OPTION_VAL_OPENBIOS_GA     },
          { NULL, NULL },
       },
       "disabled"
@@ -39466,7 +39466,7 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_GL "Sobrescribir o BIOS estándar específico dunha rexión cun BIOS libre de rexión se se atopa. É necesario reiniciar."
 #define OPTION_VAL_PSXONPSP_GL NULL
 #define OPTION_VAL_PS1_ROM_GL NULL
-#define OPTION_VAL_OPENBIOS_GL "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_GL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_GL "Resolución interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_GL "Resolucións superiores a “1x (Nativo)” melloran a fidelidade dos modelos 3D a cambio de maiores requirimentos de rendemento. Os elementos 2D xeralmente non se ven afectados por esta configuración."
 #define BEETLE_OPT_RENDERER_LABEL_GL "Motor de renderizado"
@@ -39965,7 +39965,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_GL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_GL },
-         { "openbios", OPTION_VAL_OPENBIOS_GL },
+         { "openbios", OPTION_VAL_OPENBIOS_GL     },
          { NULL, NULL },
       },
       "disabled"
@@ -41535,7 +41535,7 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HE NULL
 #define OPTION_VAL_PSXONPSP_HE NULL
 #define OPTION_VAL_PS1_ROM_HE NULL
-#define OPTION_VAL_OPENBIOS_HE "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_HE NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HE NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HE NULL
 #define BEETLE_OPT_RENDERER_LABEL_HE NULL
@@ -42034,7 +42034,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HE },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HE },
-         { "openbios", OPTION_VAL_OPENBIOS_HE },
+         { "openbios", OPTION_VAL_OPENBIOS_HE     },
          { NULL, NULL },
       },
       "disabled"
@@ -43604,7 +43604,7 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HR NULL
 #define OPTION_VAL_PSXONPSP_HR NULL
 #define OPTION_VAL_PS1_ROM_HR NULL
-#define OPTION_VAL_OPENBIOS_HR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_HR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HR NULL
 #define BEETLE_OPT_RENDERER_LABEL_HR NULL
@@ -44103,7 +44103,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HR },
-         { "openbios", OPTION_VAL_OPENBIOS_HR },
+         { "openbios", OPTION_VAL_OPENBIOS_HR     },
          { NULL, NULL },
       },
       "disabled"
@@ -45673,7 +45673,7 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_HU NULL
 #define OPTION_VAL_PSXONPSP_HU NULL
 #define OPTION_VAL_PS1_ROM_HU NULL
-#define OPTION_VAL_OPENBIOS_HU "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_HU NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_HU "A GPU belső felbontása"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_HU NULL
 #define BEETLE_OPT_RENDERER_LABEL_HU NULL
@@ -46172,7 +46172,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_HU },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_HU },
-         { "openbios", OPTION_VAL_OPENBIOS_HU },
+         { "openbios", OPTION_VAL_OPENBIOS_HU     },
          { NULL, NULL },
       },
       "disabled"
@@ -47742,7 +47742,7 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_ID NULL
 #define OPTION_VAL_PSXONPSP_ID NULL
 #define OPTION_VAL_PS1_ROM_ID NULL
-#define OPTION_VAL_OPENBIOS_ID "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_ID NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_ID "Resolusi Internal GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_ID NULL
 #define BEETLE_OPT_RENDERER_LABEL_ID NULL
@@ -48241,7 +48241,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_ID },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_ID },
-         { "openbios", OPTION_VAL_OPENBIOS_ID },
+         { "openbios", OPTION_VAL_OPENBIOS_ID     },
          { NULL, NULL },
       },
       "disabled"
@@ -49811,7 +49811,7 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_IT "Sovrascrive il BIOS specifico della regione standard con uno senza regione se trovato. È necessario il riavvio."
 #define OPTION_VAL_PSXONPSP_IT NULL
 #define OPTION_VAL_PS1_ROM_IT NULL
-#define OPTION_VAL_OPENBIOS_IT "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_IT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_IT "Risoluzione GPU Interna"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_IT "Risoluzioni maggiori di '1x (Nativo)' migliorano la fedeltà dei modelli 3D a spese di requisiti di performance più alti. Elementi 2D sono generalmente non condizionati da questa impostazione."
 #define BEETLE_OPT_RENDERER_LABEL_IT NULL
@@ -50310,7 +50310,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_IT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_IT },
-         { "openbios", OPTION_VAL_OPENBIOS_IT },
+         { "openbios", OPTION_VAL_OPENBIOS_IT     },
          { NULL, NULL },
       },
       "disabled"
@@ -51880,7 +51880,7 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_JA NULL
 #define OPTION_VAL_PSXONPSP_JA NULL
 #define OPTION_VAL_PS1_ROM_JA NULL
-#define OPTION_VAL_OPENBIOS_JA "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_JA NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_JA "内部 GPU 解像度"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_JA NULL
 #define BEETLE_OPT_RENDERER_LABEL_JA NULL
@@ -52379,7 +52379,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_JA },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_JA },
-         { "openbios", OPTION_VAL_OPENBIOS_JA },
+         { "openbios", OPTION_VAL_OPENBIOS_JA     },
          { NULL, NULL },
       },
       "disabled"
@@ -53949,7 +53949,7 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_KO "존재할 경우, 기존의 지역 제한 BIOS를 지역 제한이 없는 BIOS로 대체합니다. 재시작이 필요합니다."
 #define OPTION_VAL_PSXONPSP_KO NULL
 #define OPTION_VAL_PS1_ROM_KO NULL
-#define OPTION_VAL_OPENBIOS_KO "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_KO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_KO "내부 GPU 해상도"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_KO "'1x (네이티브)'보다 높은 값으로 설정할 경우 3D 모델의 품질이 개선되지만 요구되는 성능이 높아집니다. 2D 요소들은 일반적으로 이 설정에 아무런 영향을 받지 않습니다."
 #define BEETLE_OPT_RENDERER_LABEL_KO "렌더러"
@@ -54448,7 +54448,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_KO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_KO },
-         { "openbios", OPTION_VAL_OPENBIOS_KO },
+         { "openbios", OPTION_VAL_OPENBIOS_KO     },
          { NULL, NULL },
       },
       "disabled"
@@ -56018,7 +56018,7 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NL NULL
 #define OPTION_VAL_PSXONPSP_NL NULL
 #define OPTION_VAL_PS1_ROM_NL NULL
-#define OPTION_VAL_OPENBIOS_NL "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_NL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NL NULL
 #define BEETLE_OPT_RENDERER_LABEL_NL NULL
@@ -56517,7 +56517,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_NL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_NL },
-         { "openbios", OPTION_VAL_OPENBIOS_NL },
+         { "openbios", OPTION_VAL_OPENBIOS_NL     },
          { NULL, NULL },
       },
       "disabled"
@@ -58087,7 +58087,7 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_NO NULL
 #define OPTION_VAL_PSXONPSP_NO NULL
 #define OPTION_VAL_PS1_ROM_NO NULL
-#define OPTION_VAL_OPENBIOS_NO "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_NO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_NO NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_NO NULL
 #define BEETLE_OPT_RENDERER_LABEL_NO NULL
@@ -58586,7 +58586,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_NO },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_NO },
-         { "openbios", OPTION_VAL_OPENBIOS_NO },
+         { "openbios", OPTION_VAL_OPENBIOS_NO     },
          { NULL, NULL },
       },
       "disabled"
@@ -60156,7 +60156,7 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_OR NULL
 #define OPTION_VAL_PSXONPSP_OR NULL
 #define OPTION_VAL_PS1_ROM_OR NULL
-#define OPTION_VAL_OPENBIOS_OR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_OR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_OR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_OR NULL
 #define BEETLE_OPT_RENDERER_LABEL_OR NULL
@@ -60655,7 +60655,7 @@ struct retro_core_option_v2_definition option_defs_or[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_OR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_OR },
-         { "openbios", OPTION_VAL_OPENBIOS_OR },
+         { "openbios", OPTION_VAL_OPENBIOS_OR     },
          { NULL, NULL },
       },
       "disabled"
@@ -62225,7 +62225,7 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PL NULL
 #define OPTION_VAL_PSXONPSP_PL NULL
 #define OPTION_VAL_PS1_ROM_PL NULL
-#define OPTION_VAL_OPENBIOS_PL "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_PL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PL "Wewnętrzna rozdzielczość GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PL NULL
 #define BEETLE_OPT_RENDERER_LABEL_PL NULL
@@ -62724,7 +62724,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PL },
-         { "openbios", OPTION_VAL_OPENBIOS_PL },
+         { "openbios", OPTION_VAL_OPENBIOS_PL     },
          { NULL, NULL },
       },
       "disabled"
@@ -64294,7 +64294,7 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PT_BR "Substitui a BIOS padrão específica da região por uma BIOS livre de região, se encontrada. Reinicialização necessária."
 #define OPTION_VAL_PSXONPSP_PT_BR "BIOS de PS1 de PSP"
 #define OPTION_VAL_PS1_ROM_PT_BR "BIOS de PS1 de PS3"
-#define OPTION_VAL_OPENBIOS_PT_BR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_PT_BR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_BR "Resolução interna da GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_BR "Resoluções superiores a '1x (Nativa)' melhoram a fidelidade dos modelos 3D, ao custo de maiores requisitos de desempenho. Elementos 2D geralmente não são afetados por esta configuração."
 #define BEETLE_OPT_RENDERER_LABEL_PT_BR "Renderizador"
@@ -64793,7 +64793,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PT_BR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PT_BR },
-         { "openbios", OPTION_VAL_OPENBIOS_PT_BR },
+         { "openbios", OPTION_VAL_OPENBIOS_PT_BR     },
          { NULL, NULL },
       },
       "disabled"
@@ -66363,7 +66363,7 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_PT_PT NULL
 #define OPTION_VAL_PSXONPSP_PT_PT NULL
 #define OPTION_VAL_PS1_ROM_PT_PT NULL
-#define OPTION_VAL_OPENBIOS_PT_PT "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_PT_PT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_PT_PT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_PT_PT NULL
 #define BEETLE_OPT_RENDERER_LABEL_PT_PT NULL
@@ -66862,7 +66862,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_PT_PT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_PT_PT },
-         { "openbios", OPTION_VAL_OPENBIOS_PT_PT },
+         { "openbios", OPTION_VAL_OPENBIOS_PT_PT     },
          { NULL, NULL },
       },
       "disabled"
@@ -68432,7 +68432,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_RU NULL
 #define OPTION_VAL_PSXONPSP_RU NULL
 #define OPTION_VAL_PS1_ROM_RU NULL
-#define OPTION_VAL_OPENBIOS_RU "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_RU NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_RU "Внутреннее разрешение GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_RU NULL
 #define BEETLE_OPT_RENDERER_LABEL_RU NULL
@@ -68931,7 +68931,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_RU },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_RU },
-         { "openbios", OPTION_VAL_OPENBIOS_RU },
+         { "openbios", OPTION_VAL_OPENBIOS_RU     },
          { NULL, NULL },
       },
       "disabled"
@@ -70501,7 +70501,7 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SK NULL
 #define OPTION_VAL_PSXONPSP_SK NULL
 #define OPTION_VAL_PS1_ROM_SK NULL
-#define OPTION_VAL_OPENBIOS_SK "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_SK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SK NULL
 #define BEETLE_OPT_RENDERER_LABEL_SK NULL
@@ -71000,7 +71000,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SK },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SK },
-         { "openbios", OPTION_VAL_OPENBIOS_SK },
+         { "openbios", OPTION_VAL_OPENBIOS_SK     },
          { NULL, NULL },
       },
       "disabled"
@@ -72570,7 +72570,7 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SR NULL
 #define OPTION_VAL_PSXONPSP_SR NULL
 #define OPTION_VAL_PS1_ROM_SR NULL
-#define OPTION_VAL_OPENBIOS_SR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_SR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SR NULL
 #define BEETLE_OPT_RENDERER_LABEL_SR NULL
@@ -73069,7 +73069,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SR },
-         { "openbios", OPTION_VAL_OPENBIOS_SR },
+         { "openbios", OPTION_VAL_OPENBIOS_SR     },
          { NULL, NULL },
       },
       "disabled"
@@ -74639,7 +74639,7 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_SV "Åsidosätt det vanliga regionsspecifika BIOS med ett regionsfritt BIOS om sådant finns. Omstart krävs."
 #define OPTION_VAL_PSXONPSP_SV NULL
 #define OPTION_VAL_PS1_ROM_SV NULL
-#define OPTION_VAL_OPENBIOS_SV "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_SV NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_SV "Intern GPU-upplösning"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_SV "Upplösningar högre än ”1x (Inbyggd)” förbättrar 3D-modellernas trohet, men kräver högre prestanda. 2D-element påverkas i allmänhet inte av denna inställning."
 #define BEETLE_OPT_RENDERER_LABEL_SV "Renderare"
@@ -75138,7 +75138,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_SV },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_SV },
-         { "openbios", OPTION_VAL_OPENBIOS_SV },
+         { "openbios", OPTION_VAL_OPENBIOS_SV     },
          { NULL, NULL },
       },
       "disabled"
@@ -76591,6 +76591,2075 @@ struct retro_core_options_v2 options_sv = {
    option_defs_sv
 };
 
+/* RETRO_LANGUAGE_TH */
+
+#define CATEGORY_SYSTEM_LABEL_TH NULL
+#define CATEGORY_SYSTEM_INFO_0_TH NULL
+#define CATEGORY_VIDEO_LABEL_TH "วิดีโอ"
+#define CATEGORY_VIDEO_INFO_0_TH NULL
+#define CATEGORY_PGXP_LABEL_TH NULL
+#define CATEGORY_PGXP_INFO_0_TH NULL
+#define CATEGORY_OSD_LABEL_TH "การแสดงผลบนหน้าจอ"
+#define CATEGORY_OSD_INFO_0_TH NULL
+#define CATEGORY_INPUT_LABEL_TH "การควบคุม"
+#define CATEGORY_INPUT_INFO_0_TH NULL
+#define CATEGORY_MEMCARDS_LABEL_TH NULL
+#define CATEGORY_MEMCARDS_INFO_0_TH NULL
+#define CATEGORY_HACKS_LABEL_TH NULL
+#define CATEGORY_HACKS_INFO_0_TH NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_TH NULL
+#define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_TH NULL
+#define OPTION_VAL_50_TH NULL
+#define OPTION_VAL_60_TH NULL
+#define OPTION_VAL_70_TH NULL
+#define OPTION_VAL_80_TH NULL
+#define OPTION_VAL_90_TH NULL
+#define OPTION_VAL_100_TH NULL
+#define OPTION_VAL_110_TH NULL
+#define OPTION_VAL_120_TH NULL
+#define OPTION_VAL_130_TH NULL
+#define OPTION_VAL_140_TH NULL
+#define OPTION_VAL_150_TH NULL
+#define OPTION_VAL_160_TH NULL
+#define OPTION_VAL_170_TH NULL
+#define OPTION_VAL_180_TH NULL
+#define OPTION_VAL_190_TH NULL
+#define OPTION_VAL_200_TH NULL
+#define OPTION_VAL_210_TH NULL
+#define OPTION_VAL_220_TH NULL
+#define OPTION_VAL_230_TH NULL
+#define OPTION_VAL_240_TH NULL
+#define OPTION_VAL_250_TH NULL
+#define OPTION_VAL_260_TH NULL
+#define OPTION_VAL_270_TH NULL
+#define OPTION_VAL_280_TH NULL
+#define OPTION_VAL_290_TH NULL
+#define OPTION_VAL_300_TH NULL
+#define OPTION_VAL_310_TH NULL
+#define OPTION_VAL_320_TH NULL
+#define OPTION_VAL_330_TH NULL
+#define OPTION_VAL_340_TH NULL
+#define OPTION_VAL_350_TH NULL
+#define OPTION_VAL_360_TH NULL
+#define OPTION_VAL_370_TH NULL
+#define OPTION_VAL_380_TH NULL
+#define OPTION_VAL_390_TH NULL
+#define OPTION_VAL_400_TH NULL
+#define OPTION_VAL_410_TH NULL
+#define OPTION_VAL_420_TH NULL
+#define OPTION_VAL_430_TH NULL
+#define OPTION_VAL_440_TH NULL
+#define OPTION_VAL_450_TH NULL
+#define OPTION_VAL_460_TH NULL
+#define OPTION_VAL_470_TH NULL
+#define OPTION_VAL_480_TH NULL
+#define OPTION_VAL_490_TH NULL
+#define OPTION_VAL_500_TH NULL
+#define OPTION_VAL_510_TH NULL
+#define OPTION_VAL_520_TH NULL
+#define OPTION_VAL_530_TH NULL
+#define OPTION_VAL_540_TH NULL
+#define OPTION_VAL_550_TH NULL
+#define OPTION_VAL_560_TH NULL
+#define OPTION_VAL_570_TH NULL
+#define OPTION_VAL_580_TH NULL
+#define OPTION_VAL_590_TH NULL
+#define OPTION_VAL_600_TH NULL
+#define OPTION_VAL_610_TH NULL
+#define OPTION_VAL_620_TH NULL
+#define OPTION_VAL_630_TH NULL
+#define OPTION_VAL_640_TH NULL
+#define OPTION_VAL_650_TH NULL
+#define OPTION_VAL_660_TH NULL
+#define OPTION_VAL_670_TH NULL
+#define OPTION_VAL_680_TH NULL
+#define OPTION_VAL_690_TH NULL
+#define OPTION_VAL_700_TH NULL
+#define OPTION_VAL_710_TH NULL
+#define OPTION_VAL_720_TH NULL
+#define OPTION_VAL_730_TH NULL
+#define OPTION_VAL_740_TH NULL
+#define OPTION_VAL_750_TH NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_LABEL_TH NULL
+#define BEETLE_OPT_GPU_OVERCLOCK_INFO_0_TH NULL
+#define OPTION_VAL_1X_NATIVE_TH NULL
+#define OPTION_VAL_2X_TH NULL
+#define OPTION_VAL_4X_TH NULL
+#define OPTION_VAL_8X_TH NULL
+#define OPTION_VAL_16X_TH NULL
+#define OPTION_VAL_32X_TH NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_LABEL_TH NULL
+#define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_TH NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_TH NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_TH NULL
+#define OPTION_VAL_SYNC_TH NULL
+#define OPTION_VAL_ASYNC_TH NULL
+#define OPTION_VAL_PRECACHE_TH NULL
+#define BEETLE_OPT_CD_FASTLOAD_LABEL_TH NULL
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_TH NULL
+#define OPTION_VAL_2X_NATIVE_TH NULL
+#define OPTION_VAL_6X_TH NULL
+#define OPTION_VAL_10X_TH NULL
+#define OPTION_VAL_12X_TH NULL
+#define OPTION_VAL_14X_TH NULL
+#define BEETLE_OPT_SKIP_BIOS_LABEL_TH NULL
+#define BEETLE_OPT_SKIP_BIOS_INFO_0_TH NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_TH NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TH NULL
+#define OPTION_VAL_PSXONPSP_TH NULL
+#define OPTION_VAL_PS1_ROM_TH NULL
+#define OPTION_VAL_OPENBIOS_TH NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TH NULL
+#define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TH NULL
+#define BEETLE_OPT_RENDERER_LABEL_TH NULL
+#define BEETLE_OPT_RENDERER_INFO_0_TH NULL
+#define OPTION_VAL_HARDWARE_TH NULL
+#define OPTION_VAL_HARDWARE_GL_TH NULL
+#define OPTION_VAL_HARDWARE_VK_TH NULL
+#define OPTION_VAL_SOFTWARE_TH NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TH NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TH NULL
+#define BEETLE_OPT_DEPTH_LABEL_TH NULL
+#define BEETLE_OPT_DEPTH_INFO_0_TH NULL
+#define OPTION_VAL_16BPP_NATIVE_TH NULL
+#define OPTION_VAL_32BPP_TH NULL
+#define BEETLE_OPT_DITHER_MODE_LABEL_TH NULL
+#define BEETLE_OPT_DITHER_MODE_INFO_0_TH NULL
+#define OPTION_VAL_INTERNAL_RESOLUTION_TH NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TH NULL
+#define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_TH NULL
+#define BEETLE_OPT_FILTER_LABEL_TH NULL
+#define BEETLE_OPT_FILTER_INFO_0_TH NULL
+#define OPTION_VAL_NEAREST_TH NULL
+#define OPTION_VAL_SABR_TH NULL
+#define OPTION_VAL_XBR_TH NULL
+#define OPTION_VAL_BILINEAR_TH NULL
+#define OPTION_VAL_3_POINT_TH NULL
+#define OPTION_VAL_JINC2_TH NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_TH NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_TH NULL
+#define OPTION_VAL_OPAQUE_TH NULL
+#define OPTION_VAL_ALL_TH NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_TH NULL
+#define BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_TH NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_TH NULL
+#define BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_TH NULL
+#define BEETLE_OPT_SUPER_SAMPLING_LABEL_TH NULL
+#define BEETLE_OPT_SUPER_SAMPLING_INFO_0_TH NULL
+#define BEETLE_OPT_MSAA_LABEL_TH NULL
+#define BEETLE_OPT_MSAA_INFO_0_TH NULL
+#define OPTION_VAL_1X_TH NULL
+#define BEETLE_OPT_MDEC_YUV_LABEL_TH NULL
+#define BEETLE_OPT_MDEC_YUV_INFO_0_TH NULL
+#define BEETLE_OPT_TRACK_TEXTURES_LABEL_TH NULL
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_TH NULL
+#define BEETLE_OPT_DUMP_TEXTURES_LABEL_TH NULL
+#define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TH NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TH NULL
+#define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TH NULL
+#define BEETLE_OPT_WIREFRAME_LABEL_TH NULL
+#define BEETLE_OPT_WIREFRAME_INFO_0_TH NULL
+#define BEETLE_OPT_PGXP_MODE_LABEL_TH NULL
+#define BEETLE_OPT_PGXP_MODE_INFO_0_TH NULL
+#define OPTION_VAL_MEMORY_ONLY_TH NULL
+#define OPTION_VAL_MEMORY_CPU_TH NULL
+#define BEETLE_OPT_PGXP_2D_TOL_LABEL_TH NULL
+#define BEETLE_OPT_PGXP_2D_TOL_INFO_0_TH NULL
+#define OPTION_VAL_0PX_TH NULL
+#define OPTION_VAL_1PX_TH NULL
+#define OPTION_VAL_2PX_TH NULL
+#define OPTION_VAL_3PX_TH NULL
+#define OPTION_VAL_4PX_TH NULL
+#define OPTION_VAL_5PX_TH NULL
+#define OPTION_VAL_6PX_TH NULL
+#define OPTION_VAL_7PX_TH NULL
+#define OPTION_VAL_8PX_TH NULL
+#define BEETLE_OPT_PGXP_NCLIP_LABEL_TH NULL
+#define BEETLE_OPT_PGXP_NCLIP_INFO_0_TH NULL
+#define BEETLE_OPT_PGXP_VERTEX_LABEL_TH NULL
+#define BEETLE_OPT_PGXP_VERTEX_INFO_0_TH NULL
+#define BEETLE_OPT_PGXP_TEXTURE_LABEL_TH NULL
+#define BEETLE_OPT_PGXP_TEXTURE_INFO_0_TH NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_TH NULL
+#define BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_TH NULL
+#define BEETLE_OPT_DISPLAY_OSD_LABEL_TH NULL
+#define BEETLE_OPT_DISPLAY_OSD_INFO_0_TH NULL
+#define BEETLE_OPT_DISPLAY_VRAM_LABEL_TH NULL
+#define BEETLE_OPT_DISPLAY_VRAM_INFO_0_TH NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TH NULL
+#define BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_LABEL_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TH NULL
+#define OPTION_VAL_ENABLED_ANALOG_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TH NULL
+#define OPTION_VAL_L1_L2_R1_R2_START_SELECT_TH NULL
+#define OPTION_VAL_L1_R1_SELECT_TH NULL
+#define OPTION_VAL_L1_R1_START_TH NULL
+#define OPTION_VAL_L1_R1_L3_TH NULL
+#define OPTION_VAL_L1_R1_R3_TH NULL
+#define OPTION_VAL_L2_R2_SELECT_TH NULL
+#define OPTION_VAL_L2_R2_START_TH NULL
+#define OPTION_VAL_L2_R2_L3_TH NULL
+#define OPTION_VAL_L2_R2_R3_TH NULL
+#define OPTION_VAL_L3_R3_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TH NULL
+#define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TH NULL
+#define OPTION_VAL_0_TH NULL
+#define OPTION_VAL_1_TH NULL
+#define OPTION_VAL_2_TH NULL
+#define OPTION_VAL_3_TH NULL
+#define OPTION_VAL_4_TH NULL
+#define OPTION_VAL_5_TH NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TH NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_TH NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_TH NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_TH NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_TH NULL
+#define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_TH NULL
+#define OPTION_VAL_LIGHTGUN_TH NULL
+#define OPTION_VAL_TOUCHSCREEN_TH NULL
+#define BEETLE_OPT_GUN_CURSOR_LABEL_TH NULL
+#define BEETLE_OPT_GUN_CURSOR_INFO_0_TH NULL
+#define OPTION_VAL_CROSS_TH NULL
+#define OPTION_VAL_DOT_TH NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_TH NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_TH NULL
+#define OPTION_VAL_RED_TH NULL
+#define OPTION_VAL_BLUE_TH NULL
+#define OPTION_VAL_GREEN_TH NULL
+#define OPTION_VAL_ORANGE_TH NULL
+#define OPTION_VAL_YELLOW_TH NULL
+#define OPTION_VAL_CYAN_TH NULL
+#define OPTION_VAL_PINK_TH NULL
+#define OPTION_VAL_PURPLE_TH NULL
+#define OPTION_VAL_BLACK_TH NULL
+#define OPTION_VAL_WHITE_TH NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_TH NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TH NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TH NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TH NULL
+#define OPTION_VAL_5_O42_TH NULL
+#define OPTION_VAL_10_TH NULL
+#define OPTION_VAL_15_TH NULL
+#define OPTION_VAL_20_TH NULL
+#define OPTION_VAL_25_TH NULL
+#define OPTION_VAL_30_TH NULL
+#define OPTION_VAL_35_TH NULL
+#define OPTION_VAL_40_TH NULL
+#define OPTION_VAL_45_TH NULL
+#define OPTION_VAL_55_TH NULL
+#define OPTION_VAL_65_TH NULL
+#define OPTION_VAL_75_TH NULL
+#define OPTION_VAL_85_TH NULL
+#define OPTION_VAL_95_TH NULL
+#define OPTION_VAL_100_O42_TH NULL
+#define OPTION_VAL_105_TH NULL
+#define OPTION_VAL_115_TH NULL
+#define OPTION_VAL_125_TH NULL
+#define OPTION_VAL_135_TH NULL
+#define OPTION_VAL_145_TH NULL
+#define OPTION_VAL_155_TH NULL
+#define OPTION_VAL_165_TH NULL
+#define OPTION_VAL_175_TH NULL
+#define OPTION_VAL_185_TH NULL
+#define OPTION_VAL_195_TH NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_LABEL_TH NULL
+#define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_TH NULL
+#define OPTION_VAL_LINEAR_TH NULL
+#define OPTION_VAL_QUADRATIC_TH NULL
+#define OPTION_VAL_CUBIC_TH NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_LABEL_TH NULL
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_TH NULL
+#define OPTION_VAL_0_O44_TH NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_TH NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_TH NULL
+#define OPTION_VAL_LIBRETRO_TH NULL
+#define OPTION_VAL_MEDNAFEN_TH NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_TH NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_TH NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_TH NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_TH NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_TH NULL
+#define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_TH NULL
+#define OPTION_VAL_0_O48_TH NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_TH NULL
+#define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_TH NULL
+#define OPTION_VAL_1_O49_TH NULL
+#define BEETLE_OPT_LINE_RENDER_LABEL_TH NULL
+#define BEETLE_OPT_LINE_RENDER_INFO_0_TH NULL
+#define OPTION_VAL_DEFAULT_TH NULL
+#define OPTION_VAL_AGGRESSIVE_TH NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_TH NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_TH NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_TH NULL
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_TH NULL
+#define OPTION_VAL_16_9_TH NULL
+#define OPTION_VAL_16_10_TH NULL
+#define OPTION_VAL_18_9_TH NULL
+#define OPTION_VAL_19_9_TH NULL
+#define OPTION_VAL_20_9_TH NULL
+#define OPTION_VAL_21_9_TH NULL
+#define OPTION_VAL_32_9_TH NULL
+#define BEETLE_OPT_CPU_DYNAREC_LABEL_TH NULL
+#define BEETLE_OPT_CPU_DYNAREC_INFO_0_TH NULL
+#define OPTION_VAL_DISABLED_TH NULL
+#define OPTION_VAL_EXECUTE_TH NULL
+#define OPTION_VAL_EXECUTE_ONE_TH NULL
+#define OPTION_VAL_RUN_INTERPRETER_TH NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_TH NULL
+#define BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_TH NULL
+#define OPTION_VAL_FULL_TH NULL
+#define OPTION_VAL_DMA_TH NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_TH NULL
+#define BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_TH NULL
+#define OPTION_VAL_128_TH NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_TH NULL
+#define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_TH NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_LABEL_TH NULL
+#define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_TH NULL
+#define OPTION_VAL_AUTO_TOGGLE_TH NULL
+#define OPTION_VAL_FORCE_PROGRESSIVE_TH NULL
+#define OPTION_VAL_FORCE_INTERLACED_TH NULL
+#define BEETLE_OPT_DEINTERLACER_LABEL_TH NULL
+#define BEETLE_OPT_DEINTERLACER_INFO_0_TH NULL
+#define OPTION_VAL_WEAVE_TH NULL
+#define OPTION_VAL_BOB_TH NULL
+#define BEETLE_OPT_FRAME_DUPING_LABEL_TH NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_TH NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_TH NULL
+#define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TH NULL
+#define BEETLE_OPT_ASPECT_RATIO_LABEL_TH NULL
+#define BEETLE_OPT_ASPECT_RATIO_INFO_0_TH NULL
+#define OPTION_VAL_CORRECTED_TH NULL
+#define OPTION_VAL_UNCORRECTED_TH NULL
+#define OPTION_VAL_4_3_TH NULL
+#define OPTION_VAL_NTSC_TH NULL
+#define BEETLE_OPT_CROP_OVERSCAN_LABEL_TH NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_TH NULL
+#define OPTION_VAL_STATIC_TH NULL
+#define OPTION_VAL_SMART_TH NULL
+#define BEETLE_OPT_IMAGE_CROP_LABEL_TH NULL
+#define BEETLE_OPT_IMAGE_CROP_INFO_0_TH NULL
+#define OPTION_VAL_9PX_TH NULL
+#define OPTION_VAL_10PX_TH NULL
+#define OPTION_VAL_11PX_TH NULL
+#define OPTION_VAL_12PX_TH NULL
+#define OPTION_VAL_13PX_TH NULL
+#define OPTION_VAL_14PX_TH NULL
+#define OPTION_VAL_15PX_TH NULL
+#define OPTION_VAL_16PX_TH NULL
+#define OPTION_VAL_17PX_TH NULL
+#define OPTION_VAL_18PX_TH NULL
+#define OPTION_VAL_19PX_TH NULL
+#define OPTION_VAL_20PX_TH NULL
+#define BEETLE_OPT_IMAGE_OFFSET_LABEL_TH NULL
+#define BEETLE_OPT_IMAGE_OFFSET_INFO_0_TH NULL
+#define OPTION_VAL_12PX_O64_TH NULL
+#define OPTION_VAL_11PX_O64_TH NULL
+#define OPTION_VAL_10PX_O64_TH NULL
+#define OPTION_VAL_9PX_O64_TH NULL
+#define OPTION_VAL_8PX_O64_TH NULL
+#define OPTION_VAL_7PX_O64_TH NULL
+#define OPTION_VAL_6PX_O64_TH NULL
+#define OPTION_VAL_5PX_O64_TH NULL
+#define OPTION_VAL_4PX_O64_TH NULL
+#define OPTION_VAL_3PX_O64_TH NULL
+#define OPTION_VAL_2PX_O64_TH NULL
+#define OPTION_VAL_1PX_O64_TH NULL
+#define OPTION_VAL_1PX_O64_0_TH NULL
+#define OPTION_VAL_2PX_O64_0_TH NULL
+#define OPTION_VAL_3PX_O64_0_TH NULL
+#define OPTION_VAL_4PX_O64_0_TH NULL
+#define OPTION_VAL_5PX_O64_0_TH NULL
+#define OPTION_VAL_6PX_O64_0_TH NULL
+#define OPTION_VAL_7PX_O64_0_TH NULL
+#define OPTION_VAL_8PX_O64_0_TH NULL
+#define OPTION_VAL_9PX_O64_0_TH NULL
+#define OPTION_VAL_10PX_O64_0_TH NULL
+#define OPTION_VAL_11PX_O64_0_TH NULL
+#define OPTION_VAL_12PX_O64_0_TH NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_TH NULL
+#define BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_TH NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_LABEL_TH NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_INFO_0_TH NULL
+#define BEETLE_OPT_LAST_SCANLINE_LABEL_TH NULL
+#define BEETLE_OPT_LAST_SCANLINE_INFO_0_TH NULL
+#define OPTION_VAL_239_TH NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_TH NULL
+#define BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_TH NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_TH NULL
+#define BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_TH NULL
+#define OPTION_VAL_287_TH NULL
+
+struct retro_core_option_v2_category option_cats_th[] = {
+   {
+      "system",
+      CATEGORY_SYSTEM_LABEL_TH,
+      CATEGORY_SYSTEM_INFO_0_TH
+   },
+   {
+      "video",
+      CATEGORY_VIDEO_LABEL_TH,
+      CATEGORY_VIDEO_INFO_0_TH
+   },
+   {
+      "pgxp",
+      CATEGORY_PGXP_LABEL_TH,
+      CATEGORY_PGXP_INFO_0_TH
+   },
+   {
+      "osd",
+      CATEGORY_OSD_LABEL_TH,
+      CATEGORY_OSD_INFO_0_TH
+   },
+   {
+      "input",
+      CATEGORY_INPUT_LABEL_TH,
+      CATEGORY_INPUT_INFO_0_TH
+   },
+   {
+      "memcards",
+      CATEGORY_MEMCARDS_LABEL_TH,
+      CATEGORY_MEMCARDS_INFO_0_TH
+   },
+   {
+      "hacks",
+      CATEGORY_HACKS_LABEL_TH,
+      CATEGORY_HACKS_INFO_0_TH
+   },
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_th[] = {
+   {
+      BEETLE_OPT(cpu_freq_scale),
+      BEETLE_OPT_CPU_FREQ_SCALE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "50%",           OPTION_VAL_50_TH },
+         { "60%",           OPTION_VAL_60_TH },
+         { "70%",           OPTION_VAL_70_TH },
+         { "80%",           OPTION_VAL_80_TH },
+         { "90%",           OPTION_VAL_90_TH },
+         { "100%",          OPTION_VAL_100_TH },
+         { "110%",          OPTION_VAL_110_TH },
+         { "120%",          OPTION_VAL_120_TH },
+         { "130%",          OPTION_VAL_130_TH },
+         { "140%",          OPTION_VAL_140_TH },
+         { "150%",          OPTION_VAL_150_TH },
+         { "160%",          OPTION_VAL_160_TH },
+         { "170%",          OPTION_VAL_170_TH },
+         { "180%",          OPTION_VAL_180_TH },
+         { "190%",          OPTION_VAL_190_TH },
+         { "200%",          OPTION_VAL_200_TH },
+         { "210%",          OPTION_VAL_210_TH },
+         { "220%",          OPTION_VAL_220_TH },
+         { "230%",          OPTION_VAL_230_TH },
+         { "240%",          OPTION_VAL_240_TH },
+         { "250%",          OPTION_VAL_250_TH },
+         { "260%",          OPTION_VAL_260_TH },
+         { "270%",          OPTION_VAL_270_TH },
+         { "280%",          OPTION_VAL_280_TH },
+         { "290%",          OPTION_VAL_290_TH },
+         { "300%",          OPTION_VAL_300_TH },
+         { "310%",          OPTION_VAL_310_TH },
+         { "320%",          OPTION_VAL_320_TH },
+         { "330%",          OPTION_VAL_330_TH },
+         { "340%",          OPTION_VAL_340_TH },
+         { "350%",          OPTION_VAL_350_TH },
+         { "360%",          OPTION_VAL_360_TH },
+         { "370%",          OPTION_VAL_370_TH },
+         { "380%",          OPTION_VAL_380_TH },
+         { "390%",          OPTION_VAL_390_TH },
+         { "400%",          OPTION_VAL_400_TH },
+         { "410%",          OPTION_VAL_410_TH },
+         { "420%",          OPTION_VAL_420_TH },
+         { "430%",          OPTION_VAL_430_TH },
+         { "440%",          OPTION_VAL_440_TH },
+         { "450%",          OPTION_VAL_450_TH },
+         { "460%",          OPTION_VAL_460_TH },
+         { "470%",          OPTION_VAL_470_TH },
+         { "480%",          OPTION_VAL_480_TH },
+         { "490%",          OPTION_VAL_490_TH },
+         { "500%",          OPTION_VAL_500_TH },
+         { "510%",          OPTION_VAL_510_TH },
+         { "520%",          OPTION_VAL_520_TH },
+         { "530%",          OPTION_VAL_530_TH },
+         { "540%",          OPTION_VAL_540_TH },
+         { "550%",          OPTION_VAL_550_TH },
+         { "560%",          OPTION_VAL_560_TH },
+         { "570%",          OPTION_VAL_570_TH },
+         { "580%",          OPTION_VAL_580_TH },
+         { "590%",          OPTION_VAL_590_TH },
+         { "600%",          OPTION_VAL_600_TH },
+         { "610%",          OPTION_VAL_610_TH },
+         { "620%",          OPTION_VAL_620_TH },
+         { "630%",          OPTION_VAL_630_TH },
+         { "640%",          OPTION_VAL_640_TH },
+         { "650%",          OPTION_VAL_650_TH },
+         { "660%",          OPTION_VAL_660_TH },
+         { "670%",          OPTION_VAL_670_TH },
+         { "680%",          OPTION_VAL_680_TH },
+         { "690%",          OPTION_VAL_690_TH },
+         { "700%",          OPTION_VAL_700_TH },
+         { "710%",          OPTION_VAL_710_TH },
+         { "720%",          OPTION_VAL_720_TH },
+         { "730%",          OPTION_VAL_730_TH },
+         { "740%",          OPTION_VAL_740_TH },
+         { "750%",          OPTION_VAL_750_TH },
+         { NULL, NULL },
+      },
+      "100%"
+   },
+   {
+      BEETLE_OPT(gpu_overclock),
+      BEETLE_OPT_GPU_OVERCLOCK_LABEL_TH,
+      NULL,
+      BEETLE_OPT_GPU_OVERCLOCK_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "1x(native)", OPTION_VAL_1X_NATIVE_TH },
+         { "2x",         OPTION_VAL_2X_TH },
+         { "4x",         OPTION_VAL_4X_TH },
+         { "8x",         OPTION_VAL_8X_TH },
+         { "16x",        OPTION_VAL_16X_TH },
+         { "32x",        OPTION_VAL_32X_TH },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+   {
+      BEETLE_OPT(gte_overclock),
+      BEETLE_OPT_GTE_OVERCLOCK_LABEL_TH,
+      NULL,
+      BEETLE_OPT_GTE_OVERCLOCK_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#ifndef EMSCRIPTEN
+   {
+      BEETLE_OPT(cd_access_method),
+      BEETLE_OPT_CD_ACCESS_METHOD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "sync",     OPTION_VAL_SYNC_TH },
+         { "async",    OPTION_VAL_ASYNC_TH },
+         { "precache", OPTION_VAL_PRECACHE_TH },
+         { NULL, NULL },
+      },
+      "sync"
+   },
+#endif
+   {
+      BEETLE_OPT(cd_fastload),
+      BEETLE_OPT_CD_FASTLOAD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CD_FASTLOAD_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "2x(native)", OPTION_VAL_2X_NATIVE_TH },
+         { "4x",          OPTION_VAL_4X_TH },
+         { "6x",          OPTION_VAL_6X_TH },
+         { "8x",          OPTION_VAL_8X_TH },
+         { "10x",         OPTION_VAL_10X_TH },
+         { "12x",         OPTION_VAL_12X_TH },
+         { "14x",         OPTION_VAL_14X_TH },
+         { NULL, NULL },
+      },
+      "2x(native)"
+   },
+   {
+      BEETLE_OPT(skip_bios),
+      BEETLE_OPT_SKIP_BIOS_LABEL_TH,
+      NULL,
+      BEETLE_OPT_SKIP_BIOS_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(override_bios),
+      BEETLE_OPT_OVERRIDE_BIOS_LABEL_TH,
+      NULL,
+      BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TH,
+      NULL,
+      "system",
+      {
+         { "disabled", NULL },
+         { "psxonpsp", OPTION_VAL_PSXONPSP_TH },
+         { "ps1_rom",  OPTION_VAL_PS1_ROM_TH },
+         { "openbios", OPTION_VAL_OPENBIOS_TH     },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(internal_resolution),
+      BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TH,
+      NULL,
+      BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "1x(native)", OPTION_VAL_1X_NATIVE_TH },
+         { "2x",         OPTION_VAL_2X_TH },
+         { "4x",         OPTION_VAL_4X_TH },
+         { "8x",         OPTION_VAL_8X_TH },
+         { "16x",        OPTION_VAL_16X_TH },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(renderer),
+      BEETLE_OPT_RENDERER_LABEL_TH,
+      NULL,
+      BEETLE_OPT_RENDERER_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "hardware",    OPTION_VAL_HARDWARE_TH },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         { "hardware_gl", OPTION_VAL_HARDWARE_GL_TH },
+#endif
+#if defined(HAVE_VULKAN)
+         { "hardware_vk", OPTION_VAL_HARDWARE_VK_TH },
+#endif
+         { "software",    OPTION_VAL_SOFTWARE_TH },
+         { NULL, NULL },
+      },
+      "hardware"
+   },
+   {
+      BEETLE_OPT(renderer_software_fb),
+      BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TH,
+      NULL,
+      BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   {
+      BEETLE_OPT(depth),
+      BEETLE_OPT_DEPTH_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DEPTH_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_TH },
+         { "32bpp",         OPTION_VAL_32BPP_TH },
+         { NULL, NULL },
+      },
+      "16bpp(native)"
+   },
+   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
+#endif
+   {
+      BEETLE_OPT(dither_mode),
+      BEETLE_OPT_DITHER_MODE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DITHER_MODE_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "1x(native)",          OPTION_VAL_1X_NATIVE_TH },
+         { "internal resolution", OPTION_VAL_INTERNAL_RESOLUTION_TH },
+         { "disabled",            NULL },
+         { NULL, NULL },
+      },
+      "1x(native)"
+   },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(scaled_uv_offset),
+      BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TH,
+      NULL,
+      BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(filter),
+      BEETLE_OPT_FILTER_LABEL_TH,
+      NULL,
+      BEETLE_OPT_FILTER_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "nearest",  OPTION_VAL_NEAREST_TH },
+         { "SABR",     OPTION_VAL_SABR_TH },
+         { "xBR",      OPTION_VAL_XBR_TH },
+         { "bilinear", OPTION_VAL_BILINEAR_TH },
+         { "3-point",  OPTION_VAL_3_POINT_TH },
+         { "JINC2",    OPTION_VAL_JINC2_TH },
+         { NULL, NULL },
+      },
+      "nearest"
+   },
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(filter_exclude_sprite),
+      BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_FILTER_EXCLUDE_SPRITE_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "opaque", OPTION_VAL_OPAQUE_TH },
+         { "all", OPTION_VAL_ALL_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(filter_exclude_2d_polygon),
+      BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_LABEL_TH,
+      NULL,
+      BEETLE_OPT_FILTER_EXCLUDE_2D_POLYGON_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "opaque", OPTION_VAL_OPAQUE_TH },
+         { "all", OPTION_VAL_ALL_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+#endif
+#ifdef HAVE_VULKAN
+   {
+      BEETLE_OPT(adaptive_smoothing),
+      BEETLE_OPT_ADAPTIVE_SMOOTHING_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ADAPTIVE_SMOOTHING_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(super_sampling),
+      BEETLE_OPT_SUPER_SAMPLING_LABEL_TH,
+      NULL,
+      BEETLE_OPT_SUPER_SAMPLING_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(msaa),
+      BEETLE_OPT_MSAA_LABEL_TH,
+      NULL,
+      BEETLE_OPT_MSAA_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "1x",  OPTION_VAL_1X_TH },
+         { "2x",  OPTION_VAL_2X_TH },
+         { "4x",  OPTION_VAL_4X_TH },
+         { "8x",  OPTION_VAL_8X_TH },
+         { "16x", OPTION_VAL_16X_TH },
+         { NULL, NULL },
+      },
+      "1x"
+   },
+   {
+      BEETLE_OPT(mdec_yuv),
+      BEETLE_OPT_MDEC_YUV_LABEL_TH,
+      NULL,
+      BEETLE_OPT_MDEC_YUV_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(track_textures),
+      BEETLE_OPT_TRACK_TEXTURES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_TRACK_TEXTURES_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#ifdef TEXTURE_DUMPING_ENABLED
+   {
+      BEETLE_OPT(dump_textures),
+      BEETLE_OPT_DUMP_TEXTURES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DUMP_TEXTURES_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(replace_textures),
+      BEETLE_OPT_REPLACE_TEXTURES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   {
+      BEETLE_OPT(wireframe),
+      BEETLE_OPT_WIREFRAME_LABEL_TH,
+      NULL,
+      BEETLE_OPT_WIREFRAME_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(pgxp_mode),
+      BEETLE_OPT_PGXP_MODE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PGXP_MODE_INFO_0_TH,
+      NULL,
+      "pgxp",
+      {
+         { "disabled",     NULL },
+         { "memory only",  OPTION_VAL_MEMORY_ONLY_TH },
+         { "memory + CPU", OPTION_VAL_MEMORY_CPU_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_2d_tol),
+      BEETLE_OPT_PGXP_2D_TOL_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PGXP_2D_TOL_INFO_0_TH,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "0px", OPTION_VAL_0PX_TH },
+         { "1px", OPTION_VAL_1PX_TH },
+         { "2px", OPTION_VAL_2PX_TH },
+         { "3px", OPTION_VAL_3PX_TH },
+         { "4px", OPTION_VAL_4PX_TH },
+         { "5px", OPTION_VAL_5PX_TH },
+         { "6px", OPTION_VAL_6PX_TH },
+         { "7px", OPTION_VAL_7PX_TH },
+         { "8px", OPTION_VAL_8PX_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_nclip),
+      BEETLE_OPT_PGXP_NCLIP_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PGXP_NCLIP_INFO_0_TH,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(pgxp_vertex),
+      BEETLE_OPT_PGXP_VERTEX_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PGXP_VERTEX_INFO_0_TH,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pgxp_texture),
+      BEETLE_OPT_PGXP_TEXTURE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PGXP_TEXTURE_INFO_0_TH,
+      NULL,
+      "pgxp",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(display_internal_fps),
+      BEETLE_OPT_DISPLAY_INTERNAL_FPS_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DISPLAY_INTERNAL_FPS_INFO_0_TH,
+      NULL,
+      "osd",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(display_osd),
+      BEETLE_OPT_DISPLAY_OSD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DISPLAY_OSD_INFO_0_TH,
+      NULL,
+      "osd",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(display_vram),
+      BEETLE_OPT_DISPLAY_VRAM_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DISPLAY_VRAM_INFO_0_TH,
+      NULL,
+      "osd",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#endif
+   {
+      BEETLE_OPT(analog_calibration),
+      BEETLE_OPT_ANALOG_CALIBRATION_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ANALOG_CALIBRATION_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(analog_toggle),
+      BEETLE_OPT_ANALOG_TOGGLE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { "enabled-analog", OPTION_VAL_ENABLED_ANALOG_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(analog_toggle_combo),
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_COMBO_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "l1+l2+r1+r2+start+select", OPTION_VAL_L1_L2_R1_R2_START_SELECT_TH },
+         { "l1+r1+select",             OPTION_VAL_L1_R1_SELECT_TH },
+         { "l1+r1+start",              OPTION_VAL_L1_R1_START_TH },
+         { "l1+r1+l3",                 OPTION_VAL_L1_R1_L3_TH },
+         { "l1+r1+r3",                 OPTION_VAL_L1_R1_R3_TH },
+         { "l2+r2+select",             OPTION_VAL_L2_R2_SELECT_TH },
+         { "l2+r2+start",              OPTION_VAL_L2_R2_START_TH },
+         { "l2+r2+l3",                 OPTION_VAL_L2_R2_L3_TH },
+         { "l2+r2+r3",                 OPTION_VAL_L2_R2_R3_TH },
+         { "l3+r3",                    OPTION_VAL_L3_R3_TH },
+         { NULL, NULL },
+      },
+      "l1+r1+select"
+   },
+   {
+      BEETLE_OPT(analog_toggle_hold),
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "0", OPTION_VAL_0_TH },
+         { "1", OPTION_VAL_1_TH },
+         { "2", OPTION_VAL_2_TH },
+         { "3", OPTION_VAL_3_TH },
+         { "4", OPTION_VAL_4_TH },
+         { "5", OPTION_VAL_5_TH },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
+      BEETLE_OPT(enable_multitap_port1),
+      BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(enable_multitap_port2),
+      BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(gun_input_mode),
+      BEETLE_OPT_GUN_INPUT_MODE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_GUN_INPUT_MODE_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "lightgun",    OPTION_VAL_LIGHTGUN_TH },
+         { "touchscreen", OPTION_VAL_TOUCHSCREEN_TH },
+         { NULL, NULL },
+      },
+      "lightgun"
+   },
+   // Shouldn't the gun_input_mode just be Mouse vs. Touchscreen?
+   {
+      BEETLE_OPT(gun_cursor),
+      BEETLE_OPT_GUN_CURSOR_LABEL_TH,
+      NULL,
+      BEETLE_OPT_GUN_CURSOR_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "off",   "disabled" },
+         { "cross", OPTION_VAL_CROSS_TH },
+         { "dot",   OPTION_VAL_DOT_TH },
+         { NULL, NULL },
+      },
+      "cross"
+   },
+   {
+      BEETLE_OPT(crosshair_color_p1),
+      BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "red",    OPTION_VAL_RED_TH },
+         { "blue",   OPTION_VAL_BLUE_TH },
+         { "green",  OPTION_VAL_GREEN_TH },
+         { "orange", OPTION_VAL_ORANGE_TH },
+         { "yellow", OPTION_VAL_YELLOW_TH },
+         { "cyan",   OPTION_VAL_CYAN_TH },
+         { "pink",   OPTION_VAL_PINK_TH },
+         { "purple", OPTION_VAL_PURPLE_TH },
+         { "black",  OPTION_VAL_BLACK_TH },
+         { "white",  OPTION_VAL_WHITE_TH },
+         { NULL, NULL },
+      },
+      "red"
+   },
+   {
+      BEETLE_OPT(crosshair_color_p2),
+      BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "blue",   OPTION_VAL_BLUE_TH },
+         { "red",    OPTION_VAL_RED_TH },
+         { "green",  OPTION_VAL_GREEN_TH },
+         { "orange", OPTION_VAL_ORANGE_TH },
+         { "yellow", OPTION_VAL_YELLOW_TH },
+         { "cyan",   OPTION_VAL_CYAN_TH },
+         { "pink",   OPTION_VAL_PINK_TH },
+         { "purple", OPTION_VAL_PURPLE_TH },
+         { "black",  OPTION_VAL_BLACK_TH },
+         { "white",  OPTION_VAL_WHITE_TH },
+         { NULL, NULL },
+      },
+      "blue"
+   },
+   {
+      BEETLE_OPT(mouse_sensitivity),
+      BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_TH,
+      NULL,
+      BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "5%",   OPTION_VAL_5_O42_TH },
+         { "10%",  OPTION_VAL_10_TH },
+         { "15%",  OPTION_VAL_15_TH },
+         { "20%",  OPTION_VAL_20_TH },
+         { "25%",  OPTION_VAL_25_TH },
+         { "30%",  OPTION_VAL_30_TH },
+         { "35%",  OPTION_VAL_35_TH },
+         { "40%",  OPTION_VAL_40_TH },
+         { "45%",  OPTION_VAL_45_TH },
+         { "50%",  OPTION_VAL_50_TH },
+         { "55%",  OPTION_VAL_55_TH },
+         { "60%",  OPTION_VAL_60_TH },
+         { "65%",  OPTION_VAL_65_TH },
+         { "70%",  OPTION_VAL_70_TH },
+         { "75%",  OPTION_VAL_75_TH },
+         { "80%",  OPTION_VAL_80_TH },
+         { "85%",  OPTION_VAL_85_TH },
+         { "90%",  OPTION_VAL_90_TH },
+         { "95%",  OPTION_VAL_95_TH },
+         { "100%", OPTION_VAL_100_O42_TH },
+         { "105%", OPTION_VAL_105_TH },
+         { "110%", OPTION_VAL_110_TH },
+         { "115%", OPTION_VAL_115_TH },
+         { "120%", OPTION_VAL_120_TH },
+         { "125%", OPTION_VAL_125_TH },
+         { "130%", OPTION_VAL_130_TH },
+         { "135%", OPTION_VAL_135_TH },
+         { "140%", OPTION_VAL_140_TH },
+         { "145%", OPTION_VAL_145_TH },
+         { "150%", OPTION_VAL_150_TH },
+         { "155%", OPTION_VAL_155_TH },
+         { "160%", OPTION_VAL_160_TH },
+         { "165%", OPTION_VAL_165_TH },
+         { "170%", OPTION_VAL_170_TH },
+         { "175%", OPTION_VAL_175_TH },
+         { "180%", OPTION_VAL_180_TH },
+         { "185%", OPTION_VAL_185_TH },
+         { "190%", OPTION_VAL_190_TH },
+         { "195%", OPTION_VAL_195_TH },
+         { "200%", OPTION_VAL_200_TH },
+         { NULL, NULL },
+      },
+      "100%"
+   },
+   {
+      BEETLE_OPT(negcon_response),
+      BEETLE_OPT_NEGCON_RESPONSE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_NEGCON_RESPONSE_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "linear",    OPTION_VAL_LINEAR_TH },
+         { "quadratic", OPTION_VAL_QUADRATIC_TH },
+         { "cubic",     OPTION_VAL_CUBIC_TH },
+         { NULL, NULL },
+      },
+      "linear"
+   },
+   {
+      BEETLE_OPT(negcon_deadzone),
+      BEETLE_OPT_NEGCON_DEADZONE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_NEGCON_DEADZONE_INFO_0_TH,
+      NULL,
+      "input",
+      {
+         { "0%",  OPTION_VAL_0_O44_TH },
+         { "5%",  OPTION_VAL_5_O42_TH },
+         { "10%", OPTION_VAL_10_TH },
+         { "15%", OPTION_VAL_15_TH },
+         { "20%", OPTION_VAL_20_TH },
+         { "25%", OPTION_VAL_25_TH },
+         { "30%", OPTION_VAL_30_TH },
+         { NULL, NULL },
+      },
+      "0%"
+   },
+   {
+      BEETLE_OPT(use_mednafen_memcard0_method),
+      BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_TH,
+      NULL,
+      "memcards",
+      {
+         { "libretro", OPTION_VAL_LIBRETRO_TH },
+         { "mednafen", OPTION_VAL_MEDNAFEN_TH },
+         { NULL, NULL },
+      },
+      "libretro"
+   },
+   {
+      BEETLE_OPT(enable_memcard1),
+      BEETLE_OPT_ENABLE_MEMCARD1_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_TH,
+      NULL,
+      "memcards",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(shared_memory_cards),
+      BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_TH,
+      NULL,
+      BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_TH,
+      NULL,
+      "memcards",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(memcard_left_index),
+      BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_TH,
+      NULL,
+      BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_TH,
+      NULL,
+      "memcards",
+      {
+         { "0",  OPTION_VAL_0_O48_TH },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { "41", NULL },
+         { "42", NULL },
+         { "43", NULL },
+         { "44", NULL },
+         { "45", NULL },
+         { "46", NULL },
+         { "47", NULL },
+         { "48", NULL },
+         { "49", NULL },
+         { "50", NULL },
+         { "51", NULL },
+         { "52", NULL },
+         { "53", NULL },
+         { "54", NULL },
+         { "55", NULL },
+         { "56", NULL },
+         { "57", NULL },
+         { "58", NULL },
+         { "59", NULL },
+         { "60", NULL },
+         { "61", NULL },
+         { "62", NULL },
+         { "63", NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(memcard_right_index),
+      BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_TH,
+      NULL,
+      BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_TH,
+      NULL,
+      "memcards",
+      {
+         { "0",  NULL },
+         { "1",  OPTION_VAL_1_O49_TH },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { "41", NULL },
+         { "42", NULL },
+         { "43", NULL },
+         { "44", NULL },
+         { "45", NULL },
+         { "46", NULL },
+         { "47", NULL },
+         { "48", NULL },
+         { "49", NULL },
+         { "50", NULL },
+         { "51", NULL },
+         { "52", NULL },
+         { "53", NULL },
+         { "54", NULL },
+         { "55", NULL },
+         { "56", NULL },
+         { "57", NULL },
+         { "58", NULL },
+         { "59", NULL },
+         { "60", NULL },
+         { "61", NULL },
+         { "62", NULL },
+         { "63", NULL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+   {
+      BEETLE_OPT(line_render),
+      BEETLE_OPT_LINE_RENDER_LABEL_TH,
+      NULL,
+      BEETLE_OPT_LINE_RENDER_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "default",    OPTION_VAL_DEFAULT_TH },
+         { "aggressive", OPTION_VAL_AGGRESSIVE_TH },
+         { "disabled",   NULL },
+         { NULL, NULL },
+      },
+      "default"
+   },
+   {
+      BEETLE_OPT(widescreen_hack),
+      BEETLE_OPT_WIDESCREEN_HACK_LABEL_TH,
+      NULL,
+      BEETLE_OPT_WIDESCREEN_HACK_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(widescreen_hack_aspect_ratio),
+      BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_TH,
+      NULL,
+      BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "16:9",  OPTION_VAL_16_9_TH },
+         { "16:10", OPTION_VAL_16_10_TH },
+         { "18:9",  OPTION_VAL_18_9_TH },
+         { "19:9",  OPTION_VAL_19_9_TH },
+         { "20:9",  OPTION_VAL_20_9_TH },
+         { "21:9",  OPTION_VAL_21_9_TH }, // 64:27
+         { "32:9",  OPTION_VAL_32_9_TH },
+         { NULL,    NULL },
+      },
+      "16:9"
+   },
+#if defined(HAVE_LIGHTREC)
+   {
+      BEETLE_OPT(cpu_dynarec),
+      BEETLE_OPT_CPU_DYNAREC_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CPU_DYNAREC_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "disabled",        OPTION_VAL_DISABLED_TH },
+         { "execute",         OPTION_VAL_EXECUTE_TH },
+         { "execute_one",     OPTION_VAL_EXECUTE_ONE_TH },
+         { "run_interpreter", OPTION_VAL_RUN_INTERPRETER_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(dynarec_invalidate),
+      BEETLE_OPT_DYNAREC_INVALIDATE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DYNAREC_INVALIDATE_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "full", OPTION_VAL_FULL_TH },
+         { "dma",  OPTION_VAL_DMA_TH },
+         { NULL, NULL },
+      },
+      "full"
+   },
+   {
+      BEETLE_OPT(dynarec_eventcycles),
+      BEETLE_OPT_DYNAREC_EVENTCYCLES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DYNAREC_EVENTCYCLES_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "128",  OPTION_VAL_128_TH },
+         { "256",  NULL },
+         { "384",  NULL },
+         { "512",  NULL },
+         { "640",  NULL },
+         { "768",  NULL },
+         { "896",  NULL },
+         { "1024", NULL },
+         { "1152", NULL },
+         { "1280", NULL },
+         { "1408", NULL },
+         { "1536", NULL },
+         { "1664", NULL },
+         { "1792", NULL },
+         { "1920", NULL },
+         { "2048", NULL },
+         { NULL, NULL },
+      },
+      "128"
+   },
+   {
+      BEETLE_OPT(dynarec_spu_samples),
+      BEETLE_OPT_DYNAREC_SPU_SAMPLES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_TH,
+      NULL,
+      "hacks",
+      {
+         { "1",  OPTION_VAL_1_O49_TH },
+         { "4",  NULL },
+         { "16", NULL },
+         { NULL, NULL },
+      },
+      "1"
+   },
+#endif
+   {
+      BEETLE_OPT(core_timing_fps),
+      BEETLE_OPT_CORE_TIMING_FPS_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CORE_TIMING_FPS_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "auto_toggle",       OPTION_VAL_AUTO_TOGGLE_TH },
+         { "force_progressive", OPTION_VAL_FORCE_PROGRESSIVE_TH },
+         { "force_interlaced",  OPTION_VAL_FORCE_INTERLACED_TH },
+      },
+      "auto_toggle"
+   },
+   {
+      BEETLE_OPT(deinterlacer),
+      BEETLE_OPT_DEINTERLACER_LABEL_TH,
+      NULL,
+      BEETLE_OPT_DEINTERLACER_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "weave", OPTION_VAL_WEAVE_TH },
+         { "bob",   OPTION_VAL_BOB_TH },
+         { NULL, NULL },
+      },
+      "weave"
+   },
+   {
+      BEETLE_OPT(frame_duping),
+      BEETLE_OPT_FRAME_DUPING_LABEL_TH,
+      NULL,
+      BEETLE_OPT_FRAME_DUPING_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(pal_video_timing_override),
+      BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(aspect_ratio),
+      BEETLE_OPT_ASPECT_RATIO_LABEL_TH,
+      NULL,
+      BEETLE_OPT_ASPECT_RATIO_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "corrected", OPTION_VAL_CORRECTED_TH },
+         { "uncorrected", OPTION_VAL_UNCORRECTED_TH },
+         { "4:3",  OPTION_VAL_4_3_TH },
+         { "ntsc", OPTION_VAL_NTSC_TH },
+      },
+      "corrected"
+   },
+   {
+      BEETLE_OPT(crop_overscan),
+      BEETLE_OPT_CROP_OVERSCAN_LABEL_TH,
+      NULL,
+      BEETLE_OPT_CROP_OVERSCAN_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", "Disabled" },
+         { "static",   OPTION_VAL_STATIC_TH },
+         { "smart",    OPTION_VAL_SMART_TH },
+         { NULL, NULL },
+      },
+      "smart"
+   },
+   {
+      BEETLE_OPT(image_crop),
+      BEETLE_OPT_IMAGE_CROP_LABEL_TH,
+      NULL,
+      BEETLE_OPT_IMAGE_CROP_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "disabled", "0" },
+         { "1px",      OPTION_VAL_1PX_TH },
+         { "2px",      OPTION_VAL_2PX_TH },
+         { "3px",      OPTION_VAL_3PX_TH },
+         { "4px",      OPTION_VAL_4PX_TH },
+         { "5px",      OPTION_VAL_5PX_TH },
+         { "6px",      OPTION_VAL_6PX_TH },
+         { "7px",      OPTION_VAL_7PX_TH },
+         { "8px",      OPTION_VAL_8PX_TH },
+         { "9px",      OPTION_VAL_9PX_TH },
+         { "10px",     OPTION_VAL_10PX_TH },
+         { "11px",     OPTION_VAL_11PX_TH },
+         { "12px",     OPTION_VAL_12PX_TH },
+         { "13px",     OPTION_VAL_13PX_TH },
+         { "14px",     OPTION_VAL_14PX_TH },
+         { "15px",     OPTION_VAL_15PX_TH },
+         { "16px",     OPTION_VAL_16PX_TH },
+         { "17px",     OPTION_VAL_17PX_TH },
+         { "18px",     OPTION_VAL_18PX_TH },
+         { "19px",     OPTION_VAL_19PX_TH },
+         { "20px",     OPTION_VAL_20PX_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(image_offset),
+      BEETLE_OPT_IMAGE_OFFSET_LABEL_TH,
+      NULL,
+      BEETLE_OPT_IMAGE_OFFSET_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "-12px",    OPTION_VAL_12PX_O64_TH },
+         { "-11px",    OPTION_VAL_11PX_O64_TH },
+         { "-10px",    OPTION_VAL_10PX_O64_TH },
+         { "-9px",     OPTION_VAL_9PX_O64_TH },
+         { "-8px",     OPTION_VAL_8PX_O64_TH },
+         { "-7px",     OPTION_VAL_7PX_O64_TH },
+         { "-6px",     OPTION_VAL_6PX_O64_TH },
+         { "-5px",     OPTION_VAL_5PX_O64_TH },
+         { "-4px",     OPTION_VAL_4PX_O64_TH },
+         { "-3px",     OPTION_VAL_3PX_O64_TH },
+         { "-2px",     OPTION_VAL_2PX_O64_TH },
+         { "-1px",     OPTION_VAL_1PX_O64_TH },
+         { "disabled", "0" },
+         { "+1px",     OPTION_VAL_1PX_O64_0_TH },
+         { "+2px",     OPTION_VAL_2PX_O64_0_TH },
+         { "+3px",     OPTION_VAL_3PX_O64_0_TH },
+         { "+4px",     OPTION_VAL_4PX_O64_0_TH },
+         { "+5px",     OPTION_VAL_5PX_O64_0_TH },
+         { "+6px",     OPTION_VAL_6PX_O64_0_TH },
+         { "+7px",     OPTION_VAL_7PX_O64_0_TH },
+         { "+8px",     OPTION_VAL_8PX_O64_0_TH },
+         { "+9px",     OPTION_VAL_9PX_O64_0_TH },
+         { "+10px",    OPTION_VAL_10PX_O64_0_TH },
+         { "+11px",    OPTION_VAL_11PX_O64_0_TH },
+         { "+12px",    OPTION_VAL_12PX_O64_0_TH },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   {
+      BEETLE_OPT(image_offset_cycles),
+      BEETLE_OPT_IMAGE_OFFSET_CYCLES_LABEL_TH,
+      NULL,
+      BEETLE_OPT_IMAGE_OFFSET_CYCLES_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "-40",      NULL },
+         { "-39",      NULL },
+         { "-38",      NULL },
+         { "-37",      NULL },
+         { "-36",      NULL },
+         { "-35",      NULL },
+         { "-34",      NULL },
+         { "-33",      NULL },
+         { "-32",      NULL },
+         { "-31",      NULL },
+         { "-30",      NULL },
+         { "-29",      NULL },
+         { "-28",      NULL },
+         { "-27",      NULL },
+         { "-26",      NULL },
+         { "-25",      NULL },
+         { "-24",      NULL },
+         { "-23",      NULL },
+         { "-22",      NULL },
+         { "-21",      NULL },
+         { "-20",      NULL },
+         { "-19",      NULL },
+         { "-18",      NULL },
+         { "-17",      NULL },
+         { "-16",      NULL },
+         { "-15",      NULL },
+         { "-14",      NULL },
+         { "-13",      NULL },
+         { "-12",      NULL },
+         { "-11",      NULL },
+         { "-10",      NULL },
+         { "-9",       NULL },
+         { "-8",       NULL },
+         { "-7",       NULL },
+         { "-6",       NULL },
+         { "-5",       NULL },
+         { "-4",       NULL },
+         { "-3",       NULL },
+         { "-2",       NULL },
+         { "-1",       NULL },
+         { "0",        "0" },
+         { "+1",       NULL },
+         { "+2",       NULL },
+         { "+3",       NULL },
+         { "+4",       NULL },
+         { "+5",       NULL },
+         { "+6",       NULL },
+         { "+7",       NULL },
+         { "+8",       NULL },
+         { "+9",       NULL },
+         { "+10",      NULL },
+         { "+11",      NULL },
+         { "+12",      NULL },
+         { "+13",      NULL },
+         { "+14",      NULL },
+         { "+15",      NULL },
+         { "+16",      NULL },
+         { "+17",      NULL },
+         { "+18",      NULL },
+         { "+19",      NULL },
+         { "+20",      NULL },
+         { "+21",      NULL },
+         { "+22",      NULL },
+         { "+23",      NULL },
+         { "+24",      NULL },
+         { "+25",      NULL },
+         { "+26",      NULL },
+         { "+27",      NULL },
+         { "+28",      NULL },
+         { "+29",      NULL },
+         { "+30",      NULL },
+         { "+31",      NULL },
+         { "+32",      NULL },
+         { "+33",      NULL },
+         { "+34",      NULL },
+         { "+35",      NULL },
+         { "+36",      NULL },
+         { "+37",      NULL },
+         { "+38",      NULL },
+         { "+39",      NULL },
+         { "+40",      NULL },
+         { NULL, NULL},
+      },
+      "0"
+   },
+#endif
+   {
+      BEETLE_OPT(initial_scanline),
+      BEETLE_OPT_INITIAL_SCANLINE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_INITIAL_SCANLINE_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "0",  OPTION_VAL_0_O48_TH },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(last_scanline),
+      BEETLE_OPT_LAST_SCANLINE_LABEL_TH,
+      NULL,
+      BEETLE_OPT_LAST_SCANLINE_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "210", NULL },
+         { "211", NULL },
+         { "212", NULL },
+         { "213", NULL },
+         { "214", NULL },
+         { "215", NULL },
+         { "216", NULL },
+         { "217", NULL },
+         { "218", NULL },
+         { "219", NULL },
+         { "220", NULL },
+         { "221", NULL },
+         { "222", NULL },
+         { "223", NULL },
+         { "224", NULL },
+         { "225", NULL },
+         { "226", NULL },
+         { "227", NULL },
+         { "228", NULL },
+         { "229", NULL },
+         { "230", NULL },
+         { "231", NULL },
+         { "232", NULL },
+         { "233", NULL },
+         { "234", NULL },
+         { "235", NULL },
+         { "236", NULL },
+         { "237", NULL },
+         { "238", NULL },
+         { "239", OPTION_VAL_239_TH },
+         { NULL, NULL },
+      },
+      "239"
+   },
+   {
+      BEETLE_OPT(initial_scanline_pal),
+      BEETLE_OPT_INITIAL_SCANLINE_PAL_LABEL_TH,
+      NULL,
+      BEETLE_OPT_INITIAL_SCANLINE_PAL_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "0",  OPTION_VAL_0_O48_TH },
+         { "1",  NULL },
+         { "2",  NULL },
+         { "3",  NULL },
+         { "4",  NULL },
+         { "5",  NULL },
+         { "6",  NULL },
+         { "7",  NULL },
+         { "8",  NULL },
+         { "9",  NULL },
+         { "10", NULL },
+         { "11", NULL },
+         { "12", NULL },
+         { "13", NULL },
+         { "14", NULL },
+         { "15", NULL },
+         { "16", NULL },
+         { "17", NULL },
+         { "18", NULL },
+         { "19", NULL },
+         { "20", NULL },
+         { "21", NULL },
+         { "22", NULL },
+         { "23", NULL },
+         { "24", NULL },
+         { "25", NULL },
+         { "26", NULL },
+         { "27", NULL },
+         { "28", NULL },
+         { "29", NULL },
+         { "30", NULL },
+         { "31", NULL },
+         { "32", NULL },
+         { "33", NULL },
+         { "34", NULL },
+         { "35", NULL },
+         { "36", NULL },
+         { "37", NULL },
+         { "38", NULL },
+         { "39", NULL },
+         { "40", NULL },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
+      BEETLE_OPT(last_scanline_pal),
+      BEETLE_OPT_LAST_SCANLINE_PAL_LABEL_TH,
+      NULL,
+      BEETLE_OPT_LAST_SCANLINE_PAL_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "230", NULL },
+         { "231", NULL },
+         { "232", NULL },
+         { "233", NULL },
+         { "234", NULL },
+         { "235", NULL },
+         { "236", NULL },
+         { "237", NULL },
+         { "238", NULL },
+         { "239", NULL },
+         { "240", NULL },
+         { "241", NULL },
+         { "242", NULL },
+         { "243", NULL },
+         { "244", NULL },
+         { "245", NULL },
+         { "246", NULL },
+         { "247", NULL },
+         { "248", NULL },
+         { "249", NULL },
+         { "250", NULL },
+         { "251", NULL },
+         { "252", NULL },
+         { "253", NULL },
+         { "254", NULL },
+         { "255", NULL },
+         { "256", NULL },
+         { "257", NULL },
+         { "258", NULL },
+         { "259", NULL },
+         { "260", NULL },
+         { "261", NULL },
+         { "262", NULL },
+         { "263", NULL },
+         { "264", NULL },
+         { "265", NULL },
+         { "266", NULL },
+         { "267", NULL },
+         { "268", NULL },
+         { "269", NULL },
+         { "270", NULL },
+         { "271", NULL },
+         { "272", NULL },
+         { "273", NULL },
+         { "274", NULL },
+         { "275", NULL },
+         { "276", NULL },
+         { "277", NULL },
+         { "278", NULL },
+         { "279", NULL },
+         { "280", NULL },
+         { "281", NULL },
+         { "282", NULL },
+         { "283", NULL },
+         { "284", NULL },
+         { "285", NULL },
+         { "286", NULL },
+         { "287", OPTION_VAL_287_TH },
+         { NULL, NULL },
+      },
+      "287"
+   },
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_th = {
+   option_cats_th,
+   option_defs_th
+};
+
 /* RETRO_LANGUAGE_TR */
 
 #define CATEGORY_SYSTEM_LABEL_TR "Sistem"
@@ -76708,7 +78777,7 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TR NULL
 #define OPTION_VAL_PSXONPSP_TR NULL
 #define OPTION_VAL_PS1_ROM_TR NULL
-#define OPTION_VAL_OPENBIOS_TR "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_TR NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TR "Dahili GPU Çözünürlüğü"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TR NULL
 #define BEETLE_OPT_RENDERER_LABEL_TR NULL
@@ -77207,7 +79276,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_TR },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_TR },
-         { "openbios", OPTION_VAL_OPENBIOS_TR },
+         { "openbios", OPTION_VAL_OPENBIOS_TR     },
          { NULL, NULL },
       },
       "disabled"
@@ -78777,7 +80846,7 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_TT NULL
 #define OPTION_VAL_PSXONPSP_TT NULL
 #define OPTION_VAL_PS1_ROM_TT NULL
-#define OPTION_VAL_OPENBIOS_TT "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_TT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_TT NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_TT NULL
 #define BEETLE_OPT_RENDERER_LABEL_TT NULL
@@ -79276,7 +81345,7 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_TT },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_TT },
-         { "openbios", OPTION_VAL_OPENBIOS_TT },
+         { "openbios", OPTION_VAL_OPENBIOS_TT     },
          { NULL, NULL },
       },
       "disabled"
@@ -80846,7 +82915,7 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_UK NULL
 #define OPTION_VAL_PSXONPSP_UK NULL
 #define OPTION_VAL_PS1_ROM_UK "PS3 BIOS"
-#define OPTION_VAL_OPENBIOS_UK "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_UK NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_UK "Роздільна здатність GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_UK NULL
 #define BEETLE_OPT_RENDERER_LABEL_UK NULL
@@ -81345,7 +83414,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_UK },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_UK },
-         { "openbios", OPTION_VAL_OPENBIOS_UK },
+         { "openbios", OPTION_VAL_OPENBIOS_UK     },
          { NULL, NULL },
       },
       "disabled"
@@ -82915,7 +84984,7 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VAL NULL
 #define OPTION_VAL_PSXONPSP_VAL NULL
 #define OPTION_VAL_PS1_ROM_VAL NULL
-#define OPTION_VAL_OPENBIOS_VAL "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_VAL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VAL NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VAL NULL
 #define BEETLE_OPT_RENDERER_LABEL_VAL NULL
@@ -83414,7 +85483,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_VAL },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_VAL },
-         { "openbios", OPTION_VAL_OPENBIOS_VAL },
+         { "openbios", OPTION_VAL_OPENBIOS_VAL     },
          { NULL, NULL },
       },
       "disabled"
@@ -84984,7 +87053,7 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_VN "Ghi đè BIOS theo vùng tiêu chuẩn bằng BIOS không phân vùng nếu được tìm thấy.Cần khởi động lại."
 #define OPTION_VAL_PSXONPSP_VN "BIOS PS1 cho PSP"
 #define OPTION_VAL_PS1_ROM_VN "BIOS PS1 cho PS3"
-#define OPTION_VAL_OPENBIOS_VN "OpenBIOS"
+#define OPTION_VAL_OPENBIOS_VN "Bios mã nguồn mở"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_VN "Độ phân giải GPU nội bộ"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_VN "Độ phân giải cao hơn “1x (Native)” sẽ cải thiện độ chi tiết của các mô hình 3D nhưng yêu cầu hiệu năng cao hơn. Các thành phần 2D nhìn chung không bị ảnh hưởng bởi thiết lập này."
 #define BEETLE_OPT_RENDERER_LABEL_VN "Renderer (Trình kết xuất)"
@@ -85483,7 +87552,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
          { "disabled", NULL },
          { "psxonpsp", OPTION_VAL_PSXONPSP_VN },
          { "ps1_rom",  OPTION_VAL_PS1_ROM_VN },
-         { "openbios", OPTION_VAL_OPENBIOS_VN },
+         { "openbios", OPTION_VAL_OPENBIOS_VN     },
          { NULL, NULL },
       },
       "disabled"
