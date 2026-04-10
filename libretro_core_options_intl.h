@@ -20833,7 +20833,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_ASYNC_DE "Asynchron"
 #define OPTION_VAL_PRECACHE_DE "Vorab laden"
 #define BEETLE_OPT_CD_FASTLOAD_LABEL_DE "CD-Ladegeschwindigkeit"
-#define BEETLE_OPT_CD_FASTLOAD_INFO_0_DE "Werte höher als „2× (Nativ)“ können die Ladezeiten im Spiel erheblich verkürzen, aber zu Timingfehlern führen. Einige Spiele funktionieren möglicherweise ab einem bestimmten Wert nicht mehr richtig."
+#define BEETLE_OPT_CD_FASTLOAD_INFO_0_DE "Werte über „2x (Nativ)“ können die Ladezeiten im Spiel erheblich verkürzen, jedoch zu Timing-Fehlern führen. Einige Spiele funktionieren ab einem bestimmten Wert möglicherweise nicht mehr ordnungsgemäß."
 #define OPTION_VAL_2X_NATIVE_DE "2x (Nativ)"
 #define OPTION_VAL_6X_DE "6 x"
 #define OPTION_VAL_10X_DE NULL
@@ -76826,8 +76826,8 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_TH NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_TH NULL
 #define OPTION_VAL_RED_TH NULL
-#define OPTION_VAL_BLUE_TH NULL
-#define OPTION_VAL_GREEN_TH NULL
+#define OPTION_VAL_BLUE_TH "น้ำเงิน"
+#define OPTION_VAL_GREEN_TH "เขียว"
 #define OPTION_VAL_ORANGE_TH NULL
 #define OPTION_VAL_YELLOW_TH NULL
 #define OPTION_VAL_CYAN_TH NULL
