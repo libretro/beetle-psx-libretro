@@ -49914,9 +49914,9 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_3_IT "3 Secondi"
 #define OPTION_VAL_4_IT "4 Secondi"
 #define OPTION_VAL_5_IT "5 Secondi"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_IT NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_IT "Multitap sulla porta 1"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_IT "Abilita la funzionalità multitap sulla porta 1."
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_IT NULL
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_IT "Multitap sulla porta 2"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_IT "Abilita la funzionalità multitap sulla porta 2."
 #define BEETLE_OPT_GUN_INPUT_MODE_LABEL_IT "Modalità Input Pistola"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_IT NULL
@@ -49988,7 +49988,7 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_0_O48_IT "0 (Predefinito)"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_IT NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_IT NULL
-#define OPTION_VAL_1_O49_IT NULL
+#define OPTION_VAL_1_O49_IT "1 (Predefinito)"
 #define BEETLE_OPT_LINE_RENDER_LABEL_IT "Hack Line-to-Quad"
 #define BEETLE_OPT_LINE_RENDER_INFO_0_IT NULL
 #define OPTION_VAL_DEFAULT_IT "Predefinito"
@@ -68318,7 +68318,7 @@ struct retro_core_options_v2 options_pt_pt = {
 /* RETRO_LANGUAGE_RU */
 
 #define CATEGORY_SYSTEM_LABEL_RU "Система"
-#define CATEGORY_SYSTEM_INFO_0_RU NULL
+#define CATEGORY_SYSTEM_INFO_0_RU "Изменение параметров системы и разгона."
 #define CATEGORY_VIDEO_LABEL_RU "Видео"
 #define CATEGORY_VIDEO_INFO_0_RU "Настройки соотношения сторон, кадрирования, графических фильтров и пропуска кадров."
 #define CATEGORY_PGXP_LABEL_RU NULL
@@ -68328,9 +68328,9 @@ struct retro_core_options_v2 options_pt_pt = {
 #define CATEGORY_INPUT_LABEL_RU "Ввод"
 #define CATEGORY_INPUT_INFO_0_RU "Настройки светового пистолета, мыши и neGcon."
 #define CATEGORY_MEMCARDS_LABEL_RU "Карты памяти"
-#define CATEGORY_MEMCARDS_INFO_0_RU NULL
+#define CATEGORY_MEMCARDS_INFO_0_RU "Изменение настроек виртуальной карты памяти."
 #define CATEGORY_HACKS_LABEL_RU "Хаки эмуляции"
-#define CATEGORY_HACKS_INFO_0_RU NULL
+#define CATEGORY_HACKS_INFO_0_RU "Изменение настроек точности эмуляции, влияющих на низкую производительность и совместимость."
 #define BEETLE_OPT_CPU_FREQ_SCALE_LABEL_RU "Масштабирование частоты CPU (разгон)"
 #define BEETLE_OPT_CPU_FREQ_SCALE_INFO_0_RU "Разгон (или занижение) частоты CPU эмулируемой PSX. В некоторых играх может устранить замедления и выровнять частоту кадров, но повышает нагрузку. Часть игр не получит преимуществ из-за наличия внутр. ограничителей частоты. Также может привести к завышению скорости анимаций."
 #define OPTION_VAL_50_RU NULL
@@ -68338,7 +68338,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_70_RU NULL
 #define OPTION_VAL_80_RU NULL
 #define OPTION_VAL_90_RU NULL
-#define OPTION_VAL_100_RU NULL
+#define OPTION_VAL_100_RU "100% (нативно)"
 #define OPTION_VAL_110_RU NULL
 #define OPTION_VAL_120_RU NULL
 #define OPTION_VAL_130_RU NULL
@@ -68414,7 +68414,7 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_32X_RU NULL
 #define BEETLE_OPT_GTE_OVERCLOCK_LABEL_RU "Разгон GTE"
 #define BEETLE_OPT_GTE_OVERCLOCK_INFO_0_RU "Понижает задержку выполнения операций эмулируемого GTE (сопроцессора для 3D-графики) до одного цикла. Поднимает частоту кадров и стабилизирует время кадра в играх, интенсивно использующих GTE."
-#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_RU NULL
+#define BEETLE_OPT_CD_ACCESS_METHOD_LABEL_RU "Метод доступа CD"
 #define BEETLE_OPT_CD_ACCESS_METHOD_INFO_0_RU NULL
 #define OPTION_VAL_SYNC_RU "Синхронный"
 #define OPTION_VAL_ASYNC_RU "Асинхронный"
@@ -68428,14 +68428,14 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_14X_RU NULL
 #define BEETLE_OPT_SKIP_BIOS_LABEL_RU "Пропускать BIOS"
 #define BEETLE_OPT_SKIP_BIOS_INFO_0_RU "Пропуск начальной анимации BIOS PlayStation, отображаемой при запуске игр. При включении может влиять на совместимость с некоторыми играми (Saga Frontier, PAL-игры с защитой от копирования и др.)."
-#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_RU NULL
-#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_RU NULL
+#define BEETLE_OPT_OVERRIDE_BIOS_LABEL_RU "Переопределение настроек BIOS"
+#define BEETLE_OPT_OVERRIDE_BIOS_INFO_0_RU "Заменить стандартный региональный BIOS на образ без региональной привязки, если он будет обнаружен. Требуется перезагрузка."
 #define OPTION_VAL_PSXONPSP_RU NULL
 #define OPTION_VAL_PS1_ROM_RU NULL
 #define OPTION_VAL_OPENBIOS_RU NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_RU "Внутреннее разрешение GPU"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_RU NULL
-#define BEETLE_OPT_RENDERER_LABEL_RU NULL
+#define BEETLE_OPT_RENDERER_LABEL_RU "Рендер"
 #define BEETLE_OPT_RENDERER_INFO_0_RU NULL
 #define OPTION_VAL_HARDWARE_RU "Аппаратный (авто)"
 #define OPTION_VAL_HARDWARE_GL_RU "Аппаратный (OpenGL)"
@@ -68471,12 +68471,12 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_SUPER_SAMPLING_LABEL_RU "Суперсэмплинг (понижать к исходному разрешению)"
 #define BEETLE_OPT_SUPER_SAMPLING_INFO_0_RU "Понижает качество рендеринга с высокого разрешения до исходного. Совместно с повышением разрешения обеспечивает сглаженное 3D, но в ориг. разрешении. Наиболее эффективно для игр с 2D и 3D-элементами (напр. 3D-персонажи на отрисованном фоне), а также в связке с CRT-шейдерами. Поддерживается только рендером Vulkan. Примечание: при вкл. рекомендуется отключить опцию 'Паттерн дизеринга'."
 #define BEETLE_OPT_MSAA_LABEL_RU "Множественная выборка сглаживания"
-#define BEETLE_OPT_MSAA_INFO_0_RU NULL
+#define BEETLE_OPT_MSAA_INFO_0_RU "MSAA улучшает внешний вид 3D-объектов. Поддерживается только рендерингом на Vulkan."
 #define OPTION_VAL_1X_RU NULL
 #define BEETLE_OPT_MDEC_YUV_LABEL_RU "Сглаживание YUV MDEC"
 #define BEETLE_OPT_MDEC_YUV_INFO_0_RU "Улучшает качество видеозаставок путём уменьшения артефактов макроблокирования (квадраты/неровные края). Только для рендеринга на Vulkan."
 #define BEETLE_OPT_TRACK_TEXTURES_LABEL_RU "Отслеживать текстуры"
-#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_RU NULL
+#define BEETLE_OPT_TRACK_TEXTURES_INFO_0_RU "Требуется для выгрузки и замещения текстур. В большинстве игр будет приводить к вылетам."
 #define BEETLE_OPT_DUMP_TEXTURES_LABEL_RU "Снимать дамп текстур"
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_RU "Выгружать используемые текстуры в <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_RU "Замещать текстуры"
@@ -68535,11 +68535,11 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_3_RU "3 секунды"
 #define OPTION_VAL_4_RU "4 секунды"
 #define OPTION_VAL_5_RU "5 секунд"
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_RU NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_RU "Включает расширение multitap в порт 1."
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_RU NULL
-#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_RU "Включает расширение multitap в порт 2."
-#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_RU "Режим светового пистолета"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_RU "Мультитап на порт 1"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_RU "Включает расширение мультитапа на порту 1."
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_LABEL_RU "Мультитап на порт 2"
+#define BEETLE_OPT_ENABLE_MULTITAP_PORT2_INFO_0_RU "Включает расширение мультитапа на порту 2."
+#define BEETLE_OPT_GUN_INPUT_MODE_LABEL_RU "Режим ввода светового пистолета"
 #define BEETLE_OPT_GUN_INPUT_MODE_INFO_0_RU NULL
 #define OPTION_VAL_LIGHTGUN_RU "Световой пистолет"
 #define OPTION_VAL_TOUCHSCREEN_RU "Сенсорный экран"
@@ -68547,8 +68547,8 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_GUN_CURSOR_INFO_0_RU NULL
 #define OPTION_VAL_CROSS_RU "Перекрестье"
 #define OPTION_VAL_DOT_RU "Точка"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_RU NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_RU NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_RU "Цвет прицела оружия: Порт 1"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_RU "Цвет прицела для светового пистолета в порте 1."
 #define OPTION_VAL_RED_RU "Красный"
 #define OPTION_VAL_BLUE_RU "Голубой"
 #define OPTION_VAL_GREEN_RU "Зелёный"
@@ -68559,10 +68559,10 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_PURPLE_RU "Фиолетовый"
 #define OPTION_VAL_BLACK_RU "Чёрный"
 #define OPTION_VAL_WHITE_RU "Белый"
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_RU NULL
-#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_RU NULL
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_LABEL_RU "Цвет прицела оружия: Порт 2"
+#define BEETLE_OPT_CROSSHAIR_COLOR_P2_INFO_0_RU "Цвет прицела для светового пистолета в порте 2."
 #define BEETLE_OPT_MOUSE_SENSITIVITY_LABEL_RU "Чувствительность мыши"
-#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_RU NULL
+#define BEETLE_OPT_MOUSE_SENSITIVITY_INFO_0_RU "Чувствительность для устройства ввода типа \"Мышь\"."
 #define OPTION_VAL_5_O42_RU NULL
 #define OPTION_VAL_10_RU NULL
 #define OPTION_VAL_15_RU NULL
@@ -68596,27 +68596,27 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_RU "Мёртвая зона скручивания neGcon"
 #define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_RU NULL
 #define OPTION_VAL_0_O44_RU NULL
-#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_RU NULL
+#define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_RU "Метод карты памяти"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_RU NULL
 #define OPTION_VAL_LIBRETRO_RU NULL
 #define OPTION_VAL_MEDNAFEN_RU NULL
-#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_RU NULL
+#define BEETLE_OPT_ENABLE_MEMCARD1_LABEL_RU "Слот карты памяти 2"
 #define BEETLE_OPT_ENABLE_MEMCARD1_INFO_0_RU NULL
-#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_RU NULL
+#define BEETLE_OPT_SHARED_MEMORY_CARDS_LABEL_RU "Общие карты памяти"
 #define BEETLE_OPT_SHARED_MEMORY_CARDS_INFO_0_RU NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_LABEL_RU NULL
 #define BEETLE_OPT_MEMCARD_LEFT_INDEX_INFO_0_RU NULL
-#define OPTION_VAL_0_O48_RU NULL
+#define OPTION_VAL_0_O48_RU "0 (по умолчанию)"
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_LABEL_RU NULL
 #define BEETLE_OPT_MEMCARD_RIGHT_INDEX_INFO_0_RU NULL
-#define OPTION_VAL_1_O49_RU NULL
-#define BEETLE_OPT_LINE_RENDER_LABEL_RU "Хак линия-в-четырёхугольник"
+#define OPTION_VAL_1_O49_RU "1 (по умолчанию)"
+#define BEETLE_OPT_LINE_RENDER_LABEL_RU "Преобразование линий в полигоны"
 #define BEETLE_OPT_LINE_RENDER_INFO_0_RU NULL
 #define OPTION_VAL_DEFAULT_RU "По умолчанию"
 #define OPTION_VAL_AGGRESSIVE_RU "Агрессивно"
-#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_RU "Широкоформатный хак"
+#define BEETLE_OPT_WIDESCREEN_HACK_LABEL_RU "Широкоэкранный режим"
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_RU "Анаморфный 3D-рендеринг и вывод фреймбуфера в широкоформатном соотношении сторон. Наилучший результат достигается для игр полностью в 3D. Элементы 2D могут смещаться и будут вытянуты по горизонтали."
-#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_RU "Пропорции экрана с широкоформатным хаком"
+#define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_LABEL_RU "Пропорции широкоэкранного режима"
 #define BEETLE_OPT_WIDESCREEN_HACK_ASPECT_RATIO_INFO_0_RU NULL
 #define OPTION_VAL_16_9_RU NULL
 #define OPTION_VAL_16_10_RU NULL
@@ -68642,14 +68642,14 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DYNAREC_SPU_SAMPLES_INFO_0_RU "Макс. сэмплов, обрабатываемых до проверки обновления SPU. Более высокие значения повышают скорость, но в некоторых играх отклонение от 1 приводит к искажению звука."
 #define BEETLE_OPT_CORE_TIMING_FPS_LABEL_RU "Тайминг частоты кадров ядра"
 #define BEETLE_OPT_CORE_TIMING_FPS_INFO_0_RU NULL
-#define OPTION_VAL_AUTO_TOGGLE_RU NULL
-#define OPTION_VAL_FORCE_PROGRESSIVE_RU NULL
+#define OPTION_VAL_AUTO_TOGGLE_RU "Автоматическое переключение"
+#define OPTION_VAL_FORCE_PROGRESSIVE_RU "Принудительная прогрессивная скорость"
 #define OPTION_VAL_FORCE_INTERLACED_RU "Принуд. чересстрочная"
 #define BEETLE_OPT_DEINTERLACER_LABEL_RU "Метод деинтерлейсинга"
 #define BEETLE_OPT_DEINTERLACER_INFO_0_RU "'Weave' показывает оба поля на одном кадре для полного неподвижного изображения в высоком разрешении. 'Bob' жертвует чёткостью разрешения ради чёткости движения."
 #define OPTION_VAL_WEAVE_RU NULL
 #define OPTION_VAL_BOB_RU NULL
-#define BEETLE_OPT_FRAME_DUPING_LABEL_RU NULL
+#define BEETLE_OPT_FRAME_DUPING_LABEL_RU "Дамп кадров"
 #define BEETLE_OPT_FRAME_DUPING_INFO_0_RU NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_RU NULL
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_RU NULL
@@ -68660,9 +68660,9 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_4_3_RU "Принуд. 4:3"
 #define OPTION_VAL_NTSC_RU "Принуд. NTSC"
 #define BEETLE_OPT_CROP_OVERSCAN_LABEL_RU "Кадрирование вылетов развёртки"
-#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_RU NULL
+#define BEETLE_OPT_CROP_OVERSCAN_INFO_0_RU "Полное нативное изображение или без рамок."
 #define OPTION_VAL_STATIC_RU "Горизонтальная"
-#define OPTION_VAL_SMART_RU NULL
+#define OPTION_VAL_SMART_RU "Горизонтальный + вертикальный"
 #define BEETLE_OPT_IMAGE_CROP_LABEL_RU "Добавочное кадрирование"
 #define BEETLE_OPT_IMAGE_CROP_INFO_0_RU NULL
 #define OPTION_VAL_9PX_RU "9 пикс."
@@ -68679,20 +68679,20 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_20PX_RU "20 пикс."
 #define BEETLE_OPT_IMAGE_OFFSET_LABEL_RU "Сдвиг изображения после обрезки"
 #define BEETLE_OPT_IMAGE_OFFSET_INFO_0_RU NULL
-#define OPTION_VAL_12PX_O64_RU NULL
-#define OPTION_VAL_11PX_O64_RU NULL
-#define OPTION_VAL_10PX_O64_RU NULL
-#define OPTION_VAL_9PX_O64_RU NULL
-#define OPTION_VAL_8PX_O64_RU NULL
-#define OPTION_VAL_7PX_O64_RU NULL
-#define OPTION_VAL_6PX_O64_RU NULL
-#define OPTION_VAL_5PX_O64_RU NULL
-#define OPTION_VAL_4PX_O64_RU NULL
-#define OPTION_VAL_3PX_O64_RU NULL
-#define OPTION_VAL_2PX_O64_RU NULL
-#define OPTION_VAL_1PX_O64_RU NULL
-#define OPTION_VAL_1PX_O64_0_RU NULL
-#define OPTION_VAL_2PX_O64_0_RU NULL
+#define OPTION_VAL_12PX_O64_RU "-12 пикс."
+#define OPTION_VAL_11PX_O64_RU "-11 пикс."
+#define OPTION_VAL_10PX_O64_RU "-10 пикс."
+#define OPTION_VAL_9PX_O64_RU "-9 пикс."
+#define OPTION_VAL_8PX_O64_RU "-8 пикс."
+#define OPTION_VAL_7PX_O64_RU "-7 пикс."
+#define OPTION_VAL_6PX_O64_RU "-6 пикс."
+#define OPTION_VAL_5PX_O64_RU "-5 пикс."
+#define OPTION_VAL_4PX_O64_RU "-4 пикс."
+#define OPTION_VAL_3PX_O64_RU "-3 пикс."
+#define OPTION_VAL_2PX_O64_RU "-2 пикс."
+#define OPTION_VAL_1PX_O64_RU "-1 пикс."
+#define OPTION_VAL_1PX_O64_0_RU "+1 пикс."
+#define OPTION_VAL_2PX_O64_0_RU "+2 пикс."
 #define OPTION_VAL_3PX_O64_0_RU NULL
 #define OPTION_VAL_4PX_O64_0_RU NULL
 #define OPTION_VAL_5PX_O64_0_RU NULL
@@ -76593,7 +76593,7 @@ struct retro_core_options_v2 options_sv = {
 
 /* RETRO_LANGUAGE_TH */
 
-#define CATEGORY_SYSTEM_LABEL_TH NULL
+#define CATEGORY_SYSTEM_LABEL_TH "ระบบ"
 #define CATEGORY_SYSTEM_INFO_0_TH NULL
 #define CATEGORY_VIDEO_LABEL_TH "วิดีโอ"
 #define CATEGORY_VIDEO_INFO_0_TH NULL
