@@ -83,9 +83,6 @@ PS_CPU::PS_CPU()
  for(uint64 a = 0x00000000; a < (1ULL << 32); a += FAST_MAP_PSIZE)
   SetFastMap(DummyPage, a, FAST_MAP_PSIZE);
 
- CPUHook = NULL;
- ADDBT = NULL;
-
  GTE_Init();
 
  for(unsigned i = 0; i < 24; i++)
@@ -157,7 +154,7 @@ void PS_CPU::Power(void)
  BACKED_new_PC = BACKED_PC + 4;
  BDBT = 0;
 
- BACKED_LDWhich = 0x20;
+ BACKED_LDWhich = 0x22;
  BACKED_LDValue = 0;
  LDAbsorb = 0;
  memset(ReadAbsorb, 0, sizeof(ReadAbsorb));
@@ -199,8 +196,6 @@ void PS_CPU::Power(void)
 
 int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
 {
- uint32 OPM = BDBT;
-
  SFORMAT StateRegs[] =
  {
   SFARRAY32(GPR, 32),
@@ -208,7 +203,7 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
   SFVAR(HI),
   SFVAR(BACKED_PC),
   SFVAR(BACKED_new_PC),
-  SFVARN(OPM, "BACKED_new_PC_mask"),
+  SFVAR(BDBT),
 
   SFVAR(IPCache),
   SFVAR(Halted),
@@ -262,26 +257,13 @@ int PS_CPU::StateAction(StateMem *sm, const unsigned load, const bool data_only)
     lightrec_plugin_init();
   }
 #endif
-  if(load < 0x939)
-  {
-   //
-   // For compatibility with pre-0.9.39 save states.
-   //
-   uint32 NOPM = ~OPM;
-
-   //printf("Old: new_PC=0x%08x, new_PC_mask=0x%08x\n", BACKED_new_PC, OPM);
-
-   BDBT = ((NOPM << 1) | (NOPM >> 1)) & 0x3;
-
-   BACKED_new_PC = (BACKED_PC & OPM) + BACKED_new_PC;
-  }
-  else
-   BDBT = OPM;
-
   ReadAbsorbWhich &= 0x1F;
-  BACKED_LDWhich %= 0x21;
-
-  //printf("PC=0x%08x, new_PC=0x%08x, BDBT=0x%02x\n", BACKED_PC, BACKED_new_PC, BDBT);
+  /* BACKED_LDWhich must be a valid GPR index (0..31) or the dummy
+   * slot (0x22). Any other value (including 0x20, the dummy slot
+   * from previous save-state versions) is sanitized to the new
+   * dummy index. */
+  if (BACKED_LDWhich > 31)
+   BACKED_LDWhich = 0x22;
  }
  return ret;
 }
@@ -322,43 +304,6 @@ void PS_CPU::SetBIU(uint32 val)
 uint32 PS_CPU::GetBIU(void)
 {
  return BIU;
-}
-
-template<typename T>
-INLINE T PS_CPU::PeekMemory(uint32 address)
-{
- T ret;
- address &= addr_mask[address >> 29];
-
- if(address >= 0x1F800000 && address <= 0x1F8003FF)
-  return ScratchRAM->Read<T>(address & 0x3FF);
-
- //assert(!(CP0.SR & 0x10000));
-
- if(sizeof(T) == 1)
-  ret = PSX_MemPeek8(address);
- else if(sizeof(T) == 2)
-  ret = PSX_MemPeek16(address);
- else
-  ret = PSX_MemPeek32(address);
-
- return(ret);
-}
-
-template<typename T>
-void PS_CPU::PokeMemory(uint32 address, T value)
-{
- address &= addr_mask[address >> 29];
-
- if(address >= 0x1F800000 && address <= 0x1F8003FF)
-  return ScratchRAM->Write<T>(address & 0x3FF, value);
-
- if(sizeof(T) == 1)
-  PSX_MemPoke8(address, value);
- else if(sizeof(T) == 2)
-  PSX_MemPoke16(address, value);
- else
-  PSX_MemPoke32(address, value);
 }
 
 template<typename T>
@@ -616,9 +561,6 @@ uint32 NO_INLINE PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NP, cons
   CP0.TAR = NP;
  }
 
- if(ADDBT)
-  ADDBT(PC, handler, true);
-
  // "Push" IEc and KUc(so that the new IEc and KUc are 0)
  CP0.SR = (CP0.SR & ~0x3F) | ((CP0.SR << 2) & 0x3F);
 
@@ -658,7 +600,6 @@ uint32 NO_INLINE PS_CPU::Exception(uint32 code, uint32 PC, const uint32 NP, cons
 #define GPR_RES(n) { unsigned tn = (n); ReadAbsorb[tn] = 0; }
 #define GPR_DEPRES_END ReadAbsorb[0] = back; }
 
-template<bool DebugMode, bool BIOSPrintMode, bool ILHMode>
 pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 {
  pscpu_timestamp_t timestamp = timestamp_in;
@@ -690,24 +631,6 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
 
-#ifdef DEBUG
-   if(DebugMode && CPUHook)
-   {
-    ACTIVE_TO_BACKING;
-
-    // For save states in step mode.
-    gte_ts_done -= timestamp;
-    muldiv_ts_done -= timestamp;
-
-    CPUHook(timestamp, PC);
-
-    // For save states in step mode.
-    gte_ts_done += timestamp;
-    muldiv_ts_done += timestamp;
-
-    BACKING_TO_ACTIVE;
-   }
-#endif
 
    //
    // Instruction fetch
@@ -739,37 +662,15 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
    else
     timestamp++;
 
-   #define DO_LDS() { GPR[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x20; }
+   #define DO_LDS() { GPR_full[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x22; }
    #define BEGIN_OPF(name) { op_##name:
    #define END_OPF goto OpDone; }
-
-#ifdef DEBUG
-#define DEBUG_ADDBT() if(DebugMode && ADDBT) { ADDBT(PC, new_PC, false); }
-#define DEBUG_ILH() \
-	  if(ILHMode)						\
-	  {							\
-	   if(old_PC == (((new_PC - 4) & mask) + offset))	\
-	   {							\
-	    if(MDFN_densb_u32_aligned((uint8*)(FastMap[PC >> FAST_MAP_SHIFT] + PC)) == 0)	\
-	    {							\
-	     if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
-	     {							\
-	      timestamp = next_event_ts;			\
-	     }							\
-	    }							\
-	   }							\
-	  }
-#else
-#define DEBUG_ADDBT()
-#define DEBUG_ILH()
-#endif
 
    #define DO_BRANCH(arg_cond, arg_offset, arg_mask, arg_dolink, arg_linkreg)\
 	{							\
 	 const bool cond = (arg_cond);				\
 	 const uint32 offset = (arg_offset);			\
 	 const uint32 mask = (arg_mask);			\
-	 const uint32 old_PC = PC;				\
 	 PC = new_PC;						\
 	 new_PC += 4;						\
 	 BDBT = 2;						\
@@ -779,10 +680,8 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 								\
 	 if(cond)						\
 	 {							\
-     DEBUG_ILH() \
 	  new_PC = ((new_PC - 4) & mask) + offset;		\
 	  BDBT = 3;						\
-     DEBUG_ADDBT() \
 	 }							\
 								\
 	 goto SkipNPCStuff;					\
@@ -2635,7 +2534,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
  return(timestamp);
 }
 
-pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode)
+pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in)
 {
 #ifdef HAVE_LIGHTREC
 //track options changing
@@ -2658,181 +2557,7 @@ pscpu_timestamp_t PS_CPU::Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode
  if(psx_dynarec != DYNAREC_DISABLED)
   return(lightrec_plugin_execute(timestamp_in));
 #endif
- if(CPUHook || ADDBT)
-  return(RunReal<true, true, false>(timestamp_in));
-#ifdef DEBUG
- if(ILHMode)
-  return(RunReal<false, false, true>(timestamp_in));
- if(BIOSPrintMode)
-  return(RunReal<false, true, false>(timestamp_in));
-#endif
- return(RunReal<false, false, false>(timestamp_in));
-}
-
-void PS_CPU::SetCPUHook(void (*cpuh)(const pscpu_timestamp_t timestamp, uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception))
-{
- ADDBT = addbt;
- CPUHook = cpuh;
-}
-
-uint32 PS_CPU::GetRegister(unsigned int which, char *special, const uint32 special_len)
-{
- uint32 ret = 0;
-
- if(which >= GSREG_GPR && which < (GSREG_GPR + 32))
-  ret = GPR[which];
- else switch(which)
- {
-  case GSREG_PC:
-	ret = BACKED_PC;
-	break;
-
-  case GSREG_PC_NEXT:
-	ret = BACKED_new_PC;
-	break;
-
-  case GSREG_IN_BD_SLOT:
-	ret = BDBT;
-	break;
-
-  case GSREG_LO:
-	ret = LO;
-	break;
-
-  case GSREG_HI:
-	ret = HI;
-	break;
-
-  case GSREG_BPC:
-	ret = CP0.BPC;
-	break;
-
-  case GSREG_BDA:
-	ret = CP0.BDA;
-	break;
-
-  case GSREG_TAR:
-	ret = CP0.TAR;
-	break;
-
-  case GSREG_DCIC:
-	ret = CP0.DCIC;
-	break;
-
-  case GSREG_BADA:
-	ret = CP0.BADA;
-	break;
-
-  case GSREG_BDAM:
-	ret = CP0.BDAM;
-	break;
-
-  case GSREG_BPCM:
-	ret = CP0.BPCM;
-	break;
-
-  case GSREG_SR:
-	ret = CP0.SR;
-	break;
-
-  case GSREG_CAUSE:
-	ret = CP0.CAUSE;
-	break;
-
-  case GSREG_EPC:
-	ret = CP0.EPC;
-	break;
-
- }
-
- return(ret);
-}
-
-void PS_CPU::SetRegister(unsigned int which, uint32 value)
-{
- if(which >= GSREG_GPR && which < (GSREG_GPR + 32))
- {
-  if(which != (GSREG_GPR + 0))
-   GPR[which] = value;
- }
- else switch(which)
- {
-  case GSREG_PC:
-        BACKED_PC = value;
-        break;
-
-  case GSREG_PC_NEXT:
-	BACKED_new_PC = value;
-	break;
-
-  case GSREG_IN_BD_SLOT:
-	BDBT = value & 0x3;
-	break;
-
-  case GSREG_LO:
-        LO = value;
-        break;
-
-  case GSREG_HI:
-        HI = value;
-        break;
-
-  case GSREG_SR:
-        CP0.SR = value;		// TODO: mask
-        break;
-
-  case GSREG_CAUSE:
-	CP0.CAUSE = value;
-	break;
-
-  case GSREG_EPC:
-	CP0.EPC = value & ~0x3U;
-	break;
-
-
- }
-}
-
-bool PS_CPU::PeekCheckICache(uint32 PC, uint32 *iw)
-{
- if(ICache[(PC & 0xFFC) >> 2].TV == PC)
- {
-  *iw = ICache[(PC & 0xFFC) >> 2].Data;
-  return(true);
- }
-
- return(false);
-}
-
-
-uint8 PS_CPU::PeekMem8(uint32 A)
-{
- return PeekMemory<uint8>(A);
-}
-
-uint16 PS_CPU::PeekMem16(uint32 A)
-{
- return PeekMemory<uint16>(A);
-}
-
-uint32 PS_CPU::PeekMem32(uint32 A)
-{
- return PeekMemory<uint32>(A);
-}
-
-void PS_CPU::PokeMem8(uint32 A, uint8 V)
-{
- PokeMemory<uint8>(A, V);
-}
-
-void PS_CPU::PokeMem16(uint32 A, uint16 V)
-{
- PokeMemory<uint16>(A, V);
-}
-
-void PS_CPU::PokeMem32(uint32 A, uint32 V)
-{
- PokeMemory<uint32>(A, V);
+ return(RunReal(timestamp_in));
 }
 
 #undef BEGIN_OPF
@@ -2842,182 +2567,6 @@ void PS_CPU::PokeMem32(uint32 A, uint32 V)
 #define MK_OPF(op, funct)	((op) ? (0x40 | (op)) : (funct))
 #define BEGIN_OPF(op, funct) case MK_OPF(op, funct): {
 #define END_OPF } break;
-
-// FIXME: should we breakpoint on an illegal address?  And with LWC2/SWC2 if CP2 isn't enabled?
-void PS_CPU::CheckBreakpoints(void (*callback)(bool write, uint32 address, unsigned int len), uint32 instr)
-{
- uint32 opf;
-
- opf = instr & 0x3F;
-
- if(instr & (0x3F << 26))
-  opf = 0x40 | (instr >> 26);
-
-
- switch(opf)
- {
-  default:
-	break;
-
-    //
-    // LB - Load Byte
-    //
-    BEGIN_OPF(0x20, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 1);
-    END_OPF;
-
-    //
-    // LBU - Load Byte Unsigned
-    //
-    BEGIN_OPF(0x24, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 1);
-    END_OPF;
-
-    //
-    // LH - Load Halfword
-    //
-    BEGIN_OPF(0x21, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 2);
-    END_OPF;
-
-    //
-    // LHU - Load Halfword Unsigned
-    //
-    BEGIN_OPF(0x25, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 2);
-    END_OPF;
-
-
-    //
-    // LW - Load Word
-    //
-    BEGIN_OPF(0x23, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(false, address, 4);
-    END_OPF;
-
-    //
-    // SB - Store Byte
-    //
-    BEGIN_OPF(0x28, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 1);
-    END_OPF;
-
-    // 
-    // SH - Store Halfword
-    //
-    BEGIN_OPF(0x29, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 2);
-    END_OPF;
-
-    // 
-    // SW - Store Word
-    //
-    BEGIN_OPF(0x2B, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        callback(true, address, 4);
-    END_OPF;
-
-    //
-    // LWL - Load Word Left
-    //
-    BEGIN_OPF(0x22, 0);
-	ITYPE;
-	uint32 address = GPR[rs] + immediate;
-
-	do
-	{
-         callback(false, address, 1);
-	} while((address--) & 0x3);
-
-    END_OPF;
-
-    //
-    // SWL - Store Word Left
-    //
-    BEGIN_OPF(0x2A, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        do
-        {
-	 callback(true, address, 1);
-        } while((address--) & 0x3);
-
-    END_OPF;
-
-    //
-    // LWR - Load Word Right
-    //
-    BEGIN_OPF(0x26, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        do
-        {
-	 callback(false, address, 1);
-        } while((++address) & 0x3);
-
-    END_OPF;
-
-    //
-    // SWR - Store Word Right
-    //
-    BEGIN_OPF(0x2E, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-        do
-        {
-	 callback(true, address, 1);
-        } while((++address) & 0x3);
-
-    END_OPF;
-
-    //
-    // LWC2
-    //
-    BEGIN_OPF(0x32, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-	callback(false, address, 4);
-    END_OPF;
-
-    //
-    // SWC2
-    //
-    BEGIN_OPF(0x3A, 0);
-        ITYPE;
-        uint32 address = GPR[rs] + immediate;
-
-	callback(true, address, 4);
-    END_OPF;
-
- }
-}
 
 #ifdef HAVE_LIGHTREC
 #define ARRAY_SIZE(x) (sizeof(x) ? sizeof(x) / sizeof((x)[0]) : 0)
@@ -3802,8 +3351,6 @@ int PS_CPU::lightrec_plugin_init()
 
 int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 {
-	uint32_t GPRL[34];
-
 	uint32_t PC;
 	uint32_t new_PC;
 	uint32_t new_PC_mask;
@@ -3818,10 +3365,14 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 #ifdef LIGHTREC_DEBUG
 		u32 oldpc = PC;
 #endif
-		memcpy(&GPRL,&GPR,32*sizeof(uint32_t));
-		GPRL[32] = LO;
-		GPRL[33] = HI;
-		lightrec_restore_registers(lightrec_state, GPRL);
+		/* GPR_full is laid out as [GPR[0..31], LO, HI, LD_Dummy].
+		 * lightrec's u32 regs[34] expects [r0..r31, LO, HI] in that
+		 * exact order, so the first 34 entries of GPR_full are a
+		 * direct match - no scratch buffer or memcpy required. The
+		 * LD_Dummy slot at [34] is past lightrec's view and stays
+		 * intact across the call. Saves 256 bytes of memcpy traffic
+		 * per iteration of this hot loop. */
+		lightrec_restore_registers(lightrec_state, GPR_full);
 		lightrec_reset_cycle_count(lightrec_state, timestamp);
 
 		if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
@@ -3834,10 +3385,7 @@ int32_t PS_CPU::lightrec_plugin_execute(int32_t timestamp)
 		timestamp = lightrec_current_cycle_count(
 				lightrec_state);
 
-		lightrec_dump_registers(lightrec_state, GPRL);
-		memcpy(&GPR,&GPRL,32*sizeof(uint32_t));
-		LO = GPRL[32];
-		HI = GPRL[33];
+		lightrec_dump_registers(lightrec_state, GPR_full);
 
 		flags = lightrec_exit_flags(lightrec_state);
 

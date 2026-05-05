@@ -92,10 +92,6 @@ endif
 
 FLAGS += -DHAVE_PBP
 
-ifeq ($(DEBUG), 1)
-   SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
-endif
-
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING -DHAVE_THREADS
 endif

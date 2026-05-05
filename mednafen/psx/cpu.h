@@ -87,7 +87,7 @@ class PS_CPU
   return next_event_ts;
  }
 
- pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in, bool BIOSPrintMode, bool ILHMode);
+ pscpu_timestamp_t Run(pscpu_timestamp_t timestamp_in);
 
  void Power(void) MDFN_COLD;
 
@@ -107,10 +107,29 @@ class PS_CPU
 
  private:
 
- uint32 GPR[32 + 1];	// GPR[32] Used as dummy in load delay simulation(indexing past the end of real GPR)
-
- uint32 LO;
- uint32 HI;
+ /* Layout: GPR[32] holds the 32 real MIPS GPRs at offset 0; LO and HI
+  * follow at offsets 128 and 132 respectively. lightrec's
+  * u32 regs[34] argument expects exactly this layout (regs[32]=LO,
+  * regs[33]=HI), so lightrec_restore_registers / _dump_registers can
+  * be passed &GPR[0] directly with no scratch buffer or memcpy
+  * required. LD_Dummy is the load-delay absorption sink (formerly
+  * GPR[32] in a 33-element GPR array); DO_LDS writes there when no
+  * delayed-load target was pending. The union lets DO_LDS index past
+  * GPR[31] / LO / HI to reach LD_Dummy in a single
+  *
+  *   GPR_full[LDWhich] = LDValue;
+  *
+  * with LDWhich either an actual 0-31 register index, 32/33 for an
+  * (illegal but harmless) LO/HI write, or 34 for the dummy slot. */
+ union {
+  struct {
+   uint32 GPR[32];
+   uint32 LO;
+   uint32 HI;
+   uint32 LD_Dummy;
+  };
+  uint32 GPR_full[35];
+ };
 
  uint32 BACKED_PC;
  uint32 BACKED_new_PC;
@@ -118,7 +137,7 @@ class PS_CPU
  static uint32 IPCache;
  uint8 BDBT;
 
- uint8 ReadAbsorb[0x20 + 1];
+ uint8 ReadAbsorb[35];  /* 32 GPRs + LO + HI + LD_Dummy slot. */
  uint8 ReadAbsorbWhich;
  uint8 ReadFudge;
 
@@ -226,10 +245,13 @@ class PS_CPU
 
  uint32 Exception(uint32 code, uint32 PC, const uint32 NP, const uint32 instr) MDFN_WARN_UNUSED_RESULT;
 
- template<bool DebugMode, bool BIOSPrintMode, bool ILHMode> NO_INLINE pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
+ /* Single-arg form: BIOSPrintMode and ILHMode template args were
+  * gated on #ifdef DEBUG (release builds never instantiated them);
+  * DebugMode was gated on CPUHook/ADDBT which were debugger-only and
+  * are gone. The release build's only RunReal instantiation was
+  * <false, false, false>. */
+ NO_INLINE pscpu_timestamp_t RunReal(pscpu_timestamp_t timestamp_in);
 
- template<typename T> T PeekMemory(uint32 address) MDFN_COLD;
- template<typename T> void PokeMemory(uint32 address, T value) MDFN_COLD;
  template<typename T> T ReadMemory(pscpu_timestamp_t &timestamp, uint32 address, bool DS24 = false, bool LWC_timing = false);
  template<typename T> void WriteMemory(pscpu_timestamp_t &timestamp, uint32 address, uint32 value, bool DS24 = false);
 
@@ -282,51 +304,6 @@ class PS_CPU
  static uint32 cache_ctrl_read_word(struct lightrec_state *state, uint32 opcode, void *host, uint32 mem);
  static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp);
 #endif
-
- //
- // Mednafen debugger stuff follows:
- //
- public:
- void SetCPUHook(void (*cpuh)(const pscpu_timestamp_t timestamp, uint32 pc), void (*addbt)(uint32 from, uint32 to, bool exception));
- void CheckBreakpoints(void (*callback)(bool write, uint32 address, unsigned int len), uint32 instr);
-
- enum
- {
-  GSREG_GPR = 0,
-  GSREG_PC = 32,
-  GSREG_PC_NEXT,
-  GSREG_IN_BD_SLOT,
-  GSREG_LO,
-  GSREG_HI,
-  //
-  //
-  GSREG_BPC,
-  GSREG_BDA,
-  GSREG_TAR,
-  GSREG_DCIC,
-  GSREG_BADA,
-  GSREG_BDAM,
-  GSREG_BPCM,
-  GSREG_SR,
-  GSREG_CAUSE,
-  GSREG_EPC
- };
-
- uint32 GetRegister(unsigned int which, char *special, const uint32 special_len);
- void SetRegister(unsigned int which, uint32 value);
- bool PeekCheckICache(uint32 PC, uint32 *iw);
-
- uint8 PeekMem8(uint32 A);
- uint16 PeekMem16(uint32 A);
- uint32 PeekMem32(uint32 A);
-
- void PokeMem8(uint32 A, uint8 V);
- void PokeMem16(uint32 A, uint16 V);
- void PokeMem32(uint32 A, uint32 V);
-
- private:
- void (*CPUHook)(const pscpu_timestamp_t timestamp, uint32 pc);
- void (*ADDBT)(uint32 from, uint32 to, bool exception);
 };
 
 #endif

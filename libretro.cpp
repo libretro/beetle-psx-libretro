@@ -2225,9 +2225,6 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
 	input_init_calibration();
 
-#ifdef WANT_DEBUGGER
-   DBG_Init();
-#endif
    PSX_Power();
 }
 
@@ -4853,7 +4850,7 @@ void retro_run(void)
    GPU_StartFrame(espec);
 
    Running = -1;
-   timestamp = PSX_CPU->Run(timestamp, false, false);
+   timestamp = PSX_CPU->Run(timestamp);
 
    assert(timestamp);
 

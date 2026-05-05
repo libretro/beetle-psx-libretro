@@ -7,15 +7,11 @@
 #include "../mednafen-types.h"
 #include "../video/surface.h"
 
-// Comment out these 2 defines for extra speeeeed.
-#define PSX_DBGPRINT_ENABLE    1
-#define PSX_EVENT_SYSTEM_CHECKS 1
-
-// It's highly unlikely the user will want these if they're intentionally compiling without the debugger.
-#ifndef WANT_DEBUGGER
-#undef PSX_DBGPRINT_ENABLE
-#undef PSX_EVENT_SYSTEM_CHECKS
-#endif
+// Define PSX_DBGPRINT_ENABLE to 1 to enable PSX_DBG / PSX_WARNING
+// debug printing via stdout. The historical default in this libretro
+// build is 0 (production performance: no PSX_DBG output, all calls
+// dead-strip via the no-op static inline below).
+#define PSX_DBGPRINT_ENABLE    0
 
 #define PSX_DBG_ERROR      0  // Emulator-level error.
 #define PSX_DBG_WARNING    1  // Warning about game doing questionable things/hitting stuff that might not be emulated correctly.
@@ -83,12 +79,10 @@ void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool
 
 uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 
-#include "dis.h"
 #include "cpu.h"
 #include "irq.h"
 #include "gpu.h"
 #include "dma.h"
-#include "debug.h"
 
 class PS_CDC;
 class PS_SPU;

@@ -1505,10 +1505,6 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             GPU.scanline = (GPU.scanline + 1) % GPU.LinesPerField;
             GPU.PhaseChange = !GPU.PhaseChange;
 
-#ifdef WANT_DEBUGGER
-            DBG_GPUScanlineHook(GPU.scanline);
-#endif
-
             //
             //
             //
