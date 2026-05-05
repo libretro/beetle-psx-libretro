@@ -21,7 +21,6 @@
  */
 
 #include "vulkan.hpp"
-#include <stdexcept>
 #include <vector>
 #include <algorithm>
 #include <string.h>
@@ -46,16 +45,19 @@ Context::Context(const char **instance_ext, uint32_t instance_ext_count, const c
 {
 	if (!create_instance(instance_ext, instance_ext_count))
 	{
+		LOGE("Failed to create Vulkan instance.\n");
 		destroy();
-		throw runtime_error("Failed to create Vulkan instance.");
+		return;
 	}
 
 	VkPhysicalDeviceFeatures features = {};
 	if (!create_device(VK_NULL_HANDLE, VK_NULL_HANDLE, device_ext, device_ext_count, nullptr, 0, &features))
 	{
+		LOGE("Failed to create Vulkan device.\n");
 		destroy();
-		throw runtime_error("Failed to create Vulkan device.");
+		return;
 	}
+	valid = true;
 }
 
 bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
@@ -116,6 +118,7 @@ Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VkQ
 	volkLoadDevice(device);
 	vkGetPhysicalDeviceProperties(gpu, &gpu_props);
 	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
+	valid = true;
 }
 
 Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
@@ -130,9 +133,11 @@ Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface
 	if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
 	                   num_required_device_layers, required_features))
 	{
+		LOGE("Failed to create Vulkan device.\n");
 		destroy();
-		throw runtime_error("Failed to create Vulkan device.");
+		return;
 	}
+	valid = true;
 }
 
 void Context::destroy()
@@ -405,13 +410,21 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	if (gpu == VK_NULL_HANDLE)
 	{
 		uint32_t gpu_count = 0;
-		V(vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr));
+		if (vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr) != VK_SUCCESS)
+		{
+			LOGE("vkEnumeratePhysicalDevices failed.\n");
+			return false;
+		}
 
 		if (gpu_count == 0)
 			return false;
 
 		vector<VkPhysicalDevice> gpus(gpu_count);
-		V(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()));
+		if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()) != VK_SUCCESS)
+		{
+			LOGE("vkEnumeratePhysicalDevices failed.\n");
+			return false;
+		}
 
 		for (auto &gpu : gpus)
 		{

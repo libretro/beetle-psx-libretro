@@ -1981,7 +1981,8 @@ uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	LOGE("Couldn't find memory type for buffer domain.\n");
+	return UINT32_MAX;
 }
 
 uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
@@ -2030,7 +2031,8 @@ uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	LOGE("Couldn't find memory type for image domain.\n");
+	return UINT32_MAX;
 }
 
 static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const ImageViewCreateInfo *view)
@@ -2709,6 +2711,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 
 	vkGetImageMemoryRequirements(device, holder.image, &reqs);
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+		return ImageHandle(nullptr);
 
 	if (info.tiling == VK_IMAGE_TILING_LINEAR &&
 	    (create_info.misc & IMAGE_MISC_LINEAR_IMAGE_IGNORE_DEVICE_LOCAL_BIT) == 0)
@@ -3010,6 +3014,11 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	vkGetBufferMemoryRequirements(device, buffer, &reqs);
 
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+	{
+		vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle(nullptr);
+	}
 
 	if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 	{

@@ -251,7 +251,10 @@ else ifeq ($(platform), sncps3)
    CXX     = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR      = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST
-   CXXFLAGS += -Xc+=exceptions
+   # Previously enabled SNC exception support via '-Xc+=exceptions'
+   # because parallel-psx threw runtime_error on Vulkan failures.
+   # Those have been converted to status returns, so the flag is gone
+   # and the SNC default (no exceptions) is now correct.
    OLD_GCC  := 1
    NO_GCC   := 1
    FLAGS    += -DARCH_POWERPC_ALTIVEC
@@ -602,6 +605,18 @@ endif
 
 CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
+
+# The libretro core has been audited to remove all exception throws
+# from C++ code that could unwind across the C ABI boundary. Compile
+# C++ with -fno-exceptions so the compiler can drop the unwinding
+# tables (significant size savings on console targets) and so any
+# accidentally-reintroduced throw becomes a hard build failure rather
+# than silent UB.
+#
+# SPIRV-Cross (vendored Khronos library) is converted via its own
+# SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS flag, which routes its
+# SPIRV_CROSS_THROW macro through report_and_abort() instead of throw.
+CXXFLAGS += -fno-exceptions -DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 
 ifneq ($(SANITIZER),)
    CFLAGS   := -fsanitize=$(SANITIZER) $(CFLAGS)

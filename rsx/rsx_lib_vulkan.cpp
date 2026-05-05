@@ -104,6 +104,15 @@ static void vk_context_reset(void)
    device->set_context(*context);
 
    renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
+   if (!renderer->is_valid())
+   {
+      delete renderer;
+      delete device;
+      renderer = nullptr;
+      device = nullptr;
+      vulkan = nullptr;
+      return;
+   }
 
    for (auto &func : defer)
       func();
@@ -148,19 +157,16 @@ static bool libretro_create_device(
       context = nullptr;
    }
 
-   /* parallel-psx (the bundled Vulkan renderer) throws std::runtime_error
-    * on Vulkan API failures from vulkan.cpp / device.cpp. We treat this
-    * file as the boundary - the rest of the libretro core does not use
-    * exceptions. If the renderer ever gets converted to status returns
-    * this catch can go away with it. */
-   try
+   /* parallel-psx's Vulkan::Context constructor used to throw on
+    * failure; it now sets a valid=false flag instead. The
+    * try/catch boundary is gone with it. */
+   context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+                                 required_device_layers, num_required_device_layers,
+                                 required_features);
+   if (!context->is_valid())
    {
-      context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
-                                    required_device_layers, num_required_device_layers,
-                                    required_features);
-   }
-   catch (const std::exception &)
-   {
+      delete context;
+      context = nullptr;
       return false;
    }
 

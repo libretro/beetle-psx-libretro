@@ -58,7 +58,8 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	}
 	else
 	{
-		throw std::runtime_error("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+		LOGE("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+		return;
 	}
 
 	auto info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
@@ -199,6 +200,8 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	if (state) {
 		tracker.load_state(state->tracker_state);
 	}
+
+	valid = true;
 }
 
 void Renderer::set_scanout_semaphore(Semaphore semaphore)

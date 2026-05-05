@@ -443,11 +443,18 @@ public:
 		scaled_uv_offset = offset;
 	}
 
+	/* True iff the constructor finished successfully. The Renderer
+	 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
+	 * supported) it leaves the object in a destroyable but otherwise
+	 * unusable state. Callers must check is_valid() before use. */
+	bool is_valid() const { return valid; }
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
 	unsigned msaa;
 	bool scaled_uv_offset = false;
+	bool valid = false;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	FilterExclude sprite_filter_exclude = FilterExcludeNone;
 	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
