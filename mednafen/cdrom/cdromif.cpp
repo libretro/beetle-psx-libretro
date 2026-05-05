@@ -210,7 +210,7 @@ CDIF_Queue::~CDIF_Queue()
 }
 
 // Returns false if message not read, true if it was read.  Will always return true if "blocking" is set.
-// Will throw MDFN_Error if the read message code is CDIF_MSG_FATAL_ERROR
+// Returns false if the read message code is CDIF_MSG_FATAL_ERROR (and logs the message).
 bool CDIF_Queue::Read(CDIF_Message *message, bool blocking)
 {
    bool ret = true;
@@ -308,7 +308,12 @@ int CDIF_MT::ReadThreadStart()
    ra_count = 0;
    last_read_lba = ~0U;
 
-   RT_EjectDisc(false, true);
+   if (!RT_EjectDisc(false, true))
+   {
+      UnrecoverableError = true;
+      EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
+      return 0;
+   }
 
    EmuThreadQueue.Write(CDIF_Message(CDIF_MSG_DONE));
 
@@ -597,10 +602,21 @@ CDIF_ST::CDIF_ST(CDAccess *cda) : disc_cdaccess(cda)
    UnrecoverableError = false;
    DiscEjected = false;
 
+   if (!disc_cdaccess)
+   {
+      MDFN_Error(0, "CDIF_ST: NULL CDAccess");
+      UnrecoverableError = true;
+      return;
+   }
+
    disc_cdaccess->Read_TOC(&disc_toc);
 
    if(disc_toc.first_track < 1 || disc_toc.last_track > 99 || disc_toc.first_track > disc_toc.last_track)
-      throw(MDFN_Error(0, "TOC first(%d)/last(%d) track numbers bad.", disc_toc.first_track, disc_toc.last_track));
+   {
+      MDFN_Error(0, "TOC first(%d)/last(%d) track numbers bad.",
+            disc_toc.first_track, disc_toc.last_track);
+      UnrecoverableError = true;
+   }
 }
 
 CDIF_ST::~CDIF_ST()
@@ -807,12 +823,39 @@ Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 
 CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool image_memcache)
 {
-   CDAccess *cda = cdaccess_open_image(success, path, image_memcache);
+   CDAccess *cda;
+   CDIF     *cdif;
+
+   *success = true;
+   cda = cdaccess_open_image(success, path, image_memcache);
+
+   if (!*success)
+   {
+      if (cda)
+         delete cda;
+      return NULL;
+   }
 
 #if HAVE_THREADS
-   if(!image_memcache)
-      return new CDIF_MT(cda);
+   if (!image_memcache)
+   {
+      CDIF_MT *mt = new CDIF_MT(cda);
+      if (mt->IsUnrecoverable())
+      {
+         *success = false;
+         delete mt; /* destructor will free cda */
+         return NULL;
+      }
+      return mt;
+   }
 #endif /* HAVE_THREADS */
 
-   return new CDIF_ST(cda); 
+   cdif = new CDIF_ST(cda);
+   if (cdif->IsUnrecoverable())
+   {
+      *success = false;
+      delete cdif; /* destructor will free cda */
+      return NULL;
+   }
+   return cdif;
 }

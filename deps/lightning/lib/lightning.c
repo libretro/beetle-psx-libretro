@@ -20,6 +20,45 @@
 #include <lightning.h>
 #include <lightning/jit_private.h>
 #include <sys/mman.h>
+
+/* MinGW's <sys/mman.h> typically does not declare mprotect; provide
+ * a tiny shim implemented via VirtualProtect so the page-protection
+ * tightening below still works on Windows. The PROT_* flags are
+ * mapped to the closest VirtualProtect equivalent. */
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#  include <windows.h>
+#  ifndef PROT_NONE
+#    define PROT_NONE  0x00
+#  endif
+#  ifndef PROT_READ
+#    define PROT_READ  0x01
+#  endif
+#  ifndef PROT_WRITE
+#    define PROT_WRITE 0x02
+#  endif
+#  ifndef PROT_EXEC
+#    define PROT_EXEC  0x04
+#  endif
+static int mprotect(void *addr, size_t len, int prot)
+{
+   DWORD new_prot;
+   DWORD old_prot;
+
+   if (prot & PROT_EXEC)
+      new_prot = (prot & PROT_WRITE) ? PAGE_EXECUTE_READWRITE
+                                     : PAGE_EXECUTE_READ;
+   else if (prot & PROT_WRITE)
+      new_prot = PAGE_READWRITE;
+   else if (prot & PROT_READ)
+      new_prot = PAGE_READONLY;
+   else
+      new_prot = PAGE_NOACCESS;
+
+   if (!VirtualProtect(addr, (SIZE_T)len, new_prot, &old_prot))
+      return -1;
+   return 0;
+}
+#endif
 #if defined(__sgi)
 #  include <fcntl.h>
 #endif

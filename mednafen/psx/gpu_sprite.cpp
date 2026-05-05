@@ -231,10 +231,6 @@ static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
    }
 #endif
 
-#if 0
-   printf("SPRITE: %d %d %d -- %d %d\n", raw_size, x, y, w, h);
-#endif
-
    if (!rsx_intf_has_software_renderer())
       return;
 

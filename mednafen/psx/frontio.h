@@ -148,6 +148,4 @@ class FrontIO
       uint32_t chair_colors[8];
 };
 
-extern InputInfoStruct FIO_InputInfo;
-
 #endif

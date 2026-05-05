@@ -29,10 +29,6 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	// we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
 	// or similar which should not share edges, which leads to this unfortunate code below.
 	//
-#if 0
-	// Only apply this workaround for quads.
-	if (count == 4)
-#endif
 	{
 		// It might be faster to do more direct checking here, but the code below handles primitives in any order
 		// and orientation, and is far more SIMD-friendly if needed.

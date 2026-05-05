@@ -1060,35 +1060,3 @@ InputDevice *Device_neGconRumble_Create(const std::string &name)
 {
    return new InputDevice_neGconRumble(name);
 }
-
-
-InputDeviceInputInfoStruct Device_neGconRumble_IDII[22] =
-{
-   { "select", "Analog(mode toggle)", 13, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { "start", "START", 4, IDIT_BUTTON, NULL },
-   { "up", "D-Pad UP ↑", 0, IDIT_BUTTON, "down" },
-   { "right", "D-Pad RIGHT →", 3, IDIT_BUTTON, "left" },
-   { "down", "D-Pad DOWN ↓", 1, IDIT_BUTTON, "up" },
-   { "left", "D-Pad LEFT ←", 2, IDIT_BUTTON, "right" },
-
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { "r", "Right Shoulder", 12, IDIT_BUTTON },
-
-   { "b", "B", 9, IDIT_BUTTON, NULL },
-   { "a", "A", 10, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-   { NULL, "empty", -1, IDIT_BUTTON, NULL },
-
-   { "twist_cwise",  "Twist ↓|↑ (Analog, Turn Right)", 6, IDIT_BUTTON_ANALOG },
-   { "twist_ccwise", "Twist ↑|↓ (Analog, Turn Left)", 5, IDIT_BUTTON_ANALOG },
-   { "i", "I (Analog)", 8, IDIT_BUTTON_ANALOG },
-   { "ii", "II (Analog)", 7, IDIT_BUTTON_ANALOG },
-
-   { "l", "Left Shoulder (Analog)", 11, IDIT_BUTTON_ANALOG },
-
-   { "rumble", "RUMBLE MONSTER RUMBA", 100, IDIT_RUMBLE },
-};

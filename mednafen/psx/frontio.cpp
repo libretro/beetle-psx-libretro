@@ -395,23 +395,37 @@ void FrontIO::MapDevicesToPorts(void)
 FrontIO::FrontIO(bool emulate_memcards_[8], bool emulate_multitap_[2])
 {
    int i;
+
+   /* Zero-initialize all pointer members up front so the destructor
+    * runs cleanly if any allocation below fails. The destructor
+    * already null-guards each delete; we just need the slots that
+    * never got assigned to read as NULL rather than garbage. */
+   DummyDevice = NULL;
+   for (i = 0; i < 8; i++)
+   {
+      Devices[i]    = NULL;
+      DevicesMC[i]  = NULL;
+      DeviceData[i] = NULL;
+   }
+   for (i = 0; i < 2; i++)
+      DevicesTap[i] = NULL;
+
    memcpy(emulate_memcards, emulate_memcards_, sizeof(emulate_memcards));
    memcpy(emulate_multitap, emulate_multitap_, sizeof(emulate_multitap));
 
    DummyDevice = new InputDevice();
 
-   for(i = 0; i < 8; i++)
+   for (i = 0; i < 8; i++)
    {
-      DeviceData[i] = NULL;
-      Devices[i] = new InputDevice();
-      DevicesMC[i] = Device_Memcard_Create();
+      Devices[i]      = new InputDevice();
+      DevicesMC[i]    = Device_Memcard_Create();
       chair_cursor[i] = SETTING_GUN_CROSSHAIR_CROSS;
       Devices[i]->SetCrosshairsCursor(chair_cursor[i]);
       chair_colors[i] = 1 << 24;
       Devices[i]->SetCrosshairsColor(chair_colors[i]);
    }
 
-   for(i = 0; i < 2; i++)
+   for (i = 0; i < 2; i++)
       DevicesTap[i] = new InputDevice_Multitap();
 
    MapDevicesToPorts();
@@ -1055,130 +1069,3 @@ void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp,
 
    PSX_SetEventNT(PSX_EVENT_FIO, CalcNextEventTS(timestamp, 0x10000000));
 }
-
-static InputDeviceInfoStruct InputDeviceInfoPSXPort[] =
-{
- // None
- {
-  "none",
-  "none",
-  NULL,
-  NULL,
-  0,
-  NULL
- },
-
- // Gamepad(SCPH-1080)
- {
-  "gamepad",
-  "Digital Gamepad",
-  "PlayStation digital gamepad; SCPH-1080.",
-  NULL,
-  sizeof(Device_Gamepad_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_Gamepad_IDII,
- },
-
- // Dual Shock Gamepad(SCPH-1200)
- {
-  "dualshock",
-  "DualShock",
-  "DualShock gamepad; SCPH-1200.  Emulation in Mednafen includes the analog mode toggle button.  Rumble is emulated, but currently only supported on Linux, and MS Windows via the XInput API and XInput-compatible gamepads/joysticks.  If you're having trouble getting rumble to work on Linux, see if Mednafen is printing out error messages during startup regarding /dev/input/event*, and resolve the issue(s) as necessary.",
-  NULL,
-  sizeof(Device_DualShock_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_DualShock_IDII,
- },
-
- // Dual Analog Gamepad(SCPH-1180), forced to analog mode.
- {
-  "dualanalog",
-  "Dual Analog",
-  "Dual Analog gamepad; SCPH-1180.  It is the predecessor/prototype to the more advanced DualShock.  Emulated in Mednafen as forced to analog mode, and without rumble.",
-  NULL,
-  sizeof(Device_DualAnalog_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_DualAnalog_IDII,
- },
-
-
- // Analog joystick(SCPH-1110), forced to analog mode - emulated through a tweak to dual analog gamepad emulation.
- {
-  "analogjoy",
-  "Analog Joystick",
-  "Flight-game-oriented dual-joystick controller; SCPH-1110.   Emulated in Mednafen as forced to analog mode.",
-  NULL,
-  sizeof(Device_AnalogJoy_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_AnalogJoy_IDII,
- },
-
- {
-  "mouse",
-  "Mouse",
-  NULL,
-  NULL,
-  sizeof(Device_Mouse_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_Mouse_IDII,
- },
-
- {
-  "negcon",
-  "neGcon",
-  "Namco's unconventional twisty racing-game-oriented gamepad; NPC-101.",
-  NULL,
-  sizeof(Device_neGcon_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_neGcon_IDII,
- },
-
- {
-  "negconrumble",
-  "neGcon Rumble",
-  "Namco's unconventional twisty racing-game-oriented gamepad with added rumble interface; NPC-101.",
-  NULL,
-  sizeof(Device_neGconRumble_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_neGconRumble_IDII,
- },
-
- {
-  "guncon",
-  "GunCon",
-  "Namco's light gun; NPC-103.",
-  NULL,
-  sizeof(Device_GunCon_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_GunCon_IDII,
- },
-
- {
-  "justifier",
-  "Konami Justifier",
-  "Konami's light gun; SLUH-00017.  Rumored to be wrought of the coagulated rage of all who tried to shoot The Dog.  If the game you want to play supports the \"GunCon\", you should use that instead. NOTE: Currently does not work properly when on any of ports 1B-1D and 2B-2D.",
-  NULL,
-  sizeof(Device_Justifier_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_Justifier_IDII,
- },
-
- {
-  "dancepad",
-  "Dance Pad",
-  "Dingo Dingo Rodeo!",
-  NULL,
-  sizeof(Device_Dancepad_IDII) / sizeof(InputDeviceInputInfoStruct),
-  Device_Dancepad_IDII,
- },
-
-};
-
-static const InputPortInfoStruct PortInfo[] =
-{
- { "port1", "Virtual Port 1", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port2", "Virtual Port 2", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port3", "Virtual Port 3", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port4", "Virtual Port 4", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port5", "Virtual Port 5", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port6", "Virtual Port 6", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port7", "Virtual Port 7", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
- { "port8", "Virtual Port 8", sizeof(InputDeviceInfoPSXPort) / sizeof(InputDeviceInfoStruct), InputDeviceInfoPSXPort, "gamepad" },
-};
-
-InputInfoStruct FIO_InputInfo =
-{
- sizeof(PortInfo) / sizeof(InputPortInfoStruct),
- PortInfo
-};

@@ -1,5 +1,3 @@
-// TODO/WIP
-
 /* Mednafen - Multi-system Emulator
  *
  * This program is free software; you can redistribute it and/or modify
@@ -40,9 +38,18 @@ FileStream::~FileStream()
 
 uint64_t FileStream::read(void *data, uint64_t count)
 {
+   int64_t got;
+
    if (!fp)
       return 0;
-   return filestream_read(fp, data, count);
+
+   /* filestream_read returns int64_t; -1 indicates error. Don't wrap
+    * a negative result up into UINT64_MAX - return 0 ("read nothing")
+    * so callers comparing against the requested count behave sanely. */
+   got = filestream_read(fp, data, count);
+   if (got < 0)
+      return 0;
+   return (uint64_t)got;
 }
 
 void FileStream::write(const void *data, uint64_t count)
@@ -74,16 +81,28 @@ void FileStream::seek(int64_t offset, int whence)
 
 uint64_t FileStream::tell(void)
 {
+   int64_t pos;
+
    if (!fp)
-      return -1;
-   return filestream_tell(fp);
+      return (uint64_t)-1;
+
+   pos = filestream_tell(fp);
+   if (pos < 0)
+      return (uint64_t)-1;
+   return (uint64_t)pos;
 }
 
 uint64_t FileStream::size(void)
 {
+   int64_t sz;
+
    if (!fp)
-      return -1;
-   return filestream_get_size(fp);
+      return (uint64_t)-1;
+
+   sz = filestream_get_size(fp);
+   if (sz < 0)
+      return (uint64_t)-1;
+   return (uint64_t)sz;
 }
 
 void FileStream::close(void)

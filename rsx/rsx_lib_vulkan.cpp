@@ -148,6 +148,11 @@ static bool libretro_create_device(
       context = nullptr;
    }
 
+   /* parallel-psx (the bundled Vulkan renderer) throws std::runtime_error
+    * on Vulkan API failures from vulkan.cpp / device.cpp. We treat this
+    * file as the boundary - the rest of the libretro core does not use
+    * exceptions. If the renderer ever gets converted to status returns
+    * this catch can go away with it. */
    try
    {
       context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,

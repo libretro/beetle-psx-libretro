@@ -143,30 +143,6 @@ static INLINE void Update_CLUT_Cache(PS_GPU *g, uint16 raw_clut)
  }
 }
 
-#if 0
- TexWindowX_AND = ~(tww << 3);
- TexWindowX_ADD = ((twx & tww) << 3;
-
- TexWindowY_AND = ~(twh << 3);
- TexWindowY_OR = (twy & twh) << 3;
-
-     uint32_t u = (u_arg & TexWindowX_AND)  TexWindowX_OR;
-     uint32_t v = (v_arg & TexWindowY_AND) | TexWindowY_OR;
-     uint32_t fbtex_x = TexPageX + (u >> (2 - TexMode_TA));
-     uint32_t fbtex_y = TexPageY + v;
-     uint16 fbw = GPURAM[fbtex_y][fbtex_x & 1023];
-
-     if(TexMode_TA != 2)
-     {
-      if(TexMode_TA == 0)
-       fbw = (fbw >> ((u & 3) * 4)) & 0xF;
-      else
-       fbw = (fbw >> ((u & 1) * 8)) & 0xFF;
-
-      fbw = CLUT_Cache[fbw];
-     }
-#endif
-
 static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 {
    uint8_t tww = g->tww;

@@ -274,12 +274,3 @@ InputDevice *Device_Mouse_Create(void)
 {
    return new InputDevice_Mouse();
 }
-
-
-InputDeviceInputInfoStruct Device_Mouse_IDII[4] =
-{
-   { "x_axis", "X Axis", -1, IDIT_X_AXIS_REL },
-   { "y_axis", "Y Axis", -1, IDIT_Y_AXIS_REL },
-   { "right", "Right Button", 1, IDIT_BUTTON, NULL },
-   { "left", "Left Button", 0, IDIT_BUTTON, NULL },
-};

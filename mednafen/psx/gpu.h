@@ -263,8 +263,6 @@ void GPU_Rescale(uint8 ushift);
 
 int32_t GPU_Update(const int32_t sys_timestamp);
 
-void GPU_FillVideoParams(MDFNGI* gi);
-
 void GPU_Power(void);
 
 void GPU_ResetTS(void);

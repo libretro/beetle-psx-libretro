@@ -15,8 +15,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-// TODO/WIP
-
 #ifndef __MDFN_FILESTREAM_H
 #define __MDFN_FILESTREAM_H
 
@@ -29,6 +27,11 @@ class FileStream : public Stream
    public:
       FileStream(const char *path, const int mode);
       virtual ~FileStream();
+
+      /* True iff the underlying file handle was successfully opened.
+       * The FileStream constructor cannot fail (it does not throw),
+       * so callers must check is_open() before using a FileStream. */
+      bool is_open(void) const { return fp != NULL; }
 
       virtual uint64_t read(void *data, uint64_t count);
       virtual void write(const void *data, uint64_t count);

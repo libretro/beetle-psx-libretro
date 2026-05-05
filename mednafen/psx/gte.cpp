@@ -212,7 +212,6 @@ void GTE_Init(void)
 void GTE_Power(void)
 {
    memset(CR, 0, sizeof(CR));
-   //memset(DR, 0, sizeof(DR));
 
    memset(Matrices.All, 0, sizeof(Matrices.All));
    memset(CRVectors.All, 0, sizeof(CRVectors.All));
@@ -223,7 +222,6 @@ void GTE_Power(void)
    DQB = 0;
    ZSF3 = 0;
    ZSF4 = 0;
-
 
    memset(Vectors, 0, sizeof(Vectors));
    memset(&RGB, 0, sizeof(RGB));
@@ -241,6 +239,12 @@ void GTE_Power(void)
    LZCR = 0;
 
    Reg23 = 0;
+
+   /* On real hardware FLAGS is cleared at power-on; the previous code
+    * left this register holding whatever it was before reset, which is
+    * a determinism bug for any title that reads it without first
+    * issuing a flag-clearing GTE op. */
+   FLAGS = 0;
 }
 
 // TODO: Don't save redundant state, regarding CR cache variables
@@ -292,13 +296,6 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
       SFEND
    };
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GTE");
-
-#if 0
-   if(load)
-   {
-
-   }
-#endif
 
    return(ret);
 }

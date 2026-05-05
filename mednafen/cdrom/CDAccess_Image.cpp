@@ -241,11 +241,40 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
       track->FirstFileInstance = 1;
 
       efn = MDFN_EvalFIP(base_dir, filename, false);
+      if (efn.empty())
+      {
+         MDFN_Error(0, "Track filename failed safety check: \"%s\"", filename.c_str());
+         return false;
+      }
 
       if(image_memcache)
-         track->fp = new MemoryStream(new FileStream(efn.c_str(), MODE_READ));
+      {
+         FileStream *file = new FileStream(efn.c_str(), MODE_READ);
+         if (!file->is_open())
+         {
+            MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
+            delete file;
+            return false;
+         }
+         track->fp = new MemoryStream(file);
+         if (!static_cast<MemoryStream *>(track->fp)->is_valid())
+         {
+            delete track->fp;
+            track->fp = NULL;
+            return false;
+         }
+      }
       else
-         track->fp = new FileStream(efn.c_str(), MODE_READ);
+      {
+         FileStream *file = new FileStream(efn.c_str(), MODE_READ);
+         if (!file->is_open())
+         {
+            MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
+            delete file;
+            return false;
+         }
+         track->fp = file;
+      }
 
       toc_streamcache[filename] = track->fp;
    }
@@ -256,7 +285,7 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
       if(!track->AReader)
       {
-         MDFN_Error(0, "TODO ERROR");
+         MDFN_Error(0, "Failed to open audio track \"%s\" as Ogg Vorbis", filename.c_str());
          return false;
       }
    }
@@ -364,7 +393,20 @@ error:
 
 bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 {
-   MemoryStream fp(new FileStream(path, MODE_READ));
+   FileStream *probe = new FileStream(path, MODE_READ);
+   if (!probe->is_open())
+   {
+      MDFN_Error(0, "Could not open \"%s\"", path);
+      delete probe;
+      return false;
+   }
+   MemoryStream fp(probe);
+   if (!fp.is_valid())
+   {
+      MDFN_Error(0, "Could not load \"%s\" into memory", path);
+      return false;
+   }
+
    static const unsigned max_args = 4;
    std::string linebuf;
    std::string cmdbuf, args[max_args];
@@ -632,15 +674,25 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             std::string efn;
 
             if(args[0].find("cdrom://") == std::string::npos)
+            {
                efn = MDFN_EvalFIP(base_dir, args[0], false);
+               if (efn.empty())
+                  return false;
+            }
             else
                efn = args[0];
 
-            TmpTrack.fp = new FileStream(efn.c_str(), MODE_READ);
+            {
+               FileStream *probe = new FileStream(efn.c_str(), MODE_READ);
+               if (!probe->is_open())
+               {
+                  MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
+                  delete probe;
+                  return false;
+               }
+               TmpTrack.fp = probe;
+            }
             TmpTrack.FirstFileInstance = 1;
-
-            if (TmpTrack.fp->tell() == (uint64_t)-1)
-               return false;
 
             if(image_memcache)
                TmpTrack.fp = new MemoryStream(TmpTrack.fp);

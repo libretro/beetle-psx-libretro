@@ -18,6 +18,7 @@
 #include <mednafen/mednafen.h>
 #include <mednafen/general.h>
 #include <mednafen/mednafen-endian.h>
+#include <mednafen/error.h>
 #include <mednafen/FileStream.h>
 
 #include "CDAccess_CHD.h"
@@ -243,7 +244,7 @@ void CDAccess_CHD::Cleanup(void)
       free(hunkmem);
 }
 
-CDAccess_CHD::CDAccess_CHD(const char *path, bool image_memcache)
+CDAccess_CHD::CDAccess_CHD(bool *success, const char *path, bool image_memcache)
    : file_stream(path, MODE_READ)
 {
    chd = NULL;
@@ -252,13 +253,19 @@ CDAccess_CHD::CDAccess_CHD(const char *path, bool image_memcache)
    total_sectors = 0;
    memset(Tracks, 0, sizeof(Tracks));
 
-   // initialize opposites
+   /* initialize opposites */
    FirstTrack = 99;
    LastTrack = 0;
 
-   if (!ImageOpen(path, image_memcache))
+   if (!file_stream.is_open())
    {
+      MDFN_Error(0, "CHD: failed to open \"%s\"", path);
+      *success = false;
+      return;
    }
+
+   if (!ImageOpen(path, image_memcache))
+      *success = false;
 }
 
 CDAccess_CHD::~CDAccess_CHD()

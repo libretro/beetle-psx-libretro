@@ -18,27 +18,31 @@
 #include "mednafen.h"
 #include "error.h"
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <libretro.h>
 
 extern retro_log_printf_t log_cb;
 
-MDFN_Error::MDFN_Error(int errno_code_new, const char *format, ...)
+/* Format and log an error message via the libretro logging callback.
+ * No allocation, no exceptions, no hidden control flow - just log and
+ * return so the caller can react to whatever error condition they
+ * detected by propagating their own status code. */
+void MDFN_Error(int errno_code, const char *format, ...)
 {
+   char buf[1024];
    va_list ap;
+
+   (void)errno_code;
+
+   if (!format)
+      return;
+
    va_start(ap, format);
-   error_message = (char*)malloc(4096 * sizeof(char));
-   vsnprintf(error_message, 4096, format, ap);
+   vsnprintf(buf, sizeof(buf), format, ap);
    va_end(ap);
 
-   log_cb(RETRO_LOG_ERROR, "%s\n", error_message);
-}
-
-
-MDFN_Error::~MDFN_Error()
-{
-   if(error_message)
-      free(error_message);
-   error_message = NULL;
+   if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "%s\n", buf);
 }

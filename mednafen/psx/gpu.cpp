@@ -594,17 +594,6 @@ static void RSX_UpdateDisplayMode(void)
       }
    }
 
-#if 0
-   // First we get the horizontal range in number of pixel clock period
-   uint16_t xres = (GPU.HorizEnd - GPU.HorizStart);
-
-   // Then we apply the divider
-   xres /= pixelclock_divider;
-
-   // Then the rounding formula straight outta No$
-   xres = (xres + 2) & ~3;
-#endif
-
    rsx_intf_set_display_mode(
          depth_24bpp,
          is_pal_mode, 
@@ -697,6 +686,7 @@ void GPU_RecalcClockRatio(void) {
 void GPU_Destroy(void)
 {
    delete [] GPU.vram;
+   GPU.vram = NULL;
 }
 
 /* Rescale the GPU with a different upscale_shift 
@@ -752,41 +742,6 @@ void GPU_Rescale(uint8 ushift)
    if (vram_new)
       delete [] vram_new;
    vram_new = NULL;
-}
-
-void GPU_FillVideoParams(MDFNGI* gi)
-{
-   if(GPU.HardwarePALType)
-   {
-      gi->lcm_width = 2800;
-      gi->lcm_height = (GPU.LineVisLast + 1 - GPU.LineVisFirst) * 2; //576;
-
-      gi->nominal_width = 384;   // Dunno. :(
-      gi->nominal_height = GPU.LineVisLast + 1 - GPU.LineVisFirst; //288;
-
-      gi->fb_width = 768;
-      gi->fb_height = 576;
-   }
-   else
-   {
-      gi->lcm_width = 2800;
-      gi->lcm_height = (GPU.LineVisLast + 1 - GPU.LineVisFirst) * 2; //480;
-
-      gi->nominal_width = 320;
-      gi->nominal_height = GPU.LineVisLast + 1 - GPU.LineVisFirst; //240;
-
-      gi->fb_width = 768;
-      gi->fb_height = 480;
-   }
-
-   //
-   // For Justifier and Guncon.
-   //
-   gi->mouse_scale_x = (float)gi->lcm_width / gi->nominal_width;
-   gi->mouse_offs_x = (float)(2800 - gi->lcm_width) / 2;
-
-   gi->mouse_scale_y = 1.0;
-   gi->mouse_offs_y = GPU.LineVisFirst;
 }
 
 void GPU_SoftReset(void) // Control command 0x00
@@ -1329,13 +1284,6 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
       else
          ret = GPU.DataReadBuffer;
    }
-
-#if 0
-   if(GPU.DMAControl & 2)
-   {
-      //PSX_WARNING("[GPU READ WHEN (DMACONTROL&2)] 0x%08x - ret=0x%08x, scanline=%d", A, ret, scanline);
-   }
-#endif
 
    return(ret >> ((A & 3) * 8));
 }

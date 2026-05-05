@@ -64,9 +64,6 @@ uint32_t SIO_Read(int32_t timestamp, uint32_t A)
          ret = BaudRate;
          break;
       default:
-#if 0
-         PSX_WARNING("[SIO] Unknown read: 0x%08x -- %d\n", A, timestamp);
-#endif
          break;
    }
 
@@ -98,9 +95,6 @@ void SIO_Write(int32_t timestamp, uint32_t A, uint32_t V)
          BaudRate = V;
          break;
       default:
-#if 0
-         PSX_WARNING("[SIO] Unknown write: 0x%08x 0x%08x -- %d\n", A, V, timestamp);
-#endif
          break;
    }
 }
@@ -118,13 +112,6 @@ int SIO_StateAction(void *data, int load, int data_only)
       SFEND
    };
    int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "SIO");
-
-#if 0
-   if(load)
-   {
-
-   }
-#endif
 
    return(ret);
 }

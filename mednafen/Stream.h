@@ -1,8 +1,6 @@
 #ifndef __MDFN_STREAM_H
 #define __MDFN_STREAM_H
 
-// TODO/WIP
-
 // TODO?: BufferedStream, no virtual functions, yes inline functions, constructor takes a Stream* argument.
 
 #include "mednafen.h"

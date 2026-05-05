@@ -56,9 +56,17 @@ static INLINE uint32_t MDFN_de32lsb_(const uint8_t *morp)
    return(morp[0]|(morp[1]<<8)|(morp[2]<<16)|(morp[3]<<24));
 }
 
+/* Read `len` bytes from the state stream into `buffer`. Returns the
+ * number of bytes read (== len on success, 0 on failure / short stream).
+ *
+ * Defensive against malformed savestates: if (len + st->loc) overflows
+ * uint32_t, the resulting wraparound would compare smaller than st->len
+ * and silently read out-of-bounds. The check is restructured to
+ * subtract before adding, which can't overflow since loc <= len by the
+ * stream's invariant. */
 static int32_t smem_read(StateMem *st, void *buffer, uint32_t len)
 {
-   if ((len + st->loc) > st->len)
+   if (st->loc > st->len || len > (st->len - st->loc))
       return 0;
 
    memcpy(buffer, st->data + st->loc, len);
@@ -67,47 +75,112 @@ static int32_t smem_read(StateMem *st, void *buffer, uint32_t len)
    return(len);
 }
 
+/* Append `len` bytes from `buffer` to the state stream, growing
+ * st->data with realloc as needed. Returns the number of bytes
+ * actually written - on realloc failure or integer overflow, this is
+ * 0 and the original buffer is preserved (realloc returns NULL but
+ * does not free the old pointer, so we capture the new pointer in a
+ * temporary first instead of overwriting st->data with NULL). */
 static int32_t smem_write(StateMem *st, void *buffer, uint32_t len)
 {
+   /* Overflow guard: len + st->loc must not wrap. Re-arrange as a
+    * subtraction-from-UINT32_MAX so we can compare safely. */
+   if (len > UINT32_MAX - st->loc)
+      return 0;
+
    if ((len + st->loc) > st->malloced)
    {
+      uint8_t *new_data;
+      uint32_t target  = len + st->loc;
       uint32_t newsize = (st->malloced >= 32768) ? st->malloced : (st->initial_malloc ? st->initial_malloc : 32768);
 
-      while(newsize < (len + st->loc))
-         newsize  *= 2;
-      st->data     = (uint8_t *)realloc(st->data, newsize);
+      while (newsize < target)
+      {
+         /* The doubling can overflow uint32_t for huge writes; cap at
+          * UINT32_MAX so we still attempt the realloc with a sane
+          * size. realloc() will either succeed or return NULL, both
+          * of which we handle. */
+         if (newsize > UINT32_MAX / 2)
+         {
+            newsize = UINT32_MAX;
+            break;
+         }
+         newsize *= 2;
+      }
+
+      if (newsize < target)
+         return 0;
+
+      new_data = (uint8_t *)realloc(st->data, newsize);
+      if (!new_data)
+         return 0;
+
+      st->data     = new_data;
       st->malloced = newsize;
    }
+
    memcpy(st->data + st->loc, buffer, len);
    st->loc += len;
 
    if (st->loc > st->len)
       st->len = st->loc;
 
-   return(len);
+   return (int32_t)len;
 }
 
+/* Seek the state stream. Returns 0 on success, -1 on failure (in
+ * which case st->loc is clamped to a sane value).
+ *
+ * The original implementation computed the new location with raw
+ * addition/subtraction and then post-checked for st->loc > st->len:
+ *
+ *   - SSEEK_END with offset > st->len underflowed to a huge value.
+ *     The post-check did clamp it, but only to st->len (when it
+ *     should have stayed at whatever the caller requested before
+ *     the underflow - i.e. an unrepresentable position).
+ *   - SSEEK_CUR with offset large enough could wrap st->loc past
+ *     UINT32_MAX back to a small "valid" value.
+ *   - SSEEK_SET with offset > st->len silently clamped without
+ *     signalling failure.
+ *
+ * Now we compute into a candidate position with explicit overflow
+ * checks, and only commit on success. */
 static int32_t smem_seek(StateMem *st, uint32_t offset, int whence)
 {
+   uint32_t new_loc;
+
    switch(whence)
    {
       case SSEEK_SET:
-         st->loc = offset;
+         new_loc = offset;
          break;
       case SSEEK_END:
-         st->loc = st->len - offset;
+         if (offset > st->len)
+         {
+            st->loc = 0;
+            return -1;
+         }
+         new_loc = st->len - offset;
          break;
       case SSEEK_CUR:
-         st->loc += offset;
+         if (offset > UINT32_MAX - st->loc)
+         {
+            st->loc = st->len;
+            return -1;
+         }
+         new_loc = st->loc + offset;
          break;
+      default:
+         return -1;
    }
 
-   if(st->loc > st->len)
+   if (new_loc > st->len)
    {
       st->loc = st->len;
       return -1;
    }
 
+   st->loc = new_loc;
    return 0;
 }
 
@@ -162,9 +235,14 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
          nameo[256]    = 0;
          nameo[0]      = slen;
 
-         smem_write(st, nameo, 1 + nameo[0]);
+         /* Bail out on the first short write - subsequent writes
+          * would land at the wrong offset (loc didn't advance) and
+          * the resulting state would be unparseable. */
+         if (smem_write(st, nameo, 1 + nameo[0]) != 1 + nameo[0])
+            return false;
       }
-      smem_write32le(st, bytesize);
+      if (smem_write32le(st, bytesize) != 4)
+         return false;
 
 #ifdef MSB_FIRST
       /* Flip the byte order... */
@@ -187,11 +265,42 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
          for(int32_t bool_monster = 0; bool_monster < bytesize; bool_monster++)
          {
             uint8_t tmp_bool = ((bool *)sf->v)[bool_monster];
-            smem_write(st, &tmp_bool, 1);
+            if (smem_write(st, &tmp_bool, 1) != 1)
+            {
+#ifdef MSB_FIRST
+               /* Restore the byte order before bailing so we don't
+                * leave the live emulator state byte-flipped. */
+               if(sf->flags & MDFNSTATE_RLSB64)
+                  Endian_A64_LE_to_NE(sf->v, bytesize / sizeof(uint64_t));
+               else if(sf->flags & MDFNSTATE_RLSB32)
+                  Endian_A32_LE_to_NE(sf->v, bytesize / sizeof(uint32_t));
+               else if(sf->flags & MDFNSTATE_RLSB16)
+                  Endian_A16_LE_to_NE(sf->v, bytesize / sizeof(uint16_t));
+               else if(sf->flags & RLSB)
+                  FlipByteOrder((uint8_t*)sf->v, bytesize);
+#endif
+               return false;
+            }
          }
       }
       else
-         smem_write(st, (uint8_t *)sf->v, bytesize);
+      {
+         if (smem_write(st, (uint8_t *)sf->v, bytesize) != bytesize)
+         {
+#ifdef MSB_FIRST
+            if(sf->flags & MDFNSTATE_BOOL) { }
+            else if(sf->flags & MDFNSTATE_RLSB64)
+               Endian_A64_LE_to_NE(sf->v, bytesize / sizeof(uint64_t));
+            else if(sf->flags & MDFNSTATE_RLSB32)
+               Endian_A32_LE_to_NE(sf->v, bytesize / sizeof(uint32_t));
+            else if(sf->flags & MDFNSTATE_RLSB16)
+               Endian_A16_LE_to_NE(sf->v, bytesize / sizeof(uint16_t));
+            else if(sf->flags & RLSB)
+               FlipByteOrder((uint8_t*)sf->v, bytesize);
+#endif
+            return false;
+         }
+      }
 
 #ifdef MSB_FIRST
       /* Now restore the original byte order. */
@@ -221,9 +330,11 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
    memset(sname_tmp, 0, sizeof(sname_tmp));
    memcpy((char *)sname_tmp, sname, (sname_len < 32) ? sname_len : 32);
 
-   smem_write(st, sname_tmp, 32);
+   if (smem_write(st, sname_tmp, 32) != 32)
+      return 0;
    /* We'll come back and write this later. */
-   smem_write32le(st, 0);                
+   if (smem_write32le(st, 0) != 4)
+      return 0;
 
    data_start_pos = st->loc;
 
@@ -232,9 +343,15 @@ static int WriteStateChunk(StateMem *st, const char *sname, SFORMAT *sf)
 
    end_pos = st->loc;
 
-   smem_seek(st, data_start_pos - 4, SSEEK_SET);
-   smem_write32le(st, end_pos - data_start_pos);
-   smem_seek(st, end_pos, SSEEK_SET);
+   /* The two seeks below should always succeed (we're seeking to
+    * positions we already wrote), but propagate failure rather than
+    * silently producing a state with a wrong size header. */
+   if (smem_seek(st, data_start_pos - 4, SSEEK_SET) < 0)
+      return 0;
+   if (smem_write32le(st, end_pos - data_start_pos) != 4)
+      return 0;
+   if (smem_seek(st, end_pos, SSEEK_SET) < 0)
+      return 0;
 
    return(end_pos - data_start_pos);
 }
@@ -285,7 +402,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
    toa[0] = 0;
    toa[1] = 0;
 
-   while (st->loc < (temp + size))
+   while (st->loc < (uint32_t)(temp + size))
    {
       /* exclude text labels from fast savestates */
       if (!FastSaveStates)
@@ -299,7 +416,12 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
          toa[1 + toa[0]] = 0;
       }
 
-      smem_read32le(st, &recorded_size);
+      /* Defensive: if we couldn't read the recorded-size word, the
+       * stream is truncated - bail rather than dispatching on an
+       * uninitialized recorded_size that smem_read32le left untouched
+       * on its short-read path. */
+      if (smem_read32le(st, &recorded_size) != 4)
+         return 0;
 
       SFORMAT *tmp = FindSF((char*)toa + 1, sf);
       /* Fix for unnecessary name checks, when we find 
@@ -319,7 +441,11 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
          }
          else
          {
-            smem_read(st, (uint8_t *)tmp->v, expected_size);
+            /* Refuse to load a partial subsystem region. A short
+             * read here would leave tmp->v half-old / half-new and
+             * silently break determinism for the entire run. */
+            if (smem_read(st, (uint8_t *)tmp->v, expected_size) != expected_size)
+               return 0;
 
             if(tmp->flags & MDFNSTATE_BOOL)
             {
@@ -348,7 +474,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       }
    }
 
-   assert(st->loc == (temp + size));
+   assert(st->loc == (uint32_t)(temp + size));
    return 1;
 }
 
@@ -363,14 +489,17 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, stru
 
       int found = 0;
       uint32_t tmp_size;
-      uint32_t total = 0;
+      /* Capture the position before the section search so we can
+       * restore it absolutely at the end - the original code did
+       * 'smem_seek(st, -total, SSEEK_CUR)' which only worked on
+       * uint32 underflow, and post-hardening smem_seek that idiom
+       * is rejected by the overflow guard. */
+      uint32_t entry_loc = st->loc;
 
       while(smem_read(st, (uint8_t *)sname, 32) == 32)
       {
          if(smem_read32le(st, &tmp_size) != 4)
             return(0);
-
-         total += tmp_size + 32 + 4;
 
          /* Yay, we found the section */
          if(!strncmp(sname, section->name, 32))
@@ -386,7 +515,7 @@ static int MDFNSS_StateAction_internal(void *st_p, int load, int data_only, stru
                return(0);
          }
       }
-      if(smem_seek(st, -total, SSEEK_CUR) < 0)
+      if(smem_seek(st, entry_loc, SSEEK_SET) < 0)
          return(0);
       if(!found && !section->optional) /* Not found.  We are sad! */
          return(0);
@@ -428,14 +557,25 @@ int MDFNSS_SaveSM(void *st_p, int a, int b, const void *c, const void *d,
    MDFN_en32lsb_(header + 16, MEDNAFEN_VERSION_NUMERIC);
    MDFN_en32lsb_(header + 24, neowidth);
    MDFN_en32lsb_(header + 28, neoheight);
-   smem_write(st, header, 32);
+
+   /* If the initial header write fails (out of memory), fail fast
+    * rather than letting StateAction run and produce a corrupt
+    * partial state. */
+   if (smem_write(st, header, 32) != 32)
+      return 0;
 
    if(!StateAction(st, 0, 0))
       return(0);
 
    sizy = st->loc;
-   smem_seek(st, 16 + 4, SSEEK_SET);
-   smem_write32le(st, sizy);
+   /* Patch the total size into the header. As with WriteStateChunk
+    * these should always succeed, but propagate failure for
+    * consistency rather than producing a state with a zero size
+    * field. */
+   if (smem_seek(st, 16 + 4, SSEEK_SET) < 0)
+      return 0;
+   if (smem_write32le(st, sizy) != 4)
+      return 0;
 
    return(1);
 }
@@ -446,7 +586,14 @@ int MDFNSS_LoadSM(void *st_p, int a, int b)
    uint32_t stateversion;
    StateMem *st = (StateMem*)st_p;
 
-   smem_read(st, header, 32);
+   /* Zero the header buffer first - smem_read can return 0 on a
+    * truncated input, leaving header uninitialized. The subsequent
+    * memcmp against magic strings would then match against stack
+    * garbage and we'd attempt to load whatever followed. */
+   memset(header, 0, sizeof(header));
+
+   if (smem_read(st, header, 32) != 32)
+      return 0;
 
    if(memcmp(header, "MEDNAFENSVESTATE", 16) 
          && memcmp(header, "MDFNSVST", 8))

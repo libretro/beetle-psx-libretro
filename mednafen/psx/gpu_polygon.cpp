@@ -481,15 +481,6 @@ if(vertices[1].y == vertices[0].y)
    }
   }
  }
-
-#if 0
- printf("[GPU] Vertices: %d:%d(r=%d, g=%d, b=%d) -> %d:%d(r=%d, g=%d, b=%d) -> %d:%d(r=%d, g=%d, b=%d)\n\n\n", vertices[0].x, vertices[0].y,
-	vertices[0].r, vertices[0].g, vertices[0].b,
-	vertices[1].x, vertices[1].y,
-	vertices[1].r, vertices[1].g, vertices[1].b,
-	vertices[2].x, vertices[2].y,
-	vertices[2].r, vertices[2].g, vertices[2].b);
-#endif
 }
 
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count);

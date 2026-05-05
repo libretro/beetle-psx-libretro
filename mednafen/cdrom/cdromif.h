@@ -53,6 +53,12 @@ class CDIF
       // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
       virtual bool Eject(bool eject_status) = 0;
 
+      /* True iff the CDIF construction or background thread reported a
+       * fatal initialization error (bad TOC, allocator failure, etc).
+       * The caller of CDIF_Open uses this to decide whether to keep
+       * the object alive. */
+      bool IsUnrecoverable(void) const { return UnrecoverableError; }
+
       // For Mode 1, or Mode 2 Form 1.
       // No reference counting or whatever is done, so if you destroy the CDIF object before you destroy the returned Stream, things will go BOOM.
       Stream *MakeStream(uint32_t lba, uint32_t sector_count);

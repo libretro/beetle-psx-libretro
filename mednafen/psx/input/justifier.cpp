@@ -360,17 +360,3 @@ InputDevice *Device_Justifier_Create(void)
 {
    return new InputDevice_Justifier();
 }
-
-
-InputDeviceInputInfoStruct Device_Justifier_IDII[6] =
-{
-   { "x_axis", "X Axis", -1, IDIT_X_AXIS },
-   { "y_axis", "Y Axis", -1, IDIT_Y_AXIS },
-
-   { "trigger", "Trigger", 0, IDIT_BUTTON, NULL  },
-
-   { "o",	"O",		 1, IDIT_BUTTON,	NULL },
-   { "start", "Start",	 2, IDIT_BUTTON,	NULL },
-
-   { "offscreen_shot", "Offscreen Shot(Simulated)", 3, IDIT_BUTTON, NULL },
-};

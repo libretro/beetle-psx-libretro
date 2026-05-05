@@ -106,13 +106,30 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    char psar_sig[12];
    std::string base_dir, file_base, file_ext;
    char sbi_ext[4] = { 's', 'b', 'i', 0 };
+   FileStream *file = new FileStream(path, MODE_READ);
+
+   if (!file->is_open())
+   {
+      log_cb(RETRO_LOG_ERROR, "Could not open PBP file: %s\n", path);
+      delete file;
+      return false;
+   }
 
    MDFN_GetFilePathComponents(path, &base_dir, &file_base, &file_ext);
 
-   if(image_memcache)
-      fp = new MemoryStream(new FileStream(path, MODE_READ));
+   if (image_memcache)
+   {
+      MemoryStream *mem = new MemoryStream(file);
+      if (!mem->is_valid())
+      {
+         log_cb(RETRO_LOG_ERROR, "Could not load PBP into memory: %s\n", path);
+         delete mem;
+         return false;
+      }
+      fp = mem;
+   }
    else
-      fp = new FileStream(path, MODE_READ);
+      fp = file;
 
    // check for valid pbp
    if(fp->read(magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
@@ -218,15 +235,14 @@ void CDAccess_PBP::Cleanup(void)
       free(index_table);
 }
 
-CDAccess_PBP::CDAccess_PBP(const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
+CDAccess_PBP::CDAccess_PBP(bool *success, const char *path, bool image_memcache) : NumTracks(0), FirstTrack(0), LastTrack(0), total_sectors(0)
 {
    is_official = false;
    index_table = NULL;
    fp = NULL;
    kirk_init();
    if (!ImageOpen(path, image_memcache))
-   {
-   }
+      *success = false;
 }
 
 CDAccess_PBP::~CDAccess_PBP()

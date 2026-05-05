@@ -791,18 +791,6 @@ void PS_CDC::XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab)
          }
       }
    }
-
-#if 0
-   // Test
-   for(unsigned i = 0; i < ab->Size; i++)
-   {
-      static unsigned counter = 0;
-
-      ab->Samples[0][i] = (counter & 2) ? -0x6000 : 0x6000;
-      ab->Samples[1][i] = rand();
-      counter++;
-   }
-#endif
 }
 
 void PS_CDC::ClearAIP(void)

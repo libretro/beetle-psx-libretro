@@ -42,23 +42,6 @@ static uint32 PageSize;
 static uint32 NumPages;
 
 typedef MemoryPatch CHEATF;
-#if 0
-typedef struct __CHEATF
-{
-           char *name;
-           char *conditions;
-
-           uint32 addr;
-           uint64 val;
-           uint64 compare;
-
-           unsigned int length;
-           bool bigendian;
-           unsigned int icount; // Instance count
-           char type;   /* 'R' for replace, 'S' for substitute(GG), 'C' for substitute with compare */
-           int status;
-} CHEATF;
-#endif
 
 static std::vector<CHEATF> cheats;
 static bool CheatsActive = true;
@@ -152,29 +135,13 @@ void MDFNMP_RegSearchable(uint32 addr, uint32 size)
  MDFNMP_AddRAM(size, addr, NULL);
 }
 
-void MDFNMP_InstallReadPatches(void)
-{
-   unsigned x;
-   std::vector<SUBCHEAT>::iterator chit;
-   if(!CheatsActive) return;
-
-   for(x = 0; x < 8; x++)
-      for(chit = SubCheats[x].begin(); chit != SubCheats[x].end(); chit++)
-      {
-#if 0
-         if(EmulatedPSX.InstallReadPatch)
-            EmulatedPSX.InstallReadPatch(chit->addr);
-#endif
-      }
-}
-
-void MDFNMP_RemoveReadPatches(void)
-{
-#if 0
-   if(EmulatedPSX.RemoveReadPatches)
-      EmulatedPSX.RemoveReadPatches();
-#endif
-}
+/* These are placeholders for read-side cheat patches that PSX doesn't
+ * actually wire up - the emulator core uses MDFN_MemRead* directly
+ * rather than going through a per-address callback. The functions are
+ * still called from cheat-management paths, so we keep them as
+ * no-ops rather than removing the call sites. */
+void MDFNMP_InstallReadPatches(void) { }
+void MDFNMP_RemoveReadPatches(void)  { }
 
 /* This function doesn't allocate any memory for "name" */
 static int AddCheatEntry(char *name, char *conditions, uint32 addr, uint64 val, uint64 compare, int status, char type, unsigned int length, bool bigendian)

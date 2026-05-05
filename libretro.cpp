@@ -417,8 +417,6 @@ bool setting_apply_analog_toggle  = false;
 bool setting_apply_analog_default = false;
 bool use_mednafen_memcard0_method = false;
 
-extern MDFNGI EmulatedPSX;
-
 #if PSX_DBGPRINT_ENABLE
 static unsigned psx_dbg_level = 0;
 
@@ -522,23 +520,40 @@ MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
 #define PSX_EXPANSION1_BASE        0x1F000000U
 
 /* Mednafen splits the expansion in two buffers (PIOMem and TextMem). That's not
- * super convenient for us so I'm going to copy both of them in one contiguous
- * buffer */
-const uint8_t *PSX_LoadExpansion1(void) {
-   static uint8_t *expansion1 = NULL;
+ * super convenient for us so we copy both of them into one contiguous buffer.
+ *
+ * Hoisted out of PSX_LoadExpansion1's function scope so Cleanup() can
+ * actually free it - the previous function-static was allocated once
+ * and leaked on every core unload. */
+static uint8_t *psx_expansion1 = NULL;
 
-   if (expansion1 == NULL) {
-      expansion1 = new uint8_t[PSX_EXPANSION1_SIZE];
+const uint8_t *PSX_LoadExpansion1(void)
+{
+   uint32_t *p;
+   unsigned i;
+
+   if (psx_expansion1 == NULL)
+   {
+      psx_expansion1 = new uint8_t[PSX_EXPANSION1_SIZE];
+      if (!psx_expansion1)
+         return NULL;
    }
 
-   /* Let's read 32bits at a time to speed things up a bit */
-   uint32_t *p = reinterpret_cast<uint32_t *>(expansion1);
-
-   for (unsigned i = 0; i < PSX_EXPANSION1_SIZE / 4; i++) {
+   /* Read 32 bits at a time to speed things up. */
+   p = reinterpret_cast<uint32_t *>(psx_expansion1);
+   for (i = 0; i < PSX_EXPANSION1_SIZE / 4; i++)
       p[i] = PSX_MemPeek32(PSX_EXPANSION1_BASE + i * 4);
-   }
 
-   return expansion1;
+   return psx_expansion1;
+}
+
+static void PSX_FreeExpansion1(void)
+{
+   if (psx_expansion1)
+   {
+      delete[] psx_expansion1;
+      psx_expansion1 = NULL;
+   }
 }
 #endif
 
@@ -618,12 +633,6 @@ static void EventReset(void)
       events[i].next = (i < (PSX_EVENT__COUNT - 1)) ? &events[i + 1] : NULL;
    }
 }
-
-//static void RemoveEvent(event_list_entry *e)
-//{
-// e->prev->next = e->next;
-// e->next->prev = e->prev;
-//}
 
 static void RebaseTS(const int32_t timestamp)
 {
@@ -959,17 +968,6 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          if(!IsWrite)
             timestamp++;
 
-#if 0
-         if(IsWrite)
-         {
-            PSX_WARNING("[SIO] Write: 0x%08x 0x%08x %u", A, V, (unsigned)sizeof(T));
-         }
-         else
-         {
-            PSX_WARNING("[SIO] Read: 0x%08x", A);
-         }
-#endif
-
          if(IsWrite)
             SIO_Write(timestamp, A, V);
          else
@@ -977,21 +975,6 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          return;
       }
 
-#if 0
-      if(A >= 0x1F801060 && A <= 0x1F801063)
-      {
-         if(IsWrite)
-         {
-
-         }
-         else
-         {
-
-         }
-
-         return;
-      }
-#endif
 
       if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
       {
@@ -1374,28 +1357,23 @@ void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool
    PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 }
 
+/* Test whether the supplied file looks like a PS-X EXE. The original
+ * code returned true unconditionally because both branches returned
+ * true - the magic check had no effect. Now we actually require the
+ * "PS-X EXE" signature, which is what PSX EXEs have at offset 0. */
 static bool TestMagic(const char *name, RFILE *fp, int64_t size)
 {
    uint8_t header[8];
 
    if (size < 0x800)
-      return(false);
+      return false;
 
-   filestream_read(fp, header, 8);
+   if (filestream_read(fp, header, 8) != 8)
+      return false;
 
-   if (
-         (header[0] == 'P') &&
-         (header[1] == 'S') &&
-         (header[2] == '-') &&
-         (header[3] == 'X') &&
-         (header[4] == ' ') &&
-         (header[5] == 'E') &&
-         (header[6] == 'X') &&
-         (header[7] == 'E')
-      )
-      return(true);
-
-   return(true);
+   return (header[0] == 'P') && (header[1] == 'S') && (header[2] == '-') &&
+          (header[3] == 'X') && (header[4] == ' ') && (header[5] == 'E') &&
+          (header[6] == 'X') && (header[7] == 'E');
 }
 
 static bool TestMagicCD(std::vector<CDIF *> *_CDInterfaces)
@@ -1431,16 +1409,15 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    unsigned pvd_search_count = 0;
 
    fp = c->MakeStream(0, ~0U);
+   if (!fp)
+      return NULL;
    fp->seek(0x8000, SEEK_SET);
 
-   try // Added this back to fix audio-cd loading issue
-   {
    do
    {
       if((pvd_search_count++) == 32)
       {
          log_cb(RETRO_LOG_ERROR, "PVD search count limit met.\n");
-         ret = NULL;
          goto Breakout;
       }
 
@@ -1449,118 +1426,120 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
       if(memcmp(&pvd[1], "CD001", 5))
       {
          log_cb(RETRO_LOG_ERROR, "Not ISO-9660\n");
-         ret = NULL;
          goto Breakout;
       }
 
       if(pvd[0] == 0xFF)
       {
          log_cb(RETRO_LOG_ERROR, "Missing Primary Volume Descriptor\n");
-         ret = NULL;
          goto Breakout;
       }
    } while(pvd[0] != 0x01);
 
-   /*[156 ... 189], 34 bytes */
-   rdel = MDFN_de32lsb<false>(&pvd[0x9E]);
+   /* [156 ... 189], 34 bytes - Root directory record */
+   rdel     = MDFN_de32lsb<false>(&pvd[0x9E]);
    rdel_len = MDFN_de32lsb<false>(&pvd[0xA6]);
 
    if(rdel_len >= (1024 * 1024 * 10))  /* Arbitrary sanity check. */
    {
       log_cb(RETRO_LOG_ERROR, "Root directory table too large\n");
-      ret = NULL;
       goto Breakout;
    }
 
    fp->seek((int64)rdel * 2048, SEEK_SET);
-   //printf("%08x, %08x\n", rdel * 2048, rdel_len);
+
    while(fp->tell() < (((int64)rdel * 2048) + rdel_len))
    {
-      uint8_t len_dr = fp->get_u8();
       uint8_t dr[256 + 1];
-
-      memset(dr, 0xFF, sizeof(dr));
+      uint8_t len_dr = fp->get_u8();
+      uint8_t len_fi;
 
       if(!len_dr)
          break;
+
+      /* len_dr counts the directory record header byte itself, so we
+       * read len_dr-1 more bytes. Cap at sizeof(dr)-1 (=256) to be safe. */
+      if (len_dr - 1 > (int)sizeof(dr) - 1)
+      {
+         log_cb(RETRO_LOG_ERROR, "Directory record length out of range: %u\n", len_dr);
+         goto Breakout;
+      }
 
       memset(dr, 0, sizeof(dr));
       dr[0] = len_dr;
       fp->read(dr + 1, len_dr - 1);
 
-      uint8_t len_fi = dr[0x20];
+      len_fi = dr[0x20];
 
       if(len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
       {
          uint32_t file_lba = MDFN_de32lsb<false>(&dr[0x02]);
-         //uint32_t file_len = MDFN_de32lsb<false>(&dr[0x0A]);
          uint8_t fb[2048 + 1];
          char *bootpos;
+         char *tmp;
 
          memset(fb, 0, sizeof(fb));
          fp->seek(file_lba * 2048, SEEK_SET);
          fp->read(fb, 2048);
 
-         bootpos = strstr((char*)fb, "BOOT") + 4;
+         /* Find "BOOT" in the SYSTEM.CNF buffer; bail out if missing
+          * rather than dereferencing strstr's NULL return. */
+         bootpos = strstr((char*)fb, "BOOT");
+         if (!bootpos)
+            goto Breakout;
+         bootpos += 4;
+
          while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-         if(*bootpos == '=')
+         if (*bootpos != '=')
+            goto Breakout;
+
+         bootpos++;
+         while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
+         if (strncasecmp(bootpos, "cdrom:\\", 7) != 0)
+            goto Breakout;
+
+         bootpos += 7;
+
+         /* Game-specific framebuffer-write tweak for Monkey Hero. The
+          * filename portion of BOOT=cdrom:\SLUS_007.65;1 starts right
+          * at bootpos here - the previous "bootpos + 7" bug compared
+          * the substring starting 7 chars later, so this never matched. */
+         if (!strncmp(bootpos, "SLUS_007.65", 11) ||
+             !strncmp(bootpos, "SLES_009.79", 11))
          {
-            bootpos++;
-            while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
-            if(!strncasecmp(bootpos, "cdrom:\\", 7))
-            {
-               bootpos += 7;
-               if(!strncmp(bootpos + 7, "SLUS_007.65", 11) || !strncmp(bootpos + 7, "SLES_009.79", 11))
-               {
-                  is_monkey_hero = true;
-                  log_cb(RETRO_LOG_INFO, "Monkey Hero FBWrite Tweak Activated\n");
-               }
-
-               char *tmp;
-
-               if((tmp = strchr(bootpos, '_'))) *tmp = 0;
-               if((tmp = strchr(bootpos, '.'))) *tmp = 0;
-               if((tmp = strchr(bootpos, ';'))) *tmp = 0;
-               //puts(bootpos);
-
-               if(strlen(bootpos) == 4 && bootpos[0] == 'S' && (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
-               {
-                  switch(bootpos[2])
-                  {
-                     case 'E': if(rr)
-                                  *rr = REGION_EU;
-                               ret = "SCEE";
-                               goto Breakout;
-
-                     case 'U': if(rr)
-                                  *rr = REGION_NA;
-                               ret = "SCEA";
-                               goto Breakout;
-
-                     case 'K':   // Korea?
-                     case 'B':
-                     case 'P': if(rr)
-                                  *rr = REGION_JP;
-                               ret = "SCEI";
-                               goto Breakout;
-                  }
-               }
-            }
+            is_monkey_hero = true;
+            log_cb(RETRO_LOG_INFO, "Monkey Hero FBWrite Tweak Activated\n");
          }
 
-         //puts((char*)fb);
-         //puts("ASOFKOASDFKO");
+         if ((tmp = strchr(bootpos, '_'))) *tmp = 0;
+         if ((tmp = strchr(bootpos, '.'))) *tmp = 0;
+         if ((tmp = strchr(bootpos, ';'))) *tmp = 0;
+
+         if(strlen(bootpos) == 4 && bootpos[0] == 'S' &&
+            (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
+         {
+            switch(bootpos[2])
+            {
+               case 'E':
+                  if (rr) *rr = REGION_EU;
+                  ret = "SCEE";
+                  goto Breakout;
+
+               case 'U':
+                  if (rr) *rr = REGION_NA;
+                  ret = "SCEA";
+                  goto Breakout;
+
+               case 'K':   /* Korea? */
+               case 'B':
+               case 'P':
+                  if (rr) *rr = REGION_JP;
+                  ret = "SCEI";
+                  goto Breakout;
+            }
+         }
       }
    }
-   } // try
-   catch(std::exception &e)
-   {
-      //
-   }
-      catch(...)
-   {
-   }
-       
 
 Breakout:
    if(fp)
@@ -1569,7 +1548,7 @@ Breakout:
       fp = NULL;
    }
 
-   return(ret);
+   return ret;
 }
 
 static unsigned CalcDiscSCEx(void)
@@ -1664,20 +1643,27 @@ static unsigned CalcDiscSCEx(void)
 }
 
 static void SetDiscWrapper(const bool CD_TrayOpen) {
-    CDIF *cdif = NULL;
-    const char *disc_id = NULL;
-    if (CD_SelectedDisc >= 0 && !CD_TrayOpen) {
-        // only allow one pbp file to be loaded (at index 0)
-        if (CD_IsPBP) {
-            cdif = (*cdifs)[0];
-            disc_id = cdifs_scex_ids[0];
-        } else {
-            cdif = (*cdifs)[CD_SelectedDisc];
-            disc_id = cdifs_scex_ids[CD_SelectedDisc];
-        }
-    }
+   CDIF *cdif = NULL;
+   const char *disc_id = NULL;
 
-    PSX_CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
+   if (cdifs && CD_SelectedDisc >= 0 && !CD_TrayOpen) {
+      /* Only allow one pbp file to be loaded (at index 0). */
+      if (CD_IsPBP) {
+         if (!cdifs->empty())
+            cdif = (*cdifs)[0];
+         if (!cdifs_scex_ids.empty())
+            disc_id = cdifs_scex_ids[0];
+      } else {
+         size_t idx = (size_t)CD_SelectedDisc;
+         if (idx < cdifs->size())
+            cdif = (*cdifs)[idx];
+         if (idx < cdifs_scex_ids.size())
+            disc_id = cdifs_scex_ids[idx];
+      }
+   }
+
+   if (PSX_CDC)
+      PSX_CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
 }
 
 #ifdef HAVE_LIGHTREC
@@ -1965,6 +1951,7 @@ static void retro_led_interface(void)
 static unsigned disk_get_num_images(void);
 static void CDInsertEject(void);
 static void CDEject(void);
+static void Cleanup(void);
 
 static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMemcards = true, const bool WantPIOMem = false)
 {
@@ -2025,8 +2012,6 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    input_set_fio(PSX_FIO);
 
    DMA_Init();
-
-   GPU_FillVideoParams(&EmulatedPSX);
 
    switch (psx_gpu_dither_mode)
    {
@@ -2116,9 +2101,6 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    MDFNMP_Init(1024, ((uint64)1 << 29) / 1024);
    MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM->data8);
-#if 0
-   MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM.data8);
-#endif
 
    RFILE *BIOSFile;
 
@@ -2132,17 +2114,26 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    {
       const char *biospath_sname;
 
-      if(region == REGION_JP)
+      if (region == REGION_JP)
          biospath_sname = "psx.bios_jp";
-      else if(region == REGION_EU)
+      else if (region == REGION_EU)
          biospath_sname = "psx.bios_eu";
-      else if(region == REGION_NA)
+      else if (region == REGION_NA)
          biospath_sname = "psx.bios_na";
       else
-         abort();
+      {
+         /* A libretro core must never abort() - that would tear down
+          * the host process. Log the unexpected region value and fall
+          * back to NA so we can still attempt to boot rather than
+          * killing RetroArch. */
+         log_cb(RETRO_LOG_WARN,
+               "Unknown region %u, falling back to NA BIOS\n", region);
+         biospath_sname = "psx.bios_na";
+      }
 
-      const char *biospath = MDFN_MakeFName(MDFNMKF_FIRMWARE,
-            0, MDFN_GetSettingS(biospath_sname));
+      char biospath[4096];
+      MDFN_MakeFName(MDFNMKF_FIRMWARE, 0,
+            MDFN_GetSettingS(biospath_sname), biospath, sizeof(biospath));
 
       BIOSFile      = filestream_open(biospath,
             RETRO_VFS_FILE_ACCESS_READ,
@@ -2151,8 +2142,26 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    if (BIOSFile)
    {
-      filestream_read(BIOSFile, BIOSROM->data8, 512 * 1024);
+      const int64_t expected = 512 * 1024;
+      int64_t bios_size      = filestream_get_size(BIOSFile);
+      int64_t got;
+
+      /* Zero out the BIOS region first so a short read leaves a
+       * deterministic state - the previous code left the tail
+       * uninitialized whenever the file was smaller than 512 KB. */
+      memset(BIOSROM->data8, 0, expected);
+
+      got = filestream_read(BIOSFile, BIOSROM->data8, expected);
       filestream_close(BIOSFile);
+
+      if (bios_size != expected)
+         log_cb(RETRO_LOG_WARN,
+               "BIOS file size %lld does not match expected %lld; results may differ from real hardware\n",
+               (long long)bios_size, (long long)expected);
+      else if (got != expected)
+         log_cb(RETRO_LOG_WARN,
+               "BIOS file short read (%lld of %lld bytes); results may differ from real hardware\n",
+               (long long)got, (long long)expected);
    }
    else
    {
@@ -2170,14 +2179,14 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    for(; i < 8; i++)
    {
       char ext[64];
-      const char *memcard = NULL;
+      char memcard[4096];
       if (i == 0)
          snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
       else if (i == 1)
          snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
       else
          snprintf(ext, sizeof(ext), "%d.mcr", i);
-      memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+      MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
       PSX_FIO->LoadMemcard(i, memcard);
    }
 
@@ -2252,9 +2261,6 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
 
    // BIOS patch
    BIOSROM->WriteU32(0x6990, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
-#if 0
-   BIOSROM->WriteU32(0x691C, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
-#endif
 
    uint8 *po;
 
@@ -2369,33 +2375,51 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp =
    return true;
 }
 
+/* Load a raw PS-X EXE. The previous version had two leaks:
+ *   - malloc()'d a buffer, then immediately overwrote the pointer with
+ *     filestream_read_file(), which allocates its own buffer. The
+ *     original malloc was leaked unconditionally.
+ *   - On LoadEXE failure, the function returned without freeing the
+ *     read buffer or undoing InitCommon's allocations - and the
+ *     frontend never calls retro_unload_game when retro_load_game
+ *     fails, so those allocations would leak for the rest of the
+ *     core's lifetime. */
 static int Load(const char *name, RFILE *fp)
 {
    int64_t size     = filestream_get_size(fp);
-   const bool IsPSF = false;
    char image_label[4096];
+   void   *header   = NULL;
+   int64_t len      = 0;
 
    image_label[0] = '\0';
 
-   if(!TestMagic(name, fp, size))
+   if (!TestMagic(name, fp, size))
    {
       MDFN_Error(0, "File format is unknown to module psx..");
       return -1;
    }
 
-   InitCommon(NULL, !IsPSF, true);
+   InitCommon(NULL, true, true);
 
    TextMem.resize(0);
 
-   if(size >= 0x800)
+   if (size >= 0x800)
    {
-      int64_t len     = size;
-      uint8_t *header = (uint8_t*)malloc(len * sizeof(uint8_t));
-
-      filestream_read_file(name, (void**)&header, &len);
-
-      if (!LoadEXE(header, len))
+      /* filestream_read_file allocates its own buffer; the previous
+       * malloc-then-overwrite pattern leaked the malloc. */
+      if (filestream_read_file(name, &header, &len) == 0 || !header)
+      {
+         MDFN_Error(0, "Failed to read \"%s\"", name);
+         Cleanup();
          return -1;
+      }
+
+      if (!LoadEXE((const uint8_t *)header, (uint32_t)len))
+      {
+         free(header);
+         Cleanup();
+         return -1;
+      }
 
       free(header);
    }
@@ -2404,19 +2428,17 @@ static int Load(const char *name, RFILE *fp)
    extract_basename(image_label, name, sizeof(image_label));
    disk_control_ext_info.image_labels.push_back(image_label);
 
-   return(1);
+   return 1;
 }
 
 static int LoadCD(std::vector<CDIF *> *_CDInterfaces)
 {
    InitCommon(_CDInterfaces);
 
-   if (psx_skipbios == 1)
-   BIOSROM->WriteU32(0x6990, 0);
+   if (psx_skipbios == 1 && BIOSROM)
+      BIOSROM->WriteU32(0x6990, 0);
 
-   EmulatedPSX.GameType = GMT_CDROM;
-
-   return(1);
+   return 1;
 }
 
 static void Cleanup(void)
@@ -2445,21 +2467,40 @@ static void Cleanup(void)
    DMA_Kill();
 
 #ifdef HAVE_LIGHTREC
-   MainRAM = NULL;
-   ScratchRAM = NULL;
-   BIOSROM = NULL;
-   if(psx_mmap > 0)
+   /* InitCommon picks one of two allocation strategies based on whether
+    * lightrec_init_mmap() was able to reserve the requested base
+    * address: the mmap path stores pointers obtained from MAP() into
+    * psx_mem/psx_bios/psx_scratch, while the fallback uses plain
+    * operator new. We must free along whichever path was taken;
+    * previously the HAVE_LIGHTREC branch always skipped delete and
+    * relied solely on lightrec_free_mmap, leaking ~2.5MB per load
+    * cycle on the fallback path. */
+   if (psx_mmap > 0)
+   {
       lightrec_free_mmap();
+   }
+   else
+   {
+      if (MainRAM)
+         delete MainRAM;
+      if (ScratchRAM)
+         delete ScratchRAM;
+      if (BIOSROM)
+         delete BIOSROM;
+   }
+   MainRAM    = NULL;
+   ScratchRAM = NULL;
+   BIOSROM    = NULL;
 #else
-   if(MainRAM)
+   if (MainRAM)
       delete MainRAM;
    MainRAM = NULL;
 
-   if(ScratchRAM)
+   if (ScratchRAM)
       delete ScratchRAM;
    ScratchRAM = NULL;
 
-   if(BIOSROM)
+   if (BIOSROM)
       delete BIOSROM;
    BIOSROM = NULL;
 #endif
@@ -2468,6 +2509,10 @@ static void Cleanup(void)
       delete PIOMem;
    PIOMem = NULL;
 
+#ifdef HAVE_LIGHTREC
+   PSX_FreeExpansion1();
+#endif
+
    cdifs = NULL;
 }
 
@@ -2475,31 +2520,33 @@ static void CloseGame(void)
 {
    int i;
 
-   for (i = 0; i < 8; i++)
+   /* If load failed partway through, PSX_FIO may be NULL while
+    * CDInterfaces and other state still exist. Skip memcard saves in
+    * that case rather than segfaulting. */
+   if (PSX_FIO)
    {
-      if (i == 0 && !use_mednafen_memcard0_method)
-      {
-         PSX_FIO->SaveMemcard(i);
-         continue;
-      }
-
-      // If there's an error saving one memcard, don't skip trying to save the other, since it might succeed and
-      // we can reduce potential data loss!
-      try
+      for (i = 0; i < 8; i++)
       {
          char ext[64];
-         const char *memcard = NULL;
+         char memcard[4096];
+
+         if (i == 0 && !use_mednafen_memcard0_method)
+         {
+            PSX_FIO->SaveMemcard(i);
+            continue;
+         }
+
+         /* If saving one memcard fails, keep trying the others to
+          * minimize potential data loss. SaveMemcard does not throw
+          * (it logs and returns on error). */
          if (i == 0)
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
          else if (i == 1)
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
          else
             snprintf(ext, sizeof(ext), "%d.mcr", i);
-         memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+         MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
          PSX_FIO->SaveMemcard(i, memcard);
-      }
-      catch(std::exception &e)
-      {
       }
    }
 
@@ -2510,10 +2557,19 @@ static void CDInsertEject(void)
 {
    CD_TrayOpen = !CD_TrayOpen;
 
-   for(unsigned disc = 0; disc < cdifs->size(); disc++)
+   /* cdifs may be NULL when no game is loaded; entries may be NULL
+    * after disk_add_image_index() reserves a slot but before
+    * disk_replace_image_index() fills it. */
+   if (cdifs)
    {
-      if(!(*cdifs)[disc]->Eject(CD_TrayOpen))
-         CD_TrayOpen = !CD_TrayOpen;
+      for (unsigned disc = 0; disc < cdifs->size(); disc++)
+      {
+         CDIF *cdif = (*cdifs)[disc];
+         if (!cdif)
+            continue;
+         if (!cdif->Eject(CD_TrayOpen))
+            CD_TrayOpen = !CD_TrayOpen;
+      }
    }
 
    SetDiscWrapper(CD_TrayOpen);
@@ -2809,33 +2865,6 @@ static CheatFormatStruct CheatFormats[] =
    { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
 };
 
-static CheatFormatInfoStruct CheatFormatInfo =
-{
-   1,
-   CheatFormats
-};
-
-// Note for the future: If we ever support PSX emulation with non-8-bit RGB color components, or add a new linear RGB colorspace to MDFN_PixelFormat, we'll need
-// to buffer the intermediate 24-bit non-linear RGB calculation into an array and pass that into the GPULineHook stuff, otherwise netplay could break when
-// an emulated GunCon is used.  This IS assuming, of course, that we ever implement save state support so that netplay actually works at all...
-MDFNGI EmulatedPSX =
-{
-   true, // Multires possible?
-
-   //
-   // Note: Following video settings will be overwritten during game load.
-   //
-   0,   // lcm_width
-   0,   // lcm_height
-   NULL,  // Dummy
-
-   320,   // Nominal width
-   240,   // Nominal height
-
-   0,   // Framebuffer width
-   0,   // Framebuffer height
-};
-
 /* end of Mednafen psx.cpp */
 
 //forward decls
@@ -2903,12 +2932,20 @@ static unsigned disk_get_image_index(void)
 
 static bool disk_set_image_index(unsigned index)
 {
-   CD_SelectedDisc = index;
-   if (CD_SelectedDisc > disk_get_num_images())
-      CD_SelectedDisc = disk_get_num_images();
+   unsigned num_images = disk_get_num_images();
 
-   // Very hacky. CDSelect command will increment first.
-   CD_SelectedDisc--;
+   /* The frontend's contract on this callback is that index is in
+    * [0, num_images). Be defensive: refuse impossible values rather
+    * than letting them flow through to CD_SelectedDisc--. */
+   if (num_images == 0)
+      return false;
+   if (index >= num_images)
+      index = num_images - 1;
+
+   /* CD_SelectedDisc is signed (-1 sentinel for "no disc"); the cast
+    * is safe because we just bounded index above. The decrement is
+    * because CDSelect's command path increments first. */
+   CD_SelectedDisc = (int)index - 1;
 
    DoSimpleCommand(MDFN_MSC_SELECT_DISK);
    return true;
@@ -2920,14 +2957,16 @@ static bool disk_set_image_index(unsigned index)
 // Untested ...
 static bool disk_replace_image_index(unsigned index, const struct retro_game_info *info)
 {
-   if (index >= disk_get_num_images() || !eject_state || CD_IsPBP)
+   if (!cdifs || index >= disk_get_num_images() || !eject_state || CD_IsPBP)
       return false;
 
    if (!info)
    {
       delete cdifs->at(index);
       cdifs->erase(cdifs->begin() + index);
-      if (index < CD_SelectedDisc)
+      /* CD_SelectedDisc is signed; explicit cast to silence the
+       * mixed-sign comparison and to make the intent clear. */
+      if ((int)index < CD_SelectedDisc)
          CD_SelectedDisc--;
 
       disk_control_ext_info.image_paths.erase(
@@ -2940,30 +2979,37 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
       return true;
    }
 
-   bool success = true;
+   {
+      bool success = true;
+      CDIF *iface  = CDIF_Open(&success, info->path, false, false);
 
-   CDIF *iface = CDIF_Open(&success, info->path, false, false);
+      if (!success || !iface)
+      {
+         /* CDIF_Open's contract is to return NULL when success is false,
+          * but be defensive about a partially-constructed CDIF leak. */
+         if (iface)
+            delete iface;
+         return false;
+      }
 
-   if (!success)
-      return false;
+      delete cdifs->at(index);
+      cdifs->at(index) = iface;
+      CalcDiscSCEx();
 
-   delete cdifs->at(index);
-   cdifs->at(index) = iface;
-   CalcDiscSCEx();
+      /* If we replace, we want the "swap disk manually effect". */
+      extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
 
-   /* If we replace, we want the "swap disk manually effect". */
-   extract_basename(retro_cd_base_name, info->path, sizeof(retro_cd_base_name));
-
-   /* Update disk path/label vectors */
-   disk_control_ext_info.image_paths[index]  = info->path;
-   disk_control_ext_info.image_labels[index] = retro_cd_base_name;
+      /* Update disk path/label vectors */
+      disk_control_ext_info.image_paths[index]  = info->path;
+      disk_control_ext_info.image_labels[index] = retro_cd_base_name;
+   }
 
    return true;
 }
 
 static bool disk_add_image_index(void)
 {
-   if(CD_IsPBP)
+   if (CD_IsPBP || !cdifs)
       return false;
 
    cdifs->push_back(NULL);
@@ -3124,6 +3170,11 @@ void retro_init(void)
 
 void retro_reset(void)
 {
+   /* PSX_Power() touches MainRAM, PSX_CPU, etc. - all NULL before
+    * retro_load_game and after retro_unload_game. */
+   if (!MainRAM || !PSX_CPU || !PSX_FIO)
+      return;
+
    DoSimpleCommand(MDFN_MSC_RESET);
 }
 
@@ -4043,11 +4094,36 @@ static void check_variables(bool startup)
 }
 
 #ifdef NEED_CD
+/* Read an M3U playlist into file_list, recursively expanding any
+ * referenced .m3u entries.
+ *
+ * Two latent issues fixed here:
+ *   1. The depth check used post-increment ("depth++"), so the
+ *      recursive call received the original depth value. Mutual
+ *      recursion (a.m3u -> b.m3u -> a.m3u) could pile up frames
+ *      indefinitely. Each frame holds a 2KB linebuf plus a few
+ *      std::strings; on PSP/Vita-class devices with small stacks
+ *      that would overflow.
+ *   2. The self-reference check (efp == path) only caught direct
+ *      cycles, not mutual ones. The depth limit now bounds total
+ *      recursion regardless, lowered from 99 to 8 since any
+ *      legitimate playlist fits well within that. */
+#define M3U_MAX_DEPTH 8
+
 static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsigned depth = 0)
 {
    std::string dir_path;
    char linebuf[2048];
-   RFILE *fp = filestream_open(path.c_str(), RETRO_VFS_FILE_ACCESS_READ,
+   RFILE *fp;
+
+   if (depth >= M3U_MAX_DEPTH)
+   {
+      log_cb(RETRO_LOG_ERROR, "M3U recursion limit (%u) reached at \"%s\"\n",
+            M3U_MAX_DEPTH, path.c_str());
+      return;
+   }
+
+   fp = filestream_open(path.c_str(), RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
    if (fp == NULL)
@@ -4066,6 +4142,8 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
          continue;
 
       efp = MDFN_EvalFIP(dir_path, std::string(linebuf), false);
+      if (efp.empty())
+         continue;
 
       if(efp.size() >= 4 && efp.substr(efp.size() - 4) == ".m3u")
       {
@@ -4075,13 +4153,8 @@ static void ReadM3U(std::vector<std::string> &file_list, std::string path, unsig
             goto end;
          }
 
-         if(depth == 99)
-         {
-            log_cb(RETRO_LOG_ERROR, "M3U load recursion too deep!\n");
-            goto end;
-         }
-
-         ReadM3U(file_list, efp, depth++);
+         /* Pre-increment so the depth limit actually trips. */
+         ReadM3U(file_list, efp, depth + 1);
       }
       else
          file_list.push_back(efp);
@@ -4095,37 +4168,61 @@ end:
 
 static bool MDFNI_LoadCD(const char *devicename)
 {
+   size_t devicename_len;
+   bool   load_ok = true;
+
    log_cb(RETRO_LOG_INFO, "Loading \"%s\"\n", devicename);
 
-   try
+   if (!devicename)
+      return false;
+
+   devicename_len = strlen(devicename);
+
+   if (devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".m3u"))
    {
-      size_t devicename_len = strlen(devicename);
-      if(devicename && devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".m3u"))
+      ReadM3U(disk_control_ext_info.image_paths, devicename);
+
+      for (unsigned i = 0; i < disk_control_ext_info.image_paths.size(); i++)
       {
-         ReadM3U(disk_control_ext_info.image_paths, devicename);
-
-         for(unsigned i = 0; i < disk_control_ext_info.image_paths.size(); i++)
-         {
-            char image_label[4096];
-            bool success = true;
-
-            image_label[0] = '\0';
-
-            CDIF *image  = CDIF_Open(
-                  &success, disk_control_ext_info.image_paths[i].c_str(), false, cdimagecache);
-            CDInterfaces.push_back(image);
-
-            extract_basename(
-                  image_label, disk_control_ext_info.image_paths[i].c_str(),
-                  sizeof(image_label));
-            disk_control_ext_info.image_labels.push_back(image_label);
-         }
-      }
-      else if(devicename && devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".pbp"))
-      {
+         char image_label[4096];
          bool success = true;
-         CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
-         CD_IsPBP     = true;
+         CDIF *image  = CDIF_Open(&success,
+               disk_control_ext_info.image_paths[i].c_str(), false, cdimagecache);
+
+         if (!success || !image)
+         {
+            log_cb(RETRO_LOG_ERROR, "Error opening CD: %s\n",
+                  disk_control_ext_info.image_paths[i].c_str());
+            if (image)
+               delete image;
+            load_ok = false;
+            break;
+         }
+
+         CDInterfaces.push_back(image);
+
+         image_label[0] = '\0';
+         extract_basename(image_label,
+               disk_control_ext_info.image_paths[i].c_str(),
+               sizeof(image_label));
+         disk_control_ext_info.image_labels.push_back(image_label);
+      }
+   }
+   else if (devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".pbp"))
+   {
+      bool success = true;
+      CDIF *image  = CDIF_Open(&success, devicename, false, cdimagecache);
+
+      if (!success || !image)
+      {
+         log_cb(RETRO_LOG_ERROR, "Error opening PBP: %s\n", devicename);
+         if (image)
+            delete image;
+         load_ok = false;
+      }
+      else
+      {
+         CD_IsPBP = true;
          CDInterfaces.push_back(image);
 
          /* CDIF_Open() sets PBP_DiscCount, so we can populate
@@ -4133,7 +4230,7 @@ static bool MDFNI_LoadCD(const char *devicename)
          PBP_PhysicalDiscCount = (PBP_DiscCount == 0) ?
                1 : PBP_DiscCount;
 
-         for(unsigned i = 0; i < PBP_PhysicalDiscCount; i++)
+         for (unsigned i = 0; i < PBP_PhysicalDiscCount; i++)
          {
             /* image_name is at most 4096 - 4 (removing ".pbp")
              * gives label room to add index and quiets gcc warnings */
@@ -4153,34 +4250,50 @@ static bool MDFNI_LoadCD(const char *devicename)
             disk_control_ext_info.image_labels.push_back(image_label);
          }
       }
-      else
-      {
-         char image_label[4096];
-         bool success = true;
-
-         image_label[0] = '\0';
-
-         bool cache = cdimagecache;
-         /* don't precache if physical cdrom, will take way too long and be unresponive */
-         if (cdimagecache && devicename && !strncasecmp(devicename, "cdrom:", 6)) {
-            cache = false;
-            log_cb(RETRO_LOG_INFO, "Skipping Pre-Cache due to using physical media: %s\n", devicename);
-         }
-
-         CDIF *image  = CDIF_Open(&success, devicename, false, cache);
-         if (!success)
-            return false;
-
-         CDInterfaces.push_back(image);
-
-         disk_control_ext_info.image_paths.push_back(devicename);
-         extract_basename(image_label, devicename, sizeof(image_label));
-         disk_control_ext_info.image_labels.push_back(image_label);
-      }
    }
-   catch(std::exception &e)
+   else
    {
-      log_cb(RETRO_LOG_ERROR, "Error opening CD.\n");
+      char image_label[4096];
+      bool success = true;
+      bool cache = cdimagecache;
+      CDIF *image;
+
+      /* Don't precache if physical cdrom, will take way too long and be unresponsive */
+      if (cdimagecache && !strncasecmp(devicename, "cdrom:", 6))
+      {
+         cache = false;
+         log_cb(RETRO_LOG_INFO, "Skipping Pre-Cache due to using physical media: %s\n", devicename);
+      }
+
+      image = CDIF_Open(&success, devicename, false, cache);
+      if (!success || !image)
+      {
+         log_cb(RETRO_LOG_ERROR, "Error opening CD: %s\n", devicename);
+         if (image)
+            delete image;
+         return false;
+      }
+
+      CDInterfaces.push_back(image);
+
+      image_label[0] = '\0';
+      disk_control_ext_info.image_paths.push_back(devicename);
+      extract_basename(image_label, devicename, sizeof(image_label));
+      disk_control_ext_info.image_labels.push_back(image_label);
+   }
+
+   if (!load_ok)
+   {
+      /* Cleanup any partially-loaded CDIFs and metadata. */
+      for (unsigned i = 0; i < CDInterfaces.size(); i++)
+         delete CDInterfaces[i];
+      CDInterfaces.clear();
+
+      disk_control_ext_info.initial_index = 0;
+      disk_control_ext_info.initial_path.clear();
+      disk_control_ext_info.image_paths.clear();
+      disk_control_ext_info.image_labels.clear();
+
       return false;
    }
 
@@ -4230,7 +4343,11 @@ static bool MDFNI_LoadCD(const char *devicename)
 static bool MDFNI_LoadGame(const char *name)
 {
    RFILE *GameFile = NULL;
-   size_t name_len = strlen(name);
+   size_t name_len;
+
+   if (!name)
+      return false;
+   name_len = strlen(name);
 
    if(name_len > 3 && (
       !strcasecmp(name + name_len - 3, "cue") ||
@@ -4268,19 +4385,23 @@ error:
 bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
+   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+   int r;
+
+   if (!info || !info->path)
+      return false;
 
    input_init_env(environ_cb);
 
-   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
       return false;
 
    extract_basename(retro_cd_base_name,       info->path, sizeof(retro_cd_base_name));
    extract_directory(retro_cd_base_directory, info->path, sizeof(retro_cd_base_directory));
 
-   int r = snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
+   r = snprintf(tocbasepath, sizeof(tocbasepath), "%s%c%s.toc", retro_cd_base_directory, retro_slash, retro_cd_base_name);
 
-   if (r >= 0 && r < 4096 && filestream_exists(tocbasepath))
+   if (r >= 0 && r < (int)sizeof(tocbasepath) && filestream_exists(tocbasepath))
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", tocbasepath);
    else
       snprintf(retro_cd_path, sizeof(retro_cd_path), "%s", info->path);
@@ -4492,22 +4613,18 @@ static bool retro_set_system_av_info(void)
 void retro_run(void)
 {
    bool updated = false;
-   //code to implement audio and video disable is not yet implemented
-   //bool disableVideo = false;
-   //bool disableAudio = false;
-   //bool hardDisableAudio = false;
-   //int flags = 3;
-   //if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags))
-   //{
-   //   disableVideo = !(flags & 1);
-   //   disableAudio = !(flags & 2);
-   //   hardDisableAudio = !!(flags & 8);
-   //}
+
+   /* Defensive: a frontend should not call retro_run before
+    * retro_load_game succeeds, but if it does we'd crash on the
+    * unconditional PSX_CPU->Run / PSX_FIO->UpdateInput calls below. */
+   if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
+      return;
 
    if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
    {
       gui_draw();
-      video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
+      if (video_cb)
+         video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
    }
 
    rsx_intf_prepare_frame();
@@ -4581,23 +4698,19 @@ void retro_run(void)
                           "changing from memory card %d to memory card %d in left slot",
                           memcard_left_index_old, memcard_left_index);
 
-         try
          {
             char ext[64];
-            const char *memcard = NULL;
+            char memcard[4096];
 
-            // Save contents of left memory card to previously selected index
+            /* Save contents of left memory card to previously selected index */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index_old);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
             PSX_FIO->SaveMemcard(0, memcard, true);
 
-            // Load contents of currently selected index to left memory card
+            /* Load contents of currently selected index to left memory card */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
             PSX_FIO->LoadMemcard(0, memcard, true);
-         }
-         catch (std::exception &e)
-         {
          }
       }
 
@@ -4608,23 +4721,19 @@ void retro_run(void)
                           "changing from memory card %d to memory card %d in right slot",
                           memcard_right_index_old, memcard_right_index);
 
-         try
          {
             char ext[64];
-            const char *memcard = NULL;
+            char memcard[4096];
 
-            // Save contents of right memory card to previously selected index
+            /* Save contents of right memory card to previously selected index */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
             PSX_FIO->SaveMemcard(1, memcard, true);
 
-            // Load contents of currently selected index to right memory card
+            /* Load contents of currently selected index to right memory card */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
             PSX_FIO->LoadMemcard(1, memcard, true);
-         }
-         catch (std::exception &e)
-         {
          }
       }
 
@@ -4677,7 +4786,8 @@ void retro_run(void)
       setting_apply_analog_toggle = false;
    }
 
-   input_poll_cb();
+   if (input_poll_cb)
+      input_poll_cb();
 
    input_update(libretro_supports_bitmasks, input_state_cb);
 
@@ -4709,10 +4819,6 @@ void retro_run(void)
    assert(timestamp);
 
    ForceEventUpdates(timestamp);
-#if 0
-   if(GPU_GetScanlineNum() < 100)
-      PSX_DBG(PSX_DBG_ERROR, "[BUUUUUUUG] Frame timing end glitch; scanline=%u, st=%u\n", GPU_GetScanlineNum(), timestamp);
-#endif
 
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
@@ -4743,7 +4849,8 @@ void retro_run(void)
          if(Memcard_SaveDelay[i] >= (33868800 * 2))   // Wait until about 2 seconds of no new writes.
          {
             char ext[64];
-            const char *memcard = NULL;
+            char memcard[4096];
+            int  index = i;
 
 #ifndef NDEBUG
             log_cb(RETRO_LOG_INFO, "Saving memcard %d...\n", i);
@@ -4757,12 +4864,11 @@ void retro_run(void)
                continue;
             }
 
-            int index = i;
             if (i == 0) index = memcard_left_index;
             else if (i == 1) index = memcard_right_index;
 
             snprintf(ext, sizeof(ext), "%d.mcr", index);
-            memcard = MDFN_MakeFName(MDFNMKF_SAV, 0, ext);
+            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
             PSX_FIO->SaveMemcard(i, memcard);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
@@ -4920,7 +5026,8 @@ void retro_run(void)
             MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
    }
 
-   audio_batch_cb((int16_t*)&IntermediateBuffer, spec.SoundBufSize);
+   if (audio_batch_cb)
+      audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);
 
    if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0))
    {
@@ -4936,6 +5043,8 @@ void retro_run(void)
 
 void retro_get_system_info(struct retro_system_info *info)
 {
+   if (!info)
+      return;
    memset(info, 0, sizeof(*info));
    info->library_name     = MEDNAFEN_CORE_NAME;
 #ifdef GIT_VERSION
@@ -4950,16 +5059,69 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
+   if (!info)
+      return;
    rsx_intf_get_system_av_info(info);
 }
 
+/* Reset all process-lifetime state so that a subsequent retro_init()
+ * starts from a clean slate. This matters on consoles and other
+ * platforms that statically link the core: the same process loads
+ * and unloads multiple games, and any state retained between sessions
+ * leaks across them.
+ *
+ * The original implementation only reset two booleans, which meant
+ * frame counters, GUI state, disc state, firmware-found flag, and
+ * other module-level variables persisted into the next session and
+ * caused subtle misbehavior. */
 void retro_deinit(void)
 {
-   delete surf;
-   surf = NULL;
+   if (surf)
+   {
+      delete surf;
+      surf = NULL;
+   }
 
+   /* Frame/UI state. */
+   frame_count           = 0;
+   internal_frame_count  = 0;
+   gui_inited            = false;
+   gui_show              = false;
+   frame_width           = 0;
+   frame_height          = 0;
+
+   /* Loaded-content state. */
+   firmware_found                = false;
+   bios_path[0]                  = '\0';
+   retro_cd_path[0]              = '\0';
+
+   /* Disc-tray / multi-disc state. */
+   eject_state           = false;
+   CD_TrayOpen           = false;
+   CD_IsPBP              = false;
+   PBP_PhysicalDiscCount = 0;
+   image_offset          = 0;
+   image_crop            = 0;
+
+   /* Memcard housekeeping. */
+   memcard_left_index      = 0;
+   memcard_left_index_old  = 0;
+   memcard_right_index     = 1;
+   memcard_right_index_old = 0;
+   enable_memcard1         = false;
+   memset(Memcard_PrevDC,    0, sizeof(Memcard_PrevDC));
+   memset(Memcard_SaveDelay, 0, sizeof(Memcard_SaveDelay));
+
+   /* Display/notification toggles. */
+   display_internal_framerate = false;
+   display_notifications      = true;
+   allow_frame_duping         = false;
+
+   /* Capability flags re-detected by retro_init. */
    libretro_supports_option_categories = false;
-   libretro_supports_bitmasks = false;
+   libretro_supports_bitmasks          = false;
+   libretro_msg_interface_version      = 0;
+   enable_variable_serialization_size  = false;
 }
 
 unsigned retro_get_region(void)
@@ -5058,56 +5220,73 @@ bool UsingFastSavestates(void)
    return false;
 }
 
+/* Serialize emulator state into the frontend's `data` buffer of `size`
+ * bytes.
+ *
+ * The previous implementation was unsafe in two ways:
+ *
+ *   1. When size == DEFAULT_STATE_SIZE (the default 16MB hint), it set
+ *      st.data = (uint8_t*)data - i.e. handed the frontend's buffer to
+ *      the state-saving code. smem_write() in mednafen/state.c calls
+ *      realloc() on st.data when the running save exceeds st.malloced.
+ *      Calling realloc() on memory the core does not own is undefined
+ *      behavior. Today it works because PSX states fit comfortably in
+ *      16MB, but a single growth would corrupt the frontend's heap.
+ *
+ *   2. The non-default branch checked "st.len != size" before saving,
+ *      but st.len is always 0 at that point - it's set by smem_write
+ *      while saving. The warning was meaningless.
+ *
+ * The new implementation always saves into a core-owned malloc buffer
+ * and memcpys into the frontend's buffer afterward, with explicit
+ * truncation handling. */
 bool retro_serialize(void *data, size_t size)
 {
    StateMem st;
-   bool ret          = false;
+   bool     ret;
+   uint8_t *scratch;
 
-   st.len            = 0;
+   if (!data || size == 0)
+      return false;
+
+   /* Same defensive check as retro_unserialize - StateAction touches
+    * every subsystem and segfaults if any of them are NULL. */
+   if (!MainRAM || !PSX_CDC || !PSX_CPU || !PSX_FIO)
+      return false;
+
+   scratch = (uint8_t*)malloc(size);
+   if (!scratch)
+      return false;
+
+   st.data           = scratch;
    st.loc            = 0;
+   st.len            = 0;
    st.malloced       = size;
    st.initial_malloc = 0;
 
-   if (size == DEFAULT_STATE_SIZE)  //16MB buffer reserved
-   {
-      //actual size is around 3.75MB (3.67MB for fast savestates) rather than 16MB, so 16MB will hold a savestate without worrying about realloc
-
-      //save state in place
-      st.data     = (uint8_t*)data;
-
-      //fast save states are at least 20% faster
-      FastSaveStates = UsingFastSavestates();
-      ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-   }
-   else
-   {
-      /* it seems that mednafen can realloc pointers sent to it?
-         since we don't know the disposition of void* data (is it safe to realloc?) we have to manage a new buffer here */
-      static bool logged;
-      uint8_t *_dat = (uint8_t*)malloc(size);
-
-      if (!_dat)
-         return false;
-
-      st.data = _dat;
-
-      /* there are still some errors with the save states,
-       * the size seems to change on some games for now
-       * just log when this happens */
-      if (!logged && st.len != size)
-      {
-         log_cb(RETRO_LOG_WARN, "warning, save state size has changed\n");
-         logged = true;
-      }
-
-      FastSaveStates = UsingFastSavestates();
-      ret = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
-
-      memcpy(data, st.data, size);
-      free(st.data);
-   }
-
+   FastSaveStates = UsingFastSavestates();
+   ret            = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    FastSaveStates = false;
+
+   if (ret)
+   {
+      /* st.data may have been reallocated by smem_write; st.len is the
+       * actual amount written. Copy what we have, but warn if it
+       * exceeded the frontend's buffer. */
+      size_t copy_len = (st.len <= size) ? (size_t)st.len : size;
+      if (st.len > size)
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "retro_serialize: state grew to %u bytes, frontend buffer is %u; truncating\n",
+               (unsigned)st.len, (unsigned)size);
+         ret = false;
+      }
+      memcpy(data, st.data, copy_len);
+   }
+
+   /* st.data may differ from `scratch` if smem_write realloc'd. */
+   if (st.data)
+      free(st.data);
 
    return ret;
 }
@@ -5115,6 +5294,13 @@ bool retro_serialize(void *data, size_t size)
 bool retro_unserialize(const void *data, size_t size)
 {
    StateMem st;
+   bool okay;
+
+   /* Frontends should only call this when a game is loaded, but be
+    * defensive: MDFNSS_LoadSM walks every subsystem's StateAction
+    * which derefs MainRAM, PSX_CDC, etc. */
+   if (!data || size == 0 || !MainRAM || !PSX_CDC || !PSX_CPU || !PSX_FIO)
+      return false;
 
    st.data           = (uint8_t*)data;
    st.loc            = 0;
@@ -5122,24 +5308,27 @@ bool retro_unserialize(const void *data, size_t size)
    st.malloced       = 0;
    st.initial_malloc = 0;
 
-   //fast save states are at least 20% faster
    FastSaveStates = UsingFastSavestates();
-   bool okay = MDFNSS_LoadSM(&st, 0, 0);
+   okay           = MDFNSS_LoadSM(&st, 0, 0);
    FastSaveStates = false;
    return okay;
 }
 
 void *retro_get_memory_data(unsigned type)
 {
-   uint8_t *data;
-
+   /* This callback may be invoked before retro_load_game or after
+    * retro_unload_game. Returning NULL is a valid response per the
+    * libretro spec; the frontend must cope with that. */
    switch (type)
    {
       case RETRO_MEMORY_SYSTEM_RAM:
-         return MainRAM->data8;
+         return MainRAM ? MainRAM->data8 : NULL;
       case RETRO_MEMORY_SAVE_RAM:
-         if (!use_mednafen_memcard0_method)
-            return PSX_FIO->GetMemcardDevice(0)->GetNVData();
+         if (!use_mednafen_memcard0_method && PSX_FIO)
+         {
+            InputDevice *mc = PSX_FIO->GetMemcardDevice(0);
+            return mc ? mc->GetNVData() : NULL;
+         }
          break;
       default:
          break;
@@ -5209,61 +5398,63 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
          part+=codeParts[++cursor];
       if (part.length()==12)
       {
-         //Decode the cheat
-         try
+         /* Decode the cheat. DecodeCheat returns false on bad codes;
+          * MDFNI_AddCheat does not throw. */
+         if(!cf->DecodeCheat(std::string(part), &patch))
          {
-            if(!cf->DecodeCheat(std::string(part), &patch))
-            {
-               //Generate a name
-               snprintf(name, sizeof(name), "cheat_%i_%i",index,cursor);
+            /* Generate a name */
+            snprintf(name, sizeof(name), "cheat_%i_%i",index,cursor);
 
-               //Set parameters
-               patch.name=(std::string)name;
-               patch.status=enabled;
+            /* Set parameters */
+            patch.name=(std::string)name;
+            patch.status=enabled;
 
-               MDFNI_AddCheat(patch);
-               patch=MemoryPatch();
-            }
-         }
-         catch(std::exception &e)
-         {
-             continue;
+            MDFNI_AddCheat(patch);
+            patch=MemoryPatch();
          }
       }
    }
 }
 
-// Use a simpler approach to make sure that things go right for libretro.
-const char *MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1)
+void MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1,
+      char *out, size_t outlen)
 {
-   static char fullpath[4096];
-   int r = 0;
+   int r;
 
-   fullpath[0] = '\0';
+   (void)id1;
+
+   if (!out || outlen == 0)
+      return;
+   out[0] = '\0';
+
+   if (!cd1)
+      return;
 
    switch (type)
    {
       case MDFNMKF_SAV:
-         r = snprintf(fullpath, sizeof(fullpath), "%s%c%s.%s",
+         r = snprintf(out, outlen, "%s%c%s.%s",
                retro_save_directory,
                retro_slash,
                shared_memorycards ? "mednafen_psx_libretro_shared" : retro_cd_base_name,
                cd1);
          break;
       case MDFNMKF_FIRMWARE:
-         r = snprintf(fullpath, sizeof(fullpath), "%s%c%s", retro_base_directory, retro_slash, cd1);
+         r = snprintf(out, outlen, "%s%c%s",
+               retro_base_directory, retro_slash, cd1);
          break;
       default:
-         break;
+         return;
    }
 
-   if (r > 4095)
+   if (r < 0 || (size_t)r >= outlen)
    {
-      fullpath[4095] = '\0';
-      log_cb(RETRO_LOG_ERROR,"MakeFName path longer than 4095: %s\n", fullpath);
+      out[outlen - 1] = '\0';
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR,
+               "MDFN_MakeFName: path truncated to %zu bytes: %s\n",
+               outlen, out);
    }
-
-   return fullpath;
 }
 
 void MDFND_DispMessage(

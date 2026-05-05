@@ -30,21 +30,35 @@
 
 typedef std::map<std::string, std::string> CCD_Section;
 
+/* CCD_ReadInt: parse an integer from a CCD section.
+ *
+ * Sets *ok to false on error (missing property, malformed value).
+ * Callers MUST initialize *ok to true before a sequence of calls and
+ * check it after the sequence; once *ok is false, subsequent calls
+ * are still safe (they short-circuit return 0) so error propagation
+ * can be batched at meaningful boundaries rather than after every line. */
 template<typename T>
-static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool have_defval = false, const int defval = 0)
+static T CCD_ReadInt(bool *ok, CCD_Section &s, const std::string &propname, const bool have_defval = false, const int defval = 0)
 {
    const char *vp;
    char *ep           = NULL;
    int scan_base      = 10;
    size_t scan_offset = 0;
    long ret           = 0;
-   CCD_Section::iterator zit = s.find(propname);
+   CCD_Section::iterator zit;
+
+   if (!*ok)
+      return 0;
+
+   zit = s.find(propname);
 
    if(zit == s.end())
    {
       if(have_defval)
          return defval;
-      throw MDFN_Error(0, "Missing property: %s", propname.c_str());
+      MDFN_Error(0, "Missing property: %s", propname.c_str());
+      *ok = false;
+      return 0;
    }
 
    const std::string &v = zit->second;
@@ -63,7 +77,11 @@ static T CCD_ReadInt(CCD_Section &s, const std::string &propname, const bool hav
       ret = strtoul(vp, &ep, scan_base);
 
    if(!vp[0] || ep[0])
-      throw MDFN_Error(0, "Property %s: Malformed integer: %s", propname.c_str(), v.c_str());
+   {
+      MDFN_Error(0, "Property %s: Malformed integer: %s", propname.c_str(), v.c_str());
+      *ok = false;
+      return 0;
+   }
 
    return ret;
 }
@@ -85,6 +103,12 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
    std::string dir_path, file_base, file_ext;
    char img_extsd[4] = { 'i', 'm', 'g', 0 };
    char sub_extsd[4] = { 's', 'u', 'b', 0 };
+
+   if (!cf.is_open())
+   {
+      MDFN_Error(0, "CCD: failed to open \"%s\"", path);
+      return false;
+   }
 
    MDFN_GetFilePathComponents(path, &dir_path, &file_base, &file_ext);
 
@@ -172,10 +196,14 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
    {
       unsigned te;
-      CCD_Section            &ds = Sections["DISC"];
-      unsigned       toc_entries = CCD_ReadInt<unsigned>(ds, "TOCENTRIES");
-      unsigned      num_sessions = CCD_ReadInt<unsigned>(ds, "SESSIONS");
-      bool data_tracks_scrambled = CCD_ReadInt<unsigned>(ds, "DATATRACKSSCRAMBLED");
+      bool ok                     = true;
+      CCD_Section            &ds  = Sections["DISC"];
+      unsigned       toc_entries  = CCD_ReadInt<unsigned>(&ok, ds, "TOCENTRIES");
+      unsigned      num_sessions  = CCD_ReadInt<unsigned>(&ok, ds, "SESSIONS");
+      bool data_tracks_scrambled  = CCD_ReadInt<unsigned>(&ok, ds, "DATATRACKSSCRAMBLED") != 0;
+
+      if (!ok)
+         return false;
 
       if(num_sessions != 1)
       {
@@ -192,16 +220,31 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
       for(te = 0; te < toc_entries; te++)
       {
          char tmpbuf[64];
+         uint8_t point;
+         uint8_t adr;
+         uint8_t control;
+         uint8_t pmin;
+         uint8_t psec;
+         uint8_t pframe;
+         signed plba;
+         unsigned session;
+
          snprintf(tmpbuf, sizeof(tmpbuf), "ENTRY %u", te);
-         CCD_Section & ts = Sections[std::string(tmpbuf)];
-         unsigned session = CCD_ReadInt<unsigned>(ts, "SESSION");
-         uint8_t    point = CCD_ReadInt<uint8>(ts, "POINT");
-         uint8_t      adr = CCD_ReadInt<uint8>(ts, "ADR");
-         uint8_t  control = CCD_ReadInt<uint8>(ts, "CONTROL");
-         uint8_t     pmin = CCD_ReadInt<uint8>(ts, "PMIN");
-         uint8_t     psec = CCD_ReadInt<uint8>(ts, "PSEC");
-         uint8_t   pframe = CCD_ReadInt<uint8>(ts, "PFRAME");
-         signed      plba = CCD_ReadInt<signed>(ts, "PLBA");
+         {
+            CCD_Section & ts = Sections[std::string(tmpbuf)];
+            session = CCD_ReadInt<unsigned>(&ok, ts, "SESSION");
+            point   = CCD_ReadInt<uint8>(&ok, ts, "POINT");
+            adr     = CCD_ReadInt<uint8>(&ok, ts, "ADR");
+            control = CCD_ReadInt<uint8>(&ok, ts, "CONTROL");
+            pmin    = CCD_ReadInt<uint8>(&ok, ts, "PMIN");
+            psec    = CCD_ReadInt<uint8>(&ok, ts, "PSEC");
+            pframe  = CCD_ReadInt<uint8>(&ok, ts, "PFRAME");
+            plba    = CCD_ReadInt<signed>(&ok, ts, "PLBA");
+            (void)pframe;
+         }
+
+         if (!ok)
+            return false;
 
          if(session != 1)
          {
@@ -209,7 +252,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
             return false;
          }
 
-         // Reference: ECMA-394, page 5-14
+         /* Reference: ECMA-394, page 5-14 */
          if (point >= 1 && point <= 99)
          {
             tocd.tracks[point].adr = adr;
@@ -248,21 +291,38 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
    {
       std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd), true);
       FileStream *str        = new FileStream(image_path.c_str(), MODE_READ);
+      int64 ss;
 
-      if(image_memcache)
-         img_stream = new MemoryStream(str);
+      if (!str->is_open())
+      {
+         MDFN_Error(0, "Could not open CCD image \"%s\"", image_path.c_str());
+         delete str;
+         return false;
+      }
+
+      if (image_memcache)
+      {
+         MemoryStream *mem = new MemoryStream(str);
+         if (!mem->is_valid())
+         {
+            MDFN_Error(0, "Could not load CCD image \"%s\" into memory", image_path.c_str());
+            delete mem;
+            return false;
+         }
+         img_stream = mem;
+      }
       else
          img_stream = str;
 
-      int64 ss = img_stream->size();
+      ss = img_stream->size();
 
-      if(ss % 2352)
+      if (ss % 2352)
       {
          MDFN_Error(0, "CCD image size is not evenly divisible by 2352.");
          return false;
       }
 
-      img_numsectors = ss / 2352;  
+      img_numsectors = ss / 2352;
    }
 
    {
@@ -270,19 +330,36 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
       std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd), true);
       FileStream *str      = new FileStream(sub_path.c_str(), MODE_READ);
 
-      if(image_memcache)
-         sub_stream = new MemoryStream(str);
+      if (!str->is_open())
+      {
+         MDFN_Error(0, "Could not open CCD subchannel \"%s\"", sub_path.c_str());
+         delete str;
+         return false;
+      }
+
+      if (image_memcache)
+      {
+         MemoryStream *mem = new MemoryStream(str);
+         if (!mem->is_valid())
+         {
+            MDFN_Error(0, "Could not load CCD subchannel \"%s\" into memory", sub_path.c_str());
+            delete mem;
+            return false;
+         }
+         sub_stream = mem;
+      }
       else
          sub_stream = str;
 
-      if(sub_stream->size() != (int64)img_numsectors * 96)
+      if (sub_stream->size() != (int64)img_numsectors * 96)
       {
          MDFN_Error(0, "CCD SUB file size mismatch.");
          return false;
       }
    }
 
-   CheckSubQSanity();
+   if (!CheckSubQSanity())
+      return false;
 
    return true;
 }

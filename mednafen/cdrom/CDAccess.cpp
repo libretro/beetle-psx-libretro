@@ -48,17 +48,23 @@ CDAccess::~CDAccess()
 CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcache)
 {
    size_t path_len = strlen(path);
+   CDAccess *cda = NULL;
+
    if (path_len >= 3 && !strcasecmp(path + path_len - 3, "ccd"))
-      return new CDAccess_CCD(success, path, image_memcache);
+      cda = new CDAccess_CCD(success, path, image_memcache);
 #ifdef HAVE_PBP
    else if (path_len >= 3 && !strcasecmp(path + path_len - 3, "pbp"))
-      return new CDAccess_PBP(path, image_memcache);
+      cda = new CDAccess_PBP(success, path, image_memcache);
 #endif
 #ifdef HAVE_CHD
    else if (path_len >= 3 && !strcasecmp(path + path_len - 3, "chd"))
-      return new CDAccess_CHD(path, image_memcache);
+      cda = new CDAccess_CHD(success, path, image_memcache);
 #endif
-   return new CDAccess_Image(success, path, image_memcache);
+   else
+      cda = new CDAccess_Image(success, path, image_memcache);
+
+   /* Caller is responsible for deleting cda when *success is false. */
+   return cda;
 }
 
 bool CDAccess::Read_Raw_PW(uint8_t *buf, int32_t lba)

@@ -15,8 +15,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-// TODO/WIP
-
 #ifndef _MEMORY_STREAM_H
 #define _MEMORY_STREAM_H
 
@@ -30,12 +28,14 @@ class MemoryStream : public Stream
  MemoryStream(uint64 size_hint);
  MemoryStream(Stream *stream);	// Will create a MemoryStream equivalent of the contents of "stream", and then "delete stream".
 				// Will only work if stream->tell() == 0, or if "stream" is seekable.
-				// stream will be deleted even if this constructor throws.
-
- MemoryStream(const MemoryStream *zs);
- MemoryStream & operator=(const MemoryStream *zs);
 
  virtual ~MemoryStream();
+
+ /* True iff allocation of the underlying buffer succeeded. The
+  * MemoryStream constructors do not throw - if allocation fails,
+  * data_buffer is left NULL and the stream becomes a no-op shell.
+  * Callers MUST check is_valid() after construction. */
+ bool is_valid(void) const { return data_buffer != NULL; }
 
  virtual uint8 *map(void);
  virtual void unmap(void);

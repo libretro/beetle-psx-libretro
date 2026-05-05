@@ -360,17 +360,3 @@ InputDevice *Device_GunCon_Create(void)
 {
    return new InputDevice_GunCon();
 }
-
-
-InputDeviceInputInfoStruct Device_GunCon_IDII[6] =
-{
-   { "x_axis", "X Axis", -1, IDIT_X_AXIS },
-   { "y_axis", "Y Axis", -1, IDIT_Y_AXIS },
-
-   { "trigger", "Trigger", 0, IDIT_BUTTON, NULL  },
-
-   { "a",	"A",		 1, IDIT_BUTTON,	NULL },
-   { "b", "B",		 2, IDIT_BUTTON,	NULL },
-
-   { "offscreen_shot", "Offscreen Shot(Simulated)", 3, IDIT_BUTTON, NULL },	// Useful for "Judge Dredd", and probably not much else.
-};

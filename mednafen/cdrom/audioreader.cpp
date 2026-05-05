@@ -70,8 +70,11 @@ class OggVorbisReader : public AudioReader
       bool Seek_(int64_t frame_offset);
       int64_t FrameCount(void);
 
+      bool IsValid(void) const { return ovfile_open; }
+
    private:
       OggVorbis_File ovfile;
+      bool ovfile_open;
 };
 
 
@@ -113,7 +116,7 @@ static long iov_tell_func(void *user_data)
    return fw->tell();
 }
 
-OggVorbisReader::OggVorbisReader(Stream *fp)
+OggVorbisReader::OggVorbisReader(Stream *fp) : ovfile_open(false)
 {
    ov_callbacks cb;
 
@@ -123,14 +126,18 @@ OggVorbisReader::OggVorbisReader(Stream *fp)
    cb.close_func = iov_close_func;
    cb.tell_func = iov_tell_func;
 
+   if (!fp)
+      return;
+
    fp->seek(0, SEEK_SET);
-   if(ov_open_callbacks(fp, &ovfile, NULL, 0, cb))
-      throw(0);
+   if (ov_open_callbacks(fp, &ovfile, NULL, 0, cb) == 0)
+      ovfile_open = true;
 }
 
 OggVorbisReader::~OggVorbisReader()
 {
-   ov_clear(&ovfile);
+   if (ovfile_open)
+      ov_clear(&ovfile);
 }
 
 int64_t OggVorbisReader::Read_(int16_t *buffer, int64_t frames)
@@ -138,6 +145,9 @@ int64_t OggVorbisReader::Read_(int16_t *buffer, int64_t frames)
    uint8 *tw_buf = (uint8 *)buffer;
    int cursection = 0;
    long toread = frames * sizeof(int16_t) * 2;
+
+   if (!ovfile_open)
+      return 0;
 
    while(toread > 0)
    {
@@ -155,16 +165,29 @@ int64_t OggVorbisReader::Read_(int16_t *buffer, int64_t frames)
 
 bool OggVorbisReader::Seek_(int64_t frame_offset)
 {
+   if (!ovfile_open)
+      return false;
    ov_pcm_seek(&ovfile, frame_offset);
    return(true);
 }
 
 int64_t OggVorbisReader::FrameCount(void)
 {
+   if (!ovfile_open)
+      return 0;
    return(ov_pcm_total(&ovfile, -1));
 }
 
+/* Returns NULL if the input stream is not a valid Ogg Vorbis file.
+ * The Stream is not deleted - per AR_Open's contract the caller
+ * retains ownership. */
 AudioReader *AR_Open(Stream *fp)
 {
-   return new OggVorbisReader(fp);
+   OggVorbisReader *r = new OggVorbisReader(fp);
+   if (!r->IsValid())
+   {
+      delete r;
+      return NULL;
+   }
+   return r;
 }
