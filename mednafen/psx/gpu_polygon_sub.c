@@ -1,4 +1,23 @@
-#include "psx.h"
+/*
+ * gpu_polygon_sub.c - polygon-helper free functions used by the
+ * software rasteriser's polygon decoder. Originally a .cpp; the
+ * file uses no actual C++ features beyond `float(x)` functional-
+ * style casts (replaced by C-style `(float)x`) and includes that
+ * pulled in psx.h's heavy class definitions transitively
+ * (PS_CPU, FrontIO, etc) when none are actually used here.
+ *
+ * Switched to a minimal include set: gpu.h gives us PS_GPU and
+ * tri_vertex (both now C-includable as of 7d257de), rsx_intf.h
+ * gives us RSX_VULKAN and rsx_intf_is_type (always plain C), and
+ * beetle_psx_globals.h gives us psx_gpu_upscale_shift_hw.
+ *
+ * The forward declarations in gpu_polygon.cpp (lines 561-566 of
+ * the C++ TU that #includes gpu_polygon.cpp) link against the
+ * external linkage of these C functions; no extern "C" is needed
+ * since C functions have C linkage by default.
+ */
+
+#include "gpu.h"
 #include "../../rsx/rsx_intf.h"
 #include "../../beetle_psx_globals.h"
 
@@ -41,10 +60,10 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 
 		// Compute static derivatives, just assume W is uniform across the primitive
 		// and that the plane equation remains the same across the quad.
-		float dudx = -aby * float(vertices[2].u) - bcy * float(vertices[0].u) - cay * float(vertices[1].u);
-		float dvdx = -aby * float(vertices[2].v) - bcy * float(vertices[0].v) - cay * float(vertices[1].v);
-		float dudy = +abx * float(vertices[2].u) + bcx * float(vertices[0].u) + cax * float(vertices[1].u);
-		float dvdy = +abx * float(vertices[2].v) + bcx * float(vertices[0].v) + cax * float(vertices[1].v);
+		float dudx = -aby * (float)vertices[2].u - bcy * (float)vertices[0].u - cay * (float)vertices[1].u;
+		float dvdx = -aby * (float)vertices[2].v - bcy * (float)vertices[0].v - cay * (float)vertices[1].v;
+		float dudy = +abx * (float)vertices[2].u + bcx * (float)vertices[0].u + cax * (float)vertices[1].u;
+		float dvdy = +abx * (float)vertices[2].v + bcx * (float)vertices[0].v + cax * (float)vertices[1].v;
 		float area = bcx * cay - bcy * cax;
 
 		// iCB: Detect and reject any triangles with 0 size texture area
@@ -100,7 +119,7 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 
 			// HACK fix Wild Arms 2 overworld forest sprite
 			// TODO generalize this perhaps?
-			const float one = float(1 << gpu->upscale_shift);
+			const float one = (float)(1 << gpu->upscale_shift);
 			if (zero_dvdx &&
 				(aby == one || bcy == one || cay == one) &&
 				(aby == 0.0 || bcy == 0.0 || cay == 0.0) &&

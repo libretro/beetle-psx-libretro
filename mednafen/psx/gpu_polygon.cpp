@@ -558,12 +558,22 @@ if(vertices[1].y == vertices[0].y)
  }
 }
 
+/* Forward declarations for the helper functions defined in
+ * gpu_polygon_sub.c. extern "C" is required: gpu_polygon_sub
+ * is plain C as of the C-conversion of this file, so the
+ * actual definitions have C linkage. Without this wrapping,
+ * the C++ TU here (which #includes gpu_polygon.cpp into the
+ * gpu.cpp translation unit) would generate name-mangled
+ * references that fail to find the C-linkage definitions at
+ * link time. */
+extern "C" {
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count);
 void Reset_UVLimits(PS_GPU *gpu);
 void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count);
 void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
+}
 
 extern int psx_pgxp_2d_tol;
 

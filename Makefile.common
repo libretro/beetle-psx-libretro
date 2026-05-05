@@ -196,7 +196,6 @@ endif
                   $(CORE_EMU_DIR)/cpu.cpp \
                   $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
-                  $(CORE_EMU_DIR)/gpu_polygon_sub.cpp \
                   $(CORE_EMU_DIR)/input/gamepad.cpp \
                   $(CORE_EMU_DIR)/input/dualanalog.cpp \
                   $(CORE_EMU_DIR)/input/dualshock.cpp \
@@ -244,6 +243,7 @@ endif
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(MEDNAFEN_DIR)/video/Deinterlacer.c \
                   $(CORE_EMU_DIR)/dma.c \
+                  $(CORE_EMU_DIR)/gpu_polygon_sub.c \
                   $(CORE_EMU_DIR)/gte.c \
                   $(CORE_EMU_DIR)/irq.c \
                   $(CORE_EMU_DIR)/mdec.c \
