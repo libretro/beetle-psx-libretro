@@ -195,7 +195,6 @@ endif
    SOURCES_CXX += $(CORE_EMU_DIR)/frontio.cpp \
                   $(CORE_EMU_DIR)/cpu.cpp \
                   $(CORE_EMU_DIR)/cdc.cpp \
-                  $(CORE_EMU_DIR)/spu.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
                   $(CORE_EMU_DIR)/gpu_polygon_sub.cpp \
                   $(CORE_EMU_DIR)/input/gamepad.cpp \
@@ -250,6 +249,7 @@ endif
                   $(CORE_EMU_DIR)/irq.c \
                   $(CORE_EMU_DIR)/mdec.c \
                   $(CORE_EMU_DIR)/sio.c \
+                  $(CORE_EMU_DIR)/spu.c \
                   $(CORE_EMU_DIR)/timer.c \
                   $(MEDNAFEN_DIR)/FileStream.c \
                   $(MEDNAFEN_DIR)/MemoryStream.c \

@@ -66,12 +66,18 @@
  system, though this will obviously need to change if we ever emulate the SPU with better precision than per-sample(pair).
 */
 
-#include "psx.h"
-#include "cdc.h"
-#include "spu.h"
+#include <stdint.h>
+
+#include "../mednafen-types.h"
+#include "../state.h"
+#include "../state_helpers.h"
+#include "../clamp.h"
+
 #include <libretro.h>
 
-#include "../state_helpers.h"
+#include "irq.h"
+#include "cdc_c.h"
+#include "spu.h"
 
 uint32_t IntermediateBufferPos;
 int16_t IntermediateBuffer[4096][2];
@@ -339,31 +345,129 @@ static const int16 FIR_Table[256][4] =
 };
 
 /*
- * Singleton instance pointer. Definition moved into spu.cpp from
- * libretro.cpp so the SPU module owns its own lifecycle through
- * the SPU_Init / SPU_Kill C-linkage shims; libretro.cpp no longer
- * touches `new PS_SPU()` / `delete PSX_SPU` directly.
+ * SPU module state. Previously held inside a heap-allocated PS_SPU
+ * class instance pointed to by `PSX_SPU`; now plain file-scope
+ * statics. Init zeroes the state, Kill is a no-op - no heap, no
+ * leak surface, no failure path for allocation.
  *
- * Still file-scope visible (not `static`) because cdc.cpp and
- * spu.cpp's other PS_SPU member functions reference it. The
- * cross-TU C++ visibility goes away in the follow-up C conversion
- * commit, where the per-instance state collapses to file-scope
- * statics and PSX_SPU disappears entirely.
+ * The register block is the only awkward shape: hardware exposes
+ * a 0x100-entry uint16 array but with various named sub-regions
+ * overlapping it (Voice regs, global regs with named SPUStatus,
+ * reverb regs with named coefficient fields). Pre-conversion this
+ * was an anonymous union with anonymous struct nesting, which is
+ * a C++ feature; portable C can't use anonymous structs inside
+ * unions. The conversion gives every nested aggregate a name and
+ * accesses go through the explicit chain (e.g.
+ * regs.s.global.s.SPUStatus). The `s` field name is short for
+ * "structured" - just a tag to navigate the union.
  */
-PS_SPU *PSX_SPU = NULL;
-
-PS_SPU::PS_SPU()
+typedef union
 {
-   IntermediateBufferPos = 0;
-   memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
+   uint16_t Regs[0x100];
+   struct
+   {
+      uint16_t VoiceRegs[0xC0];
+      union
+      {
+         uint16_t GlobalRegs[0x20];
+         struct
+         {
+            uint16_t _Global0[0x17];
+            uint16_t SPUStatus;
+            uint16_t _Global1[0x08];
+         } s;
+      } global;
+      union
+      {
+         uint16 ReverbRegs[0x20];
+         struct
+         {
+            uint16 FB_SRC_A;
+            uint16 FB_SRC_B;
+            int16 IIR_ALPHA;
+            int16 ACC_COEF_A;
+            int16 ACC_COEF_B;
+            int16 ACC_COEF_C;
+            int16 ACC_COEF_D;
+            int16 IIR_COEF;
+            int16 FB_ALPHA;
+            int16 FB_X;
+            uint16 IIR_DEST_A[2];
+            uint16 ACC_SRC_A[2];
+            uint16 ACC_SRC_B[2];
+            uint16 IIR_SRC_A[2];
+            uint16 IIR_DEST_B[2];
+            uint16 ACC_SRC_C[2];
+            uint16 ACC_SRC_D[2];
+            uint16 IIR_SRC_B[2];
+            uint16 MIX_DEST_A[2];
+            uint16 MIX_DEST_B[2];
+            int16 IN_COEF[2];
+         } s;
+      } reverb;
+   } s;
+} SPU_RegBlock;
 
-}
+static SPU_Voice Voices[24];
 
-PS_SPU::~PS_SPU()
-{
-}
+static uint32_t NoiseDivider;
+static uint32_t NoiseCounter;
+static uint16_t LFSR;
 
-void PS_SPU::Power(void)
+static uint32_t FM_Mode;
+static uint32_t Noise_Mode;
+static uint32_t Reverb_Mode;
+
+static uint32_t ReverbWA;
+
+static SPU_Sweep GlobalSweep[2];	// Doesn't affect reverb volume!
+
+static int32_t ReverbVol[2];
+
+static int32_t CDVol[2];
+static int32_t ExternVol[2];
+
+static uint32_t IRQAddr;
+
+static uint32_t RWAddr;
+
+static uint16_t SPUControl;
+
+static uint32_t VoiceOn;
+static uint32_t VoiceOff;
+
+static uint32_t BlockEnd;
+
+static uint32_t CWA;
+
+static SPU_RegBlock regs;
+
+static uint16_t AuxRegs[0x10];
+
+static int16 RDSB[2][128];	// [40]
+static int16 RUSB[2][64];
+static int32_t RvbResPos;
+
+static uint32_t ReverbCur;
+
+static bool IRQAsserted;
+
+static int32_t clock_divider;
+
+static uint16_t SPURAM[524288 / sizeof(uint16)];
+
+/* Forward declarations for SPU_Sweep operations; defined further down. */
+static INLINE void SPU_Sweep_Power(SPU_Sweep *sweep);
+static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16 value);
+static INLINE int16 SPU_Sweep_ReadVolume(SPU_Sweep *sweep);
+static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16 value);
+static void SPU_Sweep_Clock(SPU_Sweep *sweep);
+
+/* Forward declarations for the static reverb helpers. */
+static int16 SPU_RD_RVB(uint16 raw_offs, int32 extra_offs);
+static void SPU_WR_RVB(uint16 raw_offs, int16 sample);
+
+  void SPU_Power(void)
 {
    clock_divider = 768;
 
@@ -386,8 +490,8 @@ void PS_SPU::Power(void)
 
       Voices[i].IgnoreSampLA = false;
 
-      Voices[i].Sweep[0].Power();
-      Voices[i].Sweep[1].Power();
+      SPU_Sweep_Power(&Voices[i].Sweep[0]);
+      SPU_Sweep_Power(&Voices[i].Sweep[1]);
 
       Voices[i].Pitch = 0;
       Voices[i].CurPhase = 0;
@@ -405,8 +509,8 @@ void PS_SPU::Power(void)
       memset(&Voices[i].ADSR, 0, sizeof(SPU_ADSR));
    }
 
-   GlobalSweep[0].Power();
-   GlobalSweep[1].Power();
+   SPU_Sweep_Power(&GlobalSweep[0]);
+   SPU_Sweep_Power(&GlobalSweep[1]);
 
    NoiseDivider = 0;
    NoiseCounter = 0;
@@ -436,7 +540,7 @@ void PS_SPU::Power(void)
 
    CWA = 0;
 
-   memset(Regs, 0, sizeof(Regs));
+   memset(&regs, 0, sizeof(regs));
    memset(AuxRegs, 0, sizeof(AuxRegs));
    memset(RDSB, 0, sizeof(RDSB));
    memset(RUSB, 0, sizeof(RUSB));
@@ -447,110 +551,110 @@ void PS_SPU::Power(void)
    IRQAsserted = false;
 }
 
-static INLINE void CalcVCDelta(const uint8 zs, uint8 speed, bool log_mode, bool dec_mode, bool inv_increment, int16 Current, int &increment, int &divinco)
+static INLINE void CalcVCDelta(const uint8 zs, uint8 speed, bool log_mode, bool dec_mode, bool inv_increment, int16 Current, int *increment, int *divinco)
 {
-   increment = (7 - (speed & 0x3));
+   *increment = (7 - (speed & 0x3));
 
    if(inv_increment)
-      increment = ~increment;
+      *increment = ~*increment;
 
-   divinco = 32768;
+   *divinco = 32768;
 
    if(speed < 0x2C)
-      increment = (unsigned)increment << ((0x2F - speed) >> 2);
+      *increment = (unsigned)*increment << ((0x2F - speed) >> 2);
 
    if(speed >= 0x30)
-      divinco >>= (speed - 0x2C) >> 2;
+      *divinco >>= (speed - 0x2C) >> 2;
 
    if(log_mode)
    {
       if(dec_mode)	// Log decrement mode
-         increment = (Current * increment) >> 15;
+         *increment = (Current * *increment) >> 15;
       else			// Log increment mode
       {
          if((Current & 0x7FFF) >= 0x6000)
          {
             if(speed < 0x28)
-               increment >>= 2;
+               *increment >>= 2;
             else if(speed >= 0x2C)
-               divinco >>= 2;
+               *divinco >>= 2;
             else	// 0x28 ... 0x2B
             {
-               increment >>= 1;
-               divinco >>= 1;
+               *increment >>= 1;
+               *divinco >>= 1;
             }
          }
       }
    } // end if(log_mode)
 
-   if(divinco == 0 && speed < zs) //0x7F)
-      divinco = 1;
+   if(*divinco == 0 && speed < zs) //0x7F)
+      *divinco = 1;
 }
 
 
-INLINE void SPU_Sweep::Power(void)
+static INLINE void SPU_Sweep_Power(SPU_Sweep *sweep)
 {
-   Control = 0;
-   Current = 0;
-   Divider = 0;
+   sweep->Control = 0;
+   sweep->Current = 0;
+   sweep->Divider = 0;
 }
 
-INLINE void SPU_Sweep::WriteControl(uint16 value)
+static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16 value)
 {
-   Control = value;
+   sweep->Control = value;
 }
 
-INLINE int16 SPU_Sweep::ReadVolume(void)
+static INLINE int16 SPU_Sweep_ReadVolume(SPU_Sweep *sweep)
 {
-   return((int16)Current);
+   return((int16)sweep->Current);
 }
 
-void SPU_Sweep::Clock()
+static void SPU_Sweep_Clock(SPU_Sweep *sweep)
 {
-   const bool log_mode = (bool)(Control & 0x4000);
-   const bool dec_mode = (bool)(Control & 0x2000);
-   const bool inv_mode = (bool)(Control & 0x1000);
+   const bool log_mode = (bool)(sweep->Control & 0x4000);
+   const bool dec_mode = (bool)(sweep->Control & 0x2000);
+   const bool inv_mode = (bool)(sweep->Control & 0x1000);
    const bool inv_increment = (dec_mode ^ inv_mode) | (dec_mode & log_mode);
    const uint16 vc_cv_xor = (inv_mode & !(dec_mode & log_mode)) ? 0xFFFF : 0x0000;
    const uint16 TestInvert = inv_mode ? 0xFFFF : 0x0000;
    int increment;
    int divinco;
 
-   CalcVCDelta(0x7F, Control & 0x7F, log_mode, dec_mode, inv_increment, (int16)(Current ^ vc_cv_xor), increment, divinco);
+   CalcVCDelta(0x7F, sweep->Control & 0x7F, log_mode, dec_mode, inv_increment, (int16)(sweep->Current ^ vc_cv_xor), &increment, &divinco);
 
-   if((dec_mode & !(inv_mode & log_mode)) && ((Current & 0x8000) == (inv_mode ? 0x0000 : 0x8000) || (Current == 0)))
+   if((dec_mode & !(inv_mode & log_mode)) && ((sweep->Current & 0x8000) == (inv_mode ? 0x0000 : 0x8000) || (sweep->Current == 0)))
    {
       // Not sure if this condition should stop the Divider adding or force the increment value to 0.
-      Current = 0;
+      sweep->Current = 0;
    }
    else
    {
-      Divider += divinco;
+      sweep->Divider += divinco;
 
-      if(Divider & 0x8000)
+      if(sweep->Divider & 0x8000)
       {
-         Divider = 0;
+         sweep->Divider = 0;
 
-         if(dec_mode || ((Current ^ TestInvert) != 0x7FFF))
+         if(dec_mode || ((sweep->Current ^ TestInvert) != 0x7FFF))
          {
-            uint16 PrevCurrent = Current;
-            Current = Current + increment;
+            uint16 PrevCurrent = sweep->Current;
+            sweep->Current = sweep->Current + increment;
 
-            if(!dec_mode && ((Current ^ PrevCurrent) & 0x8000) && ((Current ^ TestInvert) & 0x8000))
-               Current = 0x7FFF ^ TestInvert;
+            if(!dec_mode && ((sweep->Current ^ PrevCurrent) & 0x8000) && ((sweep->Current ^ TestInvert) & 0x8000))
+               sweep->Current = 0x7FFF ^ TestInvert;
          }
       }
    }
 }
 
-INLINE void SPU_Sweep::WriteVolume(int16 value)
+static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16 value)
 {
-   Current = value;
+   sweep->Current = value;
 }
 
 
 // Take care not to trigger SPU IRQ for the next block before its decoding start.
-void PS_SPU::RunDecoder(SPU_Voice *voice)
+static void SPU_RunDecoder(SPU_Voice *voice)
 {
    // 5 through 0xF appear to be 0 on the real thing.
    static const int32 Weights[16][2] =
@@ -629,7 +733,7 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
       voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
    }
 
-   // Don't else this block; we need to ALWAYS decode 4 samples per call to RunDecoder() if DecodeAvail < 11, or else sample playback
+   // Don't else this block; we need to ALWAYS decode 4 samples per call to SPU_RunDecoder() if DecodeAvail < 11, or else sample playback
    // at higher rates will fail horribly.
    {
       const int32 weight_m1 = Weights[voice->DecodeWeight][0];
@@ -671,7 +775,7 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
    }
 }
 
-void PS_SPU::CacheEnvelope(SPU_Voice *voice)
+static void SPU_CacheEnvelope(SPU_Voice *voice)
 {
    uint32_t   raw    = voice->ADSRControl;
    SPU_ADSR *ADSR    = &voice->ADSR;
@@ -695,7 +799,7 @@ void PS_SPU::CacheEnvelope(SPU_Voice *voice)
    ADSR->SustainLevel = (Sl + 1) << 11;
 }
 
-void PS_SPU::ResetEnvelope(SPU_Voice *voice)
+static void SPU_ResetEnvelope(SPU_Voice *voice)
 {
    SPU_ADSR *ADSR = &voice->ADSR;
 
@@ -704,7 +808,7 @@ void PS_SPU::ResetEnvelope(SPU_Voice *voice)
    ADSR->Phase = ADSR_ATTACK;
 }
 
-void PS_SPU::ReleaseEnvelope(SPU_Voice *voice)
+static void SPU_ReleaseEnvelope(SPU_Voice *voice)
 {
    SPU_ADSR *ADSR = &voice->ADSR;
 
@@ -713,7 +817,7 @@ void PS_SPU::ReleaseEnvelope(SPU_Voice *voice)
 }
 
 
-void PS_SPU::RunEnvelope(SPU_Voice *voice)
+static void SPU_RunEnvelope(SPU_Voice *voice)
 {
    SPU_ADSR *ADSR = &voice->ADSR;
    int increment;
@@ -729,22 +833,22 @@ void PS_SPU::RunEnvelope(SPU_Voice *voice)
                break;
 
       case ADSR_ATTACK:
-               CalcVCDelta(0x7F, ADSR->AttackRate, ADSR->AttackExp, false, false, (int16)ADSR->EnvLevel, increment, divinco);
+               CalcVCDelta(0x7F, ADSR->AttackRate, ADSR->AttackExp, false, false, (int16)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0x7FFF;
                break;
 
       case ADSR_DECAY:
-               CalcVCDelta(0x1F << 2, ADSR->DecayRate, true, true, true, (int16)ADSR->EnvLevel, increment, divinco);
+               CalcVCDelta(0x1F << 2, ADSR->DecayRate, true, true, true, (int16)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0;
                break;
 
       case ADSR_SUSTAIN:
-               CalcVCDelta(0x7F, ADSR->SustainRate, ADSR->SustainExp, ADSR->SustainDec, ADSR->SustainDec, (int16)ADSR->EnvLevel, increment, divinco);
+               CalcVCDelta(0x7F, ADSR->SustainRate, ADSR->SustainExp, ADSR->SustainDec, ADSR->SustainDec, (int16)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = ADSR->SustainDec ? 0 : 0x7FFF;
                break;
 
       case ADSR_RELEASE:
-               CalcVCDelta(0x1F << 2, ADSR->ReleaseRate, ADSR->ReleaseExp, true, true, (int16)ADSR->EnvLevel, increment, divinco);
+               CalcVCDelta(0x1F << 2, ADSR->ReleaseRate, ADSR->ReleaseExp, true, true, (int16)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0;
                break;
    }
@@ -773,7 +877,7 @@ void PS_SPU::RunEnvelope(SPU_Voice *voice)
    }
 }
 
-INLINE void PS_SPU::CheckIRQAddr(uint32 addr)
+static INLINE void SPU_CheckIRQAddr(uint32 addr)
 {
    if(SPUControl & 0x40)
    {
@@ -785,16 +889,16 @@ INLINE void PS_SPU::CheckIRQAddr(uint32 addr)
    }
 }
 
-INLINE void PS_SPU::WriteSPURAM(uint32 addr, uint16 value)
+static INLINE void SPU_WriteSPURAM(uint32 addr, uint16 value)
 {
-   CheckIRQAddr(addr);
+   SPU_CheckIRQAddr(addr);
 
    SPURAM[addr] = value;
 }
 
-INLINE uint16 PS_SPU::ReadSPURAM(uint32 addr)
+static INLINE uint16 SPU_ReadSPURAM(uint32 addr)
 {
-   CheckIRQAddr(addr);
+   SPU_CheckIRQAddr(addr);
    return(SPURAM[addr]);
 }
 
@@ -811,7 +915,7 @@ static INLINE int16 ReverbSat(int32 samp)
 
 #define REVERB_NEG(samp) (((samp) == -32768) ? 0x7FFF : -(samp))
 
-INLINE uint32 PS_SPU::Get_Reverb_Offset(uint32 in_offset)
+static INLINE uint32 SPU_Get_Reverb_Offset(uint32 in_offset)
 {
  uint32 offset = ReverbCur + (in_offset & 0x3FFFF);
 
@@ -821,15 +925,15 @@ INLINE uint32 PS_SPU::Get_Reverb_Offset(uint32 in_offset)
  return(offset);
 }
 
-int16 NO_INLINE PS_SPU::RD_RVB(uint16 raw_offs, int32 extra_offs)
+static int16 NO_INLINE SPU_RD_RVB(uint16 raw_offs, int32 extra_offs)
 {
- return ReadSPURAM(Get_Reverb_Offset((raw_offs << 2) + extra_offs));
+ return SPU_ReadSPURAM(SPU_Get_Reverb_Offset((raw_offs << 2) + extra_offs));
 }
 
-void NO_INLINE PS_SPU::WR_RVB(uint16 raw_offs, int16 sample)
+static void NO_INLINE SPU_WR_RVB(uint16 raw_offs, int16 sample)
 {
    if(SPUControl & 0x80)
-      WriteSPURAM(Get_Reverb_Offset(raw_offs << 2), sample);
+      SPU_WriteSPURAM(SPU_Get_Reverb_Offset(raw_offs << 2), sample);
 }
 
 // Zeroes optimized out; middle removed too(it's 16384)
@@ -870,20 +974,20 @@ static INLINE int32 Reverb2244(const int16 *src)
    return out;
 }
 
-static int32 IIASM(const int16 IIR_ALPHA, const int16 insamp)
+static int32 IIASM(const int16 alpha, const int16 insamp)
 {
-   if(MDFN_UNLIKELY(IIR_ALPHA == -32768))
+   if(MDFN_UNLIKELY(alpha == -32768))
    {
       if(insamp == -32768)
          return 0;
       return insamp * -65536;
    }
 
-   return insamp * (32768 - IIR_ALPHA);
+   return insamp * (32768 - alpha);
 }
 
 // Take care to thoroughly test the reverb resampling code when modifying anything that uses RvbResPos.
-void PS_SPU::RunReverb(const int32* in, int32* out)
+static void SPU_RunReverb(const int32* in, int32* out)
 {
    unsigned lr;
  int32 upsampled[2];
@@ -906,27 +1010,27 @@ void PS_SPU::RunReverb(const int32* in, int32* out)
   /* Run algorithm */
   for(unsigned lr = 0; lr < 2; lr++)
   {
-     const int16 IIR_INPUT_A = ReverbSat((((RD_RVB(IIR_SRC_A[lr ^ 0]) * IIR_COEF) >> 14) + ((downsampled[lr] * IN_COEF[lr]) >> 14)) >> 1);
-     const int16 IIR_INPUT_B = ReverbSat((((RD_RVB(IIR_SRC_B[lr ^ 1]) * IIR_COEF) >> 14) + ((downsampled[lr] * IN_COEF[lr]) >> 14)) >> 1);
-     const int16 IIR_A = ReverbSat((((IIR_INPUT_A * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_A[lr], -1)) >> 14)) >> 1);
-     const int16 IIR_B = ReverbSat((((IIR_INPUT_B * IIR_ALPHA) >> 14) + (IIASM(IIR_ALPHA, RD_RVB(IIR_DEST_B[lr], -1)) >> 14)) >> 1);
+     const int16 IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+     const int16 IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+     const int16 IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
+     const int16 IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
 
-     WR_RVB(IIR_DEST_A[lr], IIR_A);
-     WR_RVB(IIR_DEST_B[lr], IIR_B);
+     SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_A[lr], IIR_A);
+     SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_B[lr], IIR_B);
 
-     const int32 ACC = ((RD_RVB(ACC_SRC_A[lr]) * ACC_COEF_A) >> 14) +
-        ((RD_RVB(ACC_SRC_B[lr]) * ACC_COEF_B) >> 14) +
-        ((RD_RVB(ACC_SRC_C[lr]) * ACC_COEF_C) >> 14) +
-        ((RD_RVB(ACC_SRC_D[lr]) * ACC_COEF_D) >> 14);
+     const int32 ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
+        ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0) * regs.s.reverb.s.ACC_COEF_B) >> 14) +
+        ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0) * regs.s.reverb.s.ACC_COEF_C) >> 14) +
+        ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0) * regs.s.reverb.s.ACC_COEF_D) >> 14);
 
-     const int16 FB_A = RD_RVB(MIX_DEST_A[lr] - FB_SRC_A);
-     const int16 FB_B = RD_RVB(MIX_DEST_B[lr] - FB_SRC_B);
-     const int16 MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(FB_ALPHA)) >> 14)) >> 1);
-     const int16 MDB = ReverbSat(FB_A + ((((MDA * FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(FB_X)) >> 14)) >> 1));
-     const int16 IVB = ReverbSat(FB_B + ((MDB * FB_X) >> 15));
+     const int16 FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
+     const int16 FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
+     const int16 MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
+     const int16 MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
+     const int16 IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
 
-     WR_RVB(MIX_DEST_A[lr], MDA);
-     WR_RVB(MIX_DEST_B[lr], MDB);
+     SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_A[lr], MDA);
+     SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_B[lr], MDB);
 #if 0
      {
         static uint32 sqcounter;
@@ -964,7 +1068,7 @@ void PS_SPU::RunReverb(const int32* in, int32* out)
 }
 
 
-INLINE void PS_SPU::RunNoise(void)
+static INLINE void SPU_RunNoise(void)
 {
    const unsigned rf = ((SPUControl >> 8) & 0x3F);
    uint32 NoiseDividerInc = (2 << (rf >> 2));
@@ -992,7 +1096,7 @@ INLINE void PS_SPU::RunNoise(void)
    }
 }
 
-int32 PS_SPU::UpdateFromCDC(int32 clocks)
+  int32 SPU_UpdateFromCDC(int32 clocks)
 {
    int32 sample_clocks = 0;
 
@@ -1042,9 +1146,9 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
        **          0 = DMA busy(FIFO not empty when in DMA write mode?)?
        **	    1 = DMA ready?  Something to do with the FIFO?
        **
-       **     rdr - Read(DMA read?) Ready?
+       **     rdr - SPU_Read(DMA read?) Ready?
        **
-       **     wrr - Write(DMA write?) Ready?
+       **     wrr - SPU_Write(DMA write?) Ready?
        **
        **     *10 - Unknown.  Some sort of (FIFO?) busy status?(BIOS tests for this bit in places)
        **
@@ -1052,11 +1156,11 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
        **
        **     *13 - Unknown, was set to 1 when testing with an SPU delay system reg value of 0x200921E1(test result might not be reliable, re-run).
        */
-      SPUStatus = SPUControl & 0x3F;
-      SPUStatus |= IRQAsserted ? 0x40 : 0x00;
+      regs.s.global.s.SPUStatus = SPUControl & 0x3F;
+      regs.s.global.s.SPUStatus |= IRQAsserted ? 0x40 : 0x00;
 
-      if(Regs[0xD6] == 0x4)	// TODO: Investigate more(case 0x2C in global regs r/w handler)
-         SPUStatus |= (CWA & 0x100) ? 0x800 : 0x000;
+      if(regs.Regs[0xD6] == 0x4)	// TODO: Investigate more(case 0x2C in global regs r/w handler)
+         regs.s.global.s.SPUStatus |= (CWA & 0x100) ? 0x800 : 0x000;
 
       for(int voice_num = 0; voice_num < 24; voice_num++)
       {
@@ -1072,7 +1176,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          }
 
          // Decode new samples if necessary.
-         RunDecoder(voice);
+         SPU_RunDecoder(voice);
 
 
          int l, r;
@@ -1097,12 +1201,12 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          {
             int index = voice_num >> 1;
 
-            WriteSPURAM(0x400 | (index * 0x200) | CWA, voice_pvs);
+            SPU_WriteSPURAM(0x400 | (index * 0x200) | CWA, voice_pvs);
          }
 
 
-         l = (voice_pvs * voice->Sweep[0].ReadVolume()) >> 15;
-         r = (voice_pvs * voice->Sweep[1].ReadVolume()) >> 15;
+         l = (voice_pvs * SPU_Sweep_ReadVolume(&voice->Sweep[0])) >> 15;
+         r = (voice_pvs * SPU_Sweep_ReadVolume(&voice->Sweep[1])) >> 15;
 
          accum[0] += l;
          accum[1] += r;
@@ -1117,7 +1221,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          for(int lr = 0; lr < 2; lr++)
          {
             if((voice->Sweep[lr].Control & 0x8000))
-               voice->Sweep[lr].Clock();
+               SPU_Sweep_Clock(&voice->Sweep[lr]);
             else
                voice->Sweep[lr].Current = (voice->Sweep[lr].Control & 0x7FFF) << 1;
          }
@@ -1128,7 +1232,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
             unsigned phase_inc;
 
             // Run enveloping
-            RunEnvelope(voice);
+            SPU_RunEnvelope(voice);
 
             if(PhaseModCache & (1 << voice_num))
             {
@@ -1171,14 +1275,14 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
                //
                if(voice->DecodePlayDelay < 3)
                {
-                  ReleaseEnvelope(voice);
+                  SPU_ReleaseEnvelope(voice);
                }
             }
          }
 
          if(VoiceOn & (1U << voice_num))
          {
-            ResetEnvelope(voice);
+            SPU_ResetEnvelope(voice);
 
             voice->DecodeFlags = 0;
             voice->DecodeWritePos = 0;
@@ -1217,20 +1321,19 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
          accum_fv[1] = 0;
       }
 
-      // Get CD-DA
+      // Get CD-DA. CDC_GetCDAudioSample wraps the AudioBuffer
+      // position/freq probe and the GetCDAudio() call; both
+      // channels are guaranteed written, with values clamped to
+      // -32768..32767 (the historical contract from
+      // PS_CDC::GetCDAudio).
       {
          int32 cda_raw[2];
          int32 cdav[2];
-         const unsigned freq = (PSX_CDC->AudioBuffer.ReadPos < PSX_CDC->AudioBuffer.Size) ? PSX_CDC->AudioBuffer.Freq : 0;
 
-         cda_raw[0] = cda_raw[1] = 0;
+         CDC_GetCDAudioSample(cda_raw);
 
-         if (freq)
-            PSX_CDC->GetCDAudio(cda_raw, freq);	// PS_CDC::GetCDAudio() guarantees the variables passed by reference will be set to 0,
-         // and that their range shall be -32768 through 32767.
-
-         WriteSPURAM(CWA | 0x000, cda_raw[0]);
-         WriteSPURAM(CWA | 0x200, cda_raw[1]);
+         SPU_WriteSPURAM(CWA | 0x000, cda_raw[0]);
+         SPU_WriteSPURAM(CWA | 0x200, cda_raw[1]);
 
          for(unsigned i = 0; i < 2; i++)
             cdav[i] = (cda_raw[i] * CDVol[i]) >> 15;
@@ -1250,18 +1353,18 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
       CWA = (CWA + 1) & 0x1FF;
 
-      RunNoise();
+      SPU_RunNoise();
 
       for (unsigned lr = 0; lr < 2; lr++)
          clamp(&accum_fv[lr], -32768, 32767);
 
-      RunReverb(accum_fv, reverb);
+      SPU_RunReverb(accum_fv, reverb);
 
       for(unsigned lr = 0; lr < 2; lr++)
       {
          accum[lr] += ((reverb[lr] * ReverbVol[lr]) >> 15);
          clamp(&accum[lr],  -32768, 32767);
-         output[lr] = (accum[lr] * GlobalSweep[lr].ReadVolume()) >> 15;
+         output[lr] = (accum[lr] * SPU_Sweep_ReadVolume(&GlobalSweep[lr])) >> 15;
          clamp(&output[lr], -32768, 32767);
       }
 
@@ -1280,7 +1383,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
       for(unsigned lr = 0; lr < 2; lr++)
       {
          if((GlobalSweep[lr].Control & 0x8000))
-            GlobalSweep[lr].Clock();
+            SPU_Sweep_Clock(&GlobalSweep[lr]);
          else
             GlobalSweep[lr].Current = (GlobalSweep[lr].Control & 0x7FFF) << 1;
       }
@@ -1289,100 +1392,89 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
    return clock_divider;
 }
 
-void PS_SPU::WriteDMA(uint32 V)
+  void SPU_WriteDMA(uint32 V)
 {
-   WriteSPURAM(RWAddr, V);
+   SPU_WriteSPURAM(RWAddr, V);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
-   WriteSPURAM(RWAddr, V >> 16);
+   SPU_WriteSPURAM(RWAddr, V >> 16);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
 
-   CheckIRQAddr(RWAddr);
+   SPU_CheckIRQAddr(RWAddr);
 }
 
-uint32 PS_SPU::ReadDMA(void)
+  uint32 SPU_ReadDMA(void)
 {
-   uint32 ret = (uint16)ReadSPURAM(RWAddr);
+   uint32 ret = (uint16)SPU_ReadSPURAM(RWAddr);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
-   ret |= (uint32)(uint16)ReadSPURAM(RWAddr) << 16;
+   ret |= (uint32)(uint16)SPU_ReadSPURAM(RWAddr) << 16;
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
-   CheckIRQAddr(RWAddr);
+   SPU_CheckIRQAddr(RWAddr);
 
 
    return(ret);
 }
 
 /*
- * C-linkage external API for the SPU module. Forwarders defined
- * with `extern "C"` linkage to match the declarations in spu_c.h;
- * each one routes through the file-scope PSX_SPU pointer and the
- * existing PS_SPU member functions. Under -O2 / LTO the
- * forwarders inline away to a single indirect call; the
- * indirection is the same the original PSX_SPU->Member() call
- * sites already carried.
+ * External API for the SPU module. The public functions
+ * (SPU_Power / SPU_Write / SPU_Read / etc.) are defined directly
+ * earlier in this file as plain free functions operating on the
+ * file-scope state - no forwarder indirection. spu_c.h declares
+ * them with `extern "C"` so C++ consumers (libretro.cpp,
+ * cdc.cpp) link against the same C-linkage symbols this TU
+ * emits.
  *
- * SPU_Init / SPU_Kill own the singleton's lifecycle. SPU_Kill is
- * idempotent and null-safe so partial-init failure paths in
- * libretro.cpp's InitCommon can call it without first checking.
- *
- * Note that this commit only introduces the shim surface; spu.cpp
- * remains a C++ TU and PS_SPU remains a class. The follow-up
- * commit converts the implementation behind this boundary to C,
- * eliminating PSX_SPU as a heap-allocated singleton in favour of
- * file-scope static state (no allocation, no leak surface, simpler
- * teardown).
+ * SPU_Init clears every piece of mutable state to a known-zero
+ * value (matching what `new PS_SPU()` did historically: ctor
+ * left everything as default-constructed POD plus zeroed the
+ * IntermediateBuffer; Power then took it from there). SPU_Kill is
+ * a no-op now that there's no heap allocation - retained as a
+ * stable lifecycle hook so libretro.cpp's teardown sequence
+ * doesn't change shape.
  */
-extern "C" void SPU_Init(void)
+void SPU_Init(void)
 {
-   PSX_SPU = new PS_SPU();
+   memset(Voices, 0, sizeof(Voices));
+   memset(GlobalSweep, 0, sizeof(GlobalSweep));
+   memset(&regs, 0, sizeof(regs));
+   memset(AuxRegs, 0, sizeof(AuxRegs));
+   memset(RDSB, 0, sizeof(RDSB));
+   memset(RUSB, 0, sizeof(RUSB));
+   memset(SPURAM, 0, sizeof(SPURAM));
+   NoiseDivider = 0;
+   NoiseCounter = 0;
+   LFSR = 0;
+   FM_Mode = 0;
+   Noise_Mode = 0;
+   Reverb_Mode = 0;
+   ReverbWA = 0;
+   ReverbVol[0] = ReverbVol[1] = 0;
+   CDVol[0] = CDVol[1] = 0;
+   ExternVol[0] = ExternVol[1] = 0;
+   IRQAddr = 0;
+   RWAddr = 0;
+   SPUControl = 0;
+   VoiceOn = 0;
+   VoiceOff = 0;
+   BlockEnd = 0;
+   CWA = 0;
+   RvbResPos = 0;
+   ReverbCur = 0;
+   IRQAsserted = false;
+   clock_divider = 0;
+
+   IntermediateBufferPos = 0;
+   memset(IntermediateBuffer, 0, sizeof(IntermediateBuffer));
 }
 
-extern "C" void SPU_Kill(void)
+  void SPU_Kill(void)
 {
-   if (PSX_SPU)
-      delete PSX_SPU;
-   PSX_SPU = NULL;
 }
 
-extern "C" void SPU_Power(void)
-{
-   PSX_SPU->Power();
-}
-
-extern "C" void SPU_Write(int32_t timestamp, uint32_t A, uint16_t V)
-{
-   PSX_SPU->Write(timestamp, A, V);
-}
-
-extern "C" uint16_t SPU_Read(int32_t timestamp, uint32_t A)
-{
-   return PSX_SPU->Read(timestamp, A);
-}
-
-extern "C" void SPU_WriteDMA(uint32_t V)
-{
-   PSX_SPU->WriteDMA(V);
-}
-
-extern "C" uint32_t SPU_ReadDMA(void)
-{
-   return PSX_SPU->ReadDMA();
-}
-
-extern "C" int32_t SPU_UpdateFromCDC(int32_t clocks)
-{
-   return PSX_SPU->UpdateFromCDC(clocks);
-}
-
-extern "C" int SPU_StateAction(StateMem *sm, int load, int data_only)
-{
-   return PSX_SPU->StateAction(sm, load, data_only);
-}
-
-void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
+  void SPU_Write(int32_t timestamp, uint32 A, uint16 V)
 {
    A &= 0x3FF;
 
@@ -1391,7 +1483,7 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
       if(A < 0x260)
       {
          SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
-         voice->Sweep[(A & 2) >> 1].WriteVolume(V);
+         SPU_Sweep_WriteVolume(&voice->Sweep[(A & 2) >> 1], V);
       }
       else if(A < 0x280)
          AuxRegs[(A & 0x1F) >> 1] = V;
@@ -1407,7 +1499,7 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
       {
          case 0x00:
          case 0x02:
-            voice->Sweep[(A & 2) >> 1].WriteControl(V);
+            SPU_Sweep_WriteControl(&voice->Sweep[(A & 2) >> 1], V);
             break;
          case 0x04:
             voice->Pitch = V;
@@ -1418,12 +1510,12 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
          case 0x08:
             voice->ADSRControl &= 0xFFFF0000;
             voice->ADSRControl |= V;
-            CacheEnvelope(voice);
+            SPU_CacheEnvelope(voice);
             break;
          case 0x0A:
             voice->ADSRControl &= 0x0000FFFF;
             voice->ADSRControl |= V << 16;
-            CacheEnvelope(voice);
+            SPU_CacheEnvelope(voice);
             break;
          case 0x0C:
             voice->ADSR.EnvLevel = V;
@@ -1439,7 +1531,7 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
       switch(A & 0x7F)
       {
          case 0x00:
-         case 0x02: GlobalSweep[(A & 2) >> 1].WriteControl(V);
+         case 0x02: SPU_Sweep_WriteControl(&GlobalSweep[(A & 2) >> 1], V);
                     break;
 
          case 0x04: ReverbVol[0] = (int16)V;
@@ -1504,17 +1596,17 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 
          case 0x24:
                     IRQAddr = (V << 2) & 0x3FFFF;
-                    CheckIRQAddr(RWAddr);
+                    SPU_CheckIRQAddr(RWAddr);
                     break;
 
          case 0x26:
                     RWAddr = (V << 2) & 0x3FFFF;	      
-                    CheckIRQAddr(RWAddr);
+                    SPU_CheckIRQAddr(RWAddr);
                     break;
 
-         case 0x28: WriteSPURAM(RWAddr, V);
+         case 0x28: SPU_WriteSPURAM(RWAddr, V);
                     RWAddr = (RWAddr + 1) & 0x3FFFF;
-                    CheckIRQAddr(RWAddr);
+                    SPU_CheckIRQAddr(RWAddr);
                     break;
 
          case 0x2A: 
@@ -1525,7 +1617,7 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
                        IRQAsserted = false;
                        IRQ_Assert(IRQ_SPU, IRQAsserted);
                     }
-                    CheckIRQAddr(RWAddr);
+                    SPU_CheckIRQAddr(RWAddr);
                     break;
 
          case 0x2C: 
@@ -1544,15 +1636,15 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
                     break;
 
          case 0x38:
-         case 0x3A: GlobalSweep[(A & 2) >> 1].WriteVolume(V);
+         case 0x3A: SPU_Sweep_WriteVolume(&GlobalSweep[(A & 2) >> 1], V);
                     break;
       }
    }
 
-   Regs[(A & 0x1FF) >> 1] = V;
+   regs.Regs[(A & 0x1FF) >> 1] = V;
 }
 
-uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
+  uint16 SPU_Read(int32_t timestamp, uint32 A)
 {
    A &= 0x3FF;
 
@@ -1561,7 +1653,7 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
       if(A < 0x260)
       {
          SPU_Voice *voice = &Voices[(A - 0x200) >> 2];
-         return voice->Sweep[(A & 2) >> 1].ReadVolume();
+         return SPU_Sweep_ReadVolume(&voice->Sweep[(A & 2) >> 1]);
       }
       else if(A < 0x280)
          return(AuxRegs[(A & 0x1F) >> 1]);
@@ -1594,10 +1686,10 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
             break;
          case 0x28:
             {
-               uint16 ret = ReadSPURAM(RWAddr);
+               uint16 ret = SPU_ReadSPURAM(RWAddr);
 
                RWAddr = (RWAddr + 1) & 0x3FFFF;
-               CheckIRQAddr(RWAddr);
+               SPU_CheckIRQAddr(RWAddr);
 
                return (ret);
             }
@@ -1610,14 +1702,14 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
             return(0);
          case 0x38:
          case 0x3A:
-            return(GlobalSweep[(A & 2) >> 1].ReadVolume());
+            return(SPU_Sweep_ReadVolume(&GlobalSweep[(A & 2) >> 1]));
       }
    }
 
-   return(Regs[(A & 0x1FF) >> 1]);
+   return(regs.Regs[(A & 0x1FF) >> 1]);
 }
 
-int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
+  int SPU_StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
    {
@@ -1722,7 +1814,7 @@ int PS_SPU::StateAction(StateMem *sm, int load, int data_only)
 
       SFVAR(CWA),
 
-      SFARRAY16(Regs, sizeof(Regs) / sizeof(Regs[0])),
+      SFARRAY16(regs.Regs, sizeof(regs.Regs) / sizeof(regs.Regs[0])),
       SFARRAY16(AuxRegs, sizeof(AuxRegs) / sizeof(AuxRegs[0])),
 
       SFARRAY16(&RDSB[0][0], sizeof(RDSB) / sizeof(RDSB[0][0])),

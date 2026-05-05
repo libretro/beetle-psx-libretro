@@ -1104,7 +1104,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 
       /* SPUCounter is set in Power() from SPU_UpdateFromCDC(0) and
        * reassigned every loop iteration from UpdateFromCDC's return,
-       * which (per spu.cpp's clock_divider arithmetic) is positive
+       * which (per spu.c's clock_divider arithmetic) is positive
        * provided spu_samples > 0. The current build always has
        * spu_samples > 0, but matching the gating used by the other
        * counters above is cheap insurance: if SPUCounter ever became
@@ -1516,6 +1516,30 @@ uint32 PS_CDC::DMARead(void)
 extern "C" uint32_t CDC_DMARead(void)
 {
    return PSX_CDC->DMARead();
+}
+
+/*
+ * C-linkage shim declared in cdc_c.h. Wraps the historical
+ *   freq = AudioBuffer-position-and-rate gate
+ *   samples[0] = samples[1] = 0;
+ *   if (freq) PS_CDC::GetCDAudio(samples, freq);
+ * idiom that was previously inlined at spu.c's CD-DA mix call
+ * site. Centralising it here means spu.c doesn't need access to
+ * CD_Audio_Buffer's internal layout (which is private to PS_CDC),
+ * just to a single C-callable accessor. `samples` is always
+ * written; both channels are zeroed when no CD audio is currently
+ * playing or the buffer is exhausted.
+ */
+extern "C" void CDC_GetCDAudioSample(int32_t samples[2])
+{
+   const unsigned freq = (PSX_CDC->AudioBuffer.ReadPos < PSX_CDC->AudioBuffer.Size)
+      ? PSX_CDC->AudioBuffer.Freq : 0;
+
+   samples[0] = 0;
+   samples[1] = 0;
+
+   if (freq)
+      PSX_CDC->GetCDAudio(samples, freq);
 }
 
 bool PS_CDC::CommandCheckDiscPresent(void)
