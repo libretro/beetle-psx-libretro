@@ -5119,6 +5119,10 @@ void retro_deinit(void)
     * correctly. */
    CDUtility_Kill();
 
+   /* Free any lazily-allocated PGXP buffers (vertex cache).  Same
+    * dlopen/dlclose-cycle leak concern as CDUtility above. */
+   PGXP_Shutdown();
+
    /* Frame/UI state. */
    frame_count           = 0;
    internal_frame_count  = 0;

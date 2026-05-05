@@ -25,10 +25,12 @@
 *      Author: iCatButler
 ***************************************************************************/
 #include "pgxp_gpu.h"
+#include "pgxp_main.h"
 #include "pgxp_mem.h"
 #include "pgxp_value.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -67,17 +69,55 @@ PGXP_value* PGXP_ReadCB(u32 pos)
 unsigned int PGXP_tDebug = 0;
 /* ============================================================
  * Blade_Arma's Vertex Cache (CatBlade?)
+ *
+ * vertexCache is a 4096x4096 grid of PGXP_value entries indexed by
+ * the 11-bit signed vertex (sx, sy) screen coordinates.  At
+ * 28 bytes per entry that's 448 MB, so it's allocated lazily via
+ * calloc() the first time it's actually needed and only when the
+ * PGXP_VERTEX_CACHE mode bit is set.  Most users do not enable the
+ * vertex cache, and previously the buffer was static BSS that
+ * still consumed 448 MB of address space (and got faulted in on
+ * the first memset) regardless of whether the feature was on.
+ *
+ * The cache is freed in PGXP_Shutdown() (called from retro_deinit)
+ * so we don't leak across libretro dlopen/dlclose cycles.
  * ============================================================ */
 const unsigned int mode_init = 0;
 const unsigned int mode_write = 1;
 const unsigned int mode_read = 2;
 const unsigned int mode_fail = 3;
 
-PGXP_value vertexCache[0x800 * 2][0x800 * 2];
+#define VERTEX_CACHE_DIM	(0x800 * 2)
+#define VERTEX_CACHE_SIZE	(VERTEX_CACHE_DIM * VERTEX_CACHE_DIM)
+
+static PGXP_value *vertexCache = NULL;
 
 unsigned int baseID = 0;
 unsigned int lastID = 0;
 unsigned int cacheMode = 0;
+
+/* Allocate the vertex cache on first use.  Returns 1 on success, 0 on
+ * allocation failure (in which case the cache stays NULL and callers
+ * fall back to mode_fail). */
+static int VertexCacheEnsureAllocated(void)
+{
+	if (vertexCache)
+		return 1;
+	vertexCache = (PGXP_value*)calloc(VERTEX_CACHE_SIZE, sizeof(PGXP_value));
+	return vertexCache ? 1 : 0;
+}
+
+void PGXP_Shutdown(void)
+{
+	if (vertexCache)
+	{
+		free(vertexCache);
+		vertexCache = NULL;
+	}
+	cacheMode = mode_init;
+	baseID = 0;
+	lastID = 0;
+}
 
 unsigned int IsSessionID(unsigned int vertID)
 {
@@ -107,70 +147,79 @@ void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
 		return;
 	}
 
-	/*if (bGteAccuracy) */
+	if (cacheMode != mode_write)
 	{
-		if (cacheMode != mode_write)
+		/* Initialise cache on first use.  Allocate lazily; if the
+		 * allocation fails we set mode_fail so subsequent reads bail
+		 * out cleanly. */
+		if (cacheMode == mode_init)
 		{
-			/* Initialise cache on first use */
-			if (cacheMode == mode_init)
-				memset(vertexCache, 0x00, sizeof(vertexCache));
-
-			/* First vertex of write session (frame?) */
-			cacheMode = mode_write;
-			baseID = pNewVertex->count;
-		}
-
-		lastID = pNewVertex->count;
-
-		if (sx >= -0x800 && sx <= 0x7ff &&
-			sy >= -0x800 && sy <= 0x7ff)
-		{
-			pOldVertex = &vertexCache[sy + 0x800][sx + 0x800];
-
-			/* To avoid ambiguity there can only be one valid entry per-session */
-			if (0)/*(IsSessionID(pOldVertex->count) && (pOldVertex->value == pNewVertex->value)) */
+			if (!VertexCacheEnsureAllocated())
 			{
-				/* check to ensure this isn't identical */
-				if ((fabsf(pOldVertex->x - pNewVertex->x) > 0.1f) ||
-					(fabsf(pOldVertex->y - pNewVertex->y) > 0.1f) ||
-					(fabsf(pOldVertex->z - pNewVertex->z) > 0.1f))
-				{
-					*pOldVertex = *pNewVertex;
-					pOldVertex->gFlags = 5;
-					return;
-				}
+				cacheMode = mode_fail;
+				return;
 			}
-
-			/* Write vertex into cache */
-			*pOldVertex = *pNewVertex;
-			pOldVertex->gFlags = 1;
+			/* calloc already zeroed the buffer; no memset needed. */
 		}
+
+		/* First vertex of write session (frame?) */
+		cacheMode = mode_write;
+		baseID = pNewVertex->count;
+	}
+
+	lastID = pNewVertex->count;
+
+	if (sx >= -0x800 && sx <= 0x7ff &&
+		sy >= -0x800 && sy <= 0x7ff)
+	{
+		pOldVertex = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
+
+		/* To avoid ambiguity there can only be one valid entry per-session */
+		if (0)/*(IsSessionID(pOldVertex->count) && (pOldVertex->value == pNewVertex->value)) */
+		{
+			/* check to ensure this isn't identical */
+			if ((fabsf(pOldVertex->x - pNewVertex->x) > 0.1f) ||
+				(fabsf(pOldVertex->y - pNewVertex->y) > 0.1f) ||
+				(fabsf(pOldVertex->z - pNewVertex->z) > 0.1f))
+			{
+				*pOldVertex = *pNewVertex;
+				pOldVertex->gFlags = 5;
+				return;
+			}
+		}
+
+		/* Write vertex into cache */
+		*pOldVertex = *pNewVertex;
+		pOldVertex->gFlags = 1;
 	}
 }
 
 PGXP_value* PGXP_GetCachedVertex(short sx, short sy)
 {
-	/*if (bGteAccuracy) */
+	if (cacheMode != mode_read)
 	{
-		if (cacheMode != mode_read)
+		if (cacheMode == mode_fail)
+			return NULL;
+
+		/* Initialise cache on first use */
+		if (cacheMode == mode_init)
 		{
-			if (cacheMode == mode_fail)
+			if (!VertexCacheEnsureAllocated())
+			{
+				cacheMode = mode_fail;
 				return NULL;
-
-			/* Initialise cache on first use */
-			if (cacheMode == mode_init)
-				memset(vertexCache, 0x00, sizeof(vertexCache));
-
-			/* First vertex of read session (frame?) */
-			cacheMode = mode_read;
+			}
 		}
 
-		if (sx >= -0x800 && sx <= 0x7ff &&
-			sy >= -0x800 && sy <= 0x7ff)
-		{
-			/* Return pointer to cache entry */
-			return &vertexCache[sy + 0x800][sx + 0x800];
-		}
+		/* First vertex of read session (frame?) */
+		cacheMode = mode_read;
+	}
+
+	if (sx >= -0x800 && sx <= 0x7ff &&
+		sy >= -0x800 && sy <= 0x7ff)
+	{
+		/* Return pointer to cache entry */
+		return &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
 	}
 
 	return NULL;

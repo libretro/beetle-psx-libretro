@@ -5,7 +5,7 @@
 
 u32 static gMode = 0;
 
-void PGXP_Init()
+void PGXP_Init(void)
 {
 	PGXP_InitMem();
 	PGXP_InitCPU();
