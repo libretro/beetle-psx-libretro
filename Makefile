@@ -476,7 +476,6 @@ else
    IS_X86   = 1
    SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
-   FLAGS   += -DHAVE__MKDIR
    HAVE_CDROM = 1
 
    ifeq ($(HAVE_OPENGL),1)
