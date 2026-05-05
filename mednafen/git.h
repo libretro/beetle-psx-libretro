@@ -97,7 +97,19 @@ typedef struct
    int32_t SoundBufSize;
 } EmulateSpecStruct;
 
-extern retro_log_printf_t log_cb;
+/*
+ * `extern retro_log_printf_t log_cb;` historically lived here at
+ * the bottom of git.h with whatever linkage was current (the old
+ * git.h had no extern "C" block; consumers were all C++). Putting
+ * the declaration inside this header's new extern "C" block
+ * created a C-linkage decl that conflicts with the C++-linkage
+ * one force-included from lightning-lightrec-include/debug.h via
+ * the build system's -include flag. Every TU that needs log_cb
+ * already declares it locally (libretro.cpp, rsx_lib_*.cpp,
+ * mednafen/error.c, mempatcher.cpp, every CDAccess_*.cpp,
+ * libretro-common/glsm/glsm.c, debug.h) so the central decl was
+ * redundant anyway. Removed.
+ */
 
 #ifdef __cplusplus
 }
