@@ -917,7 +917,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 						DitherEnabled(gpu),
 						BlendMode,
 						MaskEval_TA,
-						gpu->MaskSetOR,
+						gpu->MaskSetOR != 0,
                   false,
                   gpu->may_be_2d);
 				}
@@ -966,7 +966,7 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 					DitherEnabled(gpu),
 					BlendMode,
 					MaskEval_TA,
-					gpu->MaskSetOR);
+					gpu->MaskSetOR != 0);
 
 				if (gpu->killQuadPart == 2)
 				{

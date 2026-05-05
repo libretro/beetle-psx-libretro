@@ -93,7 +93,7 @@ void rsx_gl_push_line(int16_t p0x, int16_t p0y,
 void rsx_gl_load_image(uint16_t x, uint16_t y,
                        uint16_t w, uint16_t h,
                        uint16_t *vram,
-                       uint32_t mask_eval_and, uint32_t mask_set_or);
+                       bool mask_test, bool set_mask);
 
 void rsx_gl_fill_rect(uint32_t color,
                       uint16_t x, uint16_t y,
@@ -102,7 +102,7 @@ void rsx_gl_fill_rect(uint32_t color,
 void rsx_gl_copy_rect(uint16_t src_x, uint16_t src_y,
                       uint16_t dst_x, uint16_t dst_y,
                       uint16_t w, uint16_t h, 
-                      uint32_t mask_eval_and, uint32_t mask_set_or);
+                      bool mask_test, bool set_mask);
 
 void rsx_gl_toggle_display(bool status);
 

@@ -109,8 +109,8 @@ void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                              * but I don't want to deal with enums in the
                              * FFI */
                             int blend_mode,
-                            uint32_t mask_test,
-                            uint32_t set_mask);
+                            bool mask_test,
+                            bool set_mask);
 
 void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         float p1x, float p1y, float p1w,
@@ -132,8 +132,8 @@ void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         uint8_t depth_shift,
                         bool dither,
                         int blend_mode,
-                        uint32_t mask_test,
-                        uint32_t set_mask,
+                        bool mask_test,
+                        bool set_mask,
                         bool is_sprite,
                         bool may_be_2d);
 
@@ -145,14 +145,14 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
                         /* This is really an `enum blending_modes`
                          * but I don't want to deal with enums in the FFI */
                         int blend_mode,
-                        uint32_t mask_test,
-                        uint32_t set_mask);
+                        bool mask_test,
+                        bool set_mask);
 
 void rsx_intf_load_image(uint16_t x, uint16_t y,
                          uint16_t w, uint16_t h,
                          uint16_t *vram,
-                         uint32_t mask_test,
-                         uint32_t set_mask);
+                         bool mask_test,
+                         bool set_mask);
 
 bool rsx_intf_read_vram(uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h,
@@ -165,7 +165,7 @@ void rsx_intf_fill_rect(uint32_t color,
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
                         uint16_t w, uint16_t h, 
-                        uint32_t mask_test, uint32_t set_mask);
+                        bool mask_test, bool set_mask);
 
 enum rsx_renderer_type rsx_intf_is_type(void);
 

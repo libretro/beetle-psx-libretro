@@ -3236,7 +3236,7 @@ void rsx_gl_load_image(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram,
-      uint32_t mask_eval_and, uint32_t mask_set_or)
+      bool mask_test, bool set_mask)
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -3245,8 +3245,8 @@ void rsx_gl_load_image(
    if (!renderer)
       return;
 
-   renderer->set_mask     = mask_set_or != 0;
-   renderer->mask_test    = mask_eval_and != 0;
+   renderer->set_mask     = set_mask;
+   renderer->mask_test    = mask_test;
 
    Framebuffer _fb;
    uint16_t top_left[2];
@@ -3410,7 +3410,7 @@ void rsx_gl_copy_rect(
       uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h,
-      uint32_t mask_eval_and, uint32_t mask_set_or) /* TODO use mask for copy. See software renderer */
+      bool mask_test, bool set_mask) /* TODO use mask for copy. See software renderer */
 {
    if (static_renderer.state == GlState_Invalid)
       return;
@@ -3422,8 +3422,8 @@ void rsx_gl_copy_rect(
    if (src_x == dst_x && src_y == dst_y)
      return;
 
-   renderer->set_mask          = mask_set_or != 0;
-   renderer->mask_test         = mask_eval_and != 0;
+   renderer->set_mask          = set_mask;
+   renderer->mask_test         = mask_test;
 
    uint16_t source_top_left[2] = {src_x, src_y};
    uint16_t target_top_left[2] = {dst_x, dst_y};
