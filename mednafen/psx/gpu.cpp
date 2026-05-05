@@ -1143,7 +1143,6 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
       V &= 0x00FFFFFF;
 
-      //PSX_WARNING("[GPU] Control command: %02x %06x %d", command, V, scanline);
 
       switch(command)
       {
@@ -1151,7 +1150,6 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             0x40-0xFF do NOT appear to be mirrors, at least not on my PS1's GPU.
             */
          default:
-            PSX_WARNING("[GPU] Unknown control command %02x - %06x", command, V);
             break;
          case 0x00:  // Reset GPU
             GPU_SoftReset();

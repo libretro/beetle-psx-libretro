@@ -417,23 +417,6 @@ bool setting_apply_analog_toggle  = false;
 bool setting_apply_analog_default = false;
 bool use_mednafen_memcard0_method = false;
 
-#if PSX_DBGPRINT_ENABLE
-static unsigned psx_dbg_level = 0;
-
-void PSX_DBG(unsigned level, const char *format, ...)
-{
-   if(psx_dbg_level >= level)
-   {
-      va_list ap;
-      va_start(ap, format);
-      vprintf(format, ap);
-      va_end(ap);
-   }
-}
-#else
-static unsigned const psx_dbg_level = 0;
-#endif
-
 /* Based off(but not the same as) public-domain "JKISS" PRNG. */
 struct MDFN_PseudoRNG
 {
@@ -1020,9 +1003,6 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
    {
       if(!IsWrite)
       {
-         //if((A & 0x7FFFFF) <= 0x84)
-         //PSX_WARNING("[PIO] Read%d from 0x%08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
-
          V = ~0U; // A game this affects:  Tetris with Cardcaptor Sakura
 
          if(PIOMem)
@@ -1060,15 +1040,8 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
       return;
    }
 
-   if(IsWrite)
-   {
-      PSX_WARNING("[MEM] Unknown write%d to %08x at time %d, =%08x(%d)", (int)(sizeof(T) * 8), A, timestamp, V, V);
-   }
-   else
-   {
+   if(!IsWrite)
       V = 0;
-      PSX_WARNING("[MEM] Unknown read%d from %08x at time %d", (int)(sizeof(T) * 8), A, timestamp);
-   }
 }
 
 void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V)
@@ -1580,8 +1553,6 @@ static unsigned CalcDiscSCEx(void)
 
             fbuf[opos++] = 0;
 
-            PSX_DBG(PSX_DBG_SPARSE, "License string: %s", (char *)fbuf);
-
             if(strstr((char *)fbuf, "licensedby") != NULL)
             {
                if(strstr((char *)fbuf, "america") != NULL)
@@ -1970,10 +1941,6 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    bool emulate_memcard[8];
    bool emulate_multitap[2];
    int sls, sle;
-
-#if PSX_DBGPRINT_ENABLE
-   psx_dbg_level = MDFN_GetSettingUI("psx.dbg_level");
-#endif
 
    for(i = 0; i < 8; i++)
    {

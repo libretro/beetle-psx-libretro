@@ -314,7 +314,6 @@ void GTE_WriteCR(unsigned int which, uint32_t value)
       0xFFFFFFFF, 0xFFFFFFFF, 0x0000FFFF, 0x0000FFFF, 0xFFFFFFFF, 0x0000FFFF, 0x0000FFFF, 0xFFFFFFFF
    };
 
-   //PSX_WARNING("[GTE] Write CR %d, 0x%08x", which, value);
 
    value &= mask_table[which];
 

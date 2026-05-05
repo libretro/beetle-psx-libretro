@@ -695,7 +695,6 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       abs(vertices[2].y - vertices[1].y) >= (512 << gpu->upscale_shift) ||
       abs(vertices[1].y - vertices[0].y) >= (512 << gpu->upscale_shift))
      {
-       //PSX_WARNING("[GPU] Triangle height too large: %d", (vertices[2].y - vertices[0].y));
 		 if (numvertices == 4)
 			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
      
@@ -708,7 +707,6 @@ static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
       abs(vertices[2].x - vertices[1].x) >= (1024 << gpu->upscale_shift) ||
       abs(vertices[1].x - vertices[0].x) >= (1024 << gpu->upscale_shift))
      {
-       //PSX_WARNING("[GPU] Triangle width too large: %d %d %d", abs(vertices[2].x - vertices[0].x), abs(vertices[2].x - vertices[1].x), abs(vertices[1].x - vertices[0].x));
 		 if (numvertices == 4)
 			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
 		 

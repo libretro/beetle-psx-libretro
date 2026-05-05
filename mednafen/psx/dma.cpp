@@ -197,10 +197,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          break;
 
       case CH_MDEC_OUT:
-         if(CRModeCache & 0x1)
-         {
-         }
-         else
+         if(!(CRModeCache & 0x1))
             *V = MDEC_DMARead(offset);
          break;
 
@@ -230,10 +227,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
             DMACH[ch].ClockCounter -= 23 * 20 / 12; // (23 + 1) = 24.  (Though closer to 24.5 or 24.4 on average per tests on a PS1)
          }
 #endif
-         if(CRModeCache & 0x1)
-         {
-         }
-         else
+         if(!(CRModeCache & 0x1))
          {
             extra_cyc_overhead = 8;	// FIXME: Test.
             *V = PSX_CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
@@ -265,13 +259,8 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          break;
 
       case CH_FIVE:
-         if(CRModeCache & 0x1)
-         {
-         }
-         else
-         {
+         if(!(CRModeCache & 0x1))
             *V = 0;
-         }
          break;
 
       case CH_OT:
@@ -540,7 +529,6 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
    int ch = (A & 0x7F) >> 4;
 
    //if(ch == 2 || ch == 7)
-   //PSX_WARNING("[DMA] Write: %08x %08x, DMAIntStatus=%08x", A, V, DMAIntStatus);
 
    // FIXME if we ever have "accurate" bus emulation
    V <<= (A & 3) * 8;
@@ -597,7 +585,6 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                DMACH[ch].ClockCounter = (1 << 30);
                RunChannel(timestamp, 1, ch);
                DMACH[ch].ClockCounter = 0;
-               PSX_WARNING("[DMA] Forced stop for channel %d -- scanline=%d", ch, GPU_GetScanlineNum());
                MDFND_DispMessage(3, RETRO_LOG_ERROR,
                      RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
                      "[DMA] Forced stop for channel %d", ch);
@@ -612,7 +599,6 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
             {
                //if(ch == 0 || ch == 1)
-               // PSX_WARNING("[DMA] Started DMA for channel=%d --- CHCR=0x%08x --- BCR=0x%08x --- scanline=%d", ch, DMACH[ch].ChanControl, DMACH[ch].BlockControl, GPU_GetScanlineNum());
 
                DMACH[ch].WordCounter = 0;
                DMACH[ch].ClockCounter = 0;
@@ -634,7 +620,6 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
          }
       default:
-         PSX_WARNING("[DMA] Unknown write: %08x %08x", A, V);
          break;
    }
 
@@ -670,7 +655,6 @@ uint32_t DMA_Read(const int32_t timestamp, uint32_t A)
             break;
          }
       default:
-         PSX_WARNING("[DMA] Unknown read: %08x", A);
          break;
    }
 

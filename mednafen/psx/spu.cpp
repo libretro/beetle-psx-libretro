@@ -812,7 +812,6 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
          voice->PreLRSample = 0;
 
-         //PSX_WARNING("[SPU] Voice %d CurPhase=%08x, pitch=%04x, CurAddr=%08x", voice_num, voice->CurPhase, voice->Pitch, voice->CurAddr);
 
          if(voice->DecodePlayDelay)
          {
@@ -1075,7 +1074,6 @@ uint32 PS_SPU::ReadDMA(void)
 void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 {
    //if((A & 0x3FF) < 0x180)
-   // PSX_WARNING("[SPU] Write: %08x %04x", A, V);
 
    A &= 0x3FF;
 
@@ -1193,7 +1191,6 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 
          case 0x22: ReverbWA = (V << 2) & 0x3FFFF;
                     ReverbCur = ReverbWA;
-                    //PSX_WARNING("[SPU] Reverb WA set: 0x%04x", V);
                     break;
 
          case 0x24:
@@ -1223,7 +1220,6 @@ void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
                     break;
 
          case 0x2C: 
-                    //PSX_WARNING("[SPU] Global reg 0x2c set: 0x%04x", V);
                     break;
 
          case 0x30: CDVol[0] = (int16_t)V;
@@ -1286,10 +1282,8 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
          case 0x1E:
             return(BlockEnd >> 16);
          case 0x26:
-            //PSX_WARNING("[SPU] RWADDR Read");
             break;
          case 0x28:
-            //PSX_WARNING("[SPU] SPURAM Read port(?) Read");
             {
                uint16 ret = ReadSPURAM(RWAddr);
 
@@ -1304,7 +1298,6 @@ uint16 PS_SPU::Read(int32_t timestamp, uint32 A)
 
             /* FIXME: What is this used for? */
          case 0x3C:
-            //PSX_WARNING("[SPU] Read Unknown: %08x", A);
             return(0);
          case 0x38:
          case 0x3A:

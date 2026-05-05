@@ -7,29 +7,6 @@
 #include "../mednafen-types.h"
 #include "../video/surface.h"
 
-// Define PSX_DBGPRINT_ENABLE to 1 to enable PSX_DBG / PSX_WARNING
-// debug printing via stdout. The historical default in this libretro
-// build is 0 (production performance: no PSX_DBG output, all calls
-// dead-strip via the no-op static inline below).
-#define PSX_DBGPRINT_ENABLE    0
-
-#define PSX_DBG_ERROR      0  // Emulator-level error.
-#define PSX_DBG_WARNING    1  // Warning about game doing questionable things/hitting stuff that might not be emulated correctly.
-#define PSX_DBG_BIOS_PRINT 2  // BIOS printf/putchar output.
-#define PSX_DBG_SPARSE     3  // Sparse(relatively) information debug messages(CDC commands).
-#define PSX_DBG_FLOOD      4  // Heavy informational debug messages(GPU commands; TODO).
-
-#if PSX_DBGPRINT_ENABLE
-void PSX_DBG(unsigned level, const char *format, ...);
-
-#define PSX_WARNING(format, ...) { PSX_DBG(PSX_DBG_WARNING, format "\n", ## __VA_ARGS__); }
-#define PSX_DBGINFO(format, ...) { }
-#else
-static void PSX_DBG(unsigned level, const char* format, ...) { }
-static void PSX_WARNING(const char* format, ...) { }
-static void PSX_DBGINFO(const char* format, ...) { }
-#endif
-
 typedef int32_t pscpu_timestamp_t;
 
 bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp);

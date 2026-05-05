@@ -750,7 +750,6 @@ bool MDEC_DMACanRead(void)
 
 void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
 {
-   //PSX_WARNING("[MDEC] Write: 0x%08x 0x%08x, %d  --- %u %u", A, V, timestamp, InFIFO.in_count, OutFIFO.in_count);
    if(A & 4)
    {
       if(V & 0x80000000) // Reset?
@@ -819,7 +818,6 @@ uint32 MDEC_Read(const int32_t timestamp, uint32 A)
    ret = FastFIFO_Read(&OutFIFO);
  }
 
- //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.in_count, InCounter);
 
  return(ret);
 }

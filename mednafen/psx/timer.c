@@ -424,7 +424,6 @@ uint16_t MDFN_FASTCALL TIMER_Read(const int32_t timestamp, uint32_t A)
 
    if(which >= 3)
    {
-      //PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A);
 
       return(ret >> ((A & 3) * 8));
    }
@@ -445,8 +444,7 @@ uint16_t MDFN_FASTCALL TIMER_Read(const int32_t timestamp, uint32_t A)
       case 0x8: ret = Timers[which].Target;
                 break;
 
-      case 0xC: /* PSX_WARNING("[TIMER] Open Bus Read: 0x%08x", A); */
-                break;
+      case 0xC: break;
    }
 
    return(ret >> ((A & 3) * 8));

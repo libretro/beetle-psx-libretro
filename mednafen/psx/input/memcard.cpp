@@ -216,11 +216,6 @@ void InputDevice_Memcard::SetDTR(bool new_dtr)
       bitpos = 0;
       transmit_count = 0;
    }
-   else if(dtr && !new_dtr)
-   {
-      if(command_phase > 0)
-         PSX_WARNING("[MCR] Communication aborted on phase %d", command_phase);
-   }
    dtr = new_dtr;
 }
 
@@ -304,11 +299,6 @@ bool InputDevice_Memcard::Clock(bool TxD, int32 &dsr_pulse_delay)
                }
                else
                {
-                  if(command == 'S')
-                  {
-                     PSX_WARNING("[MCR] Memcard S command unsupported.");
-                  }
-
                   command_phase = -1;
                   transmit_buffer = 0;
                   transmit_count = 0;

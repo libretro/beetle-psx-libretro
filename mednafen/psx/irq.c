@@ -62,7 +62,6 @@ int IRQ_StateAction(void *data, int load, int data_only)
 void IRQ_Assert(int which, bool status)
 {
    uint32_t old_Asserted = Asserted;
-   //PSX_WARNING("[IRQ] Assert: %d %d", which, status);
 
 /*
    if(which == IRQ_SPU && status && (Asserted & (1 << which)))
