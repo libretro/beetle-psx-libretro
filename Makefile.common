@@ -236,14 +236,13 @@ endif
 
    SOURCES_CXX += $(MEDNAFEN_DIR)/general.cpp \
                   $(MEDNAFEN_DIR)/mempatcher.cpp \
-                  $(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
-                  $(MEDNAFEN_DIR)/video/surface.cpp \
                   $(CORE_DIR)/libretro.cpp \
                   $(CORE_DIR)/input.cpp \
                   $(CORE_DIR)/rsx/rsx_intf.cpp
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
+                  $(MEDNAFEN_DIR)/video/Deinterlacer.c \
                   $(CORE_EMU_DIR)/dma.c \
                   $(CORE_EMU_DIR)/gte.c \
                   $(CORE_EMU_DIR)/irq.c \

@@ -38,6 +38,7 @@ struct tri_vertex
    // Precise x, y, and w coordinates using PGXP (if available)
    float precise[3];
 };
+typedef struct tri_vertex tri_vertex;
 
 struct i_group;
 struct i_deltas;
@@ -47,6 +48,7 @@ struct line_point
    int32 x, y;
    uint8 r, g, b;
 };
+typedef struct line_point line_point;
 
 #define vertex_swap(_type, _a, _b) \
 {                           \
@@ -223,6 +225,7 @@ struct PS_GPU
    */
    uint16 *vram;
 };
+typedef struct PS_GPU PS_GPU;
 
 
 

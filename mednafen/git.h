@@ -15,22 +15,36 @@
  * Everything else (MDFNGI, InputInfoStruct, VideoSystems, ModPrio,
  * GameMediumTypes, MDFN_ROTATE*) was metadata for Mednafen's standalone
  * UI and never read by the libretro driver, so it was removed during
- * the dead-code audit. */
+ * the dead-code audit.
+ *
+ * Now plain C - originally CheatFormatStruct's DecodeCheat callback
+ * took `const std::string&` for the cheat string, which trapped this
+ * whole header behind C++. The single call site (libretro.cpp's
+ * retro_cheat_set) was already constructing a temporary std::string
+ * from a C string just to call into DecodeGS, which then read it
+ * character-by-character via std::string::operator[] and .size().
+ * Switching to `const char *` (with strlen) is shorter at every layer
+ * and frees this header (and everything that transitively includes
+ * it - notably mednafen/psx/gpu.h) for inclusion from C TUs. */
 
 #include <libretro.h>
 
 #include "video/surface.h"
 #include "state.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct MemoryPatch;
 
-struct CheatFormatStruct
+typedef struct
 {
    const char *FullName;
    const char *Description;
 
-   bool (*DecodeCheat)(const std::string& cheat_string, MemoryPatch* patch);
-};
+   bool (*DecodeCheat)(const char *cheat_string, struct MemoryPatch *patch);
+} CheatFormatStruct;
 
 /* DoSimpleCommand opcodes. Originally a much larger enum from
  * Mednafen covering coin slots, DIP switches, and per-disk
@@ -84,5 +98,9 @@ typedef struct
 } EmulateSpecStruct;
 
 extern retro_log_printf_t log_cb;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

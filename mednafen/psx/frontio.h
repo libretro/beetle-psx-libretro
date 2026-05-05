@@ -18,13 +18,13 @@ class InputDevice
 
       // Divide mouse X coordinate by pix_clock_divider in the lightgun code to get the coordinate in pixel(clocks).
       // GPULineHook modified to take upscale_factor for color detection (surf_pitchinpix unused)
-      virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+      virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
       virtual void Update(const int32_t timestamp);	// Partially-implemented, don't rely on for timing any more fine-grained than a video frame for now.
       virtual void ResetTS(void);
 
       // DrawCrosshairs modified to take surface pitch (in pixels) and upscale factor for software renderer internal upscaling
-      void DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+      void DrawCrosshairs(uint32 *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
       virtual void SetAMCT(bool enabled);
       virtual void SetCrosshairsCursor(int cursor);
@@ -75,7 +75,7 @@ class FrontIO
       void ResetTS(void);
 
       // GPULineHook modified to take surface pitch (in pixels) and upscale factor for software renderer internal upscaling
-      void GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+      void GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
       void UpdateInput(void);
       void SetInput(unsigned int port, const char *type, void *ptr);

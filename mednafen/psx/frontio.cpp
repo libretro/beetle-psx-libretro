@@ -92,7 +92,6 @@ void InputDevice::SetCrosshairsColor(uint32_t color)
 
 static void crosshair_plot( uint32 *pixels,
 							int x,
-							const MDFN_PixelFormat* const format,
 							unsigned chair_r,
 							unsigned chair_g,
 							unsigned chair_b )
@@ -100,7 +99,7 @@ static void crosshair_plot( uint32 *pixels,
 	int r, g, b, a;
 	int nr, ng, nb;
 
-	format->DecodeColor(pixels[x], r, g, b, a);
+	MDFN_DecodeColor(pixels[x], &r, &g, &b, &a);
 
 	nr = (r + chair_r * 3) >> 2;
 	ng = (g + chair_g * 3) >> 2;
@@ -125,7 +124,7 @@ static void crosshair_plot( uint32 *pixels,
 	pixels[x] = MAKECOLOR(nr, ng, nb, a);
 }
 
-INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
 	switch ( chair_cursor )
 	{
@@ -153,7 +152,7 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 			{
             for (int row = 0; row < upscale_factor; row++)
             {
-               crosshair_plot( pixels, x + (row * surf_pitchinpix), format, chair_r, chair_g, chair_b );
+               crosshair_plot( pixels, x + (row * surf_pitchinpix), chair_r, chair_g, chair_b );
             }
 			}
 		}
@@ -176,7 +175,7 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 			{
             for (int row = 0; row < upscale_factor; row++)
             {
-               crosshair_plot( pixels, x + (row * surf_pitchinpix), format, chair_r, chair_g, chair_b );
+               crosshair_plot( pixels, x + (row * surf_pitchinpix), chair_r, chair_g, chair_b );
             }
 			}
 		}
@@ -254,7 +253,7 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
  return(ret);
 }
 
-int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
  return(PSX_EVENT_MAXTS);
 }
@@ -1020,13 +1019,13 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path, bool force_save)
  }
 }
 
-void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    Update(timestamp);
 
    for(unsigned i = 0; i < 8; i++)
    {
-      int32_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
+      int32_t plts = Devices[i]->GPULineHook(line_timestamp, vsync, pixels, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 
       if(i < 2)
       {
@@ -1048,7 +1047,7 @@ void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp,
    {
       for(unsigned i = 0; i < 8; i++)
       {
-         Devices[i]->DrawCrosshairs(pixels, format, width, pix_clock, surf_pitchinpix, upscale_factor);
+         Devices[i]->DrawCrosshairs(pixels, width, pix_clock, surf_pitchinpix, upscale_factor);
       }
    }
 

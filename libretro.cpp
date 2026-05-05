@@ -1343,9 +1343,9 @@ void PSX_MemPoke32(uint32 A, uint32 V)
    MemPoke<uint32, false>(0, A, V);
 }
 
-void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
-   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, format, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
+   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 }
 
 /* Test whether the supplied file looks like a PS-X EXE. The original
@@ -2695,12 +2695,13 @@ static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, c
    patch->conditions.append(tmp);
 }
 
-static bool DecodeGS(const std::string& cheat_string, MemoryPatch* patch)
+static bool DecodeGS(const char *cheat_string, MemoryPatch *patch)
 {
    uint64 code = 0;
    unsigned nybble_count = 0;
+   const size_t len = strlen(cheat_string);
 
-   for(unsigned i = 0; i < cheat_string.size(); i++)
+   for(unsigned i = 0; i < len; i++)
    {
       if(cheat_string[i] == ' ' || cheat_string[i] == '-' || cheat_string[i] == ':' || cheat_string[i] == '+')
          continue;
@@ -2885,7 +2886,6 @@ static MDFN_Surface *surf = NULL;
 
 static void alloc_surface(void)
 {
-   MDFN_PixelFormat pix_fmt(MDFN_COLORSPACE_RGB, 16, 8, 0, 24);
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
    uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H : 480;
 
@@ -2893,9 +2893,9 @@ static void alloc_surface(void)
    height <<= GPU_get_upscale_shift();
 
    if (surf != NULL)
-      delete surf;
+      MDFN_Surface_Delete(surf);
 
-   surf = new MDFN_Surface(NULL, width, height, width, pix_fmt);
+   surf = MDFN_Surface_New(width, height, width);
 }
 
 static void check_system_specs(void)
@@ -3111,6 +3111,14 @@ void retro_init(void)
       log_cb = log.log;
    else
       log_cb = fallback_log;
+
+#ifdef NEED_DEINTERLACER
+   /* The deinterlacer is a static-storage struct, so all fields
+    * are zero-initialised at process start; explicit init is
+    * still needed for the DeintType default (DEINT_WEAVE), which
+    * is a non-zero enum value. */
+   Deinterlacer_Init(&deint);
+#endif
 
    const char *dir = NULL;
 
@@ -4090,9 +4098,9 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "bob") == 0)
-         deint.SetType(Deinterlacer::DEINT_BOB);
+         Deinterlacer_SetType(&deint, DEINT_BOB);
       else
-         deint.SetType(Deinterlacer::DEINT_WEAVE);
+         Deinterlacer_SetType(&deint, DEINT_WEAVE);
    }
 }
 
@@ -4423,7 +4431,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
 #ifdef NEED_DEINTERLACER
    PrevInterlaced = false;
-   deint.ClearState();
+   Deinterlacer_ClearState(&deint);
 #endif
 
    input_init();
@@ -4925,9 +4933,9 @@ void retro_run(void)
       if (spec.InterlaceOn)
       {
          if (!PrevInterlaced)
-            deint.ClearState();
+            Deinterlacer_ClearState(&deint);
 
-         deint.Process(surf, spec.DisplayRect, rects, spec.InterlaceField);
+         Deinterlacer_Process(&deint, surf, &spec.DisplayRect, rects, spec.InterlaceField);
 
          PrevInterlaced = true;
 
@@ -4943,7 +4951,7 @@ void retro_run(void)
 
 #ifdef NEED_DEINTERLACER
       if (     (currently_interlaced || PrevInterlaced)
-            && deint.GetType() == Deinterlacer::DEINT_BOB
+            && Deinterlacer_GetType(&deint) == DEINT_BOB
             && height > MEDNAFEN_CORE_GEOMETRY_MAX_H / 2)
          height /= 2;
 #endif
@@ -5093,9 +5101,13 @@ void retro_deinit(void)
 {
    if (surf)
    {
-      delete surf;
+      MDFN_Surface_Delete(surf);
       surf = NULL;
    }
+
+#ifdef NEED_DEINTERLACER
+   Deinterlacer_Cleanup(&deint);
+#endif
 
    /* Companion to retro_init's CDUtility_Init. Frees the Reed-Solomon
     * and Galois L-EC correction tables (~4 KB) which would otherwise
@@ -5422,7 +5434,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
       {
          /* Decode the cheat. DecodeCheat returns false on bad codes;
           * MDFNI_AddCheat does not throw. */
-         if(!cf->DecodeCheat(std::string(part), &patch))
+         if(!cf->DecodeCheat(part.c_str(), &patch))
          {
             /* Generate a name */
             snprintf(name, sizeof(name), "cheat_%i_%i",index,cursor);

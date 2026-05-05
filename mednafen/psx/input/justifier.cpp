@@ -32,7 +32,7 @@ class InputDevice_Justifier : public InputDevice
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
       // GPULineHook modified to take upscale_factor for color detection (surf_pitchinpix unused)
-      virtual int32_t GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+      virtual int32_t GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
       //
       //
@@ -181,7 +181,7 @@ int InputDevice_Justifier::StateAction(StateMem* sm, int load, int data_only, co
    return(ret);
 }
 
-int32_t InputDevice_Justifier::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+int32_t InputDevice_Justifier::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    int32_t ret = PSX_EVENT_MAXTS;
 
@@ -205,7 +205,7 @@ int32_t InputDevice_Justifier::GPULineHook(const int32_t timestamp, bool vsync, 
       {
          int r, g, b, a;
 
-         format->DecodeColor(pixels[gxa * upscale_factor], r, g, b, a);
+         MDFN_DecodeColor(pixels[gxa * upscale_factor], &r, &g, &b, &a);
 
          if((r + g + b) >= 0x40)	// Wrong, but not COMPLETELY ABSOLUTELY wrong, at least. ;)
          {
