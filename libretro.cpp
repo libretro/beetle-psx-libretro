@@ -3691,8 +3691,10 @@ static void check_variables(bool startup)
 
       if(filter_mode != old_filter_mode)
       {
-         opaque_check = true;
-         semitrans_check = true;
+         /* opaque_check / semitrans_check were set here; both were
+          * write-only globals with no remaining readers (the
+          * renderer cleanup path that consumed them was removed
+          * long ago). Removed. */
          old_filter_mode = filter_mode;
       }
    }

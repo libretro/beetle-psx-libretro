@@ -21,8 +21,6 @@ extern uint8_t psx_gpu_upscale_shift;
 extern uint8_t psx_gpu_upscale_shift_hw;
 extern int line_render_mode;
 extern int filter_mode;
-extern bool opaque_check;
-extern bool semitrans_check;
 extern int crop_overscan;
 
 enum core_timing_fps_modes

@@ -40,8 +40,7 @@ static void texel_put(uint32 x, uint32 y, uint16 v);
 #include "gpu_sprite.cpp"
 #include "gpu_line.cpp"
 
-extern int crop_overscan;
-extern bool is_monkey_hero;
+#include "../../beetle_psx_globals.h"
 
 /*
    GPU display timing master clock is nominally 53.693182 MHz for NTSC PlayStations, and 53.203425 MHz for PAL PlayStations.

@@ -1,10 +1,9 @@
 #include "psx.h"
 #include "../../rsx/rsx_intf.h"
+#include "../../beetle_psx_globals.h"
 
 #include <float.h>
 #include <retro_miscellaneous.h>
-
-extern "C" uint8_t psx_gpu_upscale_shift_hw;
 
 // Determine whether to offset UVs to account for difference in interpolation between PS1 and modern GPUs
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count)

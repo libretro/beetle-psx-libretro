@@ -26,6 +26,7 @@
 #include "libretro_options.h"
 
 #include "rsx/rsx_intf.h" //enums
+#include "beetle_psx_globals.h"
 
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
 #define DRAWBUFFER_REMAINING_CAPACITY(x) ((x)->capacity - (x)->map_index)
@@ -362,11 +363,6 @@ static DrawConfig persistent_config = {
 static RetroGl static_renderer;
 
 static bool has_software_fb = false;
-
-extern "C" unsigned char widescreen_hack;
-extern "C" unsigned char widescreen_hack_aspect_ratio_setting;
-extern "C" bool content_is_pal;
-extern "C" int aspect_ratio_setting;
 
 #ifdef __cplusplus
 extern "C"
@@ -2342,8 +2338,6 @@ static bool gl_context_framebuffer_lock(void* data)
 {
    return false;
 }
-
-extern "C" bool currently_interlaced;
 
 static struct retro_system_av_info get_av_info(VideoClock std)
 {

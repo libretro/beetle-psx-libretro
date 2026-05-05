@@ -16,6 +16,7 @@
 
 #include "libretro_cbs.h"
 #include "libretro_options.h"
+#include "beetle_psx_globals.h"
 
 using namespace Vulkan;
 using namespace PSX;
@@ -25,15 +26,6 @@ static Context *context;
 static Device *device;
 static Renderer *renderer;
 static unsigned scaling = 4;
-
-// Declare extern as workaround for now to avoid variable
-// naming conflicts with beetle_psx_globals.h
-extern "C" uint8_t widescreen_hack;
-extern "C" uint8_t widescreen_hack_aspect_ratio_setting;
-extern "C" bool content_is_pal;
-extern "C" int filter_mode;
-extern "C" bool currently_interlaced;
-extern "C" int aspect_ratio_setting;
 
 extern retro_log_printf_t log_cb;
 namespace Granite
