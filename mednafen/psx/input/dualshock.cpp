@@ -56,7 +56,7 @@ class InputDevice_DualShock : public InputDevice
 {
    public:
 
-      InputDevice_DualShock(const std::string &arg_name);
+      InputDevice_DualShock(const char *arg_name);
       virtual ~InputDevice_DualShock();
 
       virtual void Power(void);
@@ -114,7 +114,7 @@ class InputDevice_DualShock : public InputDevice
       //
       bool am_prev_info;
       bool aml_prev_info;
-      std::string gp_name;
+      char gp_name[64];
       int32_t lastts;
 
       //
@@ -122,9 +122,9 @@ class InputDevice_DualShock : public InputDevice
       bool amct_enabled;
 };
 
-InputDevice_DualShock::InputDevice_DualShock(const std::string &name)
+InputDevice_DualShock::InputDevice_DualShock(const char *name)
 {
-   gp_name = name;
+   snprintf(gp_name, sizeof(gp_name), "%s", name);
    Power();
    am_prev_info = analog_mode;
    aml_prev_info = analog_mode_locked;
@@ -361,7 +361,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
       MDFN_DispMessage(2, RETRO_LOG_INFO,
             RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
             "%s: %s Mode",
-            gp_name.c_str(), analog_mode ? "Analog" : "Digital");
+            gp_name, analog_mode ? "Analog" : "Digital");
 
    aml_prev_info = analog_mode_locked;
    am_prev_info = analog_mode;
@@ -1080,7 +1080,7 @@ bool InputDevice_DualShock::Clock(bool TxD, int32 &dsr_pulse_delay)
    return(ret);
 }
 
-InputDevice *Device_DualShock_Create(const std::string &name)
+InputDevice *Device_DualShock_Create(const char *name)
 {
    return new InputDevice_DualShock(name);
 }

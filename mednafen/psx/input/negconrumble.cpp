@@ -62,7 +62,7 @@ class InputDevice_neGconRumble : public InputDevice
 {
    public:
 
-      InputDevice_neGconRumble(const std::string &arg_name);
+      InputDevice_neGconRumble(const char *arg_name);
       virtual ~InputDevice_neGconRumble();
 
       virtual void Power(void);
@@ -121,7 +121,7 @@ class InputDevice_neGconRumble : public InputDevice
       //
       bool am_prev_info;
       bool aml_prev_info;
-      std::string gp_name;
+      char gp_name[64];
       int32_t lastts;
 
       //
@@ -129,9 +129,9 @@ class InputDevice_neGconRumble : public InputDevice
       bool amct_enabled;
 };
 
-InputDevice_neGconRumble::InputDevice_neGconRumble(const std::string &name)
+InputDevice_neGconRumble::InputDevice_neGconRumble(const char *name)
 {
-   gp_name = name;
+   snprintf(gp_name, sizeof(gp_name), "%s", name);
    Power();
    am_prev_info = analog_mode;
    aml_prev_info = analog_mode_locked;
@@ -337,7 +337,7 @@ void InputDevice_neGconRumble::UpdateInput(const void *data)
       MDFN_DispMessage(2, RETRO_LOG_INFO,
             RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
             "%s: neGcon mode is %s",
-            gp_name.c_str(), analog_mode ? "ON" : "OFF");
+            gp_name, analog_mode ? "ON" : "OFF");
 
    aml_prev_info = analog_mode_locked;
    am_prev_info = analog_mode;
@@ -1056,7 +1056,7 @@ bool InputDevice_neGconRumble::Clock(bool TxD, int32 &dsr_pulse_delay)
    return(ret);
 }
 
-InputDevice *Device_neGconRumble_Create(const std::string &name)
+InputDevice *Device_neGconRumble_Create(const char *name)
 {
    return new InputDevice_neGconRumble(name);
 }

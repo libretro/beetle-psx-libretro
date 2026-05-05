@@ -912,7 +912,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
    {
       char name[256];
       snprintf(name, 256, "DualShock on port %u", port + 1);
-      Devices[port] = Device_DualShock_Create(std::string(name));
+      Devices[port] = Device_DualShock_Create(name);
    }
    else if(!strcmp(type, "mouse"))
       Devices[port] = Device_Mouse_Create();
@@ -922,7 +922,7 @@ void FrontIO::SetInput(unsigned int port, const char *type, void *ptr)
    {
       char name[256];
       snprintf(name, 256, "neGcon Rumble on port %u", port + 1);
-      Devices[port] = Device_neGconRumble_Create(std::string(name));
+      Devices[port] = Device_neGconRumble_Create(name);
    }
    else if(!strcmp(type, "guncon"))
       Devices[port] = Device_GunCon_Create();
