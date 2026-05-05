@@ -136,6 +136,19 @@ void PS_CPU::SetHalt(bool status)
  RecalcIPCache();
 }
 
+/*
+ * C-linkage shim declared in cpu_c.h. Forwards to PS_CPU::AssertIRQ
+ * through the file-scope PSX_CPU pointer. The targeted method only
+ * modifies static class state (CP0.CAUSE) and calls a static helper
+ * (RecalcIPCache), so calling it through an instance pointer is
+ * purely a syntax mechanism; the optimizer inlines the forwarder
+ * away under -O2.
+ */
+extern "C" void CPU_AssertIRQ(unsigned which, bool asserted)
+{
+ PSX_CPU->AssertIRQ(which, asserted);
+}
+
 const uint8_t *PSX_LoadExpansion1(void);
 
 void PS_CPU::Power(void)

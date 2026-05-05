@@ -15,15 +15,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "psx.h"
+#include <stdint.h>
 
+#include "../mednafen-types.h"
+#include "../state.h"
 #include "../state_helpers.h"
+
+#include "irq.h"
+#include "cpu_c.h"
 
 static uint16_t Asserted;
 static uint16_t Mask;
 static uint16_t Status;
 
-#define Recalc() PSX_CPU->AssertIRQ(0, (bool)(Status & Mask))
+#define Recalc() CPU_AssertIRQ(0, (bool)(Status & Mask))
 
 void IRQ_Power(void)
 {
