@@ -1260,7 +1260,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
    }
 }
 
-void GPU_WriteDMA(uint32_t V, uint32 addr)
+extern "C" void GPU_WriteDMA(uint32_t V, uint32 addr)
 {
    GPU_WriteCB(V, addr);
 }
@@ -1294,7 +1294,7 @@ static INLINE uint32_t GPU_ReadData(void)
    return GPU.DataReadBufferEx;
 }
 
-uint32_t GPU_ReadDMA(void)
+extern "C" uint32_t GPU_ReadDMA(void)
 {
    if(GPU.InCmd != INCMD_FBREAD)
       return GPU.DataReadBuffer;
@@ -1408,7 +1408,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }
 }
 
-int32_t GPU_Update(const int32_t sys_timestamp)
+extern "C" int32_t GPU_Update(const int32_t sys_timestamp)
 {
    int32 gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -2092,7 +2092,7 @@ uint8 GPU_get_upscale_shift(void)
    return GPU.upscale_shift;
 }
 
-bool GPU_DMACanWrite(void)
+extern "C" bool GPU_DMACanWrite(void)
 {
    return CalcFIFOReadyBit();
 }
@@ -2102,7 +2102,7 @@ uint16 *GPU_get_vram(void)
    return GPU.vram;
 }
 
-int32_t GPU_GetScanlineNum(void)
+extern "C" int32_t GPU_GetScanlineNum(void)
 {
    return GPU.scanline;
 }

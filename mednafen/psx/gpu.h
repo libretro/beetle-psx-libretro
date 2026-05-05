@@ -228,11 +228,7 @@ struct PS_GPU
 
 uint16 *GPU_get_vram(void);
 
-void GPU_WriteDMA(uint32 V, uint32 addr);
-
-uint32_t GPU_ReadDMA(void);
-
-bool GPU_DMACanWrite(void);
+#include "gpu_c.h"
 
 void GPU_set_dither_upscale_shift(uint8 factor);
 
@@ -255,8 +251,6 @@ void GPU_Destroy(void);
 
 bool GPU_Rescale(uint8 ushift);
 
-int32_t GPU_Update(const int32_t sys_timestamp);
-
 void GPU_Power(void);
 
 void GPU_ResetTS(void);
@@ -268,8 +262,6 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
-
-int32_t GPU_GetScanlineNum(void);
 
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
 
