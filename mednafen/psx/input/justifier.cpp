@@ -31,7 +31,6 @@ class InputDevice_Justifier : public InputDevice
       virtual void Power(void);
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
-      virtual bool RequireNoFrameskip(void);
       // GPULineHook modified to take upscale_factor for color detection (surf_pitchinpix unused)
       virtual int32_t GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
@@ -180,11 +179,6 @@ int InputDevice_Justifier::StateAction(StateMem* sm, int load, int data_only, co
    }
 
    return(ret);
-}
-
-bool InputDevice_Justifier::RequireNoFrameskip(void)
-{
-   return(true);
 }
 
 int32_t InputDevice_Justifier::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)

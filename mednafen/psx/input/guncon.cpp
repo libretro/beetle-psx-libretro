@@ -31,7 +31,6 @@ class InputDevice_GunCon : public InputDevice
       virtual void Power(void);
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
       virtual void UpdateInput(const void *data);
-      virtual bool RequireNoFrameskip(void);
       // GPULineHook modified to take upscale_factor for color detection (surf_pitchinpix unused)
       virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
@@ -178,11 +177,6 @@ void InputDevice_GunCon::UpdateInput(const void *data)
    if((d8[4] & 0x8) && !prev_oss && os_shot_counter == 0)
       os_shot_counter = 4;
    prev_oss = d8[4] & 0x8;
-}
-
-bool InputDevice_GunCon::RequireNoFrameskip(void)
-{
-   return(true);
 }
 
 int32_t InputDevice_GunCon::GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width,

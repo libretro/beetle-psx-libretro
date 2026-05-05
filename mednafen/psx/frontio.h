@@ -16,7 +16,6 @@ class InputDevice
       virtual void UpdateInput(const void *data);
       virtual int StateAction(StateMem* sm, int load, int data_only, const char* section_name);
 
-      virtual bool RequireNoFrameskip(void);
       // Divide mouse X coordinate by pix_clock_divider in the lightgun code to get the coordinate in pixel(clocks).
       // GPULineHook modified to take upscale_factor for color detection (surf_pitchinpix unused)
       virtual int32_t GPULineHook(const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
@@ -74,8 +73,6 @@ class FrontIO
       int32_t CalcNextEventTS(int32_t timestamp, int32_t next_event);
       int32_t Update(int32_t timestamp);
       void ResetTS(void);
-
-      bool RequireNoFrameskip(void);
 
       // GPULineHook modified to take surface pitch (in pixels) and upscale factor for software renderer internal upscaling
       void GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);

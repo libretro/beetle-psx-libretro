@@ -19,6 +19,7 @@
 #include "frontio.h"
 
 #include <compat/msvc.h>
+#include <retro_miscellaneous.h>
 #include <streams/file_stream.h>
 
 #include "../state_helpers.h"
@@ -145,8 +146,8 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 				ic = 0;
 			}
 
-			x_start = std::max<int32>(0, (chair_x - ic) * upscale_factor);
-			x_bound = std::min<int32>(width * upscale_factor, (chair_x + ic + 1) * upscale_factor);
+			x_start = MAX(0, (chair_x - ic) * upscale_factor);
+			x_bound = MIN(width * upscale_factor, (chair_x + ic + 1) * upscale_factor);
 
 			for ( int32 x = x_start; x < x_bound; x++ )
 			{
@@ -168,8 +169,8 @@ INLINE void InputDevice::DrawCrosshairs(uint32 *pixels, const MDFN_PixelFormat* 
 
 			ic = pix_clock / ( 762925 * 6 );
 
-			x_start = std::max<int32>(0, (chair_x - ic) * upscale_factor);
-			x_bound = std::min<int32>(width * upscale_factor, (chair_x + ic) * upscale_factor);
+			x_start = MAX(0, (chair_x - ic) * upscale_factor);
+			x_bound = MIN(width * upscale_factor, (chair_x + ic) * upscale_factor);
 
 			for ( int32 x = x_start; x < x_bound; x++ )
 			{
@@ -251,11 +252,6 @@ int FrontIO::StateAction(StateMem* sm, int load, int data_only)
  }
 
  return(ret);
-}
-
-bool InputDevice::RequireNoFrameskip(void)
-{
- return false;
 }
 
 int32_t InputDevice::GPULineHook(const int32_t timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
@@ -531,7 +527,7 @@ void FrontIO::CheckStartStopPending(int32_t timestamp, bool skip_event_set)
          TransmitBitCounter = 0;
       }
 
-      ClockDivider = std::max<uint32>(0x20, (Baudrate << ScaleShift[Mode & 0x3]) & ~1); // Minimum of 0x20 is an emulation sanity check to prevent severe performance degradation.
+      ClockDivider = MAX(0x20, (Baudrate << ScaleShift[Mode & 0x3]) & ~1); // Minimum of 0x20 is an emulation sanity check to prevent severe performance degradation.
       //printf("CD: 0x%02x\n", ClockDivider);
    }
 
@@ -790,7 +786,7 @@ int32_t FrontIO::Update(int32_t timestamp)
                   }
                }
             }
-            ClockDivider += std::max<uint32>(0x20, (Baudrate << ScaleShift[Mode & 0x3]) & ~1); // Minimum of 0x20 is an emulation sanity check to prevent severe performance degradation.
+            ClockDivider += MAX(0x20, (Baudrate << ScaleShift[Mode & 0x3]) & ~1); // Minimum of 0x20 is an emulation sanity check to prevent severe performance degradation.
          }
          else
             break;
@@ -1022,17 +1018,6 @@ void FrontIO::SaveMemcard(unsigned int which, const char *path, bool force_save)
 
     DevicesMC[which]->ResetNVDirtyCount();
  }
-}
-
-bool FrontIO::RequireNoFrameskip(void)
-{
-   unsigned i;
-
-   for(i = 0; i < 8; i++)
-      if(Devices[i]->RequireNoFrameskip())
-         return(true);
-
-   return(false);
 }
 
 void FrontIO::GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
