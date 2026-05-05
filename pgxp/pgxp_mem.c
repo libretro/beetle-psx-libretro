@@ -5,20 +5,37 @@
 #include "pgxp_gte.h"
 #include "pgxp_value.h"
 
-PGXP_value Mem[3 * 2048 * 1024 / 4];		/* mirror 2MB in 32-bit words * 3 */
-const u32 UserMemOffset = 0;
-const u32 ScratchOffset = 2048 * 1024 / 4;
-const u32 RegisterOffset = 2 * 2048 * 1024 / 4;
-const u32 InvalidAddress = 3 * 2048 * 1024 / 4;
+/* The PGXP shadow of PSX memory.  Previously a single
+ * `Mem[3 * 2048 * 1024 / 4]` array of PGXP_value (42 MB) carved into
+ * three equal 524288-entry slots, of which only:
+ *   - the 524288-entry User RAM slot was actually filled,
+ *   - the second slot needed 256 entries (1 KB scratch / 4 bytes),
+ *   - the third slot needed 2048 entries (8 KB hardware regs / 4 bytes).
+ * That left ~27 MB of unused PGXP_value in the middle and tail of
+ * the buffer.  Splitting into three right-sized arrays drops the
+ * static BSS from 42 MB to about 14.4 MB without changing the
+ * external (u32) contract of PGXP_ConvertAddress.  The offset
+ * constants are kept so callers that print or compare with
+ * InvalidAddress continue to work, but the offsets are now packed
+ * back-to-back instead of on 524288-entry strides. */
+#define USER_MEM_COUNT		(2048 * 1024 / 4)	/* 524288 entries: 2 MB / 4 */
+#define SCRATCH_MEM_COUNT	(1024 / 4)		/* 256 entries: 1 KB / 4 */
+#define REGISTER_MEM_COUNT	(0x2000 / 4)		/* 2048 entries: 8 KB / 4 */
+
+static PGXP_value UserMem[USER_MEM_COUNT];
+static PGXP_value ScratchMem[SCRATCH_MEM_COUNT];
+static PGXP_value RegisterMem[REGISTER_MEM_COUNT];
+
+const u32 UserMemOffset  = 0;
+const u32 ScratchOffset  = USER_MEM_COUNT;
+const u32 RegisterOffset = USER_MEM_COUNT + SCRATCH_MEM_COUNT;
+const u32 InvalidAddress = USER_MEM_COUNT + SCRATCH_MEM_COUNT + REGISTER_MEM_COUNT;
 
 void PGXP_InitMem()
 {
-	memset(Mem, 0, sizeof(Mem));
-}
-
-char* PGXP_GetMem()
-{
-	return (char*)(Mem); /* Config.PGXP_GTE ? (char*)(Mem) : NULL; */
+	memset(UserMem,     0, sizeof(UserMem));
+	memset(ScratchMem,  0, sizeof(ScratchMem));
+	memset(RegisterMem, 0, sizeof(RegisterMem));
 }
 
 /*  Playstation Memory Map (from Playstation doc by Joshua Walker)
@@ -62,10 +79,7 @@ void ValidateAddress(u32 addr)
 
 u32 PGXP_ConvertAddress(u32 addr)
 {
-	u32 memOffs = 0;
 	u32 paddr = addr;
-
-/*	ValidateAddress(addr); */
 
 	switch (paddr >> 24)
 	{
@@ -81,8 +95,6 @@ u32 PGXP_ConvertAddress(u32 addr)
 		{
 			if (paddr >= 0x1f801000)
 			{
-				/*	paddr = ((paddr & 0xFFFF) - 0x1000);
-				 *	paddr = (paddr % 0x2000) >> 2; */
 				paddr = ((paddr & 0xFFFF) - 0x1000) >> 2;
 				paddr = RegisterOffset + paddr;
 				break;
@@ -106,8 +118,12 @@ PGXP_value* GetPtr(u32 addr)
 {
 	addr = PGXP_ConvertAddress(addr);
 
-	if (addr != InvalidAddress)
-		return &Mem[addr];
+	if (addr < ScratchOffset)
+		return &UserMem[addr - UserMemOffset];
+	if (addr < RegisterOffset)
+		return &ScratchMem[addr - ScratchOffset];
+	if (addr < InvalidAddress)
+		return &RegisterMem[addr - RegisterOffset];
 	return NULL;
 }
 
