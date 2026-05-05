@@ -181,7 +181,30 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
    RecalcTexWindowStuff(gpu);
 }
 
-/* C-style function wrappers so our command table isn't so ginormous(in memory usage). */
+/*
+ * G_Command_DrawPolygon - the polygon dispatch wrapper. Sits one
+ * layer above Command_DrawPolygon in the call chain so the
+ * func[][] dispatch table can hold one pointer per (numvertices,
+ * shaded, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA)
+ * combination without also multiplying out by the PGXP-on/off
+ * dimension.
+ *
+ * PGXP (Parallel/Geometry eXtended Precision) is the
+ * subpixel-precision projection patch; whether it's enabled is
+ * a runtime user setting (PGXP_enabled() reads a global config
+ * flag) and toggling it must not require rebuilding the table.
+ * The runtime check is cheap enough vs. the rasteriser cost that
+ * we accept it; both branches are themselves fully-specialised
+ * Command_DrawPolygon instantiations so the inner loop stays
+ * branch-free on the seven static template parameters.
+ *
+ * The "ginormous (in memory usage)" comment alludes to what would
+ * happen if the table held both PGXP variants in parallel: ~280
+ * specialisations * 2 = ~560, instead of 280, plus the binary
+ * cost of every Command_DrawPolygon body twice over. The wrapper
+ * lets us pay one extra branch per polygon command for half the
+ * code size.
+ */
 template<int numvertices, bool shaded, bool textured,
     int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
@@ -414,6 +437,44 @@ static void Command_MaskSetting(PS_GPU* g, const uint32 *cb)
 }
 
 
+/*
+ * Commands[256] - GP0 command opcode dispatch table.
+ *
+ * Indexed by the high 8 bits of the command word (the GP0
+ * opcode). Each entry is a fully-instantiated CTEntry whose
+ * func[abr][slot] matrix selects the rasteriser specialisation
+ * to invoke, and whose len/fifo_fb_len fields drive the FIFO
+ * accounting in the dispatcher.
+ *
+ * Opcode ranges (see gpu_common.h for the full bit-field
+ * decoding of polygon/line/sprite opcodes):
+ *
+ *   0x00              No-op (NULLCMD)
+ *   0x01              ClearCache
+ *   0x02              FBFill (rectangle clear in VRAM)
+ *   0x03..0x1E        unused
+ *   0x1F              IRQ assert
+ *   0x20..0x3F        Polygon variants (POLY_HELPER)
+ *   0x40..0x5F        Line / polyline variants (LINE_HELPER)
+ *   0x60..0x7F        Sprite variants (SPR_HELPER)
+ *   0x80..0x9F        FBCopy (VRAM-to-VRAM rectangle copy)
+ *   0xA0..0xBF        FBWrite (CPU-to-VRAM transfer)
+ *   0xC0..0xDF        FBRead  (VRAM-to-CPU transfer)
+ *   0xE0              unused
+ *   0xE1              DrawMode  (texture page / dither / etc)
+ *   0xE2              TexWindow
+ *   0xE3              Clip0 (drawing-area top-left)
+ *   0xE4              Clip1 (drawing-area bottom-right)
+ *   0xE5              DrawingOffset
+ *   0xE6              MaskSetting (MaskSetOR / MaskEvalAND)
+ *   0xE7..0xFF        unused
+ *
+ * The polygon/line/sprite POLY_HELPER macros expand to 32-cell
+ * func[][] matrices covering every (BlendMode, TexMode_TA,
+ * MaskEval_TA) combination at compile time; the OTHER_HELPER
+ * variants replicate a single function pointer across all 32
+ * slots.
+ */
 static CTEntry Commands[256] =
 {
    /* 0x00 */

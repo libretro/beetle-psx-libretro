@@ -46,6 +46,28 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
    return(xfp >> 32);
 }
 
+/*
+ * CalcIDeltas - compute per-pixel deltas (du/dx, du/dy, dr/dx,
+ * etc.) for the upcoming triangle, given the three vertices.
+ *
+ * Template parameters:
+ *   gouraud  - if true, vertex colours r/g/b interpolate across
+ *              the triangle; deltas are stored in idl.dr/dg/db.
+ *              When false, the colour is flat across the
+ *              triangle and the delta computations are dropped.
+ *   textured - if true, vertex texture coords u/v interpolate
+ *              across the triangle. Same elision when false.
+ *
+ * CALCIS computes the cross-product-style "interpolant slope"
+ * given two attribute axes. Returns false if the triangle is
+ * degenerate (zero-area), in which case the caller skips the
+ * draw.
+ *
+ * COORD_FBS is the fixed-point shift for screen coordinates;
+ * COORD_POST_PADDING is an additional left-shift so the
+ * fixed-point result has enough headroom for the per-pixel
+ * accumulation in the inner loop.
+ */
 #define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
 template<bool gouraud, bool textured>
 static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
@@ -80,6 +102,19 @@ static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_ver
 }
 #undef CALCIS
 
+/*
+ * AddIDeltas_DX / AddIDeltas_DY - step the interpolant group
+ * `ig` by `count` pixels in screen-X or screen-Y, using the
+ * per-pixel deltas from CalcIDeltas above.
+ *
+ * gouraud / textured template parameters elide the entire
+ * delta-add when the corresponding vertex attribute isn't
+ * carried by this primitive.
+ *
+ * `count` defaults to 1 for the per-pixel inner-loop case;
+ * larger values are used by DrawTriangle to skip across clipped
+ * regions in a single multiply rather than iterating.
+ */
 template<bool gouraud, bool textured>
 static INLINE void AddIDeltas_DX(i_group &ig, const i_deltas &idl, uint32_t count = 1)
 {
@@ -114,6 +149,33 @@ static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t coun
    }
 }
 
+/*
+ * DrawSpan - rasterise one horizontal span of a triangle.
+ *
+ * Called per scanline by DrawTriangle once the top/bottom edges
+ * have been walked to the appropriate y. `ig` carries the
+ * interpolant values at x_start; `idl` carries the per-pixel
+ * deltas for stepping across the span.
+ *
+ * Template parameters (the full polygon-draw specialisation
+ * tuple, all baked in at compile time):
+ *   gouraud      - per-vertex colour interpolation enabled
+ *   textured     - texture sampling enabled
+ *   BlendMode    - BLEND_MODE_OPAQUE (-1) skips blend; otherwise
+ *                  one of BLEND_MODE_AVERAGE / _ADD / _SUBTRACT
+ *                  / _ADD_FOURTH applied to each plotted pixel
+ *   TexMult      - if true, texel colour is modulated by the
+ *                  shaded vertex colour (PS1 "texture color
+ *                  modulation"); when false, the texel goes to
+ *                  the framebuffer unmodified
+ *   TexMode_TA   - 4bpp / 8bpp / 15bpp texel format selector
+ *                  (see GetTexel above)
+ *   MaskEval_TA  - if true, gate writes on destination mask bit
+ *
+ * Calls PlotPixel (upscale-aware) per fragment; PlotPixel itself
+ * is specialised on (BlendMode, MaskEval_TA, textured), and is
+ * inlined here so the inner loop is fully fused.
+ */
 template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
 static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl)
 {
@@ -217,6 +279,20 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
   } while(MDFN_LIKELY(--w > 0));
 }
 
+/*
+ * DrawTriangle - rasterise one triangle.
+ *
+ * Walks the top and bottom edges to compute scanline x ranges,
+ * then calls DrawSpan once per scanline. Template parameters
+ * pass through verbatim from Command_DrawPolygon below; see
+ * DrawSpan for their semantics.
+ *
+ * The "core_vertex" selection picks which of the three vertices
+ * is the apex (highest or lowest y) and which two form the base.
+ * This affects subpixel-correct edge walking on PS1 hardware
+ * where the rasterisation order of the three triangle vertices
+ * is observable in some games' rendering.
+ */
 template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
 static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices)
 {
@@ -491,6 +567,39 @@ bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
 extern int psx_pgxp_2d_tol;
 
+/*
+ * Command_DrawPolygon - top-level GP0 polygon command handler.
+ *
+ * Parses the GP0 command buffer for vertex/colour/uv data,
+ * applies the drawing-offset, optionally consults PGXP for
+ * subpixel-precision projection, then walks one or two triangles
+ * (a triangle for numvertices==3, two tris for numvertices==4).
+ *
+ * Template parameters:
+ *   numvertices  - 3 (triangle) or 4 (quad rendered as two tris)
+ *   gouraud      - per-vertex colour
+ *   textured     - texture sampling
+ *   BlendMode    - blend pipeline selector (see DrawSpan)
+ *   TexMult      - texel-colour modulation flag
+ *   TexMode_TA   - 4/8/15bpp format
+ *   MaskEval_TA  - mask-bit gate on destination
+ *   pgxp         - PGXP subpixel-precision path (selected
+ *                  one layer up by G_Command_DrawPolygon based
+ *                  on the runtime PGXP_enabled() check)
+ *
+ * Reached from the GP0 dispatch via:
+ *   Commands[0x20..0x3F].func[abr][slot] (POLY_HELPER family)
+ *     -> G_Command_DrawPolygon (PGXP runtime gate)
+ *       -> Command_DrawPolygon (this function)
+ *         -> DrawTriangle (per triangle)
+ *           -> DrawSpan (per scanline)
+ *             -> PlotPixel (per pixel)
+ *
+ * Every layer except the PGXP gate is fully template-specialised,
+ * so the entire chain inlines into a single tight inner loop per
+ * (numvertices, gouraud, textured, BlendMode, TexMult,
+ * TexMode_TA, MaskEval_TA, pgxp) combination.
+ */
 template<int numvertices, bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
 static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
 {

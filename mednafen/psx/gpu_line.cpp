@@ -26,6 +26,16 @@ struct line_fxp_step
 #define LINE_XY_FRACTBITS  32
 #define LINE_RGB_FRACTBITS 12
 
+/*
+ * line_point_to_fixed_point_coord - convert a line endpoint
+ * (line_point) plus its per-pixel step (line_fxp_step) into the
+ * fixed-point bias-adjusted starting coord (line_fxp_coord) used
+ * by the per-pixel walker.
+ *
+ * `gouraud` template parameter elides the r/g/b initialisation
+ * for non-gouraud lines (single-colour path) so the unused
+ * fields aren't written.
+ */
 template<bool gouraud>
 static INLINE void line_point_to_fixed_point_coord(const line_point *point,
       const line_fxp_step *step, line_fxp_coord *coord)
@@ -58,6 +68,13 @@ static INLINE int64_t line_divide(int64_t delta, int32_t dk)
    return(delta / dk);
 }
 
+/*
+ * line_points_to_fixed_point_step - compute the per-pixel
+ * fixed-point delta in (x, y, r, g, b) for a line from point0 to
+ * point1, given the dominant-axis pixel count `dk`.
+ *
+ * `gouraud` elides the r/g/b deltas when not needed.
+ */
 template<bool gouraud>
 static INLINE void line_points_to_fixed_point_step(const line_point *point0,
       const line_point *point1, const int32_t dk, line_fxp_step *step)
@@ -87,6 +104,10 @@ static INLINE void line_points_to_fixed_point_step(const line_point *point0,
    }
 }
 
+/*
+ * AddLineStep - advance the per-pixel coordinate by one step
+ * along the line. `gouraud` elides the r/g/b advance.
+ */
 template<bool gouraud>
 static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
 {
@@ -101,6 +122,24 @@ static INLINE void AddLineStep(line_fxp_coord *point, const line_fxp_step *step)
    }
 }
 
+/*
+ * DrawLine - rasterise one line segment.
+ *
+ * Walks pixels along the dominant axis (whichever of dx/dy is
+ * larger) using a simple DDA in fixed-point, calling
+ * PlotNativePixel at each step.
+ *
+ * Template parameters:
+ *   gouraud      - per-vertex r/g/b interpolation; flat colour
+ *                  when false
+ *   BlendMode    - BLEND_MODE_OPAQUE (-1) skips blend, otherwise
+ *                  one of BLEND_MODE_AVERAGE / _ADD / _SUBTRACT
+ *                  / _ADD_FOURTH (see PlotPixelBlend)
+ *   MaskEval_TA  - mask-bit gate on destination pixel
+ *
+ * Lines are never textured on PS1 hardware, so there's no
+ * texture-mode dimension here.
+ */
 template<bool gouraud, int BlendMode, bool MaskEval_TA>
 static void DrawLine(PS_GPU *gpu, line_point *points)
 {
@@ -162,6 +201,21 @@ static void DrawLine(PS_GPU *gpu, line_point *points)
    }
 }
 
+/*
+ * Command_DrawLine - top-level GP0 line/polyline command handler.
+ *
+ * Parses the command buffer for endpoint(s) and per-vertex
+ * colour data, then invokes DrawLine once per segment.
+ *
+ * Template parameters:
+ *   polyline     - 0 for two-point line, 1 for N-point polyline
+ *                  with terminator-word detection
+ *   gouraud      - per-vertex colour
+ *   BlendMode    - blend selector (see DrawLine above)
+ *   MaskEval_TA  - mask-bit gate
+ *
+ * Reached from the GP0 dispatch via Commands[0x40..0x5F].
+ */
 template<bool polyline, bool gouraud, int BlendMode, bool MaskEval_TA>
 static void Command_DrawLine(PS_GPU *gpu, const uint32_t *cb)
 {

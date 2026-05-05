@@ -1,4 +1,32 @@
 
+/*
+ * DrawSprite - rasterise one sprite (axis-aligned textured or
+ * flat-shaded rectangle).
+ *
+ * Sprites use 1x VRAM coordinates (PlotNativePixel rather than
+ * the upscale-aware PlotPixel) since they're commonly used for
+ * UI overlays where preserving native pixel boundaries matters.
+ *
+ * Template parameters:
+ *   textured     - 1 for textured sprite (sample from texture
+ *                  page), 0 for flat fill
+ *   BlendMode    - BLEND_MODE_OPAQUE (-1) for no blend, else one
+ *                  of BLEND_MODE_AVERAGE / _ADD / _SUBTRACT /
+ *                  _ADD_FOURTH (see PlotPixelBlend)
+ *   TexMult      - 1 to modulate texel by vertex colour, 0 to
+ *                  use texel verbatim. Forced to 0 when textured
+ *                  is 0 (see SPR_HELPER_SUB)
+ *   TexMode_TA   - 4bpp / 8bpp / 15bpp texture format
+ *   MaskEval_TA  - mask-bit gate on destination
+ *   FlipX        - horizontal flip of texture (PS1's
+ *                  GP0(0xE1) bit 12)
+ *   FlipY        - vertical flip of texture (GP0(0xE1) bit 13)
+ *
+ * The clipping math (ClipX0/ClipY0/ClipX1/ClipY1) handles
+ * partial-offscreen sprites; texture coords are advanced into
+ * the clipped region before drawing begins so the visible part
+ * samples the right texels.
+ */
 template<bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA,
    bool MaskEval_TA, bool FlipX, bool FlipY>
 static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int32_t h,
@@ -115,6 +143,38 @@ static void DrawSprite(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int
    }
 }
 
+/*
+ * Command_DrawSprite - top-level GP0 sprite command handler.
+ *
+ * Parses the GP0 command buffer for position, dimensions, colour,
+ * and texture coords, then dispatches to the appropriate DrawSprite
+ * specialisation based on the runtime SpriteFlip register
+ * (GP0(0xE1) bits 12-13).
+ *
+ * Template parameters:
+ *   raw_size     - sprite size class (see SPR_HELPER family in
+ *                  gpu_common.h):
+ *                    0 = variable, w/h come from extra GP0 word
+ *                    1 = 1x1
+ *                    2 = 8x8
+ *                    3 = 16x16
+ *   textured     - 1 if sprite samples from texture page
+ *   BlendMode    - blend selector (see DrawSprite above)
+ *   TexMult      - texel-colour modulation flag (forced 0 when
+ *                  not textured)
+ *   TexMode_TA   - 4/8/15bpp texture format
+ *   MaskEval_TA  - mask-bit gate
+ *
+ * The runtime switch on `gpu->SpriteFlip & 0x3000` selects one
+ * of four DrawSprite specialisations (FlipX x FlipY). The
+ * surrounding `if(!TexMult || color == 0x808080)` handles the
+ * "neutral colour" optimisation: when the requested vertex
+ * colour is exactly mid-grey, the texel-colour modulation
+ * collapses to identity, so we route to the cheaper
+ * TexMult=false specialisation.
+ *
+ * Reached from the GP0 dispatch via Commands[0x60..0x7F].
+ */
 template<uint8_t raw_size, bool textured, int BlendMode,
    bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
 static void Command_DrawSprite(PS_GPU *gpu, const uint32_t *cb)
