@@ -24,9 +24,9 @@
 
   bool InFIFOReady;
 
-  if(InFIFO.CanWrite())
+  if(FastFIFO_CanWrite(&InFIFO))
   {
-   InFIFO.Write(V);
+   FastFIFO_Write(&InFIFO, V);
 
    if(InCommand)
    {
@@ -34,13 +34,13 @@
     {
      InCounter--;
 
-     // This condition when InFIFO.CanWrite() != 0 is a bit buggy on real hardware, decoding loop *seems* to be reading too
+     // This condition when FastFIFO_CanWrite(&InFIFO) != 0 is a bit buggy on real hardware, decoding loop *seems* to be reading too
      // much and pulling garbage from the FIFO.
      if(InCounter == 0xFFFF)
       InFIFOReady = true;
     }
 
-    if(InFIFO.CanWrite() == 0)
+    if(FastFIFO_CanWrite(&InFIFO) == 0)
      InFIFOReady = true;
    }
   }
@@ -60,6 +60,8 @@
 #include "../math_ops.h"
 #include "../state_helpers.h"
 
+#include <retro_miscellaneous.h>
+
 #include "FastFIFO.h"
 #include <math.h>
 
@@ -74,8 +76,8 @@
 
 static int32 ClockCounter;
 static unsigned MDRPhase;
-static FastFIFO<uint32, 0x20> InFIFO;
-static FastFIFO<uint32, 0x20> OutFIFO;
+static FastFIFO InFIFO;
+static FastFIFO OutFIFO;
 
 static int8 block_y[8][8];
 static int8 block_cb[8][8];	// [y >> 1][x >> 1]
@@ -131,8 +133,8 @@ void MDEC_Power(void)
    ClockCounter = 0;
    MDRPhase = 0;
 
-   InFIFO.Flush();
-   OutFIFO.Flush();
+   FastFIFO_Flush(&InFIFO);
+   FastFIFO_Flush(&OutFIFO);
 
    memset(block_y, 0, sizeof(block_y));
    memset(block_cb, 0, sizeof(block_cb));
@@ -218,8 +220,8 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
 
    if(load)
    {
-      InFIFO.SaveStatePostLoad();
-      OutFIFO.SaveStatePostLoad();
+      FastFIFO_SaveStatePostLoad(&InFIFO);
+      FastFIFO_SaveStatePostLoad(&OutFIFO);
 
       PixelBufferCount32 %= (sizeof(PixelBuffer.pix32) / sizeof(PixelBuffer.pix32[0])) + 1;
    }
@@ -240,18 +242,24 @@ static INLINE int8 Mask9ClampS8(int32 v)
    return v;
 }
 
-template<typename T>
-static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
+/* Two specialized IDCT 1-D pass functions, formerly a single template
+ * `IDCT_1D_Multi<T>` with sizeof(T)-dispatched output handling. The
+ * pass-1 (int16) variant writes the result transposed to feed pass-2;
+ * pass-2 (int8) writes non-transposed and saturates through
+ * Mask9ClampS8. Splitting them removes a C++ template - the only one
+ * in this file - and lets gcc/clang specialize each unconditionally
+ * without the dead sizeof(T) branch. */
+static void IDCT_1D_Pass1(const int16 *in_coeff, int16 *out_coeff)
 {
    unsigned col, x;
 
-   for(col = 0; col < 8; col++)
+   for (col = 0; col < 8; col++)
    {
 #if defined(__SSE2__)
-      __m128i c =  _mm_load_si128((__m128i *)&in_coeff[(col * 8)]);
+      __m128i c =  _mm_load_si128((const __m128i *)&in_coeff[(col * 8)]);
 #endif
 
-      for( x = 0; x < 8; x++)
+      for (x = 0; x < 8; x++)
       {
 #ifdef __SSE2__
          MDFN_ALIGN(16) int32 tmp[4];
@@ -262,21 +270,50 @@ static void IDCT_1D_Multi(int16 *in_coeff, T *out_coeff)
 
          _mm_store_si128((__m128i*)tmp, sum);
 
-         if(sizeof(T) == 1)
-            out_coeff[(col * 8) + x] = Mask9ClampS8((tmp[0] + 0x4000) >> 15);
-         else
-            out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
+         out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
 #else
          int32 sum = 0;
          unsigned u;
 
-         for(u = 0; u < 8; u++)
+         for (u = 0; u < 8; u++)
             sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
 
-         if(sizeof(T) == 1)
-            out_coeff[(col * 8) + x] = Mask9ClampS8((sum + 0x4000) >> 15);
-         else
-            out_coeff[(x * 8) + col] = (sum + 0x4000) >> 15;
+         out_coeff[(x * 8) + col] = (sum + 0x4000) >> 15;
+#endif
+      }
+   }
+}
+
+static void IDCT_1D_Pass2(const int16 *in_coeff, int8 *out_coeff)
+{
+   unsigned col, x;
+
+   for (col = 0; col < 8; col++)
+   {
+#if defined(__SSE2__)
+      __m128i c =  _mm_load_si128((const __m128i *)&in_coeff[(col * 8)]);
+#endif
+
+      for (x = 0; x < 8; x++)
+      {
+#ifdef __SSE2__
+         MDFN_ALIGN(16) int32 tmp[4];
+         __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
+         __m128i sum = _mm_madd_epi16(m, c);
+         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
+         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (1 << 0) | (0 << 2)));
+
+         _mm_store_si128((__m128i*)tmp, sum);
+
+         out_coeff[(col * 8) + x] = Mask9ClampS8((tmp[0] + 0x4000) >> 15);
+#else
+         int32 sum = 0;
+         unsigned u;
+
+         for (u = 0; u < 8; u++)
+            sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
+
+         out_coeff[(col * 8) + x] = Mask9ClampS8((sum + 0x4000) >> 15);
 #endif
       }
    }
@@ -286,21 +323,21 @@ static void IDCT(int16 *in_coeff, int8 *out_coeff)
 {
    MDFN_ALIGN(16) int16 tmpbuf[64];
 
-   IDCT_1D_Multi<int16>(in_coeff, tmpbuf);
-   IDCT_1D_Multi<int8>(tmpbuf, out_coeff);
+   IDCT_1D_Pass1(in_coeff, tmpbuf);
+   IDCT_1D_Pass2(tmpbuf, out_coeff);
 }
 
-static INLINE void YCbCr_to_RGB(const int8 y, const int8 cb, const int8 cr, int &r, int &g, int &b)
+static INLINE void YCbCr_to_RGB(const int8 y, const int8 cb, const int8 cr, int *r, int *g, int *b)
 {
    // The formula for green is still a bit off(precision/rounding issues when both cb and cr are non-zero).
-   r = Mask9ClampS8(y + (((359 * cr) + 0x80) >> 8));
+   *r = Mask9ClampS8(y + (((359 * cr) + 0x80) >> 8));
    //g = Mask9ClampS8(y + (((-88 * cb) + (-183 * cr) + 0x80) >> 8));
-   g = Mask9ClampS8(y + ((((-88 * cb) &~ 0x1F) + ((-183 * cr) &~ 0x07) + 0x80) >> 8));
-   b = Mask9ClampS8(y + (((454 * cb) + 0x80) >> 8));
+   *g = Mask9ClampS8(y + ((((-88 * cb) &~ 0x1F) + ((-183 * cr) &~ 0x07) + 0x80) >> 8));
+   *b = Mask9ClampS8(y + (((454 * cb) + 0x80) >> 8));
 
-   r ^= 0x80;
-   g ^= 0x80;
-   b ^= 0x80;
+   *r ^= 0x80;
+   *g ^= 0x80;
+   *b ^= 0x80;
 }
 
 static INLINE uint16 RGB_to_RGB555(uint8 r, uint8 g, uint8 b)
@@ -338,8 +375,8 @@ static void EncodeImage(const unsigned ybn)
             {
                for(int x = 0; x < 8; x += 2)
                {
-                  uint8 p0 = std::min<int>(127, block_y[y][x + 0] + 8);
-                  uint8 p1 = std::min<int>(127, block_y[y][x + 1] + 8);
+                  uint8 p0 = MIN(127, block_y[y][x + 0] + 8);
+                  uint8 p1 = MIN(127, block_y[y][x + 1] + 8);
 
                   *pix_out = ((p0 >> 4) | (p1 & 0xF0)) ^ us_xor;
                   pix_out++;
@@ -382,7 +419,7 @@ static void EncodeImage(const unsigned ybn)
                {
                   int r, g, b;
 
-                  YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], r, g, b);
+                  YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], &r, &g, &b);
 
                   pix_out[0] = r ^ rgb_xor;
                   pix_out[1] = g ^ rgb_xor;
@@ -409,7 +446,7 @@ static void EncodeImage(const unsigned ybn)
                {
                   int r, g, b;
 
-                  YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], r, g, b);
+                  YCbCr_to_RGB(by[x], cb[x >> 1], cr[x >> 1], &r, &g, &b);
 
                   StoreU16_LE(pix_out, pixel_xor ^ RGB_to_RGB555(r, g, b));
                   pix_out++;
@@ -449,7 +486,7 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
             tmp = (uint32)(ci * 2) << 4;
 
          // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
-         Coeff[ZigZag[0]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
+         Coeff[ZigZag[0]] = MIN(0x3FFF, MAX(-0x4000, tmp));
          CoeffIndex++;
       }
    }
@@ -482,7 +519,7 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
                tmp = (uint32)(ci * 2) << 4;
 
             // Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8?
-            Coeff[ZigZag[CoeffIndex]] = std::min<int>(0x3FFF, std::max<int>(-0x4000, tmp));
+            Coeff[ZigZag[CoeffIndex]] = MIN(0x3FFF, MAX(-0x4000, tmp));
             CoeffIndex++;
          }
       }
@@ -541,7 +578,7 @@ void MDEC_Run(int32 clocks)
       for(;;)
       {
          InCommand = false;
-         { { case 1: if(!(InFIFO.in_count)) { MDRPhase = 2 - MDRPhaseBias - 1; return; } }; Command = InFIFO.Read(); };
+         { { case 1: if(!(InFIFO.in_count)) { MDRPhase = 2 - MDRPhaseBias - 1; return; } }; Command = FastFIFO_Read(&InFIFO); };
          InCommand = true;
          { ClockCounter -= (1); { case 3: if(!(ClockCounter > 0)) { MDRPhase = 4 - MDRPhaseBias - 1; return; } }; };
 
@@ -553,7 +590,7 @@ void MDEC_Run(int32 clocks)
          if(((Command >> 29) & 0x7) == 1)
          {
             InCounter = Command & 0xFFFF;
-            OutFIFO.Flush();
+            FastFIFO_Flush(&OutFIFO);
             //OutBuffer.Flush();
 
             PixelBufferCount32 = 0;
@@ -580,7 +617,7 @@ void MDEC_Run(int32 clocks)
                uint32 tfr;
                int32 need_eat; // = 0;
 
-               { { case 5: if(!(InFIFO.in_count)) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 5: if(!(InFIFO.in_count)) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
                InCounter--;
 
                //     printf("KA: %04x %08x\n", InCounter, tfr);
@@ -596,7 +633,7 @@ void MDEC_Run(int32 clocks)
 
                while(PixelBufferReadOffset < PixelBufferCount32)
                {
-                  { { case 9: if(!(OutFIFO.CanWrite())) { MDRPhase = 10 - MDRPhaseBias - 1; return; } }; OutFIFO.Write(LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++])); };
+                  { { case 9: if(!(FastFIFO_CanWrite(&OutFIFO))) { MDRPhase = 10 - MDRPhaseBias - 1; return; } }; FastFIFO_Write(&OutFIFO, LoadU32_LE(&PixelBuffer.pix32[PixelBufferReadOffset++])); };
                }
             } while(InCounter != 0xFFFF);
          }
@@ -613,7 +650,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               { { case 11: if(!(InFIFO.in_count)) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 11: if(!(InFIFO.in_count)) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
                InCounter--;
 
                //printf("KA: %04x %08x\n", InCounter, tfr);
@@ -639,7 +676,7 @@ void MDEC_Run(int32 clocks)
             {
                uint32 tfr;
 
-               { { case 13: if(!(InFIFO.in_count)) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = InFIFO.Read(); };
+               { { case 13: if(!(InFIFO.in_count)) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
                InCounter--;
 
                for(unsigned i = 0; i < 2; i++)
@@ -661,10 +698,10 @@ void MDEC_Run(int32 clocks)
 
 void MDEC_DMAWrite(uint32 V)
 {
-   if(!InFIFO.CanWrite())
+   if(!FastFIFO_CanWrite(&InFIFO))
       return;
 
-   InFIFO.Write(V);
+   FastFIFO_Write(&InFIFO, V);
    MDEC_Run(0);
 }
 
@@ -676,7 +713,7 @@ uint32 MDEC_DMARead(uint32* offs)
 
    if(MDFN_LIKELY(OutFIFO.in_count))
    {
-      V = OutFIFO.Read();
+      V = FastFIFO_Read(&OutFIFO);
 
       *offs = (RAMOffsetY & 0x7) * RAMOffsetWWS;
 
@@ -700,7 +737,7 @@ uint32 MDEC_DMARead(uint32* offs)
 
 bool MDEC_DMACanWrite(void)
 {
- return((InFIFO.CanWrite() >= 0x20) && (Control & (1U << 30)) && InCommand && InCounter != 0xFFFF);
+ return((FastFIFO_CanWrite(&InFIFO) >= 0x20) && (Control & (1U << 30)) && InCommand && InCounter != 0xFFFF);
 }
 
 bool MDEC_DMACanRead(void)
@@ -731,16 +768,16 @@ void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
          CoeffIndex = 0;
          DecodeWB = 0;
 
-         InFIFO.Flush();
-         OutFIFO.Flush();
+         FastFIFO_Flush(&InFIFO);
+         FastFIFO_Flush(&OutFIFO);
       }
       Control = V & 0x7FFFFFFF;
    }
    else
    {
-      if(InFIFO.CanWrite())
+      if(FastFIFO_CanWrite(&InFIFO))
       {
-         InFIFO.Write(V);
+         FastFIFO_Write(&InFIFO, V);
 
          if(!InCommand)
          {
@@ -761,7 +798,7 @@ uint32 MDEC_Read(const int32_t timestamp, uint32 A)
   ret = 0;
 
   ret |= (OutFIFO.in_count == 0) << 31;
-  ret |= (InFIFO.CanWrite() == 0) << 30;
+  ret |= (FastFIFO_CanWrite(&InFIFO) == 0) << 30;
   ret |= InCommand << 29;
 
   ret |= MDEC_DMACanWrite() << 28;
@@ -776,7 +813,7 @@ uint32 MDEC_Read(const int32_t timestamp, uint32 A)
  else
  {
   if(OutFIFO.in_count)
-   ret = OutFIFO.Read();
+   ret = FastFIFO_Read(&OutFIFO);
  }
 
  //PSX_WARNING("[MDEC] Read: 0x%08x 0x%08x -- %d %d", A, ret, InputBuffer.in_count, InCounter);

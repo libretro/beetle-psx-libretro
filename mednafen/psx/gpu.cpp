@@ -91,7 +91,7 @@ static const int8 dither_table[4][4] =
    {  3, -1,  2, -2 },
 };
 
-static FastFIFO<uint32, 0x20> GPU_BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
+static FastFIFO GPU_BlitterFIFO; // 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h)
 
 struct CTEntry
 {
@@ -560,7 +560,7 @@ static CTEntry Commands[256] =
 
 static INLINE bool CalcFIFOReadyBit(void)
 {
-   uint32_t ctcommand = (GPU_BlitterFIFO.Peek() >> 24);
+   uint32_t ctcommand = (FastFIFO_Peek(&GPU_BlitterFIFO) >> 24);
 
    if(GPU.InCmd & (INCMD_PLINE | INCMD_QUAD))
       return(false);
@@ -572,7 +572,7 @@ static INLINE bool CalcFIFOReadyBit(void)
       return(false);
 
    // Change fifo_fb_len from 2 to 3 for Command_FBWrite when running Monkey Hero.
-   if(GPU_BlitterFIFO.in_count >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len + ((ctcommand >= 0xA0) && (ctcommand <= 0xBF) && is_monkey_hero ? 1 : 0))
+   if(GPU_BlitterFIFO.in_count >= Commands[FastFIFO_Peek(&GPU_BlitterFIFO) >> 24].fifo_fb_len + ((ctcommand >= 0xA0) && (ctcommand <= 0xBF) && is_monkey_hero ? 1 : 0))
       return(false);
 
    return(true);
@@ -821,7 +821,7 @@ static void GPU_SoftReset(void) // Control command 0x00
    if(GPU.DrawTimeAvail < 0)
       GPU.DrawTimeAvail = 0;
 
-   GPU_BlitterFIFO.Flush();
+   FastFIFO_Flush(&GPU_BlitterFIFO);
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
 
@@ -919,7 +919,7 @@ void GPU_Power(void)
    GPU.abr = 0;
    GPU.TexMode = 0;
 
-   GPU_BlitterFIFO.Flush();
+   FastFIFO_Flush(&GPU_BlitterFIFO);
 
    GPU.DataReadBuffer = 0; // Don't reset in SoftReset()
    GPU.DataReadBufferEx = 0;
@@ -1012,7 +1012,7 @@ static void ProcessFIFO(uint32_t in_count)
       case INCMD_NONE:
          break;
       case INCMD_FBWRITE:
-         InData = GPU_BlitterFIFO.Read();
+         InData = FastFIFO_Read(&GPU_BlitterFIFO);
 
          for(i = 0; i < 2; i++)
          {
@@ -1060,9 +1060,9 @@ static void ProcessFIFO(uint32_t in_count)
 
          command_len        = 1 + (bool)(GPU.InCmd_CC & 0x10);
 
-         if((GPU_BlitterFIFO.Peek() & 0xF000F000) == 0x50005000)
+         if((FastFIFO_Peek(&GPU_BlitterFIFO) & 0xF000F000) == 0x50005000)
          {
-            GPU_BlitterFIFO.Read();
+            FastFIFO_Read(&GPU_BlitterFIFO);
             GPU.InCmd = INCMD_NONE;
             return;
          }
@@ -1073,7 +1073,7 @@ static void ProcessFIFO(uint32_t in_count)
 
    if (!read_fifo)
    {
-      cc          = GPU_BlitterFIFO.Peek() >> 24;
+      cc          = FastFIFO_Peek(&GPU_BlitterFIFO) >> 24;
       command     = &Commands[cc];
       command_len = command->len;
 
@@ -1088,7 +1088,7 @@ static void ProcessFIFO(uint32_t in_count)
    {
       if(PGXP_enabled())
          PGXP_WriteCB(PGXP_ReadFIFO(GPU_BlitterFIFO.read_pos), i);
-      CB[i] = GPU_BlitterFIFO.Read();
+      CB[i] = FastFIFO_Read(&GPU_BlitterFIFO);
    }
 
    if (!read_fifo)
@@ -1122,12 +1122,12 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 {
    if(GPU_BlitterFIFO.in_count >= 0x10
       && (GPU.InCmd != INCMD_NONE || 
-      (GPU_BlitterFIFO.in_count - 0x10) >= Commands[GPU_BlitterFIFO.Peek() >> 24].fifo_fb_len))
+      (GPU_BlitterFIFO.in_count - 0x10) >= Commands[FastFIFO_Peek(&GPU_BlitterFIFO) >> 24].fifo_fb_len))
       return;
 
    if(PGXP_enabled())
       PGXP_WriteFIFO(ReadMem(addr), GPU_BlitterFIFO.write_pos);
-   GPU_BlitterFIFO.Write(InData);
+   FastFIFO_Write(&GPU_BlitterFIFO, InData);
 
    if(GPU_BlitterFIFO.in_count && GPU.InCmd != INCMD_FBREAD)
       ProcessFIFO(GPU_BlitterFIFO.in_count);
@@ -1167,7 +1167,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
          case 0x01:  // Reset command buffer
             if(GPU.DrawTimeAvail < 0)
                GPU.DrawTimeAvail = 0;
-            GPU_BlitterFIFO.Flush();
+            FastFIFO_Flush(&GPU_BlitterFIFO);
             GPU.InCmd = INCMD_NONE;
             break;
 
@@ -1866,7 +1866,7 @@ void GPU_RestoreStateP3(void)
    RecalcTexWindowStuff(&GPU);
    rsx_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
 
-   GPU_BlitterFIFO.SaveStatePostLoad();
+   FastFIFO_SaveStatePostLoad(&GPU_BlitterFIFO);
 
    GPU.HorizStart &= 0xFFF;
    GPU.HorizEnd &= 0xFFF;
