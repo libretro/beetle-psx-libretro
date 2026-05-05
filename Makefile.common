@@ -192,8 +192,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
                -include $(CORE_DIR)/lightning-lightrec-include/debug.h
 endif
 
-   SOURCES_CXX += $(CORE_EMU_DIR)/dma.cpp \
-                  $(CORE_EMU_DIR)/frontio.cpp \
+   SOURCES_CXX += $(CORE_EMU_DIR)/frontio.cpp \
                   $(CORE_EMU_DIR)/cpu.cpp \
                   $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/spu.cpp \
@@ -246,6 +245,7 @@ endif
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
+                  $(CORE_EMU_DIR)/dma.c \
                   $(CORE_EMU_DIR)/gte.c \
                   $(CORE_EMU_DIR)/irq.c \
                   $(CORE_EMU_DIR)/mdec.c \

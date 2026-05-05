@@ -1071,6 +1071,23 @@ uint32 PS_SPU::ReadDMA(void)
    return(ret);
 }
 
+/*
+ * C-linkage shims declared in spu_c.h. Forward to the PS_SPU
+ * member functions through the file-scope PSX_SPU pointer. Both
+ * touch instance state (RWAddr, SPURAM[]); the forwarders are a
+ * single indirect call each, identical in cost to the original
+ * PSX_SPU->WriteDMA() / PSX_SPU->ReadDMA() callsites.
+ */
+extern "C" void SPU_WriteDMA(uint32_t V)
+{
+   PSX_SPU->WriteDMA(V);
+}
+
+extern "C" uint32_t SPU_ReadDMA(void)
+{
+   return PSX_SPU->ReadDMA();
+}
+
 void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 {
    //if((A & 0x3FF) < 0x180)

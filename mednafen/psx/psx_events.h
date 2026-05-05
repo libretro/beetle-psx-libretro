@@ -36,6 +36,7 @@ enum
 #define PSX_EVENT_MAXTS             0x20000000
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp);
+void PSX_SetDMACycleSteal(unsigned stealage);
 
 #define OVERCLOCK_SHIFT 8
 extern int32_t psx_overclock_factor;

@@ -1506,6 +1506,18 @@ uint32 PS_CDC::DMARead(void)
    return data;
 }
 
+/*
+ * C-linkage shim declared in cdc_c.h. Forwards to PS_CDC::DMARead
+ * through the file-scope PSX_CDC pointer. Unlike the cpu_c.h shims,
+ * this one touches instance state (DMABuffer), but the indirection
+ * is the same one the original PSX_CDC->DMARead() call site already
+ * carried.
+ */
+extern "C" uint32_t CDC_DMARead(void)
+{
+   return PSX_CDC->DMARead();
+}
+
 bool PS_CDC::CommandCheckDiscPresent(void)
 {
    if(!Cur_CDIF || DiscStartupDelay > 0)

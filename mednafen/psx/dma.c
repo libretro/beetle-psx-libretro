@@ -15,16 +15,23 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "psx.h"
-#include "mdec.h"
-#include "cdc.h"
-#include "spu.h"
+#include <stdint.h>
+
+#include "../mednafen-types.h"
+#include "../state.h"
+#include "../state_helpers.h"
 
 #include <retro_miscellaneous.h>
 
-#include "../state_helpers.h"
-
-#include "../pgxp/pgxp_mem.h"
+#include "psx_events.h"
+#include "psx_mem.h"
+#include "irq.h"
+#include "cpu_c.h"
+#include "cdc_c.h"
+#include "spu_c.h"
+#include "mdec.h"
+#include "gpu_c.h"
+#include "dma.h"
 
 /* Notes:
 
@@ -58,7 +65,7 @@ static uint32_t DMAIntControl;
 static uint8_t DMAIntStatus;
 static bool IRQOut;                 /* IRQ enable for individual channels */
 
-struct Channel
+typedef struct
 {
    uint32_t BaseAddr;
    uint32_t BlockControl;
@@ -68,7 +75,7 @@ struct Channel
    uint16_t WordCounter; 
 
    int32_t ClockCounter;
-};
+} Channel;
 
 static Channel DMACH[7];
 static int32_t lastts;
@@ -83,7 +90,7 @@ static INLINE void RecalcIRQOut(void)
    irqo |= (DMAIntControl >> 15) & 1;
 
    IRQOut = irqo;
-   ::IRQ_Assert(IRQ_DMA, irqo);
+   IRQ_Assert(IRQ_DMA, irqo);
 }
 
 void DMA_ResetTS(void)
@@ -179,7 +186,7 @@ static void RecalcHalt(void)
 
    PSX_SetDMACycleSteal(tmp);
 
-   PSX_CPU->SetHalt(Halt);
+   CPU_SetHalt(Halt);
 }
 
 
@@ -230,7 +237,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          if(!(CRModeCache & 0x1))
          {
             extra_cyc_overhead = 8;	// FIXME: Test.
-            *V = PSX_CDC->DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
+            *V = CDC_DMARead();		// Note: Legend of Mana's opening movie is sensitive to DMA timing, including CDC.
          }
          break;
 
@@ -253,9 +260,9 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
          extra_cyc_overhead = 47;	// Should be closer to 69, average, but actual timing is...complicated.
 
          if(CRModeCache & 0x1)
-            PSX_SPU->WriteDMA(*V);
+            SPU_WriteDMA(*V);
          else
-            *V = PSX_SPU->ReadDMA();
+            *V = SPU_ReadDMA();
          break;
 
       case CH_FIVE:
@@ -358,7 +365,7 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
                   break;
                }
 
-               header = MainRAM->ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+               header = MainRAM_ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
                DMACH[ch].CurAddr = (DMACH[ch].CurAddr + 4) & 0xFFFFFF;
 
                DMACH[ch].WordCounter = header >> 24;
@@ -410,16 +417,16 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
             }
 
             if(CRModeCache & 0x1)
-               vtmp = MainRAM->ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
+               vtmp = MainRAM_ReadU32(DMACH[ch].CurAddr & 0x1FFFFC);
 
 			//iCB: Pass address of memory for GPU
             ChRW(ch, CRModeCache, DMACH[ch].CurAddr, &vtmp, &voffs);
 
             if(!(CRModeCache & 0x1))
             {
-               MainRAM->WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
+               MainRAM_WriteU32((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
 #ifdef HAVE_LIGHTREC
-               PSX_CPU->lightrec_plugin_clear((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, 1);
+               CPU_LightrecClear((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, 1);
 #endif
             }
          }

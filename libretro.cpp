@@ -496,6 +496,25 @@ MultiAccessSizeMem<65536> *PIOMem = NULL;
 MultiAccessSizeMem<2048 * 1024> *MainRAM = NULL;
 MultiAccessSizeMem<1024> *ScratchRAM = NULL;
 
+/*
+ * C-linkage accessors for MainRAM declared in mednafen/psx/psx_mem.h.
+ * MainRAM itself is a MultiAccessSizeMem<> template instance and so
+ * isn't reachable from a C TU; these forwarders let C consumers
+ * (dma.c, ...) access the same byte-level read/write helpers
+ * without going through psx.h's class declarations.
+ *
+ * Inline away to a single load/store under -O2 / LTO.
+ */
+extern "C" uint32_t MainRAM_ReadU32(uint32_t address)
+{
+   return MainRAM->ReadU32(address);
+}
+
+extern "C" void MainRAM_WriteU32(uint32_t address, uint32_t value)
+{
+   MainRAM->WriteU32(address, value);
+}
+
 #ifdef HAVE_LIGHTREC
 /* Size of Expansion 1 (8MB) */
 #define PSX_EXPANSION1_SIZE        0x800000U

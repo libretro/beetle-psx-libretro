@@ -149,6 +149,18 @@ extern "C" void CPU_AssertIRQ(unsigned which, bool asserted)
  PSX_CPU->AssertIRQ(which, asserted);
 }
 
+extern "C" void CPU_SetHalt(bool status)
+{
+ PSX_CPU->SetHalt(status);
+}
+
+#ifdef HAVE_LIGHTREC
+extern "C" void CPU_LightrecClear(uint32_t addr, uint32_t size)
+{
+ PSX_CPU->lightrec_plugin_clear(addr, size);
+}
+#endif
+
 const uint8_t *PSX_LoadExpansion1(void);
 
 void PS_CPU::Power(void)

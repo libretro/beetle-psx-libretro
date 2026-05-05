@@ -35,8 +35,6 @@ void ForceEventUpdates(const int32_t timestamp);
 
 #include "psx_events.h"
 
-void PSX_SetDMACycleSteal(unsigned stealage);
-
 // PSX_GPULineHook modified to take surface pitch (in pixels) and upscale factor for software renderer internal upscaling
 void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const MDFN_PixelFormat* const format, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 
