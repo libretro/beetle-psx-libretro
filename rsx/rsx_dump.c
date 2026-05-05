@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stddef.h>
+
 #include "rsx_dump.h"
 
 static FILE *file;
@@ -35,7 +38,8 @@ static void write_f32(float value)
 
 static void write_u16(const uint16_t *values, unsigned w, unsigned h)
 {
-   for (unsigned y = 0; y < h; y++)
+   unsigned y;
+   for (y = 0; y < h; y++)
       fwrite(values + y * 1024, sizeof(uint16_t), w, file);
 }
 
@@ -44,28 +48,28 @@ static void write_i32(int32_t value)
    fwrite(&value, sizeof(value), 1, file);
 }
 
-static void rsx_dump_vertex(const rsx_dump_vertex &vertex)
+static void rsx_dump_vertex_write(const rsx_dump_vertex *vertex)
 {
-   write_f32(vertex.x);
-   write_f32(vertex.y);
-   write_f32(vertex.w);
-   write_u32(vertex.color);
-   write_u32(vertex.tx);
-   write_u32(vertex.ty);
+   write_f32(vertex->x);
+   write_f32(vertex->y);
+   write_f32(vertex->w);
+   write_u32(vertex->color);
+   write_u32(vertex->tx);
+   write_u32(vertex->ty);
 }
 
-static void rsx_dump_state(const rsx_render_state &state)
+static void rsx_dump_state_write(const rsx_render_state *state)
 {
-   write_u32(state.texpage_x);
-   write_u32(state.texpage_y);
-   write_u32(state.clut_x);
-   write_u32(state.clut_y);
-   write_u32(state.texture_blend_mode);
-   write_u32(state.depth_shift);
-   write_u32(state.dither);
-   write_u32(state.blend_mode);
-   write_u32(state.mask_test);
-   write_u32(state.set_mask);
+   write_u32(state->texpage_x);
+   write_u32(state->texpage_y);
+   write_u32(state->clut_x);
+   write_u32(state->clut_y);
+   write_u32(state->texture_blend_mode);
+   write_u32(state->depth_shift);
+   write_u32(state->dither);
+   write_u32(state->blend_mode);
+   write_u32(state->mask_test);
+   write_u32(state->set_mask);
 }
 
 void rsx_dump_init(const char *path)
@@ -172,22 +176,24 @@ void rsx_dump_set_display_mode(bool depth_24bpp, bool is_pal, bool is_480i, int 
 
 void rsx_dump_triangle(const struct rsx_dump_vertex *vertices, const struct rsx_render_state *state)
 {
+   unsigned i;
    if (!file)
       return;
    write_u32(RSX_TRIANGLE);
-   for (unsigned i = 0; i < 3; i++)
-      rsx_dump_vertex(vertices[i]);
-   rsx_dump_state(*state);
+   for (i = 0; i < 3; i++)
+      rsx_dump_vertex_write(&vertices[i]);
+   rsx_dump_state_write(state);
 }
 
 void rsx_dump_quad(const struct rsx_dump_vertex *vertices, const struct rsx_render_state *state)
 {
+   unsigned i;
    if (!file)
       return;
    write_u32(RSX_QUAD);
-   for (unsigned i = 0; i < 4; i++)
-      rsx_dump_vertex(vertices[i]);
-   rsx_dump_state(*state);
+   for (i = 0; i < 4; i++)
+      rsx_dump_vertex_write(&vertices[i]);
+   rsx_dump_state_write(state);
 }
 
 void rsx_dump_line(const struct rsx_dump_line_data *line)

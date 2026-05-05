@@ -257,7 +257,7 @@ endif
                   $(MEDNAFEN_DIR)/state.c
 
    ifneq ($(RSX_DUMP),)
-      SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp
+      SOURCES_C   += $(CORE_DIR)/rsx/rsx_dump.c
       CFLAGS      += -DRSX_DUMP
       CXXFLAGS    += -DRSX_DUMP
    endif
