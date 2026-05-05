@@ -216,7 +216,7 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
             sbi_ext[i] += 'A' - 'a';
       }
    }
-   sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
+   sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext));
 
    // for multi-disc images change the sbi file syntax to [filename]_[disc_number].sbi instead of [filename].sbi
    if(PBP_DiscCount > 1)

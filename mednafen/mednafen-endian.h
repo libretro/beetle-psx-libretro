@@ -11,31 +11,30 @@
 */
 
 /*
- * Endian helpers for reading/writing little-endian and big-endian
- * integer values to/from byte buffers.
+ * Endian helpers for reading/writing little-endian integer values
+ * to/from byte buffers.
+ *
+ * Only the variants that have callers in this code base are kept.
+ * Big-endian readers/writers, MDFN_de64lsb, MDFN_en64lsb,
+ * MDFN_de24msb, and MDFN_bswap64 had zero external callers and have
+ * been removed; if a future caller needs them they are trivially
+ * derivable from the existing pattern.
  *
  * Host endianness is decided at preprocess time via MSB_FIRST (set
- * in mednafen-types.h based on the compiler's __BYTE_ORDER__ macro).
- * On a little-endian host, MDFN_de32lsb is a plain memcpy; on a
- * big-endian host it does memcpy+bswap. The choice is statically
- * dispatched at the source level via #ifdef MSB_FIRST so there is
- * no runtime branch and no reliance on the optimizer to fold the
- * dead path away.
+ * in mednafen-types.h based on __BYTE_ORDER__). On a little-endian
+ * host the readers/writers are plain memcpy; on a big-endian host
+ * they memcpy + bswap. The choice is a #ifdef so there is no runtime
+ * branch.
  *
- * This header is C89-compatible: no templates, no decltype, no
- * static_assert, no std::*. All helpers are static inline functions
- * with explicit unsigned int sizes.
+ * Header is C89-compatible: no templates, no decltype, no
+ * static_assert, no std::*. INLINE falls back through retro_inline.h
+ * on pre-C99 compilers.
  *
- * Aligned-load variant: MDFN_de32lsb_aligned uses
- * __builtin_assume_aligned to give the optimizer an alignment guarantee
- * on the cpu.cpp instruction-fetch hot path. On targets where this
- * builtin is unavailable (MSVC, ancient compilers) it falls back to
- * the unaligned form.
- *
- * Note that all calls take void* / const void* by design - the
- * pointer arithmetic in callers is byte-wise. MSB_FIRST = big-endian
- * host. LSB_FIRST = little-endian host. Exactly one of these is
- * defined; mednafen-types.h #errors otherwise.
+ * The aligned variant (MDFN_de32lsb_aligned) uses
+ * __builtin_assume_aligned to give the optimizer an alignment
+ * guarantee on the cpu.cpp instruction-fetch hot path. On targets
+ * where the builtin is unavailable (MSVC, ancient compilers) it
+ * falls back to the unaligned form.
  */
 
 #ifndef __MDFN_ENDIAN_H
@@ -44,15 +43,23 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Bulk swap helpers (operate on byte buffers, consumed by SPU/SCSP
- * resampler paths in code that links against this module). Only the
- * raw three-_Swap variants have callers; the *_NE_LE and *_NE_BE
- * orientation wrappers were unused and have been removed. */
+ * resampler paths). The *_NE_LE / *_NE_BE / Endian_V_NE_* orientation
+ * wrappers were unused and have been removed. */
 void Endian_A16_Swap(void *src, uint32 nelements);
 void Endian_A32_Swap(void *src, uint32 nelements);
 void Endian_A64_Swap(void *src, uint32 nelements);
 
-/* Byte-swap primitives. Static inline; visible to all callers. */
+#ifdef __cplusplus
+}
+#endif
+
+/* Byte-swap primitives. Only used inside #ifdef MSB_FIRST branches
+ * below; on a little-endian host both helpers are dead-stripped. */
 
 static INLINE uint16 MDFN_bswap16(uint16 v)
 {
@@ -75,22 +82,8 @@ static INLINE uint32 MDFN_bswap32(uint32 v)
 #endif
 }
 
-static INLINE uint64 MDFN_bswap64(uint64 v)
-{
-#if defined(_MSC_VER)
-   return _byteswap_uint64(v);
-#else
-   return (v << 56)
-        | (v >> 56)
-        | ((v & ((uint64)0xFF00U)) << 40)
-        | ((v >> 40) & ((uint64)0xFF00U))
-        | ((uint64)MDFN_bswap32((uint32)(v >> 16)) << 16);
-#endif
-}
-
 /*
- * Little-endian readers. On LSB_FIRST hosts these are pure memcpy;
- * on MSB_FIRST hosts they memcpy + bswap.
+ * Little-endian readers.
  */
 
 static INLINE uint16 MDFN_de16lsb(const void *ptr)
@@ -110,17 +103,6 @@ static INLINE uint32 MDFN_de32lsb(const void *ptr)
    memcpy(&tmp, ptr, sizeof(tmp));
 #ifdef MSB_FIRST
    return MDFN_bswap32(tmp);
-#else
-   return tmp;
-#endif
-}
-
-static INLINE uint64 MDFN_de64lsb(const void *ptr)
-{
-   uint64 tmp;
-   memcpy(&tmp, ptr, sizeof(tmp));
-#ifdef MSB_FIRST
-   return MDFN_bswap64(tmp);
 #else
    return tmp;
 #endif
@@ -159,52 +141,9 @@ static INLINE uint32 MDFN_de32lsb_aligned(const void *ptr)
 }
 
 /*
- * Big-endian readers.
- */
-
-static INLINE uint16 MDFN_de16msb(const void *ptr)
-{
-   uint16 tmp;
-   memcpy(&tmp, ptr, sizeof(tmp));
-#ifdef MSB_FIRST
-   return tmp;
-#else
-   return MDFN_bswap16(tmp);
-#endif
-}
-
-static INLINE uint32 MDFN_de32msb(const void *ptr)
-{
-   uint32 tmp;
-   memcpy(&tmp, ptr, sizeof(tmp));
-#ifdef MSB_FIRST
-   return tmp;
-#else
-   return MDFN_bswap32(tmp);
-#endif
-}
-
-static INLINE uint64 MDFN_de64msb(const void *ptr)
-{
-   uint64 tmp;
-   memcpy(&tmp, ptr, sizeof(tmp));
-#ifdef MSB_FIRST
-   return tmp;
-#else
-   return MDFN_bswap64(tmp);
-#endif
-}
-
-static INLINE uint32 MDFN_de24msb(const void *ptr)
-{
-   const uint8 *p = (const uint8 *)ptr;
-   return ((uint32)p[0] << 16) | ((uint32)p[1] << 8) | ((uint32)p[2] << 0);
-}
-
-/*
- * Native-endian readers. Read raw memory without any swap regardless
- * of host endianness. Used for type-pun reads from memory-mapped
- * regions whose contents are already in host order.
+ * Native-endian aligned u32 reader. Reads raw memory without any
+ * swap regardless of host endianness; used for type-pun reads from
+ * memory-mapped regions whose contents are already in host order.
  */
 
 static INLINE uint32 MDFN_densb_u32_aligned(const void *ptr)
@@ -234,50 +173,6 @@ static INLINE void MDFN_en32lsb(void *ptr, uint32 value)
    uint32 tmp = MDFN_bswap32(value);
 #else
    uint32 tmp = value;
-#endif
-   memcpy(ptr, &tmp, sizeof(tmp));
-}
-
-static INLINE void MDFN_en64lsb(void *ptr, uint64 value)
-{
-#ifdef MSB_FIRST
-   uint64 tmp = MDFN_bswap64(value);
-#else
-   uint64 tmp = value;
-#endif
-   memcpy(ptr, &tmp, sizeof(tmp));
-}
-
-/*
- * Big-endian writers.
- */
-
-static INLINE void MDFN_en16msb(void *ptr, uint16 value)
-{
-#ifdef MSB_FIRST
-   uint16 tmp = value;
-#else
-   uint16 tmp = MDFN_bswap16(value);
-#endif
-   memcpy(ptr, &tmp, sizeof(tmp));
-}
-
-static INLINE void MDFN_en32msb(void *ptr, uint32 value)
-{
-#ifdef MSB_FIRST
-   uint32 tmp = value;
-#else
-   uint32 tmp = MDFN_bswap32(value);
-#endif
-   memcpy(ptr, &tmp, sizeof(tmp));
-}
-
-static INLINE void MDFN_en64msb(void *ptr, uint64 value)
-{
-#ifdef MSB_FIRST
-   uint64 tmp = value;
-#else
-   uint64 tmp = MDFN_bswap64(value);
 #endif
    memcpy(ptr, &tmp, sizeof(tmp));
 }

@@ -14,48 +14,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <string.h>
-#include <stdarg.h>
-
-#include <sys/types.h>
-
 #include <file/file_path.h>
 
 #include <string>
 
-#include <boolean.h>
-
-#include "error.h"
-#include "mednafen.h"
 #include "general.h"
-#include "settings.h"
-#include "state.h"
 
 using namespace std;
-
-bool MDFN_IsFIROPSafe(const std::string &path)
-{
- // We could make this more OS-specific, but it shouldn't hurt to try to weed out usage of characters that are path
- // separators in one OS but not in another, and we'd also run more of a risk of missing a special path separator case
- // in some OS.
-
- if(!MDFN_GetSettingB("filesys.untrusted_fip_check"))
-  return(true);
-
- if(path.find('\0') != string::npos)
-  return(false);
-
- if(path.find(':') != string::npos)
-  return(false);
-
- if(path.find('\\') != string::npos)
-  return(false);
-
- if(path.find('/') != string::npos)
-  return(false);
-
- return(true);
-}
 
 void MDFN_GetFilePathComponents(const std::string &file_path, 
       std::string *dir_path_out, std::string *file_base_out, 
@@ -112,23 +77,14 @@ void MDFN_GetFilePathComponents(const std::string &file_path,
 }
 
 /* Resolve `rel_path` relative to `dir_path`. Returns the resolved
- * path, or an empty string if the relative path failed safety checks
- * (only when skip_safety_check is false). Callers must check for
- * empty returns. */
-std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path, bool skip_safety_check)
+ * path. */
+std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path)
 {
 #ifdef _WIN32
    char slash = '\\';
 #else
    char slash = '/';
 #endif
-
-   if (!skip_safety_check && !MDFN_IsFIROPSafe(rel_path))
-   {
-      MDFN_Error(0, "Referenced path \"%s\" is potentially unsafe. "
-            "See \"filesys.untrusted_fip_check\" setting.", rel_path.c_str());
-      return std::string();
-   }
 
    if (path_is_absolute(rel_path.c_str()))
       return rel_path;

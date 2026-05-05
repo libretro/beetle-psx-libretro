@@ -1,19 +1,6 @@
-#include <stdint.h>
-#include <string.h>
-
 #include <string>
 
 #include "misc.h"
-
-void MDFN_strtoupper(char *str)
-{
-   size_t x;
-   for(x = 0; str[x]; x++)
-   {
-      if(str[x] >= 'a' && str[x] <= 'z')
-         str[x] = str[x] - 'a' + 'A';
-   }
-}
 
 void MDFN_strtoupper(std::string &str)
 {

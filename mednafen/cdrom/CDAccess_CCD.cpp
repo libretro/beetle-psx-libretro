@@ -297,7 +297,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
    /* Open image stream. */
    {
-      std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd), true);
+      std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd));
       FileStream *str        = mdfn_filestream_new(image_path.c_str());
       int64 ss;
 
@@ -338,7 +338,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
    {
       /* Open subchannel stream */
-      std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd), true);
+      std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd));
       FileStream *str      = mdfn_filestream_new(sub_path.c_str());
 
       if (!mdfn_filestream_is_open(str))

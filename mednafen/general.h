@@ -4,11 +4,6 @@
 #include <stddef.h>
 #include <string>
 
-/* File-inclusion-for-read-only-path safety check, used by PSF and
- * CUE/TOC sheet processing to refuse paths that escape the playlist
- * directory. */
-bool MDFN_IsFIROPSafe(const std::string &path);
-
 void MDFN_trim(std::string &string);
 
 /* The full Mednafen enum had eleven entries covering save states,
@@ -39,5 +34,12 @@ void MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1,
 
 void MDFN_GetFilePathComponents(const std::string &file_path, std::string *dir_path_out, std::string *file_base_out = NULL, std::string *file_ext_out = NULL);
 
-std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path, bool skip_safety_check);
+/* Resolve `rel_path` relative to `dir_path`. If `rel_path` is
+ * absolute, it is returned unchanged; otherwise `dir_path/rel_path`
+ * is composed using the platform-appropriate separator. The previous
+ * `skip_safety_check` parameter gated a path-character whitelist
+ * predicated on the `filesys.untrusted_fip_check` setting, but that
+ * setting is hard-wired to false in this libretro core (see
+ * settings.c), making the entire check dead. The parameter is gone. */
+std::string MDFN_EvalFIP(const std::string &dir_path, const std::string &rel_path);
 #endif

@@ -230,7 +230,7 @@ bool CDAccess_CHD::ImageOpen(const char *path, bool image_memcache)
             sbi_ext[i] += 'A' - 'a';
       }
    }
-   sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
+   sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext));
 
    return true;
 }

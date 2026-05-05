@@ -19,7 +19,7 @@
 ** 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-#include "mednafen.h"
+#include "mednafen-types.h"
 #include "mednafen-endian.h"
 
 void Endian_A16_Swap(void *src, uint32 nelements)

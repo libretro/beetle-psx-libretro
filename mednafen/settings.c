@@ -101,12 +101,6 @@ bool MDFN_GetSettingB(const char *name)
       return setting_psx_analog_toggle;
    if (!strcmp("psx.fastboot", name))
       return setting_psx_fastboot;
-   /* CDROM */
-   if (!strcmp("cdrom.lec_eval", name))
-      return 1;
-   /* FILESYS */
-   if (!strcmp("filesys.untrusted_fip_check", name))
-      return 0;
    MDFN_DispMessage(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
          "unhandled setting B: %s\n", name);

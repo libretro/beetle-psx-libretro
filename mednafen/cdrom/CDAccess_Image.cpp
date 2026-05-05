@@ -240,12 +240,7 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
       track->FirstFileInstance = 1;
 
-      efn = MDFN_EvalFIP(base_dir, filename, false);
-      if (efn.empty())
-      {
-         MDFN_Error(0, "Track filename failed safety check: \"%s\"", filename.c_str());
-         return false;
-      }
+      efn = MDFN_EvalFIP(base_dir, filename);
 
       if(image_memcache)
       {
@@ -692,20 +687,10 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                active_track = -1;
             }
 
-            if(!MDFN_IsFIROPSafe(args[0]))
-            {
-               MDFN_Error(0, "Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n", args[0].c_str());
-               { ok = false; goto cleanup; }
-            }
-
             std::string efn;
 
             if(args[0].find("cdrom://") == std::string::npos)
-            {
-               efn = MDFN_EvalFIP(base_dir, args[0], false);
-               if (efn.empty())
-                  { ok = false; goto cleanup; }
-            }
+               efn = MDFN_EvalFIP(base_dir, args[0]);
             else
                efn = args[0];
 
@@ -994,7 +979,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          }
       }
 
-      sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext), true);
+      sbi_path = MDFN_EvalFIP(base_dir, file_base + std::string(".") + std::string(sbi_ext));
 
       if (filestream_exists(sbi_path.c_str()))
          LoadSBI(sbi_path.c_str());
