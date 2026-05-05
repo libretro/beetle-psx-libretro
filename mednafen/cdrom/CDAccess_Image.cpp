@@ -203,14 +203,14 @@ uint32 CDAccess_Image::GetSectorCount(CDRFILE_TRACK_INFO *track)
       if(track->AReader)
          return(((track->AReader->FrameCount() * 4) - track->FileOffset) / 2352);
 
-      size = track->fp->size();
+      size = stream_size(track->fp);
 
       if(track->SubchannelMode)
          return((size - track->FileOffset) / (2352 + 96));
       return((size - track->FileOffset) / 2352);
    }
 
-   size = track->fp->size();
+   size = stream_size(track->fp);
 
    return((size - track->FileOffset) / DI_Size_Table[track->DIFormat]);
 }
@@ -249,31 +249,39 @@ bool CDAccess_Image::ParseTOCFileLineInfo(CDRFILE_TRACK_INFO *track, const int t
 
       if(image_memcache)
       {
-         FileStream *file = new FileStream(efn.c_str(), MODE_READ);
-         if (!file->is_open())
+         FileStream *file = mdfn_filestream_new(efn.c_str());
+         if (!mdfn_filestream_is_open(file))
          {
             MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
-            delete file;
+            if (file)
+               stream_destroy(&file->base);
             return false;
          }
-         track->fp = new MemoryStream(file);
-         if (!static_cast<MemoryStream *>(track->fp)->is_valid())
+         /* mdfn_memstream_new_from_stream consumes &file->base regardless
+          * of success - no further cleanup of `file` required. */
          {
-            delete track->fp;
-            track->fp = NULL;
-            return false;
+            struct MemoryStream *mem = mdfn_memstream_new_from_stream(&file->base);
+            if (!mdfn_memstream_is_valid(mem))
+            {
+               if (mem)
+                  stream_destroy(&mem->base);
+               track->fp = NULL;
+               return false;
+            }
+            track->fp = &mem->base;
          }
       }
       else
       {
-         FileStream *file = new FileStream(efn.c_str(), MODE_READ);
-         if (!file->is_open())
+         FileStream *file = mdfn_filestream_new(efn.c_str());
+         if (!mdfn_filestream_is_open(file))
          {
             MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
-            delete file;
+            if (file)
+               stream_destroy(&file->base);
             return false;
          }
-         track->fp = file;
+         track->fp = &file->base;
       }
 
       toc_streamcache[filename] = track->fp;
@@ -393,17 +401,36 @@ error:
 
 bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
 {
-   FileStream *probe = new FileStream(path, MODE_READ);
-   if (!probe->is_open())
+   FileStream *probe = mdfn_filestream_new(path);
+   if (!mdfn_filestream_is_open(probe))
    {
       MDFN_Error(0, "Could not open \"%s\"", path);
-      delete probe;
+      if (probe)
+         stream_destroy(&probe->base);
       return false;
    }
-   MemoryStream fp(probe);
-   if (!fp.is_valid())
+
+   /* Stack-local MemoryStream that slurps the probe; mdfn_memstream_init_
+    * from_stream consumes &probe->base. fp must be cleaned up via
+    * stream_close (NOT stream_destroy - it's a stack address). All
+    * failure paths in the body below set ok=false and fall through to
+    * the single cleanup at the bottom rather than returning early. */
+   struct MemoryStream fp;
+   bool ok = true;
+   /* Hoisted from mid-function so the `goto cleanup` paths above don't
+    * cross their initialization (illegal in C++). They were locals to
+    * the post-parse track-fixup loop. */
+   int32 RunningLBA = 0;
+   int32 LastIndex  = 0;
+   long  FileOffset = 0;
+   /* Silence GCC warning - LastIndex is assigned but only conditionally read */
+   (void)LastIndex;
+
+   mdfn_memstream_init_from_stream(&fp, &probe->base);
+   if (!mdfn_memstream_is_valid(&fp))
    {
       MDFN_Error(0, "Could not load \"%s\" into memory", path);
+      stream_close(&fp.base);
       return false;
    }
 
@@ -433,12 +460,12 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    {
       uint8 bom_tmp[3];
 
-      if(fp.read(bom_tmp, 3) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
+      if(stream_read(&fp.base, bom_tmp, 3) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
       {
          log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
       }
       else
-         fp.seek(0, SEEK_SET);
+         stream_seek(&fp.base, 0, SEEK_SET);
    }
 
 
@@ -447,7 +474,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    LastTrack = 0;
 
    linebuf.reserve(1024);
-   while(fp.get_line(linebuf) >= 0)
+   while(stream_get_line_string(&fp.base, linebuf) >= 0)
    {
       unsigned argcount = 0;
 
@@ -495,7 +522,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(AutoTrackInc > 99)
             {
                MDFN_Error(0, "Invalid track number: %d", AutoTrackInc);
-               return false;
+               { ok = false; goto cleanup; }
             }
 
             active_track = AutoTrackInc++;
@@ -517,7 +544,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(format_lookup == _DI_FORMAT_COUNT)
             {
                MDFN_Error(0, "Invalid track format: %s", args[0].c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
 
             if(TmpTrack.DIFormat == DI_FORMAT_AUDIO)
@@ -527,7 +554,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             {
                TmpTrack.SubchannelMode = CDRF_SUBM_RW;
                MDFN_Error(0, "\"RW\" format subchannel data not supported, only \"RW_RAW\" is!");
-               return false;
+               { ok = false; goto cleanup; }
             }
             else if(!strcasecmp(args[1].c_str(), "RW_RAW"))
                TmpTrack.SubchannelMode = CDRF_SUBM_RW_RAW;
@@ -544,7 +571,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          else if(cmdbuf == "FIFO")
          {
             MDFN_Error(0, "Unsupported directive: %s", cmdbuf.c_str());
-            return false;
+            { ok = false; goto cleanup; }
          }
          else if(cmdbuf == "FILE" || cmdbuf == "AUDIOFILE")
          {
@@ -589,7 +616,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(active_track < 0)
             {
                MDFN_Error(0, "Command %s is outside of a TRACK definition!\n", cmdbuf.c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
             int m,s,f;
             sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
@@ -600,7 +627,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(active_track < 0)
             {
                MDFN_Error(0, "Command %s is outside of a TRACK definition!\n", cmdbuf.c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
             int m,s,f;
             sscanf(args[0].c_str(), "%d:%d:%d", &m, &s, &f);
@@ -629,7 +656,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             else
             {
                MDFN_Error(0, "Unsupported argument to \"NO\" directive: %s", args[0].c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
          }
          else if(cmdbuf == "COPY")
@@ -668,7 +695,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(!MDFN_IsFIROPSafe(args[0]))
             {
                MDFN_Error(0, "Referenced path \"%s\" is potentially unsafe.  See \"filesys.untrusted_fip_check\" setting.\n", args[0].c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
 
             std::string efn;
@@ -677,25 +704,33 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             {
                efn = MDFN_EvalFIP(base_dir, args[0], false);
                if (efn.empty())
-                  return false;
+                  { ok = false; goto cleanup; }
             }
             else
                efn = args[0];
 
             {
-               FileStream *probe = new FileStream(efn.c_str(), MODE_READ);
-               if (!probe->is_open())
+               FileStream *probe = mdfn_filestream_new(efn.c_str());
+               if (!mdfn_filestream_is_open(probe))
                {
                   MDFN_Error(0, "Could not open track file \"%s\"", efn.c_str());
-                  delete probe;
-                  return false;
+                  if (probe)
+                     stream_destroy(&probe->base);
+                  { ok = false; goto cleanup; }
                }
-               TmpTrack.fp = probe;
+               TmpTrack.fp = &probe->base;
             }
             TmpTrack.FirstFileInstance = 1;
 
             if(image_memcache)
-               TmpTrack.fp = new MemoryStream(TmpTrack.fp);
+            {
+               struct MemoryStream *mem = mdfn_memstream_new_from_stream(TmpTrack.fp);
+               /* mdfn_memstream_new_from_stream consumes its argument
+                * regardless of success; on alloc failure mem is NULL.
+                * In that case TmpTrack.fp is the now-dangling old
+                * pointer - clear it so we don't double-free at cleanup. */
+               TmpTrack.fp = mem ? &mem->base : NULL;
+            }
 
             if(!strcasecmp(args[1].c_str(), "BINARY"))
             {
@@ -712,13 +747,13 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                if(!TmpTrack.AReader)
                {
                   MDFN_Error(0, "Unsupported audio track file format: %s\n", args[0].c_str());
-                  return false;
+                  { ok = false; goto cleanup; }
                }
             }
             else
             {
                MDFN_Error(0, "Unsupported track format: %s\n", args[1].c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
          }
          else if(cmdbuf == "TRACK")
@@ -753,13 +788,13 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
             if(format_lookup == _DI_FORMAT_COUNT)
             {
                MDFN_Error(0, "Invalid track format: %s\n", args[1].c_str());
-               return false;
+               { ok = false; goto cleanup; }
             }
 
             if(active_track < 0 || active_track > 99)
             {
                MDFN_Error(0, "Invalid track number: %d\n", active_track);
-               return false;
+               { ok = false; goto cleanup; }
             }
          }
          else if(cmdbuf == "INDEX")
@@ -771,7 +806,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                if(sscanf(args[1].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
                   MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
-                  return false;
+                  { ok = false; goto cleanup; }
                }
 
                if(!strcasecmp(args[0].c_str(), "01") || !strcasecmp(args[0].c_str(), "1"))
@@ -789,7 +824,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
                   MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
-                  return false;
+                  { ok = false; goto cleanup; }
                }
 
                TmpTrack.pregap = (m * 60 + s) * 75 + f;
@@ -804,7 +839,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                if(sscanf(args[0].c_str(), "%u:%u:%u", &m, &s, &f) != 3)
                {
                   MDFN_Error(0, "Malformed m:s:f time in \"%s\" directive: %s", cmdbuf.c_str(), args[0].c_str());
-                  return false;
+                  { ok = false; goto cleanup; }
                }      
 
                TmpTrack.postgap = (m * 60 + s) * 75 + f;
@@ -839,7 +874,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
                else
                {
                   MDFN_Error(0, "Unknown CUE sheet \"FLAGS\" directive flag \"%s\".\n", args[i].c_str());
-                  return false;
+                  { ok = false; goto cleanup; }
                }
             }
          }
@@ -849,7 +884,7 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          else
          {
             MDFN_Error(0, "Unknown CUE sheet directive \"%s\".\n", cmdbuf.c_str());
-            return false;
+            { ok = false; goto cleanup; }
          }
       } // end of CUE sheet handling
    } // end of fgets() loop
@@ -860,17 +895,10 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
    if(FirstTrack > LastTrack)
    {
       MDFN_Error(0, "No tracks found!\n");
-      return false;
+      { ok = false; goto cleanup; }
    }
 
    NumTracks  = 1 + LastTrack - FirstTrack;
-
-   int32 RunningLBA = 0;
-   int32 LastIndex = 0;
-   long FileOffset = 0;
-
-   // Silence GCC warning
-   (void)LastIndex;
 
    for(int x = FirstTrack; x < (FirstTrack + NumTracks); x++)
    {
@@ -972,7 +1000,9 @@ bool CDAccess_Image::ImageOpen(const char *path, bool image_memcache)
          LoadSBI(sbi_path.c_str());
    }
 
-   return true;
+cleanup:
+   stream_close(&fp.base);
+   return ok;
 }
 
 void CDAccess_Image::Cleanup(void)
@@ -993,7 +1023,7 @@ void CDAccess_Image::Cleanup(void)
 
          if(this_track->fp)
          {
-            delete this_track->fp;
+            stream_destroy(this_track->fp);
             this_track->fp = NULL;
          }
       }
@@ -1067,29 +1097,29 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
                if(ct->SubchannelMode)
                   SeekPos += 96 * (lba - ct->LBA);
 
-               ct->fp->seek(SeekPos, SEEK_SET);
+               stream_seek(ct->fp, SeekPos, SEEK_SET);
 
                switch(ct->DIFormat)
                {
                   case DI_FORMAT_AUDIO:
-                     ct->fp->read(buf, 2352);
+                     stream_read(ct->fp, buf, 2352);
 
                      if(ct->RawAudioMSBFirst)
                         Endian_A16_Swap(buf, 588 * 2);
                      break;
 
                   case DI_FORMAT_MODE1:
-                     ct->fp->read(buf + 12 + 3 + 1, 2048);
+                     stream_read(ct->fp, buf + 12 + 3 + 1, 2048);
                      encode_mode1_sector(lba + 150, buf);
                      break;
 
                   case DI_FORMAT_MODE1_RAW:
                   case DI_FORMAT_MODE2_RAW:
-                     ct->fp->read(buf, 2352);
+                     stream_read(ct->fp, buf, 2352);
                      break;
 
                   case DI_FORMAT_MODE2:
-                     ct->fp->read(buf + 16, 2336);
+                     stream_read(ct->fp, buf + 16, 2336);
                      encode_mode2_sector(lba + 150, buf);
                      break;
 
@@ -1097,19 +1127,19 @@ bool CDAccess_Image::Read_Raw_Sector(uint8 *buf, int32 lba)
                      // FIXME: M2F1, M2F2, does sub-header come before or after user data(standards say before, but I wonder
                      // about cdrdao...).
                   case DI_FORMAT_MODE2_FORM1:
-                     ct->fp->read(buf + 24, 2048);
+                     stream_read(ct->fp, buf + 24, 2048);
                      //encode_mode2_form1_sector(lba + 150, buf);
                      break;
 
                   case DI_FORMAT_MODE2_FORM2:
-                     ct->fp->read(buf + 24, 2324);
+                     stream_read(ct->fp, buf + 24, 2324);
                      //encode_mode2_form2_sector(lba + 150, buf);
                      break;
 
                }
 
                if(ct->SubchannelMode)
-                  ct->fp->read(buf + 2352, 96);
+                  stream_read(ct->fp, buf + 2352, 96);
             }
          } // end if audible part of audio track read.
          break;

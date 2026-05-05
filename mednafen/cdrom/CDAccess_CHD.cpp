@@ -54,7 +54,7 @@ static const char *DI_CUE_Strings[7] =
 static uint64_t Callback_fsize(void *user_data)
 {
    FileStream *file_stream = (FileStream*)user_data;
-   return file_stream->size();
+   return stream_size(&file_stream->base);
 }
 
 static size_t Callback_fread(void* buffer, size_t size, size_t count, void *user_data)
@@ -63,7 +63,7 @@ static size_t Callback_fread(void* buffer, size_t size, size_t count, void *user
       return 0;
 
    FileStream *file_stream = (FileStream*)user_data;
-   return file_stream->read(buffer, count * size) / size;
+   return stream_read(&file_stream->base, buffer, count * size) / size;
 }
 
 static int Callback_fclose(void *user_data)
@@ -74,7 +74,7 @@ static int Callback_fclose(void *user_data)
 static int Callback_fseek(void *user_data, int64_t offset, int whence)
 {
    FileStream *file_stream = (FileStream*)user_data;
-   file_stream->seek(offset, whence);
+   stream_seek(&file_stream->base, offset, whence);
    return 0;
 }
 
@@ -242,10 +242,15 @@ void CDAccess_CHD::Cleanup(void)
 
    if (hunkmem != NULL)
       free(hunkmem);
+
+   /* file_stream was previously a C++ FileStream member; the implicit
+    * destructor closed the file. The C struct has no destructor, so
+    * close it explicitly here. stream_close (NOT stream_destroy) -
+    * file_stream lives inside this object's storage. */
+   stream_close(&file_stream.base);
 }
 
 CDAccess_CHD::CDAccess_CHD(bool *success, const char *path, bool image_memcache)
-   : file_stream(path, MODE_READ)
 {
    chd = NULL;
 
@@ -257,7 +262,12 @@ CDAccess_CHD::CDAccess_CHD(bool *success, const char *path, bool image_memcache)
    FirstTrack = 99;
    LastTrack = 0;
 
-   if (!file_stream.is_open())
+   /* file_stream is a stack-allocated FileStream member; init in place
+    * (mdfn_filestream_init - NOT mdfn_filestream_new). It must be
+    * stream_close()'d in the destructor / Cleanup, not stream_destroy. */
+   mdfn_filestream_init(&file_stream, path);
+
+   if (!mdfn_filestream_is_open(&file_stream))
    {
       MDFN_Error(0, "CHD: failed to open \"%s\"", path);
       *success = false;
@@ -515,26 +525,40 @@ bool CDAccess_CHD::Read_TOC(TOC *toc)
 
 int CDAccess_CHD::LoadSBI(const char* sbi_path)
 {
-   /* Loading SBI file */
+   /* Loading SBI file. All return paths past the init call go through
+    * `cleanup:` which closes sbis. sbis is stack-allocated so we must
+    * NOT use stream_destroy. */
    uint8 header[4];
    uint8 ed[4 + 10];
    uint8 tmpq[12];
-   FileStream sbis(sbi_path, MODE_READ);
+   struct FileStream sbis;
+   int ret = 0;
 
-   sbis.read(header, 4);
+   mdfn_filestream_init(&sbis, sbi_path);
+
+   stream_read(&sbis.base, header, 4);
 
    if(memcmp(header, "SBI\0", 4))
-      return -1;
+   {
+      ret = -1;
+      goto cleanup;
+   }
 
-   while(sbis.read(ed, sizeof(ed)) == sizeof(ed))
+   while (stream_read(&sbis.base, ed, sizeof(ed)) == sizeof(ed))
    {
       /* Bad BCD MSF offset in SBI file. */
       if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
-         return -1;
+      {
+         ret = -1;
+         goto cleanup;
+      }
 
       /* Unrecognized boogly oogly in SBI file */
       if(ed[3] != 0x01)
-         return -1;
+      {
+         ret = -1;
+         goto cleanup;
+      }
 
       memcpy(tmpq, &ed[4], 10);
 
@@ -542,13 +566,16 @@ int CDAccess_CHD::LoadSBI(const char* sbi_path)
       tmpq[10] ^= 0xFF;
       tmpq[11] ^= 0xFF;
 
-      uint32 aba = AMSF_to_ABA(BCD_to_U8(ed[0]), BCD_to_U8(ed[1]), BCD_to_U8(ed[2]));
-
-      memcpy(SubQReplaceMap[aba].data, tmpq, 12);
+      {
+         uint32 aba = AMSF_to_ABA(BCD_to_U8(ed[0]), BCD_to_U8(ed[1]), BCD_to_U8(ed[2]));
+         memcpy(SubQReplaceMap[aba].data, tmpq, 12);
+      }
    }
 
    log_cb(RETRO_LOG_INFO, "[CHD] Loaded SBI file %s\n", sbi_path);
-   return 0;
+cleanup:
+   stream_close(&sbis.base);
+   return ret;
 }
 
 void CDAccess_CHD::Eject(bool eject_status)

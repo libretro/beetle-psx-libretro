@@ -21,8 +21,6 @@
 #include "CDUtility.h"
 #include "../Stream.h"
 
-#include <queue>
-
 typedef TOC CD_TOC;
 
 class CDIF

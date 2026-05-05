@@ -18,11 +18,8 @@
 #ifndef _CDROM_CDACCESS_CCD_H_
 #define _CDROM_CDACCESS_CCD_H_
 
-#include "../FileStream.h"
-#include "../MemoryStream.h"
+#include "../Stream.h"
 #include "CDAccess.h"
-
-#include <vector>
 
 class CDAccess_CCD : public CDAccess
 {

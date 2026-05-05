@@ -85,7 +85,7 @@ static size_t iov_read_func(void *ptr, size_t size, size_t nmemb, void *user_dat
    if(!size || !fw)
       return 0;
 
-   return fw->read(ptr, size * nmemb) / size;
+   return stream_read(fw, ptr, size * nmemb) / size;
 }
 
 static int iov_seek_func(void *user_data, int64_t offset, int whence)
@@ -93,7 +93,7 @@ static int iov_seek_func(void *user_data, int64_t offset, int whence)
    Stream *fw = (Stream*)user_data;
 
    if (fw)
-      fw->seek(offset, whence);
+      stream_seek(fw, offset, whence);
    return 0;
 }
 
@@ -102,7 +102,7 @@ static int iov_close_func(void *user_data)
    Stream *fw = (Stream*)user_data;
 
    if (fw)
-      fw->close();
+      stream_close(fw);
    return 0;
 }
 
@@ -113,7 +113,7 @@ static long iov_tell_func(void *user_data)
    if (!fw)
       return -1;
 
-   return fw->tell();
+   return stream_tell(fw);
 }
 
 OggVorbisReader::OggVorbisReader(Stream *fp) : ovfile_open(false)
@@ -129,7 +129,7 @@ OggVorbisReader::OggVorbisReader(Stream *fp) : ovfile_open(false)
    if (!fp)
       return;
 
-   fp->seek(0, SEEK_SET);
+   stream_seek(fp, 0, SEEK_SET);
    if (ov_open_callbacks(fp, &ovfile, NULL, 0, cb) == 0)
       ovfile_open = true;
 }

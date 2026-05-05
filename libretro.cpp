@@ -1411,7 +1411,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    fp = c->MakeStream(0, ~0U);
    if (!fp)
       return NULL;
-   fp->seek(0x8000, SEEK_SET);
+   stream_seek(fp, 0x8000, SEEK_SET);
 
    do
    {
@@ -1421,7 +1421,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
          goto Breakout;
       }
 
-      fp->read(pvd, 2048);
+      stream_read(fp, pvd, 2048);
 
       if(memcmp(&pvd[1], "CD001", 5))
       {
@@ -1446,12 +1446,12 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
       goto Breakout;
    }
 
-   fp->seek((int64)rdel * 2048, SEEK_SET);
+   stream_seek(fp, (int64)rdel * 2048, SEEK_SET);
 
-   while(fp->tell() < (((int64)rdel * 2048) + rdel_len))
+   while(stream_tell(fp) < (((int64)rdel * 2048) + rdel_len))
    {
       uint8_t dr[256 + 1];
-      uint8_t len_dr = fp->get_u8();
+      uint8_t len_dr = stream_get_u8(fp);
       uint8_t len_fi;
 
       if(!len_dr)
@@ -1467,7 +1467,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
       memset(dr, 0, sizeof(dr));
       dr[0] = len_dr;
-      fp->read(dr + 1, len_dr - 1);
+      stream_read(fp, dr + 1, len_dr - 1);
 
       len_fi = dr[0x20];
 
@@ -1479,8 +1479,8 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
          char *tmp;
 
          memset(fb, 0, sizeof(fb));
-         fp->seek(file_lba * 2048, SEEK_SET);
-         fp->read(fb, 2048);
+         stream_seek(fp, file_lba * 2048, SEEK_SET);
+         stream_read(fp, fb, 2048);
 
          /* Find "BOOT" in the SYSTEM.CNF buffer; bail out if missing
           * rather than dereferencing strstr's NULL return. */
@@ -1544,7 +1544,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 Breakout:
    if(fp)
    {
-      delete fp;
+      stream_destroy(fp);
       fp = NULL;
    }
 

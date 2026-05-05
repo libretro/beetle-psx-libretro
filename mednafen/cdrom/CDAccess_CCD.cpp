@@ -25,6 +25,8 @@
 #include "../mednafen.h"
 #include "../error.h"
 #include "../general.h"
+#include "../FileStream.h"
+#include "../MemoryStream.h"
 #include "CDAccess_CCD.h"
 #include "CDUtility.h"
 
@@ -96,7 +98,11 @@ CDAccess_CCD::CDAccess_CCD(bool *success, const char *path, bool image_memcache)
 
 bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 {
-   FileStream cf(path, MODE_READ);
+   /* All return paths past this point go through `cleanup:` which
+    * calls stream_close on cf. cf is stack-allocated so we must NOT
+    * use stream_destroy. */
+   struct FileStream cf;
+   bool ok = true;
    std::map<std::string, CCD_Section> Sections;
    std::string linebuf;
    std::string cur_section_name;
@@ -104,10 +110,12 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
    char img_extsd[4] = { 'i', 'm', 'g', 0 };
    char sub_extsd[4] = { 's', 'u', 'b', 0 };
 
-   if (!cf.is_open())
+   mdfn_filestream_init(&cf, path);
+   if (!mdfn_filestream_is_open(&cf))
    {
       MDFN_Error(0, "CCD: failed to open \"%s\"", path);
-      return false;
+      ok = false;
+      goto cleanup;
    }
 
    MDFN_GetFilePathComponents(path, &dir_path, &file_base, &file_ext);
@@ -152,7 +160,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
 
    linebuf.reserve(256);
 
-   while(cf.get_line(linebuf) >= 0)
+   while(stream_get_line_string(&cf.base, linebuf) >= 0)
    {
       MDFN_trim(linebuf);
 
@@ -164,7 +172,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
          if(linebuf.length() < 3 || linebuf[linebuf.length() - 1] != ']')
          {
             MDFN_Error(0, "Malformed section specifier: %s", linebuf.c_str());
-            return false;
+            { ok = false; goto cleanup; }
          }
 
          cur_section_name = linebuf.substr(1, linebuf.length() - 2);
@@ -179,7 +187,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
          if(feqpos == std::string::npos || feqpos != leqpos)
          {
             MDFN_Error(0, "Malformed value pair specifier: %s", linebuf.c_str());
-            return false;
+            { ok = false; goto cleanup; }
          }
 
          k = linebuf.substr(0, feqpos);
@@ -203,18 +211,18 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
       bool data_tracks_scrambled  = CCD_ReadInt<unsigned>(&ok, ds, "DATATRACKSSCRAMBLED") != 0;
 
       if (!ok)
-         return false;
+         { ok = false; goto cleanup; }
 
       if(num_sessions != 1)
       {
          MDFN_Error(0, "Unsupported number of sessions: %u", num_sessions);
-         return false;
+         { ok = false; goto cleanup; }
       }
 
       if(data_tracks_scrambled)
       {
          MDFN_Error(0, "Scrambled CCD data tracks currently not supported.");
-         return false;
+         { ok = false; goto cleanup; }
       }
 
       for(te = 0; te < toc_entries; te++)
@@ -244,12 +252,12 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
          }
 
          if (!ok)
-            return false;
+            { ok = false; goto cleanup; }
 
          if(session != 1)
          {
             MDFN_Error(0, "Unsupported TOC entry Session value: %u", session);
-            return false;
+            { ok = false; goto cleanup; }
          }
 
          /* Reference: ECMA-394, page 5-14 */
@@ -264,7 +272,7 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
             {
                default:
                   MDFN_Error(0, "Unsupported TOC entry Point value: %u", point);
-                  return false;
+                  { ok = false; goto cleanup; }
                case 0xA0:
                   tocd.first_track = pmin;
                   tocd.disc_type = psec;
@@ -290,36 +298,39 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
    /* Open image stream. */
    {
       std::string image_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(img_extsd), true);
-      FileStream *str        = new FileStream(image_path.c_str(), MODE_READ);
+      FileStream *str        = mdfn_filestream_new(image_path.c_str());
       int64 ss;
 
-      if (!str->is_open())
+      if (!mdfn_filestream_is_open(str))
       {
          MDFN_Error(0, "Could not open CCD image \"%s\"", image_path.c_str());
-         delete str;
-         return false;
+         if (str)
+            stream_destroy(&str->base);
+         { ok = false; goto cleanup; }
       }
 
       if (image_memcache)
       {
-         MemoryStream *mem = new MemoryStream(str);
-         if (!mem->is_valid())
+         /* mdfn_memstream_new_from_stream consumes &str->base regardless. */
+         struct MemoryStream *mem = mdfn_memstream_new_from_stream(&str->base);
+         if (!mdfn_memstream_is_valid(mem))
          {
             MDFN_Error(0, "Could not load CCD image \"%s\" into memory", image_path.c_str());
-            delete mem;
-            return false;
+            if (mem)
+               stream_destroy(&mem->base);
+            { ok = false; goto cleanup; }
          }
-         img_stream = mem;
+         img_stream = &mem->base;
       }
       else
-         img_stream = str;
+         img_stream = &str->base;
 
-      ss = img_stream->size();
+      ss = stream_size(img_stream);
 
       if (ss % 2352)
       {
          MDFN_Error(0, "CCD image size is not evenly divisible by 2352.");
-         return false;
+         { ok = false; goto cleanup; }
       }
 
       img_numsectors = ss / 2352;
@@ -328,40 +339,44 @@ bool CDAccess_CCD::Load(const char *path, bool image_memcache)
    {
       /* Open subchannel stream */
       std::string sub_path = MDFN_EvalFIP(dir_path, file_base + std::string(".") + std::string(sub_extsd), true);
-      FileStream *str      = new FileStream(sub_path.c_str(), MODE_READ);
+      FileStream *str      = mdfn_filestream_new(sub_path.c_str());
 
-      if (!str->is_open())
+      if (!mdfn_filestream_is_open(str))
       {
          MDFN_Error(0, "Could not open CCD subchannel \"%s\"", sub_path.c_str());
-         delete str;
-         return false;
+         if (str)
+            stream_destroy(&str->base);
+         { ok = false; goto cleanup; }
       }
 
       if (image_memcache)
       {
-         MemoryStream *mem = new MemoryStream(str);
-         if (!mem->is_valid())
+         struct MemoryStream *mem = mdfn_memstream_new_from_stream(&str->base);
+         if (!mdfn_memstream_is_valid(mem))
          {
             MDFN_Error(0, "Could not load CCD subchannel \"%s\" into memory", sub_path.c_str());
-            delete mem;
-            return false;
+            if (mem)
+               stream_destroy(&mem->base);
+            { ok = false; goto cleanup; }
          }
-         sub_stream = mem;
+         sub_stream = &mem->base;
       }
       else
-         sub_stream = str;
+         sub_stream = &str->base;
 
-      if (sub_stream->size() != (int64)img_numsectors * 96)
+      if (stream_size(sub_stream) != (uint64_t)img_numsectors * 96)
       {
          MDFN_Error(0, "CCD SUB file size mismatch.");
-         return false;
+         { ok = false; goto cleanup; }
       }
    }
 
    if (!CheckSubQSanity())
-      return false;
+      { ok = false; goto cleanup; }
 
-   return true;
+cleanup:
+   stream_close(&cf.base);
+   return ok;
 }
 
 //
@@ -395,8 +410,8 @@ bool CDAccess_CCD::CheckSubQSanity(void)
          };
       } buf;
 
-      sub_stream->seek(s * 96, SEEK_SET);
-      sub_stream->read(buf.full, 96);
+      stream_seek(sub_stream, s * 96, SEEK_SET);
+      stream_read(sub_stream, buf.full, 96);
 
       if(!subq_check_checksum(buf.qbuf))
          continue;
@@ -445,15 +460,15 @@ bool CDAccess_CCD::CheckSubQSanity(void)
 
 void CDAccess_CCD::Cleanup(void)
 {
-   if(img_stream)
+   if (img_stream)
    {
-      delete img_stream;
+      stream_destroy(img_stream);
       img_stream = NULL;
    }
 
-   if(sub_stream)
+   if (sub_stream)
    {
-      delete sub_stream;
+      stream_destroy(sub_stream);
       sub_stream = NULL;
    }
 }
@@ -473,11 +488,11 @@ bool CDAccess_CCD::Read_Raw_Sector(uint8 *buf, int32 lba)
       return false;
    }
 
-   img_stream->seek(lba * 2352, SEEK_SET);
-   img_stream->read(buf, 2352);
+   stream_seek(img_stream, lba * 2352, SEEK_SET);
+   stream_read(img_stream, buf, 2352);
 
-   sub_stream->seek(lba * 96, SEEK_SET);
-   sub_stream->read(sub_buf, 96);
+   stream_seek(sub_stream, lba * 96, SEEK_SET);
+   stream_read(sub_stream, sub_buf, 96);
 
    subpw_interleave(sub_buf, buf + 2352);
 
@@ -494,8 +509,8 @@ bool CDAccess_CCD::Read_Raw_PW(uint8_t *buf, int32_t lba)
       return false;
    }
 
-   sub_stream->seek(lba * 96, SEEK_SET);
-   sub_stream->read(sub_buf, 96);
+   stream_seek(sub_stream, lba * 96, SEEK_SET);
+   stream_read(sub_stream, sub_buf, 96);
 
    subpw_interleave(sub_buf, buf);
 

@@ -106,12 +106,13 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
    char psar_sig[12];
    std::string base_dir, file_base, file_ext;
    char sbi_ext[4] = { 's', 'b', 'i', 0 };
-   FileStream *file = new FileStream(path, MODE_READ);
+   FileStream *file = mdfn_filestream_new(path);
 
-   if (!file->is_open())
+   if (!mdfn_filestream_is_open(file))
    {
       log_cb(RETRO_LOG_ERROR, "Could not open PBP file: %s\n", path);
-      delete file;
+      if (file)
+         stream_destroy(&file->base);
       return false;
    }
 
@@ -119,43 +120,46 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
    if (image_memcache)
    {
-      MemoryStream *mem = new MemoryStream(file);
-      if (!mem->is_valid())
+      /* mdfn_memstream_new_from_stream consumes &file->base regardless
+       * of success - no further cleanup of `file` required. */
+      struct MemoryStream *mem = mdfn_memstream_new_from_stream(&file->base);
+      if (!mdfn_memstream_is_valid(mem))
       {
          log_cb(RETRO_LOG_ERROR, "Could not load PBP into memory: %s\n", path);
-         delete mem;
+         if (mem)
+            stream_destroy(&mem->base);
          return false;
       }
-      fp = mem;
+      fp = &mem->base;
    }
    else
-      fp = file;
+      fp = &file->base;
 
    // check for valid pbp
-   if(fp->read(magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
+   if(stream_read(fp, magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
    {
       log_cb(RETRO_LOG_ERROR, "Invalid PBP header: %s\n", path);
       return false;
    }
 
    // offsets of internal files
-   fp->seek(0x8, SEEK_SET);
+   stream_seek(fp, 0x8, SEEK_SET);
    for(int i = 0; i < PBP_NUM_FILES; i++)
-      pbp_file_offsets[i] = fp->get_LE<uint32_t>();
+      pbp_file_offsets[i] = stream_get_le_u32(fp);
 
    // only data.psar is relevant
    psisoimg_offset = pbp_file_offsets[DATA_PSAR];
-   fp->seek(pbp_file_offsets[DATA_PSAR], SEEK_SET);
+   stream_seek(fp, pbp_file_offsets[DATA_PSAR], SEEK_SET);
 
-   fp->read(psar_sig, sizeof(psar_sig));
+   stream_read(fp, psar_sig, sizeof(psar_sig));
    if(strncmp(psar_sig, "PSTITLEIMG00", sizeof(psar_sig)) == 0)
    {
       // multidisk image
       uint8_t iso_map[0x2A0];
       uint32_t read_offset = 0;
 
-      fp->seek(pbp_file_offsets[DATA_PSAR] + 0x200, SEEK_SET);
-      fp->read(iso_map, sizeof(iso_map));
+      stream_seek(fp, pbp_file_offsets[DATA_PSAR] + 0x200, SEEK_SET);
+      stream_read(fp, iso_map, sizeof(iso_map));
 
       // check for "\0PGD", should indicate whether TOC is encrypted or not?
       if(iso_map[0] == 0 && iso_map[1] == 'P' && iso_map[2] == 'G' && iso_map[3] == 'D')
@@ -192,9 +196,9 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
       // default to first disc on loading
       psisoimg_offset += discs_start_offset[0];
-      fp->seek(psisoimg_offset, SEEK_SET);
+      stream_seek(fp, psisoimg_offset, SEEK_SET);
 
-      fp->read(psar_sig, sizeof(psar_sig));
+      stream_read(fp, psar_sig, sizeof(psar_sig));
    }
 
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
@@ -226,10 +230,10 @@ bool CDAccess_PBP::ImageOpen(const char *path, bool image_memcache)
 
 void CDAccess_PBP::Cleanup(void)
 {
-   if(fp != NULL)
+   if (fp != NULL)
    {
-      fp->close();   // need to manually close for FileStreams?
-      delete fp;
+      stream_destroy(fp);
+      fp = NULL;
    }
    if(index_table != NULL)
       free(index_table);
@@ -409,8 +413,8 @@ bool CDAccess_PBP::Read_Raw_Sector(uint8 *buf, int32 lba)
       else if(size == sizeof(buff_compressed))
          is_compressed = false;  // should be the case here?
 
-      fp->seek(start_byte, SEEK_SET);
-      fp->read(is_compressed ? buff_compressed : buff_raw[0], size);
+      stream_seek(fp, start_byte, SEEK_SET);
+      stream_read(fp, is_compressed ? buff_compressed : buff_raw[0], size);
 
 //log_cb(RETRO_LOG_DEBUG, "lba = %d, block = %u, start_byte = %#x, index_table[%i] = %#x\n", lba, block, start_byte, block, index_table[block]);
 
@@ -496,8 +500,8 @@ bool CDAccess_PBP::Read_TOC(TOC *toc)
    TOC_Clear(toc);
    memset(Tracks, 0, sizeof(Tracks));
 
-   fp->seek(psisoimg_offset + 0x400, SEEK_SET);
-   fp->read(iso_header, 0xB6600);
+   stream_seek(fp, psisoimg_offset + 0x400, SEEK_SET);
+   stream_read(fp, iso_header, 0xB6600);
    if(iso_header[0] == 0 && iso_header[1] == 'P' && iso_header[2] == 'G' && iso_header[3] == 'D')
    {
       log_cb(RETRO_LOG_DEBUG, "[PBP] decrypting iso header...\n");

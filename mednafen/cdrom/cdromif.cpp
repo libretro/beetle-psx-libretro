@@ -24,6 +24,7 @@
 #include "../general.h"
 
 #include <algorithm>
+#include <queue>
 
 #include <boolean.h>
 #include <rthreads/rthreads.h>
@@ -694,130 +695,137 @@ bool CDIF_ST::Eject(bool eject_status)
 }
 
 
-class CDIF_Stream_Thing : public Stream
+/* CDIF_Stream_Thing: a Stream view onto a region of a CDIF (start_lba
+ * .. start_lba+sector_count*2048). The CDIF itself is borrowed - this
+ * stream does not own it and must not outlive it.
+ *
+ * Embeds struct Stream as the first member so the static cdif_stream_ops
+ * vtable can dispatch via the same upcast pattern as FileStream and
+ * MemoryStream. Heap-allocated by MakeStream(); destroy via stream_destroy. */
+struct CDIF_Stream_Thing
 {
-   public:
-
-      CDIF_Stream_Thing(CDIF *cdintf_arg, uint32 lba_arg, uint32 sector_count_arg);
-      ~CDIF_Stream_Thing();
-
-      virtual uint8 *map(void);
-      virtual void unmap(void);
-
-      virtual uint64 read(void *data, uint64 count);
-      virtual void write(const void *data, uint64 count);
-
-      virtual void seek(int64 offset, int whence);
-      virtual uint64_t tell(void);
-      virtual uint64_t size(void);
-      virtual void flush(void);
-      virtual void close(void);
-
-   private:
-      CDIF *cdintf;
-      const uint32 start_lba;
-      const uint32 sector_count;
-      int64 position;
+   struct Stream  base;
+   CDIF          *cdintf;
+   uint32         start_lba;
+   uint32         sector_count;
+   int64          position;
 };
 
-CDIF_Stream_Thing::CDIF_Stream_Thing(CDIF *cdintf_arg, uint32 start_lba_arg,
-      uint32 sector_count_arg) : cdintf(cdintf_arg), start_lba(start_lba_arg), sector_count(sector_count_arg)
+static struct CDIF_Stream_Thing *cst_from_stream(struct Stream *s)
 {
-
+   return (struct CDIF_Stream_Thing *)s;
 }
 
-CDIF_Stream_Thing::~CDIF_Stream_Thing()
+static uint64_t cst_read(struct Stream *s, void *data, uint64_t count)
 {
-
-}
-
-uint8 *CDIF_Stream_Thing::map(void)
-{
-   return NULL;
-}
-
-void CDIF_Stream_Thing::unmap(void)
-{
-
-}
-
-uint64 CDIF_Stream_Thing::read(void *data, uint64 count)
-{
+   struct CDIF_Stream_Thing *cst = cst_from_stream(s);
    uint64_t rp;
+   uint64_t end_byte = (uint64_t)cst->sector_count * 2048;
 
-   if(count > (((uint64)sector_count * 2048) - position))
-      count = ((uint64)sector_count * 2048) - position;
+   if (cst->position < 0 || (uint64_t)cst->position >= end_byte)
+      return 0;
 
-   if(!count)
-      return(0);
+   if (count > end_byte - (uint64_t)cst->position)
+      count = end_byte - (uint64_t)cst->position;
+   if (!count)
+      return 0;
 
-   for(rp = position; rp < (position + count); rp = (rp &~ 2047) + 2048)
+   for (rp = (uint64_t)cst->position; rp < (uint64_t)cst->position + count;
+         rp = (rp & ~(uint64_t)2047) + 2048)
    {
-      uint8_t buf[2048];  
+      uint8_t buf[2048];
+      uint64_t in_sector_off = rp & 2047;
+      uint64_t want = 2048 - in_sector_off;
+      uint64_t remaining = count - (rp - (uint64_t)cst->position);
 
-      cdintf->ReadSector(buf, start_lba + (rp / 2048), 1);
+      cst->cdintf->ReadSector(buf, cst->start_lba + (rp / 2048), 1);
 
-      memcpy((uint8_t*)data + (rp - position),
-            buf + (rp & 2047),
-            std::min<uint64>(2048 - (rp & 2047),count - (rp - position))
-            );
+      if (want > remaining)
+         want = remaining;
+      memcpy((uint8_t *)data + (rp - (uint64_t)cst->position),
+            buf + in_sector_off, (size_t)want);
    }
 
-   position += count;
-
+   cst->position += count;
    return count;
 }
 
-void CDIF_Stream_Thing::write(const void *data, uint64 count)
+static void cst_seek(struct Stream *s, int64_t offset, int whence)
 {
-}
+   struct CDIF_Stream_Thing *cst = cst_from_stream(s);
+   int64_t new_position;
 
-void CDIF_Stream_Thing::seek(int64 offset, int whence)
-{
-   int64 new_position;
-
-   switch(whence)
+   switch (whence)
    {
       case SEEK_SET:
          new_position = offset;
          break;
-
       case SEEK_CUR:
-         new_position = position + offset;
+         new_position = cst->position + offset;
          break;
-
       case SEEK_END:
-         new_position = ((int64)sector_count * 2048) + offset;
+         new_position = (int64_t)cst->sector_count * 2048 + offset;
          break;
+      default:
+         /* The original Mednafen code fell through to a use of an
+          * uninitialised new_position here. No caller in this
+          * libretro core triggers it, but treat it as a no-op
+          * defensively. */
+         return;
    }
 
-   position = new_position;
+   if (new_position < 0)
+      return;
+   cst->position = new_position;
 }
 
-uint64_t CDIF_Stream_Thing::tell(void)
+static uint64_t cst_tell(struct Stream *s)
 {
-   return position;
+   return (uint64_t)cst_from_stream(s)->position;
 }
 
-uint64_t CDIF_Stream_Thing::size(void)
+static uint64_t cst_size(struct Stream *s)
 {
-   return(sector_count * 2048);
+   return (uint64_t)cst_from_stream(s)->sector_count * 2048;
 }
 
-void CDIF_Stream_Thing::flush(void)
+static void cst_close(struct Stream *s)
 {
-
+   /* Nothing to release - cdintf is borrowed. */
+   (void)s;
 }
 
-void CDIF_Stream_Thing::close(void)
+static void cst_destroy(struct Stream *s)
 {
-
+   if (!s)
+      return;
+   free(cst_from_stream(s));
 }
 
+static const struct StreamOps cdif_stream_ops =
+{
+   cst_read,
+   cst_seek,
+   cst_tell,
+   cst_size,
+   cst_close,
+   cst_destroy,
+   NULL,    /* get_line: not used on CDIF streams in this core */
+};
 
 Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 {
-   return new CDIF_Stream_Thing(this, lba, sector_count);
+   struct CDIF_Stream_Thing *cst =
+      (struct CDIF_Stream_Thing *)malloc(sizeof(*cst));
+   if (!cst)
+      return NULL;
+
+   cst->base.ops     = &cdif_stream_ops;
+   cst->cdintf       = this;
+   cst->start_lba    = lba;
+   cst->sector_count = sector_count;
+   cst->position     = 0;
+   return &cst->base;
 }
 
 

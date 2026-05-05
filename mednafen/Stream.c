@@ -18,29 +18,38 @@
 #include "mednafen.h"
 #include "Stream.h"
 
-Stream::Stream()
+int stream_get_line(struct Stream *s, char *out, size_t cap)
 {
-
-}
-
-Stream::~Stream()
-{
-
-}
-
-int Stream::get_line(std::string &str)
-{
+   size_t n = 0;
+   bool   got_any = false;
    uint8_t c;
 
-   str.clear();	// or str.resize(0)??
+   if (s->ops->get_line)
+      return s->ops->get_line(s, out, cap);
 
-   while(read(&c, sizeof(c)) > 0)
+   /* Fallback: byte-at-a-time. Always NUL-terminate out.
+    * cap == 0 means "no buffer"; still drain the line and report
+    * line-end / EOF correctly. */
+   for (;;)
    {
-      if(c == '\r' || c == '\n' || c == 0)
-         return(c);
+      if (stream_read(s, &c, 1) == 0)
+      {
+         if (cap > 0)
+            out[n] = '\0';
+         return got_any ? 0 : -1;
+      }
+      got_any = true;
 
-      str.push_back(c);
+      if (c == '\r' || c == '\n' || c == 0)
+      {
+         if (cap > 0)
+            out[n] = '\0';
+         return c;
+      }
+
+      /* Cap-1 to leave room for NUL. Once full, silently drop further
+       * bytes until we hit the line-end. */
+      if (cap > 0 && n + 1 < cap)
+         out[n++] = (char)c;
    }
-
-   return(-1);
 }
