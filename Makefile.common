@@ -236,8 +236,7 @@ endif
    SOURCES_CXX += $(MEDNAFEN_DIR)/general.cpp \
                   $(MEDNAFEN_DIR)/mempatcher.cpp \
                   $(CORE_DIR)/libretro.cpp \
-                  $(CORE_DIR)/input.cpp \
-                  $(CORE_DIR)/rsx/rsx_intf.cpp
+                  $(CORE_DIR)/input.cpp
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
@@ -250,6 +249,7 @@ endif
                   $(CORE_EMU_DIR)/sio.c \
                   $(CORE_EMU_DIR)/spu.c \
                   $(CORE_EMU_DIR)/timer.c \
+                  $(CORE_DIR)/rsx/rsx_intf.c \
                   $(MEDNAFEN_DIR)/FileStream.c \
                   $(MEDNAFEN_DIR)/MemoryStream.c \
                   $(MEDNAFEN_DIR)/Stream.c \
