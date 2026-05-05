@@ -508,10 +508,10 @@ PS_SPU *PSX_SPU = NULL;
 PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
 
-MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM = NULL;
-MultiAccessSizeMem<65536, uint32, false> *PIOMem = NULL;
-MultiAccessSizeMem<2048 * 1024, uint32, false> *MainRAM = NULL;
-MultiAccessSizeMem<1024, uint32, false> *ScratchRAM = NULL;
+MultiAccessSizeMem<512 * 1024> *BIOSROM = NULL;
+MultiAccessSizeMem<65536> *PIOMem = NULL;
+MultiAccessSizeMem<2048 * 1024> *MainRAM = NULL;
+MultiAccessSizeMem<1024> *ScratchRAM = NULL;
 
 #ifdef HAVE_LIGHTREC
 /* Size of Expansion 1 (8MB) */
@@ -2090,22 +2090,22 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    if(psx_mmap > 0)
    {
-      MainRAM = new(psx_mem) MultiAccessSizeMem<RAM_SIZE, uint32, false>();
-      ScratchRAM = new(psx_scratch) MultiAccessSizeMem<SCRATCH_SIZE, uint32, false>();
-      BIOSROM = new(psx_bios) MultiAccessSizeMem<BIOS_SIZE, uint32, false>();
+      MainRAM = new(psx_mem) MultiAccessSizeMem<RAM_SIZE>();
+      ScratchRAM = new(psx_scratch) MultiAccessSizeMem<SCRATCH_SIZE>();
+      BIOSROM = new(psx_bios) MultiAccessSizeMem<BIOS_SIZE>();
    }
    else
 #endif
    {
-      MainRAM = new MultiAccessSizeMem<2048 * 1024, uint32, false>();
-      ScratchRAM = new MultiAccessSizeMem<1024, uint32, false>();
-      BIOSROM = new MultiAccessSizeMem<512 * 1024, uint32, false>();
+      MainRAM = new MultiAccessSizeMem<2048 * 1024>();
+      ScratchRAM = new MultiAccessSizeMem<1024>();
+      BIOSROM = new MultiAccessSizeMem<512 * 1024>();
    }
 
    PIOMem  = NULL;
 
    if(WantPIOMem)
-      PIOMem = new MultiAccessSizeMem<65536, uint32, false>();
+      PIOMem = new MultiAccessSizeMem<65536>();
 
    for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
    {

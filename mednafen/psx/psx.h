@@ -90,9 +90,9 @@ class PS_SPU;
 extern PS_CPU *PSX_CPU;
 extern PS_CDC *PSX_CDC;
 extern PS_SPU *PSX_SPU;
-extern MultiAccessSizeMem<512 * 1024, uint32, false> *BIOSROM;
-extern MultiAccessSizeMem<2048 * 1024, uint32_t, false> *MainRAM;
-extern MultiAccessSizeMem<1024, uint32_t, false> *ScratchRAM;
+extern MultiAccessSizeMem<512 * 1024> *BIOSROM;
+extern MultiAccessSizeMem<2048 * 1024> *MainRAM;
+extern MultiAccessSizeMem<1024> *ScratchRAM;
 
 #ifdef HAVE_LIGHTREC
 enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
