@@ -37,7 +37,7 @@
 #include "pgxp_gpu.h"
 
 
-// GTE registers
+/* GTE registers */
 PGXP_value GTE_data_reg_mem[32];
 PGXP_value GTE_ctrl_reg_mem[32];
 
@@ -51,14 +51,14 @@ void PGXP_InitGTE()
 	memset(GTE_ctrl_reg_mem, 0, sizeof(GTE_ctrl_reg_mem));
 }
 
-// Instruction register decoding
-#define op(_instr)		(_instr >> 26)			// The op part of the instruction register 
-#define func(_instr)	((_instr) & 0x3F)		// The funct part of the instruction register 
-#define sa(_instr)		((_instr >>  6) & 0x1F) // The sa part of the instruction register
-#define rd(_instr)		((_instr >> 11) & 0x1F)	// The rd part of the instruction register 
-#define rt(_instr)		((_instr >> 16) & 0x1F)	// The rt part of the instruction register 
-#define rs(_instr)		((_instr >> 21) & 0x1F)	// The rs part of the instruction register 
-#define imm(_instr)		(_instr & 0xFFFF)		// The immediate part of the instruction register
+/* Instruction register decoding */
+#define op(_instr)		(_instr >> 26)			/* The op part of the instruction register */
+#define func(_instr)	((_instr) & 0x3F)		/* The funct part of the instruction register */
+#define sa(_instr)		((_instr >>  6) & 0x1F) /* The sa part of the instruction register */
+#define rd(_instr)		((_instr >> 11) & 0x1F)	/* The rd part of the instruction register */
+#define rt(_instr)		((_instr >> 16) & 0x1F)	/* The rt part of the instruction register */
+#define rs(_instr)		((_instr >> 21) & 0x1F)	/* The rs part of the instruction register */
+#define imm(_instr)		(_instr & 0xFFFF)		/* The immediate part of the instruction register */
 
 #define SX0 (GTE_data_reg[ 12 ].x)
 #define SY0 (GTE_data_reg[ 12 ].y)
@@ -76,7 +76,7 @@ void PGXP_pushSXYZ2f(float _x, float _y, float _z, unsigned int _v)
 {
 	static unsigned int uCount = 0;
 	low_value temp;
-	// push values down FIFO
+	/* push values down FIFO */
 	SXY0 = SXY1;
 	SXY1 = SXY2;
 	
@@ -87,7 +87,7 @@ void PGXP_pushSXYZ2f(float _x, float _y, float _z, unsigned int _v)
 	SXY2.flags	= VALID_ALL;
 	SXY2.count	= uCount++;
 
-	// cache value in GPU plugin
+	/* cache value in GPU plugin */
 	temp.word = _v;
 	if(PGXP_GetModes() & PGXP_VERTEX_CACHE)
 		PGXP_CacheVertex(temp.x, temp.y, &SXY2);
@@ -105,8 +105,7 @@ void PGXP_pushSXYZ2s(s64 _x, s64 _y, s64 _z, u32 v)
 	float fy = (float)(_y) / (float)(1 << 16);
 	float fz = (float)(_z);
 
-	//if(Config.PGXP_GTE)
-		PGXP_pushSXYZ2f(fx, fy, fz, v);
+	PGXP_pushSXYZ2f(fx, fy, fz, v);
 }
 
 #define VX(n) (psxRegs.CP2D.p[ n << 1 ].sw.l)
@@ -118,7 +117,7 @@ int PGXP_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2)
 	Validate(&SXY0, sxy0);
 	Validate(&SXY1, sxy1);
 	Validate(&SXY2, sxy2);
-	if (((SXY0.flags & SXY1.flags & SXY2.flags & VALID_01) == VALID_01))// && Config.PGXP_GTE && (Config.PGXP_Mode > 0))
+	if (((SXY0.flags & SXY1.flags & SXY2.flags & VALID_01) == VALID_01))/* && Config.PGXP_GTE && (Config.PGXP_Mode > 0)) */
 		return 1;
 	return 0;
 }
@@ -127,23 +126,10 @@ float PGXP_NCLIP()
 {
 	float nclip = ((SX0 * SY1) + (SX1 * SY2) + (SX2 * SY0) - (SX0 * SY2) - (SX1 * SY0) - (SX2 * SY1));
 
-	// ensure fractional values are not incorrectly rounded to 0
+	/* ensure fractional values are not incorrectly rounded to 0 */
 	float nclipAbs = fabs(nclip);
 	if (( 0.1f < nclipAbs) && (nclipAbs < 1.f))
 		nclip += (nclip < 0.f ? -1 : 1);
-
-	//float AX = SX1 - SX0;
-	//float AY = SY1 - SY0;
-
-	//float BX = SX2 - SX0;
-	//float BY = SY2 - SY0;
-
-	//// normalise A and B
-	//float mA = sqrt((AX*AX) + (AY*AY));
-	//float mB = sqrt((BX*BX) + (BY*BY));
-
-	//// calculate AxB to get Z component of C
-	//float CZ = ((AX * BY) - (AY * BX)) * (1 << 12);
 
 	return nclip;
 }
@@ -166,7 +152,7 @@ static void PGXP_MTC2_int(PGXP_value value, u32 reg)
 	switch(reg)
 	{
 		case 15:
-			// push FIFO
+			/* push FIFO */
 			SXY0 = SXY1;
 			SXY1 = SXY2;
 			SXY2 = value;
@@ -180,9 +166,9 @@ static void PGXP_MTC2_int(PGXP_value value, u32 reg)
 	GTE_data_reg[reg] = value;
 }
 
-////////////////////////////////////
-// Data transfer tracking
-////////////////////////////////////
+/* ============================================================
+ * Data transfer tracking
+ * ============================================================ */
 
 void MFC2(int reg) {
 	psx_value val;
@@ -214,23 +200,21 @@ void MFC2(int reg) {
 
 	case 28:
 	case 29:
-	//	psxRegs.CP2D.p[reg].d = LIM(IR1 >> 7, 0x1f, 0, 0) | (LIM(IR2 >> 7, 0x1f, 0, 0) << 5) | (LIM(IR3 >> 7, 0x1f, 0, 0) << 10);
 		break;
 	}
 }
 
 void PGXP_GTE_MFC2(u32 instr, u32 rtVal, u32 rdVal)
 {
-	// CPU[Rt] = GTE_D[Rd]
+	/* CPU[Rt] = GTE_D[Rd] */
 	Validate(&GTE_data_reg[rd(instr)], rdVal);
-	//MFC2(rd(instr));
 	CPU_reg[rt(instr)] = GTE_data_reg[rd(instr)];
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
 void PGXP_GTE_MTC2(u32 instr, u32 rdVal, u32 rtVal)
 {
-	// GTE_D[Rd] = CPU[Rt]
+	/* GTE_D[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
 	PGXP_MTC2_int(CPU_reg[rt(instr)], rd(instr));
 	GTE_data_reg[rd(instr)].value = rdVal;
@@ -238,7 +222,7 @@ void PGXP_GTE_MTC2(u32 instr, u32 rdVal, u32 rtVal)
 
 void PGXP_GTE_CFC2(u32 instr, u32 rtVal, u32 rdVal)
 {
-	// CPU[Rt] = GTE_C[Rd]
+	/* CPU[Rt] = GTE_C[Rd] */
 	Validate(&GTE_ctrl_reg[rd(instr)], rdVal);
 	CPU_reg[rt(instr)] = GTE_ctrl_reg[rd(instr)];
 	CPU_reg[rt(instr)].value = rtVal;
@@ -246,18 +230,18 @@ void PGXP_GTE_CFC2(u32 instr, u32 rtVal, u32 rdVal)
 
 void PGXP_GTE_CTC2(u32 instr, u32 rdVal, u32 rtVal)
 {
-	// GTE_C[Rd] = CPU[Rt]
+	/* GTE_C[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
 	GTE_ctrl_reg[rd(instr)] = CPU_reg[rt(instr)];
 	GTE_ctrl_reg[rd(instr)].value = rdVal;
 }
 
-////////////////////////////////////
-// Memory Access
-////////////////////////////////////
+/* ============================================================
+ * Memory Access
+ * ============================================================ */
 void	PGXP_GTE_LWC2(u32 instr, u32 rtVal, u32 addr)
 {
-	// GTE_D[Rt] = Mem[addr]
+	/* GTE_D[Rt] = Mem[addr] */
 	PGXP_value val;
 	ValidateAndCopyMem(&val, addr, rtVal);
 	PGXP_MTC2_int(val, rt(instr));
@@ -265,7 +249,7 @@ void	PGXP_GTE_LWC2(u32 instr, u32 rtVal, u32 addr)
 
 void	PGXP_GTE_SWC2(u32 instr, u32 rtVal, u32 addr)
 {
-	//  Mem[addr] = GTE_D[Rt]
+	/*  Mem[addr] = GTE_D[Rt] */
 	Validate(&GTE_data_reg[rt(instr)], rtVal);
 	WriteMem(&GTE_data_reg[rt(instr)], addr);
 }

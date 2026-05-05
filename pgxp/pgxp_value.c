@@ -31,21 +31,22 @@ void MakeValid(PGXP_value *pV, u32 psxV)
 
 void Validate(PGXP_value *pV, u32 psxV)
 {
-	// assume pV is not NULL
+	/* assume pV is not NULL */
 	pV->flags &= (pV->value == psxV) ? ALL : INV_VALID_ALL;
 }
 
 void MaskValidate(PGXP_value *pV, u32 psxV, u32 mask, u32 validMask)
 {
-	// assume pV is not NULL
+	/* assume pV is not NULL */
 	pV->flags &= ((pV->value & mask) == (psxV & mask)) ? ALL : (ALL ^ (validMask));
 }
 
 u32 ValueToTolerance(PGXP_value *pV, u32 psxV, float tolerance)
 {
 	psx_value psx;
+	u32       retFlags = VALID_ALL;
+
 	psx.d = psxV;
-	u32 retFlags = VALID_ALL;
 
 	if (fabs(pV->x - psx.sw.l) >= tolerance)
 		retFlags = retFlags & (VALID_1 | VALID_2 | VALID_3);
@@ -56,7 +57,7 @@ u32 ValueToTolerance(PGXP_value *pV, u32 psxV, float tolerance)
 	return retFlags;
 }
 
-/// float logical arithmetic ///
+/* float logical arithmetic */
 
 double f16Sign(double in)		{ u32 s = in * (double)((u32)1 << 16); return ((double)*((s32*)&s)) / (double)((s32)1 << 16); } 
 double f16Unsign(double in)		{ return (in >= 0) ? in : ((double)in + (double)USHRT_MAX + 1); }

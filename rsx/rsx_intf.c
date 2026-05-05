@@ -36,7 +36,7 @@ static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
 static bool gl_initialized                      = false;
 static bool vk_initialized                      = false;
 
-// GPU reset defaults
+/* GPU reset defaults */
 static int rsx_width_mode = WIDTH_MODE_256;
 static int rsx_height_mode = HEIGHT_MODE_240;
 
@@ -140,10 +140,10 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 {
    struct retro_variable var = {0};
    bool software_selected    = false;
+   enum force_renderer_type force_type = AUTO;
+   unsigned preferred        = 0; /* Will be set to RETRO_HW_CONTEXT_DUMMY if GET_PREFERRED_HW_RENDER is not supported by frontend */
    vk_initialized            = false;
    gl_initialized            = false;
-
-   enum force_renderer_type force_type = AUTO;
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    var.key                   = BEETLE_OPT(renderer);
@@ -221,7 +221,6 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       }
       /* End forces section */
 
-      unsigned preferred = 0; // This will be set to RETRO_HW_CONTEXT_DUMMY if GET_PREFERRED_HW_RENDER is not supported by frontend
       if (!environ_cb(RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER, &preferred))
       {
          preferred = RETRO_HW_CONTEXT_DUMMY;
@@ -265,7 +264,7 @@ bool rsx_intf_open(bool is_pal, bool force_software)
    }
 
 soft:
-   // rsx_soft_open(is_pal) always returns true
+   /* rsx_soft_open(is_pal) always returns true */
    if (rsx_soft_open(is_pal))
    {
       rsx_type = RSX_SOFTWARE;
@@ -542,14 +541,14 @@ void rsx_intf_set_display_mode(bool depth_24bpp,
       return;
    }
 
-   // Is this check accurate for 240i timing? May need to be fixed later
+   /* Is this check accurate for 240i timing? May need to be fixed later */
    if (currently_interlaced != is_480i)
    {
       currently_interlaced = is_480i;
       interlace_setting_dirty = true;
    }
 
-   // Also verify if this is accurate for 240i
+   /* Also verify if this is accurate for 240i */
    if ((rsx_width_mode != width_mode) || (rsx_height_mode != (int)is_480i))
    {
       rsx_width_mode = width_mode;
@@ -890,7 +889,7 @@ double rsx_common_get_timing_fps(void)
    else if (core_timing_fps_mode == FORCE_INTERLACED_TIMING)
       return (pal_timings ? FPS_PAL_INTERLACED : FPS_NTSC_INTERLACED);
 
-   //else AUTO_TOGGLE_TIMING
+   /*else AUTO_TOGGLE_TIMING */
    return (pal_timings ?
                (currently_interlaced ? FPS_PAL_INTERLACED : FPS_PAL_NONINTERLACED) :
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
@@ -901,15 +900,17 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting)
 {
-   // Current assumptions
-   //    A fixed percentage of width is cropped when crop_overscan isn't 0
-   //    aspect_ratio_setting is one of the following:
-   //          0 - Corrected
-   //          1 - Uncorrected (1:1 PAR)
-   //          2 - Force 4:3 (traditionally what Beetle PSX has done prior to adding in this setting)
-   //          3 - Force NTSC (get corrected NTSC aspect ratio even with PAL games)
+   float ar = (4.0 / 3.0);
 
-   // Aspect ratio overrides - VRAM and widescreen take precedence
+   /* Current assumptions
+    *    A fixed percentage of width is cropped when crop_overscan isn't 0
+    *    aspect_ratio_setting is one of the following:
+    *          0 - Corrected
+    *          1 - Uncorrected (1:1 PAR)
+    *          2 - Force 4:3 (traditionally what Beetle PSX has done prior to adding in this setting)
+    *          3 - Force NTSC (get corrected NTSC aspect ratio even with PAL games)
+    *
+    * Aspect ratio overrides - VRAM and widescreen take precedence */
 
    if (vram_override)
       return 2.0 / 1.0;
@@ -928,27 +929,28 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
          case 4:
             return (20.0 / 9.0);
          case 5:
-            return (/*21.0 / 9.0*/ 64.0 / 27.0);
+            return (64.0 / 27.0);
          case 6:
             return (32.0 / 9.0);
       }
 
-   float ar = (4.0 / 3.0);
-
-   if (aspect_ratio_setting == 0) // Corrected
+   if (aspect_ratio_setting == 0) /* Corrected */
    {
-      // Calculate horizontal scaling in terms of gpu clock cycles
+      int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
+
+      /* Calculate horizontal scaling in terms of gpu clock cycles */
       ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
 
-      // Calculate vertical scaling in terms of visible scanline count
-      int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
+      /* Calculate vertical scaling in terms of visible scanline count */
       ar *= (pal_content ? (288.0 / num_vis_scanlines) : (240.0 / num_vis_scanlines));
 
       return ar;
    }
-   else if (aspect_ratio_setting == 1) // Uncorrected
+   else if (aspect_ratio_setting == 1) /* Uncorrected */
    {
       int width_base = 0;
+      double height_base;
+
       switch (rsx_width_mode)
       {
          case WIDTH_MODE_256:
@@ -964,26 +966,26 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
             width_base = crop_overscan ? 640 : 700;
             break;
          case WIDTH_MODE_368:
-            // Probably slightly off because of rounding, see libretro.cpp comments
+            /* Probably slightly off because of rounding, see libretro.cpp comments */
             width_base = crop_overscan ? 366 : 400;
             break;
       }
 
-      double height_base = (last_visible_scanline - first_visible_scanline + 1) *
-                           (rsx_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
+      height_base = (last_visible_scanline - first_visible_scanline + 1) *
+                    (rsx_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
 
-      // Calculate aspect ratio as quotient of raw native framebuffer width and height
+      /* Calculate aspect ratio as quotient of raw native framebuffer width and height */
       return width_base / height_base;
    }
-   else if (aspect_ratio_setting == 3) // Force NTSC
+   else if (aspect_ratio_setting == 3) /* Force NTSC */
    {
-      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
-
       int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
+
+      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
       ar *= (240.0 / num_vis_scanlines);
 
       return ar;
    }
 
-   return ar; // 4:3
+   return ar; /* 4:3 */
 }

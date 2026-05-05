@@ -76,7 +76,6 @@ void IRQ_Assert(int which, bool status)
    if(status)
    {
       Asserted |= 1 << which;
-      //Status |= 1 << which;
       Status |= (old_Asserted ^ Asserted) & Asserted;
    }
 
@@ -86,18 +85,13 @@ void IRQ_Assert(int which, bool status)
 
 void IRQ_Write(uint32_t A, uint32_t V)
 {
-   // FIXME if we ever have "accurate" bus emulation
+   /* FIXME if we ever have "accurate" bus emulation */
    V <<= (A & 3) * 8;
-
-   //printf("[IRQ] Write: 0x%08x 0x%08x --- PAD TEMP\n", A, V);
 
    if(A & 4)
       Mask = V;
    else
-   {
       Status &= V;
-      //Status |= Asserted;
-   }
 
    Recalc();
 }
@@ -110,11 +104,9 @@ uint32_t IRQ_Read(uint32_t A)
    if(A & 4)
       ret = Mask;
 
-   // FIXME: Might want to move this out to psx.cpp eventually.
+   /* FIXME: Might want to move this out to psx.cpp eventually. */
    ret |= 0x1F800000;
    ret >>= (A & 3) * 8;
-
-   //printf("[IRQ] Read: 0x%08x 0x%08x --- PAD TEMP\n", A, ret);
 
    return(ret);
 }

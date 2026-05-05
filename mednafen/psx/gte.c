@@ -82,7 +82,7 @@ static uint32_t CR[32];
 typedef union
 {
  gtematrix All[4];
- int32_t Raw[4][5];	// Don't read from this(Raw[][]), only write(and when writing, if running on a big-endian platform, swap the upper 16-bits with the lower 16-bits)
+ int32_t Raw[4][5];	/* Don't read from this(Raw[][]), only write(and when writing, if running on a big-endian platform, swap the upper 16-bits with the lower 16-bits) */
  int16_t Raw16[4][10];
 
  struct
@@ -97,7 +97,7 @@ typedef union
 
 static union
 {
- int32_t All[4][4];	// Really only [4][3], but [4] to ease address calculation.
+ int32_t All[4][4];	/* Really only [4][3], but [4] to ease address calculation. */
 
  struct
  {
@@ -122,7 +122,7 @@ static int16_t ZSF4;    /* Scale factor when computing the average of 4 Z values
 
 static Matrices_t Matrices;   /* Three 3x3 signed 4.12 matrices: rotation, light, and color */
 
-// Begin DR
+/* Begin DR */
 static int16_t Vectors[3][4]; /* Five 3x signed words control vectors: translation,
                                  BackgroundColor, FarColor and Zero (which is always equal to
                                  [0, 0, 0]. */
@@ -157,7 +157,7 @@ static uint32_t Reg23;        /* Register 23: 32bit read/write but not used for 
 #define IR3 IR[3]
 
 
-// end DR
+/* end DR */
 
 #include "../../beetle_psx_globals.h"
 
@@ -170,9 +170,9 @@ static INLINE uint8_t Sat5(int16_t cc)
    return(cc);
 }
 
-//
-// Newton-Raphson division table.  (Initialized at startup; do NOT save in save states!)
-//
+/*
+ * Newton-Raphson division table.  (Initialized at startup; do NOT save in save states!)
+ * */
 static uint8_t DivTable[0x100 + 1];
 static INLINE int32_t CalcRecip(uint16 divisor)
 {
@@ -196,10 +196,9 @@ void GTE_Init(void)
          xa = (xa * (1024 * 512 - ((divisor >> 7) * xa))) >> 18;
 
       DivTable[(divisor >> 7) & 0xFF] = ((xa + 1) >> 1) - 0x101;
-      //printf("%04x, %02x\n", divisor, ((xa + 1) >> 1) - 0x101);
    }
 
-   // To avoid a bounds limiting if statement in the emulation code:
+   /* To avoid a bounds limiting if statement in the emulation code: */
    DivTable[0x100] = DivTable[0xFF];
 }
 
@@ -242,7 +241,7 @@ void GTE_Power(void)
    FLAGS = 0;
 }
 
-// TODO: Don't save redundant state, regarding CR cache variables
+/* TODO: Don't save redundant state, regarding CR cache variables */
 int GTE_StateAction(StateMem *sm, int load, int data_only)
 {
    SFORMAT StateRegs[] =
@@ -566,7 +565,7 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
          IR3 = ((value >> 10) & 0x1F) << 7;
          break;
 
-      case 29:	// Read-only
+      case 29:	/* Read-only */
          break;
 
       case 30:
@@ -575,7 +574,7 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
 		 LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
          break;
 
-      case 31:	// Read-only
+      case 31:	/* Read-only */
          break;
    }
 }
@@ -731,13 +730,13 @@ static INLINE int64_t F(int64_t value)
 {
    if(value < -2147483648LL)
    {
-      // flag set here
+      /* flag set here */
       FLAGS |= 1 << 15;
    }
 
    if(value > 2147483647LL)
    {
-      // flag set here
+      /* flag set here */
       FLAGS |= 1 << 16;
    }
    return(value);
@@ -768,14 +767,14 @@ static INLINE int16_t i32_to_i16_saturate(unsigned int which, int32_t value, int
 
    if(value < (-32768 + tmp))
    {
-      // set flag here
+      /* set flag here */
       FLAGS |= 1 << (24 - which);
       return -32768 + tmp;
    }
 
    if(value > 32767)
    {
-      // Set flag here
+      /* Set flag here */
       FLAGS |= 1 << (24 - which);
       return 32767;
    }
@@ -808,8 +807,8 @@ static INLINE uint8_t Lm_C(unsigned int which, int32_t value)
 {
    if(value & ~0xFF)
    {
-      // Set flag here
-      FLAGS |= 1 << (21 - which);	// Tested with GPF
+      /* Set flag here */
+      FLAGS |= 1 << (21 - which);	/* Tested with GPF */
 
       if(value < 0)
          value = 0;
@@ -823,7 +822,7 @@ static INLINE uint8_t Lm_C(unsigned int which, int32_t value)
 
 static INLINE int32_t Lm_D(int32_t value, int unchained)
 {
-   // Not sure if we should have it as int64, or just chain on to and special case when the F flags are set.
+   /* Not sure if we should have it as int64, or just chain on to and special case when the F flags are set. */
    if(!unchained)
    {
       if(FLAGS & (1 << 15))
@@ -841,15 +840,15 @@ static INLINE int32_t Lm_D(int32_t value, int unchained)
 
    if(value < 0)
    {
-      // Set flag here
+      /* Set flag here */
       value = 0;
-      FLAGS |= 1 << 18;	// Tested with AVSZ3
+      FLAGS |= 1 << 18;	/* Tested with AVSZ3 */
    }
    else if(value > 65535)
    {
-      // Set flag here.
+      /* Set flag here. */
       value = 65535;
-      FLAGS |= 1 << 18;	// Tested with AVSZ3
+      FLAGS |= 1 << 18;	/* Tested with AVSZ3 */
    }
 
    return(value);
@@ -859,14 +858,14 @@ static INLINE int32_t Lm_G(unsigned int which, int32_t value)
 {
    if(value < -1024)
    {
-      // Set flag here
+      /* Set flag here */
       value = -1024;
       FLAGS |= 1 << (14 - which);
    }
 
    if(value > 1023)
    {
-      // Set flag here.
+      /* Set flag here. */
       value = 1023;
       FLAGS |= 1 << (14 - which);
    }
@@ -874,7 +873,7 @@ static INLINE int32_t Lm_G(unsigned int which, int32_t value)
    return(value);
 }
 
-// limit to 4096, not 4095
+/* limit to 4096, not 4095 */
 static INLINE int32_t Lm_H(int32_t value)
 {
 #if 0
@@ -932,14 +931,14 @@ static INLINE uint16_t i64_to_otz(int64_t average, int unchained)
 
    if(value < 0)
    {
-      // Set flag here
-      FLAGS |= 1 << 18;	// Tested with AVSZ3
+      /* Set flag here */
+      FLAGS |= 1 << 18;	/* Tested with AVSZ3 */
       return 0;
    }
    else if(value > 65535)
    {
-      // Set flag here.
-      FLAGS |= 1 << 18;	// Tested with AVSZ3
+      /* Set flag here. */
+      FLAGS |= 1 << 18;	/* Tested with AVSZ3 */
       return 65535;
    }
 
@@ -962,14 +961,14 @@ static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
 
    if(value < (-32768 + tmp))
    {
-      // set flag here
+      /* set flag here */
       FLAGS |= 1 << (24 - which);
       value = -32768 + tmp;
    }
 
    if(value > 32767)
    {
-      // Set flag here
+      /* Set flag here */
       FLAGS |= 1 << (24 - which);
       value = 32767;
    }
@@ -1060,7 +1059,6 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 
    IR1 = Lm_B(0, MAC[1], lm);
    IR2 = Lm_B(1, MAC[2], lm);
-   //printf("FTV: %08x %08x\n", crv[2], (uint32)(tmp[2] >> 12));
    IR3 = Lm_B_PTZ(2, MAC[3], tmp[2] >> 12, lm);
 
    Z_FIFO[0] = Z_FIFO[1];
@@ -1092,11 +1090,10 @@ static INLINE void MultiplyMatrixByVector_PT(const gtematrix *matrix, const int1
 /* SQR - Square Vector */
 static int32_t SQR(uint32_t instr)
 {
+   unsigned i;
    DECODE_FIELDS;
 
    /* PSX GTE test fails with this code */
-   unsigned i;
-
    for (i = 1; i < 4; i++)
    {
       int32_t ir = IR[i];
@@ -1153,25 +1150,25 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    float widescreen_hack_aspect_ratio;
    switch(widescreen_hack_aspect_ratio_setting)
    {
-      case 0: // 16:10
+      case 0: /* 16:10 */
          widescreen_hack_aspect_ratio = 0.80f;
          break;
-      case 1: // 16:9 (default)
+      case 1: /* 16:9 (default) */
          widescreen_hack_aspect_ratio = 0.75f;
          break;
-      case 2: // 18:9 (smartphone)
+      case 2: /* 18:9 (smartphone) */
          widescreen_hack_aspect_ratio = 0.66f;
          break;
-      case 3: // 19:9 (smartphone)
+      case 3: /* 19:9 (smartphone) */
          widescreen_hack_aspect_ratio = 0.63f;
          break;
-      case 4: // 20:9 (smartphone)
+      case 4: /* 20:9 (smartphone) */
          widescreen_hack_aspect_ratio = 0.6f;
          break;
-      case 5: // 21:9 (ultrawide, 64:27)
+      case 5: /* 21:9 (ultrawide, 64:27) */
          widescreen_hack_aspect_ratio = 0.55f;
          break;
-      case 6: // 32:9 (superwide)
+      case 6: /* 32:9 (superwide) */
          widescreen_hack_aspect_ratio = 0.37f;
          break;
    }
@@ -1186,32 +1183,32 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    XY_FIFO[1] = XY_FIFO[2];
    XY_FIFO[2] = XY_FIFO[3];
 
-   /*
-    * PGXP hack to add subpixel precision as well
-    */
-   float fofx       = ((float)OFX / (float)(1 << 16));
-   float fofy       = ((float)OFY / (float)(1 << 16));
+   /* PGXP hack to add subpixel precision as well */
+   {
+      float fofx       = ((float)OFX / (float)(1 << 16));
+      float fofy       = ((float)OFY / (float)(1 << 16));
 
-   /* Project X and Y onto the plane */
-   int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
-   int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
+      /* Project X and Y onto the plane */
+      int64_t screen_x = (int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
+      int64_t screen_y = (int64_t)OFY + IR2 * h_div_sz;
 
-   /* Increased precision calculation (sub-pixel precision) */
-   float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
-   float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
+      /* Increased precision calculation (sub-pixel precision) */
+      float precise_x  = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
+      float precise_y  = fofy + ((float)IR2 * precise_h_div_sz);
 
-   /* Pack the freshly-written XY_FIFO[3] into a u32 for PGXP. The
-    * previous code did `*((uint32*)&XY_FIFO[3])` which is a strict
-    * aliasing violation; memcpy is well-defined and modern compilers
-    * fold it into a single mov. */
-   uint32 value;
-   memcpy(&value, &XY_FIFO[3], sizeof(value));
+      /* Pack the freshly-written XY_FIFO[3] into a u32 for PGXP. The
+       * previous code did `*((uint32*)&XY_FIFO[3])` which is a strict
+       * aliasing violation; memcpy is well-defined and modern compilers
+       * fold it into a single mov. */
+      uint32 value;
+      memcpy(&value, &XY_FIFO[3], sizeof(value));
 
-   /* Clamp precision values to valid range */
-   precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
-   precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
+      /* Clamp precision values to valid range */
+      precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
+      precise_y = float_max(-0x400, float_min(precise_y, 0x3ff));
 
-   PGXP_pushSXYZ2f(precise_x, precise_y, precise_z, value);
+      PGXP_pushSXYZ2f(precise_x, precise_y, precise_z, value);
+   }
 }
 
 
@@ -1223,10 +1220,10 @@ static INLINE void TransformDQ(int64_t h_div_sz)
 
 static INLINE int32 RTPS(uint32 instr)
 {
- DECODE_FIELDS;
  int64 h_div_sz;
  float precise_z;
  float precise_h_div_sz;
+ DECODE_FIELDS;
 
  MultiplyMatrixByVector_PT(&Matrices.m.Rot, Vectors[0], CRVectors.v.T, sf, lm);
  h_div_sz = Divide(H, Z_FIFO[3]);
@@ -1242,8 +1239,8 @@ static INLINE int32 RTPS(uint32 instr)
 
 static INLINE int32 RTPT(uint32 instr)
 {
- DECODE_FIELDS;
  int i;
+ DECODE_FIELDS;
 
  for(i = 0; i < 3; i++)
  {
@@ -1399,7 +1396,7 @@ static int32_t DPCS(uint32_t instr)
    const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
    const int      lm  = (instr >> 10) & 1;
 
-   //assert(sf);
+   /*assert(sf); */
    RGB_temp[0] = RGB.c.R << 4;
    RGB_temp[1] = RGB.c.G << 4;
    RGB_temp[2] = RGB.c.B << 4;
@@ -1610,8 +1607,8 @@ static int32_t AVSZ4(uint32_t instr)
 }
 
 
-// -32768 * -32768 - 32767 * -32768 = 2147450880
-// (2 ^ 31) - 1 =		      2147483647
+/* -32768 * -32768 - 32767 * -32768 = 2147450880
+ * (2 ^ 31) - 1 =		      2147483647 */
 static int32_t OP(uint32_t instr)
 {
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
@@ -1701,7 +1698,7 @@ int32_t GTE_Instruction(uint32_t instr)
    {
       default: 
          break;
-      case 0x00:	// alternate?
+      case 0x00:	/* alternate? */
       case 0x01:
          ret = RTPS(instr);
          break;
@@ -1850,7 +1847,7 @@ int32_t GTE_Instruction(uint32_t instr)
          ret = SQR(instr);
          break;
 
-	  case 0x1A:	// Alternate for 0x29?
+	  case 0x1A:	/* Alternate for 0x29? */
       case 0x29:
          ret = DCPL(instr);
          break;
@@ -1935,7 +1932,7 @@ int32_t GTE_Instruction(uint32_t instr)
          break;
    }
 
-   // Overclock: force all GTE instruction to have 1 cycle latency
+   /* Overclock: force all GTE instruction to have 1 cycle latency */
    if (psx_gte_overclock)
       ret = 1;
 

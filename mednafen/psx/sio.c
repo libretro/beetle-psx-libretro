@@ -23,7 +23,7 @@
 
 #include "sio.h"
 
-// Dummy implementation.
+/* Dummy implementation. */
 
 static uint16_t Status;
 static uint16_t Mode;
@@ -47,7 +47,7 @@ uint32_t SIO_Read(int32_t timestamp, uint32_t A)
    switch(A & 0xE)
    {
       case 0x0:
-         //case 0x2:
+         /* case 0x2: */
          ret = DataBuffer >> ((A & 2) * 8);
          break;
 
@@ -81,7 +81,7 @@ void SIO_Write(int32_t timestamp, uint32_t A, uint32_t V)
    {
 
       case 0x0:
-         //case 0x2:
+         /* case 0x2: */
          V <<= (A & 2) * 8;
          DataBuffer = V;
          break;

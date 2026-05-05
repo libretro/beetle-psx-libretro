@@ -43,9 +43,6 @@ extern "C" {
 		unsigned char valid_w;
 	} OGLVertex;
 
-	//struct OGLVertexTag;
-	//typedef struct OGLVertexTag OGLVertex;
-
 	void		PGXP_WriteFIFO(PGXP_value* pV, u32 pos);
 	PGXP_value*	PGXP_ReadFIFO(u32 pos);
 	void		PGXP_WriteCB(PGXP_value* pV, u32 pos);
@@ -56,10 +53,9 @@ extern "C" {
 	void	PGXP_SetAddress(unsigned int addr);
 	int		PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOffs);
 	int		PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVertex* pOutput, int xOffs, int yOffs);
-	//void	PGXP_glVertexfv(GLfloat* pVertex);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _PGXP_GPU_H_
+#endif /* _PGXP_GPU_H_ */
