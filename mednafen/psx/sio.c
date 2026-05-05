@@ -15,10 +15,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "psx.h"
-#include "sio.h"
+#include <stdint.h>
 
+#include "../mednafen-types.h"
 #include "../state_helpers.h"
+
+#include "sio.h"
 
 // Dummy implementation.
 

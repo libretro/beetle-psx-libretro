@@ -196,7 +196,6 @@ endif
                   $(CORE_EMU_DIR)/timer.cpp \
                   $(CORE_EMU_DIR)/dma.cpp \
                   $(CORE_EMU_DIR)/frontio.cpp \
-                  $(CORE_EMU_DIR)/sio.cpp \
                   $(CORE_EMU_DIR)/cpu.cpp \
                   $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/spu.cpp \
@@ -251,6 +250,7 @@ endif
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(CORE_EMU_DIR)/gte.c \
                   $(CORE_EMU_DIR)/mdec.c \
+                  $(CORE_EMU_DIR)/sio.c \
                   $(MEDNAFEN_DIR)/FileStream.c \
                   $(MEDNAFEN_DIR)/MemoryStream.c \
                   $(MEDNAFEN_DIR)/Stream.c \
