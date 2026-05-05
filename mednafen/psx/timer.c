@@ -145,20 +145,19 @@ static uint32_t CalcNextEvent(void)
       if((i == 0x2) && (Timers[i].Mode & 0x1))
          continue;
 
-      /**/
-      /**/
-      /**/
-      const uint32_t target = ((Timers[i].Mode & 0x18) && (Timers[i].Counter < Timers[i].Target)) ? Timers[i].Target : 0x10000;
-      const uint32_t count_delta = target - Timers[i].Counter;
-      uint32_t tmp_clocks;
+      {
+         const uint32_t target      = ((Timers[i].Mode & 0x18) && (Timers[i].Counter < Timers[i].Target)) ? Timers[i].Target : 0x10000;
+         const uint32_t count_delta = target - Timers[i].Counter;
+         uint32_t tmp_clocks;
 
-      if((i == 0x2) && (Timers[i].Mode & 0x200))
-         tmp_clocks = (count_delta * 8) - Timers[i].Div8Counter;
-      else
-         tmp_clocks = count_delta;
+         if((i == 0x2) && (Timers[i].Mode & 0x200))
+            tmp_clocks = (count_delta * 8) - Timers[i].Div8Counter;
+         else
+            tmp_clocks = count_delta;
 
-      if(next_event > tmp_clocks)
-         next_event = tmp_clocks;
+         if(next_event > tmp_clocks)
+            next_event = tmp_clocks;
+      }
    }
 
    overclock_device_to_cpu(&next_event);
@@ -237,13 +236,12 @@ static void MDFN_FASTCALL ClockTimer(int i, uint32_t clocks)
    else if(clocks)
    {
       uint32_t before = Timers[i].Counter;
+      bool irq_exact  = false;
 
       Timers[i].Counter += clocks;
 
       if(Timers[i].Mode & 0x40)
          Timers[i].IRQDone = false;
-
-      bool irq_exact = false;
 
       /*
        * Target match handling
@@ -337,10 +335,10 @@ void TIMER_ClockHRetrace(void)
 int32_t MDFN_FASTCALL TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
+   int32_t i;
 
    overclock_cpu_to_device(&cpu_clocks);
 
-   int32_t i;
    for(i = 0; i < 3; i++)
    {
       if(Timers[i].Mode & 0x100)
@@ -382,9 +380,9 @@ static void MDFN_FASTCALL CalcCountingStart(unsigned which)
 
 void MDFN_FASTCALL TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
 {
-   TIMER_Update(timestamp);
-
    int which = (A >> 4) & 0x3;
+
+   TIMER_Update(timestamp);
 
    V <<= (A & 3) * 8;
 
