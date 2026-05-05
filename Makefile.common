@@ -202,7 +202,6 @@ endif
                   $(CORE_EMU_DIR)/spu.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
                   $(CORE_EMU_DIR)/gpu_polygon_sub.cpp \
-                  $(CORE_EMU_DIR)/mdec.cpp \
                   $(CORE_EMU_DIR)/input/gamepad.cpp \
                   $(CORE_EMU_DIR)/input/dualanalog.cpp \
                   $(CORE_EMU_DIR)/input/dualshock.cpp \
@@ -251,6 +250,7 @@ endif
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(CORE_EMU_DIR)/gte.c \
+                  $(CORE_EMU_DIR)/mdec.c \
                   $(MEDNAFEN_DIR)/FileStream.c \
                   $(MEDNAFEN_DIR)/MemoryStream.c \
                   $(MEDNAFEN_DIR)/Stream.c \

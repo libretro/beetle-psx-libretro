@@ -1,6 +1,16 @@
 #ifndef __MDFN_PSX_MDEC_H
 #define __MDFN_PSX_MDEC_H
 
+#include <stdint.h>
+#include <boolean.h>
+
+#include "../mednafen-types.h"
+#include "../state.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void MDEC_DMAWrite(uint32_t V);
 
 uint32_t MDEC_DMARead(uint32_t *offs);
@@ -15,5 +25,9 @@ bool MDEC_DMACanRead(void);
 void MDEC_Run(int32 clocks);
 
 int MDEC_StateAction(StateMem *sm, int load, int data_only);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

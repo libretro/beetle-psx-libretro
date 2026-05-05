@@ -53,17 +53,20 @@
 //	SimCity 2000 startup.
 
 
-#include "psx.h"
-#include "mdec.h"
+#include <math.h>
+#include <stdint.h>
+#include <string.h>
 
+#include <boolean.h>
+#include <retro_miscellaneous.h>
+
+#include "../mednafen-types.h"
 #include "../masmem.h"
 #include "../math_ops.h"
 #include "../state_helpers.h"
 
-#include <retro_miscellaneous.h>
-
+#include "mdec.h"
 #include "FastFIFO.h"
-#include <math.h>
 
 #if defined(__SSE2__)
 #include <xmmintrin.h>
