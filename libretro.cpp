@@ -1825,9 +1825,20 @@ int lightrec_init_mmap()
 	}
 #endif
 
-	/* Try to map at various base addresses*/
+	/* Try to map at various base addresses */
 	for (i = 0; i < ARRAY_SIZE(supported_io_bases); i++) {
 		base = supported_io_bases[i];
+
+		/* Skip base=0: even if mmap honors NULL+MAP_FIXED_NOREPLACE
+		 * (some kernels permit it when mmap_min_addr is small or
+		 * inside containers), psx_mem=NULL is indistinguishable from
+		 * "no mmap" and would then be passed to placement-new for
+		 * MainRAM, leaving MainRAM->data8 also NULL and breaking
+		 * retro_get_memory_data + every direct RAM access. The first
+		 * usable base is 0x10000000. */
+		if (base == 0)
+			continue;
+
 		bios = (void *)(base + 0x1fc00000);
 		scratch = (void *)(base + 0x1f800000);
 
