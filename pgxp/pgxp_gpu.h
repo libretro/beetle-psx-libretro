@@ -50,6 +50,8 @@ extern "C" {
 
 	void	PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex);
 
+	void	PGXP_FreeVertexCache(void);
+
 	void	PGXP_SetAddress(unsigned int addr);
 	int		PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOffs);
 	int		PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVertex* pOutput, int xOffs, int yOffs);

@@ -107,7 +107,11 @@ static int VertexCacheEnsureAllocated(void)
 	return vertexCache ? 1 : 0;
 }
 
-void PGXP_Shutdown(void)
+/* Free the heap-allocated vertex cache.  Safe to call when the
+ * cache was never allocated (e.g. PGXP_VERTEX_CACHE was never on).
+ * Called from PGXP_Shutdown (retro_deinit) and from the mode-toggle
+ * path in pgxp_main.c when the vertex cache bit is cleared. */
+void PGXP_FreeVertexCache(void)
 {
 	if (vertexCache)
 	{
