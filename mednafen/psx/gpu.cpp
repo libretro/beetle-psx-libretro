@@ -241,12 +241,12 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
    int32_t destY             = (cb[1] >> 16) & 0x3FF;
    int32_t width             = (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
    int32_t height            = (cb[2] >> 16) & 0x1FF;
+   const bool sw             = rsx_intf_has_software_renderer();
 
    gpu->DrawTimeAvail       -= 46; // Approximate
 
    for(y = 0; y < height; y++)
    {
-      unsigned x;
       const int32 d_y = (y + destY) & 511;
 
       if(LineSkipTest(gpu, d_y))
@@ -254,11 +254,21 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
       gpu->DrawTimeAvail -= (width >> 3) + 9;
 
-      for(x = 0; x < width; x++)
+      /* Only execute the per-pixel software writes when a software
+       * renderer is actually consuming GPU.vram - the trailing
+       * rsx_intf_fill_rect handles the work for hardware backends
+       * directly, so dirtying VRAM here would just be a wasted
+       * width-many texel_puts (each splatting UPSCALE^2 subpixels)
+       * that nothing reads. */
+      if (sw)
       {
-         const int32 d_x = (x + destX) & 1023;
+         unsigned x;
+         for(x = 0; x < width; x++)
+         {
+            const int32 d_x = (x + destX) & 1023;
 
-         texel_put(d_x, d_y, fill_value);
+            texel_put(d_x, d_y, fill_value);
+         }
       }
    }
 
@@ -267,7 +277,6 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
 static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
 {
-   unsigned y;
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
    int32_t sourceY = (cb[1] >> 16) & 0x3FF;
    int32_t destX   = (cb[2] >> 0) & 0x3FF;
@@ -285,31 +294,39 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
 
    g->DrawTimeAvail -= (width * height) * 2;
 
-   for(y = 0; y < height; y++)
+   /* Run the in-VRAM copy only when something will actually read
+    * back from GPU.vram.  Hardware backends do the copy themselves
+    * via rsx_intf_copy_rect below, so the per-pixel software loop
+    * would just dirty VRAM that nothing consumes. */
+   if (rsx_intf_has_software_renderer())
    {
-      unsigned x;
-
-      for(x = 0; x < width; x += 128)
+      unsigned y;
+      for(y = 0; y < (unsigned)height; y++)
       {
-         const int32 chunk_x_max = MIN((int32)(width - x), 128);
-         uint16 tmpbuf[128]; // TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
+         unsigned x;
 
-         for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+         for(x = 0; x < (unsigned)width; x += 128)
          {
-            int32 s_y = (y + sourceY) & 511;
-            int32 s_x = (x + chunk_x + sourceX) & 1023;
+            const int32 chunk_x_max = MIN((int32)(width - x), 128);
+            uint16 tmpbuf[128]; // TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
 
-            // XXX make upscaling-friendly, as it is we copy at 1x
-            tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
-         }
+            for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            {
+               int32 s_y = (y + sourceY) & 511;
+               int32 s_x = (x + chunk_x + sourceX) & 1023;
 
-         for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
-         {
-            int32 d_y = (y + destY) & 511;
-            int32 d_x = (x + chunk_x + destX) & 1023;
+               // XXX make upscaling-friendly, as it is we copy at 1x
+               tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
+            }
 
-            if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
-               texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
+            for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            {
+               int32 d_y = (y + destY) & 511;
+               int32 d_x = (x + chunk_x + destX) & 1023;
+
+               if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
+                  texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
+            }
          }
       }
    }
