@@ -15,18 +15,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <string.h>
+
 #include <boolean.h>
 #include <retro_miscellaneous.h>
 #include <compat/intrinsics.h>
 #include <math/float_minmax.h>
 
-#include "psx.h"
-#include "gte.h"
-
+#include "../mednafen-types.h"
 #include "../math_ops.h"
 #include "../state_helpers.h"
 #include "../pgxp/pgxp_gte.h"
 #include "../pgxp/pgxp_main.h"
+#include "gte.h"
 
 extern bool psx_gte_overclock;
 
@@ -60,19 +61,16 @@ __attribute__((__packed__))
 #endif
 gtematrix;
 
-typedef struct
+typedef union
 {
-   union
+   struct
    {
-      struct
-      {
-         uint8_t R;
-         uint8_t G;
-         uint8_t B;
-         uint8_t CD;
-      };
-      uint8_t Raw8[4];
-   };
+      uint8_t R;
+      uint8_t G;
+      uint8_t B;
+      uint8_t CD;
+   } c;
+   uint8_t Raw8[4];
 } gtergb;
 
 typedef struct
@@ -95,21 +93,21 @@ typedef union
   gtematrix Light;
   gtematrix Color;
   gtematrix AbbyNormal;
- };
+ } m;
 } Matrices_t;
 
 
 static union
 {
  int32_t All[4][4];	// Really only [4][3], but [4] to ease address calculation.
-  
+
  struct
  {
   int32_t T[4];
   int32_t B[4];
   int32_t FC[4];
   int32_t Null[4];
- };
+ } v;
 } CRVectors;
 
 /* Control registers */
@@ -163,8 +161,7 @@ static uint32_t Reg23;        /* Register 23: 32bit read/write but not used for 
 
 // end DR
 
-extern "C" unsigned char widescreen_hack;
-extern "C" unsigned char widescreen_hack_aspect_ratio_setting;
+#include "../../beetle_psx_globals.h"
 
 static INLINE uint8_t Sat5(int16_t cc)
 {
@@ -457,10 +454,10 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
          break;
 
       case 6:
-         RGB.R = value >> 0;
-         RGB.G = value >> 8;
-         RGB.B = value >> 16;
-         RGB.CD = value >> 24;
+         RGB.c.R = value >> 0;
+         RGB.c.G = value >> 8;
+         RGB.c.B = value >> 16;
+         RGB.c.CD = value >> 24;
          break;
 
       case 7:
@@ -526,24 +523,24 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
          break;
 
       case 20:
-         RGB_FIFO[0].R = value;
-         RGB_FIFO[0].G = value >> 8;
-         RGB_FIFO[0].B = value >> 16;
-         RGB_FIFO[0].CD = value >> 24;
+         RGB_FIFO[0].c.R = value;
+         RGB_FIFO[0].c.G = value >> 8;
+         RGB_FIFO[0].c.B = value >> 16;
+         RGB_FIFO[0].c.CD = value >> 24;
          break;
 
       case 21:
-         RGB_FIFO[1].R = value;
-         RGB_FIFO[1].G = value >> 8;
-         RGB_FIFO[1].B = value >> 16;
-         RGB_FIFO[1].CD = value >> 24;
+         RGB_FIFO[1].c.R = value;
+         RGB_FIFO[1].c.G = value >> 8;
+         RGB_FIFO[1].c.B = value >> 16;
+         RGB_FIFO[1].c.CD = value >> 24;
          break;
 
       case 22:
-         RGB_FIFO[2].R = value;
-         RGB_FIFO[2].G = value >> 8;
-         RGB_FIFO[2].B = value >> 16;
-         RGB_FIFO[2].CD = value >> 24;
+         RGB_FIFO[2].c.R = value;
+         RGB_FIFO[2].c.G = value >> 8;
+         RGB_FIFO[2].c.B = value >> 16;
+         RGB_FIFO[2].c.CD = value >> 24;
          break;
 
       case 23:
@@ -617,7 +614,7 @@ uint32_t GTE_ReadDR(unsigned int which)
          break;
 
       case 6:
-         ret = RGB.R | (RGB.G << 8) | (RGB.B << 16) | (RGB.CD << 24);
+         ret = RGB.c.R | (RGB.c.G << 8) | (RGB.c.B << 16) | (RGB.c.CD << 24);
          break;
 
       case 7:
@@ -673,15 +670,15 @@ uint32_t GTE_ReadDR(unsigned int which)
          break;
 
       case 20:
-         ret = RGB_FIFO[0].R | (RGB_FIFO[0].G << 8) | (RGB_FIFO[0].B << 16) | (RGB_FIFO[0].CD << 24);
+         ret = RGB_FIFO[0].c.R | (RGB_FIFO[0].c.G << 8) | (RGB_FIFO[0].c.B << 16) | (RGB_FIFO[0].c.CD << 24);
          break;
 
       case 21:
-         ret = RGB_FIFO[1].R | (RGB_FIFO[1].G << 8) | (RGB_FIFO[1].B << 16) | (RGB_FIFO[1].CD << 24);
+         ret = RGB_FIFO[1].c.R | (RGB_FIFO[1].c.G << 8) | (RGB_FIFO[1].c.B << 16) | (RGB_FIFO[1].c.CD << 24);
          break;
 
       case 22:
-         ret = RGB_FIFO[2].R | (RGB_FIFO[2].G << 8) | (RGB_FIFO[2].B << 16) | (RGB_FIFO[2].CD << 24);
+         ret = RGB_FIFO[2].c.R | (RGB_FIFO[2].c.G << 8) | (RGB_FIFO[2].c.B << 16) | (RGB_FIFO[2].c.CD << 24);
          break;
 
       case 23:
@@ -946,48 +943,14 @@ static INLINE uint16_t i64_to_otz(int64_t average, int unchained)
    return value;
 }
 
-static INLINE int32_t i32_to_i11_saturate(uint8_t flag, int32_t value)
-{
-   if(value < -0x400)
-   {
-      FLAGS |= 1 << (14 - flag);
-      return -0x400;
-   }
-
-   if(value > 0x3ff)
-   {
-      FLAGS |= 1 << (14 - flag);
-      return 0x3ff;
-   }
-
-   return value;
-}
-
-static INLINE uint8_t MAC_to_COLOR(uint8_t flag, int32_t mac)
-{
-   int32_t c = mac >> 4;
-
-   if (c < 0)
-   {
-      FLAGS |= 1 << (21 - flag);	/* Tested with GPF */
-      return 0;
-   }
-   if (c > 0xff)
-   {
-      FLAGS |= 1 << (21 - flag);	/* Tested with GPF */
-      return 0xff;
-   }
-   return c;
-}
-
 static INLINE void MAC_to_RGB_FIFO(void)
 {
    RGB_FIFO[0] = RGB_FIFO[1];
    RGB_FIFO[1] = RGB_FIFO[2];
-   RGB_FIFO[2].R = Lm_C(0, MAC[1] >> 4);
-   RGB_FIFO[2].G = Lm_C(1, MAC[2] >> 4);
-   RGB_FIFO[2].B = Lm_C(2, MAC[3] >> 4);
-   RGB_FIFO[2].CD = RGB.CD;
+   RGB_FIFO[2].c.R = Lm_C(0, MAC[1] >> 4);
+   RGB_FIFO[2].c.G = Lm_C(1, MAC[2] >> 4);
+   RGB_FIFO[2].c.B = Lm_C(2, MAC[3] >> 4);
+   RGB_FIFO[2].c.CD = RGB.c.CD;
 }
 
 static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)
@@ -1029,12 +992,12 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
 
       tmp = (uint64_t)(int64_t)crv[i] << 12;
 
-      if(matrix == &Matrices.AbbyNormal)
+      if(matrix == &Matrices.m.AbbyNormal)
       {
          if(i == 0)
          {
-            mulr[0] = -(RGB.R << 4);
-            mulr[1] = (RGB.R << 4);
+            mulr[0] = -(RGB.c.R << 4);
+            mulr[1] = (RGB.c.R << 4);
             mulr[2] = IR0;
          }
          else
@@ -1055,7 +1018,7 @@ static INLINE void MultiplyMatrixByVector(const gtematrix *matrix, const int16_t
       mulr[2] *= v[2];
 
       tmp = A_MV(i, tmp + mulr[0]);
-      if(crv == CRVectors.FC)
+      if(crv == CRVectors.v.FC)
       {
          Lm_B(i, tmp >> sf, false);
          tmp = 0;
@@ -1163,7 +1126,7 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
       dividend <<= shift_bias;
       divisor <<= shift_bias;
 
-      return std::min<uint32>(0x1FFFF, ((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
+      return MIN((uint32_t)0x1FFFF, (uint32_t)(((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16));
    }
 
    /* If the Z coordinate is smaller than or equal to half the 
@@ -1234,7 +1197,12 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    float precise_x = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
    float precise_y = fofy + ((float)IR2 * precise_h_div_sz);
 
-   uint32 value = *((uint32*)&XY_FIFO[3]);
+   /* Pack the freshly-written XY_FIFO[3] into a u32 for PGXP. The
+    * previous code did `*((uint32*)&XY_FIFO[3])` which is a strict
+    * aliasing violation; memcpy is well-defined and modern compilers
+    * fold it into a single mov. */
+   uint32 value;
+   memcpy(&value, &XY_FIFO[3], sizeof(value));
 
    /* Clamp precision values to valid range */
    precise_x = float_max(-0x400, float_min(precise_x, 0x3ff));
@@ -1257,7 +1225,7 @@ static INLINE int32 RTPS(uint32 instr)
  float precise_z;
  float precise_h_div_sz;
 
- MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[0], CRVectors.T, sf, lm);
+ MultiplyMatrixByVector_PT(&Matrices.m.Rot, Vectors[0], CRVectors.v.T, sf, lm);
  h_div_sz = Divide(H, Z_FIFO[3]);
 
  precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
@@ -1280,7 +1248,7 @@ static INLINE int32 RTPT(uint32 instr)
   float precise_z;
   float precise_h_div_sz;
 
-  MultiplyMatrixByVector_PT(&Matrices.Rot, Vectors[i], CRVectors.T, sf, lm);
+  MultiplyMatrixByVector_PT(&Matrices.m.Rot, Vectors[i], CRVectors.v.T, sf, lm);
   h_div_sz = Divide(H, Z_FIFO[3]);
 
   precise_z = float_max(H/2.f, (float)Z_FIFO[3]);
@@ -1299,10 +1267,10 @@ static INLINE void NormColor(uint32_t sf, int lm, uint32_t v)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Light, Vectors[v], CRVectors.v.Null, sf, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Color, tmp_vector, CRVectors.v.B, sf, lm);
 
    MAC_to_RGB_FIFO();
 }
@@ -1335,14 +1303,14 @@ static INLINE void NCC(uint32_t vector_index, uint32_t sf, int lm)
 {
    int16_t tmp_vector[3];
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[vector_index], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Light, Vectors[vector_index], CRVectors.v.Null, sf, lm);
 
    tmp_vector[0] = IR1; tmp_vector[1] = IR2; tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Color, tmp_vector, CRVectors.v.B, sf, lm);
 
-   MAC[1] = ((RGB.R << 4) * IR1) >> sf;
-   MAC[2] = ((RGB.G << 4) * IR2) >> sf;
-   MAC[3] = ((RGB.B << 4) * IR3) >> sf;
+   MAC[1] = ((RGB.c.R << 4) * IR1) >> sf;
+   MAC[2] = ((RGB.c.G << 4) * IR2) >> sf;
+   MAC[3] = ((RGB.c.B << 4) * IR3) >> sf;
 
    MAC_to_IR(lm);
    MAC_to_RGB_FIFO();
@@ -1377,13 +1345,13 @@ static INLINE void DPC(uint32_t instr)
    const uint32_t sf   = (instr & (1 << 19)) ? 12 : 0;
    const int      lm   = (instr >> 10) & 1;
 
-   RGB_temp[0] = RGB_FIFO[0].R << 4;
-   RGB_temp[1] = RGB_FIFO[0].G << 4;
-   RGB_temp[2] = RGB_FIFO[0].B << 4;
+   RGB_temp[0] = RGB_FIFO[0].c.R << 4;
+   RGB_temp[1] = RGB_FIFO[0].c.G << 4;
+   RGB_temp[2] = RGB_FIFO[0].c.B << 4;
 
    for(i = 0; i < 3; i++)
    {
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
@@ -1402,13 +1370,13 @@ static int32_t DCPL(uint32_t instr)
    const uint32_t sf  = (instr & (1 << 19)) ? 12 : 0;
    const int      lm  = (instr >> 10) & 1;
 
-   RGB_temp[0] = RGB.R << 4;
-   RGB_temp[1] = RGB.G << 4;
-   RGB_temp[2] = RGB.B << 4;
+   RGB_temp[0] = RGB.c.R << 4;
+   RGB_temp[1] = RGB.c.G << 4;
+   RGB_temp[2] = RGB.c.B << 4;
 
    for(i = 0; i < 3; i++)
    {
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[i] << 12) - RGB_temp[i] * IR_temp[i])) >> sf;
       MAC[1 + i] = i64_to_i44(i, (RGB_temp[i] * IR_temp[i] + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
@@ -1429,13 +1397,13 @@ static int32_t DPCS(uint32_t instr)
    const int      lm  = (instr >> 10) & 1;
 
    //assert(sf);
-   RGB_temp[0] = RGB.R << 4;
-   RGB_temp[1] = RGB.G << 4;
-   RGB_temp[2] = RGB.B << 4;
+   RGB_temp[0] = RGB.c.R << 4;
+   RGB_temp[1] = RGB.c.G << 4;
+   RGB_temp[2] = RGB.c.B << 4;
 
    for(i = 0; i < 3; i++)
    {
-      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
+      MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf;
       MAC[1 + i] = i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC[1 + i], false))) >> sf;
    }
 
@@ -1465,9 +1433,9 @@ static int32_t INTPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
-   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
-   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
+   MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[0] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf;
+   MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf;
+   MAC[3] = i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)CRVectors.v.FC[2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf;
 
    MAC[1] = i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC[1], false)) >> sf);
    MAC[2] = i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC[2], false)) >> sf);
@@ -1486,7 +1454,7 @@ static INLINE void NormColorDepthCue(uint32_t instr, uint32_t v)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   MultiplyMatrixByVector(&Matrices.Light, Vectors[v], CRVectors.Null, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Light, Vectors[v], CRVectors.v.Null, sf, lm);
 
    /* Use the custom 4th vector to store the intermediate
     * values. This vector does not exist in the real hardware
@@ -1495,7 +1463,7 @@ static INLINE void NormColorDepthCue(uint32_t instr, uint32_t v)
    tmp_vector[0] = IR1;
    tmp_vector[1] = IR2;
    tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Color, tmp_vector, CRVectors.v.B, sf, lm);
 
    DCPL(instr);
 }
@@ -1525,11 +1493,11 @@ static int32_t CC(uint32_t instr)
    const int          lm = (instr >> 10) & 1;
    int16_t tmp_vector[3] = {IR1, IR2, IR3 };
 
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Color, tmp_vector, CRVectors.v.B, sf, lm);
 
-   MAC[1] = ((RGB.R << 4) * IR1) >> sf;
-   MAC[2] = ((RGB.G << 4) * IR2) >> sf;
-   MAC[3] = ((RGB.B << 4) * IR3) >> sf;
+   MAC[1] = ((RGB.c.R << 4) * IR1) >> sf;
+   MAC[2] = ((RGB.c.G << 4) * IR2) >> sf;
+   MAC[3] = ((RGB.c.B << 4) * IR3) >> sf;
 
    MAC_to_IR(lm);
    MAC_to_RGB_FIFO();
@@ -1546,7 +1514,7 @@ static int32_t CDP(uint32_t instr)
    tmp_vector[0] = IR1;
    tmp_vector[1] = IR2;
    tmp_vector[2] = IR3;
-   MultiplyMatrixByVector(&Matrices.Color, tmp_vector, CRVectors.B, sf, lm);
+   MultiplyMatrixByVector(&Matrices.m.Color, tmp_vector, CRVectors.v.B, sf, lm);
 
    DCPL(instr);
 
@@ -1567,10 +1535,22 @@ static int32_t NCLIP(uint32_t instr)
    int64_t c      = x2 * (y0 - y1);
    int32_t sum    = a + b + c;
 
-   if ((PGXP_GetModes() & PGXP_NCLIP_IMPL) &&
-       PGXP_NCLIP_valid(*((uint32*)&XY_FIFO[0]), *((uint32*)&XY_FIFO[1]), *((uint32*)&XY_FIFO[2]))) {
-      sum = PGXP_NCLIP();
-   } else {
+   /* PGXP_NCLIP wants the three XY_FIFO entries packed as u32. The
+    * previous code did `*((uint32*)&XY_FIFO[N])` which is a strict
+    * aliasing violation; memcpy is well-defined and modern compilers
+    * fold it into a single mov per call. */
+   bool used_pgxp = false;
+   if (PGXP_GetModes() & PGXP_NCLIP_IMPL) {
+      uint32 v0, v1, v2;
+      memcpy(&v0, &XY_FIFO[0], sizeof(v0));
+      memcpy(&v1, &XY_FIFO[1], sizeof(v1));
+      memcpy(&v2, &XY_FIFO[2], sizeof(v2));
+      if (PGXP_NCLIP_valid(v0, v1, v2)) {
+         sum = PGXP_NCLIP();
+         used_pgxp = true;
+      }
+   }
+   if (!used_pgxp) {
       sum = F( (int64_t)(XY_FIFO[0].X * (XY_FIFO[1].Y - XY_FIFO[2].Y)) + (XY_FIFO[1].X * (XY_FIFO[2].Y - XY_FIFO[0].Y)) + (XY_FIFO[2].X * (XY_FIFO[0].Y - XY_FIFO[1].Y))
          );
       check_mac_overflow(sum);
@@ -1636,9 +1616,9 @@ static int32_t OP(uint32_t instr)
    int32_t       ir1 = IR1;
    int32_t       ir2 = IR2;
    int32_t       ir3 = IR3;
-   int32_t        r0 = Matrices.Rot.MX[0][0];
-   int32_t        r1 = Matrices.Rot.MX[1][1];
-   int32_t        r2 = Matrices.Rot.MX[2][2];
+   int32_t        r0 = Matrices.m.Rot.MX[0][0];
+   int32_t        r1 = Matrices.m.Rot.MX[1][1];
+   int32_t        r2 = Matrices.m.Rot.MX[2][2];
 
    MAC[1] = (r1 * ir3 - r2 * ir2) >> sf;
    MAC[2] = (r2 * ir1 - r0 * ir3) >> sf;

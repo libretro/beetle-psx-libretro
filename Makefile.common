@@ -198,7 +198,6 @@ endif
                   $(CORE_EMU_DIR)/frontio.cpp \
                   $(CORE_EMU_DIR)/sio.cpp \
                   $(CORE_EMU_DIR)/cpu.cpp \
-                  $(CORE_EMU_DIR)/gte.cpp \
                   $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/spu.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
@@ -251,6 +250,7 @@ endif
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
+                  $(CORE_EMU_DIR)/gte.c \
                   $(MEDNAFEN_DIR)/FileStream.c \
                   $(MEDNAFEN_DIR)/MemoryStream.c \
                   $(MEDNAFEN_DIR)/Stream.c \
