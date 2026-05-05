@@ -52,7 +52,17 @@ static dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
-static int crop_overscan;
+/*
+ * File-local copy of the crop_overscan core option, distinct
+ * from the cross-TU `crop_overscan` global declared in
+ * beetle_psx_globals.h. Both are populated from the same
+ * BEETLE_OPT(crop_overscan) env var (in parallel - libretro.cpp
+ * writes the global, this file writes vulkan_crop_overscan), so
+ * their values track identically; renaming here just makes the
+ * shadow explicit and stops the static-after-extern conflict
+ * that fc4d742's switch to the central globals header surfaced.
+ */
+static int vulkan_crop_overscan;
 static int image_offset_cycles;
 static unsigned image_crop;
 static int initial_scanline;
@@ -224,7 +234,7 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
-   info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
+   info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, vulkan_crop_overscan,
                                        content_is_pal ? initial_scanline_pal : initial_scanline,
                                        content_is_pal ? last_scanline_pal : last_scanline,
                                        aspect_ratio_setting, show_vram, widescreen_hack, widescreen_hack_aspect_ratio_setting);
@@ -255,7 +265,7 @@ void rsx_vulkan_refresh_variables(void)
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
-   int old_crop_overscan = crop_overscan;
+   int old_crop_overscan = vulkan_crop_overscan;
    unsigned old_image_crop = image_crop;
    bool old_widescreen_hack = widescreen_hack;
    unsigned old_widescreen_hack_aspect_ratio_setting = widescreen_hack_aspect_ratio_setting;
@@ -351,11 +361,11 @@ void rsx_vulkan_refresh_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "disabled") == 0)
-         crop_overscan = 0;
+         vulkan_crop_overscan = 0;
       else if (strcmp(var.value, "static") == 0)
-         crop_overscan = 1;
+         vulkan_crop_overscan = 1;
       else if (strcmp(var.value, "smart") == 0)
-         crop_overscan = 2;
+         vulkan_crop_overscan = 2;
    }
 
    var.key = BEETLE_OPT(image_offset_cycles);
@@ -511,7 +521,7 @@ void rsx_vulkan_refresh_variables(void)
         old_super_sampling != super_sampling ||
         old_msaa != msaa ||
         old_show_vram != show_vram ||
-        old_crop_overscan != crop_overscan ||
+        old_crop_overscan != vulkan_crop_overscan ||
         old_image_crop != image_crop ||
         old_widescreen_hack != widescreen_hack ||
         old_widescreen_hack_aspect_ratio_setting != widescreen_hack_aspect_ratio_setting ||
@@ -592,7 +602,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_replace_textures(replace_textures);
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
-   renderer->set_horizontal_overscan_cropping(crop_overscan);
+   renderer->set_horizontal_overscan_cropping(vulkan_crop_overscan);
    renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
    renderer->set_horizontal_additional_cropping(image_crop);

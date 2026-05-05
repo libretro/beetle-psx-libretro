@@ -521,18 +521,37 @@ void PS_CDC::ReadAudioBuffer(int32 samples[2])
 
 INLINE void PS_CDC::ApplyVolume(int32 samples[2])
 {
-   // Take care not to alter samples[] before we're done calculating the new output samples!
-   int32 left_out = ((samples[0] * DecodeVolume[0][0]) >> 7) + ((samples[1] * DecodeVolume[1][0]) >> 7);
+   /* Muted is the resting state any time CD audio isn't actively
+    * playing - skip the entire mix-and-saturate pipeline. The
+    * historical version computed left_out/right_out
+    * unconditionally (including the clamps) and only zeroed them
+    * at the end; that was 4 multiplies + 4 shifts + 2 adds + 4
+    * saturating compares of pure waste per sample on the muted
+    * path. */
+   if (Muted)
+   {
+      samples[0] = 0;
+      samples[1] = 0;
+      return;
+   }
+
+   /* DecodeVolume is a 2x2 mixing matrix:
+    *   [ src_L_to_dst_L  src_L_to_dst_R ]
+    *   [ src_R_to_dst_L  src_R_to_dst_R ]
+    * applied as a >> 7 fixed-point multiply (volume in 0.7 fmt).
+    * Take care not to alter samples[] before we're done
+    * calculating both output channels - the L/R outputs depend
+    * on both L/R inputs. */
+   int32 left_out  = ((samples[0] * DecodeVolume[0][0]) >> 7) + ((samples[1] * DecodeVolume[1][0]) >> 7);
    int32 right_out = ((samples[0] * DecodeVolume[0][1]) >> 7) + ((samples[1] * DecodeVolume[1][1]) >> 7);
 
-   clamp(&left_out, -32768, 32767);
-   clamp(&right_out, -32768, 32767);
-
-   if(Muted)
-   {
-      left_out = 0;
-      right_out = 0;
-   }
+   /* Saturate each output channel to signed 16-bit. The CDC
+    * publishes samples in the int16 range to the SPU's CD-DA
+    * input mixer; clipping here matches PS1 silicon behaviour. */
+   if (left_out  < -32768) left_out  = -32768;
+   if (left_out  >  32767) left_out  =  32767;
+   if (right_out < -32768) right_out = -32768;
+   if (right_out >  32767) right_out =  32767;
 
    samples[0] = left_out;
    samples[1] = right_out;
@@ -550,23 +569,26 @@ void PS_CDC::GetCDAudio(int32 samples[2], const unsigned freq)
    }
    else
    {
-      int32 out_tmp[2];
-
-      out_tmp[0] = out_tmp[1] = 0;
-
-      for(unsigned i = 0; i < 2; i++)
+      /* Fractional-rate path: 25-tap windowed-sinc resampler per
+       * channel. Was using an int32 out_tmp[2] stack scratch
+       * accumulator; folded directly into samples[i] now since
+       * each channel's accumulation is independent and the final
+       * write was already to samples[i]. */
+      for (unsigned i = 0; i < 2; i++)
       {
-         const int16* imp = CDADPCMImpulse[ADPCM_ResampCurPhase];
-         int16* wf = &ADPCM_ResampBuf[i][(ADPCM_ResampCurPos + 32 - 25) & 0x1F];
+         const int16 *imp = CDADPCMImpulse[ADPCM_ResampCurPhase];
+         int16       *wf  = &ADPCM_ResampBuf[i][(ADPCM_ResampCurPos + 32 - 25) & 0x1F];
+         int32        acc = 0;
 
-         for(unsigned s = 0; s < 25; s++)
-         {
-            out_tmp[i] += imp[s] * wf[s];
-         }
+         for (unsigned s = 0; s < 25; s++)
+            acc += imp[s] * wf[s];
 
-         out_tmp[i] >>= 15;
-         clamp(&out_tmp[i], -32768, 32767);
-         samples[i] = out_tmp[i];
+         acc >>= 15;
+         /* Saturate resampled output to signed 16-bit; required
+          * by this function's contract per its leading comment. */
+         if (acc < -32768) acc = -32768;
+         if (acc >  32767) acc =  32767;
+         samples[i] = acc;
       }
 
       ADPCM_ResampCurPhase += freq;
@@ -710,7 +732,12 @@ static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shif
 
       sample += ((output[i - 1] * Weights[weight][0]) >> 6) + ((output[i - 2] * Weights[weight][1]) >> 6);
 
-      clamp(&sample, -32768, 32767);
+      /* Saturate to signed 16-bit. The clamped value is fed back
+       * via output[i-1]/output[i-2] into subsequent iterations'
+       * IIR-style filter (weights from SPU's ADPCM playback - may
+       * not be exact for CD-XA ADPCM per the comment above). */
+      if (sample < -32768) sample = -32768;
+      if (sample >  32767) sample =  32767;
       output[i] = sample;
    }
 }

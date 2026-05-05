@@ -71,7 +71,6 @@
 #include "../mednafen-types.h"
 #include "../state.h"
 #include "../state_helpers.h"
-#include "../clamp.h"
 
 #include <libretro.h>
 
@@ -762,7 +761,14 @@ static void SPU_RunDecoder(SPU_Voice *voice)
          sample += ((voice->DecodeM2 * weight_m2) >> 6);
          sample += ((voice->DecodeM1 * weight_m1) >> 6);
 
-         clamp(&sample, -32768, 32767);
+         /* Saturate to signed 16-bit. The decoded sample is fed
+          * back into the M1/M2 history for the next nibble's
+          * IIR-style filter, so the clamp bounds those stored
+          * values to int16 range too (matching PS1 silicon
+          * behaviour where the ADPCM unit operates on 16-bit
+          * intermediates). */
+         if (sample < -32768) sample = -32768;
+         if (sample >  32767) sample =  32767;
 
          tb[i] = sample;
          voice->DecodeM2 = voice->DecodeM1;
@@ -944,32 +950,37 @@ static const int16 ResampTable[20] =
 
 static INLINE int32 Reverb4422(const int16 *src)
 {
- int32 out = 0;	// 32-bits is adequate(it won't overflow)
+   int32 out = 0; /* 32-bits is adequate (it won't overflow). */
 
- for(unsigned i = 0; i < 20; i++)
-  out += ResampTable[i] * src[i * 2];
+   for (unsigned i = 0; i < 20; i++)
+      out += ResampTable[i] * src[i * 2];
 
- // Middle non-zero
- out += 0x4000 * src[19];
+   /* Middle non-zero. */
+   out += 0x4000 * src[19];
 
- out >>= 15;
+   out >>= 15;
 
- clamp(&out, -32768, 32767);
+   /* Saturate to signed 16-bit before returning to the reverb
+    * downsample/upsample chain. */
+   if (out < -32768) out = -32768;
+   if (out >  32767) out =  32767;
 
- return(out);
+   return out;
 }
 
 static INLINE int32 Reverb2244(const int16 *src)
 {
    unsigned i;
-   int32_t out = 0; /* 32bits is adequate (it won't overflow) */
+   int32_t out = 0; /* 32-bits is adequate (it won't overflow). */
 
-   for(i = 0; i < 20; i++)
+   for (i = 0; i < 20; i++)
       out += ResampTable[i] * src[i];
 
    out >>= 14;
 
-   clamp(&out, -32768, 32767);
+   /* Saturate to signed 16-bit. Same role as Reverb4422 above. */
+   if (out < -32768) out = -32768;
+   if (out >  32767) out =  32767;
 
    return out;
 }
@@ -1121,13 +1132,15 @@ static INLINE void SPU_RunNoise(void)
       // Output of reverb processing.
       int32 reverb[2];
 
-      // Final output.
-      int32 output[2];
-
       accum[0]    = accum[1]    = 0;
       accum_fv[0] = accum_fv[1] = 0;
       reverb[0]   = reverb[1]   = 0;
-      output[0]   = output[1]   = 0;
+      /* The historical `int32 output[2]` scratch array is gone -
+       * its only role was to carry per-sample post-volume-sweep
+       * output between the volume-sweep step and the
+       * IntermediateBuffer write, both of which now live in the
+       * same fused expression below. Saved 8 bytes of stack and
+       * one round-trip to that stack location per sample. */
 
       const uint32 PhaseModCache = FM_Mode & ~ 1;
       /*
@@ -1355,24 +1368,56 @@ static INLINE void SPU_RunNoise(void)
 
       SPU_RunNoise();
 
-      for (unsigned lr = 0; lr < 2; lr++)
-         clamp(&accum_fv[lr], -32768, 32767);
+      /* Saturate accum_fv (the reverb-input accumulator) to
+       * signed 16-bit before feeding it to the reverb block. PS1
+       * silicon clamps at this stage because the reverb engine
+       * works on int16 samples internally. */
+      if (accum_fv[0] < -32768) accum_fv[0] = -32768;
+      if (accum_fv[0] >  32767) accum_fv[0] =  32767;
+      if (accum_fv[1] < -32768) accum_fv[1] = -32768;
+      if (accum_fv[1] >  32767) accum_fv[1] =  32767;
 
       SPU_RunReverb(accum_fv, reverb);
 
-      for(unsigned lr = 0; lr < 2; lr++)
+      /* Final per-sample mix:
+       *   1. Add reverb contribution scaled by ReverbVol.
+       *   2. Saturate the dry+wet accumulator to signed 16-bit.
+       *   3. Apply the global volume sweep, saturating the
+       *      result again to signed 16-bit (this is the "final
+       *      output sample" before the resampler-headroom 75%
+       *      attenuation).
+       *   4. Write the attenuated sample directly to
+       *      IntermediateBuffer.
+       *
+       * The historical `int32 output[2]` scratch lived between
+       * steps 3 and 4; folding the post-volume-sweep value
+       * straight into the IntermediateBuffer expression
+       * eliminates that round-trip. The IntermediateBufferPos
+       * overflow guard now covers the volume-sweep step too -
+       * previously only the buffer write was guarded and the
+       * sweep + clamp ran every sample even when the result was
+       * about to be discarded. SPU_Sweep_ReadVolume is pure
+       * (returns sweep->Current), so skipping it on the buffer-
+       * full path is behaviour-preserving. */
+      for (unsigned lr = 0; lr < 2; lr++)
       {
          accum[lr] += ((reverb[lr] * ReverbVol[lr]) >> 15);
-         clamp(&accum[lr],  -32768, 32767);
-         output[lr] = (accum[lr] * SPU_Sweep_ReadVolume(&GlobalSweep[lr])) >> 15;
-         clamp(&output[lr], -32768, 32767);
+         /* Saturate post-reverb mix to signed 16-bit. */
+         if (accum[lr] < -32768) accum[lr] = -32768;
+         if (accum[lr] >  32767) accum[lr] =  32767;
       }
 
-      if(IntermediateBufferPos < 4096)	// Overflow might occur in some debugger use cases.
+      if (IntermediateBufferPos < 4096) /* Overflow might occur in some debugger use cases. */
       {
-         // 75%, for some (resampling) headroom.
-         for(unsigned lr = 0; lr < 2; lr++)
-            IntermediateBuffer[IntermediateBufferPos][lr] = (output[lr] * 3 + 2) >> 2;
+         for (unsigned lr = 0; lr < 2; lr++)
+         {
+            int32 out = (accum[lr] * SPU_Sweep_ReadVolume(&GlobalSweep[lr])) >> 15;
+            /* Saturate final output sample to signed 16-bit. */
+            if (out < -32768) out = -32768;
+            if (out >  32767) out =  32767;
+            /* 75% attenuation for resampling headroom. */
+            IntermediateBuffer[IntermediateBufferPos][lr] = (out * 3 + 2) >> 2;
+         }
 
          IntermediateBufferPos++;
       }

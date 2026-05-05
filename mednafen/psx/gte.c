@@ -31,8 +31,6 @@
 
 extern bool psx_gte_overclock;
 
-#include "../clamp.h"
-
 /* Notes:
 
  AVSZ3/AVSZ4:
@@ -788,6 +786,7 @@ static INLINE int16_t i32_to_i16_saturate(unsigned int which, int32_t value, int
 static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_value, int lm)
 {
    int32_t tmp = lm << 15;
+   int32_t lo  = -32768 + tmp;
 
    if(ftv_value < -32768)
       FLAGS |= 1 << (24 - which);
@@ -795,9 +794,14 @@ static INLINE int16_t Lm_B_PTZ(unsigned int which, int32_t value, int32_t ftv_va
    if(ftv_value > 32767)
       FLAGS |= 1 << (24 - which);
 
-   clamp(&value, (-32768 + tmp), 32767);
+   /* Saturate `value` to [lo, 32767]. The lower bound depends on
+    * the lm (limit-mode) flag from the GTE opcode: when set, the
+    * lower bound rises to 0 (-32768 + 32768) so the result is
+    * unsigned. Was clamp(&value, lo, 32767) from clamp.h. */
+   if (value < lo)    value = lo;
+   if (value > 32767) value = 32767;
 
-   return(value);
+   return value;
 }
 
 static INLINE uint8_t Lm_C(unsigned int which, int32_t value)

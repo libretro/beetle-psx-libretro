@@ -3,7 +3,6 @@
 
 #include "../cdrom/cdromif.h"
 #include "../cdrom/SimpleFIFO.h"
-#include "../clamp.h"
 
 struct CD_Audio_Buffer
 {
