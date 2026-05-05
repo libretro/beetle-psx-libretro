@@ -129,15 +129,9 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 		info.pBindings = bindings.data();
 	}
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned desc_index = device->register_descriptor_set_layout(get_hash(), info);
-#endif
 	LOGI("Creating descriptor set layout.\n");
 	if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
 		LOGE("Failed to create descriptor set layout.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_descriptor_set_layout_handle(desc_index, set_layout);
-#endif
 }
 
 void DescriptorSetAllocator::begin_frame()

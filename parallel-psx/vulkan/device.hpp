@@ -43,10 +43,6 @@
 #include <functional>
 #include <unordered_map>
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-#include "shader_manager.hpp"
-#include "texture_manager.hpp"
-#endif
 
 #ifdef GRANITE_VULKAN_MT
 #include <atomic>
@@ -55,9 +51,6 @@
 #include "thread_group.hpp"
 #endif
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-#include "fossilize.hpp"
-#endif
 
 #include "quirks.hpp"
 
@@ -92,9 +85,6 @@ struct HandlePool
 };
 
 class Device
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	: public Fossilize::StateCreatorInterface
-#endif
 {
 public:
 	// Device-based objects which need to poke at internal data structures when their lifetimes end.
@@ -253,12 +243,6 @@ public:
 
 	const Sampler &get_stock_sampler(StockSampler sampler) const;
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	ShaderManager &get_shader_manager();
-	TextureManager &get_texture_manager();
-	void init_shader_manager_cache();
-	void flush_shader_manager_cache();
-#endif
 
 	// For some platforms, the device and queue might be shared, possibly across threads, so need some mechanism to
 	// lock the global device and queue.
@@ -519,51 +503,9 @@ private:
 
 	Fence request_fence();
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	ShaderManager shader_manager;
-	TextureManager texture_manager;
-#endif
 
 	std::string get_pipeline_cache_string() const;
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	Fossilize::StateRecorder state_recorder;
-	std::mutex state_recorder_lock;
-	bool enqueue_create_sampler(Fossilize::Hash hash, unsigned index, const VkSamplerCreateInfo *create_info, VkSampler *sampler) override;
-	bool enqueue_create_descriptor_set_layout(Fossilize::Hash hash, unsigned index, const VkDescriptorSetLayoutCreateInfo *create_info, VkDescriptorSetLayout *layout) override;
-	bool enqueue_create_pipeline_layout(Fossilize::Hash hash, unsigned index, const VkPipelineLayoutCreateInfo *create_info, VkPipelineLayout *layout) override;
-	bool enqueue_create_shader_module(Fossilize::Hash hash, unsigned index, const VkShaderModuleCreateInfo *create_info, VkShaderModule *module) override;
-	bool enqueue_create_render_pass(Fossilize::Hash hash, unsigned index, const VkRenderPassCreateInfo *create_info, VkRenderPass *render_pass) override;
-	bool enqueue_create_compute_pipeline(Fossilize::Hash hash, unsigned index, const VkComputePipelineCreateInfo *create_info, VkPipeline *pipeline) override;
-	bool enqueue_create_graphics_pipeline(Fossilize::Hash hash, unsigned index, const VkGraphicsPipelineCreateInfo *create_info, VkPipeline *pipeline) override;
-	void wait_enqueue() override;
-	VkPipeline fossilize_create_graphics_pipeline(Fossilize::Hash hash, VkGraphicsPipelineCreateInfo &info);
-	VkPipeline fossilize_create_compute_pipeline(Fossilize::Hash hash, VkComputePipelineCreateInfo &info);
-
-	unsigned register_graphics_pipeline(Fossilize::Hash hash, const VkGraphicsPipelineCreateInfo &info);
-	unsigned register_compute_pipeline(Fossilize::Hash hash, const VkComputePipelineCreateInfo &info);
-	unsigned register_render_pass(Fossilize::Hash hash, const VkRenderPassCreateInfo &info);
-	unsigned register_descriptor_set_layout(Fossilize::Hash hash, const VkDescriptorSetLayoutCreateInfo &info);
-	unsigned register_pipeline_layout(Fossilize::Hash hash, const VkPipelineLayoutCreateInfo &info);
-	unsigned register_shader_module(Fossilize::Hash hash, const VkShaderModuleCreateInfo &info);
-
-	void set_render_pass_handle(unsigned index, VkRenderPass render_pass);
-	void set_descriptor_set_layout_handle(unsigned index, VkDescriptorSetLayout set_layout);
-	void set_pipeline_layout_handle(unsigned index, VkPipelineLayout layout);
-	void set_shader_module_handle(unsigned index, VkShaderModule module);
-
-	struct
-	{
-		std::unordered_map<VkShaderModule, Shader *> shader_map;
-		std::unordered_map<VkRenderPass, RenderPass *> render_pass_map;
-#ifdef GRANITE_VULKAN_MT
-		Granite::TaskGroup pipeline_group;
-#endif
-	} replayer_state;
-
-	void init_pipeline_state();
-	void flush_pipeline_state();
-#endif
 
 	ImplementationWorkarounds workarounds;
 	void init_workarounds();

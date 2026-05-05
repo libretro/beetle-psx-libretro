@@ -58,10 +58,6 @@ namespace Vulkan
 Device::Device()
     : framebuffer_allocator(this)
     , transient_allocator(this)
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	, shader_manager(this)
-	, texture_manager(this)
-#endif
 {
 #ifdef GRANITE_VULKAN_MT
 	cookie.store(0);
@@ -471,19 +467,6 @@ string Device::get_pipeline_cache_string() const
 
 void Device::init_pipeline_cache()
 {
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	auto file = Granite::Global::filesystem()->open(Util::join("cache://pipeline_cache_", get_pipeline_cache_string(), ".bin"),
-	                                                Granite::FileMode::ReadOnly);
-	if (file)
-	{
-		auto size = file->get_size();
-		auto *mapped = static_cast<uint8_t *>(file->map());
-		if (mapped && !init_pipeline_cache(mapped, size))
-			LOGE("Failed to initialize pipeline cache.\n");
-	}
-	else if (!init_pipeline_cache(nullptr, 0))
-		LOGE("Failed to initialize pipeline cache.\n");
-#endif
 }
 
 size_t Device::get_pipeline_cache_size()
@@ -526,35 +509,6 @@ bool Device::get_pipeline_cache_data(uint8_t *data, size_t size)
 
 void Device::flush_pipeline_cache()
 {
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	size_t size = get_pipeline_cache_size();
-	if (!size)
-	{
-		LOGE("Failed to get pipeline cache size.\n");
-		return;
-	}
-
-	auto file = Granite::Global::filesystem()->open(Util::join("cache://pipeline_cache_", get_pipeline_cache_string(), ".bin"),
-	                                                Granite::FileMode::WriteOnly);
-	if (!file)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-
-	uint8_t *data = static_cast<uint8_t *>(file->map_write(size));
-	if (!data)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-
-	if (!get_pipeline_cache_data(data, size))
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-#endif
 }
 
 void Device::init_workarounds()
@@ -595,12 +549,6 @@ void Device::set_context(const Context &context)
 
 	init_stock_samplers();
 	init_pipeline_cache();
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	init_pipeline_state();
-#endif
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	init_shader_manager_cache();
-#endif
 
 #ifdef ANDROID
 	init_frame_contexts(3); // Android needs a bit more ... ;)
@@ -1518,13 +1466,7 @@ Device::~Device()
 		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
 	}
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	flush_shader_manager_cache();
-#endif
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	flush_pipeline_state();
-#endif
 
 	framebuffer_allocator.clear();
 	transient_allocator.clear();
@@ -3006,17 +2948,10 @@ SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, Stoc
 	auto info = fill_vk_sampler_info(sampler_info);
 	VkSampler sampler;
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned index = state_recorder.register_sampler(Fossilize::Hash(stock_sampler), info);
-#else
 	(void)stock_sampler;
-#endif
 	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
 		return SamplerHandle(nullptr);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	state_recorder.set_sampler_handle(index, sampler);
-#endif
 	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
 }
 
@@ -3415,30 +3350,6 @@ void Device::set_name(const CommandBuffer &cmd, const char *name)
 	}
 }
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-TextureManager &Device::get_texture_manager()
-{
-	return texture_manager;
-}
 
-ShaderManager &Device::get_shader_manager()
-{
-	return shader_manager;
-}
-#endif
-
-#ifdef GRANITE_VULKAN_FILESYSTEM
-void Device::init_shader_manager_cache()
-{
-	//if (!shader_manager.load_shader_cache("assets://shader_cache.json"))
-	//	shader_manager.load_shader_cache("cache://shader_cache.json");
-	shader_manager.load_shader_cache("assets://shader_cache.json");
-}
-
-void Device::flush_shader_manager_cache()
-{
-	shader_manager.save_shader_cache("cache://shader_cache.json");
-}
-#endif
 
 }

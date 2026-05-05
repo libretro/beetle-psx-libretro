@@ -105,11 +105,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const VkRenderPassCreateInfo &
 	// Store the important subpass information for later.
 	setup_subpasses(create_info);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), create_info);
-#endif
 
-	// Fixup after, we want the Fossilize render pass to be generic.
+	// Fixup after, we want the underlying render pass to be generic.
 	auto info = create_info;
 	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
 	fixup_render_pass_nvidia(info, fixup_attachments);
@@ -119,9 +116,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const VkRenderPassCreateInfo &
 	LOGI("Creating render pass.\n");
 	if (vkCreateRenderPass(device->get_device(), &info, nullptr, &render_pass) != VK_SUCCESS)
 		LOGE("Failed to create render pass.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
-#endif
 }
 
 RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
@@ -790,11 +784,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	// Store the important subpass information for later.
 	setup_subpasses(rp_info);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), rp_info);
-#endif
 
-	// Fixup after, we want the Fossilize render pass to be generic.
+	// Fixup after, we want the underlying render pass to be generic.
 	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
 	fixup_render_pass_nvidia(rp_info, fixup_attachments);
 	if (device->get_workarounds().wsi_acquire_barrier_is_expensive)
@@ -803,9 +794,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	LOGI("Creating render pass.\n");
 	if (vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
 		LOGE("Failed to create render pass.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
-#endif
 }
 
 void RenderPass::fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
