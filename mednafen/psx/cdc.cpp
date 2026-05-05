@@ -212,7 +212,12 @@ void PS_CDC::SoftReset(void)
 
    CurSector = 0;
 
-   ClearAIP();
+   /* Sentinel: 0xFF is out-of-range for the 4-bit (SubQBuf_Safe[0x9] >> 4)
+    * value compared against this in HandlePlayRead, so the first MODE_REPORT
+    * frame after reset always emits a report. Without this the field could
+    * retain a stale value across resets and silently swallow the first
+    * report frame. */
+   ReportLastF = 0xFF;
 
    SeekTarget = 0;
 
@@ -907,7 +912,11 @@ void PS_CDC::HandlePlayRead(void)
    }
    else if (cd_warned_slow)
    {
-      Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
+      /* Return value intentionally discarded - on failure CDIF_ST
+       * zeroes read_buf via cdromif.cpp:641 and CDAccess_Image always
+       * populates it to a defined state via MakeSubPQ + memset, so
+       * DecodeSubQ below is safe to run on the buffer regardless. */
+      (void)Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
    }
    else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, cd_slow_timeout))
    {
@@ -921,7 +930,8 @@ void PS_CDC::HandlePlayRead(void)
                "Slow CD image read detected: consider using async or precache CD Access Method");
 
       cd_warned_slow = true;
-      Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
+      /* Same intentional-discard contract as above. */
+      (void)Cur_CDIF->ReadRawSector(read_buf, CurSector, -1);
    }
 
    DecodeSubQ(read_buf + 2352);
@@ -1131,7 +1141,15 @@ int32_t PS_CDC::Update(const int32_t timestamp)
       if(PendingCommandCounter > 0 && chunk_clocks > PendingCommandCounter)
          chunk_clocks = PendingCommandCounter;
 
-      if(chunk_clocks > SPUCounter)
+      /* SPUCounter is set in Power() from PS_SPU::UpdateFromCDC(0) and
+       * reassigned every loop iteration from UpdateFromCDC's return,
+       * which (per spu.cpp's clock_divider arithmetic) is positive
+       * provided spu_samples > 0. The current build always has
+       * spu_samples > 0, but matching the gating used by the other
+       * counters above is cheap insurance: if SPUCounter ever became
+       * <=0 here, chunk_clocks could be clamped to 0 and the outer
+       * `while(clocks > 0)` loop would spin without progress. */
+      if(SPUCounter > 0 && chunk_clocks > SPUCounter)
          chunk_clocks = SPUCounter;
 
       if(DiscStartupDelay > 0)
