@@ -22,6 +22,7 @@
 #include "../state_helpers.h"
 
 #include "irq.h"
+#include "../../osd_message.h"
 #include "cpu_c.h"
 
 static uint16_t Asserted;
@@ -65,7 +66,7 @@ void IRQ_Assert(int which, bool status)
 
 /*
    if(which == IRQ_SPU && status && (Asserted & (1 << which)))
-      MDFND_DispMessage(3, RETRO_LOG_ERROR,
+      osd_message(3, RETRO_LOG_ERROR,
             RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
             "SPU IRQ glitch??");
 */

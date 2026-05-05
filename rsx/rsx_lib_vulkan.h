@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "libretro.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //void rsx_vulkan_set_blend_mode(enum blending_modes mode);
 void rsx_vulkan_set_environment(retro_environment_t cb);
 void rsx_vulkan_set_video_refresh(retro_video_refresh_t cb);
@@ -106,5 +110,9 @@ void rsx_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 void rsx_vulkan_toggle_display(bool status);
 
 bool rsx_vulkan_has_software_renderer(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__RSX_LIB_VULKAN_H__*/

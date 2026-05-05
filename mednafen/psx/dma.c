@@ -24,6 +24,7 @@
 #include <retro_miscellaneous.h>
 
 #include "psx_events.h"
+#include "../../osd_message.h"
 #include "psx_mem.h"
 #include "irq.h"
 #include "cpu_c.h"
@@ -592,7 +593,7 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                DMACH[ch].ClockCounter = (1 << 30);
                RunChannel(timestamp, 1, ch);
                DMACH[ch].ClockCounter = 0;
-               MDFND_DispMessage(3, RETRO_LOG_ERROR,
+               osd_message(3, RETRO_LOG_ERROR,
                      RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
                      "[DMA] Forced stop for channel %d", ch);
 #endif

@@ -53,6 +53,7 @@
 #include "spu_c.h"
 
 #include "../mednafen-endian.h"
+#include "../../osd_message.h"
 #include "../state_helpers.h"
 
 PS_CDC::PS_CDC() : DMABuffer(4096)
@@ -925,11 +926,11 @@ void PS_CDC::HandlePlayRead(void)
    else if (!Cur_CDIF->ReadRawSector(read_buf, CurSector, cd_slow_timeout))
    {
       if (cd_async)
-         MDFND_DispMessage(3, RETRO_LOG_WARN,
+         osd_message(3, RETRO_LOG_WARN,
                RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                "*Really* slow CD image read detected: consider using precache CD Access Method");
       else
-         MDFND_DispMessage(3, RETRO_LOG_WARN,
+         osd_message(3, RETRO_LOG_WARN,
                RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                "Slow CD image read detected: consider using async or precache CD Access Method");
 
@@ -1037,7 +1038,7 @@ void PS_CDC::HandlePlayRead(void)
                {
                   if(!edc_lec_check_and_correct(buf, true))
                   {
-                     MDFN_DispMessage(3, RETRO_LOG_ERROR,
+                     osd_message(3, RETRO_LOG_ERROR,
                            RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
                            "Bad sector? - %d", CurSector);
                   }

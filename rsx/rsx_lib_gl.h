@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "libretro.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //void rsx_gl_set_blend_mode(enum blending_modes mode);
 void rsx_gl_set_environment(retro_environment_t cb);
 void rsx_gl_set_video_refresh(retro_video_refresh_t cb);
@@ -103,5 +107,9 @@ void rsx_gl_copy_rect(uint16_t src_x, uint16_t src_y,
 void rsx_gl_toggle_display(bool status);
 
 bool rsx_gl_has_software_renderer(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__RSX_LIB_GL_H__*/

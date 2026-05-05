@@ -27,6 +27,7 @@
 #include "../state_helpers.h"
 #include "../math_ops.h"
 #include "../mednafen.h"
+#include "../../osd_message.h"
 #include "../mednafen-endian.h"
 
 // iCB: PGXP STUFF
@@ -2823,7 +2824,7 @@ static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
 
 static void cop_op(struct lightrec_state *state, u32 func)
 {
-   MDFND_DispMessage(3, RETRO_LOG_WARN,
+   osd_message(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
          "Access to invalid co-processor 0");
 }
@@ -2832,7 +2833,7 @@ static void cop2_op(struct lightrec_state *state, u32 func)
 {
    if (MDFN_UNLIKELY(!cp2_ops[func & 0x3f]))
    {
-      MDFN_DispMessage(3, RETRO_LOG_WARN,
+      osd_message(3, RETRO_LOG_WARN,
             RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
             "Invalid CP2 function %u\n", func);
    }

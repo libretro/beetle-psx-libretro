@@ -22,6 +22,7 @@
 
 #include "mednafen.h"
 #include "settings.h"
+#include "../osd_message.h"
 
 int setting_initial_scanline = 0;
 int setting_initial_scanline_pal = 0;
@@ -44,7 +45,7 @@ uint64_t MDFN_GetSettingUI(const char *name)
    if (!strcmp("psx.input.port2.gun_chairs", name))
       return setting_crosshair_color_p2;
 
-   MDFN_DispMessage(3, RETRO_LOG_WARN,
+   osd_message(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
          "unhandled setting UI: %s\n", name);
    return 0;
@@ -62,7 +63,7 @@ int64_t MDFN_GetSettingI(const char *name)
       return setting_last_scanline;
    if (!strcmp("psx.slendp", name))
       return setting_last_scanline_pal;
-   MDFN_DispMessage(3, RETRO_LOG_WARN,
+   osd_message(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
          "unhandled setting I: %s\n", name);
    return 0;
@@ -101,7 +102,7 @@ bool MDFN_GetSettingB(const char *name)
       return setting_psx_analog_toggle;
    if (!strcmp("psx.fastboot", name))
       return setting_psx_fastboot;
-   MDFN_DispMessage(3, RETRO_LOG_WARN,
+   osd_message(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
          "unhandled setting B: %s\n", name);
    return 0;
@@ -117,7 +118,7 @@ const char *MDFN_GetSettingS(const char *name)
       return "scph5501.bin";
    if (!strcmp("psx.region_default", name)) /* make configurable */
       return "na";
-   MDFN_DispMessage(3, RETRO_LOG_WARN,
+   osd_message(3, RETRO_LOG_WARN,
          RETRO_MESSAGE_TARGET_LOG, RETRO_MESSAGE_TYPE_NOTIFICATION,
          "unhandled setting S: %s\n", name);
    return 0;

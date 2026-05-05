@@ -19,6 +19,7 @@
 #include "beetle_psx_globals.h"
 #include "libretro_options.h"
 #include "input.h"
+#include "osd_message.h"
 
 #include "parallel-psx/custom-textures/dbg_input_callback.h"
 retro_input_state_t dbg_input_state_cb = 0;
@@ -3985,7 +3986,7 @@ static void check_variables(bool startup)
             // if(use_mednafen_memcard0_method)
                shared_memorycards = true;
             // else
-               // MDFND_DispMessage(3, RETRO_LOG_WARN,
+               // osd_message(3, RETRO_LOG_WARN,
                      // RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                      // "Memory Card 0 Method not set to Mednafen; shared memory cards could not be enabled.");
          }
@@ -4718,7 +4719,7 @@ void retro_run(void)
       if (use_mednafen_memcard0_method &&
           memcard_left_index_old != memcard_left_index)
       {
-         MDFN_DispMessage(0, RETRO_LOG_INFO,
+         osd_message(0, RETRO_LOG_INFO,
                           RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
                           "changing from memory card %d to memory card %d in left slot",
                           memcard_left_index_old, memcard_left_index);
@@ -4741,7 +4742,7 @@ void retro_run(void)
 
       if (memcard_right_index_old != memcard_right_index)
       {
-         MDFN_DispMessage(0, RETRO_LOG_INFO,
+         osd_message(0, RETRO_LOG_INFO,
                           RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
                           "changing from memory card %d to memory card %d in right slot",
                           memcard_right_index_old, memcard_right_index);
@@ -4790,7 +4791,7 @@ void retro_run(void)
          snprintf(msg_buffer, sizeof(msg_buffer),
                "Internal FPS: %.2f", internal_fps);
 
-         MDFND_DispMessage(1, RETRO_LOG_INFO,
+         osd_message(1, RETRO_LOG_INFO,
                RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_STATUS,
                msg_buffer);
 
@@ -5493,50 +5494,56 @@ void MDFN_MakeFName(MakeFName_Type type, int id1, const char *cd1,
    }
 }
 
-void MDFND_DispMessage(
-      unsigned priority, enum retro_log_level level,
-      enum retro_message_target target, enum retro_message_type type,
-      const char *str)
+/*
+ * osd_message - the only libretro OSD/log message helper for
+ * this core. Formats the printf-style args into a 4 KiB stack
+ * buffer (matching the historical MDFN_DispMessage behaviour;
+ * 4 KiB is generous - none of the call sites approach that
+ * size), then dispatches via RETRO_ENVIRONMENT_SET_MESSAGE_EXT
+ * if the frontend advertises RETRO_MESSAGE_INTERFACE_VERSION
+ * >= 1, falling back to the legacy SET_MESSAGE otherwise.
+ *
+ * Replaces the previous MDFN_DispMessage + MDFND_DispMessage
+ * pair, which were a holdover from Mednafen's standalone-build
+ * driver-abstraction layer (MDFND_* was the abstract driver
+ * entry point implemented per frontend, MDFN_* was the printf-
+ * style wrapper that built a string then called the driver).
+ * In the libretro core there's only one frontend, so the
+ * indirection added nothing; folded into one function. See
+ * osd_message.h for the API contract.
+ */
+void osd_message(unsigned priority,
+                 enum retro_log_level level,
+                 enum retro_message_target target,
+                 enum retro_message_type type,
+                 const char *format, ...)
 {
-   if (display_notifications)
-   {
-      if (libretro_msg_interface_version >= 1)
-      {
-         struct retro_message_ext msg = {
-            str,
-            3000,
-            priority,
-            level,
-            target,
-            type,
-            -1
-         };
-         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
-      }
-      else
-      {
-         struct retro_message msg =
-         {
-            str,
-            180
-         };
-         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
-      }
-   }
-}
-
-void MDFN_DispMessage(
-      unsigned priority, enum retro_log_level level,
-      enum retro_message_target target, enum retro_message_type type,
-      const char *format, ...)
-{
+   char str[4096];
    va_list ap;
-   char *str = (char*)malloc(4096 * sizeof(char));
+
+   if (!display_notifications)
+      return;
 
    va_start(ap, format);
-   vsnprintf(str, 4096, format, ap);
+   vsnprintf(str, sizeof(str), format, ap);
    va_end(ap);
 
-   MDFND_DispMessage(priority, level, target, type, str);
-   free(str);
+   if (libretro_msg_interface_version >= 1)
+   {
+      struct retro_message_ext msg = {
+         str,
+         3000,
+         priority,
+         level,
+         target,
+         type,
+         -1
+      };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &msg);
+   }
+   else
+   {
+      struct retro_message msg = { str, 180 };
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+   }
 }

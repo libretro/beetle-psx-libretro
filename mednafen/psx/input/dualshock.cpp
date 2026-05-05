@@ -20,6 +20,7 @@
 #include "dualshock.h"
 
 #include "../../mednafen.h"
+#include "../../../osd_message.h"
 #include "../../mednafen-endian.h"
 
 /*
@@ -358,7 +359,7 @@ void InputDevice_DualShock::UpdateInput(const void *data)
    CheckManualAnaModeChange();
 
    if(am_prev_info != analog_mode)
-      MDFN_DispMessage(2, RETRO_LOG_INFO,
+      osd_message(2, RETRO_LOG_INFO,
             RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
             "%s: %s Mode",
             gp_name, analog_mode ? "Analog" : "Digital");
