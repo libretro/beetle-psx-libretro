@@ -153,17 +153,25 @@ void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
 
 	if (cacheMode != mode_write)
 	{
-		/* Initialise cache on first use.  Allocate lazily; if the
-		 * allocation fails we set mode_fail so subsequent reads bail
-		 * out cleanly. */
-		if (cacheMode == mode_init)
+		/* Make sure the cache buffer is allocated before we start
+		 * writing vertices into it.  This covers two cases:
+		 *
+		 *   1. First-ever use after PGXP_Init (cacheMode == mode_init,
+		 *      vertexCache == NULL).
+		 *   2. Re-enable after the user toggled PGXP_VERTEX_CACHE off
+		 *      and then on again - PGXP_FreeVertexCache freed the
+		 *      buffer, and during the off interval pgxp_gte.c was
+		 *      calling us with a NULL vertex which set cacheMode to
+		 *      mode_fail.  Now that the user toggled it back on we
+		 *      get a real vertex again, and we need to re-allocate.
+		 *
+		 * If allocation fails (e.g. on an embedded target with tight
+		 * memory) cacheMode goes to mode_fail and we bail out
+		 * cleanly. */
+		if (!VertexCacheEnsureAllocated())
 		{
-			if (!VertexCacheEnsureAllocated())
-			{
-				cacheMode = mode_fail;
-				return;
-			}
-			/* calloc already zeroed the buffer; no memset needed. */
+			cacheMode = mode_fail;
+			return;
 		}
 
 		/* First vertex of write session (frame?) */
