@@ -29,9 +29,7 @@
 #include "pgxp_mem.h"
 #include "pgxp_value.h"
 
-#include <math.h>
 #include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 
 /* ============================================================
@@ -110,8 +108,6 @@ const unsigned int mode_fail = 3;
 
 static PGXP_cache_entry *vertexCache = NULL;
 
-unsigned int baseID = 0;
-unsigned int lastID = 0;
 unsigned int cacheMode = 0;
 
 /* Allocate the vertex cache on first use.  Returns 1 on success, 0 on
@@ -137,25 +133,6 @@ void PGXP_FreeVertexCache(void)
 		vertexCache = NULL;
 	}
 	cacheMode = mode_init;
-	baseID = 0;
-	lastID = 0;
-}
-
-unsigned int IsSessionID(unsigned int vertID)
-{
-	/* No wrapping */
-	if (lastID >= baseID)
-		return (vertID >= baseID);
-
-	/* If vertID is >= baseID it is pre-wrap and in session */
-	if (vertID >= baseID)
-		return 1;
-
-	/* vertID is < baseID, If it is <= lastID it is post-wrap and in session */
-	if (vertID <= lastID)
-		return 1;
-
-	return 0;
 }
 
 void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
@@ -194,31 +171,12 @@ void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
 
 		/* First vertex of write session (frame?) */
 		cacheMode = mode_write;
-		baseID = pNewVertex->count;
 	}
-
-	lastID = pNewVertex->count;
 
 	if (sx >= -0x800 && sx <= 0x7ff &&
 		sy >= -0x800 && sy <= 0x7ff)
 	{
 		pOldVertex = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
-
-		/* To avoid ambiguity there can only be one valid entry per-session */
-		if (0)/*(IsSessionID(pOldVertex->count) && (pOldVertex->value == pNewVertex->value)) */
-		{
-			/* check to ensure this isn't identical */
-			if ((fabsf(pOldVertex->x - pNewVertex->x) > 0.1f) ||
-				(fabsf(pOldVertex->y - pNewVertex->y) > 0.1f) ||
-				(fabsf(pOldVertex->z - pNewVertex->z) > 0.1f))
-			{
-				pOldVertex->x      = pNewVertex->x;
-				pOldVertex->y      = pNewVertex->y;
-				pOldVertex->z      = pNewVertex->z;
-				pOldVertex->gFlags = 5;
-				return;
-			}
-		}
 
 		/* Write vertex into cache */
 		pOldVertex->x      = pNewVertex->x;

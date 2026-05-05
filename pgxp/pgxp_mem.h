@@ -48,9 +48,6 @@ extern "C" {
    void WriteMem(PGXP_value* value, u32 addr);
    void WriteMem16(PGXP_value* src, u32 addr);
 
-   void PGXP_SetLastDMA(u32 addr);
-   u32	 PGXP_GetLastDMA();
-
 #ifdef __cplusplus
 }
 #endif

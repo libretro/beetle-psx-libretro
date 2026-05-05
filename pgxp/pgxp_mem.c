@@ -234,15 +234,3 @@ void WriteMem16(PGXP_value* src, u32 addr)
 		dest->gFlags |= src->gFlags;				/* inherit flags from both values (?) */
 	}
 }
-
-u32 lastDMAAddr = 0;
-
-void PGXP_SetLastDMA(u32 addr)
-{
-	lastDMAAddr = PGXP_ConvertAddress(addr);
-}
-
-u32	 PGXP_GetLastDMA()
-{
-	return lastDMAAddr;
-}
