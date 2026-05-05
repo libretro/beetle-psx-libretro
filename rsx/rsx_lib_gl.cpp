@@ -62,12 +62,147 @@
 #include "libretro.h"
 #include "libretro_options.h"
 
-#if 0 || defined(__APPLE__) || defined(HAVE_OPENGLES3)
-#define NEW_COPY_RECT
+/* Quad triangulation order.
+ *
+ * A PSX quad is rendered as two triangles sharing one diagonal.
+ * The choice of which diagonal-vertex pair to duplicate produced
+ * visible seams along the shared edge on Apple desktop GL and
+ * some GLES3 drivers when "{0,1,2,1,2,3}" was used; "{0,1,2,2,1,3}"
+ * was reported to fix it.  Backface culling is disabled for the
+ * PSX renderer so the winding direction does not affect
+ * visibility, only rasteriser fill convention along the diagonal.
+ *
+ * This is unrelated to the runtime gl_caps detection introduced
+ * below; it stays a build-time choice because the difference is
+ * driver-rasteriser-specific and not safe to consolidate without
+ * cross-platform visual testing. */
+#if defined(__APPLE__) || defined(HAVE_OPENGLES3)
 static const GLushort indices[6] = {0, 1, 2, 2, 1, 3};
 #else
 static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
 #endif
+
+/* === GL capability bookkeeping ============================
+ *
+ * Populated once at context_reset by gl_caps_init().  Call sites
+ * that want a feature beyond the GL/GLES baseline of their
+ * compile profile consult this struct rather than relying on
+ * compile-time #ifdefs - the build-time GLES2/GLES3/desktop
+ * split decides only which header bundle is available; what the
+ * driver actually exposes at runtime is a separate question.
+ *
+ * Version-cap reminders for future contributors:
+ *
+ *   - Apple desktop OpenGL is permanently capped at GL 4.1 Core.
+ *     macOS shipped 4.1 in 10.9 (2013) and never advanced before
+ *     deprecating the API in 10.14.  Anything from 4.2+ -
+ *     including glCopyImageSubData (4.3), compute shaders (4.3),
+ *     and the core glDebugMessageCallback (4.3) - will never be
+ *     available on Apple desktop builds.
+ *
+ *   - Apple iOS / iPadOS are capped at GLES 3.0.  GLES 3.1 / 3.2
+ *     features are not available there.
+ *
+ *   - Linux/Windows desktop drivers commonly expose 4.6 today,
+ *     but the floor for a libretro frontend can be as low as 2.1
+ *     (legacy compat).
+ *
+ *   - Android GLES drivers are commonly 3.0/3.1/3.2; very old
+ *     devices may report only GLES 2.0.
+ *
+ * Function pointers are resolved via the libretro frontend's
+ * get_proc_address callback (obtained through
+ * glsm_ctl(GLSM_CTL_PROC_ADDRESS_GET, ...)).  This works
+ * regardless of whether the function is declared in the static
+ * GL/GLES header for the current build profile, so call sites
+ * never reference symbols their headers might lack.
+ *
+ * Pattern at every call site:
+ *
+ *   if (gl_caps.fp_glCopyImageSubData)
+ *      gl_caps.fp_glCopyImageSubData(...);
+ *   else if (gl_caps.fp_glBlitFramebuffer)
+ *      gl_caps.fp_glBlitFramebuffer(...);
+ *   else
+ *      <portable readback fallback>
+ */
+
+/* Function-pointer typedef calling convention.  Different
+ * profiles spell this differently:
+ *   - Desktop GL  defines APIENTRY (via <GL/gl.h>) and via the
+ *     glsym layer also gets APIENTRYP.
+ *   - GLES        defines GL_APIENTRY (via <GLES{2,3}/gl{2,3}.h>)
+ *     and GL_APIENTRYP, but does not necessarily provide the
+ *     non-prefixed APIENTRY/APIENTRYP.
+ *
+ * Pick whichever the build's GL header bundle actually provides;
+ * it's just a calling-convention attribute so an empty
+ * definition is correct on profiles that have no special
+ * convention. */
+#if defined(APIENTRYP)
+#  define BEETLE_GL_APIENTRYP APIENTRYP
+#elif defined(GL_APIENTRYP)
+#  define BEETLE_GL_APIENTRYP GL_APIENTRYP
+#elif defined(APIENTRY)
+#  define BEETLE_GL_APIENTRYP APIENTRY *
+#elif defined(GL_APIENTRY)
+#  define BEETLE_GL_APIENTRYP GL_APIENTRY *
+#else
+#  define BEETLE_GL_APIENTRYP *
+#endif
+
+typedef enum gl_api_family
+{
+   GL_API_UNKNOWN = 0,
+   GL_API_DESKTOP,
+   GL_API_GLES
+} gl_api_family;
+
+typedef enum gl_profile
+{
+   GL_PROFILE_UNKNOWN = 0,
+   GL_PROFILE_LEGACY, /* desktop pre-3.0, or 3.0+ compat profile */
+   GL_PROFILE_CORE,   /* desktop 3.2+ core profile */
+   GL_PROFILE_ES      /* GLES (no profile distinction) */
+} gl_profile;
+
+typedef void (BEETLE_GL_APIENTRYP PFN_BEETLE_GL_BLITFRAMEBUFFER)(
+      GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1,
+      GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
+      GLbitfield mask, GLenum filter);
+
+typedef void (BEETLE_GL_APIENTRYP PFN_BEETLE_GL_COPYIMAGESUBDATA)(
+      GLuint srcName, GLenum srcTarget, GLint srcLevel,
+      GLint srcX, GLint srcY, GLint srcZ,
+      GLuint dstName, GLenum dstTarget, GLint dstLevel,
+      GLint dstX, GLint dstY, GLint dstZ,
+      GLsizei srcWidth, GLsizei srcHeight, GLsizei srcDepth);
+
+typedef struct gl_caps
+{
+   /* Identity */
+   gl_api_family api;
+   gl_profile    profile;
+   int           version_major;
+   int           version_minor;
+   /* Composite version for easy ordered comparisons:
+    *   GL  3.3 -> 0x0303,  GL  4.5 -> 0x0405
+    *   GLES 3.0 -> 0x0300, GLES 3.2 -> 0x0302 */
+   int           version_packed;
+
+   /* Driver identification (logging only).  Pointers into
+    * GL-owned static memory; valid for the lifetime of the
+    * context. */
+   const char *vendor;
+   const char *renderer;
+   const char *version_string;
+
+   /* Resolved entry points.  NULL when not available. */
+   PFN_BEETLE_GL_BLITFRAMEBUFFER  fp_glBlitFramebuffer;
+   PFN_BEETLE_GL_COPYIMAGESUBDATA fp_glCopyImageSubData;
+} gl_caps_t;
+
+static gl_caps_t gl_caps;
 
 #define VRAM_WIDTH_PIXELS 1024
 #define VRAM_HEIGHT 512
@@ -2292,10 +2427,206 @@ extern void GPU_RestoreStateP1(bool val);
 extern void GPU_RestoreStateP2(bool val);
 extern void GPU_RestoreStateP3(void);
 
+/* Resolve a function via the libretro frontend's get_proc_address,
+ * trying the core name first then a NULL-terminated list of common
+ * extension suffixes (OES, EXT, ARB, NV, ...).  Returns the first
+ * non-NULL pointer or NULL if nothing matched. */
+static retro_proc_address_t gl_caps_resolve(
+      retro_get_proc_address_t get_proc,
+      const char *base_name,
+      const char *const *suffixes)
+{
+   retro_proc_address_t ptr;
+   char buf[128];
+   const char *s;
+   size_t base_len;
+   size_t i;
+
+   if (!get_proc || !base_name)
+      return NULL;
+
+   ptr = get_proc(base_name);
+   if (ptr)
+      return ptr;
+
+   if (!suffixes)
+      return NULL;
+
+   base_len = strlen(base_name);
+   if (base_len + 8 >= sizeof(buf))
+      return NULL;
+
+   for (i = 0; (s = suffixes[i]) != NULL; i++)
+   {
+      size_t s_len;
+      s_len = strlen(s);
+      if (base_len + s_len + 1 > sizeof(buf))
+         continue;
+      memcpy(buf, base_name, base_len);
+      memcpy(buf + base_len, s, s_len);
+      buf[base_len + s_len] = '\0';
+      ptr = get_proc(buf);
+      if (ptr)
+         return ptr;
+   }
+
+   return NULL;
+}
+
+/* Parse "X.Y" out of a version string fragment.  Accepts a
+ * leading "OpenGL ES " prefix.  Stores results into *major /
+ * *minor; on parse failure leaves them untouched. */
+static void gl_caps_parse_version(const char *version,
+      int *major, int *minor)
+{
+   const char *p;
+   int mj = 0;
+   int mn = 0;
+
+   if (!version)
+      return;
+
+   p = version;
+   if (strncmp(p, "OpenGL ES", 9) == 0)
+   {
+      p += 9;
+      while (*p == ' ')
+         p++;
+   }
+
+   while (*p >= '0' && *p <= '9')
+   {
+      mj = mj * 10 + (*p - '0');
+      p++;
+   }
+   if (*p != '.')
+      return;
+   p++;
+   while (*p >= '0' && *p <= '9')
+   {
+      mn = mn * 10 + (*p - '0');
+      p++;
+   }
+
+   *major = mj;
+   *minor = mn;
+}
+
+/* Initialise gl_caps once a real GL context is current.
+ * Must be called after glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, ...)
+ * so rglgen has resolved its baseline symbols. */
+static void gl_caps_init(void)
+{
+   /* Suffix lists ordered most-likely-first.  ARB before EXT
+    * because ARB tends to be the canonical desktop extension;
+    * OES/EXT before NV because vendor-prefixed are last resort. */
+   static const char *const copy_image_suffixes[] = {
+      "ARB", "OES", "EXT", "NV", NULL
+   };
+   static const char *const blit_framebuffer_suffixes[] = {
+      "EXT", "NV", "ANGLE", NULL
+   };
+
+   glsm_ctx_proc_address_t proc;
+   retro_get_proc_address_t get_proc = NULL;
+   const GLubyte *gl_version_str;
+   const GLubyte *gl_vendor_str;
+   const GLubyte *gl_renderer_str;
+
+   memset(&gl_caps, 0, sizeof(gl_caps));
+
+   /* Strings: safe to query before anything else. */
+   gl_version_str  = glGetString(GL_VERSION);
+   gl_vendor_str   = glGetString(GL_VENDOR);
+   gl_renderer_str = glGetString(GL_RENDERER);
+
+   gl_caps.version_string = gl_version_str  ? (const char *)gl_version_str  : "(unknown)";
+   gl_caps.vendor         = gl_vendor_str   ? (const char *)gl_vendor_str   : "(unknown)";
+   gl_caps.renderer       = gl_renderer_str ? (const char *)gl_renderer_str : "(unknown)";
+
+   /* Detect API family from the version string.  GL_VERSION on
+    * any GLES context begins with "OpenGL ES "; desktop versions
+    * begin with the version number directly. */
+   if (gl_version_str
+         && strncmp((const char *)gl_version_str, "OpenGL ES", 9) == 0)
+      gl_caps.api = GL_API_GLES;
+   else
+      gl_caps.api = GL_API_DESKTOP;
+
+   /* Parse "X.Y" out of GL_VERSION.  String parse rather than
+    * glGetIntegerv(GL_MAJOR_VERSION) because the latter only
+    * works on GL 3.0+ / GLES 3.0+ contexts. */
+   gl_caps_parse_version(gl_caps.version_string,
+         &gl_caps.version_major, &gl_caps.version_minor);
+   gl_caps.version_packed =
+        ((gl_caps.version_major & 0xFF) << 8)
+      |  (gl_caps.version_minor & 0xFF);
+
+   /* Profile detection.  GL_CONTEXT_PROFILE_MASK is a 3.2+ desktop
+    * enum and is not defined in any GLES header; GLES has no
+    * profile distinction so we don't need it there anyway. */
+   if (gl_caps.api == GL_API_GLES)
+      gl_caps.profile = GL_PROFILE_ES;
+#if defined(GL_CONTEXT_PROFILE_MASK) && defined(GL_CONTEXT_CORE_PROFILE_BIT)
+   else if (gl_caps.version_packed >= 0x0302)
+   {
+      GLint mask = 0;
+      glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &mask);
+      if (mask & GL_CONTEXT_CORE_PROFILE_BIT)
+         gl_caps.profile = GL_PROFILE_CORE;
+      else
+         gl_caps.profile = GL_PROFILE_LEGACY;
+   }
+#endif
+   else
+      gl_caps.profile = GL_PROFILE_LEGACY;
+
+   /* Pull the libretro frontend's symbol resolver.  Without it
+    * we can't probe for runtime-loaded extension entry points;
+    * leave function pointers NULL and let call sites fall back. */
+   if (glsm_ctl(GLSM_CTL_PROC_ADDRESS_GET, &proc) && proc.addr)
+      get_proc = proc.addr;
+
+   if (get_proc)
+   {
+      gl_caps.fp_glBlitFramebuffer =
+         (PFN_BEETLE_GL_BLITFRAMEBUFFER)gl_caps_resolve(
+            get_proc, "glBlitFramebuffer", blit_framebuffer_suffixes);
+
+      gl_caps.fp_glCopyImageSubData =
+         (PFN_BEETLE_GL_COPYIMAGESUBDATA)gl_caps_resolve(
+            get_proc, "glCopyImageSubData", copy_image_suffixes);
+   }
+
+   log_cb(RETRO_LOG_INFO,
+         "[gl_caps] %s | %s | %s\n",
+         gl_caps.vendor, gl_caps.renderer, gl_caps.version_string);
+   log_cb(RETRO_LOG_INFO,
+         "[gl_caps] api=%s profile=%s version=%d.%d (packed 0x%04x)\n",
+         gl_caps.api == GL_API_GLES ? "GLES"
+            : gl_caps.api == GL_API_DESKTOP ? "Desktop" : "?",
+         gl_caps.profile == GL_PROFILE_CORE   ? "Core"
+            : gl_caps.profile == GL_PROFILE_ES     ? "ES"
+            : gl_caps.profile == GL_PROFILE_LEGACY ? "Legacy/Compat" : "?",
+         gl_caps.version_major, gl_caps.version_minor,
+         gl_caps.version_packed);
+   log_cb(RETRO_LOG_INFO,
+         "[gl_caps] glBlitFramebuffer:  %s\n",
+         gl_caps.fp_glBlitFramebuffer  ? "available" : "NOT available");
+   log_cb(RETRO_LOG_INFO,
+         "[gl_caps] glCopyImageSubData: %s\n",
+         gl_caps.fp_glCopyImageSubData ? "available" : "NOT available");
+}
+
 static void gl_context_reset(void)
 {
    log_cb(RETRO_LOG_DEBUG, "gl_context_reset called.\n");
    glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+
+   /* Detect what the running driver actually supports.  Must run
+    * after CONTEXT_RESET (so glsm has resolved its symbols) and
+    * before any feature-gated code path is taken. */
+   gl_caps_init();
 
    if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
       return;
@@ -3443,58 +3774,67 @@ void rsx_gl_copy_rect(
    GLsizei new_w = (GLsizei) dimensions[0] * (GLsizei) upscale;
    GLsizei new_h = (GLsizei) dimensions[1] * (GLsizei) upscale;
 
-#ifdef NEW_COPY_RECT
-   /* TODO/FIXME - buggy code!
+   /* === Choose the copy mechanism at runtime ===
     *
-    * Dead or Alive/Tekken 3 (high-res interlaced game) has screen
-    * flickering issues with this code! */
+    * Preference order:
+    *
+    *   1. glCopyImageSubData (GL 4.3 / GLES 3.2 / GL_ARB_copy_image
+    *      / GL_OES_copy_image / GL_EXT_copy_image / GL_NV_copy_image).
+    *      Direct texture-to-texture, no framebuffer dance.  XXX it
+    *      gives undefined results if the source and target areas
+    *      overlap; this is not handled explicitly.
+    *
+    *   2. Portable fallback: bind fb_out to a transient FBO, use
+    *      glCopyTexSubImage2D from the read-bound FBO into the
+    *      same texture.  Works on every profile that has FBO
+    *      support (GL 3.0+, GLES 2.0+).  This is the path used
+    *      historically by the NEW_COPY_RECT codepath, kept here
+    *      as the universal fallback.  Known to cause screen
+    *      flickering on Dead or Alive / Tekken 3 (high-res
+    *      interlaced); investigate before relying on it for
+    *      serious work. */
+   if (gl_caps.fp_glCopyImageSubData)
+   {
+      gl_caps.fp_glCopyImageSubData(
+            renderer->fb_out.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
+            renderer->fb_out.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
+            new_w, new_h, 1);
+   }
+#ifdef GL_READ_FRAMEBUFFER
+   else
+   {
+      GLuint fb;
+      glGenFramebuffers(1, &fb);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
 
-   /* The diagonal is duplicated. I originally used "1, 2, 1, 2" to
-    *  duplicate the diagonal but I believe it was incorrect because of
-    *  the OpenGL filling convention. At least it's what TinyTiger told
-    *  me... */
-
-   GLuint fb;
-
-   glGenFramebuffers(1, &fb);
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
+      /* glFramebufferTexture (layered, GL 3.2+) is not present on
+       * GLES; use the 2D variant on GLES profiles. */
 #ifdef HAVE_OPENGLES3
-   glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
-         GL_COLOR_ATTACHMENT0,
-         GL_TEXTURE_2D,
-         renderer->fb_out.id,
-         0);
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D,
+            renderer->fb_out.id,
+            0);
 #else
-   glFramebufferTexture(GL_READ_FRAMEBUFFER,
-         GL_COLOR_ATTACHMENT0,
-         renderer->fb_out.id,
-         0);
+      glFramebufferTexture(GL_READ_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            renderer->fb_out.id,
+            0);
 #endif
 
-   glReadBuffer(GL_COLOR_ATTACHMENT0);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
 
-   /* TODO - Can I bind the same texture to the framebuffer and
-    * GL_TEXTURE_2D? Something tells me this is undefined
-    * behaviour. I could use glReadPixels and glWritePixels instead
-    * or something like that. */
-   /* former seems to work just fine on GLES 3.0 */
-   glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-   glCopyTexSubImage2D( GL_TEXTURE_2D, 0, new_dst_x, new_dst_y,
-                        new_src_x, new_src_y, new_w, new_h);
+      /* TODO - binding the same texture to the framebuffer and
+       * GL_TEXTURE_2D may be undefined; consider using
+       * glReadPixels / glTexSubImage2D via a scratch buffer
+       * instead. */
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, new_dst_x, new_dst_y,
+            new_src_x, new_src_y, new_w, new_h);
 
-   glDeleteFramebuffers(1, &fb);
-#else
-
-   /* The diagonal is duplicated */
-
-   /* XXX CopyImageSubData gives undefined results if the source
-    * and target area overlap, this should be handled
-    * explicitely */
-   /* TODO - OpenGL 4.3 and GLES 3.2 requirement! FIXME! */
-   glCopyImageSubData(  renderer->fb_out.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
-                        renderer->fb_out.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
-                        new_w, new_h, 1 );
-#endif
+      glDeleteFramebuffers(1, &fb);
+   }
+#endif /* GL_READ_FRAMEBUFFER */
 
 #ifdef DEBUG
    get_error("rsx_gl_copy_rect");
