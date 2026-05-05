@@ -8,7 +8,7 @@
  *
  * Switched to a minimal include set: gpu.h gives us PS_GPU and
  * tri_vertex (both now C-includable as of 7d257de), rsx_intf.h
- * gives us RSX_VULKAN and rsx_intf_is_type (always plain C), and
+ * gives us RSX_VULKAN and rsx_intf_is_type, and
  * beetle_psx_globals.h gives us psx_gpu_upscale_shift_hw.
  *
  * The forward declarations in gpu_polygon.cpp (lines 561-566 of

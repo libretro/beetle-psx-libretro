@@ -61,6 +61,10 @@ enum height_modes
    HEIGHT_MODE_480
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
 void rsx_intf_get_system_av_info(struct retro_system_av_info *info);
@@ -175,5 +179,9 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__RSX_H__*/
