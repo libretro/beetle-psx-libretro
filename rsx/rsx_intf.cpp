@@ -30,7 +30,7 @@
 extern bool fast_pal;
 extern unsigned int image_height;
 
-static enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
+enum rsx_renderer_type rsx_type          = RSX_SOFTWARE;
 
 static bool gl_initialized                      = false;
 static bool vk_initialized                      = false;
