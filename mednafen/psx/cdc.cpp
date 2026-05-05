@@ -50,7 +50,7 @@
 
 #include "psx.h"
 #include "cdc.h"
-#include "spu.h"
+#include "spu_c.h"
 
 #include "../mednafen-endian.h"
 #include "../state_helpers.h"
@@ -229,13 +229,13 @@ void PS_CDC::SoftReset(void)
 
 void PS_CDC::Power(void)
 {
-   PSX_SPU->Power();
+   SPU_Power();
 
    SoftReset();
 
    DiscStartupDelay = 0;
 
-   SPUCounter = PSX_SPU->UpdateFromCDC(0);
+   SPUCounter = SPU_UpdateFromCDC(0);
    lastts = 0;
 }
 
@@ -1102,7 +1102,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
       if(PendingCommandCounter > 0 && chunk_clocks > PendingCommandCounter)
          chunk_clocks = PendingCommandCounter;
 
-      /* SPUCounter is set in Power() from PS_SPU::UpdateFromCDC(0) and
+      /* SPUCounter is set in Power() from SPU_UpdateFromCDC(0) and
        * reassigned every loop iteration from UpdateFromCDC's return,
        * which (per spu.cpp's clock_divider arithmetic) is positive
        * provided spu_samples > 0. The current build always has
@@ -1311,7 +1311,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
          }
       }
 
-      SPUCounter = PSX_SPU->UpdateFromCDC(chunk_clocks);
+      SPUCounter = SPU_UpdateFromCDC(chunk_clocks);
 
       clocks -= chunk_clocks;
    } // end while(clocks > 0)

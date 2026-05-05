@@ -80,8 +80,277 @@ extern uint8_t spu_samples;
 
 static const int16 FIR_Table[256][4] =
 {
-#include "spu_fir_table.inc"
+ { (int16)0x12c7, (int16)0x59b3, (int16)0x1307, (int16)0xffff },
+ { (int16)0x1288, (int16)0x59b2, (int16)0x1347, (int16)0xffff },
+ { (int16)0x1249, (int16)0x59b0, (int16)0x1388, (int16)0xffff },
+ { (int16)0x120b, (int16)0x59ad, (int16)0x13c9, (int16)0xffff },
+ { (int16)0x11cd, (int16)0x59a9, (int16)0x140b, (int16)0xffff },
+ { (int16)0x118f, (int16)0x59a4, (int16)0x144d, (int16)0xffff },
+ { (int16)0x1153, (int16)0x599e, (int16)0x1490, (int16)0xffff },
+ { (int16)0x1116, (int16)0x5997, (int16)0x14d4, (int16)0xffff },
+ { (int16)0x10db, (int16)0x598f, (int16)0x1517, (int16)0xffff },
+ { (int16)0x109f, (int16)0x5986, (int16)0x155c, (int16)0xffff },
+ { (int16)0x1065, (int16)0x597c, (int16)0x15a0, (int16)0xffff },
+ { (int16)0x102a, (int16)0x5971, (int16)0x15e6, (int16)0xffff },
+ { (int16)0x0ff1, (int16)0x5965, (int16)0x162c, (int16)0xffff },
+ { (int16)0x0fb7, (int16)0x5958, (int16)0x1672, (int16)0xffff },
+ { (int16)0x0f7f, (int16)0x5949, (int16)0x16b9, (int16)0xffff },
+ { (int16)0x0f46, (int16)0x593a, (int16)0x1700, (int16)0xffff },
+ { (int16)0x0f0f, (int16)0x592a, (int16)0x1747, (int16)0x0000 },
+ { (int16)0x0ed7, (int16)0x5919, (int16)0x1790, (int16)0x0000 },
+ { (int16)0x0ea1, (int16)0x5907, (int16)0x17d8, (int16)0x0000 },
+ { (int16)0x0e6b, (int16)0x58f4, (int16)0x1821, (int16)0x0000 },
+ { (int16)0x0e35, (int16)0x58e0, (int16)0x186b, (int16)0x0000 },
+ { (int16)0x0e00, (int16)0x58cb, (int16)0x18b5, (int16)0x0000 },
+ { (int16)0x0dcb, (int16)0x58b5, (int16)0x1900, (int16)0x0000 },
+ { (int16)0x0d97, (int16)0x589e, (int16)0x194b, (int16)0x0001 },
+ { (int16)0x0d63, (int16)0x5886, (int16)0x1996, (int16)0x0001 },
+ { (int16)0x0d30, (int16)0x586d, (int16)0x19e2, (int16)0x0001 },
+ { (int16)0x0cfd, (int16)0x5853, (int16)0x1a2e, (int16)0x0001 },
+ { (int16)0x0ccb, (int16)0x5838, (int16)0x1a7b, (int16)0x0002 },
+ { (int16)0x0c99, (int16)0x581c, (int16)0x1ac8, (int16)0x0002 },
+ { (int16)0x0c68, (int16)0x57ff, (int16)0x1b16, (int16)0x0002 },
+ { (int16)0x0c38, (int16)0x57e2, (int16)0x1b64, (int16)0x0003 },
+ { (int16)0x0c07, (int16)0x57c3, (int16)0x1bb3, (int16)0x0003 },
+ { (int16)0x0bd8, (int16)0x57a3, (int16)0x1c02, (int16)0x0003 },
+ { (int16)0x0ba9, (int16)0x5782, (int16)0x1c51, (int16)0x0004 },
+ { (int16)0x0b7a, (int16)0x5761, (int16)0x1ca1, (int16)0x0004 },
+ { (int16)0x0b4c, (int16)0x573e, (int16)0x1cf1, (int16)0x0005 },
+ { (int16)0x0b1e, (int16)0x571b, (int16)0x1d42, (int16)0x0005 },
+ { (int16)0x0af1, (int16)0x56f6, (int16)0x1d93, (int16)0x0006 },
+ { (int16)0x0ac4, (int16)0x56d1, (int16)0x1de5, (int16)0x0007 },
+ { (int16)0x0a98, (int16)0x56ab, (int16)0x1e37, (int16)0x0007 },
+ { (int16)0x0a6c, (int16)0x5684, (int16)0x1e89, (int16)0x0008 },
+ { (int16)0x0a40, (int16)0x565b, (int16)0x1edc, (int16)0x0009 },
+ { (int16)0x0a16, (int16)0x5632, (int16)0x1f2f, (int16)0x0009 },
+ { (int16)0x09eb, (int16)0x5609, (int16)0x1f82, (int16)0x000a },
+ { (int16)0x09c1, (int16)0x55de, (int16)0x1fd6, (int16)0x000b },
+ { (int16)0x0998, (int16)0x55b2, (int16)0x202a, (int16)0x000c },
+ { (int16)0x096f, (int16)0x5585, (int16)0x207f, (int16)0x000d },
+ { (int16)0x0946, (int16)0x5558, (int16)0x20d4, (int16)0x000e },
+ { (int16)0x091e, (int16)0x5529, (int16)0x2129, (int16)0x000f },
+ { (int16)0x08f7, (int16)0x54fa, (int16)0x217f, (int16)0x0010 },
+ { (int16)0x08d0, (int16)0x54ca, (int16)0x21d5, (int16)0x0011 },
+ { (int16)0x08a9, (int16)0x5499, (int16)0x222c, (int16)0x0012 },
+ { (int16)0x0883, (int16)0x5467, (int16)0x2282, (int16)0x0013 },
+ { (int16)0x085d, (int16)0x5434, (int16)0x22da, (int16)0x0015 },
+ { (int16)0x0838, (int16)0x5401, (int16)0x2331, (int16)0x0016 },
+ { (int16)0x0813, (int16)0x53cc, (int16)0x2389, (int16)0x0018 },
+ { (int16)0x07ef, (int16)0x5397, (int16)0x23e1, (int16)0x0019 },
+ { (int16)0x07cb, (int16)0x5361, (int16)0x2439, (int16)0x001b },
+ { (int16)0x07a7, (int16)0x532a, (int16)0x2492, (int16)0x001c },
+ { (int16)0x0784, (int16)0x52f3, (int16)0x24eb, (int16)0x001e },
+ { (int16)0x0762, (int16)0x52ba, (int16)0x2545, (int16)0x0020 },
+ { (int16)0x0740, (int16)0x5281, (int16)0x259e, (int16)0x0021 },
+ { (int16)0x071e, (int16)0x5247, (int16)0x25f8, (int16)0x0023 },
+ { (int16)0x06fd, (int16)0x520c, (int16)0x2653, (int16)0x0025 },
+ { (int16)0x06dc, (int16)0x51d0, (int16)0x26ad, (int16)0x0027 },
+ { (int16)0x06bb, (int16)0x5194, (int16)0x2708, (int16)0x0029 },
+ { (int16)0x069b, (int16)0x5156, (int16)0x2763, (int16)0x002c },
+ { (int16)0x067c, (int16)0x5118, (int16)0x27be, (int16)0x002e },
+ { (int16)0x065c, (int16)0x50da, (int16)0x281a, (int16)0x0030 },
+ { (int16)0x063e, (int16)0x509a, (int16)0x2876, (int16)0x0033 },
+ { (int16)0x061f, (int16)0x505a, (int16)0x28d2, (int16)0x0035 },
+ { (int16)0x0601, (int16)0x5019, (int16)0x292e, (int16)0x0038 },
+ { (int16)0x05e4, (int16)0x4fd7, (int16)0x298b, (int16)0x003a },
+ { (int16)0x05c7, (int16)0x4f95, (int16)0x29e7, (int16)0x003d },
+ { (int16)0x05aa, (int16)0x4f52, (int16)0x2a44, (int16)0x0040 },
+ { (int16)0x058e, (int16)0x4f0e, (int16)0x2aa1, (int16)0x0043 },
+ { (int16)0x0572, (int16)0x4ec9, (int16)0x2aff, (int16)0x0046 },
+ { (int16)0x0556, (int16)0x4e84, (int16)0x2b5c, (int16)0x0049 },
+ { (int16)0x053b, (int16)0x4e3e, (int16)0x2bba, (int16)0x004d },
+ { (int16)0x0520, (int16)0x4df7, (int16)0x2c18, (int16)0x0050 },
+ { (int16)0x0506, (int16)0x4db0, (int16)0x2c76, (int16)0x0054 },
+ { (int16)0x04ec, (int16)0x4d68, (int16)0x2cd4, (int16)0x0057 },
+ { (int16)0x04d2, (int16)0x4d20, (int16)0x2d33, (int16)0x005b },
+ { (int16)0x04b9, (int16)0x4cd7, (int16)0x2d91, (int16)0x005f },
+ { (int16)0x04a0, (int16)0x4c8d, (int16)0x2df0, (int16)0x0063 },
+ { (int16)0x0488, (int16)0x4c42, (int16)0x2e4f, (int16)0x0067 },
+ { (int16)0x0470, (int16)0x4bf7, (int16)0x2eae, (int16)0x006b },
+ { (int16)0x0458, (int16)0x4bac, (int16)0x2f0d, (int16)0x006f },
+ { (int16)0x0441, (int16)0x4b5f, (int16)0x2f6c, (int16)0x0074 },
+ { (int16)0x042a, (int16)0x4b13, (int16)0x2fcc, (int16)0x0078 },
+ { (int16)0x0413, (int16)0x4ac5, (int16)0x302b, (int16)0x007d },
+ { (int16)0x03fc, (int16)0x4a77, (int16)0x308b, (int16)0x0082 },
+ { (int16)0x03e7, (int16)0x4a29, (int16)0x30ea, (int16)0x0087 },
+ { (int16)0x03d1, (int16)0x49d9, (int16)0x314a, (int16)0x008c },
+ { (int16)0x03bc, (int16)0x498a, (int16)0x31aa, (int16)0x0091 },
+ { (int16)0x03a7, (int16)0x493a, (int16)0x3209, (int16)0x0096 },
+ { (int16)0x0392, (int16)0x48e9, (int16)0x3269, (int16)0x009c },
+ { (int16)0x037e, (int16)0x4898, (int16)0x32c9, (int16)0x00a1 },
+ { (int16)0x036a, (int16)0x4846, (int16)0x3329, (int16)0x00a7 },
+ { (int16)0x0356, (int16)0x47f4, (int16)0x3389, (int16)0x00ad },
+ { (int16)0x0343, (int16)0x47a1, (int16)0x33e9, (int16)0x00b3 },
+ { (int16)0x0330, (int16)0x474e, (int16)0x3449, (int16)0x00ba },
+ { (int16)0x031d, (int16)0x46fa, (int16)0x34a9, (int16)0x00c0 },
+ { (int16)0x030b, (int16)0x46a6, (int16)0x3509, (int16)0x00c7 },
+ { (int16)0x02f9, (int16)0x4651, (int16)0x3569, (int16)0x00cd },
+ { (int16)0x02e7, (int16)0x45fc, (int16)0x35c9, (int16)0x00d4 },
+ { (int16)0x02d6, (int16)0x45a6, (int16)0x3629, (int16)0x00db },
+ { (int16)0x02c4, (int16)0x4550, (int16)0x3689, (int16)0x00e3 },
+ { (int16)0x02b4, (int16)0x44fa, (int16)0x36e8, (int16)0x00ea },
+ { (int16)0x02a3, (int16)0x44a3, (int16)0x3748, (int16)0x00f2 },
+ { (int16)0x0293, (int16)0x444c, (int16)0x37a8, (int16)0x00fa },
+ { (int16)0x0283, (int16)0x43f4, (int16)0x3807, (int16)0x0101 },
+ { (int16)0x0273, (int16)0x439c, (int16)0x3867, (int16)0x010a },
+ { (int16)0x0264, (int16)0x4344, (int16)0x38c6, (int16)0x0112 },
+ { (int16)0x0255, (int16)0x42eb, (int16)0x3926, (int16)0x011b },
+ { (int16)0x0246, (int16)0x4292, (int16)0x3985, (int16)0x0123 },
+ { (int16)0x0237, (int16)0x4239, (int16)0x39e4, (int16)0x012c },
+ { (int16)0x0229, (int16)0x41df, (int16)0x3a43, (int16)0x0135 },
+ { (int16)0x021b, (int16)0x4185, (int16)0x3aa2, (int16)0x013f },
+ { (int16)0x020d, (int16)0x412a, (int16)0x3b00, (int16)0x0148 },
+ { (int16)0x0200, (int16)0x40d0, (int16)0x3b5f, (int16)0x0152 },
+ { (int16)0x01f2, (int16)0x4074, (int16)0x3bbd, (int16)0x015c },
+ { (int16)0x01e5, (int16)0x4019, (int16)0x3c1b, (int16)0x0166 },
+ { (int16)0x01d9, (int16)0x3fbd, (int16)0x3c79, (int16)0x0171 },
+ { (int16)0x01cc, (int16)0x3f62, (int16)0x3cd7, (int16)0x017b },
+ { (int16)0x01c0, (int16)0x3f05, (int16)0x3d35, (int16)0x0186 },
+ { (int16)0x01b4, (int16)0x3ea9, (int16)0x3d92, (int16)0x0191 },
+ { (int16)0x01a8, (int16)0x3e4c, (int16)0x3def, (int16)0x019c },
+ { (int16)0x019c, (int16)0x3def, (int16)0x3e4c, (int16)0x01a8 },
+ { (int16)0x0191, (int16)0x3d92, (int16)0x3ea9, (int16)0x01b4 },
+ { (int16)0x0186, (int16)0x3d35, (int16)0x3f05, (int16)0x01c0 },
+ { (int16)0x017b, (int16)0x3cd7, (int16)0x3f62, (int16)0x01cc },
+ { (int16)0x0171, (int16)0x3c79, (int16)0x3fbd, (int16)0x01d9 },
+ { (int16)0x0166, (int16)0x3c1b, (int16)0x4019, (int16)0x01e5 },
+ { (int16)0x015c, (int16)0x3bbd, (int16)0x4074, (int16)0x01f2 },
+ { (int16)0x0152, (int16)0x3b5f, (int16)0x40d0, (int16)0x0200 },
+ { (int16)0x0148, (int16)0x3b00, (int16)0x412a, (int16)0x020d },
+ { (int16)0x013f, (int16)0x3aa2, (int16)0x4185, (int16)0x021b },
+ { (int16)0x0135, (int16)0x3a43, (int16)0x41df, (int16)0x0229 },
+ { (int16)0x012c, (int16)0x39e4, (int16)0x4239, (int16)0x0237 },
+ { (int16)0x0123, (int16)0x3985, (int16)0x4292, (int16)0x0246 },
+ { (int16)0x011b, (int16)0x3926, (int16)0x42eb, (int16)0x0255 },
+ { (int16)0x0112, (int16)0x38c6, (int16)0x4344, (int16)0x0264 },
+ { (int16)0x010a, (int16)0x3867, (int16)0x439c, (int16)0x0273 },
+ { (int16)0x0101, (int16)0x3807, (int16)0x43f4, (int16)0x0283 },
+ { (int16)0x00fa, (int16)0x37a8, (int16)0x444c, (int16)0x0293 },
+ { (int16)0x00f2, (int16)0x3748, (int16)0x44a3, (int16)0x02a3 },
+ { (int16)0x00ea, (int16)0x36e8, (int16)0x44fa, (int16)0x02b4 },
+ { (int16)0x00e3, (int16)0x3689, (int16)0x4550, (int16)0x02c4 },
+ { (int16)0x00db, (int16)0x3629, (int16)0x45a6, (int16)0x02d6 },
+ { (int16)0x00d4, (int16)0x35c9, (int16)0x45fc, (int16)0x02e7 },
+ { (int16)0x00cd, (int16)0x3569, (int16)0x4651, (int16)0x02f9 },
+ { (int16)0x00c7, (int16)0x3509, (int16)0x46a6, (int16)0x030b },
+ { (int16)0x00c0, (int16)0x34a9, (int16)0x46fa, (int16)0x031d },
+ { (int16)0x00ba, (int16)0x3449, (int16)0x474e, (int16)0x0330 },
+ { (int16)0x00b3, (int16)0x33e9, (int16)0x47a1, (int16)0x0343 },
+ { (int16)0x00ad, (int16)0x3389, (int16)0x47f4, (int16)0x0356 },
+ { (int16)0x00a7, (int16)0x3329, (int16)0x4846, (int16)0x036a },
+ { (int16)0x00a1, (int16)0x32c9, (int16)0x4898, (int16)0x037e },
+ { (int16)0x009c, (int16)0x3269, (int16)0x48e9, (int16)0x0392 },
+ { (int16)0x0096, (int16)0x3209, (int16)0x493a, (int16)0x03a7 },
+ { (int16)0x0091, (int16)0x31aa, (int16)0x498a, (int16)0x03bc },
+ { (int16)0x008c, (int16)0x314a, (int16)0x49d9, (int16)0x03d1 },
+ { (int16)0x0087, (int16)0x30ea, (int16)0x4a29, (int16)0x03e7 },
+ { (int16)0x0082, (int16)0x308b, (int16)0x4a77, (int16)0x03fc },
+ { (int16)0x007d, (int16)0x302b, (int16)0x4ac5, (int16)0x0413 },
+ { (int16)0x0078, (int16)0x2fcc, (int16)0x4b13, (int16)0x042a },
+ { (int16)0x0074, (int16)0x2f6c, (int16)0x4b5f, (int16)0x0441 },
+ { (int16)0x006f, (int16)0x2f0d, (int16)0x4bac, (int16)0x0458 },
+ { (int16)0x006b, (int16)0x2eae, (int16)0x4bf7, (int16)0x0470 },
+ { (int16)0x0067, (int16)0x2e4f, (int16)0x4c42, (int16)0x0488 },
+ { (int16)0x0063, (int16)0x2df0, (int16)0x4c8d, (int16)0x04a0 },
+ { (int16)0x005f, (int16)0x2d91, (int16)0x4cd7, (int16)0x04b9 },
+ { (int16)0x005b, (int16)0x2d33, (int16)0x4d20, (int16)0x04d2 },
+ { (int16)0x0057, (int16)0x2cd4, (int16)0x4d68, (int16)0x04ec },
+ { (int16)0x0054, (int16)0x2c76, (int16)0x4db0, (int16)0x0506 },
+ { (int16)0x0050, (int16)0x2c18, (int16)0x4df7, (int16)0x0520 },
+ { (int16)0x004d, (int16)0x2bba, (int16)0x4e3e, (int16)0x053b },
+ { (int16)0x0049, (int16)0x2b5c, (int16)0x4e84, (int16)0x0556 },
+ { (int16)0x0046, (int16)0x2aff, (int16)0x4ec9, (int16)0x0572 },
+ { (int16)0x0043, (int16)0x2aa1, (int16)0x4f0e, (int16)0x058e },
+ { (int16)0x0040, (int16)0x2a44, (int16)0x4f52, (int16)0x05aa },
+ { (int16)0x003d, (int16)0x29e7, (int16)0x4f95, (int16)0x05c7 },
+ { (int16)0x003a, (int16)0x298b, (int16)0x4fd7, (int16)0x05e4 },
+ { (int16)0x0038, (int16)0x292e, (int16)0x5019, (int16)0x0601 },
+ { (int16)0x0035, (int16)0x28d2, (int16)0x505a, (int16)0x061f },
+ { (int16)0x0033, (int16)0x2876, (int16)0x509a, (int16)0x063e },
+ { (int16)0x0030, (int16)0x281a, (int16)0x50da, (int16)0x065c },
+ { (int16)0x002e, (int16)0x27be, (int16)0x5118, (int16)0x067c },
+ { (int16)0x002c, (int16)0x2763, (int16)0x5156, (int16)0x069b },
+ { (int16)0x0029, (int16)0x2708, (int16)0x5194, (int16)0x06bb },
+ { (int16)0x0027, (int16)0x26ad, (int16)0x51d0, (int16)0x06dc },
+ { (int16)0x0025, (int16)0x2653, (int16)0x520c, (int16)0x06fd },
+ { (int16)0x0023, (int16)0x25f8, (int16)0x5247, (int16)0x071e },
+ { (int16)0x0021, (int16)0x259e, (int16)0x5281, (int16)0x0740 },
+ { (int16)0x0020, (int16)0x2545, (int16)0x52ba, (int16)0x0762 },
+ { (int16)0x001e, (int16)0x24eb, (int16)0x52f3, (int16)0x0784 },
+ { (int16)0x001c, (int16)0x2492, (int16)0x532a, (int16)0x07a7 },
+ { (int16)0x001b, (int16)0x2439, (int16)0x5361, (int16)0x07cb },
+ { (int16)0x0019, (int16)0x23e1, (int16)0x5397, (int16)0x07ef },
+ { (int16)0x0018, (int16)0x2389, (int16)0x53cc, (int16)0x0813 },
+ { (int16)0x0016, (int16)0x2331, (int16)0x5401, (int16)0x0838 },
+ { (int16)0x0015, (int16)0x22da, (int16)0x5434, (int16)0x085d },
+ { (int16)0x0013, (int16)0x2282, (int16)0x5467, (int16)0x0883 },
+ { (int16)0x0012, (int16)0x222c, (int16)0x5499, (int16)0x08a9 },
+ { (int16)0x0011, (int16)0x21d5, (int16)0x54ca, (int16)0x08d0 },
+ { (int16)0x0010, (int16)0x217f, (int16)0x54fa, (int16)0x08f7 },
+ { (int16)0x000f, (int16)0x2129, (int16)0x5529, (int16)0x091e },
+ { (int16)0x000e, (int16)0x20d4, (int16)0x5558, (int16)0x0946 },
+ { (int16)0x000d, (int16)0x207f, (int16)0x5585, (int16)0x096f },
+ { (int16)0x000c, (int16)0x202a, (int16)0x55b2, (int16)0x0998 },
+ { (int16)0x000b, (int16)0x1fd6, (int16)0x55de, (int16)0x09c1 },
+ { (int16)0x000a, (int16)0x1f82, (int16)0x5609, (int16)0x09eb },
+ { (int16)0x0009, (int16)0x1f2f, (int16)0x5632, (int16)0x0a16 },
+ { (int16)0x0009, (int16)0x1edc, (int16)0x565b, (int16)0x0a40 },
+ { (int16)0x0008, (int16)0x1e89, (int16)0x5684, (int16)0x0a6c },
+ { (int16)0x0007, (int16)0x1e37, (int16)0x56ab, (int16)0x0a98 },
+ { (int16)0x0007, (int16)0x1de5, (int16)0x56d1, (int16)0x0ac4 },
+ { (int16)0x0006, (int16)0x1d93, (int16)0x56f6, (int16)0x0af1 },
+ { (int16)0x0005, (int16)0x1d42, (int16)0x571b, (int16)0x0b1e },
+ { (int16)0x0005, (int16)0x1cf1, (int16)0x573e, (int16)0x0b4c },
+ { (int16)0x0004, (int16)0x1ca1, (int16)0x5761, (int16)0x0b7a },
+ { (int16)0x0004, (int16)0x1c51, (int16)0x5782, (int16)0x0ba9 },
+ { (int16)0x0003, (int16)0x1c02, (int16)0x57a3, (int16)0x0bd8 },
+ { (int16)0x0003, (int16)0x1bb3, (int16)0x57c3, (int16)0x0c07 },
+ { (int16)0x0003, (int16)0x1b64, (int16)0x57e2, (int16)0x0c38 },
+ { (int16)0x0002, (int16)0x1b16, (int16)0x57ff, (int16)0x0c68 },
+ { (int16)0x0002, (int16)0x1ac8, (int16)0x581c, (int16)0x0c99 },
+ { (int16)0x0002, (int16)0x1a7b, (int16)0x5838, (int16)0x0ccb },
+ { (int16)0x0001, (int16)0x1a2e, (int16)0x5853, (int16)0x0cfd },
+ { (int16)0x0001, (int16)0x19e2, (int16)0x586d, (int16)0x0d30 },
+ { (int16)0x0001, (int16)0x1996, (int16)0x5886, (int16)0x0d63 },
+ { (int16)0x0001, (int16)0x194b, (int16)0x589e, (int16)0x0d97 },
+ { (int16)0x0000, (int16)0x1900, (int16)0x58b5, (int16)0x0dcb },
+ { (int16)0x0000, (int16)0x18b5, (int16)0x58cb, (int16)0x0e00 },
+ { (int16)0x0000, (int16)0x186b, (int16)0x58e0, (int16)0x0e35 },
+ { (int16)0x0000, (int16)0x1821, (int16)0x58f4, (int16)0x0e6b },
+ { (int16)0x0000, (int16)0x17d8, (int16)0x5907, (int16)0x0ea1 },
+ { (int16)0x0000, (int16)0x1790, (int16)0x5919, (int16)0x0ed7 },
+ { (int16)0x0000, (int16)0x1747, (int16)0x592a, (int16)0x0f0f },
+ { (int16)0xffff, (int16)0x1700, (int16)0x593a, (int16)0x0f46 },
+ { (int16)0xffff, (int16)0x16b9, (int16)0x5949, (int16)0x0f7f },
+ { (int16)0xffff, (int16)0x1672, (int16)0x5958, (int16)0x0fb7 },
+ { (int16)0xffff, (int16)0x162c, (int16)0x5965, (int16)0x0ff1 },
+ { (int16)0xffff, (int16)0x15e6, (int16)0x5971, (int16)0x102a },
+ { (int16)0xffff, (int16)0x15a0, (int16)0x597c, (int16)0x1065 },
+ { (int16)0xffff, (int16)0x155c, (int16)0x5986, (int16)0x109f },
+ { (int16)0xffff, (int16)0x1517, (int16)0x598f, (int16)0x10db },
+ { (int16)0xffff, (int16)0x14d4, (int16)0x5997, (int16)0x1116 },
+ { (int16)0xffff, (int16)0x1490, (int16)0x599e, (int16)0x1153 },
+ { (int16)0xffff, (int16)0x144d, (int16)0x59a4, (int16)0x118f },
+ { (int16)0xffff, (int16)0x140b, (int16)0x59a9, (int16)0x11cd },
+ { (int16)0xffff, (int16)0x13c9, (int16)0x59ad, (int16)0x120b },
+ { (int16)0xffff, (int16)0x1388, (int16)0x59b0, (int16)0x1249 },
+ { (int16)0xffff, (int16)0x1347, (int16)0x59b2, (int16)0x1288 },
+ { (int16)0xffff, (int16)0x1307, (int16)0x59b3, (int16)0x12c7 },
 };
+
+/*
+ * Singleton instance pointer. Definition moved into spu.cpp from
+ * libretro.cpp so the SPU module owns its own lifecycle through
+ * the SPU_Init / SPU_Kill C-linkage shims; libretro.cpp no longer
+ * touches `new PS_SPU()` / `delete PSX_SPU` directly.
+ *
+ * Still file-scope visible (not `static`) because cdc.cpp and
+ * spu.cpp's other PS_SPU member functions reference it. The
+ * cross-TU C++ visibility goes away in the follow-up C conversion
+ * commit, where the per-instance state collapses to file-scope
+ * statics and PSX_SPU disappears entirely.
+ */
+PS_SPU *PSX_SPU = NULL;
 
 PS_SPU::PS_SPU()
 {
@@ -251,9 +520,7 @@ void SPU_Sweep::Clock()
 
    if((dec_mode & !(inv_mode & log_mode)) && ((Current & 0x8000) == (inv_mode ? 0x0000 : 0x8000) || (Current == 0)))
    {
-      //
       // Not sure if this condition should stop the Divider adding or force the increment value to 0.
-      //
       Current = 0;
    }
    else
@@ -282,9 +549,7 @@ INLINE void SPU_Sweep::WriteVolume(int16 value)
 }
 
 
-//
 // Take care not to trigger SPU IRQ for the next block before its decoding start.
-//
 void PS_SPU::RunDecoder(SPU_Voice *voice)
 {
    // 5 through 0xF appear to be 0 on the real thing.
@@ -339,76 +604,70 @@ void PS_SPU::RunDecoder(SPU_Voice *voice)
       }
    }
 
-   //for(int z = 0; z < 4; z++)
+   if(SPUControl & 0x40)
    {
-
-      if(SPUControl & 0x40)
+      unsigned test_addr = voice->CurAddr & 0x3FFFF;
+      if(IRQAddr == test_addr || IRQAddr == (test_addr & 0x3FFF8))
       {
-         unsigned test_addr = voice->CurAddr & 0x3FFFF;
-         if(IRQAddr == test_addr || IRQAddr == (test_addr & 0x3FFF8))
-         {
-            IRQAsserted = true;
-            IRQ_Assert(IRQ_SPU, IRQAsserted);
-         }
+         IRQAsserted = true;
+         IRQ_Assert(IRQ_SPU, IRQAsserted);
+      }
+   }
+
+   if((voice->CurAddr & 0x7) == 0)
+   {
+      const uint16 CV = SPURAM[voice->CurAddr];
+      voice->DecodeShift = CV & 0xF;
+      voice->DecodeWeight = (CV >> 4) & 0xF;
+      voice->DecodeFlags = (CV >> 8) & 0xFF;
+
+      if(voice->DecodeFlags & 0x4)
+      {
+         if(!voice->IgnoreSampLA)
+            voice->LoopAddr = voice->CurAddr;
+      }
+      voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
+   }
+
+   // Don't else this block; we need to ALWAYS decode 4 samples per call to RunDecoder() if DecodeAvail < 11, or else sample playback
+   // at higher rates will fail horribly.
+   {
+      const int32 weight_m1 = Weights[voice->DecodeWeight][0];
+      const int32 weight_m2 = Weights[voice->DecodeWeight][1];
+      uint16 CV;
+      unsigned shift;
+      uint32 coded;
+      int16 *tb = &voice->DecodeBuffer[voice->DecodeWritePos];
+
+      CV = SPURAM[voice->CurAddr];
+      shift = voice->DecodeShift;
+
+      if(MDFN_UNLIKELY(shift > 12))
+      {
+         shift = 8;
+         CV &= 0x8888;
       }
 
-      if((voice->CurAddr & 0x7) == 0)
+      coded = (uint32)CV << 12;
+
+
+      for(int i = 0; i < 4; i++)
       {
-         const uint16 CV = SPURAM[voice->CurAddr];
-         voice->DecodeShift = CV & 0xF;
-         voice->DecodeWeight = (CV >> 4) & 0xF;
-         voice->DecodeFlags = (CV >> 8) & 0xFF;
+         int32 sample = (int16)(coded & 0xF000) >> shift;
 
-         if(voice->DecodeFlags & 0x4)
-         {
-            if(!voice->IgnoreSampLA)
-               voice->LoopAddr = voice->CurAddr;
-         }
-         voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
+         sample += ((voice->DecodeM2 * weight_m2) >> 6);
+         sample += ((voice->DecodeM1 * weight_m1) >> 6);
+
+         clamp(&sample, -32768, 32767);
+
+         tb[i] = sample;
+         voice->DecodeM2 = voice->DecodeM1;
+         voice->DecodeM1 = sample;
+         coded >>= 4;
       }
-
-      //
-      // Don't else this block; we need to ALWAYS decode 4 samples per call to RunDecoder() if DecodeAvail < 11, or else sample playback
-      // at higher rates will fail horribly.
-      //
-      {
-         const int32 weight_m1 = Weights[voice->DecodeWeight][0];
-         const int32 weight_m2 = Weights[voice->DecodeWeight][1];
-         uint16 CV;
-         unsigned shift;
-         uint32 coded;
-         int16 *tb = &voice->DecodeBuffer[voice->DecodeWritePos];
-
-         CV = SPURAM[voice->CurAddr];
-         shift = voice->DecodeShift;
-
-         if(MDFN_UNLIKELY(shift > 12))
-         {
-            shift = 8;
-            CV &= 0x8888;
-         }
-
-         coded = (uint32)CV << 12;
-
-
-         for(int i = 0; i < 4; i++)
-         {
-            int32 sample = (int16)(coded & 0xF000) >> shift;
-
-            sample += ((voice->DecodeM2 * weight_m2) >> 6);
-            sample += ((voice->DecodeM1 * weight_m1) >> 6);
-
-            clamp(&sample, -32768, 32767);
-
-            tb[i] = sample;
-            voice->DecodeM2 = voice->DecodeM1;
-            voice->DecodeM1 = sample;
-            coded >>= 4;
-         }
-         voice->DecodeWritePos = (voice->DecodeWritePos + 4) & 0x1F;
-         voice->DecodeAvail += 4;
-         voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
-      }
+      voice->DecodeWritePos = (voice->DecodeWritePos + 4) & 0x1F;
+      voice->DecodeAvail += 4;
+      voice->CurAddr = (voice->CurAddr + 1) & 0x3FFFF;
    }
 }
 
@@ -464,7 +723,6 @@ void PS_SPU::RunEnvelope(SPU_Voice *voice)
    if(ADSR->Phase == ADSR_ATTACK && ADSR->EnvLevel == 0x7FFF)
       ADSR->Phase++;
 
-   //static INLINE void CalcVCDelta(const uint8 zs, uint8 speed, bool log_mode, bool decrement, bool inv_increment, int16 Current, int &increment, int &divinco)
    switch(ADSR->Phase)
    {
       default: assert(0);
@@ -574,7 +832,6 @@ void NO_INLINE PS_SPU::WR_RVB(uint16 raw_offs, int16 sample)
       WriteSPURAM(Get_Reverb_Offset(raw_offs << 2), sample);
 }
 
-//
 // Zeroes optimized out; middle removed too(it's 16384)
 static const int16 ResampTable[20] =
 {
@@ -625,9 +882,7 @@ static int32 IIASM(const int16 IIR_ALPHA, const int16 insamp)
    return insamp * (32768 - IIR_ALPHA);
 }
 
-//
 // Take care to thoroughly test the reverb resampling code when modifying anything that uses RvbResPos.
-//
 void PS_SPU::RunReverb(const int32* in, int32* out)
 {
    unsigned lr;
@@ -739,9 +994,7 @@ INLINE void PS_SPU::RunNoise(void)
 
 int32 PS_SPU::UpdateFromCDC(int32 clocks)
 {
-   //int32 clocks = timestamp - lastts;
    int32 sample_clocks = 0;
-   //lastts = timestamp;
 
    clock_divider -= clocks;
 
@@ -818,15 +1071,10 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
             voice->IgnoreSampLA = false;
          }
 
-         //
          // Decode new samples if necessary.
-         //
          RunDecoder(voice);
 
 
-         //
-         //
-         //
          int l, r;
 
          if(Noise_Mode & (1 << voice_num))
@@ -940,9 +1188,7 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
 
             BlockEnd &= ~(1 << voice_num);
 
-            //
             // Weight/filter previous value initialization:
-            //
             voice->DecodeM2 = 0;
             voice->DecodeM1 = 0;
 
@@ -1040,8 +1286,6 @@ int32 PS_SPU::UpdateFromCDC(int32 clocks)
       }
    }
 
-   //assert(clock_divider < 768);
-
    return clock_divider;
 }
 
@@ -1072,12 +1316,52 @@ uint32 PS_SPU::ReadDMA(void)
 }
 
 /*
- * C-linkage shims declared in spu_c.h. Forward to the PS_SPU
- * member functions through the file-scope PSX_SPU pointer. Both
- * touch instance state (RWAddr, SPURAM[]); the forwarders are a
- * single indirect call each, identical in cost to the original
- * PSX_SPU->WriteDMA() / PSX_SPU->ReadDMA() callsites.
+ * C-linkage external API for the SPU module. Forwarders defined
+ * with `extern "C"` linkage to match the declarations in spu_c.h;
+ * each one routes through the file-scope PSX_SPU pointer and the
+ * existing PS_SPU member functions. Under -O2 / LTO the
+ * forwarders inline away to a single indirect call; the
+ * indirection is the same the original PSX_SPU->Member() call
+ * sites already carried.
+ *
+ * SPU_Init / SPU_Kill own the singleton's lifecycle. SPU_Kill is
+ * idempotent and null-safe so partial-init failure paths in
+ * libretro.cpp's InitCommon can call it without first checking.
+ *
+ * Note that this commit only introduces the shim surface; spu.cpp
+ * remains a C++ TU and PS_SPU remains a class. The follow-up
+ * commit converts the implementation behind this boundary to C,
+ * eliminating PSX_SPU as a heap-allocated singleton in favour of
+ * file-scope static state (no allocation, no leak surface, simpler
+ * teardown).
  */
+extern "C" void SPU_Init(void)
+{
+   PSX_SPU = new PS_SPU();
+}
+
+extern "C" void SPU_Kill(void)
+{
+   if (PSX_SPU)
+      delete PSX_SPU;
+   PSX_SPU = NULL;
+}
+
+extern "C" void SPU_Power(void)
+{
+   PSX_SPU->Power();
+}
+
+extern "C" void SPU_Write(int32_t timestamp, uint32_t A, uint16_t V)
+{
+   PSX_SPU->Write(timestamp, A, V);
+}
+
+extern "C" uint16_t SPU_Read(int32_t timestamp, uint32_t A)
+{
+   return PSX_SPU->Read(timestamp, A);
+}
+
 extern "C" void SPU_WriteDMA(uint32_t V)
 {
    PSX_SPU->WriteDMA(V);
@@ -1088,10 +1372,18 @@ extern "C" uint32_t SPU_ReadDMA(void)
    return PSX_SPU->ReadDMA();
 }
 
+extern "C" int32_t SPU_UpdateFromCDC(int32_t clocks)
+{
+   return PSX_SPU->UpdateFromCDC(clocks);
+}
+
+extern "C" int SPU_StateAction(StateMem *sm, int load, int data_only)
+{
+   return PSX_SPU->StateAction(sm, load, data_only);
+}
+
 void PS_SPU::Write(int32_t timestamp, uint32 A, uint16 V)
 {
-   //if((A & 0x3FF) < 0x180)
-
    A &= 0x3FF;
 
    if(A >= 0x200)

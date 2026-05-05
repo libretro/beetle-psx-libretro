@@ -46,11 +46,9 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 #include "dma.h"
 
 class PS_CDC;
-class PS_SPU;
 
 extern PS_CPU *PSX_CPU;
 extern PS_CDC *PSX_CDC;
-extern PS_SPU *PSX_SPU;
 extern MultiAccessSizeMem<512 * 1024> *BIOSROM;
 extern MultiAccessSizeMem<2048 * 1024> *MainRAM;
 extern MultiAccessSizeMem<1024> *ScratchRAM;

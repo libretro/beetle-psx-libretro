@@ -1,8 +1,7 @@
 #ifndef __MDFN_PSX_SPU_H
 #define __MDFN_PSX_SPU_H
 
-extern uint32_t IntermediateBufferPos;
-extern int16_t IntermediateBuffer[4096][2];
+#include "spu_c.h"
 
 enum
 {

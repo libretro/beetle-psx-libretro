@@ -407,7 +407,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 #include "mednafen/psx/timer.h"
 #include "mednafen/psx/sio.h"
 #include "mednafen/psx/cdc.h"
-#include "mednafen/psx/spu.h"
+#include "mednafen/psx/spu_c.h"
 #include "mednafen/mempatcher.h"
 
 #include <stdarg.h>
@@ -487,7 +487,6 @@ static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
 
 PS_CPU *PSX_CPU = NULL;
-PS_SPU *PSX_SPU = NULL;
 PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
 
@@ -850,8 +849,8 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                //if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                // PSX_EventHandler(timestamp);
 
-               PSX_SPU->Write(timestamp, A | 0, V);
-               PSX_SPU->Write(timestamp, A | 2, V >> 16);
+               SPU_Write(timestamp, A | 0, V);
+               SPU_Write(timestamp, A | 2, V >> 16);
             }
             else
             {
@@ -860,7 +859,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                   PSX_EventHandler(timestamp);
 
-               V = PSX_SPU->Read(timestamp, A) | (PSX_SPU->Read(timestamp, A | 2) << 16);
+               V = SPU_Read(timestamp, A) | (SPU_Read(timestamp, A | 2) << 16);
             }
          }
          else
@@ -872,7 +871,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                //if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                // PSX_EventHandler(timestamp);
 
-               PSX_SPU->Write(timestamp, A & ~1, V);
+               SPU_Write(timestamp, A & ~1, V);
             }
             else
             {
@@ -881,7 +880,7 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
                if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
                   PSX_EventHandler(timestamp);
 
-               V = PSX_SPU->Read(timestamp, A & ~1);
+               V = SPU_Read(timestamp, A & ~1);
             }
          }
          return;
@@ -1992,7 +1991,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    }
 
    PSX_CPU = new PS_CPU();
-   PSX_SPU = new PS_SPU();
+   SPU_Init();
 
    /* GPU_Init returns false on VRAM allocation failure. There is no
     * graceful recovery path through InitCommon's existing void
@@ -2457,9 +2456,7 @@ static void Cleanup(void)
       delete PSX_CDC;
    PSX_CDC = NULL;
 
-   if(PSX_SPU)
-      delete PSX_SPU;
-   PSX_SPU = NULL;
+   SPU_Kill();
 
    GPU_Destroy();
 
@@ -2647,7 +2644,7 @@ extern "C" int StateAction(StateMem *sm, int load, int data_only)
    ret &= PSX_CDC->StateAction(sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
    ret &= GPU_StateAction(sm, load, data_only);
-   ret &= PSX_SPU->StateAction(sm, load, data_only);
+   ret &= SPU_StateAction(sm, load, data_only);
 
    ret &= PSX_FIO->StateAction(sm, load, data_only);
 
