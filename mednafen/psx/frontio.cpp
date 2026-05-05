@@ -488,7 +488,7 @@ int32_t FrontIO::CalcNextEventTS(int32_t timestamp, int32_t next_event)
       if(dsr_pulse_delay[i] > 0 && next_event > dsr_pulse_delay[i])
          next_event = dsr_pulse_delay[i];
 
-   overclock_device_to_cpu(next_event);
+   overclock_device_to_cpu(&next_event);
 
    ret = timestamp + next_event;
 
@@ -711,7 +711,7 @@ int32_t FrontIO::Update(int32_t timestamp)
 
    clocks = timestamp - lastts;
 
-   overclock_cpu_to_device(clocks);
+   overclock_cpu_to_device(&clocks);
 
    for(i = 0; i < 4; i++)
       if(dsr_pulse_delay[i] > 0)
@@ -721,7 +721,7 @@ int32_t FrontIO::Update(int32_t timestamp)
          {
             int32_t off = 32 + dsr_pulse_delay[i];
 
-            overclock_device_to_cpu(off);
+            overclock_device_to_cpu(&off);
 
             dsr_active_until_ts[i] = timestamp + off;
             DoDSRIRQ();

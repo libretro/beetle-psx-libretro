@@ -144,7 +144,7 @@ int32 PS_CDC::CalcNextEvent(void)
 
    //fprintf(stderr, "%d %d %d %d --- %d\n", PSRCounter, PendingCommandCounter, CDCReadyReceiveCounter, DiscStartupDelay, next_event);
 
-   overclock_device_to_cpu(next_event);
+   overclock_device_to_cpu(&next_event);
 
    return(next_event);
 }
@@ -1127,7 +1127,7 @@ int32_t PS_CDC::Update(const int32_t timestamp)
 {
    int32 clocks = timestamp - lastts;
 
-   overclock_cpu_to_device(clocks);
+   overclock_cpu_to_device(&clocks);
 
    //doom_ts = timestamp;
 

@@ -15,10 +15,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "psx.h"
-#include "timer.h"
+#include <stdint.h>
 
+#include "../mednafen-types.h"
+#include "../state.h"
 #include "../state_helpers.h"
+
+#include "irq.h"
+#include "psx_events.h"
+#include "timer.h"
 
 /*
  Notes(some of it may be incomplete or wrong in subtle ways)
@@ -94,7 +99,7 @@
  TODO: If we ever return randomish values to "simulate" open bus, remember to change the return type and such of the TIMER_Read() function to full 32-bit too.
 */
 
-struct Timer
+typedef struct
 {
    uint32_t Mode;
    uint32_t Counter;  /* Counter value. Only 16-bit, but 32-bit here for detecting counting past target. */
@@ -104,7 +109,7 @@ struct Timer
 
    bool IRQDone;
    int32_t DoZeCounting;
-};
+} Timer;
 
 static bool vblank;
 static bool hretrace;
@@ -156,7 +161,7 @@ static uint32_t CalcNextEvent(void)
          next_event = tmp_clocks;
    }
 
-   overclock_device_to_cpu(next_event);
+   overclock_device_to_cpu(&next_event);
 
    return(next_event);
 }
@@ -333,7 +338,7 @@ int32_t MDFN_FASTCALL TIMER_Update(const int32_t timestamp)
 {
    int32_t cpu_clocks = timestamp - lastts;
 
-   overclock_cpu_to_device(cpu_clocks);
+   overclock_cpu_to_device(&cpu_clocks);
 
    int32_t i;
    for(i = 0; i < 3; i++)

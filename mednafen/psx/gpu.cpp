@@ -728,7 +728,7 @@ void GPU_RecalcClockRatio(void) {
    else  // PAL clock
       GPU.GPUClockRatio = 102948; // 65536 * 53203425 / (44100 * 768)
 
-   overclock_cpu_to_device(GPU.GPUClockRatio);
+   overclock_cpu_to_device(&GPU.GPUClockRatio);
 }
 
 void GPU_Destroy(void)

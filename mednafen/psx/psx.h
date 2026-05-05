@@ -56,21 +56,7 @@ void PSX_MemPoke32(uint32_t A, uint32_t V);
 void PSX_RequestMLExit(void);
 void ForceEventUpdates(const int32_t timestamp);
 
-enum
-{
-   PSX_EVENT__SYNFIRST = 0,
-   PSX_EVENT_GPU,
-   PSX_EVENT_CDC,
-   //PSX_EVENT_SPU,
-   PSX_EVENT_TIMER,
-   PSX_EVENT_DMA,
-   PSX_EVENT_FIO,
-   PSX_EVENT__SYNLAST,
-   PSX_EVENT__COUNT
-};
-
-#define PSX_EVENT_MAXTS             0x20000000
-void PSX_SetEventNT(const int type, const int32_t next_timestamp);
+#include "psx_events.h"
 
 void PSX_SetDMACycleSteal(unsigned stealage);
 
@@ -98,33 +84,6 @@ extern MultiAccessSizeMem<1024> *ScratchRAM;
 enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_EXECUTE_ONE, DYNAREC_RUN_INTERPRETER};
 extern enum DYNAREC psx_dynarec;
 #endif
-
-#define OVERCLOCK_SHIFT 8
-extern int32_t psx_overclock_factor;
-
-static INLINE void overclock_device_to_cpu(int32_t &clock) {
-   if (psx_overclock_factor) {
-      int64_t n = clock;
-
-      n = (n * psx_overclock_factor) + (1 << (OVERCLOCK_SHIFT)) - 1;
-
-      n >>= OVERCLOCK_SHIFT;
-
-      clock = n;
-   }
-}
-
-static INLINE void overclock_cpu_to_device(int32_t &clock) {
-   if (psx_overclock_factor) {
-      int64_t n = clock;
-
-      n = (n << OVERCLOCK_SHIFT) + (psx_overclock_factor - 1);
-
-      n /= psx_overclock_factor;
-
-      clock = n;
-   }
-}
 
 extern unsigned psx_gpu_overclock_shift;
 
