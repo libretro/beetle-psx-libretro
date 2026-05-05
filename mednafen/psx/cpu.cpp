@@ -544,7 +544,7 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
 
   if(address >= 0xA0000000 || !(BIU & 0x800))
   {
-   instr = MDFN_de32lsb<true>((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
+   instr = MDFN_de32lsb_aligned((uint8*)(FastMap[address >> FAST_MAP_SHIFT] + address));
 
    if (!psx_gte_overclock) {
       timestamp += 4;	// Approximate best-case cache-disabled time, per PS1 tests(executing out of 0xA0000000+); it can be 5 in *some* sequences of code(like a lot of sequential "nop"s, probably other simple instructions too).
@@ -572,25 +572,25 @@ INLINE uint32 PS_CPU::ReadInstruction(pscpu_timestamp_t &timestamp, uint32 addre
            timestamp++;
         }
         ICI[0x00].TV &= ~0x2;
-	ICI[0x00].Data = MDFN_de32lsb<true>(&FMP[0x0]);
+	ICI[0x00].Data = MDFN_de32lsb_aligned(&FMP[0x0]);
     case 0x4:
         if (!psx_gte_overclock) {
            timestamp++;
         }
         ICI[0x01].TV &= ~0x2;
-	ICI[0x01].Data = MDFN_de32lsb<true>(&FMP[0x4]);
+	ICI[0x01].Data = MDFN_de32lsb_aligned(&FMP[0x4]);
     case 0x8:
         if (!psx_gte_overclock) {
            timestamp++;
         }
         ICI[0x02].TV &= ~0x2;
-	ICI[0x02].Data = MDFN_de32lsb<true>(&FMP[0x8]);
+	ICI[0x02].Data = MDFN_de32lsb_aligned(&FMP[0x8]);
     case 0xC:
         if (!psx_gte_overclock) {
            timestamp++;
         }
         ICI[0x03].TV &= ~0x2;
-	ICI[0x03].Data = MDFN_de32lsb<true>(&FMP[0xC]);
+	ICI[0x03].Data = MDFN_de32lsb_aligned(&FMP[0xC]);
 	break;
    }
    instr = ICache[(address & 0xFFC) >> 2].Data;
@@ -750,7 +750,7 @@ pscpu_timestamp_t PS_CPU::RunReal(pscpu_timestamp_t timestamp_in)
 	  {							\
 	   if(old_PC == (((new_PC - 4) & mask) + offset))	\
 	   {							\
-	    if(MDFN_densb<uint32, true>((uint8*)(FastMap[PC >> FAST_MAP_SHIFT] + PC)) == 0)	\
+	    if(MDFN_densb_u32_aligned((uint8*)(FastMap[PC >> FAST_MAP_SHIFT] + PC)) == 0)	\
 	    {							\
 	     if(next_event_ts > timestamp) /* Necessary since next_event_ts might be set to something like "0" to force a call to the event handler. */		\
 	     {							\

@@ -297,11 +297,11 @@ void InputDevice_neGconRumble::UpdateInput(const void *data)
    buttons[1] = d8[1];
    cur_ana_button_state = d8[2] & 0x01;
 
-   twist = ((32768 + MDFN_de32lsb<false>((const uint8 *)data + 4) - (((int32)MDFN_de32lsb<false>((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
+   twist = ((32768 + MDFN_de32lsb((const uint8 *)data + 4) - (((int32)MDFN_de32lsb((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
 
-   anabuttons[0] = (MDFN_de32lsb<false>((const uint8 *)data + 12) * 255 + 16383) / 32767; 
-   anabuttons[1] = (MDFN_de32lsb<false>((const uint8 *)data + 16) * 255 + 16383) / 32767;
-   anabuttons[2] = (MDFN_de32lsb<false>((const uint8 *)data + 20) * 255 + 16383) / 32767;
+   anabuttons[0] = (MDFN_de32lsb((const uint8 *)data + 12) * 255 + 16383) / 32767; 
+   anabuttons[1] = (MDFN_de32lsb((const uint8 *)data + 16) * 255 + 16383) / 32767;
+   anabuttons[2] = (MDFN_de32lsb((const uint8 *)data + 20) * 255 + 16383) / 32767;
 
    //printf("%02x %02x %02x %02x\n", twist, anabuttons[0], anabuttons[1], anabuttons[2]);
 
@@ -317,7 +317,7 @@ void InputDevice_neGconRumble::UpdateInput(const void *data)
       //revert to 0.9.33, should be fixed on libretro side instead
       //MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8));
 
-      MDFN_en32lsb<false>(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
+      MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (rumble_param[1] << 8));
    }
    else
    {
@@ -328,7 +328,7 @@ void InputDevice_neGconRumble::UpdateInput(const void *data)
 
       //revert to 0.9.33, should be fixed on libretro side instead
       //MDFN_en16lsb(rumb_dp, sneaky_weaky << 0);
-      MDFN_en32lsb<false>(&d8[4 + 32 + 0], sneaky_weaky << 0);
+      MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
    }
 
    CheckManualAnaModeChange();
