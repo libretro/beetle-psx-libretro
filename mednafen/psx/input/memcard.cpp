@@ -190,9 +190,10 @@ int InputDevice_Memcard::StateAction(StateMem* sm, int load, int data_only, cons
       //printf("%s data_used=%d\n", section_name, data_used);
       if(data_used)
       {
-         std::string tmp_name = std::string(section_name) + "_DT";
+         char tmp_name[64];
+         snprintf(tmp_name, sizeof(tmp_name), "%s_DT", section_name);
 
-         ret &= MDFNSS_StateAction(sm, load, data_only, CD_StateRegs, tmp_name.c_str());
+         ret &= MDFNSS_StateAction(sm, load, data_only, CD_StateRegs, tmp_name);
       }
 
       if(load)

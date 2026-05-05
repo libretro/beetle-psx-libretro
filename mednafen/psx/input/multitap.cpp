@@ -19,6 +19,8 @@
 #include "../frontio.h"
 #include "multitap.h"
 
+#include <retro_miscellaneous.h>
+
 /*
 TODO: PS1 multitap appears to have some internal knowledge of controller IDs, so it won't get "stuck" waiting for data from a controller that'll never
 come.  We currently sort of "cheat" due to how the dsr_pulse_delay stuff works, but in the future we should try to emulate this multitap functionality.
@@ -409,7 +411,7 @@ bool InputDevice_Multitap::Clock(bool TxD, int32 &dsr_pulse_delay)
       {
          if((unsigned)selected_device < 4)
          {
-            dsr_pulse_delay = std::max<int32>(tmp_pulse_delay[0][selected_device], tmp_pulse_delay[1][selected_device]);
+            dsr_pulse_delay = MAX(tmp_pulse_delay[0][selected_device], tmp_pulse_delay[1][selected_device]);
          }
       }
 
