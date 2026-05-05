@@ -151,17 +151,11 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
    uint8_t twy = g->twy;
 
    g->SUCV.TWX_AND = ~(tww << 3);
-   g->SUCV.TWX_ADD = ((twx & tww) << 3) + (g->TexPageX << (2 - std::min<uint32>(2, g->TexMode)));
+   g->SUCV.TWX_ADD = ((twx & tww) << 3) + (g->TexPageX << (2 - MIN(2u, g->TexMode)));
 
    g->SUCV.TWY_AND = ~(twh << 3);
    g->SUCV.TWY_ADD = ((twy & twh) << 3) + g->TexPageY;
 }
-
-struct TexCache_t
-{
-      uint16 Data[4];
-      uint32 Tag;
-};
 
 template<uint32_t TexMode_TA>
 static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)

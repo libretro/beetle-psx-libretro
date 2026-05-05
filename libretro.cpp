@@ -2008,7 +2008,23 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
    PSX_CPU = new PS_CPU();
    PSX_SPU = new PS_SPU();
 
-   GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift);
+   /* GPU_Init returns false on VRAM allocation failure. There is no
+    * graceful recovery path through InitCommon's existing void
+    * signature - the caller (retro_load_game) doesn't propagate
+    * failure either. Log to the frontend and bail out hard; users
+    * will see the error message and the core will be in an aborted
+    * state until reset. Full propagation (InitCommon, MDFNI_LoadGame,
+    * retro_load_game all returning the failure) is left to a follow
+    * up; that is an architectural change with broader scope than
+    * the current GPU audit. */
+   if (!GPU_Init(region == REGION_EU, sls, sle, psx_gpu_upscale_shift))
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "GPU_Init: VRAM allocation failed for upscale shift %u\n",
+            (unsigned)psx_gpu_upscale_shift);
+      MDFN_Error(0, "GPU_Init failed");
+      return;
+   }
 
    PSX_CDC = new PS_CDC();
    PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
@@ -4649,11 +4665,25 @@ void retro_run(void)
       {
          if (retro_set_system_av_info())
          {
-            // We successfully changed the frontend's resolution, we can
-            // apply the change immediately
-            GPU_Rescale(psx_gpu_upscale_shift);
-            alloc_surface();
-            has_new_geometry = false;
+            /* We successfully changed the frontend's resolution.
+             * Apply the rescale; on VRAM allocation failure GPU_Rescale
+             * leaves GPU.vram intact and returns false, so we just
+             * roll back our cached shift to whatever the GPU still
+             * has. The user-visible effect is "upscale change ignored
+             * due to OOM" rather than a crash or a NULL VRAM pointer. */
+            if (GPU_Rescale(psx_gpu_upscale_shift))
+            {
+               alloc_surface();
+               has_new_geometry = false;
+            }
+            else
+            {
+               log_cb(RETRO_LOG_WARN,
+                     "GPU_Rescale: VRAM allocation failed for upscale "
+                     "shift %u; keeping previous resolution\n",
+                     (unsigned)psx_gpu_upscale_shift);
+               psx_gpu_upscale_shift = GPU_get_upscale_shift();
+            }
          }
          else
          {

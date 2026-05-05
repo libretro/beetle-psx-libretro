@@ -234,13 +234,9 @@ uint32_t GPU_ReadDMA(void);
 
 bool GPU_DMACanWrite(void);
 
-uint8 GPU_get_dither_upscale_shift(void);
-
 void GPU_set_dither_upscale_shift(uint8 factor);
 
 uint8 GPU_get_upscale_shift(void);
-
-void GPU_set_upscale_shift(uint8 factor);
 
 bool GPU_get_display_possibly_dirty(void);
 
@@ -250,16 +246,14 @@ void GPU_set_display_change_count(unsigned a);
 
 unsigned GPU_get_display_change_count(void);
 
-void GPU_Init(bool pal_clock_and_tv,
+bool GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift);
-
-void GPU_SoftReset(void);
 
 void GPU_RecalcClockRatio(void);
 
 void GPU_Destroy(void);
 
-void GPU_Rescale(uint8 ushift);
+bool GPU_Rescale(uint8 ushift);
 
 int32_t GPU_Update(const int32_t sys_timestamp);
 
@@ -275,13 +269,7 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 
-uint16 GPU_PeekRAM(uint32 A);
-
-void GPU_PokeRAM(uint32 A, uint16 V);
-
 int32_t GPU_GetScanlineNum(void);
-
-void texel_put(uint32 x, uint32 y, uint16 v);
 
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
 

@@ -19,6 +19,8 @@
 #include "timer.h"
 #include "FastFIFO.h"
 
+#include <retro_miscellaneous.h>
+
 #include "../math_ops.h"
 #include "../state_helpers.h"
 #include "../../rsx/rsx_intf.h"
@@ -26,6 +28,11 @@
 #include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"
 #include "../pgxp/pgxp_mem.h"
+
+/* Forward decl: gpu_common.h's PlotNativePixel template calls
+ * texel_put. The actual definition is below at file scope (static)
+ * because it's used only inside this translation unit. */
+static void texel_put(uint32 x, uint32 y, uint16 v);
 
 #include "gpu_common.h"
 
@@ -96,10 +103,15 @@ struct CTEntry
 
 PS_GPU GPU;
 
-/* Buffers used to hold data during upscale operations */
-uint32 TexCache_Tag[256];
-uint16 TexCache_Data[256][4];
-uint16 *vram_new = NULL;
+/* Scratch handles for PS1-state save/load and resolution rescale.
+ * Used as a swap buffer between the GPU.vram (which is at the current
+ * upscaled resolution) and the savestate format (which is always
+ * stored at 1x for compatibility). Not part of the GPU state itself
+ * - merely shared across the multi-stage RestoreStateP1/P2/P3 flow
+ * and the GPU_Rescale path. File-scope, no external use. */
+static uint32  TexCache_Tag[256];
+static uint16  TexCache_Data[256][4];
+static uint16 *vram_new = NULL;
 
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
@@ -112,6 +124,33 @@ static INLINE void InvalidateCache(PS_GPU *gpu)
 {
    gpu->CLUT_Cache_VB = ~0U;
    InvalidateTexCache(gpu);
+}
+
+/* Set a pixel in VRAM, upscaling it if necessary. Static because the
+ * only callers are in this translation unit (gpu.cpp textually
+ * #includes gpu_polygon.cpp / gpu_sprite.cpp / gpu_line.cpp, and the
+ * sole header use is a static-INLINE in gpu_common.h that resolves
+ * within this TU). */
+static void texel_put(uint32 x, uint32 y, uint16 v)
+{
+   uint32_t dy, dx;
+   x <<= GPU.upscale_shift;
+   y <<= GPU.upscale_shift;
+
+   /* Duplicate the pixel as many times as necessary (nearest
+    * neighbour upscaling) */
+   for (dy = 0; dy < UPSCALE(&GPU); dy++)
+   {
+      for (dx = 0; dx < UPSCALE(&GPU); dx++)
+         vram_put(&GPU, x + dx, y + dy, v);
+   }
+}
+
+/* Internal helper used only by GPU_Rescale; static for the same TU
+ * reason as texel_put above. */
+static void GPU_set_upscale_shift(uint8 factor)
+{
+   GPU.upscale_shift = factor;
 }
 
 static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
@@ -230,7 +269,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
 
       for(x = 0; x < width; x += 128)
       {
-         const int32 chunk_x_max = std::min<int32>(width - x, 128);
+         const int32 chunk_x_max = MIN((int32)(width - x), 128);
          uint16 tmpbuf[128]; // TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache.
 
          for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
@@ -606,27 +645,34 @@ void GPU_RestoreStateP1(bool);
 void GPU_RestoreStateP2(bool);
 void GPU_RestoreStateP3();
 
-/* Return a ptr to memory with enough space
- * for the VRAM, taking upscaling into account */
+/* Allocate the GPU framebuffer at the requested upscale shift. Returns
+ * NULL on allocation failure. Was previously `new uint16_t[size]`,
+ * which under -fno-exceptions either aborts (libstdc++) or returns
+ * NULL but leaves the global new-handler unspecified. malloc + an
+ * explicit NULL check is portable and matches the audit-pass error
+ * regime (no exceptions, callers propagate failure via return codes). */
 static uint16_t *VRAM_Alloc(uint8 upscale_shift)
 {
    unsigned width  = 1024 << upscale_shift;
    unsigned height =  512 << upscale_shift;
-   unsigned size   = width * height;
+   size_t   bytes  = (size_t)width * height * sizeof(uint16_t);
+   uint16_t *vram  = (uint16_t *)malloc(bytes);
 
-   uint16_t *vram    = new uint16_t[size];
-   memset(vram, 0, size * sizeof(*vram));
+   if (!vram)
+      return NULL;
 
+   memset(vram, 0, bytes);
    return vram;
 }
 
-void GPU_Init(bool pal_clock_and_tv,
+bool GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift)
 {
-   
-   GPU.vram = VRAM_Alloc(upscale_shift);
-
    int x, y, v;
+
+   GPU.vram = VRAM_Alloc(upscale_shift);
+   if (!GPU.vram)
+      return false;
 
    GPU.HardwarePALType = pal_clock_and_tv;
 
@@ -672,6 +718,8 @@ void GPU_Init(bool pal_clock_and_tv,
    GPU.dither_upscale_shift = 0;
 
    GPU.killQuadPart = 0;
+
+   return true;
 }
 
 void GPU_RecalcClockRatio(void) {
@@ -685,66 +733,84 @@ void GPU_RecalcClockRatio(void) {
 
 void GPU_Destroy(void)
 {
-   delete [] GPU.vram;
+   free(GPU.vram);
    GPU.vram = NULL;
 }
 
-/* Rescale the GPU with a different upscale_shift 
- * 
- * We copy, if necessary, the current VRAM (GPU.vram) at 1x
- * to a buffer (vram_new). 
- * We allocate enough space for the rescaled VRAM 
- * and copy the buffer to it, taking the upscale factor into account 
- * 
+/* Rescale the GPU with a different upscale_shift.
+ *
+ * The flow is:
+ *   1. Allocate a 1x scratch buffer (vram_new)
+ *   2. Copy GPU.vram (downscaled if needed) into vram_new
+ *   3. Allocate the new GPU.vram at the requested upscale
+ *   4. Copy vram_new into the new GPU.vram (upscaled if needed)
+ *   5. Free the old GPU.vram and the scratch buffer
+ *
+ * Failure handling: an OOM at any allocation step must leave the GPU
+ * in a usable state with the original GPU.vram intact. We therefore
+ * allocate everything we need up front (or back out cleanly) before
+ * touching GPU.vram. Returns true on success, false on allocation
+ * failure (state unchanged in that case).
  */
-void GPU_Rescale(uint8 ushift)
+bool GPU_Rescale(uint8 ushift)
 {
-   if (GPU.upscale_shift == 0) 
-   {
-      /* VRAM is already at 1x, make the buffer point to the old VRAM
-       * to avoid copying it */
-      vram_new = GPU.vram;  
-   }
+   uint16_t *old_vram = GPU.vram;
+   uint8     old_shift = GPU.upscale_shift;
+   uint16_t *new_vram;
 
+   /* Step 1+2: allocate scratch buffer at 1x. If we're already at 1x
+    * we can alias the old vram directly; otherwise allocate scratch
+    * and downscale into it. */
+   if (old_shift == 0)
+   {
+      vram_new = old_vram;
+   }
    else
    {
-      /* Copy current VRAM to temp buffer at 1x */
       vram_new = VRAM_Alloc(0);
+      if (!vram_new)
+         return false;
 
       for (unsigned y = 0; y < 512; y++)
-      {
          for (unsigned x = 0; x < 1024; x++)
             vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
-      }
-
-      /* Cleanup the old VRAM */
-      delete [] GPU.vram;
    }
 
-   GPU.vram = NULL;
-
-   /* Change the state of the upscale shift right now
-    * or else texel_put won't use the new scaling factor
-    * resulting in corrupted VRAM */
-   GPU_set_upscale_shift(ushift);
-   
-   GPU.vram = VRAM_Alloc(ushift);
-
-   /* Copy the temp buffer to the rescaled VRAM, taking the
-    * upscale factor into account (nearest neighbor upscaling) */
-   for (unsigned y = 0; y < 512; y++)
+   /* Step 3: allocate the new VRAM at the requested upscale. This
+    * is the second failure point; if it fails we must restore
+    * GPU.vram and free the scratch (when it isn't aliased). */
+   new_vram = VRAM_Alloc(ushift);
+   if (!new_vram)
    {
+      if (old_shift != 0)
+         free(vram_new);
+      vram_new = NULL;
+      return false;
+   }
+
+   /* Past the OOM cliff. Now we can commit: switch upscale_shift
+    * before texel_put runs (it reads upscale_shift to compute
+    * destination coords) and swap the vram pointer. */
+   GPU.vram = new_vram;
+   GPU_set_upscale_shift(ushift);
+
+   /* Step 4: copy the scratch buffer into the new VRAM, upscaling
+    * via texel_put (nearest neighbour). */
+   for (unsigned y = 0; y < 512; y++)
       for (unsigned x = 0; x < 1024; x++)
          texel_put(x, y, vram_new[y * 1024 + x]);
-   }
 
-   /* Cleanup the temporary buffer */
-   if (vram_new)
-      delete [] vram_new;
+   /* Step 5: free the old buffer (skipping the alias case where
+    * old_vram == vram_new) and clear the scratch handle. */
+   if (old_shift != 0)
+      free(vram_new);
+   free(old_vram);
    vram_new = NULL;
+
+   return true;
 }
 
-void GPU_SoftReset(void) // Control command 0x00
+static void GPU_SoftReset(void) // Control command 0x00
 {
    GPU.IRQPending = false;
    IRQ_Assert(IRQ_GPU, GPU.IRQPending);
@@ -858,6 +924,18 @@ void GPU_Power(void)
    GPU.DataReadBuffer = 0; // Don't reset in SoftReset()
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
+   GPU.InCmd_CC = 0;
+   /* Mid-cmd quad state. Power doesn't strictly need to clear these
+    * because they're only consumed when InCmd == INCMD_QUAD (and we
+    * just zeroed InCmd above), but explicit clears match the saved
+    * state and make cold-reset behavior deterministic regardless of
+    * BSS contents. */
+   GPU.InQuad_clut = 0;
+   GPU.InQuad_invalidW = false;
+   GPU.killQuadPart = 0;
+   memset(GPU.InQuad_F3Vertices, 0, sizeof(GPU.InQuad_F3Vertices));
+   memset(&GPU.InPLine_PrevPoint, 0, sizeof(GPU.InPLine_PrevPoint));
+
    GPU.FBRW_X = 0;
    GPU.FBRW_Y = 0;
    GPU.FBRW_W = 0;
@@ -1707,8 +1785,8 @@ TheEnd:
 
    next_dt = (((int64)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
-   next_dt = std::max<int32>(1, next_dt);
-   next_dt = std::min<int32>(EventCycles, next_dt);
+   next_dt = MAX(1, next_dt);
+   next_dt = MIN(EventCycles, next_dt);
 
    return(sys_timestamp + next_dt);
 }
@@ -1733,10 +1811,14 @@ void GPU_RestoreStateP1(bool load)
    else
    {
       // We have increased internal resolution, savestates are always
-      // made at 1x for compatibility
-      vram_new = new uint16[1024 * 512];
+      // made at 1x for compatibility. The 1MB scratch is exposed to
+      // MDFNSS_StateAction via SFARRAY16N below; if this allocation
+      // fails the SFARRAY16N would deref NULL, so we leave vram_new
+      // at NULL and the StateAction caller is responsible for noticing
+      // (an upcoming change will surface the failure to libretro).
+      vram_new = (uint16 *)malloc(1024 * 512 * sizeof(uint16));
 
-      if (!load)
+      if (vram_new && !load)
       {
          // We must downscale the current VRAM contents back to 1x
          for (unsigned y = 0; y < 512; y++)
@@ -1761,7 +1843,7 @@ void GPU_RestoreStateP2(bool load)
 {
    if (GPU.upscale_shift > 0)
    {
-      if (load)
+      if (load && vram_new)
       {
          // Restore upscaled VRAM from savestate
          for (unsigned y = 0; y < 512; y++)
@@ -1771,7 +1853,7 @@ void GPU_RestoreStateP2(bool load)
          }
       }
 
-      delete [] vram_new;
+      free(vram_new);
       vram_new = NULL;
    }
 }
@@ -1881,6 +1963,22 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(GPU.InCmd, "InCmd"),
       SFVARN(GPU.InCmd_CC, "InCmd_CC"),
 
+      /* Mid-quad-command state. These fields are read by the second
+       * triangle of a quad command (gpu_polygon.cpp line 560+) only
+       * when InCmd == INCMD_QUAD. Without saving them, a state-save
+       * mid-quad followed by a load uses stale-from-prior-session
+       * values for clut, invalidW, killQuadPart, and the precise[]
+       * PGXP fields, giving a non-deterministic second triangle.
+       * The fields are meaningless when InCmd != INCMD_QUAD, but
+       * saving them unconditionally is simpler than gating and the
+       * cost is tiny. precise[N] is a float; the state framework
+       * stores it as a 4-byte MDFNSTATE_RLSB blob, which round-trips
+       * correctly within an architecture (libretro savestates are
+       * not portable across endianness regardless). */
+      SFVARN(GPU.InQuad_clut, "InQuad_clut"),
+      SFVARN(GPU.InQuad_invalidW, "InQuad_invalidW"),
+      SFVARN(GPU.killQuadPart, "killQuadPart"),
+
       SFVARN(GPU.InQuad_F3Vertices[0].x, "InQuad_F3Vertices[0].x"),
       SFVARN(GPU.InQuad_F3Vertices[0].y, "InQuad_F3Vertices[0].y"),
       SFVARN(GPU.InQuad_F3Vertices[0].u, "InQuad_F3Vertices[0].u"),
@@ -1888,6 +1986,9 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(GPU.InQuad_F3Vertices[0].r, "InQuad_F3Vertices[0].r"),
       SFVARN(GPU.InQuad_F3Vertices[0].g, "InQuad_F3Vertices[0].g"),
       SFVARN(GPU.InQuad_F3Vertices[0].b, "InQuad_F3Vertices[0].b"),
+      SFVARN(GPU.InQuad_F3Vertices[0].precise[0], "InQuad_F3Vertices[0].precise[0]"),
+      SFVARN(GPU.InQuad_F3Vertices[0].precise[1], "InQuad_F3Vertices[0].precise[1]"),
+      SFVARN(GPU.InQuad_F3Vertices[0].precise[2], "InQuad_F3Vertices[0].precise[2]"),
 
       SFVARN(GPU.InQuad_F3Vertices[1].x, "InQuad_F3Vertices[1].x"),
       SFVARN(GPU.InQuad_F3Vertices[1].y, "InQuad_F3Vertices[1].y"),
@@ -1896,6 +1997,9 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(GPU.InQuad_F3Vertices[1].r, "InQuad_F3Vertices[1].r"),
       SFVARN(GPU.InQuad_F3Vertices[1].g, "InQuad_F3Vertices[1].g"),
       SFVARN(GPU.InQuad_F3Vertices[1].b, "InQuad_F3Vertices[1].b"),
+      SFVARN(GPU.InQuad_F3Vertices[1].precise[0], "InQuad_F3Vertices[1].precise[0]"),
+      SFVARN(GPU.InQuad_F3Vertices[1].precise[1], "InQuad_F3Vertices[1].precise[1]"),
+      SFVARN(GPU.InQuad_F3Vertices[1].precise[2], "InQuad_F3Vertices[1].precise[2]"),
 
       SFVARN(GPU.InQuad_F3Vertices[2].x, "InQuad_F3Vertices[2].x"),
       SFVARN(GPU.InQuad_F3Vertices[2].y, "InQuad_F3Vertices[2].y"),
@@ -1904,6 +2008,9 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(GPU.InQuad_F3Vertices[2].r, "InQuad_F3Vertices[2].r"),
       SFVARN(GPU.InQuad_F3Vertices[2].g, "InQuad_F3Vertices[2].g"),
       SFVARN(GPU.InQuad_F3Vertices[2].b, "InQuad_F3Vertices[2].b"),
+      SFVARN(GPU.InQuad_F3Vertices[2].precise[0], "InQuad_F3Vertices[2].precise[0]"),
+      SFVARN(GPU.InQuad_F3Vertices[2].precise[1], "InQuad_F3Vertices[2].precise[1]"),
+      SFVARN(GPU.InQuad_F3Vertices[2].precise[2], "InQuad_F3Vertices[2].precise[2]"),
 
       SFVARN(GPU.InPLine_PrevPoint.x, "InPLine_PrevPoint.x"),
       SFVARN(GPU.InPLine_PrevPoint.y, "InPLine_PrevPoint.y"),
@@ -1986,16 +2093,6 @@ void GPU_set_dither_upscale_shift(uint8 factor)
    GPU.dither_upscale_shift = factor;
 }
 
-uint8 GPU_get_dither_upscale_shift(void)
-{
-   return GPU.dither_upscale_shift;
-}
-
-void GPU_set_upscale_shift(uint8 factor)
-{
-   GPU.upscale_shift = factor;
-}
-
 uint8 GPU_get_upscale_shift(void)
 {
    return GPU.upscale_shift;
@@ -2009,32 +2106,6 @@ bool GPU_DMACanWrite(void)
 uint16 *GPU_get_vram(void)
 {
    return GPU.vram;
-}
-
-uint16 GPU_PeekRAM(uint32 A)
-{
-   return texel_fetch(&GPU, A & 0x3FF, (A >> 10) & 0x1FF);
-}
-
-void GPU_PokeRAM(uint32 A, uint16 V)
-{
-   texel_put(A & 0x3FF, (A >> 10) & 0x1FF, V);
-}
-
-/* Set a pixel in VRAM, upscaling it if necessary */
-void texel_put(uint32 x, uint32 y, uint16 v)
-{
-   uint32_t dy, dx;
-   x <<= GPU.upscale_shift;
-   y <<= GPU.upscale_shift;
-
-   /* Duplicate the pixel as many times as necessary (nearest
-    * neighbour upscaling) */
-   for (dy = 0; dy < UPSCALE(&GPU); dy++)
-   {
-      for (dx = 0; dx < UPSCALE(&GPU); dx++)
-         vram_put(&GPU, x + dx, y + dy, v);
-   }
 }
 
 int32_t GPU_GetScanlineNum(void)

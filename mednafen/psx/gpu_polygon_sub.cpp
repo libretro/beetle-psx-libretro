@@ -2,6 +2,7 @@
 #include "../../rsx/rsx_intf.h"
 
 #include <float.h>
+#include <retro_miscellaneous.h>
 
 extern "C" uint8_t psx_gpu_upscale_shift_hw;
 
@@ -157,10 +158,12 @@ void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 		// If we're not using texture window, we're likely accessing a small subset of the texture.
 		for (unsigned int i = 0; i < count; i++)
 		{
-			min_u = std::min(min_u, uint16_t(vertices[i].u));
-			min_v = std::min(min_v, uint16_t(vertices[i].v));
-			max_u = std::max(max_u, uint16_t(vertices[i].u));
-			max_v = std::max(max_v, uint16_t(vertices[i].v));
+			uint16_t u = (uint16_t)vertices[i].u;
+			uint16_t v = (uint16_t)vertices[i].v;
+			min_u = MIN(min_u, u);
+			min_v = MIN(min_v, v);
+			max_u = MAX(max_u, u);
+			max_v = MAX(max_v, v);
 		}
 	}
 	else

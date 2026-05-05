@@ -1,5 +1,4 @@
 #include <math.h>
-#include <algorithm>
 #include "beetle_psx_globals.h"
 
 #define COORD_FBS 12
@@ -247,19 +246,19 @@ static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices)
 
       if(vertices[2].y < vertices[1].y)
          {
-            std::swap(vertices[2], vertices[1]);
+            vertex_swap(tri_vertex, vertices[2], vertices[1]);
             cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1);
          }
 
       if(vertices[1].y < vertices[0].y)
          {
-            std::swap(vertices[1], vertices[0]);
+            vertex_swap(tri_vertex, vertices[1], vertices[0]);
             cvtemp = ((cvtemp >> 1) & 0x1) | ((cvtemp << 1) & 0x2) | (cvtemp & 0x4);
          }
 
       if(vertices[2].y < vertices[1].y)
          {
-            std::swap(vertices[2], vertices[1]);
+            vertex_swap(tri_vertex, vertices[2], vertices[1]);
             cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1);
          }
 
