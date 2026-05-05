@@ -70,18 +70,36 @@ unsigned int PGXP_tDebug = 0;
 /* ============================================================
  * Blade_Arma's Vertex Cache (CatBlade?)
  *
- * vertexCache is a 4096x4096 grid of PGXP_value entries indexed by
- * the 11-bit signed vertex (sx, sy) screen coordinates.  At
- * 28 bytes per entry that's 448 MB, so it's allocated lazily via
- * calloc() the first time it's actually needed and only when the
- * PGXP_VERTEX_CACHE mode bit is set.  Most users do not enable the
- * vertex cache, and previously the buffer was static BSS that
- * still consumed 448 MB of address space (and got faulted in on
- * the first memset) regardless of whether the feature was on.
+ * vertexCache is a 4096x4096 grid indexed by the 11-bit signed
+ * vertex (sx, sy) screen coordinates.  At 28 bytes per PGXP_value
+ * that grid would be 448 MB if we stored full PGXP_values; the
+ * read path however only uses x, y, z, and a tiny session-validity
+ * flag, so the cache is stored as a packed 16-byte
+ * PGXP_cache_entry instead - shaving off ~192 MB of heap when the
+ * cache is allocated.  The full PGXP_value's count / value / flags
+ * / lFlags / hFlags fields are not relevant for cache reads; they
+ * matter only on the FIFO/CB side, which uses PGXP_value directly.
+ *
+ * The buffer is allocated lazily via calloc() the first time it's
+ * actually needed and only when the PGXP_VERTEX_CACHE mode bit is
+ * set.  Most users do not enable the vertex cache, and previously
+ * the buffer was static BSS that still consumed 448 MB of address
+ * space (and got faulted in on the first memset) regardless of
+ * whether the feature was on.
  *
  * The cache is freed in PGXP_Shutdown() (called from retro_deinit)
  * so we don't leak across libretro dlopen/dlclose cycles.
  * ============================================================ */
+typedef struct
+{
+	float   x;
+	float   y;
+	float   z;
+	uint8_t gFlags;	/* 0: empty.  1: valid this session.  5 was used by
+	                 * the (currently disabled) "ambiguous" branch. */
+	/* 3 bytes of tail padding bring this to 16 bytes naturally. */
+} PGXP_cache_entry;
+
 const unsigned int mode_init = 0;
 const unsigned int mode_write = 1;
 const unsigned int mode_read = 2;
@@ -90,7 +108,7 @@ const unsigned int mode_fail = 3;
 #define VERTEX_CACHE_DIM	(0x800 * 2)
 #define VERTEX_CACHE_SIZE	(VERTEX_CACHE_DIM * VERTEX_CACHE_DIM)
 
-static PGXP_value *vertexCache = NULL;
+static PGXP_cache_entry *vertexCache = NULL;
 
 unsigned int baseID = 0;
 unsigned int lastID = 0;
@@ -103,7 +121,7 @@ static int VertexCacheEnsureAllocated(void)
 {
 	if (vertexCache)
 		return 1;
-	vertexCache = (PGXP_value*)calloc(VERTEX_CACHE_SIZE, sizeof(PGXP_value));
+	vertexCache = (PGXP_cache_entry*)calloc(VERTEX_CACHE_SIZE, sizeof(PGXP_cache_entry));
 	return vertexCache ? 1 : 0;
 }
 
@@ -143,7 +161,7 @@ unsigned int IsSessionID(unsigned int vertID)
 void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
 {
 	const PGXP_value*	pNewVertex = (const PGXP_value*)_pVertex;
-	PGXP_value*		pOldVertex = NULL;
+	PGXP_cache_entry*	pOldVertex = NULL;
 
 	if (!pNewVertex)
 	{
@@ -194,19 +212,23 @@ void PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex)
 				(fabsf(pOldVertex->y - pNewVertex->y) > 0.1f) ||
 				(fabsf(pOldVertex->z - pNewVertex->z) > 0.1f))
 			{
-				*pOldVertex = *pNewVertex;
+				pOldVertex->x      = pNewVertex->x;
+				pOldVertex->y      = pNewVertex->y;
+				pOldVertex->z      = pNewVertex->z;
 				pOldVertex->gFlags = 5;
 				return;
 			}
 		}
 
 		/* Write vertex into cache */
-		*pOldVertex = *pNewVertex;
+		pOldVertex->x      = pNewVertex->x;
+		pOldVertex->y      = pNewVertex->y;
+		pOldVertex->z      = pNewVertex->z;
 		pOldVertex->gFlags = 1;
 	}
 }
 
-PGXP_value* PGXP_GetCachedVertex(short sx, short sy)
+static PGXP_cache_entry* PGXP_GetCachedVertex(short sx, short sy)
 {
 	if (cacheMode != mode_read)
 	{
@@ -287,15 +309,17 @@ int PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVerte
 	}
 	else
 	{
-		/* Look in cache for valid vertex */
-		vert = PGXP_GetCachedVertex(psxData[0], psxData[1]);
-		if ((vert) && (vert->gFlags == 1))
+		/* Look in cache for valid vertex.  The cache holds a smaller
+		 * struct (just x/y/z/gFlags) than the FIFO/CB, so we use a
+		 * separate local rather than aliasing `vert`. */
+		PGXP_cache_entry* cache_vert = PGXP_GetCachedVertex(psxData[0], psxData[1]);
+		if ((cache_vert) && (cache_vert->gFlags == 1))
 		{
 			/* a value is found, it is from the current session and is unambiguous (there was only one value recorded at that position) */
-			pOutput->x = vert->x + xOffs;
-			pOutput->y = vert->y + yOffs;
+			pOutput->x = cache_vert->x + xOffs;
+			pOutput->y = cache_vert->y + yOffs;
 			pOutput->z = 0.95f;
-			pOutput->w = vert->z;
+			pOutput->w = cache_vert->z;
 			pOutput->valid_w = 0;	/* iCB: Getting the wrong w component causes too great an error when using perspective correction so disable it */
 		}
 		else
