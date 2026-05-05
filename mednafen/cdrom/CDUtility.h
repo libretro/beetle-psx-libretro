@@ -56,6 +56,7 @@ struct TOC
 // the initialization function to be called is called, for potential
 // usage in constructors of statically-declared objects.
 void CDUtility_Init(void);
+void CDUtility_Kill(void);
 
 // Quick definitions here:
 //

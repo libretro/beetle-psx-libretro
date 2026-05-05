@@ -5121,6 +5121,13 @@ void retro_deinit(void)
       surf = NULL;
    }
 
+   /* Companion to retro_init's CDUtility_Init. Frees the Reed-Solomon
+    * and Galois L-EC correction tables (~4 KB) which would otherwise
+    * leak per dlopen/dlclose cycle. The Init has an internal Inited
+    * guard, so a re-init in a subsequent retro_init call works
+    * correctly. */
+   CDUtility_Kill();
+
    /* Frame/UI state. */
    frame_count           = 0;
    internal_frame_count  = 0;
