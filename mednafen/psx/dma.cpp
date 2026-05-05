@@ -20,6 +20,8 @@
 #include "cdc.h"
 #include "spu.h"
 
+#include <retro_miscellaneous.h>
+
 #include "../state_helpers.h"
 
 #include "../pgxp/pgxp_mem.h"
@@ -72,16 +74,6 @@ static Channel DMACH[7];
 static int32_t lastts;
 
 static const char *PrettyChannelNames[7] = { "MDEC IN", "MDEC OUT", "GPU", "CDC", "SPU", "PIO", "OTC" };
-
-void DMA_Init(void)
-{
-
-}
-
-void DMA_Kill(void)
-{
-
-}
 
 static INLINE void RecalcIRQOut(void)
 {
@@ -291,11 +283,7 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
    }
 
    // GROSS APPROXIMATION, shoehorning multiple effects together, TODO separate(especially SPU and CDC)
-   DMACH[ch].ClockCounter -= std::max<int>(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
-}
-
-static INLINE void RunChannelI(const unsigned ch, const uint32_t CRModeCache, int32_t clocks)
-{
+   DMACH[ch].ClockCounter -= MAX(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
 }
 
 static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
@@ -719,11 +707,6 @@ int DMA_StateAction(StateMem *sm, int load, int data_only)
    };
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "DMA");
-
-   if(load)
-   {
-
-   }
 
    return(ret);
 }

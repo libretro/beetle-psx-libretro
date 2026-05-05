@@ -2038,8 +2038,6 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    input_set_fio(PSX_FIO);
 
-   DMA_Init();
-
    switch (psx_gpu_dither_mode)
    {
       case DITHER_NATIVE:
@@ -2487,8 +2485,6 @@ static void Cleanup(void)
       delete PSX_FIO;
    PSX_FIO = NULL;
    input_set_fio(NULL);
-
-   DMA_Kill();
 
 #ifdef HAVE_LIGHTREC
    /* InitCommon picks one of two allocation strategies based on whether
