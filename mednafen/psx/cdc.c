@@ -404,7 +404,7 @@ int32 PS_CDC_CalcNextEvent(PS_CDC *cdc)
    if(cdc->DiscStartupDelay > 0 && next_event > cdc->DiscStartupDelay)
       next_event = cdc->DiscStartupDelay;
 
-/*fprintf(stderr, "%d %d %d %d --- %d\n", PSRCounter, PendingCommandCounter, CDCReadyReceiveCounter, DiscStartupDelay, next_event); */
+   /*fprintf(stderr, "%d %d %d %d --- %d\n", PSRCounter, PendingCommandCounter, CDCReadyReceiveCounter, DiscStartupDelay, next_event); */
 
    overclock_device_to_cpu(&next_event);
 
@@ -415,7 +415,7 @@ void PS_CDC_SoftReset(PS_CDC *cdc)
 {
    PS_CDC_ClearAudioBuffers(cdc);
 
-/* Not sure about initial volume state */
+   /* Not sure about initial volume state */
    cdc->Pending_DecodeVolume[0][0] = 0x80;
    cdc->Pending_DecodeVolume[0][1] = 0x00;
    cdc->Pending_DecodeVolume[1][0] = 0x00;
@@ -638,7 +638,7 @@ int PS_CDC_StateAction(PS_CDC *cdc, StateMem *sm, int load, int data_only)
       cdc->ADPCM_ResampCurPhase %= 7;
 
 
-/* Handle pre-0.9.37 state loading, and maliciously-constructed/corrupted save states. */
+      /* Handle pre-0.9.37 state loading, and maliciously-constructed/corrupted save states. */
       if(!cdc->Cur_CDIF)
          PS_CDC_DMForceStop(cdc);
    }
@@ -669,10 +669,10 @@ void PS_CDC_WriteIRQ(PS_CDC *cdc, uint8 V)
 
 void PS_CDC_BeginResults(PS_CDC *cdc)
 {
-/*if(ResultsIn) */
-/* { */
-/* printf("Cleared %d results. IRQBuffer=0x%02x\n", ResultsIn, IRQBuffer); */
-/*} */
+   /*if(ResultsIn) */
+   /* { */
+   /* printf("Cleared %d results. IRQBuffer=0x%02x\n", ResultsIn, IRQBuffer); */
+   /*} */
 
    cdc->ResultsIn = 0;
    cdc->ResultsWP = 0;
@@ -888,8 +888,8 @@ void PS_CDC_GetCDAudio(PS_CDC *cdc, int32 samples[2], const unsigned freq)
       }
    }
 
-/* Algorithmically, volume is applied after resampling for CD-XA ADPCM playback, */
-/* per PS1 tests(though when "mute" is applied wasn't tested). */
+   /* Algorithmically, volume is applied after resampling for CD-XA ADPCM playback, */
+   /* per PS1 tests(though when "mute" is applied wasn't tested). */
    PS_CDC_ApplyVolume(cdc, samples);
 }
 
@@ -963,7 +963,7 @@ bool PS_CDC_XA_Test(PS_CDC *cdc, const uint8 *sdata)
 
    if(sh->submode & XA_SUBMODE_EOF)
    {
-/*puts("YAY"); */
+      /*puts("YAY"); */
       cdc->xa_cur_set = false;
       cdc->xa_cur_file = 0;
       cdc->xa_cur_chan = 0;
@@ -990,11 +990,11 @@ void PS_CDC_ClearAudioBuffers(PS_CDC *cdc)
 /* output should be readable at -2 and -1 */
 static void DecodeXAADPCM(const uint8 *input, int16 *output, const unsigned shift, const unsigned weight)
 {
-/* Weights copied over from SPU channel ADPCM playback code, */
-/* may not be entirely the same for CD-XA ADPCM, we need to run tests. */
+   /* Weights copied over from SPU channel ADPCM playback code, */
+   /* may not be entirely the same for CD-XA ADPCM, we need to run tests. */
    static const int32 Weights[16][2] =
    {
-/* s-1    s-2 */
+      /* s-1    s-2 */
       {   0,    0 },
       {  60,    0 },
       { 115,  -52 },
@@ -1035,7 +1035,7 @@ void PS_CDC_XA_ProcessSector(PS_CDC *cdc, const uint8 *sdata, CD_Audio_Buffer *a
 
    ab->Freq = (sh->coding & XA_CODING_189) ? 3 : 6;
 
-/*fprintf(stderr, "Coding: %02x %02x\n", sh->coding, sh->coding_dup); */
+   /*fprintf(stderr, "Coding: %02x %02x\n", sh->coding, sh->coding_dup); */
 
    {
       unsigned group;
@@ -1254,7 +1254,7 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
       cdc->HeaderBufValid = false;
 
 
-/* Status in this end-of-disc context here should be generated after we're in the pause state. */
+      /* Status in this end-of-disc context here should be generated after we're in the pause state. */
       cdc->DriveStatus = DS_PAUSED;
       cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
       cdc->SectorsRead = 0;
@@ -1265,13 +1265,13 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    if(cdc->DriveStatus == DS_PLAYING)
    {
-/* Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause). */
+      /* Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause). */
       if(cdc->PlayTrackMatch == -1 && cdc->SubQChecksumOK)
          cdc->PlayTrackMatch = cdc->SubQBuf_Safe[0x1];
 
       if((cdc->Mode & MODE_AUTOPAUSE) && cdc->PlayTrackMatch != -1 && cdc->SubQBuf_Safe[0x1] != cdc->PlayTrackMatch)
       {
-/* Status needs to be taken before we're paused(IE it should still report playing). */
+         /* Status needs to be taken before we're paused(IE it should still report playing). */
          PS_CDC_SetAIP1(cdc, CDCIRQ_DATA_END, PS_CDC_MakeStatus(cdc, false));
 
          cdc->DriveStatus = DS_PAUSED;
@@ -1348,7 +1348,7 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
             }
             else
             {
-/* maybe if(!(Mode & 0x30)) too? */
+               /* maybe if(!(Mode & 0x30)) too? */
                if(!(buf[12 + 6] & 0x20))
                {
                   if(!edc_lec_check_and_correct(buf, true))
@@ -1389,18 +1389,18 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
    cdc->SectorPipe_In++;
 
    if (cdc->Mode & MODE_SPEED) {
-/* We're in 2x mode */
+      /* We're in 2x mode */
       if (cdc->Mode & (MODE_CDDA | MODE_STRSND)) {
-/* We're probably streaming audio to the CD drive, keep the */
-/* native speed */
+         /* We're probably streaming audio to the CD drive, keep the */
+         /* native speed */
          speed_mul = 2;
       } else {
-/* *Probably* not streaming audio, we can try increasing the */
-/* *CD speed beyond native */
+         /* *Probably* not streaming audio, we can try increasing the */
+         /* *CD speed beyond native */
          speed_mul = 2 * cd_2x_speedup;
       }
    } else {
-/* 1x mode */
+      /* 1x mode */
       speed_mul = 1;
    }
 
@@ -1408,7 +1408,7 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    if(cdc->DriveStatus == DS_PLAYING)
    {
-/* FIXME: What's the real fast-forward and backward speed? */
+      /* FIXME: What's the real fast-forward and backward speed? */
       if(cdc->Forward)
          cdc->CurSector += 12;
       else if(cdc->Backward)
@@ -1433,7 +1433,7 @@ int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
 
    overclock_cpu_to_device(&clocks);
 
-/*doom_ts = timestamp; */
+   /*doom_ts = timestamp; */
 
    while(clocks > 0)
    {
@@ -1509,8 +1509,8 @@ int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
                      int x;
                      cdc->CurSector = cdc->SeekTarget;
 
-/* CurSector + x for "Tomb Raider"'s sake, as it relies on behavior that we can't emulate very well without a more accurate CD drive */
-/* emulation model. */
+                     /* CurSector + x for "Tomb Raider"'s sake, as it relies on behavior that we can't emulate very well without a more accurate CD drive */
+                     /* emulation model. */
                      for(x = -1; x >= -16; x--)
                      {
                         uint8 pwbuf[96];
@@ -1570,10 +1570,10 @@ int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
          {
             cdc->PendingCommandCounter = cdc->CDCReadyReceiveCounter;  /*256; */
          }
-/*else if(PendingCommandCounter <= 0 && PSRCounter > 0 && PSRCounter < 2000) */
-/*{ */
-/* PendingCommandCounter = PSRCounter + 1; */
-/*} */
+         /*else if(PendingCommandCounter <= 0 && PSRCounter > 0 && PSRCounter < 2000) */
+         /*{ */
+         /* PendingCommandCounter = PSRCounter + 1; */
+         /*} */
          else if(cdc->PendingCommandCounter <= 0)
          {
             int32 next_time = 0;
@@ -1669,7 +1669,7 @@ void PS_CDC_Write(PS_CDC *cdc, const int32_t timestamp, uint32 A, uint8 V)
 {
    A &= 0x3;
 
-/*printf("Write: %08x %02x\n", A, V); */
+   /*printf("Write: %08x %02x\n", A, V); */
 
    if(A == 0x00)
    {
@@ -1746,9 +1746,9 @@ void PS_CDC_Write(PS_CDC *cdc, const int32_t timestamp, uint32 A, uint8 V)
          case 0x05:
             if((cdc->IRQBuffer &~ V) != cdc->IRQBuffer && cdc->ResultsIn)
             {
-/* To debug icky race-condition related problems in "Psychic Detective", and to see if any games suffer from the same potential issue */
-/* (to know what to test when we emulate CPU more accurately in regards to pipeline stalls and timing, which could throw off our kludge */
-/*  for this issue) */
+            /* To debug icky race-condition related problems in "Psychic Detective", and to see if any games suffer from the same potential issue */
+            /* (to know what to test when we emulate CPU more accurately in regards to pipeline stalls and timing, which could throw off our kludge */
+            /*  for this issue) */
             }
 
             cdc->IRQBuffer &= ~V;
@@ -1792,7 +1792,7 @@ uint8 PS_CDC_Read(PS_CDC *cdc, const int32_t timestamp, uint32 A)
 {
    A &= 0x03;
 
-/*printf("Read %08x\n", A); */
+   /*printf("Read %08x\n", A); */
 
    if(A == 0x00)
    {
@@ -1967,21 +1967,21 @@ int32 PS_CDC_CalcSeekTime(PS_CDC *cdc, int32 initial, int32 target, bool motor_o
       ret += (int64)33868800 * 300 / 1000;
    else if(paused)
    {
-/* The delay to restart from a Pause state is...very....WEIRD.  The time it takes is related to the amount of time that has passed since the pause, and */
-/* where on the disc the laser head is, with generally more time passed = longer to resume, except that there's a window of time where it takes a */
-/* ridiculous amount of time when not much time has passed. */
+      /* The delay to restart from a Pause state is...very....WEIRD.  The time it takes is related to the amount of time that has passed since the pause, and */
+      /* where on the disc the laser head is, with generally more time passed = longer to resume, except that there's a window of time where it takes a */
+      /* ridiculous amount of time when not much time has passed. */
 
-/* What we have here will be EXTREMELY simplified. */
-
-
+      /* What we have here will be EXTREMELY simplified. */
 
 
-/*if(time_passed >= 67737) */
-/*{ */
-/*} */
-/*else */
+
+
+      /*if(time_passed >= 67737) */
+      /*{ */
+      /*} */
+      /*else */
       {
-/* Take twice as long for 1x mode. */
+         /* Take twice as long for 1x mode. */
          if (cdc->Mode & MODE_SPEED) {
             ret += 1237952 / cd_2x_speedup;
          } else {
@@ -1989,8 +1989,8 @@ int32 PS_CDC_CalcSeekTime(PS_CDC *cdc, int32 initial, int32 target, bool motor_o
          }
       }
    }
-/*else if(target < initial) */
-/* ret += 1000000; */
+   /*else if(target < initial) */
+   /* ret += 1000000; */
 
    ret += PSX_GetRandU32(0, 25000);
    return(ret);
@@ -2006,7 +2006,7 @@ void PS_CDC_PreSeekHack(PS_CDC *cdc, uint32 target)
    cdc->CurSector = target;  /* If removing/changing this, take into account how it will affect ReadN/ReadS/Play/etc command calls that interrupt a seek. */
    cdc->SeekRetryCounter = 128;
 
-/* If removing this SubQ reading bit, think about how it will interact with a Read command of data(or audio :b) sectors when Mode bit0 is 1. */
+   /* If removing this SubQ reading bit, think about how it will interact with a Read command of data(or audio :b) sectors when Mode bit0 is 1. */
    do
    {
       CDIF_ReadRawSectorPWOnly(cdc->Cur_CDIF, pwbuf, target++, true);
@@ -2137,14 +2137,14 @@ void PS_CDC_ReadBase(PS_CDC *cdc)
 
    if(cdc->CommandLoc_Dirty || cdc->DriveStatus != DS_READING)
    {
-/* Don't flush the DMABuffer here; see CTR course selection screen. */
+      /* Don't flush the DMABuffer here; see CTR course selection screen. */
       PS_CDC_ClearAIP(cdc);
       PS_CDC_ClearAudioBuffers(cdc);
       cdc->SB_In = 0;
       cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
       cdc->SectorsRead = 0;
 
-/* TODO: separate motor start from seek phase? */
+      /* TODO: separate motor start from seek phase? */
 
       if(cdc->CommandLoc_Dirty)
          cdc->SeekTarget = cdc->CommandLoc;
@@ -2261,13 +2261,13 @@ int32 PS_CDC_Command_Pause(PS_CDC *cdc, const int arg_count, const uint8 *args)
    }
    cdc->SectorsRead = 0;
 
-/* "Viewpoint" flips out and crashes if reading isn't stopped (almost?) immediately. */
-/*PS_CDC_ClearAudioBuffers(cdc); */
+   /* "Viewpoint" flips out and crashes if reading isn't stopped (almost?) immediately. */
+   /*PS_CDC_ClearAudioBuffers(cdc); */
    cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
    PS_CDC_ClearAIP(cdc);
    cdc->DriveStatus = DS_PAUSED;
 
-/* An approximation. */
+   /* An approximation. */
    return((1124584 + ((int64)cdc->CurSector * 42596 / (75 * 60))) * ((cdc->Mode & MODE_SPEED) ? 1 : 2));
 }
 
@@ -2369,7 +2369,7 @@ int32 PS_CDC_Command_GetlocL(PS_CDC *cdc, const int arg_count, const uint8 *args
       unsigned i;
       for (i = 0; i < 8; i++)
    {
-/*printf("%d %d: %02x\n", DriveStatus, i, HeaderBuf[i]); */
+      /*printf("%d %d: %02x\n", DriveStatus, i, HeaderBuf[i]); */
       PS_CDC_WriteResult(cdc, cdc->HeaderBuf[i]);
    }
    }
@@ -2384,7 +2384,7 @@ int32 PS_CDC_Command_GetlocP(PS_CDC *cdc, const int arg_count, const uint8 *args
    if(!PS_CDC_CommandCheckDiscPresent(cdc))
       return(0);
 
-/*printf("%2x:%2x %2x:%2x:%2x %2x:%2x:%2x\n", SubQBuf_Safe[0x1], SubQBuf_Safe[0x2], SubQBuf_Safe[0x3], SubQBuf_Safe[0x4], SubQBuf_Safe[0x5], SubQBuf_Safe[0x7], SubQBuf_Safe[0x8], SubQBuf_Safe[0x9]); */
+   /*printf("%2x:%2x %2x:%2x:%2x %2x:%2x:%2x\n", SubQBuf_Safe[0x1], SubQBuf_Safe[0x2], SubQBuf_Safe[0x3], SubQBuf_Safe[0x4], SubQBuf_Safe[0x5], SubQBuf_Safe[0x7], SubQBuf_Safe[0x8], SubQBuf_Safe[0x9]); */
 
    PS_CDC_WriteResult(cdc, cdc->SubQBuf_Safe[0x1]);  /* Track */
    PS_CDC_WriteResult(cdc, cdc->SubQBuf_Safe[0x2]);  /* Index */
@@ -2458,7 +2458,7 @@ int32 PS_CDC_Command_GetTD(PS_CDC *cdc, const int arg_count, const uint8 *args)
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteResult(cdc, U8_to_BCD(m));
    PS_CDC_WriteResult(cdc, U8_to_BCD(s));
-/*PS_CDC_WriteResult(cdc, U8_to_BCD(f)); */
+   /*PS_CDC_WriteResult(cdc, U8_to_BCD(f)); */
 
    PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
 
@@ -2536,7 +2536,7 @@ int32 PS_CDC_Command_Test(PS_CDC *cdc, const int arg_count, const uint8 *args)
          break;
 #if 0
       case 0x50:  /* *Need to retest this test command, it takes additional arguments??? Or in any case, it generates a different error code(0x20) than most other Test */
-/* sub-commands that generate an error code(0x10). */
+         /* sub-commands that generate an error code(0x10). */
          break;
 
 /* Same with 0x60, 0x71-0x76 */
@@ -2557,7 +2557,7 @@ int32 PS_CDC_Command_Test(PS_CDC *cdc, const int arg_count, const uint8 *args)
          break;
 
 
-/* SCEx counters not reset by command 0x0A. */
+      /* SCEx counters not reset by command 0x0A. */
 
 
       case 0x04:  /* Reset SCEx counters */
@@ -2695,18 +2695,18 @@ int32 PS_CDC_Command_ReadTOC(PS_CDC *cdc, const int arg_count, const uint8 *args
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
 
-/* ReadTOC doesn't error out if the tray is open, and it completes rather quickly in that case. */
+   /* ReadTOC doesn't error out if the tray is open, and it completes rather quickly in that case. */
 
    if(!PS_CDC_CommandCheckDiscPresent(cdc))
       return(26000);
 
 
 
-/* A gross approximation. */
-/* The penalty for the drive being stopped seems to be rather high(higher than what PS_CDC_CalcSeekTime(cdc) currently introduces), although */
-/* that should be investigated further. */
+   /* A gross approximation. */
+   /* The penalty for the drive being stopped seems to be rather high(higher than what PS_CDC_CalcSeekTime(cdc) currently introduces), although */
+   /* that should be investigated further. */
 
-/* ...and not to mention the time taken varies from disc to disc even! */
+   /* ...and not to mention the time taken varies from disc to disc even! */
    ret_time = 30000000 + PS_CDC_CalcSeekTime(cdc, cdc->CurSector, 0, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
 
    cdc->DriveStatus = DS_PAUSED;  /* Ends up in a pause state when the command is finished.  Maybe we should add DS_READTOC or something... */
@@ -2717,8 +2717,8 @@ int32 PS_CDC_Command_ReadTOC(PS_CDC *cdc, const int arg_count, const uint8 *args
 
 int32 PS_CDC_Command_ReadTOC_Part2(PS_CDC *cdc)
 {
-/*if(!PS_CDC_CommandCheckDiscPresent(cdc)) */
-/* DriveStatus = DS_PAUSED; */
+   /*if(!PS_CDC_CommandCheckDiscPresent(cdc)) */
+   /* DriveStatus = DS_PAUSED; */
 
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_COMPLETE);
