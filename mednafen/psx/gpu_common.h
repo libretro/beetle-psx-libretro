@@ -697,20 +697,212 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  *                 frame-buffer-cost word count differs from len
  *                 for textured non-variable sprites
  *                 (`|, not +, for this` annotation in original).
- */
-#define SPR_HELPER_SUB(bm, cv, tm, mam) Command_DrawSprite<(cv >> 3) & 0x3,	((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam>
+ *
+ * The Command_DrawSprite mangled name is built from cv's bits at
+ * preprocessor time:
+ *
+ *    SPR_HELPER_S_<cv>     yields S<n>           (raw_size 0..3)
+ *    SPR_HELPER_T_<cv>     yields T<n>           (textured 0/1)
+ *    SPR_HELPER_BM_<cv>(bm) yields BMopaque
+ *                           or BM_##bm           (per blended bit)
+ *    SPR_HELPER_TM_<cv>    yields TM<n>          (texmult, derived
+ *                                                 from bits 0+2)
+ *
+ * The MaskEval (mam) and TexMode_TA (mo) dimensions are pasted
+ * directly as literals at the FG level.  For non-textured cv the
+ * MO dimension collapses (TexMode_TA fixed at 0); SPR_HELPER_FG
+ * still emits 4 slots of the same name to fill the dispatch row.
+ *
+ * The bm-tag rewrite goes through the LINE_BMTAG_* family from the
+ * line block above (BMavg/BMadd/BMsub/BMaddq tags - same layout). */
 
-#define SPR_HELPER_FG(bm, cv)						\
-	 {								\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		SPR_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-	 }
+/*  cv         raw_size  textured  blended  texmult  */
+#define SPR_HELPER_S_0x60   S0
+#define SPR_HELPER_T_0x60   T0
+#define SPR_HELPER_TM_0x60  TM0
+#define SPR_HELPER_BM_0x60(bm) BMopaque
+#define SPR_HELPER_S_0x61   S0
+#define SPR_HELPER_T_0x61   T0
+#define SPR_HELPER_TM_0x61  TM0
+#define SPR_HELPER_BM_0x61(bm) BMopaque
+#define SPR_HELPER_S_0x62   S0
+#define SPR_HELPER_T_0x62   T0
+#define SPR_HELPER_TM_0x62  TM0
+#define SPR_HELPER_BM_0x62(bm) BM_##bm
+#define SPR_HELPER_S_0x63   S0
+#define SPR_HELPER_T_0x63   T0
+#define SPR_HELPER_TM_0x63  TM0
+#define SPR_HELPER_BM_0x63(bm) BM_##bm
+#define SPR_HELPER_S_0x64   S0
+#define SPR_HELPER_T_0x64   T1
+#define SPR_HELPER_TM_0x64  TM1
+#define SPR_HELPER_BM_0x64(bm) BMopaque
+#define SPR_HELPER_S_0x65   S0
+#define SPR_HELPER_T_0x65   T1
+#define SPR_HELPER_TM_0x65  TM0
+#define SPR_HELPER_BM_0x65(bm) BMopaque
+#define SPR_HELPER_S_0x66   S0
+#define SPR_HELPER_T_0x66   T1
+#define SPR_HELPER_TM_0x66  TM1
+#define SPR_HELPER_BM_0x66(bm) BM_##bm
+#define SPR_HELPER_S_0x67   S0
+#define SPR_HELPER_T_0x67   T1
+#define SPR_HELPER_TM_0x67  TM0
+#define SPR_HELPER_BM_0x67(bm) BM_##bm
+#define SPR_HELPER_S_0x68   S1
+#define SPR_HELPER_T_0x68   T0
+#define SPR_HELPER_TM_0x68  TM0
+#define SPR_HELPER_BM_0x68(bm) BMopaque
+#define SPR_HELPER_S_0x69   S1
+#define SPR_HELPER_T_0x69   T0
+#define SPR_HELPER_TM_0x69  TM0
+#define SPR_HELPER_BM_0x69(bm) BMopaque
+#define SPR_HELPER_S_0x6a   S1
+#define SPR_HELPER_T_0x6a   T0
+#define SPR_HELPER_TM_0x6a  TM0
+#define SPR_HELPER_BM_0x6a(bm) BM_##bm
+#define SPR_HELPER_S_0x6b   S1
+#define SPR_HELPER_T_0x6b   T0
+#define SPR_HELPER_TM_0x6b  TM0
+#define SPR_HELPER_BM_0x6b(bm) BM_##bm
+#define SPR_HELPER_S_0x6c   S1
+#define SPR_HELPER_T_0x6c   T1
+#define SPR_HELPER_TM_0x6c  TM1
+#define SPR_HELPER_BM_0x6c(bm) BMopaque
+#define SPR_HELPER_S_0x6d   S1
+#define SPR_HELPER_T_0x6d   T1
+#define SPR_HELPER_TM_0x6d  TM0
+#define SPR_HELPER_BM_0x6d(bm) BMopaque
+#define SPR_HELPER_S_0x6e   S1
+#define SPR_HELPER_T_0x6e   T1
+#define SPR_HELPER_TM_0x6e  TM1
+#define SPR_HELPER_BM_0x6e(bm) BM_##bm
+#define SPR_HELPER_S_0x6f   S1
+#define SPR_HELPER_T_0x6f   T1
+#define SPR_HELPER_TM_0x6f  TM0
+#define SPR_HELPER_BM_0x6f(bm) BM_##bm
+#define SPR_HELPER_S_0x70   S2
+#define SPR_HELPER_T_0x70   T0
+#define SPR_HELPER_TM_0x70  TM0
+#define SPR_HELPER_BM_0x70(bm) BMopaque
+#define SPR_HELPER_S_0x71   S2
+#define SPR_HELPER_T_0x71   T0
+#define SPR_HELPER_TM_0x71  TM0
+#define SPR_HELPER_BM_0x71(bm) BMopaque
+#define SPR_HELPER_S_0x72   S2
+#define SPR_HELPER_T_0x72   T0
+#define SPR_HELPER_TM_0x72  TM0
+#define SPR_HELPER_BM_0x72(bm) BM_##bm
+#define SPR_HELPER_S_0x73   S2
+#define SPR_HELPER_T_0x73   T0
+#define SPR_HELPER_TM_0x73  TM0
+#define SPR_HELPER_BM_0x73(bm) BM_##bm
+#define SPR_HELPER_S_0x74   S2
+#define SPR_HELPER_T_0x74   T1
+#define SPR_HELPER_TM_0x74  TM1
+#define SPR_HELPER_BM_0x74(bm) BMopaque
+#define SPR_HELPER_S_0x75   S2
+#define SPR_HELPER_T_0x75   T1
+#define SPR_HELPER_TM_0x75  TM0
+#define SPR_HELPER_BM_0x75(bm) BMopaque
+#define SPR_HELPER_S_0x76   S2
+#define SPR_HELPER_T_0x76   T1
+#define SPR_HELPER_TM_0x76  TM1
+#define SPR_HELPER_BM_0x76(bm) BM_##bm
+#define SPR_HELPER_S_0x77   S2
+#define SPR_HELPER_T_0x77   T1
+#define SPR_HELPER_TM_0x77  TM0
+#define SPR_HELPER_BM_0x77(bm) BM_##bm
+#define SPR_HELPER_S_0x78   S3
+#define SPR_HELPER_T_0x78   T0
+#define SPR_HELPER_TM_0x78  TM0
+#define SPR_HELPER_BM_0x78(bm) BMopaque
+#define SPR_HELPER_S_0x79   S3
+#define SPR_HELPER_T_0x79   T0
+#define SPR_HELPER_TM_0x79  TM0
+#define SPR_HELPER_BM_0x79(bm) BMopaque
+#define SPR_HELPER_S_0x7a   S3
+#define SPR_HELPER_T_0x7a   T0
+#define SPR_HELPER_TM_0x7a  TM0
+#define SPR_HELPER_BM_0x7a(bm) BM_##bm
+#define SPR_HELPER_S_0x7b   S3
+#define SPR_HELPER_T_0x7b   T0
+#define SPR_HELPER_TM_0x7b  TM0
+#define SPR_HELPER_BM_0x7b(bm) BM_##bm
+#define SPR_HELPER_S_0x7c   S3
+#define SPR_HELPER_T_0x7c   T1
+#define SPR_HELPER_TM_0x7c  TM1
+#define SPR_HELPER_BM_0x7c(bm) BMopaque
+#define SPR_HELPER_S_0x7d   S3
+#define SPR_HELPER_T_0x7d   T1
+#define SPR_HELPER_TM_0x7d  TM0
+#define SPR_HELPER_BM_0x7d(bm) BMopaque
+#define SPR_HELPER_S_0x7e   S3
+#define SPR_HELPER_T_0x7e   T1
+#define SPR_HELPER_TM_0x7e  TM1
+#define SPR_HELPER_BM_0x7e(bm) BM_##bm
+#define SPR_HELPER_S_0x7f   S3
+#define SPR_HELPER_T_0x7f   T1
+#define SPR_HELPER_TM_0x7f  TM0
+#define SPR_HELPER_BM_0x7f(bm) BM_##bm
+
+/* MO selector per cv: non-textured cv always wants MO=0 (since
+ * Command_DrawSprite is only defined with MO0 when T=0); textured
+ * cv passes through the MO slot value. */
+#define SPR_HELPER_MO_0x60(mo) 0
+#define SPR_HELPER_MO_0x61(mo) 0
+#define SPR_HELPER_MO_0x62(mo) 0
+#define SPR_HELPER_MO_0x63(mo) 0
+#define SPR_HELPER_MO_0x64(mo) mo
+#define SPR_HELPER_MO_0x65(mo) mo
+#define SPR_HELPER_MO_0x66(mo) mo
+#define SPR_HELPER_MO_0x67(mo) mo
+#define SPR_HELPER_MO_0x68(mo) 0
+#define SPR_HELPER_MO_0x69(mo) 0
+#define SPR_HELPER_MO_0x6a(mo) 0
+#define SPR_HELPER_MO_0x6b(mo) 0
+#define SPR_HELPER_MO_0x6c(mo) mo
+#define SPR_HELPER_MO_0x6d(mo) mo
+#define SPR_HELPER_MO_0x6e(mo) mo
+#define SPR_HELPER_MO_0x6f(mo) mo
+#define SPR_HELPER_MO_0x70(mo) 0
+#define SPR_HELPER_MO_0x71(mo) 0
+#define SPR_HELPER_MO_0x72(mo) 0
+#define SPR_HELPER_MO_0x73(mo) 0
+#define SPR_HELPER_MO_0x74(mo) mo
+#define SPR_HELPER_MO_0x75(mo) mo
+#define SPR_HELPER_MO_0x76(mo) mo
+#define SPR_HELPER_MO_0x77(mo) mo
+#define SPR_HELPER_MO_0x78(mo) 0
+#define SPR_HELPER_MO_0x79(mo) 0
+#define SPR_HELPER_MO_0x7a(mo) 0
+#define SPR_HELPER_MO_0x7b(mo) 0
+#define SPR_HELPER_MO_0x7c(mo) mo
+#define SPR_HELPER_MO_0x7d(mo) mo
+#define SPR_HELPER_MO_0x7e(mo) mo
+#define SPR_HELPER_MO_0x7f(mo) mo
+
+/* Three-level paste indirection so all bm/tm/mam fragments expand
+ * fully before token-pasting into the function name. */
+#define SPR_HELPER_NAME(s, t, bmtag, tm, mo, mam)        SPR_HELPER_NAME_(s, t, bmtag, tm, mo, mam)
+#define SPR_HELPER_NAME_(s, t, bmtag, tm, mo, mam)       SPR_HELPER_NAME__(s, t, LINE_BMTAG_##bmtag, tm, mo, mam)
+#define SPR_HELPER_NAME__(s, t, finaltag, tm, mo, mam)   SPR_HELPER_NAME___(s, t, finaltag, tm, mo, mam)
+#define SPR_HELPER_NAME___(s, t, finaltag, tm, mo, mam)  Command_DrawSprite_##s##_##t##_##finaltag##_##tm##_MO##mo##_ME##mam
+
+#define SPR_HELPER_SUB(bm, cv, mo, mam) \
+   SPR_HELPER_NAME(SPR_HELPER_S_##cv, SPR_HELPER_T_##cv, SPR_HELPER_BM_##cv(bm), SPR_HELPER_TM_##cv, SPR_HELPER_MO_##cv(mo), mam)
+
+#define SPR_HELPER_FG(bm, cv) \
+   { \
+      SPR_HELPER_SUB(bm, cv, 0, 0), \
+      SPR_HELPER_SUB(bm, cv, 1, 0), \
+      SPR_HELPER_SUB(bm, cv, 2, 0), \
+      SPR_HELPER_SUB(bm, cv, 2, 0), \
+      SPR_HELPER_SUB(bm, cv, 0, 1), \
+      SPR_HELPER_SUB(bm, cv, 1, 1), \
+      SPR_HELPER_SUB(bm, cv, 2, 1), \
+      SPR_HELPER_SUB(bm, cv, 2, 1)  \
+   }
 
 
 #define SPR_HELPER(cv)												\
