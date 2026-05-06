@@ -723,9 +723,9 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 
 /*
  * LINE_HELPER_SUB / _FG / LINE_HELPER - line analogue. Lines are
- * never textured, so TexMode/TexMult are absent from the template
- * argument list and all 8 dispatch slots within a row carry the
- * same MaskEval pair (0/0/0/0/1/1/1/1).
+ * never textured, so TexMode/TexMult are absent from the argument
+ * list and all 8 dispatch slots within a row carry the same
+ * MaskEval pair (0/0/0/0/1/1/1/1).
  *
  * LINE_HELPER's `len`:
  *   3 + polyline
@@ -735,8 +735,103 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  *        the terminator-checking phase the rasteriser performs.
  *
  *   fifo_fb_len = 1
+ *
+ * Each LINE_HELPER_PG_<cv> resolves the polyline / gouraud bits of
+ * the opcode at preprocessor time, yielding the correct P<n>_G<n>
+ * fragment for the Command_DrawLine_<...> mangled name in
+ * gpu_line.cpp.  The blend-mode dimension is dispatched by selecting
+ * between the BMopaque and BM<bm> tags via the LINE_BMTAG_<bm>_<cv>
+ * macro family below.
  */
-#define LINE_HELPER_SUB(bm, cv, mam) Command_DrawLine<((cv & 0x08) >> 3), ((cv & 0x10) >> 4), ((cv & 0x2) >> 1) ? bm : -1, mam>
+
+/*  cv         polyline  gouraud  blended  */
+#define LINE_HELPER_PG_0x40 P0_G0  /*    0       0        0      */
+#define LINE_HELPER_PG_0x41 P0_G0  /*    0       0        0      */
+#define LINE_HELPER_PG_0x42 P0_G0  /*    0       0        1      */
+#define LINE_HELPER_PG_0x43 P0_G0  /*    0       0        1      */
+#define LINE_HELPER_PG_0x44 P0_G0  /*    0       0        0      */
+#define LINE_HELPER_PG_0x45 P0_G0  /*    0       0        0      */
+#define LINE_HELPER_PG_0x46 P0_G0  /*    0       0        1      */
+#define LINE_HELPER_PG_0x47 P0_G0  /*    0       0        1      */
+#define LINE_HELPER_PG_0x48 P1_G0  /*    1       0        0      */
+#define LINE_HELPER_PG_0x49 P1_G0  /*    1       0        0      */
+#define LINE_HELPER_PG_0x4a P1_G0  /*    1       0        1      */
+#define LINE_HELPER_PG_0x4b P1_G0  /*    1       0        1      */
+#define LINE_HELPER_PG_0x4c P1_G0  /*    1       0        0      */
+#define LINE_HELPER_PG_0x4d P1_G0  /*    1       0        0      */
+#define LINE_HELPER_PG_0x4e P1_G0  /*    1       0        1      */
+#define LINE_HELPER_PG_0x4f P1_G0  /*    1       0        1      */
+#define LINE_HELPER_PG_0x50 P0_G1  /*    0       1        0      */
+#define LINE_HELPER_PG_0x51 P0_G1  /*    0       1        0      */
+#define LINE_HELPER_PG_0x52 P0_G1  /*    0       1        1      */
+#define LINE_HELPER_PG_0x53 P0_G1  /*    0       1        1      */
+#define LINE_HELPER_PG_0x54 P0_G1  /*    0       1        0      */
+#define LINE_HELPER_PG_0x55 P0_G1  /*    0       1        0      */
+#define LINE_HELPER_PG_0x56 P0_G1  /*    0       1        1      */
+#define LINE_HELPER_PG_0x57 P0_G1  /*    0       1        1      */
+#define LINE_HELPER_PG_0x58 P1_G1  /*    1       1        0      */
+#define LINE_HELPER_PG_0x59 P1_G1  /*    1       1        0      */
+#define LINE_HELPER_PG_0x5a P1_G1  /*    1       1        1      */
+#define LINE_HELPER_PG_0x5b P1_G1  /*    1       1        1      */
+#define LINE_HELPER_PG_0x5c P1_G1  /*    1       1        0      */
+#define LINE_HELPER_PG_0x5d P1_G1  /*    1       1        0      */
+#define LINE_HELPER_PG_0x5e P1_G1  /*    1       1        1      */
+#define LINE_HELPER_PG_0x5f P1_G1  /*    1       1        1      */
+
+/* For non-blended cv (bit 1 = 0) all four bm rows collapse to BMopaque.
+ * For blended cv (bit 1 = 1) each bm picks the matching BM<bm> tag.
+ * Per-cv LINE_HELPER_BM_<cv>(bm) yields either BMopaque or BM<bm>. */
+#define LINE_HELPER_BM_0x40(bm) BMopaque
+#define LINE_HELPER_BM_0x41(bm) BMopaque
+#define LINE_HELPER_BM_0x42(bm) BM_##bm
+#define LINE_HELPER_BM_0x43(bm) BM_##bm
+#define LINE_HELPER_BM_0x44(bm) BMopaque
+#define LINE_HELPER_BM_0x45(bm) BMopaque
+#define LINE_HELPER_BM_0x46(bm) BM_##bm
+#define LINE_HELPER_BM_0x47(bm) BM_##bm
+#define LINE_HELPER_BM_0x48(bm) BMopaque
+#define LINE_HELPER_BM_0x49(bm) BMopaque
+#define LINE_HELPER_BM_0x4a(bm) BM_##bm
+#define LINE_HELPER_BM_0x4b(bm) BM_##bm
+#define LINE_HELPER_BM_0x4c(bm) BMopaque
+#define LINE_HELPER_BM_0x4d(bm) BMopaque
+#define LINE_HELPER_BM_0x4e(bm) BM_##bm
+#define LINE_HELPER_BM_0x4f(bm) BM_##bm
+#define LINE_HELPER_BM_0x50(bm) BMopaque
+#define LINE_HELPER_BM_0x51(bm) BMopaque
+#define LINE_HELPER_BM_0x52(bm) BM_##bm
+#define LINE_HELPER_BM_0x53(bm) BM_##bm
+#define LINE_HELPER_BM_0x54(bm) BMopaque
+#define LINE_HELPER_BM_0x55(bm) BMopaque
+#define LINE_HELPER_BM_0x56(bm) BM_##bm
+#define LINE_HELPER_BM_0x57(bm) BM_##bm
+#define LINE_HELPER_BM_0x58(bm) BMopaque
+#define LINE_HELPER_BM_0x59(bm) BMopaque
+#define LINE_HELPER_BM_0x5a(bm) BM_##bm
+#define LINE_HELPER_BM_0x5b(bm) BM_##bm
+#define LINE_HELPER_BM_0x5c(bm) BMopaque
+#define LINE_HELPER_BM_0x5d(bm) BMopaque
+#define LINE_HELPER_BM_0x5e(bm) BM_##bm
+#define LINE_HELPER_BM_0x5f(bm) BM_##bm
+
+/* The bm dimension is named by tag in the function suffix.  The
+ * trailing _##bm in BM_##bm produces 'BM_0', 'BM_1' etc; we rewrite
+ * those to the actual specialisation tags via the LINE_BMTAG family. */
+#define LINE_BMTAG_BM_0   BMavg
+#define LINE_BMTAG_BM_1   BMadd
+#define LINE_BMTAG_BM_2   BMsub
+#define LINE_BMTAG_BM_3   BMaddq
+#define LINE_BMTAG_BMopaque BMopaque
+
+/* Three-level paste indirection so the bm fragment expands fully
+ * before token-pasting into the function name. */
+#define LINE_HELPER_NAME(pg, bmtag, mam)         LINE_HELPER_NAME_(pg, bmtag, mam)
+#define LINE_HELPER_NAME_(pg, bmtag, mam)        LINE_HELPER_NAME__(pg, LINE_BMTAG_##bmtag, mam)
+#define LINE_HELPER_NAME__(pg, finaltag, mam)    LINE_HELPER_NAME___(pg, finaltag, mam)
+#define LINE_HELPER_NAME___(pg, finaltag, mam)   Command_DrawLine_##pg##_##finaltag##_ME##mam
+
+#define LINE_HELPER_SUB(bm, cv, mam) \
+   LINE_HELPER_NAME(LINE_HELPER_PG_##cv, LINE_HELPER_BM_##cv(bm), mam)
 
 #define LINE_HELPER_FG(bm, cv)											\
 	 {													\
