@@ -200,11 +200,11 @@ static float analog_radius(int x, int y)
    return sqrtf(fx * fx + fy * fy);
 }
 
-static void analog_scale(uint32_t *v, float s)
+static inline uint32_t analog_clamp_scale(uint32_t v, float s)
 {
-   *v *= s;
-   if (*v > 0x7fff)
-      *v = 0x7fff;
+   float r = (float)v * s;
+   uint32_t u = (uint32_t)r;
+   return u > 0x7fff ? 0x7fff : u;
 }
 
 static uint16_t get_analog_button( retro_input_state_t input_state_cb,
@@ -901,15 +901,15 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                   l_scaling = dualshock_analog_radius / analog_calibration->left;
                   r_scaling = dualshock_analog_radius / analog_calibration->right;
 
-                  analog_scale(&l_left, l_scaling);
-                  analog_scale(&l_right, l_scaling);
-                  analog_scale(&l_up, l_scaling);
-                  analog_scale(&l_down, l_scaling);
+                  l_left = analog_clamp_scale(l_left, l_scaling);
+                  l_right = analog_clamp_scale(l_right, l_scaling);
+                  l_up = analog_clamp_scale(l_up, l_scaling);
+                  l_down = analog_clamp_scale(l_down, l_scaling);
 
-                  analog_scale(&r_left, r_scaling);
-                  analog_scale(&r_right, r_scaling);
-                  analog_scale(&r_up, r_scaling);
-                  analog_scale(&r_down, r_scaling);
+                  r_left = analog_clamp_scale(r_left, r_scaling);
+                  r_right = analog_clamp_scale(r_right, r_scaling);
+                  r_up = analog_clamp_scale(r_up, r_scaling);
+                  r_down = analog_clamp_scale(r_down, r_scaling);
                }
                else
                {
