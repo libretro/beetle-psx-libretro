@@ -1,30 +1,22 @@
 #include "rsx_lib_gl.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h> /* exit() */
 #include <stddef.h> /* offsetof() */
-
-#include <stdexcept>
+#include <assert.h>
 
 #include <glsym/glsym.h>
 
 #include <boolean.h>
-
-#include <vector>
-#include <cstdio>
-#include <stdint.h>
-
-#include <map>
-#include <string>
-#include <algorithm>
 
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
 #include "libretro.h"
 #include "libretro_options.h"
 
-#include "rsx/rsx_intf.h" //enums
+#include "rsx/rsx_intf.h" /* enums */
 #include "beetle_psx_globals.h"
 
 #define DRAWBUFFER_IS_EMPTY(x)           ((x)->map_index == 0)
@@ -331,7 +323,69 @@ static const unsigned int VERTEX_BUFFER_LEN = 0x4000;
  * length */
 static const unsigned int INDEX_BUFFER_LEN = ((VERTEX_BUFFER_LEN * 3 + 1) / 2);
 
-typedef std::map<std::string, GLint> UniformMap;
+/* Maximum uniform name length (matches the buffer size used in
+ * load_program_uniforms when querying glGetActiveUniform). */
+#define UNIFORM_NAME_MAX 64
+
+/* Maximum uniforms per program.  Beetle's shaders have at most
+ * ~7 active uniforms; bumping to 16 leaves headroom without
+ * dynamic allocation. */
+#define UNIFORM_MAX_ENTRIES 16
+
+struct UniformEntry
+{
+   char name[UNIFORM_NAME_MAX];
+   GLint location;
+};
+
+struct UniformMap
+{
+   struct UniformEntry items[UNIFORM_MAX_ENTRIES];
+   size_t count;
+};
+
+/* Linear-scan replacement for std::map<std::string,GLint>::operator[].
+ * Beetle's per-program uniform count is small (3-7) so a straight
+ * memcmp loop is fine and avoids the std::map allocation overhead. */
+static GLint UniformMap_get(const struct UniformMap *m, const char *name)
+{
+   size_t i;
+   for (i = 0; i < m->count; i++)
+   {
+      if (strcmp(m->items[i].name, name) == 0)
+         return m->items[i].location;
+   }
+   /* Sentinel matches glGetUniformLocation's "no such uniform"
+    * convention - calls into glUniform* with location -1 are
+    * silently ignored by GL. */
+   return -1;
+}
+
+static bool UniformMap_set(struct UniformMap *m, const char *name, GLint location)
+{
+   size_t name_len;
+   if (m->count >= UNIFORM_MAX_ENTRIES)
+   {
+      log_cb(RETRO_LOG_WARN,
+            "[UniformMap] capacity exceeded, dropping uniform \"%s\"\n",
+            name);
+      return false;
+   }
+   name_len = strlen(name);
+   if (name_len >= UNIFORM_NAME_MAX)
+   {
+      log_cb(RETRO_LOG_WARN,
+            "[UniformMap] name \"%s\" exceeds %d-byte limit, dropping\n",
+            name, UNIFORM_NAME_MAX);
+      return false;
+   }
+   memcpy(m->items[m->count].name, name, name_len + 1);
+   m->items[m->count].location = location;
+   m->count++;
+   return true;
+}
+
+typedef struct UniformMap UniformMap;
 
 enum VideoClock {
    VideoClock_Ntsc,
@@ -415,9 +469,6 @@ struct CommandVertex {
    uint16_t texture_limits[4];
    /* Texture window mask/OR values */
    uint8_t texture_window[4];
-
-
-   static std::vector<Attribute> attributes();
 };
 
 struct OutputVertex {
@@ -425,16 +476,20 @@ struct OutputVertex {
    float position[2];
    /* Corresponding coordinate in the framebuffer */
    uint16_t fb_coord[2];
-
-   static std::vector<Attribute> attributes();
 };
 
 struct ImageLoadVertex {
    /* Vertex position in VRAM */
    uint16_t position[2];
-
-   static std::vector<Attribute> attributes();
 };
+
+/* Forward declarations for vertex-attribute accessor functions.
+ * The arrays and bodies live further down (after push_primitive)
+ * but GlRenderer_new calls them when constructing each
+ * DrawBuffer, well before that point. */
+static const struct Attribute *CommandVertex_attributes(size_t *count);
+static const struct Attribute *OutputVertex_attributes(size_t *count);
+static const struct Attribute *ImageLoadVertex_attributes(size_t *count);
 
 struct GlDisplayRect
 {
@@ -488,7 +543,67 @@ struct PrimitiveBatch {
    unsigned count;
 };
 
-template<typename T>
+/* Replaces std::vector<PrimitiveBatch>.  Heap-backed dynamic array
+ * with explicit init/free; capacity grows by doubling.  Used for
+ * the per-frame batch list which can grow to thousands of entries
+ * on heavy frames, so fixed-size storage isn't viable. */
+struct PrimitiveBatchVec {
+   struct PrimitiveBatch *items;
+   size_t count;
+   size_t capacity;
+};
+
+static void PrimitiveBatchVec_init(struct PrimitiveBatchVec *v)
+{
+   v->items    = NULL;
+   v->count    = 0;
+   v->capacity = 0;
+}
+
+static void PrimitiveBatchVec_free(struct PrimitiveBatchVec *v)
+{
+   if (!v)
+      return;
+   if (v->items)
+   {
+      free(v->items);
+      v->items = NULL;
+   }
+   v->count    = 0;
+   v->capacity = 0;
+}
+
+static void PrimitiveBatchVec_clear(struct PrimitiveBatchVec *v)
+{
+   /* Keep the allocated buffer; just reset count.  Preserves
+    * std::vector::clear() semantics: subsequent push_back stays
+    * in the same backing storage until a grow is needed. */
+   v->count = 0;
+}
+
+static bool PrimitiveBatchVec_push(struct PrimitiveBatchVec *v,
+      const struct PrimitiveBatch *b)
+{
+   if (v->count >= v->capacity)
+   {
+      size_t new_cap = v->capacity ? v->capacity * 2 : 64;
+      struct PrimitiveBatch *new_items =
+         (struct PrimitiveBatch *)realloc(v->items,
+               new_cap * sizeof(struct PrimitiveBatch));
+      if (!new_items)
+         return false;
+      v->items    = new_items;
+      v->capacity = new_cap;
+   }
+   v->items[v->count++] = *b;
+   return true;
+}
+
+/* DrawBuffer holds a typed-but-not-templated vertex buffer.  T was
+ * the vertex type in the original C++ code; the template only
+ * affected how 'map' was typed and how 'element_size' was computed
+ * (sizeof(T)).  Both are stored explicitly now so a single
+ * non-templated struct works for all three vertex types. */
 struct DrawBuffer
 {
    /* OpenGL name for this buffer */
@@ -498,13 +613,18 @@ struct DrawBuffer
     * buffer for simplicity. */
    GLuint vao;
    /* Program used to draw this buffer */
-   Program* program;
-   /* Currently mapped buffer range (write-only) */
-   T *map;
-   /* Number of elements T mapped at once in 'map' */
+   Program *program;
+   /* Currently mapped buffer range (write-only).  void* because
+    * the actual element type is one of CommandVertex /
+    * OutputVertex / ImageLoadVertex; element_size below tells
+    * us the stride. */
+   void *map;
+   /* sizeof(vertex_type), stored at construction */
+   size_t element_size;
+   /* Number of elements mapped at once in 'map' */
    size_t capacity;
-   /* Index one-past the last element stored in 'map', relative to
-    * the first element in 'map' */
+   /* Index one-past the last element stored in 'map', relative
+    * to the first element in 'map' */
    size_t map_index;
    /* Absolute offset of the 1st mapped element in the current
     * buffer relative to the beginning of the GL storage. */
@@ -513,11 +633,11 @@ struct DrawBuffer
 
 struct GlRenderer {
    /* Buffer used to handle PlayStation GPU draw commands */
-   DrawBuffer<CommandVertex>* command_buffer;
+   DrawBuffer *command_buffer;
    /* Buffer used to draw to the frontend's framebuffer */
-   DrawBuffer<OutputVertex>* output_buffer;
+   DrawBuffer *output_buffer;
    /* Buffer used to copy textures from 'fb_texture' to 'fb_out' */
-   DrawBuffer<ImageLoadVertex>* image_load_buffer;
+   DrawBuffer *image_load_buffer;
 
    GLushort vertex_indices[INDEX_BUFFER_LEN];
    /* GPU buffer for vertex_indices (required for core profile) */
@@ -526,7 +646,7 @@ struct GlRenderer {
     * (TRIANGLES or LINES) */
    GLenum command_draw_mode;
    unsigned vertex_index_pos;
-   std::vector<PrimitiveBatch> batches;
+   PrimitiveBatchVec batches;
    /* Whether we're currently pushing opaque primitives or not */
    bool opaque;
    /* Current semi-transparency mode */
@@ -754,6 +874,8 @@ static UniformMap load_program_uniforms(GLuint program)
    GLint max_name_len = 0;
    GLint n_uniforms   = 0;
 
+   memset(&uniforms, 0, sizeof(uniforms));
+
    glGetProgramiv( program,
          GL_ACTIVE_UNIFORMS,
          &n_uniforms );
@@ -762,13 +884,14 @@ static UniformMap load_program_uniforms(GLuint program)
          GL_ACTIVE_UNIFORM_MAX_LENGTH,
          &max_name_len);
 
-   for (u = 0; u < n_uniforms; ++u)
+   for (u = 0; u < (size_t)n_uniforms; ++u)
    {
       char name[256];
       size_t name_len = max_name_len;
       GLsizei len     = 0;
       GLint size      = 0;
       GLenum ty       = 0;
+      GLint location;
 
       glGetActiveUniform( program,
             (GLuint) u,
@@ -785,7 +908,7 @@ static UniformMap load_program_uniforms(GLuint program)
       }
 
       /* Retrieve the location of this uniform */
-      GLint location = glGetUniformLocation(program, (const char*) name);
+      location = glGetUniformLocation(program, (const char*) name);
 
       if (location < 0)
       {
@@ -793,7 +916,7 @@ static UniformMap load_program_uniforms(GLuint program)
          continue;
       }
 
-      uniforms[name] = location;
+      UniformMap_set(&uniforms, name, location);
    }
 
    return uniforms;
@@ -866,8 +989,11 @@ static void Program_free(Program *program)
       free(program->info_log);
 }
 
-template<typename T>
-static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
+/* Forward declaration: DrawBuffer_draw and DrawBuffer_new both
+ * call DrawBuffer_map__no_bind, but it appears below them. */
+static void DrawBuffer_map__no_bind(DrawBuffer *drawbuffer);
+
+static void DrawBuffer_enable_attribute(DrawBuffer *drawbuffer, const char *attr)
 {
    GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
 
@@ -882,8 +1008,7 @@ static void DrawBuffer_enable_attribute(DrawBuffer<T> *drawbuffer, const char* a
 #endif
 }
 
-template<typename T>
-static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* attr)
+static void DrawBuffer_disable_attribute(DrawBuffer *drawbuffer, const char *attr)
 {
    GLint index = glGetAttribLocation(drawbuffer->program->id, attr);
 
@@ -898,20 +1023,23 @@ static void DrawBuffer_disable_attribute(DrawBuffer<T> *drawbuffer, const char* 
 #endif
 }
 
+/* DrawBuffer_push_slice copies n elements of size 'len' bytes
+ * each from 'slice' into the mapped buffer.  The map is typed
+ * void* (was T* in the templated version) so we cast to char*
+ * for byte arithmetic. */
 #ifdef DEBUG
 #define DrawBuffer_push_slice(drawbuffer, slice, n, len) \
-   assert(n <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer)); \
-   assert(drawbuffer->map != NULL); \
-   memcpy(drawbuffer->map + drawbuffer->map_index, slice, n * len); \
-   drawbuffer->map_index += n;
+   assert((n) <= DRAWBUFFER_REMAINING_CAPACITY(drawbuffer)); \
+   assert((drawbuffer)->map != NULL); \
+   memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
+   (drawbuffer)->map_index += (n);
 #else
 #define DrawBuffer_push_slice(drawbuffer, slice, n, len) \
-   memcpy(drawbuffer->map + drawbuffer->map_index, slice, n * len); \
-   drawbuffer->map_index += n;
+   memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
+   (drawbuffer)->map_index += (n);
 #endif
 
-template<typename T>
-static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
+static void DrawBuffer_draw(DrawBuffer *drawbuffer, GLenum mode)
 {
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
    /* Unmap the active buffer */
@@ -934,12 +1062,11 @@ static void DrawBuffer_draw(DrawBuffer<T> *drawbuffer, GLenum mode)
 }
 
 /* Map the buffer for write-only access */
-template<typename T>
-static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
+static void DrawBuffer_map__no_bind(DrawBuffer *drawbuffer)
 {
    GLintptr offset_bytes;
    void *m                = NULL;
-   size_t element_size    = sizeof(T);
+   size_t element_size    = drawbuffer->element_size;
    GLsizeiptr buffer_size = drawbuffer->capacity * element_size;
 
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
@@ -962,66 +1089,82 @@ static void DrawBuffer_map__no_bind(DrawBuffer<T> *drawbuffer)
 
    assert(m != NULL);
 
-   drawbuffer->map = reinterpret_cast<T *>(m);
+   drawbuffer->map = m;
 }
 
-template<typename T>
-static void DrawBuffer_free(DrawBuffer<T> *drawbuffer)
+static void DrawBuffer_free(DrawBuffer *drawbuffer)
 {
    if (!drawbuffer)
       return;
 
-   /* Unmap the active buffer */
-   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
-   glUnmapBuffer(GL_ARRAY_BUFFER);
+   if (drawbuffer->id != 0)
+   {
+      /* Unmap if currently mapped */
+      glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+      if (drawbuffer->map)
+         glUnmapBuffer(GL_ARRAY_BUFFER);
+   }
 
-   Program_free(drawbuffer->program);
-   glDeleteBuffers(1, &drawbuffer->id);
-   glDeleteVertexArrays(1, &drawbuffer->vao);
+   if (drawbuffer->program)
+   {
+      Program_free(drawbuffer->program);
+      free(drawbuffer->program);
+      drawbuffer->program = NULL;
+   }
 
-   delete drawbuffer->program;
+   if (drawbuffer->id != 0)
+   {
+      glDeleteBuffers(1, &drawbuffer->id);
+      drawbuffer->id = 0;
+   }
+
+   if (drawbuffer->vao != 0)
+   {
+      glDeleteVertexArrays(1, &drawbuffer->vao);
+      drawbuffer->vao = 0;
+   }
 
    drawbuffer->map       = NULL;
-   drawbuffer->id        = 0;
-   drawbuffer->vao       = 0;
-   drawbuffer->program   = NULL;
    drawbuffer->capacity  = 0;
    drawbuffer->map_index = 0;
    drawbuffer->map_start = 0;
 }
 
-template<typename T>
-static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
+static void DrawBuffer_bind_attributes(DrawBuffer *drawbuffer,
+      const Attribute *attrs, size_t n_attrs)
 {
    unsigned i;
    GLint nVertexAttribs;
+   GLint element_size;
+   size_t a;
 
    glBindVertexArray(drawbuffer->vao);
 
    /* ARRAY_BUFFER is captured by VertexAttribPointer */
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
 
-   std::vector<Attribute> attrs = T::attributes();
-   GLint element_size = (GLint) sizeof( T );
+   element_size = (GLint) drawbuffer->element_size;
 
-   /* speculative: attribs enabled on VAO=0 (disabled) get applied to the VAO when created initially
-    * as a core, we don't control the state entirely at this point. frontend may have enabled attribs.
-    * we need to make sure they're all disabled before then re-enabling the attribs we want
-    * (solves crashes on some drivers/compilers due to accidentally enabled attribs) */
+   /* speculative: attribs enabled on VAO=0 (disabled) get applied
+    * to the VAO when created initially.  As a core, we don't
+    * control the state entirely at this point: frontend may have
+    * enabled attribs.  We need to make sure they're all disabled
+    * before then re-enabling the attribs we want (solves crashes
+    * on some drivers/compilers due to accidentally enabled
+    * attribs). */
    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nVertexAttribs);
 
-   for (i = 0; i < nVertexAttribs; i++)
+   for (i = 0; i < (unsigned)nVertexAttribs; i++)
       glDisableVertexAttribArray(i);
 
-   for (std::vector<Attribute>::iterator it(attrs.begin()); it != attrs.end(); ++it)
+   for (a = 0; a < n_attrs; a++)
    {
-      Attribute& attr = *it;
-      GLint index     = glGetAttribLocation(drawbuffer->program->id, attr.name);
+      const Attribute *attr = &attrs[a];
+      GLint index = glGetAttribLocation(drawbuffer->program->id, attr->name);
 
-      /* Don't error out if the shader doesn't use this
-       * attribute, it could be caused by shader
-       * optimization if the attribute is unused for
-       * some reason. */
+      /* Don't error out if the shader doesn't use this attribute,
+       * it could be caused by shader optimization if the attribute
+       * is unused for some reason. */
       if (index < 0)
          continue;
 
@@ -1029,7 +1172,7 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
 
       /* This captures the buffer so that we don't have to bind it
        * when we draw later on, we'll just have to bind the vao */
-      switch (attr.type)
+      switch (attr->type)
       {
          case GL_BYTE:
          case GL_UNSIGNED_BYTE:
@@ -1038,78 +1181,106 @@ static void DrawBuffer_bind_attributes(DrawBuffer<T> *drawbuffer)
          case GL_INT:
          case GL_UNSIGNED_INT:
             glVertexAttribIPointer( index,
-                  attr.components,
-                  attr.type,
+                  attr->components,
+                  attr->type,
                   element_size,
-                  (GLvoid*)attr.offset);
+                  (GLvoid*)attr->offset);
             break;
          case GL_FLOAT:
             glVertexAttribPointer(  index,
-                  attr.components,
-                  attr.type,
+                  attr->components,
+                  attr->type,
                   GL_FALSE,
                   element_size,
-                  (GLvoid*)attr.offset);
+                  (GLvoid*)attr->offset);
             break;
 #ifndef HAVE_OPENGLES3
          case GL_DOUBLE:
             glVertexAttribLPointer( index,
-                  attr.components,
-                  attr.type,
+                  attr->components,
+                  attr->type,
                   element_size,
-                  (GLvoid*)attr.offset);
+                  (GLvoid*)attr->offset);
             break;
 #endif
       }
    }
 }
 
-template<typename T>
-static void DrawBuffer_new(DrawBuffer<T> *drawbuffer,
-      const char *vertex_shader, const char *fragment_shader, size_t capacity)
+/* Initialise a DrawBuffer in-place.  Returns true on success.  On
+ * failure, releases all resources acquired up to the failure point
+ * (no shader leak, no Program leak, no GL object leak) and leaves
+ * 'drawbuffer' zeroed.  This is stricter than the original C++
+ * code, which silently left a half-initialised DrawBuffer behind
+ * if Program_init failed and leaked the two compiled shader
+ * objects + their info logs. */
+static bool DrawBuffer_new(DrawBuffer *drawbuffer,
+      const char *vertex_shader_src,
+      const char *fragment_shader_src,
+      size_t capacity,
+      size_t element_size,
+      const Attribute *attrs,
+      size_t n_attrs)
 {
-   GLuint id = 0;
-   size_t element_size = sizeof(T);
    Shader vs, fs;
-   Program* program    = new Program;
+   Program *program;
+   GLsizeiptr storage_size;
+   bool vs_ok = false;
+   bool fs_ok = false;
+   bool program_ok = false;
 
-   Shader_init(&vs, vertex_shader, GL_VERTEX_SHADER);
-   Shader_init(&fs, fragment_shader, GL_FRAGMENT_SHADER);
+   memset(drawbuffer, 0, sizeof(*drawbuffer));
+   memset(&vs, 0, sizeof(vs));
+   memset(&fs, 0, sizeof(fs));
 
-   if (!Program_init(program, &vs, &fs))
+   program = (Program *)calloc(1, sizeof(*program));
+   if (!program)
    {
-      delete program;
-      return;
+      log_cb(RETRO_LOG_ERROR,
+            "[DrawBuffer_new] OOM allocating Program\n");
+      return false;
    }
 
-   /* Program owns the two pointers, so we clean them up now */
-   glDeleteShader(fs.id);
+   if (!Shader_init(&vs, vertex_shader_src, GL_VERTEX_SHADER))
+      goto fail;
+   vs_ok = true;
+   if (!Shader_init(&fs, fragment_shader_src, GL_FRAGMENT_SHADER))
+      goto fail;
+   fs_ok = true;
+   if (!Program_init(program, &vs, &fs))
+      goto fail;
+   program_ok = true;
+
+   /* Program now owns the linked binary; the shader objects can
+    * be detached and the info-log strings released. */
    glDeleteShader(vs.id);
-   if (fs.info_log)
-      free(fs.info_log);
-   if (vs.info_log)
-      free(vs.info_log);
+   glDeleteShader(fs.id);
+   if (vs.info_log) { free(vs.info_log); vs.info_log = NULL; }
+   if (fs.info_log) { free(fs.info_log); fs.info_log = NULL; }
+   vs_ok = false;
+   fs_ok = false;
 
-   glGenVertexArrays(1, &id);
+   /* From here on every failure must drop the linked program too. */
+   glGenVertexArrays(1, &drawbuffer->vao);
+   if (drawbuffer->vao == 0)
+      goto fail;
 
-   drawbuffer->map       = NULL;
-   drawbuffer->vao       = id;
+   glGenBuffers(1, &drawbuffer->id);
+   if (drawbuffer->id == 0)
+      goto fail;
 
-   id                    = 0;
+   drawbuffer->program      = program;
+   drawbuffer->capacity     = capacity;
+   drawbuffer->element_size = element_size;
+   drawbuffer->map_index    = 0;
+   drawbuffer->map_start    = 0;
+   drawbuffer->map          = NULL;
 
-   /* Generate the buffer object */
-   glGenBuffers(1, &id);
-
-   drawbuffer->program  = program;
-   drawbuffer->capacity = capacity;
-   drawbuffer->id       = id;
-
-   /* Create and map the buffer */
-   glBindBuffer(GL_ARRAY_BUFFER, id);
-
-   /* We allocate enough space for 3 times the buffer space and
-    * we only remap one third of it at a time */
-   GLsizeiptr storage_size = drawbuffer->capacity * element_size * 3;
+   /* Create and size the GL buffer.  We allocate enough space for
+    * 3 times the requested capacity and only remap one third of
+    * it at a time. */
+   glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
+   storage_size = drawbuffer->capacity * element_size * 3;
 
    /* Since we store indexes in unsigned shorts we want to make
     * sure the entire buffer is indexable. */
@@ -1117,12 +1288,40 @@ static void DrawBuffer_new(DrawBuffer<T> *drawbuffer,
 
    glBufferData(GL_ARRAY_BUFFER, storage_size, NULL, GL_DYNAMIC_DRAW);
 
-   DrawBuffer_bind_attributes<T>(drawbuffer);
-
-   drawbuffer->map_index = 0;
-   drawbuffer->map_start = 0;
-
+   DrawBuffer_bind_attributes(drawbuffer, attrs, n_attrs);
    DrawBuffer_map__no_bind(drawbuffer);
+
+   return true;
+
+fail:
+   /* Unwind in reverse order of acquisition. */
+   if (drawbuffer->id != 0)
+   {
+      glDeleteBuffers(1, &drawbuffer->id);
+      drawbuffer->id = 0;
+   }
+   if (drawbuffer->vao != 0)
+   {
+      glDeleteVertexArrays(1, &drawbuffer->vao);
+      drawbuffer->vao = 0;
+   }
+   if (program_ok)
+   {
+      Program_free(program);
+   }
+   if (fs_ok)
+   {
+      glDeleteShader(fs.id);
+   }
+   if (vs_ok)
+   {
+      glDeleteShader(vs.id);
+   }
+   if (fs.info_log) free(fs.info_log);
+   if (vs.info_log) free(vs.info_log);
+   free(program);
+   memset(drawbuffer, 0, sizeof(*drawbuffer));
+   return false;
 }
 
 static void Framebuffer_init(struct Framebuffer *fb,
@@ -1216,15 +1415,27 @@ static void Texture_set_sub_image_window(
    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
-template<typename T>
-static DrawBuffer<T>* DrawBuffer_build( const char* vertex_shader,
-      const char* fragment_shader,
-      size_t capacity)
+/* Allocate, initialise, and return a heap DrawBuffer.  Returns
+ * NULL on any failure (allocation, shader compile, program link,
+ * GL object creation).  The caller is responsible for calling
+ * DrawBuffer_free + free() to release a non-NULL return. */
+static DrawBuffer *DrawBuffer_build(const char *vertex_shader_src,
+      const char *fragment_shader_src,
+      size_t capacity,
+      size_t element_size,
+      const Attribute *attrs,
+      size_t n_attrs)
 {
-   DrawBuffer<T> *t = new DrawBuffer<T>;
-   DrawBuffer_new<T>(t, vertex_shader, fragment_shader, capacity);
-
-   return t;
+   DrawBuffer *db = (DrawBuffer *)calloc(1, sizeof(*db));
+   if (!db)
+      return NULL;
+   if (!DrawBuffer_new(db, vertex_shader_src, fragment_shader_src,
+            capacity, element_size, attrs, n_attrs))
+   {
+      free(db);
+      return NULL;
+   }
+   return db;
 }
 
 static void GlRenderer_draw(GlRenderer *renderer)
@@ -1239,9 +1450,9 @@ static void GlRenderer_draw(GlRenderer *renderer)
    if (renderer->command_buffer->program)
    {
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform2i(renderer->command_buffer->program->uniforms["offset"], (GLint)x, (GLint)y);
+      glUniform2i(UniformMap_get(&renderer->command_buffer->program->uniforms, "offset"), (GLint)x, (GLint)y);
       /* We use texture unit 0 */
-      glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+      glUniform1i(UniformMap_get(&renderer->command_buffer->program->uniforms, "fb_texture"), 0);
    }
 
    /* Bind the out framebuffer */
@@ -1275,9 +1486,11 @@ static void GlRenderer_draw(GlRenderer *renderer)
 
    renderer->command_buffer->map = NULL;
 
-   if (!renderer->batches.empty())
-      renderer->batches.back().count = renderer->vertex_index_pos
-         - renderer->batches.back().first;
+   if (renderer->batches.count > 0)
+   {
+      struct PrimitiveBatch *last = &renderer->batches.items[renderer->batches.count - 1];
+      last->count = renderer->vertex_index_pos - last->first;
+   }
 
    /* Upload index data to EBO (required for core profile - client-side
     * index pointers are not allowed) */
@@ -1286,26 +1499,27 @@ static void GlRenderer_draw(GlRenderer *renderer)
                    renderer->vertex_index_pos * sizeof(GLushort),
                    renderer->vertex_indices);
 
-   for (std::vector<PrimitiveBatch>::iterator it =
-         renderer->batches.begin();
-         it != renderer->batches.end();
-         ++it)
    {
-      /* Mask bits */
-      if (it->set_mask)
-         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-      else
-         glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+      size_t bi;
+      for (bi = 0; bi < renderer->batches.count; bi++)
+      {
+         struct PrimitiveBatch *it = &renderer->batches.items[bi];
 
-      if (it->mask_test)
-         glStencilFunc(GL_NOTEQUAL, 1, 1);
-      else
-         glStencilFunc(GL_ALWAYS, 1, 1);
+         /* Mask bits */
+         if (it->set_mask)
+            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+         else
+            glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
 
-      /* Blending */
+         if (it->mask_test)
+            glStencilFunc(GL_NOTEQUAL, 1, 1);
+         else
+            glStencilFunc(GL_ALWAYS, 1, 1);
+
+         /* Blending */
       bool opaque = it->opaque;
       if (renderer->command_buffer->program)
-         glUniform1ui(renderer->command_buffer->program->uniforms["draw_semi_transparent"], !opaque);
+         glUniform1ui(UniformMap_get(&renderer->command_buffer->program->uniforms, "draw_semi_transparent"), !opaque);
       if (opaque)
          glDisable(GL_BLEND);
       else
@@ -1358,6 +1572,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
          glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                         (GLvoid*)(it->first * sizeof(GLushort)));
       }
+      }
    }
 
    glDisable(GL_STENCIL_TEST);
@@ -1367,7 +1582,7 @@ static void GlRenderer_draw(GlRenderer *renderer)
    DrawBuffer_map__no_bind(renderer->command_buffer);
 
    renderer->primitive_ordering = 0;
-   renderer->batches.clear();
+   PrimitiveBatchVec_clear(&renderer->batches);
    renderer->opaque = false;
    renderer->vertex_index_pos = 0;
    renderer->mask_test = false;
@@ -1434,11 +1649,11 @@ static void GlRenderer_upload_textures(
       {
          /* fb_texture is always at 1x */
          glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
-         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+         glUniform1i(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
+         glUniform1ui(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
 
          glUseProgram(renderer->command_buffer->program->id);
-         glUniform1i(renderer->command_buffer->program->uniforms["fb_texture"], 0);
+         glUniform1i(UniformMap_get(&renderer->command_buffer->program->uniforms, "fb_texture"), 0);
       }
    }
 
@@ -1494,7 +1709,7 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
 
 static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 {
-   DrawBuffer<CommandVertex>* command_buffer;
+   DrawBuffer *command_buffer = NULL;
    uint8_t upscaling         = 1;
    bool display_vram         = false;
    struct retro_variable var = {0};
@@ -1615,57 +1830,105 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
 
    log_cb(RETRO_LOG_DEBUG, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
-   switch(renderer->filter_type)
    {
-      case FILTER_MODE_SABR:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex_xbr,
-               command_fragment_sabr,
-               VERTEX_BUFFER_LEN);
-         break;
-      case FILTER_MODE_XBR:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex_xbr,
-               command_fragment_xbr,
-               VERTEX_BUFFER_LEN);
-         break;
-      case FILTER_MODE_BILINEAR:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex,
-               command_fragment_bilinear,
-               VERTEX_BUFFER_LEN);
-         break;
-      case FILTER_MODE_3POINT:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex,
-               command_fragment_3point,
-               VERTEX_BUFFER_LEN);
-         break;
-      case FILTER_MODE_JINC2:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex,
-               command_fragment_jinc2,
-               VERTEX_BUFFER_LEN);
-         break;
-      case FILTER_MODE_NEAREST:
-      default:
-         command_buffer = DrawBuffer_build<CommandVertex>(
-               command_vertex,
-               command_fragment,
-               VERTEX_BUFFER_LEN);
+      size_t cmd_n_attrs;
+      size_t out_n_attrs;
+      size_t img_n_attrs;
+      const Attribute *cmd_attrs = CommandVertex_attributes(&cmd_n_attrs);
+      const Attribute *out_attrs = OutputVertex_attributes(&out_n_attrs);
+      const Attribute *img_attrs = ImageLoadVertex_attributes(&img_n_attrs);
+      DrawBuffer *output_buffer;
+      DrawBuffer *image_load_buffer;
+
+      switch(renderer->filter_type)
+      {
+         case FILTER_MODE_SABR:
+            command_buffer = DrawBuffer_build(
+                  command_vertex_xbr,
+                  command_fragment_sabr,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+            break;
+         case FILTER_MODE_XBR:
+            command_buffer = DrawBuffer_build(
+                  command_vertex_xbr,
+                  command_fragment_xbr,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+            break;
+         case FILTER_MODE_BILINEAR:
+            command_buffer = DrawBuffer_build(
+                  command_vertex,
+                  command_fragment_bilinear,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+            break;
+         case FILTER_MODE_3POINT:
+            command_buffer = DrawBuffer_build(
+                  command_vertex,
+                  command_fragment_3point,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+            break;
+         case FILTER_MODE_JINC2:
+            command_buffer = DrawBuffer_build(
+                  command_vertex,
+                  command_fragment_jinc2,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+            break;
+         case FILTER_MODE_NEAREST:
+         default:
+            command_buffer = DrawBuffer_build(
+                  command_vertex,
+                  command_fragment,
+                  VERTEX_BUFFER_LEN,
+                  sizeof(CommandVertex), cmd_attrs, cmd_n_attrs);
+      }
+
+      output_buffer =
+         DrawBuffer_build(
+               output_vertex,
+               output_fragment,
+               4,
+               sizeof(OutputVertex), out_attrs, out_n_attrs);
+
+      image_load_buffer =
+         DrawBuffer_build(
+               image_load_vertex,
+               image_load_fragment,
+               4,
+               sizeof(ImageLoadVertex), img_attrs, img_n_attrs);
+
+      /* If any of the three failed, free the others to avoid
+       * leaking GL/heap resources, and refuse the renderer. */
+      if (!command_buffer || !output_buffer || !image_load_buffer)
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "[GlRenderer_new] DrawBuffer_build failed: cmd=%p out=%p img=%p\n",
+               (void *)command_buffer, (void *)output_buffer,
+               (void *)image_load_buffer);
+         if (command_buffer)
+         {
+            DrawBuffer_free(command_buffer);
+            free(command_buffer);
+         }
+         if (output_buffer)
+         {
+            DrawBuffer_free(output_buffer);
+            free(output_buffer);
+         }
+         if (image_load_buffer)
+         {
+            DrawBuffer_free(image_load_buffer);
+            free(image_load_buffer);
+         }
+         return false;
+      }
+
+      renderer->output_buffer     = output_buffer;
+      renderer->image_load_buffer = image_load_buffer;
    }
-
-   DrawBuffer<OutputVertex>* output_buffer =
-      DrawBuffer_build<OutputVertex>(
-            output_vertex,
-            output_fragment,
-            4);
-
-   DrawBuffer<ImageLoadVertex>* image_load_buffer =
-      DrawBuffer_build<ImageLoadVertex>(
-            image_load_vertex,
-            image_load_fragment,
-            4);
 
    uint32_t native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
    uint32_t native_height = (uint32_t) VRAM_HEIGHT;
@@ -1691,7 +1954,7 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
 
       glUseProgram(command_buffer->program->id);
-      glUniform1ui(command_buffer->program->uniforms["dither_scaling"], dither_scaling);
+      glUniform1ui(UniformMap_get(&command_buffer->program->uniforms, "dither_scaling"), dither_scaling);
    }
 
    GLenum texture_storage = GL_RGB5_A1;
@@ -1733,8 +1996,8 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
-   renderer->output_buffer = output_buffer;
-   renderer->image_load_buffer = image_load_buffer;
+   /* output_buffer and image_load_buffer were assigned to
+    * renderer above inside the DrawBuffer_build block. */
    renderer->config = config;
    renderer->frontend_resolution[0] = 0;
    renderer->frontend_resolution[1] = 0;
@@ -1771,23 +2034,28 @@ static void GlRenderer_free(GlRenderer *renderer)
    if (renderer->command_buffer)
    {
       DrawBuffer_free(renderer->command_buffer);
-      delete renderer->command_buffer;
+      free(renderer->command_buffer);
    }
    renderer->command_buffer = NULL;
 
    if (renderer->output_buffer)
    {
       DrawBuffer_free(renderer->output_buffer);
-      delete renderer->output_buffer;
+      free(renderer->output_buffer);
    }
    renderer->output_buffer = NULL;
 
    if (renderer->image_load_buffer)
    {
       DrawBuffer_free(renderer->image_load_buffer);
-      delete renderer->image_load_buffer;
+      free(renderer->image_load_buffer);
    }
    renderer->image_load_buffer = NULL;
+
+   /* Release the dynamic batch list backing storage.  C++ used
+    * to do this implicitly via std::vector's destructor; in C we
+    * must call PrimitiveBatchVec_free explicitly or leak. */
+   PrimitiveBatchVec_free(&renderer->batches);
 
    if (renderer->index_buffer)
       glDeleteBuffers(1, &renderer->index_buffer);
@@ -1808,9 +2076,11 @@ static void GlRenderer_free(GlRenderer *renderer)
    renderer->fb_out_depth.width  = 0;
    renderer->fb_out_depth.height = 0;
 
-   unsigned i;
-   for (i = 0; i < INDEX_BUFFER_LEN; i++)
-      renderer->vertex_indices[i] = 0;
+   {
+      unsigned i;
+      for (i = 0; i < INDEX_BUFFER_LEN; i++)
+         renderer->vertex_indices[i] = 0;
+   }
 }
 
 static inline void apply_scissor(GlRenderer *renderer)
@@ -2197,7 +2467,7 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
 
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], dither_scaling);
+      glUniform1ui(UniformMap_get(&renderer->command_buffer->program->uniforms, "dither_scaling"), dither_scaling);
    }
 
    glLineWidth((GLfloat) upscaling);
@@ -2266,7 +2536,7 @@ static void vertex_preprocessing(
       v[i].texture_window[3] = renderer->tex_y_or;
    }
 
-   if (renderer->batches.empty()
+   if (renderer->batches.count == 0
        || mode != renderer->command_draw_mode
        || is_opaque != renderer->opaque
        || (is_semi_transparent &&
@@ -2274,12 +2544,13 @@ static void vertex_preprocessing(
        || renderer->set_mask != set_mask
        || renderer->mask_test != mask_test)
    {
-      if (!renderer->batches.empty())
+      struct PrimitiveBatch batch;
+
+      if (renderer->batches.count > 0)
       {
-         PrimitiveBatch& last_batch = renderer->batches.back();
-         last_batch.count = renderer->vertex_index_pos - last_batch.first;
+         struct PrimitiveBatch *last = &renderer->batches.items[renderer->batches.count - 1];
+         last->count = renderer->vertex_index_pos - last->first;
       }
-      PrimitiveBatch batch;
       batch.opaque = is_opaque;
       batch.draw_mode = mode;
       batch.transparency_mode = stm;
@@ -2287,7 +2558,7 @@ static void vertex_preprocessing(
       batch.mask_test = mask_test;
       batch.first = renderer->vertex_index_pos;
       batch.count = 0;
-      renderer->batches.push_back(batch);
+      PrimitiveBatchVec_push(&renderer->batches, &batch);
 
       renderer->semi_transparency_mode = stm;
       renderer->command_draw_mode = mode;
@@ -2300,20 +2571,21 @@ static void vertex_preprocessing(
 static void vertex_add_blended_pass(
       GlRenderer *renderer, int vertex_index)
 {
-   if (!renderer->batches.empty())
+   if (renderer->batches.count > 0)
    {
-      PrimitiveBatch& last_batch = renderer->batches.back();
-      last_batch.count = renderer->vertex_index_pos - last_batch.first;
+      struct PrimitiveBatch *last = &renderer->batches.items[renderer->batches.count - 1];
+      struct PrimitiveBatch batch;
 
-      PrimitiveBatch batch;
+      last->count = renderer->vertex_index_pos - last->first;
+
       batch.opaque = false;
-      batch.draw_mode = last_batch.draw_mode;
-      batch.transparency_mode = last_batch.transparency_mode;
+      batch.draw_mode = last->draw_mode;
+      batch.transparency_mode = last->transparency_mode;
       batch.set_mask = true;
-      batch.mask_test = last_batch.mask_test;
+      batch.mask_test = last->mask_test;
       batch.first = vertex_index;
       batch.count = 0;
-      renderer->batches.push_back(batch);
+      PrimitiveBatchVec_push(&renderer->batches, &batch);
 
       renderer->opaque = false;
       renderer->set_mask = true;
@@ -2352,126 +2624,49 @@ static void push_primitive(
          );
 }
 
-std::vector<Attribute> CommandVertex::attributes()
+/* Vertex-attribute layouts.  The original code expressed these as
+ * 'static std::vector<Attribute> T::attributes()' factory methods;
+ * we drop them in favour of file-static const arrays plus small
+ * accessor helpers since the layouts never change at runtime. */
+static const struct Attribute CommandVertex_attribs[] = {
+   { "position",           offsetof(CommandVertex, position),           GL_FLOAT,          4 },
+   { "color",              offsetof(CommandVertex, color),              GL_UNSIGNED_BYTE,  3 },
+   { "texture_coord",      offsetof(CommandVertex, texture_coord),      GL_UNSIGNED_SHORT, 2 },
+   { "texture_page",       offsetof(CommandVertex, texture_page),       GL_UNSIGNED_SHORT, 2 },
+   { "clut",               offsetof(CommandVertex, clut),               GL_UNSIGNED_SHORT, 2 },
+   { "texture_blend_mode", offsetof(CommandVertex, texture_blend_mode), GL_UNSIGNED_BYTE,  1 },
+   { "depth_shift",        offsetof(CommandVertex, depth_shift),        GL_UNSIGNED_BYTE,  1 },
+   { "dither",             offsetof(CommandVertex, dither),             GL_UNSIGNED_BYTE,  1 },
+   { "semi_transparent",   offsetof(CommandVertex, semi_transparent),   GL_UNSIGNED_BYTE,  1 },
+   { "texture_window",     offsetof(CommandVertex, texture_window),     GL_UNSIGNED_BYTE,  4 },
+   { "texture_limits",     offsetof(CommandVertex, texture_limits),     GL_UNSIGNED_SHORT, 4 }
+};
+
+static const struct Attribute OutputVertex_attribs[] = {
+   { "position", offsetof(OutputVertex, position), GL_FLOAT,          2 },
+   { "fb_coord", offsetof(OutputVertex, fb_coord), GL_UNSIGNED_SHORT, 2 }
+};
+
+static const struct Attribute ImageLoadVertex_attribs[] = {
+   { "position", offsetof(ImageLoadVertex, position), GL_UNSIGNED_SHORT, 2 }
+};
+
+static const struct Attribute *CommandVertex_attributes(size_t *count)
 {
-   std::vector<Attribute> result;
-   Attribute attr;
-
-   strcpy(attr.name, "position");
-   attr.offset     = offsetof(CommandVertex, position);
-   attr.type       = GL_FLOAT;
-   attr.components = 4;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "color");
-   attr.offset     = offsetof(CommandVertex, color);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 3;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "texture_coord");
-   attr.offset     = offsetof(CommandVertex, texture_coord);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "texture_page");
-   attr.offset     = offsetof(CommandVertex, texture_page);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "clut");
-   attr.offset     = offsetof(CommandVertex, clut);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "texture_blend_mode");
-   attr.offset     = offsetof(CommandVertex, texture_blend_mode);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 1;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "depth_shift");
-   attr.offset     = offsetof(CommandVertex, depth_shift);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 1;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "dither");
-   attr.offset     = offsetof(CommandVertex, dither);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 1;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "semi_transparent");
-   attr.offset     = offsetof(CommandVertex, semi_transparent);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 1;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "texture_window");
-   attr.offset     = offsetof(CommandVertex, texture_window);
-   attr.type       = GL_UNSIGNED_BYTE;
-   attr.components = 4;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "texture_limits");
-   attr.offset     = offsetof(CommandVertex, texture_limits);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 4;
-
-   result.push_back(attr);
-
-   return result;
+   *count = sizeof(CommandVertex_attribs) / sizeof(CommandVertex_attribs[0]);
+   return CommandVertex_attribs;
 }
 
-std::vector<Attribute> OutputVertex::attributes()
+static const struct Attribute *OutputVertex_attributes(size_t *count)
 {
-   std::vector<Attribute> result;
-   Attribute attr;
-
-   strcpy(attr.name, "position");
-   attr.offset     = offsetof(OutputVertex, position);
-   attr.type       = GL_FLOAT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   strcpy(attr.name, "fb_coord");
-   attr.offset     = offsetof(OutputVertex, fb_coord);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   return result;
+   *count = sizeof(OutputVertex_attribs) / sizeof(OutputVertex_attribs[0]);
+   return OutputVertex_attribs;
 }
 
-std::vector<Attribute> ImageLoadVertex::attributes()
+static const struct Attribute *ImageLoadVertex_attributes(size_t *count)
 {
-   std::vector<Attribute> result;
-   Attribute attr;
-
-   strcpy(attr.name, "position");
-   attr.offset     = offsetof(ImageLoadVertex, position);
-   attr.type       = GL_UNSIGNED_SHORT;
-   attr.components = 2;
-
-   result.push_back(attr);
-
-   return result;
+   *count = sizeof(ImageLoadVertex_attribs) / sizeof(ImageLoadVertex_attribs[0]);
+   return ImageLoadVertex_attribs;
 }
 
 static void cleanup_gl_state(void)
@@ -2750,7 +2945,18 @@ static void gl_context_reset(void)
       return;
    }
 
-   static_renderer.state_data = new GlRenderer();
+   static_renderer.state_data = (GlRenderer *)calloc(1, sizeof(GlRenderer));
+   if (!static_renderer.state_data)
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "[gl_context_reset] OOM allocating GlRenderer\n");
+      return;
+   }
+   /* Initialise the dynamic batch vec.  GlRenderer_new doesn't
+    * touch it; the per-frame draw code is the first thing to push
+    * into it.  Must be init'd before any push or free or we'd
+    * be reading garbage. */
+   PrimitiveBatchVec_init(&static_renderer.state_data->batches);
 
    if (GlRenderer_new(static_renderer.state_data, persistent_config))
    {
@@ -2764,6 +2970,11 @@ static void gl_context_reset(void)
    else
    {
       log_cb(RETRO_LOG_WARN, "[gl_context_reset] GlRenderer_new failed. State will be invalid.\n");
+      /* Tear down anything GlRenderer_new acquired before failing
+       * so we don't leak GL resources or heap. */
+      GlRenderer_free(static_renderer.state_data);
+      free(static_renderer.state_data);
+      static_renderer.state_data = NULL;
    }
 }
 
@@ -2774,7 +2985,7 @@ static void gl_context_destroy(void)
    if (static_renderer.state_data)
    {
       GlRenderer_free(static_renderer.state_data);
-      delete static_renderer.state_data;
+      free(static_renderer.state_data);
    }
 
    static_renderer.state_data = NULL;
@@ -3176,12 +3387,12 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
             if (renderer->output_buffer->program)
             {
                glUseProgram(renderer->output_buffer->program->id);
-               glUniform1i(renderer->output_buffer->program->uniforms["fb"], 1);
-               glUniform2ui(renderer->output_buffer->program->uniforms["offset"], fb_x_start, fb_y_start);
+               glUniform1i(UniformMap_get(&renderer->output_buffer->program->uniforms, "fb"), 1);
+               glUniform2ui(UniformMap_get(&renderer->output_buffer->program->uniforms, "offset"), fb_x_start, fb_y_start);
 
-               glUniform1i(renderer->output_buffer->program->uniforms["depth_24bpp"], depth_24bpp);
+               glUniform1i(UniformMap_get(&renderer->output_buffer->program->uniforms, "depth_24bpp"), depth_24bpp);
 
-               glUniform1ui(renderer->output_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+               glUniform1ui(UniformMap_get(&renderer->output_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
             }
 
             if (!DRAWBUFFER_IS_EMPTY(renderer->output_buffer))
@@ -3211,7 +3422,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          if (renderer->image_load_buffer->program)
          {
             glUseProgram(renderer->image_load_buffer->program->id);
-            glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 1);
+            glUniform1i(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 1);
          }
       }
 
@@ -3226,7 +3437,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
       if (renderer->image_load_buffer->program)
       {
          glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], renderer->internal_upscaling);
+         glUniform1ui(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
       }
 
       if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
@@ -3769,9 +3980,9 @@ void rsx_gl_load_image(
       if (renderer->image_load_buffer->program)
       {
          glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1i(renderer->image_load_buffer->program->uniforms["fb_texture"], 0);
+         glUniform1i(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
          /* fb_texture is always at 1x */
-         glUniform1ui(renderer->image_load_buffer->program->uniforms["internal_upscaling"], 1);
+         glUniform1ui(UniformMap_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
       }
    }
 
