@@ -711,7 +711,7 @@ void ForceEventUpdates(const int32_t timestamp)
 
    PSX_SetEventNT(PSX_EVENT_DMA, DMA_Update(timestamp));
 
-   PSX_SetEventNT(PSX_EVENT_FIO, PSX_FIO->Update(timestamp));
+   PSX_SetEventNT(PSX_EVENT_FIO, FrontIO_Update(PSX_FIO, timestamp));
 
    PSX_CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
@@ -742,7 +742,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = DMA_Update(e->event_time);
             break;
          case PSX_EVENT_FIO:
-            nt = PSX_FIO->Update(e->event_time);
+            nt = FrontIO_Update(PSX_FIO, e->event_time);
             break;
       }
 
@@ -959,9 +959,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
             timestamp++;
 
          if(IsWrite)
-            PSX_FIO->Write(timestamp, A, V);
+            FrontIO_Write(PSX_FIO, timestamp, A, V);
          else
-            V = PSX_FIO->Read(timestamp, A);
+            V = FrontIO_Read(PSX_FIO, timestamp, A);
          return;
       }
 
@@ -1251,7 +1251,7 @@ uint32_t PSX_MemPeek32(uint32_t A)
    return MemPeek<uint32, false>(0, A);
 }
 
-// FIXME: Add PSX_Reset() and FrontIO::Reset() so that emulated input devices don't get power-reset on reset-button reset.
+// FIXME: Add PSX_Reset() and Reset() so that emulated input devices don't get power-reset on reset-button reset.
 static void PSX_Power(void)
 {
    unsigned i;
@@ -1277,7 +1277,7 @@ static void PSX_Power(void)
 
    DMA_Power();
 
-   PSX_FIO->Power();
+   FrontIO_Power(PSX_FIO);
    SIO_Power();
 
    MDEC_Power();
@@ -1346,7 +1346,7 @@ void PSX_MemPoke32(uint32 A, uint32 V)
 
 void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
-   PSX_FIO->GPULineHook(timestamp, line_timestamp, vsync, pixels, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
+   FrontIO_GPULineHook(PSX_FIO, timestamp, line_timestamp, vsync, pixels, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 }
 
 /* Test whether the supplied file looks like a PS-X EXE. The original
@@ -2014,13 +2014,13 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    PSX_CDC = (PS_CDC *)calloc(1, sizeof(PS_CDC));
    PS_CDC_Init(PSX_CDC);
-   PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
-   PSX_FIO->SetAMCT(setting_psx_analog_toggle);
+   PSX_FIO = FrontIO_New(emulate_memcard, emulate_multitap);
+   FrontIO_SetAMCT(PSX_FIO, setting_psx_analog_toggle);
    for(unsigned i = 0; i < 2; i++)
    {
       char buf[64];
       snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
-      PSX_FIO->SetCrosshairsColor(i, MDFN_GetSettingUI(buf));
+      FrontIO_SetCrosshairsColor(PSX_FIO, i, MDFN_GetSettingUI(buf));
    }
 
    input_set_fio(PSX_FIO);
@@ -2184,7 +2184,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
 
    if (!use_mednafen_memcard0_method)
    {
-      PSX_FIO->LoadMemcard(0);
+      FrontIO_LoadMemcard(PSX_FIO, 0);
       i = 1;
    }
 
@@ -2199,12 +2199,12 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       else
          snprintf(ext, sizeof(ext), "%d.mcr", i);
       MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-      PSX_FIO->LoadMemcard(i, memcard);
+      FrontIO_LoadMemcardFromPath(PSX_FIO, i, memcard, false);
    }
 
    for(i = 0; i < 8; i++)
    {
-      Memcard_PrevDC[i] = PSX_FIO->GetMemcardDirtyCount(i);
+      Memcard_PrevDC[i] = FrontIO_GetMemcardDirtyCount(PSX_FIO, i);
       Memcard_SaveDelay[i] = -1;
    }
 
@@ -2470,8 +2470,10 @@ static void Cleanup(void)
    PSX_CPU = NULL;
 
    if(PSX_FIO)
-      delete PSX_FIO;
-   PSX_FIO = NULL;
+   {
+      FrontIO_Free(PSX_FIO);
+      PSX_FIO = NULL;
+   }
    input_set_fio(NULL);
 
 #ifdef HAVE_LIGHTREC
@@ -2540,7 +2542,7 @@ static void CloseGame(void)
 
          if (i == 0 && !use_mednafen_memcard0_method)
          {
-            PSX_FIO->SaveMemcard(i);
+            FrontIO_SaveMemcard(PSX_FIO, i);
             continue;
          }
 
@@ -2554,7 +2556,7 @@ static void CloseGame(void)
          else
             snprintf(ext, sizeof(ext), "%d.mcr", i);
          MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-         PSX_FIO->SaveMemcard(i, memcard);
+         FrontIO_SaveMemcardToPath(PSX_FIO, i, memcard, false);
       }
    }
 
@@ -2651,7 +2653,7 @@ extern "C" int StateAction(StateMem *sm, int load, int data_only)
    ret &= GPU_StateAction(sm, load, data_only);
    ret &= SPU_StateAction(sm, load, data_only);
 
-   ret &= PSX_FIO->StateAction(sm, load, data_only);
+   ret &= FrontIO_StateAction(PSX_FIO, sm, load, data_only);
 
    ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
 
@@ -3871,11 +3873,11 @@ static void check_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "off") == 0)
-         input_set_gun_cursor(FrontIO::SETTING_GUN_CROSSHAIR_OFF);
+         input_set_gun_cursor(SETTING_GUN_CROSSHAIR_OFF);
       else if (strcmp(var.value, "cross") == 0)
-         input_set_gun_cursor(FrontIO::SETTING_GUN_CROSSHAIR_CROSS);
+         input_set_gun_cursor(SETTING_GUN_CROSSHAIR_CROSS);
       else if (strcmp(var.value, "dot") == 0)
-         input_set_gun_cursor(FrontIO::SETTING_GUN_CROSSHAIR_DOT);
+         input_set_gun_cursor(SETTING_GUN_CROSSHAIR_DOT);
    }
 
    var.key = BEETLE_OPT(gun_input_mode);
@@ -4731,12 +4733,12 @@ void retro_run(void)
             /* Save contents of left memory card to previously selected index */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index_old);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            PSX_FIO->SaveMemcard(0, memcard, true);
+            FrontIO_SaveMemcardToPath(PSX_FIO, 0, memcard, true);
 
             /* Load contents of currently selected index to left memory card */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            PSX_FIO->LoadMemcard(0, memcard, true);
+            FrontIO_LoadMemcardFromPath(PSX_FIO, 0, memcard, true);
          }
       }
 
@@ -4754,18 +4756,18 @@ void retro_run(void)
             /* Save contents of right memory card to previously selected index */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            PSX_FIO->SaveMemcard(1, memcard, true);
+            FrontIO_SaveMemcardToPath(PSX_FIO, 1, memcard, true);
 
             /* Load contents of currently selected index to right memory card */
             snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            PSX_FIO->LoadMemcard(1, memcard, true);
+            FrontIO_LoadMemcardFromPath(PSX_FIO, 1, memcard, true);
          }
       }
 
       // Update gun crosshair color
-      PSX_FIO->SetCrosshairsColor(0, setting_crosshair_color_p1);
-      PSX_FIO->SetCrosshairsColor(1, setting_crosshair_color_p2);
+      FrontIO_SetCrosshairsColor(PSX_FIO, 0, setting_crosshair_color_p1);
+      FrontIO_SetCrosshairsColor(PSX_FIO, 1, setting_crosshair_color_p2);
    }
 
    /* We only start counting after the first frame we encounter. This
@@ -4808,7 +4810,7 @@ void retro_run(void)
 
    if (setting_apply_analog_toggle)
    {
-      PSX_FIO->SetAMCT(setting_psx_analog_toggle);
+      FrontIO_SetAMCT(PSX_FIO, setting_psx_analog_toggle);
       setting_apply_analog_toggle = false;
    }
 
@@ -4836,7 +4838,7 @@ void retro_run(void)
 
    espec->SoundBufSize = 0;
 
-   PSX_FIO->UpdateInput();
+   FrontIO_UpdateInput(PSX_FIO);
    GPU_StartFrame(espec);
 
    Running = -1;
@@ -4853,7 +4855,7 @@ void retro_run(void)
    TIMER_ResetTS();
    DMA_ResetTS();
    GPU_ResetTS();
-   PSX_FIO->ResetTS();
+   FrontIO_ResetTS(PSX_FIO);
 
    RebaseTS(timestamp);
 
@@ -4861,7 +4863,7 @@ void retro_run(void)
    unsigned players = input_get_player_count();
    for(int i = 0; i < players; i++)
    {
-      uint64_t new_dc = PSX_FIO->GetMemcardDirtyCount(i);
+      uint64_t new_dc = FrontIO_GetMemcardDirtyCount(PSX_FIO, i);
 
       if(new_dc > Memcard_PrevDC[i])
       {
@@ -4884,7 +4886,7 @@ void retro_run(void)
 
             if (i == 0 && !use_mednafen_memcard0_method)
             {
-               PSX_FIO->SaveMemcard(i);
+               FrontIO_SaveMemcard(PSX_FIO, i);
                Memcard_SaveDelay[i] = -1;
                Memcard_PrevDC[i] = 0;
                continue;
@@ -4895,7 +4897,7 @@ void retro_run(void)
 
             snprintf(ext, sizeof(ext), "%d.mcr", index);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            PSX_FIO->SaveMemcard(i, memcard);
+            FrontIO_SaveMemcardToPath(PSX_FIO, i, memcard, false);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }
@@ -5367,8 +5369,8 @@ void *retro_get_memory_data(unsigned type)
       case RETRO_MEMORY_SAVE_RAM:
          if (!use_mednafen_memcard0_method && PSX_FIO)
          {
-            InputDevice *mc = PSX_FIO->GetMemcardDevice(0);
-            return mc ? mc->GetNVData() : NULL;
+            InputDevice *mc = FrontIO_GetMemcardDevice(PSX_FIO, 0);
+            return mc ? mc->vt->GetNVData(mc) : NULL;
          }
          break;
       default:

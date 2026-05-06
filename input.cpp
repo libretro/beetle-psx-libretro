@@ -23,7 +23,7 @@ static FrontIO* FIO; // cached in input_set_fio
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
 static float mouse_sensitivity = 1.0f;
-static int gun_cursor = FrontIO::SETTING_GUN_CROSSHAIR_CROSS;
+static int gun_cursor = SETTING_GUN_CROSSHAIR_CROSS;
 
 int gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
 
@@ -218,7 +218,7 @@ static void analog_scale(uint32_t *v, float s)
 
 static void SetInput(int port, const char *type, void *ptr)
 {
-   FIO->SetInput(port, type, ptr);
+   FrontIO_SetInput(FIO, port, type, ptr);
 }
 
 static uint16_t get_analog_button( retro_input_state_t input_state_cb,
@@ -513,7 +513,7 @@ void input_set_gun_cursor( int cursor )
    {
       // todo -- support multiple guns.
       for ( int port = 0; port < 8; ++port )
-         FIO->SetCrosshairsCursor( port, gun_cursor );
+         FrontIO_SetCrosshairsCursor(FIO, port, gun_cursor);
    }
 }
 
@@ -1156,14 +1156,14 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
             log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
             SetInput( in_port, "guncon", (uint8*)&input_data[ in_port ] );
             if ( FIO )
-               FIO->SetCrosshairsCursor( in_port, gun_cursor );
+               FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
             break;
 
          case RETRO_DEVICE_PS_JUSTIFIER:
             log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
             SetInput( in_port, "justifier", (uint8*)&input_data[ in_port ] );
             if ( FIO )
-               FIO->SetCrosshairsCursor( in_port, gun_cursor );
+               FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
             break;
 
          case RETRO_DEVICE_PS_MOUSE:
