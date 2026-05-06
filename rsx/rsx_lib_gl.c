@@ -1435,9 +1435,26 @@ static void gl_texture_set_sub_image_window(
    uint16_t x         = top_left[0];
    uint16_t y         = top_left[1];
 
+   /* `data` is the caller's full 1024x512 VRAM buffer.  `index`
+    * picks the first pixel of the upload region.  With x < 1024
+    * and y < 512 (both clamped at the GP0 FBWrite parser via
+    * x &= 0x3FF, y &= 0x1FF, see gpu.cpp), index is at most
+    * 511*1024 + 1023 == 524287, the last element of vram.
+    *
+    * glTexSubImage2D below then reads (resolution[1]-1) * row_len
+    * + resolution[0] words past sub_data using GL_UNPACK_ROW_LENGTH.
+    * If x + resolution[0] > 1024 or y + resolution[1] > 512 the
+    * upload reads past the end of vram - i.e. an FBWrite whose
+    * target rectangle wraps across the VRAM seam.  The PS1 GPU
+    * wraps such writes (the SW renderer's texel_put does
+    * curx & 1023, cury & 511); this GL fast-path does not, and
+    * the corresponding upload is incorrect for wrap-across writes.
+    *
+    * This is a pre-existing limitation, not introduced by this
+    * function.  Fixing it would require splitting the upload
+    * into 1-4 glTexSubImage2D calls along the seam(s), or
+    * pre-rotating the source data into a scratch buffer. */
    size_t index       = ((size_t) y) * row_len + ((size_t) x);
-
-   /* TODO - Am I indexing data out of bounds? */
    uint16_t* sub_data = &( data[index] );
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
@@ -3193,8 +3210,6 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 {
    struct retro_system_av_info result;
 
-   /* TODO/FIXME - This definition seems very backwards and duplicating work */
-
    /* This will possibly trigger the frontend to reconfigure itself */
    if (static_renderer.inited)
       rsx_gl_refresh_variables();
@@ -3563,8 +3578,23 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
 
 void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
-   /* TODO/FIXME */
-   return;
+   /* No-op for the GL backend.  The PS1 GPU's mask state
+    * (MaskSetOR / MaskEvalAND) is forwarded to the renderer
+    * per-draw via the `mask_test` and `set_mask` parameters on
+    * each push_primitive / rsx_gl_load_image / rsx_gl_copy_rect /
+    * rsx_gl_fill_rect call (see e.g. push_primitive's mask_test
+    * argument).  The GL renderer batches by mask_test value (see
+    * the comparison in gl_renderer_*_finalize) and never reads
+    * any persistent renderer-global mask register, so there's
+    * nothing for this entry point to update.
+    *
+    * The interface exists because the rsx_intf vtable is shared
+    * across SW / GL / Vulkan backends, and at least one backend
+    * (the SW path, kept in sync via the gpu.cpp-side MaskSetOR /
+    * MaskEvalAND fields) does care about the global form of this
+    * state.  For GL the per-draw values are sufficient. */
+   (void)mask_set_or;
+   (void)mask_eval_and;
 }
 
 void rsx_gl_set_draw_offset(int16_t x, int16_t y)
