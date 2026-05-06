@@ -13,7 +13,6 @@
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <rhash.h>
-#include "ugui_tools.h"
 #include "rsx/rsx_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"
@@ -97,8 +96,6 @@ static bool enable_memcard1 = false;
 static bool enable_variable_serialization_size = false;
 static int frame_width = 0;
 static int frame_height = 0;
-static bool gui_inited = false;
-static bool gui_show = false;
 static char bios_path[4096];
 static bool firmware_found = false;
 
@@ -4453,19 +4450,6 @@ bool retro_load_game(const struct retro_game_info *info)
    // MDFNI_LoadGame() has been called and surface has been allocated,
    // we can now perform firmware check
    bool force_software_renderer = false;
-   if (!firmware_found)
-   {
-      /* TODO - We're forcing the sw renderer to show the ugui error message. Figure out
-      how to copy the ugui framebuffer to the hardware renderer side with rsx_intf calls,
-      so we don't have to force this anymore. */
-      force_software_renderer = true;
-
-#ifdef HAVE_LIGHTREC
-      /* Do not run lightrec if firmware is not found, recompiling garbage is bad*/
-      psx_dynarec = DYNAREC_DISABLED;
-#endif
-   }
-
    bool ret = rsx_intf_open(content_is_pal, force_software_renderer);
 
    /* Hide irrelevant core options */
@@ -4633,13 +4617,6 @@ void retro_run(void)
     * unconditional PSX_CPU->Run / PSX_FIO->UpdateInput calls below. */
    if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
       return;
-
-   if (gui_show && gui_inited && frame_width > 0 && frame_height > 0)
-   {
-      gui_draw();
-      if (video_cb)
-         video_cb(gui_get_framebuffer(), frame_width, frame_height, frame_width * sizeof(unsigned));
-   }
 
    rsx_intf_prepare_frame();
 
@@ -5029,30 +5006,8 @@ void retro_run(void)
          fb = pix;
    }
 
-   if (gui_show)
-   {
-      if (!gui_inited)
-      {
-         frame_width = width;
-         frame_height = height;
-
-         gui_init(frame_width, frame_height, sizeof(unsigned));
-         gui_set_window_title("Error");
-         gui_inited = true;
-      }
-
-      if (width != frame_width || height != frame_height)
-      {
-        frame_width = width;
-        frame_height = height;
-        gui_window_resize(0, 0, frame_width, frame_height);
-      }
-   }
-   else
-   {
-      rsx_intf_finalize_frame(fb, width, height,
-            MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
-   }
+   rsx_intf_finalize_frame(fb, width, height,
+		   MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    if (audio_batch_cb)
       audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);
@@ -5128,8 +5083,6 @@ void retro_deinit(void)
    /* Frame/UI state. */
    frame_count           = 0;
    internal_frame_count  = 0;
-   gui_inited            = false;
-   gui_show              = false;
    frame_width           = 0;
    frame_height          = 0;
 

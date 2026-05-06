@@ -71,15 +71,11 @@ INCFLAGS := -I$(CORE_DIR) \
             -I$(MEDNAFEN_DIR)/hw_sound \
             -I$(MEDNAFEN_DIR)/hw_cpu \
             -I$(MEDNAFEN_DIR)/hw_misc \
-            -I$(LIBRETRO_COMM_DIR)/include \
-            -I$(DEPS_DIR)/ugui
+            -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc,$(platform)))
    INCFLAGS += -I$(CORE_DIR)/msvc
 endif
-
-SOURCES_C += $(DEPS_DIR)/ugui/ugui.c \
-               $(CORE_DIR)/ugui_tools.c
 
 ifeq ($(SYSTEM_ZLIB), 1)
    CFLAGS += $(shell pkg-config --cflags zlib)
