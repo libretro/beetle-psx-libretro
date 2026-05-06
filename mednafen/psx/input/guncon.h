@@ -1,6 +1,0 @@
-#ifndef __MDFN_PSX_INPUT_GUNCON_H
-#define __MDFN_PSX_INPUT_GUNCON_H
-
-InputDevice *Device_GunCon_Create(void);
-
-#endif
