@@ -206,6 +206,33 @@ static int smem_read32le(StateMem *st, uint32_t *b)
    return(4);
 }
 
+#ifdef MSB_FIRST
+static void FlipByteOrder(uint8_t *src, uint32_t count)
+{
+   uint8_t *start = src;
+   uint8_t *end;
+
+   if ((count & 1) || !count)
+      return;     /* This shouldn't happen. */
+
+   end = src + count - 1;
+   /* Iterate while start < end, not 'count' times: the original loop
+    * over-iterated and effectively performed a no-op on every even count.
+    * That broke savestate portability across LE<->BE for every
+    * MDFNSTATE_RLSB-marked field. */
+   while (start < end)
+   {
+      uint8_t tmp;
+
+      tmp = *end;
+      *end = *start;
+      *start = tmp;
+      end--;
+      start++;
+   }
+}
+#endif
+
 static bool SubWrite(StateMem *st, SFORMAT *sf)
 {
    while(sf->size || sf->name)	/* Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct. */
