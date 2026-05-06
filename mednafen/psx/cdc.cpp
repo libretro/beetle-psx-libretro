@@ -313,6 +313,7 @@ int PS_CDC::StateAction(StateMem *sm, int load, int data_only)
       SFVAR(PendingCommandCounter),
 
       SFVAR(SPUCounter),
+      SFVAR(lastts),
 
       SFVAR(Mode),
       SFVAR(DriveStatus),
