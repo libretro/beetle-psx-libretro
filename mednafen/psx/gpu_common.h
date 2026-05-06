@@ -38,66 +38,86 @@ extern enum dither_mode psx_gpu_dither_mode;
  * Specialised on BlendMode at every call site so the switch
  * collapses to a single arm at compile time.
  */
+/*
+ * Generator macro for one PlotPixelBlend specialisation.  See the
+ * banner comment above for the per-mode pixel math.  The switch on
+ * BLENDMODE_VAL is a C switch over a literal integer, so the C
+ * compiler reduces it to the single matching arm.
+ */
+#define DEFINE_PlotPixelBlend(SUFFIX, BLENDMODE_VAL) \
+static INLINE void PlotPixelBlend_##SUFFIX(uint16_t bg_pix, uint16_t *fore_pix) \
+{ \
+   switch (BLENDMODE_VAL) \
+   { \
+      case BLEND_MODE_AVERAGE: \
+         bg_pix   |= 0x8000; \
+         *fore_pix = ((*fore_pix + bg_pix) - ((*fore_pix ^ bg_pix) & 0x0421)) >> 1; \
+         break; \
+      case BLEND_MODE_ADD: \
+         { \
+            uint32_t sum, carry; \
+            bg_pix   &= ~0x8000; \
+            sum       = *fore_pix + bg_pix; \
+            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420; \
+            *fore_pix = (sum - carry) | (carry - (carry >> 5)); \
+         } \
+         break; \
+      case BLEND_MODE_SUBTRACT: \
+         { \
+            uint32_t diff; \
+            uint32_t borrow; \
+            bg_pix    |= 0x8000; \
+            *fore_pix &= ~0x8000; \
+            diff       = bg_pix - *fore_pix + 0x108420; \
+            borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420; \
+            *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5)); \
+         } \
+         break; \
+      case BLEND_MODE_ADD_FOURTH: \
+         { \
+            uint32_t sum, carry; \
+            bg_pix   &= ~0x8000; \
+            *fore_pix = ((*fore_pix >> 2) & 0x1CE7) | 0x8000; \
+            sum       = *fore_pix + bg_pix; \
+            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420; \
+            *fore_pix = (sum - carry) | (carry - (carry >> 5)); \
+         } \
+         break; \
+      case BLEND_MODE_OPAQUE: \
+         break; \
+   } \
+}
+
+DEFINE_PlotPixelBlend(BMavg,  BLEND_MODE_AVERAGE)
+DEFINE_PlotPixelBlend(BMadd,  BLEND_MODE_ADD)
+DEFINE_PlotPixelBlend(BMsub,  BLEND_MODE_SUBTRACT)
+DEFINE_PlotPixelBlend(BMaddq, BLEND_MODE_ADD_FOURTH)
+/* No PlotPixelBlend_BMopaque function - opaque path is gated out by the
+ * caller (BlendMode >= 0 check) before any blend call is made.
+ * Define a no-op macro that still touches its arguments so callers
+ * compiling at -Wunused-variable don't see the bg_pix decl as unused. */
+#define PlotPixelBlend_BMopaque(bg, fp) ((void)(bg), (void)(fp))
+
+#ifdef __cplusplus
+/* Thin C++ template wrapper that switch-dispatches to the right
+ * specialisation by literal blend-mode tag.  When BlendMode is a
+ * compile-time constant (which it always is at the call sites),
+ * the optimiser collapses the switch to a single direct call.  The
+ * wrapper exists so we can keep the rest of this header (still
+ * templated) compiling unchanged during the staged conversion. */
 template<int BlendMode>
 static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
 {
-   /*
-    * fore_pix - foreground -  the screen
-    * bg_pix   - background  - the texture
-    */
-
-   /* Efficient 15bpp pixel math algorithms from blargg */
-   switch(BlendMode)
+   switch (BlendMode)
    {
-      /* 0.5 x B + 0.5 x F */
-      case BLEND_MODE_AVERAGE:
-         bg_pix   |= 0x8000;
-         *fore_pix = ((*fore_pix + bg_pix) - ((*fore_pix ^ bg_pix) & 0x0421)) >> 1;
-         break;
-
-         /* 1.0 x B + 1.0 x F */
-      case BLEND_MODE_ADD:
-         {
-            uint32_t sum, carry;
-            bg_pix   &= ~0x8000;
-            sum       = *fore_pix + bg_pix;
-            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-            *fore_pix = (sum - carry) | (carry - (carry >> 5));
-         }
-         break;
-
-         /* 1.0 x B - 1.0 x F */
-
-      case BLEND_MODE_SUBTRACT:
-         {
-            uint32_t diff;
-            uint32_t borrow;
-
-            bg_pix    |= 0x8000;
-            *fore_pix &= ~0x8000;
-            diff       = bg_pix - *fore_pix + 0x108420;
-            borrow     = (diff  - ((bg_pix ^ *fore_pix) & 0x108420)) & 0x108420;
-            *fore_pix  = (diff  - borrow) & (borrow - (borrow >> 5));
-         }
-         break;
-
-         /* 1.0 x B + 0.25 * F */
-
-      case BLEND_MODE_ADD_FOURTH:
-         {
-            uint32_t sum, carry;
-            bg_pix   &= ~0x8000;
-            *fore_pix = ((*fore_pix >> 2) & 0x1CE7) | 0x8000;
-            sum       = *fore_pix + bg_pix;
-            carry     = (sum - ((*fore_pix ^ bg_pix) & 0x8421)) & 0x8420;
-            *fore_pix = (sum - carry) | (carry - (carry >> 5));
-         }
-         break;
-      case BLEND_MODE_OPAQUE:
-         break;
+      case BLEND_MODE_AVERAGE:    PlotPixelBlend_BMavg (bg_pix, fore_pix); break;
+      case BLEND_MODE_ADD:        PlotPixelBlend_BMadd (bg_pix, fore_pix); break;
+      case BLEND_MODE_SUBTRACT:   PlotPixelBlend_BMsub (bg_pix, fore_pix); break;
+      case BLEND_MODE_ADD_FOURTH: PlotPixelBlend_BMaddq(bg_pix, fore_pix); break;
+      case BLEND_MODE_OPAQUE:     break;
    }
-
 }
+#endif
 
 /*
  * Plot a single pixel into VRAM at the current upscale, applying
@@ -127,27 +147,112 @@ static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
  * non-upscaled equivalent used by the line and sprite
  * rasterisers, see PlotNativePixel below.
  */
+/*
+ * Generator macro for one PlotPixel specialisation.  BLENDMODE_VAL
+ * is a literal int constant from the BLEND_MODE_* enum, BLENDMODE_TAG
+ * is the matching specialisation suffix used by PlotPixelBlend_<TAG>
+ * (BMavg/BMadd/BMsub/BMaddq/BMopaque).  MASKEVAL and TEXTURED are
+ * literal 0/1.  The if(0)/(1) blocks compile away.
+ */
+#define DEFINE_PlotPixel(SUFFIX, BLENDMODE_VAL, BLENDMODE_TAG, MASKEVAL, TEXTURED) \
+static INLINE void PlotPixel_##SUFFIX(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix) \
+{ \
+   y &= (512 << gpu->upscale_shift) - 1; \
+   if ((BLENDMODE_VAL) >= 0 && (fore_pix & 0x8000)) \
+   { \
+      uint16_t bg_pix = vram_fetch(gpu, x, y); \
+      PlotPixelBlend_##BLENDMODE_TAG(bg_pix, &fore_pix); \
+   } \
+   if (!(MASKEVAL) || !(vram_fetch(gpu, x, y) & 0x8000)) \
+   { \
+      if (TEXTURED) \
+         vram_put(gpu, x, y, fore_pix | gpu->MaskSetOR); \
+      else \
+         vram_put(gpu, x, y, (fore_pix & 0x7FFF) | gpu->MaskSetOR); \
+   } \
+}
+
+/* All combinations of (blend, maskeval, textured) the dispatch table
+ * may produce.  Opaque + textured/non-textured + maskeval/no = 4 combos;
+ * each blend mode * 2 maskeval * 2 textured = 16 more.  20 total. */
+DEFINE_PlotPixel(BMopaque_ME0_T0, BLEND_MODE_OPAQUE,     BMopaque, 0, 0)
+DEFINE_PlotPixel(BMopaque_ME0_T1, BLEND_MODE_OPAQUE,     BMopaque, 0, 1)
+DEFINE_PlotPixel(BMopaque_ME1_T0, BLEND_MODE_OPAQUE,     BMopaque, 1, 0)
+DEFINE_PlotPixel(BMopaque_ME1_T1, BLEND_MODE_OPAQUE,     BMopaque, 1, 1)
+DEFINE_PlotPixel(BMavg_ME0_T0,    BLEND_MODE_AVERAGE,    BMavg,    0, 0)
+DEFINE_PlotPixel(BMavg_ME0_T1,    BLEND_MODE_AVERAGE,    BMavg,    0, 1)
+DEFINE_PlotPixel(BMavg_ME1_T0,    BLEND_MODE_AVERAGE,    BMavg,    1, 0)
+DEFINE_PlotPixel(BMavg_ME1_T1,    BLEND_MODE_AVERAGE,    BMavg,    1, 1)
+DEFINE_PlotPixel(BMadd_ME0_T0,    BLEND_MODE_ADD,        BMadd,    0, 0)
+DEFINE_PlotPixel(BMadd_ME0_T1,    BLEND_MODE_ADD,        BMadd,    0, 1)
+DEFINE_PlotPixel(BMadd_ME1_T0,    BLEND_MODE_ADD,        BMadd,    1, 0)
+DEFINE_PlotPixel(BMadd_ME1_T1,    BLEND_MODE_ADD,        BMadd,    1, 1)
+DEFINE_PlotPixel(BMsub_ME0_T0,    BLEND_MODE_SUBTRACT,   BMsub,    0, 0)
+DEFINE_PlotPixel(BMsub_ME0_T1,    BLEND_MODE_SUBTRACT,   BMsub,    0, 1)
+DEFINE_PlotPixel(BMsub_ME1_T0,    BLEND_MODE_SUBTRACT,   BMsub,    1, 0)
+DEFINE_PlotPixel(BMsub_ME1_T1,    BLEND_MODE_SUBTRACT,   BMsub,    1, 1)
+DEFINE_PlotPixel(BMaddq_ME0_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 0)
+DEFINE_PlotPixel(BMaddq_ME0_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 1)
+DEFINE_PlotPixel(BMaddq_ME1_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 0)
+DEFINE_PlotPixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
+
+#ifdef __cplusplus
+/* Thin C++ template wrapper - dispatches on literal template params. */
 template<int BlendMode, bool MaskEval_TA, bool textured>
 static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
-   // More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
-   y &= (512 << gpu->upscale_shift) - 1;
-
-   if(BlendMode >= 0 && (fore_pix & 0x8000))
+   if (textured)
    {
-      // Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      uint16_t bg_pix = vram_fetch(gpu, x, y);
-      PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
-   }
-
-   if(!MaskEval_TA || !(vram_fetch(gpu, x, y) & 0x8000))
-   {
-      if (textured)
-         vram_put(gpu, x, y, fore_pix | gpu->MaskSetOR);
+      if (MaskEval_TA)
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME1_T1(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME1_T1  (gpu, x, y, fore_pix); break;
+         }
+      }
       else
-         vram_put(gpu, x, y, (fore_pix & 0x7FFF) | gpu->MaskSetOR);
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME0_T1(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME0_T1  (gpu, x, y, fore_pix); break;
+         }
+      }
+   }
+   else
+   {
+      if (MaskEval_TA)
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME1_T0(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME1_T0  (gpu, x, y, fore_pix); break;
+         }
+      }
+      else
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME0_T0(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME0_T0  (gpu, x, y, fore_pix); break;
+         }
+      }
    }
 }
+#endif
 
 /*
  * Plot a single pixel without any internal upscaling (1x VRAM
@@ -167,21 +272,99 @@ static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pi
  * Uses texel_fetch / texel_put which round both dimensions down
  * to the nearest 1x texel of the upscaled buffer.
  */
+/* Same shape as PlotPixel but uses texel_fetch/texel_put (1x VRAM
+ * coords) - see banner comment.  Note: the original had an
+ * unused 'output' decl which is dropped. */
+#define DEFINE_PlotNativePixel(SUFFIX, BLENDMODE_VAL, BLENDMODE_TAG, MASKEVAL, TEXTURED) \
+static INLINE void PlotNativePixel_##SUFFIX(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix) \
+{ \
+   y &= 511; \
+   if ((BLENDMODE_VAL) >= 0 && (fore_pix & 0x8000)) \
+   { \
+      uint16_t bg_pix = texel_fetch(gpu, x, y); \
+      PlotPixelBlend_##BLENDMODE_TAG(bg_pix, &fore_pix); \
+   } \
+   if (!(MASKEVAL) || !(texel_fetch(gpu, x, y) & 0x8000)) \
+      texel_put(x, y, ((TEXTURED) ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR); \
+}
+
+DEFINE_PlotNativePixel(BMopaque_ME0_T0, BLEND_MODE_OPAQUE,     BMopaque, 0, 0)
+DEFINE_PlotNativePixel(BMopaque_ME0_T1, BLEND_MODE_OPAQUE,     BMopaque, 0, 1)
+DEFINE_PlotNativePixel(BMopaque_ME1_T0, BLEND_MODE_OPAQUE,     BMopaque, 1, 0)
+DEFINE_PlotNativePixel(BMopaque_ME1_T1, BLEND_MODE_OPAQUE,     BMopaque, 1, 1)
+DEFINE_PlotNativePixel(BMavg_ME0_T0,    BLEND_MODE_AVERAGE,    BMavg,    0, 0)
+DEFINE_PlotNativePixel(BMavg_ME0_T1,    BLEND_MODE_AVERAGE,    BMavg,    0, 1)
+DEFINE_PlotNativePixel(BMavg_ME1_T0,    BLEND_MODE_AVERAGE,    BMavg,    1, 0)
+DEFINE_PlotNativePixel(BMavg_ME1_T1,    BLEND_MODE_AVERAGE,    BMavg,    1, 1)
+DEFINE_PlotNativePixel(BMadd_ME0_T0,    BLEND_MODE_ADD,        BMadd,    0, 0)
+DEFINE_PlotNativePixel(BMadd_ME0_T1,    BLEND_MODE_ADD,        BMadd,    0, 1)
+DEFINE_PlotNativePixel(BMadd_ME1_T0,    BLEND_MODE_ADD,        BMadd,    1, 0)
+DEFINE_PlotNativePixel(BMadd_ME1_T1,    BLEND_MODE_ADD,        BMadd,    1, 1)
+DEFINE_PlotNativePixel(BMsub_ME0_T0,    BLEND_MODE_SUBTRACT,   BMsub,    0, 0)
+DEFINE_PlotNativePixel(BMsub_ME0_T1,    BLEND_MODE_SUBTRACT,   BMsub,    0, 1)
+DEFINE_PlotNativePixel(BMsub_ME1_T0,    BLEND_MODE_SUBTRACT,   BMsub,    1, 0)
+DEFINE_PlotNativePixel(BMsub_ME1_T1,    BLEND_MODE_SUBTRACT,   BMsub,    1, 1)
+DEFINE_PlotNativePixel(BMaddq_ME0_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 0)
+DEFINE_PlotNativePixel(BMaddq_ME0_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 1)
+DEFINE_PlotNativePixel(BMaddq_ME1_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 0)
+DEFINE_PlotNativePixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
+
+#ifdef __cplusplus
 template<int BlendMode, bool MaskEval_TA, bool textured>
 static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
 {
-   uint16_t output;
-   y &= 511;	// More Y precision bits than GPU RAM installed in (non-arcade, at least) Playstation hardware.
-
-   if(BlendMode >= 0 && (fore_pix & 0x8000))
+   if (textured)
    {
-      uint16_t bg_pix = texel_fetch(gpu, x, y);	// Don't use bg_pix for mask evaluation, it's modified in blending code paths.
-      PlotPixelBlend<BlendMode>(bg_pix, &fore_pix);
+      if (MaskEval_TA)
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME1_T1(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME1_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME1_T1  (gpu, x, y, fore_pix); break;
+         }
+      }
+      else
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME0_T1(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME0_T1   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME0_T1  (gpu, x, y, fore_pix); break;
+         }
+      }
    }
-
-   if(!MaskEval_TA || !(texel_fetch(gpu, x, y) & 0x8000))
-      texel_put(x, y, (textured ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR);
+   else
+   {
+      if (MaskEval_TA)
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME1_T0(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME1_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME1_T0  (gpu, x, y, fore_pix); break;
+         }
+      }
+      else
+      {
+         switch (BlendMode)
+         {
+            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME0_T0(gpu, x, y, fore_pix); break;
+            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME0_T0   (gpu, x, y, fore_pix); break;
+            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME0_T0  (gpu, x, y, fore_pix); break;
+         }
+      }
+   }
 }
+#endif
 
 #define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[(((texel & 0x1F)  * (r))   >> (5 - 1))] << 0) | (dither_offset[(((texel & 0x3E0)  * (g))  >> (10 - 1))] << 5) | (dither_offset[(((texel & 0x7C00) * (b)) >> (15 - 1))] << 10))
 
@@ -204,33 +387,49 @@ static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t f
  * upper bits, X position in the low 6); the high bit is masked
  * because the GPU silicon ignores it (verified on SCPH-5501).
  */
+/* Generator macro for one Update_CLUT_Cache specialisation.  Three
+ * texture-mode flavours: 0 (4bpp), 1 (8bpp), 2 (15bpp; no-op).  The
+ * if (TM_VAL < 2) test is a literal-compare, so the entire body
+ * vanishes for TM2. */
+#define DEFINE_Update_CLUT_Cache(SUFFIX, TM_VAL) \
+static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16 raw_clut) \
+{ \
+   if ((TM_VAL) < 2) \
+   { \
+      const uint32 new_ccvb = ((raw_clut & 0x7FFF) | ((TM_VAL) << 16)); \
+      if (g->CLUT_Cache_VB != new_ccvb) \
+      { \
+         uint16_t y = (raw_clut >> 6) & 0x1FF; \
+         const uint32 cxo = (raw_clut & 0x3F) << 4; \
+         const uint32 count = ((TM_VAL) ? 256 : 16); \
+         unsigned i; \
+         g->DrawTimeAvail -= count; \
+         for (i = 0; i < count; i++) \
+         { \
+            uint16_t x = (cxo + i) & 0x3FF; \
+            g->CLUT_Cache[i] = texel_fetch(g, x, y); \
+         } \
+         g->CLUT_Cache_VB = new_ccvb; \
+      } \
+   } \
+}
+
+DEFINE_Update_CLUT_Cache(TM0, 0)
+DEFINE_Update_CLUT_Cache(TM1, 1)
+DEFINE_Update_CLUT_Cache(TM2, 2)
+
+#ifdef __cplusplus
 template<uint32 TexMode_TA>
 static INLINE void Update_CLUT_Cache(PS_GPU *g, uint16 raw_clut)
 {
- if(TexMode_TA < 2)
- {
-  const uint32 new_ccvb = ((raw_clut & 0x7FFF) | (TexMode_TA << 16));	// Confirmed upper bit of raw_clut is ignored(at least on SCPH-5501's GPU).
-
-  if(g->CLUT_Cache_VB != new_ccvb)
-  {
-     uint16_t y = (raw_clut >> 6) & 0x1FF;
-
-     //uint16* const gpulp = GPURAM[(raw_clut >> 6) & 0x1FF];
-     const uint32 cxo = (raw_clut & 0x3F) << 4;
-     const uint32 count = (TexMode_TA ? 256 : 16);
-
-     g->DrawTimeAvail -= count;
-
-     for(unsigned i = 0; i < count; i++)
-        {
-           uint16_t x = (cxo + i) & 0x3FF;
-           g->CLUT_Cache[i] = texel_fetch(g, x, y);
-        }
-
-   g->CLUT_Cache_VB = new_ccvb;
-  }
- }
+   switch (TexMode_TA)
+   {
+      case 0: Update_CLUT_Cache_TM0(g, raw_clut); break;
+      case 1: Update_CLUT_Cache_TM1(g, raw_clut); break;
+      case 2: Update_CLUT_Cache_TM2(g, raw_clut); break;
+   }
 }
+#endif
 
 static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 {
@@ -271,60 +470,76 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
  * (HAS_CXX11), the C build will rely on the dispatch table to
  * never produce an out-of-range value.
  */
+/* Generator macro for one GetTexel specialisation.  TM_VAL is the
+ * literal texture-mode (0/1/2).  The switch on TM_VAL collapses to
+ * the matching arm; the if (TM_VAL != 2) and if (TM_VAL == 0) tests
+ * are literal so dead arms vanish. */
+#define DEFINE_GetTexel(SUFFIX, TM_VAL) \
+static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+{ \
+   uint32_t u_ext   = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD); \
+   uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
+   uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
+   uint32_t gro     = fbtex_y * 1024U + fbtex_x; \
+   PS_GPU_TexCache_t *TexCache = &g->TexCache[0]; \
+   PS_GPU_TexCache_t *c = NULL; \
+   uint16 fbw; \
+   switch (TM_VAL) \
+   { \
+      case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break; \
+      case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
+      case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
+   } \
+   if (MDFN_UNLIKELY(c->Tag != (gro &~ 0x3))) \
+   { \
+      uint32_t cache_x = fbtex_x & ~3; \
+      g->DrawTimeAvail -= 4; \
+      c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
+      c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
+      c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
+      c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y); \
+      c->Tag = (gro &~ 0x3); \
+   } \
+   fbw = c->Data[gro & 0x3]; \
+   if ((TM_VAL) != 2) \
+   { \
+      if ((TM_VAL) == 0) \
+         fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF; \
+      else \
+         fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF; \
+      fbw = g->CLUT_Cache[fbw]; \
+   } \
+   return fbw; \
+}
+
+#ifdef __cplusplus
+typedef PS_GPU::TexCache_t PS_GPU_TexCache_t;
+#else
+typedef struct PS_GPU_TexCache_t {
+   uint16 Data[4];
+   uint32 Tag;
+} PS_GPU_TexCache_t;
+#endif
+
+DEFINE_GetTexel(TM0, 0)
+DEFINE_GetTexel(TM1, 1)
+DEFINE_GetTexel(TM2, 2)
+
+#ifdef __cplusplus
 template<uint32_t TexMode_TA>
 static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)
 {
 #ifdef HAS_CXX11
-     static_assert(TexMode_TA <= 2, "TexMode_TA must be <= 2");
+   static_assert(TexMode_TA <= 2, "TexMode_TA must be <= 2");
 #endif
-
-     uint32_t u_ext = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD);
-     uint32_t fbtex_x = ((u_ext >> (2 - TexMode_TA))) & 1023;
-     uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD;
-     uint32_t gro = fbtex_y * 1024U + fbtex_x;
-
-     PS_GPU::TexCache_t *TexCache = &g->TexCache[0];
-     PS_GPU::TexCache_t *c = NULL;
-
-     switch(TexMode_TA)
-     {
-      case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break;	// 64x64
-      case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 64x32 (NOT 32x64!)
-      case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break;	// 32x32
-     }
-
-     if(MDFN_UNLIKELY(c->Tag != (gro &~ 0x3)))
-     {
-      // SCPH-1001 old revision GPU is like(for sprites at least): (20 + 4)
-      // SCPH-5501 new revision GPU is like(for sprites at least): (12 + 4)
-      //
-      // We'll be conservative and just go with 4 for now, until we can run some tests with triangles too.
-      //
-      g->DrawTimeAvail -= 4;
-
-      uint32_t cache_x= fbtex_x & ~3;
-
-      c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y);
-      c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y);
-      c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y);
-      c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y);
-      c->Tag = (gro &~ 0x3);
-     }
-
-     uint16 fbw = c->Data[gro & 0x3];
-
-     if(TexMode_TA != 2)
-     {
-      if(TexMode_TA == 0)
-       fbw = (fbw >> ((u_ext & 3) * 4)) & 0xF;
-      else
-       fbw = (fbw >> ((u_ext & 1) * 8)) & 0xFF;
-
-      fbw = g->CLUT_Cache[fbw];
-     }
-
-     return(fbw);
+   switch (TexMode_TA)
+   {
+      case 0:  return GetTexel_TM0(g, u_arg, v_arg);
+      case 1:  return GetTexel_TM1(g, u_arg, v_arg);
+      default: return GetTexel_TM2(g, u_arg, v_arg);
+   }
 }
+#endif
 
 static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 {
