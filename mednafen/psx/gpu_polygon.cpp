@@ -50,16 +50,19 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
  * CalcIDeltas - compute per-pixel deltas (du/dx, du/dy, dr/dx,
  * etc.) for the upcoming triangle, given the three vertices.
  *
- * Template parameters:
- *   gouraud  - if true, vertex colours r/g/b interpolate across
- *              the triangle; deltas are stored in idl.dr/dg/db.
- *              When false, the colour is flat across the
- *              triangle and the delta computations are dropped.
- *   textured - if true, vertex texture coords u/v interpolate
- *              across the triangle. Same elision when false.
+ * Macro parameters:
+ *   SUFFIX        - mangled-name suffix
+ *   GOURAUD_LIT   - 0/1 literal: when 1, vertex colours r/g/b
+ *                   interpolate across the triangle and the
+ *                   corresponding deltas are stored.  When 0 the
+ *                   colour is flat across the triangle and the
+ *                   delta computations are dropped.
+ *   TEXTURED_LIT  - 0/1 literal: when 1, vertex texture coords
+ *                   u/v interpolate across the triangle.  Same
+ *                   elision when 0.
  *
  * CALCIS computes the cross-product-style "interpolant slope"
- * given two attribute axes. Returns false if the triangle is
+ * given two attribute axes.  Returns false if the triangle is
  * degenerate (zero-area), in which case the caller skips the
  * draw.
  *
@@ -69,37 +72,35 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
  * accumulation in the inner loop.
  */
 #define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
-template<bool gouraud, bool textured>
-static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C)
-{
- int32 denom = CALCIS(x, y);
-
- if(!denom)
-  return(false);
-
- if(gouraud)
- {
-  idl.dr_dx = (uint32)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-  idl.dr_dy = (uint32)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-
-  idl.dg_dx = (uint32)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-  idl.dg_dy = (uint32)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-
-  idl.db_dx = (uint32)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-  idl.db_dy = (uint32)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
- }
-
- if(textured)
- {
-  idl.du_dx = (uint32)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-  idl.du_dy = (uint32)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-
-  idl.dv_dx = (uint32)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
-  idl.dv_dy = (uint32)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING;
- }
-
- return(true);
+#define DEFINE_CalcIDeltas(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
+static INLINE bool CalcIDeltas_##SUFFIX(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C) \
+{ \
+   int32 denom = CALCIS(x, y); \
+   if (!denom) \
+      return false; \
+   if (GOURAUD_LIT) \
+   { \
+      idl.dr_dx = (uint32)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.dr_dy = (uint32)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.dg_dx = (uint32)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.dg_dy = (uint32)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.db_dx = (uint32)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.db_dy = (uint32)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+   } \
+   if (TEXTURED_LIT) \
+   { \
+      idl.du_dx = (uint32)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.du_dy = (uint32)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.dv_dx = (uint32)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl.dv_dy = (uint32)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+   } \
+   return true; \
 }
+
+DEFINE_CalcIDeltas(g0_t0, 0, 0)
+DEFINE_CalcIDeltas(g0_t1, 0, 1)
+DEFINE_CalcIDeltas(g1_t0, 1, 0)
+DEFINE_CalcIDeltas(g1_t1, 1, 1)
 #undef CALCIS
 
 /*
@@ -107,185 +108,229 @@ static INLINE bool CalcIDeltas(i_deltas &idl, const tri_vertex &A, const tri_ver
  * `ig` by `count` pixels in screen-X or screen-Y, using the
  * per-pixel deltas from CalcIDeltas above.
  *
- * gouraud / textured template parameters elide the entire
- * delta-add when the corresponding vertex attribute isn't
- * carried by this primitive.
+ * GOURAUD_LIT / TEXTURED_LIT elide the entire delta-add when the
+ * corresponding vertex attribute isn't carried by this primitive.
  *
- * `count` defaults to 1 for the per-pixel inner-loop case;
- * larger values are used by DrawTriangle to skip across clipped
- * regions in a single multiply rather than iterating.
+ * `count` is 1 for the per-pixel inner-loop case; larger values
+ * are used by DrawTriangle to skip across clipped regions in a
+ * single multiply rather than iterating.  C macros do not support
+ * default arguments so callers must always pass `count` explicitly.
  */
-template<bool gouraud, bool textured>
-static INLINE void AddIDeltas_DX(i_group &ig, const i_deltas &idl, uint32_t count = 1)
-{
-   if(textured)
-   {
-      ig.u += idl.du_dx * count;
-      ig.v += idl.dv_dx * count;
-   }
-
-   if(gouraud)
-   {
-      ig.r += idl.dr_dx * count;
-      ig.g += idl.dg_dx * count;
-      ig.b += idl.db_dx * count;
-   }
+#define DEFINE_AddIDeltas_DX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
+static INLINE void AddIDeltas_DX_##SUFFIX(i_group &ig, const i_deltas &idl, uint32_t count) \
+{ \
+   if (TEXTURED_LIT) \
+   { \
+      ig.u += idl.du_dx * count; \
+      ig.v += idl.dv_dx * count; \
+   } \
+   if (GOURAUD_LIT) \
+   { \
+      ig.r += idl.dr_dx * count; \
+      ig.g += idl.dg_dx * count; \
+      ig.b += idl.db_dx * count; \
+   } \
 }
 
-template<bool gouraud, bool textured>
-static INLINE void AddIDeltas_DY(i_group &ig, const i_deltas &idl, uint32_t count = 1)
-{
-   if(textured)
-   {
-      ig.u += idl.du_dy * count;
-      ig.v += idl.dv_dy * count;
-   }
+DEFINE_AddIDeltas_DX(g0_t0, 0, 0)
+DEFINE_AddIDeltas_DX(g0_t1, 0, 1)
+DEFINE_AddIDeltas_DX(g1_t0, 1, 0)
+DEFINE_AddIDeltas_DX(g1_t1, 1, 1)
 
-   if(gouraud)
-   {
-      ig.r += idl.dr_dy * count;
-      ig.g += idl.dg_dy * count;
-      ig.b += idl.db_dy * count;
-   }
+#define DEFINE_AddIDeltas_DY(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
+static INLINE void AddIDeltas_DY_##SUFFIX(i_group &ig, const i_deltas &idl, uint32_t count) \
+{ \
+   if (TEXTURED_LIT) \
+   { \
+      ig.u += idl.du_dy * count; \
+      ig.v += idl.dv_dy * count; \
+   } \
+   if (GOURAUD_LIT) \
+   { \
+      ig.r += idl.dr_dy * count; \
+      ig.g += idl.dg_dy * count; \
+      ig.b += idl.db_dy * count; \
+   } \
 }
+
+DEFINE_AddIDeltas_DY(g0_t0, 0, 0)
+DEFINE_AddIDeltas_DY(g0_t1, 0, 1)
+DEFINE_AddIDeltas_DY(g1_t0, 1, 0)
+DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
 
 /*
  * DrawSpan - rasterise one horizontal span of a triangle.
  *
  * Called per scanline by DrawTriangle once the top/bottom edges
- * have been walked to the appropriate y. `ig` carries the
+ * have been walked to the appropriate y.  `ig` carries the
  * interpolant values at x_start; `idl` carries the per-pixel
  * deltas for stepping across the span.
  *
- * Template parameters (the full polygon-draw specialisation
- * tuple, all baked in at compile time):
- *   gouraud      - per-vertex colour interpolation enabled
- *   textured     - texture sampling enabled
- *   BlendMode    - BLEND_MODE_OPAQUE (-1) skips blend; otherwise
- *                  one of BLEND_MODE_AVERAGE / _ADD / _SUBTRACT
- *                  / _ADD_FOURTH applied to each plotted pixel
- *   TexMult      - if true, texel colour is modulated by the
- *                  shaded vertex colour (PS1 "texture color
- *                  modulation"); when false, the texel goes to
- *                  the framebuffer unmodified
- *   TexMode_TA   - 4bpp / 8bpp / 15bpp texel format selector
- *                  (see GetTexel above)
- *   MaskEval_TA  - if true, gate writes on destination mask bit
+ * Macro parameters:
+ *   SUFFIX        - mangled-name suffix
+ *   GOURAUD_LIT   - 0/1: per-vertex colour interpolation enabled
+ *   TEXTURED_LIT  - 0/1: texture sampling enabled
+ *   BM_VAL        - integer literal blend mode (-1 / 0..3)
+ *   BM_TAG        - matching blend tag (BMopaque / BMavg / BMadd /
+ *                   BMsub / BMaddq) used in the PlotPixel_<...>
+ *                   mangled call
+ *   TM_LIT        - 0/1: when 1, texel colour is modulated by the
+ *                   shaded vertex colour (PS1 "texture color
+ *                   modulation"); when 0, the texel goes to the
+ *                   framebuffer unmodified
+ *   MO_LIT        - 4 / 8 / 15bpp texel format selector
+ *                   (0 / 1 / 2)
+ *   ME_LIT        - 0/1: gate writes on destination mask bit
  *
  * Calls PlotPixel (upscale-aware) per fragment; PlotPixel itself
  * is specialised on (BlendMode, MaskEval_TA, textured), and is
  * inlined here so the inner loop is fully fused.
  */
-template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl)
-{
-   if(LineSkipTest(gpu, y >> gpu->upscale_shift))
-      return;
-
-   int32 clipx0 = gpu->ClipX0 << gpu->upscale_shift;
-   int32 clipx1 = gpu->ClipX1 << gpu->upscale_shift;
-
-
-  int32 x_ig_adjust = x_start;
-  int32 w = x_bound - x_start;
-  //int32 x = x_start;
-  int32 x = sign_x_to_s32(11 + gpu->upscale_shift, x_start);
-
-  bool dither      = DitherEnabled(gpu);
-
-  if(x < clipx0)
-  {
-   int32 delta = clipx0 - x;
-   x_ig_adjust += delta;
-   x += delta;
-   w -= delta;
-  }
-
-  if((x + w) > (clipx1 + 1))
-   w = clipx1 + 1 - x;
-
-  if(w <= 0)
-   return;
-
-  //printf("%d %d %d %d\n", x, w, ClipX0, ClipX1);
-
-  AddIDeltas_DX<gouraud, textured>(ig, idl, x_ig_adjust);
-  AddIDeltas_DY<gouraud, textured>(ig, idl, y);
-
-  // Only compute timings for one every `upscale_shift` lines so that
-  // we don't end up "slower" than 1x
-  if ((y & ((1UL << gpu->upscale_shift) - 1)) == 0) {
-     if(gouraud || textured)
-        gpu->DrawTimeAvail -= (w * 2) >> gpu->upscale_shift;
-     else if((BlendMode >= 0) || MaskEval_TA)
-        gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> gpu->upscale_shift;
-     else
-        gpu->DrawTimeAvail -= w >> gpu->upscale_shift;
-  }
-
-  do
-  {
-   const uint32 r = ig.r >> (COORD_FBS + COORD_POST_PADDING);
-   const uint32 g = ig.g >> (COORD_FBS + COORD_POST_PADDING);
-   const uint32 b = ig.b >> (COORD_FBS + COORD_POST_PADDING);
-   uint32 dither_x = (x >> gpu->dither_upscale_shift) & 3;
-   uint32 dither_y = (y >> gpu->dither_upscale_shift) & 3;
-
-   //assert(x >= ClipX0 && x <= ClipX1);
-
-   if(textured)
-   {
-	   uint16 fbw = GetTexel<TexMode_TA>(gpu, ig.u >> (COORD_FBS + COORD_POST_PADDING), ig.v >> (COORD_FBS + COORD_POST_PADDING));
-
-    if(fbw)
-    {
-     if(TexMult)
-     {
-
-      if(!DitherEnabled(gpu))
-      {
-       dither_x = 3;
-       dither_y = 2;
-      }
-
-      uint8_t *dither_offset = gpu->DitherLUT[dither_y][dither_x];
-      fbw = ModTexel(dither_offset, fbw, r, g, b);
-     }
-     PlotPixel<BlendMode, MaskEval_TA, true>(gpu, x, y, fbw);
-    }
-   }
-   else
-   {
-    uint16 pix = 0x8000;
-
-    if(gouraud && DitherEnabled(gpu))
-    {
-     pix |= gpu->DitherLUT[dither_y][dither_x][r] << 0;
-     pix |= gpu->DitherLUT[dither_y][dither_x][g] << 5;
-     pix |= gpu->DitherLUT[dither_y][dither_x][b] << 10;
-    }
-    else
-    {
-     pix |= (r >> 3) << 0;
-     pix |= (g >> 3) << 5;
-     pix |= (b >> 3) << 10;
-    }
-
-    PlotPixel<BlendMode, MaskEval_TA, false>(gpu, x, y, pix);
-   }
-
-   x++;
-   AddIDeltas_DX<gouraud, textured>(ig, idl);
-  } while(MDFN_LIKELY(--w > 0));
+#define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl) \
+{ \
+   int32 clipx0; \
+   int32 clipx1; \
+   int32 x_ig_adjust; \
+   int32 w; \
+   int32 x; \
+   if (LineSkipTest(gpu, y >> gpu->upscale_shift)) \
+      return; \
+   clipx0 = gpu->ClipX0 << gpu->upscale_shift; \
+   clipx1 = gpu->ClipX1 << gpu->upscale_shift; \
+   x_ig_adjust = x_start; \
+   w = x_bound - x_start; \
+   /*int32 x = x_start;*/ \
+   x = sign_x_to_s32(11 + gpu->upscale_shift, x_start); \
+   /* The 'bool dither = DitherEnabled(gpu)' from the original was \
+    * never read - all uses fall through to direct DitherEnabled() \
+    * calls.  Dropped to silence -Wunused-but-set-variable. */ \
+   if (x < clipx0) \
+   { \
+      int32 delta = clipx0 - x; \
+      x_ig_adjust += delta; \
+      x += delta; \
+      w -= delta; \
+   } \
+   if ((x + w) > (clipx1 + 1)) \
+      w = clipx1 + 1 - x; \
+   if (w <= 0) \
+      return; \
+   /*printf("%d %d %d %d\n", x, w, ClipX0, ClipX1);*/ \
+   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, x_ig_adjust); \
+   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, y); \
+   /* Only compute timings for one every `upscale_shift` lines so that */ \
+   /* we don't end up "slower" than 1x */ \
+   if ((y & ((1UL << gpu->upscale_shift) - 1)) == 0) { \
+      if ((GOURAUD_LIT) || (TEXTURED_LIT)) \
+         gpu->DrawTimeAvail -= (w * 2) >> gpu->upscale_shift; \
+      else if (((BM_VAL) >= 0) || (ME_LIT)) \
+         gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> gpu->upscale_shift; \
+      else \
+         gpu->DrawTimeAvail -= w >> gpu->upscale_shift; \
+   } \
+   do \
+   { \
+      const uint32 r = ig.r >> (COORD_FBS + COORD_POST_PADDING); \
+      const uint32 g = ig.g >> (COORD_FBS + COORD_POST_PADDING); \
+      const uint32 b = ig.b >> (COORD_FBS + COORD_POST_PADDING); \
+      uint32 dither_x = (x >> gpu->dither_upscale_shift) & 3; \
+      uint32 dither_y = (y >> gpu->dither_upscale_shift) & 3; \
+      /*assert(x >= ClipX0 && x <= ClipX1);*/ \
+      if (TEXTURED_LIT) \
+      { \
+         uint16 fbw = GetTexel_TM##MO_LIT(gpu, ig.u >> (COORD_FBS + COORD_POST_PADDING), ig.v >> (COORD_FBS + COORD_POST_PADDING)); \
+         if (fbw) \
+         { \
+            if (TM_LIT) \
+            { \
+               uint8_t *dither_offset; \
+               if (!DitherEnabled(gpu)) \
+               { \
+                  dither_x = 3; \
+                  dither_y = 2; \
+               } \
+               dither_offset = gpu->DitherLUT[dither_y][dither_x]; \
+               fbw = ModTexel(dither_offset, fbw, r, g, b); \
+            } \
+            PlotPixel_##BM_TAG##_ME##ME_LIT##_T1(gpu, x, y, fbw); \
+         } \
+      } \
+      else \
+      { \
+         uint16 pix = 0x8000; \
+         if ((GOURAUD_LIT) && DitherEnabled(gpu)) \
+         { \
+            pix |= gpu->DitherLUT[dither_y][dither_x][r] << 0; \
+            pix |= gpu->DitherLUT[dither_y][dither_x][g] << 5; \
+            pix |= gpu->DitherLUT[dither_y][dither_x][b] << 10; \
+         } \
+         else \
+         { \
+            pix |= (r >> 3) << 0; \
+            pix |= (g >> 3) << 5; \
+            pix |= (b >> 3) << 10; \
+         } \
+         PlotPixel_##BM_TAG##_ME##ME_LIT##_T0(gpu, x, y, pix); \
+      } \
+      x++; \
+      AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, 1); \
+   } while (MDFN_LIKELY(--w > 0)); \
 }
+
+/* DRAWSPAN_T0_BMGROUP and DRAWSPAN_T1_BMGROUP emit the 10
+ * (BlendMode * MaskEval) specs for given outer parameters.
+ *   T0 (non-textured): TM/MO collapse to 0; only Gouraud varies
+ *      across the 2 outer-group calls.
+ *   T1 (textured)    : full TM (2) * MO (3) cross product. */
+
+#define DRAWSPAN_T0_BMGROUP(G) \
+   DEFINE_DrawSpan(g##G##_t0_BMopaque_TM0_MO0_ME0, G, 0, -1, BMopaque, 0, 0, 0) \
+   DEFINE_DrawSpan(g##G##_t0_BMopaque_TM0_MO0_ME1, G, 0, -1, BMopaque, 0, 0, 1) \
+   DEFINE_DrawSpan(g##G##_t0_BMavg_TM0_MO0_ME0,    G, 0,  0, BMavg,    0, 0, 0) \
+   DEFINE_DrawSpan(g##G##_t0_BMavg_TM0_MO0_ME1,    G, 0,  0, BMavg,    0, 0, 1) \
+   DEFINE_DrawSpan(g##G##_t0_BMadd_TM0_MO0_ME0,    G, 0,  1, BMadd,    0, 0, 0) \
+   DEFINE_DrawSpan(g##G##_t0_BMadd_TM0_MO0_ME1,    G, 0,  1, BMadd,    0, 0, 1) \
+   DEFINE_DrawSpan(g##G##_t0_BMsub_TM0_MO0_ME0,    G, 0,  2, BMsub,    0, 0, 0) \
+   DEFINE_DrawSpan(g##G##_t0_BMsub_TM0_MO0_ME1,    G, 0,  2, BMsub,    0, 0, 1) \
+   DEFINE_DrawSpan(g##G##_t0_BMaddq_TM0_MO0_ME0,   G, 0,  3, BMaddq,   0, 0, 0) \
+   DEFINE_DrawSpan(g##G##_t0_BMaddq_TM0_MO0_ME1,   G, 0,  3, BMaddq,   0, 0, 1)
+
+#define DRAWSPAN_T1_BMGROUP(G, TM, MO) \
+   DEFINE_DrawSpan(g##G##_t1_BMopaque_TM##TM##_MO##MO##_ME0, G, 1, -1, BMopaque, TM, MO, 0) \
+   DEFINE_DrawSpan(g##G##_t1_BMopaque_TM##TM##_MO##MO##_ME1, G, 1, -1, BMopaque, TM, MO, 1) \
+   DEFINE_DrawSpan(g##G##_t1_BMavg_TM##TM##_MO##MO##_ME0,    G, 1,  0, BMavg,    TM, MO, 0) \
+   DEFINE_DrawSpan(g##G##_t1_BMavg_TM##TM##_MO##MO##_ME1,    G, 1,  0, BMavg,    TM, MO, 1) \
+   DEFINE_DrawSpan(g##G##_t1_BMadd_TM##TM##_MO##MO##_ME0,    G, 1,  1, BMadd,    TM, MO, 0) \
+   DEFINE_DrawSpan(g##G##_t1_BMadd_TM##TM##_MO##MO##_ME1,    G, 1,  1, BMadd,    TM, MO, 1) \
+   DEFINE_DrawSpan(g##G##_t1_BMsub_TM##TM##_MO##MO##_ME0,    G, 1,  2, BMsub,    TM, MO, 0) \
+   DEFINE_DrawSpan(g##G##_t1_BMsub_TM##TM##_MO##MO##_ME1,    G, 1,  2, BMsub,    TM, MO, 1) \
+   DEFINE_DrawSpan(g##G##_t1_BMaddq_TM##TM##_MO##MO##_ME0,   G, 1,  3, BMaddq,   TM, MO, 0) \
+   DEFINE_DrawSpan(g##G##_t1_BMaddq_TM##TM##_MO##MO##_ME1,   G, 1,  3, BMaddq,   TM, MO, 1)
+
+DRAWSPAN_T0_BMGROUP(0)
+DRAWSPAN_T0_BMGROUP(1)
+
+DRAWSPAN_T1_BMGROUP(0, 0, 0)
+DRAWSPAN_T1_BMGROUP(0, 0, 1)
+DRAWSPAN_T1_BMGROUP(0, 0, 2)
+DRAWSPAN_T1_BMGROUP(0, 1, 0)
+DRAWSPAN_T1_BMGROUP(0, 1, 1)
+DRAWSPAN_T1_BMGROUP(0, 1, 2)
+DRAWSPAN_T1_BMGROUP(1, 0, 0)
+DRAWSPAN_T1_BMGROUP(1, 0, 1)
+DRAWSPAN_T1_BMGROUP(1, 0, 2)
+DRAWSPAN_T1_BMGROUP(1, 1, 0)
+DRAWSPAN_T1_BMGROUP(1, 1, 1)
+DRAWSPAN_T1_BMGROUP(1, 1, 2)
 
 /*
  * DrawTriangle - rasterise one triangle.
  *
  * Walks the top and bottom edges to compute scanline x ranges,
- * then calls DrawSpan once per scanline. Template parameters
+ * then calls DrawSpan once per scanline.  Macro parameters
  * pass through verbatim from Command_DrawPolygon below; see
- * DrawSpan for their semantics.
+ * DrawSpan above for their semantics.
  *
  * The "core_vertex" selection picks which of the three vertices
  * is the apex (highest or lowest y) and which two form the base.
@@ -293,270 +338,216 @@ static INLINE void DrawSpan(PS_GPU *gpu, int y, const int32 x_start, const int32
  * where the rasterisation order of the three triangle vertices
  * is observable in some games' rendering.
  */
-template<bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA>
-static INLINE void DrawTriangle(PS_GPU *gpu, tri_vertex *vertices)
-{
-   i_deltas idl;
-   unsigned core_vertex;
-
-   int32 clipy0 = gpu->ClipY0 << gpu->upscale_shift;
-   int32 clipy1 = gpu->ClipY1 << gpu->upscale_shift;
-
-   //
-   // Calculate the "core" vertex based on the unsorted input vertices, and sort vertices by Y.
-   //
-   {
-      unsigned cvtemp = 0;
-
-      if(vertices[1].x <= vertices[0].x)
-         {
-            if(vertices[2].x <= vertices[1].x)
-               cvtemp = (1 << 2);
-            else
-               cvtemp = (1 << 1);
-         }
-      else if(vertices[2].x < vertices[0].x)
-         cvtemp = (1 << 2);
-      else
-         cvtemp = (1 << 0);
-
-      if(vertices[2].y < vertices[1].y)
-         {
-            vertex_swap(tri_vertex, vertices[2], vertices[1]);
-            cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1);
-         }
-
-      if(vertices[1].y < vertices[0].y)
-         {
-            vertex_swap(tri_vertex, vertices[1], vertices[0]);
-            cvtemp = ((cvtemp >> 1) & 0x1) | ((cvtemp << 1) & 0x2) | (cvtemp & 0x4);
-         }
-
-      if(vertices[2].y < vertices[1].y)
-         {
-            vertex_swap(tri_vertex, vertices[2], vertices[1]);
-            cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1);
-         }
-
-      core_vertex = cvtemp >> 1;
-   }
-
-   //
-   // 0-height, abort out.
-   //
-   if(vertices[0].y == vertices[2].y)
-      return;
-
-
-   if(!CalcIDeltas<gouraud, textured>(idl, vertices[0], vertices[1], vertices[2]))
-      return;
-
-
- // [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex.
- //
- //
- int64 base_coord;
- int64 base_step;
-
- int64 bound_coord_us;
- int64 bound_coord_ls;
-
- bool right_facing;
- i_group ig;
-
- if(textured)
- {
-  ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING;
-  ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING;
-
-  if (gpu->upscale_shift > 0)
-     {
-        // Bias the texture coordinates so that it rounds to the
-        // correct value when the game is mapping a 2D sprite using
-        // triangles. Otherwise this could cause a small "shift" in
-        // the texture coordinates when upscaling.
-
-		 if(gpu->off_u)
-			ig.u += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING;
-		 if (gpu->off_v)
-			 ig.v += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING;
-     }
- }
-
- ig.r = (COORD_MF_INT(vertices[core_vertex].r) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING;
- ig.g = (COORD_MF_INT(vertices[core_vertex].g) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING;
- ig.b = (COORD_MF_INT(vertices[core_vertex].b) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING;
-
- AddIDeltas_DX<gouraud, textured>(ig, idl, -vertices[core_vertex].x);
- AddIDeltas_DY<gouraud, textured>(ig, idl, -vertices[core_vertex].y);
-
- base_coord = MakePolyXFP(vertices[0].x);
- base_step = MakePolyXFPStep((vertices[2].x - vertices[0].x), (vertices[2].y - vertices[0].y));
-
-   //
-   //
-   //
-
-if(vertices[1].y == vertices[0].y)
- {
-  bound_coord_us = 0;
-  right_facing = (bool)(vertices[1].x > vertices[0].x);
- }
- else
- {
-  bound_coord_us = MakePolyXFPStep((vertices[1].x - vertices[0].x), (vertices[1].y - vertices[0].y));
-  right_facing = (bool)(bound_coord_us > base_step);
- }
-
- if(vertices[2].y == vertices[1].y)
-  bound_coord_ls = 0;
- else
-  bound_coord_ls = MakePolyXFPStep((vertices[2].x - vertices[1].x), (vertices[2].y - vertices[1].y));
-
- //
- // Left side draw order
- //
- // core_vertex == 0
- //	Left(base): vertices[0] -> (?vertices[1]?) -> vertices[2]
- //
- // core_vertex == 1:
- // 	Left(base): vertices[1] -> vertices[2], vertices[1] -> vertices[0]
- //
- // core_vertex == 2:
- //	Left(base): vertices[2] -> (?vertices[1]?) -> vertices[0]
- //printf("%d %d\n", core_vertex, right_facing);
- struct tripart
- {
-  uint64 x_coord[2];
-  uint64 x_step[2];
-
-  int32 y_coord;
-  int32 y_bound;
-
-  bool dec_mode;
- } tripart[2];
-
-#if 0
- switch(core_vertex)
- {
-  case 0:
-	tripart[0].dec_mode = tripart[1].dec_mode = false;
-
-	tripart[0].y_coord = vertices[0].y;
-	tripart[0].y_bound = vertices[1].y;
-	if(vertices[0].y != vertices[1].y)
-	{
-	 tripart[0].x_coord[0] = MakePolyXFP(vertices[0].x);
-	 tripart[0].x_step[0] =
-
-	 tripart[0].x_coord[1] = MakePolyXFP(vertices[0].x);
-	 tripart[0].x_step[1] =
-	}
-	break;
-
-  case 1:
-	break;
-
-  case 2:
-	break;
- }
-#endif
-
- unsigned vo = 0;
- unsigned vp = 0;
-
- if(core_vertex)
-  vo = 1;
-
- if(core_vertex == 2)
-  vp = 3;
-
- {
-    struct tripart* tp = &tripart[vo];
-
-  tp->y_coord = vertices[0 ^ vo].y;
-  tp->y_bound = vertices[1 ^ vo].y;
-  tp->x_coord[right_facing] = MakePolyXFP(vertices[0 ^ vo].x);
-  tp->x_step[right_facing] = bound_coord_us;
-  tp->x_coord[!right_facing] = base_coord + ((vertices[vo].y - vertices[0].y) * base_step);
-  tp->x_step[!right_facing] = base_step;
-  tp->dec_mode = vo;
- }
-
- {
-    struct tripart* tp = &tripart[vo ^ 1];
-
-  tp->y_coord = vertices[1 ^ vp].y;
-  tp->y_bound = vertices[2 ^ vp].y;
-  tp->x_coord[right_facing] = MakePolyXFP(vertices[1 ^ vp].x);
-  tp->x_step[right_facing] = bound_coord_ls;
-  tp->x_coord[!right_facing] = base_coord + ((vertices[1 ^ vp].y - vertices[0].y) * base_step); //base_coord + ((vertices[1].y - vertices[0].y) * base_step);
-  tp->x_step[!right_facing] = base_step;
-  tp->dec_mode = vp;
- }
-
- for(unsigned i = 0; i < 2; i++) //2; i++)
- {
-  int32 yi = tripart[i].y_coord;
-  int32 yb = tripart[i].y_bound;
-
-  uint64 lc = tripart[i].x_coord[0];
-  uint64 ls = tripart[i].x_step[0];
-
-  uint64 rc = tripart[i].x_coord[1];
-  uint64 rs = tripart[i].x_step[1];
-
-  if(tripart[i].dec_mode)
-  {
-   while(MDFN_LIKELY(yi > yb))
-   {
-    yi--;
-    lc -= ls;
-    rc -= rs;
-    //
-    //
-    //
-    int32 y = sign_x_to_s32(11 + gpu->upscale_shift, yi);
-
-    if(y < clipy0)
-     break;
-
-    if(y > clipy1)
-    {
-     gpu->DrawTimeAvail -= 2;
-     continue;
-    }
-
-    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
-   }
-  }
-  else
-  {
-   while(MDFN_LIKELY(yi < yb))
-   {
-      int32 y = sign_x_to_s32(11 + gpu->upscale_shift, yi);
-
-    if(y > clipy1)
-     break;
-
-    if(y < clipy0)
-    {
-     gpu->DrawTimeAvail -= 2;
-     goto skipit;
-    }
-
-    DrawSpan<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl);
-    //
-    //
-    //
-    skipit: ;
-    yi++;
-    lc += ls;
-    rc += rs;
-   }
-  }
- }
+#define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
+{ \
+   i_deltas idl; \
+   unsigned core_vertex; \
+   int32 clipy0 = gpu->ClipY0 << gpu->upscale_shift; \
+   int32 clipy1 = gpu->ClipY1 << gpu->upscale_shift; \
+   int64 base_coord; \
+   int64 base_step; \
+   int64 bound_coord_us; \
+   int64 bound_coord_ls; \
+   bool right_facing; \
+   i_group ig; \
+   unsigned vo = 0; \
+   unsigned vp = 0; \
+   unsigned i; \
+   struct tripart \
+   { \
+      uint64 x_coord[2]; \
+      uint64 x_step[2]; \
+      int32 y_coord; \
+      int32 y_bound; \
+      bool dec_mode; \
+   } tripart[2]; \
+   /* Calculate the "core" vertex based on the unsorted input vertices, and sort vertices by Y. */ \
+   { \
+      unsigned cvtemp = 0; \
+      if (vertices[1].x <= vertices[0].x) \
+      { \
+         if (vertices[2].x <= vertices[1].x) \
+            cvtemp = (1 << 2); \
+         else \
+            cvtemp = (1 << 1); \
+      } \
+      else if (vertices[2].x < vertices[0].x) \
+         cvtemp = (1 << 2); \
+      else \
+         cvtemp = (1 << 0); \
+      if (vertices[2].y < vertices[1].y) \
+      { \
+         vertex_swap(tri_vertex, vertices[2], vertices[1]); \
+         cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1); \
+      } \
+      if (vertices[1].y < vertices[0].y) \
+      { \
+         vertex_swap(tri_vertex, vertices[1], vertices[0]); \
+         cvtemp = ((cvtemp >> 1) & 0x1) | ((cvtemp << 1) & 0x2) | (cvtemp & 0x4); \
+      } \
+      if (vertices[2].y < vertices[1].y) \
+      { \
+         vertex_swap(tri_vertex, vertices[2], vertices[1]); \
+         cvtemp = ((cvtemp >> 1) & 0x2) | ((cvtemp << 1) & 0x4) | (cvtemp & 0x1); \
+      } \
+      core_vertex = cvtemp >> 1; \
+   } \
+   /* 0-height, abort out. */ \
+   if (vertices[0].y == vertices[2].y) \
+      return; \
+   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(idl, vertices[0], vertices[1], vertices[2])) \
+      return; \
+   /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
+   if (TEXTURED_LIT) \
+   { \
+      ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
+      ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
+      if (gpu->upscale_shift > 0) \
+      { \
+         /* Bias the texture coordinates so that it rounds to the */ \
+         /* correct value when the game is mapping a 2D sprite using */ \
+         /* triangles.  Otherwise this could cause a small "shift" in */ \
+         /* the texture coordinates when upscaling. */ \
+         if (gpu->off_u) \
+            ig.u += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
+         if (gpu->off_v) \
+            ig.v += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
+      } \
+   } \
+   ig.r = (COORD_MF_INT(vertices[core_vertex].r) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
+   ig.g = (COORD_MF_INT(vertices[core_vertex].g) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
+   ig.b = (COORD_MF_INT(vertices[core_vertex].b) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
+   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, -vertices[core_vertex].x); \
+   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, -vertices[core_vertex].y); \
+   base_coord = MakePolyXFP(vertices[0].x); \
+   base_step  = MakePolyXFPStep((vertices[2].x - vertices[0].x), (vertices[2].y - vertices[0].y)); \
+   if (vertices[1].y == vertices[0].y) \
+   { \
+      bound_coord_us = 0; \
+      right_facing = (bool)(vertices[1].x > vertices[0].x); \
+   } \
+   else \
+   { \
+      bound_coord_us = MakePolyXFPStep((vertices[1].x - vertices[0].x), (vertices[1].y - vertices[0].y)); \
+      right_facing = (bool)(bound_coord_us > base_step); \
+   } \
+   if (vertices[2].y == vertices[1].y) \
+      bound_coord_ls = 0; \
+   else \
+      bound_coord_ls = MakePolyXFPStep((vertices[2].x - vertices[1].x), (vertices[2].y - vertices[1].y)); \
+   if (core_vertex) \
+      vo = 1; \
+   if (core_vertex == 2) \
+      vp = 3; \
+   { \
+      struct tripart* tp = &tripart[vo]; \
+      tp->y_coord = vertices[0 ^ vo].y; \
+      tp->y_bound = vertices[1 ^ vo].y; \
+      tp->x_coord[right_facing] = MakePolyXFP(vertices[0 ^ vo].x); \
+      tp->x_step[right_facing] = bound_coord_us; \
+      tp->x_coord[!right_facing] = base_coord + ((vertices[vo].y - vertices[0].y) * base_step); \
+      tp->x_step[!right_facing] = base_step; \
+      tp->dec_mode = vo; \
+   } \
+   { \
+      struct tripart* tp = &tripart[vo ^ 1]; \
+      tp->y_coord = vertices[1 ^ vp].y; \
+      tp->y_bound = vertices[2 ^ vp].y; \
+      tp->x_coord[right_facing] = MakePolyXFP(vertices[1 ^ vp].x); \
+      tp->x_step[right_facing] = bound_coord_ls; \
+      tp->x_coord[!right_facing] = base_coord + ((vertices[1 ^ vp].y - vertices[0].y) * base_step); \
+      tp->x_step[!right_facing] = base_step; \
+      tp->dec_mode = vp; \
+   } \
+   for (i = 0; i < 2; i++) \
+   { \
+      int32 yi = tripart[i].y_coord; \
+      int32 yb = tripart[i].y_bound; \
+      uint64 lc = tripart[i].x_coord[0]; \
+      uint64 ls = tripart[i].x_step[0]; \
+      uint64 rc = tripart[i].x_coord[1]; \
+      uint64 rs = tripart[i].x_step[1]; \
+      if (tripart[i].dec_mode) \
+      { \
+         while (MDFN_LIKELY(yi > yb)) \
+         { \
+            int32 y; \
+            yi--; \
+            lc -= ls; \
+            rc -= rs; \
+            y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
+            if (y < clipy0) \
+               break; \
+            if (y > clipy1) \
+            { \
+               gpu->DrawTimeAvail -= 2; \
+               continue; \
+            } \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl); \
+         } \
+      } \
+      else \
+      { \
+         while (MDFN_LIKELY(yi < yb)) \
+         { \
+            int32 y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
+            if (y > clipy1) \
+               break; \
+            if (y < clipy0) \
+            { \
+               gpu->DrawTimeAvail -= 2; \
+               goto skipit_##SUFFIX; \
+            } \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl); \
+            skipit_##SUFFIX: ; \
+            yi++; \
+            lc += ls; \
+            rc += rs; \
+         } \
+      } \
+   } \
 }
+
+#define DRAWTRI_T0_BMGROUP(G) \
+   DEFINE_DrawTriangle(g##G##_t0_BMopaque_TM0_MO0_ME0, G, 0, -1, BMopaque, 0, 0, 0) \
+   DEFINE_DrawTriangle(g##G##_t0_BMopaque_TM0_MO0_ME1, G, 0, -1, BMopaque, 0, 0, 1) \
+   DEFINE_DrawTriangle(g##G##_t0_BMavg_TM0_MO0_ME0,    G, 0,  0, BMavg,    0, 0, 0) \
+   DEFINE_DrawTriangle(g##G##_t0_BMavg_TM0_MO0_ME1,    G, 0,  0, BMavg,    0, 0, 1) \
+   DEFINE_DrawTriangle(g##G##_t0_BMadd_TM0_MO0_ME0,    G, 0,  1, BMadd,    0, 0, 0) \
+   DEFINE_DrawTriangle(g##G##_t0_BMadd_TM0_MO0_ME1,    G, 0,  1, BMadd,    0, 0, 1) \
+   DEFINE_DrawTriangle(g##G##_t0_BMsub_TM0_MO0_ME0,    G, 0,  2, BMsub,    0, 0, 0) \
+   DEFINE_DrawTriangle(g##G##_t0_BMsub_TM0_MO0_ME1,    G, 0,  2, BMsub,    0, 0, 1) \
+   DEFINE_DrawTriangle(g##G##_t0_BMaddq_TM0_MO0_ME0,   G, 0,  3, BMaddq,   0, 0, 0) \
+   DEFINE_DrawTriangle(g##G##_t0_BMaddq_TM0_MO0_ME1,   G, 0,  3, BMaddq,   0, 0, 1)
+
+#define DRAWTRI_T1_BMGROUP(G, TM, MO) \
+   DEFINE_DrawTriangle(g##G##_t1_BMopaque_TM##TM##_MO##MO##_ME0, G, 1, -1, BMopaque, TM, MO, 0) \
+   DEFINE_DrawTriangle(g##G##_t1_BMopaque_TM##TM##_MO##MO##_ME1, G, 1, -1, BMopaque, TM, MO, 1) \
+   DEFINE_DrawTriangle(g##G##_t1_BMavg_TM##TM##_MO##MO##_ME0,    G, 1,  0, BMavg,    TM, MO, 0) \
+   DEFINE_DrawTriangle(g##G##_t1_BMavg_TM##TM##_MO##MO##_ME1,    G, 1,  0, BMavg,    TM, MO, 1) \
+   DEFINE_DrawTriangle(g##G##_t1_BMadd_TM##TM##_MO##MO##_ME0,    G, 1,  1, BMadd,    TM, MO, 0) \
+   DEFINE_DrawTriangle(g##G##_t1_BMadd_TM##TM##_MO##MO##_ME1,    G, 1,  1, BMadd,    TM, MO, 1) \
+   DEFINE_DrawTriangle(g##G##_t1_BMsub_TM##TM##_MO##MO##_ME0,    G, 1,  2, BMsub,    TM, MO, 0) \
+   DEFINE_DrawTriangle(g##G##_t1_BMsub_TM##TM##_MO##MO##_ME1,    G, 1,  2, BMsub,    TM, MO, 1) \
+   DEFINE_DrawTriangle(g##G##_t1_BMaddq_TM##TM##_MO##MO##_ME0,   G, 1,  3, BMaddq,   TM, MO, 0) \
+   DEFINE_DrawTriangle(g##G##_t1_BMaddq_TM##TM##_MO##MO##_ME1,   G, 1,  3, BMaddq,   TM, MO, 1)
+
+DRAWTRI_T0_BMGROUP(0)
+DRAWTRI_T0_BMGROUP(1)
+
+DRAWTRI_T1_BMGROUP(0, 0, 0)
+DRAWTRI_T1_BMGROUP(0, 0, 1)
+DRAWTRI_T1_BMGROUP(0, 0, 2)
+DRAWTRI_T1_BMGROUP(0, 1, 0)
+DRAWTRI_T1_BMGROUP(0, 1, 1)
+DRAWTRI_T1_BMGROUP(0, 1, 2)
+DRAWTRI_T1_BMGROUP(1, 0, 0)
+DRAWTRI_T1_BMGROUP(1, 0, 1)
+DRAWTRI_T1_BMGROUP(1, 0, 2)
+DRAWTRI_T1_BMGROUP(1, 1, 0)
+DRAWTRI_T1_BMGROUP(1, 1, 1)
+DRAWTRI_T1_BMGROUP(1, 1, 2)
 
 /* Forward declarations for the helper functions defined in
  * gpu_polygon_sub.c. extern "C" is required: gpu_polygon_sub
@@ -575,6 +566,14 @@ bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 }
 
+/* The C++ template wrapper for DrawTriangle that previously sat
+ * here is gone in stage 4: Command_DrawPolygon below is now itself
+ * macro-generated, so the per-spec call to DrawTriangle resolves
+ * to a direct mangled-name reference at preprocessor time.  No
+ * runtime switch on BlendMode / TexMode_TA / TexMult / MaskEval is
+ * needed since every parameter is a literal in the macro context.
+ */
+
 extern int psx_pgxp_2d_tol;
 
 /*
@@ -585,421 +584,418 @@ extern int psx_pgxp_2d_tol;
  * subpixel-precision projection, then walks one or two triangles
  * (a triangle for numvertices==3, two tris for numvertices==4).
  *
- * Template parameters:
- *   numvertices  - 3 (triangle) or 4 (quad rendered as two tris)
- *   gouraud      - per-vertex colour
- *   textured     - texture sampling
- *   BlendMode    - blend pipeline selector (see DrawSpan)
- *   TexMult      - texel-colour modulation flag
- *   TexMode_TA   - 4/8/15bpp format
- *   MaskEval_TA  - mask-bit gate on destination
- *   pgxp         - PGXP subpixel-precision path (selected
- *                  one layer up by G_Command_DrawPolygon based
- *                  on the runtime PGXP_enabled() check)
+ * Macro parameters:
+ *   SUFFIX        - mangled-name suffix encoding all dimensions
+ *   NV_LIT        - 3 or 4: numvertices
+ *   GOURAUD_LIT   - 0/1: per-vertex colour
+ *   TEXTURED_LIT  - 0/1: texture sampling
+ *   BM_VAL        - integer literal blend mode (-1 / 0..3)
+ *   BM_TAG        - matching blend tag (BMopaque / BMavg / BMadd /
+ *                   BMsub / BMaddq) used in the DrawTriangle_<...>
+ *                   mangled call
+ *   TM_LIT        - 0/1: texel-colour modulation flag
+ *   MO_LIT        - 0/1/2: 4 / 8 / 15bpp texture format
+ *   ME_LIT        - 0/1: mask-bit gate
+ *   PGXP_LIT      - 0/1: PGXP subpixel-precision path
  *
  * Reached from the GP0 dispatch via:
  *   Commands[0x20..0x3F].func[abr][slot] (POLY_HELPER family)
- *     -> G_Command_DrawPolygon (PGXP runtime gate)
- *       -> Command_DrawPolygon (this function)
- *         -> DrawTriangle (per triangle)
- *           -> DrawSpan (per scanline)
- *             -> PlotPixel (per pixel)
+ *     -> G_Command_DrawPolygon (PGXP runtime gate, in gpu.cpp)
+ *       -> Command_DrawPolygon (this body)
+ *         -> DrawTriangle_<...> (per triangle, mangled-name call)
+ *           -> DrawSpan_<...> (per scanline)
+ *             -> PlotPixel_<...> (per pixel)
  *
- * Every layer except the PGXP gate is fully template-specialised,
- * so the entire chain inlines into a single tight inner loop per
- * (numvertices, gouraud, textured, BlendMode, TexMult,
- * TexMode_TA, MaskEval_TA, pgxp) combination.
+ * Every layer is fully macro-specialised, so the entire chain
+ * reduces to direct calls under -O2 since all parameters are
+ * compile-time literals in the macro context.
  */
-template<int numvertices, bool gouraud, bool textured, int BlendMode, bool TexMult, uint32_t TexMode_TA, bool MaskEval_TA, bool pgxp>
-static void Command_DrawPolygon(PS_GPU *gpu, const uint32_t *cb)
-{
-   tri_vertex vertices[3];
-   const uint32_t* baseCB = cb;
-   const unsigned cb0     = cb[0];
-   uint32_t clut          = 0;
-   unsigned sv            = 0;
-   bool invalidW          = false;
-   //uint32_t tpage       = 0;
-
-   vertices[0].x          = 0;
-   vertices[0].y          = 0;
-   vertices[0].u          = 0;
-   vertices[0].v          = 0;
-   vertices[0].r          = 0;
-   vertices[0].g          = 0;
-   vertices[0].b          = 0;
-   vertices[0].precise[0] = 0.0f;
-   vertices[0].precise[1] = 0.0f;
-   vertices[0].precise[2] = 0.0f;
-
-   vertices[1].x          = 0;
-   vertices[1].y          = 0;
-   vertices[1].u          = 0;
-   vertices[1].v          = 0;
-   vertices[1].r          = 0;
-   vertices[1].g          = 0;
-   vertices[1].b          = 0;
-   vertices[1].precise[0] = 0.0f;
-   vertices[1].precise[1] = 0.0f;
-   vertices[1].precise[2] = 0.0f;
-
-   vertices[2].x          = 0;
-   vertices[2].y          = 0;
-   vertices[2].u          = 0;
-   vertices[2].v          = 0;
-   vertices[2].r          = 0;
-   vertices[2].g          = 0;
-   vertices[2].b          = 0;
-   vertices[2].precise[0] = 0.0f;
-   vertices[2].precise[1] = 0.0f;
-   vertices[2].precise[2] = 0.0f;
-
-   // Base timing is approximate, and could be improved.
-   if(numvertices == 4 && gpu->InCmd == INCMD_QUAD)
-      gpu->DrawTimeAvail -= (28 + 18);
-   else
-      gpu->DrawTimeAvail -= (64 + 18);
-
-   if(gouraud && textured)
-      gpu->DrawTimeAvail -= 150 * 3;
-   else if(gouraud)
-      gpu->DrawTimeAvail -= 96 * 3;
-   else if(textured)
-      gpu->DrawTimeAvail -= 60 * 3;
-
-   // if entire previous quad was rejected reset flags
-   if (gpu->killQuadPart == 3)
-	   gpu->killQuadPart = 0;
-
-   if(numvertices == 4)
-   {
-      if(gpu->InCmd == INCMD_QUAD)
-      {
-         memcpy(&vertices[0], &gpu->InQuad_F3Vertices[1], 2 * sizeof(tri_vertex));
-         clut = gpu->InQuad_clut;
-         invalidW = gpu->InQuad_invalidW;
-         sv = 2;
-      }
-   }
-   //else
-   // memset(vertices, 0, sizeof(vertices));
-
-   for (unsigned v = sv; v < 3; v++)
-   {
-      if (v == 0 || gouraud)
-      {
-         uint32_t raw_color = (*cb & 0xFFFFFF);
-
-         vertices[v].r = raw_color & 0xFF;
-         vertices[v].g = (raw_color >> 8) & 0xFF;
-         vertices[v].b = (raw_color >> 16) & 0xFF;
-
-         cb++;
-      }
-      else
-      {
-         vertices[v].r = vertices[0].r;
-         vertices[v].g = vertices[0].g;
-         vertices[v].b = vertices[0].b;
-      }
-
-      int32 x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF)));
-      int32 y = sign_x_to_s32(11, ((int16_t)(*cb >> 16)));
-
-      vertices[v].x = (x + gpu->OffsX) << gpu->upscale_shift;
-      vertices[v].y = (y + gpu->OffsY) << gpu->upscale_shift;
-
-      if (pgxp)
-      {
-         OGLVertex vert;
-         PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0);
-
-         vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * UPSCALE(gpu));
-         vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * UPSCALE(gpu));
-         vertices[v].precise[2] = vert.w;
-
-         if (!vert.valid_w || vert.w <= 0.0)
-            invalidW = true;
-      }
-      else
-      {
-         vertices[v].precise[0] = vertices[v].x;
-         vertices[v].precise[1] = vertices[v].y;
-         invalidW = true;
-      }
-
-      cb++;
-
-      if (textured)
-      {
-         vertices[v].u = (*cb & 0xFF);
-         vertices[v].v = (*cb >> 8) & 0xFF;
-
-         if (v == 0)
-         {
-            clut = ((*cb >> 16) & 0xFFFF) << 4;
-            Update_CLUT_Cache<TexMode_TA>(gpu, (*cb >> 16) & 0xFFFF);
-         }
-
-         cb++;
-      }
-   }
-
-   // iCB: If any vertices lack w components then set all to 1
-   if (invalidW)
-      for (unsigned v = 0; v < 3; v++)
-      {
-         // lacking w component tends to mean degenerate coordinates
-         // set to non-pgxp value if difference is too great
-         if (pgxp && psx_pgxp_2d_tol >= 0)
-         {
-            unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
-            if (
-               abs(vertices[v].precise[0] - vertices[v].x) > tol ||
-               abs(vertices[v].precise[1] - vertices[v].y) > tol
-            )
-            {
-               vertices[v].precise[0] = vertices[v].x;
-               vertices[v].precise[1] = vertices[v].y;
-            }
-         }
-         vertices[v].precise[2] = 1.f;
-      }
-
-   // Copy before Calc_UVOffsets which modifies vertices
-   // Calc_UVOffsets likes to see unadjusted vertices
-   if(numvertices == 4 && gpu->InCmd != INCMD_QUAD)
-      memcpy(&gpu->InQuad_F3Vertices[1], &vertices[1], sizeof(tri_vertex) * 2);
-
-   // Calculated UV offsets (needed for hardware renderers and software with scaling)
-   // Do one time updates for primitive
-   if (textured)
-      Calc_UVOffsets_Adjust_Verts(gpu, vertices, numvertices);
-
-   if(numvertices == 4)
-   {
-      if(gpu->InCmd == INCMD_QUAD)
-      {
-         gpu->InCmd = INCMD_NONE;
-
-         if (invalidW)
-         {
-            if (pgxp && psx_pgxp_2d_tol >= 0)
-            {
-               unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift;
-               if (
-                  abs(gpu->InQuad_F3Vertices[0].precise[0] - gpu->InQuad_F3Vertices[0].x) > tol ||
-                  abs(gpu->InQuad_F3Vertices[0].precise[1] - gpu->InQuad_F3Vertices[0].y) > tol
-               )
-               {
-                  gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x;
-                  gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y;
-               }
-            }
-            // default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay)
-            gpu->InQuad_F3Vertices[0].precise[2] = 1.f;
-         }
-      }
-      else
-      {
-         gpu->InCmd = INCMD_QUAD;
-         gpu->InCmd_CC = cb0 >> 24;
-         memcpy(&gpu->InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex));
-         gpu->InQuad_clut = clut;
-         gpu->InQuad_invalidW = invalidW;
-      }
-   }
-
-   if(abs(vertices[2].y - vertices[0].y) >= (512 << gpu->upscale_shift) ||
-      abs(vertices[2].y - vertices[1].y) >= (512 << gpu->upscale_shift) ||
-      abs(vertices[1].y - vertices[0].y) >= (512 << gpu->upscale_shift))
-     {
-		 if (numvertices == 4)
-			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
-     
-		 // hardware renderer still needs to render first triangle
-		 if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2))
-			 return;
-     }
-
-   if(abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) ||
-      abs(vertices[2].x - vertices[1].x) >= (1024 << gpu->upscale_shift) ||
-      abs(vertices[1].x - vertices[0].x) >= (1024 << gpu->upscale_shift))
-     {
-		 if (numvertices == 4)
-			 gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2;
-		 
-		 // hardware renderer still needs to render first triangle
-		 if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2))
-			return;
-     }
-
-   uint16_t clut_x = (clut & (0x3f << 4));
-   uint16_t clut_y = (clut >> 10) & 0x1ff;
-
-   tri_vertex lineVertices[3];	// Line Render: store second triangle vertices (software renderer modifies originals)
-	bool lineFound = false;		// Used to loop drawing code to draw second triangle (avoids second inline call)
-	do
-	{
-
-		enum blending_modes blend_mode = BLEND_MODE_AVERAGE;
-
-		if (textured)
-		{
-			if (TexMult)
-				blend_mode = BLEND_MODE_SUBTRACT;
-			else
-				blend_mode = BLEND_MODE_ADD;
-		}
-
-		// Line Renderer: Detect triangles that would resolve as lines at x1 scale and create second triangle to make quad
-		if ((line_render_mode != 0) && (!lineFound) && (numvertices == 3) && (textured))
-		{
-			if(line_render_mode == 1)
-				lineFound = Hack_FindLine(gpu, vertices, lineVertices);		// Default enabled
-			else if (line_render_mode == 2)
-				lineFound = Hack_ForceLine(gpu, vertices, lineVertices);	// Aggressive mode enabled (causes more artifacts)
-			else
-				lineFound = false;
-		}
-		else
-			lineFound = false;
-
-		if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN)
-		{
-			Reset_UVLimits(gpu);
-
-			if ((numvertices == 4) && (!gpu->killQuadPart))
-			{
-				if (gpu->InCmd == INCMD_NONE)
-				{
-					// We have 4 quad vertices, we can push that at once
-					tri_vertex *first = &gpu->InQuad_F3Vertices[0];
-
-					Extend_UVLimits(gpu, first, 1);
-					Extend_UVLimits(gpu, vertices, 3);
-					Finalise_UVLimits(gpu);
-
-					rsx_intf_push_quad(first->precise[0],
-						first->precise[1],
-						first->precise[2],
-						vertices[0].precise[0],
-						vertices[0].precise[1],
-						vertices[0].precise[2],
-						vertices[1].precise[0],
-						vertices[1].precise[1],
-						vertices[1].precise[2],
-						vertices[2].precise[0],
-						vertices[2].precise[1],
-						vertices[2].precise[2],
-						((uint32_t)first->r) |
-						((uint32_t)first->g << 8) |
-						((uint32_t)first->b << 16),
-						((uint32_t)vertices[0].r) |
-						((uint32_t)vertices[0].g << 8) |
-						((uint32_t)vertices[0].b << 16),
-						((uint32_t)vertices[1].r) |
-						((uint32_t)vertices[1].g << 8) |
-						((uint32_t)vertices[1].b << 16),
-						((uint32_t)vertices[2].r) |
-						((uint32_t)vertices[2].g << 8) |
-						((uint32_t)vertices[2].b << 16),
-						first->u + gpu->off_u, first->v + gpu->off_v,
-						vertices[0].u + gpu->off_u, vertices[0].v + gpu->off_v,
-						vertices[1].u + gpu->off_u, vertices[1].v + gpu->off_v,
-						vertices[2].u + gpu->off_u, vertices[2].v + gpu->off_v,
-						gpu->min_u, gpu->min_v,
-						gpu->max_u, gpu->max_v,
-						gpu->TexPageX, gpu->TexPageY,
-						clut_x, clut_y,
-						blend_mode,
-						2 - TexMode_TA,
-						DitherEnabled(gpu),
-						BlendMode,
-						MaskEval_TA,
-						gpu->MaskSetOR != 0,
-                  false,
-                  gpu->may_be_2d);
-				}
-			}
-			else
-			{
-				tri_vertex *verts;
-
-				// Only need to render first triangle that we skipped
-				if (gpu->killQuadPart == 2)
-					verts = &gpu->InQuad_F3Vertices[0];
-				else
-					verts = &vertices[0];
-
-				Extend_UVLimits(gpu, verts, 3);
-				Finalise_UVLimits(gpu);
-
-				// Push a single triangle
-				rsx_intf_push_triangle(verts[0].precise[0],
-					verts[0].precise[1],
-					verts[0].precise[2],
-					verts[1].precise[0],
-					verts[1].precise[1],
-					verts[1].precise[2],
-					verts[2].precise[0],
-					verts[2].precise[1],
-					verts[2].precise[2],
-					((uint32_t)verts[0].r) |
-					((uint32_t)verts[0].g << 8) |
-					((uint32_t)verts[0].b << 16),
-					((uint32_t)verts[1].r) |
-					((uint32_t)verts[1].g << 8) |
-					((uint32_t)verts[1].b << 16),
-					((uint32_t)verts[2].r) |
-					((uint32_t)verts[2].g << 8) |
-					((uint32_t)verts[2].b << 16),
-					verts[0].u, verts[0].v,
-					verts[1].u, verts[1].v,
-					verts[2].u, verts[2].v,
-					gpu->min_u, gpu->min_v,
-					gpu->max_u, gpu->max_v,
-					gpu->TexPageX, gpu->TexPageY,
-					clut_x, clut_y,
-					blend_mode,
-					2 - TexMode_TA,
-					DitherEnabled(gpu),
-					BlendMode,
-					MaskEval_TA,
-					gpu->MaskSetOR != 0);
-
-				if (gpu->killQuadPart == 2)
-				{
-					gpu->killQuadPart = 0;
-					return;
-				}
-
-				gpu->killQuadPart = 0;
-			}
-		}
-
-      if (rsx_intf_is_type() == RSX_SOFTWARE)
-      {
-         if (pgxp)
-         {
-            for (uint32 i = 0; i < 3; ++i)
-            {
-               vertices[i].x = vertices[i].precise[0];
-               vertices[i].y = vertices[i].precise[1];
-            }
-         }
-      }
-
-		if (rsx_intf_has_software_renderer())
-			DrawTriangle<gouraud, textured, BlendMode, TexMult, TexMode_TA, MaskEval_TA>(gpu, vertices);
-
-		// Line Render: Overwrite vertices with those of the second triangle
-		if ((lineFound) && (numvertices == 3) && (textured))
-			memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex));
-
-	} while (lineFound);
+#define DEFINE_Command_DrawPolygon(SUFFIX, NV_LIT, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, PGXP_LIT) \
+static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
+{ \
+   tri_vertex     vertices[3]; \
+   const uint32_t *baseCB = cb; \
+   const unsigned cb0     = cb[0]; \
+   uint32_t       clut    = 0; \
+   unsigned       sv      = 0; \
+   bool           invalidW = false; \
+   unsigned       v; \
+   uint16_t       clut_x, clut_y; \
+   tri_vertex     lineVertices[3]; \
+   bool           lineFound = false; \
+   /*uint32_t tpage = 0;*/ \
+   vertices[0].x          = 0; \
+   vertices[0].y          = 0; \
+   vertices[0].u          = 0; \
+   vertices[0].v          = 0; \
+   vertices[0].r          = 0; \
+   vertices[0].g          = 0; \
+   vertices[0].b          = 0; \
+   vertices[0].precise[0] = 0.0f; \
+   vertices[0].precise[1] = 0.0f; \
+   vertices[0].precise[2] = 0.0f; \
+   vertices[1].x          = 0; \
+   vertices[1].y          = 0; \
+   vertices[1].u          = 0; \
+   vertices[1].v          = 0; \
+   vertices[1].r          = 0; \
+   vertices[1].g          = 0; \
+   vertices[1].b          = 0; \
+   vertices[1].precise[0] = 0.0f; \
+   vertices[1].precise[1] = 0.0f; \
+   vertices[1].precise[2] = 0.0f; \
+   vertices[2].x          = 0; \
+   vertices[2].y          = 0; \
+   vertices[2].u          = 0; \
+   vertices[2].v          = 0; \
+   vertices[2].r          = 0; \
+   vertices[2].g          = 0; \
+   vertices[2].b          = 0; \
+   vertices[2].precise[0] = 0.0f; \
+   vertices[2].precise[1] = 0.0f; \
+   vertices[2].precise[2] = 0.0f; \
+   /* Base timing is approximate, and could be improved. */ \
+   if (NV_LIT == 4 && gpu->InCmd == INCMD_QUAD) \
+      gpu->DrawTimeAvail -= (28 + 18); \
+   else \
+      gpu->DrawTimeAvail -= (64 + 18); \
+   if (GOURAUD_LIT && TEXTURED_LIT) \
+      gpu->DrawTimeAvail -= 150 * 3; \
+   else if (GOURAUD_LIT) \
+      gpu->DrawTimeAvail -= 96 * 3; \
+   else if (TEXTURED_LIT) \
+      gpu->DrawTimeAvail -= 60 * 3; \
+   /* if entire previous quad was rejected reset flags */ \
+   if (gpu->killQuadPart == 3) \
+      gpu->killQuadPart = 0; \
+   if (NV_LIT == 4) \
+   { \
+      if (gpu->InCmd == INCMD_QUAD) \
+      { \
+         memcpy(&vertices[0], &gpu->InQuad_F3Vertices[1], 2 * sizeof(tri_vertex)); \
+         clut     = gpu->InQuad_clut; \
+         invalidW = gpu->InQuad_invalidW; \
+         sv       = 2; \
+      } \
+   } \
+   /* else memset(vertices, 0, sizeof(vertices)); */ \
+   for (v = sv; v < 3; v++) \
+   { \
+      int32 x, y; \
+      if (v == 0 || GOURAUD_LIT) \
+      { \
+         uint32_t raw_color = (*cb & 0xFFFFFF); \
+         vertices[v].r = raw_color & 0xFF; \
+         vertices[v].g = (raw_color >> 8) & 0xFF; \
+         vertices[v].b = (raw_color >> 16) & 0xFF; \
+         cb++; \
+      } \
+      else \
+      { \
+         vertices[v].r = vertices[0].r; \
+         vertices[v].g = vertices[0].g; \
+         vertices[v].b = vertices[0].b; \
+      } \
+      x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF))); \
+      y = sign_x_to_s32(11, ((int16_t)(*cb >> 16))); \
+      vertices[v].x = (x + gpu->OffsX) << gpu->upscale_shift; \
+      vertices[v].y = (y + gpu->OffsY) << gpu->upscale_shift; \
+      if (PGXP_LIT) \
+      { \
+         OGLVertex vert; \
+         PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0); \
+         vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * UPSCALE(gpu)); \
+         vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * UPSCALE(gpu)); \
+         vertices[v].precise[2] = vert.w; \
+         if (!vert.valid_w || vert.w <= 0.0) \
+            invalidW = true; \
+      } \
+      else \
+      { \
+         vertices[v].precise[0] = vertices[v].x; \
+         vertices[v].precise[1] = vertices[v].y; \
+         invalidW = true; \
+      } \
+      cb++; \
+      if (TEXTURED_LIT) \
+      { \
+         vertices[v].u = (*cb & 0xFF); \
+         vertices[v].v = (*cb >> 8) & 0xFF; \
+         if (v == 0) \
+         { \
+            clut = ((*cb >> 16) & 0xFFFF) << 4; \
+            Update_CLUT_Cache_TM##MO_LIT(gpu, (*cb >> 16) & 0xFFFF); \
+         } \
+         cb++; \
+      } \
+   } \
+   /* iCB: If any vertices lack w components then set all to 1 */ \
+   if (invalidW) \
+      for (v = 0; v < 3; v++) \
+      { \
+         /* lacking w component tends to mean degenerate coordinates */ \
+         /* set to non-pgxp value if difference is too great */ \
+         if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
+         { \
+            unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift; \
+            if ( \
+               (unsigned)abs(vertices[v].precise[0] - vertices[v].x) > tol || \
+               (unsigned)abs(vertices[v].precise[1] - vertices[v].y) > tol \
+            ) \
+            { \
+               vertices[v].precise[0] = vertices[v].x; \
+               vertices[v].precise[1] = vertices[v].y; \
+            } \
+         } \
+         vertices[v].precise[2] = 1.f; \
+      } \
+   /* Copy before Calc_UVOffsets which modifies vertices */ \
+   /* Calc_UVOffsets likes to see unadjusted vertices */ \
+   if (NV_LIT == 4 && gpu->InCmd != INCMD_QUAD) \
+      memcpy(&gpu->InQuad_F3Vertices[1], &vertices[1], sizeof(tri_vertex) * 2); \
+   /* Calculated UV offsets (needed for hardware renderers and software with scaling) */ \
+   /* Do one time updates for primitive */ \
+   if (TEXTURED_LIT) \
+      Calc_UVOffsets_Adjust_Verts(gpu, vertices, NV_LIT); \
+   if (NV_LIT == 4) \
+   { \
+      if (gpu->InCmd == INCMD_QUAD) \
+      { \
+         gpu->InCmd = INCMD_NONE; \
+         if (invalidW) \
+         { \
+            if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
+            { \
+               unsigned tol = (unsigned)psx_pgxp_2d_tol << gpu->upscale_shift; \
+               if ( \
+                  (unsigned)abs(gpu->InQuad_F3Vertices[0].precise[0] - gpu->InQuad_F3Vertices[0].x) > tol || \
+                  (unsigned)abs(gpu->InQuad_F3Vertices[0].precise[1] - gpu->InQuad_F3Vertices[0].y) > tol \
+               ) \
+               { \
+                  gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x; \
+                  gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y; \
+               } \
+            } \
+            /* default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay) */ \
+            gpu->InQuad_F3Vertices[0].precise[2] = 1.f; \
+         } \
+      } \
+      else \
+      { \
+         gpu->InCmd = INCMD_QUAD; \
+         gpu->InCmd_CC = cb0 >> 24; \
+         memcpy(&gpu->InQuad_F3Vertices[0], &vertices[0], sizeof(tri_vertex)); \
+         gpu->InQuad_clut = clut; \
+         gpu->InQuad_invalidW = invalidW; \
+      } \
+   } \
+   if (abs(vertices[2].y - vertices[0].y) >= (512 << gpu->upscale_shift) || \
+       abs(vertices[2].y - vertices[1].y) >= (512 << gpu->upscale_shift) || \
+       abs(vertices[1].y - vertices[0].y) >= (512 << gpu->upscale_shift)) \
+   { \
+      if (NV_LIT == 4) \
+         gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
+      /* hardware renderer still needs to render first triangle */ \
+      if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2)) \
+         return; \
+   } \
+   if (abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) || \
+       abs(vertices[2].x - vertices[1].x) >= (1024 << gpu->upscale_shift) || \
+       abs(vertices[1].x - vertices[0].x) >= (1024 << gpu->upscale_shift)) \
+   { \
+      if (NV_LIT == 4) \
+         gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
+      /* hardware renderer still needs to render first triangle */ \
+      if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2)) \
+         return; \
+   } \
+   clut_x = (clut & (0x3f << 4)); \
+   clut_y = (clut >> 10) & 0x1ff; \
+   /* Line Render: store second triangle vertices (software renderer modifies originals) */ \
+   /* Used to loop drawing code to draw second triangle (avoids second inline call) */ \
+   do \
+   { \
+      enum blending_modes blend_mode = BLEND_MODE_AVERAGE; \
+      if (TEXTURED_LIT) \
+      { \
+         if (TM_LIT) \
+            blend_mode = BLEND_MODE_SUBTRACT; \
+         else \
+            blend_mode = BLEND_MODE_ADD; \
+      } \
+      /* Line Renderer: Detect triangles that would resolve as lines at x1 scale and create second triangle to make quad */ \
+      if ((line_render_mode != 0) && (!lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
+      { \
+         if (line_render_mode == 1) \
+            lineFound = Hack_FindLine(gpu, vertices, lineVertices);  /* Default enabled */ \
+         else if (line_render_mode == 2) \
+            lineFound = Hack_ForceLine(gpu, vertices, lineVertices); /* Aggressive mode enabled (causes more artifacts) */ \
+         else \
+            lineFound = false; \
+      } \
+      else \
+         lineFound = false; \
+      if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN) \
+      { \
+         Reset_UVLimits(gpu); \
+         if ((NV_LIT == 4) && (!gpu->killQuadPart)) \
+         { \
+            if (gpu->InCmd == INCMD_NONE) \
+            { \
+               /* We have 4 quad vertices, we can push that at once */ \
+               tri_vertex *first = &gpu->InQuad_F3Vertices[0]; \
+               Extend_UVLimits(gpu, first, 1); \
+               Extend_UVLimits(gpu, vertices, 3); \
+               Finalise_UVLimits(gpu); \
+               rsx_intf_push_quad(first->precise[0], \
+                  first->precise[1], \
+                  first->precise[2], \
+                  vertices[0].precise[0], \
+                  vertices[0].precise[1], \
+                  vertices[0].precise[2], \
+                  vertices[1].precise[0], \
+                  vertices[1].precise[1], \
+                  vertices[1].precise[2], \
+                  vertices[2].precise[0], \
+                  vertices[2].precise[1], \
+                  vertices[2].precise[2], \
+                  ((uint32_t)first->r) | ((uint32_t)first->g << 8) | ((uint32_t)first->b << 16), \
+                  ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16), \
+                  ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16), \
+                  ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16), \
+                  first->u + gpu->off_u, first->v + gpu->off_v, \
+                  vertices[0].u + gpu->off_u, vertices[0].v + gpu->off_v, \
+                  vertices[1].u + gpu->off_u, vertices[1].v + gpu->off_v, \
+                  vertices[2].u + gpu->off_u, vertices[2].v + gpu->off_v, \
+                  gpu->min_u, gpu->min_v, \
+                  gpu->max_u, gpu->max_v, \
+                  gpu->TexPageX, gpu->TexPageY, \
+                  clut_x, clut_y, \
+                  blend_mode, \
+                  2 - (MO_LIT), \
+                  DitherEnabled(gpu), \
+                  (BM_VAL), \
+                  (ME_LIT), \
+                  gpu->MaskSetOR != 0, \
+                  false, \
+                  gpu->may_be_2d); \
+            } \
+         } \
+         else \
+         { \
+            tri_vertex *verts; \
+            /* Only need to render first triangle that we skipped */ \
+            if (gpu->killQuadPart == 2) \
+               verts = &gpu->InQuad_F3Vertices[0]; \
+            else \
+               verts = &vertices[0]; \
+            Extend_UVLimits(gpu, verts, 3); \
+            Finalise_UVLimits(gpu); \
+            /* Push a single triangle */ \
+            rsx_intf_push_triangle(verts[0].precise[0], \
+               verts[0].precise[1], \
+               verts[0].precise[2], \
+               verts[1].precise[0], \
+               verts[1].precise[1], \
+               verts[1].precise[2], \
+               verts[2].precise[0], \
+               verts[2].precise[1], \
+               verts[2].precise[2], \
+               ((uint32_t)verts[0].r) | ((uint32_t)verts[0].g << 8) | ((uint32_t)verts[0].b << 16), \
+               ((uint32_t)verts[1].r) | ((uint32_t)verts[1].g << 8) | ((uint32_t)verts[1].b << 16), \
+               ((uint32_t)verts[2].r) | ((uint32_t)verts[2].g << 8) | ((uint32_t)verts[2].b << 16), \
+               verts[0].u, verts[0].v, \
+               verts[1].u, verts[1].v, \
+               verts[2].u, verts[2].v, \
+               gpu->min_u, gpu->min_v, \
+               gpu->max_u, gpu->max_v, \
+               gpu->TexPageX, gpu->TexPageY, \
+               clut_x, clut_y, \
+               blend_mode, \
+               2 - (MO_LIT), \
+               DitherEnabled(gpu), \
+               (BM_VAL), \
+               (ME_LIT), \
+               gpu->MaskSetOR != 0); \
+            if (gpu->killQuadPart == 2) \
+            { \
+               gpu->killQuadPart = 0; \
+               return; \
+            } \
+            gpu->killQuadPart = 0; \
+         } \
+      } \
+      if (rsx_intf_is_type() == RSX_SOFTWARE) \
+      { \
+         if (PGXP_LIT) \
+         { \
+            uint32 i; \
+            for (i = 0; i < 3; ++i) \
+            { \
+               vertices[i].x = vertices[i].precise[0]; \
+               vertices[i].y = vertices[i].precise[1]; \
+            } \
+         } \
+      } \
+      if (rsx_intf_has_software_renderer()) \
+         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices); \
+      /* Line Render: Overwrite vertices with those of the second triangle */ \
+      if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
+         memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex)); \
+   } while (lineFound); \
 }
+
+/* CMD_DRAWPOLY_T0_BMGROUP and CMD_DRAWPOLY_T1_BMGROUP emit the
+ * 10 (BlendMode * MaskEval) specs for given outer parameters,
+ * keeping the explicit-instantiation list short. */
+
+#define CMD_DRAWPOLY_T0_BMGROUP(RAWNV, RAWG, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMopaque_TM0_MO0_ME0_PG##RAWPG, RAWNV, RAWG, 0, -1, BMopaque, 0, 0, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMopaque_TM0_MO0_ME1_PG##RAWPG, RAWNV, RAWG, 0, -1, BMopaque, 0, 0, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMavg_TM0_MO0_ME0_PG##RAWPG, RAWNV, RAWG, 0,  0, BMavg,    0, 0, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMavg_TM0_MO0_ME1_PG##RAWPG, RAWNV, RAWG, 0,  0, BMavg,    0, 0, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMadd_TM0_MO0_ME0_PG##RAWPG, RAWNV, RAWG, 0,  1, BMadd,    0, 0, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMadd_TM0_MO0_ME1_PG##RAWPG, RAWNV, RAWG, 0,  1, BMadd,    0, 0, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMsub_TM0_MO0_ME0_PG##RAWPG, RAWNV, RAWG, 0,  2, BMsub,    0, 0, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMsub_TM0_MO0_ME1_PG##RAWPG, RAWNV, RAWG, 0,  2, BMsub,    0, 0, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMaddq_TM0_MO0_ME0_PG##RAWPG, RAWNV, RAWG, 0,  3, BMaddq,   0, 0, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMaddq_TM0_MO0_ME1_PG##RAWPG, RAWNV, RAWG, 0,  3, BMaddq,   0, 0, 1, RAWPG)
+
+#define CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, TM, MO, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMopaque_TM##TM##_MO##MO##_ME0_PG##RAWPG, RAWNV, RAWG, 1, -1, BMopaque, TM, MO, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMopaque_TM##TM##_MO##MO##_ME1_PG##RAWPG, RAWNV, RAWG, 1, -1, BMopaque, TM, MO, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMavg_TM##TM##_MO##MO##_ME0_PG##RAWPG, RAWNV, RAWG, 1,  0, BMavg,    TM, MO, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMavg_TM##TM##_MO##MO##_ME1_PG##RAWPG, RAWNV, RAWG, 1,  0, BMavg,    TM, MO, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMadd_TM##TM##_MO##MO##_ME0_PG##RAWPG, RAWNV, RAWG, 1,  1, BMadd,    TM, MO, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMadd_TM##TM##_MO##MO##_ME1_PG##RAWPG, RAWNV, RAWG, 1,  1, BMadd,    TM, MO, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMsub_TM##TM##_MO##MO##_ME0_PG##RAWPG, RAWNV, RAWG, 1,  2, BMsub,    TM, MO, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMsub_TM##TM##_MO##MO##_ME1_PG##RAWPG, RAWNV, RAWG, 1,  2, BMsub,    TM, MO, 1, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMaddq_TM##TM##_MO##MO##_ME0_PG##RAWPG, RAWNV, RAWG, 1,  3, BMaddq,   TM, MO, 0, RAWPG) \
+   DEFINE_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMaddq_TM##TM##_MO##MO##_ME1_PG##RAWPG, RAWNV, RAWG, 1,  3, BMaddq,   TM, MO, 1, RAWPG)
+
+/* CMD_DRAWPOLY_BMGROUP_ALL emits all 70 (10 non-textured + 60
+ * textured) specs for one (NV, G, PG) combination. */
+#define CMD_DRAWPOLY_BMGROUP_ALL(RAWNV, RAWG, RAWPG) \
+   CMD_DRAWPOLY_T0_BMGROUP(RAWNV, RAWG, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 0, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 1, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 2, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 0, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 1, RAWPG) \
+   CMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 2, RAWPG)
+
+/* Emit all 560 Command_DrawPolygon specialisations:
+ *   2 NV * 2 G * 2 PG * 70 (BM cross) = 560 */
+CMD_DRAWPOLY_BMGROUP_ALL(3, 0, 0)
+CMD_DRAWPOLY_BMGROUP_ALL(3, 0, 1)
+CMD_DRAWPOLY_BMGROUP_ALL(3, 1, 0)
+CMD_DRAWPOLY_BMGROUP_ALL(3, 1, 1)
+CMD_DRAWPOLY_BMGROUP_ALL(4, 0, 0)
+CMD_DRAWPOLY_BMGROUP_ALL(4, 0, 1)
+CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 0)
+CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 1)
 
 #undef COORD_POST_PADDING
 #undef COORD_FBS
 #undef COORD_MF_INT
+

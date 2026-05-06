@@ -629,14 +629,226 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  */
 
 /*
- * POLY_HELPER_SUB - emit one Command_DrawPolygon template
- * specialisation. Decodes `cv` as detailed above and combines
- * with the row-level `bm` / `tm` / `mam` to produce the full
- * eight-parameter template instantiation. Also threads the PGXP
- * runtime gate via G_Command_DrawPolygon (gpu.cpp).
+ * POLY_HELPER_SUB - emit one G_Command_DrawPolygon mangled-name
+ * reference. Decodes `cv` as detailed above and combines with the
+ * row-level `bm` / `tm` / `mam` to produce the full eight-parameter
+ * specialisation entry. Also threads the PGXP runtime gate via
+ * G_Command_DrawPolygon (gpu.cpp), which dispatches to
+ * Command_DrawPolygon_..._PG0 / _PG1 based on PGXP_enabled().
+ *
+ * Per-cv macros decode polyline / quad / gouraud / textured /
+ * blended / texmult bits at preprocessor time, in the same style
+ * as SPR_HELPER and LINE_HELPER above.  bm-tag rewrite reuses the
+ * LINE_BMTAG_BM_<n> chain.
  */
-#define POLY_HELPER_SUB(bm, cv, tm, mam)	\
-	 G_Command_DrawPolygon<3 + ((cv & 0x8) >> 3), ((cv & 0x10) >> 4), ((cv & 0x4) >> 2), ((cv & 0x2) >> 1) ? bm : -1, ((cv & 1) ^ 1) & ((cv & 0x4) >> 2), tm, mam >
+
+/*  cv         numvertices  gouraud  textured  blended  texmult  */
+#define POLY_HELPER_NV_0x20  NV3
+#define POLY_HELPER_G_0x20   G0
+#define POLY_HELPER_T_0x20   T0
+#define POLY_HELPER_TM_0x20  TM0
+#define POLY_HELPER_BM_0x20(bm) BMopaque
+#define POLY_HELPER_NV_0x21  NV3
+#define POLY_HELPER_G_0x21   G0
+#define POLY_HELPER_T_0x21   T0
+#define POLY_HELPER_TM_0x21  TM0
+#define POLY_HELPER_BM_0x21(bm) BMopaque
+#define POLY_HELPER_NV_0x22  NV3
+#define POLY_HELPER_G_0x22   G0
+#define POLY_HELPER_T_0x22   T0
+#define POLY_HELPER_TM_0x22  TM0
+#define POLY_HELPER_BM_0x22(bm) BM_##bm
+#define POLY_HELPER_NV_0x23  NV3
+#define POLY_HELPER_G_0x23   G0
+#define POLY_HELPER_T_0x23   T0
+#define POLY_HELPER_TM_0x23  TM0
+#define POLY_HELPER_BM_0x23(bm) BM_##bm
+#define POLY_HELPER_NV_0x24  NV3
+#define POLY_HELPER_G_0x24   G0
+#define POLY_HELPER_T_0x24   T1
+#define POLY_HELPER_TM_0x24  TM1
+#define POLY_HELPER_BM_0x24(bm) BMopaque
+#define POLY_HELPER_NV_0x25  NV3
+#define POLY_HELPER_G_0x25   G0
+#define POLY_HELPER_T_0x25   T1
+#define POLY_HELPER_TM_0x25  TM0
+#define POLY_HELPER_BM_0x25(bm) BMopaque
+#define POLY_HELPER_NV_0x26  NV3
+#define POLY_HELPER_G_0x26   G0
+#define POLY_HELPER_T_0x26   T1
+#define POLY_HELPER_TM_0x26  TM1
+#define POLY_HELPER_BM_0x26(bm) BM_##bm
+#define POLY_HELPER_NV_0x27  NV3
+#define POLY_HELPER_G_0x27   G0
+#define POLY_HELPER_T_0x27   T1
+#define POLY_HELPER_TM_0x27  TM0
+#define POLY_HELPER_BM_0x27(bm) BM_##bm
+#define POLY_HELPER_NV_0x28  NV4
+#define POLY_HELPER_G_0x28   G0
+#define POLY_HELPER_T_0x28   T0
+#define POLY_HELPER_TM_0x28  TM0
+#define POLY_HELPER_BM_0x28(bm) BMopaque
+#define POLY_HELPER_NV_0x29  NV4
+#define POLY_HELPER_G_0x29   G0
+#define POLY_HELPER_T_0x29   T0
+#define POLY_HELPER_TM_0x29  TM0
+#define POLY_HELPER_BM_0x29(bm) BMopaque
+#define POLY_HELPER_NV_0x2a  NV4
+#define POLY_HELPER_G_0x2a   G0
+#define POLY_HELPER_T_0x2a   T0
+#define POLY_HELPER_TM_0x2a  TM0
+#define POLY_HELPER_BM_0x2a(bm) BM_##bm
+#define POLY_HELPER_NV_0x2b  NV4
+#define POLY_HELPER_G_0x2b   G0
+#define POLY_HELPER_T_0x2b   T0
+#define POLY_HELPER_TM_0x2b  TM0
+#define POLY_HELPER_BM_0x2b(bm) BM_##bm
+#define POLY_HELPER_NV_0x2c  NV4
+#define POLY_HELPER_G_0x2c   G0
+#define POLY_HELPER_T_0x2c   T1
+#define POLY_HELPER_TM_0x2c  TM1
+#define POLY_HELPER_BM_0x2c(bm) BMopaque
+#define POLY_HELPER_NV_0x2d  NV4
+#define POLY_HELPER_G_0x2d   G0
+#define POLY_HELPER_T_0x2d   T1
+#define POLY_HELPER_TM_0x2d  TM0
+#define POLY_HELPER_BM_0x2d(bm) BMopaque
+#define POLY_HELPER_NV_0x2e  NV4
+#define POLY_HELPER_G_0x2e   G0
+#define POLY_HELPER_T_0x2e   T1
+#define POLY_HELPER_TM_0x2e  TM1
+#define POLY_HELPER_BM_0x2e(bm) BM_##bm
+#define POLY_HELPER_NV_0x2f  NV4
+#define POLY_HELPER_G_0x2f   G0
+#define POLY_HELPER_T_0x2f   T1
+#define POLY_HELPER_TM_0x2f  TM0
+#define POLY_HELPER_BM_0x2f(bm) BM_##bm
+#define POLY_HELPER_NV_0x30  NV3
+#define POLY_HELPER_G_0x30   G1
+#define POLY_HELPER_T_0x30   T0
+#define POLY_HELPER_TM_0x30  TM0
+#define POLY_HELPER_BM_0x30(bm) BMopaque
+#define POLY_HELPER_NV_0x31  NV3
+#define POLY_HELPER_G_0x31   G1
+#define POLY_HELPER_T_0x31   T0
+#define POLY_HELPER_TM_0x31  TM0
+#define POLY_HELPER_BM_0x31(bm) BMopaque
+#define POLY_HELPER_NV_0x32  NV3
+#define POLY_HELPER_G_0x32   G1
+#define POLY_HELPER_T_0x32   T0
+#define POLY_HELPER_TM_0x32  TM0
+#define POLY_HELPER_BM_0x32(bm) BM_##bm
+#define POLY_HELPER_NV_0x33  NV3
+#define POLY_HELPER_G_0x33   G1
+#define POLY_HELPER_T_0x33   T0
+#define POLY_HELPER_TM_0x33  TM0
+#define POLY_HELPER_BM_0x33(bm) BM_##bm
+#define POLY_HELPER_NV_0x34  NV3
+#define POLY_HELPER_G_0x34   G1
+#define POLY_HELPER_T_0x34   T1
+#define POLY_HELPER_TM_0x34  TM1
+#define POLY_HELPER_BM_0x34(bm) BMopaque
+#define POLY_HELPER_NV_0x35  NV3
+#define POLY_HELPER_G_0x35   G1
+#define POLY_HELPER_T_0x35   T1
+#define POLY_HELPER_TM_0x35  TM0
+#define POLY_HELPER_BM_0x35(bm) BMopaque
+#define POLY_HELPER_NV_0x36  NV3
+#define POLY_HELPER_G_0x36   G1
+#define POLY_HELPER_T_0x36   T1
+#define POLY_HELPER_TM_0x36  TM1
+#define POLY_HELPER_BM_0x36(bm) BM_##bm
+#define POLY_HELPER_NV_0x37  NV3
+#define POLY_HELPER_G_0x37   G1
+#define POLY_HELPER_T_0x37   T1
+#define POLY_HELPER_TM_0x37  TM0
+#define POLY_HELPER_BM_0x37(bm) BM_##bm
+#define POLY_HELPER_NV_0x38  NV4
+#define POLY_HELPER_G_0x38   G1
+#define POLY_HELPER_T_0x38   T0
+#define POLY_HELPER_TM_0x38  TM0
+#define POLY_HELPER_BM_0x38(bm) BMopaque
+#define POLY_HELPER_NV_0x39  NV4
+#define POLY_HELPER_G_0x39   G1
+#define POLY_HELPER_T_0x39   T0
+#define POLY_HELPER_TM_0x39  TM0
+#define POLY_HELPER_BM_0x39(bm) BMopaque
+#define POLY_HELPER_NV_0x3a  NV4
+#define POLY_HELPER_G_0x3a   G1
+#define POLY_HELPER_T_0x3a   T0
+#define POLY_HELPER_TM_0x3a  TM0
+#define POLY_HELPER_BM_0x3a(bm) BM_##bm
+#define POLY_HELPER_NV_0x3b  NV4
+#define POLY_HELPER_G_0x3b   G1
+#define POLY_HELPER_T_0x3b   T0
+#define POLY_HELPER_TM_0x3b  TM0
+#define POLY_HELPER_BM_0x3b(bm) BM_##bm
+#define POLY_HELPER_NV_0x3c  NV4
+#define POLY_HELPER_G_0x3c   G1
+#define POLY_HELPER_T_0x3c   T1
+#define POLY_HELPER_TM_0x3c  TM1
+#define POLY_HELPER_BM_0x3c(bm) BMopaque
+#define POLY_HELPER_NV_0x3d  NV4
+#define POLY_HELPER_G_0x3d   G1
+#define POLY_HELPER_T_0x3d   T1
+#define POLY_HELPER_TM_0x3d  TM0
+#define POLY_HELPER_BM_0x3d(bm) BMopaque
+#define POLY_HELPER_NV_0x3e  NV4
+#define POLY_HELPER_G_0x3e   G1
+#define POLY_HELPER_T_0x3e   T1
+#define POLY_HELPER_TM_0x3e  TM1
+#define POLY_HELPER_BM_0x3e(bm) BM_##bm
+#define POLY_HELPER_NV_0x3f  NV4
+#define POLY_HELPER_G_0x3f   G1
+#define POLY_HELPER_T_0x3f   T1
+#define POLY_HELPER_TM_0x3f  TM0
+#define POLY_HELPER_BM_0x3f(bm) BM_##bm
+
+/* MO selector per cv: non-textured cv always wants MO=0 (since
+ * G_Command_DrawPolygon is only defined with MO0 when T=0); textured
+ * cv passes through the MO slot value. */
+#define POLY_HELPER_MO_0x20(mo) 0
+#define POLY_HELPER_MO_0x21(mo) 0
+#define POLY_HELPER_MO_0x22(mo) 0
+#define POLY_HELPER_MO_0x23(mo) 0
+#define POLY_HELPER_MO_0x24(mo) mo
+#define POLY_HELPER_MO_0x25(mo) mo
+#define POLY_HELPER_MO_0x26(mo) mo
+#define POLY_HELPER_MO_0x27(mo) mo
+#define POLY_HELPER_MO_0x28(mo) 0
+#define POLY_HELPER_MO_0x29(mo) 0
+#define POLY_HELPER_MO_0x2a(mo) 0
+#define POLY_HELPER_MO_0x2b(mo) 0
+#define POLY_HELPER_MO_0x2c(mo) mo
+#define POLY_HELPER_MO_0x2d(mo) mo
+#define POLY_HELPER_MO_0x2e(mo) mo
+#define POLY_HELPER_MO_0x2f(mo) mo
+#define POLY_HELPER_MO_0x30(mo) 0
+#define POLY_HELPER_MO_0x31(mo) 0
+#define POLY_HELPER_MO_0x32(mo) 0
+#define POLY_HELPER_MO_0x33(mo) 0
+#define POLY_HELPER_MO_0x34(mo) mo
+#define POLY_HELPER_MO_0x35(mo) mo
+#define POLY_HELPER_MO_0x36(mo) mo
+#define POLY_HELPER_MO_0x37(mo) mo
+#define POLY_HELPER_MO_0x38(mo) 0
+#define POLY_HELPER_MO_0x39(mo) 0
+#define POLY_HELPER_MO_0x3a(mo) 0
+#define POLY_HELPER_MO_0x3b(mo) 0
+#define POLY_HELPER_MO_0x3c(mo) mo
+#define POLY_HELPER_MO_0x3d(mo) mo
+#define POLY_HELPER_MO_0x3e(mo) mo
+#define POLY_HELPER_MO_0x3f(mo) mo
+
+/* Three-level paste indirection so all bm/tm/mam fragments expand
+ * fully before token-pasting into the function name. */
+#define POLY_HELPER_NAME(nv, g, t, bmtag, tm, mo, mam)        POLY_HELPER_NAME_(nv, g, t, bmtag, tm, mo, mam)
+#define POLY_HELPER_NAME_(nv, g, t, bmtag, tm, mo, mam)       POLY_HELPER_NAME__(nv, g, t, LINE_BMTAG_##bmtag, tm, mo, mam)
+#define POLY_HELPER_NAME__(nv, g, t, finaltag, tm, mo, mam)   POLY_HELPER_NAME___(nv, g, t, finaltag, tm, mo, mam)
+#define POLY_HELPER_NAME___(nv, g, t, finaltag, tm, mo, mam)  G_Command_DrawPolygon_##nv##_##g##_##t##_##finaltag##_##tm##_MO##mo##_ME##mam
+
+#define POLY_HELPER_SUB(bm, cv, mo, mam) \
+   POLY_HELPER_NAME(POLY_HELPER_NV_##cv, POLY_HELPER_G_##cv, POLY_HELPER_T_##cv, POLY_HELPER_BM_##cv(bm), POLY_HELPER_TM_##cv, POLY_HELPER_MO_##cv(mo), mam)
 
 /*
  * POLY_HELPER_FG - emit one row (8 entries) of the func[][]
@@ -645,17 +857,17 @@ static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
  * primitives the TexMode dimension collapses to 0 via the
  * `((cv & 0x4) ? N : 0)` ternary.
  */
-#define POLY_HELPER_FG(bm, cv)						\
-	 {								\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 0),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 0 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 1 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-		POLY_HELPER_SUB(bm, cv, ((cv & 0x4) ? 2 : 0), 1),	\
-	 }
+#define POLY_HELPER_FG(bm, cv) \
+   { \
+      POLY_HELPER_SUB(bm, cv, 0, 0), \
+      POLY_HELPER_SUB(bm, cv, 1, 0), \
+      POLY_HELPER_SUB(bm, cv, 2, 0), \
+      POLY_HELPER_SUB(bm, cv, 2, 0), \
+      POLY_HELPER_SUB(bm, cv, 0, 1), \
+      POLY_HELPER_SUB(bm, cv, 1, 1), \
+      POLY_HELPER_SUB(bm, cv, 2, 1), \
+      POLY_HELPER_SUB(bm, cv, 2, 1)  \
+   }
 
 /*
  * POLY_HELPER - top-level entry for one polygon opcode. Emits a

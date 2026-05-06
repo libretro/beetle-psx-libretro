@@ -203,18 +203,65 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
  * cost of every Command_DrawPolygon body twice over. The wrapper
  * lets us pay one extra branch per polygon command for half the
  * code size.
+ *
+ * The macro DEFINE_G_Command_DrawPolygon emits one specialisation
+ * per (NV, G, T, BM_VAL, BM_TAG, TM, MO, ME) tuple; each calls the
+ * matching Command_DrawPolygon_<...>_PG0 / _PG1 mangled name based
+ * on the runtime PGXP_enabled() check.  The gpu_polygon.cpp side
+ * defines the underlying Command_DrawPolygon specs that this
+ * wrapper dispatches to.
  */
-template<int numvertices, bool shaded, bool textured,
-    int BlendMode, bool TexMult, uint32 TexMode_TA, bool MaskEval_TA>
-static void G_Command_DrawPolygon(PS_GPU* g, const uint32 *cb)
-{
-  if (PGXP_enabled())
-    Command_DrawPolygon<numvertices, shaded, textured,
-            BlendMode, TexMult, TexMode_TA, MaskEval_TA, true>(g, cb);
-  else
-    Command_DrawPolygon<numvertices, shaded, textured,
-            BlendMode, TexMult, TexMode_TA, MaskEval_TA, false>(g, cb);
+#define DEFINE_G_Command_DrawPolygon(SUFFIX, NV_LIT, G_LIT, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+static void G_Command_DrawPolygon_##SUFFIX(PS_GPU *g, const uint32 *cb) \
+{ \
+   if (PGXP_enabled()) \
+      Command_DrawPolygon_NV##NV_LIT##_G##G_LIT##_T##T_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT##_PG1(g, cb); \
+   else \
+      Command_DrawPolygon_NV##NV_LIT##_G##G_LIT##_T##T_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT##_PG0(g, cb); \
 }
+
+/* GCMD_DRAWPOLY_T0_BMGROUP / GCMD_DRAWPOLY_T1_BMGROUP - emit the
+ * 10 (BlendMode * MaskEval) G_ specs for given outer parameters. */
+
+#define GCMD_DRAWPOLY_T0_BMGROUP(RAWNV, RAWG) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMopaque_TM0_MO0_ME0, RAWNV, RAWG, 0, -1, BMopaque, 0, 0, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMopaque_TM0_MO0_ME1, RAWNV, RAWG, 0, -1, BMopaque, 0, 0, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMavg_TM0_MO0_ME0, RAWNV, RAWG, 0,  0, BMavg,    0, 0, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMavg_TM0_MO0_ME1, RAWNV, RAWG, 0,  0, BMavg,    0, 0, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMadd_TM0_MO0_ME0, RAWNV, RAWG, 0,  1, BMadd,    0, 0, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMadd_TM0_MO0_ME1, RAWNV, RAWG, 0,  1, BMadd,    0, 0, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMsub_TM0_MO0_ME0, RAWNV, RAWG, 0,  2, BMsub,    0, 0, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMsub_TM0_MO0_ME1, RAWNV, RAWG, 0,  2, BMsub,    0, 0, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMaddq_TM0_MO0_ME0, RAWNV, RAWG, 0,  3, BMaddq,   0, 0, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T0_BMaddq_TM0_MO0_ME1, RAWNV, RAWG, 0,  3, BMaddq,   0, 0, 1)
+
+#define GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, TM, MO) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMopaque_TM##TM##_MO##MO##_ME0, RAWNV, RAWG, 1, -1, BMopaque, TM, MO, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMopaque_TM##TM##_MO##MO##_ME1, RAWNV, RAWG, 1, -1, BMopaque, TM, MO, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMavg_TM##TM##_MO##MO##_ME0, RAWNV, RAWG, 1,  0, BMavg,    TM, MO, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMavg_TM##TM##_MO##MO##_ME1, RAWNV, RAWG, 1,  0, BMavg,    TM, MO, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMadd_TM##TM##_MO##MO##_ME0, RAWNV, RAWG, 1,  1, BMadd,    TM, MO, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMadd_TM##TM##_MO##MO##_ME1, RAWNV, RAWG, 1,  1, BMadd,    TM, MO, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMsub_TM##TM##_MO##MO##_ME0, RAWNV, RAWG, 1,  2, BMsub,    TM, MO, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMsub_TM##TM##_MO##MO##_ME1, RAWNV, RAWG, 1,  2, BMsub,    TM, MO, 1) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMaddq_TM##TM##_MO##MO##_ME0, RAWNV, RAWG, 1,  3, BMaddq,   TM, MO, 0) \
+   DEFINE_G_Command_DrawPolygon(NV##RAWNV##_G##RAWG##_T1_BMaddq_TM##TM##_MO##MO##_ME1, RAWNV, RAWG, 1,  3, BMaddq,   TM, MO, 1)
+
+#define GCMD_DRAWPOLY_BMGROUP_ALL(RAWNV, RAWG) \
+   GCMD_DRAWPOLY_T0_BMGROUP(RAWNV, RAWG) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 0) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 1) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 0, 2) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 0) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 1) \
+   GCMD_DRAWPOLY_T1_BMGROUP(RAWNV, RAWG, 1, 2)
+
+/* Emit all 280 G_Command_DrawPolygon specialisations:
+ *   2 NV * 2 G * 70 (BM cross) = 280 */
+GCMD_DRAWPOLY_BMGROUP_ALL(3, 0)
+GCMD_DRAWPOLY_BMGROUP_ALL(3, 1)
+GCMD_DRAWPOLY_BMGROUP_ALL(4, 0)
+GCMD_DRAWPOLY_BMGROUP_ALL(4, 1)
 
 
 static void Command_ClearCache(PS_GPU* g, const uint32 *cb)
