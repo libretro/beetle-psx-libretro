@@ -177,21 +177,16 @@ bool rsx_intf_open(bool is_pal, bool force_software)
             rsx_intf_dump_init();
             return true;
          }
-         else
-         {
-            osd_message(3, RETRO_LOG_ERROR,
-                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
-                  "Could not force Vulkan renderer. Falling back to software renderer.");
-
-            goto soft;
-         }
+         osd_message(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Could not force Vulkan renderer. Falling back to software renderer.");
 #else
          osd_message(3, RETRO_LOG_ERROR,
                RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                "Attempted to force Vulkan renderer, but core was built without it. Falling back to software renderer.");
 
-         goto soft;
 #endif
+         goto soft;
       }
       else if (force_type == FORCE_OPENGL)
       {
@@ -203,21 +198,15 @@ bool rsx_intf_open(bool is_pal, bool force_software)
             rsx_intf_dump_init();
             return true;
          }
-         else
-         {
-            osd_message(3, RETRO_LOG_ERROR,
-                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
-                  "Could not force OpenGL renderer. Falling back to software renderer.");
-
-            goto soft;
-         }
+         osd_message(3, RETRO_LOG_ERROR,
+               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+               "Could not force OpenGL renderer. Falling back to software renderer.");
 #else
          osd_message(3, RETRO_LOG_ERROR,
                RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
                "Attempted to force OpenGL renderer, but core was built without it. Falling back to software renderer.");
-
-         goto soft;
 #endif
+         goto soft;
       }
       /* End forces section */
 
@@ -241,9 +230,9 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 #endif
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-      if ((preferred == RETRO_HW_CONTEXT_DUMMY ||
-           preferred == RETRO_HW_CONTEXT_OPENGL ||
-           preferred == RETRO_HW_CONTEXT_OPENGL_CORE)
+      if ((   preferred == RETRO_HW_CONTEXT_DUMMY
+           || preferred == RETRO_HW_CONTEXT_OPENGL
+           || preferred == RETRO_HW_CONTEXT_OPENGL_CORE)
           && rsx_gl_open(is_pal))
       {
          rsx_type       = RSX_OPENGL;

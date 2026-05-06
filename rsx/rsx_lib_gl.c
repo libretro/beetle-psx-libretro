@@ -778,7 +778,6 @@ extern "C"
 }
 #endif
 
-
 #ifdef DEBUG
 static void get_error(const char *msg)
 {
@@ -836,10 +835,7 @@ static bool gl_shader_init(
    id               = glCreateShader(shader_type);
 
    if (id == 0)
-   {
-      log_cb(RETRO_LOG_ERROR, "An error occured creating the shader object\n");
       return false;
-   }
 
    glShaderSource( id,
          1,
@@ -870,8 +866,6 @@ static bool gl_shader_init(
    if (status == GL_FALSE)
    {
       log_cb(RETRO_LOG_ERROR, "gl_shader_init() - gl_shader compilation failed:\n%s\n", source);
-
-
       log_cb(RETRO_LOG_DEBUG, "gl_shader info log:\n%s\n", shader->info_log);
 
       return false;
@@ -3016,8 +3010,6 @@ static void gl_caps_init(void)
 
 static void gl_context_reset(void)
 {
-   log_cb(RETRO_LOG_DEBUG, "gl_context_reset called.\n");
-
    /* Resolve the GL function-pointer table for this context.
     * rglgen_resolve_symbols walks the rglgen-generated symbol
     * declarations and populates each __rglgen_glFoo via the
@@ -3079,8 +3071,6 @@ static void gl_context_reset(void)
 
 static void gl_context_destroy(void)
 {
-   log_cb(RETRO_LOG_DEBUG, "gl_context_destroy called.\n");
-
    if (static_renderer.state_data)
    {
       gl_renderer_free(static_renderer.state_data);

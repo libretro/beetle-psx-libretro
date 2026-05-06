@@ -979,9 +979,6 @@ void rsx_vulkan_load_image(
       uint16_t *vram,
       bool mask_test, bool set_mask)
 {
-#ifndef NDEBUG
-   TT_LOG_VERBOSE(RETRO_LOG_INFO, "rsx_vulkan_load_image(x=%i, y=%i, w=%i, h=%i, mask_test=%i, set_mask=%i).\n", x, y, w, h, mask_test, set_mask);
-#endif
    if (!renderer)
    {
       // Generally happens if someone loads a save state before the Vulkan context is created.
