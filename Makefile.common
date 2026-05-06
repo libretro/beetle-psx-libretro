@@ -61,7 +61,7 @@ ifeq ($(HAVE_OPENGL), 1)
 
    SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 
-   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
+   SOURCES_C += $(CORE_DIR)/rsx/rsx_lib_gl.c
 endif
 
 INCFLAGS := -I$(CORE_DIR) \
