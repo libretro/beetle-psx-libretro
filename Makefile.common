@@ -193,7 +193,6 @@ endif
 
    SOURCES_CXX += $(CORE_EMU_DIR)/frontio.cpp \
                   $(CORE_EMU_DIR)/cpu.cpp \
-                  $(CORE_EMU_DIR)/cdc.cpp \
                   $(CORE_EMU_DIR)/gpu.cpp \
                   $(CORE_EMU_DIR)/input/gamepad.cpp \
                   $(CORE_EMU_DIR)/input/dualanalog.cpp \
@@ -211,7 +210,8 @@ endif
    endif
 
    SOURCES_C += $(CORE_DIR)/libretro_cbs.c \
-                $(CORE_DIR)/beetle_psx_globals.c
+                $(CORE_DIR)/beetle_psx_globals.c \
+                $(CORE_EMU_DIR)/cdc.c
 
    ifeq ($(NEED_TREMOR), 1)
       SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))

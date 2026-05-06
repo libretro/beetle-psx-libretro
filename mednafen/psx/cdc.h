@@ -1,271 +1,201 @@
 #ifndef __MDFN_PSX_CDC_H
 #define __MDFN_PSX_CDC_H
 
-#include "../cdrom/cdromif.h"
-#include "../cdrom/SimpleFIFO.h"
+#include <stdint.h>
+#include <boolean.h>
 
-struct CD_Audio_Buffer
+#include "../state.h"
+
+#ifdef __cplusplus
+#include "../cdrom/cdromif.h"   /* Full class CDIF for C++ consumers */
+#else
+#include "../cdrom/cdromif_c.h" /* Opaque struct CDIF for C consumers */
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* CD-DA / XA audio buffer.  Filled by the disc-read pipeline (CDDA
+ * sectors decoded directly, XA sectors via XA ADPCM decode), drained
+ * by the SPU through CDC_GetCDAudioSample. */
+typedef struct CD_Audio_Buffer
 {
-   int16 Samples[2][0x1000];	// [0][...] = l, [1][...] = r
-   uint32 Size;
-   uint32 Freq;
-   uint32 ReadPos;
-};
+   int16_t  Samples[2][0x1000];   /* [0][...] = l, [1][...] = r */
+   uint32_t Size;
+   uint32_t Freq;
+   uint32_t ReadPos;
+} CD_Audio_Buffer;
 
-class PS_CDC
+/* SimpleFIFO is a fixed-power-of-two-capacity ring buffer of bytes,
+ * used by the CDC DMA path; the only place it lives is inside
+ * struct PS_CDC.  Was a tiny C++ class with inline methods - now
+ * a plain C struct, with the access helpers static-inlined into
+ * cdc.c.  Field layout is preserved for savestate compatibility. */
+typedef struct SimpleFIFO
 {
-   public:
+   uint8_t  *data;
+   uint32_t size;
+   uint32_t read_pos;
+   uint32_t write_pos;
+   uint32_t in_count;
+} SimpleFIFO;
 
-      PS_CDC();
-      ~PS_CDC();
+/* Number of pipelined sectors held by the disc-read delay buffer.
+ * Was a class-scoped enum constant inside PS_CDC; promoted to a
+ * #define so the array dimension below is a constant expression
+ * in C as well as C++. */
+#define CDC_SECTOR_PIPE_COUNT 2
 
-      void SetDisc(bool tray_open, CDIF *cdif, const char disc_id[4]);
+/* PS_CDC was a C++ class with all members private and access via
+ * PSX_CDC->Method(...).  It is now a plain struct: the fields
+ * below are the former class members in the same declaration
+ * order (savestate-compatible), and the former member functions
+ * are declared at the bottom of this header as free functions
+ * PS_CDC_*(struct PS_CDC *cdc, ...). */
+typedef struct PS_CDC
+{
+   /* Fields formerly in the public section. */
+   CD_Audio_Buffer AudioBuffer;
+   int             DriveStatus;
 
-      void Power(void);
-      int StateAction(StateMem *sm, int load, int data_only);
-      void ResetTS(void);
+   /* Fields formerly in the private section. */
+   CDIF      *Cur_CDIF;
+   bool      DiscChanged;
+   int32_t   DiscStartupDelay;
 
-      int32 CalcNextEvent(void);	// Returns in master cycles to next event.
+   uint8_t   Pending_DecodeVolume[2][2];   /* [data_source][output_port] */
+   uint8_t   DecodeVolume[2][2];
 
-      int32_t Update(const int32_t timestamp);
+   int16_t   ADPCM_ResampBuf[2][32 * 2];
+   uint8_t   ADPCM_ResampCurPos;
+   uint8_t   ADPCM_ResampCurPhase;
 
-      void Write(const int32_t timestamp, uint32 A, uint8 V);
-      uint8 Read(const int32_t timestamp, uint32 A);
+   uint8_t   RegSelector;
+   uint8_t   ArgsBuf[16];
+   uint8_t   ArgsWP;          /* 5-bit (0..31) */
+   uint8_t   ArgsRP;          /* 5-bit (0..31) */
 
-      bool DMACanRead(void);
-      uint32 DMARead(void);
-      void SoftReset(void);
+   uint8_t   ArgsReceiveLatch;
+   uint8_t   ArgsReceiveBuf[32];
+   uint8_t   ArgsReceiveIn;
 
-      void GetCDAudio(int32 samples[2], const unsigned freq);
+   uint8_t   ResultsBuffer[16];
+   uint8_t   ResultsIn;       /* 5-bit (0..31) */
+   uint8_t   ResultsWP;       /* Write position, 4-bit (0..15) */
+   uint8_t   ResultsRP;       /* Read position,  4-bit (0..15) */
 
-      CD_Audio_Buffer AudioBuffer;
-#ifdef __LIBRETRO__
-      int DriveStatus;
+   SimpleFIFO DMABuffer;
+   uint8_t   SB[2340];
+   uint32_t  SB_In;
+
+   uint8_t   SectorPipe[CDC_SECTOR_PIPE_COUNT][2352];
+   uint8_t   SectorPipe_Pos;
+   uint8_t   SectorPipe_In;
+
+   uint8_t   SubQBuf[0xC];
+   uint8_t   SubQBuf_Safe[0xC];
+   bool      SubQChecksumOK;
+
+   bool      HeaderBufValid;
+   uint8_t   HeaderBuf[12];
+
+   uint8_t   IRQBuffer;
+   uint8_t   IRQOutTestMask;
+   /* IRQBuffer being non-zero prevents new results and a new IRQ
+    * from coming in and erasing the current results, but at least
+    * one game clears the IRQ state BEFORE reading the results, so
+    * we have a delay between IRQBuffer being cleared and when we
+    * allow new results in. */
+   int32_t   CDCReadyReceiveCounter;
+
+   uint8_t   FilterFile;
+   uint8_t   FilterChan;
+
+   uint8_t   PendingCommand;
+   int       PendingCommandPhase;
+   int32_t   PendingCommandCounter;
+
+   int32_t   SPUCounter;
+
+   uint8_t   Mode;
+
+   int       StatusAfterSeek;
+   bool      Forward;
+   bool      Backward;
+   bool      Muted;
+
+   int32_t   PlayTrackMatch;
+
+   int32_t   PSRCounter;
+
+   int32_t   CurSector;
+   uint32_t  SectorsRead;     /* Reset on Read or Play start; used by
+                                 the rough simulation of PS1 SetLoc-
+                                 then-Read-then-Pause-then-Read behaviour. */
+
+   unsigned  AsyncIRQPending;
+   uint8_t   AsyncResultsPending[16];
+   uint8_t   AsyncResultsPendingCount;
+
+   int32_t   SeekTarget;
+   uint32_t  SeekRetryCounter;
+
+   int32_t   lastts;
+
+   TOC       toc;
+   bool      IsPSXDisc;
+   uint8_t   DiscID[4];
+
+   int32_t   CommandLoc;
+   bool      CommandLoc_Dirty;
+
+   int16_t   xa_previous[2][2];
+   bool      xa_cur_set;
+   uint8_t   xa_cur_file;
+   uint8_t   xa_cur_chan;
+
+   uint8_t   ReportLastF;
+} PS_CDC;
+
+/* Public API.  Each function takes the instance pointer as its
+ * first argument; otherwise the signatures match the former
+ * PS_CDC member functions one-to-one. */
+void     PS_CDC_Init(PS_CDC *cdc);
+void     PS_CDC_Destroy(PS_CDC *cdc);
+
+/* Global instance pointer.  Allocated in libretro.cpp's InitCommon
+ * and freed in Cleanup; declared here so both C++ callers (libretro.cpp,
+ * gpu.cpp) and the in-file C-linkage shims (CDC_DMARead, CDC_GetCDAudioSample,
+ * defined in cdc.cpp) agree on the symbol. */
+extern PS_CDC *PSX_CDC;
+
+void     PS_CDC_SetDisc(PS_CDC *cdc, bool tray_open,
+                        CDIF *cdif, const char *disc_id);
+
+void     PS_CDC_Power(PS_CDC *cdc);
+int      PS_CDC_StateAction(PS_CDC *cdc, StateMem *sm,
+                            int load, int data_only);
+void     PS_CDC_ResetTS(PS_CDC *cdc);
+
+int32_t  PS_CDC_CalcNextEvent(PS_CDC *cdc);
+
+int32_t  PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp);
+
+void     PS_CDC_Write(PS_CDC *cdc, const int32_t timestamp,
+                      uint32_t A, uint8_t V);
+uint8_t  PS_CDC_Read(PS_CDC *cdc, const int32_t timestamp,
+                     uint32_t A);
+
+bool     PS_CDC_DMACanRead(PS_CDC *cdc);
+uint32_t PS_CDC_DMARead(PS_CDC *cdc);
+void     PS_CDC_SoftReset(PS_CDC *cdc);
+
+void     PS_CDC_GetCDAudio(PS_CDC *cdc, int32_t samples[2],
+                           const unsigned freq);
+
+#ifdef __cplusplus
+}
 #endif
 
-   private:
-      CDIF *Cur_CDIF;
-      bool DiscChanged;
-      int32 DiscStartupDelay;
-
-      uint8 Pending_DecodeVolume[2][2], DecodeVolume[2][2];		// [data_source][output_port]
-
-      int16 ADPCM_ResampBuf[2][32 * 2];
-      uint8 ADPCM_ResampCurPos;
-      uint8 ADPCM_ResampCurPhase;
-
-      void ApplyVolume(int32 samples[2]);
-      void ReadAudioBuffer(int32 samples[2]);
-
-      void ClearAudioBuffers(void);
-
-      uint8 RegSelector;
-      uint8 ArgsBuf[16];
-      uint8 ArgsWP;		// 5-bit(0 ... 31)
-      uint8 ArgsRP;		// 5-bit(0 ... 31)
-
-      uint8 ArgsReceiveLatch;
-      uint8 ArgsReceiveBuf[32];
-      uint8 ArgsReceiveIn;
-
-      uint8 ResultsBuffer[16];
-      uint8 ResultsIn;	// 5-bit(0 ... 31)
-      uint8 ResultsWP;	// Write position, 4 bit(0 ... 15).
-      uint8 ResultsRP;	// Read position, 4 bit(0 ... 15).
-
-      SimpleFIFO DMABuffer;
-      uint8 SB[2340];
-      uint32 SB_In;
-
-      enum { SectorPipe_Count = 2 };
-      uint8 SectorPipe[SectorPipe_Count][2352];
-      uint8 SectorPipe_Pos;
-      uint8 SectorPipe_In;
-
-      uint8 SubQBuf[0xC];
-      uint8 SubQBuf_Safe[0xC];
-      bool SubQChecksumOK;
-
-      bool HeaderBufValid;
-      uint8 HeaderBuf[12];
-
-      void RecalcIRQ(void);
-      enum
-      {
-         CDCIRQ_NONE = 0,
-         CDCIRQ_DATA_READY = 1,
-         CDCIRQ_COMPLETE = 2,
-         CDCIRQ_ACKNOWLEDGE = 3,
-         CDCIRQ_DATA_END = 4,
-         CDCIRQ_DISC_ERROR = 5
-      };
-
-      // Names are just guessed for these based on what conditions cause them:
-      enum
-      {
-         ERRCODE_BAD_ARGVAL  = 0x10,
-         ERRCODE_BAD_NUMARGS = 0x20,
-         ERRCODE_BAD_COMMAND = 0x40,
-         ERRCODE_NOT_READY   = 0x80	// 0x80 (happens with getlocl when drive isn't reading, pause when tray is open, and MAYBE when trying to run an async
-            //	 command while another async command is currently in its asynch phase being executed[pause when in readtoc, todo test more])
-      };
-
-      uint8 IRQBuffer;
-      uint8 IRQOutTestMask;
-      int32 CDCReadyReceiveCounter;	// IRQBuffer being non-zero prevents new results and new IRQ from coming in and erasing the current results,
-      // but apparently at least one CONFOUNDED game is clearing the IRQ state BEFORE reading the results, so we need to have a delay
-      // between IRQBuffer being cleared to when we allow new results to come in.  (The real thing should be like this too,
-      // but the mechanism is probably more nuanced and complex and ugly and I like anchovy pizza)
-
-      void BeginResults(void);
-      void WriteIRQ(uint8);
-      void WriteResult(uint8);
-      uint8 ReadResult(void);
-
-      uint8 FilterFile;
-      uint8 FilterChan;
-
-
-      uint8 PendingCommand;
-      int PendingCommandPhase;
-      int32 PendingCommandCounter;
-
-      int32 SPUCounter;
-
-      enum { MODE_SPEED = 0x80 };
-      enum { MODE_STRSND = 0x40 };
-      enum { MODE_SIZE = 0x20 };
-      enum { MODE_SIZE2 = 0x10 };
-      enum { MODE_SF = 0x08 };
-      enum { MODE_REPORT = 0x04 };
-      enum { MODE_AUTOPAUSE = 0x02 };
-      enum { MODE_CDDA = 0x01 };
-      uint8 Mode;
-
-      enum
-      {
-         DS_STANDBY = -2,
-         DS_PAUSED = -1,
-         DS_STOPPED = 0,
-         DS_SEEKING,
-         DS_SEEKING_LOGICAL,
-         DS_PLAY_SEEKING,
-         DS_PLAYING,
-         DS_READING,
-         DS_RESETTING
-      };
-#ifndef __LIBRETRO__
-      int DriveStatus;
-#endif
-      int StatusAfterSeek;
-      bool Forward;
-      bool Backward;
-      bool Muted;
-
-      int32 PlayTrackMatch;
-
-      int32 PSRCounter;
-
-      int32 CurSector;
-      uint32 SectorsRead;	// Reset to 0 on Read*/Play command start; used in the rough simulation of PS1 SetLoc->Read->Pause->Read behavior.
-
-      unsigned AsyncIRQPending;
-      uint8 AsyncResultsPending[16];
-      uint8 AsyncResultsPendingCount;
-
-      int32 CalcSeekTime(int32 initial, int32 target, bool motor_on, bool paused);
-
-      void ClearAIP(void);
-      void CheckAIP(void);
-      void SetAIP(unsigned irq, unsigned result_count, uint8 *r);
-      void SetAIP(unsigned irq, uint8 result0);
-      void SetAIP(unsigned irq, uint8 result0, uint8 result1);
-
-      int32 SeekTarget;
-      uint32 SeekRetryCounter;
-
-      int32_t lastts;
-
-      TOC toc;
-      bool IsPSXDisc;
-      uint8 DiscID[4];
-
-      int32 CommandLoc;
-      bool CommandLoc_Dirty;
-
-      uint8 MakeStatus(bool cmd_error = false);
-      bool DecodeSubQ(uint8 *subpw);
-      bool CommandCheckDiscPresent(void);
-      void DMForceStop();
-
-      void EnbufferizeCDDASector(const uint8 *buf);
-      bool XA_Test(const uint8 *sdata);
-      void XA_ProcessSector(const uint8 *sdata, CD_Audio_Buffer *ab);
-      int16 xa_previous[2][2];
-      bool xa_cur_set;
-      uint8 xa_cur_file;
-      uint8 xa_cur_chan;
-
-      uint8 ReportLastF;
-
-      void HandlePlayRead(void);
-
-      struct CDC_CTEntry
-      {
-         uint8 args_min;
-         uint8 args_max;
-         const char *name;
-         int32 (PS_CDC::*func)(const int arg_count, const uint8 *args);
-         int32 (PS_CDC::*func2)(void);
-      };
-
-      void PreSeekHack(uint32_t target);
-      void ReadBase(void);
-
-      static CDC_CTEntry Commands[0x20];
-
-      int32 Command_Nop(const int arg_count, const uint8 *args);
-      int32 Command_Setloc(const int arg_count, const uint8 *args);
-      int32 Command_Play(const int arg_count, const uint8 *args);
-      int32 Command_Forward(const int arg_count, const uint8 *args);
-      int32 Command_Backward(const int arg_count, const uint8 *args);
-      int32 Command_ReadN(const int arg_count, const uint8 *args);
-      int32 Command_Standby(const int arg_count, const uint8 *args);
-      int32 Command_Standby_Part2(void);
-      int32 Command_Stop(const int arg_count, const uint8 *args);
-      int32 Command_Stop_Part2(void); 
-      int32 Command_Pause(const int arg_count, const uint8 *args);
-      int32 Command_Pause_Part2(void);
-      int32 Command_Reset(const int arg_count, const uint8 *args);
-      int32 Command_Mute(const int arg_count, const uint8 *args);
-      int32 Command_Demute(const int arg_count, const uint8 *args);
-      int32 Command_Setfilter(const int arg_count, const uint8 *args);
-      int32 Command_Setmode(const int arg_count, const uint8 *args);
-      int32 Command_Getparam(const int arg_count, const uint8 *args);
-      int32 Command_GetlocL(const int arg_count, const uint8 *args);
-      int32 Command_GetlocP(const int arg_count, const uint8 *args);
-
-      int32 Command_ReadT(const int arg_count, const uint8 *args);
-      int32 Command_ReadT_Part2(void);
-
-      int32 Command_GetTN(const int arg_count, const uint8 *args);
-      int32 Command_GetTD(const int arg_count, const uint8 *args);
-      int32 Command_SeekL(const int arg_count, const uint8 *args);
-      int32 Command_SeekP(const int arg_count, const uint8 *args);
-      int32 Command_Seek_PartN(void);
-
-      int32 Command_Test(const int arg_count, const uint8 *args);
-
-      int32 Command_ID(const int arg_count, const uint8 *args);
-      int32 Command_ID_Part2(void);
-
-      int32 Command_ReadS(const int arg_count, const uint8 *args);
-      int32 Command_Init(const int arg_count, const uint8 *args);
-
-      int32 Command_ReadTOC(const int arg_count, const uint8 *args);
-      int32 Command_ReadTOC_Part2(void);
-
-      int32 Command_0x1d(const int arg_count, const uint8 *args);
-};
-
-#endif
+#endif /* __MDFN_PSX_CDC_H */

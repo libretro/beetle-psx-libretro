@@ -829,7 +829,7 @@ Stream *CDIF::MakeStream(uint32 lba, uint32 sector_count)
 }
 
 
-CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool image_memcache)
+extern "C" CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool image_memcache)
 {
    CDAccess *cda;
    CDIF     *cdif;
@@ -866,4 +866,28 @@ CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool imag
       return NULL;
    }
    return cdif;
+}
+
+/*
+ * C-linkage shims so plain-C consumers (cdc.c) can drive CDIF
+ * without needing to parse the C++ class declaration.  Each one
+ * resolves to a single virtual call (the CDIF instance is still
+ * a vtable-bearing C++ object); the wrappers just route the
+ * non-mangled symbol to the mangled member function.
+ */
+extern "C" void CDIF_ReadTOC(CDIF *cdif, TOC *read_target)
+{
+   cdif->ReadTOC(read_target);
+}
+
+extern "C" bool CDIF_ReadRawSector(CDIF *cdif, uint8_t *buf,
+                                   uint32_t lba, int64_t timeout_us)
+{
+   return cdif->ReadRawSector(buf, lba, timeout_us);
+}
+
+extern "C" bool CDIF_ReadRawSectorPWOnly(CDIF *cdif, uint8_t *buf,
+                                         uint32_t lba, bool hint_fullread)
+{
+   return cdif->ReadRawSectorPWOnly(buf, lba, hint_fullread);
 }

@@ -67,6 +67,6 @@ class CDIF
       bool DiscEjected;
 };
 
-CDIF *CDIF_Open(bool *success, const char *path, const bool is_device, bool image_memcache);
+#include "cdromif_c.h"
 
 #endif

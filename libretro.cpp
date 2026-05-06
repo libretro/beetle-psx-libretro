@@ -705,7 +705,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 void ForceEventUpdates(const int32_t timestamp)
 {
    PSX_SetEventNT(PSX_EVENT_GPU, GPU_Update(timestamp));
-   PSX_SetEventNT(PSX_EVENT_CDC, PSX_CDC->Update(timestamp));
+   PSX_SetEventNT(PSX_EVENT_CDC, PS_CDC_Update(PSX_CDC, timestamp));
 
    PSX_SetEventNT(PSX_EVENT_TIMER, TIMER_Update(timestamp));
 
@@ -733,7 +733,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = GPU_Update(e->event_time);
             break;
          case PSX_EVENT_CDC:
-            nt = PSX_CDC->Update(e->event_time);
+            nt = PS_CDC_Update(PSX_CDC, e->event_time);
             break;
          case PSX_EVENT_TIMER:
             nt = TIMER_Update(e->event_time);
@@ -897,9 +897,9 @@ template<typename T, bool IsWrite, bool Access24> static INLINE void MemRW(int32
          }
 
          if(IsWrite)
-            PSX_CDC->Write(timestamp, A & 0x3, V);
+            PS_CDC_Write(PSX_CDC, timestamp, A & 0x3, V);
          else
-            V = PSX_CDC->Read(timestamp, A & 0x3);
+            V = PS_CDC_Read(PSX_CDC, timestamp, A & 0x3);
 
          return;
       }
@@ -1281,7 +1281,7 @@ static void PSX_Power(void)
    SIO_Power();
 
    MDEC_Power();
-   PSX_CDC->Power();
+   PS_CDC_Power(PSX_CDC);
    GPU_Power();
    //SPU->Power();   // Called from CDC->Power()
    IRQ_Power();
@@ -1653,7 +1653,7 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
    }
 
    if (PSX_CDC)
-      PSX_CDC->SetDisc(CD_TrayOpen, cdif, disc_id);
+      PS_CDC_SetDisc(PSX_CDC, CD_TrayOpen, cdif, disc_id);
 }
 
 #ifdef HAVE_LIGHTREC
@@ -2012,7 +2012,8 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
       return;
    }
 
-   PSX_CDC = new PS_CDC();
+   PSX_CDC = (PS_CDC *)calloc(1, sizeof(PS_CDC));
+   PS_CDC_Init(PSX_CDC);
    PSX_FIO = new FrontIO(emulate_memcard, emulate_multitap);
    PSX_FIO->SetAMCT(setting_psx_analog_toggle);
    for(unsigned i = 0; i < 2; i++)
@@ -2057,7 +2058,7 @@ static void InitCommon(std::vector<CDIF *> *_CDInterfaces, const bool EmulateMem
                CD_SelectedDisc = (int)disk_control_ext_info.initial_index;
    }
 
-   PSX_CDC->SetDisc(true, NULL, NULL);
+   PS_CDC_SetDisc(PSX_CDC, true, NULL, NULL);
 
    /* Multi-disk PBP files cause additional complication
     * here, since the first disk is always loaded by default */
@@ -2453,8 +2454,11 @@ static void Cleanup(void)
 {
    TextMem.resize(0);
 
-   if(PSX_CDC)
-      delete PSX_CDC;
+   if (PSX_CDC)
+   {
+      PS_CDC_Destroy(PSX_CDC);
+      free(PSX_CDC);
+   }
    PSX_CDC = NULL;
 
    SPU_Kill();
@@ -2642,7 +2646,7 @@ extern "C" int StateAction(StateMem *sm, int load, int data_only)
    ret &= TIMER_StateAction(sm, load, data_only);
    ret &= SIO_StateAction(sm, load, data_only);
 
-   ret &= PSX_CDC->StateAction(sm, load, data_only);
+   ret &= PS_CDC_StateAction(PSX_CDC, sm, load, data_only);
    ret &= MDEC_StateAction(sm, load, data_only);
    ret &= GPU_StateAction(sm, load, data_only);
    ret &= SPU_StateAction(sm, load, data_only);
@@ -4845,7 +4849,7 @@ void retro_run(void)
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
 
-   PSX_CDC->ResetTS();
+   PS_CDC_ResetTS(PSX_CDC);
    TIMER_ResetTS();
    DMA_ResetTS();
    GPU_ResetTS();

@@ -51,6 +51,9 @@ struct TOC
    struct TOC_Track tracks[100 + 1];
 };
 
+typedef struct TOC_Track TOC_Track;
+typedef struct TOC TOC;
+
 // Call once at app startup before creating any threads that could potentially cause re-entrancy to these functions.
 // It will also be called automatically if needed for the first time a function in this namespace that requires
 // the initialization function to be called is called, for potential

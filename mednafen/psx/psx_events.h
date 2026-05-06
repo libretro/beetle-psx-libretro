@@ -38,6 +38,8 @@ enum
 void PSX_SetEventNT(const int type, const int32_t next_timestamp);
 void PSX_SetDMACycleSteal(unsigned stealage);
 
+uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
+
 #define OVERCLOCK_SHIFT 8
 extern int32_t psx_overclock_factor;
 
