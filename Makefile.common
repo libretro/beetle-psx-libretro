@@ -204,10 +204,10 @@ endif
                   $(CDROM_DIR)/CDAccess_CCD.cpp \
                   $(CDROM_DIR)/CDAccess_PBP.cpp \
                   $(CDROM_DIR)/audioreader.cpp \
-                  $(CDROM_DIR)/misc.cpp \
-                  $(CDROM_DIR)/cdromif.cpp
+                  $(CDROM_DIR)/misc.cpp
 
-   SOURCES_C +=   $(CDROM_DIR)/CDUtility.c \
+   SOURCES_C +=   $(CDROM_DIR)/cdromif.c \
+                  $(CDROM_DIR)/CDUtility.c \
                   $(CDROM_DIR)/galois.c \
                   $(CDROM_DIR)/l-ec.c \
                   $(CDROM_DIR)/lec.c \

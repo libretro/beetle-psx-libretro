@@ -18,55 +18,73 @@
 #ifndef __MDFN_CDROM_CDROMIF_H
 #define __MDFN_CDROM_CDROMIF_H
 
+#include <stdint.h>
+#include <boolean.h>
+
 #include "CDUtility.h"
 #include "../Stream.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef TOC CD_TOC;
 
-class CDIF
-{
-   public:
+/* CDIF is opaque.  Concrete struct lives in cdromif.c. */
+struct CDIF;
+typedef struct CDIF CDIF;
 
-      CDIF();
-      virtual ~CDIF();
+/* Construct a CDIF for the given disc image path.  Selects MT or
+ * ST flavour based on image_memcache.  On failure returns NULL and
+ * sets *success to false; on success returns a CDIF pointer that
+ * must eventually be released with CDIF_Close. */
+CDIF *CDIF_Open(bool *success, const char *path,
+      const bool is_device, bool image_memcache);
 
-      inline void ReadTOC(TOC *read_target)
-      {
-         *read_target = disc_toc;
-      }
+/* Tear down a CDIF (joins the read thread if MT, deletes the
+ * underlying CDAccess, frees all resources). */
+void CDIF_Close(CDIF *cdif);
 
-      virtual void HintReadSector(uint32_t lba) = 0;
-      virtual bool ReadRawSector(uint8_t *buf, uint32_t lba, int64_t timeout_us = -1) = 0;
-      virtual bool ReadRawSectorPWOnly(uint8_t *buf, uint32_t lba, bool hint_fullread) = 0;
+/* Copy the disc TOC into *out. */
+void CDIF_ReadTOC(CDIF *cdif, TOC *out);
 
-      // Call for mode 1 or mode 2 form 1 only.
-      bool ValidateRawSector(uint8_t *buf);
+/* Hint that lba is about to be read.  No-op on ST. */
+void CDIF_HintReadSector(CDIF *cdif, uint32_t lba);
 
-      // Utility/Wrapped functions
-      // Reads mode 1 and mode2 form 1 sectors(2048 bytes per sector returned)
-      // Will return the type(1, 2) of the first sector read to the buffer supplied, 0 on error
-      int ReadSector(uint8_t *pBuf, uint32_t lba, uint32_t nSectors);
+/* Read 2352 main + 96 subchannel bytes for the sector at lba into
+ * buf.  timeout_us is an MT-mode wait budget in microseconds:
+ * 0 = non-blocking try, -1 = wait indefinitely, ignored on ST. */
+bool CDIF_ReadRawSector(CDIF *cdif, uint8_t *buf, uint32_t lba,
+      int64_t timeout_us);
 
-      // Return true if operation succeeded or it was a NOP(either due to not being implemented, or the current status matches eject_status).
-      // Returns false on failure(usually drive error of some kind; not completely fatal, can try again).
-      virtual bool Eject(bool eject_status) = 0;
+/* Read only the 96 bytes of P+W subchannel for the sector at lba.
+ * If hint_fullread is true, also nudge the MT read-ahead. */
+bool CDIF_ReadRawSectorPWOnly(CDIF *cdif, uint8_t *buf, uint32_t lba,
+      bool hint_fullread);
 
-      /* True iff the CDIF construction or background thread reported a
-       * fatal initialization error (bad TOC, allocator failure, etc).
-       * The caller of CDIF_Open uses this to decide whether to keep
-       * the object alive. */
-      bool IsUnrecoverable(void) const { return UnrecoverableError; }
+/* Read nSectors of mode-1 / mode-2-form-1 user data (2048 B per
+ * sector) starting at lba into pBuf.  Returns the mode of the
+ * first sector on success, 0 on error. */
+int CDIF_ReadSector(CDIF *cdif, uint8_t *pBuf, uint32_t lba,
+      uint32_t nSectors);
 
-      // For Mode 1, or Mode 2 Form 1.
-      // No reference counting or whatever is done, so if you destroy the CDIF object before you destroy the returned Stream, things will go BOOM.
-      Stream *MakeStream(uint32_t lba, uint32_t sector_count);
+/* Validate a 2352-byte sector via EDC/ECC.  Mode-1 / mode-2-form-1
+ * only.  Returns true if intact (or correctable). */
+bool CDIF_ValidateRawSector(uint8_t *buf);
 
-   protected:
-      bool UnrecoverableError;
-      TOC disc_toc;
-      bool DiscEjected;
-};
+/* Eject (true) or insert (false) the disc.  Returns true on
+ * success or NOP. */
+bool CDIF_Eject(CDIF *cdif, bool eject_status);
 
-#include "cdromif_c.h"
+/* True iff CDIF_Open or the read thread reported a fatal error. */
+bool CDIF_IsUnrecoverable(const CDIF *cdif);
+
+/* Construct a Stream view onto a (start_lba, sector_count) region
+ * of the disc.  The stream borrows cdif and must not outlive it. */
+struct Stream *CDIF_MakeStream(CDIF *cdif, uint32_t lba, uint32_t sector_count);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

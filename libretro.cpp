@@ -1373,14 +1373,14 @@ static bool TestMagicCD(std::vector<CDIF *> *_CDInterfaces)
 
    TOC_Clear(&toc);
 
-   (*_CDInterfaces)[0]->ReadTOC(&toc);
+   CDIF_ReadTOC((*_CDInterfaces)[0], &toc);
 
    dt = TOC_FindTrackByLBA(&toc, 4);
 
    if(dt > 0 && !(toc.tracks[dt].control & 0x4))
       return(false);
 
-   if((*_CDInterfaces)[0]->ReadSector(buf, 4, 1) != 0x2)
+   if(CDIF_ReadSector((*_CDInterfaces)[0], buf, 4, 1) != 0x2)
       return(false);
 
    if(strncmp((char *)buf + 10, "Licensed  by", strlen("Licensed  by")))
@@ -1397,7 +1397,7 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    Stream *fp      = NULL;
    unsigned pvd_search_count = 0;
 
-   fp = c->MakeStream(0, ~0U);
+   fp = CDIF_MakeStream(c, 0, ~0U);
    if (!fp)
       return NULL;
    stream_seek(fp, 0x8000, SEEK_SET);
@@ -1556,7 +1556,7 @@ static unsigned CalcDiscSCEx(void)
 
          memset(fbuf, 0, sizeof(fbuf));
 
-         if(id == NULL && (*cdifs)[i]->ReadSector(buf, 4, 1) == 0x2)
+         if(id == NULL && CDIF_ReadSector((*cdifs)[i], buf, 4, 1) == 0x2)
          {
             unsigned ipos, opos;
             for(ipos = 0, opos = 0; ipos < 0x48; ipos++)
@@ -2574,7 +2574,7 @@ static void CDInsertEject(void)
          CDIF *cdif = (*cdifs)[disc];
          if (!cdif)
             continue;
-         if (!cdif->Eject(CD_TrayOpen))
+         if (!CDIF_Eject(cdif, CD_TrayOpen))
             CD_TrayOpen = !CD_TrayOpen;
       }
    }
@@ -2969,7 +2969,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
 
    if (!info)
    {
-      delete cdifs->at(index);
+      CDIF_Close(cdifs->at(index));
       cdifs->erase(cdifs->begin() + index);
       /* CD_SelectedDisc is signed; explicit cast to silence the
        * mixed-sign comparison and to make the intent clear. */
@@ -2995,11 +2995,11 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
          /* CDIF_Open's contract is to return NULL when success is false,
           * but be defensive about a partially-constructed CDIF leak. */
          if (iface)
-            delete iface;
+            CDIF_Close(iface);
          return false;
       }
 
-      delete cdifs->at(index);
+      CDIF_Close(cdifs->at(index));
       cdifs->at(index) = iface;
       CalcDiscSCEx();
 
@@ -4209,7 +4209,7 @@ static bool MDFNI_LoadCD(const char *devicename)
             log_cb(RETRO_LOG_ERROR, "Error opening CD: %s\n",
                   disk_control_ext_info.image_paths[i].c_str());
             if (image)
-               delete image;
+               CDIF_Close(image);
             load_ok = false;
             break;
          }
@@ -4232,7 +4232,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       {
          log_cb(RETRO_LOG_ERROR, "Error opening PBP: %s\n", devicename);
          if (image)
-            delete image;
+            CDIF_Close(image);
          load_ok = false;
       }
       else
@@ -4285,7 +4285,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       {
          log_cb(RETRO_LOG_ERROR, "Error opening CD: %s\n", devicename);
          if (image)
-            delete image;
+            CDIF_Close(image);
          return false;
       }
 
@@ -4319,7 +4319,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       TOC toc;
       TOC_Clear(&toc);
 
-      CDInterfaces[i]->ReadTOC(&toc);
+      CDIF_ReadTOC(CDInterfaces[i], &toc);
 
       log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
 

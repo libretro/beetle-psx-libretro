@@ -45,7 +45,7 @@ CDAccess::~CDAccess()
 
 }
 
-CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcache)
+extern "C" CDAccess *cdaccess_open_image(bool *success, const char *path, bool image_memcache)
 {
    size_t path_len = strlen(path);
    CDAccess *cda = NULL;
@@ -76,4 +76,38 @@ bool CDAccess::Read_Raw_PW(uint8_t *buf, int32_t lba)
    memcpy(buf, tmpbuf + 2352, 96);
 
    return true;
+}
+
+/*
+ * C-linkage shims so plain-C consumers (cdromif.c) can drive
+ * CDAccess instances without needing to parse the C++ class
+ * declaration. Each one resolves to a single virtual call (the
+ * CDAccess instance is still a vtable-bearing C++ object); the
+ * wrappers route the unmangled symbol to the mangled member.
+ */
+extern "C" bool CDAccess_Read_Raw_Sector(CDAccess *cda, uint8_t *buf,
+      int32_t lba)
+{
+   return cda->Read_Raw_Sector(buf, lba);
+}
+
+extern "C" bool CDAccess_Read_Raw_PW(CDAccess *cda, uint8_t *buf,
+      int32_t lba)
+{
+   return cda->Read_Raw_PW(buf, lba);
+}
+
+extern "C" bool CDAccess_Read_TOC(CDAccess *cda, TOC *toc)
+{
+   return cda->Read_TOC(toc);
+}
+
+extern "C" void CDAccess_Eject(CDAccess *cda, bool eject_status)
+{
+   cda->Eject(eject_status);
+}
+
+extern "C" void CDAccess_destroy(CDAccess *cda)
+{
+   delete cda;
 }

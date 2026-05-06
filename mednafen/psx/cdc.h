@@ -6,11 +6,7 @@
 
 #include "../state.h"
 
-#ifdef __cplusplus
-#include "../cdrom/cdromif.h"   /* Full class CDIF for C++ consumers */
-#else
-#include "../cdrom/cdromif_c.h" /* Opaque struct CDIF for C consumers */
-#endif
+#include "../cdrom/cdromif.h"   /* Now plain C - shared header for both languages */
 
 #ifdef __cplusplus
 extern "C" {

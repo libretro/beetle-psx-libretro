@@ -57,7 +57,7 @@
 #include "../mednafen-endian.h"
 #include "../../osd_message.h"
 #include "../state_helpers.h"
-#include "../cdrom/cdromif_c.h"
+#include "../cdrom/cdromif.h"
 
 #include <retro_miscellaneous.h>
 
