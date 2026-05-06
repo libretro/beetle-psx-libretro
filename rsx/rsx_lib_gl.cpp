@@ -7,11 +7,10 @@
 
 #include <stdexcept>
 
-#include <glsm/glsmsym.h>
+#include <glsym/glsym.h>
 
 #include <boolean.h>
 
-#include <glsm/glsmsym.h>
 #include <vector>
 #include <cstdio>
 #include <stdint.h>
@@ -111,11 +110,11 @@ static const GLushort indices[6] = {0, 1, 2, 1, 2, 3};
  *     devices may report only GLES 2.0.
  *
  * Function pointers are resolved via the libretro frontend's
- * get_proc_address callback (obtained through
- * glsm_ctl(GLSM_CTL_PROC_ADDRESS_GET, ...)).  This works
- * regardless of whether the function is declared in the static
- * GL/GLES header for the current build profile, so call sites
- * never reference symbols their headers might lack.
+ * get_proc_address callback (hw_render.get_proc_address, set
+ * by the frontend during SET_HW_RENDER).  This works regardless
+ * of whether the function is declared in the static GL/GLES
+ * header for the current build profile, so call sites never
+ * reference symbols their headers might lack.
  *
  * Pattern at every call site:
  *
@@ -200,15 +199,127 @@ typedef struct gl_caps
    /* Resolved entry points.  NULL when not available. */
    PFN_BEETLE_GL_BLITFRAMEBUFFER  fp_glBlitFramebuffer;
    PFN_BEETLE_GL_COPYIMAGESUBDATA fp_glCopyImageSubData;
+
+   /* Set to 1 when the detected version is below the floor
+    * beetle's GL renderer needs to function (GL/GLES 3.0).
+    * gl_context_reset checks this and refuses to activate the
+    * renderer when set. */
+   int unsupported;
 } gl_caps_t;
 
 static gl_caps_t gl_caps;
+
+/* === GLES 2.x compile-time bridges ============================
+ *
+ * Beetle-PSX targets GL 3.3 Core / GLES 3.x.  The GLES 2.x build
+ * (HAVE_OPENGLES + HAVE_OPENGLES2) does not currently produce a
+ * working renderer and there are pre-existing compile errors in
+ * the file unrelated to glsm folding.  These bridges narrow the
+ * scope of "what's missing for GLES 2.x" so a future contributor
+ * who wants to make GLES 2.x actually work can replace them with
+ * proper runtime branches at the call sites that still need them
+ * (per the gl_caps pattern).
+ *
+ * Two flavours:
+ *
+ *   - Macro-aliases to OES/EXT extension entry points: for
+ *     functions GLES 2.x does not have in core but commonly has
+ *     via a vendor extension.  rglgen resolves the OES/EXT
+ *     symbol for us at context_reset time; if the running driver
+ *     does not expose the extension the function pointer is NULL
+ *     and any call crashes loudly (preferable to silent no-ops
+ *     that paint over real bugs).
+ *
+ *   - Empty / harmless stubs: for functions that have no GLES 2.x
+ *     equivalent at all (typed integer uniforms, polygon mode,
+ *     etc.).  These should never be reached at runtime because
+ *     gl_caps_init refuses to mark the renderer valid below
+ *     GL/GLES 3.0 (see "version_packed >= 0x0300" gate); they
+ *     exist only so the compile graph stays connected.
+ *
+ * Once a real GLES 2.x rendering path is implemented these
+ * bridges should disappear, replaced by gl_caps-style runtime
+ * branches at each call site. */
+#if defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES2)
+
+/* Aliases to extension entry points.  rglgen resolves the
+ * OES/EXT-suffixed symbol; the call goes through that runtime
+ * pointer when reachable. */
+#define glBindVertexArray         glBindVertexArrayOES
+#define glDeleteVertexArrays      glDeleteVertexArraysOES
+#define glDrawBuffers             glDrawBuffersEXT
+#define glFramebufferTexture      glFramebufferTextureOES
+#define glGenVertexArrays         glGenVertexArraysOES
+#define glMapBufferRange          glMapBufferRangeEXT
+#define glTexStorage2D            glTexStorage2DEXT
+#define glUnmapBuffer             glUnmapBufferOES
+
+/* Stubs for functions with no GLES 2.x equivalent.  Unreachable
+ * at runtime because gl_caps_init refuses the renderer below
+ * GL/GLES 3.0; present only to keep the file compile-clean. */
+static INLINE void glUniform1ui(GLint location, GLuint v0)
+{
+   (void)location; (void)v0;
+}
+static INLINE void glUniform2ui(GLint location, GLuint v0, GLuint v1)
+{
+   (void)location; (void)v0; (void)v1;
+}
+static INLINE void glVertexAttribIPointer(
+      GLuint index, GLint size, GLenum type,
+      GLsizei stride, const void *pointer)
+{
+   (void)index; (void)size; (void)type;
+   (void)stride; (void)pointer;
+}
+static INLINE void glVertexAttribLPointer(
+      GLuint index, GLint size, GLenum type,
+      GLsizei stride, const void *pointer)
+{
+   (void)index; (void)size; (void)type;
+   (void)stride; (void)pointer;
+}
+
+#endif /* HAVE_OPENGLES && HAVE_OPENGLES2 */
 
 #define VRAM_WIDTH_PIXELS 1024
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
 
 extern retro_log_printf_t log_cb;
+
+/* === GL hardware-render plumbing ============================
+ *
+ * Beetle-PSX previously used libretro-common's glsm shim for
+ * registering its GL context with the frontend (via
+ * RETRO_ENVIRONMENT_SET_HW_RENDER), looking up the
+ * frontend-provided default framebuffer object, and resolving
+ * GL function symbols.  glsm also exposed a ~150-function
+ * gl* -> rgl* macro layer that maintained an extensive
+ * gl_state mirror for save / restore between shader passes.
+ *
+ * Beetle never used the save / restore part: it never called
+ * GLSM_CTL_STATE_BIND or GLSM_CTL_STATE_UNBIND, and never used
+ * the glsm_state_setup VAO (it allocates its own VAOs per
+ * DrawBuffer).  All the rgl* wrappers were therefore
+ * passthrough-plus-bookkeeping-nobody-read, and all the gl_state
+ * fields were write-only.
+ *
+ * The remaining glsm functionality - SET_HW_RENDER plumbing,
+ * default-framebuffer lookup, and GL-symbol resolution - is a
+ * few-dozen lines that lives directly here now, so the GL state
+ * surface beetle actually exercises is visible at this file's
+ * level. */
+static struct retro_hw_render_callback hw_render;
+
+static GLuint beetle_gl_get_current_framebuffer(void)
+{
+   /* libretro frontend hands us the default FBO id each frame.
+    * Used by bind_libretro_framebuffer() when finalising a frame. */
+   if (hw_render.get_current_framebuffer)
+      return (GLuint)hw_render.get_current_framebuffer();
+   return 0;
+}
 
 /* How many vertices we buffer before forcing a draw. Since the
  * indexes are stored on 16bits we need to make sure that the length
@@ -1897,7 +2008,7 @@ static void bind_libretro_framebuffer(GlRenderer *renderer)
    }
 
    /* Bind the output framebuffer provided by the frontend */
-   fbo = glsm_get_current_framebuffer();
+   fbo = beetle_gl_get_current_framebuffer();
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
    glViewport((GLsizei) x, (GLsizei) y, (GLsizei) vp_w, (GLsizei) vp_h);
 }
@@ -2478,8 +2589,8 @@ static void gl_caps_parse_version(const char *version,
 }
 
 /* Initialise gl_caps once a real GL context is current.
- * Must be called after glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, ...)
- * so rglgen has resolved its baseline symbols. */
+ * Must be called after rglgen_resolve_symbols(...) so the
+ * baseline GL function-pointer table is populated. */
 static void gl_caps_init(void)
 {
    /* Suffix lists ordered most-likely-first.  ARB before EXT
@@ -2492,7 +2603,6 @@ static void gl_caps_init(void)
       "EXT", "NV", "ANGLE", NULL
    };
 
-   glsm_ctx_proc_address_t proc;
    retro_get_proc_address_t get_proc = NULL;
    const GLubyte *gl_version_str;
    const GLubyte *gl_vendor_str;
@@ -2549,8 +2659,8 @@ static void gl_caps_init(void)
    /* Pull the libretro frontend's symbol resolver.  Without it
     * we can't probe for runtime-loaded extension entry points;
     * leave function pointers NULL and let call sites fall back. */
-   if (glsm_ctl(GLSM_CTL_PROC_ADDRESS_GET, &proc) && proc.addr)
-      get_proc = proc.addr;
+   if (hw_render.get_proc_address)
+      get_proc = hw_render.get_proc_address;
 
    if (get_proc)
    {
@@ -2581,20 +2691,64 @@ static void gl_caps_init(void)
    log_cb(RETRO_LOG_INFO,
          "[gl_caps] glCopyImageSubData: %s\n",
          gl_caps.fp_glCopyImageSubData ? "available" : "NOT available");
+
+   /* Floor check.  Beetle's GL renderer needs VAOs (3.0+ core),
+    * separate read/draw FBO bindings (3.0+), glMapBufferRange
+    * (3.0+), glDrawBuffers in core (3.0+), unsigned-integer
+    * uniforms (3.0+), and several other 3.0+ features.  Below
+    * GL 3.0 / GLES 3.0 the renderer cannot function, so we mark
+    * the context unsupported and gl_context_reset will skip
+    * activating the renderer.  Logged as ERROR so the user sees
+    * exactly why nothing's drawing.
+    *
+    * Exception: a parsed version of 0.0 means the version string
+    * was unrecognised - rather than refuse outright we let it
+    * through and let the call sites fail naturally, since this
+    * usually indicates a context-detection oddity rather than a
+    * genuinely-too-old driver. */
+   if (gl_caps.version_packed != 0 && gl_caps.version_packed < 0x0300)
+   {
+      gl_caps.unsupported = 1;
+      log_cb(RETRO_LOG_ERROR,
+            "[gl_caps] GL/GLES version %d.%d is below the supported "
+            "floor of 3.0.  This renderer requires GL 3.0+ or GLES "
+            "3.0+ features (VAOs, separate read/draw FBOs, "
+            "glMapBufferRange, unsigned uniforms, ...).  The "
+            "renderer will not be activated; expect a black "
+            "screen or no output.\n",
+            gl_caps.version_major, gl_caps.version_minor);
+   }
 }
 
 static void gl_context_reset(void)
 {
    log_cb(RETRO_LOG_DEBUG, "gl_context_reset called.\n");
-   glsm_ctl(GLSM_CTL_STATE_CONTEXT_RESET, NULL);
+
+   /* Resolve the GL function-pointer table for this context.
+    * rglgen_resolve_symbols walks the rglgen-generated symbol
+    * declarations and populates each __rglgen_glFoo via the
+    * frontend's get_proc_address callback.  Must run before any
+    * gl call that goes through one of those wrappers. */
+   if (hw_render.get_proc_address)
+      rglgen_resolve_symbols(hw_render.get_proc_address);
 
    /* Detect what the running driver actually supports.  Must run
-    * after CONTEXT_RESET (so glsm has resolved its symbols) and
-    * before any feature-gated code path is taken. */
+    * after the symbol table is populated and before any
+    * feature-gated code path is taken. */
    gl_caps_init();
 
-   if (!glsm_ctl(GLSM_CTL_STATE_SETUP, NULL))
+   /* If the version is below our floor, leave the renderer in
+    * GlState_Invalid so all subsequent rsx_gl_* entry points
+    * short-circuit.  The user sees nothing render but gets an
+    * unambiguous error in the log explaining why. */
+   if (gl_caps.unsupported)
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "[gl_context_reset] aborting renderer init due to "
+            "unsupported GL/GLES version (see [gl_caps] error "
+            "above).\n");
       return;
+   }
 
    static_renderer.state_data = new GlRenderer();
 
@@ -2615,8 +2769,6 @@ static void gl_context_reset(void)
 
 static void gl_context_destroy(void)
 {
-   glsm_ctl(GLSM_CTL_STATE_CONTEXT_DESTROY, NULL);
-
    log_cb(RETRO_LOG_DEBUG, "gl_context_destroy called.\n");
 
    if (static_renderer.state_data)
@@ -2628,11 +2780,6 @@ static void gl_context_destroy(void)
    static_renderer.state_data = NULL;
    static_renderer.state      = GlState_Invalid;
    static_renderer.inited     = false;
-}
-
-static bool gl_context_framebuffer_lock(void* data)
-{
-   return false;
 }
 
 static struct retro_system_av_info get_av_info(VideoClock std)
@@ -2764,27 +2911,65 @@ void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
 
 bool rsx_gl_open(bool is_pal)
 {
-   glsm_ctx_params_t params = {0};
    retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
    VideoClock clock = is_pal ? VideoClock_Pal : VideoClock_Ntsc;
+   /* Compile-time profile string - what GL feature set this build
+    * was compiled to assume.  This is independent of the runtime
+    * caps detection in gl_caps_init: this tells you what subset of
+    * GL the build was *targeted at*; gl_caps tells you what the
+    * driver actually exposes.  Useful for triage when a bug report
+    * comes in - confirms which build artifact the user is running. */
+   const char *profile_str =
+#if defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES3)
+      "OpenGL ES 3.x"
+#elif defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES2)
+      "OpenGL ES 2.x"
+#elif defined(CORE)
+      "OpenGL Core 3.3+"
+#else
+      "OpenGL (compatibility)"
+#endif
+      ;
 
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &f))
       return false;
 
-   /* glsm related setup */
-   params.context_reset         = gl_context_reset;
-   params.context_destroy       = gl_context_destroy;
-   params.framebuffer_lock      = gl_context_framebuffer_lock;
-   params.environ_cb            = environ_cb;
-   params.stencil               = false;
-   params.imm_vbo_draw          = NULL;
-   params.imm_vbo_disable       = NULL;
-   params.context_type          = RETRO_HW_CONTEXT_OPENGL_CORE;
-   params.major                 = 3;
-   params.minor                 = 3;
+   /* Register our hardware render context with the libretro
+    * frontend.  This was previously routed through the glsm shim
+    * (GLSM_CTL_STATE_CONTEXT_INIT); the shim mostly maintained an
+    * extensive gl_state mirror that beetle never used, so the
+    * registration is now done directly here.  Compile-time
+    * profile selection follows the conditions glsm used (GLES
+    * builds always force the matching context_type; desktop
+    * builds are configurable but beetle pins to GL Core 3.3). */
+   memset(&hw_render, 0, sizeof(hw_render));
+#if defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES3)
+   hw_render.context_type    = RETRO_HW_CONTEXT_OPENGLES3;
+#elif defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES2)
+   hw_render.context_type    = RETRO_HW_CONTEXT_OPENGLES2;
+#else
+   hw_render.context_type    = RETRO_HW_CONTEXT_OPENGL_CORE;
+   hw_render.version_major   = 3;
+   hw_render.version_minor   = 3;
+#endif
+   hw_render.context_reset      = gl_context_reset;
+   hw_render.context_destroy    = gl_context_destroy;
+   hw_render.depth              = true;
+   hw_render.stencil            = false;
+   hw_render.bottom_left_origin = true;
+   hw_render.cache_context      = false;
 
-   if (!glsm_ctl(GLSM_CTL_STATE_CONTEXT_INIT, &params))
+   log_cb(RETRO_LOG_INFO,
+         "[rsx_gl_open] requesting hardware render context: %s\n",
+         profile_str);
+
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "[rsx_gl_open] frontend rejected SET_HW_RENDER for %s\n",
+            profile_str);
       return false;
+   }
 
    /* No context until 'context_reset' is called */
    static_renderer.video_clock  = clock;

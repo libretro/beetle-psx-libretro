@@ -8,10 +8,6 @@
 
 #include "../git.h"
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#include <glsm/glsmsym.h>
-#endif
-
 #define INCMD_NONE     0
 #define INCMD_PLINE    1
 #define INCMD_QUAD     2
