@@ -30,13 +30,25 @@ void PSX_MemPoke8(uint32_t A, uint8_t V);
 void PSX_MemPoke16(uint32_t A, uint16_t V);
 void PSX_MemPoke32(uint32_t A, uint32_t V);
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void PSX_RequestMLExit(void);
+#ifdef __cplusplus
+}
+#endif
 void ForceEventUpdates(const int32_t timestamp);
 
 #include "psx_events.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 // PSX_GPULineHook modified to take surface pitch (in pixels) and upscale factor for software renderer internal upscaling
 void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+#ifdef __cplusplus
+}
+#endif
 
 uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);
 

@@ -187,8 +187,7 @@ ifeq ($(HAVE_LIGHTREC), 1)
                -include $(CORE_DIR)/lightning-lightrec-include/debug.h
 endif
 
-   SOURCES_CXX += $(CORE_EMU_DIR)/cpu.cpp \
-                  $(CORE_EMU_DIR)/gpu.cpp
+   SOURCES_CXX += $(CORE_EMU_DIR)/cpu.cpp
 
    ifeq ($(HAVE_JIT), 1)
       SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
@@ -197,7 +196,8 @@ endif
    SOURCES_C += $(CORE_DIR)/libretro_cbs.c \
                 $(CORE_DIR)/beetle_psx_globals.c \
                 $(CORE_EMU_DIR)/cdc.c \
-                $(CORE_EMU_DIR)/frontio.c
+                $(CORE_EMU_DIR)/frontio.c \
+                $(CORE_EMU_DIR)/gpu.c
 
    ifeq ($(NEED_TREMOR), 1)
       SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))

@@ -1,27 +1,20 @@
-#ifdef __cplusplus
-
-#ifndef __STDC_CONSTANT_MACROS
-#define __STDC_CONSTANT_MACROS
-#endif
-
-#ifdef _STDINT_H
-#undef _STDINT_H
-#endif
-
-# include <stdint.h>
-#endif
+/* gpu_line.c is textually #included into gpu.c, which already
+ * includes <stdint.h> via psx.h.  No additional headers needed
+ * here. */
 
 struct line_fxp_coord
 {
    uint64_t x, y;
    uint32_t r, g, b;
 };
+typedef struct line_fxp_coord line_fxp_coord;
 
 struct line_fxp_step
 {
    int64_t dx_dk, dy_dk;
    int32_t dr_dk, dg_dk, db_dk;
 };
+typedef struct line_fxp_step line_fxp_step;
 
 #define LINE_XY_FRACTBITS  32
 #define LINE_RGB_FRACTBITS 12

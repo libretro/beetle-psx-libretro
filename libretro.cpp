@@ -648,7 +648,7 @@ static void RebaseTS(const int32_t timestamp)
    PSX_CPU->SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
 }
 
-void PSX_SetEventNT(const int type, const int32_t next_timestamp)
+extern "C" void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 {
    event_list_entry *e = &events[type];
 
@@ -753,7 +753,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
 }
 
 
-void PSX_RequestMLExit(void)
+extern "C" void PSX_RequestMLExit(void)
 {
    Running = 0;
    PSX_CPU->SetEventNT(0);
@@ -1341,7 +1341,7 @@ void PSX_MemPoke32(uint32 A, uint32 V)
    MemPoke<uint32, false>(0, A, V);
 }
 
-void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+extern "C" void PSX_GPULineHook(const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    FrontIO_GPULineHook(PSX_FIO, timestamp, line_timestamp, vsync, pixels, width, pix_clock_offset, pix_clock, pix_clock_divider, surf_pitchinpix, upscale_factor);
 }

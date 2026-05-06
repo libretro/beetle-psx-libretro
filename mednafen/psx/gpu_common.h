@@ -98,26 +98,11 @@ DEFINE_PlotPixelBlend(BMaddq, BLEND_MODE_ADD_FOURTH)
  * compiling at -Wunused-variable don't see the bg_pix decl as unused. */
 #define PlotPixelBlend_BMopaque(bg, fp) ((void)(bg), (void)(fp))
 
-#ifdef __cplusplus
-/* Thin C++ template wrapper that switch-dispatches to the right
- * specialisation by literal blend-mode tag.  When BlendMode is a
- * compile-time constant (which it always is at the call sites),
- * the optimiser collapses the switch to a single direct call.  The
- * wrapper exists so we can keep the rest of this header (still
- * templated) compiling unchanged during the staged conversion. */
-template<int BlendMode>
-static INLINE void PlotPixelBlend(uint16_t bg_pix, uint16_t *fore_pix)
-{
-   switch (BlendMode)
-   {
-      case BLEND_MODE_AVERAGE:    PlotPixelBlend_BMavg (bg_pix, fore_pix); break;
-      case BLEND_MODE_ADD:        PlotPixelBlend_BMadd (bg_pix, fore_pix); break;
-      case BLEND_MODE_SUBTRACT:   PlotPixelBlend_BMsub (bg_pix, fore_pix); break;
-      case BLEND_MODE_ADD_FOURTH: PlotPixelBlend_BMaddq(bg_pix, fore_pix); break;
-      case BLEND_MODE_OPAQUE:     break;
-   }
-}
-#endif
+/* The template-style PlotPixelBlend dispatcher that previously sat
+ * here under #ifdef __cplusplus is gone in stage 5: every caller
+ * now references the right PlotPixelBlend_<TAG> specialisation by
+ * mangled name through macro literal pasting, so the runtime switch
+ * (which the optimiser collapsed at -O2) is no longer needed. */
 
 /*
  * Plot a single pixel into VRAM at the current upscale, applying
@@ -196,63 +181,9 @@ DEFINE_PlotPixel(BMaddq_ME0_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 1)
 DEFINE_PlotPixel(BMaddq_ME1_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 0)
 DEFINE_PlotPixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
 
-#ifdef __cplusplus
-/* Thin C++ template wrapper - dispatches on literal template params. */
-template<int BlendMode, bool MaskEval_TA, bool textured>
-static INLINE void PlotPixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
-{
-   if (textured)
-   {
-      if (MaskEval_TA)
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME1_T1(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME1_T1  (gpu, x, y, fore_pix); break;
-         }
-      }
-      else
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME0_T1(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME0_T1  (gpu, x, y, fore_pix); break;
-         }
-      }
-   }
-   else
-   {
-      if (MaskEval_TA)
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME1_T0(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME1_T0  (gpu, x, y, fore_pix); break;
-         }
-      }
-      else
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotPixel_BMopaque_ME0_T0(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotPixel_BMavg_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotPixel_BMadd_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotPixel_BMsub_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotPixel_BMaddq_ME0_T0  (gpu, x, y, fore_pix); break;
-         }
-      }
-   }
-}
-#endif
+/* The template-style PlotPixel dispatcher previously here is gone
+ * in stage 5; callers now reference the right PlotPixel_<TAG>_<...>
+ * specialisation by mangled name. */
 
 /*
  * Plot a single pixel without any internal upscaling (1x VRAM
@@ -309,62 +240,9 @@ DEFINE_PlotNativePixel(BMaddq_ME0_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   0, 1)
 DEFINE_PlotNativePixel(BMaddq_ME1_T0,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 0)
 DEFINE_PlotNativePixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
 
-#ifdef __cplusplus
-template<int BlendMode, bool MaskEval_TA, bool textured>
-static INLINE void PlotNativePixel(PS_GPU *gpu, int32_t x, int32_t y, uint16_t fore_pix)
-{
-   if (textured)
-   {
-      if (MaskEval_TA)
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME1_T1(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME1_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME1_T1  (gpu, x, y, fore_pix); break;
-         }
-      }
-      else
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME0_T1(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME0_T1   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME0_T1  (gpu, x, y, fore_pix); break;
-         }
-      }
-   }
-   else
-   {
-      if (MaskEval_TA)
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME1_T0(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME1_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME1_T0  (gpu, x, y, fore_pix); break;
-         }
-      }
-      else
-      {
-         switch (BlendMode)
-         {
-            case BLEND_MODE_OPAQUE:     PlotNativePixel_BMopaque_ME0_T0(gpu, x, y, fore_pix); break;
-            case BLEND_MODE_AVERAGE:    PlotNativePixel_BMavg_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD:        PlotNativePixel_BMadd_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_SUBTRACT:   PlotNativePixel_BMsub_ME0_T0   (gpu, x, y, fore_pix); break;
-            case BLEND_MODE_ADD_FOURTH: PlotNativePixel_BMaddq_ME0_T0  (gpu, x, y, fore_pix); break;
-         }
-      }
-   }
-}
-#endif
+/* The template-style PlotNativePixel dispatcher previously here is
+ * gone in stage 5; callers now reference the right
+ * PlotNativePixel_<TAG>_<...> specialisation by mangled name. */
 
 #define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[(((texel & 0x1F)  * (r))   >> (5 - 1))] << 0) | (dither_offset[(((texel & 0x3E0)  * (g))  >> (10 - 1))] << 5) | (dither_offset[(((texel & 0x7C00) * (b)) >> (15 - 1))] << 10))
 
@@ -418,18 +296,9 @@ DEFINE_Update_CLUT_Cache(TM0, 0)
 DEFINE_Update_CLUT_Cache(TM1, 1)
 DEFINE_Update_CLUT_Cache(TM2, 2)
 
-#ifdef __cplusplus
-template<uint32 TexMode_TA>
-static INLINE void Update_CLUT_Cache(PS_GPU *g, uint16 raw_clut)
-{
-   switch (TexMode_TA)
-   {
-      case 0: Update_CLUT_Cache_TM0(g, raw_clut); break;
-      case 1: Update_CLUT_Cache_TM1(g, raw_clut); break;
-      case 2: Update_CLUT_Cache_TM2(g, raw_clut); break;
-   }
-}
-#endif
+/* The template-style Update_CLUT_Cache dispatcher previously here
+ * is gone in stage 5; callers now reference the right
+ * Update_CLUT_Cache_TM<n> specialisation by mangled name. */
 
 static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 {
@@ -512,34 +381,18 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
    return fbw; \
 }
 
-#ifdef __cplusplus
-typedef PS_GPU::TexCache_t PS_GPU_TexCache_t;
-#else
-typedef struct PS_GPU_TexCache_t {
-   uint16 Data[4];
-   uint32 Tag;
-} PS_GPU_TexCache_t;
-#endif
+/* PS_GPU_TexCache_t aliases the nested TexCache_t struct from
+ * PS_GPU.  The nested struct is hoisted to file scope in C, so we
+ * can reference it as `struct TexCache_t` directly. */
+typedef struct TexCache_t PS_GPU_TexCache_t;
 
 DEFINE_GetTexel(TM0, 0)
 DEFINE_GetTexel(TM1, 1)
 DEFINE_GetTexel(TM2, 2)
 
-#ifdef __cplusplus
-template<uint32_t TexMode_TA>
-static INLINE uint16_t GetTexel(PS_GPU *g, int32_t u_arg, int32_t v_arg)
-{
-#ifdef HAS_CXX11
-   static_assert(TexMode_TA <= 2, "TexMode_TA must be <= 2");
-#endif
-   switch (TexMode_TA)
-   {
-      case 0:  return GetTexel_TM0(g, u_arg, v_arg);
-      case 1:  return GetTexel_TM1(g, u_arg, v_arg);
-      default: return GetTexel_TM2(g, u_arg, v_arg);
-   }
-}
-#endif
+/* The template-style GetTexel dispatcher previously here is gone
+ * in stage 5; callers now reference the right GetTexel_TM<n>
+ * specialisation by mangled name. */
 
 static INLINE bool LineSkipTest(PS_GPU* g, unsigned y)
 {

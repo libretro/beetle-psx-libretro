@@ -225,6 +225,10 @@ typedef struct PS_GPU PS_GPU;
 
 #include "gpu_c.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void GPU_set_dither_upscale_shift(uint8 factor);
 
 uint8 GPU_get_upscale_shift(void);
@@ -259,5 +263,9 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg);
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

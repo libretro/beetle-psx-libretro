@@ -10,6 +10,7 @@ struct i_group
    uint32_t u, v;
    uint32_t r, g, b;
 };
+typedef struct i_group i_group;
 
 struct i_deltas
 {
@@ -19,6 +20,7 @@ struct i_deltas
    uint32_t du_dy, dv_dy;
    uint32_t dr_dy, dg_dy, db_dy;
 };
+typedef struct i_deltas i_deltas;
 
 static INLINE int64_t MakePolyXFP(uint32_t x)
 {
@@ -71,28 +73,28 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
  * fixed-point result has enough headroom for the per-pixel
  * accumulation in the inner loop.
  */
-#define CALCIS(x,y) (((B.x - A.x) * (C.y - B.y)) - ((C.x - B.x) * (B.y - A.y)))
+#define CALCIS(x,y) (((B->x - A->x) * (C->y - B->y)) - ((C->x - B->x) * (B->y - A->y)))
 #define DEFINE_CalcIDeltas(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
-static INLINE bool CalcIDeltas_##SUFFIX(i_deltas &idl, const tri_vertex &A, const tri_vertex &B, const tri_vertex &C) \
+static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C) \
 { \
    int32 denom = CALCIS(x, y); \
    if (!denom) \
       return false; \
    if (GOURAUD_LIT) \
    { \
-      idl.dr_dx = (uint32)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.dr_dy = (uint32)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.dg_dx = (uint32)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.dg_dy = (uint32)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.db_dx = (uint32)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.db_dy = (uint32)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dr_dx = (uint32)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dr_dy = (uint32)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dg_dx = (uint32)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dg_dy = (uint32)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->db_dx = (uint32)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->db_dy = (uint32)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
    } \
    if (TEXTURED_LIT) \
    { \
-      idl.du_dx = (uint32)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.du_dy = (uint32)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.dv_dx = (uint32)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl.dv_dy = (uint32)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->du_dx = (uint32)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->du_dy = (uint32)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dv_dx = (uint32)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dv_dy = (uint32)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
    } \
    return true; \
 }
@@ -117,18 +119,18 @@ DEFINE_CalcIDeltas(g1_t1, 1, 1)
  * default arguments so callers must always pass `count` explicitly.
  */
 #define DEFINE_AddIDeltas_DX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
-static INLINE void AddIDeltas_DX_##SUFFIX(i_group &ig, const i_deltas &idl, uint32_t count) \
+static INLINE void AddIDeltas_DX_##SUFFIX(i_group *ig, const i_deltas *idl, uint32_t count) \
 { \
    if (TEXTURED_LIT) \
    { \
-      ig.u += idl.du_dx * count; \
-      ig.v += idl.dv_dx * count; \
+      ig->u += idl->du_dx * count; \
+      ig->v += idl->dv_dx * count; \
    } \
    if (GOURAUD_LIT) \
    { \
-      ig.r += idl.dr_dx * count; \
-      ig.g += idl.dg_dx * count; \
-      ig.b += idl.db_dx * count; \
+      ig->r += idl->dr_dx * count; \
+      ig->g += idl->dg_dx * count; \
+      ig->b += idl->db_dx * count; \
    } \
 }
 
@@ -138,18 +140,18 @@ DEFINE_AddIDeltas_DX(g1_t0, 1, 0)
 DEFINE_AddIDeltas_DX(g1_t1, 1, 1)
 
 #define DEFINE_AddIDeltas_DY(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
-static INLINE void AddIDeltas_DY_##SUFFIX(i_group &ig, const i_deltas &idl, uint32_t count) \
+static INLINE void AddIDeltas_DY_##SUFFIX(i_group *ig, const i_deltas *idl, uint32_t count) \
 { \
    if (TEXTURED_LIT) \
    { \
-      ig.u += idl.du_dy * count; \
-      ig.v += idl.dv_dy * count; \
+      ig->u += idl->du_dy * count; \
+      ig->v += idl->dv_dy * count; \
    } \
    if (GOURAUD_LIT) \
    { \
-      ig.r += idl.dr_dy * count; \
-      ig.g += idl.dg_dy * count; \
-      ig.b += idl.db_dy * count; \
+      ig->r += idl->dr_dy * count; \
+      ig->g += idl->dg_dy * count; \
+      ig->b += idl->db_dy * count; \
    } \
 }
 
@@ -187,7 +189,7 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  * inlined here so the inner loop is fully fused.
  */
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas &idl) \
+static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas *idl) \
 { \
    int32 clipx0; \
    int32 clipx1; \
@@ -217,8 +219,8 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
    if (w <= 0) \
       return; \
    /*printf("%d %d %d %d\n", x, w, ClipX0, ClipX1);*/ \
-   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, x_ig_adjust); \
-   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, y); \
+   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, x_ig_adjust); \
+   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, y); \
    /* Only compute timings for one every `upscale_shift` lines so that */ \
    /* we don't end up "slower" than 1x */ \
    if ((y & ((1UL << gpu->upscale_shift) - 1)) == 0) { \
@@ -274,7 +276,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
          PlotPixel_##BM_TAG##_ME##ME_LIT##_T0(gpu, x, y, pix); \
       } \
       x++; \
-      AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, 1); \
+      AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, 1); \
    } while (MDFN_LIKELY(--w > 0)); \
 }
 
@@ -396,7 +398,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
    /* 0-height, abort out. */ \
    if (vertices[0].y == vertices[2].y) \
       return; \
-   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(idl, vertices[0], vertices[1], vertices[2])) \
+   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
       return; \
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
@@ -418,8 +420,8 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
    ig.r = (COORD_MF_INT(vertices[core_vertex].r) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
    ig.g = (COORD_MF_INT(vertices[core_vertex].g) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
    ig.b = (COORD_MF_INT(vertices[core_vertex].b) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
-   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, -vertices[core_vertex].x); \
-   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(ig, idl, -vertices[core_vertex].y); \
+   AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, &idl, -vertices[core_vertex].x); \
+   AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, &idl, -vertices[core_vertex].y); \
    base_coord = MakePolyXFP(vertices[0].x); \
    base_step  = MakePolyXFPStep((vertices[2].x - vertices[0].x), (vertices[2].y - vertices[0].y)); \
    if (vertices[1].y == vertices[0].y) \
@@ -484,7 +486,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
                gpu->DrawTimeAvail -= 2; \
                continue; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl); \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl); \
          } \
       } \
       else \
@@ -499,7 +501,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
                gpu->DrawTimeAvail -= 2; \
                goto skipit_##SUFFIX; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, idl); \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl); \
             skipit_##SUFFIX: ; \
             yi++; \
             lc += ls; \
@@ -550,21 +552,15 @@ DRAWTRI_T1_BMGROUP(1, 1, 1)
 DRAWTRI_T1_BMGROUP(1, 1, 2)
 
 /* Forward declarations for the helper functions defined in
- * gpu_polygon_sub.c. extern "C" is required: gpu_polygon_sub
- * is plain C as of the C-conversion of this file, so the
- * actual definitions have C linkage. Without this wrapping,
- * the C++ TU here (which #includes gpu_polygon.cpp into the
- * gpu.cpp translation unit) would generate name-mangled
- * references that fail to find the C-linkage definitions at
- * link time. */
-extern "C" {
+ * gpu_polygon_sub.c.  Since gpu_polygon.c is now itself plain C
+ * (textually included into gpu.c, also plain C as of stage 5),
+ * these are simple C-linkage forward declarations. */
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count);
 void Reset_UVLimits(PS_GPU *gpu);
 void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count);
 void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
-}
 
 /* The C++ template wrapper for DrawTriangle that previously sat
  * here is gone in stage 4: Command_DrawPolygon below is now itself
