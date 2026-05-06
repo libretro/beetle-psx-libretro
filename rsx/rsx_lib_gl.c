@@ -2780,10 +2780,6 @@ static void cleanup_gl_state(void)
    glClearColor(0.0, 0.0, 0.0, 0.0);
 }
 
-extern void GPU_RestoreStateP1(bool val);
-extern void GPU_RestoreStateP2(bool val);
-extern void GPU_RestoreStateP3(void);
-
 /* Resolve a function via the libretro frontend's get_proc_address,
  * trying the core name first then a NULL-terminated list of common
  * extension suffixes (OES, EXT, ARB, NV, ...).  Returns the first

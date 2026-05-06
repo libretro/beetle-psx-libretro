@@ -110,7 +110,7 @@ PS_GPU GPU;
  * and the GPU_Rescale path. File-scope, no external use. */
 static uint32  TexCache_Tag[256];
 static uint16  TexCache_Data[256][4];
-static uint16 *vram_new = NULL;
+static uint16_t *vram_new = NULL;
 
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
@@ -716,11 +716,6 @@ static void RSX_UpdateDisplayMode(void)
          is_480i_mode,
          curr_width_mode);
 }
-
-/* Forward decls */
-void GPU_RestoreStateP1(bool);
-void GPU_RestoreStateP2(bool);
-void GPU_RestoreStateP3();
 
 /* Allocate the GPU framebuffer at the requested upscale shift. Returns
  * NULL on allocation failure. Was previously `new uint16_t[size]`,
@@ -1885,7 +1880,7 @@ void GPU_RestoreStateP1(bool load)
       // fails the SFARRAY16N would deref NULL, so we leave vram_new
       // at NULL and the StateAction caller is responsible for noticing
       // (an upcoming change will surface the failure to libretro).
-      vram_new = (uint16 *)malloc(1024 * 512 * sizeof(uint16));
+      vram_new = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
 
       if (vram_new && !load)
       {
@@ -2172,7 +2167,7 @@ extern "C" bool GPU_DMACanWrite(void)
    return CalcFIFOReadyBit();
 }
 
-uint16 *GPU_get_vram(void)
+uint16_t *GPU_get_vram(void)
 {
    return GPU.vram;
 }

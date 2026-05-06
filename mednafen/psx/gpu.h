@@ -223,10 +223,6 @@ struct PS_GPU
 };
 typedef struct PS_GPU PS_GPU;
 
-
-
-uint16 *GPU_get_vram(void);
-
 #include "gpu_c.h"
 
 void GPU_set_dither_upscale_shift(uint8 factor);
