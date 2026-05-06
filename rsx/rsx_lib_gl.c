@@ -3733,7 +3733,6 @@ void rsx_gl_push_triangle(
    gl_renderer *renderer;
    gl_semi_transparency_mode semi_transparency_mode    = SEMI_TRANSPARENCY_MODE_ADD;
    bool semi_transparent        = false;
-   gl_command_vertex v[3];
 
    if (static_renderer.state == GL_STATE_INVALID)
       return;
@@ -3769,7 +3768,7 @@ void rsx_gl_push_triangle(
    }
 
    {
-      gl_command_vertex init[3] =
+      gl_command_vertex v[3] =
       {
          {
             {p0x, p0y, 0.95, p0w},   /* position */
@@ -3820,11 +3819,10 @@ void rsx_gl_push_triangle(
             {min_u, min_v, max_u, max_v},
          }
       };
-      memcpy(v, init, sizeof(v));
-   }
 
-   push_primitive(renderer, v, 3, GL_TRIANGLES,
-         semi_transparency_mode, mask_test, set_mask);
+      push_primitive(renderer, v, 3, GL_TRIANGLES,
+            semi_transparency_mode, mask_test, set_mask);
+   }
 }
 
 void rsx_gl_push_quad(
@@ -3853,7 +3851,6 @@ void rsx_gl_push_quad(
    gl_renderer *renderer;
    gl_semi_transparency_mode semi_transparency_mode = SEMI_TRANSPARENCY_MODE_ADD;
    bool semi_transparent     = false;
-   gl_command_vertex v[4];
    bool is_semi_transparent;
    bool is_textured;
    unsigned index;
@@ -3894,7 +3891,7 @@ void rsx_gl_push_quad(
    }
 
    {
-      gl_command_vertex init[4] =
+      gl_command_vertex v[4] =
       {
          {
             {p0x, p0y, 0.95, p0w},   /* position */
@@ -3961,27 +3958,26 @@ void rsx_gl_push_quad(
             { min_u, min_v, max_u, max_v },
          },
       };
-      memcpy(v, init, sizeof(v));
+
+      is_semi_transparent = v[0].semi_transparent == 1;
+      is_textured         = v[0].texture_blend_mode != 0;
+
+      vertex_preprocessing(renderer, v, 4,
+            GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
+
+      index     = gl_draw_buffer_next_index(renderer->command_buffer);
+      index_pos = renderer->vertex_index_pos;
+
+      for (i = 0; i < 6; i++)
+         renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
+
+      /* Add transparent pass if needed */
+      if (is_semi_transparent && is_textured)
+         vertex_add_blended_pass(renderer, index_pos);
+
+      gl_draw_buffer_push_slice(renderer->command_buffer, v, 4,
+            sizeof(gl_command_vertex));
    }
-
-   is_semi_transparent = v[0].semi_transparent == 1;
-   is_textured         = v[0].texture_blend_mode != 0;
-
-   vertex_preprocessing(renderer, v, 4,
-         GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
-
-   index     = gl_draw_buffer_next_index(renderer->command_buffer);
-   index_pos = renderer->vertex_index_pos;
-
-   for (i = 0; i < 6; i++)
-      renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
-
-   /* Add transparent pass if needed */
-   if (is_semi_transparent && is_textured)
-      vertex_add_blended_pass(renderer, index_pos);
-
-   gl_draw_buffer_push_slice(renderer->command_buffer, v, 4,
-         sizeof(gl_command_vertex));
 }
 
 void rsx_gl_push_line(
@@ -3995,7 +3991,6 @@ void rsx_gl_push_line(
    gl_renderer *renderer;
    gl_semi_transparency_mode semi_transparency_mode = SEMI_TRANSPARENCY_MODE_ADD;
    bool semi_transparent = false;
-   gl_command_vertex v[2];
 
    if (static_renderer.state == GL_STATE_INVALID)
       return;
@@ -4031,7 +4026,7 @@ void rsx_gl_push_line(
    }
 
    {
-      gl_command_vertex init[2] = {
+      gl_command_vertex v[2] = {
          {
             {(float)p0x, (float)p0y, 0., 1.0}, /* position */
             {
@@ -4063,11 +4058,10 @@ void rsx_gl_push_line(
             semi_transparent,
          }
       };
-      memcpy(v, init, sizeof(v));
-   }
 
-   push_primitive(renderer, v, 2,
-         GL_LINES, semi_transparency_mode, mask_test, set_mask);
+      push_primitive(renderer, v, 2,
+            GL_LINES, semi_transparency_mode, mask_test, set_mask);
+   }
 }
 
 void rsx_gl_load_image(
