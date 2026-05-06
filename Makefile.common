@@ -220,12 +220,12 @@ endif
 
    SOURCES_CXX += $(MEDNAFEN_DIR)/general.cpp \
                   $(MEDNAFEN_DIR)/mempatcher.cpp \
-                  $(CORE_DIR)/libretro.cpp \
-                  $(CORE_DIR)/input.cpp
+                  $(CORE_DIR)/libretro.cpp
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(MEDNAFEN_DIR)/video/Deinterlacer.c \
+                  $(CORE_DIR)/input.c \
                   $(CORE_EMU_DIR)/dma.c \
                   $(CORE_EMU_DIR)/gpu_polygon_sub.c \
                   $(CORE_EMU_DIR)/gte.c \

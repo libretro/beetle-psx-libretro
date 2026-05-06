@@ -1,7 +1,8 @@
 #include "libretro.h"
+#include <retro_miscellaneous.h>
+#include <retro_inline.h>
 #include "mednafen/mednafen-types.h"
 #include <math.h>
-#include <algorithm>
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"
 #include "input.h"
@@ -9,14 +10,14 @@
 
 extern retro_log_printf_t log_cb;
 
-//------------------------------------------------------------------------------
-// Locals
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Locals */
+/* ------------------------------------------------------------------------------ */
 
-static retro_environment_t environ_cb; // cached during input_init_env
-static retro_rumble_interface rumble; // acquired during input_init_env
+static retro_environment_t environ_cb; /*  cached during input_init_env */
+static struct retro_rumble_interface rumble; /*  acquired during input_init_env */
 
-static FrontIO* FIO; // cached in input_set_fio
+static FrontIO* FIO; /*  cached in input_set_fio */
 
 #define MAX_CONTROLLERS 8
 
@@ -27,28 +28,28 @@ static int gun_cursor = SETTING_GUN_CROSSHAIR_CROSS;
 
 int gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
 
-// Touchscreen Lightgun Sensitivity
+/*  Touchscreen Lightgun Sensitivity */
 static int pointer_pressed = 0;
 static const int POINTER_PRESSED_CYCLES = 4;
 static int pointer_cycles_after_released = 0;
 static int pointer_pressed_last_x = 0;
 static int pointer_pressed_last_y = 0;
 
-// NegCon adjustment parameters
-// > The NegCon 'twist' action is somewhat awkward when mapped
-//   to a standard analog stick -> user should be able to tweak
-//   response/deadzone for comfort
-// > When response is linear, 'additional' deadzone (set here)
-//   may be left at zero, since this is normally handled via in-game
-//   options menus
-// > When response is non-linear, deadzone should be set to match the
-//   controller being used (otherwise precision may be lost)
-// > negcon_linearity:
-//   - 1: Response is linear - recommended when using racing wheel
-//        peripherals, not recommended for standard gamepads
-//   - 2: Response is quadratic - optimal setting for gamepads
-//   - 3: Response is cubic - enables precise fine control, but
-//        difficult to use...
+/*  NegCon adjustment parameters */
+/*  > The NegCon 'twist' action is somewhat awkward when mapped */
+/*    to a standard analog stick -> user should be able to tweak */
+/*    response/deadzone for comfort */
+/*  > When response is linear, 'additional' deadzone (set here) */
+/*    may be left at zero, since this is normally handled via in-game */
+/*    options menus */
+/*  > When response is non-linear, deadzone should be set to match the */
+/*    controller being used (otherwise precision may be lost) */
+/*  > negcon_linearity: */
+/*    - 1: Response is linear - recommended when using racing wheel */
+/*         peripherals, not recommended for standard gamepads */
+/*    - 2: Response is quadratic - optimal setting for gamepads */
+/*    - 3: Response is cubic - enables precise fine control, but */
+/*         difficult to use... */
 #define NEGCON_RANGE 0x7FFF
 static int negcon_deadzone = 0;
 static int negcon_linearity = 1;
@@ -63,7 +64,7 @@ typedef union
 INPUT_DATA;
 
 /* Controller state buffer (per player) */
-static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {{0}};
+static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {{{0}}};
 
 struct analog_calibration
 {
@@ -77,9 +78,9 @@ static struct analog_calibration analog_calibration[MAX_CONTROLLERS];
 /* Controller type (per player) */
 static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 
-//------------------------------------------------------------------------------
-// Supported Devices
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Supported Devices */
+/* ------------------------------------------------------------------------------ */
 
 #define RETRO_DEVICE_PS_CONTROLLER         RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0)
 #define RETRO_DEVICE_PS_DUALSHOCK          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
@@ -91,7 +92,7 @@ static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
 #define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 #define RETRO_DEVICE_PS_NEGCON_RUMBLE      RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4)
 
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 9 }; // <-- update me!
+enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 9 }; /*  <-- update me! */
 
 static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
 {
@@ -138,60 +139,60 @@ static const struct retro_controller_info ports2[ 2 + 1 ] =
 };
 
 
-//------------------------------------------------------------------------------
-// Mapping Helpers
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Mapping Helpers */
+/* ------------------------------------------------------------------------------ */
 
 /* Controller (default) */
 enum { INPUT_MAP_CONTROLLER_SIZE = 16 };
 static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
 {
- // libretro input                  at position   || maps to PS1         on bit
- //-----------------------------------------------------------------------------
+ /*  libretro input                  at position   || maps to PS1         on bit */
+ /* ----------------------------------------------------------------------------- */
 #ifdef MSB_FIRST
-   RETRO_DEVICE_ID_JOYPAD_L2,       // L-trigger    -> L2
-   RETRO_DEVICE_ID_JOYPAD_R2,       // R-trigger    -> R2
-   RETRO_DEVICE_ID_JOYPAD_L,        // L-shoulder   -> L1
-   RETRO_DEVICE_ID_JOYPAD_R,        // R-shoulder   -> R1
-   RETRO_DEVICE_ID_JOYPAD_X,        // X(top)       -> Triangle
-   RETRO_DEVICE_ID_JOYPAD_A,        // A(right)     -> Circle
-   RETRO_DEVICE_ID_JOYPAD_B,        // B(down)      -> Cross
-   RETRO_DEVICE_ID_JOYPAD_Y,        // Y(left)      -> Square
-   RETRO_DEVICE_ID_JOYPAD_SELECT,   // Select       -> Select
-   RETRO_DEVICE_ID_JOYPAD_L3,       // L-thumb      -> L3
-   RETRO_DEVICE_ID_JOYPAD_R3,       // R-thumb      -> R3
-   RETRO_DEVICE_ID_JOYPAD_START,    // Start        -> Start
-   RETRO_DEVICE_ID_JOYPAD_UP,       // Pad-Up       -> Pad-Up
-   RETRO_DEVICE_ID_JOYPAD_RIGHT,    // Pad-Right    -> Pad-Right
-   RETRO_DEVICE_ID_JOYPAD_DOWN,     // Pad-Down     -> Pad-Down
-   RETRO_DEVICE_ID_JOYPAD_LEFT,     // Pad-Left     -> Pad-Left
+   RETRO_DEVICE_ID_JOYPAD_L2,       /*  L-trigger    -> L2 */
+   RETRO_DEVICE_ID_JOYPAD_R2,       /*  R-trigger    -> R2 */
+   RETRO_DEVICE_ID_JOYPAD_L,        /*  L-shoulder   -> L1 */
+   RETRO_DEVICE_ID_JOYPAD_R,        /*  R-shoulder   -> R1 */
+   RETRO_DEVICE_ID_JOYPAD_X,        /*  X(top)       -> Triangle */
+   RETRO_DEVICE_ID_JOYPAD_A,        /*  A(right)     -> Circle */
+   RETRO_DEVICE_ID_JOYPAD_B,        /*  B(down)      -> Cross */
+   RETRO_DEVICE_ID_JOYPAD_Y,        /*  Y(left)      -> Square */
+   RETRO_DEVICE_ID_JOYPAD_SELECT,   /*  Select       -> Select */
+   RETRO_DEVICE_ID_JOYPAD_L3,       /*  L-thumb      -> L3 */
+   RETRO_DEVICE_ID_JOYPAD_R3,       /*  R-thumb      -> R3 */
+   RETRO_DEVICE_ID_JOYPAD_START,    /*  Start        -> Start */
+   RETRO_DEVICE_ID_JOYPAD_UP,       /*  Pad-Up       -> Pad-Up */
+   RETRO_DEVICE_ID_JOYPAD_RIGHT,    /*  Pad-Right    -> Pad-Right */
+   RETRO_DEVICE_ID_JOYPAD_DOWN,     /*  Pad-Down     -> Pad-Down */
+   RETRO_DEVICE_ID_JOYPAD_LEFT,     /*  Pad-Left     -> Pad-Left */
 #else
-   RETRO_DEVICE_ID_JOYPAD_SELECT,   // Select       -> Select               0
-   RETRO_DEVICE_ID_JOYPAD_L3,       // L-thumb      -> L3                   1
-   RETRO_DEVICE_ID_JOYPAD_R3,       // R-thumb      -> R3                   2
-   RETRO_DEVICE_ID_JOYPAD_START,    // Start        -> Start                3
-   RETRO_DEVICE_ID_JOYPAD_UP,       // Pad-Up       -> Pad-Up               4
-   RETRO_DEVICE_ID_JOYPAD_RIGHT,    // Pad-Right    -> Pad-Right            5
-   RETRO_DEVICE_ID_JOYPAD_DOWN,     // Pad-Down     -> Pad-Down             6
-   RETRO_DEVICE_ID_JOYPAD_LEFT,     // Pad-Left     -> Pad-Left             7
-   RETRO_DEVICE_ID_JOYPAD_L2,       // L-trigger    -> L2                   8
-   RETRO_DEVICE_ID_JOYPAD_R2,       // R-trigger    -> R2                   9
-   RETRO_DEVICE_ID_JOYPAD_L,        // L-shoulder   -> L1                  10
-   RETRO_DEVICE_ID_JOYPAD_R,        // R-shoulder   -> R1                  11
-   RETRO_DEVICE_ID_JOYPAD_X,        // X(top)       -> Triangle            12
-   RETRO_DEVICE_ID_JOYPAD_A,        // A(right)     -> Circle              13
-   RETRO_DEVICE_ID_JOYPAD_B,        // B(down)      -> Cross               14
-   RETRO_DEVICE_ID_JOYPAD_Y,        // Y(left)      -> Square              15
+   RETRO_DEVICE_ID_JOYPAD_SELECT,   /*  Select       -> Select               0 */
+   RETRO_DEVICE_ID_JOYPAD_L3,       /*  L-thumb      -> L3                   1 */
+   RETRO_DEVICE_ID_JOYPAD_R3,       /*  R-thumb      -> R3                   2 */
+   RETRO_DEVICE_ID_JOYPAD_START,    /*  Start        -> Start                3 */
+   RETRO_DEVICE_ID_JOYPAD_UP,       /*  Pad-Up       -> Pad-Up               4 */
+   RETRO_DEVICE_ID_JOYPAD_RIGHT,    /*  Pad-Right    -> Pad-Right            5 */
+   RETRO_DEVICE_ID_JOYPAD_DOWN,     /*  Pad-Down     -> Pad-Down             6 */
+   RETRO_DEVICE_ID_JOYPAD_LEFT,     /*  Pad-Left     -> Pad-Left             7 */
+   RETRO_DEVICE_ID_JOYPAD_L2,       /*  L-trigger    -> L2                   8 */
+   RETRO_DEVICE_ID_JOYPAD_R2,       /*  R-trigger    -> R2                   9 */
+   RETRO_DEVICE_ID_JOYPAD_L,        /*  L-shoulder   -> L1                  10 */
+   RETRO_DEVICE_ID_JOYPAD_R,        /*  R-shoulder   -> R1                  11 */
+   RETRO_DEVICE_ID_JOYPAD_X,        /*  X(top)       -> Triangle            12 */
+   RETRO_DEVICE_ID_JOYPAD_A,        /*  A(right)     -> Circle              13 */
+   RETRO_DEVICE_ID_JOYPAD_B,        /*  B(down)      -> Cross               14 */
+   RETRO_DEVICE_ID_JOYPAD_Y,        /*  Y(left)      -> Square              15 */
 #endif
 };
 
 
-//------------------------------------------------------------------------------
-// Local Functions
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Local Functions */
+/* ------------------------------------------------------------------------------ */
 
-// Return the normalized distance between the origin and the current
-// (x,y) analog stick position
+/*  Return the normalized distance between the origin and the current */
+/*  (x,y) analog stick position */
 static float analog_radius(int x, int y)
 {
    float fx = ((float)x) / 0x8000;
@@ -200,7 +201,7 @@ static float analog_radius(int x, int y)
    return sqrtf(fx * fx + fy * fy);
 }
 
-static inline uint32_t analog_clamp_scale(uint32_t v, float s)
+static INLINE uint32_t analog_clamp_scale(uint32_t v, float s)
 {
    float r = (float)v * s;
    uint32_t u = (uint32_t)r;
@@ -222,11 +223,11 @@ static uint16_t get_analog_button( retro_input_state_t input_state_cb,
 
    if ( button == 0 )
    {
-      // If we got exactly zero, we're either not pressing the button, or the front-end
-      // is not reporting analog values. We need to do a second check using the classic
-      // digital API method, to at least get some response - better than nothing.
+      /*  If we got exactly zero, we're either not pressing the button, or the front-end */
+      /*  is not reporting analog values. We need to do a second check using the classic */
+      /*  digital API method, to at least get some response - better than nothing. */
 
-      // NOTE: If we're really just not holding the button, we're still going to get zero.
+      /*  NOTE: If we're really just not holding the button, we're still going to get zero. */
 
       button = input_state_cb( player_index,
                                RETRO_DEVICE_JOYPAD,
@@ -238,15 +239,12 @@ static uint16_t get_analog_button( retro_input_state_t input_state_cb,
 }
 
 
-//------------------------------------------------------------------------------
-// Global Functions
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Global Functions */
+/* ------------------------------------------------------------------------------ */
 
 void input_init_env( retro_environment_t _environ_cb )
 {
-   // Cache this
-   environ_cb = _environ_cb;
-
    struct retro_input_descriptor desc[] =
    {
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
@@ -421,6 +419,9 @@ void input_init_env( retro_environment_t _environ_cb )
       { 0 },
    };
 
+   /*  Cache this */
+   environ_cb = _environ_cb;
+
    environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
 
    if ( environ_cb( RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble ) && log_cb )
@@ -449,8 +450,9 @@ void input_set_env( retro_environment_t _environ_cb )
 
 void input_init()
 {
-   // Initialise to default and bind input buffers to PS1 emulation.
-   for ( unsigned i = 0; i < MAX_CONTROLLERS; ++i )
+   unsigned i;
+   /*  Initialise to default and bind input buffers to PS1 emulation. */
+   for (i = 0; i < MAX_CONTROLLERS; ++i )
    {
       input_type[ i ] = RETRO_DEVICE_JOYPAD;
       FrontIO_SetInput(FIO, i, "gamepad", (uint8*)&input_data[i]);
@@ -464,7 +466,8 @@ void input_set_fio(FrontIO* fio)
 
 void input_init_calibration(void)
 {
-   for ( unsigned i = 0; i < MAX_CONTROLLERS; i++ )
+   unsigned i;
+   for (i = 0; i < MAX_CONTROLLERS; i++ )
    {
       analog_calibration[ i ].left = 0.7f;
       analog_calibration[ i ].right = 0.7f;
@@ -491,11 +494,12 @@ void input_set_mouse_sensitivity( int percent )
 
 void input_set_gun_cursor( int cursor )
 {
+   int port;
    gun_cursor = cursor;
    if ( FIO )
    {
-      // todo -- support multiple guns.
-      for ( int port = 0; port < 8; ++port )
+      /*  todo -- support multiple guns. */
+      for (port = 0; port < 8; ++port )
          FrontIO_SetCrosshairsCursor(FIO, port, gun_cursor);
    }
 }
@@ -517,14 +521,15 @@ unsigned input_get_player_count(void)
 
 static void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer, retro_input_state_t input_state_cb )
 {
+   int touch_count;
    int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
    int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
 
-   // Comments by hiddenasbestos
-   // .. scale into screen space:
-   // NOTE: the scaling here is semi-guesswork, need to re-write.
-   // TODO: Test with PAL games.
-   // Can also implement scaling with initial/last scanline
+   /*  Comments by hiddenasbestos */
+   /*  .. scale into screen space: */
+   /*  NOTE: the scaling here is semi-guesswork, need to re-write. */
+   /*  TODO: Test with PAL games. */
+   /*  Can also implement scaling with initial/last scanline */
 
    const int scale_x = (crop_overscan ? 2560 : 2800);
    const int scale_y = (content_is_pal ? 288 : 240);
@@ -532,10 +537,10 @@ static void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer,
    int gun_x = (( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1)) + (crop_overscan ? 120 : 0);
    int gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1) + (content_is_pal ? 4 : 0);
 
-   // Handle offscreen by checking corrected x and y values
+   /*  Handle offscreen by checking corrected x and y values */
    if ( gun_x == 0 || gun_y == 0 )
    {
-      gun_x = -16384; // magic position to disable cross-hair drawing.
+      gun_x = -16384; /*  magic position to disable cross-hair drawing. */
       gun_y = -16384;
    }
 
@@ -567,42 +572,42 @@ static void input_handle_lightgun_touchscreen( INPUT_DATA *p_input, int iplayer,
       return;
    }
 
-   // position
+   /*  position */
    p_input->gun_pos[ 0 ] = gun_x;
    p_input->gun_pos[ 1 ] = gun_y;
 
-   // buttons
+   /*  buttons */
    p_input->u8[ 4 ] = 0;
 
-   // use multi-touch to support different button inputs:
-   // 3-finger touch: START button
-   // 2-finger touch: Reload
-   // offscreen touch: Reload
-   int touch_count = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT );
+   /*  use multi-touch to support different button inputs: */
+   /*  3-finger touch: START button */
+   /*  2-finger touch: Reload */
+   /*  offscreen touch: Reload */
+   touch_count = input_state_cb( iplayer, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT );
    if ( touch_count == 1 )
       p_input->u8[ 4 ] |= 0x1;
 
    if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
    {
-      // Justifier 'Aux'
+      /*  Justifier 'Aux' */
       if ( touch_count == 2 )
          p_input->u8[ 4 ] |= 0x2;
 
-      // Justifier 'Start'
+      /*  Justifier 'Start' */
       if ( touch_count == 3 )
          p_input->u8[ 4 ] |= 0x4;
    }
    else
    {
-      // Guncon 'A'
+      /*  Guncon 'A' */
       if ( touch_count == 2 )
          p_input->u8[ 4 ] |= 0x2;
 
-      // Guncon 'B'
+      /*  Guncon 'B' */
       if ( touch_count == 3 )
          p_input->u8[ 4 ] |= 0x4;
 
-      // Guncon 'A' + 'B'
+      /*  Guncon 'A' + 'B' */
       if ( touch_count == 4 )
       {
          p_input->u8[ 4 ] |= 0x2;
@@ -617,62 +622,61 @@ static void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input
    int gun_x, gun_y;
    int forced_reload = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_RELOAD );
 
-   // off-screen?
+   /*  off-screen? */
    if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN ) || forced_reload )
    {
-      shot_type = 0x8; // off-screen shot
+      shot_type = 0x8; /*  off-screen shot */
 
-      gun_x = -16384; // magic position to disable cross-hair drawing.
+      gun_x = -16384; /*  magic position to disable cross-hair drawing. */
       gun_y = -16384;
    }
    else
    {
-      shot_type = 0x1; // on-screen shot
-
       int gun_x_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X );
       int gun_y_raw = input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y );
-
-      // Comments by hiddenasbestos
-      // .. scale into screen space:
-      // NOTE: the scaling here is semi-guesswork, need to re-write.
-      // TODO: Test with PAL games.
-      // Can also implement scaling with initial/last scanline
-
       const int scale_x = (crop_overscan ? 2560 : 2800);
       const int scale_y = (content_is_pal ? 288 : 240);
+
+      shot_type = 0x1; /*  on-screen shot */
+
+      /*  Comments by hiddenasbestos */
+      /*  .. scale into screen space: */
+      /*  NOTE: the scaling here is semi-guesswork, need to re-write. */
+      /*  TODO: Test with PAL games. */
+      /*  Can also implement scaling with initial/last scanline */
 
       gun_x = (( ( gun_x_raw + 0x7fff ) * scale_x ) / (0x7fff << 1)) + (crop_overscan ? 120 : 0);
       gun_y = ( ( gun_y_raw + 0x7fff ) * scale_y ) / (0x7fff << 1) + (content_is_pal ? 4 : 0);
    }
 
-   // position
+   /*  position */
    p_input->gun_pos[ 0 ] = gun_x;
    p_input->gun_pos[ 1 ] = gun_y;
 
-   // buttons
+   /*  buttons */
    p_input->u8[ 4 ] = 0;
 
-   // trigger
+   /*  trigger */
    if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER ) || forced_reload )
       p_input->u8[ 4 ] |= shot_type;
 
    if ( input_type[ iplayer ] == RETRO_DEVICE_PS_JUSTIFIER )
    {
-      // Justifier 'Aux'
+      /*  Justifier 'Aux' */
       if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
          p_input->u8[ 4 ] |= 0x2;
 
-      // Justifier 'Start'
+      /*  Justifier 'Start' */
       if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_START ) )
          p_input->u8[ 4 ] |= 0x4;
    }
    else
    {
-      // Guncon 'A'
+      /*  Guncon 'A' */
       if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_A ) )
          p_input->u8[ 4 ] |= 0x2;
 
-      // Guncon 'B'
+      /*  Guncon 'B' */
       if ( input_state_cb( iplayer, RETRO_DEVICE_LIGHTGUN, 0, RETRO_DEVICE_ID_LIGHTGUN_AUX_B ) )
          p_input->u8[ 4 ] |= 0x4;
    }
@@ -680,6 +684,7 @@ static void input_handle_lightgun( INPUT_DATA *p_input, int iplayer, retro_input
 
 void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_state_cb )
 {
+   unsigned i;
    unsigned iplayer;
    /* For each player (logical controller) */
    for (iplayer = 0; iplayer < players; ++iplayer )
@@ -699,18 +704,18 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
          case RETRO_DEVICE_PS_ANALOG:
          case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
 
-            // Use fixed lookup table to map RetroPad inputs to PlayStation input bitmap.
+            /*  Use fixed lookup table to map RetroPad inputs to PlayStation input bitmap. */
             p_input->buttons = 0;
             if (libretro_supports_bitmasks)
             {
                int16_t ret = input_state_cb(iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-               for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+               for (i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
                   p_input->buttons |= (ret & (1 << input_map_controller[ i ] ))
                      ? ( 1 << i ) : 0;
             }
             else
             {
-               for ( unsigned i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
+               for (i = 0; i < INPUT_MAP_CONTROLLER_SIZE; i++ )
                {
                   p_input->buttons |=
                      input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, input_map_controller[ i ] )
@@ -725,31 +730,31 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
             if ( gun_input_mode == SETTING_GUN_INPUT_POINTER )
                input_handle_lightgun_touchscreen( p_input, iplayer, input_state_cb );
             else
-               // RETRO_DEVICE_LIGHTGUN is default
+               /*  RETRO_DEVICE_LIGHTGUN is default */
                input_handle_lightgun( p_input, iplayer, input_state_cb );
 
-            // allow guncon buttons to be pressed by gamepad while using lightgun
-            // Joypad L/R/A buttons are mapped to Guncon 'A'
-            // The idea is to be able to use the controller in tandem with some games
-            // like Time Crisis where you need to hold a button down and fire
+            /*  allow guncon buttons to be pressed by gamepad while using lightgun */
+            /*  Joypad L/R/A buttons are mapped to Guncon 'A' */
+            /*  The idea is to be able to use the controller in tandem with some games */
+            /*  like Time Crisis where you need to hold a button down and fire */
             if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) ||
                   input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L ) ||
                   input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
-               // Guncon 'A'
+               /*  Guncon 'A' */
                p_input->u8[ 4 ] |= 0x2;
 
             break;
 
          case RETRO_DEVICE_PS_MOUSE:
 
-            // Simple two-button mouse.
+            /*  Simple two-button mouse. */
             p_input->u32[ 2 ] = 0;
             if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT ) )
-               p_input->u32[ 2 ] |= ( 1 << 1 ); // Left
+               p_input->u32[ 2 ] |= ( 1 << 1 ); /*  Left */
             if ( input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT ) )
-               p_input->u32[ 2 ] |= ( 1 << 0 ); // Right
+               p_input->u32[ 2 ] |= ( 1 << 0 ); /*  Right */
 
-            // Relative input.
+            /*  Relative input. */
             {
                /* mouse input */
                int dx_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X );
@@ -769,63 +774,63 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                p_input->u8[ 0 ] = 0;
 
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP ) )
-                  p_input->u8[ 0 ] |= ( 1 << 4 ); // Pad-Up
+                  p_input->u8[ 0 ] |= ( 1 << 4 ); /*  Pad-Up */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT ) )
-                  p_input->u8[ 0 ] |= ( 1 << 5 ); // Pad-Right
+                  p_input->u8[ 0 ] |= ( 1 << 5 ); /*  Pad-Right */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) )
-                  p_input->u8[ 0 ] |= ( 1 << 6 ); // Pad-Down
+                  p_input->u8[ 0 ] |= ( 1 << 6 ); /*  Pad-Down */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) )
-                  p_input->u8[ 0 ] |= ( 1 << 7 ); // Pad-Left
+                  p_input->u8[ 0 ] |= ( 1 << 7 ); /*  Pad-Left */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) )
-                  p_input->u8[ 0 ] |= ( 1 << 3 ); // Start
+                  p_input->u8[ 0 ] |= ( 1 << 3 ); /*  Start */
 
                p_input->u8[ 1 ] = 0;
 
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) )
-                  p_input->u8[ 1 ] |= ( 1 << 5 ); // neGcon A
+                  p_input->u8[ 1 ] |= ( 1 << 5 ); /*  neGcon A */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X ) )
-                  p_input->u8[ 1 ] |= ( 1 << 4 ); // neGcon B
+                  p_input->u8[ 1 ] |= ( 1 << 4 ); /*  neGcon B */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
-                  p_input->u8[ 1 ] |= ( 1 << 3 ); // neGcon R shoulder (digital)
+                  p_input->u8[ 1 ] |= ( 1 << 3 ); /*  neGcon R shoulder (digital) */
             }
 
             break;
 
          case RETRO_DEVICE_PS_NEGCON_RUMBLE:
 
-            // Digital Buttons
+            /*  Digital Buttons */
             {
                p_input->u8[ 0 ] = 0;
 
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP ) )
-                  p_input->u8[ 0 ] |= ( 1 << 4 ); // Pad-Up
+                  p_input->u8[ 0 ] |= ( 1 << 4 ); /*  Pad-Up */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT ) )
-                  p_input->u8[ 0 ] |= ( 1 << 5 ); // Pad-Right
+                  p_input->u8[ 0 ] |= ( 1 << 5 ); /*  Pad-Right */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN ) )
-                  p_input->u8[ 0 ] |= ( 1 << 6 ); // Pad-Down
+                  p_input->u8[ 0 ] |= ( 1 << 6 ); /*  Pad-Down */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT ) )
-                  p_input->u8[ 0 ] |= ( 1 << 7 ); // Pad-Left
+                  p_input->u8[ 0 ] |= ( 1 << 7 ); /*  Pad-Left */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START ) )
-                  p_input->u8[ 0 ] |= ( 1 << 3 ); // Start
+                  p_input->u8[ 0 ] |= ( 1 << 3 ); /*  Start */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT ) )
-                  p_input->u8[ 0 ] |= ( 1 << 0 ); // Select / Analog
+                  p_input->u8[ 0 ] |= ( 1 << 0 ); /*  Select / Analog */
 
                p_input->u8[ 1 ] = 0;
 
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A ) )
-                  p_input->u8[ 1 ] |= ( 1 << 5 ); // neGcon A
+                  p_input->u8[ 1 ] |= ( 1 << 5 ); /*  neGcon A */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X ) )
-                  p_input->u8[ 1 ] |= ( 1 << 4 ); // neGcon B
+                  p_input->u8[ 1 ] |= ( 1 << 4 ); /*  neGcon B */
                if ( input_state_cb( iplayer, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R ) )
-                  p_input->u8[ 1 ] |= ( 1 << 3 ); // neGcon R shoulder (digital)
+                  p_input->u8[ 1 ] |= ( 1 << 3 ); /*  neGcon R shoulder (digital) */
             }
 
             break;
       }
 
 
-      //
-      // -- Analog Inputs
+      /*  */
+      /*  -- Analog Inputs */
 
       switch ( input_type[ iplayer ] )
       {
@@ -861,20 +866,20 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
                if ( enable_analog_calibration )
                {
-                  // This represents the maximal value the DualShock sticks can
-                  // reach, where 1.0 would be the maximum value along the X or
-                  // Y axis.
-                  //
-                  // simias: With my (old and clunky) DualShock I managed to
-                  // reach x = 0x00, y = 0x05 on the left stick which give us a
-                  // radius of:
-                  //
-                  //   int left_x = 0x80 - 0x00;
-                  //   int left_y = 0x80 - 0x05;
-                  //
-                  //   sqrt(left_x * left_x + left_y * left_y) / 0x80
-                  //
-                  // Which gives the value below
+                  /*  This represents the maximal value the DualShock sticks can */
+                  /*  reach, where 1.0 would be the maximum value along the X or */
+                  /*  Y axis. */
+                  /*  */
+                  /*  simias: With my (old and clunky) DualShock I managed to */
+                  /*  reach x = 0x00, y = 0x05 on the left stick which give us a */
+                  /*  radius of: */
+                  /*  */
+                  /*    int left_x = 0x80 - 0x00; */
+                  /*    int left_y = 0x80 - 0x05; */
+                  /*  */
+                  /*    sqrt(left_x * left_x + left_y * left_y) / 0x80 */
+                  /*  */
+                  /*  Which gives the value below */
                   static const float dualshock_analog_radius = 1.387;
                   float l_scaling, r_scaling;
                   /* Compute the "radius" (distance from 0, 0) of the current
@@ -895,9 +900,9 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                      log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
                   }
 
-                  // Now compute the scaling factor to apply to convert the
-                  // emulator's controller coordinates to a native DualShock's
-                  // ones
+                  /*  Now compute the scaling factor to apply to convert the */
+                  /*  emulator's controller coordinates to a native DualShock's */
+                  /*  ones */
                   l_scaling = dualshock_analog_radius / analog_calibration->left;
                   r_scaling = dualshock_analog_radius / analog_calibration->right;
 
@@ -913,9 +918,9 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                }
                else
                {
-                  // Reset the calibration. Since we only increase the
-                  // calibration coordinates we can start with a reasonably
-                  // small value.
+                  /*  Reset the calibration. Since we only increase the */
+                  /*  calibration coordinates we can start with a reasonably */
+                  /*  small value. */
                   analog_calibration->left = 0.7;
                   analog_calibration->right = 0.7;
                }
@@ -937,14 +942,14 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
          case RETRO_DEVICE_PS_NEGCON:
          case RETRO_DEVICE_PS_NEGCON_RUMBLE:
 
-            // Analog Inputs
+            /*  Analog Inputs */
             {
-               uint16_t button_ii = std::max(
+               uint16_t button_ii = MAX(
                      get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 ),
                      get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y )
                      );
 
-               uint16_t button_i = std::max(
+               uint16_t button_i = MAX(
                      get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 ),
                      get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B )
                      );
@@ -955,10 +960,11 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                p_input->u32[ 5 ] = left_shoulder; /* Analog shoulder (left only!) */
             }
 
-            // Twist
+            /*  Twist */
             {
                struct analog_calibration *calibration;
                float analog_left_x_amplitude;
+               uint32_t twist_left, twist_right;
                int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_X);
 
@@ -973,12 +979,12 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                /* Convert to an 'amplitude' [-1.0,1.0] */
                analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
 
-               // Handle 'analog self-calibration'...
-               // NB: This seems pointless, since all it does is arbitrarily
-               // reduce the precision of 'twist' input (making games rather
-               // unplayable). Someone, however, must have thought it was a
-               // good idea at some point, so we'll leave the basic functionality
-               // in place...
+               /*  Handle 'analog self-calibration'... */
+               /*  NB: This seems pointless, since all it does is arbitrarily */
+               /*  reduce the precision of 'twist' input (making games rather */
+               /*  unplayable). Someone, however, must have thought it was a */
+               /*  good idea at some point, so we'll leave the basic functionality */
+               /*  in place... */
                calibration = &analog_calibration[ iplayer ];
                if ( enable_analog_calibration )
                {
@@ -986,6 +992,7 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                   static const float neGcon_analog_deflection = 1.35f;
                   /* Compute the current stick deflection */
                   float twist = fabsf(analog_left_x_amplitude);
+                  float twist_scaling;
                   /* We recalibrate when we find a new max value for the sticks */
                   if ( twist > analog_calibration->twist )
                   {
@@ -996,21 +1003,21 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
                   /* Now compute the scaling factor to apply to convert the
                    * emulator's controller coordinates to a native neGcon range. */
-                  float twist_scaling = neGcon_analog_deflection / analog_calibration->twist;
+                  twist_scaling = neGcon_analog_deflection / analog_calibration->twist;
 
                   analog_left_x_amplitude = analog_left_x_amplitude * twist_scaling;
                }
                else
                {
-                  // Reset the calibration. Since we only increase the
-                  // calibration coordinates we can start with a reasonably
-                  // small value.
+                  /*  Reset the calibration. Since we only increase the */
+                  /*  calibration coordinates we can start with a reasonably */
+                  /*  small value. */
                   analog_calibration->twist = 0.7;
                }
 
-               // Safety check
-               // (also fixes range when above 'analog self-calibration' twist_scaling
-               // is applied)
+               /*  Safety check */
+               /*  (also fixes range when above 'analog self-calibration' twist_scaling */
+               /*  is applied) */
                analog_left_x_amplitude = analog_left_x_amplitude < -1.0f ? -1.0f : analog_left_x_amplitude;
                analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
 
@@ -1025,22 +1032,22 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                else if (negcon_linearity == 3)
                   analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
 
-               // Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF]
+               /*  Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF] */
                analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
 
-               uint32_t twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
-               uint32_t twist_right = analog_left_x > 0 ?  analog_left_x : 0;
+               twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
+               twist_right = analog_left_x > 0 ?  analog_left_x : 0;
 
-               p_input->u32[ 1 ] = twist_right; // Twist Right
-               p_input->u32[ 2 ] = twist_left; // Twist Left
+               p_input->u32[ 1 ] = twist_right; /*  Twist Right */
+               p_input->u32[ 2 ] = twist_left; /*  Twist Left */
             }
 
             break;
       }
 
 
-      //
-      // -- Rumble
+      /*  */
+      /*  -- Rumble */
 
       if ( rumble.set_rumble_state )
       {
@@ -1059,9 +1066,9 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
    } /* for each player */
 }
 
-//------------------------------------------------------------------------------
-// Libretro Interface
-//------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------ */
+/*  Libretro Interface */
+/* ------------------------------------------------------------------------------ */
 
 void retro_set_controller_port_device( unsigned in_port, unsigned device )
 {
