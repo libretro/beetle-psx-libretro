@@ -3215,8 +3215,11 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          }
       }
 
-      glDisable(GL_SCISSOR_TEST);
-      glDisable(GL_BLEND);
+      /* GL_SCISSOR_TEST and GL_BLEND were disabled at the top of
+       * the finalize block (a few hundred lines up) for the
+       * frontend output draw, and nothing in the output draw or
+       * DrawBuffer_draw modifies either, so they are still off
+       * here.  Two reflexive disables removed. */
 
       Framebuffer_init(&_fb, &renderer->fb_texture);
 
